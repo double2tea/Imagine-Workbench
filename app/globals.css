@@ -503,6 +503,10 @@
   border-radius: 9px !important;
 }
 
+.imagine-asset-hover-scrim {
+  background: rgba(2, 6, 23, 0.2) !important;
+}
+
 .imagine-card-action {
   min-height: 28px;
   border-radius: 7px !important;
@@ -555,22 +559,30 @@
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
 }
 
+.imagine-theme-light .imagine-asset-hover-scrim {
+  background: rgba(15, 23, 42, 0.2) !important;
+}
+
 .imagine-theme-light .imagine-card-actions {
-  background: rgba(255, 255, 255, 0.94) !important;
-  border-color: rgba(15, 23, 42, 0.12) !important;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16) !important;
+  background: rgba(15, 23, 42, 0.86) !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.22) !important;
 }
 
 .imagine-theme-light .imagine-card-action {
-  background: #ffffff !important;
-  border-color: rgba(15, 23, 42, 0.1) !important;
-  color: #344054 !important;
+  background: rgba(15, 23, 42, 0.78) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: #ffffff !important;
 }
 
 .imagine-theme-light .imagine-card-action:hover {
-  background: #f4f6fb !important;
-  border-color: rgba(79, 70, 229, 0.18) !important;
-  color: #4f46e5 !important;
+  background: #2563eb !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  color: #ffffff !important;
+}
+
+.imagine-theme-light .imagine-card-action :is(svg, span) {
+  color: currentColor !important;
 }
 
 .imagine-theme-light .imagine-meta-chip {

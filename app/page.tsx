@@ -402,8 +402,15 @@ export default function Home() {
   const activeVideoSize = videoCapabilities.sizes.some(option => option.value === aspectRatio) ? aspectRatio : "auto";
   const videoReferenceMode = videoCapabilities.referenceMode;
   const videoReferenceLimit = videoCapabilities.maxReferenceImages;
-  const videoReferenceLabel =
-    videoReferenceMode === "firstLast" ? "视频起始/结束关键帧" : "视频参考图";
+  const isFirstLastVideoMode = videoReferenceMode === "firstLast";
+  const videoReferenceLabel = isFirstLastVideoMode ? "首帧 / 尾帧" : "视频参考图";
+  const videoPromptPlaceholder = isFirstLastVideoMode
+    ? "描述首帧到尾帧之间的运动、转场与镜头变化... 输入 @ 可引用关键帧"
+    : "描述场景的运动与镜头动作... 输入 @ 可引用图像作为视频参考";
+  const videoReferenceHelp = isFirstLastVideoMode
+    ? "第 1 张为首帧，第 2 张为尾帧"
+    : "参考图用于主体、风格或场景引导，不作为首尾帧";
+  const videoClearReferenceLabel = isFirstLastVideoMode ? "清空关键帧" : "清空参考图";
   const imageModelGroups = getProviderModelGroups(imageModelOptions);
   const videoModelGroups = getProviderModelGroups(videoModelOptions);
   const chatModelGroups = getProviderModelGroups(chatModelOptions);
@@ -1868,7 +1875,7 @@ export default function Home() {
                     }`}
                   >
                     <VideoIcon className="h-3.5 w-3.5" />
-                    视频合成 <span className="hidden sm:inline text-slate-500">Veo Studio</span>
+                    视频合成 <span className="hidden sm:inline text-slate-500">Video Studio</span>
                   </button>
                 </div>
 
@@ -2196,11 +2203,11 @@ export default function Home() {
                         <textarea
                           value={prompt}
                           onChange={(e) => handleTextareaChange(e.target.value, "video-prompt")}
-                          placeholder="描述场景的运动与镜头动作... 输入 @ 可快捷引用图像作为动态首帧"
+                          placeholder={videoPromptPlaceholder}
                           className="w-full h-24 resize-none border-0 bg-transparent text-sm leading-6 text-slate-100 placeholder-slate-500 outline-0 ring-0 focus:ring-0"
                         />
                         <div className="mt-2 flex items-center justify-between border-t border-slate-800 pt-2 font-mono text-[10px] text-slate-500">
-                          <span>输入 @ 呼出参考图 | 支持运动镜头与画面控制</span>
+                          <span>输入 @ 呼出图像资产 | 支持运动镜头与画面控制</span>
                           <span>{prompt.length} 字符</span>
                         </div>
                       </div>
@@ -2210,7 +2217,7 @@ export default function Home() {
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div>
                         <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">
-                          视频生成模型 <span className="text-slate-500">(Veo)</span>
+                          视频生成模型
                         </label>
                         <select
                           value={selectedVideoModel}
@@ -2259,7 +2266,7 @@ export default function Home() {
                             }}
                             className="text-[10px] text-red-300 transition hover:text-red-200 cursor-pointer"
                           >
-                            清空参考图
+                            {videoClearReferenceLabel}
                           </button>
                         )}
                       </div>
@@ -2306,9 +2313,9 @@ export default function Home() {
                                         ? "bg-amber-600/80"
                                         : "bg-black/60 hover:bg-black/80"
                                     }`}
-                                    title="点击切换：起始帧 / 结束帧 / 普通视频参考"
+                                    title="点击切换：首帧 / 尾帧 / 普通参考"
                                   >
-                                    {isStart ? "🎬 起始帧" : isEnd ? "🏁 结束帧" : "📎 普通参考"}
+                                    {isStart ? "🎬 首帧" : isEnd ? "🏁 尾帧" : "📎 普通参考"}
                                   </button>
                                 ) : (
                                   <div className="absolute inset-x-0 bottom-0 bg-black/60 py-1 text-center text-[8px] font-bold text-white backdrop-blur-subtle">
@@ -2349,7 +2356,7 @@ export default function Home() {
                             </label>
                           </span>
                           <span className="mt-1 text-[9px] text-slate-500">
-                            支持 JPG / PNG / WEBP | 最多 {videoReferenceLimit} 张
+                            支持 JPG / PNG / WEBP | 最多 {videoReferenceLimit} 张 | {videoReferenceHelp}
                           </span>
                         </div>
                       )}
@@ -2370,7 +2377,7 @@ export default function Home() {
                       ) : (
                         <VideoIcon className="h-4 w-4 text-white hover:scale-110 transition" />
                       )}
-                      {isSubmittingVideo ? `提交中 (${videoSubmitCount})，可继续排队` : "一键渲染合成 Veo 动态视频 (Render Video)"}
+                      {isSubmittingVideo ? `提交中 (${videoSubmitCount})，可继续排队` : "一键渲染合成动态视频 (Render Video)"}
                     </button>
                   </div>
                 )}
@@ -3149,7 +3156,7 @@ export default function Home() {
                             />
                           </div>
 
-                          <div className="absolute inset-0 bg-slate-950/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10 pointer-events-none" />
+                          <div className="imagine-asset-hover-scrim absolute inset-0 bg-slate-950/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10 pointer-events-none" />
                           <div className="absolute inset-x-3 bottom-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 pointer-events-none group-hover:pointer-events-auto">
                             <div className="imagine-card-actions flex flex-wrap items-center justify-center gap-1 rounded-xl border border-white/10 bg-slate-950/80 p-1 backdrop-blur-md shadow-xl">
 
