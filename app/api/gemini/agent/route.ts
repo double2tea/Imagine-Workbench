@@ -1,200 +1,329 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getGeminiClient } from "@/lib/gemini";
-import { Type } from "@google/genai";
+import { createChatCompletionText, createChatCompletionWithTools, parseJsonObjectText } from "@/lib/providers/chat";
+import { DEFAULT_CHAT_MODEL, DEFAULT_VISION_CHAT_MODEL, parseProviderModel } from "@/lib/providers/model-catalog";
+import type { ChatMessageInput, ToolCall } from "@/lib/providers/types";
+import { isRecord, optionalText, resolveProviderConfig } from "@/lib/providers/utils";
 import { SKILL_REGISTRY } from "./skills";
+import { executeToolCall, getAgentTools } from "./tools";
+
+interface AgentBody {
+  messages?: unknown;
+  gallerySummary?: unknown;
+  agentReferenceId?: unknown;
+  agentReferences?: unknown;
+  model?: unknown;
+}
+
+interface GalleryItem {
+  id: string;
+  type: string;
+  prompt: string;
+  aspectRatio: string;
+  url?: string;
+}
+
+interface AgentReference {
+  id: string;
+  url: string;
+}
+
+interface AgentAction {
+  type: "none" | "optimize_prompt" | "generate_image" | "edit_image" | "generate_video";
+  params?: {
+    prompt?: string;
+    model?: string;
+    aspectRatio?: string;
+    referenceImageId?: string;
+  };
+}
+
+interface AgentResponsePayload {
+  thought: string;
+  text: string;
+  activeSkills: string[];
+  recommendedAction: AgentAction;
+  suggestedFollowUps: string[];
+}
+
+const MAX_TOOL_ROUNDS = 3;
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages, gallerySummary = [], agentReferenceId, agentReferences = [] } = await req.json();
-
-    if (!messages || !Array.isArray(messages)) {
-      return NextResponse.json({ error: "Messages array is required" }, { status: 400 });
+    const body = (await req.json()) as AgentBody;
+    const messages = readMessages(body.messages);
+    const gallerySummary = readGallery(body.gallerySummary);
+    const agentReferences = readReferences(body.agentReferences);
+    const agentReferenceId = optionalText(body.agentReferenceId);
+    const latestUserMessage = [...messages].reverse().find(message => message.role === "user");
+    const latestUserMsg = typeof latestUserMessage?.content === "string" ? latestUserMessage.content : "";
+    const normalizedAgentRefs = [...agentReferences];
+    if (normalizedAgentRefs.length === 0 && agentReferenceId) {
+      const match = gallerySummary.find(item => item.id === agentReferenceId);
+      normalizedAgentRefs.push({ id: agentReferenceId, url: match?.url ?? "" });
     }
+    const hasImageReference = normalizedAgentRefs.some(item => item.url.length > 0);
+    const modelValue = hasImageReference
+      ? DEFAULT_VISION_CHAT_MODEL
+      : optionalText(body.model) ?? req.headers.get("x-ai-chat-model") ?? DEFAULT_CHAT_MODEL;
+    const parsed = parseProviderModel(modelValue, "12ai");
+    const config = resolveProviderConfig(req, parsed.provider);
 
-    const customKey = req.headers.get("x-gemini-api-key") || undefined;
-    const ai = getGeminiClient(customKey);
-
-    // Get the latest user query to perform smart skill routing
-    const latestUserMsg = [...messages].reverse().find((m: any) => m.role === "user")?.content || "";
-
-    // Step 1: LLM Router Pass to select 2~4 active skills
-    let activeSkillsList: string[] = ["PromptEngineer", "ImageGenerator"]; // Fallbacks
-    try {
-      const routingSystemPrompt =
-        "You are the Intelligent Skill Router for the Imagine Workbench.\n" +
-        "Analyze the user's creative request and conversation history, then select the 2 to 4 most relevant skills from the provided registry that are needed to fulfill or discuss the user's intent.\n" +
-        "Return ONLY a raw JSON array of the selected skill names.\n\n" +
-        "Available Skills:\n" +
-        SKILL_REGISTRY.map(s => `- ${s.name}: ${s.description} (Category: ${s.category}, Trigger: ${s.whenToUse})`).join("\n");
-
-      const routerResponse = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
-        contents: [
-          { role: "user", parts: [{ text: `Conversation History:\n${messages.slice(-4).map((m: any) => `${m.role}: ${m.content}`).join("\n")}\n\nLatest Request: "${latestUserMsg}"` }] }
-        ],
-        config: {
-          systemInstruction: routingSystemPrompt,
-          temperature: 0.1, // High precision
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.ARRAY,
-            items: { type: Type.STRING }
-          }
-        }
-      });
-
-      const parsedRouter = JSON.parse(routerResponse.text?.trim() || "[]");
-      if (Array.isArray(parsedRouter) && parsedRouter.length > 0) {
-        // Intersect with valid skills
-        const validNames = SKILL_REGISTRY.map(s => s.name);
-        const filtered = parsedRouter.filter(name => validNames.includes(name));
-        if (filtered.length > 0) {
-          activeSkillsList = filtered;
-        }
-      }
-    } catch (routeErr) {
-      console.warn("Skill Router failed, using default fallback skills:", routeErr);
-    }
-
-    // Always ensure CreativePlanner is included for complex ideas, or at least 2 skills
+    const activeSkillsList = await routeSkills(config, parsed.model, messages, latestUserMsg);
     if (latestUserMsg.length > 50 && !activeSkillsList.includes("CreativePlanner")) {
       activeSkillsList.push("CreativePlanner");
     }
 
-    // Retrieve full metadata for only the activated skills
-    const activatedSkills = SKILL_REGISTRY.filter(s => activeSkillsList.includes(s.name));
+    const activatedSkills = SKILL_REGISTRY.filter(skill => activeSkillsList.includes(skill.name));
+    const galleryContext =
+      gallerySummary.length > 0
+        ? gallerySummary
+            .map(
+              item =>
+                `- ID: "${item.id}", Type: ${item.type}, AspectRatio: ${item.aspectRatio}, Brief Prompt: "${item.prompt.slice(0, 60)}..."`,
+            )
+            .join("\n")
+        : "No items generated in this session yet.";
 
-    // Format the gallery profile for the Agent's context
-    const galleryContext = gallerySummary.length > 0
-      ? gallerySummary.map((item: any) => `- ID: "${item.id}", Type: ${item.type}, AspectRatio: ${item.aspectRatio}, Brief Prompt: "${item.prompt.substring(0, 60)}..."`).join("\n")
-      : "No items generated in this session yet.";
+    const referenceMsg =
+      normalizedAgentRefs.length > 0
+        ? `\n[CRITICAL USER REFERENCES]\n${normalizedAgentRefs
+            .map(
+              (item, idx) =>
+                `- Reference [${idx + 1}]: ID "${item.id}". Use this ID for referenceImageId when recommending edit_image or generate_video.`,
+            )
+            .join("\n")}`
+        : "";
 
-    // Normalize the references list to support both array & single fallback
-    const normalizedAgentRefs = [...agentReferences];
-    if (normalizedAgentRefs.length === 0 && agentReferenceId) {
-      const match = gallerySummary.find((x: any) => x.id === agentReferenceId);
-      normalizedAgentRefs.push({ id: agentReferenceId, url: match?.url || "" });
-    }
-
-    const referenceMsg = normalizedAgentRefs.length > 0
-      ? `\n[CRITICAL USER REFERENCES] The user has explicitly SELECTED or TAGGED reference image(s) to perform editing or reference as direct context:\n` +
-        normalizedAgentRefs.map((item: any, idx: number) => `- Reference [${idx + 1}]: ID "${item.id}" (use this ID for referenceImageId if requested to edit or mutate).`).join("\n") +
-        `\nWhen recommending 'edit_image' or 'generate_video', specify the target reference ID (e.g., "${normalizedAgentRefs[normalizedAgentRefs.length - 1].id}") in the 'referenceImageId' parameter of recommendedAction.`
-      : "";
-
-    // Step 2: Build highly focused System Prompt based ONLY on activated skills
-    const skillsDetailText = activatedSkills.map((s, idx) => {
-      return `### Skill [${idx + 1}]: ${s.name} (${s.category.toUpperCase()})
-- Description: ${s.description}
-- Examples / Patterns:
-${s.examples.map(ex => `  * ${ex}`).join("\n")}`;
-    }).join("\n\n");
+    const skillsDetailText = activatedSkills
+      .map((skill, idx) => {
+        return `### Skill [${idx + 1}]: ${skill.name} (${skill.category.toUpperCase()})
+- Description: ${skill.description}
+- Examples:
+${skill.examples.map(example => `  * ${example}`).join("\n")}`;
+      })
+      .join("\n\n");
 
     const systemInstruction =
-      "You are the senior Creative Agent of the Imagine Workbench (灵感创作工作台).\n" +
-      "Your goal is to collaborate with the user on complex, multi-step creative projects (like films, manga visual bards, game assets, or campaigns).\n" +
-      "You are fully context-aware and can build, edit, or reference workspace items in chain actions.\n\n" +
-      "Currently Generated Workspace Assets:\n" +
-      `${galleryContext}\n\n` +
-      `${referenceMsg}\n\n` +
-      "⚡ [DYNAMICAL SKILLS LOADED FOR THIS TURN]\n" +
-      "The intelligent router has loaded only the most relevant expert skills for this conversation to prevent context dilution. Use these specific specialized capabilities to formulate your plan:\n" +
-      `${skillsDetailText}\n\n` +
-      "Core Actions you can recommend in 'recommendedAction':\n" +
-      "1. 'none' - For chatting, explaining design guidelines, or brainstorming.\n" +
-      "2. 'optimize_prompt' - For expanding and refining crude prompts.\n" +
-      "3. 'generate_image' - Create image. Requires: prompt, model, aspectRatio.\n" +
-      "4. 'edit_image' - Modify cropped parts or entire image (img2img). Requires: prompt, model, referenceImageId.\n" +
-      "5. 'generate_video' - Generate video. If using an image as starting/motion frame, specify referenceImageId.\n\n" +
-      "Rule of Operation:\n" +
-      "- Think through your design strategy, explain your rationale in the 'thought' field, and write a friendly Chinese conversational feedback in 'text' (use professional visual design terms).\n" +
-      "- Select the single best tool action in 'recommendedAction'.\n" +
-      "- Suggest 2-3 logical follow-ups in 'suggestedFollowUps'.\n" +
-      "- Echo the selected active skills names back in 'activeSkills' to acknowledge your current operations.";
+      "You are the senior Creative Agent of the Imagine Workbench.\n" +
+      "Collaborate with the user on visual creative projects and recommend exactly one workstation action when useful.\n" +
+      "You have access to tools. Use them to query model capabilities before recommending a model — never guess model IDs.\n" +
+      "After gathering necessary information, return ONLY valid JSON matching this shape:\n" +
+      "{\"thought\":\"...\",\"text\":\"Chinese user-facing reply\",\"activeSkills\":[\"...\"],\"recommendedAction\":{\"type\":\"none|optimize_prompt|generate_image|edit_image|generate_video\",\"params\":{\"prompt\":\"...\",\"model\":\"...\",\"aspectRatio\":\"...\",\"referenceImageId\":\"...\"}},\"suggestedFollowUps\":[\"...\",\"...\"]}.\n\n" +
+      `Currently Generated Workspace Assets:\n${galleryContext}\n${referenceMsg}\n\n` +
+      `Active Skills:\n${skillsDetailText}`;
 
-    // Format chat contents for content generation
-    const contents = messages.map((m: any) => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.content }],
-    }));
+    const tools = getAgentTools();
+    const responsePayload = await runAgentLoop(
+      config,
+      parsed.model,
+      systemInstruction,
+      buildAgentMessages(messages, normalizedAgentRefs),
+      tools,
+    );
 
-    // Configure JSON structural schema including activeSkills list
-    const responseSchema = {
-      type: Type.OBJECT,
-      properties: {
-        thought: {
-          type: Type.STRING,
-          description: "Internal analysis, strategy, reasoning, planning logic, or step splits."
-        },
-        text: {
-          type: Type.STRING,
-          description: "Friendly conversational response, design rationale, or briefing in Chinese."
-        },
-        activeSkills: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING },
-          description: "The list of skill names that were used and echoed to demonstrate active expertise."
-        },
-        recommendedAction: {
-          type: Type.OBJECT,
-          description: "Structured action recommended to run on the workstation assets.",
-          properties: {
-            type: {
-              type: Type.STRING,
-              description: "Action type. Must be 'none', 'optimize_prompt', 'generate_image', 'edit_image', or 'generate_video'."
-            },
-            params: {
-              type: Type.OBJECT,
-              description: "Configuration arguments.",
-              properties: {
-                prompt: { type: Type.STRING, description: "The refined text prompt to use for the creation tool." },
-                model: { type: Type.STRING, description: "Target model ID (e.g., 'gemini-3.1-flash-image-preview', 'gemini-2.5-flash-image', 'veo-3.1-lite-generate-preview')" },
-                aspectRatio: { type: Type.STRING, description: "Aspect ratio ('1:1', '16:9', '9:16', '4:3', '3:4')" },
-                referenceImageId: { type: Type.STRING, description: "The gallery item ID to reference as seed or starting frame (crucial for img2img and image-to-video)." }
-              }
-            }
-          },
-          required: ["type"]
-        },
-        suggestedFollowUps: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING },
-          description: "2-3 scannable next-step suggestions for quick tapping."
-        }
-      },
-      required: ["thought", "text", "recommendedAction"]
-    };
-
-    console.log(`Generating agent reply with dynamically active skills: [${activeSkillsList.join(", ")}]`);
-    const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
-      contents,
-      config: {
-        systemInstruction,
-        temperature: 0.75,
-        responseMimeType: "application/json",
-        responseSchema,
-      },
-    });
-
-    const parsedResponse = JSON.parse(response.text?.trim() || "{}");
-    
-    // Inject selected skill names to response just in case LLM didn't return them perfectly
-    if (!parsedResponse.activeSkills || !Array.isArray(parsedResponse.activeSkills)) {
-      parsedResponse.activeSkills = activeSkillsList;
-    }
-
-    return NextResponse.json(parsedResponse);
-
-  } catch (err: any) {
+    const response = normalizeAgentResponse(responsePayload, activeSkillsList);
+    return NextResponse.json(response);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
     console.error("Agent interaction failure:", err);
-    return NextResponse.json({
-      thought: "An error occurred inside the agent pipeline. Setting fallback response.",
-      text: `抱歉，极智大脑连接遇到一点小状况 (${err.message || "Unknown error"})，让我们重新整理思路重试。`,
-      activeSkills: ["PromptEngineer"],
-      recommendedAction: { type: "none" },
-      suggestedFollowUps: ["重试对话", "直接去生图", "导入创意参考图"]
-    });
+    return NextResponse.json(
+      {
+        thought: "Agent provider request failed.",
+        text: `抱歉，Agent 调用第三方服务失败：${message}`,
+        activeSkills: ["PromptEngineer"],
+        recommendedAction: { type: "none" },
+        suggestedFollowUps: ["检查 API Key 和 Base URL", "切换到传统创作模式"],
+      },
+      { status: 500 },
+    );
   }
 }
 
+async function runAgentLoop(
+  config: ReturnType<typeof resolveProviderConfig>,
+  model: string,
+  systemInstruction: string,
+  userMessages: ChatMessageInput[],
+  tools: ReturnType<typeof getAgentTools>,
+): Promise<unknown> {
+  const conversation: ChatMessageInput[] = [
+    { role: "system", content: systemInstruction },
+    ...userMessages,
+  ];
+
+  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    const completion = await createChatCompletionWithTools(config, model, conversation, tools, 0.75);
+    const choice = completion.choices?.[0];
+    if (!choice) throw new Error("Chat completion returned no choices");
+
+    const toolCalls = choice.message.tool_calls;
+    if (choice.finish_reason === "tool_calls" && toolCalls && toolCalls.length > 0) {
+      conversation.push({
+        role: "assistant",
+        content: null,
+        tool_calls: toolCalls,
+      });
+      for (const tc of toolCalls) {
+        const result = executeToolCall(tc.function.name, tc.function.arguments);
+        conversation.push({
+          role: "tool",
+          tool_call_id: tc.id,
+          content: result,
+        });
+      }
+      continue;
+    }
+
+    const content = readContent(choice.message.content);
+    return parseJsonObjectText(content);
+  }
+
+  // Max rounds reached — force a final text-only completion
+  const final = await createChatCompletionText(config, model, conversation, 0.75);
+  return parseJsonObjectText(final);
+}
+
+function readContent(value: string | null): string {
+  if (typeof value === "string" && value.trim().length > 0) return value;
+  throw new Error("Agent returned empty response");
+}
+
+function buildAgentMessages(messages: ChatMessageInput[], references: AgentReference[]): ChatMessageInput[] {
+  const imageParts = references
+    .filter(reference => reference.url.length > 0)
+    .map(reference => ({ type: "image_url" as const, image_url: { url: reference.url } }));
+  if (imageParts.length === 0) return messages;
+
+  return messages.map((message, index) => {
+    if (index !== messages.length - 1 || message.role !== "user" || typeof message.content !== "string") {
+      return message;
+    }
+    return {
+      role: message.role,
+      content: [{ type: "text", text: message.content }, ...imageParts],
+    };
+  });
+}
+
+async function routeSkills(
+  config: ReturnType<typeof resolveProviderConfig>,
+  model: string,
+  messages: ChatMessageInput[],
+  latestUserMsg: string,
+): Promise<string[]> {
+  const registryText = SKILL_REGISTRY.map(
+    skill => `- ${skill.name}: ${skill.description} (Category: ${skill.category}, Trigger: ${skill.whenToUse})`,
+  ).join("\n");
+  try {
+    const text = await createChatCompletionText(
+      config,
+      model,
+      [
+        {
+          role: "system",
+          content:
+            "Select the 2 to 4 most relevant skill names from the registry. Return ONLY a raw JSON string array.",
+        },
+        {
+          role: "user",
+          content: `Available Skills:\n${registryText}\n\nConversation History:\n${messages
+            .slice(-4)
+            .map(message => `${message.role}: ${message.content}`)
+            .join("\n")}\n\nLatest Request: "${latestUserMsg}"`,
+        },
+      ],
+      0.1,
+    );
+    const parsed = parseJsonObjectOrArrayText(text);
+    const validNames = new Set(SKILL_REGISTRY.map(skill => skill.name));
+    if (Array.isArray(parsed)) {
+      const names = parsed.filter((name): name is string => typeof name === "string" && validNames.has(name));
+      if (names.length > 0) return names;
+    }
+  } catch (err) {
+    console.warn("Skill Router failed, using default fallback skills:", err);
+  }
+  return ["PromptEngineer", "ImageGenerator"];
+}
+
+function readMessages(value: unknown): ChatMessageInput[] {
+  if (!Array.isArray(value)) throw new Error("Messages array is required");
+  return value.map(item => {
+    if (!isRecord(item)) throw new Error("Invalid message item");
+    const role = item.role;
+    const content = item.content;
+    if ((role !== "user" && role !== "assistant") || typeof content !== "string") {
+      throw new Error("Invalid message item");
+    }
+    return { role, content };
+  });
+}
+
+function readGallery(value: unknown): GalleryItem[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(isRecord).map(item => ({
+    id: typeof item.id === "string" ? item.id : "",
+    type: typeof item.type === "string" ? item.type : "",
+    prompt: typeof item.prompt === "string" ? item.prompt : "",
+    aspectRatio: typeof item.aspectRatio === "string" ? item.aspectRatio : "",
+    url: typeof item.url === "string" ? item.url : undefined,
+  }));
+}
+
+function readReferences(value: unknown): AgentReference[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(isRecord).flatMap(item => {
+    if (typeof item.id === "string" && typeof item.url === "string") {
+      return [{ id: item.id, url: item.url }];
+    }
+    return [];
+  });
+}
+
+function normalizeAgentResponse(value: unknown, activeSkills: string[]): AgentResponsePayload {
+  if (!isRecord(value)) throw new Error("Agent response must be a JSON object");
+  return {
+    thought: typeof value.thought === "string" ? value.thought : "已分析当前创作上下文。",
+    text: typeof value.text === "string" ? value.text : "我已整理好下一步建议。",
+    activeSkills: Array.isArray(value.activeSkills)
+      ? value.activeSkills.filter((skill): skill is string => typeof skill === "string")
+      : activeSkills,
+    recommendedAction: normalizeAction(value.recommendedAction),
+    suggestedFollowUps: Array.isArray(value.suggestedFollowUps)
+      ? value.suggestedFollowUps.filter((item): item is string => typeof item === "string")
+      : [],
+  };
+}
+
+function normalizeAction(value: unknown): AgentAction {
+  if (!isRecord(value)) return { type: "none" };
+  const type = value.type;
+  if (
+    type !== "optimize_prompt" &&
+    type !== "generate_image" &&
+    type !== "edit_image" &&
+    type !== "generate_video" &&
+    type !== "none"
+  ) {
+    return { type: "none" };
+  }
+
+  const params = isRecord(value.params) ? value.params : {};
+  return {
+    type,
+    params: {
+      prompt: typeof params.prompt === "string" ? params.prompt : undefined,
+      model: typeof params.model === "string" ? params.model : undefined,
+      aspectRatio: typeof params.aspectRatio === "string" ? params.aspectRatio : undefined,
+      referenceImageId: typeof params.referenceImageId === "string" ? params.referenceImageId : undefined,
+    },
+  };
+}
+
+function parseJsonObjectOrArrayText(text: string): unknown {
+  const trimmed = text.trim();
+  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+    return JSON.parse(trimmed);
+  }
+  return parseJsonObjectText(trimmed);
+}

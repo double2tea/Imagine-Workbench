@@ -1,4 +1,7 @@
 import type {NextConfig} from 'next';
+import path from 'node:path';
+
+const projectRoot = path.resolve(process.cwd());
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -20,6 +23,7 @@ const nextConfig: NextConfig = {
     ],
   },
   output: 'standalone',
+  outputFileTracingRoot: projectRoot,
   transpilePackages: ['motion'],
   webpack: (config, {dev}) => {
     // HMR is disabled in AI Studio via DISABLE_HMR env var.
