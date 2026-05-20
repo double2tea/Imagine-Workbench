@@ -49,6 +49,7 @@ import {
   type ModelOption,
   type VideoReferenceMode,
 } from "@/lib/providers/model-catalog";
+import { PROVIDER_KEYS, getProviderMeta, isKnownProvider } from "@/lib/providers/registry";
 
 // Reference image object structure for multiple selection support
 export interface ReferenceImageRef {
@@ -253,16 +254,14 @@ function mergeProviderModelOptions(
   base: Record<AiProvider, ModelOption[]>,
   incoming: ModelOption[],
 ): Record<AiProvider, ModelOption[]> {
-  return {
-    "12ai": mergeModelOptions(
-      base["12ai"],
-      incoming.filter(option => parseProviderModel(option.value, "12ai").provider === "12ai"),
-    ),
-    "grok2api": mergeModelOptions(
-      base["grok2api"],
-      incoming.filter(option => parseProviderModel(option.value, "12ai").provider === "grok2api"),
-    ),
-  };
+  const result = { ...base };
+  for (const p of PROVIDER_KEYS) {
+    result[p] = mergeModelOptions(
+      base[p],
+      incoming.filter(option => parseProviderModel(option.value, "12ai").provider === p),
+    );
+  }
+  return result;
 }
 
 function mergeRecordModelOptions(
@@ -273,7 +272,7 @@ function mergeRecordModelOptions(
   if (typeof incoming !== "object" || incoming === null) return base;
   const record = incoming as Record<string, unknown>;
   const result = { ...base };
-  for (const p of ["12ai", "grok2api"] as AiProvider[]) {
+  for (const p of PROVIDER_KEYS) {
     if (Array.isArray(record[p])) {
       const options = filterFn
         ? (record[p] as unknown[]).filter(isModelOption).filter(filterFn)
@@ -305,7 +304,7 @@ function hasBuiltInChatModel(value: string): boolean {
 }
 
 function getProviderLabel(provider: AiProvider): string {
-  return provider === "12ai" ? "12AI" : "Grok2API";
+  return getProviderMeta(provider).label;
 }
 
 function getProviderModelGroups(optionsByProvider: Record<AiProvider, ModelOption[]>): Array<{
@@ -313,7 +312,7 @@ function getProviderModelGroups(optionsByProvider: Record<AiProvider, ModelOptio
   label: string;
   options: ModelOption[];
 }> {
-  return (["12ai", "grok2api"] as AiProvider[])
+  return ([...PROVIDER_KEYS] as AiProvider[])
     .map(provider => ({
       provider,
       label: getProviderLabel(provider),
@@ -424,6 +423,8 @@ export default function Home() {
   const [twelveAiApiKey, setTwelveAiApiKey] = useState("");
   const [grokApiKey, setGrokApiKey] = useState("");
   const [grokBaseUrl, setGrokBaseUrl] = useState("");
+  const [xstxApiKey, setXstxApiKey] = useState("");
+  const [xstxBaseUrl, setXstxBaseUrl] = useState("");
   const [selectedProvider, setSelectedProvider] = useState<AiProvider>("12ai");
   const [selectedChatModel, setSelectedChatModel] = useState(DEFAULT_CHAT_MODEL);
   const [chatModelOptions, setChatModelOptions] = useState<Record<AiProvider, ModelOption[]>>(CHAT_MODEL_OPTIONS);
@@ -490,21 +491,22 @@ export default function Home() {
 
   const buildProviderHeaders = useCallback((target?: string) => {
     const provider =
-      target === "12ai" || target === "grok2api"
+      target && isKnownProvider(target)
         ? target
         : target
           ? parseProviderModel(target, selectedProvider).provider
           : selectedProvider;
-    const chatModelHeader = target && target !== "12ai" && target !== "grok2api" ? target : selectedChatModel;
+    const chatModelHeader = target && !isKnownProvider(target) ? target : selectedChatModel;
     const headers: Record<string, string> = {
       "x-ai-provider": provider,
       "x-ai-chat-model": chatModelHeader,
     };
-    const apiKey = provider === "12ai" ? twelveAiApiKey : grokApiKey;
+    const apiKey = provider === "12ai" ? twelveAiApiKey : provider === "grok2api" ? grokApiKey : xstxApiKey;
     if (apiKey) headers["x-ai-api-key"] = apiKey;
     if (provider === "grok2api" && grokBaseUrl) headers["x-ai-base-url"] = grokBaseUrl;
+    if (provider === "xstx" && xstxBaseUrl) headers["x-ai-base-url"] = xstxBaseUrl;
     return headers;
-  }, [grokApiKey, grokBaseUrl, selectedChatModel, selectedProvider, twelveAiApiKey]);
+  }, [grokApiKey, grokBaseUrl, selectedChatModel, selectedProvider, twelveAiApiKey, xstxApiKey, xstxBaseUrl]);
 
   const imageCapabilities = getImageModelCapabilities(selectedModel);
   const videoCapabilities = getVideoModelCapabilities(selectedVideoModel);
@@ -688,8 +690,14 @@ export default function Home() {
         localStorage.getItem("imagine_grok2api_base_url") ?? localStorage.getItem("imagine_custom_api_base_url");
       if (storedGrokBaseUrl) setGrokBaseUrl(storedGrokBaseUrl);
 
+      const storedXstxKey = localStorage.getItem("imagine_xstx_api_key");
+      if (storedXstxKey) setXstxApiKey(storedXstxKey);
+
+      const storedXstxBaseUrl = localStorage.getItem("imagine_xstx_base_url");
+      if (storedXstxBaseUrl) setXstxBaseUrl(storedXstxBaseUrl);
+
       const storedProvider = localStorage.getItem("imagine_ai_provider");
-      if (storedProvider === "12ai" || storedProvider === "grok2api") setSelectedProvider(storedProvider);
+      if (storedProvider && isKnownProvider(storedProvider)) setSelectedProvider(storedProvider);
 
       const storedChatModel = localStorage.getItem("imagine_chat_model");
       if (storedChatModel === "12ai:gemini-3.1-flash" || (storedChatModel && !hasBuiltInChatModel(storedChatModel))) {
@@ -915,17 +923,32 @@ export default function Home() {
     localStorage.setItem("imagine_grok2api_base_url", url);
   };
 
+  const handleSaveXstxApiKey = (key: string) => {
+    setXstxApiKey(key);
+    localStorage.setItem("imagine_xstx_api_key", key);
+  };
+
+  const handleSaveXstxBaseUrl = (url: string) => {
+    setXstxBaseUrl(url);
+    localStorage.setItem("imagine_xstx_base_url", url);
+  };
+
   const clearProviderCredentials = (provider: ProviderConnection) => {
     if (provider === "12ai") {
       setTwelveAiApiKey("");
       localStorage.removeItem("imagine_12ai_api_key");
       localStorage.removeItem("imagine_custom_api_key");
-    } else {
+    } else if (provider === "grok2api") {
       setGrokApiKey("");
       setGrokBaseUrl("");
       localStorage.removeItem("imagine_grok2api_api_key");
       localStorage.removeItem("imagine_grok2api_base_url");
       localStorage.removeItem("imagine_custom_api_base_url");
+    } else if (provider === "xstx") {
+      setXstxApiKey("");
+      setXstxBaseUrl("");
+      localStorage.removeItem("imagine_xstx_api_key");
+      localStorage.removeItem("imagine_xstx_base_url");
     }
   };
 
@@ -3732,6 +3755,59 @@ export default function Home() {
                       </p>
                     )}
                   </div>
+
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/45 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-semibold text-slate-200">星途 (xstx)</h4>
+                      {xstxApiKey && <span className="text-[10px] text-emerald-400">Key 已保存</span>}
+                    </div>
+                    <label className="font-semibold text-slate-400 block mb-1.5">
+                      API Key
+                    </label>
+                    <input
+                      type="password"
+                      value={xstxApiKey}
+                      onChange={(e) => handleSaveXstxApiKey(e.target.value)}
+                      placeholder="sk_your_xstx_key"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 px-3 text-xs text-slate-200 placeholder-slate-650 focus:outline-none focus:border-slate-700 font-mono transition"
+                    />
+                    <label className="font-semibold text-slate-400 block mt-3 mb-1.5">
+                      Base URL
+                    </label>
+                    <input
+                      type="url"
+                      value={xstxBaseUrl}
+                      onChange={(e) => handleSaveXstxBaseUrl(e.target.value)}
+                      placeholder="https://api.xstx.info"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 px-3 text-xs text-slate-200 placeholder-slate-650 focus:outline-none focus:border-slate-700 font-mono transition"
+                    />
+                    <div className="mt-3 rounded-lg bg-slate-900/70 border border-slate-800 px-3 py-2 font-mono text-[10px] text-slate-400 leading-relaxed">
+                      <div>Chat: https://api.xstx.info/v1</div>
+                    </div>
+                    <div className="mt-3 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => testProviderConnection("xstx")}
+                        disabled={providerTest.status === "testing" && providerTest.provider === "xstx"}
+                        className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-950 px-3 text-[10px] font-semibold text-slate-300 transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:text-slate-600"
+                      >
+                        <RefreshCw className={`h-3 w-3 ${providerTest.status === "testing" && providerTest.provider === "xstx" ? "animate-spin" : ""}`} />
+                        测试
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => clearProviderCredentials("xstx")}
+                        className="h-8 rounded-lg border border-red-500/20 bg-red-950/20 px-3 text-[10px] font-semibold text-red-300 transition hover:bg-red-950/35"
+                      >
+                        清除 Key/Base URL
+                      </button>
+                    </div>
+                    {providerTest.provider === "xstx" && providerTest.message && (
+                      <p className={`mt-2 font-mono text-[10px] ${providerTest.status === "error" ? "text-red-300" : "text-emerald-300"}`}>
+                        {providerTest.message}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -3746,6 +3822,7 @@ export default function Home() {
                     >
                       <option value="12ai">12AI</option>
                       <option value="grok2api">grok2api</option>
+                      <option value="xstx">星途 (xstx)</option>
                     </select>
                   </div>
                   <div>
@@ -3826,7 +3903,7 @@ export default function Home() {
                 <div className="text-[10px] text-slate-500 mt-2 flex items-start gap-1.5 leading-normal">
                   <span>ℹ️</span>
                   <span>
-                    Imagine Workbench 现在通过统一 provider adapter 接入 12AI 与 grok2api。图片、异步图片、视频与 Agent 对话都走同一组密钥和 Base URL 规则。
+                    Imagine Workbench 现在通过统一 provider adapter 接入 12AI、grok2api 与 星途。图片、异步图片、视频与 Agent 对话都走同一组密钥和 Base URL 规则。
                   </span>
                 </div>
 

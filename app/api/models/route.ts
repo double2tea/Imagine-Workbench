@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { AiProvider } from "@/lib/providers/model-catalog";
+import { isKnownProvider } from "@/lib/providers/registry";
 import { listProviderModels, type ModelKindFilter } from "@/lib/providers/models";
 import { resolveProviderConfig } from "@/lib/providers/utils";
 
@@ -20,8 +21,8 @@ export async function GET(req: NextRequest) {
 }
 
 function readProvider(req: NextRequest): AiProvider {
-  const provider = req.nextUrl.searchParams.get("provider") ?? req.headers.get("x-ai-provider");
-  if (provider === "12ai" || provider === "grok2api") return provider;
+  const raw = req.nextUrl.searchParams.get("provider") ?? req.headers.get("x-ai-provider");
+  if (raw && isKnownProvider(raw)) return raw;
   return "12ai";
 }
 
