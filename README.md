@@ -54,7 +54,6 @@ The app can also accept provider credentials from the in-app settings panel. Req
 Provider model IDs use this shape:
 
 ```text
-12ai:deepseek-v4-flash
 12ai:gemini-3.1-flash-lite-preview
 12ai:gemini-3.1-flash-image-preview
 12ai-async:gemini-3.1-flash-image-preview
@@ -78,7 +77,7 @@ Default models live in `lib/providers/model-catalog.ts`.
 
 - Image: `12ai:gemini-3.1-flash-image-preview`
 - Video: `12ai:veo_3_1-fast`
-- Agent text chat: `12ai:deepseek-v4-flash`
+- Agent text chat: `12ai:gemini-3.1-flash-lite-preview`
 - Agent vision chat: `12ai:gemini-3.1-flash-lite-preview`
 
 Agent Mode automatically switches to the vision chat model when the request carries a selected or pasted reference image. The UI does not expose sync/async as a user-facing choice; image requests stay synchronous by default, and repeat submissions use the async 12AI endpoint only when the selected image model supports it.

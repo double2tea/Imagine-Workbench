@@ -182,10 +182,10 @@
 }
 
 .imagine-agent-dock.imagine-theme-light {
-  background: rgba(255, 255, 255, 0.94) !important;
+  background: rgba(255, 255, 255, 0.98) !important;
   border-color: rgba(15, 23, 42, 0.12) !important;
   color: #172033 !important;
-  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.12) !important;
+  box-shadow: 0 20px 56px rgba(15, 23, 42, 0.16) !important;
 }
 
 .imagine-agent-dock.imagine-theme-light :is(
@@ -623,19 +623,19 @@
 }
 
 .imagine-agent-dock:not(:focus-within):not(:hover) {
-  opacity: 0.92 !important;
+  opacity: 0.96 !important;
 }
 
 .imagine-theme-dark.imagine-agent-dock {
-  background: rgba(9, 13, 22, 0.88) !important;
+  background: rgba(9, 13, 22, 0.96) !important;
   border-color: rgba(148, 163, 184, 0.16) !important;
-  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.42) !important;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.46) !important;
 }
 
 .imagine-agent-dock.imagine-theme-light {
-  background: rgba(255, 255, 255, 0.9) !important;
+  background: rgba(255, 255, 255, 0.98) !important;
   border-color: rgba(15, 23, 42, 0.12) !important;
-  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12) !important;
+  box-shadow: 0 20px 56px rgba(15, 23, 42, 0.16) !important;
 }
 
 @media (max-width: 1023px) {

@@ -287,7 +287,7 @@ function isSelectableImageModel(option: ModelOption): boolean {
 }
 
 function isSelectableChatModel(option: ModelOption): boolean {
-  return option.value !== "12ai:gemini-3.1-flash";
+  return option.value !== "12ai:gemini-3.1-flash" && !option.value.toLowerCase().includes("deepseek");
 }
 
 function hasBuiltInChatModel(value: string): boolean {
