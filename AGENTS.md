@@ -20,8 +20,11 @@ Current core surfaces:
 
 - `app/page.tsx`: main browser UI for traditional image/video generation, Agent Mode, gallery, compare, masking, batch delete, and ZIP export.
 - `app/api/gemini/*`: server routes for generation, optimization, Agent Mode, async polling, and media download proxying.
+- `app/api/gemini/agent/route.ts`: Agent Mode with tool-calling loop. Uses zod for request/response validation. Agent calls tools to query models, skills, and gallery assets before recommending actions. Model IDs are validated server-side against the catalog.
+- `app/api/gemini/agent/tools.ts`: Agent tool definitions and executors. Tools: `query_models`, `get_skill_info`, `get_gallery_assets`. Tool arg schemas defined with zod, JSON Schema introspected for OpenAI tool definitions.
+- `app/api/gemini/agent/skills.ts`: Skill registry (static descriptions). Agent activates skills at runtime via tools rather than a pre-routed LLM call.
 - `app/api/models/route.ts`: provider model listing.
-- `lib/providers/*`: provider adapters, model catalog, parsing, request helpers, and shared types.
+- `lib/providers/*`: provider adapters, model catalog, tool-calling chat completions, parsing, request helpers, and shared types.
 - `lib/db.ts`: browser IndexedDB persistence for generated assets.
 - `components/CanvasMaskEditor.tsx`: local mask drawing UI.
 
@@ -67,6 +70,25 @@ Generation responsibilities:
 - Model listing: `lib/providers/models.ts`
 
 Keep API routes thin: parse body, resolve provider config, call provider adapter, return response.
+
+## Agent Tool Calling
+
+The Agent Mode uses OpenAI-compatible function calling with a bounded loop (max 3 rounds). The flow:
+
+1. Request body is validated with a zod schema (`agentBodySchema`).
+2. Skill names only (not full descriptions) are injected into the system prompt.
+3. Gallery assets are NOT injected — the agent queries them via `get_gallery_assets` when needed.
+4. The agent loop calls `createChatCompletionWithTools`; if the model returns `tool_calls`, each is executed and results fed back.
+5. After the loop, the final LLM text response is parsed with `agentResponseSchema` (zod).
+6. `validateActionModel` checks the recommended model ID against `MODEL_CAPABILITIES` — invalid IDs are stripped.
+7. `validateActiveSkills` filters skill names to known registry entries.
+
+Adding a new tool:
+- Add a zod schema for its arguments in `tools.ts`.
+- Add the tool definition to `TOOL_DEFINITIONS`.
+- Add a case to `executeToolCall`.
+
+The system prompt is kept lean: no hardcoded model recommendations, no gallery summary, no full skill descriptions. All data is fetched on demand through tools (progressive disclosure).
 
 ## UI Rules
 
