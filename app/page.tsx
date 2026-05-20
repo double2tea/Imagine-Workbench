@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useState, useEffect, useRef } from "react";
+import React, { useCallback, useDeferredValue, useMemo, useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
   Sparkles,
@@ -85,6 +85,12 @@ type AssetStatusFilter = "all" | StorageItem["status"];
 type ProviderConnection = AiProvider;
 type ModelCategory = "chat" | "image" | "video";
 type ThemeMode = "light" | "dark";
+
+interface AssetStats {
+  modelOptions: string[];
+  typeCounts: Record<StorageItem["type"], number>;
+  statusCounts: Record<StorageItem["status"], number>;
+}
 
 interface WorkspaceNotice {
   id: string;
@@ -461,6 +467,7 @@ export default function Home() {
   const chatBottomRef = useRef<HTMLDivElement | null>(null);
   const agentDockRef = useRef<HTMLElement | null>(null);
   const autoCountdownInterval = useRef<NodeJS.Timeout | null>(null);
+  const dockOverlapFrameRef = useRef<number | null>(null);
   const pollingFailuresRef = useRef<Record<string, number>>({});
   const isAgentDockSuppressed = showSettings || isMaskOpen || fullscreenItem !== null;
 
@@ -517,7 +524,55 @@ export default function Home() {
   const imageModelGroups = getProviderModelGroups(imageModelOptions);
   const videoModelGroups = getProviderModelGroups(videoModelOptions);
   const chatModelGroups = getProviderModelGroups(chatModelOptions);
-  const assetModelOptions = Array.from(new Set(items.map(item => item.model))).sort();
+  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const selectedItemIdSet = useMemo(() => new Set(selectedItemIds), [selectedItemIds]);
+  const compareItemIdSet = useMemo(() => new Set(compareItemIds), [compareItemIds]);
+  const assetStats = useMemo<AssetStats>(() => {
+    const models = new Set<string>();
+    const typeCounts: Record<StorageItem["type"], number> = { image: 0, video: 0 };
+    const statusCounts: Record<StorageItem["status"], number> = {
+      complete: 0,
+      failed: 0,
+      pending: 0,
+      processing: 0,
+    };
+
+    for (const item of items) {
+      models.add(item.model);
+      typeCounts[item.type] += 1;
+      statusCounts[item.status] += 1;
+    }
+
+    return {
+      modelOptions: Array.from(models).sort(),
+      typeCounts,
+      statusCounts,
+    };
+  }, [items]);
+  const filteredItems = useMemo(() => {
+    const query = deferredSearchQuery.trim().toLowerCase();
+
+    return items.filter(item => {
+      if (filterType === "images" && item.type !== "image") return false;
+      if (filterType === "videos" && item.type !== "video") return false;
+      if (assetStatusFilter !== "all" && item.status !== assetStatusFilter) return false;
+      if (assetModelFilter !== "all" && item.model !== assetModelFilter) return false;
+      if (!query) return true;
+
+      return item.prompt.toLowerCase().includes(query) || item.model.toLowerCase().includes(query);
+    });
+  }, [assetModelFilter, assetStatusFilter, deferredSearchQuery, filterType, items]);
+  const searchableReferenceImages = useMemo(
+    () => items.filter(item => item.type === "image" && item.status === "complete"),
+    [items],
+  );
+  const compareItems = useMemo(() => {
+    const itemById = new Map(items.map(item => [item.id, item]));
+    return {
+      first: compareItemIds[0] ? itemById.get(compareItemIds[0]) : undefined,
+      second: compareItemIds[1] ? itemById.get(compareItemIds[1]) : undefined,
+    };
+  }, [compareItemIds, items]);
 
   const handleSelectImageModel = (model: string) => {
     const capabilities = getImageModelCapabilities(model);
@@ -572,14 +627,26 @@ export default function Home() {
       setIsAgentDockOverContent(isOverContent);
     };
 
-    const readyTimer = window.setTimeout(updateDockOverlap, 0);
-    window.addEventListener("scroll", updateDockOverlap, { passive: true });
-    window.addEventListener("resize", updateDockOverlap);
+    const scheduleDockOverlapUpdate = () => {
+      if (dockOverlapFrameRef.current !== null) return;
+      dockOverlapFrameRef.current = window.requestAnimationFrame(() => {
+        dockOverlapFrameRef.current = null;
+        updateDockOverlap();
+      });
+    };
+
+    const readyTimer = window.setTimeout(scheduleDockOverlapUpdate, 0);
+    window.addEventListener("scroll", scheduleDockOverlapUpdate, { passive: true });
+    window.addEventListener("resize", scheduleDockOverlapUpdate);
 
     return () => {
       window.clearTimeout(readyTimer);
-      window.removeEventListener("scroll", updateDockOverlap);
-      window.removeEventListener("resize", updateDockOverlap);
+      if (dockOverlapFrameRef.current !== null) {
+        window.cancelAnimationFrame(dockOverlapFrameRef.current);
+        dockOverlapFrameRef.current = null;
+      }
+      window.removeEventListener("scroll", scheduleDockOverlapUpdate);
+      window.removeEventListener("resize", scheduleDockOverlapUpdate);
     };
   }, [isAgentPortalReady, isAgentDockOpen]);
 
@@ -1233,7 +1300,7 @@ export default function Home() {
   const toggleSelectItem = (id: string, e?: React.MouseEvent) => {
     if (e && e.shiftKey && selectedItemIds.length > 0) {
       // Handle Shift+Click range selection
-      const allDisplayItems = filterAndSearchItems();
+      const allDisplayItems = filteredItems;
       const lastSelectedIdx = allDisplayItems.findIndex(x => x.id === selectedItemIds[selectedItemIds.length - 1]);
       const currentSelectedIdx = allDisplayItems.findIndex(x => x.id === id);
 
@@ -1286,8 +1353,8 @@ export default function Home() {
 
   const exportMetadataJson = () => {
     const sourceItems = selectedItemIds.length > 0
-      ? items.filter(item => selectedItemIds.includes(item.id))
-      : filterAndSearchItems();
+      ? items.filter(item => selectedItemIdSet.has(item.id))
+      : filteredItems;
     if (sourceItems.length === 0) return;
     const metadata = sourceItems.map(item => ({
       id: item.id,
@@ -1523,24 +1590,6 @@ export default function Home() {
     }
   };
 
-  // Filter and searches combined
-  const filterAndSearchItems = () => {
-    return items.filter(item => {
-      // filter type
-      if (filterType === "images" && item.type !== "image") return false;
-      if (filterType === "videos" && item.type !== "video") return false;
-      if (assetStatusFilter !== "all" && item.status !== assetStatusFilter) return false;
-      if (assetModelFilter !== "all" && item.model !== assetModelFilter) return false;
-
-      // search query
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase();
-        return item.prompt.toLowerCase().includes(query) || item.model.toLowerCase().includes(query);
-      }
-      return true;
-    });
-  };
-
   // Launch mask editor layout dialog
   const launchMaskEditor = (imageUrl: string, id: string, destination: MaskDestination = "creative") => {
     setMaskTargetUrl(imageUrl);
@@ -1623,10 +1672,10 @@ export default function Home() {
   };
 
   const renderAtDropdown = (type: "image-prompt" | "video-prompt" | "agent-prompt") => {
-    const searchableImages = items.filter(x => x.type === "image" && x.status === "complete");
-    const filtered = searchableImages.filter(x =>
-      x.id.toLowerCase().includes(atDropdown.search.toLowerCase()) ||
-      x.prompt.toLowerCase().includes(atDropdown.search.toLowerCase())
+    const query = atDropdown.search.toLowerCase();
+    const filtered = searchableReferenceImages.filter(x =>
+      x.id.toLowerCase().includes(query) ||
+      x.prompt.toLowerCase().includes(query)
     );
 
     if (filtered.length === 0) {
@@ -2892,8 +2941,8 @@ export default function Home() {
                   <div className="flex min-w-0 flex-wrap gap-1.5">
                     {([
                       { value: "all", label: "全部", count: items.length },
-                      { value: "images", label: "图片", count: items.filter(x => x.type === "image").length },
-                      { value: "videos", label: "视频", count: items.filter(x => x.type === "video").length },
+                      { value: "images", label: "图片", count: assetStats.typeCounts.image },
+                      { value: "videos", label: "视频", count: assetStats.typeCounts.video },
                     ] as const).map(option => (
                       <button
                         key={option.value}
@@ -2918,10 +2967,10 @@ export default function Home() {
                   <div className="flex min-w-0 flex-wrap gap-1.5">
                     {([
                       { value: "all", label: "全部", count: items.length },
-                      { value: "pending", label: "pending", count: items.filter(x => x.status === "pending").length },
-                      { value: "processing", label: "processing", count: items.filter(x => x.status === "processing").length },
-                      { value: "failed", label: "failed", count: items.filter(x => x.status === "failed").length },
-                      { value: "complete", label: "complete", count: items.filter(x => x.status === "complete").length },
+                      { value: "pending", label: "pending", count: assetStats.statusCounts.pending },
+                      { value: "processing", label: "processing", count: assetStats.statusCounts.processing },
+                      { value: "failed", label: "failed", count: assetStats.statusCounts.failed },
+                      { value: "complete", label: "complete", count: assetStats.statusCounts.complete },
                     ] as const).map(option => (
                       <button
                         key={option.value}
@@ -2950,7 +2999,7 @@ export default function Home() {
                     className="imagine-toolbar-select h-9 min-w-0 rounded-lg border border-slate-800 bg-slate-950/55 px-3 font-mono text-[10px] text-slate-300 transition focus:border-blue-400/35 focus:outline-none"
                   >
                     <option value="all">全部模型</option>
-                    {assetModelOptions.map(model => (
+                    {assetStats.modelOptions.map(model => (
                       <option key={model} value={model}>{formatStoredModelLabel(model, selectedProvider)}</option>
                     ))}
                   </select>
@@ -3049,10 +3098,7 @@ export default function Home() {
 
                 <div className="flex items-center gap-3">
                   {/* Selector only if both items are images */}
-                  {(() => {
-                    const matchedA = items.find(x => x.id === compareItemIds[0]);
-                    const matchedB = items.find(x => x.id === compareItemIds[1]);
-                    if (matchedA?.type === "image" && matchedB?.type === "image") {
+                  {compareItems.first?.type === "image" && compareItems.second?.type === "image" && (
                       return (
                         <div className="flex bg-white/5 border border-white/5 rounded-lg p-0.5 text-xs">
                           <button
@@ -3079,9 +3125,7 @@ export default function Home() {
                           </button>
                         </div>
                       );
-                    }
-                    return null;
-                  })()}
+                  )}
 
                   <button
                     onClick={() => { setIsCompareMode(false); setCompareItemIds([]); }}
@@ -3099,8 +3143,8 @@ export default function Home() {
                 </div>
               ) : (
                 (() => {
-                  const matchedA = items.find(x => x.id === compareItemIds[0]);
-                  const matchedB = items.find(x => x.id === compareItemIds[1]);
+                  const matchedA = compareItems.first;
+                  const matchedB = compareItems.second;
 
                   if (!matchedA || !matchedB) {
                     return (
@@ -3192,7 +3236,7 @@ export default function Home() {
                             {matchedA.type === "image" ? (
                               <PreviewImage src={matchedA.url} alt="A" className="w-full h-full object-cover" />
                             ) : (
-                              <video src={matchedA.url} controls loop className="w-full h-full object-cover" />
+                              <video src={matchedA.url} controls loop preload="metadata" className="w-full h-full object-cover" />
                             )}
                           </div>
                         </div>
@@ -3218,7 +3262,7 @@ export default function Home() {
                             {matchedB.type === "image" ? (
                               <PreviewImage src={matchedB.url} alt="B" className="w-full h-full object-cover" />
                             ) : (
-                              <video src={matchedB.url} controls loop className="w-full h-full object-cover" />
+                              <video src={matchedB.url} controls loop preload="metadata" className="w-full h-full object-cover" />
                             )}
                           </div>
                         </div>
