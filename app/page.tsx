@@ -1,25 +1,29 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from "react";
-import { 
-  Sparkles, 
-  Settings, 
-  Trash2, 
-  Download, 
-  Paintbrush, 
-  Check, 
-  X, 
-  RefreshCw, 
-  Play, 
-  Pause, 
-  Search, 
-  Send, 
-  Layers, 
-  Sliders, 
-  Image as ImageIcon, 
-  Video as VideoIcon, 
-  ChevronRight, 
-  FileArchive, 
+import React, { useCallback, useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
+import {
+  Sparkles,
+  Settings,
+  Moon,
+  Sun,
+  Trash2,
+  Download,
+  Paintbrush,
+  Check,
+  X,
+  RefreshCw,
+  Play,
+  Pause,
+  Search,
+  Send,
+  Layers,
+  CloudUpload,
+  Sliders,
+  Image as ImageIcon,
+  Video as VideoIcon,
+  ChevronRight,
+  FileArchive,
   Maximize2,
   Info
 } from "lucide-react";
@@ -27,7 +31,23 @@ import { motion, AnimatePresence } from "motion/react";
 import JSZip from "jszip";
 import { VISUAL_PRESETS, VisualPreset } from "@/components/PresetStyles";
 import CanvasMaskEditor from "@/components/CanvasMaskEditor";
+import PreviewImage from "@/components/PreviewImage";
 import { saveToDB, getAllFromDB, deleteFromDB, clearAllDB, StorageItem } from "@/lib/db";
+import {
+  CHAT_MODEL_OPTIONS,
+  DEFAULT_CHAT_MODEL,
+  DEFAULT_VISION_CHAT_MODEL,
+  DEFAULT_IMAGE_MODEL,
+  DEFAULT_VIDEO_MODEL,
+  IMAGE_MODEL_OPTIONS,
+  getImageModelCapabilities,
+  getVideoModelCapabilities,
+  parseProviderModel,
+  supportsAsyncImageGeneration,
+  VIDEO_MODEL_OPTIONS,
+  type AiProvider,
+  type ModelOption,
+} from "@/lib/providers/model-catalog";
 
 // Reference image object structure for multiple selection support
 export interface ReferenceImageRef {
@@ -56,29 +76,188 @@ interface ChatMessage {
   activeSkills?: string[];
 }
 
+type AgentToolAction = NonNullable<ChatMessage["recommendedAction"]>;
+type NoticeType = "error" | "info" | "success";
+type MaskDestination = "creative" | "agent";
+type AssetStatusFilter = "all" | StorageItem["status"];
+type ProviderConnection = AiProvider;
+type ModelCategory = "chat" | "image" | "video";
+type ThemeMode = "light" | "dark";
+
+interface WorkspaceNotice {
+  id: string;
+  type: NoticeType;
+  message: string;
+}
+
+interface ProviderTestState {
+  provider: ProviderConnection;
+  status: "idle" | "testing" | "success" | "error";
+  message: string;
+}
+
+function makeClientId(prefix: string): string {
+  return `${prefix}_${Date.now()}`;
+}
+
+function getStringField(value: unknown, field: string): string | null {
+  if (typeof value !== "object" || value === null || !(field in value)) return null;
+  const record = value as Record<string, unknown>;
+  const fieldValue = record[field];
+  return typeof fieldValue === "string" && fieldValue.trim() ? fieldValue : null;
+}
+
+function toErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message.trim() ? error.message : fallback;
+}
+
+async function readFetchError(response: Response, fallback: string): Promise<string> {
+  try {
+    const data: unknown = await response.json();
+    return getStringField(data, "error") ?? getStringField(data, "message") ?? `${fallback} (HTTP ${response.status})`;
+  } catch {
+    return `${fallback} (HTTP ${response.status})`;
+  }
+}
+
+function isModelOption(value: unknown): value is ModelOption {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "value" in value &&
+    "label" in value &&
+    typeof value.value === "string" &&
+    typeof value.label === "string"
+  );
+}
+
+function mergeModelOptions(base: ModelOption[], incoming: ModelOption[]): ModelOption[] {
+  const seen = new Set<string>();
+  return [...incoming, ...base].filter(option => {
+    if (seen.has(option.value)) return false;
+    seen.add(option.value);
+    return true;
+  });
+}
+
+function mergeProviderModelOptions(
+  base: Record<AiProvider, ModelOption[]>,
+  incoming: ModelOption[],
+): Record<AiProvider, ModelOption[]> {
+  return {
+    "12ai": mergeModelOptions(
+      base["12ai"],
+      incoming.filter(option => parseProviderModel(option.value, "12ai").provider === "12ai"),
+    ),
+    "grok2api": mergeModelOptions(
+      base["grok2api"],
+      incoming.filter(option => parseProviderModel(option.value, "12ai").provider === "grok2api"),
+    ),
+  };
+}
+
+function mergeRecordModelOptions(
+  base: Record<AiProvider, ModelOption[]>,
+  incoming: unknown,
+  filterFn?: (option: ModelOption) => boolean,
+): Record<AiProvider, ModelOption[]> {
+  if (typeof incoming !== "object" || incoming === null) return base;
+  const record = incoming as Record<string, unknown>;
+  const result = { ...base };
+  for (const p of ["12ai", "grok2api"] as AiProvider[]) {
+    if (Array.isArray(record[p])) {
+      const options = filterFn
+        ? (record[p] as unknown[]).filter(isModelOption).filter(filterFn)
+        : (record[p] as unknown[]).filter(isModelOption);
+      if (options.length > 0) result[p] = mergeModelOptions(base[p], options);
+    }
+  }
+  return result;
+}
+
+function classifyModelOption(option: ModelOption): ModelCategory {
+  const parsed = parseProviderModel(option.value, "12ai");
+  const model = parsed.model.toLowerCase();
+  if (model.includes("video") || model.includes("veo")) return "video";
+  if (model.includes("image") || model.includes("imagen") || model.includes("imagine")) return "image";
+  return "chat";
+}
+
+function isSelectableImageModel(option: ModelOption): boolean {
+  return !parseProviderModel(option.value, "12ai").async;
+}
+
+function isSelectableChatModel(option: ModelOption): boolean {
+  return option.value !== "12ai:gpt-5.1";
+}
+
+function getProviderLabel(provider: AiProvider): string {
+  return provider === "12ai" ? "12AI" : "Grok2API";
+}
+
+function getProviderModelGroups(optionsByProvider: Record<AiProvider, ModelOption[]>): Array<{
+  provider: AiProvider;
+  label: string;
+  options: ModelOption[];
+}> {
+  return (["12ai", "grok2api"] as AiProvider[])
+    .map(provider => ({
+      provider,
+      label: getProviderLabel(provider),
+      options: optionsByProvider[provider],
+    }))
+    .filter(group => group.options.length > 0);
+}
+
+function formatStoredModelLabel(value: string, fallbackProvider: AiProvider): string {
+  const parsed = parseProviderModel(value, fallbackProvider);
+  return `${getProviderLabel(parsed.provider)} ${parsed.model}`;
+}
+
+function validateGptImageSize(size: string): string | null {
+  if (size === "auto") return null;
+  const match = size.match(/^(\d+)x(\d+)$/);
+  if (!match) return "尺寸格式必须是 widthxheight，例如 2560x1440";
+  const width = Number(match[1]);
+  const height = Number(match[2]);
+  if (width > 3840 || height > 3840) return "最大边长不能超过 3840px";
+  if (width % 16 !== 0 || height % 16 !== 0) return "宽高都必须是 16px 的倍数";
+  const longSide = Math.max(width, height);
+  const shortSide = Math.min(width, height);
+  if (longSide / shortSide > 3) return "长短边比例不能超过 3:1";
+  const pixels = width * height;
+  if (pixels < 655360 || pixels > 8294400) return "总像素必须在 655,360 到 8,294,400 之间";
+  return null;
+}
+
 export default function Home() {
   // Database State
   const [items, setItems] = useState<StorageItem[]>([]);
-  
+
   // Traditional Form States
   const [prompt, setPrompt] = useState("");
   const [negativePrompt, setNegativePrompt] = useState("");
-  const [selectedModel, setSelectedModel] = useState("gemini-2.5-flash-image");
-  const [selectedVideoModel, setSelectedVideoModel] = useState("veo-3.1-lite-generate-preview");
+  const [selectedModel, setSelectedModel] = useState(DEFAULT_IMAGE_MODEL);
+  const [selectedVideoModel, setSelectedVideoModel] = useState(DEFAULT_VIDEO_MODEL);
   const [aspectRatio, setAspectRatio] = useState("1:1");
   const [imageSize, setImageSize] = useState("1K");
+  const [imageThinkingLevel, setImageThinkingLevel] = useState("minimal");
+  const [customGptImageSize, setCustomGptImageSize] = useState("2560x1440");
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"traditional" | "agent">("traditional");
   const [traditionalSubTab, setTraditionalSubTab] = useState<"image" | "video">("image");
+  const [isAgentDockOpen, setIsAgentDockOpen] = useState(false);
+  const [isAgentPortalReady, setIsAgentPortalReady] = useState(false);
+  const [isAgentDockOverContent, setIsAgentDockOverContent] = useState(false);
 
   const applyAsVideoReference = (imageUrl: string) => {
     setReferenceImage(imageUrl);
-    setActiveTab("traditional");
     setTraditionalSubTab("video");
   };
 
   // Filter & UI Select States
   const [filterType, setFilterType] = useState<"all" | "images" | "videos">("all");
+  const [assetStatusFilter, setAssetStatusFilter] = useState<AssetStatusFilter>("all");
+  const [assetModelFilter, setAssetModelFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [isCompareMode, setIsCompareMode] = useState(false);
@@ -91,12 +270,12 @@ export default function Home() {
     {
       id: "welcome",
       role: "assistant",
-      content: "您好！我是您的智能创意代理（Agent Mode）。您可以随时通过聊天交办高阶创意任务。例如：「帮我做一套3张赛博朋克风战士的相册」或「帮我把上一部图片转成16:9的微短视频」。我会自主为您写提示词、渲染资产、并在确认后一键执行！",
-      thought: "初始化创意代理面板，准备读取画廊资产上下文...",
+      content: "您好！我是您的智能创意助手。您可以一边调整左侧创作参数，一边随时交办高阶创意任务。例如：「帮我做一套3张赛博朋克风战士的相册」或「帮我把上一部图片转成16:9的微短视频」。我会给出建议，并在确认后填入参数或执行生成。",
+      thought: "初始化底部 Agent Dock，准备读取画廊资产上下文...",
       suggestedFollowUps: [
         "优化并生成一张赛博朋克飞艇",
         "我想做一段太空科幻题材视频",
-        "使用传统模式尝试手工控制"
+        "根据当前画廊给我三个延展方向"
       ]
     }
   ]);
@@ -108,15 +287,33 @@ export default function Home() {
   const [countdownSeconds, setCountdownSeconds] = useState(3);
 
   // Settings State
-  const [customApiKey, setCustomApiKey] = useState("");
+  const [twelveAiApiKey, setTwelveAiApiKey] = useState("");
+  const [grokApiKey, setGrokApiKey] = useState("");
+  const [grokBaseUrl, setGrokBaseUrl] = useState("");
+  const [selectedProvider, setSelectedProvider] = useState<AiProvider>("12ai");
+  const [selectedChatModel, setSelectedChatModel] = useState(DEFAULT_CHAT_MODEL);
+  const [chatModelOptions, setChatModelOptions] = useState<Record<AiProvider, ModelOption[]>>(CHAT_MODEL_OPTIONS);
+  const [imageModelOptions, setImageModelOptions] = useState<Record<AiProvider, ModelOption[]>>(IMAGE_MODEL_OPTIONS);
+  const [videoModelOptions, setVideoModelOptions] = useState<Record<AiProvider, ModelOption[]>>(VIDEO_MODEL_OPTIONS);
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
+  const [modelListMessage, setModelListMessage] = useState("");
+  const [providerTest, setProviderTest] = useState<ProviderTestState>({
+    provider: "12ai",
+    status: "idle",
+    message: "",
+  });
   const [showSettings, setShowSettings] = useState(false);
+  const [themeMode, setThemeMode] = useState<ThemeMode>("light");
   const [isOptimizing, setIsOptimizing] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [imageSubmitCount, setImageSubmitCount] = useState(0);
+  const [videoSubmitCount, setVideoSubmitCount] = useState(0);
+  const [workspaceNotices, setWorkspaceNotices] = useState<WorkspaceNotice[]>([]);
 
   // Interactive Mask Editor State
   const [isMaskOpen, setIsMaskOpen] = useState(false);
   const [maskTargetUrl, setMaskTargetUrl] = useState("");
   const [maskTargetId, setMaskTargetId] = useState("");
+  const [maskDestination, setMaskDestination] = useState<MaskDestination>("creative");
 
   // Fullscreen Preview Overlay State
   const [fullscreenItem, setFullscreenItem] = useState<StorageItem | null>(null);
@@ -138,7 +335,117 @@ export default function Home() {
 
   // References
   const chatBottomRef = useRef<HTMLDivElement | null>(null);
+  const agentDockRef = useRef<HTMLElement | null>(null);
   const autoCountdownInterval = useRef<NodeJS.Timeout | null>(null);
+  const pollingFailuresRef = useRef<Record<string, number>>({});
+
+  const dismissWorkspaceNotice = useCallback((id: string) => {
+    setWorkspaceNotices(prev => prev.filter(notice => notice.id !== id));
+  }, []);
+
+  const pushWorkspaceNotice = useCallback((type: NoticeType, message: string) => {
+    const id = makeClientId("notice");
+    setWorkspaceNotices(prev => [{ id, type, message }, ...prev].slice(0, 4));
+    window.setTimeout(() => dismissWorkspaceNotice(id), 8000);
+  }, [dismissWorkspaceNotice]);
+
+  const buildProviderHeaders = useCallback((target?: string) => {
+    const provider =
+      target === "12ai" || target === "grok2api"
+        ? target
+        : target
+          ? parseProviderModel(target, selectedProvider).provider
+          : selectedProvider;
+    const chatModelHeader = target && target !== "12ai" && target !== "grok2api" ? target : selectedChatModel;
+    const headers: Record<string, string> = {
+      "x-ai-provider": provider,
+      "x-ai-chat-model": chatModelHeader,
+    };
+    const apiKey = provider === "12ai" ? twelveAiApiKey : grokApiKey;
+    if (apiKey) headers["x-ai-api-key"] = apiKey;
+    if (provider === "grok2api" && grokBaseUrl) headers["x-ai-base-url"] = grokBaseUrl;
+    return headers;
+  }, [grokApiKey, grokBaseUrl, selectedChatModel, selectedProvider, twelveAiApiKey]);
+
+  const imageCapabilities = getImageModelCapabilities(selectedModel);
+  const videoCapabilities = getVideoModelCapabilities(selectedVideoModel);
+  const isSubmittingImage = imageSubmitCount > 0;
+  const isSubmittingVideo = videoSubmitCount > 0;
+  const isGptImageModel = parseProviderModel(selectedModel, selectedProvider).model === "gpt-image-2";
+  const canUseAsyncImageGeneration = supportsAsyncImageGeneration(selectedModel);
+  const activeImageSize = isGptImageModel && aspectRatio === "custom" ? customGptImageSize.trim() : aspectRatio;
+  const activeImageModel = isSubmittingImage && canUseAsyncImageGeneration
+    ? `12ai-async:${parseProviderModel(selectedModel, selectedProvider).model}`
+    : selectedModel;
+  const activeVideoSize = videoCapabilities.sizes.some(option => option.value === aspectRatio) ? aspectRatio : "auto";
+  const imageModelGroups = getProviderModelGroups(imageModelOptions);
+  const videoModelGroups = getProviderModelGroups(videoModelOptions);
+  const chatModelGroups = getProviderModelGroups(chatModelOptions);
+  const assetModelOptions = Array.from(new Set(items.map(item => item.model))).sort();
+
+  const handleSelectImageModel = (model: string) => {
+    const capabilities = getImageModelCapabilities(model);
+    setSelectedModel(model);
+    if (!capabilities.aspectRatios.some(option => option.value === aspectRatio)) {
+      setAspectRatio(capabilities.aspectRatios[0]?.value ?? "1:1");
+    }
+    if (capabilities.imageSizes.length > 0 && !capabilities.imageSizes.some(option => option.value === imageSize)) {
+      setImageSize(capabilities.imageSizes[0].value);
+    }
+    if (
+      capabilities.thinkingLevels.length > 0 &&
+      !capabilities.thinkingLevels.some(option => option.value === imageThinkingLevel)
+    ) {
+      setImageThinkingLevel(capabilities.thinkingLevels[0].value);
+    }
+  };
+
+  const handleSelectVideoModel = (model: string) => {
+    const capabilities = getVideoModelCapabilities(model);
+    setSelectedVideoModel(model);
+    if (!capabilities.sizes.some(option => option.value === aspectRatio)) {
+      setAspectRatio(capabilities.sizes[0]?.value ?? "auto");
+    }
+  };
+
+  useEffect(() => {
+    const readyTimer = window.setTimeout(() => setIsAgentPortalReady(true), 0);
+    return () => window.clearTimeout(readyTimer);
+  }, []);
+
+  useEffect(() => {
+    if (!isAgentPortalReady) return;
+
+    const updateDockOverlap = () => {
+      const dock = agentDockRef.current;
+      if (!dock) return;
+
+      const rect = dock.getBoundingClientRect();
+      const sampleY = Math.min(window.innerHeight - 1, Math.max(0, rect.top + 8));
+      const sampleXs = [0.25, 0.5, 0.75].map(position =>
+        Math.min(window.innerWidth - 1, Math.max(0, rect.left + rect.width * position)),
+      );
+      const isOverContent = sampleXs.some(x =>
+        document.elementsFromPoint(x, sampleY).some(element => {
+          if (dock.contains(element)) return false;
+          if (element === document.body || element === document.documentElement) return false;
+          return element.closest("main") !== null;
+        }),
+      );
+
+      setIsAgentDockOverContent(isOverContent);
+    };
+
+    const readyTimer = window.setTimeout(updateDockOverlap, 0);
+    window.addEventListener("scroll", updateDockOverlap, { passive: true });
+    window.addEventListener("resize", updateDockOverlap);
+
+    return () => {
+      window.clearTimeout(readyTimer);
+      window.removeEventListener("scroll", updateDockOverlap);
+      window.removeEventListener("resize", updateDockOverlap);
+    };
+  }, [isAgentPortalReady, isAgentDockOpen]);
 
   // Load items from database on mount
   useEffect(() => {
@@ -148,12 +455,65 @@ export default function Home() {
     }
     loadWorkspace();
 
-    // Check localStorage for API Key preference
-    const storedKey = localStorage.getItem("imagine_custom_api_key");
-    if (storedKey) setCustomApiKey(storedKey);
+    const restoreSettings = setTimeout(() => {
+      const stored12AiKey =
+        localStorage.getItem("imagine_12ai_api_key") ?? localStorage.getItem("imagine_custom_api_key");
+      if (stored12AiKey) setTwelveAiApiKey(stored12AiKey);
 
-    const storedAutoExec = localStorage.getItem("imagine_auto_execute");
-    if (storedAutoExec) setAutoExecute(storedAutoExec === "true");
+      const storedGrokKey = localStorage.getItem("imagine_grok2api_api_key");
+      if (storedGrokKey) setGrokApiKey(storedGrokKey);
+
+      const storedGrokBaseUrl =
+        localStorage.getItem("imagine_grok2api_base_url") ?? localStorage.getItem("imagine_custom_api_base_url");
+      if (storedGrokBaseUrl) setGrokBaseUrl(storedGrokBaseUrl);
+
+      const storedProvider = localStorage.getItem("imagine_ai_provider");
+      if (storedProvider === "12ai" || storedProvider === "grok2api") setSelectedProvider(storedProvider);
+
+      const storedChatModel = localStorage.getItem("imagine_chat_model");
+      if (storedChatModel === "12ai:gpt-5.1") {
+        localStorage.setItem("imagine_chat_model", DEFAULT_CHAT_MODEL);
+      } else if (storedChatModel) {
+        setSelectedChatModel(storedChatModel);
+      }
+
+      const restoreModelOptions = (
+        key: string,
+        setter: React.Dispatch<React.SetStateAction<Record<AiProvider, ModelOption[]>>>,
+        defaults: Record<AiProvider, ModelOption[]>,
+        filterFn?: (option: ModelOption) => boolean,
+      ) => {
+        const stored = localStorage.getItem(key);
+        if (!stored) return;
+        try {
+          const parsed = JSON.parse(stored) as unknown;
+          if (Array.isArray(parsed)) {
+            const flat = filterFn
+              ? parsed.filter(isModelOption).filter(filterFn)
+              : parsed.filter(isModelOption);
+            if (flat.length > 0) setter(mergeProviderModelOptions(defaults, flat));
+          } else {
+            setter(prev => mergeRecordModelOptions(prev, parsed, filterFn));
+          }
+        } catch (err) {
+          console.warn(`Failed to restore model list (${key}):`, err);
+        }
+      };
+
+      restoreModelOptions("imagine_chat_model_options", setChatModelOptions, CHAT_MODEL_OPTIONS, isSelectableChatModel);
+      restoreModelOptions("imagine_image_model_options", setImageModelOptions, IMAGE_MODEL_OPTIONS, isSelectableImageModel);
+      restoreModelOptions("imagine_video_model_options", setVideoModelOptions, VIDEO_MODEL_OPTIONS);
+
+      const storedAutoExec = localStorage.getItem("imagine_auto_execute");
+      if (storedAutoExec) setAutoExecute(storedAutoExec === "true");
+
+      const storedThemeMode = localStorage.getItem("imagine_theme_mode");
+      if (storedThemeMode === "light" || storedThemeMode === "dark") {
+        setThemeMode(storedThemeMode);
+      }
+    }, 0);
+
+    return () => clearTimeout(restoreSettings);
   }, []);
 
   // Listen to clipboard paste events globally to import reference images
@@ -166,37 +526,23 @@ export default function Home() {
           const file = item.getAsFile();
           if (file) {
             const reader = new FileReader();
-            reader.onload = async (event) => {
+            reader.onload = (event) => {
               const base64 = event.target?.result as string;
-              // Create imported asset
-              const newAssetId = `import_${Date.now()}`;
-              const newAsset: StorageItem = {
-                id: newAssetId,
-                type: "image",
-                url: base64,
-                prompt: "📋 粘贴导入的创意参考图 (Pasted Reference Image)",
-                model: "Imported Local File",
-                aspectRatio: "1:1",
-                createdAt: new Date().toISOString(),
-                status: "complete",
-                progress: 100,
-              };
-              await saveToDB(newAsset);
-              setItems(prev => [newAsset, ...prev]);
-              
+              const newReferenceId = makeClientId("import");
+
               // Set reference image context
               setReferenceImage(base64);
-              setAgentReferenceId(newAssetId);
+              setAgentReferenceId(newReferenceId);
               setAgentReferenceUrl(base64);
               setReferenceImages(prev => {
-                if (prev.some(r => r.id === newAssetId)) return prev;
-                return [...prev, { id: newAssetId, url: base64, role: "general" }];
+                if (prev.some(r => r.id === newReferenceId)) return prev;
+                return [...prev, { id: newReferenceId, url: base64, role: "general" }];
               });
               setAgentReferences(prev => {
-                if (prev.some(r => r.id === newAssetId)) return prev;
-                return [...prev, { id: newAssetId, url: base64 }];
+                if (prev.some(r => r.id === newReferenceId)) return prev;
+                return [...prev, { id: newReferenceId, url: base64 }];
               });
-              alert("📋 识别到剪贴板图像！已成功作为参考图导入画廊。");
+              alert("📋 识别到剪贴板图像！已作为参考图导入。");
             };
             reader.readAsDataURL(file);
             break;
@@ -215,7 +561,7 @@ export default function Home() {
     }
   }, [agentMessages, isAgentLoading]);
 
-  // Video Polling engine - checks processing operations every 4 seconds
+  // Media Polling engine - checks processing image/video operations every 4 seconds
   useEffect(() => {
     const processingItems = items.filter(x => x.status === "processing" && x.operationName);
     if (processingItems.length === 0) return;
@@ -229,8 +575,7 @@ export default function Home() {
         if (item.status === "processing" && item.operationName) {
           try {
             console.log(`Polling status for operation: ${item.operationName}`);
-            const headers: Record<string, string> = {};
-            if (customApiKey) headers["x-gemini-api-key"] = customApiKey;
+            const headers = buildProviderHeaders(item.operationName);
 
             const res = await fetch("/api/gemini/video-status", {
               method: "POST",
@@ -238,12 +583,26 @@ export default function Home() {
               body: JSON.stringify({ operationName: item.operationName }),
             });
 
-            if (res.ok) {
-              const statusData = await res.json();
-              if (statusData.done) {
-                // Completed! Trigger download
-                console.log(`Operation done! Fetching final MP4 download: ${item.operationName}`);
-                const dlRes = await fetch("/api/gemini/video-download", {
+            if (!res.ok) {
+              throw new Error(await readFetchError(res, "任务状态查询失败"));
+            }
+
+            const statusData: unknown = await res.json();
+            if (typeof statusData !== "object" || statusData === null) {
+              throw new Error("任务状态接口返回格式不正确");
+            }
+            const statusRecord = statusData as Record<string, unknown>;
+            pollingFailuresRef.current[item.id] = 0;
+
+            if (statusRecord.done === true) {
+                const mediaType = statusRecord.mediaType === "image" ? "image" : "video";
+                const downloadEndpoint =
+                  mediaType === "image"
+                    ? "/api/gemini/image-download"
+                    : "/api/gemini/video-download";
+
+                console.log(`Operation done! Fetching final ${mediaType} download: ${item.operationName}`);
+                const dlRes = await fetch(downloadEndpoint, {
                   method: "POST",
                   headers: { "Content-Type": "application/json", ...headers },
                   body: JSON.stringify({ operationName: item.operationName }),
@@ -266,22 +625,39 @@ export default function Home() {
                   reader.readAsDataURL(blob);
                   changed = true;
                 } else {
-                  throw new Error("Download stream failed");
+                  throw new Error(await readFetchError(dlRes, "结果下载失败"));
                 }
               } else {
+                const nextProgress = typeof statusRecord.progress === "number" ? statusRecord.progress : item.progress;
                 // Update progress percentages
-                if (item.progress !== statusData.progress) {
+                if (item.progress !== nextProgress) {
                   updatedList[i] = {
                     ...item,
-                    progress: statusData.progress || 50,
+                    progress: nextProgress,
                   };
                   await saveToDB(updatedList[i]);
                   changed = true;
                 }
-              }
             }
           } catch (e) {
+            const previousFailures = pollingFailuresRef.current[item.id] ?? 0;
+            const nextFailures = previousFailures + 1;
+            pollingFailuresRef.current[item.id] = nextFailures;
             console.error(`Polling failed for ${item.id}:`, e);
+
+            if (nextFailures >= 3) {
+              const failedItem: StorageItem = {
+                ...item,
+                status: "failed",
+                progress: 100,
+                errorMessage: toErrorMessage(e, "任务轮询失败"),
+              };
+              updatedList[i] = failedItem;
+              delete pollingFailuresRef.current[item.id];
+              await saveToDB(failedItem);
+              pushWorkspaceNotice("error", `异步任务失败：${failedItem.errorMessage}`);
+              changed = true;
+            }
           }
         }
       }
@@ -292,12 +668,121 @@ export default function Home() {
     }, 4000);
 
     return () => clearInterval(interval);
-  }, [items, customApiKey]);
+  }, [buildProviderHeaders, items, pushWorkspaceNotice]);
 
   // Handle setting API keys securely inside local tab variables
-  const handleSaveApiKey = (key: string) => {
-    setCustomApiKey(key);
-    localStorage.setItem("imagine_custom_api_key", key);
+  const handleSave12AiApiKey = (key: string) => {
+    setTwelveAiApiKey(key);
+    localStorage.setItem("imagine_12ai_api_key", key);
+  };
+
+  const handleSaveGrokApiKey = (key: string) => {
+    setGrokApiKey(key);
+    localStorage.setItem("imagine_grok2api_api_key", key);
+  };
+
+  const handleSaveGrokBaseUrl = (url: string) => {
+    setGrokBaseUrl(url);
+    localStorage.setItem("imagine_grok2api_base_url", url);
+  };
+
+  const clearProviderCredentials = (provider: ProviderConnection) => {
+    if (provider === "12ai") {
+      setTwelveAiApiKey("");
+      localStorage.removeItem("imagine_12ai_api_key");
+      localStorage.removeItem("imagine_custom_api_key");
+    } else {
+      setGrokApiKey("");
+      setGrokBaseUrl("");
+      localStorage.removeItem("imagine_grok2api_api_key");
+      localStorage.removeItem("imagine_grok2api_base_url");
+      localStorage.removeItem("imagine_custom_api_base_url");
+    }
+  };
+
+  const handleSelectProvider = (provider: AiProvider) => {
+    setSelectedProvider(provider);
+    localStorage.setItem("imagine_ai_provider", provider);
+  };
+
+  const handleSelectChatModel = (model: string) => {
+    setSelectedChatModel(model);
+    localStorage.setItem("imagine_chat_model", model);
+  };
+
+  const refreshProviderModels = async () => {
+    setIsLoadingModels(true);
+    setModelListMessage("");
+    try {
+      const headers = buildProviderHeaders(selectedProvider);
+      const res = await fetch(`/api/models?provider=${selectedProvider}&kind=all`, {
+        headers,
+      });
+      if (!res.ok) {
+        throw new Error(await readFetchError(res, "模型列表获取失败"));
+      }
+      const data: unknown = await res.json();
+      const models = typeof data === "object" && data !== null && "models" in data
+        ? (data as Record<string, unknown>).models
+        : [];
+      const fetched: ModelOption[] = Array.isArray(models) ? models.filter(isModelOption) : [];
+      if (fetched.length === 0) {
+        throw new Error("服务商没有返回可用模型");
+      }
+
+      const fetchedChat = fetched.filter(option => classifyModelOption(option) === "chat").filter(isSelectableChatModel);
+      const fetchedImage = fetched.filter(option => classifyModelOption(option) === "image").filter(isSelectableImageModel);
+      const fetchedVideo = fetched.filter(option => classifyModelOption(option) === "video");
+
+      if (fetchedChat.length > 0) {
+        const nextChatOptions = mergeModelOptions(chatModelOptions[selectedProvider], fetchedChat);
+        const nextChatOptionsByProvider = { ...chatModelOptions, [selectedProvider]: nextChatOptions };
+        setChatModelOptions(nextChatOptionsByProvider);
+        localStorage.setItem("imagine_chat_model_options", JSON.stringify(nextChatOptionsByProvider));
+        if (!fetchedChat.some(option => option.value === selectedChatModel)) {
+          handleSelectChatModel(fetchedChat[0].value);
+        }
+      }
+      if (fetchedImage.length > 0) {
+        const nextImageOptions = mergeModelOptions(imageModelOptions[selectedProvider], fetchedImage);
+        const nextImageOptionsByProvider = { ...imageModelOptions, [selectedProvider]: nextImageOptions };
+        setImageModelOptions(nextImageOptionsByProvider);
+        localStorage.setItem("imagine_image_model_options", JSON.stringify(nextImageOptionsByProvider));
+      }
+      if (fetchedVideo.length > 0) {
+        const nextVideoOptions = mergeModelOptions(videoModelOptions[selectedProvider], fetchedVideo);
+        const nextVideoOptionsByProvider = { ...videoModelOptions, [selectedProvider]: nextVideoOptions };
+        setVideoModelOptions(nextVideoOptionsByProvider);
+        localStorage.setItem("imagine_video_model_options", JSON.stringify(nextVideoOptionsByProvider));
+      }
+
+      setModelListMessage(`已获取 ${fetched.length} 个模型：Chat ${fetchedChat.length} / Image ${fetchedImage.length} / Video ${fetchedVideo.length}`);
+    } catch (err) {
+      const message = toErrorMessage(err, "模型列表获取失败");
+      setModelListMessage(message);
+      pushWorkspaceNotice("error", message);
+    } finally {
+      setIsLoadingModels(false);
+    }
+  };
+
+  const testProviderConnection = async (provider: ProviderConnection) => {
+    setProviderTest({ provider, status: "testing", message: "测试中..." });
+    try {
+      const res = await fetch(`/api/models?provider=${provider}`, {
+        headers: buildProviderHeaders(provider),
+      });
+      if (!res.ok) {
+        throw new Error(await readFetchError(res, `${getProviderLabel(provider)} 连接测试失败`));
+      }
+      setProviderTest({ provider, status: "success", message: `${getProviderLabel(provider)} 连接正常` });
+    } catch (err) {
+      setProviderTest({
+        provider,
+        status: "error",
+        message: toErrorMessage(err, `${getProviderLabel(provider)} 连接测试失败`),
+      });
+    }
   };
 
   const handleToggleAutoExecute = (val: boolean) => {
@@ -312,7 +797,7 @@ export default function Home() {
   const applyPreset = (preset: VisualPreset) => {
     let base = prompt.trim();
     const hasPreset = base.includes(preset.promptSuffix);
-    
+
     // Remove any previously appended preset suffixes to allow seamless switching
     VISUAL_PRESETS.forEach(p => {
       if (base.includes(`, ${p.promptSuffix}`)) {
@@ -321,7 +806,7 @@ export default function Home() {
         base = base.replace(p.promptSuffix, "");
       }
     });
-    
+
     // Clean up trailing/leading commas or whitespace
     base = base.trim().replace(/^,|,$/g, "").trim();
 
@@ -349,21 +834,27 @@ export default function Home() {
     if (!prompt.trim()) return;
     setIsOptimizing(true);
     try {
-      const headers: Record<string, string> = {};
-      if (customApiKey) headers["x-gemini-api-key"] = customApiKey;
+      const headers = buildProviderHeaders(selectedChatModel);
 
       const res = await fetch("/api/gemini/optimize", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ prompt, model: selectedChatModel }),
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        setPrompt(data.optimized || prompt);
+      if (!res.ok) {
+        throw new Error(await readFetchError(res, "提示词优化失败"));
       }
+      const data: unknown = await res.json();
+      const optimized = getStringField(data, "optimized");
+      if (!optimized) {
+        throw new Error("提示词优化接口返回格式不正确");
+      }
+      setPrompt(optimized);
     } catch (e) {
+      const message = toErrorMessage(e, "提示词优化失败");
       console.error(e);
+      pushWorkspaceNotice("error", message);
     } finally {
       setIsOptimizing(false);
     }
@@ -372,17 +863,24 @@ export default function Home() {
   // Launch Traditional Image generator call
   const generateManualImage = async () => {
     if (!prompt.trim()) return;
-    setIsGenerating(true);
-    
+    if (isGptImageModel) {
+      const sizeError = validateGptImageSize(activeImageSize);
+      if (sizeError) {
+        pushWorkspaceNotice("error", `GPT Image 2 尺寸无效：${sizeError}`);
+        return;
+      }
+    }
+    setImageSubmitCount(prev => prev + 1);
+
     // Create pre-queued item in memory immediately
-    const tempId = `temp_img_${Date.now()}`;
+    const tempId = makeClientId("temp_img");
     const newItem: StorageItem = {
       id: tempId,
       type: "image",
       url: "https://picsum.photos/800/800", // temp fallback placeholder display
       prompt: prompt,
-      model: selectedModel,
-      aspectRatio: aspectRatio,
+      model: activeImageModel,
+      aspectRatio: activeImageSize,
       createdAt: new Date().toISOString(),
       status: "pending",
       progress: 30,
@@ -391,64 +889,86 @@ export default function Home() {
     setItems(prev => [newItem, ...prev]);
 
     try {
-      const headers: Record<string, string> = {};
-      if (customApiKey) headers["x-gemini-api-key"] = customApiKey;
+      const headers = buildProviderHeaders(selectedModel);
 
       const res = await fetch("/api/gemini/generate-image", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
         body: JSON.stringify({
           prompt,
-          model: selectedModel,
-          aspectRatio,
+          model: activeImageModel,
+          aspectRatio: activeImageSize,
           imageSize,
+          thinkingLevel: imageThinkingLevel,
           referenceImage: referenceImages[0]?.url || referenceImage || undefined,
           referenceImages: referenceImages.map(r => r.url),
         }),
       });
 
       if (res.ok) {
-        const data = await res.json();
+        const data: unknown = await res.json();
+        const operationName = getStringField(data, "operationName");
+        const imageUrl = getStringField(data, "imageUrl");
+        if (operationName) {
+          const compilingItem: StorageItem = {
+            ...newItem,
+            id: makeClientId("img"),
+            operationName,
+            status: "processing",
+            progress: 15,
+          };
+          await saveToDB(compilingItem);
+          setItems(prev => [compilingItem, ...prev.filter(x => x.id !== tempId)]);
+          return;
+        }
+
         const completedItem: StorageItem = {
           ...newItem,
-          id: `img_${Date.now()}`,
-          url: data.imageUrl,
+          id: makeClientId("img"),
+          url: imageUrl ?? "",
           status: "complete",
           progress: 100,
         };
-        
+        if (!imageUrl) {
+          throw new Error("图片接口返回缺少 imageUrl 或 operationName");
+        }
+
         // Remove temp and insert completed item
         await saveToDB(completedItem);
         setItems(prev => [completedItem, ...prev.filter(x => x.id !== tempId)]);
       } else {
-        throw new Error("HTTP error on image render");
+        throw new Error(await readFetchError(res, "图片生成请求失败"));
       }
-    } catch (e: any) {
+    } catch (e) {
       console.error(e);
+      const message = toErrorMessage(e, "图片生成失败");
       const failedItem: StorageItem = {
         ...newItem,
         status: "failed",
+        progress: 100,
+        errorMessage: message,
       };
       await saveToDB(failedItem);
       setItems(prev => [failedItem, ...prev.filter(x => x.id !== tempId)]);
+      pushWorkspaceNotice("error", message);
     } finally {
-      setIsGenerating(false);
+      setImageSubmitCount(prev => Math.max(0, prev - 1));
     }
   };
 
   // Launch Traditional Veo Video generator call
   const generateManualVideo = async () => {
     if (!prompt.trim()) return;
-    setIsGenerating(true);
+    setVideoSubmitCount(prev => prev + 1);
 
-    const tempId = `temp_vid_${Date.now()}`;
+    const tempId = makeClientId("temp_vid");
     const newItem: StorageItem = {
       id: tempId,
       type: "video",
       url: "",
       prompt: prompt,
       model: selectedVideoModel,
-      aspectRatio: aspectRatio,
+      aspectRatio: activeVideoSize,
       createdAt: new Date().toISOString(),
       status: "processing",
       progress: 12,
@@ -457,8 +977,7 @@ export default function Home() {
     setItems(prev => [newItem, ...prev]);
 
     try {
-      const headers: Record<string, string> = {};
-      if (customApiKey) headers["x-gemini-api-key"] = customApiKey;
+      const headers = buildProviderHeaders(selectedVideoModel);
 
       const startImg = referenceImages.find(r => r.role === "start")?.url || referenceImages[0]?.url || referenceImage || undefined;
       const endImg = referenceImages.find(r => r.role === "end")?.url || referenceImages[1]?.url || undefined;
@@ -471,19 +990,22 @@ export default function Home() {
           image: startImg,
           lastFrame: endImg,
           images: referenceImages.map(r => r.url),
-          aspectRatio,
+          aspectRatio: activeVideoSize,
           model: selectedVideoModel,
         }),
       });
 
       if (res.ok) {
-        const data = await res.json();
-        const activeOperationName = data.operationName;
-        
+        const data: unknown = await res.json();
+        const activeOperationName = getStringField(data, "operationName");
+        if (!activeOperationName) {
+          throw new Error("视频接口返回缺少 operationName");
+        }
+
         // Save polling handle
         const compilingItem: StorageItem = {
           ...newItem,
-          id: `vid_${Date.now()}`,
+          id: makeClientId("vid"),
           operationName: activeOperationName,
           status: "processing",
         };
@@ -491,18 +1013,22 @@ export default function Home() {
         await saveToDB(compilingItem);
         setItems(prev => [compilingItem, ...prev.filter(x => x.id !== tempId)]);
       } else {
-        throw new Error("Video generation request failed");
+        throw new Error(await readFetchError(res, "视频生成请求失败"));
       }
     } catch (e) {
       console.error(e);
+      const message = toErrorMessage(e, "视频生成失败");
       const failedItem: StorageItem = {
         ...newItem,
         status: "failed",
+        progress: 100,
+        errorMessage: message,
       };
       await saveToDB(failedItem);
       setItems(prev => [failedItem, ...prev.filter(x => x.id !== tempId)]);
+      pushWorkspaceNotice("error", message);
     } finally {
-      setIsGenerating(false);
+      setVideoSubmitCount(prev => Math.max(0, prev - 1));
     }
   };
 
@@ -512,27 +1038,14 @@ export default function Home() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onloadend = async () => {
+    reader.onloadend = () => {
       const base64 = reader.result as string;
-      const newAssetId = `upload_${Date.now()}`;
-      const newAsset: StorageItem = {
-        id: newAssetId,
-        type: "image",
-        url: base64,
-        prompt: `📋 上传导入的参考图 (${file.name || "Uploaded Image"})`,
-        model: "Uploaded Reference File",
-        aspectRatio: "1:1",
-        createdAt: new Date().toISOString(),
-        status: "complete",
-        progress: 100,
-      };
-      await saveToDB(newAsset);
-      setItems(prev => [newAsset, ...prev]);
+      const newReferenceId = makeClientId("upload");
 
       setReferenceImage(base64);
       setReferenceImages(prev => {
-        if (prev.some(r => r.id === newAssetId)) return prev;
-        return [...prev, { id: newAssetId, url: base64, role: "general" }];
+        if (prev.some(r => r.id === newReferenceId)) return prev;
+        return [...prev, { id: newReferenceId, url: base64, role: "general" }];
       });
     };
     reader.readAsDataURL(file);
@@ -569,12 +1082,12 @@ export default function Home() {
       const allDisplayItems = filterAndSearchItems();
       const lastSelectedIdx = allDisplayItems.findIndex(x => x.id === selectedItemIds[selectedItemIds.length - 1]);
       const currentSelectedIdx = allDisplayItems.findIndex(x => x.id === id);
-      
+
       if (lastSelectedIdx !== -1 && currentSelectedIdx !== -1) {
         const start = Math.min(lastSelectedIdx, currentSelectedIdx);
         const end = Math.max(lastSelectedIdx, currentSelectedIdx);
         const slicedIds = allDisplayItems.slice(start, end + 1).map(x => x.id);
-        
+
         setSelectedItemIds(prev => Array.from(new Set([...prev, ...slicedIds])));
         return;
       }
@@ -604,18 +1117,179 @@ export default function Home() {
     }
   };
 
+  const deleteItemsByStatus = async (statuses: StorageItem["status"][]) => {
+    const ids = items.filter(item => statuses.includes(item.status)).map(item => item.id);
+    if (ids.length === 0) return;
+    if (confirm(`确定要删除 ${ids.length} 个 ${statuses.join("/")} 任务吗？`)) {
+      for (const id of ids) {
+        await deleteFromDB(id);
+      }
+      setItems(prev => prev.filter(item => !ids.includes(item.id)));
+      setSelectedItemIds(prev => prev.filter(id => !ids.includes(id)));
+      setCompareItemIds(prev => prev.filter(id => !ids.includes(id)));
+    }
+  };
+
+  const exportMetadataJson = () => {
+    const sourceItems = selectedItemIds.length > 0
+      ? items.filter(item => selectedItemIds.includes(item.id))
+      : filterAndSearchItems();
+    if (sourceItems.length === 0) return;
+    const metadata = sourceItems.map(item => ({
+      id: item.id,
+      type: item.type,
+      prompt: item.prompt,
+      model: item.model,
+      provider: parseProviderModel(item.model, selectedProvider).provider,
+      aspectRatio: item.aspectRatio,
+      status: item.status,
+      progress: item.progress,
+      operationName: item.operationName,
+      errorMessage: item.errorMessage,
+      createdAt: item.createdAt,
+    }));
+    const blob = new Blob([JSON.stringify(metadata, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${makeClientId("imagine_metadata")}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const retryFailedItem = async (item: StorageItem) => {
+    if (item.status !== "failed") return;
+    const retryingItem: StorageItem = {
+      ...item,
+      status: item.type === "image" ? "pending" : "processing",
+      progress: item.type === "image" ? 30 : 12,
+      errorMessage: undefined,
+      operationName: undefined,
+    };
+    await saveToDB(retryingItem);
+    setItems(prev => prev.map(current => current.id === item.id ? retryingItem : current));
+
+    try {
+      const headers = buildProviderHeaders(item.model);
+      const endpoint = item.type === "image" ? "/api/gemini/generate-image" : "/api/gemini/generate-video";
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({
+          prompt: item.prompt,
+          model: item.model,
+          aspectRatio: item.aspectRatio,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(await readFetchError(res, "任务重试失败"));
+      }
+
+      const data: unknown = await res.json();
+      const operationName = getStringField(data, "operationName");
+      const imageUrl = getStringField(data, "imageUrl");
+
+      if (operationName) {
+        const processingItem: StorageItem = {
+          ...retryingItem,
+          status: "processing",
+          progress: 15,
+          operationName,
+        };
+        await saveToDB(processingItem);
+        setItems(prev => prev.map(current => current.id === item.id ? processingItem : current));
+        return;
+      }
+
+      if (item.type === "image" && imageUrl) {
+        const completedItem: StorageItem = {
+          ...retryingItem,
+          url: imageUrl,
+          status: "complete",
+          progress: 100,
+        };
+        await saveToDB(completedItem);
+        setItems(prev => prev.map(current => current.id === item.id ? completedItem : current));
+        return;
+      }
+
+      throw new Error(item.type === "image" ? "图片接口返回缺少 imageUrl 或 operationName" : "视频接口返回缺少 operationName");
+    } catch (err) {
+      const message = toErrorMessage(err, "任务重试失败");
+      const failedItem: StorageItem = {
+        ...item,
+        status: "failed",
+        progress: 100,
+        errorMessage: message,
+      };
+      await saveToDB(failedItem);
+      setItems(prev => prev.map(current => current.id === item.id ? failedItem : current));
+      pushWorkspaceNotice("error", message);
+    }
+  };
+
+  // Download single item as a file
+  const handleDownloadItem = async (item: StorageItem) => {
+    const extension = item.type === "image" ? "png" : "mp4";
+    const fileName = `imagine_${item.id}.${extension}`;
+
+    try {
+      let blob: Blob;
+      if (item.url && item.url.startsWith("data:")) {
+        const parts = item.url.split(";base64,");
+        if (parts.length === 2) {
+          const byteChars = atob(parts[1]);
+          const bytes = new Uint8Array(byteChars.length);
+          for (let idx = 0; idx < byteChars.length; idx += 1) {
+            bytes[idx] = byteChars.charCodeAt(idx);
+          }
+          blob = new Blob([bytes], { type: item.type === "image" ? "image/png" : "video/mp4" });
+        } else {
+          throw new Error("Invalid data URI");
+        }
+      } else {
+        const fileRes = await fetch(item.url);
+        if (!fileRes.ok) throw new Error(`Fetch failed: HTTP ${fileRes.status}`);
+        blob = await fileRes.blob();
+      }
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Download item failed:", err);
+      alert("下载失败，请检查网络或文件是否可访问。");
+    }
+  };
+
   // Compiles and exports selected assets inside a single ZIP with mapping layout JSON
   const handleBatchDownloadZip = async () => {
     if (selectedItemIds.length === 0) return;
     const itemsToExport = items.filter(x => selectedItemIds.includes(x.id));
-    
+
     const zip = new JSZip();
-    const metadataList: any[] = [];
+    const metadataList: Array<{
+      id: string;
+      fileName: string;
+      type: StorageItem["type"];
+      prompt: string;
+      model: string;
+      aspectRatio: string;
+      createdAt: string;
+    }> = [];
 
     await Promise.all(itemsToExport.map(async (item) => {
       const extension = item.type === "image" ? "png" : "mp4";
       const fileName = `creation_${item.id}.${extension}`;
-      
+
       // Metadata mapping output
       metadataList.push({
         id: item.id,
@@ -655,10 +1329,10 @@ export default function Home() {
 
     const content = await zip.generateAsync({ type: "blob" });
     const url = URL.createObjectURL(content);
-    
+
     const a = document.createElement("a");
     a.href = url;
-    a.download = `Imagine_Workbench_Export_${Date.now()}.zip`;
+    a.download = `${makeClientId("Imagine_Workbench_Export")}.zip`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -682,7 +1356,7 @@ export default function Home() {
         setIsCompareMode(true);
         // Reset slider position
         setCompareSliderPos(50);
-        
+
         // Find if they are both images
         const matchA = items.find(x => x.id === nextBatch[0]);
         const matchB = items.find(x => x.id === nextBatch[1]);
@@ -701,6 +1375,8 @@ export default function Home() {
       // filter type
       if (filterType === "images" && item.type !== "image") return false;
       if (filterType === "videos" && item.type !== "video") return false;
+      if (assetStatusFilter !== "all" && item.status !== assetStatusFilter) return false;
+      if (assetModelFilter !== "all" && item.model !== assetModelFilter) return false;
 
       // search query
       if (searchQuery.trim()) {
@@ -712,18 +1388,20 @@ export default function Home() {
   };
 
   // Launch mask editor layout dialog
-  const launchMaskEditor = (imageUrl: string, id: string) => {
+  const launchMaskEditor = (imageUrl: string, id: string, destination: MaskDestination = "creative") => {
     setMaskTargetUrl(imageUrl);
     setMaskTargetId(id);
+    setMaskDestination(destination);
     setIsMaskOpen(true);
   };
 
   const saveMaskOutput = (mergedImageBase64: string, maskBase64: string) => {
-    if (activeTab === "agent") {
+    if (maskDestination === "agent") {
       setAgentReferenceUrl(mergedImageBase64);
       if (!agentInput.includes("modify the marked region")) {
         setAgentInput(`In the marked region, change: `);
       }
+      setIsAgentDockOpen(true);
     } else {
       // Inject drew brush directly into reference seeds
       setReferenceImage(mergedImageBase64);
@@ -731,8 +1409,8 @@ export default function Home() {
       if (!prompt.includes("modify the marked region")) {
         setPrompt(`In the marked region of the image, change: ${prompt || "[输入你的新修改构想...]"}`);
       }
-      // Set active model to nano banana image editing
-      setSelectedModel("gemini-2.5-flash-image");
+      // Set active model to an image editing capable endpoint
+      setSelectedModel("12ai:gpt-image-2");
       // Smooth scroll to top/traditional panel to alert user
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -785,8 +1463,8 @@ export default function Home() {
 
   const renderAtDropdown = (type: "image-prompt" | "video-prompt" | "agent-prompt") => {
     const searchableImages = items.filter(x => x.type === "image" && x.status === "complete");
-    const filtered = searchableImages.filter(x => 
-      x.id.toLowerCase().includes(atDropdown.search.toLowerCase()) || 
+    const filtered = searchableImages.filter(x =>
+      x.id.toLowerCase().includes(atDropdown.search.toLowerCase()) ||
       x.prompt.toLowerCase().includes(atDropdown.search.toLowerCase())
     );
 
@@ -812,7 +1490,7 @@ export default function Home() {
             className="w-full flex items-center gap-2.5 p-1.5 hover:bg-white/5 hover:border-white/10 rounded-lg text-left transition select-none cursor-pointer border border-transparent"
           >
             <div className="h-8 w-8 rounded overflow-hidden bg-slate-950 shrink-0 border border-white/5">
-              <img src={item.url} alt="at option" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+              <PreviewImage src={item.url} alt="at option" className="h-full w-full object-cover" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[10px] font-mono font-bold text-blue-400 truncate">
@@ -843,9 +1521,10 @@ export default function Home() {
     if (!activeText) return;
 
     clearActiveCountdown();
+    setIsAgentDockOpen(true);
 
     const userMsg: ChatMessage = {
-      id: `usr_${Date.now()}`,
+      id: makeClientId("usr"),
       role: "user",
       content: activeText,
     };
@@ -860,10 +1539,18 @@ export default function Home() {
         type: x.type,
         prompt: x.prompt,
         aspectRatio: x.aspectRatio,
+        url: x.url,
       }));
 
-      const headers: Record<string, string> = {};
-      if (customApiKey) headers["x-gemini-api-key"] = customApiKey;
+      const activeAgentReferences =
+        agentReferences.length > 0
+          ? agentReferences
+          : agentReferenceId && agentReferenceUrl
+            ? [{ id: agentReferenceId, url: agentReferenceUrl }]
+            : [];
+      const hasAgentImageReference = activeAgentReferences.some(reference => reference.url.trim().length > 0);
+      const agentModel = hasAgentImageReference ? DEFAULT_VISION_CHAT_MODEL : selectedChatModel;
+      const headers = buildProviderHeaders(agentModel);
 
       // Construct sliding window history for request
       const requestHistory = agentMessages
@@ -880,15 +1567,16 @@ export default function Home() {
         body: JSON.stringify({
           messages: requestHistory,
           gallerySummary,
-          agentReferences: agentReferences.map(r => ({ id: r.id, url: r.url })),
-          agentReferenceId: agentReferences[0]?.id || agentReferenceId || undefined,
+          agentReferences: activeAgentReferences.map(r => ({ id: r.id, url: r.url })),
+          agentReferenceId: activeAgentReferences[0]?.id || agentReferenceId || undefined,
+          model: agentModel,
         }),
       });
 
       if (res.ok) {
         const agentResponse = await res.json();
-        const assistantMsgId = `asst_${Date.now()}`;
-        
+        const assistantMsgId = makeClientId("asst");
+
         const assistantMsg: ChatMessage = {
           id: assistantMsgId,
           role: "assistant",
@@ -907,13 +1595,14 @@ export default function Home() {
           startAutoCountdown(assistantMsgId, agentResponse.recommendedAction);
         }
       }
-    } catch (e: any) {
+    } catch (e) {
       console.error(e);
+      const message = e instanceof Error ? e.message : "请求过载";
       setAgentMessages(prev => [...prev, {
-        id: `asst_err_${Date.now()}`,
+        id: makeClientId("asst_err"),
         role: "assistant",
-        content: `抱歉，Agent 在网络调谐时出现异常 (${e.message || "请求过载"}). 请检查网络、API Key 或重试。`,
-        suggestedFollowUps: ["重试我先前的请求", "返回传统创作模式"]
+        content: `抱歉，Agent 在网络调谐时出现异常 (${message}). 请检查网络、API Key 或重试。`,
+        suggestedFollowUps: ["重试我先前的请求", "根据当前参数重新规划"]
       }]);
     } finally {
       setIsAgentLoading(false);
@@ -921,7 +1610,7 @@ export default function Home() {
   };
 
   // Interactive countdown loader representation for Auto-execute modes
-  const startAutoCountdown = (msgId: string, action: any) => {
+  const startAutoCountdown = (msgId: string, action: AgentToolAction) => {
     clearActiveCountdown();
     setActiveCountdownId(msgId);
     let secLeft = 3;
@@ -938,27 +1627,24 @@ export default function Home() {
   };
 
   // Run the Tool recommendations parsed from the Agent's response payload
-  const executeAgentToolAction = async (msgId: string, action: any) => {
+  const executeAgentToolAction = async (msgId: string, action: AgentToolAction) => {
     clearActiveCountdown();
 
     // Mark interactive state as executing
     setAgentMessages(prev => prev.map(m => m.id === msgId ? { ...m, interactiveState: "completed" } : m));
 
     const { type, params = {} } = action;
-    console.log(`Executing Agent proposed tool action: ${type}`, params);
 
     if (type === "optimize_prompt") {
       setPrompt(params.prompt || "");
-      setActiveTab("traditional");
       optimizeActivePrompt();
     } else if (type === "generate_image") {
       // Feed values to manual inputs and trigger
       setPrompt(params.prompt || "");
       if (params.aspectRatio) setAspectRatio(params.aspectRatio);
-      if (params.model) setSelectedModel(params.model);
-      setActiveTab("traditional");
+      if (params.model) handleSelectImageModel(params.model);
       setTraditionalSubTab("image");
-      
+
       // We trigger traditional image generation using immediate inline params
       setTimeout(() => {
         generateManualImage();
@@ -966,8 +1652,8 @@ export default function Home() {
     } else if (type === "generate_video") {
       setPrompt(params.prompt || "");
       if (params.aspectRatio) setAspectRatio(params.aspectRatio);
-      if (params.model) setSelectedVideoModel(params.model);
-      
+      if (params.model) handleSelectVideoModel(params.model);
+
       // Check if this refers to an existing asset
       if (params.referenceImageId) {
         const matchedAsset = items.find(x => x.id === params.referenceImageId);
@@ -977,7 +1663,6 @@ export default function Home() {
         }
       }
 
-      setActiveTab("traditional");
       setTraditionalSubTab("video");
       setTimeout(() => {
         generateManualVideo();
@@ -1010,46 +1695,96 @@ export default function Home() {
     }
   };
 
+  const toggleThemeMode = () => {
+    setThemeMode(prev => {
+      const next: ThemeMode = prev === "light" ? "dark" : "light";
+      localStorage.setItem("imagine_theme_mode", next);
+      return next;
+    });
+  };
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#050506] text-slate-200 font-sans selection:bg-blue-500/30 selection:text-slate-200 relative overflow-hidden">
-      
-      {/* Immersive UI Atmospheric Background Glow Spotlights */}
+    <div className={`imagine-workbench-shell imagine-theme-${themeMode} min-h-screen flex flex-col bg-[#07080b] text-slate-100 font-sans selection:bg-blue-500/30 selection:text-slate-100 relative overflow-hidden`}>
+
+      {/* Workbench depth layer */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-blue-600/10 blur-[130px] rounded-full" />
-        <div className="absolute bottom-[-5%] left-[5%] w-[400px] h-[400px] bg-indigo-600/5 blur-[110px] rounded-full" />
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.045)_1px,transparent_1px)] bg-[size:48px_48px] [mask-image:linear-gradient(to_bottom,black,transparent_78%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(30,41,59,0.42),transparent_56%)]" />
+      </div>
+
+      <div className="fixed top-[72px] right-4 z-[70] flex w-[min(360px,calc(100vw-32px))] flex-col gap-2">
+        <AnimatePresence>
+          {workspaceNotices.map(notice => (
+            <motion.div
+              key={notice.id}
+              initial={{ opacity: 0, y: -8, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8, scale: 0.98 }}
+              className={`flex items-start gap-3 rounded-lg border px-3 py-2.5 shadow-2xl backdrop-blur-xl ${
+                notice.type === "error"
+                  ? "border-red-500/30 bg-red-950/80 text-red-100"
+                  : notice.type === "success"
+                    ? "border-emerald-500/30 bg-emerald-950/80 text-emerald-100"
+                    : "border-blue-500/30 bg-blue-950/80 text-blue-100"
+              }`}
+            >
+              <Info className="mt-0.5 h-4 w-4 shrink-0 opacity-80" />
+              <p className="min-w-0 flex-1 text-xs leading-5">{notice.message}</p>
+              <button
+                type="button"
+                onClick={() => dismissWorkspaceNotice(notice.id)}
+                className="rounded-md p-1 text-current/60 transition hover:bg-white/10 hover:text-current"
+                title="关闭提示"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
 
       {/* Dynamic Header */}
-      <header className="sticky top-0 z-40 bg-[#050506]/70 backdrop-blur-xl border-b border-white/5 px-6 py-3.5 flex items-center justify-between select-none">
-        <div className="flex items-center gap-3 z-10">
-          <div className="relative h-9.5 w-9.5 bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-650 rounded-xl flex items-center justify-center shadow-[0_0_22px_rgba(99,102,241,0.35)] overflow-hidden group">
-            <span className="absolute inset-0 bg-gradient-to-r from-pink-500/20 to-blue-500/15 opacity-0 group-hover:opacity-100 transition-opacity duration-500 animate-pulse" />
-            <Sparkles className="h-4.5 w-4.5 text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.85)] z-10 transition duration-300 group-hover:rotate-12 group-hover:scale-110" />
-            <div className="absolute inset-[3px] border border-white/15 rounded-[8px] pointer-events-none" />
+      <header className="imagine-app-header sticky top-0 z-40 bg-[#07080b]/86 backdrop-blur-xl border-b border-slate-800/80 px-4 py-3 sm:px-6 flex items-center justify-between gap-3 select-none">
+        <div className="flex min-w-0 items-center gap-3 z-10">
+          <div className="imagine-brand-mark relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-blue-400/20 bg-blue-500/12 shadow-sm">
+            <Sparkles className="h-4.5 w-4.5 text-blue-200" />
           </div>
-          <div>
-            <h1 className="text-sm font-semibold tracking-tight text-white flex items-center gap-2">
-              <span className="text-[10px] font-mono text-indigo-455 text-indigo-400 uppercase tracking-widest hidden sm:inline">WORKSPACE //</span>
-              <span>Imagine Workbench</span>
-              <span className="text-[9px] bg-gradient-to-r from-blue-500/15 to-indigo-505/15 text-blue-400 px-1.5 py-0.5 rounded border border-blue-500/15 font-mono tracking-widest font-normal">v1.2 PRO</span>
+          <div className="min-w-0">
+            <h1 className="flex min-w-0 items-center gap-2 text-sm font-semibold tracking-tight text-white">
+              <span className="truncate">Imagine Workbench</span>
+              <span className="shrink-0 rounded border border-blue-400/20 bg-blue-400/10 px-1.5 py-0.5 text-[9px] font-mono font-normal tracking-widest text-blue-300">v1.2 PRO</span>
             </h1>
-            <p className="text-[11px] text-slate-450 font-medium font-sans">智能创意与媒体调谐工作台</p>
+            <p className="truncate text-[11px] font-medium text-slate-400">智能图像与视频生成工作台</p>
           </div>
         </div>
 
         {/* Global actions bar */}
-        <div className="flex items-center gap-3 z-10">
+        <div className="flex shrink-0 items-center gap-2 z-10">
           <button
             onClick={() => setShowSettings(!showSettings)}
-            className="flex items-center gap-1.5 rounded-lg border border-white/5 bg-white/5 hover:bg-white/10 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:text-white transition cursor-pointer"
+            className="imagine-header-button flex h-9 items-center gap-1.5 rounded-lg border border-slate-700/80 bg-slate-900/80 px-3 text-xs font-semibold text-slate-200 transition hover:border-slate-600 hover:bg-slate-800 cursor-pointer"
           >
             <Settings className="h-3.5 w-3.5" />
-            配置设置
+            <span className="hidden sm:inline">设置</span>
           </button>
-          
+
+          <button
+            type="button"
+            onClick={toggleThemeMode}
+            aria-pressed={themeMode === "dark"}
+            className="imagine-header-button imagine-icon-button flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700/80 bg-slate-900/80 text-slate-400 transition hover:border-blue-500/40 hover:bg-blue-950/30 hover:text-blue-300 cursor-pointer"
+            title={themeMode === "light" ? "切换深色模式" : "切换浅色模式"}
+          >
+            {themeMode === "light" ? (
+              <Moon className="h-3.5 w-3.5" />
+            ) : (
+              <Sun className="h-3.5 w-3.5" />
+            )}
+          </button>
+
           <button
             onClick={handleClearProject}
-            className="rounded-lg border border-white/5 hover:border-red-500/30 hover:bg-red-950/25 bg-white/5 p-2 text-slate-400 hover:text-red-400 transition cursor-pointer"
+            className="imagine-header-button imagine-icon-button flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700/80 bg-slate-900/80 text-slate-400 transition hover:border-red-500/40 hover:bg-red-950/30 hover:text-red-300 cursor-pointer"
             title="清空当前项目"
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -1058,82 +1793,60 @@ export default function Home() {
       </header>
 
       {/* Main Multi-panel Layout grid */}
-      <main className="flex-1 w-full max-w-7xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start z-10">
-        
-        {/* Creation Controls sidebar container (Col 5) */}
-        <section className="lg:col-span-5 flex flex-col gap-6">
-          
-          {/* Creative Mode Navigation System */}
-          <div className="flex p-1 rounded-xl bg-white/5 border border-white/5">
-            <button
-              onClick={() => { setActiveTab("traditional"); clearActiveCountdown(); }}
-              className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-semibold tracking-wide transition-all duration-200 cursor-pointer ${
-                activeTab === "traditional"
-                  ? "bg-white/10 text-slate-100 shadow-[0_0_12px_rgba(255,255,255,0.05)] border border-white/5"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              <Sliders className="h-4 w-4" />
-              传统模式
-            </button>
-            <button
-              onClick={() => { setActiveTab("agent"); }}
-              className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-bold tracking-wide transition-all duration-200 relative overflow-hidden cursor-pointer ${
-                activeTab === "agent"
-                  ? "bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/20 text-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.15)]"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              <Sparkles className="h-4 w-4 text-orange-500 animate-pulse" />
-              Agent 智能代理
-              <span className="absolute top-1 right-2 block h-1.5 w-1.5 rounded-full bg-orange-400 animate-ping" />
-            </button>
-          </div>
+      <main
+        className="imagine-main-grid flex-1 w-full max-w-[1880px] mx-auto px-4 pt-5 sm:px-6 sm:pt-6 grid grid-cols-1 lg:grid-cols-[minmax(420px,0.54fr)_minmax(0,1fr)] gap-5 xl:gap-6 items-start z-10"
+        style={{ paddingBottom: isAgentDockOpen ? "72px" : "48px" }}
+      >
+
+        {/* Creation Controls sidebar container (Col 4) */}
+        <section className="imagine-creator-panel flex flex-col gap-4">
 
           {/* Active Creative Panel switch */}
-          <div className="rounded-2xl dark-glass p-5 flex flex-col gap-5 min-h-[500px]">
-            
-            {/* TRADITIONAL WORKFLOW TAB */}
-            {activeTab === "traditional" && (
-              <div className="flex flex-col gap-4 animate-fade-in">
-                
+          <div className="imagine-control-surface rounded-xl dark-glass p-4 flex flex-col gap-4 min-h-[500px]">
+
+            {/* Creative workflow controls */}
+              <div className="flex flex-col gap-3.5 animate-fade-in">
+
                 {/* Traditional Sub-tabs Switcher */}
-                <div className="flex p-1 rounded-xl bg-white/5 border border-white/5 mb-1.5">
+                <div className="imagine-tabbar flex rounded-lg border border-slate-800 bg-slate-950/60 p-1">
                   <button
                     type="button"
                     onClick={() => setTraditionalSubTab("image")}
-                    className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2 text-xs font-semibold select-none cursor-pointer transition-all duration-200 ${
+                    data-active={traditionalSubTab === "image"}
+                    className={`imagine-tab-button flex-1 flex items-center justify-center gap-2 rounded-md py-2 text-xs font-semibold select-none cursor-pointer transition-all duration-200 ${
                       traditionalSubTab === "image"
-                        ? "bg-blue-600/15 border border-blue-500/20 text-blue-400 font-bold"
-                        : "text-slate-400 hover:text-slate-200"
+                        ? "bg-blue-500/14 text-blue-200"
+                        : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
                     }`}
                   >
                     <ImageIcon className="h-3.5 w-3.5" />
-                    🌌 智能绘图 (Image Studio)
+                    智能绘图 <span className="hidden sm:inline text-slate-500">Image Studio</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setTraditionalSubTab("video")}
-                    className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2 text-xs font-semibold select-none cursor-pointer transition-all duration-200 ${
+                    data-active={traditionalSubTab === "video"}
+                    className={`imagine-tab-button flex-1 flex items-center justify-center gap-2 rounded-md py-2 text-xs font-semibold select-none cursor-pointer transition-all duration-200 ${
                       traditionalSubTab === "video"
-                        ? "bg-purple-600/15 border border-purple-500/20 text-purple-400 font-bold"
-                        : "text-slate-400 hover:text-slate-200"
+                        ? "bg-violet-500/14 text-violet-200"
+                        : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
                     }`}
                   >
                     <VideoIcon className="h-3.5 w-3.5" />
-                    🎬 视频合成 (Veo Studio)
+                    视频合成 <span className="hidden sm:inline text-slate-500">Veo Studio</span>
                   </button>
                 </div>
 
                 {traditionalSubTab === "image" ? (
                   /* IMAGE TAB CONFIG */
-                  <div className="flex flex-col gap-4 animate-fade-in">
+                  <div className="flex flex-col gap-3.5 animate-fade-in">
                     {/* Visual Preset Tag Picker */}
                     <div>
-                      <label className="text-xs text-slate-400 font-medium mb-2 block">
-                        🎨 艺术预设风格
+                      <label className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold text-slate-300">
+                        <Paintbrush className="h-3.5 w-3.5 text-blue-300" />
+                        艺术预设
                       </label>
-                      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                      <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
                         {VISUAL_PRESETS.map((preset) => {
                           const isActive = prompt.includes(preset.promptSuffix);
                           return (
@@ -1141,16 +1854,16 @@ export default function Home() {
                               key={preset.id}
                               type="button"
                               onClick={() => applyPreset(preset)}
-                              className={`flex items-center gap-1.5 shrink-0 rounded-full py-1.5 px-3.5 text-xs transition duration-200 cursor-pointer ${
+                              className={`imagine-preset-chip flex h-8 items-center gap-1.5 shrink-0 rounded-lg border px-3 text-xs transition duration-200 cursor-pointer ${
                                 isActive
-                                  ? "bg-blue-600/20 border border-blue-500/50 text-blue-300 shadow-[0_0_12px_rgba(37,99,235,0.25)] font-bold scale-[1.03]"
-                                  : "bg-white/5 border border-white/5 hover:border-white/10 hover:bg-white/10 text-slate-300"
+                                  ? "bg-blue-500/14 border-blue-400/35 text-blue-100"
+                                  : "bg-slate-950/50 border-slate-800 text-slate-300 hover:border-slate-700 hover:bg-slate-900"
                               }`}
                             >
                               <span>{preset.emoji}</span>
                               <span>{preset.name}</span>
                               {isActive && (
-                                <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
+                                <span className="h-1.5 w-1.5 rounded-full bg-blue-300" />
                               )}
                             </button>
                           );
@@ -1161,36 +1874,37 @@ export default function Home() {
                     {/* Prompt Box */}
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <label className="text-xs text-slate-400 font-medium flex items-center gap-1">
-                          <span>✍️</span> 提示词 (Prompt)
+                        <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-300">
+                          <Sparkles className="h-3.5 w-3.5 text-blue-300" />
+                          提示词 <span className="text-slate-500">(Prompt)</span>
                         </label>
                         <button
                           onClick={optimizeActivePrompt}
                           disabled={isOptimizing || !prompt.trim()}
-                          className={`text-[11px] font-semibold flex items-center gap-1 px-2.5 py-1 rounded-md border transition ${
+                          className={`flex h-7 items-center gap-1 rounded-md border px-2.5 text-[11px] font-semibold transition ${
                             isOptimizing || !prompt.trim()
-                              ? "bg-white/5 text-slate-650 border-white/5 cursor-not-allowed"
-                              : "bg-blue-500/10 text-blue-400 border-blue-500/20 hover:bg-blue-500/20 cursor-pointer"
+                              ? "bg-slate-900/70 text-slate-600 border-slate-800 cursor-not-allowed"
+                              : "bg-blue-500/12 text-blue-200 border-blue-400/25 hover:bg-blue-500/18 cursor-pointer"
                           }`}
                         >
                           {isOptimizing ? (
                             <RefreshCw className="h-3 w-3 animate-spin text-blue-400" />
                           ) : (
-                            <Sparkles className="h-3 w-3 text-blue-400 animate-pulse" />
+                            <Sparkles className="h-3 w-3 text-blue-300" />
                           )}
                           一键智能优化
                         </button>
                       </div>
 
-                      <div className="relative rounded-xl border border-white/5 bg-white/5 p-2.5 focus-within:border-white/10 transition">
+                      <div className="imagine-field-shell relative rounded-lg border border-slate-800 bg-slate-950/55 p-3 transition focus-within:border-blue-400/35 focus-within:bg-slate-950/75">
                         {atDropdown.visible && atDropdown.type === "image-prompt" && renderAtDropdown("image-prompt")}
                         <textarea
                           value={prompt}
                           onChange={(e) => handleTextareaChange(e.target.value, "image-prompt")}
                           placeholder="写下你想创造的图片奇思妙想... 输入 @ 可引用历史生成图像作为参考"
-                          className="w-full text-sm bg-transparent border-0 outline-0 ring-0 focus:ring-0 text-slate-100 placeholder-slate-500 resize-none h-24"
+                          className="w-full h-24 resize-none border-0 bg-transparent text-sm leading-6 text-slate-100 placeholder-slate-500 outline-0 ring-0 focus:ring-0"
                         />
-                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5 text-[10px] text-slate-500 font-mono">
+                        <div className="mt-2 flex items-center justify-between border-t border-slate-800 pt-2 font-mono text-[10px] text-slate-500">
                           <span>输入 @ 呼出参考图 | 支持中英文</span>
                           <span>{prompt.length} 字符</span>
                         </div>
@@ -1199,83 +1913,129 @@ export default function Home() {
 
                     {/* Negative prompt entry box */}
                     <div>
-                      <label className="text-xs text-slate-400 font-medium mb-1.5 block">
-                        🚫 反向提示词 (Negative Prompt)
+                      <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">
+                        反向提示词 <span className="text-slate-500">(Negative Prompt)</span>
                       </label>
                       <input
                         type="text"
                         value={negativePrompt}
                         onChange={(e) => setNegativePrompt(e.target.value)}
                         placeholder="不希望出现在作品里的元素，例如：blurred, ugly, deformed, text"
-                        className="w-full bg-white/5 border border-white/5 rounded-xl py-2 px-3 text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-white/10 transition"
+                        className="w-full rounded-lg border border-slate-800 bg-slate-950/55 px-3 py-2.5 text-xs text-slate-200 placeholder-slate-600 transition focus:border-blue-400/35 focus:outline-none"
                       />
                     </div>
 
                     {/* Model & Aspect Ratio */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div>
-                        <label className="text-xs text-slate-400 font-medium mb-1.5 block">
-                          🤖 图片生成模型
+                        <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">
+                          图片生成模型
                         </label>
                         <select
                           value={selectedModel}
-                          onChange={(e) => setSelectedModel(e.target.value)}
-                          className="w-full bg-[#0d0d10] border border-white/5 rounded-xl py-2 px-3 text-xs text-slate-300 focus:outline-none focus:border-white/10 font-mono cursor-pointer"
+                          onChange={(e) => handleSelectImageModel(e.target.value)}
+                          className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 transition focus:border-blue-400/35 focus:outline-none cursor-pointer"
                         >
-                          <option value="gemini-2.5-flash-image">Gemini 2.5 Flash Image ⚡</option>
-                          <option value="gemini-3.1-flash-image-preview">Gemini 3.1 Flash Image PRO 🌟</option>
-                          <option value="imagen-4.0-generate-001">Imagen 4.0 Studio 🎨</option>
+                          {imageModelGroups.map(group => (
+                            <optgroup key={group.provider} label={group.label}>
+                              {group.options.map(option => (
+                                <option key={option.value} value={option.value}>{option.label}</option>
+                              ))}
+                            </optgroup>
+                          ))}
                         </select>
                       </div>
 
                       <div>
-                        <label className="text-xs text-slate-400 font-medium mb-1.5 block">
-                          📐 画面宽高比 (Size)
+                        <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">
+                          {isGptImageModel ? "输出分辨率" : "画面宽高比"} <span className="text-slate-500">(Size)</span>
                         </label>
                         <select
-                          value={aspectRatio}
+                          value={activeVideoSize}
                           onChange={(e) => setAspectRatio(e.target.value)}
-                          className="w-full bg-[#0d0d10] border border-white/5 rounded-xl py-2 px-3 text-xs text-slate-300 focus:outline-none focus:border-white/10 font-mono cursor-pointer"
+                          className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 transition focus:border-blue-400/35 focus:outline-none cursor-pointer"
                         >
-                          <option value="1:1">1:1 Square (正方形)</option>
-                          <option value="16:9">16:9 Cinema 🎬 (横版高清)</option>
-                          <option value="9:16">9:16 Portrait📱 (竖屏短视频)</option>
-                          <option value="4:3">4:3 Retro (古典屏幕)</option>
-                          <option value="3:4">3:4 Portrait (人像画报)</option>
+                          {imageCapabilities.aspectRatios.map(option => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                          ))}
                         </select>
                       </div>
                     </div>
 
-                    {/* Resolution size parameter (For Gemini 3.1 PRO) */}
-                    {selectedModel.includes("preview") && (
+                    {isGptImageModel && aspectRatio === "custom" && (
                       <div>
-                        <label className="text-xs text-slate-400 font-medium mb-1.5 block">
-                          💎 高清合成分辨率
+                        <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">
+                          自定义 GPT Image 2 分辨率
                         </label>
-                        <div className="flex gap-2">
-                          {["512px", "1K", "2K", "4K"].map((sz) => (
-                            <button
-                              key={sz}
-                              type="button"
-                              onClick={() => setImageSize(sz)}
-                              className={`flex-1 py-1.5 px-2 text-[10px] font-mono rounded-lg border transition cursor-pointer ${
-                                imageSize === sz
-                                  ? "bg-blue-500/10 text-blue-400 border-blue-500/25"
-                                  : "bg-white/5 border-white/5 text-slate-500 hover:text-slate-300"
-                              }`}
-                            >
-                              {sz}
-                            </button>
-                          ))}
-                        </div>
+                        <input
+                          type="text"
+                          value={customGptImageSize}
+                          onChange={(e) => setCustomGptImageSize(e.target.value)}
+                          placeholder="例如 2560x1440，宽高需为 16 的倍数"
+                          className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 placeholder-slate-600 transition focus:border-blue-400/35 focus:outline-none"
+                        />
+                        <p className="mt-1.5 font-mono text-[10px] leading-relaxed text-slate-500">
+                          约束：最大边 ≤ 3840px，宽高为 16 的倍数，比例 ≤ 3:1，总像素 655,360-8,294,400。
+                        </p>
                       </div>
                     )}
+
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {imageCapabilities.imageSizes.length > 0 && (
+                        <div>
+                          <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">
+                            {selectedModel.includes("gpt-image") ? "画质档位" : "高清合成分辨率"}
+                          </label>
+                          <div className="grid grid-cols-4 gap-1.5 rounded-lg border border-slate-800 bg-slate-950/45 p-1.5">
+                            {imageCapabilities.imageSizes.map((option) => (
+                              <button
+                                key={option.value}
+                                type="button"
+                                onClick={() => setImageSize(option.value)}
+                                className={`min-h-8 rounded-md px-2 font-mono text-[10px] transition cursor-pointer ${
+                                  imageSize === option.value
+                                    ? "bg-blue-500/16 text-blue-100"
+                                    : "text-slate-500 hover:bg-slate-900 hover:text-slate-300"
+                                }`}
+                              >
+                                {option.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {imageCapabilities.thinkingLevels.length > 0 && (
+                        <div>
+                          <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">
+                            图片思考等级
+                          </label>
+                          <div className="grid grid-cols-2 gap-1.5 rounded-lg border border-slate-800 bg-slate-950/45 p-1.5">
+                            {imageCapabilities.thinkingLevels.map(option => (
+                              <button
+                                key={option.value}
+                                type="button"
+                                onClick={() => setImageThinkingLevel(option.value)}
+                                className={`min-h-8 rounded-md px-2 font-mono text-[10px] transition cursor-pointer ${
+                                  imageThinkingLevel === option.value
+                                    ? "bg-amber-500/16 text-amber-100"
+                                    : "text-slate-500 hover:bg-slate-900 hover:text-slate-300"
+                                }`}
+                              >
+                                {option.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
 
                     {/* Image-to-image reference (Upload / Masking) */}
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <label className="text-xs text-slate-400 font-medium flex items-center gap-1">
-                          <span>🖼️</span> 创意参考图 / 多图垫图 {referenceImages.length > 0 && `(${referenceImages.length})`}
+                        <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-300">
+                          <Layers className="h-3.5 w-3.5 text-slate-400" />
+                          创意参考图 / 多图垫图 {referenceImages.length > 0 && `(${referenceImages.length})`}
                         </label>
                         {referenceImages.length > 0 && (
                           <button
@@ -1284,7 +2044,7 @@ export default function Home() {
                               setReferenceImages([]);
                               setReferenceImage(null);
                             }}
-                            className="text-[10px] text-red-400 hover:text-red-350 transition cursor-pointer"
+                            className="text-[10px] text-red-300 transition hover:text-red-200 cursor-pointer"
                           >
                             清空所有垫图
                           </button>
@@ -1292,7 +2052,7 @@ export default function Home() {
                       </div>
 
                       {referenceImages.length > 0 ? (
-                        <div className="grid grid-cols-4 gap-2 p-2 rounded-xl bg-white/2 border border-white/5">
+                        <div className="grid grid-cols-4 gap-2 rounded-lg border border-slate-800 bg-slate-950/45 p-2">
                           {referenceImages.map((refImg) => (
                             <div
                               key={refImg.id}
@@ -1310,7 +2070,7 @@ export default function Home() {
                               </button>
 
                               {/* Tiny ID indicator */}
-                              <div className="absolute bottom-0 inset-x-0 bg-black/60 text-[8px] font-mono text-slate-300 truncate px-1 py-0.5 text-center">
+                              <div className="absolute bottom-0 inset-x-0 bg-black/65 text-[8px] font-mono text-slate-300 truncate px-1 py-0.5 text-center">
                                 {refImg.id.includes("upload") ? "Uploaded" : refImg.id.substring(0, 10)}
                               </div>
                             </div>
@@ -1318,7 +2078,7 @@ export default function Home() {
 
                           {/* Add button inside grid */}
                           {referenceImages.length < 4 && (
-                            <label className="relative aspect-square rounded-lg border border-dashed border-white/10 hover:border-white/20 hover:bg-white/5 transition flex flex-col items-center justify-center cursor-pointer select-none bg-white/2">
+                            <label className="relative aspect-square rounded-lg border border-dashed border-slate-700 bg-slate-900/40 transition hover:border-slate-500 hover:bg-slate-900 flex flex-col items-center justify-center cursor-pointer select-none">
                               <span className="text-slate-400 font-bold text-lg leading-none">+</span>
                               <span className="text-[8px] text-slate-500 font-semibold mt-0.5">多图垫</span>
                               <input
@@ -1331,11 +2091,11 @@ export default function Home() {
                           )}
                         </div>
                       ) : (
-                        <div className="rounded-xl border border-dashed border-white/10 bg-white/2 p-3.5 flex flex-col items-center justify-center min-h-[90px] text-center hover:bg-white/5 transition relative">
-                          <Layers className="h-6 w-6 text-slate-600 mb-1.5 animate-pulse" />
-                          <span className="text-xs text-slate-400">
+                        <div className="imagine-upload-zone relative flex min-h-[76px] flex-col items-center justify-center rounded-lg border border-dashed border-slate-700 bg-slate-950/35 p-3 text-center transition hover:border-slate-600 hover:bg-slate-950/60">
+                          <CloudUpload className="mb-1.5 h-5 w-5 text-slate-500" />
+                          <span className="text-xs text-slate-300">
                             拖拽图片，或{" "}
-                            <label className="text-blue-400 hover:text-blue-300 cursor-pointer font-medium underline">
+                            <label className="font-medium text-blue-300 underline-offset-4 hover:text-blue-200 hover:underline cursor-pointer">
                               浏览上传
                               <input
                                 type="file"
@@ -1345,7 +2105,7 @@ export default function Home() {
                               />
                             </label>
                           </span>
-                          <span className="text-[9px] text-slate-500 mt-1">支持 JPG / PNG / WEBP | 粘贴剪贴板快捷垫图</span>
+                          <span className="mt-1 text-[9px] text-slate-500">支持 JPG / PNG / WEBP | 粘贴剪贴板快捷垫图</span>
                         </div>
                       )}
                     </div>
@@ -1353,57 +2113,58 @@ export default function Home() {
                     {/* Bottom main trigger button */}
                     <button
                       onClick={generateManualImage}
-                      disabled={isGenerating || !prompt.trim()}
-                      className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-xs font-bold transition duration-200 mt-1.5 ${
-                        isGenerating || !prompt.trim()
-                          ? "bg-white/5 text-slate-550 border border-white/5 cursor-not-allowed"
-                          : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white active:scale-95 shadow-[0_0_20px_rgba(37,99,235,0.25)] hover:shadow-[0_0_25px_rgba(37,99,235,0.4)] cursor-pointer"
+                      disabled={!prompt.trim()}
+                      className={`imagine-primary-action mt-1 flex w-full items-center justify-center gap-2 rounded-lg py-3 text-xs font-bold transition duration-200 ${
+                        !prompt.trim()
+                          ? "bg-slate-900/70 text-slate-600 border border-slate-800 cursor-not-allowed"
+                          : "bg-blue-600 hover:bg-blue-500 text-white active:scale-95 shadow-lg shadow-blue-950/30 cursor-pointer"
                       }`}
                     >
-                      {isGenerating ? (
+                      {isSubmittingImage ? (
                         <RefreshCw className="h-4 w-4 animate-spin text-white" />
                       ) : (
-                        <Sparkles className="h-4 w-4 text-white animate-pulse" />
+                        <Sparkles className="h-4 w-4 text-white" />
                       )}
-                      一键渲染合成全新图片 (Render Image)
+                      {isSubmittingImage ? `提交中 (${imageSubmitCount})，可继续排队` : "一键渲染合成全新图片 (Render Image)"}
                     </button>
                   </div>
                 ) : (
                   /* VIDEO TAB CONFIG */
-                  <div className="flex flex-col gap-4 animate-fade-in">
+                  <div className="flex flex-col gap-3.5 animate-fade-in">
                     {/* Prompt Box */}
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <label className="text-xs text-slate-400 font-medium flex items-center gap-1">
-                          <span>🎬</span> 视频场景运动描述 (Video Motion Prompt)
+                        <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-300">
+                          <VideoIcon className="h-3.5 w-3.5 text-violet-300" />
+                          视频场景运动描述 <span className="text-slate-500">(Video Motion Prompt)</span>
                         </label>
                         <button
                           onClick={optimizeActivePrompt}
                           disabled={isOptimizing || !prompt.trim()}
-                          className={`text-[11px] font-semibold flex items-center gap-1 px-2.5 py-1 rounded-md border transition ${
+                          className={`flex h-7 items-center gap-1 rounded-md border px-2.5 text-[11px] font-semibold transition ${
                             isOptimizing || !prompt.trim()
-                              ? "bg-white/5 text-slate-650 border-white/5 cursor-not-allowed"
-                              : "bg-purple-500/10 text-purple-400 border-purple-500/20 hover:bg-purple-500/20 cursor-pointer"
+                              ? "bg-slate-900/70 text-slate-600 border-slate-800 cursor-not-allowed"
+                              : "bg-violet-500/12 text-violet-200 border-violet-400/25 hover:bg-violet-500/18 cursor-pointer"
                           }`}
                         >
                           {isOptimizing ? (
                             <RefreshCw className="h-3 w-3 animate-spin text-purple-400" />
                           ) : (
-                            <Sparkles className="h-3 w-3 text-purple-400 animate-pulse" />
+                            <Sparkles className="h-3 w-3 text-violet-300" />
                           )}
                           提示词动态润色
                         </button>
                       </div>
 
-                      <div className="relative rounded-xl border border-white/5 bg-white/5 p-2.5 focus-within:border-white/10 transition">
+                      <div className="imagine-field-shell relative rounded-lg border border-slate-800 bg-slate-950/55 p-3 transition focus-within:border-violet-400/35 focus-within:bg-slate-950/75">
                         {atDropdown.visible && atDropdown.type === "video-prompt" && renderAtDropdown("video-prompt")}
                         <textarea
                           value={prompt}
                           onChange={(e) => handleTextareaChange(e.target.value, "video-prompt")}
                           placeholder="描述场景的运动与镜头动作... 输入 @ 可快捷引用图像作为动态首帧"
-                          className="w-full text-sm bg-transparent border-0 outline-0 ring-0 focus:ring-0 text-slate-100 placeholder-slate-550 resize-none h-24"
+                          className="w-full h-24 resize-none border-0 bg-transparent text-sm leading-6 text-slate-100 placeholder-slate-500 outline-0 ring-0 focus:ring-0"
                         />
-                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5 text-[10px] text-slate-505 font-mono">
+                        <div className="mt-2 flex items-center justify-between border-t border-slate-800 pt-2 font-mono text-[10px] text-slate-500">
                           <span>输入 @ 呼出参考图 | 支持运动镜头与画面控制</span>
                           <span>{prompt.length} 字符</span>
                         </div>
@@ -1411,33 +2172,38 @@ export default function Home() {
                     </div>
 
                     {/* Model & Aspect Ratio */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div>
-                        <label className="text-xs text-slate-400 font-medium mb-1.5 block">
-                          🤖 视频生成模型 (Veo)
+                        <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">
+                          视频生成模型 <span className="text-slate-500">(Veo)</span>
                         </label>
                         <select
                           value={selectedVideoModel}
-                          onChange={(e) => setSelectedVideoModel(e.target.value)}
-                          className="w-full bg-[#0d0d10] border border-white/5 rounded-xl py-2 px-3 text-xs text-slate-300 focus:outline-none focus:border-white/10 font-mono cursor-pointer"
+                          onChange={(e) => handleSelectVideoModel(e.target.value)}
+                          className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 transition focus:border-violet-400/35 focus:outline-none cursor-pointer"
                         >
-                          <option value="veo-3.1-lite-generate-preview">Veo 3.1 Lite ⚡ (Speedy)</option>
-                          <option value="veo-3.1-generate-preview">Veo 3.1 HQ 💎 (Pro Cine)</option>
+                          {videoModelGroups.map(group => (
+                            <optgroup key={group.provider} label={group.label}>
+                              {group.options.map(option => (
+                                <option key={option.value} value={option.value}>{option.label}</option>
+                              ))}
+                            </optgroup>
+                          ))}
                         </select>
                       </div>
 
                       <div>
-                        <label className="text-xs text-slate-400 font-medium mb-1.5 block">
-                          📐 画面宽高比 (Size)
+                        <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">
+                          视频尺寸
                         </label>
                         <select
                           value={aspectRatio}
                           onChange={(e) => setAspectRatio(e.target.value)}
-                          className="w-full bg-[#0d0d10] border border-white/5 rounded-xl py-2 px-3 text-xs text-slate-300 focus:outline-none focus:border-white/10 font-mono cursor-pointer"
+                          className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 transition focus:border-violet-400/35 focus:outline-none cursor-pointer"
                         >
-                          <option value="16:9">16:9 Cinema 🎬 (横版超清)</option>
-                          <option value="9:16">9:16 Portrait📱 (竖屏短视频)</option>
-                          <option value="1:1">1:1 Square (正方形)</option>
+                          {videoCapabilities.sizes.map(option => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                          ))}
                         </select>
                       </div>
                     </div>
@@ -1445,8 +2211,9 @@ export default function Home() {
                     {/* Reference First Frame / Image-to-Video seed */}
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <label className="text-xs text-slate-400 font-medium flex items-center gap-1">
-                          <span>🎞️</span> 视频起始/结束关键帧 {referenceImages.length > 0 && `(${referenceImages.length})`}
+                        <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-300">
+                          <Layers className="h-3.5 w-3.5 text-slate-400" />
+                          视频起始/结束关键帧 {referenceImages.length > 0 && `(${referenceImages.length})`}
                         </label>
                         {referenceImages.length > 0 && (
                           <button
@@ -1455,7 +2222,7 @@ export default function Home() {
                               setReferenceImages([]);
                               setReferenceImage(null);
                             }}
-                            className="text-[10px] text-red-400 hover:text-red-350 transition cursor-pointer"
+                            className="text-[10px] text-red-300 transition hover:text-red-200 cursor-pointer"
                           >
                             清空所有关键帧
                           </button>
@@ -1463,7 +2230,7 @@ export default function Home() {
                       </div>
 
                       {referenceImages.length > 0 ? (
-                        <div className="grid grid-cols-4 gap-2 p-2 rounded-xl bg-white/2 border border-white/5">
+                        <div className="grid grid-cols-4 gap-2 rounded-lg border border-slate-800 bg-slate-950/45 p-2">
                           {referenceImages.map((refImg) => {
                             const isStart = refImg.role === "start";
                             const isEnd = refImg.role === "end";
@@ -1513,7 +2280,7 @@ export default function Home() {
 
                           {/* Add button inside grid */}
                           {referenceImages.length < 4 && (
-                            <label className="relative aspect-square rounded-lg border border-dashed border-white/10 hover:border-white/20 hover:bg-white/5 transition flex flex-col items-center justify-center cursor-pointer select-none bg-white/2">
+                            <label className="relative aspect-square rounded-lg border border-dashed border-slate-700 bg-slate-900/40 transition hover:border-slate-500 hover:bg-slate-900 flex flex-col items-center justify-center cursor-pointer select-none">
                               <span className="text-slate-400 font-bold text-lg leading-none">+</span>
                               <span className="text-[8px] text-slate-500 font-semibold mt-0.5">多图垫</span>
                               <input
@@ -1526,11 +2293,11 @@ export default function Home() {
                           )}
                         </div>
                       ) : (
-                        <div className="rounded-xl border border-dashed border-white/10 bg-white/2 p-3.5 flex flex-col items-center justify-center min-h-[90px] text-center hover:bg-white/5 transition relative">
-                          <VideoIcon className="h-6 w-6 text-slate-600 mb-1.5 animate-pulse" />
-                          <span className="text-xs text-slate-400">
+                        <div className="imagine-upload-zone relative flex min-h-[76px] flex-col items-center justify-center rounded-lg border border-dashed border-slate-700 bg-slate-950/35 p-3 text-center transition hover:border-slate-600 hover:bg-slate-950/60">
+                          <CloudUpload className="mb-1.5 h-5 w-5 text-slate-500" />
+                          <span className="text-xs text-slate-300">
                             拖拽起始/结束帧，或{" "}
-                            <label className="text-purple-400 hover:text-purple-300 cursor-pointer font-medium underline">
+                            <label className="font-medium text-violet-300 underline-offset-4 hover:text-violet-200 hover:underline cursor-pointer">
                               浏览上传
                               <input
                                 type="file"
@@ -1540,7 +2307,7 @@ export default function Home() {
                               />
                             </label>
                           </span>
-                          <span className="text-[9px] text-slate-500 mt-1">支持 JPG / PNG / WEBP | 点击切换起始帧与结束帧</span>
+                          <span className="mt-1 text-[9px] text-slate-500">支持 JPG / PNG / WEBP | 点击切换起始帧与结束帧</span>
                         </div>
                       )}
                     </div>
@@ -1548,32 +2315,65 @@ export default function Home() {
                     {/* Bottom main video trigger button */}
                     <button
                       onClick={generateManualVideo}
-                      disabled={isGenerating || !prompt.trim()}
-                      className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-xs font-bold transition duration-200 mt-1.5 ${
-                        isGenerating || !prompt.trim()
-                          ? "bg-white/5 text-slate-550 border border-white/5 cursor-not-allowed"
-                          : "bg-gradient-to-r from-purple-600 to-indigo-650 hover:from-purple-500 hover:to-indigo-555 text-white active:scale-95 shadow-[0_0_20px_rgba(139,92,246,0.25)] hover:shadow-[0_0_25px_rgba(139,92,246,0.4)] cursor-pointer"
+                      disabled={!prompt.trim()}
+                      className={`imagine-primary-action mt-1 flex w-full items-center justify-center gap-2 rounded-lg py-3 text-xs font-bold transition duration-200 ${
+                        !prompt.trim()
+                          ? "bg-slate-900/70 text-slate-600 border border-slate-800 cursor-not-allowed"
+                          : "bg-violet-600 hover:bg-violet-500 text-white active:scale-95 shadow-lg shadow-violet-950/30 cursor-pointer"
                       }`}
                     >
-                      {isGenerating ? (
+                      {isSubmittingVideo ? (
                         <RefreshCw className="h-4 w-4 animate-spin text-white" />
                       ) : (
                         <VideoIcon className="h-4 w-4 text-white hover:scale-110 transition" />
                       )}
-                      一键渲染合成 Veo 动态视频 (Render Video)
+                      {isSubmittingVideo ? `提交中 (${videoSubmitCount})，可继续排队` : "一键渲染合成 Veo 动态视频 (Render Video)"}
                     </button>
                   </div>
                 )}
 
               </div>
-            )}
 
-            {/* AI AGENT Creative Panel */}
-            {activeTab === "agent" && (
-              <div className="flex flex-col h-[520px] justify-between animate-fade-in text-slate-200">
-                
+
+            {/* Persistent Agent Dock */}
+            {isAgentPortalReady && !showSettings && createPortal(
+              <section
+                ref={agentDockRef}
+                className={`imagine-agent-dock imagine-theme-${themeMode} fixed inset-x-4 bottom-12 z-50 mx-auto w-[calc(100vw-32px)] max-w-3xl rounded-lg border border-slate-700/70 bg-[#0b0d13]/94 p-2 text-slate-200 shadow-[0_18px_54px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-opacity duration-200 hover:opacity-100 focus-within:opacity-100 sm:bottom-16 sm:w-[min(760px,calc(100vw-40px))] ${
+                  isAgentDockOverContent ? "opacity-[0.84]" : "opacity-100"
+                }`}
+              >
+              <div className={`${isAgentDockOpen ? "mb-2" : "mb-1.5"} grid grid-cols-[auto_1fr_auto] items-center gap-2`}>
+                <button
+                  type="button"
+                  onClick={() => setIsAgentDockOpen(prev => !prev)}
+                  className="flex min-w-0 items-center gap-2 text-left text-xs font-semibold text-slate-200 transition hover:text-white"
+                  title={isAgentDockOpen ? "收起 Agent 对话" : "展开 Agent 对话"}
+                >
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-blue-400/20 bg-blue-500/12">
+                    <Sparkles className="h-3 w-3 text-blue-200" />
+                  </span>
+                  <span className="min-w-0 truncate">Agent</span>
+                  <ChevronRight className={`h-3 w-3 text-slate-500 transition ${isAgentDockOpen ? "rotate-90" : "-rotate-90"}`} />
+                </button>
+
+                <span className="h-px bg-gradient-to-r from-slate-700/60 via-slate-800/40 to-transparent" />
+
+                <span className="hidden shrink-0 items-center gap-1.5 font-mono text-[10px] text-slate-500 sm:flex">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400/70" />
+                  {agentReferenceId || agentReferenceUrl ? "引用中" : "画廊"}
+                </span>
+              </div>
+
                 {/* Scrollable chat thread feed */}
-                <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-4 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+              <AnimatePresence initial={false}>
+                {isAgentDockOpen && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="max-h-[min(30vh,260px)] overflow-y-auto pr-1 flex flex-col gap-2.5 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent"
+                  >
                   {agentMessages.map((msg) => (
                     <div
                       key={msg.id}
@@ -1618,10 +2418,10 @@ export default function Home() {
                       )}
 
                       {/* Msg text element wrapper */}
-                      <div className={`rounded-xl px-3.5 py-2.5 text-xs inline-block leading-relaxed ${
+                      <div className={`max-h-24 overflow-y-auto rounded-lg px-3 py-2 text-xs inline-block leading-relaxed ${
                         msg.role === "user"
                           ? "bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-medium rounded-tr-none shadow-[0_4px_15px_rgba(37,99,235,0.25)]"
-                          : "bg-white/5 border border-white/5 text-slate-200 rounded-tl-none"
+                          : "bg-slate-900/80 border border-slate-700/60 text-slate-200 rounded-tl-none"
                       }`}>
                         {msg.content}
                       </div>
@@ -1630,8 +2430,7 @@ export default function Home() {
                       {msg.role === "assistant" && msg.thought && (
                         <details className="group self-start outline-none">
                           <summary className="text-[10px] text-slate-500 select-none cursor-pointer outline-none hover:text-slate-350 group-open:text-blue-400 flex items-center gap-1">
-                            <span>🧠</span>
-                            <span className="font-mono">Agent 思考过程 (Collapsible Thoughts)</span>
+                            <span className="font-mono">思考过程</span>
                             <ChevronRight className="h-3 w-3 transform transition group-open:rotate-90 text-slate-500" />
                           </summary>
                           <div className="mt-1.5 p-2.5 bg-black/40 rounded-lg border border-white/5 text-[10px] font-mono text-slate-400 whitespace-pre-line leading-normal">
@@ -1644,9 +2443,9 @@ export default function Home() {
                       {msg.role === "assistant" && msg.recommendedAction && msg.recommendedAction.type !== "none" && (
                         <div className="mt-2.5 w-full rounded-xl border border-dashed border-blue-500/25 bg-gradient-to-b from-blue-500/5 to-transparent p-3 shadow-inner">
                           <span className="text-[10px] text-blue-400 font-mono tracking-widest font-bold block mb-1 animate-pulse">
-                            🎯 创意指令方案 (Action Proposed)
+                            Action
                           </span>
-                          
+
                           <div className="text-xs text-slate-200 flex flex-col gap-1.5">
                             <p>
                               <strong className="text-blue-400">操作工具:</strong>{" "}
@@ -1654,7 +2453,7 @@ export default function Home() {
                                 {msg.recommendedAction.type}
                               </code>
                             </p>
-                            
+
                             {msg.recommendedAction.params?.prompt && (
                               <p className="leading-normal">
                                 <strong className="text-blue-400">规划提示词:</strong>{" "}
@@ -1680,18 +2479,20 @@ export default function Home() {
                               <>
                                 <button
                                   type="button"
-                                  onClick={() => executeAgentToolAction(msg.id, msg.recommendedAction)}
+                                  onClick={() => {
+                                    if (msg.recommendedAction) executeAgentToolAction(msg.id, msg.recommendedAction);
+                                  }}
                                   className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-1.5 px-3 rounded-lg text-[10px] flex items-center justify-center gap-1 shadow-md hover:shadow-[0_0_15px_rgba(37,99,235,0.3)] cursor-pointer transition"
                                 >
                                   <Check className="h-3 w-3" />
-                                  确认并立即执行
+                                  执行
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => declineAgentToolAction(msg.id)}
                                   className="border border-white/5 hover:border-white/10 bg-white/5 text-slate-400 hover:text-slate-200 py-1.5 px-3 rounded-lg text-[10px] cursor-pointer transition"
                                 >
-                                  拒绝方案
+                                  拒绝
                                 </button>
                               </>
                             )}
@@ -1714,7 +2515,7 @@ export default function Home() {
                           {activeCountdownId === msg.id && msg.interactiveState === "idle" && (
                             <div className="mt-2 text-center">
                               <div className="h-1 bg-white/5 rounded overflow-hidden">
-                                <motion.div 
+                                <motion.div
                                   initial={{ width: "100%" }}
                                   animate={{ width: "0%" }}
                                   transition={{ duration: countdownSeconds, ease: "linear" }}
@@ -1758,7 +2559,7 @@ export default function Home() {
                       <span className="text-[10px] font-mono tracking-widest text-blue-400 animate-pulse">
                         AGENT COMPILING THOUGHTS
                       </span>
-                      <div className="rounded-xl px-4 py-3 bg-white/5 border border-white/5 text-slate-400 text-xs flex items-center gap-2">
+                      <div className="rounded-xl px-4 py-3 bg-slate-900/80 border border-slate-700/60 text-slate-300 text-xs flex items-center gap-2">
                         <RefreshCw className="h-3.5 w-3.5 animate-spin text-blue-400" />
                         <span>智囊团正在研判画廊状态，筹备提示词设计框架...</span>
                       </div>
@@ -1767,21 +2568,22 @@ export default function Home() {
 
                   {/* Bottom anchor point */}
                   <div ref={chatBottomRef} />
-                </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
                 {/* Combined input form */}
-                <div className="border-t border-white/5 pt-4 mt-2 flex flex-col gap-3">
-                  
+              <div className={`${isAgentDockOpen ? "border-t border-white/5 pt-3 mt-2" : ""} flex flex-col gap-3`}>
+
                   {/* Current reference banner inside Agent Workspace */}
                   {(agentReferenceId || agentReferenceUrl) && (
                     <div className="flex items-center justify-between gap-3 p-2 bg-blue-500/10 border border-blue-500/20 rounded-xl animate-fade-in mb-1">
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div className="relative h-10 w-10 shrink-0 rounded-lg overflow-hidden border border-blue-500/30 bg-slate-950">
-                          <img 
-                            src={agentReferenceUrl || ""} 
-                            alt="agent ref" 
-                            className="h-full w-full object-cover" 
-                            referrerPolicy="no-referrer"
+                          <PreviewImage
+                            src={agentReferenceUrl || ""}
+                            alt="agent ref"
+                            className="h-full w-full object-cover"
                           />
                         </div>
                         <div className="flex flex-col min-w-0">
@@ -1791,13 +2593,13 @@ export default function Home() {
                           </span>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center gap-1.5 shrink-0">
                         <button
                           type="button"
                           onClick={() => {
                             if (agentReferenceUrl) {
-                              launchMaskEditor(agentReferenceUrl, agentReferenceId || "custom_ref");
+                              launchMaskEditor(agentReferenceUrl, agentReferenceId || "custom_ref", "agent");
                             }
                           }}
                           className="px-2 py-1 bg-blue-600/30 hover:bg-blue-600 border border-blue-500/30 text-blue-200 hover:text-white rounded-lg text-[10px] font-bold transition flex items-center gap-1 cursor-pointer"
@@ -1821,7 +2623,8 @@ export default function Home() {
                     </div>
                   )}
 
-                  <div className="relative w-full">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                  <div className="relative min-w-0">
                     {atDropdown.visible && atDropdown.type === "agent-prompt" && renderAtDropdown("agent-prompt")}
                     <form
                       onSubmit={(e) => { e.preventDefault(); submitAgentPrompt(); }}
@@ -1831,8 +2634,8 @@ export default function Home() {
                         type="text"
                         value={agentInput}
                         onChange={(e) => handleTextareaChange(e.target.value, "agent-prompt")}
-                        placeholder="发送自然语言指令给 Agent 代理... 输入 @ 可快捷引用完成图"
-                        className="w-full bg-white/5 border border-white/5 rounded-xl py-3 pl-4 pr-12 text-xs placeholder-slate-600 text-slate-100 focus:outline-none focus:border-white/10 transition"
+                        placeholder="问 Agent... 输入 @ 引用完成图"
+                        className="w-full rounded-lg border border-slate-700/70 bg-slate-950/70 py-2.5 pl-3.5 pr-11 text-xs text-slate-100 placeholder-slate-500 transition focus:border-blue-400/45 focus:outline-none"
                       />
                       <button
                         type="submit"
@@ -1848,84 +2651,136 @@ export default function Home() {
                     </form>
                   </div>
 
-                  {/* Agent workflow toggler bar */}
-                  <div className="flex items-center justify-between px-1">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="auto_trigger"
-                        checked={autoExecute}
-                        onChange={(e) => handleToggleAutoExecute(e.target.checked)}
-                        className="rounded border-none accent-blue-500 focus:ring-0 cursor-pointer h-3.5 w-3.5 bg-white/5"
-                      />
-                      <label htmlFor="auto_trigger" className="text-[11px] text-slate-400 select-none cursor-pointer">
-                        自动执行模式 (Auto-Execute Action)
-                      </label>
-                    </div>
-
-                    <p className="text-[10px] text-slate-500 font-mono">
-                      上下文感知已激活 💡
-                    </p>
-                  </div>
+                  <label
+                    htmlFor="auto_trigger"
+                    className={`flex h-9 shrink-0 cursor-pointer select-none items-center justify-center gap-2 rounded-lg border px-3 text-[11px] font-medium transition ${
+                      autoExecute
+                        ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
+                        : "border-slate-700/70 bg-slate-950/45 text-slate-400 hover:text-slate-200"
+                    }`}
+                    title="自动执行 Agent action"
+                  >
+                    <span className={`h-2 w-2 rounded-full ${autoExecute ? "bg-emerald-300" : "bg-slate-600"}`} />
+                    <span>自动</span>
+                    <input
+                      type="checkbox"
+                      id="auto_trigger"
+                      checked={autoExecute}
+                      onChange={(e) => handleToggleAutoExecute(e.target.checked)}
+                      className="sr-only"
+                    />
+                  </label>
+                </div>
                 </div>
 
-              </div>
+              </section>,
+              document.body,
             )}
 
           </div>
         </section>
 
-        {/* Right Studio Workspace (Gallery, Masonry & Comparative Canvas) (Col 7) */}
-        <section className="lg:col-span-7 flex flex-col gap-6">
-          
-          {/* Controls Header toolbar */}
-          <div className="rounded-2xl dark-glass p-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setFilterType("all")}
-                className={`py-1.5 px-3.5 text-xs rounded-xl transition cursor-pointer ${
-                  filterType === "all"
-                    ? "bg-white/10 text-white font-semibold border border-white/10"
-                    : "text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                所有资产 ({items.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilterType("images")}
-                className={`py-1.5 px-3.5 text-xs rounded-xl transition cursor-pointer ${
-                  filterType === "images"
-                    ? "bg-white/10 text-white font-semibold border border-white/10"
-                    : "text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                图片 ({items.filter(x => x.type === "image").length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilterType("videos")}
-                className={`py-1.5 px-3.5 text-xs rounded-xl transition cursor-pointer ${
-                  filterType === "videos"
-                    ? "bg-white/10 text-white font-semibold border border-white/10"
-                    : "text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                视频 ({items.filter(x => x.type === "video").length})
-              </button>
-            </div>
+        {/* Right Studio Workspace (Gallery, Masonry & Comparative Canvas) (Col 8) */}
+        <section className="imagine-gallery-panel flex min-w-0 flex-col gap-4">
 
-            {/* Quick search input */}
-            <div className="relative">
-              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-500" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="搜索提示词、模型..."
-                className="bg-white/5 border border-white/5 rounded-xl pl-9 pr-4 py-1.5 text-xs placeholder-slate-600 focus:outline-none focus:border-white/10 text-slate-300 transition w-full sm:w-44"
-              />
+          {/* Controls Header toolbar */}
+          <div className="imagine-toolbar-surface rounded-xl dark-glass p-4">
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
+              <div className="flex min-w-0 flex-col gap-2.5">
+                <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center">
+                  <span className="w-10 shrink-0 text-[10px] font-semibold uppercase tracking-widest text-slate-500">类型</span>
+                  <div className="flex min-w-0 flex-wrap gap-1.5">
+                    {([
+                      { value: "all", label: "全部", count: items.length },
+                      { value: "images", label: "图片", count: items.filter(x => x.type === "image").length },
+                      { value: "videos", label: "视频", count: items.filter(x => x.type === "video").length },
+                    ] as const).map(option => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setFilterType(option.value)}
+                        className={`imagine-filter-chip h-7 rounded-md border px-2.5 text-xs transition focus:outline-none cursor-pointer ${
+                          filterType === option.value
+                            ? "border-slate-700 bg-slate-800/80 text-slate-100"
+                            : "border-transparent text-slate-450 hover:border-slate-800 hover:bg-slate-900/70 hover:text-slate-200"
+                        }`}
+                      >
+                        <span>{option.label}</span>
+                        <span className="ml-1 font-mono text-[10px] text-slate-500">{option.count}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center">
+                  <span className="w-10 shrink-0 text-[10px] font-semibold uppercase tracking-widest text-slate-500">状态</span>
+                  <div className="flex min-w-0 flex-wrap gap-1.5">
+                    {([
+                      { value: "all", label: "全部", count: items.length },
+                      { value: "pending", label: "pending", count: items.filter(x => x.status === "pending").length },
+                      { value: "processing", label: "processing", count: items.filter(x => x.status === "processing").length },
+                      { value: "failed", label: "failed", count: items.filter(x => x.status === "failed").length },
+                      { value: "complete", label: "complete", count: items.filter(x => x.status === "complete").length },
+                    ] as const).map(option => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setAssetStatusFilter(option.value)}
+                        className={`imagine-filter-chip h-7 rounded-md border px-2.5 font-mono text-[10px] transition focus:outline-none cursor-pointer ${
+                          assetStatusFilter === option.value
+                            ? "border-slate-700 bg-slate-800/80 text-slate-100"
+                            : "border-transparent text-slate-500 hover:border-slate-800 hover:bg-slate-900/70 hover:text-slate-200"
+                        }`}
+                      >
+                        <span>{option.label}</span>
+                        <span className="ml-1 text-slate-500">{option.count}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                  <select
+                    value={assetModelFilter}
+                    onChange={(e) => setAssetModelFilter(e.target.value)}
+                    className="h-9 min-w-0 rounded-lg border border-slate-800 bg-slate-950/55 px-3 font-mono text-[10px] text-slate-300 transition focus:border-blue-400/35 focus:outline-none"
+                  >
+                    <option value="all">全部模型</option>
+                    {assetModelOptions.map(model => (
+                      <option key={model} value={model}>{formatStoredModelLabel(model, selectedProvider)}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={exportMetadataJson}
+                    className="h-9 rounded-lg border border-slate-800 bg-slate-950/55 px-3 text-[10px] font-semibold text-slate-300 transition hover:bg-slate-900"
+                  >
+                    导出
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                  <div className="relative min-w-0">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="搜索提示词、模型..."
+                      className="h-9 w-full rounded-lg border border-slate-800 bg-slate-950/55 pl-9 pr-4 text-xs text-slate-200 placeholder-slate-600 transition focus:border-blue-400/35 focus:outline-none"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => deleteItemsByStatus(["failed", "pending"])}
+                    className="h-9 rounded-lg border border-red-500/20 bg-red-950/20 px-3 text-[10px] font-semibold text-red-300 transition hover:bg-red-950/35"
+                  >
+                    清失败
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1942,7 +2797,7 @@ export default function Home() {
                     选中两张创意项，即可进行高精度像素级滑动擦拭或双面分屏对判。
                   </p>
                 </div>
-                
+
                 <div className="flex items-center gap-3">
                   {/* Selector only if both items are images */}
                   {(() => {
@@ -1997,7 +2852,7 @@ export default function Home() {
                 (() => {
                   const matchedA = items.find(x => x.id === compareItemIds[0]);
                   const matchedB = items.find(x => x.id === compareItemIds[1]);
-                  
+
                   if (!matchedA || !matchedB) {
                     return (
                       <div className="p-4 border border-dashed border-slate-800 rounded-xl text-center text-xs text-slate-500">
@@ -2013,11 +2868,10 @@ export default function Home() {
                       <div className="flex flex-col gap-3">
                         <div className="relative w-full aspect-[4/3] rounded-2xl border border-white/5 overflow-hidden bg-slate-950 select-none shadow-2xl">
                           {/* Left Image (matchedA) as ambient base background */}
-                          <img 
-                            src={matchedA.url} 
+                          <PreviewImage
+                            src={matchedA.url}
                             alt="Compare item A"
                             className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-                            referrerPolicy="no-referrer"
                           />
                           <div className="absolute bottom-3 left-3 z-20 bg-black/70 backdrop-blur-md border border-white/5 px-2.5 py-1 rounded-xl text-[10px] text-slate-300 pointer-events-none flex flex-col gap-0.5">
                             <span className="font-bold text-blue-400 text-[11px]">A: 原始起稿</span>
@@ -2027,12 +2881,11 @@ export default function Home() {
                           </div>
 
                           {/* Right Image (matchedB) clipped overlay */}
-                          <img 
-                            src={matchedB.url} 
+                          <PreviewImage
+                            src={matchedB.url}
                             alt="Compare item B"
                             className="absolute inset-0 w-full h-full object-cover pointer-events-none"
                             style={{ clipPath: `polygon(0 0, ${compareSliderPos}% 0, ${compareSliderPos}% 100%, 0 100%)` }}
-                            referrerPolicy="no-referrer"
                           />
                           <div className="absolute bottom-3 right-3 z-20 bg-black/70 backdrop-blur-md border border-white/5 px-2.5 py-1 rounded-xl text-[10px] text-slate-300 pointer-events-none text-right flex flex-col gap-0.5">
                             <span className="font-bold text-amber-500 text-[11px]">B: 演进渲染</span>
@@ -2042,7 +2895,7 @@ export default function Home() {
                           </div>
 
                           {/* Sliding handle bar line and icon */}
-                          <div 
+                          <div
                             className="absolute top-0 bottom-0 w-0.5 bg-blue-500/80 z-20 pointer-events-none"
                             style={{ left: `${compareSliderPos}%` }}
                           >
@@ -2052,16 +2905,16 @@ export default function Home() {
                           </div>
 
                           {/* Range slider input overlaid */}
-                          <input 
-                            type="range" 
-                            min="0" 
-                            max="100" 
-                            value={compareSliderPos} 
-                            onChange={(e) => setCompareSliderPos(Number(e.target.value))} 
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={compareSliderPos}
+                            onChange={(e) => setCompareSliderPos(Number(e.target.value))}
                             className="absolute inset-0 w-full h-full opacity-0 z-30 cursor-ew-resize"
                           />
                         </div>
-                        
+
                         <div className="flex items-center justify-between text-[11px] px-1 font-mono text-slate-400">
                           <span className="truncate max-w-[45%] italic" title={matchedA.prompt}>👈 A: {matchedA.prompt}</span>
                           <span className="text-blue-400 font-bold">拉拽滑锁进行滑动对比 (Drag Slider)</span>
@@ -2085,16 +2938,16 @@ export default function Home() {
                               🤖 {matchedA.model.replace("-preview", "").replace("lite-", "").replace("imagen-", "Imagen")}
                             </span>
                           </div>
-                          
+
                           <div className="aspect-[4/3] relative w-full rounded-xl overflow-hidden bg-slate-900 border border-white/5 flex items-center justify-center">
                             {matchedA.type === "image" ? (
-                              <img src={matchedA.url} alt="A" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                              <PreviewImage src={matchedA.url} alt="A" className="w-full h-full object-cover" />
                             ) : (
                               <video src={matchedA.url} controls loop className="w-full h-full object-cover" />
                             )}
                           </div>
                         </div>
-                        
+
                         <p className="text-[10px] text-slate-300 mt-2.5 line-clamp-2 leading-relaxed italic" title={matchedA.prompt}>
                           &ldquo;{matchedA.prompt}&rdquo;
                         </p>
@@ -2111,16 +2964,16 @@ export default function Home() {
                               🤖 {matchedB.model.replace("-preview", "").replace("lite-", "").replace("imagen-", "Imagen")}
                             </span>
                           </div>
-                          
+
                           <div className="aspect-[4/3] relative w-full rounded-xl overflow-hidden bg-slate-900 border border-white/5 flex items-center justify-center">
                             {matchedB.type === "image" ? (
-                              <img src={matchedB.url} alt="B" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                              <PreviewImage src={matchedB.url} alt="B" className="w-full h-full object-cover" />
                             ) : (
                               <video src={matchedB.url} controls loop className="w-full h-full object-cover" />
                             )}
                           </div>
                         </div>
-                        
+
                         <p className="text-[10px] text-slate-300 mt-2.5 line-clamp-2 leading-relaxed italic" title={matchedB.prompt}>
                           &ldquo;{matchedB.prompt}&rdquo;
                         </p>
@@ -2133,53 +2986,57 @@ export default function Home() {
           )}
 
           {/* Main Gallery List */}
-          <div className="min-h-[400px]">
+          <div className="min-h-[calc(100vh-360px)]">
             {filterAndSearchItems().length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 bg-slate-900/10 border border-slate-900 border-dashed rounded-2xl p-6 text-slate-550">
-                <ImageIcon className="h-10 w-10 text-slate-800 mb-3" />
-                <p className="text-sm">暂无生成的创意文件</p>
-                <p className="text-xs text-slate-600 mt-1">在左侧写下创意设想并生成，文件将实时存档至本地 IndexedDB！</p>
+              <div className="imagine-gallery-empty flex min-h-[calc(100vh-390px)] flex-col items-center justify-center rounded-xl border border-dashed border-slate-800 bg-slate-950/28 p-6 text-center text-slate-500">
+                <ImageIcon className="mb-3 h-9 w-9 text-slate-700" />
+                <p className="text-sm font-semibold text-slate-400">暂无生成的创意文件</p>
+                <p className="mt-1 max-w-sm text-xs leading-5 text-slate-600">在左侧写下创意设想并生成，文件将实时存档至本地 IndexedDB。</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+              <div className="imagine-gallery-grid grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
                 {filterAndSearchItems().map((item) => (
                   <div
                     key={item.id}
-                    className={`relative overflow-hidden rounded-2xl group border bg-slate-900 shadow-xl transition-all duration-300 flex flex-col justify-between ${
+                    className={`imagine-asset-card relative overflow-hidden rounded-2xl group border bg-slate-900 shadow-xl transition-all duration-300 flex flex-col justify-between ${
                       selectedItemIds.includes(item.id)
                         ? "border-blue-500 ring-2 ring-blue-500/20"
                         : "border-slate-850 hover:border-slate-750"
                     }`}
                   >
-                    
+
                     {/* Visual creation node */}
-                    <div className="relative aspect-[4/3] w-full bg-slate-950 overflow-hidden flex items-center justify-center border-b border-white/5">
-                      
-                      {item.status === "processing" ? (
+                    <div className="imagine-asset-media relative aspect-[4/3] w-full bg-slate-950 overflow-hidden flex items-center justify-center border-b border-white/5">
+
+                      {item.status === "processing" || item.status === "pending" ? (
                         <div className="absolute inset-0 bg-[#07070a] flex flex-col items-center justify-center p-6 text-center select-none overflow-hidden">
                           {/* Pulsing glow background elements */}
                           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-28 h-28 bg-blue-500/10 rounded-full blur-2xl animate-pulse" />
                           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-indigo-500/5 rounded-full blur-xl animate-ping" />
-                          
+
                           <div className="relative z-10 flex flex-col items-center">
                             <div className="h-9 w-9 rounded-xl bg-blue-600/10 border border-blue-500/30 flex items-center justify-center shadow-[0_0_15px_rgba(59,130,246,0.2)] mb-3 animate-spin duration-3000">
                               <RefreshCw className="h-4.5 w-4.5 text-blue-400 animate-spin" />
                             </div>
                             <p className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
-                              {item.type === "video" ? "🎬 智影合成中..." : "🎨 极精算色中..."}
+                              {item.status === "pending"
+                                ? "任务已排队..."
+                                : item.type === "video"
+                                  ? "智影合成中..."
+                                  : "极精算色中..."}
                             </p>
                             <span className="text-[9px] font-mono text-slate-500 mt-1">
                               模型: {item.model.replace("-preview", "").replace("lite-", "").replace("-generate", "").replace("imagen-", "Imagen")}
                             </span>
 
                             <div className="w-36 bg-white/5 h-1 rounded-full overflow-hidden mt-4 border border-white/5 shadow-inner">
-                              <div 
+                              <div
                                 className="bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-600 h-full transition-all duration-300 shadow-[0_0_10px_rgba(59,130,246,0.5)]"
                                 style={{ width: `${item.progress}%` }}
                               />
                             </div>
                             <span className="text-[10px] text-blue-400 mt-2 font-mono font-bold tracking-widest">
-                              {item.progress}% RENDERING
+                              {item.progress}% {item.status.toUpperCase()}
                             </span>
                           </div>
                         </div>
@@ -2187,16 +3044,26 @@ export default function Home() {
                         <div className="absolute inset-0 bg-slate-950 flex flex-col items-center justify-center p-6 text-center text-red-400 select-none">
                           <X className="h-8 w-8 text-red-500/50 mb-2.5" />
                           <p className="text-xs font-semibold">生成失败 / 链接中断</p>
-                          <p className="text-[10px] text-slate-550 mt-1">请核查 API Key 或重构参数。</p>
+                          <p className="mt-1 line-clamp-3 text-[10px] text-slate-550">
+                            {item.errorMessage ?? "请核查 API Key 或重构参数。"}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => retryFailedItem(item)}
+                            className="mt-3 flex items-center gap-1.5 rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-1.5 text-[10px] font-bold text-red-100 transition hover:bg-red-500/20"
+                          >
+                            <RefreshCw className="h-3 w-3" />
+                            重试
+                          </button>
                         </div>
                       ) : (
                         // Standard complete state display
                         <div className="relative w-full h-full">
                           {item.type === "image" ? (
-                            <img
+                            <PreviewImage
                               src={item.url}
                               alt={item.prompt}
-                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 cursor-pointer"
+                              className="w-full h-full object-contain bg-slate-950 transition duration-500 cursor-pointer"
                               onClick={() => setFullscreenItem(item)}
                             />
                           ) : (
@@ -2235,17 +3102,18 @@ export default function Home() {
                             />
                           </div>
 
-                          {/* Immersive Hover Action Overlay (Cleanest, zero interaction overlap) */}
-                          <div className="absolute inset-0 bg-slate-950/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-2 z-10 pointer-events-none group-hover:pointer-events-auto">
-                            
+                          <div className="absolute inset-0 bg-slate-950/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10 pointer-events-none" />
+                          <div className="absolute inset-x-3 bottom-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 pointer-events-none group-hover:pointer-events-auto">
+                            <div className="flex flex-wrap items-center justify-center gap-1 rounded-xl border border-white/10 bg-slate-950/80 p-1 backdrop-blur-md shadow-xl">
+
                              {item.type === "image" && (
                               <button
                                 onClick={() => applyAsVideoReference(item.url)}
-                                className="p-2 bg-slate-900/90 hover:bg-purple-600 border border-white/5 rounded-xl text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center gap-1 cursor-pointer hover:scale-105"
+                                className="min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-purple-600 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
                                 title="以此图首帧生图动态 Veo 航拍影片"
                               >
-                                <VideoIcon className="h-3.5 w-3.5 text-purple-450 group-hover:text-white" />
-                                <span className="text-[10px] font-bold px-0.5">生视频</span>
+                                <VideoIcon className="h-3 w-3 text-purple-450 group-hover:text-white" />
+                                <span className="text-[9px] font-bold">生视频</span>
                               </button>
                             )}
 
@@ -2254,54 +3122,64 @@ export default function Home() {
                                 onClick={() => {
                                   setAgentReferenceId(item.id);
                                   setAgentReferenceUrl(item.url);
-                                  setActiveTab("agent");
+                                  setIsAgentDockOpen(true);
                                 }}
-                                className="p-2 bg-slate-900/90 hover:bg-blue-600 border border-white/5 rounded-xl text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center gap-1 cursor-pointer hover:scale-105"
+                                className="min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-blue-600 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
                                 title="引用该图片至 Agent 智能代理进行对话与局部修改"
                               >
-                                <Sparkles className="h-3.5 w-3.5 text-blue-455 text-blue-400 group-hover:text-white animate-pulse" />
-                                <span className="text-[10px] font-bold px-0.5">引用 Agent</span>
+                                <Sparkles className="h-3 w-3 text-blue-455 text-blue-400 group-hover:text-white animate-pulse" />
+                                <span className="text-[9px] font-bold">Agent</span>
                               </button>
                             )}
 
                             {item.type === "image" && (
                               <button
                                 onClick={() => launchMaskEditor(item.url, item.id)}
-                                className="p-2 bg-slate-900/90 hover:bg-amber-600 border border-white/5 rounded-xl text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center gap-1 cursor-pointer hover:scale-105"
+                                className="min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-amber-600 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
                                 title="对该图片局部进行笔刷遮罩修改 & 创意局部重绘"
                               >
-                                <Paintbrush className="h-3.5 w-3.5 text-amber-500 group-hover:text-white" />
-                                <span className="text-[10px] font-bold px-0.5">修改图片</span>
+                                <Paintbrush className="h-3 w-3 text-amber-500 group-hover:text-white" />
+                                <span className="text-[9px] font-bold">修改</span>
                               </button>
                             )}
 
                             <button
+                              onClick={() => handleDownloadItem(item)}
+                              className="min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-emerald-600 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
+                              title="下载该文件到本地"
+                            >
+                              <Download className="h-3 w-3 text-emerald-400 group-hover:text-white" />
+                              <span className="text-[9px] font-bold">下载</span>
+                            </button>
+
+                            <button
                               onClick={() => toggleCompare(item.id)}
-                              className={`p-2 rounded-xl border transition-all duration-200 shadow-lg flex items-center justify-center gap-1 cursor-pointer hover:scale-105 ${
+                              className={`min-w-0 px-1.5 py-1 rounded-md border transition-all duration-200 shadow-lg flex items-center justify-center gap-0.5 cursor-pointer ${
                                 compareItemIds.includes(item.id)
                                   ? "bg-blue-600 border-blue-500 text-white"
                                   : "bg-slate-900/90 border-white/5 text-slate-300 hover:text-white hover:bg-slate-800"
                               }`}
                               title="加入左右侧滑块对比面板"
                             >
-                              <RefreshCw className="h-3.5 w-3.5 text-blue-400" />
-                              <span className="text-[10px] font-bold px-0.5">对比</span>
+                              <RefreshCw className="h-3 w-3 text-blue-400" />
+                              <span className="text-[9px] font-bold">对比</span>
                             </button>
 
                             <button
                               onClick={() => setFullscreenItem(item)}
-                              className="p-2 bg-slate-900/90 hover:bg-slate-800 border border-white/5 rounded-xl text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center cursor-pointer hover:scale-105"
+                              className="min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-slate-800 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center cursor-pointer"
                               title="全屏大画幅细节放大"
                             >
-                              <Maximize2 className="h-3.5 w-3.5 text-slate-300" />
+                              <Maximize2 className="h-3 w-3 text-slate-300" />
                             </button>
+                            </div>
                           </div>
                         </div>
                       )}
                     </div>
 
                     {/* Meta parameter details */}
-                    <div className="p-3.5 bg-[#0e0e12] flex-1 flex flex-col justify-between">
+                    <div className="imagine-asset-meta p-3.5 bg-[#0e0e12] flex-1 flex flex-col justify-between">
                       <div>
                         <p className="text-[11px] text-slate-300 line-clamp-2 leading-relaxed font-sans" title={item.prompt}>
                           {item.prompt}
@@ -2310,17 +3188,26 @@ export default function Home() {
 
                       <div className="mt-3 pt-2.5 border-t border-slate-850 flex items-center justify-between">
                         <div className="flex flex-wrap items-center gap-1.5 text-[9px] font-mono text-slate-500">
+                          <span className="bg-white/5 px-2 py-0.5 rounded text-[9px]">
+                            {getProviderLabel(parseProviderModel(item.model, selectedProvider).provider)}
+                          </span>
                           <span className="bg-white/5 px-2 py-0.5 rounded text-[9px]" title={item.model}>
                             🤖 {item.model.replace("-preview", "").replace("lite-", "").replace("-generate", "").replace("imagen-", "Imagen")}
                           </span>
                           <span className="bg-white/5 px-2 py-0.5 rounded">📐 {item.aspectRatio}</span>
+                          <span className="bg-white/5 px-2 py-0.5 rounded">{item.status}</span>
+                          {item.errorMessage && (
+                            <span className="max-w-[160px] truncate rounded bg-red-500/10 px-2 py-0.5 text-red-300" title={item.errorMessage}>
+                              last error: {item.errorMessage}
+                            </span>
+                          )}
                         </div>
 
                         <div className="flex items-center gap-2">
                           <span className="text-[9px] font-mono text-slate-650">
                             {new Date(item.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                           </span>
-                          
+
                           <button
                             onClick={async () => {
                               if (confirm("确定要删除此创意项吗？")) {
@@ -2410,13 +3297,13 @@ export default function Home() {
               initial={{ scale: 0.95 }}
               animate={{ scale: 1 }}
               exit={{ scale: 0.95 }}
-              className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl"
+              className="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl"
             >
               {/* Header */}
               <div className="flex items-center justify-between border-b border-slate-850 px-6 py-4">
                 <h3 className="font-bold text-slate-100 flex items-center gap-2">
                   <Settings className="h-5 w-5 text-amber-500" />
-                  灵感工作台高级设置 Panel
+                  API 服务商设置
                 </h3>
                 <button onClick={() => setShowSettings(false)} className="text-slate-400 hover:text-slate-100">
                   <X className="h-5 w-5" />
@@ -2425,28 +3312,152 @@ export default function Home() {
 
               {/* Body */}
               <div className="p-6 flex flex-col gap-4 font-sans text-xs">
-                
-                {/* Custom API Key configured (stored inside client storage) */}
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="font-semibold text-slate-300">
-                      🔑 外部 API 密钥连接 (Optional API Key)
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/45 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-semibold text-slate-200">12AI</h4>
+                      {twelveAiApiKey && <span className="text-[10px] text-emerald-400">Key 已保存</span>}
+                    </div>
+                    <label className="font-semibold text-slate-400 block mb-1.5">
+                      API Key
                     </label>
-                    {customApiKey && (
-                      <span className="text-[10px] text-emerald-400">已启用自定义密钥</span>
+                    <input
+                      type="password"
+                      value={twelveAiApiKey}
+                      onChange={(e) => handleSave12AiApiKey(e.target.value)}
+                      placeholder="sk_your_12ai_key"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 px-3 text-xs text-slate-200 placeholder-slate-650 focus:outline-none focus:border-slate-700 font-mono transition"
+                    />
+                    <div className="mt-3 rounded-lg bg-slate-900/70 border border-slate-800 px-3 py-2 font-mono text-[10px] text-slate-400 leading-relaxed">
+                      <div>Chat/Image: https://cdn.12ai.org</div>
+                      <div>Veo: https://new.12ai.org</div>
+                    </div>
+                    <div className="mt-3 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => testProviderConnection("12ai")}
+                        disabled={providerTest.status === "testing" && providerTest.provider === "12ai"}
+                        className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-950 px-3 text-[10px] font-semibold text-slate-300 transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:text-slate-600"
+                      >
+                        <RefreshCw className={`h-3 w-3 ${providerTest.status === "testing" && providerTest.provider === "12ai" ? "animate-spin" : ""}`} />
+                        测试
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => clearProviderCredentials("12ai")}
+                        className="h-8 rounded-lg border border-red-500/20 bg-red-950/20 px-3 text-[10px] font-semibold text-red-300 transition hover:bg-red-950/35"
+                      >
+                        清除 Key
+                      </button>
+                    </div>
+                    {providerTest.provider === "12ai" && providerTest.message && (
+                      <p className={`mt-2 font-mono text-[10px] ${providerTest.status === "error" ? "text-red-300" : "text-emerald-300"}`}>
+                        {providerTest.message}
+                      </p>
                     )}
                   </div>
-                  
-                  <input
-                    type="password"
-                    value={customApiKey}
-                    onChange={(e) => handleSaveApiKey(e.target.value)}
-                    placeholder="留空则使用默认后端共享 Gemini API Key"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 px-3 text-xs text-amber-350 placeholder-slate-650 focus:outline-none focus:border-slate-700 font-mono transition"
-                  />
-                  <p className="text-[10px] text-slate-500 leading-normal mt-1.5 font-mono">
-                    私钥保存在浏览器 localStorage。可用于自主运行、提高限额、或绕过共享密钥并发限制。
-                  </p>
+
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/45 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-semibold text-slate-200">grok2api</h4>
+                      {grokApiKey && <span className="text-[10px] text-emerald-400">Key 已保存</span>}
+                    </div>
+                    <label className="font-semibold text-slate-400 block mb-1.5">
+                      API Key
+                    </label>
+                    <input
+                      type="password"
+                      value={grokApiKey}
+                      onChange={(e) => handleSaveGrokApiKey(e.target.value)}
+                      placeholder="your_grok2api_key"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 px-3 text-xs text-slate-200 placeholder-slate-650 focus:outline-none focus:border-slate-700 font-mono transition"
+                    />
+                    <label className="font-semibold text-slate-400 block mt-3 mb-1.5">
+                      Base URL
+                    </label>
+                    <input
+                      type="url"
+                      value={grokBaseUrl}
+                      onChange={(e) => handleSaveGrokBaseUrl(e.target.value)}
+                      placeholder="http://localhost:8000"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 px-3 text-xs text-slate-200 placeholder-slate-650 focus:outline-none focus:border-slate-700 font-mono transition"
+                    />
+                    <div className="mt-3 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => testProviderConnection("grok2api")}
+                        disabled={providerTest.status === "testing" && providerTest.provider === "grok2api"}
+                        className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-950 px-3 text-[10px] font-semibold text-slate-300 transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:text-slate-600"
+                      >
+                        <RefreshCw className={`h-3 w-3 ${providerTest.status === "testing" && providerTest.provider === "grok2api" ? "animate-spin" : ""}`} />
+                        测试
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => clearProviderCredentials("grok2api")}
+                        className="h-8 rounded-lg border border-red-500/20 bg-red-950/20 px-3 text-[10px] font-semibold text-red-300 transition hover:bg-red-950/35"
+                      >
+                        清除 Key/Base URL
+                      </button>
+                    </div>
+                    {providerTest.provider === "grok2api" && providerTest.message && (
+                      <p className={`mt-2 font-mono text-[10px] ${providerTest.status === "error" ? "text-red-300" : "text-emerald-300"}`}>
+                        {providerTest.message}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-semibold text-slate-300 block mb-1.5">
+                      模型列表服务商
+                    </label>
+                    <select
+                      value={selectedProvider}
+                      onChange={(e) => handleSelectProvider(e.target.value as AiProvider)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 px-3 text-xs text-slate-300 focus:outline-none focus:border-slate-700 font-mono transition"
+                    >
+                      <option value="12ai">12AI</option>
+                      <option value="grok2api">grok2api</option>
+                    </select>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="font-semibold text-slate-300">
+                        Agent / 优化模型
+                      </label>
+                      <button
+                        type="button"
+                        onClick={refreshProviderModels}
+                        disabled={isLoadingModels}
+                        className={`flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] transition ${
+                          isLoadingModels
+                            ? "border-slate-800 bg-slate-950 text-slate-600 cursor-not-allowed"
+                            : "border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200 cursor-pointer"
+                        }`}
+                      >
+                        <RefreshCw className={`h-3 w-3 ${isLoadingModels ? "animate-spin" : ""}`} />
+                        获取模型
+                      </button>
+                    </div>
+                    <select
+                      value={selectedChatModel}
+                      onChange={(e) => handleSelectChatModel(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 px-3 text-xs text-slate-300 focus:outline-none focus:border-slate-700 font-mono transition"
+                    >
+                      {chatModelGroups.map(group => (
+                        <optgroup key={group.provider} label={group.label}>
+                          {group.options.map(option => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                    {modelListMessage && (
+                      <p className="mt-1.5 text-[10px] text-slate-500 font-mono">{modelListMessage}</p>
+                    )}
+                  </div>
                 </div>
 
                 {/* Polling description */}
@@ -2489,7 +3500,7 @@ export default function Home() {
                 <div className="text-[10px] text-slate-500 mt-2 flex items-start gap-1.5 leading-normal">
                   <span>ℹ️</span>
                   <span>
-                    Imagine Workbench 为全自可部署设计。您可以通过 Settings &gt; Secrets 界面随时添加密钥来扩展创作并发数，当前应用已包含 12ai 的全部异步生成标准适配。
+                    Imagine Workbench 现在通过统一 provider adapter 接入 12AI 与 grok2api。图片、异步图片、视频与 Agent 对话都走同一组密钥和 Base URL 规则。
                   </span>
                 </div>
 
@@ -2523,7 +3534,7 @@ export default function Home() {
             </button>
             <div className="max-w-4xl max-h-[85vh] flex flex-col items-center justify-center gap-4">
               {fullscreenItem.type === "image" ? (
-                <img
+                <PreviewImage
                   src={fullscreenItem.url}
                   alt={fullscreenItem.prompt}
                   className="rounded-lg max-h-[75vh] object-contain border border-slate-800"

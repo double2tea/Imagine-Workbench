@@ -14,6 +14,7 @@ export interface StorageItem {
   status: "complete" | "processing" | "pending" | "failed";
   progress: number;
   operationName?: string;
+  errorMessage?: string;
   maskOriginalId?: string; // If this was created by drawing on another image
 }
 
