@@ -3292,16 +3292,16 @@ export default function Home() {
                           </div>
                         </div>
                       ) : item.status === "failed" ? (
-                        <div className="absolute inset-0 bg-slate-950 flex flex-col items-center justify-center p-6 text-center text-red-400 select-none">
-                          <X className="h-8 w-8 text-red-500/50 mb-2.5" />
-                          <p className="text-xs font-semibold">生成失败 / 链接中断</p>
-                          <p className="mt-1 line-clamp-3 text-[10px] text-slate-550">
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950 px-4 py-3 text-center text-red-400 select-none">
+                          <X className="mb-1.5 h-6 w-6 shrink-0 text-red-500/55" />
+                          <p className="text-xs font-semibold leading-5">生成失败 / 链接中断</p>
+                          <p className="mt-0.5 line-clamp-2 max-w-full break-words text-[10px] leading-4 text-slate-550">
                             {item.errorMessage ?? "请核查 API Key 或重构参数。"}
                           </p>
                           <button
                             type="button"
                             onClick={() => retryFailedItem(item)}
-                            className="mt-3 flex items-center gap-1.5 rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-1.5 text-[10px] font-bold text-red-100 transition hover:bg-red-500/20"
+                            className="mt-2 flex shrink-0 items-center gap-1.5 rounded-lg border border-red-400/60 bg-red-600 px-3 py-1.5 text-[10px] font-bold text-white shadow-sm shadow-red-950/20 transition hover:bg-red-500"
                           >
                             <RefreshCw className="h-3 w-3" />
                             重试
