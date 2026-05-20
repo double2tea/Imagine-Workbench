@@ -109,6 +109,96 @@ const TOOL_LABELS: Record<string, string> = {
   get_prompt_blueprint: "获取模板",
 };
 
+const SKILL_LABELS: Record<string, { label: string; className: string }> = {
+  PromptEngineer: { label: "提示词工程", className: "bg-teal-500/12 text-teal-300 border-teal-500/20" },
+  ImageGenerator: { label: "智能生图", className: "bg-rose-500/12 text-rose-300 border-rose-500/20" },
+  VideoGenerator: { label: "视频合成", className: "bg-purple-500/12 text-purple-300 border-purple-500/20" },
+  ImageEditor: { label: "局部重绘", className: "bg-amber-500/12 text-amber-300 border-amber-500/20" },
+  CreativePlanner: { label: "创意规划", className: "bg-indigo-500/12 text-indigo-300 border-indigo-500/20" },
+  SessionHistoryRetriever: { label: "历史回退", className: "bg-sky-500/12 text-sky-300 border-sky-500/20" },
+  VariationSuggester: { label: "变体推荐", className: "bg-emerald-500/12 text-emerald-300 border-emerald-500/20" },
+  AsyncTaskManager: { label: "后台跟踪", className: "bg-cyan-500/12 text-cyan-300 border-cyan-500/20" },
+  ProjectSummarizer: { label: "资产汇总", className: "bg-violet-500/12 text-violet-300 border-violet-500/20" },
+  ExportManager: { label: "批量导出", className: "bg-red-500/12 text-red-300 border-red-500/20" },
+};
+
+const ACTION_LABELS: Record<AgentToolAction["type"], string> = {
+  none: "无操作",
+  optimize_prompt: "优化提示词",
+  generate_image: "生成图片",
+  edit_image: "编辑图片",
+  generate_video: "生成视频",
+};
+
+interface AgentContentLine {
+  kind: "paragraph" | "ordered" | "bullet";
+  marker?: string;
+  text: string;
+}
+
+function parseAgentContent(content: string): AgentContentLine[] {
+  const normalized = content
+    .replace(/\s+(\d+\.\s+)/g, "\n$1")
+    .replace(/\s+([-•]\s+)/g, "\n$1");
+
+  return normalized
+    .split(/\n+/)
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map(line => {
+      const ordered = line.match(/^(\d+)\.\s+(.*)$/);
+      if (ordered) return { kind: "ordered", marker: ordered[1], text: ordered[2].trim() };
+
+      const bullet = line.match(/^[-•]\s+(.*)$/);
+      if (bullet) return { kind: "bullet", text: bullet[1].trim() };
+
+      return { kind: "paragraph", text: line };
+    });
+}
+
+function renderInlineEmphasis(text: string): React.ReactNode[] {
+  return text
+    .split(/(\*\*[^*]+\*\*)/g)
+    .filter(Boolean)
+    .map((part, index) => {
+      if (part.startsWith("**") && part.endsWith("**")) {
+        return (
+          <strong key={`${part}-${index}`} className="font-semibold text-slate-100">
+            {part.slice(2, -2)}
+          </strong>
+        );
+      }
+      return part;
+    });
+}
+
+function renderAgentContent(content: string): React.ReactNode {
+  const lines = parseAgentContent(content);
+
+  return (
+    <div className="space-y-2">
+      {lines.map((line, index) => {
+        if (line.kind === "paragraph") {
+          return (
+            <p key={`${line.kind}-${index}`} className="leading-relaxed">
+              {renderInlineEmphasis(line.text)}
+            </p>
+          );
+        }
+
+        return (
+          <div key={`${line.kind}-${index}`} className="grid grid-cols-[auto_1fr] gap-2 leading-relaxed">
+            <span className="mt-0.5 flex h-5 min-w-5 items-center justify-center rounded-md border border-blue-400/18 bg-blue-500/10 px-1.5 text-[10px] font-semibold text-blue-300">
+              {line.marker ?? "•"}
+            </span>
+            <span>{renderInlineEmphasis(line.text)}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function getStringField(value: unknown, field: string): string | null {
   if (typeof value !== "object" || value === null || !(field in value)) return null;
   const record = value as Record<string, unknown>;
@@ -2425,19 +2515,19 @@ export default function Home() {
             {isAgentPortalReady && !isAgentDockSuppressed && createPortal(
               <section
                 ref={agentDockRef}
-                className={`imagine-agent-dock imagine-theme-${themeMode} fixed inset-x-4 bottom-12 z-40 mx-auto w-[calc(100vw-32px)] max-w-3xl rounded-lg border border-slate-700/70 bg-[#0b0d13]/94 p-2 text-slate-200 shadow-[0_18px_54px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-opacity duration-200 hover:opacity-100 focus-within:opacity-100 sm:bottom-16 sm:w-[min(760px,calc(100vw-40px))] ${
+                className={`imagine-agent-dock imagine-theme-${themeMode} fixed inset-x-4 bottom-12 z-40 mx-auto w-[calc(100vw-32px)] max-w-5xl rounded-lg border border-slate-700/70 bg-[#0b0d13]/96 p-3 text-slate-200 shadow-[0_18px_54px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-opacity duration-200 hover:opacity-100 focus-within:opacity-100 sm:bottom-16 sm:w-[min(1040px,calc(100vw-40px))] ${
                   isAgentDockOverContent ? "opacity-[0.84]" : "opacity-100"
                 }`}
               >
-              <div className={`${isAgentDockOpen ? "mb-2" : "mb-1.5"} grid grid-cols-[auto_1fr_auto] items-center gap-2`}>
+              <div className={`${isAgentDockOpen ? "mb-2.5" : "mb-1.5"} grid grid-cols-[auto_1fr_auto] items-center gap-2`}>
                 <button
                   type="button"
                   onClick={() => setIsAgentDockOpen(prev => !prev)}
-                  className="flex min-w-0 items-center gap-2 text-left text-xs font-semibold text-slate-200 transition hover:text-white"
+                  className="flex min-w-0 items-center gap-2 text-left text-sm font-semibold text-slate-200 transition hover:text-white"
                   title={isAgentDockOpen ? "收起 Agent 对话" : "展开 Agent 对话"}
                 >
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-blue-400/20 bg-blue-500/12">
-                    <Sparkles className="h-3 w-3 text-blue-200" />
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-blue-400/20 bg-blue-500/12">
+                    <Sparkles className="h-3.5 w-3.5 text-blue-200" />
                   </span>
                   <span className="min-w-0 truncate">Agent</span>
                   <ChevronRight className={`h-3 w-3 text-slate-500 transition ${isAgentDockOpen ? "rotate-90" : "-rotate-90"}`} />
@@ -2470,12 +2560,12 @@ export default function Home() {
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: "auto", opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
-                    className="max-h-[min(30vh,260px)] overflow-y-auto pr-1 flex flex-col gap-2.5 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent"
+                    className="max-h-[min(46vh,440px)] overflow-y-auto pr-1 flex flex-col gap-3 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent"
                   >
                   {agentMessages.map((msg) => (
                     <div
                       key={msg.id}
-                      className={`flex flex-col max-w-[90%] gap-1.5 ${
+                      className={`flex flex-col gap-1.5 ${
                         msg.role === "user" ? "self-end ml-10" : "self-start mr-10"
                       }`}
                     >
@@ -2488,25 +2578,19 @@ export default function Home() {
 
                       {/* Active Dynamic Skills Loading Indicators */}
                       {msg.role === "assistant" && msg.activeSkills && msg.activeSkills.length > 0 && (
-                        <div className="flex flex-wrap items-center gap-1 mb-1 shadow-sm">
+                        <div className="flex flex-wrap items-center gap-1 mb-0.5 shadow-sm">
                           {msg.activeSkills.map((skillName) => {
-                            let info = { label: skillName, color: "bg-blue-500/10 text-blue-400 border-blue-500/15" };
-                            if (skillName === "PromptEngineer") info = { label: "🛠️ 提示词工程", color: "bg-teal-500/15 text-teal-300 border-teal-500/20" };
-                            else if (skillName === "ImageGenerator") info = { label: "🎨 智能生图", color: "bg-rose-500/15 text-rose-300 border-rose-500/20" };
-                            else if (skillName === "VideoGenerator") info = { label: "🎬 智影视频合成", color: "bg-purple-500/15 text-purple-300 border-purple-500/20" };
-                            else if (skillName === "ImageEditor") info = { label: "🖌️ 局部重绘", color: "bg-amber-500/15 text-amber-300 border-amber-500/20" };
-                            else if (skillName === "CreativePlanner") info = { label: "🎯 创意规划", color: "bg-indigo-500/15 text-indigo-300 border-indigo-500/20" };
-                            else if (skillName === "SessionHistoryRetriever") info = { label: "💾 历史回退", color: "bg-sky-500/15 text-sky-300 border-sky-500/20" };
-                            else if (skillName === "VariationSuggester") info = { label: "🧬 变体推荐", color: "bg-emerald-500/15 text-emerald-300 border-emerald-500/20" };
-                            else if (skillName === "AsyncTaskManager") info = { label: "⏱️ 后台跟踪", color: "bg-cyan-500/15 text-cyan-300 border-cyan-500/20" };
-                            else if (skillName === "ProjectSummarizer") info = { label: "📊 资产汇总", color: "bg-violet-500/15 text-violet-300 border-violet-500/20" };
-                            else if (skillName === "ExportManager") info = { label: "📦 批量导出", color: "bg-red-500/15 text-red-300 border-red-500/20" };
+                            const info =
+                              SKILL_LABELS[skillName] ?? {
+                                label: skillName,
+                                className: "bg-blue-500/10 text-blue-400 border-blue-500/15",
+                              };
 
                             return (
                               <span
                                 key={skillName}
-                                className={`text-[9px] scale-95 origin-left px-2 py-0.5 rounded-md border font-sans font-semibold flex items-center gap-1 transition-transform duration-200 select-none ${info.color}`}
-                                title={`当前激活的特定智力分支 (Activated Domain Skill): ${skillName}`}
+                                className={`text-[10px] px-2 py-0.5 rounded-md border font-sans font-medium flex items-center gap-1 transition-transform duration-200 select-none ${info.className}`}
+                                title={`Activated Domain Skill: ${skillName}`}
                               >
                                 {info.label}
                               </span>
@@ -2518,12 +2602,12 @@ export default function Home() {
                       {/* Tool calls made by agent */}
                       {msg.role === "assistant" && msg.toolCalls && msg.toolCalls.length > 0 && (
                         <div className="flex flex-wrap items-center gap-1 opacity-70">
-                          {msg.toolCalls.map((tc) => {
+                          {msg.toolCalls.map((tc, idx) => {
                             const label = TOOL_LABELS[tc.name] || tc.name;
                             return (
                               <span
-                                key={tc.name}
-                                className="text-[9px] px-1.5 py-0.5 rounded border border-slate-700 bg-slate-900 text-slate-400 font-mono"
+                                key={`${tc.name}-${idx}`}
+                                className="text-[10px] px-1.5 py-0.5 rounded border border-slate-700 bg-slate-900/80 text-slate-400 font-mono"
                                 title={JSON.stringify(tc.args)}
                               >
                                 {label}
@@ -2534,12 +2618,12 @@ export default function Home() {
                       )}
 
                       {/* Msg text element wrapper */}
-                      <div className={`max-h-24 overflow-y-auto rounded-lg px-3 py-2 text-xs inline-block leading-relaxed ${
+                      <div className={`overflow-y-auto rounded-lg px-3 py-2 text-xs inline-block leading-relaxed ${
                         msg.role === "user"
-                          ? "bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-medium rounded-tr-none shadow-[0_4px_15px_rgba(37,99,235,0.25)]"
-                          : "bg-slate-900/80 border border-slate-700/60 text-slate-200 rounded-tl-none"
+                          ? "max-w-[min(620px,86vw)] bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-medium rounded-tr-none shadow-[0_4px_15px_rgba(37,99,235,0.25)]"
+                          : "max-h-64 w-[min(760px,calc(100vw-72px))] bg-slate-900/82 border border-slate-700/60 text-slate-200 rounded-tl-none"
                       }`}>
-                        {msg.content}
+                        {msg.role === "assistant" ? renderAgentContent(msg.content) : msg.content}
                       </div>
 
                       {/* Expandable Inner Thought Process (If Assistant) */}
@@ -2549,7 +2633,7 @@ export default function Home() {
                             <span className="font-mono">思考过程</span>
                             <ChevronRight className="h-3 w-3 transform transition group-open:rotate-90 text-slate-500" />
                           </summary>
-                          <div className="mt-1.5 p-2.5 bg-black/40 rounded-lg border border-white/5 text-[10px] font-mono text-slate-400 whitespace-pre-line leading-normal">
+                          <div className="mt-1.5 max-w-[min(760px,calc(100vw-72px))] p-2.5 bg-black/40 rounded-lg border border-white/5 text-[10px] font-mono text-slate-400 whitespace-pre-line leading-normal">
                             {msg.thought}
                           </div>
                         </details>
@@ -2557,16 +2641,16 @@ export default function Home() {
 
                       {/* Tool Call proposal indicator block (IF active and matching tool) */}
                       {msg.role === "assistant" && msg.recommendedAction && msg.recommendedAction.type !== "none" && (
-                        <div className="mt-2.5 w-full rounded-xl border border-dashed border-blue-500/25 bg-gradient-to-b from-blue-500/5 to-transparent p-3 shadow-inner">
-                          <span className="text-[10px] text-blue-400 font-mono tracking-widest font-bold block mb-1 animate-pulse">
-                            Action
+                        <div className="mt-2.5 w-[min(760px,calc(100vw-72px))] rounded-lg border border-blue-500/20 bg-blue-500/5 p-3 shadow-inner">
+                          <span className="text-[10px] text-blue-400 font-mono tracking-widest font-bold block mb-2">
+                            建议动作
                           </span>
 
                           <div className="text-xs text-slate-200 flex flex-col gap-1.5">
                             <p>
-                              <strong className="text-blue-400">操作工具:</strong>{" "}
+                              <strong className="text-blue-400">操作:</strong>{" "}
                               <code className="bg-black/30 px-1 py-0.5 rounded text-[10px] font-mono text-blue-300">
-                                {msg.recommendedAction.type}
+                                {ACTION_LABELS[msg.recommendedAction.type]}
                               </code>
                             </p>
 
@@ -2598,7 +2682,7 @@ export default function Home() {
                                   onClick={() => {
                                     if (msg.recommendedAction) executeAgentToolAction(msg.id, msg.recommendedAction);
                                   }}
-                                  className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-1.5 px-3 rounded-lg text-[10px] flex items-center justify-center gap-1 shadow-md hover:shadow-[0_0_15px_rgba(37,99,235,0.3)] cursor-pointer transition"
+                                  className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-1.5 px-3 rounded-lg text-[10px] flex items-center justify-center gap-1 shadow-md hover:shadow-[0_0_15px_rgba(37,99,235,0.3)] cursor-pointer transition"
                                 >
                                   <Check className="h-3 w-3" />
                                   执行
