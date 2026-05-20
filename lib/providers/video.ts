@@ -1,5 +1,5 @@
 import type { GenerateVideoInput, GenerateVideoResult, MediaStatusResult, ProviderConfig } from "./types";
-import { aspectRatioToVideoSize, authHeaders, getJson, isRecord, mediaOperationName, postForm } from "./utils";
+import { aspectRatioToVideoSize, authHeaders, deleteJson, getJson, isRecord, mediaOperationName, postForm } from "./utils";
 
 interface VideoCreateResponse {
   id?: string;
@@ -15,6 +15,11 @@ interface VideoStatusResponse {
   data?: { url?: string };
   output?: { url?: string };
   error?: { message?: string };
+}
+
+interface VideoDeleteResponse {
+  success?: boolean;
+  message?: string;
 }
 
 export async function generateVideo(config: ProviderConfig, input: GenerateVideoInput): Promise<GenerateVideoResult> {
@@ -93,6 +98,14 @@ export async function downloadVideo(config: ProviderConfig, taskId: string): Pro
       "Cache-Control": "public, max-age=31536000",
     },
   });
+}
+
+export async function cancelVideo(config: ProviderConfig, taskId: string): Promise<void> {
+  const baseUrl = config.provider === "12ai" ? config.videoBaseUrl : config.baseUrl;
+  const response = await deleteJson<VideoDeleteResponse>(`${baseUrl}/v1/videos/${encodeURIComponent(taskId)}`, config);
+  if (response.success !== true) {
+    throw new Error(response.message ?? "Video task cancel failed");
+  }
 }
 
 function readVideoUrl(value: VideoStatusResponse): string | undefined {

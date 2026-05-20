@@ -216,6 +216,10 @@ function toErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message.trim() ? error.message : fallback;
 }
 
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
 async function readFetchError(response: Response, fallback: string): Promise<string> {
   try {
     const data: unknown = await response.json();
@@ -437,6 +441,7 @@ export default function Home() {
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [imageSubmitCount, setImageSubmitCount] = useState(0);
   const [videoSubmitCount, setVideoSubmitCount] = useState(0);
+  const [cancelingItemIds, setCancelingItemIds] = useState<string[]>([]);
   const [workspaceNotices, setWorkspaceNotices] = useState<WorkspaceNotice[]>([]);
 
   // Interactive Mask Editor State
@@ -469,6 +474,8 @@ export default function Home() {
   const autoCountdownInterval = useRef<NodeJS.Timeout | null>(null);
   const dockOverlapFrameRef = useRef<number | null>(null);
   const pollingFailuresRef = useRef<Record<string, number>>({});
+  const generationAbortControllersRef = useRef<Record<string, AbortController>>({});
+  const locallyCanceledItemIdsRef = useRef<Set<string>>(new Set());
   const isAgentDockSuppressed = showSettings || isMaskOpen || fullscreenItem !== null;
 
   const dismissWorkspaceNotice = useCallback((id: string) => {
@@ -527,6 +534,7 @@ export default function Home() {
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const selectedItemIdSet = useMemo(() => new Set(selectedItemIds), [selectedItemIds]);
   const compareItemIdSet = useMemo(() => new Set(compareItemIds), [compareItemIds]);
+  const cancelingItemIdSet = useMemo(() => new Set(cancelingItemIds), [cancelingItemIds]);
   const assetStats = useMemo<AssetStats>(() => {
     const models = new Set<string>();
     const typeCounts: Record<StorageItem["type"], number> = { image: 0, video: 0 };
@@ -793,6 +801,7 @@ export default function Home() {
       for (let i = 0; i < updatedList.length; i++) {
         const item = updatedList[i];
         if (item.status === "processing" && item.operationName) {
+          if (locallyCanceledItemIdsRef.current.has(item.id)) continue;
           try {
             console.log(`Polling status for operation: ${item.operationName}`);
             const headers = buildProviderHeaders(item.operationName);
@@ -1108,12 +1117,16 @@ export default function Home() {
 
     setItems(prev => [newItem, ...prev]);
 
+    const controller = new AbortController();
+    generationAbortControllersRef.current[tempId] = controller;
+
     try {
       const headers = buildProviderHeaders(selectedModel);
 
       const res = await fetch("/api/gemini/generate-image", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
+        signal: controller.signal,
         body: JSON.stringify({
           prompt,
           model: activeImageModel,
@@ -1160,6 +1173,10 @@ export default function Home() {
         throw new Error(await readFetchError(res, "图片生成请求失败"));
       }
     } catch (e) {
+      if (locallyCanceledItemIdsRef.current.has(tempId) || isAbortError(e)) {
+        locallyCanceledItemIdsRef.current.delete(tempId);
+        return;
+      }
       console.error(e);
       const message = toErrorMessage(e, "图片生成失败");
       const failedItem: StorageItem = {
@@ -1172,6 +1189,7 @@ export default function Home() {
       setItems(prev => [failedItem, ...prev.filter(x => x.id !== tempId)]);
       pushWorkspaceNotice("error", message);
     } finally {
+      delete generationAbortControllersRef.current[tempId];
       setImageSubmitCount(prev => Math.max(0, prev - 1));
     }
   };
@@ -1196,6 +1214,9 @@ export default function Home() {
 
     setItems(prev => [newItem, ...prev]);
 
+    const controller = new AbortController();
+    generationAbortControllersRef.current[tempId] = controller;
+
     try {
       const headers = buildProviderHeaders(selectedVideoModel);
       const videoReferenceUrls = buildVideoReferenceUrls(
@@ -1208,6 +1229,7 @@ export default function Home() {
       const res = await fetch("/api/gemini/generate-video", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
+        signal: controller.signal,
         body: JSON.stringify({
           prompt,
           images: videoReferenceUrls,
@@ -1237,6 +1259,10 @@ export default function Home() {
         throw new Error(await readFetchError(res, "视频生成请求失败"));
       }
     } catch (e) {
+      if (locallyCanceledItemIdsRef.current.has(tempId) || isAbortError(e)) {
+        locallyCanceledItemIdsRef.current.delete(tempId);
+        return;
+      }
       console.error(e);
       const message = toErrorMessage(e, "视频生成失败");
       const failedItem: StorageItem = {
@@ -1249,6 +1275,7 @@ export default function Home() {
       setItems(prev => [failedItem, ...prev.filter(x => x.id !== tempId)]);
       pushWorkspaceNotice("error", message);
     } finally {
+      delete generationAbortControllersRef.current[tempId];
       setVideoSubmitCount(prev => Math.max(0, prev - 1));
     }
   };
@@ -1348,6 +1375,50 @@ export default function Home() {
       setItems(prev => prev.filter(item => !ids.includes(item.id)));
       setSelectedItemIds(prev => prev.filter(id => !ids.includes(id)));
       setCompareItemIds(prev => prev.filter(id => !ids.includes(id)));
+    }
+  };
+
+  const cancelProcessingItem = async (item: StorageItem) => {
+    const operationName = item.operationName;
+    const canCancelRemote = operationName?.startsWith("12ai:video:") === true;
+    const confirmText = canCancelRemote
+      ? "确定要取消这个视频生成任务吗？"
+      : "确定要本地取消这个任务吗？远端生成可能仍会继续。";
+    if (!confirm(confirmText)) return;
+
+    setCancelingItemIds(prev => [...prev, item.id]);
+    try {
+      const controller = generationAbortControllersRef.current[item.id];
+      if (controller) {
+        locallyCanceledItemIdsRef.current.add(item.id);
+        controller.abort();
+      }
+      if (!canCancelRemote) {
+        locallyCanceledItemIdsRef.current.add(item.id);
+      }
+
+      if (canCancelRemote) {
+        const res = await fetch("/api/gemini/cancel-media", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...buildProviderHeaders(operationName) },
+          body: JSON.stringify({ operationName }),
+        });
+
+        if (!res.ok) {
+          throw new Error(await readFetchError(res, "任务取消失败"));
+        }
+      }
+
+      await deleteFromDB(item.id);
+      delete pollingFailuresRef.current[item.id];
+      setItems(prev => prev.filter(current => current.id !== item.id));
+      setSelectedItemIds(prev => prev.filter(id => id !== item.id));
+      setCompareItemIds(prev => prev.filter(id => id !== item.id));
+      pushWorkspaceNotice("success", canCancelRemote ? "视频生成任务已取消" : "任务已从本地取消");
+    } catch (err) {
+      pushWorkspaceNotice("error", toErrorMessage(err, "任务取消失败"));
+    } finally {
+      setCancelingItemIds(prev => prev.filter(id => id !== item.id));
     }
   };
 
@@ -3331,6 +3402,16 @@ export default function Home() {
                             <span className="text-[10px] text-blue-400 mt-2 font-mono font-bold tracking-widest">
                               {item.progress}% {item.status.toUpperCase()}
                             </span>
+                            <button
+                              type="button"
+                              onClick={() => cancelProcessingItem(item)}
+                              disabled={cancelingItemIdSet.has(item.id)}
+                              className="mt-3 flex items-center gap-1.5 rounded-lg border border-red-400/50 bg-red-500/10 px-3 py-1.5 text-[10px] font-bold text-red-200 transition hover:border-red-300 hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-55"
+                              title={item.operationName?.startsWith("12ai:video:") ? "取消 12AI 视频生成任务" : "从本地取消并停止等待"}
+                            >
+                              <X className="h-3 w-3" />
+                              {cancelingItemIdSet.has(item.id) ? "取消中" : "取消"}
+                            </button>
                           </div>
                         </div>
                       ) : item.status === "failed" ? (
