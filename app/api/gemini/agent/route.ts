@@ -12,6 +12,8 @@ import { resolveProviderConfig } from "@/lib/providers/utils";
 import { SKILL_REGISTRY } from "./skills";
 import { executeToolCall, getAgentTools, type ToolContext } from "./tools";
 
+export const runtime = "edge";
+
 // -- Zod schemas --
 
 const agentMessageSchema = z.object({

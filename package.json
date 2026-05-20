@@ -7,6 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "pages:build": "npx @cloudflare/next-on-pages@1",
+    "pages:preview": "npm run pages:build && npx wrangler pages dev .vercel/output/static",
+    "pages:deploy": "npm run pages:build && npx wrangler pages deploy .vercel/output/static --project-name=imagine-workbench --commit-dirty=true",
     "test:providers": "tsc -p tests/tsconfig.json && node .tmp/provider-tests/tests/model-catalog.test.js",
     "clean": "next clean"
   },

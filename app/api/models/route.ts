@@ -3,6 +3,8 @@ import type { AiProvider } from "@/lib/providers/model-catalog";
 import { listProviderModels, type ModelKindFilter } from "@/lib/providers/models";
 import { resolveProviderConfig } from "@/lib/providers/utils";
 
+export const runtime = "edge";
+
 export async function GET(req: NextRequest) {
   try {
     const provider = readProvider(req);

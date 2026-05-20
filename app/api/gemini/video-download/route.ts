@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { downloadVideo } from "@/lib/providers/video";
 import { parseMediaOperationName, requireText, resolveProviderConfig } from "@/lib/providers/utils";
 
+export const runtime = "edge";
+
 interface DownloadBody {
   operationName?: unknown;
 }
