@@ -1,9 +1,6 @@
 import type { AiProvider } from "./model-catalog";
 import type { ProviderConfig } from "./types";
-
-const DEFAULT_12AI_BASE_URL = "https://cdn.12ai.org";
-const DEFAULT_12AI_VIDEO_BASE_URL = "https://new.12ai.org";
-const DEFAULT_GROK_BASE_URL = "http://localhost:8000";
+import { isKnownProvider, resolveProviderApiKey, resolveProviderBaseUrl, resolveProviderVideoBaseUrl } from "./registry";
 
 export function requireText(value: unknown, name: string): string {
   if (typeof value !== "string" || value.trim().length === 0) {
@@ -19,22 +16,9 @@ export function optionalText(value: unknown): string | undefined {
 export function resolveProviderConfig(req: Request, provider: AiProvider): ProviderConfig {
   const headerKey = req.headers.get("x-ai-api-key") ?? "";
   const headerBaseUrl = req.headers.get("x-ai-base-url") ?? "";
-
-  const envKey =
-    provider === "12ai"
-      ? process.env.TWELVE_AI_API_KEY ?? process.env.AI_API_KEY ?? ""
-      : process.env.GROK2API_API_KEY ?? process.env.AI_API_KEY ?? "";
-
-  const baseUrl =
-    headerBaseUrl ||
-    (provider === "12ai"
-      ? process.env.TWELVE_AI_BASE_URL ?? DEFAULT_12AI_BASE_URL
-      : process.env.GROK2API_BASE_URL ?? DEFAULT_GROK_BASE_URL);
-
-  const videoBaseUrl =
-    provider === "12ai"
-      ? process.env.TWELVE_AI_VIDEO_BASE_URL ?? DEFAULT_12AI_VIDEO_BASE_URL
-      : baseUrl;
+  const envKey = resolveProviderApiKey(provider);
+  const baseUrl = headerBaseUrl || resolveProviderBaseUrl(provider);
+  const videoBaseUrl = resolveProviderVideoBaseUrl(provider);
 
   const apiKey = headerKey || envKey;
   if (provider === "12ai" && !apiKey) {
@@ -145,7 +129,7 @@ export function parseMediaOperationName(operationName: string): {
   }
   const provider = parts[0];
   const mediaType = parts[1];
-  if ((provider !== "12ai" && provider !== "grok2api") || (mediaType !== "image" && mediaType !== "video")) {
+  if (!isKnownProvider(provider) || (mediaType !== "image" && mediaType !== "video")) {
     throw new Error("Unsupported media operation name");
   }
   return { provider, mediaType, id: parts.slice(2).join(":") };

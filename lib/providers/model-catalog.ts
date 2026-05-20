@@ -1,4 +1,6 @@
-export type AiProvider = "12ai" | "grok2api";
+export type { AiProvider } from "./registry";
+import type { AiProvider } from "./registry";
+import { PROVIDER_KEYS, isKnownProvider } from "./registry";
 
 export interface ModelOption {
   value: string;
@@ -287,22 +289,41 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     provider: "grok2api",
     model: "grok-4.20-expert",
   }),
+  chatCapability({
+    value: "xstx:claude-opus-4-5-20251101",
+    label: "星途 Claude Opus 4.5",
+    provider: "xstx",
+    model: "claude-opus-4-5-20251101",
+  }),
+  chatCapability({
+    value: "xstx:claude-opus-4-5-20251101-thinking",
+    label: "星途 Claude Opus 4.5 Thinking",
+    provider: "xstx",
+    model: "claude-opus-4-5-20251101-thinking",
+  }),
+  chatCapability({
+    value: "xstx:claude-sonnet-4-5-20250929",
+    label: "星途 Claude Sonnet 4.5",
+    provider: "xstx",
+    model: "claude-sonnet-4-5-20250929",
+  }),
+  chatCapability({
+    value: "xstx:claude-sonnet-4-5-20250929-thinking",
+    label: "星途 Claude Sonnet 4.5 Thinking",
+    provider: "xstx",
+    model: "claude-sonnet-4-5-20250929-thinking",
+  }),
+  chatCapability({
+    value: "xstx:claude-haiku-4-5-20251001",
+    label: "星途 Claude Haiku 4.5",
+    provider: "xstx",
+    model: "claude-haiku-4-5-20251001",
+  }),
 ];
 
-export const IMAGE_MODEL_OPTIONS: Record<AiProvider, ModelOption[]> = {
-  "12ai": optionsForKind("image", "12ai", false),
-  "grok2api": optionsForKind("image", "grok2api", false),
-};
-
-export const VIDEO_MODEL_OPTIONS: Record<AiProvider, ModelOption[]> = {
-  "12ai": optionsForKind("video", "12ai"),
-  "grok2api": optionsForKind("video", "grok2api"),
-};
-
-export const CHAT_MODEL_OPTIONS: Record<AiProvider, ModelOption[]> = {
-  "12ai": optionsForKind("chat", "12ai"),
-  "grok2api": optionsForKind("chat", "grok2api"),
-};
+export const IMAGE_MODEL_OPTIONS = buildProviderOptionsRecord("image", false);
+export const VIDEO_MODEL_OPTIONS = buildProviderOptionsRecord("video", true);
+export const CHAT_MODEL_OPTIONS = buildProviderOptionsRecord("chat", true);
 
 export function getChatModelOptions(provider: AiProvider): ModelOption[] {
   return CHAT_MODEL_OPTIONS[provider];
@@ -400,7 +421,7 @@ export function parseProviderModel(value: string, fallbackProvider: AiProvider):
 
   const provider = value.slice(0, separator);
   const model = value.slice(separator + 1);
-  if (provider === "12ai" || provider === "grok2api") {
+  if (isKnownProvider(provider)) {
     return { provider, model, async: false };
   }
 
@@ -486,6 +507,14 @@ function chatCapability(input: CapabilityInput): ProviderModelCapability {
     maxReferenceImages: 0,
     minReferenceImages: 0,
   };
+}
+
+function buildProviderOptionsRecord(kind: ModelKind, includeAsync: boolean): Record<AiProvider, ModelOption[]> {
+  const record = {} as Record<AiProvider, ModelOption[]>;
+  for (const key of PROVIDER_KEYS) {
+    record[key] = optionsForKind(kind, key, includeAsync);
+  }
+  return record;
 }
 
 function optionsForKind(kind: ModelKind, provider?: AiProvider, includeAsync = true): ModelOption[] {

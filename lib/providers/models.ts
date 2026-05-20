@@ -1,4 +1,5 @@
 import { formatProviderModel, isAgentCompatibleModelId, type AiProvider, type ModelOption } from "./model-catalog";
+import { getProviderMeta } from "./registry";
 import type { ProviderConfig } from "./types";
 import { getJson, isRecord } from "./utils";
 
@@ -32,7 +33,7 @@ function readModelId(value: unknown, provider: AiProvider, kind: ModelKindFilter
   return [
     {
       value: formatProviderModel(provider, value.id),
-      label: `${provider === "12ai" ? "12AI" : "Grok2API"} ${value.id}`,
+      label: `${getProviderMeta(provider).label} ${value.id}`,
     },
   ];
 }

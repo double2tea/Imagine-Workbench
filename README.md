@@ -45,6 +45,9 @@ TWELVE_AI_VIDEO_BASE_URL="https://new.12ai.org"
 
 GROK2API_API_KEY="your_grok2api_key"
 GROK2API_BASE_URL="http://localhost:8000"
+
+XSTX_API_KEY="sk_your_xstx_key"
+XSTX_BASE_URL="https://api.xstx.info"
 ```
 
 The app can also accept provider credentials from the in-app settings panel. Request headers from the UI are resolved by `lib/providers/utils.ts`.
@@ -59,19 +62,41 @@ Provider model IDs use this shape:
 12ai-async:gemini-3.1-flash-image-preview
 grok2api:grok-4.20-auto
 grok2api:grok-imagine-image
+xstx:claude-opus-4-5-20251101
 ```
+
+### Adding a new provider
+
+New providers are added through a centralized registry — no scattered if-else branches. Add one entry to `lib/providers/registry.ts`:
+
+```typescript
+{
+  key: "newprovider",
+  label: "Display Name",
+  envApiKey: "NEWPROVIDER_API_KEY",
+  envBaseUrl: "NEWPROVIDER_BASE_URL",
+  defaultBaseUrl: "https://api.example.com",
+  defaultVideoBaseUrl: "https://api.example.com",
+  supportsImage: true | false,
+  supportsVideo: true | false,
+  supportsChat: true | false,
+}
+```
+
+Then add model capabilities to `MODEL_CAPABILITIES` in `lib/providers/model-catalog.ts`. If the provider needs custom generation logic (non-OpenAI-compatible endpoints), add adapter branches in `lib/providers/image.ts` or `lib/providers/video.ts`. OpenAI-compatible chat, image, and model-listing endpoints work with zero additional adapter code.
+
+The `AiProvider` type, `PROVIDER_KEYS`, settings UI cards, localStorage persistence, env var resolution, and model dropdown groups are all derived automatically from the registry.
 
 Current adapters:
 
-- Chat: `/v1/chat/completions`
-- Model list: `/v1/models`
+- Chat: `/v1/chat/completions` (OpenAI-compatible)
+- Model list: `/v1/models` (OpenAI-compatible)
 - 12AI Gemini image: `/v1beta/models/{model}:generateContent`
 - 12AI GPT Image 2: `/v1/images/generations`, `/v1/images/edits`
 - 12AI async image: `/v1/images/async/generations`
 - 12AI Veo: `/v1/videos`
 - grok2api image/video/chat: OpenAI-compatible endpoints plus `/v1/videos`
-
-Default models live in `lib/providers/model-catalog.ts`.
+- 星途 (xstx): OpenAI-compatible chat and model listing — chat-only provider
 
 ## Model Defaults
 
@@ -116,7 +141,7 @@ components/
   PresetStyles.ts                  Visual preset definitions
 lib/
   db.ts                            IndexedDB asset store
-  providers/                       Provider adapters and model catalog
+  providers/                       Provider adapters, registry, and model catalog
 hooks/
   use-mobile.ts                    Mobile breakpoint helper
 ```
@@ -137,4 +162,5 @@ npm run start
 - Generated assets are stored in the browser, not in a server database.
 - Async operations are tracked with operation names in the form `provider:mediaType:id`.
 - Reference images are passed as data URI base64 strings.
-- The app currently keeps provider integration logic in `lib/providers/*`; avoid putting provider-specific request details directly in UI components.
+- Provider metadata lives in `lib/providers/registry.ts` — the single source of truth for keys, labels, env vars, and defaults.
+- The app keeps provider integration logic in `lib/providers/*`; avoid putting provider-specific request details directly in UI components.
