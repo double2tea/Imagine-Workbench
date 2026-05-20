@@ -75,6 +75,7 @@ interface ChatMessage {
   suggestedFollowUps?: string[];
   interactiveState?: "idle" | "executing" | "completed" | "declined";
   activeSkills?: string[];
+  toolCalls?: Array<{ name: string; args: Record<string, unknown> }>;
 }
 
 type AgentToolAction = NonNullable<ChatMessage["recommendedAction"]>;
@@ -100,6 +101,13 @@ interface ProviderTestState {
 function makeClientId(prefix: string): string {
   return `${prefix}_${Date.now()}`;
 }
+
+const TOOL_LABELS: Record<string, string> = {
+  query_models: "查询模型",
+  get_skill_info: "查询技能",
+  get_gallery_assets: "搜索资产",
+  get_prompt_blueprint: "获取模板",
+};
 
 function getStringField(value: unknown, field: string): string | null {
   if (typeof value !== "object" || value === null || !(field in value)) return null;
@@ -189,7 +197,11 @@ function isSelectableImageModel(option: ModelOption): boolean {
 }
 
 function isSelectableChatModel(option: ModelOption): boolean {
-  return option.value !== "12ai:gpt-5.1";
+  return option.value !== "12ai:gemini-3.1-flash";
+}
+
+function hasBuiltInChatModel(value: string): boolean {
+  return Object.values(CHAT_MODEL_OPTIONS).some(options => options.some(option => option.value === value));
 }
 
 function getProviderLabel(provider: AiProvider): string {
@@ -287,20 +299,20 @@ export default function Home() {
   const [compareViewType, setCompareViewType] = useState<"side-by-side" | "wipe-slider">("side-by-side");
   const [compareSliderPos, setCompareSliderPos] = useState(50);
 
+  const WELCOME_MESSAGE: ChatMessage = {
+    id: "welcome",
+    role: "assistant",
+    content: "您好！我是您的智能创意助手。您可以一边调整左侧创作参数，一边随时交办高阶创意任务。例如：「帮我做一套3张赛博朋克风战士的相册」或「帮我把上一部图片转成16:9的微短视频」。我会给出建议，并在确认后填入参数或执行生成。",
+    thought: "初始化底部 Agent Dock，准备读取画廊资产上下文...",
+    suggestedFollowUps: [
+      "优化并生成一张赛博朋克飞艇",
+      "我想做一段太空科幻题材视频",
+      "根据当前画廊给我三个延展方向"
+    ]
+  };
+
   // Agent State
-  const [agentMessages, setAgentMessages] = useState<ChatMessage[]>([
-    {
-      id: "welcome",
-      role: "assistant",
-      content: "您好！我是您的智能创意助手。您可以一边调整左侧创作参数，一边随时交办高阶创意任务。例如：「帮我做一套3张赛博朋克风战士的相册」或「帮我把上一部图片转成16:9的微短视频」。我会给出建议，并在确认后填入参数或执行生成。",
-      thought: "初始化底部 Agent Dock，准备读取画廊资产上下文...",
-      suggestedFollowUps: [
-        "优化并生成一张赛博朋克飞艇",
-        "我想做一段太空科幻题材视频",
-        "根据当前画廊给我三个延展方向"
-      ]
-    }
-  ]);
+  const [agentMessages, setAgentMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
   const [agentInput, setAgentInput] = useState("");
   const [isAgentLoading, setIsAgentLoading] = useState(false);
   const [autoExecute, setAutoExecute] = useState(false);
@@ -360,6 +372,7 @@ export default function Home() {
   const agentDockRef = useRef<HTMLElement | null>(null);
   const autoCountdownInterval = useRef<NodeJS.Timeout | null>(null);
   const pollingFailuresRef = useRef<Record<string, number>>({});
+  const isAgentDockSuppressed = showSettings || isMaskOpen || fullscreenItem !== null;
 
   const dismissWorkspaceNotice = useCallback((id: string) => {
     setWorkspaceNotices(prev => prev.filter(notice => notice.id !== id));
@@ -485,6 +498,16 @@ export default function Home() {
     async function loadWorkspace() {
       const allItems = await getAllFromDB();
       setItems(allItems);
+      const storedChat = localStorage.getItem("imagine_agent_chat");
+      if (storedChat) {
+        try {
+          const parsed = JSON.parse(storedChat);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setAgentMessages(parsed as ChatMessage[]);
+            return;
+          }
+        } catch { /* ignore corrupt data */ }
+      }
     }
     loadWorkspace();
 
@@ -504,7 +527,7 @@ export default function Home() {
       if (storedProvider === "12ai" || storedProvider === "grok2api") setSelectedProvider(storedProvider);
 
       const storedChatModel = localStorage.getItem("imagine_chat_model");
-      if (storedChatModel === "12ai:gpt-5.1") {
+      if (storedChatModel === "12ai:gemini-3.1-flash" || (storedChatModel && !hasBuiltInChatModel(storedChatModel))) {
         localStorage.setItem("imagine_chat_model", DEFAULT_CHAT_MODEL);
       } else if (storedChatModel) {
         setSelectedChatModel(storedChatModel);
@@ -593,6 +616,13 @@ export default function Home() {
       chatBottomRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [agentMessages, isAgentLoading]);
+
+  // Persist agent chat to localStorage
+  useEffect(() => {
+    if (agentMessages.length > 1) {
+      localStorage.setItem("imagine_agent_chat", JSON.stringify(agentMessages));
+    }
+  }, [agentMessages]);
 
   // Media Polling engine - checks processing image/video operations every 4 seconds
   useEffect(() => {
@@ -1627,6 +1657,7 @@ export default function Home() {
           suggestedFollowUps: agentResponse.suggestedFollowUps || [],
           interactiveState: "idle",
           activeSkills: agentResponse.activeSkills || [],
+          toolCalls: agentResponse.toolCalls || [],
         };
 
         setAgentMessages(prev => [...prev, assistantMsg]);
@@ -1725,6 +1756,11 @@ export default function Home() {
   const declineAgentToolAction = (msgId: string) => {
     clearActiveCountdown();
     setAgentMessages(prev => prev.map(m => m.id === msgId ? { ...m, interactiveState: "declined" } : m));
+  };
+
+  const handleClearChat = () => {
+    setAgentMessages([WELCOME_MESSAGE]);
+    localStorage.removeItem("imagine_agent_chat");
   };
 
   const handleClearProject = async () => {
@@ -2386,10 +2422,10 @@ export default function Home() {
 
 
             {/* Persistent Agent Dock */}
-            {isAgentPortalReady && !showSettings && createPortal(
+            {isAgentPortalReady && !isAgentDockSuppressed && createPortal(
               <section
                 ref={agentDockRef}
-                className={`imagine-agent-dock imagine-theme-${themeMode} fixed inset-x-4 bottom-12 z-50 mx-auto w-[calc(100vw-32px)] max-w-3xl rounded-lg border border-slate-700/70 bg-[#0b0d13]/94 p-2 text-slate-200 shadow-[0_18px_54px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-opacity duration-200 hover:opacity-100 focus-within:opacity-100 sm:bottom-16 sm:w-[min(760px,calc(100vw-40px))] ${
+                className={`imagine-agent-dock imagine-theme-${themeMode} fixed inset-x-4 bottom-12 z-40 mx-auto w-[calc(100vw-32px)] max-w-3xl rounded-lg border border-slate-700/70 bg-[#0b0d13]/94 p-2 text-slate-200 shadow-[0_18px_54px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-opacity duration-200 hover:opacity-100 focus-within:opacity-100 sm:bottom-16 sm:w-[min(760px,calc(100vw-40px))] ${
                   isAgentDockOverContent ? "opacity-[0.84]" : "opacity-100"
                 }`}
               >
@@ -2409,9 +2445,21 @@ export default function Home() {
 
                 <span className="h-px bg-gradient-to-r from-slate-700/60 via-slate-800/40 to-transparent" />
 
-                <span className="hidden shrink-0 items-center gap-1.5 font-mono text-[10px] text-slate-500 sm:flex">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400/70" />
-                  {agentReferenceId || agentReferenceUrl ? "引用中" : "画廊"}
+                <span className="flex shrink-0 items-center gap-2">
+                  <span className="hidden items-center gap-1.5 font-mono text-[10px] text-slate-500 sm:flex">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400/70" />
+                    {agentReferenceId || agentReferenceUrl ? "引用中" : "画廊"}
+                  </span>
+                  {agentMessages.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={handleClearChat}
+                      className="flex h-5 w-5 items-center justify-center rounded border border-slate-700/60 text-slate-500 transition hover:border-red-500/30 hover:text-red-400"
+                      title="清空对话"
+                    >
+                      <X className="h-2.5 w-2.5" />
+                    </button>
+                  )}
                 </span>
               </div>
 
@@ -2461,6 +2509,24 @@ export default function Home() {
                                 title={`当前激活的特定智力分支 (Activated Domain Skill): ${skillName}`}
                               >
                                 {info.label}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Tool calls made by agent */}
+                      {msg.role === "assistant" && msg.toolCalls && msg.toolCalls.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1 opacity-70">
+                          {msg.toolCalls.map((tc) => {
+                            const label = TOOL_LABELS[tc.name] || tc.name;
+                            return (
+                              <span
+                                key={tc.name}
+                                className="text-[9px] px-1.5 py-0.5 rounded border border-slate-700 bg-slate-900 text-slate-400 font-mono"
+                                title={JSON.stringify(tc.args)}
+                              >
+                                {label}
                               </span>
                             );
                           })}
@@ -2836,6 +2902,53 @@ export default function Home() {
             </div>
           </div>
 
+          <AnimatePresence initial={false}>
+            {selectedItemIds.length > 0 && (
+              <motion.div
+                initial={{ y: -8, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: -8, opacity: 0 }}
+                className="rounded-xl border border-blue-500/20 bg-slate-950/55 p-3 shadow-[0_14px_34px_rgba(0,0,0,0.28)] backdrop-blur-md"
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="flex items-center gap-2 text-xs font-bold text-slate-100">
+                      <span className="inline-block h-2.5 w-2.5 rounded-full bg-blue-500" />
+                      已选中 {selectedItemIds.length} 项创意作品
+                    </p>
+                    <p className="mt-0.5 text-[10px] text-slate-500">可批量打包为 ZIP，或移除所选资产。</p>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleBatchDownloadZip}
+                      className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-blue-500"
+                    >
+                      <FileArchive className="h-3.5 w-3.5" />
+                      打包 ZIP
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleBatchDelete}
+                      className="rounded-lg border border-red-500/20 bg-red-950/20 px-3 py-2 text-xs font-bold text-red-300 transition hover:bg-red-950/35"
+                    >
+                      批量删除
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleClearSelection}
+                      className="rounded-lg p-2 text-slate-500 transition hover:bg-white/5 hover:text-slate-200"
+                      title="清空勾选"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* Active project Compare Slider workspace (Show if CompareMode on with exactly 2 items) */}
           {isCompareMode && (
             <div className="rounded-2xl border border-blue-500/20 bg-[#0e0e12]/90 backdrop-blur-md p-5 flex flex-col gap-4 animate-fade-in shadow-[0_0_25px_rgba(37,99,235,0.07)]">
@@ -3112,21 +3225,21 @@ export default function Home() {
                         </div>
                       ) : (
                         // Standard complete state display
-                        <div className="relative w-full h-full">
+                        <div className="relative flex h-full w-full items-center justify-center bg-slate-950">
                           {item.type === "image" ? (
                             <PreviewImage
                               src={item.url}
                               alt={item.prompt}
-                              className="w-full h-full object-contain bg-slate-950 transition duration-500 cursor-pointer"
+                              className="h-full w-full cursor-pointer object-contain transition duration-500"
                               onClick={() => setFullscreenItem(item)}
                             />
                           ) : (
-                            <div className="relative w-full h-full bg-slate-950">
+                            <div className="relative flex h-full w-full items-center justify-center bg-slate-950">
                               <video
                                 src={item.url}
                                 controls
                                 loop
-                                className="w-full h-full object-cover"
+                                className="h-full w-full object-contain"
                               />
                             </div>
                           )}
@@ -3288,55 +3401,6 @@ export default function Home() {
         </section>
 
       </main>
-
-      {/* Floating Batch Operation Panel (Appears when 1+ checklist items selected) */}
-      <AnimatePresence>
-        {selectedItemIds.length > 0 && (
-          <motion.div
-            initial={{ y: 80, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 80, opacity: 0 }}
-            className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-lg px-4"
-          >
-            <div className="bg-[#0e0e12]/90 backdrop-blur-xl border border-blue-500/20 shadow-[0_20px_50px_rgba(0,0,0,0.8),0_0_30px_rgba(37,99,235,0.15)] rounded-2xl p-4 flex items-center justify-between gap-4">
-              <div>
-                <p className="text-xs font-bold text-slate-100 flex items-center gap-2">
-                  <span className="inline-block h-2.5 w-2.5 rounded-full bg-blue-500 animate-pulse" />
-                  已选中 {selectedItemIds.length} 项创意作品
-                </p>
-                <p className="text-[10px] text-slate-400 mt-0.5">可一键批量封包并打包下载为 zip 压缩文件包。</p>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={handleBatchDownloadZip}
-                  className="bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition duration-200 transform hover:scale-[1.03]"
-                >
-                  <FileArchive className="h-3.5 w-3.5" />
-                  打包 ZIP
-                </button>
-                <button
-                  type="button"
-                  onClick={handleBatchDelete}
-                  className="bg-slate-900 hover:bg-red-950/40 text-red-400 font-bold px-3 py-2 border border-white/5 hover:border-red-500/30 rounded-xl text-xs transition duration-200"
-                  title="批量移除"
-                >
-                  批量删除
-                </button>
-                <button
-                  type="button"
-                  onClick={handleClearSelection}
-                  className="rounded-xl p-2 text-slate-400 hover:bg-white/5 hover:text-white transition duration-200"
-                  title="清空勾选"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Settings Panel Overlay Drawer */}
       <AnimatePresence>
