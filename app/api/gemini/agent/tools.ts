@@ -3,39 +3,37 @@ import { MODEL_CAPABILITIES, type ProviderModelCapability } from "@/lib/provider
 import type { ToolDefinition } from "@/lib/providers/types";
 import { SKILL_REGISTRY } from "./skills";
 
-// -- Tool argument schemas (zod) --
+// -- Tool argument schemas (zod, for runtime validation only) --
 
 const queryModelsSchema = z.object({
   kind: z.enum(["image", "video", "chat"]).optional(),
 });
 
 const getSkillInfoSchema = z.object({
-  name: z.string().describe("技能名称，如 PromptEngineer、ImageGenerator"),
+  name: z.string(),
 });
 
 const getGalleryAssetsSchema = z.object({
-  type: z.enum(["image", "video"]).optional().describe("按类型过滤"),
-  search: z.string().optional().describe("在 prompt 文本中搜索关键词"),
+  type: z.enum(["image", "video"]).optional(),
+  search: z.string().optional(),
 });
 
 const getPromptBlueprintSchema = z.object({
-  category: z
-    .enum([
-      "portrait-avatar",
-      "social-media-post",
-      "infographic-edu-visual",
-      "youtube-thumbnail",
-      "comic-storyboard",
-      "product-marketing",
-      "ecommerce-main-image",
-      "game-asset",
-      "poster-flyer",
-      "app-web-design",
-    ])
-    .describe("目标使用场景类别"),
+  category: z.enum([
+    "portrait-avatar",
+    "social-media-post",
+    "infographic-edu-visual",
+    "youtube-thumbnail",
+    "comic-storyboard",
+    "product-marketing",
+    "ecommerce-main-image",
+    "game-asset",
+    "poster-flyer",
+    "app-web-design",
+  ]),
 });
 
-// -- Tool definitions --
+// -- Tool definitions (JSON Schema hand-written for OpenAI compatibility) --
 
 const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
@@ -45,16 +43,35 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       description:
         "查询当前可用的生成模型及参数能力。kind 过滤：image / video / chat，不传返回全部。" +
         "返回：模型 ID、提供商、宽高比列表、输出尺寸列表、思考级别、是否异步、是否支持参考图、视频参考模式与数量限制。",
-      parameters: zodToJsonSchema(queryModelsSchema),
+      parameters: {
+        type: "object",
+        properties: {
+          kind: {
+            type: "string",
+            enum: ["image", "video", "chat"],
+            description: "模型类别过滤，不传返回全部",
+          },
+        },
+        additionalProperties: false,
+      },
     },
   },
   {
     type: "function",
     function: {
       name: "get_skill_info",
-      description:
-        "查询某项技能的完整描述、适用场景和示例。在决定激活哪些技能时调用此工具，而非猜测。",
-      parameters: zodToJsonSchema(getSkillInfoSchema),
+      description: "查询某项技能的完整描述、适用场景和示例。在决定激活哪些技能时调用此工具，而非猜测。",
+      parameters: {
+        type: "object",
+        properties: {
+          name: {
+            type: "string",
+            description: "技能名称，如 PromptEngineer、ImageGenerator",
+          },
+        },
+        required: ["name"],
+        additionalProperties: false,
+      },
     },
   },
   {
@@ -64,7 +81,21 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       description:
         "查询当前工作区已生成的图像/视频资产。可按类型过滤或按 prompt 关键词搜索。" +
         "返回匹配项的 ID、类型、宽高比、prompt 摘要。用于引用历史资产做编辑或视频合成。",
-      parameters: zodToJsonSchema(getGalleryAssetsSchema),
+      parameters: {
+        type: "object",
+        properties: {
+          type: {
+            type: "string",
+            enum: ["image", "video"],
+            description: "按类型过滤",
+          },
+          search: {
+            type: "string",
+            description: "在 prompt 文本中搜索关键词",
+          },
+        },
+        additionalProperties: false,
+      },
     },
   },
   {
@@ -74,7 +105,29 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       description:
         "获取特定使用场景的结构化提示词蓝图。返回该场景的推荐风格、结构化 JSON 模板字段、和构图建议。" +
         "在用户需要生成特定类别图像（头像、海报、信息图等）但 PromptEngineer 技能描述不足以指导时调用。",
-      parameters: zodToJsonSchema(getPromptBlueprintSchema),
+      parameters: {
+        type: "object",
+        properties: {
+          category: {
+            type: "string",
+            enum: [
+              "portrait-avatar",
+              "social-media-post",
+              "infographic-edu-visual",
+              "youtube-thumbnail",
+              "comic-storyboard",
+              "product-marketing",
+              "ecommerce-main-image",
+              "game-asset",
+              "poster-flyer",
+              "app-web-design",
+            ],
+            description: "目标使用场景类别",
+          },
+        },
+        required: ["category"],
+        additionalProperties: false,
+      },
     },
   },
 ];
@@ -307,29 +360,3 @@ function formatCapabilities(c: ProviderModelCapability): Record<string, unknown>
   };
 }
 
-function zodToJsonSchema(schema: z.ZodObject<z.ZodRawShape>): Record<string, unknown> {
-  const shape = schema.shape;
-  const properties: Record<string, unknown> = {};
-  const required: string[] = [];
-  for (const [key, def] of Object.entries(shape)) {
-    const zodType = def instanceof z.ZodOptional ? def._def.innerType : def;
-    const isOptional = def instanceof z.ZodOptional;
-
-    if (zodType instanceof z.ZodString) {
-      properties[key] = { type: "string", description: zodType.description ?? "" };
-    } else if (zodType instanceof z.ZodEnum) {
-      properties[key] = {
-        type: "string",
-        enum: Object.values(zodType._def.entries) as string[],
-        description: zodType.description ?? "",
-      };
-    }
-
-    if (!isOptional) required.push(key);
-  }
-  return {
-    type: "object",
-    properties,
-    ...(required.length > 0 ? { required } : {}),
-  };
-}
