@@ -1794,8 +1794,9 @@ export default function Home() {
 
       {/* Main Multi-panel Layout grid */}
       <main
-        className="imagine-main-grid flex-1 w-full max-w-[1880px] mx-auto px-4 pt-5 sm:px-6 sm:pt-6 grid grid-cols-1 lg:grid-cols-[minmax(420px,0.54fr)_minmax(0,1fr)] gap-5 xl:gap-6 items-start z-10"
-        style={{ paddingBottom: isAgentDockOpen ? "72px" : "48px" }}
+        className={`imagine-main-grid ${
+          isAgentDockOpen ? "imagine-main-grid-agent-open" : "imagine-main-grid-agent-closed"
+        } flex-1 w-full max-w-[1880px] mx-auto px-4 pt-5 sm:px-6 sm:pt-6 grid grid-cols-1 lg:grid-cols-[minmax(420px,0.54fr)_minmax(0,1fr)] gap-5 xl:gap-6 items-start z-10`}
       >
 
         {/* Creation Controls sidebar container (Col 4) */}
@@ -2986,7 +2987,7 @@ export default function Home() {
           )}
 
           {/* Main Gallery List */}
-          <div className="min-h-[calc(100vh-360px)]">
+          <div className="imagine-gallery-scroll min-h-[calc(100vh-360px)]">
             {filterAndSearchItems().length === 0 ? (
               <div className="imagine-gallery-empty flex min-h-[calc(100vh-390px)] flex-col items-center justify-center rounded-xl border border-dashed border-slate-800 bg-slate-950/28 p-6 text-center text-slate-500">
                 <ImageIcon className="mb-3 h-9 w-9 text-slate-700" />
