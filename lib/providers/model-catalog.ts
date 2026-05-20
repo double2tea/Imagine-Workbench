@@ -45,7 +45,7 @@ export interface ProviderModelCapability {
 
 export const DEFAULT_IMAGE_MODEL = "12ai:gemini-3.1-flash-image-preview";
 export const DEFAULT_VIDEO_MODEL = "12ai:veo_3_1-fast";
-export const DEFAULT_CHAT_MODEL = "12ai:deepseek-v4-flash";
+export const DEFAULT_CHAT_MODEL = "12ai:gemini-3.1-flash-lite-preview";
 export const DEFAULT_VISION_CHAT_MODEL = "12ai:gemini-3.1-flash-lite-preview";
 
 const GEMINI_25_RATIOS: ParameterOption[] = [
@@ -262,12 +262,6 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     videoReferenceMode: "reference",
     maxReferenceImages: 7,
     minReferenceImages: 0,
-  }),
-  chatCapability({
-    value: "12ai:deepseek-v4-flash",
-    label: "12AI DeepSeek 4 Flash",
-    provider: "12ai",
-    model: "deepseek-v4-flash",
   }),
   chatCapability({
     value: "12ai:gemini-3.1-flash-lite-preview",
