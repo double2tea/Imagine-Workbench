@@ -1,0 +1,110 @@
+export interface Skill {
+  name: string;
+  category: 'prompt' | 'image' | 'video' | 'edit' | 'planning' | 'retrieval' | 'export' | 'system';
+  description: string;
+  whenToUse: string;
+  examples: string[];
+}
+
+export const SKILL_REGISTRY: Skill[] = [
+  {
+    name: "PromptEngineer",
+    category: "prompt",
+    description: "高级提示词工程器。负责解析用户的粗糙/不完整构想，通过增加氛围细节、灯光、镜头控制、流派特质和画面细节，将其演进、扩写为专业级、高精度的生成提示词。",
+    whenToUse: "用户输入含糊（如 '画个猫'）、或者明确表示需要让画面更精美/精细、优化提示词、微调文字风格时。",
+    examples: [
+      "用户输入: '科幻飞船' -> 优化为: 'A colossal monolithic starship hovering over a futuristic cyberpunk metropolis, massive neon billboards, driving rain, reflection of holographic lights on wet steel panels, cinematic lighting, photorealistic, 8k resolution, shot on Arri Alexa.'",
+      "用户输入: '精修一下我的提示词，加点艺术感'"
+    ]
+  },
+  {
+    name: "ImageGenerator",
+    category: "image",
+    description: "智感文生图/图生图核心引擎。负责调用 Imagen 3.0 或相关高性能算色模型，一键生成全新的创意视觉静态画作、人物肖像、背景插画、角色设定等。",
+    whenToUse: "当用户提出生成图像、设计画作、创作插图、设定新角色或场景（无特定参考图）时的创建型指令。",
+    examples: [
+      "用户输入: '生成一张戴狐狸面具的日系和服少女形象'",
+      "用户输入: '为我刚刚创作的故事主角生成一张写实半身像，背景在密林深处'"
+    ]
+  },
+  {
+    name: "VideoGenerator",
+    category: "video",
+    description: "智影视频合成引擎。负责通过 Veo 3.1 等顶级模型，根据精炼过的文案或基于选定关联的图片作为首尾起点，合成生动逼真或奇幻动态的高分辨率短视频视频流。",
+    whenToUse: "当用户说 '转成视频'、'让这张图动起来'、'合成一段镜头动作'、'帮我做一段电影预告片' 时，或明确需要创建视频资产时。",
+    examples: [
+      "用户输入: '把刚才生成的赛博飞船图片转化成一段微缩镜头摇移、引擎喷火的5秒视频'",
+      "用户输入: '做一个日落金山、云海翻涌的延时摄影短视频'"
+    ]
+  },
+  {
+    name: "ImageEditor",
+    category: "edit",
+    description: "局部智能重绘与蒙版编辑引擎。负责实现局部编辑（img2img / Inpainting）及图生图调整。利用用户传入或标记的 Mask 特征，根据新的提示指令精准替换、修补、增删特定画布区块。",
+    whenToUse: "当用户引用了某个已生成图像的 ID，或者有 referenceImageId，并请求在特定部分局部编辑、擦拭重绘、改变局部颜色、替换背景或增删物件时。",
+    examples: [
+      "用户输入: '(引用图A) 把这个角色右手持的剑改成一柄散发蓝光的科技感光刃'",
+      "用户输入: '帮我把这张图的背景换成星空'"
+    ]
+  },
+  {
+    name: "CreativePlanner",
+    category: "planning",
+    description: "极智创意宏观规划师。擅长进行复杂创意、多步骤、长周期项目的全局拆解，制定合理的步骤计划。向用户输出结构化的任务流程，引导用户一步步达成复杂的创作目标（如完整的漫画、短篇视频短片等）。",
+    whenToUse: "当用户给出了极其复杂、高难度或宏大含糊的长篇目标时（如：'我想做个关于外星人入侵的完整科幻预告片/连环画'、'帮我全套设计一款古风仙侠的手游角色和宣传视频流程'）。",
+    examples: [
+      "用户输入: '我想从头做一部3分钟、有故事情节的赛博朋克微电影。我该怎么做？'",
+      "用户输入: '我们要帮一款能量饮料做全套视觉创意提案'"
+    ]
+  },
+  {
+    name: "SessionHistoryRetriever",
+    category: "retrieval",
+    description: "对话历史与资产回溯器。负责分析当前已生成的全部项状态，在上下文丢失或对话较长时，精确帮用户回溯某次生成的结果，交叉比对前后作品的异同点与色彩逻辑。",
+    whenToUse: "用户提到 '之前那张图'、'对比刚才和开始画的那版'、'帮我找出最满意的那个星空图' 或要求盘点此前的创意记录时。",
+    examples: [
+      "用户输入: '帮我找出我在此处生成的第一个版本，我想要重新微调它'",
+      "用户输入: '对比一下第二版和第四版的主要色彩差异表现'"
+    ]
+  },
+  {
+    name: "VariationSuggester",
+    category: "image",
+    description: "创意变体延伸推荐器。负责根据现有的得意作品，横向发散、提炼出多重不同分支风格、构图倾斜或色彩倾向的变体提案，一举拓宽创意池深度。",
+    whenToUse: "用户觉得生成图效果好但想要 '更多类似的风格选项'、'提供一些变体方案'、'微调一下构图再试几种可能' 等。",
+    examples: [
+      "用户输入: '我很喜欢刚才的角色设计，有什么其他发型和配饰变体可以选？'",
+      "用户输入: '在当前的冷色调大背景下，发散 3 种不同的渲染色调方案选项给我'"
+    ]
+  },
+  {
+    name: "AsyncTaskManager",
+    category: "system",
+    description: "智能后台异步进度跟踪器。负责在多个视频、图片算力大规模并发调度时，精密把控任务列表，监控状态反馈，解决进度焦虑，在轮询完成时第一速度给予动态响应通知。",
+    whenToUse: "用户在等待视频生成时频繁询问 '好了吗'、'生成进度多少了'、'后台视频还在转吗' 或者是提示对处于 processing 的项目做出状态核验时。",
+    examples: [
+      "用户输入: '看一下视频生成好了没'",
+      "用户输入: '帮我跟踪刚才那批渲染作业进度，好了请弹通知'"
+    ]
+  },
+  {
+    name: "ProjectSummarizer",
+    category: "planning",
+    description: "创想阶段性汇总提炼器。对已生成的画廊资产做总结，整理已定稿的要素清单（如: 角色形象、主要冷色调、已经做好的3个分镜镜头等），生成详尽的设计规范或创意工作大纲（Bible Book）。",
+    whenToUse: "用户要求 '盘点整理一下我们现在做出的所有成果'、'做个创意汇报大纲'、'把当前已经敲定的美术风格指南整理出来' 时。",
+    examples: [
+      "用户输入: '帮我总结今天做出来的成果，写一个300字的设计企划风格简介'",
+      "用户输入: '盘点我们敲定并生成的4个分镜切片，看是否有风格断层'"
+    ]
+  },
+  {
+    name: "ExportManager",
+    category: "export",
+    description: "一键打包批处理与封包导出大师。负责引导用户呼出批量操作面板，辅助解释 zip 压缩方法，进行归档整理下载说明，推荐将当前满意的成果批量导出的路线规划。",
+    whenToUse: "用户提到 '怎么下载'、'我要打包带走'、'能不能把图片保存到电脑'、'下载全部做好的素材' 等与资产一键打包成 ZIP、保存导出、共享等需求强相关时。",
+    examples: [
+      "用户输入: '我要怎么把今天的所有大片打包下载下来？'",
+      "用户输入: '帮我一键打包这四个定稿素材'"
+    ]
+  }
+];

@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+@layer utilities {
+  /* Ultra-Premium Glassmorphism mapping Immersive UI style */
+  .dark-glass {
+    background-color: rgba(255, 255, 255, 0.02);
+    backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.45);
+  }
+
+  .accent-glow {
+    box-shadow: 0 0 25px rgba(37, 99, 235, 0.25);
+  }
+
+  .accent-glow-orange {
+    box-shadow: 0 0 25px rgba(249, 115, 22, 0.25);
+  }
+}
+
+

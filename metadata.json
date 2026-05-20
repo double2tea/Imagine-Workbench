@@ -1,0 +1,6 @@
+{
+  "name": "Imagine Workbench",
+  "description": "Imagine Workbench is a professional, elegant, and offline-first AI image and video creation studio. It features advanced prompt optimization, precise canvas masking edit capabilities, batch operations, and a chat-driven creative Agent Mode inspired by Grok. Complete with real-time status polling, local history archiving, and professional presets.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
