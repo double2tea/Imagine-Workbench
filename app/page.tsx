@@ -47,6 +47,7 @@ import {
   VIDEO_MODEL_OPTIONS,
   type AiProvider,
   type ModelOption,
+  type VideoReferenceMode,
 } from "@/lib/providers/model-catalog";
 
 // Reference image object structure for multiple selection support
@@ -207,6 +208,27 @@ function getProviderModelGroups(optionsByProvider: Record<AiProvider, ModelOptio
       options: optionsByProvider[provider],
     }))
     .filter(group => group.options.length > 0);
+}
+
+function buildVideoReferenceUrls(
+  references: ReferenceImageRef[],
+  fallbackReference: string | null,
+  mode: VideoReferenceMode,
+  maxCount: number,
+): string[] {
+  if (maxCount === 0 || mode === "none") return [];
+
+  if (mode === "firstLast") {
+    const start = references.find(reference => reference.role === "start")?.url ?? references[0]?.url ?? fallbackReference;
+    const end =
+      references.find(reference => reference.role === "end")?.url ??
+      references.find(reference => reference.url !== start)?.url;
+    return [start, end].filter((url): url is string => typeof url === "string" && url.length > 0).slice(0, maxCount);
+  }
+
+  const urls = references.map(reference => reference.url);
+  if (urls.length === 0 && fallbackReference) urls.push(fallbackReference);
+  return urls.filter(url => url.length > 0).slice(0, maxCount);
 }
 
 function formatStoredModelLabel(value: string, fallbackProvider: AiProvider): string {
@@ -378,6 +400,10 @@ export default function Home() {
     ? `12ai-async:${parseProviderModel(selectedModel, selectedProvider).model}`
     : selectedModel;
   const activeVideoSize = videoCapabilities.sizes.some(option => option.value === aspectRatio) ? aspectRatio : "auto";
+  const videoReferenceMode = videoCapabilities.referenceMode;
+  const videoReferenceLimit = videoCapabilities.maxReferenceImages;
+  const videoReferenceLabel =
+    videoReferenceMode === "firstLast" ? "视频起始/结束关键帧" : "视频参考图";
   const imageModelGroups = getProviderModelGroups(imageModelOptions);
   const videoModelGroups = getProviderModelGroups(videoModelOptions);
   const chatModelGroups = getProviderModelGroups(chatModelOptions);
@@ -978,18 +1004,19 @@ export default function Home() {
 
     try {
       const headers = buildProviderHeaders(selectedVideoModel);
-
-      const startImg = referenceImages.find(r => r.role === "start")?.url || referenceImages[0]?.url || referenceImage || undefined;
-      const endImg = referenceImages.find(r => r.role === "end")?.url || referenceImages[1]?.url || undefined;
+      const videoReferenceUrls = buildVideoReferenceUrls(
+        referenceImages,
+        referenceImage,
+        videoReferenceMode,
+        videoReferenceLimit,
+      );
 
       const res = await fetch("/api/gemini/generate-video", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
         body: JSON.stringify({
           prompt,
-          image: startImg,
-          lastFrame: endImg,
-          images: referenceImages.map(r => r.url),
+          images: videoReferenceUrls,
           aspectRatio: activeVideoSize,
           model: selectedVideoModel,
         }),
@@ -1454,7 +1481,14 @@ export default function Home() {
       setReferenceImage(itemUrl);
       setReferenceImages(prev => {
         if (prev.some(r => r.id === itemId)) return prev;
-        const role = type === "video-prompt" && prev.length === 1 ? "end" : (prev.length === 0 ? "start" : "general");
+        const role =
+          type === "video-prompt" && videoReferenceMode === "firstLast"
+            ? prev.length === 1
+              ? "end"
+              : prev.length === 0
+                ? "start"
+                : "general"
+            : "general";
         return [...prev, { id: itemId, url: itemUrl, role }];
       });
     }
@@ -2209,12 +2243,12 @@ export default function Home() {
                       </div>
                     </div>
 
-                    {/* Reference First Frame / Image-to-Video seed */}
+                    {/* Video reference inputs */}
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-300">
                           <Layers className="h-3.5 w-3.5 text-slate-400" />
-                          视频起始/结束关键帧 {referenceImages.length > 0 && `(${referenceImages.length})`}
+                          {videoReferenceLabel} {referenceImages.length > 0 && `(${Math.min(referenceImages.length, videoReferenceLimit)}/${videoReferenceLimit})`}
                         </label>
                         {referenceImages.length > 0 && (
                           <button
@@ -2225,16 +2259,17 @@ export default function Home() {
                             }}
                             className="text-[10px] text-red-300 transition hover:text-red-200 cursor-pointer"
                           >
-                            清空所有关键帧
+                            清空参考图
                           </button>
                         )}
                       </div>
 
                       {referenceImages.length > 0 ? (
                         <div className="grid grid-cols-4 gap-2 rounded-lg border border-slate-800 bg-slate-950/45 p-2">
-                          {referenceImages.map((refImg) => {
-                            const isStart = refImg.role === "start";
-                            const isEnd = refImg.role === "end";
+                          {referenceImages.slice(0, videoReferenceLimit).map((refImg) => {
+                            const isFirstLastMode = videoReferenceMode === "firstLast";
+                            const isStart = isFirstLastMode && refImg.role === "start";
+                            const isEnd = isFirstLastMode && refImg.role === "end";
                             return (
                               <div
                                 key={refImg.id}
@@ -2257,33 +2292,38 @@ export default function Home() {
                                   <X className="h-3 w-3" />
                                 </button>
 
-                                {/* Interactive Role Selection */}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const nextRole = isStart ? "end" : isEnd ? "general" : "start";
-                                    toggleReferenceRole(refImg.id, nextRole as "start" | "end" | "general");
-                                  }}
-                                  className={`absolute inset-x-0 bottom-0 py-1 text-[8px] font-sans font-bold text-center text-white backdrop-blur-subtle cursor-pointer transition-colors ${
-                                    isStart
-                                      ? "bg-emerald-600/80"
-                                      : isEnd
-                                      ? "bg-amber-600/80"
-                                      : "bg-black/60 hover:bg-black/80"
-                                  }`}
-                                  title="点击切换：起始帧 / 结束帧 / 普通视频参考"
-                                >
-                                  {isStart ? "🎬 起始帧" : isEnd ? "🏁 结束帧" : "📎 普通参考"}
-                                </button>
+                                {isFirstLastMode ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const nextRole = isStart ? "end" : isEnd ? "general" : "start";
+                                      toggleReferenceRole(refImg.id, nextRole as "start" | "end" | "general");
+                                    }}
+                                    className={`absolute inset-x-0 bottom-0 py-1 text-[8px] font-sans font-bold text-center text-white backdrop-blur-subtle cursor-pointer transition-colors ${
+                                      isStart
+                                        ? "bg-emerald-600/80"
+                                        : isEnd
+                                        ? "bg-amber-600/80"
+                                        : "bg-black/60 hover:bg-black/80"
+                                    }`}
+                                    title="点击切换：起始帧 / 结束帧 / 普通视频参考"
+                                  >
+                                    {isStart ? "🎬 起始帧" : isEnd ? "🏁 结束帧" : "📎 普通参考"}
+                                  </button>
+                                ) : (
+                                  <div className="absolute inset-x-0 bottom-0 bg-black/60 py-1 text-center text-[8px] font-bold text-white backdrop-blur-subtle">
+                                    📎 参考图
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
 
                           {/* Add button inside grid */}
-                          {referenceImages.length < 4 && (
+                          {referenceImages.length < videoReferenceLimit && (
                             <label className="relative aspect-square rounded-lg border border-dashed border-slate-700 bg-slate-900/40 transition hover:border-slate-500 hover:bg-slate-900 flex flex-col items-center justify-center cursor-pointer select-none">
                               <span className="text-slate-400 font-bold text-lg leading-none">+</span>
-                              <span className="text-[8px] text-slate-500 font-semibold mt-0.5">多图垫</span>
+                              <span className="text-[8px] text-slate-500 font-semibold mt-0.5">添加参考</span>
                               <input
                                 type="file"
                                 accept="image/*"
@@ -2297,7 +2337,7 @@ export default function Home() {
                         <div className="imagine-upload-zone relative flex min-h-[76px] flex-col items-center justify-center rounded-lg border border-dashed border-slate-700 bg-slate-950/35 p-3 text-center transition hover:border-slate-600 hover:bg-slate-950/60">
                           <CloudUpload className="mb-1.5 h-5 w-5 text-slate-500" />
                           <span className="text-xs text-slate-300">
-                            拖拽起始/结束帧，或{" "}
+                            拖拽{videoReferenceLabel}，或{" "}
                             <label className="font-medium text-violet-300 underline-offset-4 hover:text-violet-200 hover:underline cursor-pointer">
                               浏览上传
                               <input
@@ -2308,7 +2348,9 @@ export default function Home() {
                               />
                             </label>
                           </span>
-                          <span className="mt-1 text-[9px] text-slate-500">支持 JPG / PNG / WEBP | 点击切换起始帧与结束帧</span>
+                          <span className="mt-1 text-[9px] text-slate-500">
+                            支持 JPG / PNG / WEBP | 最多 {videoReferenceLimit} 张
+                          </span>
                         </div>
                       )}
                     </div>
@@ -2700,6 +2742,7 @@ export default function Home() {
                         key={option.value}
                         type="button"
                         onClick={() => setFilterType(option.value)}
+                        data-active={filterType === option.value}
                         className={`imagine-filter-chip h-7 rounded-md border px-2.5 text-xs transition focus:outline-none cursor-pointer ${
                           filterType === option.value
                             ? "border-slate-700 bg-slate-800/80 text-slate-100"
@@ -2727,6 +2770,7 @@ export default function Home() {
                         key={option.value}
                         type="button"
                         onClick={() => setAssetStatusFilter(option.value)}
+                        data-active={assetStatusFilter === option.value}
                         className={`imagine-filter-chip h-7 rounded-md border px-2.5 font-mono text-[10px] transition focus:outline-none cursor-pointer ${
                           assetStatusFilter === option.value
                             ? "border-slate-700 bg-slate-800/80 text-slate-100"
@@ -2746,7 +2790,7 @@ export default function Home() {
                   <select
                     value={assetModelFilter}
                     onChange={(e) => setAssetModelFilter(e.target.value)}
-                    className="h-9 min-w-0 rounded-lg border border-slate-800 bg-slate-950/55 px-3 font-mono text-[10px] text-slate-300 transition focus:border-blue-400/35 focus:outline-none"
+                    className="imagine-toolbar-select h-9 min-w-0 rounded-lg border border-slate-800 bg-slate-950/55 px-3 font-mono text-[10px] text-slate-300 transition focus:border-blue-400/35 focus:outline-none"
                   >
                     <option value="all">全部模型</option>
                     {assetModelOptions.map(model => (
@@ -2756,7 +2800,7 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={exportMetadataJson}
-                    className="h-9 rounded-lg border border-slate-800 bg-slate-950/55 px-3 text-[10px] font-semibold text-slate-300 transition hover:bg-slate-900"
+                    className="imagine-secondary-action h-9 rounded-lg border border-slate-800 bg-slate-950/55 px-3 text-[10px] font-semibold text-slate-300 transition hover:bg-slate-900"
                   >
                     导出
                   </button>
@@ -2770,13 +2814,13 @@ export default function Home() {
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder="搜索提示词、模型..."
-                      className="h-9 w-full rounded-lg border border-slate-800 bg-slate-950/55 pl-9 pr-4 text-xs text-slate-200 placeholder-slate-600 transition focus:border-blue-400/35 focus:outline-none"
+                      className="imagine-toolbar-search h-9 w-full rounded-lg border border-slate-800 bg-slate-950/55 pl-9 pr-4 text-xs text-slate-200 placeholder-slate-600 transition focus:border-blue-400/35 focus:outline-none"
                     />
                   </div>
                   <button
                     type="button"
                     onClick={() => deleteItemsByStatus(["failed", "pending"])}
-                    className="h-9 rounded-lg border border-red-500/20 bg-red-950/20 px-3 text-[10px] font-semibold text-red-300 transition hover:bg-red-950/35"
+                    className="imagine-danger-action h-9 rounded-lg border border-red-500/20 bg-red-950/20 px-3 text-[10px] font-semibold text-red-300 transition hover:bg-red-950/35"
                   >
                     清失败
                   </button>
@@ -2999,6 +3043,8 @@ export default function Home() {
                 {filterAndSearchItems().map((item) => (
                   <div
                     key={item.id}
+                    data-status={item.status}
+                    data-type={item.type}
                     className={`imagine-asset-card relative overflow-hidden rounded-2xl group border bg-slate-900 shadow-xl transition-all duration-300 flex flex-col justify-between ${
                       selectedItemIds.includes(item.id)
                         ? "border-blue-500 ring-2 ring-blue-500/20"
@@ -3081,12 +3127,12 @@ export default function Home() {
                           {/* Dynamic Top-Right Badge: Image vs Video */}
                           <div className="absolute top-3 right-3 z-10 flex gap-1.5">
                             {item.type === "image" ? (
-                              <span className="flex items-center gap-1.5 px-2 py-1 text-[9px] font-bold tracking-wider uppercase rounded bg-blue-500/80 backdrop-blur-md text-white border border-blue-400/25">
+                              <span className="imagine-asset-type-badge flex items-center gap-1.5 px-2 py-1 text-[9px] font-bold tracking-wider uppercase rounded bg-blue-500/80 backdrop-blur-md text-white border border-blue-400/25">
                                 <ImageIcon className="h-3 w-3" />
                                 IMAGE
                               </span>
                             ) : (
-                              <span className="flex items-center gap-1.5 px-2 py-1 text-[9px] font-bold tracking-wider uppercase rounded bg-purple-500/80 backdrop-blur-md text-white border border-purple-400/25">
+                              <span className="imagine-asset-type-badge flex items-center gap-1.5 px-2 py-1 text-[9px] font-bold tracking-wider uppercase rounded bg-purple-500/80 backdrop-blur-md text-white border border-purple-400/25">
                                 <span className="h-1.5 w-1.5 rounded-full bg-red-400 animate-ping" />
                                 VEO VIDEO
                               </span>
@@ -3105,12 +3151,12 @@ export default function Home() {
 
                           <div className="absolute inset-0 bg-slate-950/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10 pointer-events-none" />
                           <div className="absolute inset-x-3 bottom-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 pointer-events-none group-hover:pointer-events-auto">
-                            <div className="flex flex-wrap items-center justify-center gap-1 rounded-xl border border-white/10 bg-slate-950/80 p-1 backdrop-blur-md shadow-xl">
+                            <div className="imagine-card-actions flex flex-wrap items-center justify-center gap-1 rounded-xl border border-white/10 bg-slate-950/80 p-1 backdrop-blur-md shadow-xl">
 
                              {item.type === "image" && (
                               <button
                                 onClick={() => applyAsVideoReference(item.url)}
-                                className="min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-purple-600 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
+                                className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-purple-600 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
                                 title="以此图首帧生图动态 Veo 航拍影片"
                               >
                                 <VideoIcon className="h-3 w-3 text-purple-450 group-hover:text-white" />
@@ -3125,7 +3171,7 @@ export default function Home() {
                                   setAgentReferenceUrl(item.url);
                                   setIsAgentDockOpen(true);
                                 }}
-                                className="min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-blue-600 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
+                                className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-blue-600 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
                                 title="引用该图片至 Agent 智能代理进行对话与局部修改"
                               >
                                 <Sparkles className="h-3 w-3 text-blue-455 text-blue-400 group-hover:text-white animate-pulse" />
@@ -3136,7 +3182,7 @@ export default function Home() {
                             {item.type === "image" && (
                               <button
                                 onClick={() => launchMaskEditor(item.url, item.id)}
-                                className="min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-amber-600 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
+                                className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-amber-600 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
                                 title="对该图片局部进行笔刷遮罩修改 & 创意局部重绘"
                               >
                                 <Paintbrush className="h-3 w-3 text-amber-500 group-hover:text-white" />
@@ -3146,7 +3192,7 @@ export default function Home() {
 
                             <button
                               onClick={() => handleDownloadItem(item)}
-                              className="min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-emerald-600 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
+                              className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-emerald-600 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
                               title="下载该文件到本地"
                             >
                               <Download className="h-3 w-3 text-emerald-400 group-hover:text-white" />
@@ -3155,7 +3201,7 @@ export default function Home() {
 
                             <button
                               onClick={() => toggleCompare(item.id)}
-                              className={`min-w-0 px-1.5 py-1 rounded-md border transition-all duration-200 shadow-lg flex items-center justify-center gap-0.5 cursor-pointer ${
+                              className={`imagine-card-action min-w-0 px-1.5 py-1 rounded-md border transition-all duration-200 shadow-lg flex items-center justify-center gap-0.5 cursor-pointer ${
                                 compareItemIds.includes(item.id)
                                   ? "bg-blue-600 border-blue-500 text-white"
                                   : "bg-slate-900/90 border-white/5 text-slate-300 hover:text-white hover:bg-slate-800"
@@ -3168,7 +3214,7 @@ export default function Home() {
 
                             <button
                               onClick={() => setFullscreenItem(item)}
-                              className="min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-slate-800 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center cursor-pointer"
+                              className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-slate-800 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center cursor-pointer"
                               title="全屏大画幅细节放大"
                             >
                               <Maximize2 className="h-3 w-3 text-slate-300" />
@@ -3189,14 +3235,14 @@ export default function Home() {
 
                       <div className="mt-3 pt-2.5 border-t border-slate-850 flex items-center justify-between">
                         <div className="flex flex-wrap items-center gap-1.5 text-[9px] font-mono text-slate-500">
-                          <span className="bg-white/5 px-2 py-0.5 rounded text-[9px]">
+                          <span className="imagine-meta-chip bg-white/5 px-2 py-0.5 rounded text-[9px]">
                             {getProviderLabel(parseProviderModel(item.model, selectedProvider).provider)}
                           </span>
-                          <span className="bg-white/5 px-2 py-0.5 rounded text-[9px]" title={item.model}>
+                          <span className="imagine-meta-chip bg-white/5 px-2 py-0.5 rounded text-[9px]" title={item.model}>
                             🤖 {item.model.replace("-preview", "").replace("lite-", "").replace("-generate", "").replace("imagen-", "Imagen")}
                           </span>
-                          <span className="bg-white/5 px-2 py-0.5 rounded">📐 {item.aspectRatio}</span>
-                          <span className="bg-white/5 px-2 py-0.5 rounded">{item.status}</span>
+                          <span className="imagine-meta-chip bg-white/5 px-2 py-0.5 rounded">📐 {item.aspectRatio}</span>
+                          <span className="imagine-meta-chip imagine-status-chip bg-white/5 px-2 py-0.5 rounded">{item.status}</span>
                           {item.errorMessage && (
                             <span className="max-w-[160px] truncate rounded bg-red-500/10 px-2 py-0.5 text-red-300" title={item.errorMessage}>
                               last error: {item.errorMessage}

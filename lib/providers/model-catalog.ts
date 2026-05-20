@@ -18,9 +18,13 @@ export interface ImageModelCapabilities {
 
 export interface VideoModelCapabilities {
   sizes: ParameterOption[];
+  referenceMode: VideoReferenceMode;
+  maxReferenceImages: number;
+  minReferenceImages: number;
 }
 
 export type ModelKind = "chat" | "image" | "video";
+export type VideoReferenceMode = "none" | "reference" | "firstLast";
 
 export interface ProviderModelCapability {
   value: string;
@@ -34,6 +38,9 @@ export interface ProviderModelCapability {
   sizes: ParameterOption[];
   thinkingLevels: ParameterOption[];
   qualityLevels: ParameterOption[];
+  videoReferenceMode: VideoReferenceMode;
+  maxReferenceImages: number;
+  minReferenceImages: number;
 }
 
 export const DEFAULT_IMAGE_MODEL = "12ai:gemini-3.1-flash-image-preview";
@@ -225,11 +232,14 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
   }),
   videoCapability({
     value: "12ai:veo_3_1-fast",
-    label: "12AI Veo 3.1 Fast",
+    label: "12AI Veo 3.1 Fast Reference",
     provider: "12ai",
     model: "veo_3_1-fast",
     supportsReferences: true,
     sizes: TWELVE_AI_VIDEO_SIZES,
+    videoReferenceMode: "reference",
+    maxReferenceImages: 3,
+    minReferenceImages: 0,
   }),
   videoCapability({
     value: "12ai:veo_3_1-fast-fl",
@@ -238,6 +248,9 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     model: "veo_3_1-fast-fl",
     supportsReferences: true,
     sizes: TWELVE_AI_VIDEO_SIZES,
+    videoReferenceMode: "firstLast",
+    maxReferenceImages: 2,
+    minReferenceImages: 1,
   }),
   videoCapability({
     value: "grok2api:grok-imagine-video",
@@ -246,6 +259,9 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     model: "grok-imagine-video",
     supportsReferences: true,
     sizes: GROK_VIDEO_SIZES,
+    videoReferenceMode: "reference",
+    maxReferenceImages: 7,
+    minReferenceImages: 0,
   }),
   chatCapability({
     value: "12ai:deepseek-v4-flash",
@@ -366,7 +382,12 @@ export function getImageModelCapabilities(value: string): ImageModelCapabilities
 
 export function getVideoModelCapabilities(value: string): VideoModelCapabilities {
   const capability = getKnownCapability(value, "video");
-  return { sizes: capability?.sizes ?? TWELVE_AI_VIDEO_SIZES };
+  return {
+    sizes: capability?.sizes ?? TWELVE_AI_VIDEO_SIZES,
+    referenceMode: capability?.videoReferenceMode ?? "reference",
+    maxReferenceImages: capability?.maxReferenceImages ?? 3,
+    minReferenceImages: capability?.minReferenceImages ?? 0,
+  };
 }
 
 export function parseProviderModel(value: string, fallbackProvider: AiProvider): {
@@ -411,6 +432,9 @@ interface ImageCapabilityInput extends CapabilityInput {
 interface VideoCapabilityInput extends CapabilityInput {
   supportsReferences: boolean;
   sizes: ParameterOption[];
+  videoReferenceMode: VideoReferenceMode;
+  maxReferenceImages: number;
+  minReferenceImages: number;
 }
 
 function imageCapability(input: ImageCapabilityInput): ProviderModelCapability {
@@ -426,6 +450,9 @@ function imageCapability(input: ImageCapabilityInput): ProviderModelCapability {
     sizes: input.sizes ?? [],
     thinkingLevels: input.thinkingLevels ?? [],
     qualityLevels: input.qualityLevels ?? [],
+    videoReferenceMode: "none",
+    maxReferenceImages: 0,
+    minReferenceImages: 0,
   };
 }
 
@@ -442,6 +469,9 @@ function videoCapability(input: VideoCapabilityInput): ProviderModelCapability {
     sizes: input.sizes,
     thinkingLevels: [],
     qualityLevels: [],
+    videoReferenceMode: input.videoReferenceMode,
+    maxReferenceImages: input.maxReferenceImages,
+    minReferenceImages: input.minReferenceImages,
   };
 }
 
@@ -458,6 +488,9 @@ function chatCapability(input: CapabilityInput): ProviderModelCapability {
     sizes: [],
     thinkingLevels: [],
     qualityLevels: [],
+    videoReferenceMode: "none",
+    maxReferenceImages: 0,
+    minReferenceImages: 0,
   };
 }
 

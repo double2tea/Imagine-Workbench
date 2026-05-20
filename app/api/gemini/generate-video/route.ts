@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { parseProviderModel } from "@/lib/providers/model-catalog";
+import { getModelCapability, parseProviderModel } from "@/lib/providers/model-catalog";
 import { generateVideo } from "@/lib/providers/video";
 import { optionalText, requireText, resolveProviderConfig } from "@/lib/providers/utils";
 
@@ -18,7 +18,9 @@ export async function POST(req: NextRequest) {
     const modelValue = optionalText(body.model) ?? "12ai:veo_3_1-fast";
     const parsed = parseProviderModel(modelValue, "12ai");
     const config = resolveProviderConfig(req, parsed.provider);
+    const capability = getModelCapability(modelValue, "video");
     const referenceImages = readReferenceImages(body.images, body.image, body.lastFrame);
+    validateReferenceCount(referenceImages.length, capability.minReferenceImages, capability.maxReferenceImages);
 
     const result = await generateVideo(config, {
       prompt: requireText(body.prompt, "Prompt"),
@@ -44,4 +46,13 @@ function readReferenceImages(images: unknown, image: unknown, lastFrame: unknown
   if (typeof image === "string" && image.length > 0) refs.push(image);
   if (typeof lastFrame === "string" && lastFrame.length > 0) refs.push(lastFrame);
   return refs;
+}
+
+function validateReferenceCount(count: number, min: number, max: number): void {
+  if (count < min) {
+    throw new Error(`Selected video model requires at least ${min} reference image(s)`);
+  }
+  if (count > max) {
+    throw new Error(`Selected video model supports at most ${max} reference image(s)`);
+  }
 }
