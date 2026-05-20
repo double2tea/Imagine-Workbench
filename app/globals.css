@@ -559,29 +559,33 @@
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
 }
 
-.imagine-theme-light .imagine-asset-hover-scrim {
-  background: rgba(15, 23, 42, 0.2) !important;
+.imagine-workbench-shell.imagine-theme-light .imagine-asset-hover-scrim {
+  background: rgba(255, 255, 255, 0.08) !important;
+  background-image: none !important;
 }
 
-.imagine-theme-light .imagine-card-actions {
-  background: rgba(15, 23, 42, 0.86) !important;
-  border-color: rgba(255, 255, 255, 0.16) !important;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.22) !important;
+.imagine-workbench-shell.imagine-theme-light .imagine-card-actions {
+  background: rgba(255, 255, 255, 0.92) !important;
+  background-image: none !important;
+  border-color: rgba(15, 23, 42, 0.1) !important;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16) !important;
 }
 
-.imagine-theme-light .imagine-card-action {
-  background: rgba(15, 23, 42, 0.78) !important;
-  border-color: rgba(255, 255, 255, 0.12) !important;
-  color: #ffffff !important;
+.imagine-workbench-shell.imagine-theme-light .imagine-card-action {
+  background: #ffffff !important;
+  background-image: none !important;
+  border-color: rgba(15, 23, 42, 0.12) !important;
+  color: #172033 !important;
 }
 
-.imagine-theme-light .imagine-card-action:hover {
-  background: #2563eb !important;
-  border-color: rgba(255, 255, 255, 0.18) !important;
-  color: #ffffff !important;
+.imagine-workbench-shell.imagine-theme-light .imagine-card-action:hover {
+  background: #eef2ff !important;
+  background-image: none !important;
+  border-color: rgba(79, 70, 229, 0.24) !important;
+  color: #4f46e5 !important;
 }
 
-.imagine-theme-light .imagine-card-action :is(svg, span) {
+.imagine-workbench-shell.imagine-theme-light .imagine-card-action :is(svg, span) {
   color: currentColor !important;
 }
 

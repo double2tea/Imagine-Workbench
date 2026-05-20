@@ -46,7 +46,7 @@ export interface ProviderModelCapability {
 export const DEFAULT_IMAGE_MODEL = "12ai:gemini-3.1-flash-image-preview";
 export const DEFAULT_VIDEO_MODEL = "12ai:veo_3_1-fast";
 export const DEFAULT_CHAT_MODEL = "12ai:deepseek-v4-flash";
-export const DEFAULT_VISION_CHAT_MODEL = "12ai:gemini-3.1-flash";
+export const DEFAULT_VISION_CHAT_MODEL = "12ai:gemini-3.1-flash-lite-preview";
 
 const GEMINI_25_RATIOS: ParameterOption[] = [
   { value: "1:1", label: "1:1 Square" },
@@ -270,10 +270,10 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     model: "deepseek-v4-flash",
   }),
   chatCapability({
-    value: "12ai:gemini-3.1-flash",
-    label: "12AI Gemini 3.1 Flash Vision",
+    value: "12ai:gemini-3.1-flash-lite-preview",
+    label: "12AI Gemini 3.1 Flash Lite Vision",
     provider: "12ai",
-    model: "gemini-3.1-flash",
+    model: "gemini-3.1-flash-lite-preview",
   }),
   chatCapability({
     value: "grok2api:grok-4.20-auto",

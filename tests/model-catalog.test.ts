@@ -71,8 +71,8 @@ test("image model selector hides duplicate async variants", () => {
 
 test("agent chat defaults use 12AI DeepSeek and Gemini vision", () => {
   assert.equal(DEFAULT_CHAT_MODEL, "12ai:deepseek-v4-flash");
-  assert.equal(DEFAULT_VISION_CHAT_MODEL, "12ai:gemini-3.1-flash");
-  assert.equal(CHAT_MODEL_OPTIONS["12ai"].some(option => option.value === "12ai:gpt-5.1"), false);
+  assert.equal(DEFAULT_VISION_CHAT_MODEL, "12ai:gemini-3.1-flash-lite-preview");
+  assert.equal(CHAT_MODEL_OPTIONS["12ai"].some(option => option.value === "12ai:gemini-3.1-flash"), false);
   assert.equal(CHAT_MODEL_OPTIONS["12ai"].some(option => option.value === DEFAULT_CHAT_MODEL), true);
   assert.equal(CHAT_MODEL_OPTIONS["12ai"].some(option => option.value === DEFAULT_VISION_CHAT_MODEL), true);
 });
