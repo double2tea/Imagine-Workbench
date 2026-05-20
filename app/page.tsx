@@ -3099,32 +3099,30 @@ export default function Home() {
                 <div className="flex items-center gap-3">
                   {/* Selector only if both items are images */}
                   {compareItems.first?.type === "image" && compareItems.second?.type === "image" && (
-                      return (
-                        <div className="flex bg-white/5 border border-white/5 rounded-lg p-0.5 text-xs">
-                          <button
-                            type="button"
-                            onClick={() => setCompareViewType("wipe-slider")}
-                            className={`px-2 py-1 text-[10px] rounded-md font-bold transition-all duration-200 cursor-pointer ${
-                              compareViewType === "wipe-slider"
-                                ? "bg-blue-600 text-white shadow-sm"
-                                : "text-slate-400 hover:text-slate-200"
-                            }`}
-                          >
-                            🖱️ 滑过擦拭
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setCompareViewType("side-by-side")}
-                            className={`px-2 py-1 text-[10px] rounded-md font-bold transition-all duration-200 cursor-pointer ${
-                              compareViewType === "side-by-side"
-                                ? "bg-blue-600 text-white shadow-sm"
-                                : "text-slate-400 hover:text-slate-200"
-                            }`}
-                          >
-                            🔲 双幅分屏
-                          </button>
-                        </div>
-                      );
+                    <div className="flex bg-white/5 border border-white/5 rounded-lg p-0.5 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setCompareViewType("wipe-slider")}
+                        className={`px-2 py-1 text-[10px] rounded-md font-bold transition-all duration-200 cursor-pointer ${
+                          compareViewType === "wipe-slider"
+                            ? "bg-blue-600 text-white shadow-sm"
+                            : "text-slate-400 hover:text-slate-200"
+                        }`}
+                      >
+                        🖱️ 滑过擦拭
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCompareViewType("side-by-side")}
+                        className={`px-2 py-1 text-[10px] rounded-md font-bold transition-all duration-200 cursor-pointer ${
+                          compareViewType === "side-by-side"
+                            ? "bg-blue-600 text-white shadow-sm"
+                            : "text-slate-400 hover:text-slate-200"
+                        }`}
+                      >
+                        🔲 双幅分屏
+                      </button>
+                    </div>
                   )}
 
                   <button
@@ -3280,7 +3278,7 @@ export default function Home() {
 
           {/* Main Gallery List */}
           <div className="imagine-gallery-scroll min-h-[calc(100vh-360px)]">
-            {filterAndSearchItems().length === 0 ? (
+            {filteredItems.length === 0 ? (
               <div className="imagine-gallery-empty flex min-h-[calc(100vh-390px)] flex-col items-center justify-center rounded-xl border border-dashed border-slate-800 bg-slate-950/28 p-6 text-center text-slate-500">
                 <ImageIcon className="mb-3 h-9 w-9 text-slate-700" />
                 <p className="text-sm font-semibold text-slate-400">暂无生成的创意文件</p>
@@ -3288,13 +3286,13 @@ export default function Home() {
               </div>
             ) : (
               <div className="imagine-gallery-grid grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                {filterAndSearchItems().map((item) => (
+                {filteredItems.map((item) => (
                   <div
                     key={item.id}
                     data-status={item.status}
                     data-type={item.type}
                     className={`imagine-asset-card relative overflow-hidden rounded-2xl group border bg-slate-900 shadow-xl transition-all duration-300 flex flex-col justify-between ${
-                      selectedItemIds.includes(item.id)
+                      selectedItemIdSet.has(item.id)
                         ? "border-blue-500 ring-2 ring-blue-500/20"
                         : "border-slate-850 hover:border-slate-750"
                     }`}
@@ -3367,6 +3365,7 @@ export default function Home() {
                                 src={item.url}
                                 controls
                                 loop
+                                preload="metadata"
                                 className="h-full w-full object-contain"
                               />
                             </div>
@@ -3391,7 +3390,7 @@ export default function Home() {
                           <div className="absolute top-3 left-3 z-10">
                             <input
                               type="checkbox"
-                              checked={selectedItemIds.includes(item.id)}
+                              checked={selectedItemIdSet.has(item.id)}
                               onChange={() => toggleSelectItem(item.id)}
                               className="h-4.5 w-4.5 bg-slate-950/85 border-white/10 text-blue-500 focus:ring-0 rounded-md cursor-pointer checked:bg-blue-600 flex items-center justify-center transition"
                             />
@@ -3450,7 +3449,7 @@ export default function Home() {
                             <button
                               onClick={() => toggleCompare(item.id)}
                               className={`imagine-card-action min-w-0 px-1.5 py-1 rounded-md border transition-all duration-200 shadow-lg flex items-center justify-center gap-0.5 cursor-pointer ${
-                                compareItemIds.includes(item.id)
+                                compareItemIdSet.has(item.id)
                                   ? "bg-blue-600 border-blue-500 text-white"
                                   : "bg-slate-900/90 border-white/5 text-slate-300 hover:text-white hover:bg-slate-800"
                               }`}
@@ -3737,8 +3736,8 @@ export default function Home() {
                   </div>
                   <ul className="mt-2 text-[10px] text-slate-500 font-mono flex flex-col gap-1 list-disc pl-3">
                     <li>类型: Browser IndexedDB 离线隔离数据库</li>
-                    <li>合成图片数量: {items.filter(x => x.type === "image").length} 张</li>
-                    <li>合成 Veo 视频: {items.filter(x => x.type === "video").length} 个</li>
+                    <li>合成图片数量: {assetStats.typeCounts.image} 张</li>
+                    <li>合成 Veo 视频: {assetStats.typeCounts.video} 个</li>
                   </ul>
                 </div>
 
