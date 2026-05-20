@@ -10,12 +10,26 @@ export const SKILL_REGISTRY: Skill[] = [
   {
     name: "PromptEngineer",
     category: "prompt",
-    description: "高级提示词工程器。负责解析用户的粗糙/不完整构想，通过增加氛围细节、灯光、镜头控制、流派特质和画面细节，将其演进、扩写为专业级、高精度的生成提示词。",
-    whenToUse: "用户输入含糊（如 '画个猫'）、或者明确表示需要让画面更精美/精细、优化提示词、微调文字风格时。",
+    description:
+      "高级提示词工程器。将用户粗糙构想演进为专业级生成提示词。\n\n" +
+      "## 提示词工程核心原则\n" +
+      "- 先确定使用场景与风格，再展开细节\n" +
+      "- 自然语言用于简单场景；结构化 JSON 格式用于复杂构图（信息图、UI mockup、爆炸图等）\n" +
+      "- 明确指定构图：主体位置、前景/中景/背景、光线方向、镜头角度\n" +
+      "- 多语言文本渲染时显式写出目标文字，不要用占位符\n\n" +
+      "## 使用场景分类\n" +
+      "人像/头像、社交媒体帖子、信息图/知识图解、YouTube缩略图、漫画/分镜、产品营销、电商主图、游戏资产、海报/传单、App/网页设计\n\n" +
+      "## 风格分类\n" +
+      "摄影写实、电影级/定帧、动漫/漫画、插画、素描/线稿、3D渲染、Q版/Chibi、等距视图、像素艺术、油画、水彩、水墨/国风、复古/Vintage、赛博朋克/科幻、极简主义\n\n" +
+      "## 主题分类\n" +
+      "肖像/自拍、网红/模特、角色、群像/情侣、产品、食品/饮品、时尚单品、动物/生物、载具、建筑/室内、风景/自然、城市/街景、图表/图解、文字/排版、抽象/背景",
+    whenToUse:
+      "用户输入含糊、请求优化提示词、需要特定风格/场景的生成建议、或需要将自然语言转化为高精度专业提示词时。",
     examples: [
-      "用户输入: '科幻飞船' -> 优化为: 'A colossal monolithic starship hovering over a futuristic cyberpunk metropolis, massive neon billboards, driving rain, reflection of holographic lights on wet steel panels, cinematic lighting, photorealistic, 8k resolution, shot on Arri Alexa.'",
-      "用户输入: '精修一下我的提示词，加点艺术感'"
-    ]
+      "用户: '画个猫' -> 询问偏好：写实还是卡通？室内还是室外？继续挖掘后输出专业级提示词",
+      "用户: '帮我优化这段提示词' -> 增加氛围、光线、构图、风格标注，必要时转结构化格式",
+      "用户: '做个产品宣传图' -> 调用 get_prompt_blueprint 获取产品营销模板后填充",
+    ],
   },
   {
     name: "ImageGenerator",
@@ -30,7 +44,7 @@ export const SKILL_REGISTRY: Skill[] = [
   {
     name: "VideoGenerator",
     category: "video",
-    description: "智影视频合成引擎。负责通过 Veo 3.1 等顶级模型，根据精炼过的文案或基于选定关联的图片作为首尾起点，合成生动逼真或奇幻动态的高分辨率短视频视频流。",
+    description: "智影视频合成引擎。负责通过 Veo 3.1 等模型，根据精炼文案、参考图模式或首尾帧模式合成高分辨率短视频。",
     whenToUse: "当用户说 '转成视频'、'让这张图动起来'、'合成一段镜头动作'、'帮我做一段电影预告片' 时，或明确需要创建视频资产时。",
     examples: [
       "用户输入: '把刚才生成的赛博飞船图片转化成一段微缩镜头摇移、引擎喷火的5秒视频'",

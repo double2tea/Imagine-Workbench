@@ -87,8 +87,18 @@ Adding a new tool:
 - Add a zod schema for its arguments in `tools.ts`.
 - Add the tool definition to `TOOL_DEFINITIONS`.
 - Add a case to `executeToolCall`.
+- For data-driven tools (blueprints, templates), store data in the tool file rather than system prompt.
 
 The system prompt is kept lean: no hardcoded model recommendations, no gallery summary, no full skill descriptions. All data is fetched on demand through tools (progressive disclosure).
+
+### Prompt Engineering
+
+The `PromptEngineer` skill and `get_prompt_blueprint` tool encode knowledge from prompt libraries:
+
+- **Structured JSON format** for complex compositions (infographics, UI mockups, posters) — use explicit `type`/`style`/`subject`/`sections`/`callouts` fields
+- **Use case taxonomy** (10 categories): portrait, social-media, infographic, youtube-thumbnail, comic-storyboard, product-marketing, ecommerce, game-asset, poster-flyer, app-web-design
+- **Style taxonomy** (16 categories): photography, cinematic, anime, illustration, sketch, 3D-render, chibi, isometric, pixel-art, oil-painting, watercolor, ink/chinese, retro/vintage, cyberpunk/sci-fi, minimalism
+- **GPT Image 2 notes**: pixel-perfect text rendering, multi-language support, cross-image consistency — prefer for infographics, posters, and storyboards
 
 ## UI Rules
 
