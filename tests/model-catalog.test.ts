@@ -10,6 +10,7 @@ import {
   getImageModelCapabilities,
   getModelCapabilities,
   getModelCapability,
+  getVideoModelCapabilities,
   parseProviderModel,
   supportsAsyncImageGeneration,
 } from "../lib/providers/model-catalog";
@@ -79,8 +80,17 @@ test("agent chat defaults use 12AI DeepSeek and Gemini vision", () => {
 test("video model selector exposes auto size", () => {
   assert.equal(VIDEO_MODEL_OPTIONS["12ai"].length > 0, true);
   const twelveAiVideo = getModelCapability("12ai:veo_3_1-fast", "video");
+  const twelveAiFirstLastVideo = getModelCapability("12ai:veo_3_1-fast-fl", "video");
   const grokVideo = getModelCapability("grok2api:grok-imagine-video", "video");
 
   assert.equal(twelveAiVideo.sizes[0]?.value, "auto");
+  assert.equal(twelveAiVideo.videoReferenceMode, "reference");
+  assert.equal(twelveAiVideo.maxReferenceImages, 3);
+  assert.equal(twelveAiFirstLastVideo.videoReferenceMode, "firstLast");
+  assert.equal(twelveAiFirstLastVideo.minReferenceImages, 1);
+  assert.equal(twelveAiFirstLastVideo.maxReferenceImages, 2);
   assert.equal(grokVideo.sizes[0]?.value, "auto");
+  assert.equal(grokVideo.videoReferenceMode, "reference");
+  assert.equal(grokVideo.maxReferenceImages, 7);
+  assert.equal(getVideoModelCapabilities("12ai:veo_3_1-fast-fl").referenceMode, "firstLast");
 });

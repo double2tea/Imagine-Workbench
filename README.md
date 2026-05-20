@@ -5,7 +5,7 @@ Imagine Workbench is a Next.js creative workstation for AI image, image-editing,
 The current app focuses on a browser-first creative loop:
 
 - Generate images from prompts, reference images, or masked edits.
-- Generate videos from prompts and optional start/end reference frames.
+- Generate videos from prompts, reference images, or start/end frames depending on the selected video model.
 - Use Agent Mode to plan creative actions and trigger one recommended workstation action.
 - Store generated assets locally in browser IndexedDB.
 - Search, compare, preview, delete, and ZIP-export workspace assets.
@@ -90,6 +90,9 @@ Model-specific parameters are defined in the catalog so the UI can adapt control
 - Gemini image models expose aspect ratio, output size, and thinking-level controls when supported.
 - GPT Image models expose explicit pixel sizes and quality.
 - Video models expose `auto` size first, so image-to-video can preserve the source image size when the upstream service supports it.
+- `12ai:veo_3_1-fast` supports text-to-video and reference-image mode with 0-3 images.
+- `12ai:veo_3_1-fast-fl` is the only built-in 12AI first/last-frame mode and requires 1-2 images.
+- `grok2api:grok-imagine-video` supports optional reference images with the grok2api video parameters.
 
 ## App Routes
 
