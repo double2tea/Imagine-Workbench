@@ -1,0 +1,5 @@
+"$schema" = "./node_modules/wrangler/config-schema.json"
+name = "imagine-workbench"
+pages_build_output_dir = ".vercel/output/static"
+compatibility_date = "2026-05-20"
+compatibility_flags = ["nodejs_compat"]

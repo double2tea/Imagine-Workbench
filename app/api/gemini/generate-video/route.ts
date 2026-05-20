@@ -3,6 +3,8 @@ import { getModelCapability, parseProviderModel } from "@/lib/providers/model-ca
 import { generateVideo } from "@/lib/providers/video";
 import { optionalText, requireText, resolveProviderConfig } from "@/lib/providers/utils";
 
+export const runtime = "edge";
+
 interface GenerateVideoBody {
   prompt?: unknown;
   model?: unknown;

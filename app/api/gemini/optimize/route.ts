@@ -3,6 +3,8 @@ import { createChatCompletionText } from "@/lib/providers/chat";
 import { DEFAULT_CHAT_MODEL, parseProviderModel } from "@/lib/providers/model-catalog";
 import { optionalText, requireText, resolveProviderConfig } from "@/lib/providers/utils";
 
+export const runtime = "edge";
+
 interface OptimizeBody {
   prompt?: unknown;
   model?: unknown;

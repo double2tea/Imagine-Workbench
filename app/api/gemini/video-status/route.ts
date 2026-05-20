@@ -3,6 +3,8 @@ import { getAsyncImageStatus } from "@/lib/providers/image";
 import { getVideoStatus } from "@/lib/providers/video";
 import { parseMediaOperationName, requireText, resolveProviderConfig } from "@/lib/providers/utils";
 
+export const runtime = "edge";
+
 interface StatusBody {
   operationName?: unknown;
 }

@@ -3,6 +3,8 @@ import { parseProviderModel } from "@/lib/providers/model-catalog";
 import { generateImage } from "@/lib/providers/image";
 import { optionalText, requireText, resolveProviderConfig } from "@/lib/providers/utils";
 
+export const runtime = "edge";
+
 interface GenerateImageBody {
   prompt?: unknown;
   model?: unknown;
