@@ -72,6 +72,14 @@ export async function getJson<T>(url: string, config: ProviderConfig): Promise<T
   return parseJsonResponse<T>(res);
 }
 
+export async function deleteJson<T>(url: string, config: ProviderConfig): Promise<T> {
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: authHeaders(config),
+  });
+  return parseJsonResponse<T>(res);
+}
+
 export async function postForm<T>(url: string, config: ProviderConfig, form: FormData): Promise<T> {
   const res = await fetch(url, {
     method: "POST",
