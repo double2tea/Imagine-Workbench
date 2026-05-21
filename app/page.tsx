@@ -14,8 +14,6 @@ import {
   RefreshCw,
   Play,
   Pause,
-  Layers,
-  CloudUpload,
   Image as ImageIcon,
   Video as VideoIcon,
   Maximize2,
@@ -33,6 +31,7 @@ import FloatingCompareButton from "@/components/assets/FloatingCompareButton";
 import FullscreenPreview from "@/components/assets/FullscreenPreview";
 import AssetSelectionBar from "@/components/assets/AssetSelectionBar";
 import AssetToolbar, { type AssetStatusFilter, type AssetTypeFilter } from "@/components/assets/AssetToolbar";
+import ReferenceImagePicker, { type ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import SettingsModal, { type ProviderTestState } from "@/components/settings/SettingsModal";
 import { saveToDB, getAllFromDB, deleteFromDB, clearAllDB, StorageItem } from "@/lib/db";
 import {
@@ -52,13 +51,6 @@ import {
   type VideoReferenceMode,
 } from "@/lib/providers/model-catalog";
 import { PROVIDER_KEYS, getProviderMeta, isKnownProvider } from "@/lib/providers/registry";
-
-// Reference image object structure for multiple selection support
-export interface ReferenceImageRef {
-  id: string;
-  url: string;
-  role?: "start" | "end" | "general";
-}
 
 type NoticeType = "error" | "info" | "success";
 type MaskDestination = "creative" | "agent";
@@ -2229,85 +2221,23 @@ export default function Home() {
                       )}
                     </div>
 
-                    {/* Image-to-image reference (Upload / Masking) */}
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-300">
-                          <Layers className="h-3.5 w-3.5 text-slate-400" />
-                          创意参考图 / 多图垫图 {referenceImages.length > 0 && `(${referenceImages.length})`}
-                        </label>
-                        {referenceImages.length > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setReferenceImages([]);
-                              setReferenceImage(null);
-                            }}
-                            className="text-[10px] text-red-300 transition hover:text-red-200 cursor-pointer"
-                          >
-                            清空所有垫图
-                          </button>
-                        )}
-                      </div>
-
-                      {referenceImages.length > 0 ? (
-                        <div className="grid grid-cols-4 gap-2 rounded-lg border border-slate-800 bg-slate-950/45 p-2">
-                          {referenceImages.map((refImg) => (
-                            <div
-                              key={refImg.id}
-                              className="relative aspect-square rounded-lg border border-white/10 overflow-hidden bg-cover bg-center group"
-                              style={{ backgroundImage: `url(${refImg.url})` }}
-                            >
-                              {/* Hover close overlay */}
-                              <button
-                                type="button"
-                                onClick={() => removeReferenceImage(refImg.id)}
-                                className="absolute top-1 right-1 bg-red-600/95 text-white rounded-md p-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition cursor-pointer hover:scale-105"
-                                title="移除该图"
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
-
-                              {/* Tiny ID indicator */}
-                              <div className="absolute bottom-0 inset-x-0 bg-black/65 text-[8px] font-mono text-slate-300 truncate px-1 py-0.5 text-center">
-                                {refImg.id.includes("upload") ? "Uploaded" : refImg.id.substring(0, 10)}
-                              </div>
-                            </div>
-                          ))}
-
-                          {/* Add button inside grid */}
-                          {referenceImages.length < 4 && (
-                            <label className="relative aspect-square rounded-lg border border-dashed border-slate-700 bg-slate-900/40 transition hover:border-slate-500 hover:bg-slate-900 flex flex-col items-center justify-center cursor-pointer select-none">
-                              <span className="text-slate-400 font-bold text-lg leading-none">+</span>
-                              <span className="text-[8px] text-slate-500 font-semibold mt-0.5">多图垫</span>
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={handleImageUpload}
-                                className="hidden"
-                              />
-                            </label>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="imagine-upload-zone relative flex min-h-[76px] flex-col items-center justify-center rounded-lg border border-dashed border-slate-700 bg-slate-950/35 p-3 text-center transition hover:border-slate-600 hover:bg-slate-950/60">
-                          <CloudUpload className="mb-1.5 h-5 w-5 text-slate-500" />
-                          <span className="text-xs text-slate-300">
-                            拖拽图片，或{" "}
-                            <label className="font-medium text-blue-300 underline-offset-4 hover:text-blue-200 hover:underline cursor-pointer">
-                              浏览上传
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={handleImageUpload}
-                                className="hidden"
-                              />
-                            </label>
-                          </span>
-                          <span className="mt-1 text-[9px] text-slate-500">支持 JPG / PNG / WEBP | 粘贴剪贴板快捷垫图</span>
-                        </div>
-                      )}
-                    </div>
+                    <ReferenceImagePicker
+                      addLabel="多图垫"
+                      browseClassName="font-medium text-blue-300 underline-offset-4 hover:text-blue-200 hover:underline cursor-pointer"
+                      clearLabel="清空所有垫图"
+                      emptyHelp="支持 JPG / PNG / WEBP | 粘贴剪贴板快捷垫图"
+                      emptyLabel="拖拽图片"
+                      label={`创意参考图 / 多图垫图 ${referenceImages.length > 0 ? `(${referenceImages.length})` : ""}`}
+                      maxCount={4}
+                      references={referenceImages}
+                      uploadLabel="浏览上传"
+                      onClear={() => {
+                        setReferenceImages([]);
+                        setReferenceImage(null);
+                      }}
+                      onRemove={removeReferenceImage}
+                      onUpload={handleImageUpload}
+                    />
 
                     {/* Bottom main trigger button */}
                     <button
@@ -2407,117 +2337,25 @@ export default function Home() {
                       </div>
                     </div>
 
-                    {/* Video reference inputs */}
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-300">
-                          <Layers className="h-3.5 w-3.5 text-slate-400" />
-                          {videoReferenceLabel} {referenceImages.length > 0 && `(${Math.min(referenceImages.length, videoReferenceLimit)}/${videoReferenceLimit})`}
-                        </label>
-                        {referenceImages.length > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setReferenceImages([]);
-                              setReferenceImage(null);
-                            }}
-                            className="text-[10px] text-red-300 transition hover:text-red-200 cursor-pointer"
-                          >
-                            {videoClearReferenceLabel}
-                          </button>
-                        )}
-                      </div>
-
-                      {referenceImages.length > 0 ? (
-                        <div className="grid grid-cols-4 gap-2 rounded-lg border border-slate-800 bg-slate-950/45 p-2">
-                          {referenceImages.slice(0, videoReferenceLimit).map((refImg) => {
-                            const isFirstLastMode = videoReferenceMode === "firstLast";
-                            const isStart = isFirstLastMode && refImg.role === "start";
-                            const isEnd = isFirstLastMode && refImg.role === "end";
-                            return (
-                              <div
-                                key={refImg.id}
-                                className={`relative aspect-square rounded-lg border overflow-hidden bg-cover bg-center group transition-all duration-300 ${
-                                  isStart
-                                    ? "border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.25)]"
-                                    : isEnd
-                                    ? "border-amber-500/50 shadow-[0_0_10px_rgba(245,158,11,0.25)]"
-                                    : "border-white/10"
-                                }`}
-                                style={{ backgroundImage: `url(${refImg.url})` }}
-                              >
-                                {/* Hover close overlay */}
-                                <button
-                                  type="button"
-                                  onClick={() => removeReferenceImage(refImg.id)}
-                                  className="absolute top-1 right-1 bg-red-600/95 text-white rounded-md p-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition cursor-pointer hover:scale-105 z-10"
-                                  title="移除该图"
-                                >
-                                  <X className="h-3 w-3" />
-                                </button>
-
-                                {isFirstLastMode ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const nextRole = isStart ? "end" : isEnd ? "general" : "start";
-                                      toggleReferenceRole(refImg.id, nextRole as "start" | "end" | "general");
-                                    }}
-                                    className={`absolute inset-x-0 bottom-0 py-1 text-[8px] font-sans font-bold text-center text-white backdrop-blur-subtle cursor-pointer transition-colors ${
-                                      isStart
-                                        ? "bg-emerald-600/80"
-                                        : isEnd
-                                        ? "bg-amber-600/80"
-                                        : "bg-black/60 hover:bg-black/80"
-                                    }`}
-                                    title="点击切换：首帧 / 尾帧 / 普通参考"
-                                  >
-                                    {isStart ? "🎬 首帧" : isEnd ? "🏁 尾帧" : "📎 普通参考"}
-                                  </button>
-                                ) : (
-                                  <div className="absolute inset-x-0 bottom-0 bg-black/60 py-1 text-center text-[8px] font-bold text-white backdrop-blur-subtle">
-                                    📎 参考图
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-
-                          {/* Add button inside grid */}
-                          {referenceImages.length < videoReferenceLimit && (
-                            <label className="relative aspect-square rounded-lg border border-dashed border-slate-700 bg-slate-900/40 transition hover:border-slate-500 hover:bg-slate-900 flex flex-col items-center justify-center cursor-pointer select-none">
-                              <span className="text-slate-400 font-bold text-lg leading-none">+</span>
-                              <span className="text-[8px] text-slate-500 font-semibold mt-0.5">添加参考</span>
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={handleImageUpload}
-                                className="hidden"
-                              />
-                            </label>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="imagine-upload-zone relative flex min-h-[76px] flex-col items-center justify-center rounded-lg border border-dashed border-slate-700 bg-slate-950/35 p-3 text-center transition hover:border-slate-600 hover:bg-slate-950/60">
-                          <CloudUpload className="mb-1.5 h-5 w-5 text-slate-500" />
-                          <span className="text-xs text-slate-300">
-                            拖拽{videoReferenceLabel}，或{" "}
-                            <label className="font-medium text-violet-300 underline-offset-4 hover:text-violet-200 hover:underline cursor-pointer">
-                              浏览上传
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={handleImageUpload}
-                                className="hidden"
-                              />
-                            </label>
-                          </span>
-                          <span className="mt-1 text-[9px] text-slate-500">
-                            支持 JPG / PNG / WEBP | 最多 {videoReferenceLimit} 张 | {videoReferenceHelp}
-                          </span>
-                        </div>
-                      )}
-                    </div>
+                    <ReferenceImagePicker
+                      addLabel="添加参考"
+                      browseClassName="font-medium text-violet-300 underline-offset-4 hover:text-violet-200 hover:underline cursor-pointer"
+                      clearLabel={videoClearReferenceLabel}
+                      emptyHelp={`支持 JPG / PNG / WEBP | 最多 ${videoReferenceLimit} 张 | ${videoReferenceHelp}`}
+                      emptyLabel={`拖拽${videoReferenceLabel}`}
+                      label={`${videoReferenceLabel} ${referenceImages.length > 0 ? `(${Math.min(referenceImages.length, videoReferenceLimit)}/${videoReferenceLimit})` : ""}`}
+                      maxCount={videoReferenceLimit}
+                      references={referenceImages}
+                      roleMode={videoReferenceMode === "firstLast"}
+                      uploadLabel="浏览上传"
+                      onClear={() => {
+                        setReferenceImages([]);
+                        setReferenceImage(null);
+                      }}
+                      onRemove={removeReferenceImage}
+                      onRoleChange={(id, role) => toggleReferenceRole(id, role ?? "general")}
+                      onUpload={handleImageUpload}
+                    />
 
                     {/* Bottom main video trigger button */}
                     <button
