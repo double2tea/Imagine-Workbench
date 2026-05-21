@@ -18,6 +18,7 @@ import CreationModeTabs, { type CreationMode } from "@/components/creation/Creat
 import ImageGenerationPanel from "@/components/creation/ImageGenerationPanel";
 import VideoGenerationPanel from "@/components/creation/VideoGenerationPanel";
 import AtReferenceDropdown from "@/components/reference/AtReferenceDropdown";
+import PromptReferenceDropdown from "@/components/reference/PromptReferenceDropdown";
 import {
   type DraggedReferenceAsset,
   makeReferenceDropToken,
@@ -1665,8 +1666,6 @@ export default function Home() {
       setAgentInput(val);
     } else {
       setPrompt(val);
-      setAtDropdown({ visible: false, type, search: "" });
-      return;
     }
 
     const lastAtIdx = val.lastIndexOf("@");
@@ -1677,6 +1676,16 @@ export default function Home() {
         return;
       }
     }
+    setAtDropdown({ visible: false, type, search: "" });
+  };
+
+  const handleSelectPromptReference = (index: number, type: "image-prompt" | "video-prompt") => {
+    const lastAtIdx = prompt.lastIndexOf("@");
+    const base = lastAtIdx !== -1 ? prompt.substring(0, lastAtIdx) : prompt;
+    const searchLength = atDropdown.visible && atDropdown.type === type ? atDropdown.search.length : 0;
+    const suffixStart = lastAtIdx === -1 ? prompt.length : lastAtIdx + 1 + searchLength;
+    const suffix = prompt.substring(suffixStart);
+    setPrompt(`${base}${getReferencePromptToken(index)} ${suffix}`);
     setAtDropdown({ visible: false, type, search: "" });
   };
 
@@ -1713,6 +1722,16 @@ export default function Home() {
   };
 
   const renderAtDropdown = (type: "image-prompt" | "video-prompt" | "agent-prompt") => {
+    if (type !== "agent-prompt") {
+      return (
+        <PromptReferenceDropdown
+          references={referenceImages}
+          search={atDropdown.search}
+          onSelect={(index) => handleSelectPromptReference(index, type)}
+        />
+      );
+    }
+
     return (
       <AtReferenceDropdown
         items={searchableReferenceImages}
