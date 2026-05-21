@@ -5,6 +5,7 @@ import {
   DEFAULT_CHAT_MODEL,
   IMAGE_MODEL_OPTIONS,
   VIDEO_MODEL_OPTIONS,
+  formatProviderModel,
   parseProviderModel,
   type AiProvider,
   type ModelOption,
@@ -14,6 +15,7 @@ import type { ProviderCredentials } from "@/lib/providers/types";
 
 type ModelCategory = "chat" | "image" | "video";
 type NoticeType = "error" | "info" | "success";
+type FetchedModelOptions = Record<AiProvider, Record<ModelCategory, ModelOption[]>>;
 
 interface UseProviderSettingsParams {
   pushWorkspaceNotice: (type: NoticeType, message: string) => void;
@@ -111,11 +113,13 @@ function isSelectableImageModel(option: ModelOption): boolean {
 }
 
 function isSelectableChatModel(option: ModelOption): boolean {
-  return option.value !== "12ai:gemini-3.1-flash" && !option.value.toLowerCase().includes("deepseek");
+  const parsed = parseProviderModel(option.value, "12ai");
+  if (parsed.provider !== "12ai") return true;
+  return parsed.model !== "gemini-3.1-flash" && !parsed.model.toLowerCase().includes("deepseek");
 }
 
-function hasBuiltInChatModel(value: string): boolean {
-  return PROVIDER_KEYS.some(provider => CHAT_MODEL_OPTIONS[provider].some(option => option.value === value));
+function hasChatModel(value: string, options: Record<AiProvider, ModelOption[]>): boolean {
+  return PROVIDER_KEYS.some(provider => options[provider].some(option => option.value === value));
 }
 
 function getProviderLabel(provider: AiProvider): string {
@@ -129,6 +133,7 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
   const [chatModelOptions, setChatModelOptions] = useState<Record<AiProvider, ModelOption[]>>(CHAT_MODEL_OPTIONS);
   const [imageModelOptions, setImageModelOptions] = useState<Record<AiProvider, ModelOption[]>>(IMAGE_MODEL_OPTIONS);
   const [videoModelOptions, setVideoModelOptions] = useState<Record<AiProvider, ModelOption[]>>(VIDEO_MODEL_OPTIONS);
+  const [fetchedModelOptions, setFetchedModelOptions] = useState<FetchedModelOptions>(emptyFetchedModelOptions);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [modelListMessage, setModelListMessage] = useState("");
   const [providerTest, setProviderTest] = useState<ProviderTestState>({
@@ -181,6 +186,67 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
     localStorage.setItem("imagine_chat_model", model);
   };
 
+  const saveModelOptions = (
+    category: ModelCategory,
+    setter: Dispatch<SetStateAction<Record<AiProvider, ModelOption[]>>>,
+    options: Record<AiProvider, ModelOption[]>,
+  ) => {
+    setter(options);
+    localStorage.setItem(modelOptionsStorageKey(category), JSON.stringify(options));
+  };
+
+  const addManualModels = (category: ModelCategory, rawInput: string) => {
+    const modelNames = parseManualModelNames(rawInput);
+    if (modelNames.length === 0) {
+      const message = "请输入至少一个模型名称";
+      setModelListMessage(message);
+      pushWorkspaceNotice("error", message);
+      return;
+    }
+
+    const byProvider = groupManualModels(selectedProvider, modelNames);
+    if (category === "chat") {
+      const next = mergeManualModelGroups(chatModelOptions, byProvider);
+      saveModelOptions(category, setChatModelOptions, next);
+    } else if (category === "image") {
+      const next = mergeManualModelGroups(imageModelOptions, byProvider);
+      saveModelOptions(category, setImageModelOptions, next);
+    } else {
+      const next = mergeManualModelGroups(videoModelOptions, byProvider);
+      saveModelOptions(category, setVideoModelOptions, next);
+    }
+
+    const message = `已添加 ${countManualModels(byProvider)} 个${modelCategoryLabel(category)}模型`;
+    setModelListMessage(message);
+    pushWorkspaceNotice("success", message);
+  };
+
+  const addFetchedModels = (category: ModelCategory, values: string[]) => {
+    const valueSet = new Set(values);
+    const selectedModels = fetchedModelOptions[selectedProvider][category].filter(option => valueSet.has(option.value));
+    if (selectedModels.length === 0) {
+      const message = "请选择要添加的模型";
+      setModelListMessage(message);
+      pushWorkspaceNotice("error", message);
+      return;
+    }
+
+    if (category === "chat") {
+      const next = { ...chatModelOptions, [selectedProvider]: mergeModelOptions(chatModelOptions[selectedProvider], selectedModels) };
+      saveModelOptions(category, setChatModelOptions, next);
+    } else if (category === "image") {
+      const next = { ...imageModelOptions, [selectedProvider]: mergeModelOptions(imageModelOptions[selectedProvider], selectedModels) };
+      saveModelOptions(category, setImageModelOptions, next);
+    } else {
+      const next = { ...videoModelOptions, [selectedProvider]: mergeModelOptions(videoModelOptions[selectedProvider], selectedModels) };
+      saveModelOptions(category, setVideoModelOptions, next);
+    }
+
+    const message = `已添加 ${selectedModels.length} 个${modelCategoryLabel(category)}模型`;
+    setModelListMessage(message);
+    pushWorkspaceNotice("success", message);
+  };
+
   const refreshProviderModels = async () => {
     setIsLoadingModels(true);
     setModelListMessage("");
@@ -203,29 +269,16 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
       const fetchedImage = fetched.filter(option => classifyModelOption(option) === "image").filter(isSelectableImageModel);
       const fetchedVideo = fetched.filter(option => classifyModelOption(option) === "video");
 
-      if (fetchedChat.length > 0) {
-        const nextChatOptions = mergeModelOptions(chatModelOptions[selectedProvider], fetchedChat);
-        const nextChatOptionsByProvider = { ...chatModelOptions, [selectedProvider]: nextChatOptions };
-        setChatModelOptions(nextChatOptionsByProvider);
-        localStorage.setItem("imagine_chat_model_options", JSON.stringify(nextChatOptionsByProvider));
-        if (!fetchedChat.some(option => option.value === selectedChatModel)) {
-          handleSelectChatModel(fetchedChat[0].value);
-        }
-      }
-      if (fetchedImage.length > 0) {
-        const nextImageOptions = mergeModelOptions(imageModelOptions[selectedProvider], fetchedImage);
-        const nextImageOptionsByProvider = { ...imageModelOptions, [selectedProvider]: nextImageOptions };
-        setImageModelOptions(nextImageOptionsByProvider);
-        localStorage.setItem("imagine_image_model_options", JSON.stringify(nextImageOptionsByProvider));
-      }
-      if (fetchedVideo.length > 0) {
-        const nextVideoOptions = mergeModelOptions(videoModelOptions[selectedProvider], fetchedVideo);
-        const nextVideoOptionsByProvider = { ...videoModelOptions, [selectedProvider]: nextVideoOptions };
-        setVideoModelOptions(nextVideoOptionsByProvider);
-        localStorage.setItem("imagine_video_model_options", JSON.stringify(nextVideoOptionsByProvider));
-      }
+      setFetchedModelOptions(prev => ({
+        ...prev,
+        [selectedProvider]: {
+          chat: fetchedChat,
+          image: fetchedImage,
+          video: fetchedVideo,
+        },
+      }));
 
-      setModelListMessage(`已获取 ${fetched.length} 个模型：Chat ${fetchedChat.length} / Image ${fetchedImage.length} / Video ${fetchedVideo.length}`);
+      setModelListMessage(`已获取 ${fetched.length} 个模型：Chat ${fetchedChat.length} / Image ${fetchedImage.length} / Video ${fetchedVideo.length}，请选择后添加`);
     } catch (err) {
       const message = toErrorMessage(err, "模型列表获取失败");
       setModelListMessage(message);
@@ -289,51 +342,52 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
       const storedProvider = localStorage.getItem("imagine_ai_provider");
       if (storedProvider && isKnownProvider(storedProvider)) setSelectedProvider(storedProvider);
 
-      const storedChatModel = localStorage.getItem("imagine_chat_model");
-      if (storedChatModel === "12ai:gemini-3.1-flash" || (storedChatModel && !hasBuiltInChatModel(storedChatModel))) {
-        localStorage.setItem("imagine_chat_model", DEFAULT_CHAT_MODEL);
-      } else if (storedChatModel) {
-        setSelectedChatModel(storedChatModel);
-      }
-
       const restoreModelOptions = (
         key: string,
         setter: Dispatch<SetStateAction<Record<AiProvider, ModelOption[]>>>,
         defaults: Record<AiProvider, ModelOption[]>,
         filterFn?: (option: ModelOption) => boolean,
-      ) => {
+      ): Record<AiProvider, ModelOption[]> => {
         const stored = localStorage.getItem(key);
-        if (!stored) return;
+        if (!stored) return defaults;
         try {
           const parsed = JSON.parse(stored) as unknown;
-          if (Array.isArray(parsed)) {
-            const flat = filterFn
-              ? parsed.filter(isModelOption).filter(filterFn)
-              : parsed.filter(isModelOption);
-            if (flat.length > 0) setter(mergeProviderModelOptions(defaults, flat));
-          } else {
-            setter(prev => mergeRecordModelOptions(prev, parsed, filterFn));
-          }
+          const restored = Array.isArray(parsed)
+            ? restoreFlatModelOptions(defaults, parsed, filterFn)
+            : mergeRecordModelOptions(defaults, parsed, filterFn);
+          setter(restored);
+          return restored;
         } catch (err) {
           console.warn(`Failed to restore model list (${key}):`, err);
+          return defaults;
         }
       };
 
-      restoreModelOptions("imagine_chat_model_options", setChatModelOptions, CHAT_MODEL_OPTIONS, isSelectableChatModel);
+      const restoredChatOptions = restoreModelOptions("imagine_chat_model_options", setChatModelOptions, CHAT_MODEL_OPTIONS, isSelectableChatModel);
       restoreModelOptions("imagine_image_model_options", setImageModelOptions, IMAGE_MODEL_OPTIONS, isSelectableImageModel);
       restoreModelOptions("imagine_video_model_options", setVideoModelOptions, VIDEO_MODEL_OPTIONS);
+
+      const storedChatModel = localStorage.getItem("imagine_chat_model");
+      if (storedChatModel === "12ai:gemini-3.1-flash" || (storedChatModel && !hasChatModel(storedChatModel, restoredChatOptions))) {
+        localStorage.setItem("imagine_chat_model", DEFAULT_CHAT_MODEL);
+      } else if (storedChatModel) {
+        setSelectedChatModel(storedChatModel);
+      }
     }, 0);
 
     return () => clearTimeout(restoreSettings);
   }, [setChatModelOptions, setImageModelOptions, setProviderCredentials, setSelectedChatModel, setSelectedProvider, setVideoModelOptions]);
 
   return {
+    addFetchedModels,
+    addManualModels,
     buildProviderHeaders,
     chatModelOptions,
     clearProviderCredentials,
     handleSaveCredential,
     handleSelectChatModel,
     handleSelectProvider,
+    fetchedModelOptions,
     imageModelOptions,
     isLoadingModels,
     modelListMessage,
@@ -345,4 +399,91 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
     testProviderConnection,
     videoModelOptions,
   };
+}
+
+function restoreFlatModelOptions(
+  defaults: Record<AiProvider, ModelOption[]>,
+  parsed: unknown[],
+  filterFn?: (option: ModelOption) => boolean,
+): Record<AiProvider, ModelOption[]> {
+  const flat = filterFn
+    ? parsed.filter(isModelOption).filter(filterFn)
+    : parsed.filter(isModelOption);
+  return flat.length > 0 ? mergeProviderModelOptions(defaults, flat) : defaults;
+}
+
+function modelOptionsStorageKey(category: ModelCategory): string {
+  if (category === "chat") return "imagine_chat_model_options";
+  if (category === "image") return "imagine_image_model_options";
+  return "imagine_video_model_options";
+}
+
+function modelCategoryLabel(category: ModelCategory): string {
+  if (category === "chat") return "Chat";
+  if (category === "image") return "Image";
+  return "Video";
+}
+
+function parseManualModelNames(rawInput: string): string[] {
+  const seen = new Set<string>();
+  return rawInput
+    .split(/[\n,]+/)
+    .map(stripModelPrefix)
+    .filter(item => {
+      if (!item || seen.has(item)) return false;
+      seen.add(item);
+      return true;
+    });
+}
+
+function groupManualModels(fallbackProvider: AiProvider, modelNames: string[]): Record<AiProvider, ModelOption[]> {
+  const grouped = emptyProviderOptions();
+  for (const modelName of modelNames) {
+    const value = formatProviderModel(fallbackProvider, modelName);
+    grouped[fallbackProvider].push({
+      value,
+      label: `${getProviderLabel(fallbackProvider)} ${modelName}`,
+    });
+  }
+  return grouped;
+}
+
+function stripModelPrefix(modelName: string): string {
+  const trimmed = modelName.trim();
+  const separator = trimmed.indexOf(":");
+  if (separator === -1) return trimmed;
+  return trimmed.slice(separator + 1).trim();
+}
+
+function emptyProviderOptions(): Record<AiProvider, ModelOption[]> {
+  const record = {} as Record<AiProvider, ModelOption[]>;
+  for (const provider of PROVIDER_KEYS) record[provider] = [];
+  return record;
+}
+
+function mergeManualModelGroups(
+  current: Record<AiProvider, ModelOption[]>,
+  incoming: Record<AiProvider, ModelOption[]>,
+): Record<AiProvider, ModelOption[]> {
+  const next = { ...current };
+  for (const provider of PROVIDER_KEYS) {
+    next[provider] = mergeModelOptions(current[provider], incoming[provider]);
+  }
+  return next;
+}
+
+function countManualModels(groups: Record<AiProvider, ModelOption[]>): number {
+  return PROVIDER_KEYS.reduce((count, provider) => count + groups[provider].length, 0);
+}
+
+function emptyFetchedModelOptions(): FetchedModelOptions {
+  const record = {} as FetchedModelOptions;
+  for (const provider of PROVIDER_KEYS) {
+    record[provider] = {
+      chat: [],
+      image: [],
+      video: [],
+    };
+  }
+  return record;
 }

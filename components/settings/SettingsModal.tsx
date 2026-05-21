@@ -1,5 +1,5 @@
-import { Info, RefreshCw, Settings, X } from "lucide-react";
-import { useState } from "react";
+import { Check, Info, ListPlus, RefreshCw, Settings, X } from "lucide-react";
+import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { StorageItem } from "@/lib/db";
 import type { AiProvider, ModelOption } from "@/lib/providers/model-catalog";
@@ -16,6 +16,13 @@ interface ModelGroup {
   provider: AiProvider;
   label: string;
   options: ModelOption[];
+}
+
+type ModelCategory = "chat" | "image" | "video";
+type FetchedModelOptions = Record<AiProvider, Record<ModelCategory, ModelOption[]>>;
+interface FetchedSelection {
+  scope: string;
+  values: string[];
 }
 
 interface ProviderCredentialCardProps {
@@ -38,6 +45,8 @@ interface ProviderCredentialCardProps {
 interface SettingsModalProps {
   assetStatusCounts: Record<StorageItem["type"], number>;
   chatModelGroups: ModelGroup[];
+  fetchedModelOptions: FetchedModelOptions;
+  imageModelGroups: ModelGroup[];
   isLoadingModels: boolean;
   modelListMessage: string;
   open: boolean;
@@ -45,9 +54,12 @@ interface SettingsModalProps {
   providerTest: ProviderTestState;
   selectedChatModel: string;
   selectedProvider: AiProvider;
+  videoModelGroups: ModelGroup[];
   onClearCredentials: (provider: AiProvider) => void;
   onClose: () => void;
   onResetData: () => void;
+  onAddFetchedModels: (category: ModelCategory, values: string[]) => void;
+  onAddManualModels: (category: ModelCategory, value: string) => void;
   onSaveCredential: (provider: AiProvider, field: keyof ProviderCredentials, value: string) => void;
   onSelectChatModel: (value: string) => void;
   onSelectProvider: (value: AiProvider) => void;
@@ -61,6 +73,12 @@ const TABS: { key: SettingsTab; label: string }[] = [
   { key: "providers", label: "服务商" },
   { key: "models", label: "模型" },
   { key: "system", label: "系统" },
+];
+
+const MODEL_CATEGORY_OPTIONS: { key: ModelCategory; label: string }[] = [
+  { key: "chat", label: "Chat" },
+  { key: "image", label: "Image" },
+  { key: "video", label: "Video" },
 ];
 
 function providerEndpointInfo(provider: AiProvider): string[] | undefined {
@@ -157,6 +175,8 @@ function ProviderCredentialCard({
 export default function SettingsModal({
   assetStatusCounts,
   chatModelGroups,
+  fetchedModelOptions,
+  imageModelGroups,
   isLoadingModels,
   modelListMessage,
   open,
@@ -164,9 +184,12 @@ export default function SettingsModal({
   providerTest,
   selectedChatModel,
   selectedProvider,
+  videoModelGroups,
   onClearCredentials,
   onClose,
   onResetData,
+  onAddFetchedModels,
+  onAddManualModels,
   onSaveCredential,
   onSelectChatModel,
   onSelectProvider,
@@ -174,6 +197,45 @@ export default function SettingsModal({
   testProviderConnection,
 }: SettingsModalProps) {
   const [tab, setTab] = useState<SettingsTab>("providers");
+  const [modelCategory, setModelCategory] = useState<ModelCategory>("chat");
+  const [manualModels, setManualModels] = useState("");
+  const [fetchedSelection, setFetchedSelection] = useState<FetchedSelection>({ scope: "", values: [] });
+
+  const submitManualModels = () => {
+    onAddManualModels(modelCategory, manualModels);
+    setManualModels("");
+  };
+
+  const activeModelGroups = modelCategory === "chat"
+    ? chatModelGroups
+    : modelCategory === "image"
+      ? imageModelGroups
+      : videoModelGroups;
+  const activeModelOptions = useMemo(
+    () => activeModelGroups.find(group => group.provider === selectedProvider)?.options ?? [],
+    [activeModelGroups, selectedProvider],
+  );
+  const activeModelValues = useMemo(() => new Set(activeModelOptions.map(option => option.value)), [activeModelOptions]);
+  const fetchedOptions = fetchedModelOptions[selectedProvider][modelCategory].filter(option => !activeModelValues.has(option.value));
+  const fetchedSelectionScope = `${selectedProvider}:${modelCategory}`;
+  const selectedFetchedModels = fetchedSelection.scope === fetchedSelectionScope ? fetchedSelection.values : [];
+
+  const toggleFetchedModel = (value: string) => {
+    setFetchedSelection(prev => {
+      const values = prev.scope === fetchedSelectionScope ? prev.values : [];
+      return {
+        scope: fetchedSelectionScope,
+        values: values.includes(value)
+          ? values.filter(item => item !== value)
+          : [...values, value],
+      };
+    });
+  };
+
+  const submitFetchedModels = () => {
+    onAddFetchedModels(modelCategory, selectedFetchedModels);
+    setFetchedSelection({ scope: fetchedSelectionScope, values: [] });
+  };
 
   return (
     <AnimatePresence>
@@ -182,15 +244,15 @@ export default function SettingsModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-50 flex items-stretch justify-end bg-slate-950/80 backdrop-blur-sm p-0 sm:items-center sm:justify-center sm:p-4"
         >
           <motion.div
             initial={{ scale: 0.95 }}
             animate={{ scale: 1 }}
             exit={{ scale: 0.95 }}
-            className="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl"
+            className="flex max-h-[100dvh] min-h-[100dvh] w-full max-w-4xl flex-col overflow-hidden border border-slate-800 bg-slate-900 shadow-2xl sm:min-h-0 sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl"
           >
-            <div className="flex items-center justify-between border-b border-slate-850 px-6 py-4">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-850 px-4 py-3 sm:px-6 sm:py-4">
               <h3 className="font-bold text-slate-100 flex items-center gap-2">
                 <Settings className="h-5 w-5 text-amber-500" />
                 设置
@@ -201,13 +263,13 @@ export default function SettingsModal({
             </div>
 
             {/* Tab bar */}
-            <div className="flex border-b border-slate-850 px-6">
+            <div className="flex shrink-0 overflow-x-auto border-b border-slate-850 px-4 sm:px-6">
               {TABS.map(t => (
                 <button
                   key={t.key}
                   type="button"
                   onClick={() => setTab(t.key)}
-                  className={`px-4 py-2.5 text-xs font-semibold transition border-b-2 -mb-[1px] ${
+                  className={`shrink-0 px-4 py-2.5 text-xs font-semibold transition border-b-2 -mb-[1px] ${
                     tab === t.key
                       ? "text-amber-400 border-amber-400"
                       : "text-slate-500 border-transparent hover:text-slate-300"
@@ -218,9 +280,9 @@ export default function SettingsModal({
               ))}
             </div>
 
-            <div className="p-6 flex flex-col gap-4 font-sans text-xs">
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 font-sans text-xs sm:p-6">
               {tab === "providers" && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 sm:gap-4">
                   {PROVIDER_KEYS.map(provider => {
                     const creds = providerCredentials[provider];
                     const meta = getProviderMeta(provider);
@@ -248,52 +310,161 @@ export default function SettingsModal({
               )}
 
               {tab === "models" && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="font-semibold text-slate-300 block mb-1.5">模型列表服务商</label>
-                    <select
-                      value={selectedProvider}
-                      onChange={(e) => onSelectProvider(e.target.value as AiProvider)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 px-3 text-xs text-slate-300 focus:outline-none focus:border-slate-700 font-mono transition"
-                    >
-                      {PROVIDER_KEYS.map(provider => (
-                        <option key={provider} value={provider}>{getProviderMeta(provider).label}</option>
+                <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-[180px_1fr]">
+                  <div className="flex flex-col gap-3">
+                    <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-slate-800 bg-slate-950">
+                      {MODEL_CATEGORY_OPTIONS.map(option => (
+                        <button
+                          key={option.key}
+                          type="button"
+                          onClick={() => setModelCategory(option.key)}
+                          className={`h-9 text-[10px] font-semibold transition ${
+                            modelCategory === option.key
+                              ? "bg-amber-500/15 text-amber-300"
+                              : "text-slate-500 hover:bg-slate-900 hover:text-slate-300"
+                          }`}
+                        >
+                          {option.label}
+                        </button>
                       ))}
-                    </select>
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="font-semibold text-slate-300">Agent / 优化模型</label>
-                      <button
-                        type="button"
-                        onClick={refreshProviderModels}
-                        disabled={isLoadingModels}
-                        className={`flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] transition ${
-                          isLoadingModels
-                            ? "border-slate-800 bg-slate-950 text-slate-600 cursor-not-allowed"
-                            : "border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200 cursor-pointer"
-                        }`}
-                      >
-                        <RefreshCw className={`h-3 w-3 ${isLoadingModels ? "animate-spin" : ""}`} />
-                        获取模型
-                      </button>
                     </div>
-                    <select
-                      value={selectedChatModel}
-                      onChange={(e) => onSelectChatModel(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 px-3 text-xs text-slate-300 focus:outline-none focus:border-slate-700 font-mono transition"
-                    >
-                      {chatModelGroups.map(group => (
-                        <optgroup key={group.provider} label={group.label}>
-                          {group.options.map(option => (
-                            <option key={option.value} value={option.value}>{option.label}</option>
-                          ))}
-                        </optgroup>
-                      ))}
-                    </select>
-                    {modelListMessage && (
-                      <p className="mt-1.5 text-[10px] text-slate-500 font-mono">{modelListMessage}</p>
+                    <div className="flex gap-2 overflow-x-auto rounded-xl border border-slate-800 bg-slate-950/45 p-2 lg:max-h-64 lg:flex-col lg:gap-1 lg:overflow-y-auto">
+                      {PROVIDER_KEYS.map(provider => {
+                        const count = activeModelGroups.find(group => group.provider === provider)?.options.length ?? 0;
+                        const selected = provider === selectedProvider;
+                        return (
+                          <button
+                            key={provider}
+                            type="button"
+                            onClick={() => onSelectProvider(provider)}
+                            className={`flex h-9 min-w-28 items-center justify-between rounded-lg px-2 text-left transition lg:min-w-0 ${
+                              selected
+                                ? "bg-slate-800 text-slate-100"
+                                : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
+                            }`}
+                          >
+                            <span className="font-semibold">{getProviderMeta(provider).label}</span>
+                            <span className="font-mono text-[10px] text-slate-500">{count}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="flex min-h-0 flex-col gap-3">
+                    <div className="flex flex-col gap-2 rounded-xl border border-slate-800 bg-slate-950/45 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                            {MODEL_CATEGORY_OPTIONS.find(option => option.key === modelCategory)?.label}
+                          </div>
+                          <div className="truncate text-sm font-semibold text-slate-200">
+                            {getProviderMeta(selectedProvider).label} 模型
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={refreshProviderModels}
+                          disabled={isLoadingModels}
+                          className={`flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-[10px] font-semibold transition ${
+                            isLoadingModels
+                              ? "border-slate-800 bg-slate-950 text-slate-600 cursor-not-allowed"
+                              : "border-slate-800 bg-slate-900 text-slate-300 hover:bg-slate-850 cursor-pointer"
+                          }`}
+                        >
+                          <RefreshCw className={`h-3.5 w-3.5 ${isLoadingModels ? "animate-spin" : ""}`} />
+                          获取模型
+                        </button>
+                      </div>
+                      {modelListMessage && (
+                        <p className="font-mono text-[10px] text-slate-500">{modelListMessage}</p>
+                      )}
+                      <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-800 bg-slate-950 sm:max-h-56">
+                        {activeModelOptions.length === 0 ? (
+                          <div className="px-3 py-6 text-center text-[11px] text-slate-600">暂无模型</div>
+                        ) : (
+                          activeModelOptions.map(option => {
+                            const isSelectedChat = modelCategory === "chat" && option.value === selectedChatModel;
+                            return (
+                              <button
+                                key={option.value}
+                                type="button"
+                                onClick={() => {
+                                  if (modelCategory === "chat") onSelectChatModel(option.value);
+                                }}
+                                className={`flex min-h-10 w-full items-center justify-between gap-3 border-b border-slate-900 px-3 py-2 text-left last:border-b-0 ${
+                                  modelCategory === "chat" ? "hover:bg-slate-900" : "cursor-default"
+                                }`}
+                              >
+                                <span className="min-w-0">
+                                  <span className="block truncate text-xs font-semibold text-slate-200">{option.label}</span>
+                                  <span className="block break-all font-mono text-[10px] text-slate-500">{option.value}</span>
+                                </span>
+                                {isSelectedChat && <Check className="h-4 w-4 shrink-0 text-amber-300" />}
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+
+                    {fetchedOptions.length > 0 && (
+                      <div className="rounded-xl border border-slate-800 bg-slate-950/45 p-3">
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                          <div className="text-xs font-semibold text-slate-300">获取结果</div>
+                          <button
+                            type="button"
+                            onClick={submitFetchedModels}
+                            disabled={selectedFetchedModels.length === 0}
+                            className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900 px-3 text-[10px] font-semibold text-slate-300 transition hover:bg-slate-850 disabled:cursor-not-allowed disabled:text-slate-600"
+                          >
+                            <ListPlus className="h-3.5 w-3.5" />
+                            添加选中
+                          </button>
+                        </div>
+                        <div className="max-h-40 overflow-y-auto rounded-lg border border-slate-800 bg-slate-950 sm:max-h-44">
+                          {fetchedOptions.map(option => {
+                            const selected = selectedFetchedModels.includes(option.value);
+                            return (
+                              <button
+                                key={option.value}
+                                type="button"
+                                onClick={() => toggleFetchedModel(option.value)}
+                                className={`flex min-h-10 w-full items-center justify-between gap-3 border-b border-slate-900 px-3 py-2 text-left last:border-b-0 ${
+                                  selected ? "bg-amber-500/10" : "hover:bg-slate-900"
+                                }`}
+                              >
+                                <span className="min-w-0">
+                                  <span className="block truncate text-xs font-semibold text-slate-200">{option.label}</span>
+                                  <span className="block break-all font-mono text-[10px] text-slate-500">{option.value}</span>
+                                </span>
+                                {selected && <Check className="h-4 w-4 shrink-0 text-amber-300" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
                     )}
+
+                    <div className="rounded-xl border border-slate-800 bg-slate-950/45 p-3">
+                      <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto]">
+                        <textarea
+                          value={manualModels}
+                          onChange={(e) => setManualModels(e.target.value)}
+                          placeholder={`${getProviderMeta(selectedProvider).label}: model-a, model-b`}
+                          className="min-h-16 resize-y rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-200 placeholder-slate-650 focus:border-slate-700 focus:outline-none sm:min-h-20"
+                        />
+                        <button
+                          type="button"
+                          onClick={submitManualModels}
+                          disabled={!manualModels.trim()}
+                          className="flex h-9 items-center justify-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900 px-3 text-[10px] font-semibold text-slate-300 transition hover:bg-slate-850 disabled:cursor-not-allowed disabled:text-slate-600 md:self-start"
+                        >
+                          <ListPlus className="h-3.5 w-3.5" />
+                          添加
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -332,7 +503,7 @@ export default function SettingsModal({
               )}
             </div>
 
-            <div className="border-t border-slate-850 bg-slate-900/50 px-6 py-4 text-right">
+            <div className="shrink-0 border-t border-slate-850 bg-slate-900/50 px-4 py-3 text-right sm:px-6 sm:py-4">
               <button
                 type="button"
                 onClick={onClose}

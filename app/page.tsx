@@ -188,12 +188,15 @@ export default function Home() {
   }, [dismissWorkspaceNotice, setWorkspaceNotices]);
 
   const {
+    addFetchedModels,
+    addManualModels,
     buildProviderHeaders,
     chatModelOptions,
     clearProviderCredentials,
     handleSaveCredential,
     handleSelectChatModel,
     handleSelectProvider,
+    fetchedModelOptions,
     imageModelOptions,
     isLoadingModels,
     modelListMessage,
@@ -812,6 +815,8 @@ export default function Home() {
       <SettingsModal
         assetStatusCounts={assetStats.typeCounts}
         chatModelGroups={chatModelGroups}
+        fetchedModelOptions={fetchedModelOptions}
+        imageModelGroups={imageModelGroups}
         isLoadingModels={isLoadingModels}
         modelListMessage={modelListMessage}
         open={showSettings}
@@ -819,9 +824,12 @@ export default function Home() {
         providerTest={providerTest}
         selectedChatModel={selectedChatModel}
         selectedProvider={selectedProvider}
+        videoModelGroups={videoModelGroups}
         onClearCredentials={clearProviderCredentials}
         onClose={() => setShowSettings(false)}
         onResetData={handleResetLocalData}
+        onAddFetchedModels={addFetchedModels}
+        onAddManualModels={addManualModels}
         onSaveCredential={handleSaveCredential}
         onSelectChatModel={handleSelectChatModel}
         onSelectProvider={handleSelectProvider}
