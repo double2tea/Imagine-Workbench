@@ -668,6 +668,284 @@
   box-shadow: 0 20px 56px rgba(15, 23, 42, 0.16) !important;
 }
 
+.imagine-agent-dock.imagine-agent-dock-idle-orb {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  max-width: none !important;
+  padding: 0 !important;
+  width: auto !important;
+}
+
+.imagine-agent-dock-panel {
+  transform-origin: calc(100% - 36px) 100%;
+  will-change: transform, opacity;
+}
+
+.imagine-agent-orb-button {
+  --agent-eye-x: 0px;
+  --agent-eye-y: 0px;
+  background:
+    radial-gradient(circle at 32% 22%, rgba(255, 255, 255, 0.92), transparent 19%),
+    radial-gradient(circle at 72% 76%, rgba(56, 189, 248, 0.34), transparent 30%),
+    radial-gradient(circle at 26% 84%, rgba(167, 139, 250, 0.24), transparent 28%),
+    linear-gradient(145deg, rgba(15, 23, 42, 0.96), rgba(30, 41, 59, 0.94) 48%, rgba(30, 64, 175, 0.82));
+  border: 1px solid rgba(191, 219, 254, 0.34);
+  box-shadow:
+    0 18px 42px rgba(15, 23, 42, 0.28),
+    0 8px 22px rgba(37, 99, 235, 0.18),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset,
+    0 -14px 28px rgba(255, 255, 255, 0.1) inset;
+  color: #dbeafe;
+  overflow: visible;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+  will-change: transform;
+}
+
+.imagine-agent-orb-button::before {
+  position: absolute;
+  inset: -6px;
+  content: "";
+  border-radius: inherit;
+  border: 1px solid rgba(147, 197, 253, 0.2);
+  box-shadow: 0 0 0 5px rgba(59, 130, 246, 0.05);
+  opacity: 0.9;
+}
+
+.imagine-agent-orb-button::after {
+  position: absolute;
+  inset: 9px 13px auto;
+  height: 16px;
+  content: "";
+  border-radius: 999px;
+  background: linear-gradient(92deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.04));
+  transform: rotate(-24deg);
+  pointer-events: none;
+}
+
+.imagine-agent-orb-button:hover {
+  border-color: rgba(191, 219, 254, 0.58);
+  box-shadow:
+    0 22px 54px rgba(15, 23, 42, 0.32),
+    0 10px 32px rgba(37, 99, 235, 0.28),
+    0 0 0 1px rgba(255, 255, 255, 0.14) inset,
+    0 -14px 28px rgba(255, 255, 255, 0.12) inset;
+  transform: translateY(-3px) scale(1.035);
+}
+
+.imagine-agent-orb-button:active {
+  transform: translateY(0) scale(0.96);
+}
+
+.imagine-agent-orb-aura {
+  position: absolute;
+  inset: -16px;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle, rgba(59, 130, 246, 0.2), transparent 58%),
+    radial-gradient(circle at 68% 36%, rgba(168, 85, 247, 0.16), transparent 42%);
+  opacity: 0.78;
+  animation: imagine-agent-orb-breathe 4s ease-in-out infinite;
+}
+
+.imagine-agent-orb-ring {
+  position: absolute;
+  inset: 7px;
+  border-radius: inherit;
+  border: 1px solid rgba(219, 234, 254, 0.18);
+  box-shadow: 0 0 18px rgba(125, 211, 252, 0.16) inset;
+  pointer-events: none;
+}
+
+.imagine-agent-orb-core {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: 43px;
+  height: 43px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 40% 28%, rgba(255, 255, 255, 0.92), transparent 18%),
+    linear-gradient(145deg, rgba(219, 234, 254, 0.9), rgba(96, 165, 250, 0.42));
+  box-shadow:
+    0 7px 18px rgba(15, 23, 42, 0.22),
+    0 0 0 1px rgba(255, 255, 255, 0.28) inset;
+  transition: transform 180ms ease;
+}
+
+.imagine-agent-orb-button:hover .imagine-agent-orb-core {
+  transform: translateY(-1px);
+}
+
+.imagine-agent-orb-eye {
+  z-index: 1;
+  background:
+    radial-gradient(circle at 34% 30%, #ffffff 0 14%, transparent 15%),
+    linear-gradient(145deg, rgba(248, 250, 252, 0.98), rgba(226, 232, 240, 0.9));
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow:
+    0 3px 10px rgba(15, 23, 42, 0.2),
+    0 0 0 3px rgba(15, 23, 42, 0.08);
+  transform-origin: 50% 52%;
+  animation: imagine-agent-orb-blink 5.8s ease-in-out infinite;
+}
+
+.imagine-agent-orb-pupil {
+  background:
+    radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.9) 0 12%, transparent 13%),
+    radial-gradient(circle, #0f172a 0 55%, #2563eb 58% 100%);
+  box-shadow: 0 0 10px rgba(37, 99, 235, 0.34);
+  transform: translate(var(--agent-eye-x), var(--agent-eye-y));
+}
+
+.imagine-agent-orb-glint {
+  position: absolute;
+  right: 7px;
+  top: 7px;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  pointer-events: none;
+}
+
+.imagine-agent-orb-smile {
+  position: absolute;
+  bottom: 7px;
+  left: 50%;
+  z-index: 2;
+  width: 12px;
+  height: 6px;
+  border-bottom: 1.5px solid rgba(15, 23, 42, 0.42);
+  border-radius: 0 0 999px 999px;
+  transform: translateX(-50%);
+  opacity: 0.64;
+}
+
+.imagine-agent-orb-spark {
+  position: absolute;
+  z-index: 1;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(219, 234, 254, 0.88);
+  box-shadow: 0 0 10px rgba(125, 211, 252, 0.6);
+  pointer-events: none;
+}
+
+.imagine-agent-orb-spark-one {
+  top: 12px;
+  right: 13px;
+  animation: imagine-agent-orb-spark 3.8s ease-in-out infinite;
+}
+
+.imagine-agent-orb-spark-two {
+  bottom: 16px;
+  left: 12px;
+  animation: imagine-agent-orb-spark 3.8s ease-in-out 1.2s infinite;
+}
+
+.imagine-agent-orb-reminder {
+  animation: imagine-agent-orb-reminder 16s ease-in-out infinite;
+  background: rgba(15, 23, 42, 0.78) !important;
+  border-color: rgba(147, 197, 253, 0.22) !important;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.22);
+  color: #dbeafe !important;
+  pointer-events: none;
+}
+
+.imagine-agent-dock-idle-orb.imagine-theme-light .imagine-agent-orb-button {
+  background:
+    radial-gradient(circle at 32% 22%, rgba(255, 255, 255, 0.98), transparent 20%),
+    radial-gradient(circle at 70% 78%, rgba(14, 165, 233, 0.24), transparent 30%),
+    radial-gradient(circle at 28% 84%, rgba(167, 139, 250, 0.18), transparent 28%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(239, 246, 255, 0.94) 45%, rgba(147, 197, 253, 0.72));
+  border-color: rgba(59, 130, 246, 0.18);
+  box-shadow:
+    0 18px 42px rgba(15, 23, 42, 0.12),
+    0 8px 22px rgba(59, 130, 246, 0.14),
+    0 0 0 1px rgba(255, 255, 255, 0.86) inset,
+    0 -14px 28px rgba(37, 99, 235, 0.08) inset;
+}
+
+.imagine-agent-dock-idle-orb.imagine-theme-light .imagine-agent-orb-core {
+  background:
+    radial-gradient(circle at 40% 28%, rgba(255, 255, 255, 0.98), transparent 18%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(191, 219, 254, 0.72));
+}
+
+.imagine-agent-dock-idle-orb.imagine-theme-light .imagine-agent-orb-reminder {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border-color: rgba(59, 130, 246, 0.18) !important;
+  color: #1e3a8a !important;
+}
+
+.imagine-agent-dock-idle-orb.imagine-theme-light .imagine-agent-orb-aura {
+  background:
+    radial-gradient(circle, rgba(37, 99, 235, 0.15), transparent 58%),
+    radial-gradient(circle at 68% 36%, rgba(168, 85, 247, 0.1), transparent 42%);
+}
+
+@keyframes imagine-agent-orb-breathe {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.92);
+  }
+
+  50% {
+    opacity: 0.72;
+    transform: scale(1.12);
+  }
+}
+
+@keyframes imagine-agent-orb-blink {
+  0%,
+  88%,
+  94%,
+  100% {
+    scale: 1 1;
+  }
+
+  91% {
+    scale: 1 0.18;
+  }
+}
+
+@keyframes imagine-agent-orb-spark {
+  0%,
+  100% {
+    opacity: 0.22;
+    transform: scale(0.72);
+  }
+
+  45% {
+    opacity: 1;
+    transform: scale(1.18);
+  }
+}
+
+@keyframes imagine-agent-orb-reminder {
+  0%,
+  68%,
+  100% {
+    opacity: 0;
+    transform: translateY(-50%) translateX(6px) scale(0.96);
+  }
+
+  74%,
+  88% {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0) scale(1);
+  }
+}
+
 .imagine-modal-overlay {
   align-items: flex-start;
   justify-content: center;
@@ -1347,5 +1625,16 @@
 
   .imagine-agent-dock form {
     min-width: 0;
+  }
+}
+
+@media (max-width: 860px) {
+  .imagine-agent-dock.imagine-agent-dock-idle-orb {
+    bottom: calc(16px + env(safe-area-inset-bottom)) !important;
+    inset-inline: auto 16px !important;
+    width: auto !important;
+    border: 0 !important;
+    border-radius: 999px !important;
+    padding: 0 !important;
   }
 }

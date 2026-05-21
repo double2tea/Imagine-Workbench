@@ -1,5 +1,5 @@
 import type { FormEvent, ReactNode, Ref } from "react";
-import { forwardRef } from "react";
+import { forwardRef, useEffect, useRef } from "react";
 import { Check, ChevronRight, Paintbrush, RefreshCw, Send, Sparkles, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import PreviewImage from "@/components/PreviewImage";
@@ -370,14 +370,86 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
     event.preventDefault();
     onSubmit();
   };
+  const isIdleOrb = !isOpen && !isLoading && input.trim().length === 0 && !agentReferenceId && !agentReferenceUrl;
+  const orbButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (!isIdleOrb) return;
+
+    const updateEyeOffset = (event: PointerEvent) => {
+      const orbButton = orbButtonRef.current;
+      if (!orbButton) return;
+
+      const rect = orbButton.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const deltaX = event.clientX - centerX;
+      const deltaY = event.clientY - centerY;
+      const distance = Math.hypot(deltaX, deltaY);
+
+      if (distance === 0) {
+        orbButton.style.setProperty("--agent-eye-x", "0px");
+        orbButton.style.setProperty("--agent-eye-y", "0px");
+        return;
+      }
+
+      const gazeStrength = Math.min(distance / 180, 1);
+      orbButton.style.setProperty("--agent-eye-x", `${(deltaX / distance) * 5 * gazeStrength}px`);
+      orbButton.style.setProperty("--agent-eye-y", `${(deltaY / distance) * 4 * gazeStrength}px`);
+    };
+
+    window.addEventListener("pointermove", updateEyeOffset, { passive: true });
+    return () => window.removeEventListener("pointermove", updateEyeOffset);
+  }, [isIdleOrb]);
 
   return (
-    <section
-      ref={ref}
-      className={`imagine-agent-dock imagine-theme-${themeMode} fixed inset-x-4 bottom-12 z-40 mx-auto w-[calc(100vw-32px)] max-w-5xl rounded-lg border border-slate-700/70 bg-[#0b0d13]/96 p-3 text-slate-200 shadow-[0_18px_54px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-opacity duration-200 hover:opacity-100 focus-within:opacity-100 sm:bottom-16 sm:w-[min(1040px,calc(100vw-40px))] ${
-        isOverContent ? "opacity-[0.84]" : "opacity-100"
-      }`}
-    >
+    <AnimatePresence initial={false} mode="wait">
+      {isIdleOrb ? (
+        <motion.section
+          key="agent-orb"
+          ref={ref}
+          initial={{ opacity: 0, scale: 0.92, y: 8 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.94, y: 8 }}
+          transition={{ duration: 0.16, ease: "easeOut" }}
+          className={`imagine-agent-dock imagine-agent-dock-idle-orb imagine-theme-${themeMode} fixed bottom-6 right-5 z-40 text-slate-200`}
+        >
+          <button
+            ref={orbButtonRef}
+            type="button"
+            onClick={onToggleOpen}
+            className="imagine-agent-orb-button group relative flex h-16 w-16 items-center justify-center rounded-full"
+            title="展开 Agent 对话"
+            aria-label="展开 Agent 对话"
+          >
+            <span className="imagine-agent-orb-aura" />
+            <span className="imagine-agent-orb-ring" />
+            <span className="imagine-agent-orb-core">
+              <span className="imagine-agent-orb-eye relative flex h-8 w-8 items-center justify-center rounded-full">
+                <span
+                  className="imagine-agent-orb-pupil block h-3.5 w-3.5 rounded-full transition-transform duration-75"
+                />
+                <span className="imagine-agent-orb-glint" />
+              </span>
+              <span className="imagine-agent-orb-smile" />
+            </span>
+            <span className="imagine-agent-orb-spark imagine-agent-orb-spark-one" />
+            <span className="imagine-agent-orb-spark imagine-agent-orb-spark-two" />
+            <span className="imagine-agent-orb-reminder absolute right-14 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-full border px-2.5 py-1 text-[10px] font-semibold shadow-lg backdrop-blur">
+              Agent
+            </span>
+          </button>
+        </motion.section>
+      ) : (
+        <motion.section
+          key="agent-panel"
+          ref={ref}
+          initial={{ opacity: 0, scale: 0.98, y: 18 }}
+          animate={{ opacity: isOverContent ? 0.84 : 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.99, y: 10 }}
+          transition={{ duration: 0.16, ease: "easeOut" }}
+          className={`imagine-agent-dock imagine-agent-dock-panel imagine-theme-${themeMode} fixed inset-x-4 bottom-12 z-40 mx-auto w-[calc(100vw-32px)] max-w-5xl rounded-lg border border-slate-700/70 bg-[#0b0d13]/96 p-3 text-slate-200 shadow-[0_18px_54px_rgba(0,0,0,0.5)] backdrop-blur-xl hover:opacity-100 focus-within:opacity-100 sm:bottom-16 sm:w-[min(1040px,calc(100vw-40px))]`}
+        >
       <div className={`${isOpen ? "mb-2.5" : "mb-1.5"} grid grid-cols-[auto_1fr_auto] items-center gap-2`}>
         <button
           type="button"
@@ -533,7 +605,9 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
           </label>
         </div>
       </div>
-    </section>
+        </motion.section>
+      )}
+    </AnimatePresence>
   );
 });
 
