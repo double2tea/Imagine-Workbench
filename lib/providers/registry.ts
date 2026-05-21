@@ -6,6 +6,8 @@ export interface ProviderMeta {
   envVideoBaseUrl?: string;
   defaultBaseUrl: string;
   defaultVideoBaseUrl: string;
+  apiKeyPlaceholder: string;
+  hasEditableBaseUrl: boolean;
   supportsImage: boolean;
   supportsVideo: boolean;
   supportsChat: boolean;
@@ -20,6 +22,8 @@ export const PROVIDER_REGISTRY = [
     envVideoBaseUrl: "TWELVE_AI_VIDEO_BASE_URL",
     defaultBaseUrl: "https://cdn.12ai.org",
     defaultVideoBaseUrl: "https://new.12ai.org",
+    apiKeyPlaceholder: "sk_your_12ai_key",
+    hasEditableBaseUrl: false,
     supportsImage: true,
     supportsVideo: true,
     supportsChat: true,
@@ -31,6 +35,8 @@ export const PROVIDER_REGISTRY = [
     envBaseUrl: "GROK2API_BASE_URL",
     defaultBaseUrl: "http://localhost:8000",
     defaultVideoBaseUrl: "http://localhost:8000",
+    apiKeyPlaceholder: "your_grok2api_key",
+    hasEditableBaseUrl: true,
     supportsImage: true,
     supportsVideo: true,
     supportsChat: true,
@@ -42,6 +48,8 @@ export const PROVIDER_REGISTRY = [
     envBaseUrl: "XSTX_BASE_URL",
     defaultBaseUrl: "https://api.xstx.info",
     defaultVideoBaseUrl: "https://api.xstx.info",
+    apiKeyPlaceholder: "sk_your_xstx_key",
+    hasEditableBaseUrl: true,
     supportsImage: false,
     supportsVideo: false,
     supportsChat: true,

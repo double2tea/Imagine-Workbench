@@ -3,36 +3,34 @@
 import React, { useCallback, useDeferredValue, useMemo, useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
-  Sparkles,
-  Settings,
-  Moon,
-  Sun,
-  Trash2,
   Download,
-  X,
   Play,
   Pause,
-  Image as ImageIcon,
   Maximize2,
-  Info
 } from "lucide-react";
-import { motion, AnimatePresence } from "motion/react";
 import JSZip from "jszip";
 import AgentDock, { type AgentToolAction, type ChatMessage } from "@/components/agent/AgentDock";
 import { VISUAL_PRESETS, type VisualPreset } from "@/components/PresetStyles";
 import CanvasMaskEditor from "@/components/CanvasMaskEditor";
-import AssetCard from "@/components/assets/AssetCard";
-import ComparePanel, { type CompareViewType } from "@/components/assets/ComparePanel";
+import type { CompareViewType } from "@/components/assets/ComparePanel";
 import FloatingCompareButton from "@/components/assets/FloatingCompareButton";
 import FullscreenPreview from "@/components/assets/FullscreenPreview";
-import AssetSelectionBar from "@/components/assets/AssetSelectionBar";
-import AssetToolbar, { type AssetStatusFilter, type AssetTypeFilter } from "@/components/assets/AssetToolbar";
+import type { AssetStatusFilter, AssetTypeFilter } from "@/components/assets/AssetToolbar";
 import CreationModeTabs, { type CreationMode } from "@/components/creation/CreationModeTabs";
 import ImageGenerationPanel from "@/components/creation/ImageGenerationPanel";
 import VideoGenerationPanel from "@/components/creation/VideoGenerationPanel";
 import AtReferenceDropdown from "@/components/reference/AtReferenceDropdown";
+import {
+  type DraggedReferenceAsset,
+  makeReferenceDropToken,
+  readDraggedReferenceAsset,
+} from "@/components/reference/referenceDrag";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import SettingsModal, { type ProviderTestState } from "@/components/settings/SettingsModal";
+import type { ProviderCredentials } from "@/lib/providers/types";
+import AssetGalleryWorkspace from "@/components/workbench/AssetGalleryWorkspace";
+import WorkspaceHeader, { type ThemeMode } from "@/components/workbench/WorkspaceHeader";
+import WorkspaceNotices, { type WorkspaceNotice } from "@/components/workbench/WorkspaceNotices";
 import { saveToDB, getAllFromDB, deleteFromDB, clearAllDB, StorageItem } from "@/lib/db";
 import {
   CHAT_MODEL_OPTIONS,
@@ -56,23 +54,14 @@ type NoticeType = "error" | "info" | "success";
 type MaskDestination = "creative" | "agent";
 type ProviderConnection = AiProvider;
 type ModelCategory = "chat" | "image" | "video";
-type ThemeMode = "light" | "dark";
+type PromptReferenceTarget = "image-prompt" | "video-prompt";
+
+const IMAGE_REFERENCE_LIMIT = 4;
 
 interface AssetStats {
   modelOptions: string[];
   typeCounts: Record<StorageItem["type"], number>;
   statusCounts: Record<StorageItem["status"], number>;
-}
-
-interface WorkspaceNotice {
-  id: string;
-  type: NoticeType;
-  message: string;
-}
-
-interface ProviderCredentials {
-  apiKey: string;
-  baseUrl: string;
 }
 
 function defaultProviderCredentials(): Record<AiProvider, ProviderCredentials> {
@@ -221,6 +210,36 @@ function buildVideoReferenceUrls(
   return urls.filter(url => url.length > 0).slice(0, maxCount);
 }
 
+function getReferencePromptToken(index: number): string {
+  return `@图片${index + 1}`;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function buildPromptWithReferenceMap(
+  prompt: string,
+  references: ReferenceImageRef[],
+  sentReferenceUrls = references.map(reference => reference.url),
+): string {
+  const lines = references
+    .map((reference, index) => ({
+      sentIndex: sentReferenceUrls.findIndex(url => url === reference.url),
+      token: getReferencePromptToken(index),
+    }))
+    .filter(reference => reference.sentIndex !== -1)
+    .filter(reference => new RegExp(`${escapeRegExp(reference.token)}(?!\\d)`).test(prompt))
+    .map(reference => `- ${reference.token} = reference image ${reference.sentIndex + 1}`);
+
+  if (lines.length === 0) return prompt;
+  return `Reference mapping:\n${lines.join("\n")}\n\nUser prompt:\n${prompt}`;
+}
+
+function insertTextAtRange(value: string, start: number, end: number, text: string): string {
+  return `${value.slice(0, start)}${text}${value.slice(end)}`;
+}
+
 function formatStoredModelLabel(value: string, fallbackProvider: AiProvider): string {
   const parsed = parseProviderModel(value, fallbackProvider);
   return `${getProviderLabel(parsed.provider)} ${parsed.model}`;
@@ -261,8 +280,9 @@ export default function Home() {
   const [isAgentPortalReady, setIsAgentPortalReady] = useState(false);
   const [isAgentDockOverContent, setIsAgentDockOverContent] = useState(false);
 
-  const applyAsVideoReference = (imageUrl: string) => {
-    setReferenceImage(imageUrl);
+  const applyAsVideoReference = (asset: StorageItem) => {
+    setReferenceImage(asset.url);
+    setReferenceImages([{ id: asset.id, url: asset.url, role: "start" }]);
     setTraditionalSubTab("video");
   };
 
@@ -356,13 +376,13 @@ export default function Home() {
 
   const dismissWorkspaceNotice = useCallback((id: string) => {
     setWorkspaceNotices(prev => prev.filter(notice => notice.id !== id));
-  }, []);
+  }, [setWorkspaceNotices]);
 
   const pushWorkspaceNotice = useCallback((type: NoticeType, message: string) => {
     const id = makeClientId("notice");
     setWorkspaceNotices(prev => [{ id, type, message }, ...prev].slice(0, 4));
     window.setTimeout(() => dismissWorkspaceNotice(id), 8000);
-  }, [dismissWorkspaceNotice]);
+  }, [dismissWorkspaceNotice, setWorkspaceNotices]);
 
   const buildProviderHeaders = useCallback((target?: string) => {
     const provider =
@@ -398,8 +418,8 @@ export default function Home() {
   const isFirstLastVideoMode = videoReferenceMode === "firstLast";
   const videoReferenceLabel = isFirstLastVideoMode ? "首帧 / 尾帧" : "视频参考图";
   const videoPromptPlaceholder = isFirstLastVideoMode
-    ? "描述首帧到尾帧之间的运动、转场与镜头变化... 输入 @ 可引用关键帧"
-    : "描述场景的运动与镜头动作... 输入 @ 可引用图像作为视频参考";
+    ? "描述首帧到尾帧之间的运动、转场与镜头变化... 可拖入右侧资产生成 @图片 引用"
+    : "描述场景的运动与镜头动作... 可拖入右侧资产作为视频参考";
   const videoReferenceHelp = isFirstLastVideoMode
     ? "第 1 张为首帧，第 2 张为尾帧"
     : "参考图用于主体、风格或场景引导，不作为首尾帧";
@@ -450,6 +470,71 @@ export default function Home() {
     () => items.filter(item => item.type === "image" && item.status === "complete"),
     [items],
   );
+  const getReferenceLimitForTarget = (target: PromptReferenceTarget): number =>
+    target === "video-prompt" ? videoReferenceLimit : IMAGE_REFERENCE_LIMIT;
+  const getDroppedReferenceRole = (target: PromptReferenceTarget, index: number): ReferenceImageRef["role"] => {
+    if (target !== "video-prompt" || videoReferenceMode !== "firstLast") return "general";
+    if (index === 0) return "start";
+    if (index === 1) return "end";
+    return "general";
+  };
+  const addDroppedReferenceAsset = (asset: DraggedReferenceAsset, target: PromptReferenceTarget): number | null => {
+    const existingIndex = referenceImages.findIndex(reference => reference.id === asset.id);
+    if (existingIndex !== -1) return existingIndex;
+
+    const limit = getReferenceLimitForTarget(target);
+    if (referenceImages.length >= limit) {
+      pushWorkspaceNotice("error", `参考图已达上限：最多 ${limit} 张`);
+      return null;
+    }
+
+    const nextIndex = referenceImages.length;
+    const nextReference: ReferenceImageRef = {
+      id: asset.id,
+      url: asset.url,
+      role: getDroppedReferenceRole(target, nextIndex),
+    };
+
+    setReferenceImage(referenceImages[0]?.url ?? asset.url);
+    setReferenceImages(prev => {
+      if (prev.some(reference => reference.id === asset.id)) return prev;
+      if (prev.length >= limit) return prev;
+      return [...prev, nextReference];
+    });
+    return nextIndex;
+  };
+  const handleReferenceDropAsset = (asset: DraggedReferenceAsset, target: PromptReferenceTarget) => {
+    addDroppedReferenceAsset(asset, target);
+  };
+  const handlePromptDropAsset = (
+    event: React.DragEvent<HTMLTextAreaElement>,
+    target: PromptReferenceTarget,
+  ) => {
+    const asset = readDraggedReferenceAsset(event.dataTransfer);
+    if (!asset) return;
+
+    const textarea = event.currentTarget;
+    const dropToken = makeReferenceDropToken(asset.id);
+    const selectionStart = textarea.selectionStart;
+    const selectionEnd = textarea.selectionEnd;
+    const referenceIndex = addDroppedReferenceAsset(asset, target);
+
+    window.setTimeout(() => {
+      const currentValue = textarea.value;
+      if (referenceIndex === null) {
+        setPrompt(currentValue.replace(dropToken, ""));
+        return;
+      }
+
+      const referenceToken = getReferencePromptToken(referenceIndex);
+      const nextPrompt = currentValue.includes(dropToken)
+        ? currentValue.replace(dropToken, referenceToken)
+        : insertTextAtRange(currentValue, selectionStart, selectionEnd, referenceToken);
+
+      setPrompt(nextPrompt);
+      setAtDropdown({ visible: false, type: target, search: "" });
+    }, 0);
+  };
   const compareItems = useMemo(() => {
     const itemById = new Map(items.map(item => [item.id, item]));
     return {
@@ -571,19 +656,17 @@ export default function Home() {
         const legacyGrokKey = localStorage.getItem("imagine_grok2api_api_key");
         const legacyGrokBaseUrl = localStorage.getItem("imagine_grok2api_base_url") ?? localStorage.getItem("imagine_custom_api_base_url");
         if (legacy12AiKey || legacyGrokKey || legacyGrokBaseUrl) {
-          setProviderCredentials(prev => {
-            const next = { ...prev };
-            if (legacy12AiKey) next["12ai"] = { ...next["12ai"], apiKey: legacy12AiKey };
-            if (legacyGrokKey) next["grok2api"] = { ...next["grok2api"], apiKey: legacyGrokKey };
-            if (legacyGrokBaseUrl) next["grok2api"] = { ...next["grok2api"], baseUrl: legacyGrokBaseUrl };
-            localStorage.removeItem("imagine_12ai_api_key");
-            localStorage.removeItem("imagine_custom_api_key");
-            localStorage.removeItem("imagine_grok2api_api_key");
-            localStorage.removeItem("imagine_grok2api_base_url");
-            localStorage.removeItem("imagine_custom_api_base_url");
-            localStorage.setItem("imagine_provider_credentials", JSON.stringify(next));
-            return next;
-          });
+          const migrated = defaultProviderCredentials();
+          if (legacy12AiKey) migrated["12ai"] = { ...migrated["12ai"], apiKey: legacy12AiKey };
+          if (legacyGrokKey) migrated["grok2api"] = { ...migrated["grok2api"], apiKey: legacyGrokKey };
+          if (legacyGrokBaseUrl) migrated["grok2api"] = { ...migrated["grok2api"], baseUrl: legacyGrokBaseUrl };
+          setProviderCredentials(migrated);
+          localStorage.removeItem("imagine_12ai_api_key");
+          localStorage.removeItem("imagine_custom_api_key");
+          localStorage.removeItem("imagine_grok2api_api_key");
+          localStorage.removeItem("imagine_grok2api_base_url");
+          localStorage.removeItem("imagine_custom_api_base_url");
+          localStorage.setItem("imagine_provider_credentials", JSON.stringify(migrated));
         }
       }
 
@@ -804,7 +887,7 @@ export default function Home() {
       localStorage.setItem("imagine_provider_credentials", JSON.stringify(next));
       return next;
     });
-  }, []);
+  }, [setProviderCredentials]);
 
   const clearProviderCredentials = useCallback((provider: AiProvider) => {
     setProviderCredentials(prev => {
@@ -812,7 +895,7 @@ export default function Home() {
       localStorage.setItem("imagine_provider_credentials", JSON.stringify(next));
       return next;
     });
-  }, []);
+  }, [setProviderCredentials]);
 
   const handleSelectProvider = (provider: AiProvider) => {
     setSelectedProvider(provider);
@@ -985,6 +1068,7 @@ export default function Home() {
       }
     }
     setImageSubmitCount(prev => prev + 1);
+    const generationPrompt = buildPromptWithReferenceMap(prompt, referenceImages);
 
     // Create pre-queued item in memory immediately
     const tempId = makeClientId("temp_img");
@@ -1013,7 +1097,7 @@ export default function Home() {
         headers: { "Content-Type": "application/json", ...headers },
         signal: controller.signal,
         body: JSON.stringify({
-          prompt,
+          prompt: generationPrompt,
           model: activeImageModel,
           aspectRatio: activeImageSize,
           imageSize,
@@ -1110,13 +1194,14 @@ export default function Home() {
         videoReferenceMode,
         videoReferenceLimit,
       );
+      const generationPrompt = buildPromptWithReferenceMap(prompt, referenceImages, videoReferenceUrls);
 
       const res = await fetch("/api/gemini/generate-video", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
         signal: controller.signal,
         body: JSON.stringify({
-          prompt,
+          prompt: generationPrompt,
           images: videoReferenceUrls,
           aspectRatio: activeVideoSize,
           model: selectedVideoModel,
@@ -1600,6 +1685,8 @@ export default function Home() {
       setAgentInput(val);
     } else {
       setPrompt(val);
+      setAtDropdown({ visible: false, type, search: "" });
+      return;
     }
 
     const lastAtIdx = val.lastIndexOf("@");
@@ -1867,85 +1954,14 @@ export default function Home() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(30,41,59,0.42),transparent_56%)]" />
       </div>
 
-      <div className="fixed top-[72px] right-4 z-[70] flex w-[min(360px,calc(100vw-32px))] flex-col gap-2">
-        <AnimatePresence>
-          {workspaceNotices.map(notice => (
-            <motion.div
-              key={notice.id}
-              initial={{ opacity: 0, y: -8, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -8, scale: 0.98 }}
-              className={`flex items-start gap-3 rounded-lg border px-3 py-2.5 shadow-2xl backdrop-blur-xl ${
-                notice.type === "error"
-                  ? "border-red-500/30 bg-red-950/80 text-red-100"
-                  : notice.type === "success"
-                    ? "border-emerald-500/30 bg-emerald-950/80 text-emerald-100"
-                    : "border-blue-500/30 bg-blue-950/80 text-blue-100"
-              }`}
-            >
-              <Info className="mt-0.5 h-4 w-4 shrink-0 opacity-80" />
-              <p className="min-w-0 flex-1 text-xs leading-5">{notice.message}</p>
-              <button
-                type="button"
-                onClick={() => dismissWorkspaceNotice(notice.id)}
-                className="rounded-md p-1 text-current/60 transition hover:bg-white/10 hover:text-current"
-                title="关闭提示"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
+      <WorkspaceNotices notices={workspaceNotices} onDismiss={dismissWorkspaceNotice} />
 
-      {/* Dynamic Header */}
-      <header className="imagine-app-header sticky top-0 z-40 bg-[#07080b]/86 backdrop-blur-xl border-b border-slate-800/80 px-4 py-3 sm:px-6 flex items-center justify-between gap-3 select-none">
-        <div className="flex min-w-0 items-center gap-3 z-10">
-          <div className="imagine-brand-mark relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-blue-400/20 bg-blue-500/12 shadow-sm">
-            <Sparkles className="h-4.5 w-4.5 text-blue-200" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="flex min-w-0 items-center gap-2 text-sm font-semibold tracking-tight text-white">
-              <span className="truncate">Imagine Workbench</span>
-              <span className="shrink-0 rounded border border-blue-400/20 bg-blue-400/10 px-1.5 py-0.5 text-[9px] font-mono font-normal tracking-widest text-blue-300">v1.2 PRO</span>
-            </h1>
-            <p className="truncate text-[11px] font-medium text-slate-400">智能图像与视频生成工作台</p>
-          </div>
-        </div>
-
-        {/* Global actions bar */}
-        <div className="flex shrink-0 items-center gap-2 z-10">
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className="imagine-header-button flex h-9 items-center gap-1.5 rounded-lg border border-slate-700/80 bg-slate-900/80 px-3 text-xs font-semibold text-slate-200 transition hover:border-slate-600 hover:bg-slate-800 cursor-pointer"
-          >
-            <Settings className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">设置</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={toggleThemeMode}
-            aria-pressed={themeMode === "dark"}
-            className="imagine-header-button imagine-icon-button flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700/80 bg-slate-900/80 text-slate-400 transition hover:border-blue-500/40 hover:bg-blue-950/30 hover:text-blue-300 cursor-pointer"
-            title={themeMode === "light" ? "切换深色模式" : "切换浅色模式"}
-          >
-            {themeMode === "light" ? (
-              <Moon className="h-3.5 w-3.5" />
-            ) : (
-              <Sun className="h-3.5 w-3.5" />
-            )}
-          </button>
-
-          <button
-            onClick={handleClearProject}
-            className="imagine-header-button imagine-icon-button flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700/80 bg-slate-900/80 text-slate-400 transition hover:border-red-500/40 hover:bg-red-950/30 hover:text-red-300 cursor-pointer"
-            title="清空当前项目"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      </header>
+      <WorkspaceHeader
+        themeMode={themeMode}
+        onClearProject={handleClearProject}
+        onOpenSettings={() => setShowSettings(prev => !prev)}
+        onToggleTheme={toggleThemeMode}
+      />
 
       {/* Main Multi-panel Layout grid */}
       <main
@@ -1993,6 +2009,8 @@ export default function Home() {
                     onNegativePromptChange={setNegativePrompt}
                     onOptimizePrompt={optimizeActivePrompt}
                     onPromptChange={(value) => handleTextareaChange(value, "image-prompt")}
+                    onPromptDropAsset={(event) => handlePromptDropAsset(event, "image-prompt")}
+                    onReferenceDropAsset={(asset) => handleReferenceDropAsset(asset, "image-prompt")}
                     onReferenceRemove={removeReferenceImage}
                     onReferenceUpload={handleImageUpload}
                     onSelectAspectRatio={setAspectRatio}
@@ -2024,6 +2042,8 @@ export default function Home() {
                     onGenerate={generateManualVideo}
                     onOptimizePrompt={optimizeActivePrompt}
                     onPromptChange={(value) => handleTextareaChange(value, "video-prompt")}
+                    onPromptDropAsset={(event) => handlePromptDropAsset(event, "video-prompt")}
+                    onReferenceDropAsset={(asset) => handleReferenceDropAsset(asset, "video-prompt")}
                     onReferenceRemove={removeReferenceImage}
                     onReferenceRoleChange={(id, role) => toggleReferenceRole(id, role ?? "general")}
                     onReferenceUpload={handleImageUpload}
@@ -2076,90 +2096,57 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Right Studio Workspace (Gallery, Masonry & Comparative Canvas) (Col 8) */}
-        <section className="imagine-gallery-panel flex min-w-0 flex-col gap-4">
-
-          <AssetToolbar
-            assetModelFilter={assetModelFilter}
-            assetStatusFilter={assetStatusFilter}
-            filterType={filterType}
-            itemsCount={items.length}
-            modelOptions={assetStats.modelOptions}
-            searchQuery={searchQuery}
-            selectedProvider={selectedProvider}
-            statusCounts={assetStats.statusCounts}
-            typeCounts={assetStats.typeCounts}
-            deleteItemsByStatus={deleteItemsByStatus}
-            exportMetadataJson={exportMetadataJson}
-            formatModelLabel={formatStoredModelLabel}
-            setAssetModelFilter={setAssetModelFilter}
-            setAssetStatusFilter={setAssetStatusFilter}
-            setFilterType={setFilterType}
-            setSearchQuery={setSearchQuery}
-          />
-
-          <AssetSelectionBar
-            selectedCount={selectedItemIds.length}
-            onClear={handleClearSelection}
-            onDelete={handleBatchDelete}
-            onDownloadZip={handleBatchDownloadZip}
-          />
-
-          {isCompareMode && (
-            <ComparePanel
-              compareItemIds={compareItemIds}
-              first={compareItems.first}
-              second={compareItems.second}
-              sliderPos={compareSliderPos}
-              viewType={compareViewType}
-              onReset={() => {
-                setIsCompareMode(false);
-                setCompareItemIds([]);
-              }}
-              onSliderPosChange={setCompareSliderPos}
-              onViewTypeChange={setCompareViewType}
-            />
-          )}
-
-          {/* Main Gallery List */}
-          <div className="imagine-gallery-scroll min-h-[calc(100vh-360px)]">
-            {filteredItems.length === 0 ? (
-              <div className="imagine-gallery-empty flex min-h-[calc(100vh-390px)] flex-col items-center justify-center rounded-xl border border-dashed border-slate-800 bg-slate-950/28 p-6 text-center text-slate-500">
-                <ImageIcon className="mb-3 h-9 w-9 text-slate-700" />
-                <p className="text-sm font-semibold text-slate-400">暂无生成的创意文件</p>
-                <p className="mt-1 max-w-sm text-xs leading-5 text-slate-600">在左侧写下创意设想并生成，文件将实时存档至本地 IndexedDB。</p>
-              </div>
-            ) : (
-              <div className="imagine-gallery-grid grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                {filteredItems.map((item) => (
-                  <AssetCard
-                    key={item.id}
-                    canceling={cancelingItemIdSet.has(item.id)}
-                    inCompare={compareItemIdSet.has(item.id)}
-                    item={item}
-                    selected={selectedItemIdSet.has(item.id)}
-                    selectedProvider={selectedProvider}
-                    onApplyVideoReference={applyAsVideoReference}
-                    onCancel={cancelProcessingItem}
-                    onDelete={handleDeleteItem}
-                    onDownload={handleDownloadItem}
-                    onLaunchMaskEditor={launchMaskEditor}
-                    onOpenFullscreen={setFullscreenItem}
-                    onRetry={retryFailedItem}
-                    onToggleCompare={toggleCompare}
-                    onToggleSelect={toggleSelectItem}
-                    onUseAgentReference={(asset) => {
-                      setAgentReferenceId(asset.id);
-                      setAgentReferenceUrl(asset.url);
-                      setIsAgentDockOpen(true);
-                    }}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-
-        </section>
+        <AssetGalleryWorkspace
+          assetModelFilter={assetModelFilter}
+          assetStatusFilter={assetStatusFilter}
+          cancelingItemIdSet={cancelingItemIdSet}
+          compareItemIdSet={compareItemIdSet}
+          compareItemIds={compareItemIds}
+          compareItems={compareItems}
+          compareSliderPos={compareSliderPos}
+          compareViewType={compareViewType}
+          filterType={filterType}
+          filteredItems={filteredItems}
+          itemsCount={items.length}
+          modelOptions={assetStats.modelOptions}
+          searchQuery={searchQuery}
+          selectedCount={selectedItemIds.length}
+          selectedItemIdSet={selectedItemIdSet}
+          selectedProvider={selectedProvider}
+          statusCounts={assetStats.statusCounts}
+          typeCounts={assetStats.typeCounts}
+          isCompareMode={isCompareMode}
+          onApplyVideoReference={applyAsVideoReference}
+          onBatchDelete={handleBatchDelete}
+          onBatchDownloadZip={handleBatchDownloadZip}
+          onCancelItem={cancelProcessingItem}
+          onClearSelection={handleClearSelection}
+          onDeleteItem={handleDeleteItem}
+          onDeleteItemsByStatus={deleteItemsByStatus}
+          onDownloadItem={handleDownloadItem}
+          onExportMetadata={exportMetadataJson}
+          onLaunchMaskEditor={launchMaskEditor}
+          onOpenFullscreen={setFullscreenItem}
+          onResetCompare={() => {
+            setIsCompareMode(false);
+            setCompareItemIds([]);
+          }}
+          onRetryItem={retryFailedItem}
+          onSetAssetModelFilter={setAssetModelFilter}
+          onSetAssetStatusFilter={setAssetStatusFilter}
+          onSetCompareSliderPos={setCompareSliderPos}
+          onSetCompareViewType={setCompareViewType}
+          onSetFilterType={setFilterType}
+          onSetSearchQuery={setSearchQuery}
+          onToggleCompare={toggleCompare}
+          onToggleSelect={toggleSelectItem}
+          onUseAgentReference={(asset) => {
+            setAgentReferenceId(asset.id);
+            setAgentReferenceUrl(asset.url);
+            setIsAgentDockOpen(true);
+          }}
+          formatModelLabel={formatStoredModelLabel}
+        />
 
       </main>
 

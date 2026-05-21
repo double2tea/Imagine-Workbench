@@ -1,5 +1,10 @@
 import type { AiProvider } from "./model-catalog";
 
+export interface ProviderCredentials {
+  apiKey: string;
+  baseUrl: string;
+}
+
 export interface ProviderConfig {
   provider: AiProvider;
   apiKey: string;
