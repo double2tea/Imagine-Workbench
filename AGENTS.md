@@ -18,12 +18,19 @@ Imagine Workbench is a Next.js App Router workstation for AI creative generation
 
 Current core surfaces:
 
-- `app/page.tsx`: main browser UI for traditional image/video generation, Agent Mode, gallery, compare, masking, batch delete, and ZIP export.
+- `app/page.tsx`: main browser composition shell. It wires workstation state/hooks into creation panels, Agent Dock, gallery, settings, fullscreen preview, and mask editor.
 - `app/api/gemini/*`: server routes for generation, optimization, Agent Mode, async polling, and media download proxying.
 - `app/api/gemini/agent/route.ts`: Agent Mode with tool-calling loop. Uses zod for request/response validation. Agent calls tools to query models, skills, and gallery assets before recommending actions. Model IDs are validated server-side against the catalog.
 - `app/api/gemini/agent/tools.ts`: Agent tool definitions and executors. Tools: `query_models`, `get_skill_info`, `get_gallery_assets`. Tool arg schemas defined with zod, JSON Schema introspected for OpenAI tool definitions.
 - `app/api/gemini/agent/skills.ts`: Skill registry (static descriptions). Agent activates skills at runtime via tools rather than a pre-routed LLM call.
 - `app/api/models/route.ts`: provider model listing.
+- `hooks/useAgentController.ts`: Agent chat state, localStorage persistence, tool action execution, auto-execute countdown, and Agent API submission.
+- `hooks/useAssetActions.ts`: gallery actions for selection, delete, cancel, retry, metadata export, ZIP export, and compare toggles.
+- `hooks/useAssetWorkspaceState.ts`: gallery filters, counts, search, selected IDs, compare state, and derived reference-image lists.
+- `hooks/useGenerationActions.ts`: manual image/video submission, temporary asset records, async operation handles, and generation abort controllers.
+- `hooks/useProviderSettings.ts`: provider credentials, base URLs, model-list fetching, connection tests, and header construction.
+- `hooks/useReferenceState.ts`: reference image upload/drop handling, prompt `@` references, and role toggling.
+- `hooks/useMediaPolling.ts`: async image/video status polling and final media download into IndexedDB.
 - `lib/providers/*`: provider adapters, model catalog, tool-calling chat completions, parsing, request helpers, and shared types.
 - `lib/db.ts`: browser IndexedDB persistence for generated assets.
 - `components/CanvasMaskEditor.tsx`: local mask drawing UI.

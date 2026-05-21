@@ -8,7 +8,7 @@ import {
   Pause,
   Maximize2,
 } from "lucide-react";
-import AgentDock, { type AgentToolAction, type ChatMessage } from "@/components/agent/AgentDock";
+import AgentDock from "@/components/agent/AgentDock";
 import { VISUAL_PRESETS, type VisualPreset } from "@/components/PresetStyles";
 import CanvasMaskEditor from "@/components/CanvasMaskEditor";
 import FloatingCompareButton from "@/components/assets/FloatingCompareButton";
@@ -23,6 +23,7 @@ import AssetGalleryWorkspace from "@/components/workbench/AssetGalleryWorkspace"
 import WorkspaceHeader, { type ThemeMode } from "@/components/workbench/WorkspaceHeader";
 import WorkspaceNotices, { type WorkspaceNotice } from "@/components/workbench/WorkspaceNotices";
 import { getAllFromDB, clearAllDB, StorageItem } from "@/lib/db";
+import { useAgentController } from "@/hooks/useAgentController";
 import { useAssetActions } from "@/hooks/useAssetActions";
 import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
 import { useClipboardImageImport } from "@/hooks/useClipboardImageImport";
@@ -35,7 +36,6 @@ import {
 } from "@/hooks/useReferenceState";
 import { useProviderSettings } from "@/hooks/useProviderSettings";
 import {
-  DEFAULT_VISION_CHAT_MODEL,
   DEFAULT_IMAGE_MODEL,
   DEFAULT_VIDEO_MODEL,
   getImageModelCapabilities,
@@ -150,26 +150,8 @@ export default function Home() {
     setSelectedItemIds,
   } = useAssetWorkspaceState(items);
 
-  const WELCOME_MESSAGE: ChatMessage = {
-    id: "welcome",
-    role: "assistant",
-    content: "您好！我是您的智能创意助手。您可以一边调整左侧创作参数，一边随时交办高阶创意任务。例如：「帮我做一套3张赛博朋克风战士的相册」或「帮我把上一部图片转成16:9的微短视频」。我会给出建议，并在确认后填入参数或执行生成。",
-    thought: "初始化底部 Agent Dock，准备读取画廊资产上下文...",
-    suggestedFollowUps: [
-      "优化并生成一张赛博朋克飞艇",
-      "我想做一段太空科幻题材视频",
-      "根据当前画廊给我三个延展方向"
-    ]
-  };
-
   // Agent State
-  const [agentMessages, setAgentMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
   const [agentInput, setAgentInput] = useState("");
-  const [isAgentLoading, setIsAgentLoading] = useState(false);
-  const [autoExecute, setAutoExecute] = useState(false);
-  const [countdownId, setCountdownId] = useState<NodeJS.Timeout | null>(null);
-  const [activeCountdownId, setActiveCountdownId] = useState<string | null>(null);
-  const [countdownSeconds, setCountdownSeconds] = useState(3);
 
   const [showSettings, setShowSettings] = useState(false);
   const [themeMode, setThemeMode] = useState<ThemeMode>("light");
@@ -188,9 +170,7 @@ export default function Home() {
   const [fullscreenItem, setFullscreenItem] = useState<StorageItem | null>(null);
 
   // References
-  const chatBottomRef = useRef<HTMLDivElement | null>(null);
   const agentDockRef = useRef<HTMLElement | null>(null);
-  const autoCountdownInterval = useRef<NodeJS.Timeout | null>(null);
   const dockOverlapFrameRef = useRef<number | null>(null);
   const pollingFailuresRef = useRef<Record<string, number>>({});
   const generationAbortControllersRef = useRef<Record<string, AbortController>>({});
@@ -434,23 +414,10 @@ export default function Home() {
     async function loadWorkspace() {
       const allItems = await getAllFromDB();
       setItems(allItems);
-      const storedChat = localStorage.getItem("imagine_agent_chat");
-      if (storedChat) {
-        try {
-          const parsed = JSON.parse(storedChat);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setAgentMessages(parsed as ChatMessage[]);
-            return;
-          }
-        } catch { /* ignore corrupt data */ }
-      }
     }
     loadWorkspace();
 
     const restoreSettings = setTimeout(() => {
-      const storedAutoExec = localStorage.getItem("imagine_auto_execute");
-      if (storedAutoExec) setAutoExecute(storedAutoExec === "true");
-
       const storedThemeMode = localStorage.getItem("imagine_theme_mode");
       if (storedThemeMode === "light" || storedThemeMode === "dark") {
         setThemeMode(storedThemeMode);
@@ -459,28 +426,6 @@ export default function Home() {
 
     return () => clearTimeout(restoreSettings);
   }, []);
-
-  // Scroll to bottom of agent chat as new messages arrived
-  useEffect(() => {
-    if (chatBottomRef.current) {
-      chatBottomRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [agentMessages, isAgentLoading]);
-
-  // Persist agent chat to localStorage
-  useEffect(() => {
-    if (agentMessages.length > 1) {
-      localStorage.setItem("imagine_agent_chat", JSON.stringify(agentMessages));
-    }
-  }, [agentMessages]);
-
-  const handleToggleAutoExecute = (val: boolean) => {
-    setAutoExecute(val);
-    localStorage.setItem("imagine_auto_execute", String(val));
-    if (!val) {
-      clearActiveCountdown();
-    }
-  };
 
   // Preset quick injection
   const applyPreset = (preset: VisualPreset) => {
@@ -599,191 +544,41 @@ export default function Home() {
     );
   };
 
-  // Clears active timeouts
-  const clearActiveCountdown = () => {
-    if (countdownId) clearTimeout(countdownId);
-    if (autoCountdownInterval.current) clearInterval(autoCountdownInterval.current);
-    setCountdownId(null);
-    setActiveCountdownId(null);
-    setCountdownSeconds(3);
-  };
-
-  // Run the Agent chat-completion query
-  const submitAgentPrompt = async (forcedPrompt?: string) => {
-    const activeText = (forcedPrompt || agentInput).trim();
-    if (!activeText) return;
-
-    clearActiveCountdown();
-    setIsAgentDockOpen(true);
-
-    const userMsg: ChatMessage = {
-      id: makeClientId("usr"),
-      role: "user",
-      content: activeText,
-    };
-
-    setAgentMessages(prev => [...prev, userMsg]);
-    setAgentInput("");
-    setIsAgentLoading(true);
-
-    try {
-      const gallerySummary = items.map(x => ({
-        id: x.id,
-        type: x.type,
-        prompt: x.prompt,
-        aspectRatio: x.aspectRatio,
-        url: x.url,
-      }));
-
-      const activeAgentReferences =
-        agentReferences.length > 0
-          ? agentReferences
-          : agentReferenceId && agentReferenceUrl
-            ? [{ id: agentReferenceId, url: agentReferenceUrl }]
-            : [];
-      const hasAgentImageReference = activeAgentReferences.some(reference => reference.url.trim().length > 0);
-      const agentModel = hasAgentImageReference ? DEFAULT_VISION_CHAT_MODEL : selectedChatModel;
-      const headers = buildProviderHeaders(agentModel);
-
-      // Construct sliding window history for request
-      const requestHistory = agentMessages
-        .concat(userMsg)
-        .slice(-10) // last 10 dialogs
-        .map(x => ({
-          role: x.role,
-          content: x.content,
-        }));
-
-      const res = await fetch("/api/gemini/agent", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...headers },
-        body: JSON.stringify({
-          messages: requestHistory,
-          gallerySummary,
-          agentReferences: activeAgentReferences.map(r => ({ id: r.id, url: r.url })),
-          agentReferenceId: activeAgentReferences[0]?.id || agentReferenceId || undefined,
-          model: agentModel,
-        }),
-      });
-
-      if (res.ok) {
-        const agentResponse = await res.json();
-        const assistantMsgId = makeClientId("asst");
-
-        const assistantMsg: ChatMessage = {
-          id: assistantMsgId,
-          role: "assistant",
-          content: agentResponse.text || "我已收到指令，该项目可以怎么推进？",
-          thought: agentResponse.thought || "分析场景，规划后续设计合成步骤...",
-          recommendedAction: agentResponse.recommendedAction || { type: "none" },
-          suggestedFollowUps: agentResponse.suggestedFollowUps || [],
-          interactiveState: "idle",
-          activeSkills: agentResponse.activeSkills || [],
-          toolCalls: agentResponse.toolCalls || [],
-        };
-
-        setAgentMessages(prev => [...prev, assistantMsg]);
-
-        // Auto execute proposed structural action if enabled and action is valid
-        if (autoExecute && agentResponse.recommendedAction && agentResponse.recommendedAction.type !== "none") {
-          startAutoCountdown(assistantMsgId, agentResponse.recommendedAction);
-        }
-      }
-    } catch (e) {
-      console.error(e);
-      const message = e instanceof Error ? e.message : "请求过载";
-      setAgentMessages(prev => [...prev, {
-        id: makeClientId("asst_err"),
-        role: "assistant",
-        content: `抱歉，Agent 在网络调谐时出现异常 (${message}). 请检查网络、API Key 或重试。`,
-        suggestedFollowUps: ["重试我先前的请求", "根据当前参数重新规划"]
-      }]);
-    } finally {
-      setIsAgentLoading(false);
-    }
-  };
-
-  // Interactive countdown loader representation for Auto-execute modes
-  const startAutoCountdown = (msgId: string, action: AgentToolAction) => {
-    clearActiveCountdown();
-    setActiveCountdownId(msgId);
-    let secLeft = 3;
-    setCountdownSeconds(secLeft);
-
-    autoCountdownInterval.current = setInterval(() => {
-      secLeft--;
-      setCountdownSeconds(secLeft);
-      if (secLeft <= 0) {
-        if (autoCountdownInterval.current) clearInterval(autoCountdownInterval.current);
-        executeAgentToolAction(msgId, action);
-      }
-    }, 1000);
-  };
-
-  // Run the Tool recommendations parsed from the Agent's response payload
-  const executeAgentToolAction = async (msgId: string, action: AgentToolAction) => {
-    clearActiveCountdown();
-
-    // Mark interactive state as executing
-    setAgentMessages(prev => prev.map(m => m.id === msgId ? { ...m, interactiveState: "completed" } : m));
-
-    const { type, params = {} } = action;
-
-    if (type === "optimize_prompt") {
-      setPrompt(params.prompt || "");
-      optimizeActivePrompt();
-    } else if (type === "generate_image") {
-      // Feed values to manual inputs and trigger
-      setPrompt(params.prompt || "");
-      if (params.aspectRatio) setAspectRatio(params.aspectRatio);
-      if (params.model) handleSelectImageModel(params.model);
-      setTraditionalSubTab("image");
-
-      // We trigger traditional image generation using immediate inline params
-      setTimeout(() => {
-        generateManualImage();
-      }, 500);
-    } else if (type === "generate_video") {
-      setPrompt(params.prompt || "");
-      if (params.aspectRatio) setAspectRatio(params.aspectRatio);
-      if (params.model) handleSelectVideoModel(params.model);
-
-      // Check if this refers to an existing asset
-      if (params.referenceImageId) {
-        const matchedAsset = items.find(x => x.id === params.referenceImageId);
-        if (matchedAsset) {
-          setReferenceImage(matchedAsset.url);
-          setReferenceImages([{ id: matchedAsset.id, url: matchedAsset.url, role: "general" }]);
-        }
-      }
-
-      setTraditionalSubTab("video");
-      setTimeout(() => {
-        generateManualVideo();
-      }, 500);
-    } else if (type === "edit_image") {
-      setPrompt(params.prompt || "");
-      setTraditionalSubTab("image");
-      if (params.referenceImageId) {
-        const matchedAsset = items.find(x => x.id === params.referenceImageId);
-        if (matchedAsset) {
-          setReferenceImage(matchedAsset.url);
-          setReferenceImages([{ id: matchedAsset.id, url: matchedAsset.url, role: "general" }]);
-          launchMaskEditor(matchedAsset.url, matchedAsset.id);
-        }
-      }
-    }
-  };
-
-  const declineAgentToolAction = (msgId: string) => {
-    clearActiveCountdown();
-    setAgentMessages(prev => prev.map(m => m.id === msgId ? { ...m, interactiveState: "declined" } : m));
-  };
-
-  const handleClearChat = () => {
-    setAgentMessages([WELCOME_MESSAGE]);
-    localStorage.removeItem("imagine_agent_chat");
-  };
+  const {
+    activeCountdownId,
+    agentMessages,
+    autoExecute,
+    chatBottomRef,
+    clearActiveCountdown,
+    countdownSeconds,
+    declineAgentToolAction,
+    executeAgentToolAction,
+    handleClearChat,
+    handleToggleAutoExecute,
+    isAgentLoading,
+    submitAgentPrompt,
+  } = useAgentController({
+    agentInput,
+    agentReferenceId,
+    agentReferences,
+    agentReferenceUrl,
+    buildProviderHeaders,
+    generateManualImage,
+    generateManualVideo,
+    handleSelectImageModel,
+    handleSelectVideoModel,
+    items,
+    launchMaskEditor,
+    optimizeActivePrompt,
+    selectedChatModel,
+    setAgentInput,
+    setAspectRatio,
+    setIsAgentDockOpen,
+    setPrompt,
+    setReferenceImage,
+    setReferenceImages,
+    setTraditionalSubTab,
+  });
 
   const handleClearProject = async () => {
     if (confirm("🚨 注意：此操作将清空本地 IndexedDB 存储的所有创意图片与视频。已被下载的文件不会受影响。确认清空吗？")) {
