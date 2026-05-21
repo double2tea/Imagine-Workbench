@@ -1,4 +1,5 @@
 import { Info, RefreshCw, Settings, X } from "lucide-react";
+import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { StorageItem } from "@/lib/db";
 import type { AiProvider, ModelOption } from "@/lib/providers/model-catalog";
@@ -16,48 +17,83 @@ interface ModelGroup {
   options: ModelOption[];
 }
 
+interface ProviderCredentials {
+  apiKey: string;
+  baseUrl: string;
+}
+
 interface ProviderCredentialCardProps {
   apiKey: string;
   apiPlaceholder: string;
+  baseUrl: string;
+  baseUrlPlaceholder: string;
   clearLabel: string;
   endpoints?: string[];
-  baseUrl?: string;
-  baseUrlPlaceholder?: string;
   provider: AiProvider;
   providerTest: ProviderTestState;
+  showBaseUrl: boolean;
   title: string;
   onClear: (provider: AiProvider) => void;
-  onSaveApiKey: (value: string) => void;
-  onSaveBaseUrl?: (value: string) => void;
+  onSaveApiKey: (provider: AiProvider, value: string) => void;
+  onSaveBaseUrl: (provider: AiProvider, value: string) => void;
   onTest: (provider: AiProvider) => void;
 }
 
 interface SettingsModalProps {
   assetStatusCounts: Record<StorageItem["type"], number>;
   chatModelGroups: ModelGroup[];
-  grokApiKey: string;
-  grokBaseUrl: string;
   isLoadingModels: boolean;
   modelListMessage: string;
   open: boolean;
+  providerCredentials: Record<AiProvider, ProviderCredentials>;
   providerTest: ProviderTestState;
   selectedChatModel: string;
   selectedProvider: AiProvider;
-  twelveAiApiKey: string;
-  xstxApiKey: string;
-  xstxBaseUrl: string;
-  clearProviderCredentials: (provider: AiProvider) => void;
-  handleSave12AiApiKey: (value: string) => void;
-  handleSaveGrokApiKey: (value: string) => void;
-  handleSaveGrokBaseUrl: (value: string) => void;
-  handleSaveXstxApiKey: (value: string) => void;
-  handleSaveXstxBaseUrl: (value: string) => void;
-  handleSelectChatModel: (value: string) => void;
-  handleSelectProvider: (value: AiProvider) => void;
+  onClearCredentials: (provider: AiProvider) => void;
   onClose: () => void;
   onResetData: () => void;
+  onSaveCredential: (provider: AiProvider, field: keyof ProviderCredentials, value: string) => void;
+  onSelectChatModel: (value: string) => void;
+  onSelectProvider: (value: AiProvider) => void;
   refreshProviderModels: () => void;
   testProviderConnection: (provider: AiProvider) => void;
+}
+
+type SettingsTab = "providers" | "models" | "system";
+
+const TABS: { key: SettingsTab; label: string }[] = [
+  { key: "providers", label: "服务商" },
+  { key: "models", label: "模型" },
+  { key: "system", label: "系统" },
+];
+
+function providerEndpointInfo(provider: AiProvider): string[] | undefined {
+  if (provider === "12ai") {
+    return ["Chat/Image: https://cdn.12ai.org", "Veo: https://new.12ai.org"];
+  }
+  if (provider === "xstx") {
+    return ["Chat: https://api.xstx.info/v1"];
+  }
+  return undefined;
+}
+
+function providerHasEditableBaseUrl(provider: AiProvider): boolean {
+  return provider !== "12ai";
+}
+
+function providerPlaceholder(provider: AiProvider): string {
+  if (provider === "12ai") return "sk_your_12ai_key";
+  if (provider === "grok2api") return "your_grok2api_key";
+  return `sk_your_${provider}_key`;
+}
+
+function providerBaseUrlPlaceholder(provider: AiProvider): string {
+  return getProviderMeta(provider).defaultBaseUrl;
+}
+
+function providerClearLabel(provider: AiProvider): string {
+  if (provider === "12ai") return "清除 Key";
+  return "清除 Key/Base URL";
 }
 
 function ProviderCredentialCard({
@@ -69,6 +105,7 @@ function ProviderCredentialCard({
   endpoints,
   provider,
   providerTest,
+  showBaseUrl,
   title,
   onClear,
   onSaveApiKey,
@@ -76,7 +113,6 @@ function ProviderCredentialCard({
   onTest,
 }: ProviderCredentialCardProps) {
   const isTesting = providerTest.status === "testing" && providerTest.provider === provider;
-  const hasBaseUrl = typeof baseUrl === "string" && onSaveBaseUrl;
 
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-950/45 p-4">
@@ -88,17 +124,17 @@ function ProviderCredentialCard({
       <input
         type="password"
         value={apiKey}
-        onChange={(e) => onSaveApiKey(e.target.value)}
+        onChange={(e) => onSaveApiKey(provider, e.target.value)}
         placeholder={apiPlaceholder}
         className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 px-3 text-xs text-slate-200 placeholder-slate-650 focus:outline-none focus:border-slate-700 font-mono transition"
       />
-      {hasBaseUrl && (
+      {showBaseUrl && (
         <>
           <label className="font-semibold text-slate-400 block mt-3 mb-1.5">Base URL</label>
           <input
             type="url"
             value={baseUrl}
-            onChange={(e) => onSaveBaseUrl(e.target.value)}
+            onChange={(e) => onSaveBaseUrl(provider, e.target.value)}
             placeholder={baseUrlPlaceholder}
             className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 px-3 text-xs text-slate-200 placeholder-slate-650 focus:outline-none focus:border-slate-700 font-mono transition"
           />
@@ -139,30 +175,24 @@ function ProviderCredentialCard({
 export default function SettingsModal({
   assetStatusCounts,
   chatModelGroups,
-  grokApiKey,
-  grokBaseUrl,
   isLoadingModels,
   modelListMessage,
   open,
+  providerCredentials,
   providerTest,
   selectedChatModel,
   selectedProvider,
-  twelveAiApiKey,
-  xstxApiKey,
-  xstxBaseUrl,
-  clearProviderCredentials,
-  handleSave12AiApiKey,
-  handleSaveGrokApiKey,
-  handleSaveGrokBaseUrl,
-  handleSaveXstxApiKey,
-  handleSaveXstxBaseUrl,
-  handleSelectChatModel,
-  handleSelectProvider,
+  onClearCredentials,
   onClose,
   onResetData,
+  onSaveCredential,
+  onSelectChatModel,
+  onSelectProvider,
   refreshProviderModels,
   testProviderConnection,
 }: SettingsModalProps) {
+  const [tab, setTab] = useState<SettingsTab>("providers");
+
   return (
     <AnimatePresence>
       {open && (
@@ -181,135 +211,143 @@ export default function SettingsModal({
             <div className="flex items-center justify-between border-b border-slate-850 px-6 py-4">
               <h3 className="font-bold text-slate-100 flex items-center gap-2">
                 <Settings className="h-5 w-5 text-amber-500" />
-                API 服务商设置
+                设置
               </h3>
               <button onClick={onClose} className="text-slate-400 hover:text-slate-100">
                 <X className="h-5 w-5" />
               </button>
             </div>
 
+            {/* Tab bar */}
+            <div className="flex border-b border-slate-850 px-6">
+              {TABS.map(t => (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => setTab(t.key)}
+                  className={`px-4 py-2.5 text-xs font-semibold transition border-b-2 -mb-[1px] ${
+                    tab === t.key
+                      ? "text-amber-400 border-amber-400"
+                      : "text-slate-500 border-transparent hover:text-slate-300"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
             <div className="p-6 flex flex-col gap-4 font-sans text-xs">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <ProviderCredentialCard
-                  apiKey={twelveAiApiKey}
-                  apiPlaceholder="sk_your_12ai_key"
-                  clearLabel="清除 Key"
-                  endpoints={["Chat/Image: https://cdn.12ai.org", "Veo: https://new.12ai.org"]}
-                  provider="12ai"
-                  providerTest={providerTest}
-                  title="12AI"
-                  onClear={clearProviderCredentials}
-                  onSaveApiKey={handleSave12AiApiKey}
-                  onTest={testProviderConnection}
-                />
-                <ProviderCredentialCard
-                  apiKey={grokApiKey}
-                  apiPlaceholder="your_grok2api_key"
-                  baseUrl={grokBaseUrl}
-                  baseUrlPlaceholder="http://localhost:8000"
-                  clearLabel="清除 Key/Base URL"
-                  provider="grok2api"
-                  providerTest={providerTest}
-                  title="grok2api"
-                  onClear={clearProviderCredentials}
-                  onSaveApiKey={handleSaveGrokApiKey}
-                  onSaveBaseUrl={handleSaveGrokBaseUrl}
-                  onTest={testProviderConnection}
-                />
-                <ProviderCredentialCard
-                  apiKey={xstxApiKey}
-                  apiPlaceholder="sk_your_xstx_key"
-                  baseUrl={xstxBaseUrl}
-                  baseUrlPlaceholder="https://api.xstx.info"
-                  clearLabel="清除 Key/Base URL"
-                  endpoints={["Chat: https://api.xstx.info/v1"]}
-                  provider="xstx"
-                  providerTest={providerTest}
-                  title="星途 (xstx)"
-                  onClear={clearProviderCredentials}
-                  onSaveApiKey={handleSaveXstxApiKey}
-                  onSaveBaseUrl={handleSaveXstxBaseUrl}
-                  onTest={testProviderConnection}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="font-semibold text-slate-300 block mb-1.5">模型列表服务商</label>
-                  <select
-                    value={selectedProvider}
-                    onChange={(e) => handleSelectProvider(e.target.value as AiProvider)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 px-3 text-xs text-slate-300 focus:outline-none focus:border-slate-700 font-mono transition"
-                  >
-                    {PROVIDER_KEYS.map(provider => (
-                      <option key={provider} value={provider}>{getProviderMeta(provider).label}</option>
-                    ))}
-                  </select>
+              {tab === "providers" && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {PROVIDER_KEYS.map(provider => {
+                    const creds = providerCredentials[provider];
+                    const meta = getProviderMeta(provider);
+                    return (
+                      <ProviderCredentialCard
+                        key={provider}
+                        apiKey={creds.apiKey}
+                        apiPlaceholder={providerPlaceholder(provider)}
+                        baseUrl={creds.baseUrl}
+                        baseUrlPlaceholder={providerBaseUrlPlaceholder(provider)}
+                        clearLabel={providerClearLabel(provider)}
+                        endpoints={providerEndpointInfo(provider)}
+                        provider={provider}
+                        providerTest={providerTest}
+                        showBaseUrl={providerHasEditableBaseUrl(provider)}
+                        title={meta.label}
+                        onClear={onClearCredentials}
+                        onSaveApiKey={(p, v) => onSaveCredential(p, "apiKey", v)}
+                        onSaveBaseUrl={(p, v) => onSaveCredential(p, "baseUrl", v)}
+                        onTest={testProviderConnection}
+                      />
+                    );
+                  })}
                 </div>
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="font-semibold text-slate-300">Agent / 优化模型</label>
-                    <button
-                      type="button"
-                      onClick={refreshProviderModels}
-                      disabled={isLoadingModels}
-                      className={`flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] transition ${
-                        isLoadingModels
-                          ? "border-slate-800 bg-slate-950 text-slate-600 cursor-not-allowed"
-                          : "border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200 cursor-pointer"
-                      }`}
+              )}
+
+              {tab === "models" && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-semibold text-slate-300 block mb-1.5">模型列表服务商</label>
+                    <select
+                      value={selectedProvider}
+                      onChange={(e) => onSelectProvider(e.target.value as AiProvider)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 px-3 text-xs text-slate-300 focus:outline-none focus:border-slate-700 font-mono transition"
                     >
-                      <RefreshCw className={`h-3 w-3 ${isLoadingModels ? "animate-spin" : ""}`} />
-                      获取模型
-                    </button>
+                      {PROVIDER_KEYS.map(provider => (
+                        <option key={provider} value={provider}>{getProviderMeta(provider).label}</option>
+                      ))}
+                    </select>
                   </div>
-                  <select
-                    value={selectedChatModel}
-                    onChange={(e) => handleSelectChatModel(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 px-3 text-xs text-slate-300 focus:outline-none focus:border-slate-700 font-mono transition"
-                  >
-                    {chatModelGroups.map(group => (
-                      <optgroup key={group.provider} label={group.label}>
-                        {group.options.map(option => (
-                          <option key={option.value} value={option.value}>{option.label}</option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                  {modelListMessage && (
-                    <p className="mt-1.5 text-[10px] text-slate-500 font-mono">{modelListMessage}</p>
-                  )}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="font-semibold text-slate-300">Agent / 优化模型</label>
+                      <button
+                        type="button"
+                        onClick={refreshProviderModels}
+                        disabled={isLoadingModels}
+                        className={`flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] transition ${
+                          isLoadingModels
+                            ? "border-slate-800 bg-slate-950 text-slate-600 cursor-not-allowed"
+                            : "border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200 cursor-pointer"
+                        }`}
+                      >
+                        <RefreshCw className={`h-3 w-3 ${isLoadingModels ? "animate-spin" : ""}`} />
+                        获取模型
+                      </button>
+                    </div>
+                    <select
+                      value={selectedChatModel}
+                      onChange={(e) => onSelectChatModel(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 px-3 text-xs text-slate-300 focus:outline-none focus:border-slate-700 font-mono transition"
+                    >
+                      {chatModelGroups.map(group => (
+                        <optgroup key={group.provider} label={group.label}>
+                          {group.options.map(option => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                    {modelListMessage && (
+                      <p className="mt-1.5 text-[10px] text-slate-500 font-mono">{modelListMessage}</p>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
-              <div>
-                <label className="font-semibold text-slate-400 block mb-1">📡 Web 异步任务轮询间隔</label>
-                <p className="font-mono text-[10px] text-slate-300">自动侦测间隔: 4秒 (指数退避保护算法)</p>
-              </div>
+              {tab === "system" && (
+                <>
+                  <div>
+                    <label className="font-semibold text-slate-400 block mb-1">📡 Web 异步任务轮询间隔</label>
+                    <p className="font-mono text-[10px] text-slate-300">自动侦测间隔: 4秒 (指数退避保护算法)</p>
+                  </div>
 
-              <div className="bg-slate-950/50 rounded-xl p-3 border border-slate-850/50">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-450 font-semibold flex items-center gap-1 text-[11px]">
-                    <Info className="h-3.5 w-3.5 text-slate-500" />
-                    当前本地项目库概要:
-                  </span>
-                  <button onClick={onResetData} className="text-[10px] text-red-400 hover:text-red-300 underline">
-                    安全复位数据
-                  </button>
-                </div>
-                <ul className="mt-2 text-[10px] text-slate-500 font-mono flex flex-col gap-1 list-disc pl-3">
-                  <li>类型: Browser IndexedDB 离线隔离数据库</li>
-                  <li>合成图片数量: {assetStatusCounts.image} 张</li>
-                  <li>合成 Veo 视频: {assetStatusCounts.video} 个</li>
-                </ul>
-              </div>
+                  <div className="bg-slate-950/50 rounded-xl p-3 border border-slate-850/50">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-450 font-semibold flex items-center gap-1 text-[11px]">
+                        <Info className="h-3.5 w-3.5 text-slate-500" />
+                        当前本地项目库概要:
+                      </span>
+                      <button onClick={onResetData} className="text-[10px] text-red-400 hover:text-red-300 underline">
+                        安全复位数据
+                      </button>
+                    </div>
+                    <ul className="mt-2 text-[10px] text-slate-500 font-mono flex flex-col gap-1 list-disc pl-3">
+                      <li>类型: Browser IndexedDB 离线隔离数据库</li>
+                      <li>合成图片数量: {assetStatusCounts.image} 张</li>
+                      <li>合成 Veo 视频: {assetStatusCounts.video} 个</li>
+                    </ul>
+                  </div>
 
-              <div className="text-[10px] text-slate-500 mt-2 flex items-start gap-1.5 leading-normal">
-                <span>ℹ️</span>
-                <span>
-                  Imagine Workbench 现在通过统一 provider adapter 接入 12AI、grok2api 与 星途。图片、异步图片、视频与 Agent 对话都走同一组密钥和 Base URL 规则。
-                </span>
-              </div>
+                  <div className="text-[10px] text-slate-500 mt-2 flex items-start gap-1.5 leading-normal">
+                    <span>ℹ️</span>
+                    <span>
+                      Imagine Workbench 通过统一 provider adapter 接入服务商。图片、异步图片、视频与 Agent 对话都走同一组密钥和 Base URL 规则。新增服务商只需在 registry.ts 中添加一行配置。
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="border-t border-slate-850 bg-slate-900/50 px-6 py-4 text-right">
