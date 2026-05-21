@@ -50,8 +50,8 @@ export async function generateImage(config: ProviderConfig, input: GenerateImage
   if (input.async) {
     return generate12AiAsyncImage(config, input);
   }
-  if (input.model === "gpt-image-2") {
-    return generateOpenAiCompatibleImage(config, input, "12ai");
+  if (input.model === "gpt-image-2" || input.model === "gpt-image-2-2k" || input.model === "gpt-image-2-4k") {
+    return generateOpenAiCompatibleImage(config, input, config.provider);
   }
   return generate12AiGeminiImage(config, input);
 }
