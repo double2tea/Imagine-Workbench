@@ -2,6 +2,7 @@ import {
   Download,
   Image as ImageIcon,
   Maximize2,
+  MoreHorizontal,
   Paintbrush,
   RefreshCw,
   Sparkles,
@@ -9,7 +10,7 @@ import {
   Video as VideoIcon,
   X,
 } from "lucide-react";
-import type { DragEvent } from "react";
+import { useState, type DragEvent } from "react";
 import PreviewImage from "@/components/PreviewImage";
 import { makeReferenceDropToken, REFERENCE_ASSET_MIME } from "@/components/reference/referenceDrag";
 import type { StorageItem } from "@/lib/db";
@@ -55,6 +56,7 @@ export default function AssetCard({
   onToggleSelect,
   onUseAgentReference,
 }: AssetCardProps) {
+  const [isMobileActionsOpen, setIsMobileActionsOpen] = useState(false);
   const provider = parseProviderModel(item.model, selectedProvider).provider;
   const isDraggableReference = item.type === "image" && item.status === "complete";
 
@@ -67,6 +69,11 @@ export default function AssetCard({
     event.dataTransfer.effectAllowed = "copy";
     event.dataTransfer.setData(REFERENCE_ASSET_MIME, JSON.stringify({ id: item.id, url: item.url }));
     event.dataTransfer.setData("text/plain", makeReferenceDropToken(item.id));
+  };
+
+  const runMobileAction = (action: () => void) => {
+    setIsMobileActionsOpen(false);
+    action();
   };
 
   return (
@@ -168,6 +175,69 @@ export default function AssetCard({
                 className="h-4.5 w-4.5 bg-slate-950/85 border-white/10 text-blue-500 focus:ring-0 rounded-md cursor-pointer checked:bg-blue-600 flex items-center justify-center transition"
               />
             </div>
+
+            <button
+              type="button"
+              className="imagine-mobile-action-trigger hidden"
+              aria-expanded={isMobileActionsOpen}
+              aria-label="打开资产操作"
+              onClick={() => setIsMobileActionsOpen(prev => !prev)}
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
+
+            {isMobileActionsOpen && (
+              <div className="imagine-mobile-action-sheet">
+                <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
+                  <span className="imagine-mobile-action-sheet-title text-[11px] font-semibold">资产操作</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsMobileActionsOpen(false)}
+                    className="imagine-mobile-action-sheet-close rounded-md p-1"
+                    aria-label="关闭资产操作"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-1.5 p-2">
+                  {item.type === "image" && (
+                    <button type="button" onClick={() => runMobileAction(() => onApplyVideoReference(item))}>
+                      <VideoIcon className="h-3.5 w-3.5 text-purple-300" />
+                      生视频
+                    </button>
+                  )}
+                  {item.type === "image" && (
+                    <button type="button" onClick={() => runMobileAction(() => onUseAgentReference(item))}>
+                      <Sparkles className="h-3.5 w-3.5 text-blue-300" />
+                      Agent
+                    </button>
+                  )}
+                  {item.type === "image" && (
+                    <button type="button" onClick={() => runMobileAction(() => onLaunchMaskEditor(item.url, item.id))}>
+                      <Paintbrush className="h-3.5 w-3.5 text-amber-300" />
+                      修改
+                    </button>
+                  )}
+                  <button type="button" onClick={() => runMobileAction(() => onDownload(item))}>
+                    <Download className="h-3.5 w-3.5 text-emerald-300" />
+                    下载
+                  </button>
+                  <button type="button" onClick={() => runMobileAction(() => onToggleCompare(item.id))}>
+                    <RefreshCw className="h-3.5 w-3.5 text-blue-300" />
+                    {inCompare ? "取消对比" : "对比"}
+                  </button>
+                  <button type="button" onClick={() => runMobileAction(() => onOpenFullscreen(item))}>
+                    <Maximize2 className="h-3.5 w-3.5 text-slate-300" />
+                    放大
+                  </button>
+                  <button type="button" onClick={() => runMobileAction(() => onDelete(item))}>
+                    <Trash2 className="h-3.5 w-3.5 text-red-300" />
+                    删除
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="imagine-asset-hover-scrim absolute inset-0 bg-slate-950/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10 pointer-events-none" />
             <div className="imagine-card-actions-shell absolute inset-x-3 bottom-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 pointer-events-none group-hover:pointer-events-auto">
