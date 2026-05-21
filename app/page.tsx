@@ -29,6 +29,8 @@ import CanvasMaskEditor from "@/components/CanvasMaskEditor";
 import PreviewImage from "@/components/PreviewImage";
 import AssetCard from "@/components/assets/AssetCard";
 import ComparePanel, { type CompareViewType } from "@/components/assets/ComparePanel";
+import FloatingCompareButton from "@/components/assets/FloatingCompareButton";
+import FullscreenPreview from "@/components/assets/FullscreenPreview";
 import AssetSelectionBar from "@/components/assets/AssetSelectionBar";
 import AssetToolbar, { type AssetStatusFilter, type AssetTypeFilter } from "@/components/assets/AssetToolbar";
 import SettingsModal, { type ProviderTestState } from "@/components/settings/SettingsModal";
@@ -74,6 +76,17 @@ interface WorkspaceNotice {
   id: string;
   type: NoticeType;
   message: string;
+}
+
+interface ProviderCredentials {
+  apiKey: string;
+  baseUrl: string;
+}
+
+function defaultProviderCredentials(): Record<AiProvider, ProviderCredentials> {
+  const record = {} as Record<AiProvider, ProviderCredentials>;
+  for (const provider of PROVIDER_KEYS) record[provider] = { apiKey: "", baseUrl: "" };
+  return record;
 }
 
 function makeClientId(prefix: string): string {
@@ -294,15 +307,6 @@ export default function Home() {
   const [countdownSeconds, setCountdownSeconds] = useState(3);
 
   // Settings State
-  interface ProviderCredentials {
-    apiKey: string;
-    baseUrl: string;
-  }
-  function defaultProviderCredentials(): Record<AiProvider, ProviderCredentials> {
-    const record = {} as Record<AiProvider, ProviderCredentials>;
-    for (const p of PROVIDER_KEYS) record[p] = { apiKey: "", baseUrl: "" };
-    return record;
-  }
   const [providerCredentials, setProviderCredentials] = useState<Record<AiProvider, ProviderCredentials>>(defaultProviderCredentials);
   const [selectedProvider, setSelectedProvider] = useState<AiProvider>("12ai");
   const [selectedChatModel, setSelectedChatModel] = useState(DEFAULT_CHAT_MODEL);
@@ -557,22 +561,39 @@ export default function Home() {
     loadWorkspace();
 
     const restoreSettings = setTimeout(() => {
-      const stored12AiKey =
-        localStorage.getItem("imagine_12ai_api_key") ?? localStorage.getItem("imagine_custom_api_key");
-      if (stored12AiKey) setTwelveAiApiKey(stored12AiKey);
-
-      const storedGrokKey = localStorage.getItem("imagine_grok2api_api_key");
-      if (storedGrokKey) setGrokApiKey(storedGrokKey);
-
-      const storedGrokBaseUrl =
-        localStorage.getItem("imagine_grok2api_base_url") ?? localStorage.getItem("imagine_custom_api_base_url");
-      if (storedGrokBaseUrl) setGrokBaseUrl(storedGrokBaseUrl);
-
-      const storedXstxKey = localStorage.getItem("imagine_xstx_api_key");
-      if (storedXstxKey) setXstxApiKey(storedXstxKey);
-
-      const storedXstxBaseUrl = localStorage.getItem("imagine_xstx_base_url");
-      if (storedXstxBaseUrl) setXstxBaseUrl(storedXstxBaseUrl);
+      // Restore from unified storage first, then migrate legacy keys
+      const storedCreds = localStorage.getItem("imagine_provider_credentials");
+      if (storedCreds) {
+        try {
+          const parsed = JSON.parse(storedCreds);
+          const merged = defaultProviderCredentials();
+          for (const p of PROVIDER_KEYS) {
+            if (parsed[p]?.apiKey) merged[p].apiKey = parsed[p].apiKey;
+            if (parsed[p]?.baseUrl) merged[p].baseUrl = parsed[p].baseUrl;
+          }
+          setProviderCredentials(merged);
+        } catch { /* ignore corrupt data */ }
+      } else {
+        // Migrate legacy per-provider keys
+        const legacy12AiKey = localStorage.getItem("imagine_12ai_api_key") ?? localStorage.getItem("imagine_custom_api_key");
+        const legacyGrokKey = localStorage.getItem("imagine_grok2api_api_key");
+        const legacyGrokBaseUrl = localStorage.getItem("imagine_grok2api_base_url") ?? localStorage.getItem("imagine_custom_api_base_url");
+        if (legacy12AiKey || legacyGrokKey || legacyGrokBaseUrl) {
+          setProviderCredentials(prev => {
+            const next = { ...prev };
+            if (legacy12AiKey) next["12ai"] = { ...next["12ai"], apiKey: legacy12AiKey };
+            if (legacyGrokKey) next["grok2api"] = { ...next["grok2api"], apiKey: legacyGrokKey };
+            if (legacyGrokBaseUrl) next["grok2api"] = { ...next["grok2api"], baseUrl: legacyGrokBaseUrl };
+            localStorage.removeItem("imagine_12ai_api_key");
+            localStorage.removeItem("imagine_custom_api_key");
+            localStorage.removeItem("imagine_grok2api_api_key");
+            localStorage.removeItem("imagine_grok2api_base_url");
+            localStorage.removeItem("imagine_custom_api_base_url");
+            localStorage.setItem("imagine_provider_credentials", JSON.stringify(next));
+            return next;
+          });
+        }
+      }
 
       const storedProvider = localStorage.getItem("imagine_ai_provider");
       if (storedProvider && isKnownProvider(storedProvider)) setSelectedProvider(storedProvider);
@@ -2652,67 +2673,24 @@ export default function Home() {
       <SettingsModal
         assetStatusCounts={assetStats.typeCounts}
         chatModelGroups={chatModelGroups}
-        grokApiKey={grokApiKey}
-        grokBaseUrl={grokBaseUrl}
         isLoadingModels={isLoadingModels}
         modelListMessage={modelListMessage}
         open={showSettings}
+        providerCredentials={providerCredentials}
         providerTest={providerTest}
         selectedChatModel={selectedChatModel}
         selectedProvider={selectedProvider}
-        twelveAiApiKey={twelveAiApiKey}
-        xstxApiKey={xstxApiKey}
-        xstxBaseUrl={xstxBaseUrl}
-        clearProviderCredentials={clearProviderCredentials}
-        handleSave12AiApiKey={handleSave12AiApiKey}
-        handleSaveGrokApiKey={handleSaveGrokApiKey}
-        handleSaveGrokBaseUrl={handleSaveGrokBaseUrl}
-        handleSaveXstxApiKey={handleSaveXstxApiKey}
-        handleSaveXstxBaseUrl={handleSaveXstxBaseUrl}
-        handleSelectChatModel={handleSelectChatModel}
-        handleSelectProvider={handleSelectProvider}
+        onClearCredentials={clearProviderCredentials}
         onClose={() => setShowSettings(false)}
         onResetData={handleResetLocalData}
+        onSaveCredential={handleSaveCredential}
+        onSelectChatModel={handleSelectChatModel}
+        onSelectProvider={handleSelectProvider}
         refreshProviderModels={refreshProviderModels}
         testProviderConnection={testProviderConnection}
       />
 
-      {/* Fullscreen Preview overlay modal */}
-      <AnimatePresence>
-        {fullscreenItem && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 backdrop-blur-md p-4">
-            <button
-              onClick={() => setFullscreenItem(null)}
-              className="absolute top-6 right-6 text-slate-400 hover:text-white rounded-lg p-2 bg-slate-900 border border-slate-800 transition"
-            >
-              <X className="h-6 w-6" />
-            </button>
-            <div className="max-w-4xl max-h-[85vh] flex flex-col items-center justify-center gap-4">
-              {fullscreenItem.type === "image" ? (
-                <PreviewImage
-                  src={fullscreenItem.url}
-                  alt={fullscreenItem.prompt}
-                  className="rounded-lg max-h-[75vh] object-contain border border-slate-800"
-                />
-              ) : (
-                <video
-                  src={fullscreenItem.url}
-                  controls
-                  loop
-                  autoPlay
-                  className="rounded-lg max-h-[75vh] border border-slate-800"
-                />
-              )}
-              <div className="text-center w-full max-w-xl">
-                <p className="text-xs text-slate-300 italic">&ldquo;{fullscreenItem.prompt}&rdquo;</p>
-                <span className="text-[9px] font-mono text-slate-600 block mt-1.5">
-                  ID: {fullscreenItem.id} | 模型: {fullscreenItem.model} | Aspect Ratio: {fullscreenItem.aspectRatio}
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-      </AnimatePresence>
+      <FullscreenPreview item={fullscreenItem} onClose={() => setFullscreenItem(null)} />
 
       {/* Inpainting Mask Drawer overlay loader */}
       {isMaskOpen && (
@@ -2724,17 +2702,11 @@ export default function Home() {
         />
       )}
 
-      {/* Global comparison toggles in page backgrounds */}
-      {compareItemIds.length > 0 && !isCompareMode && (
-        <div className="fixed top-20 right-6 z-30">
-          <button
-            onClick={() => setIsCompareMode(true)}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-amber-500 rounded-full text-slate-950 text-xs font-bold border border-amber-600 shadow-xl shadow-amber-500/10 cursor-pointer hover:bg-amber-450 motion-safe:animate-bounce"
-          >
-            <span>🔄 调谐对比器 ({compareItemIds.length}/2)</span>
-          </button>
-        </div>
-      )}
+      <FloatingCompareButton
+        selectedCount={compareItemIds.length}
+        show={compareItemIds.length > 0 && !isCompareMode}
+        onOpen={() => setIsCompareMode(true)}
+      />
 
     </div>
   );
