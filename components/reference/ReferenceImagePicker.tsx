@@ -75,7 +75,7 @@ export default function ReferenceImagePicker({
             return (
               <div
                 key={reference.id}
-                className={`relative aspect-square rounded-lg border overflow-hidden bg-cover bg-center group transition-all duration-300 ${
+                className={`imagine-reference-thumb relative aspect-square rounded-lg border overflow-hidden bg-cover bg-center group transition-all duration-300 ${
                   isStart
                     ? "border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.25)]"
                     : isEnd
