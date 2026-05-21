@@ -77,7 +77,7 @@ export default function VideoGenerationPanel({
         <div className="flex items-center justify-between mb-2">
           <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-300">
             <VideoIcon className="h-3.5 w-3.5 text-violet-300" />
-            视频场景运动描述 <span className="text-slate-500">(Video Motion Prompt)</span>
+            视频场景运动描述 <span className="hidden text-slate-500 sm:inline">(Video Motion Prompt)</span>
           </label>
           <button
             onClick={onOptimizePrompt}
@@ -93,7 +93,8 @@ export default function VideoGenerationPanel({
             ) : (
               <Sparkles className="h-3 w-3 text-violet-300" />
             )}
-            提示词动态润色
+            <span className="sm:hidden">润色</span>
+            <span className="hidden sm:inline">提示词动态润色</span>
           </button>
         </div>
 
@@ -111,7 +112,8 @@ export default function VideoGenerationPanel({
             className="w-full h-24 resize-none border-0 bg-transparent text-sm leading-6 text-slate-100 placeholder-slate-500 outline-0 ring-0 focus:ring-0"
           />
           <div className="mt-2 flex items-center justify-between border-t border-slate-800 pt-2 font-mono text-[10px] text-slate-500">
-            <span>拖入资产到此处插入 @图片N | 拖入下方只作为参考图</span>
+            <span className="hidden sm:inline">拖入资产到此处插入 @图片N | 拖入下方只作为参考图</span>
+            <span className="sm:hidden">@ 可引用作品</span>
             <span>{prompt.length} 字符</span>
           </div>
         </div>
@@ -154,7 +156,7 @@ export default function VideoGenerationPanel({
         browseClassName="font-medium text-violet-300 underline-offset-4 hover:text-violet-200 hover:underline cursor-pointer"
         clearLabel={clearReferenceLabel}
         emptyHelp={`支持 JPG / PNG / WEBP | 最多 ${referenceLimit} 张 | ${referenceHelp}`}
-        emptyLabel={`拖拽${referenceLabel}`}
+        emptyLabel={`添加${referenceLabel}`}
         label={`${referenceLabel} ${referenceImages.length > 0 ? `(${Math.min(referenceImages.length, referenceLimit)}/${referenceLimit})` : ""}`}
         maxCount={referenceLimit}
         references={referenceImages}
@@ -182,7 +184,14 @@ export default function VideoGenerationPanel({
         ) : (
           <VideoIcon className="h-4 w-4 text-white hover:scale-110 transition" />
         )}
-        {isSubmitting ? `提交中 (${submitCount})，可继续排队` : "一键渲染合成动态视频 (Render Video)"}
+        {isSubmitting ? (
+          `提交中 (${submitCount})，可继续排队`
+        ) : (
+          <>
+            <span className="sm:hidden">生成视频</span>
+            <span className="hidden sm:inline">一键渲染合成动态视频 (Render Video)</span>
+          </>
+        )}
       </button>
     </div>
   );

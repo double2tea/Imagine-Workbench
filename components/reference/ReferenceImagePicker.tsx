@@ -182,7 +182,7 @@ export default function ReferenceImagePicker({
               <input type="file" accept="image/*" onChange={onUpload} className="hidden" />
             </label>
           </span>
-          <span className="mt-1 text-[9px] text-slate-500">{emptyHelp}</span>
+          <span className="mt-1 hidden text-[9px] text-slate-500 sm:inline">{emptyHelp}</span>
         </div>
       )}
     </div>

@@ -487,7 +487,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+        <div className="imagine-agent-input-row grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
           <div className="relative min-w-0">
             {atDropdownNode}
             <form onSubmit={submit} className="relative flex items-center w-full">

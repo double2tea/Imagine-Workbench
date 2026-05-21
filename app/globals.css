@@ -813,9 +813,23 @@
 }
 
 @media (max-width: 640px) {
+  .imagine-workbench-shell > .absolute {
+    opacity: 0.36;
+  }
+
   .imagine-app-header {
-    min-height: 58px;
-    padding-inline: 12px !important;
+    min-height: 48px;
+    padding-inline: 10px !important;
+    padding-block: 7px !important;
+  }
+
+  .imagine-app-header h1 {
+    font-size: 12px !important;
+  }
+
+  .imagine-app-header h1 span:last-child,
+  .imagine-app-header p {
+    display: none !important;
   }
 
   .imagine-main-grid {
@@ -824,45 +838,138 @@
     gap: 12px !important;
   }
 
+  .imagine-main-grid-agent-closed {
+    padding-bottom: calc(116px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .imagine-main-grid-agent-open {
+    padding-bottom: calc(min(54dvh, 440px) + 32px + env(safe-area-inset-bottom)) !important;
+  }
+
   .imagine-control-surface,
   .imagine-toolbar-surface {
     padding: 12px !important;
+    border-radius: 10px !important;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24) !important;
+  }
+
+  .imagine-control-surface {
+    gap: 12px !important;
   }
 
   .imagine-brand-mark {
-    height: 36px !important;
-    width: 36px !important;
-    border-radius: 10px !important;
+    height: 32px !important;
+    width: 32px !important;
+    border-radius: 9px !important;
   }
 
   .imagine-header-button {
-    min-height: 36px;
+    height: 32px !important;
+    min-height: 32px;
+    padding-inline: 10px !important;
   }
 
   .imagine-icon-button {
-    min-width: 36px;
+    min-width: 32px;
+    width: 32px !important;
   }
 
   .imagine-tabbar {
-    height: 40px;
+    height: 36px;
   }
 
   .imagine-tab-button {
-    gap: 6px !important;
-    font-size: 11px !important;
+    gap: 5px !important;
+    font-size: 10px !important;
+    padding-block: 6px !important;
+  }
+
+  .imagine-field-shell {
+    padding: 10px !important;
+  }
+
+  .imagine-field-shell textarea {
+    height: 116px !important;
+    font-size: 16px !important;
+    line-height: 1.5 !important;
+  }
+
+  .imagine-workbench-shell :is(input:not([type="checkbox"]), select) {
+    font-size: 16px !important;
+  }
+
+  .imagine-primary-action {
+    min-height: 44px;
+    font-size: 12px !important;
+  }
+
+  .imagine-upload-zone {
+    min-height: 56px !important;
+    padding: 10px !important;
+  }
+
+  .imagine-upload-zone svg {
+    display: none;
+  }
+
+  .imagine-reference-thumb + label span:last-of-type {
+    display: none;
   }
 
   .imagine-gallery-panel {
     gap: 12px !important;
   }
 
+  .imagine-mobile-asset-stream {
+    border-radius: 10px !important;
+  }
+
+  .imagine-mobile-asset-stream .imagine-toolbar-surface {
+    display: none !important;
+  }
+
+  .imagine-mobile-asset-stream .imagine-gallery-scroll,
+  .imagine-mobile-asset-stream .imagine-gallery-empty {
+    min-height: 148px !important;
+  }
+
+  .imagine-mobile-asset-stream .imagine-gallery-empty {
+    padding: 16px !important;
+  }
+
+  .imagine-mobile-asset-stream .imagine-gallery-empty svg {
+    height: 28px !important;
+    width: 28px !important;
+  }
+
+  .imagine-mobile-asset-stream .imagine-gallery-empty p:last-child {
+    display: none;
+  }
+
   .imagine-toolbar-surface > div {
     gap: 12px !important;
   }
 
+  .imagine-toolbar-surface [class*="w-10"] {
+    width: auto !important;
+    min-width: 32px;
+  }
+
+  .imagine-toolbar-surface [class*="flex-wrap"] {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .imagine-toolbar-surface [class*="flex-wrap"]::-webkit-scrollbar {
+    display: none;
+  }
+
   .imagine-filter-chip {
-    min-height: 30px;
-    padding-inline: 10px !important;
+    min-height: 28px;
+    padding-inline: 9px !important;
+    flex: 0 0 auto;
   }
 
   .imagine-gallery-grid {
@@ -874,8 +981,40 @@
     border-radius: 9px !important;
   }
 
+  .imagine-asset-media {
+    aspect-ratio: 1 / 1;
+  }
+
+  .imagine-asset-type-badge {
+    padding-inline: 7px !important;
+  }
+
+  .imagine-asset-type-badge svg,
+  .imagine-asset-type-badge span {
+    display: none;
+  }
+
+  .imagine-asset-meta {
+    padding: 10px !important;
+  }
+
+  .imagine-asset-meta > div:last-child {
+    align-items: flex-start !important;
+    gap: 8px;
+  }
+
   .imagine-card-actions {
     inset-inline: 8px;
+    justify-content: space-between !important;
+  }
+
+  .imagine-asset-card .imagine-asset-hover-scrim,
+  .imagine-asset-card .imagine-card-actions {
+    opacity: 1 !important;
+  }
+
+  .imagine-asset-card .imagine-card-actions {
+    pointer-events: auto !important;
   }
 
   .imagine-card-action span {
@@ -883,16 +1022,52 @@
   }
 
   .imagine-card-action {
-    min-width: 32px;
-    min-height: 32px;
-    padding-inline: 8px !important;
+    min-width: 30px;
+    min-height: 30px;
+    padding-inline: 7px !important;
   }
 
   .imagine-agent-dock {
-    bottom: 12px !important;
-    inset-inline: 12px !important;
-    width: calc(100vw - 24px) !important;
-    padding: 8px !important;
+    bottom: 0 !important;
+    inset-inline: 0 !important;
+    width: 100vw !important;
+    max-width: none !important;
+    border-inline: 0 !important;
+    border-bottom: 0 !important;
+    border-radius: 14px 14px 0 0 !important;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .imagine-agent-dock > div:first-child {
+    margin-bottom: 6px !important;
+  }
+
+  .imagine-agent-dock [class*="max-h-[min(46vh,440px)]"] {
+    max-height: min(54dvh, 440px) !important;
+  }
+
+  .imagine-agent-dock input[type="text"] {
+    height: 40px;
+    font-size: 16px !important;
+  }
+
+  .imagine-agent-input-row {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    align-items: center;
+  }
+
+  .imagine-agent-dock label[for="auto_trigger"] {
+    height: 40px !important;
+    min-width: 58px;
+    padding-inline: 9px !important;
+  }
+
+  .imagine-agent-dock [class*="self-end ml-10"] {
+    margin-left: 26px !important;
+  }
+
+  .imagine-agent-dock [class*="self-start mr-10"] {
+    margin-right: 26px !important;
   }
 
   .imagine-agent-dock form {
