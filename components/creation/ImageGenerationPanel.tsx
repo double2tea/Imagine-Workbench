@@ -1,7 +1,8 @@
-import type { ChangeEvent, ReactNode } from "react";
+import type { ChangeEvent, DragEvent, ReactNode } from "react";
 import { Paintbrush, RefreshCw, Sparkles } from "lucide-react";
 import { VISUAL_PRESETS, type VisualPreset } from "@/components/PresetStyles";
 import ReferenceImagePicker, { type ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
+import { type DraggedReferenceAsset, hasDraggedReferenceAsset } from "@/components/reference/referenceDrag";
 import type { ImageModelCapabilities, ModelOption } from "@/lib/providers/model-catalog";
 
 interface ModelOptionGroup {
@@ -34,6 +35,8 @@ interface ImageGenerationPanelProps {
   onNegativePromptChange: (value: string) => void;
   onOptimizePrompt: () => void;
   onPromptChange: (value: string) => void;
+  onPromptDropAsset: (event: DragEvent<HTMLTextAreaElement>) => void;
+  onReferenceDropAsset: (asset: DraggedReferenceAsset) => void;
   onReferenceRemove: (id: string) => void;
   onReferenceUpload: (event: ChangeEvent<HTMLInputElement>) => void;
   onSelectAspectRatio: (value: string) => void;
@@ -65,6 +68,8 @@ export default function ImageGenerationPanel({
   onNegativePromptChange,
   onOptimizePrompt,
   onPromptChange,
+  onPromptDropAsset,
+  onReferenceDropAsset,
   onReferenceRemove,
   onReferenceUpload,
   onSelectAspectRatio,
@@ -130,11 +135,16 @@ export default function ImageGenerationPanel({
           <textarea
             value={prompt}
             onChange={(event) => onPromptChange(event.target.value)}
-            placeholder="写下你想创造的图片奇思妙想... 输入 @ 可引用历史生成图像作为参考"
+            onDragOver={(event) => {
+              if (!hasDraggedReferenceAsset(event.dataTransfer)) return;
+              event.dataTransfer.dropEffect = "copy";
+            }}
+            onDrop={onPromptDropAsset}
+            placeholder="写下你想创造的图片奇思妙想... 可拖入右侧资产并生成 @图片 引用"
             className="w-full h-24 resize-none border-0 bg-transparent text-sm leading-6 text-slate-100 placeholder-slate-500 outline-0 ring-0 focus:ring-0"
           />
           <div className="mt-2 flex items-center justify-between border-t border-slate-800 pt-2 font-mono text-[10px] text-slate-500">
-            <span>输入 @ 呼出参考图 | 支持中英文</span>
+            <span>拖入资产到此处插入 @图片N | 拖入下方只作为参考图</span>
             <span>{prompt.length} 字符</span>
           </div>
         </div>
@@ -257,13 +267,14 @@ export default function ImageGenerationPanel({
         addLabel="多图垫"
         browseClassName="font-medium text-blue-300 underline-offset-4 hover:text-blue-200 hover:underline cursor-pointer"
         clearLabel="清空所有垫图"
-        emptyHelp="支持 JPG / PNG / WEBP | 粘贴剪贴板快捷垫图"
+        emptyHelp="支持 JPG / PNG / WEBP | 可拖入右侧资产或粘贴剪贴板"
         emptyLabel="拖拽图片"
         label={`创意参考图 / 多图垫图 ${referenceImages.length > 0 ? `(${referenceImages.length})` : ""}`}
         maxCount={4}
         references={referenceImages}
         uploadLabel="浏览上传"
         onClear={onClearReferences}
+        onDropAsset={onReferenceDropAsset}
         onRemove={onReferenceRemove}
         onUpload={onReferenceUpload}
       />

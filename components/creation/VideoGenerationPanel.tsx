@@ -1,6 +1,7 @@
-import type { ChangeEvent, ReactNode } from "react";
+import type { ChangeEvent, DragEvent, ReactNode } from "react";
 import { RefreshCw, Sparkles, Video as VideoIcon } from "lucide-react";
 import ReferenceImagePicker, { type ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
+import { type DraggedReferenceAsset, hasDraggedReferenceAsset } from "@/components/reference/referenceDrag";
 import type { ModelOption, VideoModelCapabilities, VideoReferenceMode } from "@/lib/providers/model-catalog";
 
 interface ModelOptionGroup {
@@ -30,6 +31,8 @@ interface VideoGenerationPanelProps {
   onGenerate: () => void;
   onOptimizePrompt: () => void;
   onPromptChange: (value: string) => void;
+  onPromptDropAsset: (event: DragEvent<HTMLTextAreaElement>) => void;
+  onReferenceDropAsset: (asset: DraggedReferenceAsset) => void;
   onReferenceRemove: (id: string) => void;
   onReferenceRoleChange: (id: string, role: ReferenceImageRef["role"]) => void;
   onReferenceUpload: (event: ChangeEvent<HTMLInputElement>) => void;
@@ -58,6 +61,8 @@ export default function VideoGenerationPanel({
   onGenerate,
   onOptimizePrompt,
   onPromptChange,
+  onPromptDropAsset,
+  onReferenceDropAsset,
   onReferenceRemove,
   onReferenceRoleChange,
   onReferenceUpload,
@@ -95,11 +100,16 @@ export default function VideoGenerationPanel({
           <textarea
             value={prompt}
             onChange={(event) => onPromptChange(event.target.value)}
+            onDragOver={(event) => {
+              if (!hasDraggedReferenceAsset(event.dataTransfer)) return;
+              event.dataTransfer.dropEffect = "copy";
+            }}
+            onDrop={onPromptDropAsset}
             placeholder={promptPlaceholder}
             className="w-full h-24 resize-none border-0 bg-transparent text-sm leading-6 text-slate-100 placeholder-slate-500 outline-0 ring-0 focus:ring-0"
           />
           <div className="mt-2 flex items-center justify-between border-t border-slate-800 pt-2 font-mono text-[10px] text-slate-500">
-            <span>输入 @ 呼出图像资产 | 支持运动镜头与画面控制</span>
+            <span>拖入资产到此处插入 @图片N | 拖入下方只作为参考图</span>
             <span>{prompt.length} 字符</span>
           </div>
         </div>
@@ -149,6 +159,7 @@ export default function VideoGenerationPanel({
         roleMode={referenceMode === "firstLast"}
         uploadLabel="浏览上传"
         onClear={onClearReferences}
+        onDropAsset={onReferenceDropAsset}
         onRemove={onReferenceRemove}
         onRoleChange={onReferenceRoleChange}
         onUpload={onReferenceUpload}

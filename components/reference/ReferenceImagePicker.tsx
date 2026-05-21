@@ -1,5 +1,10 @@
-import type { ChangeEvent } from "react";
+import type { ChangeEvent, DragEvent } from "react";
 import { CloudUpload, Layers, X } from "lucide-react";
+import {
+  type DraggedReferenceAsset,
+  hasDraggedReferenceAsset,
+  readDraggedReferenceAsset,
+} from "@/components/reference/referenceDrag";
 
 export interface ReferenceImageRef {
   id: string;
@@ -19,6 +24,7 @@ interface ReferenceImagePickerProps {
   roleMode?: boolean;
   uploadLabel: string;
   onClear: () => void;
+  onDropAsset?: (asset: DraggedReferenceAsset) => void;
   onRemove: (id: string) => void;
   onRoleChange?: (id: string, role: ReferenceImageRef["role"]) => void;
   onUpload: (event: ChangeEvent<HTMLInputElement>) => void;
@@ -42,14 +48,30 @@ export default function ReferenceImagePicker({
   roleMode = false,
   uploadLabel,
   onClear,
+  onDropAsset,
   onRemove,
   onRoleChange,
   onUpload,
 }: ReferenceImagePickerProps) {
   const visibleReferences = references.slice(0, maxCount);
 
+  const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
+    if (!onDropAsset || !hasDraggedReferenceAsset(event.dataTransfer)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+  };
+
+  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+    if (!onDropAsset) return;
+    const asset = readDraggedReferenceAsset(event.dataTransfer);
+    if (!asset) return;
+
+    event.preventDefault();
+    onDropAsset(asset);
+  };
+
   return (
-    <div>
+    <div onDragOver={handleDragOver} onDrop={handleDrop}>
       <div className="flex items-center justify-between mb-2">
         <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-300">
           <Layers className="h-3.5 w-3.5 text-slate-400" />
@@ -68,7 +90,7 @@ export default function ReferenceImagePicker({
 
       {references.length > 0 ? (
         <div className="grid grid-cols-4 gap-2 rounded-lg border border-slate-800 bg-slate-950/45 p-2">
-          {visibleReferences.map((reference) => {
+          {visibleReferences.map((reference, index) => {
             const isStart = roleMode && reference.role === "start";
             const isEnd = roleMode && reference.role === "end";
 
@@ -102,11 +124,11 @@ export default function ReferenceImagePicker({
                     }`}
                     title="点击切换：首帧 / 尾帧 / 普通参考"
                   >
-                    {isStart ? "🎬 首帧" : isEnd ? "🏁 尾帧" : "📎 普通参考"}
+                    {isStart ? `🎬 首帧 @图片${index + 1}` : isEnd ? `🏁 尾帧 @图片${index + 1}` : `📎 @图片${index + 1}`}
                   </button>
                 ) : (
                   <div className="absolute bottom-0 inset-x-0 bg-black/65 text-[8px] font-mono text-slate-300 truncate px-1 py-0.5 text-center">
-                    {reference.id.includes("upload") ? "Uploaded" : reference.id.substring(0, 10)}
+                    @图片{index + 1}
                   </div>
                 )}
               </div>
