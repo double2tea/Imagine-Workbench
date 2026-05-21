@@ -170,7 +170,7 @@ export default function AssetCard({
             </div>
 
             <div className="imagine-asset-hover-scrim absolute inset-0 bg-slate-950/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10 pointer-events-none" />
-            <div className="absolute inset-x-3 bottom-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 pointer-events-none group-hover:pointer-events-auto">
+            <div className="imagine-card-actions-shell absolute inset-x-3 bottom-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 pointer-events-none group-hover:pointer-events-auto">
               <div className="imagine-card-actions flex flex-wrap items-center justify-center gap-1 rounded-xl border border-white/10 bg-slate-950/80 p-1 backdrop-blur-md shadow-xl">
                 {item.type === "image" && (
                   <button
@@ -233,6 +233,14 @@ export default function AssetCard({
                   title="全屏大画幅细节放大"
                 >
                   <Maximize2 className="h-3 w-3 text-slate-300" />
+                </button>
+
+                <button
+                  onClick={() => onDelete(item)}
+                  className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-red-600 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center cursor-pointer"
+                  title="移除此项"
+                >
+                  <Trash2 className="h-3 w-3 text-red-300" />
                 </button>
               </div>
             </div>

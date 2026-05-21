@@ -834,8 +834,8 @@
 
   .imagine-main-grid {
     padding-inline: 12px !important;
-    padding-top: 12px !important;
-    gap: 12px !important;
+    padding-top: 10px !important;
+    gap: 10px !important;
   }
 
   .imagine-main-grid-agent-closed {
@@ -857,6 +857,18 @@
     gap: 12px !important;
   }
 
+  .imagine-mobile-workflow {
+    gap: 10px !important;
+  }
+
+  .imagine-mobile-composer {
+    padding: 10px !important;
+  }
+
+  .imagine-mobile-composer > .mt-3 {
+    margin-top: 10px !important;
+  }
+
   .imagine-brand-mark {
     height: 32px !important;
     width: 32px !important;
@@ -875,13 +887,13 @@
   }
 
   .imagine-tabbar {
-    height: 36px;
+    height: 34px;
   }
 
   .imagine-tab-button {
     gap: 5px !important;
     font-size: 10px !important;
-    padding-block: 6px !important;
+    padding-block: 5px !important;
   }
 
   .imagine-field-shell {
@@ -889,7 +901,7 @@
   }
 
   .imagine-field-shell textarea {
-    height: 116px !important;
+    height: 104px !important;
     font-size: 16px !important;
     line-height: 1.5 !important;
   }
@@ -899,13 +911,13 @@
   }
 
   .imagine-primary-action {
-    min-height: 44px;
+    min-height: 42px;
     font-size: 12px !important;
   }
 
   .imagine-upload-zone {
-    min-height: 56px !important;
-    padding: 10px !important;
+    min-height: 50px !important;
+    padding: 8px !important;
   }
 
   .imagine-upload-zone svg {
@@ -934,7 +946,7 @@
 
   .imagine-mobile-asset-stream .imagine-gallery-scroll,
   .imagine-mobile-asset-stream .imagine-gallery-empty {
-    min-height: 148px !important;
+    min-height: 132px !important;
   }
 
   .imagine-mobile-asset-stream .imagine-gallery-scroll {
@@ -957,7 +969,7 @@
   .imagine-mobile-asset-stream .imagine-gallery-grid {
     display: grid !important;
     grid-auto-flow: column;
-    grid-auto-columns: minmax(240px, min(78vw, 320px));
+    grid-auto-columns: minmax(220px, min(72vw, 292px));
     grid-template-columns: none !important;
     gap: 10px !important;
     overflow-x: auto;
@@ -1026,8 +1038,16 @@
     min-width: 0;
   }
 
+  .imagine-mobile-asset-stream .imagine-asset-meta {
+    display: none !important;
+  }
+
   .imagine-asset-media {
-    aspect-ratio: 1 / 1;
+    aspect-ratio: 4 / 3;
+  }
+
+  .imagine-mobile-asset-stream .imagine-asset-media {
+    border-bottom: 0 !important;
   }
 
   .imagine-asset-type-badge {
@@ -1040,7 +1060,17 @@
   }
 
   .imagine-asset-meta {
-    padding: 10px !important;
+    padding: 8px !important;
+  }
+
+  .imagine-mobile-asset-stream .imagine-asset-meta p {
+    line-height: 1.35 !important;
+    -webkit-line-clamp: 1;
+  }
+
+  .imagine-mobile-asset-stream .imagine-asset-meta > div:last-child {
+    margin-top: 7px !important;
+    padding-top: 7px !important;
   }
 
   .imagine-asset-meta > div:last-child {
@@ -1048,9 +1078,29 @@
     gap: 8px;
   }
 
+  .imagine-mobile-asset-stream .imagine-meta-chip {
+    padding: 2px 6px !important;
+    font-size: 8px !important;
+  }
+
+  .imagine-mobile-asset-stream .imagine-meta-chip:nth-child(2) {
+    display: none;
+  }
+
   .imagine-card-actions {
     inset-inline: 8px;
     justify-content: space-between !important;
+  }
+
+  .imagine-mobile-asset-stream .imagine-card-actions-shell {
+    inset-inline: 6px !important;
+  }
+
+  .imagine-mobile-asset-stream .imagine-card-actions {
+    gap: 3px !important;
+    flex-wrap: nowrap !important;
+    justify-content: center !important;
+    padding: 3px !important;
   }
 
   .imagine-asset-card .imagine-asset-hover-scrim,
@@ -1072,8 +1122,48 @@
     padding-inline: 7px !important;
   }
 
+  .imagine-mobile-asset-stream .imagine-card-action {
+    min-width: 25px;
+    min-height: 25px;
+    padding-inline: 5px !important;
+  }
+
+  .imagine-mobile-asset-stream .imagine-asset-card[data-status="processing"] .imagine-asset-media span:first-of-type,
+  .imagine-mobile-asset-stream .imagine-asset-card[data-status="pending"] .imagine-asset-media span:first-of-type {
+    display: none;
+  }
+
+  .imagine-mobile-asset-stream .imagine-asset-card[data-status="processing"] .imagine-asset-media [class*="w-36"],
+  .imagine-mobile-asset-stream .imagine-asset-card[data-status="pending"] .imagine-asset-media [class*="w-36"] {
+    width: 112px !important;
+    margin-top: 10px !important;
+  }
+
+  .imagine-mobile-asset-stream .imagine-asset-card[data-status="processing"] .imagine-asset-media button,
+  .imagine-mobile-asset-stream .imagine-asset-card[data-status="pending"] .imagine-asset-media button {
+    margin-top: 10px !important;
+    padding: 5px 10px !important;
+  }
+
+  .imagine-floating-compare {
+    inset: auto 12px calc(104px + env(safe-area-inset-bottom)) auto !important;
+    z-index: 45 !important;
+  }
+
+  .imagine-floating-compare button {
+    min-height: 36px;
+    padding: 8px 12px !important;
+    font-size: 11px !important;
+    box-shadow: 0 12px 28px rgba(245, 158, 11, 0.2) !important;
+  }
+
   .imagine-mobile-advanced {
-    padding: 10px !important;
+    padding: 9px !important;
+  }
+
+  .imagine-mobile-advanced > div {
+    gap: 8px !important;
+    margin-top: 10px !important;
   }
 
   .imagine-mobile-advanced summary {
@@ -1081,15 +1171,15 @@
   }
 
   .imagine-mobile-advanced .imagine-preset-chip {
-    height: 28px !important;
-    padding-inline: 9px !important;
-    font-size: 11px !important;
+    height: 26px !important;
+    padding-inline: 8px !important;
+    font-size: 10px !important;
   }
 
   .imagine-mobile-advanced :is(input:not([type="checkbox"]), select) {
-    min-height: 36px;
-    padding: 7px 10px !important;
-    font-size: 13px !important;
+    min-height: 34px;
+    padding: 6px 9px !important;
+    font-size: 12px !important;
   }
 
   .imagine-mobile-advanced [class*="grid-cols-4"] {
@@ -1098,7 +1188,7 @@
   }
 
   .imagine-mobile-advanced [class*="grid-cols-4"] button {
-    min-height: 28px !important;
+    min-height: 26px !important;
     padding-inline: 6px !important;
     font-size: 9px !important;
   }
