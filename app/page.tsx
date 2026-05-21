@@ -259,6 +259,8 @@ export default function Home() {
     setPrompt,
   });
   useClipboardImageImport({
+    pushWorkspaceNotice,
+    referenceImageCount: referenceImages.length,
     setAgentReferenceId,
     setAgentReferenceUrl,
     setAgentReferences,
