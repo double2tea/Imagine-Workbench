@@ -902,7 +902,7 @@ export default function Home() {
       <main
         className={`imagine-main-grid ${
           isAgentDockOpen ? "imagine-main-grid-agent-open" : "imagine-main-grid-agent-closed"
-        } flex-1 w-full max-w-[1880px] mx-auto px-4 pt-5 sm:px-6 sm:pt-6 grid grid-cols-1 lg:grid-cols-[minmax(420px,0.54fr)_minmax(0,1fr)] gap-5 xl:gap-6 items-start z-10`}
+        } flex-1 w-full max-w-[1880px] mx-auto px-4 pt-5 sm:px-6 sm:pt-6 grid grid-cols-1 lg:grid-cols-[minmax(360px,420px)_minmax(0,1fr)] xl:grid-cols-[minmax(390px,440px)_minmax(0,1fr)] gap-5 xl:gap-6 items-start z-10`}
       >
 
         {/* Creation Controls sidebar container (Col 4) */}

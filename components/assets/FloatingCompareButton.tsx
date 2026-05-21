@@ -8,7 +8,7 @@ export default function FloatingCompareButton({ selectedCount, show, onOpen }: F
   if (!show) return null;
 
   return (
-    <div className="fixed top-20 right-6 z-30">
+    <div className="imagine-floating-compare fixed top-20 right-6 z-30">
       <button
         onClick={onOpen}
         className="flex items-center gap-1.5 px-4 py-2.5 bg-amber-500 rounded-full text-slate-950 text-xs font-bold border border-amber-600 shadow-xl shadow-amber-500/10 cursor-pointer hover:bg-amber-450 motion-safe:animate-bounce"
