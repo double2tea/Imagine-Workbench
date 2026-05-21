@@ -336,8 +336,9 @@ export default function SettingsModal({
                           <button
                             key={provider}
                             type="button"
+                            data-active={selected ? "true" : "false"}
                             onClick={() => onSelectProvider(provider)}
-                            className={`flex h-9 min-w-28 items-center justify-between rounded-lg px-2 text-left transition lg:min-w-0 ${
+                            className={`imagine-settings-provider-button flex h-9 min-w-28 items-center justify-between rounded-lg px-2 text-left transition lg:min-w-0 ${
                               selected
                                 ? "bg-slate-800 text-slate-100"
                                 : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
@@ -507,7 +508,7 @@ export default function SettingsModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="bg-slate-800 hover:bg-slate-750 text-slate-350 font-semibold px-4 py-2 rounded-lg text-xs cursor-pointer transition"
+                className="imagine-settings-save-button bg-slate-800 hover:bg-slate-750 text-slate-350 font-semibold px-4 py-2 rounded-lg text-xs cursor-pointer transition"
               >
                 保存并关闭
               </button>

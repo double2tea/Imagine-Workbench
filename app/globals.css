@@ -601,6 +601,24 @@
   color: currentColor !important;
 }
 
+.imagine-workbench-shell.imagine-theme-light .imagine-settings-provider-button[data-active="true"] {
+  background: #fff3d7 !important;
+  color: #92400e !important;
+  box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.22);
+}
+
+.imagine-workbench-shell.imagine-theme-light .imagine-settings-save-button {
+  background: #ffffff !important;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  color: #344054 !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.imagine-workbench-shell.imagine-theme-light .imagine-settings-save-button:hover {
+  background: #f8fafc !important;
+  color: #172033 !important;
+}
+
 .imagine-theme-light .imagine-meta-chip {
   background: #f6f8fb !important;
   color: #667085 !important;
