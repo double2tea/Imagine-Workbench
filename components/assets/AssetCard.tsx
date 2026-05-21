@@ -9,7 +9,9 @@ import {
   Video as VideoIcon,
   X,
 } from "lucide-react";
+import type { DragEvent } from "react";
 import PreviewImage from "@/components/PreviewImage";
+import { makeReferenceDropToken, REFERENCE_ASSET_MIME } from "@/components/reference/referenceDrag";
 import type { StorageItem } from "@/lib/db";
 import { parseProviderModel, type AiProvider } from "@/lib/providers/model-catalog";
 import { getProviderMeta } from "@/lib/providers/registry";
@@ -20,7 +22,7 @@ interface AssetCardProps {
   item: StorageItem;
   selected: boolean;
   selectedProvider: AiProvider;
-  onApplyVideoReference: (imageUrl: string) => void;
+  onApplyVideoReference: (item: StorageItem) => void;
   onCancel: (item: StorageItem) => void;
   onDelete: (item: StorageItem) => void;
   onDownload: (item: StorageItem) => void;
@@ -54,11 +56,25 @@ export default function AssetCard({
   onUseAgentReference,
 }: AssetCardProps) {
   const provider = parseProviderModel(item.model, selectedProvider).provider;
+  const isDraggableReference = item.type === "image" && item.status === "complete";
+
+  const handleDragStart = (event: DragEvent<HTMLDivElement>) => {
+    if (!isDraggableReference) {
+      event.preventDefault();
+      return;
+    }
+
+    event.dataTransfer.effectAllowed = "copy";
+    event.dataTransfer.setData(REFERENCE_ASSET_MIME, JSON.stringify({ id: item.id, url: item.url }));
+    event.dataTransfer.setData("text/plain", makeReferenceDropToken(item.id));
+  };
 
   return (
     <div
+      draggable={isDraggableReference}
       data-status={item.status}
       data-type={item.type}
+      onDragStart={handleDragStart}
       className={`imagine-asset-card relative overflow-hidden rounded-2xl group border bg-slate-900 shadow-xl transition-all duration-300 flex flex-col justify-between ${
         selected ? "border-blue-500 ring-2 ring-blue-500/20" : "border-slate-850 hover:border-slate-750"
       }`}
@@ -158,7 +174,7 @@ export default function AssetCard({
               <div className="imagine-card-actions flex flex-wrap items-center justify-center gap-1 rounded-xl border border-white/10 bg-slate-950/80 p-1 backdrop-blur-md shadow-xl">
                 {item.type === "image" && (
                   <button
-                    onClick={() => onApplyVideoReference(item.url)}
+                    onClick={() => onApplyVideoReference(item)}
                     className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-purple-600 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
                     title="以此图首帧生图动态 Veo 航拍影片"
                   >

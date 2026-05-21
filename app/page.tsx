@@ -240,6 +240,22 @@ function insertTextAtRange(value: string, start: number, end: number, text: stri
   return `${value.slice(0, start)}${text}${value.slice(end)}`;
 }
 
+function remapPromptAfterReferenceRemoval(prompt: string, removedIndex: number): string {
+  return prompt.replace(/@图片(\d+)/g, (match, value) => {
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed < 1) return match;
+
+    const index = parsed - 1;
+    if (index === removedIndex) return "";
+    if (index > removedIndex) return getReferencePromptToken(index - 1);
+    return match;
+  });
+}
+
+function removePromptReferenceTokens(prompt: string): string {
+  return prompt.replace(/@图片\d+/g, "");
+}
+
 function formatStoredModelLabel(value: string, fallbackProvider: AiProvider): string {
   const parsed = parseProviderModel(value, fallbackProvider);
   return `${getProviderLabel(parsed.provider)} ${parsed.model}`;
@@ -1270,6 +1286,11 @@ export default function Home() {
   };
 
   const removeReferenceImage = (id: string) => {
+    const removedIndex = referenceImages.findIndex(reference => reference.id === id);
+    if (removedIndex !== -1) {
+      setPrompt(current => remapPromptAfterReferenceRemoval(current, removedIndex));
+    }
+
     setReferenceImages(prev => {
       const filtered = prev.filter(r => r.id !== id);
       if (filtered.length === 0) {
@@ -2002,6 +2023,7 @@ export default function Home() {
                     onClearReferences={() => {
                       setReferenceImages([]);
                       setReferenceImage(null);
+                      setPrompt(removePromptReferenceTokens);
                     }}
                     onCustomGptImageSizeChange={setCustomGptImageSize}
                     onGenerate={generateManualImage}
@@ -2038,6 +2060,7 @@ export default function Home() {
                     onClearReferences={() => {
                       setReferenceImages([]);
                       setReferenceImage(null);
+                      setPrompt(removePromptReferenceTokens);
                     }}
                     onGenerate={generateManualVideo}
                     onOptimizePrompt={optimizeActivePrompt}
