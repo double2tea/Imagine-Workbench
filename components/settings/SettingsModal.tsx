@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import type { StorageItem } from "@/lib/db";
 import type { AiProvider, ModelOption } from "@/lib/providers/model-catalog";
 import { PROVIDER_KEYS, getProviderMeta } from "@/lib/providers/registry";
+import type { ProviderCredentials } from "@/lib/providers/types";
 
 export interface ProviderTestState {
   provider: AiProvider;
@@ -15,11 +16,6 @@ interface ModelGroup {
   provider: AiProvider;
   label: string;
   options: ModelOption[];
-}
-
-interface ProviderCredentials {
-  apiKey: string;
-  baseUrl: string;
 }
 
 interface ProviderCredentialCardProps {
@@ -68,32 +64,18 @@ const TABS: { key: SettingsTab; label: string }[] = [
 ];
 
 function providerEndpointInfo(provider: AiProvider): string[] | undefined {
+  const meta = getProviderMeta(provider);
   if (provider === "12ai") {
-    return ["Chat/Image: https://cdn.12ai.org", "Veo: https://new.12ai.org"];
+    return [`Chat/Image: ${meta.defaultBaseUrl}`, `Veo: ${meta.defaultVideoBaseUrl}`];
   }
-  if (provider === "xstx") {
-    return ["Chat: https://api.xstx.info/v1"];
+  if (!meta.supportsImage && !meta.supportsVideo) {
+    return [`Chat: ${meta.defaultBaseUrl}/v1`];
   }
   return undefined;
 }
 
-function providerHasEditableBaseUrl(provider: AiProvider): boolean {
-  return provider !== "12ai";
-}
-
-function providerPlaceholder(provider: AiProvider): string {
-  if (provider === "12ai") return "sk_your_12ai_key";
-  if (provider === "grok2api") return "your_grok2api_key";
-  return `sk_your_${provider}_key`;
-}
-
-function providerBaseUrlPlaceholder(provider: AiProvider): string {
-  return getProviderMeta(provider).defaultBaseUrl;
-}
-
 function providerClearLabel(provider: AiProvider): string {
-  if (provider === "12ai") return "清除 Key";
-  return "清除 Key/Base URL";
+  return getProviderMeta(provider).hasEditableBaseUrl ? "清除 Key/Base URL" : "清除 Key";
 }
 
 function ProviderCredentialCard({
@@ -246,14 +228,14 @@ export default function SettingsModal({
                       <ProviderCredentialCard
                         key={provider}
                         apiKey={creds.apiKey}
-                        apiPlaceholder={providerPlaceholder(provider)}
+                        apiPlaceholder={meta.apiKeyPlaceholder}
                         baseUrl={creds.baseUrl}
-                        baseUrlPlaceholder={providerBaseUrlPlaceholder(provider)}
+                        baseUrlPlaceholder={meta.defaultBaseUrl}
                         clearLabel={providerClearLabel(provider)}
                         endpoints={providerEndpointInfo(provider)}
                         provider={provider}
                         providerTest={providerTest}
-                        showBaseUrl={providerHasEditableBaseUrl(provider)}
+                        showBaseUrl={meta.hasEditableBaseUrl}
                         title={meta.label}
                         onClear={onClearCredentials}
                         onSaveApiKey={(p, v) => onSaveCredential(p, "apiKey", v)}
