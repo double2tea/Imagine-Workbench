@@ -9,20 +9,17 @@ import {
   Sun,
   Trash2,
   Download,
-  Paintbrush,
   X,
-  RefreshCw,
   Play,
   Pause,
   Image as ImageIcon,
-  Video as VideoIcon,
   Maximize2,
   Info
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import JSZip from "jszip";
 import AgentDock, { type AgentToolAction, type ChatMessage } from "@/components/agent/AgentDock";
-import { VISUAL_PRESETS, VisualPreset } from "@/components/PresetStyles";
+import { VISUAL_PRESETS, type VisualPreset } from "@/components/PresetStyles";
 import CanvasMaskEditor from "@/components/CanvasMaskEditor";
 import AssetCard from "@/components/assets/AssetCard";
 import ComparePanel, { type CompareViewType } from "@/components/assets/ComparePanel";
@@ -30,8 +27,11 @@ import FloatingCompareButton from "@/components/assets/FloatingCompareButton";
 import FullscreenPreview from "@/components/assets/FullscreenPreview";
 import AssetSelectionBar from "@/components/assets/AssetSelectionBar";
 import AssetToolbar, { type AssetStatusFilter, type AssetTypeFilter } from "@/components/assets/AssetToolbar";
+import CreationModeTabs, { type CreationMode } from "@/components/creation/CreationModeTabs";
+import ImageGenerationPanel from "@/components/creation/ImageGenerationPanel";
+import VideoGenerationPanel from "@/components/creation/VideoGenerationPanel";
 import AtReferenceDropdown from "@/components/reference/AtReferenceDropdown";
-import ReferenceImagePicker, { type ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
+import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import SettingsModal, { type ProviderTestState } from "@/components/settings/SettingsModal";
 import { saveToDB, getAllFromDB, deleteFromDB, clearAllDB, StorageItem } from "@/lib/db";
 import {
@@ -256,7 +256,7 @@ export default function Home() {
   const [imageThinkingLevel, setImageThinkingLevel] = useState("minimal");
   const [customGptImageSize, setCustomGptImageSize] = useState("2560x1440");
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
-  const [traditionalSubTab, setTraditionalSubTab] = useState<"image" | "video">("image");
+  const [traditionalSubTab, setTraditionalSubTab] = useState<CreationMode>("image");
   const [isAgentDockOpen, setIsAgentDockOpen] = useState(false);
   const [isAgentPortalReady, setIsAgentPortalReady] = useState(false);
   const [isAgentDockOverContent, setIsAgentDockOverContent] = useState(false);
@@ -1963,383 +1963,73 @@ export default function Home() {
             {/* Creative workflow controls */}
               <div className="flex flex-col gap-3.5 animate-fade-in">
 
-                {/* Traditional Sub-tabs Switcher */}
-                <div className="imagine-tabbar flex rounded-lg border border-slate-800 bg-slate-950/60 p-1">
-                  <button
-                    type="button"
-                    onClick={() => setTraditionalSubTab("image")}
-                    data-active={traditionalSubTab === "image"}
-                    className={`imagine-tab-button flex-1 flex items-center justify-center gap-2 rounded-md py-2 text-xs font-semibold select-none cursor-pointer transition-all duration-200 ${
-                      traditionalSubTab === "image"
-                        ? "bg-blue-500/14 text-blue-200"
-                        : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
-                    }`}
-                  >
-                    <ImageIcon className="h-3.5 w-3.5" />
-                    智能绘图 <span className="hidden sm:inline text-slate-500">Image Studio</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTraditionalSubTab("video")}
-                    data-active={traditionalSubTab === "video"}
-                    className={`imagine-tab-button flex-1 flex items-center justify-center gap-2 rounded-md py-2 text-xs font-semibold select-none cursor-pointer transition-all duration-200 ${
-                      traditionalSubTab === "video"
-                        ? "bg-violet-500/14 text-violet-200"
-                        : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
-                    }`}
-                  >
-                    <VideoIcon className="h-3.5 w-3.5" />
-                    视频合成 <span className="hidden sm:inline text-slate-500">Video Studio</span>
-                  </button>
-                </div>
+                <CreationModeTabs value={traditionalSubTab} onChange={setTraditionalSubTab} />
 
                 {traditionalSubTab === "image" ? (
-                  /* IMAGE TAB CONFIG */
-                  <div className="flex flex-col gap-3.5 animate-fade-in">
-                    {/* Visual Preset Tag Picker */}
-                    <div>
-                      <label className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold text-slate-300">
-                        <Paintbrush className="h-3.5 w-3.5 text-blue-300" />
-                        艺术预设
-                      </label>
-                      <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
-                        {VISUAL_PRESETS.map((preset) => {
-                          const isActive = prompt.includes(preset.promptSuffix);
-                          return (
-                            <button
-                              key={preset.id}
-                              type="button"
-                              onClick={() => applyPreset(preset)}
-                              className={`imagine-preset-chip flex h-8 items-center gap-1.5 shrink-0 rounded-lg border px-3 text-xs transition duration-200 cursor-pointer ${
-                                isActive
-                                  ? "bg-blue-500/14 border-blue-400/35 text-blue-100"
-                                  : "bg-slate-950/50 border-slate-800 text-slate-300 hover:border-slate-700 hover:bg-slate-900"
-                              }`}
-                            >
-                              <span>{preset.emoji}</span>
-                              <span>{preset.name}</span>
-                              {isActive && (
-                                <span className="h-1.5 w-1.5 rounded-full bg-blue-300" />
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Prompt Box */}
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-300">
-                          <Sparkles className="h-3.5 w-3.5 text-blue-300" />
-                          提示词 <span className="text-slate-500">(Prompt)</span>
-                        </label>
-                        <button
-                          onClick={optimizeActivePrompt}
-                          disabled={isOptimizing || !prompt.trim()}
-                          className={`flex h-7 items-center gap-1 rounded-md border px-2.5 text-[11px] font-semibold transition ${
-                            isOptimizing || !prompt.trim()
-                              ? "bg-slate-900/70 text-slate-600 border-slate-800 cursor-not-allowed"
-                              : "bg-blue-500/12 text-blue-200 border-blue-400/25 hover:bg-blue-500/18 cursor-pointer"
-                          }`}
-                        >
-                          {isOptimizing ? (
-                            <RefreshCw className="h-3 w-3 animate-spin text-blue-400" />
-                          ) : (
-                            <Sparkles className="h-3 w-3 text-blue-300" />
-                          )}
-                          一键智能优化
-                        </button>
-                      </div>
-
-                      <div className="imagine-field-shell relative rounded-lg border border-slate-800 bg-slate-950/55 p-3 transition focus-within:border-blue-400/35 focus-within:bg-slate-950/75">
-                        {atDropdown.visible && atDropdown.type === "image-prompt" && renderAtDropdown("image-prompt")}
-                        <textarea
-                          value={prompt}
-                          onChange={(e) => handleTextareaChange(e.target.value, "image-prompt")}
-                          placeholder="写下你想创造的图片奇思妙想... 输入 @ 可引用历史生成图像作为参考"
-                          className="w-full h-24 resize-none border-0 bg-transparent text-sm leading-6 text-slate-100 placeholder-slate-500 outline-0 ring-0 focus:ring-0"
-                        />
-                        <div className="mt-2 flex items-center justify-between border-t border-slate-800 pt-2 font-mono text-[10px] text-slate-500">
-                          <span>输入 @ 呼出参考图 | 支持中英文</span>
-                          <span>{prompt.length} 字符</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Negative prompt entry box */}
-                    <div>
-                      <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">
-                        反向提示词 <span className="text-slate-500">(Negative Prompt)</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={negativePrompt}
-                        onChange={(e) => setNegativePrompt(e.target.value)}
-                        placeholder="不希望出现在作品里的元素，例如：blurred, ugly, deformed, text"
-                        className="w-full rounded-lg border border-slate-800 bg-slate-950/55 px-3 py-2.5 text-xs text-slate-200 placeholder-slate-600 transition focus:border-blue-400/35 focus:outline-none"
-                      />
-                    </div>
-
-                    {/* Model & Aspect Ratio */}
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <div>
-                        <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">
-                          图片生成模型
-                        </label>
-                        <select
-                          value={selectedModel}
-                          onChange={(e) => handleSelectImageModel(e.target.value)}
-                          className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 transition focus:border-blue-400/35 focus:outline-none cursor-pointer"
-                        >
-                          {imageModelGroups.map(group => (
-                            <optgroup key={group.provider} label={group.label}>
-                              {group.options.map(option => (
-                                <option key={option.value} value={option.value}>{option.label}</option>
-                              ))}
-                            </optgroup>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">
-                          {isGptImageModel ? "输出分辨率" : "画面宽高比"} <span className="text-slate-500">(Size)</span>
-                        </label>
-                        <select
-                          value={activeVideoSize}
-                          onChange={(e) => setAspectRatio(e.target.value)}
-                          className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 transition focus:border-blue-400/35 focus:outline-none cursor-pointer"
-                        >
-                          {imageCapabilities.aspectRatios.map(option => (
-                            <option key={option.value} value={option.value}>{option.label}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    {isGptImageModel && aspectRatio === "custom" && (
-                      <div>
-                        <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">
-                          自定义 GPT Image 2 分辨率
-                        </label>
-                        <input
-                          type="text"
-                          value={customGptImageSize}
-                          onChange={(e) => setCustomGptImageSize(e.target.value)}
-                          placeholder="例如 2560x1440，宽高需为 16 的倍数"
-                          className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 placeholder-slate-600 transition focus:border-blue-400/35 focus:outline-none"
-                        />
-                        <p className="mt-1.5 font-mono text-[10px] leading-relaxed text-slate-500">
-                          约束：最大边 ≤ 3840px，宽高为 16 的倍数，比例 ≤ 3:1，总像素 655,360-8,294,400。
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      {imageCapabilities.imageSizes.length > 0 && (
-                        <div>
-                          <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">
-                            {selectedModel.includes("gpt-image") ? "画质档位" : "高清合成分辨率"}
-                          </label>
-                          <div className="grid grid-cols-4 gap-1.5 rounded-lg border border-slate-800 bg-slate-950/45 p-1.5">
-                            {imageCapabilities.imageSizes.map((option) => (
-                              <button
-                                key={option.value}
-                                type="button"
-                                onClick={() => setImageSize(option.value)}
-                                className={`min-h-8 rounded-md px-2 font-mono text-[10px] transition cursor-pointer ${
-                                  imageSize === option.value
-                                    ? "bg-blue-500/16 text-blue-100"
-                                    : "text-slate-500 hover:bg-slate-900 hover:text-slate-300"
-                                }`}
-                              >
-                                {option.label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {imageCapabilities.thinkingLevels.length > 0 && (
-                        <div>
-                          <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">
-                            图片思考等级
-                          </label>
-                          <div className="grid grid-cols-2 gap-1.5 rounded-lg border border-slate-800 bg-slate-950/45 p-1.5">
-                            {imageCapabilities.thinkingLevels.map(option => (
-                              <button
-                                key={option.value}
-                                type="button"
-                                onClick={() => setImageThinkingLevel(option.value)}
-                                className={`min-h-8 rounded-md px-2 font-mono text-[10px] transition cursor-pointer ${
-                                  imageThinkingLevel === option.value
-                                    ? "bg-amber-500/16 text-amber-100"
-                                    : "text-slate-500 hover:bg-slate-900 hover:text-slate-300"
-                                }`}
-                              >
-                                {option.label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <ReferenceImagePicker
-                      addLabel="多图垫"
-                      browseClassName="font-medium text-blue-300 underline-offset-4 hover:text-blue-200 hover:underline cursor-pointer"
-                      clearLabel="清空所有垫图"
-                      emptyHelp="支持 JPG / PNG / WEBP | 粘贴剪贴板快捷垫图"
-                      emptyLabel="拖拽图片"
-                      label={`创意参考图 / 多图垫图 ${referenceImages.length > 0 ? `(${referenceImages.length})` : ""}`}
-                      maxCount={4}
-                      references={referenceImages}
-                      uploadLabel="浏览上传"
-                      onClear={() => {
-                        setReferenceImages([]);
-                        setReferenceImage(null);
-                      }}
-                      onRemove={removeReferenceImage}
-                      onUpload={handleImageUpload}
-                    />
-
-                    {/* Bottom main trigger button */}
-                    <button
-                      onClick={generateManualImage}
-                      disabled={!prompt.trim()}
-                      className={`imagine-primary-action mt-1 flex w-full items-center justify-center gap-2 rounded-lg py-3 text-xs font-bold transition duration-200 ${
-                        !prompt.trim()
-                          ? "bg-slate-900/70 text-slate-600 border border-slate-800 cursor-not-allowed"
-                          : "bg-blue-600 hover:bg-blue-500 text-white active:scale-95 shadow-lg shadow-blue-950/30 cursor-pointer"
-                      }`}
-                    >
-                      {isSubmittingImage ? (
-                        <RefreshCw className="h-4 w-4 animate-spin text-white" />
-                      ) : (
-                        <Sparkles className="h-4 w-4 text-white" />
-                      )}
-                      {isSubmittingImage ? `提交中 (${imageSubmitCount})，可继续排队` : "一键渲染合成全新图片 (Render Image)"}
-                    </button>
-                  </div>
+                  <ImageGenerationPanel
+                    atDropdownNode={atDropdown.visible && atDropdown.type === "image-prompt" ? renderAtDropdown("image-prompt") : null}
+                    capabilities={imageCapabilities}
+                    customGptImageSize={customGptImageSize}
+                    imageSize={imageSize}
+                    imageThinkingLevel={imageThinkingLevel}
+                    isGptImageModel={isGptImageModel}
+                    isOptimizing={isOptimizing}
+                    isSubmitting={isSubmittingImage}
+                    modelGroups={imageModelGroups}
+                    negativePrompt={negativePrompt}
+                    prompt={prompt}
+                    referenceImages={referenceImages}
+                    selectedAspectRatio={aspectRatio}
+                    selectedModel={selectedModel}
+                    submitCount={imageSubmitCount}
+                    onApplyPreset={applyPreset}
+                    onClearReferences={() => {
+                      setReferenceImages([]);
+                      setReferenceImage(null);
+                    }}
+                    onCustomGptImageSizeChange={setCustomGptImageSize}
+                    onGenerate={generateManualImage}
+                    onImageSizeChange={setImageSize}
+                    onNegativePromptChange={setNegativePrompt}
+                    onOptimizePrompt={optimizeActivePrompt}
+                    onPromptChange={(value) => handleTextareaChange(value, "image-prompt")}
+                    onReferenceRemove={removeReferenceImage}
+                    onReferenceUpload={handleImageUpload}
+                    onSelectAspectRatio={setAspectRatio}
+                    onSelectModel={handleSelectImageModel}
+                    onThinkingLevelChange={setImageThinkingLevel}
+                  />
                 ) : (
-                  /* VIDEO TAB CONFIG */
-                  <div className="flex flex-col gap-3.5 animate-fade-in">
-                    {/* Prompt Box */}
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-300">
-                          <VideoIcon className="h-3.5 w-3.5 text-violet-300" />
-                          视频场景运动描述 <span className="text-slate-500">(Video Motion Prompt)</span>
-                        </label>
-                        <button
-                          onClick={optimizeActivePrompt}
-                          disabled={isOptimizing || !prompt.trim()}
-                          className={`flex h-7 items-center gap-1 rounded-md border px-2.5 text-[11px] font-semibold transition ${
-                            isOptimizing || !prompt.trim()
-                              ? "bg-slate-900/70 text-slate-600 border-slate-800 cursor-not-allowed"
-                              : "bg-violet-500/12 text-violet-200 border-violet-400/25 hover:bg-violet-500/18 cursor-pointer"
-                          }`}
-                        >
-                          {isOptimizing ? (
-                            <RefreshCw className="h-3 w-3 animate-spin text-purple-400" />
-                          ) : (
-                            <Sparkles className="h-3 w-3 text-violet-300" />
-                          )}
-                          提示词动态润色
-                        </button>
-                      </div>
-
-                      <div className="imagine-field-shell relative rounded-lg border border-slate-800 bg-slate-950/55 p-3 transition focus-within:border-violet-400/35 focus-within:bg-slate-950/75">
-                        {atDropdown.visible && atDropdown.type === "video-prompt" && renderAtDropdown("video-prompt")}
-                        <textarea
-                          value={prompt}
-                          onChange={(e) => handleTextareaChange(e.target.value, "video-prompt")}
-                          placeholder={videoPromptPlaceholder}
-                          className="w-full h-24 resize-none border-0 bg-transparent text-sm leading-6 text-slate-100 placeholder-slate-500 outline-0 ring-0 focus:ring-0"
-                        />
-                        <div className="mt-2 flex items-center justify-between border-t border-slate-800 pt-2 font-mono text-[10px] text-slate-500">
-                          <span>输入 @ 呼出图像资产 | 支持运动镜头与画面控制</span>
-                          <span>{prompt.length} 字符</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Model & Aspect Ratio */}
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <div>
-                        <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">
-                          视频生成模型
-                        </label>
-                        <select
-                          value={selectedVideoModel}
-                          onChange={(e) => handleSelectVideoModel(e.target.value)}
-                          className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 transition focus:border-violet-400/35 focus:outline-none cursor-pointer"
-                        >
-                          {videoModelGroups.map(group => (
-                            <optgroup key={group.provider} label={group.label}>
-                              {group.options.map(option => (
-                                <option key={option.value} value={option.value}>{option.label}</option>
-                              ))}
-                            </optgroup>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">
-                          视频尺寸
-                        </label>
-                        <select
-                          value={aspectRatio}
-                          onChange={(e) => setAspectRatio(e.target.value)}
-                          className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 transition focus:border-violet-400/35 focus:outline-none cursor-pointer"
-                        >
-                          {videoCapabilities.sizes.map(option => (
-                            <option key={option.value} value={option.value}>{option.label}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    <ReferenceImagePicker
-                      addLabel="添加参考"
-                      browseClassName="font-medium text-violet-300 underline-offset-4 hover:text-violet-200 hover:underline cursor-pointer"
-                      clearLabel={videoClearReferenceLabel}
-                      emptyHelp={`支持 JPG / PNG / WEBP | 最多 ${videoReferenceLimit} 张 | ${videoReferenceHelp}`}
-                      emptyLabel={`拖拽${videoReferenceLabel}`}
-                      label={`${videoReferenceLabel} ${referenceImages.length > 0 ? `(${Math.min(referenceImages.length, videoReferenceLimit)}/${videoReferenceLimit})` : ""}`}
-                      maxCount={videoReferenceLimit}
-                      references={referenceImages}
-                      roleMode={videoReferenceMode === "firstLast"}
-                      uploadLabel="浏览上传"
-                      onClear={() => {
-                        setReferenceImages([]);
-                        setReferenceImage(null);
-                      }}
-                      onRemove={removeReferenceImage}
-                      onRoleChange={(id, role) => toggleReferenceRole(id, role ?? "general")}
-                      onUpload={handleImageUpload}
-                    />
-
-                    {/* Bottom main video trigger button */}
-                    <button
-                      onClick={generateManualVideo}
-                      disabled={!prompt.trim()}
-                      className={`imagine-primary-action mt-1 flex w-full items-center justify-center gap-2 rounded-lg py-3 text-xs font-bold transition duration-200 ${
-                        !prompt.trim()
-                          ? "bg-slate-900/70 text-slate-600 border border-slate-800 cursor-not-allowed"
-                          : "bg-violet-600 hover:bg-violet-500 text-white active:scale-95 shadow-lg shadow-violet-950/30 cursor-pointer"
-                      }`}
-                    >
-                      {isSubmittingVideo ? (
-                        <RefreshCw className="h-4 w-4 animate-spin text-white" />
-                      ) : (
-                        <VideoIcon className="h-4 w-4 text-white hover:scale-110 transition" />
-                      )}
-                      {isSubmittingVideo ? `提交中 (${videoSubmitCount})，可继续排队` : "一键渲染合成动态视频 (Render Video)"}
-                    </button>
-                  </div>
+                  <VideoGenerationPanel
+                    atDropdownNode={atDropdown.visible && atDropdown.type === "video-prompt" ? renderAtDropdown("video-prompt") : null}
+                    capabilities={videoCapabilities}
+                    clearReferenceLabel={videoClearReferenceLabel}
+                    isOptimizing={isOptimizing}
+                    isSubmitting={isSubmittingVideo}
+                    modelGroups={videoModelGroups}
+                    prompt={prompt}
+                    promptPlaceholder={videoPromptPlaceholder}
+                    referenceHelp={videoReferenceHelp}
+                    referenceImages={referenceImages}
+                    referenceLabel={videoReferenceLabel}
+                    referenceLimit={videoReferenceLimit}
+                    referenceMode={videoReferenceMode}
+                    selectedModel={selectedVideoModel}
+                    selectedSize={aspectRatio}
+                    submitCount={videoSubmitCount}
+                    onClearReferences={() => {
+                      setReferenceImages([]);
+                      setReferenceImage(null);
+                    }}
+                    onGenerate={generateManualVideo}
+                    onOptimizePrompt={optimizeActivePrompt}
+                    onPromptChange={(value) => handleTextareaChange(value, "video-prompt")}
+                    onReferenceRemove={removeReferenceImage}
+                    onReferenceRoleChange={(id, role) => toggleReferenceRole(id, role ?? "general")}
+                    onReferenceUpload={handleImageUpload}
+                    onSelectModel={handleSelectVideoModel}
+                    onSelectSize={setAspectRatio}
+                  />
                 )}
 
               </div>
