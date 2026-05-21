@@ -19,7 +19,6 @@ import ImageGenerationPanel from "@/components/creation/ImageGenerationPanel";
 import VideoGenerationPanel from "@/components/creation/VideoGenerationPanel";
 import AtReferenceDropdown from "@/components/reference/AtReferenceDropdown";
 import PromptReferenceDropdown from "@/components/reference/PromptReferenceDropdown";
-import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import SettingsModal from "@/components/settings/SettingsModal";
 import AssetGalleryWorkspace from "@/components/workbench/AssetGalleryWorkspace";
 import WorkspaceHeader, { type ThemeMode } from "@/components/workbench/WorkspaceHeader";
@@ -27,9 +26,9 @@ import WorkspaceNotices, { type WorkspaceNotice } from "@/components/workbench/W
 import { saveToDB, getAllFromDB, deleteFromDB, clearAllDB, StorageItem } from "@/lib/db";
 import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
 import { useClipboardImageImport } from "@/hooks/useClipboardImageImport";
+import { useGenerationActions } from "@/hooks/useGenerationActions";
 import { useMediaPolling } from "@/hooks/useMediaPolling";
 import {
-  buildPromptWithReferenceMap,
   removePromptReferenceTokens,
   useReferenceState,
   type AtDropdownTarget,
@@ -45,7 +44,6 @@ import {
   supportsAsyncImageGeneration,
   type AiProvider,
   type ModelOption,
-  type VideoReferenceMode,
 } from "@/lib/providers/model-catalog";
 import { PROVIDER_KEYS, getProviderMeta } from "@/lib/providers/registry";
 
@@ -65,10 +63,6 @@ function getStringField(value: unknown, field: string): string | null {
 
 function toErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message.trim() ? error.message : fallback;
-}
-
-function isAbortError(error: unknown): boolean {
-  return error instanceof DOMException && error.name === "AbortError";
 }
 
 async function readFetchError(response: Response, fallback: string): Promise<string> {
@@ -98,46 +92,9 @@ function getProviderModelGroups(optionsByProvider: Record<AiProvider, ModelOptio
     .filter(group => group.options.length > 0);
 }
 
-function buildVideoReferenceUrls(
-  references: ReferenceImageRef[],
-  fallbackReference: string | null,
-  mode: VideoReferenceMode,
-  maxCount: number,
-): string[] {
-  if (maxCount === 0 || mode === "none") return [];
-
-  if (mode === "firstLast") {
-    const start = references.find(reference => reference.role === "start")?.url ?? references[0]?.url ?? fallbackReference;
-    const end =
-      references.find(reference => reference.role === "end")?.url ??
-      references.find(reference => reference.url !== start)?.url;
-    return [start, end].filter((url): url is string => typeof url === "string" && url.length > 0).slice(0, maxCount);
-  }
-
-  const urls = references.map(reference => reference.url);
-  if (urls.length === 0 && fallbackReference) urls.push(fallbackReference);
-  return urls.filter(url => url.length > 0).slice(0, maxCount);
-}
-
 function formatStoredModelLabel(value: string, fallbackProvider: AiProvider): string {
   const parsed = parseProviderModel(value, fallbackProvider);
   return `${getProviderLabel(parsed.provider)} ${parsed.model}`;
-}
-
-function validateGptImageSize(size: string): string | null {
-  if (size === "auto") return null;
-  const match = size.match(/^(\d+)x(\d+)$/);
-  if (!match) return "尺寸格式必须是 widthxheight，例如 2560x1440";
-  const width = Number(match[1]);
-  const height = Number(match[2]);
-  if (width > 3840 || height > 3840) return "最大边长不能超过 3840px";
-  if (width % 16 !== 0 || height % 16 !== 0) return "宽高都必须是 16px 的倍数";
-  const longSide = Math.max(width, height);
-  const shortSide = Math.min(width, height);
-  if (longSide / shortSide > 3) return "长短边比例不能超过 3:1";
-  const pixels = width * height;
-  if (pixels < 655360 || pixels > 8294400) return "总像素必须在 655,360 到 8,294,400 之间";
-  return null;
 }
 
 export default function Home() {
@@ -335,6 +292,31 @@ export default function Home() {
     pushWorkspaceNotice,
     setItems,
   });
+  const {
+    generateManualImage,
+    generateManualVideo,
+  } = useGenerationActions({
+    activeImageModel,
+    activeImageSize,
+    activeVideoSize,
+    buildProviderHeaders,
+    generationAbortControllersRef,
+    imageSize,
+    imageThinkingLevel,
+    isGptImageModel,
+    locallyCanceledItemIdsRef,
+    prompt,
+    pushWorkspaceNotice,
+    referenceImage,
+    referenceImages,
+    selectedModel,
+    selectedVideoModel,
+    setImageSubmitCount,
+    setItems,
+    setVideoSubmitCount,
+    videoReferenceLimit,
+    videoReferenceMode,
+  });
   const imageModelGroups = getProviderModelGroups(imageModelOptions);
   const videoModelGroups = getProviderModelGroups(videoModelOptions);
   const chatModelGroups = getProviderModelGroups(chatModelOptions);
@@ -531,199 +513,6 @@ export default function Home() {
       pushWorkspaceNotice("error", message);
     } finally {
       setIsOptimizing(false);
-    }
-  };
-
-  // Launch Traditional Image generator call
-  const generateManualImage = async () => {
-    if (!prompt.trim()) return;
-    if (isGptImageModel) {
-      const sizeError = validateGptImageSize(activeImageSize);
-      if (sizeError) {
-        pushWorkspaceNotice("error", `GPT Image 2 尺寸无效：${sizeError}`);
-        return;
-      }
-    }
-    setImageSubmitCount(prev => prev + 1);
-    const generationPrompt = buildPromptWithReferenceMap(prompt, referenceImages);
-
-    // Create pre-queued item in memory immediately
-    const tempId = makeClientId("temp_img");
-    const newItem: StorageItem = {
-      id: tempId,
-      type: "image",
-      url: "https://picsum.photos/800/800", // temp fallback placeholder display
-      prompt: prompt,
-      model: activeImageModel,
-      aspectRatio: activeImageSize,
-      createdAt: new Date().toISOString(),
-      status: "pending",
-      progress: 30,
-    };
-
-    setItems(prev => [newItem, ...prev]);
-
-    const controller = new AbortController();
-    generationAbortControllersRef.current[tempId] = controller;
-
-    try {
-      const headers = buildProviderHeaders(selectedModel);
-
-      const res = await fetch("/api/gemini/generate-image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...headers },
-        signal: controller.signal,
-        body: JSON.stringify({
-          prompt: generationPrompt,
-          model: activeImageModel,
-          aspectRatio: activeImageSize,
-          imageSize,
-          thinkingLevel: imageThinkingLevel,
-          referenceImage: referenceImages[0]?.url || referenceImage || undefined,
-          referenceImages: referenceImages.map(r => r.url),
-        }),
-      });
-
-      if (res.ok) {
-        const data: unknown = await res.json();
-        const operationName = getStringField(data, "operationName");
-        const imageUrl = getStringField(data, "imageUrl");
-        if (operationName) {
-          const compilingItem: StorageItem = {
-            ...newItem,
-            id: makeClientId("img"),
-            operationName,
-            status: "processing",
-            progress: 15,
-          };
-          await saveToDB(compilingItem);
-          setItems(prev => [compilingItem, ...prev.filter(x => x.id !== tempId)]);
-          return;
-        }
-
-        const completedItem: StorageItem = {
-          ...newItem,
-          id: makeClientId("img"),
-          url: imageUrl ?? "",
-          status: "complete",
-          progress: 100,
-        };
-        if (!imageUrl) {
-          throw new Error("图片接口返回缺少 imageUrl 或 operationName");
-        }
-
-        // Remove temp and insert completed item
-        await saveToDB(completedItem);
-        setItems(prev => [completedItem, ...prev.filter(x => x.id !== tempId)]);
-      } else {
-        throw new Error(await readFetchError(res, "图片生成请求失败"));
-      }
-    } catch (e) {
-      if (locallyCanceledItemIdsRef.current.has(tempId) || isAbortError(e)) {
-        locallyCanceledItemIdsRef.current.delete(tempId);
-        return;
-      }
-      console.error(e);
-      const message = toErrorMessage(e, "图片生成失败");
-      const failedItem: StorageItem = {
-        ...newItem,
-        status: "failed",
-        progress: 100,
-        errorMessage: message,
-      };
-      await saveToDB(failedItem);
-      setItems(prev => [failedItem, ...prev.filter(x => x.id !== tempId)]);
-      pushWorkspaceNotice("error", message);
-    } finally {
-      delete generationAbortControllersRef.current[tempId];
-      setImageSubmitCount(prev => Math.max(0, prev - 1));
-    }
-  };
-
-  // Launch Traditional Veo Video generator call
-  const generateManualVideo = async () => {
-    if (!prompt.trim()) return;
-    setVideoSubmitCount(prev => prev + 1);
-
-    const tempId = makeClientId("temp_vid");
-    const newItem: StorageItem = {
-      id: tempId,
-      type: "video",
-      url: "",
-      prompt: prompt,
-      model: selectedVideoModel,
-      aspectRatio: activeVideoSize,
-      createdAt: new Date().toISOString(),
-      status: "processing",
-      progress: 12,
-    };
-
-    setItems(prev => [newItem, ...prev]);
-
-    const controller = new AbortController();
-    generationAbortControllersRef.current[tempId] = controller;
-
-    try {
-      const headers = buildProviderHeaders(selectedVideoModel);
-      const videoReferenceUrls = buildVideoReferenceUrls(
-        referenceImages,
-        referenceImage,
-        videoReferenceMode,
-        videoReferenceLimit,
-      );
-      const generationPrompt = buildPromptWithReferenceMap(prompt, referenceImages, videoReferenceUrls);
-
-      const res = await fetch("/api/gemini/generate-video", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...headers },
-        signal: controller.signal,
-        body: JSON.stringify({
-          prompt: generationPrompt,
-          images: videoReferenceUrls,
-          aspectRatio: activeVideoSize,
-          model: selectedVideoModel,
-        }),
-      });
-
-      if (res.ok) {
-        const data: unknown = await res.json();
-        const activeOperationName = getStringField(data, "operationName");
-        if (!activeOperationName) {
-          throw new Error("视频接口返回缺少 operationName");
-        }
-
-        // Save polling handle
-        const compilingItem: StorageItem = {
-          ...newItem,
-          id: makeClientId("vid"),
-          operationName: activeOperationName,
-          status: "processing",
-        };
-
-        await saveToDB(compilingItem);
-        setItems(prev => [compilingItem, ...prev.filter(x => x.id !== tempId)]);
-      } else {
-        throw new Error(await readFetchError(res, "视频生成请求失败"));
-      }
-    } catch (e) {
-      if (locallyCanceledItemIdsRef.current.has(tempId) || isAbortError(e)) {
-        locallyCanceledItemIdsRef.current.delete(tempId);
-        return;
-      }
-      console.error(e);
-      const message = toErrorMessage(e, "视频生成失败");
-      const failedItem: StorageItem = {
-        ...newItem,
-        status: "failed",
-        progress: 100,
-        errorMessage: message,
-      };
-      await saveToDB(failedItem);
-      setItems(prev => [failedItem, ...prev.filter(x => x.id !== tempId)]);
-      pushWorkspaceNotice("error", message);
-    } finally {
-      delete generationAbortControllersRef.current[tempId];
-      setVideoSubmitCount(prev => Math.max(0, prev - 1));
     }
   };
 
