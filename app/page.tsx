@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useMemo, useState, useEffect, useRef } from "react";
+import React, { useCallback, useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
   Download,
@@ -19,11 +19,6 @@ import ImageGenerationPanel from "@/components/creation/ImageGenerationPanel";
 import VideoGenerationPanel from "@/components/creation/VideoGenerationPanel";
 import AtReferenceDropdown from "@/components/reference/AtReferenceDropdown";
 import PromptReferenceDropdown from "@/components/reference/PromptReferenceDropdown";
-import {
-  type DraggedReferenceAsset,
-  makeReferenceDropToken,
-  readDraggedReferenceAsset,
-} from "@/components/reference/referenceDrag";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import SettingsModal, { type ProviderTestState } from "@/components/settings/SettingsModal";
 import type { ProviderCredentials } from "@/lib/providers/types";
@@ -32,6 +27,12 @@ import WorkspaceHeader, { type ThemeMode } from "@/components/workbench/Workspac
 import WorkspaceNotices, { type WorkspaceNotice } from "@/components/workbench/WorkspaceNotices";
 import { saveToDB, getAllFromDB, deleteFromDB, clearAllDB, StorageItem } from "@/lib/db";
 import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
+import {
+  buildPromptWithReferenceMap,
+  removePromptReferenceTokens,
+  useReferenceState,
+  type AtDropdownTarget,
+} from "@/hooks/useReferenceState";
 import {
   CHAT_MODEL_OPTIONS,
   DEFAULT_CHAT_MODEL,
@@ -54,9 +55,6 @@ type NoticeType = "error" | "info" | "success";
 type MaskDestination = "creative" | "agent";
 type ProviderConnection = AiProvider;
 type ModelCategory = "chat" | "image" | "video";
-type PromptReferenceTarget = "image-prompt" | "video-prompt";
-
-const IMAGE_REFERENCE_LIMIT = 4;
 
 function defaultProviderCredentials(): Record<AiProvider, ProviderCredentials> {
   const record = {} as Record<AiProvider, ProviderCredentials>;
@@ -204,52 +202,6 @@ function buildVideoReferenceUrls(
   return urls.filter(url => url.length > 0).slice(0, maxCount);
 }
 
-function getReferencePromptToken(index: number): string {
-  return `@图片${index + 1}`;
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function buildPromptWithReferenceMap(
-  prompt: string,
-  references: ReferenceImageRef[],
-  sentReferenceUrls = references.map(reference => reference.url),
-): string {
-  const lines = references
-    .map((reference, index) => ({
-      sentIndex: sentReferenceUrls.findIndex(url => url === reference.url),
-      token: getReferencePromptToken(index),
-    }))
-    .filter(reference => reference.sentIndex !== -1)
-    .filter(reference => new RegExp(`${escapeRegExp(reference.token)}(?!\\d)`).test(prompt))
-    .map(reference => `- ${reference.token} = reference image ${reference.sentIndex + 1}`);
-
-  if (lines.length === 0) return prompt;
-  return `Reference mapping:\n${lines.join("\n")}\n\nUser prompt:\n${prompt}`;
-}
-
-function insertTextAtRange(value: string, start: number, end: number, text: string): string {
-  return `${value.slice(0, start)}${text}${value.slice(end)}`;
-}
-
-function remapPromptAfterReferenceRemoval(prompt: string, removedIndex: number): string {
-  return prompt.replace(/@图片(\d+)/g, (match, value) => {
-    const parsed = Number(value);
-    if (!Number.isInteger(parsed) || parsed < 1) return match;
-
-    const index = parsed - 1;
-    if (index === removedIndex) return "";
-    if (index > removedIndex) return getReferencePromptToken(index - 1);
-    return match;
-  });
-}
-
-function removePromptReferenceTokens(prompt: string): string {
-  return prompt.replace(/@图片\d+/g, "");
-}
-
 function formatStoredModelLabel(value: string, fallbackProvider: AiProvider): string {
   const parsed = parseProviderModel(value, fallbackProvider);
   return `${getProviderLabel(parsed.provider)} ${parsed.model}`;
@@ -284,7 +236,6 @@ export default function Home() {
   const [imageSize, setImageSize] = useState("1K");
   const [imageThinkingLevel, setImageThinkingLevel] = useState("minimal");
   const [customGptImageSize, setCustomGptImageSize] = useState("2560x1440");
-  const [referenceImage, setReferenceImage] = useState<string | null>(null);
   const [traditionalSubTab, setTraditionalSubTab] = useState<CreationMode>("image");
   const [isAgentDockOpen, setIsAgentDockOpen] = useState(false);
   const [isAgentPortalReady, setIsAgentPortalReady] = useState(false);
@@ -376,21 +327,6 @@ export default function Home() {
   // Fullscreen Preview Overlay State
   const [fullscreenItem, setFullscreenItem] = useState<StorageItem | null>(null);
 
-  // Agent Reference States (Support Multiple)
-  const [referenceImages, setReferenceImages] = useState<ReferenceImageRef[]>([]);
-  const [agentReferences, setAgentReferences] = useState<ReferenceImageRef[]>([]);
-
-  // Agent Reference States
-  const [agentReferenceId, setAgentReferenceId] = useState<string | null>(null);
-  const [agentReferenceUrl, setAgentReferenceUrl] = useState<string | null>(null);
-
-  // At dropdown state
-  const [atDropdown, setAtDropdown] = useState<{
-    visible: boolean;
-    type: "image-prompt" | "video-prompt" | "agent-prompt";
-    search: string;
-  }>({ visible: false, type: "image-prompt", search: "" });
-
   // References
   const chatBottomRef = useRef<HTMLDivElement | null>(null);
   const agentDockRef = useRef<HTMLElement | null>(null);
@@ -451,74 +387,38 @@ export default function Home() {
     ? "第 1 张为首帧，第 2 张为尾帧"
     : "参考图用于主体、风格或场景引导，不作为首尾帧";
   const videoClearReferenceLabel = isFirstLastVideoMode ? "清空关键帧" : "清空参考图";
+  const {
+    agentReferenceId,
+    agentReferences,
+    agentReferenceUrl,
+    atDropdown,
+    handleImageUpload,
+    handlePromptDropAsset,
+    handleReferenceDropAsset,
+    handleSelectAtItem,
+    handleSelectPromptReference,
+    handleTextareaChange,
+    referenceImage,
+    referenceImages,
+    removeReferenceImage,
+    setAgentReferenceId,
+    setAgentReferences,
+    setAgentReferenceUrl,
+    setReferenceImage,
+    setReferenceImages,
+    toggleReferenceRole,
+  } = useReferenceState({
+    agentInput,
+    prompt,
+    videoReferenceLimit,
+    videoReferenceMode,
+    pushWorkspaceNotice,
+    setAgentInput,
+    setPrompt,
+  });
   const imageModelGroups = getProviderModelGroups(imageModelOptions);
   const videoModelGroups = getProviderModelGroups(videoModelOptions);
   const chatModelGroups = getProviderModelGroups(chatModelOptions);
-  const getReferenceLimitForTarget = (target: PromptReferenceTarget): number =>
-    target === "video-prompt" ? videoReferenceLimit : IMAGE_REFERENCE_LIMIT;
-  const getDroppedReferenceRole = (target: PromptReferenceTarget, index: number): ReferenceImageRef["role"] => {
-    if (target !== "video-prompt" || videoReferenceMode !== "firstLast") return "general";
-    if (index === 0) return "start";
-    if (index === 1) return "end";
-    return "general";
-  };
-  const addDroppedReferenceAsset = (asset: DraggedReferenceAsset, target: PromptReferenceTarget): number | null => {
-    const existingIndex = referenceImages.findIndex(reference => reference.id === asset.id);
-    if (existingIndex !== -1) return existingIndex;
-
-    const limit = getReferenceLimitForTarget(target);
-    if (referenceImages.length >= limit) {
-      pushWorkspaceNotice("error", `参考图已达上限：最多 ${limit} 张`);
-      return null;
-    }
-
-    const nextIndex = referenceImages.length;
-    const nextReference: ReferenceImageRef = {
-      id: asset.id,
-      url: asset.url,
-      role: getDroppedReferenceRole(target, nextIndex),
-    };
-
-    setReferenceImage(referenceImages[0]?.url ?? asset.url);
-    setReferenceImages(prev => {
-      if (prev.some(reference => reference.id === asset.id)) return prev;
-      if (prev.length >= limit) return prev;
-      return [...prev, nextReference];
-    });
-    return nextIndex;
-  };
-  const handleReferenceDropAsset = (asset: DraggedReferenceAsset, target: PromptReferenceTarget) => {
-    addDroppedReferenceAsset(asset, target);
-  };
-  const handlePromptDropAsset = (
-    event: React.DragEvent<HTMLTextAreaElement>,
-    target: PromptReferenceTarget,
-  ) => {
-    const asset = readDraggedReferenceAsset(event.dataTransfer);
-    if (!asset) return;
-
-    const textarea = event.currentTarget;
-    const dropToken = makeReferenceDropToken(asset.id);
-    const selectionStart = textarea.selectionStart;
-    const selectionEnd = textarea.selectionEnd;
-    const referenceIndex = addDroppedReferenceAsset(asset, target);
-
-    window.setTimeout(() => {
-      const currentValue = textarea.value;
-      if (referenceIndex === null) {
-        setPrompt(currentValue.replace(dropToken, ""));
-        return;
-      }
-
-      const referenceToken = getReferencePromptToken(referenceIndex);
-      const nextPrompt = currentValue.includes(dropToken)
-        ? currentValue.replace(dropToken, referenceToken)
-        : insertTextAtRange(currentValue, selectionStart, selectionEnd, referenceToken);
-
-      setPrompt(nextPrompt);
-      setAtDropdown({ visible: false, type: target, search: "" });
-    }, 0);
-  };
   const handleSelectImageModel = (model: string) => {
     const capabilities = getImageModelCapabilities(model);
     setSelectedModel(model);
@@ -731,7 +631,7 @@ export default function Home() {
     };
     window.addEventListener("paste", handlePaste);
     return () => window.removeEventListener("paste", handlePaste);
-  }, []);
+  }, [setAgentReferenceId, setAgentReferenceUrl, setAgentReferences, setReferenceImage, setReferenceImages]);
 
   // Scroll to bottom of agent chat as new messages arrived
   useEffect(() => {
@@ -1226,54 +1126,6 @@ export default function Home() {
     }
   };
 
-  // Launch file reader for reference seed upload
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64 = reader.result as string;
-      const newReferenceId = makeClientId("upload");
-
-      setReferenceImage(base64);
-      setReferenceImages(prev => {
-        if (prev.some(r => r.id === newReferenceId)) return prev;
-        return [...prev, { id: newReferenceId, url: base64, role: "general" }];
-      });
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const removeReferenceImage = (id: string) => {
-    const removedIndex = referenceImages.findIndex(reference => reference.id === id);
-    if (removedIndex !== -1) {
-      setPrompt(current => remapPromptAfterReferenceRemoval(current, removedIndex));
-    }
-
-    setReferenceImages(prev => {
-      const filtered = prev.filter(r => r.id !== id);
-      if (filtered.length === 0) {
-        setReferenceImage(null);
-      } else {
-        setReferenceImage(filtered[0].url);
-      }
-      return filtered;
-    });
-  };
-
-  const toggleReferenceRole = (id: string, role: "start" | "end" | "general") => {
-    setReferenceImages(prev => prev.map(r => {
-      if (r.id === id) {
-        return { ...r, role };
-      }
-      if ((role === "start" || role === "end") && r.role === role) {
-        return { ...r, role: "general" };
-      }
-      return r;
-    }));
-  };
-
   // Floating selection tools management
   const toggleSelectItem = (id: string, e?: React.MouseEvent) => {
     if (e && e.shiftKey && selectedItemIds.length > 0) {
@@ -1660,68 +1512,7 @@ export default function Home() {
     setIsMaskOpen(false);
   };
 
-  // Live @ reference typing handler
-  const handleTextareaChange = (val: string, type: "image-prompt" | "video-prompt" | "agent-prompt") => {
-    if (type === "agent-prompt") {
-      setAgentInput(val);
-    } else {
-      setPrompt(val);
-    }
-
-    const lastAtIdx = val.lastIndexOf("@");
-    if (lastAtIdx !== -1 && lastAtIdx >= val.length - 15) {
-      const searchPart = val.substring(lastAtIdx + 1);
-      if (!searchPart.includes(" ") && !searchPart.includes("\n")) {
-        setAtDropdown({ visible: true, type, search: searchPart });
-        return;
-      }
-    }
-    setAtDropdown({ visible: false, type, search: "" });
-  };
-
-  const handleSelectPromptReference = (index: number, type: "image-prompt" | "video-prompt") => {
-    const lastAtIdx = prompt.lastIndexOf("@");
-    const base = lastAtIdx !== -1 ? prompt.substring(0, lastAtIdx) : prompt;
-    const searchLength = atDropdown.visible && atDropdown.type === type ? atDropdown.search.length : 0;
-    const suffixStart = lastAtIdx === -1 ? prompt.length : lastAtIdx + 1 + searchLength;
-    const suffix = prompt.substring(suffixStart);
-    setPrompt(`${base}${getReferencePromptToken(index)} ${suffix}`);
-    setAtDropdown({ visible: false, type, search: "" });
-  };
-
-  const handleSelectAtItem = (itemUrl: string, itemId: string, type: "image-prompt" | "video-prompt" | "agent-prompt") => {
-    if (type === "agent-prompt") {
-      const lastAtIdx = agentInput.lastIndexOf("@");
-      const base = lastAtIdx !== -1 ? agentInput.substring(0, lastAtIdx) : agentInput;
-      setAgentInput(`${base}[Ref: ${itemId}] `);
-      setAgentReferenceId(itemId);
-      setAgentReferenceUrl(itemUrl);
-      setAgentReferences(prev => {
-        if (prev.some(r => r.id === itemId)) return prev;
-        return [...prev, { id: itemId, url: itemUrl }];
-      });
-    } else {
-      const lastAtIdx = prompt.lastIndexOf("@");
-      const base = lastAtIdx !== -1 ? prompt.substring(0, lastAtIdx) : prompt;
-      setPrompt(`${base}[Ref: ${itemId}] `);
-      setReferenceImage(itemUrl);
-      setReferenceImages(prev => {
-        if (prev.some(r => r.id === itemId)) return prev;
-        const role =
-          type === "video-prompt" && videoReferenceMode === "firstLast"
-            ? prev.length === 1
-              ? "end"
-              : prev.length === 0
-                ? "start"
-                : "general"
-            : "general";
-        return [...prev, { id: itemId, url: itemUrl, role }];
-      });
-    }
-    setAtDropdown({ visible: false, type, search: "" });
-  };
-
-  const renderAtDropdown = (type: "image-prompt" | "video-prompt" | "agent-prompt") => {
+  const renderAtDropdown = (type: AtDropdownTarget) => {
     if (type !== "agent-prompt") {
       return (
         <PromptReferenceDropdown
