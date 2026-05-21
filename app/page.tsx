@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useDeferredValue, useMemo, useState, useEffect, useRef } from "react";
+import React, { useCallback, useMemo, useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
   Download,
@@ -12,10 +12,8 @@ import JSZip from "jszip";
 import AgentDock, { type AgentToolAction, type ChatMessage } from "@/components/agent/AgentDock";
 import { VISUAL_PRESETS, type VisualPreset } from "@/components/PresetStyles";
 import CanvasMaskEditor from "@/components/CanvasMaskEditor";
-import type { CompareViewType } from "@/components/assets/ComparePanel";
 import FloatingCompareButton from "@/components/assets/FloatingCompareButton";
 import FullscreenPreview from "@/components/assets/FullscreenPreview";
-import type { AssetStatusFilter, AssetTypeFilter } from "@/components/assets/AssetToolbar";
 import CreationModeTabs, { type CreationMode } from "@/components/creation/CreationModeTabs";
 import ImageGenerationPanel from "@/components/creation/ImageGenerationPanel";
 import VideoGenerationPanel from "@/components/creation/VideoGenerationPanel";
@@ -32,6 +30,7 @@ import AssetGalleryWorkspace from "@/components/workbench/AssetGalleryWorkspace"
 import WorkspaceHeader, { type ThemeMode } from "@/components/workbench/WorkspaceHeader";
 import WorkspaceNotices, { type WorkspaceNotice } from "@/components/workbench/WorkspaceNotices";
 import { saveToDB, getAllFromDB, deleteFromDB, clearAllDB, StorageItem } from "@/lib/db";
+import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
 import {
   CHAT_MODEL_OPTIONS,
   DEFAULT_CHAT_MODEL,
@@ -57,12 +56,6 @@ type ModelCategory = "chat" | "image" | "video";
 type PromptReferenceTarget = "image-prompt" | "video-prompt";
 
 const IMAGE_REFERENCE_LIMIT = 4;
-
-interface AssetStats {
-  modelOptions: string[];
-  typeCounts: Record<StorageItem["type"], number>;
-  statusCounts: Record<StorageItem["status"], number>;
-}
 
 function defaultProviderCredentials(): Record<AiProvider, ProviderCredentials> {
   const record = {} as Record<AiProvider, ProviderCredentials>;
@@ -302,16 +295,34 @@ export default function Home() {
     setTraditionalSubTab("video");
   };
 
-  // Filter & UI Select States
-  const [filterType, setFilterType] = useState<AssetTypeFilter>("all");
-  const [assetStatusFilter, setAssetStatusFilter] = useState<AssetStatusFilter>("all");
-  const [assetModelFilter, setAssetModelFilter] = useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
-  const [isCompareMode, setIsCompareMode] = useState(false);
-  const [compareItemIds, setCompareItemIds] = useState<string[]>([]);
-  const [compareViewType, setCompareViewType] = useState<CompareViewType>("side-by-side");
-  const [compareSliderPos, setCompareSliderPos] = useState(50);
+  const {
+    assetModelFilter,
+    assetStats,
+    assetStatusFilter,
+    cancelingItemIdSet,
+    compareItemIdSet,
+    compareItemIds,
+    compareItems,
+    compareSliderPos,
+    compareViewType,
+    filterType,
+    filteredItems,
+    isCompareMode,
+    searchQuery,
+    searchableReferenceImages,
+    selectedItemIdSet,
+    selectedItemIds,
+    setAssetModelFilter,
+    setAssetStatusFilter,
+    setCancelingItemIds,
+    setCompareItemIds,
+    setCompareSliderPos,
+    setCompareViewType,
+    setFilterType,
+    setIsCompareMode,
+    setSearchQuery,
+    setSelectedItemIds,
+  } = useAssetWorkspaceState(items);
 
   const WELCOME_MESSAGE: ChatMessage = {
     id: "welcome",
@@ -353,7 +364,6 @@ export default function Home() {
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [imageSubmitCount, setImageSubmitCount] = useState(0);
   const [videoSubmitCount, setVideoSubmitCount] = useState(0);
-  const [cancelingItemIds, setCancelingItemIds] = useState<string[]>([]);
   const [workspaceNotices, setWorkspaceNotices] = useState<WorkspaceNotice[]>([]);
 
   // Interactive Mask Editor State
@@ -443,49 +453,6 @@ export default function Home() {
   const imageModelGroups = getProviderModelGroups(imageModelOptions);
   const videoModelGroups = getProviderModelGroups(videoModelOptions);
   const chatModelGroups = getProviderModelGroups(chatModelOptions);
-  const deferredSearchQuery = useDeferredValue(searchQuery);
-  const selectedItemIdSet = useMemo(() => new Set(selectedItemIds), [selectedItemIds]);
-  const compareItemIdSet = useMemo(() => new Set(compareItemIds), [compareItemIds]);
-  const cancelingItemIdSet = useMemo(() => new Set(cancelingItemIds), [cancelingItemIds]);
-  const assetStats = useMemo<AssetStats>(() => {
-    const models = new Set<string>();
-    const typeCounts: Record<StorageItem["type"], number> = { image: 0, video: 0 };
-    const statusCounts: Record<StorageItem["status"], number> = {
-      complete: 0,
-      failed: 0,
-      pending: 0,
-      processing: 0,
-    };
-
-    for (const item of items) {
-      models.add(item.model);
-      typeCounts[item.type] += 1;
-      statusCounts[item.status] += 1;
-    }
-
-    return {
-      modelOptions: Array.from(models).sort(),
-      typeCounts,
-      statusCounts,
-    };
-  }, [items]);
-  const filteredItems = useMemo(() => {
-    const query = deferredSearchQuery.trim().toLowerCase();
-
-    return items.filter(item => {
-      if (filterType === "images" && item.type !== "image") return false;
-      if (filterType === "videos" && item.type !== "video") return false;
-      if (assetStatusFilter !== "all" && item.status !== assetStatusFilter) return false;
-      if (assetModelFilter !== "all" && item.model !== assetModelFilter) return false;
-      if (!query) return true;
-
-      return item.prompt.toLowerCase().includes(query) || item.model.toLowerCase().includes(query);
-    });
-  }, [assetModelFilter, assetStatusFilter, deferredSearchQuery, filterType, items]);
-  const searchableReferenceImages = useMemo(
-    () => items.filter(item => item.type === "image" && item.status === "complete"),
-    [items],
-  );
   const getReferenceLimitForTarget = (target: PromptReferenceTarget): number =>
     target === "video-prompt" ? videoReferenceLimit : IMAGE_REFERENCE_LIMIT;
   const getDroppedReferenceRole = (target: PromptReferenceTarget, index: number): ReferenceImageRef["role"] => {
@@ -551,14 +518,6 @@ export default function Home() {
       setAtDropdown({ visible: false, type: target, search: "" });
     }, 0);
   };
-  const compareItems = useMemo(() => {
-    const itemById = new Map(items.map(item => [item.id, item]));
-    return {
-      first: compareItemIds[0] ? itemById.get(compareItemIds[0]) : undefined,
-      second: compareItemIds[1] ? itemById.get(compareItemIds[1]) : undefined,
-    };
-  }, [compareItemIds, items]);
-
   const handleSelectImageModel = (model: string) => {
     const capabilities = getImageModelCapabilities(model);
     setSelectedModel(model);
