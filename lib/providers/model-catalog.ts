@@ -319,6 +319,34 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     provider: "xstx",
     model: "claude-haiku-4-5-20251001",
   }),
+  imageCapability({
+    value: "xstx:gpt-image-2",
+    label: "星途 GPT Image 2",
+    provider: "xstx",
+    model: "gpt-image-2",
+    supportsAsync: false,
+    supportsReferences: true,
+    sizes: GPT_IMAGE_SIZES,
+    qualityLevels: GPT_QUALITY_OPTIONS,
+  }),
+  imageCapability({
+    value: "xstx:gpt-image-2-2k",
+    label: "星途 GPT Image 2 (2K)",
+    provider: "xstx",
+    model: "gpt-image-2-2k",
+    supportsAsync: false,
+    supportsReferences: true,
+    sizes: GPT_IMAGE_SIZES.filter(s => s.value !== "3840x2160" && s.value !== "2160x3840"),
+  }),
+  imageCapability({
+    value: "xstx:gpt-image-2-4k",
+    label: "星途 GPT Image 2 (4K)",
+    provider: "xstx",
+    model: "gpt-image-2-4k",
+    supportsAsync: false,
+    supportsReferences: true,
+    sizes: GPT_IMAGE_SIZES,
+  }),
 ];
 
 export const IMAGE_MODEL_OPTIONS = buildProviderOptionsRecord("image", false);
