@@ -1,0 +1,425 @@
+import type { Dispatch, MouseEvent, MutableRefObject, SetStateAction } from "react";
+import JSZip from "jszip";
+import type { CompareViewType } from "@/components/assets/ComparePanel";
+import { clearAllDB, deleteFromDB, saveToDB, type StorageItem } from "@/lib/db";
+import { parseProviderModel, type AiProvider } from "@/lib/providers/model-catalog";
+
+type NoticeType = "error" | "info" | "success";
+
+interface UseAssetActionsParams {
+  buildProviderHeaders: (target?: string) => Record<string, string>;
+  compareItemIds: string[];
+  filteredItems: StorageItem[];
+  generationAbortControllersRef: MutableRefObject<Record<string, AbortController>>;
+  items: StorageItem[];
+  locallyCanceledItemIdsRef: MutableRefObject<Set<string>>;
+  pollingFailuresRef: MutableRefObject<Record<string, number>>;
+  pushWorkspaceNotice: (type: NoticeType, message: string) => void;
+  selectedItemIdSet: Set<string>;
+  selectedItemIds: string[];
+  selectedProvider: AiProvider;
+  setCancelingItemIds: Dispatch<SetStateAction<string[]>>;
+  setCompareItemIds: Dispatch<SetStateAction<string[]>>;
+  setCompareSliderPos: Dispatch<SetStateAction<number>>;
+  setCompareViewType: Dispatch<SetStateAction<CompareViewType>>;
+  setIsCompareMode: Dispatch<SetStateAction<boolean>>;
+  setItems: Dispatch<SetStateAction<StorageItem[]>>;
+  setSelectedItemIds: Dispatch<SetStateAction<string[]>>;
+}
+
+function makeClientId(prefix: string): string {
+  return `${prefix}_${Date.now()}`;
+}
+
+function getStringField(value: unknown, field: string): string | null {
+  if (typeof value !== "object" || value === null || !(field in value)) return null;
+  const record = value as Record<string, unknown>;
+  const fieldValue = record[field];
+  return typeof fieldValue === "string" && fieldValue.trim() ? fieldValue : null;
+}
+
+function toErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message.trim() ? error.message : fallback;
+}
+
+async function readFetchError(response: Response, fallback: string): Promise<string> {
+  try {
+    const data: unknown = await response.json();
+    return getStringField(data, "error") ?? getStringField(data, "message") ?? `${fallback} (HTTP ${response.status})`;
+  } catch {
+    return `${fallback} (HTTP ${response.status})`;
+  }
+}
+
+export function useAssetActions({
+  buildProviderHeaders,
+  compareItemIds,
+  filteredItems,
+  generationAbortControllersRef,
+  items,
+  locallyCanceledItemIdsRef,
+  pollingFailuresRef,
+  pushWorkspaceNotice,
+  selectedItemIdSet,
+  selectedItemIds,
+  selectedProvider,
+  setCancelingItemIds,
+  setCompareItemIds,
+  setCompareSliderPos,
+  setCompareViewType,
+  setIsCompareMode,
+  setItems,
+  setSelectedItemIds,
+}: UseAssetActionsParams) {
+  const toggleSelectItem = (id: string, event?: MouseEvent) => {
+    if (event?.shiftKey && selectedItemIds.length > 0) {
+      const lastSelectedIdx = filteredItems.findIndex(item => item.id === selectedItemIds[selectedItemIds.length - 1]);
+      const currentSelectedIdx = filteredItems.findIndex(item => item.id === id);
+
+      if (lastSelectedIdx !== -1 && currentSelectedIdx !== -1) {
+        const start = Math.min(lastSelectedIdx, currentSelectedIdx);
+        const end = Math.max(lastSelectedIdx, currentSelectedIdx);
+        const slicedIds = filteredItems.slice(start, end + 1).map(item => item.id);
+
+        setSelectedItemIds(prev => Array.from(new Set([...prev, ...slicedIds])));
+        return;
+      }
+    }
+
+    if (selectedItemIds.includes(id)) {
+      setSelectedItemIds(prev => prev.filter(itemId => itemId !== id));
+    } else {
+      setSelectedItemIds(prev => [...prev, id]);
+    }
+  };
+
+  const handleClearSelection = () => {
+    setSelectedItemIds([]);
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedItemIds.length === 0) return;
+    if (confirm(`确定要彻底删除已选中的 ${selectedItemIds.length} 项创意资产吗？`)) {
+      for (const id of selectedItemIds) {
+        await deleteFromDB(id);
+      }
+      setItems(prev => prev.filter(item => !selectedItemIds.includes(item.id)));
+      setSelectedItemIds([]);
+      setCompareItemIds([]);
+    }
+  };
+
+  const deleteItemsByStatus = async (statuses: StorageItem["status"][]) => {
+    const ids = items.filter(item => statuses.includes(item.status)).map(item => item.id);
+    if (ids.length === 0) return;
+    if (confirm(`确定要删除 ${ids.length} 个 ${statuses.join("/")} 任务吗？`)) {
+      for (const id of ids) {
+        await deleteFromDB(id);
+      }
+      setItems(prev => prev.filter(item => !ids.includes(item.id)));
+      setSelectedItemIds(prev => prev.filter(id => !ids.includes(id)));
+      setCompareItemIds(prev => prev.filter(id => !ids.includes(id)));
+    }
+  };
+
+  const cancelProcessingItem = async (item: StorageItem) => {
+    const operationName = item.operationName;
+    const canCancelRemote = operationName?.startsWith("12ai:video:") === true;
+    const confirmText = canCancelRemote
+      ? "确定要取消这个视频生成任务吗？"
+      : "确定要本地取消这个任务吗？远端生成可能仍会继续。";
+    if (!confirm(confirmText)) return;
+
+    setCancelingItemIds(prev => [...prev, item.id]);
+    try {
+      const controller = generationAbortControllersRef.current[item.id];
+      if (controller) {
+        locallyCanceledItemIdsRef.current.add(item.id);
+        controller.abort();
+      }
+      if (!canCancelRemote) {
+        locallyCanceledItemIdsRef.current.add(item.id);
+      }
+
+      if (canCancelRemote) {
+        const res = await fetch("/api/gemini/cancel-media", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...buildProviderHeaders(operationName) },
+          body: JSON.stringify({ operationName }),
+        });
+
+        if (!res.ok) {
+          throw new Error(await readFetchError(res, "任务取消失败"));
+        }
+      }
+
+      await deleteFromDB(item.id);
+      delete pollingFailuresRef.current[item.id];
+      setItems(prev => prev.filter(current => current.id !== item.id));
+      setSelectedItemIds(prev => prev.filter(id => id !== item.id));
+      setCompareItemIds(prev => prev.filter(id => id !== item.id));
+      pushWorkspaceNotice("success", canCancelRemote ? "视频生成任务已取消" : "任务已从本地取消");
+    } catch (error) {
+      pushWorkspaceNotice("error", toErrorMessage(error, "任务取消失败"));
+    } finally {
+      setCancelingItemIds(prev => prev.filter(id => id !== item.id));
+    }
+  };
+
+  const handleDeleteItem = async (item: StorageItem) => {
+    if (confirm("确定要删除此创意项吗？")) {
+      await deleteFromDB(item.id);
+      setItems(prev => prev.filter(current => current.id !== item.id));
+      setSelectedItemIds(prev => prev.filter(id => id !== item.id));
+      setCompareItemIds(prev => prev.filter(id => id !== item.id));
+    }
+  };
+
+  const handleResetLocalData = async () => {
+    if (confirm("这会清空所有生成的历史卡片，无法恢复！")) {
+      await clearAllDB();
+      setItems([]);
+      setCompareItemIds([]);
+      setSelectedItemIds([]);
+    }
+  };
+
+  const exportMetadataJson = () => {
+    const sourceItems = selectedItemIds.length > 0
+      ? items.filter(item => selectedItemIdSet.has(item.id))
+      : filteredItems;
+    if (sourceItems.length === 0) return;
+    const metadata = sourceItems.map(item => ({
+      id: item.id,
+      type: item.type,
+      prompt: item.prompt,
+      model: item.model,
+      provider: parseProviderModel(item.model, selectedProvider).provider,
+      aspectRatio: item.aspectRatio,
+      status: item.status,
+      progress: item.progress,
+      operationName: item.operationName,
+      errorMessage: item.errorMessage,
+      createdAt: item.createdAt,
+    }));
+    const blob = new Blob([JSON.stringify(metadata, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${makeClientId("imagine_metadata")}.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  };
+
+  const retryFailedItem = async (item: StorageItem) => {
+    if (item.status !== "failed") return;
+    const retryingItem: StorageItem = {
+      ...item,
+      status: item.type === "image" ? "pending" : "processing",
+      progress: item.type === "image" ? 30 : 12,
+      errorMessage: undefined,
+      operationName: undefined,
+    };
+    await saveToDB(retryingItem);
+    setItems(prev => prev.map(current => current.id === item.id ? retryingItem : current));
+
+    try {
+      const headers = buildProviderHeaders(item.model);
+      const endpoint = item.type === "image" ? "/api/gemini/generate-image" : "/api/gemini/generate-video";
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({
+          prompt: item.prompt,
+          model: item.model,
+          aspectRatio: item.aspectRatio,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(await readFetchError(res, "任务重试失败"));
+      }
+
+      const data: unknown = await res.json();
+      const operationName = getStringField(data, "operationName");
+      const imageUrl = getStringField(data, "imageUrl");
+
+      if (operationName) {
+        const processingItem: StorageItem = {
+          ...retryingItem,
+          status: "processing",
+          progress: 15,
+          operationName,
+        };
+        await saveToDB(processingItem);
+        setItems(prev => prev.map(current => current.id === item.id ? processingItem : current));
+        return;
+      }
+
+      if (item.type === "image" && imageUrl) {
+        const completedItem: StorageItem = {
+          ...retryingItem,
+          url: imageUrl,
+          status: "complete",
+          progress: 100,
+        };
+        await saveToDB(completedItem);
+        setItems(prev => prev.map(current => current.id === item.id ? completedItem : current));
+        return;
+      }
+
+      throw new Error(item.type === "image" ? "图片接口返回缺少 imageUrl 或 operationName" : "视频接口返回缺少 operationName");
+    } catch (error) {
+      const message = toErrorMessage(error, "任务重试失败");
+      const failedItem: StorageItem = {
+        ...item,
+        status: "failed",
+        progress: 100,
+        errorMessage: message,
+      };
+      await saveToDB(failedItem);
+      setItems(prev => prev.map(current => current.id === item.id ? failedItem : current));
+      pushWorkspaceNotice("error", message);
+    }
+  };
+
+  const handleDownloadItem = async (item: StorageItem) => {
+    const extension = item.type === "image" ? "png" : "mp4";
+    const fileName = `imagine_${item.id}.${extension}`;
+
+    try {
+      let blob: Blob;
+      if (item.url && item.url.startsWith("data:")) {
+        const parts = item.url.split(";base64,");
+        if (parts.length === 2) {
+          const byteChars = atob(parts[1]);
+          const bytes = new Uint8Array(byteChars.length);
+          for (let index = 0; index < byteChars.length; index += 1) {
+            bytes[index] = byteChars.charCodeAt(index);
+          }
+          blob = new Blob([bytes], { type: item.type === "image" ? "image/png" : "video/mp4" });
+        } else {
+          throw new Error("Invalid data URI");
+        }
+      } else {
+        const fileRes = await fetch(item.url);
+        if (!fileRes.ok) throw new Error(`Fetch failed: HTTP ${fileRes.status}`);
+        blob = await fileRes.blob();
+      }
+
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = fileName;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Download item failed:", error);
+      alert("下载失败，请检查网络或文件是否可访问。");
+    }
+  };
+
+  const handleBatchDownloadZip = async () => {
+    if (selectedItemIds.length === 0) return;
+    const itemsToExport = items.filter(item => selectedItemIds.includes(item.id));
+
+    const zip = new JSZip();
+    const metadataList: Array<{
+      id: string;
+      fileName: string;
+      type: StorageItem["type"];
+      prompt: string;
+      model: string;
+      aspectRatio: string;
+      createdAt: string;
+    }> = [];
+
+    await Promise.all(itemsToExport.map(async (item) => {
+      const extension = item.type === "image" ? "png" : "mp4";
+      const fileName = `creation_${item.id}.${extension}`;
+
+      metadataList.push({
+        id: item.id,
+        fileName,
+        type: item.type,
+        prompt: item.prompt,
+        model: item.model,
+        aspectRatio: item.aspectRatio,
+        createdAt: item.createdAt,
+      });
+
+      try {
+        if (item.url && item.url.startsWith("data:")) {
+          const parts = item.url.split(";base64,");
+          if (parts.length === 2) {
+            zip.file(fileName, parts[1], { base64: true });
+          }
+        } else if (item.url) {
+          const fileRes = await fetch(item.url);
+          if (fileRes.ok) {
+            const blob = await fileRes.blob();
+            zip.file(fileName, blob);
+          } else {
+            zip.file(`link_fallback_${item.id}.txt`, item.url);
+          }
+        }
+      } catch (error) {
+        console.error(`Error adding file ${item.id} to zip:`, error);
+        zip.file(`error_log_${item.id}.txt`, `Failed to fetch from: ${item.url}\nError: ${error}`);
+      }
+    }));
+
+    zip.file("workspace_metadata.json", JSON.stringify(metadataList, null, 2));
+
+    const content = await zip.generateAsync({ type: "blob" });
+    const url = URL.createObjectURL(content);
+
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${makeClientId("Imagine_Workbench_Export")}.zip`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  };
+
+  const toggleCompare = (id: string) => {
+    if (compareItemIds.includes(id)) {
+      setCompareItemIds(prev => prev.filter(itemId => itemId !== id));
+    } else {
+      const nextBatch = compareItemIds.length >= 2 ? [compareItemIds[1], id] : [...compareItemIds, id];
+      setCompareItemIds(nextBatch);
+      if (nextBatch.length === 2) {
+        setIsCompareMode(true);
+        setCompareSliderPos(50);
+
+        const matchA = items.find(item => item.id === nextBatch[0]);
+        const matchB = items.find(item => item.id === nextBatch[1]);
+        if (matchA?.type === "image" && matchB?.type === "image") {
+          setCompareViewType("wipe-slider");
+        } else {
+          setCompareViewType("side-by-side");
+        }
+      }
+    }
+  };
+
+  return {
+    cancelProcessingItem,
+    deleteItemsByStatus,
+    exportMetadataJson,
+    handleBatchDelete,
+    handleBatchDownloadZip,
+    handleClearSelection,
+    handleDeleteItem,
+    handleDownloadItem,
+    handleResetLocalData,
+    retryFailedItem,
+    toggleCompare,
+    toggleSelectItem,
+  };
+}
