@@ -26,6 +26,8 @@ import WorkspaceHeader, { type ThemeMode } from "@/components/workbench/Workspac
 import WorkspaceNotices, { type WorkspaceNotice } from "@/components/workbench/WorkspaceNotices";
 import { saveToDB, getAllFromDB, deleteFromDB, clearAllDB, StorageItem } from "@/lib/db";
 import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
+import { useClipboardImageImport } from "@/hooks/useClipboardImageImport";
+import { useMediaPolling } from "@/hooks/useMediaPolling";
 import {
   buildPromptWithReferenceMap,
   removePromptReferenceTokens,
@@ -318,6 +320,21 @@ export default function Home() {
     setAgentInput,
     setPrompt,
   });
+  useClipboardImageImport({
+    setAgentReferenceId,
+    setAgentReferenceUrl,
+    setAgentReferences,
+    setReferenceImage,
+    setReferenceImages,
+  });
+  useMediaPolling({
+    buildProviderHeaders,
+    items,
+    locallyCanceledItemIdsRef,
+    pollingFailuresRef,
+    pushWorkspaceNotice,
+    setItems,
+  });
   const imageModelGroups = getProviderModelGroups(imageModelOptions);
   const videoModelGroups = getProviderModelGroups(videoModelOptions);
   const chatModelGroups = getProviderModelGroups(chatModelOptions);
@@ -428,44 +445,6 @@ export default function Home() {
     return () => clearTimeout(restoreSettings);
   }, []);
 
-  // Listen to clipboard paste events globally to import reference images
-  useEffect(() => {
-    const handlePaste = async (e: ClipboardEvent) => {
-      const clipboardItems = e.clipboardData?.items;
-      if (!clipboardItems) return;
-      for (const item of clipboardItems) {
-        if (item.type.indexOf("image") !== -1) {
-          const file = item.getAsFile();
-          if (file) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-              const base64 = event.target?.result as string;
-              const newReferenceId = makeClientId("import");
-
-              // Set reference image context
-              setReferenceImage(base64);
-              setAgentReferenceId(newReferenceId);
-              setAgentReferenceUrl(base64);
-              setReferenceImages(prev => {
-                if (prev.some(r => r.id === newReferenceId)) return prev;
-                return [...prev, { id: newReferenceId, url: base64, role: "general" }];
-              });
-              setAgentReferences(prev => {
-                if (prev.some(r => r.id === newReferenceId)) return prev;
-                return [...prev, { id: newReferenceId, url: base64 }];
-              });
-              alert("📋 识别到剪贴板图像！已作为参考图导入。");
-            };
-            reader.readAsDataURL(file);
-            break;
-          }
-        }
-      }
-    };
-    window.addEventListener("paste", handlePaste);
-    return () => window.removeEventListener("paste", handlePaste);
-  }, [setAgentReferenceId, setAgentReferenceUrl, setAgentReferences, setReferenceImage, setReferenceImages]);
-
   // Scroll to bottom of agent chat as new messages arrived
   useEffect(() => {
     if (chatBottomRef.current) {
@@ -479,116 +458,6 @@ export default function Home() {
       localStorage.setItem("imagine_agent_chat", JSON.stringify(agentMessages));
     }
   }, [agentMessages]);
-
-  // Media Polling engine - checks processing image/video operations every 4 seconds
-  useEffect(() => {
-    const processingItems = items.filter(x => x.status === "processing" && x.operationName);
-    if (processingItems.length === 0) return;
-
-    const interval = setInterval(async () => {
-      let changed = false;
-      const updatedList = [...items];
-
-      for (let i = 0; i < updatedList.length; i++) {
-        const item = updatedList[i];
-        if (item.status === "processing" && item.operationName) {
-          if (locallyCanceledItemIdsRef.current.has(item.id)) continue;
-          try {
-            console.log(`Polling status for operation: ${item.operationName}`);
-            const headers = buildProviderHeaders(item.operationName);
-
-            const res = await fetch("/api/gemini/video-status", {
-              method: "POST",
-              headers: { "Content-Type": "application/json", ...headers },
-              body: JSON.stringify({ operationName: item.operationName }),
-            });
-
-            if (!res.ok) {
-              throw new Error(await readFetchError(res, "任务状态查询失败"));
-            }
-
-            const statusData: unknown = await res.json();
-            if (typeof statusData !== "object" || statusData === null) {
-              throw new Error("任务状态接口返回格式不正确");
-            }
-            const statusRecord = statusData as Record<string, unknown>;
-            pollingFailuresRef.current[item.id] = 0;
-
-            if (statusRecord.done === true) {
-                const mediaType = statusRecord.mediaType === "image" ? "image" : "video";
-                const downloadEndpoint =
-                  mediaType === "image"
-                    ? "/api/gemini/image-download"
-                    : "/api/gemini/video-download";
-
-                console.log(`Operation done! Fetching final ${mediaType} download: ${item.operationName}`);
-                const dlRes = await fetch(downloadEndpoint, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json", ...headers },
-                  body: JSON.stringify({ operationName: item.operationName }),
-                });
-
-                if (dlRes.ok) {
-                  const blob = await dlRes.blob();
-                  const reader = new FileReader();
-                  reader.onloadend = async () => {
-                    const base64data = reader.result as string;
-                    updatedList[i] = {
-                      ...item,
-                      url: base64data,
-                      status: "complete",
-                      progress: 100,
-                    };
-                    await saveToDB(updatedList[i]);
-                    setItems([...updatedList]);
-                  };
-                  reader.readAsDataURL(blob);
-                  changed = true;
-                } else {
-                  throw new Error(await readFetchError(dlRes, "结果下载失败"));
-                }
-              } else {
-                const nextProgress = typeof statusRecord.progress === "number" ? statusRecord.progress : item.progress;
-                // Update progress percentages
-                if (item.progress !== nextProgress) {
-                  updatedList[i] = {
-                    ...item,
-                    progress: nextProgress,
-                  };
-                  await saveToDB(updatedList[i]);
-                  changed = true;
-                }
-            }
-          } catch (e) {
-            const previousFailures = pollingFailuresRef.current[item.id] ?? 0;
-            const nextFailures = previousFailures + 1;
-            pollingFailuresRef.current[item.id] = nextFailures;
-            console.error(`Polling failed for ${item.id}:`, e);
-
-            if (nextFailures >= 3) {
-              const failedItem: StorageItem = {
-                ...item,
-                status: "failed",
-                progress: 100,
-                errorMessage: toErrorMessage(e, "任务轮询失败"),
-              };
-              updatedList[i] = failedItem;
-              delete pollingFailuresRef.current[item.id];
-              await saveToDB(failedItem);
-              pushWorkspaceNotice("error", `异步任务失败：${failedItem.errorMessage}`);
-              changed = true;
-            }
-          }
-        }
-      }
-
-      if (changed) {
-        setItems(updatedList);
-      }
-    }, 4000);
-
-    return () => clearInterval(interval);
-  }, [buildProviderHeaders, items, pushWorkspaceNotice]);
 
   const handleToggleAutoExecute = (val: boolean) => {
     setAutoExecute(val);
