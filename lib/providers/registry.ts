@@ -7,6 +7,7 @@ export interface ProviderMeta {
   defaultBaseUrl: string;
   defaultVideoBaseUrl: string;
   apiKeyPlaceholder: string;
+  registerUrl?: string;
   hasEditableBaseUrl: boolean;
   supportsImage: boolean;
   supportsVideo: boolean;
@@ -23,6 +24,7 @@ export const PROVIDER_REGISTRY = [
     defaultBaseUrl: "https://cdn.12ai.org",
     defaultVideoBaseUrl: "https://new.12ai.org",
     apiKeyPlaceholder: "sk_your_12ai_key",
+    registerUrl: "https://new.12ai.org/register?aff=PYE8",
     hasEditableBaseUrl: false,
     supportsImage: true,
     supportsVideo: true,
@@ -49,6 +51,7 @@ export const PROVIDER_REGISTRY = [
     defaultBaseUrl: "https://api.xstx.info",
     defaultVideoBaseUrl: "https://api.xstx.info",
     apiKeyPlaceholder: "sk_your_xstx_key",
+    registerUrl: "https://api.xstx.info/register?aff=fYXi",
     hasEditableBaseUrl: true,
     supportsImage: true,
     supportsVideo: false,

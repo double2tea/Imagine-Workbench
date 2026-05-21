@@ -34,6 +34,7 @@ interface ProviderCredentialCardProps {
   endpoints?: string[];
   provider: AiProvider;
   providerTest: ProviderTestState;
+  registerUrl?: string;
   showBaseUrl: boolean;
   title: string;
   onClear: (provider: AiProvider) => void;
@@ -105,6 +106,7 @@ function ProviderCredentialCard({
   endpoints,
   provider,
   providerTest,
+  registerUrl,
   showBaseUrl,
   title,
   onClear,
@@ -143,6 +145,19 @@ function ProviderCredentialCard({
       {endpoints && (
         <div className="mt-3 rounded-lg bg-slate-900/70 border border-slate-800 px-3 py-2 font-mono text-[10px] text-slate-400 leading-relaxed">
           {endpoints.map(endpoint => <div key={endpoint}>{endpoint}</div>)}
+        </div>
+      )}
+      {registerUrl && (
+        <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2">
+          <span className="text-[10px] font-semibold text-slate-400">需要填入令牌后使用</span>
+          <a
+            href={registerUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex h-7 items-center rounded-lg border border-amber-400/25 bg-amber-500/15 px-2.5 text-[10px] font-semibold text-amber-300 transition hover:bg-amber-500/20 hover:text-amber-200"
+          >
+            前往获取令牌
+          </a>
         </div>
       )}
       <div className="mt-3 flex items-center gap-2">
@@ -297,6 +312,7 @@ export default function SettingsModal({
                         endpoints={providerEndpointInfo(provider)}
                         provider={provider}
                         providerTest={providerTest}
+                        registerUrl={meta.registerUrl}
                         showBaseUrl={meta.hasEditableBaseUrl}
                         title={meta.label}
                         onClear={onClearCredentials}
