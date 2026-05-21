@@ -112,7 +112,7 @@ export default function ImageGenerationPanel({
         <div className="flex items-center justify-between mb-2">
           <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-300">
             <Sparkles className="h-3.5 w-3.5 text-blue-300" />
-            提示词 <span className="text-slate-500">(Prompt)</span>
+            提示词 <span className="hidden text-slate-500 sm:inline">(Prompt)</span>
           </label>
           <button
             onClick={onOptimizePrompt}
@@ -128,7 +128,8 @@ export default function ImageGenerationPanel({
             ) : (
               <Sparkles className="h-3 w-3 text-blue-300" />
             )}
-            一键智能优化
+            <span className="sm:hidden">优化</span>
+            <span className="hidden sm:inline">一键智能优化</span>
           </button>
         </div>
 
@@ -142,11 +143,12 @@ export default function ImageGenerationPanel({
               event.dataTransfer.dropEffect = "copy";
             }}
             onDrop={onPromptDropAsset}
-            placeholder="写下你想创造的图片奇思妙想... 可拖入右侧资产并生成 @图片 引用"
+            placeholder="写下你想创造的图片奇思妙想... 输入 @ 可引用作品"
             className="w-full h-24 resize-none border-0 bg-transparent text-sm leading-6 text-slate-100 placeholder-slate-500 outline-0 ring-0 focus:ring-0"
           />
           <div className="mt-2 flex items-center justify-between border-t border-slate-800 pt-2 font-mono text-[10px] text-slate-500">
-            <span>拖入资产到此处插入 @图片N | 拖入下方只作为参考图</span>
+            <span className="hidden sm:inline">拖入资产到此处插入 @图片N | 拖入下方只作为参考图</span>
+            <span className="sm:hidden">@ 可引用作品</span>
             <span>{prompt.length} 字符</span>
           </div>
         </div>
@@ -154,7 +156,7 @@ export default function ImageGenerationPanel({
 
       <div>
         <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">
-          反向提示词 <span className="text-slate-500">(Negative Prompt)</span>
+          反向提示词 <span className="hidden text-slate-500 sm:inline">(Negative Prompt)</span>
         </label>
         <input
           type="text"
@@ -270,7 +272,7 @@ export default function ImageGenerationPanel({
         browseClassName="font-medium text-blue-300 underline-offset-4 hover:text-blue-200 hover:underline cursor-pointer"
         clearLabel="清空所有垫图"
         emptyHelp="支持 JPG / PNG / WEBP | 可拖入右侧资产或粘贴剪贴板"
-        emptyLabel="拖拽图片"
+        emptyLabel="添加图片"
         label={`创意参考图 / 多图垫图 ${referenceImages.length > 0 ? `(${referenceImages.length})` : ""}`}
         maxCount={4}
         references={referenceImages}
@@ -296,7 +298,14 @@ export default function ImageGenerationPanel({
         ) : (
           <Sparkles className="h-4 w-4 text-white" />
         )}
-        {isSubmitting ? `提交中 (${submitCount})，可继续排队` : "一键渲染合成全新图片 (Render Image)"}
+        {isSubmitting ? (
+          `提交中 (${submitCount})，可继续排队`
+        ) : (
+          <>
+            <span className="sm:hidden">生成图片</span>
+            <span className="hidden sm:inline">一键渲染合成全新图片 (Render Image)</span>
+          </>
+        )}
       </button>
     </div>
   );

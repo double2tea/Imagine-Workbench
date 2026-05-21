@@ -141,7 +141,7 @@ export default function AssetGalleryWorkspace({
           <div className="imagine-gallery-empty flex min-h-[calc(100vh-390px)] flex-col items-center justify-center rounded-xl border border-dashed border-slate-800 bg-slate-950/28 p-6 text-center text-slate-500">
             <ImageIcon className="mb-3 h-9 w-9 text-slate-700" />
             <p className="text-sm font-semibold text-slate-400">暂无生成的创意文件</p>
-            <p className="mt-1 max-w-sm text-xs leading-5 text-slate-600">在左侧写下创意设想并生成，文件将实时存档至本地 IndexedDB。</p>
+            <p className="mt-1 max-w-sm text-xs leading-5 text-slate-600">写下创意设想并生成，文件将实时存档至本地 IndexedDB。</p>
           </div>
         ) : (
           <div className="imagine-gallery-grid grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">

@@ -2,12 +2,7 @@
 
 import React, { useCallback, useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import {
-  Download,
-  Play,
-  Pause,
-  Maximize2,
-} from "lucide-react";
+import { RefreshCw, SlidersHorizontal, Sparkles, Video } from "lucide-react";
 import AgentDock from "@/components/agent/AgentDock";
 import { VISUAL_PRESETS, type VisualPreset } from "@/components/PresetStyles";
 import CanvasMaskEditor from "@/components/CanvasMaskEditor";
@@ -18,6 +13,7 @@ import ImageGenerationPanel from "@/components/creation/ImageGenerationPanel";
 import VideoGenerationPanel from "@/components/creation/VideoGenerationPanel";
 import AtReferenceDropdown from "@/components/reference/AtReferenceDropdown";
 import PromptReferenceDropdown from "@/components/reference/PromptReferenceDropdown";
+import ReferenceImagePicker from "@/components/reference/ReferenceImagePicker";
 import SettingsModal from "@/components/settings/SettingsModal";
 import AssetGalleryWorkspace from "@/components/workbench/AssetGalleryWorkspace";
 import WorkspaceHeader, { type ThemeMode } from "@/components/workbench/WorkspaceHeader";
@@ -225,8 +221,8 @@ export default function Home() {
   const isFirstLastVideoMode = videoReferenceMode === "firstLast";
   const videoReferenceLabel = isFirstLastVideoMode ? "首帧 / 尾帧" : "视频参考图";
   const videoPromptPlaceholder = isFirstLastVideoMode
-    ? "描述首帧到尾帧之间的运动、转场与镜头变化... 可拖入右侧资产生成 @图片 引用"
-    : "描述场景的运动与镜头动作... 可拖入右侧资产作为视频参考";
+    ? "描述首帧到尾帧之间的运动、转场与镜头变化... 输入 @ 可引用作品"
+    : "描述场景的运动与镜头动作... 输入 @ 可引用作品";
   const videoReferenceHelp = isFirstLastVideoMode
     ? "第 1 张为首帧，第 2 张为尾帧"
     : "参考图用于主体、风格或场景引导，不作为首尾帧";
@@ -603,6 +599,287 @@ export default function Home() {
     });
   };
 
+  const renderAssetGalleryWorkspace = () => (
+    <AssetGalleryWorkspace
+      assetModelFilter={assetModelFilter}
+      assetStatusFilter={assetStatusFilter}
+      cancelingItemIdSet={cancelingItemIdSet}
+      compareItemIdSet={compareItemIdSet}
+      compareItemIds={compareItemIds}
+      compareItems={compareItems}
+      compareSliderPos={compareSliderPos}
+      compareViewType={compareViewType}
+      filterType={filterType}
+      filteredItems={filteredItems}
+      itemsCount={items.length}
+      modelOptions={assetStats.modelOptions}
+      searchQuery={searchQuery}
+      selectedCount={selectedItemIds.length}
+      selectedItemIdSet={selectedItemIdSet}
+      selectedProvider={selectedProvider}
+      statusCounts={assetStats.statusCounts}
+      typeCounts={assetStats.typeCounts}
+      isCompareMode={isCompareMode}
+      onApplyVideoReference={applyAsVideoReference}
+      onBatchDelete={handleBatchDelete}
+      onBatchDownloadZip={handleBatchDownloadZip}
+      onCancelItem={cancelProcessingItem}
+      onClearSelection={handleClearSelection}
+      onDeleteItem={handleDeleteItem}
+      onDeleteItemsByStatus={deleteItemsByStatus}
+      onDownloadItem={handleDownloadItem}
+      onExportMetadata={exportMetadataJson}
+      onLaunchMaskEditor={launchMaskEditor}
+      onOpenFullscreen={setFullscreenItem}
+      onResetCompare={() => {
+        setIsCompareMode(false);
+        setCompareItemIds([]);
+      }}
+      onRetryItem={retryFailedItem}
+      onSetAssetModelFilter={setAssetModelFilter}
+      onSetAssetStatusFilter={setAssetStatusFilter}
+      onSetCompareSliderPos={setCompareSliderPos}
+      onSetCompareViewType={setCompareViewType}
+      onSetFilterType={setFilterType}
+      onSetSearchQuery={setSearchQuery}
+      onToggleCompare={toggleCompare}
+      onToggleSelect={toggleSelectItem}
+      onUseAgentReference={(asset) => {
+        setAgentReferenceId(asset.id);
+        setAgentReferenceUrl(asset.url);
+        setIsAgentDockOpen(true);
+      }}
+      formatModelLabel={formatStoredModelLabel}
+    />
+  );
+
+  const renderMobileQuickComposer = () => {
+    const isImageMode = traditionalSubTab === "image";
+    const activeOptimizeLabel = isImageMode ? "优化" : "润色";
+    const activeSubmitCount = isImageMode ? imageSubmitCount : videoSubmitCount;
+    const isSubmitting = isImageMode ? isSubmittingImage : isSubmittingVideo;
+    const promptType: AtDropdownTarget = isImageMode ? "image-prompt" : "video-prompt";
+
+    return (
+      <section className="imagine-mobile-composer rounded-xl dark-glass p-3">
+        <CreationModeTabs value={traditionalSubTab} onChange={setTraditionalSubTab} />
+
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-200">
+            {isImageMode ? <Sparkles className="h-3.5 w-3.5 text-blue-300" /> : <Video className="h-3.5 w-3.5 text-violet-300" />}
+            描述
+          </label>
+          <button
+            type="button"
+            onClick={optimizeActivePrompt}
+            disabled={isOptimizing || !prompt.trim()}
+            className={`flex h-8 items-center gap-1 rounded-md border px-2.5 text-[11px] font-semibold transition ${
+              isOptimizing || !prompt.trim()
+                ? "border-slate-800 bg-slate-900/70 text-slate-600"
+                : "border-blue-400/25 bg-blue-500/12 text-blue-200"
+            }`}
+          >
+            {isOptimizing ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+            {activeOptimizeLabel}
+          </button>
+        </div>
+
+        <div className="imagine-field-shell relative mt-2 rounded-lg border border-slate-800 bg-slate-950/55 p-3 transition focus-within:border-blue-400/35">
+          {atDropdown.visible && atDropdown.type === promptType ? renderAtDropdown(promptType) : null}
+          <textarea
+            value={prompt}
+            onChange={(event) => handleTextareaChange(event.target.value, promptType)}
+            onDrop={(event) => handlePromptDropAsset(event, promptType)}
+            placeholder={isImageMode ? "描述你想生成的画面，输入 @ 引用作品" : videoPromptPlaceholder}
+            className="h-32 w-full resize-none border-0 bg-transparent text-base leading-6 text-slate-100 placeholder-slate-500 outline-0 ring-0 focus:ring-0"
+          />
+          <div className="mt-2 flex items-center justify-between border-t border-slate-800 pt-2 font-mono text-[10px] text-slate-500">
+            <span>@ 引用作品</span>
+            <span>{prompt.length} 字符</span>
+          </div>
+        </div>
+
+        {isImageMode ? (
+          <ReferenceImagePicker
+            addLabel="多图垫"
+            browseClassName="font-medium text-blue-300 underline-offset-4 hover:text-blue-200 hover:underline cursor-pointer"
+            clearLabel="清空"
+            emptyHelp="支持 JPG / PNG / WEBP"
+            emptyLabel="添加图片"
+            label={`参考图 ${referenceImages.length > 0 ? `(${referenceImages.length})` : ""}`}
+            maxCount={4}
+            references={referenceImages}
+            uploadLabel="上传"
+            onClear={() => {
+              setReferenceImages([]);
+              setReferenceImage(null);
+              setPrompt(removePromptReferenceTokens);
+            }}
+            onDropAsset={(asset) => handleReferenceDropAsset(asset, "image-prompt")}
+            onDropFiles={(files) => handleReferenceDropFiles(files, "image-prompt")}
+            onRemove={removeReferenceImage}
+            onUpload={handleImageUpload}
+          />
+        ) : (
+          <ReferenceImagePicker
+            addLabel="添加参考"
+            browseClassName="font-medium text-violet-300 underline-offset-4 hover:text-violet-200 hover:underline cursor-pointer"
+            clearLabel={videoClearReferenceLabel}
+            emptyHelp={videoReferenceHelp}
+            emptyLabel={`添加${videoReferenceLabel}`}
+            label={`${videoReferenceLabel} ${referenceImages.length > 0 ? `(${Math.min(referenceImages.length, videoReferenceLimit)}/${videoReferenceLimit})` : ""}`}
+            maxCount={videoReferenceLimit}
+            references={referenceImages}
+            roleMode={isFirstLastVideoMode}
+            uploadLabel="上传"
+            onClear={() => {
+              setReferenceImages([]);
+              setReferenceImage(null);
+              setPrompt(removePromptReferenceTokens);
+            }}
+            onDropAsset={(asset) => handleReferenceDropAsset(asset, "video-prompt")}
+            onDropFiles={(files) => handleReferenceDropFiles(files, "video-prompt")}
+            onRemove={removeReferenceImage}
+            onRoleChange={(id, role) => toggleReferenceRole(id, role ?? "general")}
+            onUpload={handleImageUpload}
+          />
+        )}
+
+        <button
+          type="button"
+          onClick={isImageMode ? generateManualImage : generateManualVideo}
+          disabled={!prompt.trim()}
+          className={`imagine-primary-action mt-3 flex w-full items-center justify-center gap-2 rounded-lg py-3 text-sm font-bold transition ${
+            !prompt.trim()
+              ? "cursor-not-allowed border border-slate-800 bg-slate-900/70 text-slate-600"
+              : isImageMode
+              ? "bg-blue-600 text-white active:scale-95"
+              : "bg-violet-600 text-white active:scale-95"
+          }`}
+        >
+          {isSubmitting ? <RefreshCw className="h-4 w-4 animate-spin" /> : isImageMode ? <Sparkles className="h-4 w-4" /> : <Video className="h-4 w-4" />}
+          {isSubmitting ? `提交中 (${activeSubmitCount})` : isImageMode ? "生成图片" : "生成视频"}
+        </button>
+      </section>
+    );
+  };
+
+  const renderMobileAdvancedSettings = () => {
+    const isImageMode = traditionalSubTab === "image";
+
+    return (
+      <details className="imagine-mobile-advanced rounded-xl border border-slate-800 bg-slate-950/35 p-3">
+        <summary className="flex cursor-pointer list-none items-center justify-between text-xs font-semibold text-slate-300">
+          <span className="flex items-center gap-2">
+            <SlidersHorizontal className="h-3.5 w-3.5 text-slate-400" />
+            高级参数
+          </span>
+          <span className="font-mono text-[10px] text-slate-500">{isImageMode ? "图像" : "视频"}</span>
+        </summary>
+
+        {isImageMode ? (
+          <div className="mt-3 flex flex-col gap-3">
+            <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
+              {VISUAL_PRESETS.map((preset) => {
+                const isActive = prompt.includes(preset.promptSuffix);
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => applyPreset(preset)}
+                    className={`imagine-preset-chip flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-xs ${
+                      isActive
+                        ? "border-blue-400/35 bg-blue-500/14 text-blue-100"
+                        : "border-slate-800 bg-slate-950/50 text-slate-300"
+                    }`}
+                  >
+                    <span>{preset.emoji}</span>
+                    <span>{preset.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <input
+              type="text"
+              value={negativePrompt}
+              onChange={(event) => setNegativePrompt(event.target.value)}
+              placeholder="反向提示词"
+              className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 text-xs text-slate-200 placeholder-slate-600 focus:border-blue-400/35 focus:outline-none"
+            />
+
+            <div className="grid grid-cols-1 gap-3">
+              <select
+                value={selectedModel}
+                onChange={(event) => handleSelectImageModel(event.target.value)}
+                className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 focus:border-blue-400/35 focus:outline-none"
+              >
+                {imageModelGroups.map(group => (
+                  <optgroup key={group.provider} label={group.label}>
+                    {group.options.map(option => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+
+              <select
+                value={aspectRatio}
+                onChange={(event) => setAspectRatio(event.target.value)}
+                className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 focus:border-blue-400/35 focus:outline-none"
+              >
+                {imageCapabilities.aspectRatios.map(option => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {imageCapabilities.imageSizes.length > 0 && (
+              <div className="grid grid-cols-4 gap-1.5 rounded-lg border border-slate-800 bg-slate-950/45 p-1.5">
+                {imageCapabilities.imageSizes.map(option => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setImageSize(option.value)}
+                    className={`min-h-8 rounded-md px-2 font-mono text-[10px] ${imageSize === option.value ? "bg-blue-500/16 text-blue-100" : "text-slate-500"}`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="mt-3 grid grid-cols-1 gap-3">
+            <select
+              value={selectedVideoModel}
+              onChange={(event) => handleSelectVideoModel(event.target.value)}
+              className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 focus:border-violet-400/35 focus:outline-none"
+            >
+              {videoModelGroups.map(group => (
+                <optgroup key={group.provider} label={group.label}>
+                  {group.options.map(option => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+
+            <select
+              value={aspectRatio}
+              onChange={(event) => setAspectRatio(event.target.value)}
+              className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 focus:border-violet-400/35 focus:outline-none"
+            >
+              {videoCapabilities.sizes.map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+        )}
+      </details>
+    );
+  };
+
   return (
     <div className={`imagine-workbench-shell imagine-theme-${themeMode} min-h-screen flex flex-col bg-[#07080b] text-slate-100 font-sans selection:bg-blue-500/30 selection:text-slate-100 relative overflow-hidden`}>
 
@@ -630,9 +907,22 @@ export default function Home() {
 
         {/* Creation Controls sidebar container (Col 4) */}
         <section className="imagine-creator-panel flex flex-col gap-4">
+          <section className="imagine-mobile-workflow flex flex-col gap-3 lg:hidden">
+            <section className="imagine-mobile-asset-stream">
+              <div className="mb-2 flex items-center justify-between px-1">
+                <h2 className="text-xs font-semibold text-slate-300">任务与结果</h2>
+                <span className="font-mono text-[10px] text-slate-500">{items.length} 项</span>
+              </div>
+              {renderAssetGalleryWorkspace()}
+            </section>
+
+            {renderMobileQuickComposer()}
+
+            {renderMobileAdvancedSettings()}
+          </section>
 
           {/* Active Creative Panel switch */}
-          <div className="imagine-control-surface rounded-xl dark-glass p-4 flex flex-col gap-4 min-h-[500px]">
+          <div className="imagine-control-surface hidden rounded-xl dark-glass p-4 lg:flex flex-col gap-4 min-h-[500px]">
 
             {/* Creative workflow controls */}
               <div className="flex flex-col gap-3.5 animate-fade-in">
@@ -758,57 +1048,9 @@ export default function Home() {
           </div>
         </section>
 
-        <AssetGalleryWorkspace
-          assetModelFilter={assetModelFilter}
-          assetStatusFilter={assetStatusFilter}
-          cancelingItemIdSet={cancelingItemIdSet}
-          compareItemIdSet={compareItemIdSet}
-          compareItemIds={compareItemIds}
-          compareItems={compareItems}
-          compareSliderPos={compareSliderPos}
-          compareViewType={compareViewType}
-          filterType={filterType}
-          filteredItems={filteredItems}
-          itemsCount={items.length}
-          modelOptions={assetStats.modelOptions}
-          searchQuery={searchQuery}
-          selectedCount={selectedItemIds.length}
-          selectedItemIdSet={selectedItemIdSet}
-          selectedProvider={selectedProvider}
-          statusCounts={assetStats.statusCounts}
-          typeCounts={assetStats.typeCounts}
-          isCompareMode={isCompareMode}
-          onApplyVideoReference={applyAsVideoReference}
-          onBatchDelete={handleBatchDelete}
-          onBatchDownloadZip={handleBatchDownloadZip}
-          onCancelItem={cancelProcessingItem}
-          onClearSelection={handleClearSelection}
-          onDeleteItem={handleDeleteItem}
-          onDeleteItemsByStatus={deleteItemsByStatus}
-          onDownloadItem={handleDownloadItem}
-          onExportMetadata={exportMetadataJson}
-          onLaunchMaskEditor={launchMaskEditor}
-          onOpenFullscreen={setFullscreenItem}
-          onResetCompare={() => {
-            setIsCompareMode(false);
-            setCompareItemIds([]);
-          }}
-          onRetryItem={retryFailedItem}
-          onSetAssetModelFilter={setAssetModelFilter}
-          onSetAssetStatusFilter={setAssetStatusFilter}
-          onSetCompareSliderPos={setCompareSliderPos}
-          onSetCompareViewType={setCompareViewType}
-          onSetFilterType={setFilterType}
-          onSetSearchQuery={setSearchQuery}
-          onToggleCompare={toggleCompare}
-          onToggleSelect={toggleSelectItem}
-          onUseAgentReference={(asset) => {
-            setAgentReferenceId(asset.id);
-            setAgentReferenceUrl(asset.url);
-            setIsAgentDockOpen(true);
-          }}
-          formatModelLabel={formatStoredModelLabel}
-        />
+        <div className="hidden min-w-0 lg:block">
+          {renderAssetGalleryWorkspace()}
+        </div>
 
       </main>
 
