@@ -18,7 +18,6 @@ import {
   Send,
   Layers,
   CloudUpload,
-  Sliders,
   Image as ImageIcon,
   Video as VideoIcon,
   ChevronRight,
@@ -31,6 +30,7 @@ import { VISUAL_PRESETS, VisualPreset } from "@/components/PresetStyles";
 import CanvasMaskEditor from "@/components/CanvasMaskEditor";
 import PreviewImage from "@/components/PreviewImage";
 import AssetCard from "@/components/assets/AssetCard";
+import ComparePanel, { type CompareViewType } from "@/components/assets/ComparePanel";
 import AssetSelectionBar from "@/components/assets/AssetSelectionBar";
 import AssetToolbar, { type AssetStatusFilter, type AssetTypeFilter } from "@/components/assets/AssetToolbar";
 import { saveToDB, getAllFromDB, deleteFromDB, clearAllDB, StorageItem } from "@/lib/db";
@@ -395,7 +395,7 @@ export default function Home() {
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [isCompareMode, setIsCompareMode] = useState(false);
   const [compareItemIds, setCompareItemIds] = useState<string[]>([]);
-  const [compareViewType, setCompareViewType] = useState<"side-by-side" | "wipe-slider">("side-by-side");
+  const [compareViewType, setCompareViewType] = useState<CompareViewType>("side-by-side");
   const [compareSliderPos, setCompareSliderPos] = useState(50);
 
   const WELCOME_MESSAGE: ChatMessage = {
@@ -3061,198 +3061,20 @@ export default function Home() {
             onDownloadZip={handleBatchDownloadZip}
           />
 
-          {/* Active project Compare Slider workspace (Show if CompareMode on with exactly 2 items) */}
           {isCompareMode && (
-            <div className="rounded-2xl border border-blue-500/20 bg-[#0e0e12]/90 backdrop-blur-md p-5 flex flex-col gap-4 animate-fade-in shadow-[0_0_25px_rgba(37,99,235,0.07)]">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-                    <span className="flex h-2 w-2 rounded-full bg-blue-500 animate-ping" />
-                    🔄 极智画论对比器 (Visual Layout Contrast)
-                  </h3>
-                  <p className="text-[10px] text-slate-400 mt-0.5">
-                    选中两张创意项，即可进行高精度像素级滑动擦拭或双面分屏对判。
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  {/* Selector only if both items are images */}
-                  {compareItems.first?.type === "image" && compareItems.second?.type === "image" && (
-                    <div className="flex bg-white/5 border border-white/5 rounded-lg p-0.5 text-xs">
-                      <button
-                        type="button"
-                        onClick={() => setCompareViewType("wipe-slider")}
-                        className={`px-2 py-1 text-[10px] rounded-md font-bold transition-all duration-200 cursor-pointer ${
-                          compareViewType === "wipe-slider"
-                            ? "bg-blue-600 text-white shadow-sm"
-                            : "text-slate-400 hover:text-slate-200"
-                        }`}
-                      >
-                        🖱️ 滑过擦拭
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCompareViewType("side-by-side")}
-                        className={`px-2 py-1 text-[10px] rounded-md font-bold transition-all duration-200 cursor-pointer ${
-                          compareViewType === "side-by-side"
-                            ? "bg-blue-600 text-white shadow-sm"
-                            : "text-slate-400 hover:text-slate-200"
-                        }`}
-                      >
-                        🔲 双幅分屏
-                      </button>
-                    </div>
-                  )}
-
-                  <button
-                    onClick={() => { setIsCompareMode(false); setCompareItemIds([]); }}
-                    className="text-xs text-slate-400 hover:text-red-400 font-medium px-2 py-1 bg-white/5 border border-white/5 rounded-lg hover:border-red-500/20 transition cursor-pointer"
-                  >
-                    重置
-                  </button>
-                </div>
-              </div>
-
-              {compareItemIds.length !== 2 ? (
-                <div className="p-8 border border-dashed border-slate-800 rounded-xl text-center text-xs text-slate-500 flex flex-col items-center justify-center gap-1.5">
-                  <span>ℹ️ 请先到下方画廊中勾选 2 个项目的「对比」按钮来开启对比！</span>
-                  <span>（当前已选中: {compareItemIds.length}/2 个）</span>
-                </div>
-              ) : (
-                (() => {
-                  const matchedA = compareItems.first;
-                  const matchedB = compareItems.second;
-
-                  if (!matchedA || !matchedB) {
-                    return (
-                      <div className="p-4 border border-dashed border-slate-800 rounded-xl text-center text-xs text-slate-500">
-                        匹配素材载入失败。请重新勾选有效果的原片。
-                      </div>
-                    );
-                  }
-
-                  const isBothImages = matchedA.type === "image" && matchedB.type === "image";
-
-                  if (compareViewType === "wipe-slider" && isBothImages) {
-                    return (
-                      <div className="flex flex-col gap-3">
-                        <div className="relative w-full aspect-[4/3] rounded-2xl border border-white/5 overflow-hidden bg-slate-950 select-none shadow-2xl">
-                          {/* Left Image (matchedA) as ambient base background */}
-                          <PreviewImage
-                            src={matchedA.url}
-                            alt="Compare item A"
-                            className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-                          />
-                          <div className="absolute bottom-3 left-3 z-20 bg-black/70 backdrop-blur-md border border-white/5 px-2.5 py-1 rounded-xl text-[10px] text-slate-300 pointer-events-none flex flex-col gap-0.5">
-                            <span className="font-bold text-blue-400 text-[11px]">A: 原始起稿</span>
-                            <span className="font-mono text-[9px] text-slate-400 truncate max-w-[120px]" title={matchedA.prompt}>
-                              {matchedA.id.substring(0, 8)}
-                            </span>
-                          </div>
-
-                          {/* Right Image (matchedB) clipped overlay */}
-                          <PreviewImage
-                            src={matchedB.url}
-                            alt="Compare item B"
-                            className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-                            style={{ clipPath: `polygon(0 0, ${compareSliderPos}% 0, ${compareSliderPos}% 100%, 0 100%)` }}
-                          />
-                          <div className="absolute bottom-3 right-3 z-20 bg-black/70 backdrop-blur-md border border-white/5 px-2.5 py-1 rounded-xl text-[10px] text-slate-300 pointer-events-none text-right flex flex-col gap-0.5">
-                            <span className="font-bold text-amber-500 text-[11px]">B: 演进渲染</span>
-                            <span className="font-mono text-[9px] text-slate-400 truncate max-w-[120px]" title={matchedB.prompt}>
-                              {matchedB.id.substring(0, 8)}
-                            </span>
-                          </div>
-
-                          {/* Sliding handle bar line and icon */}
-                          <div
-                            className="absolute top-0 bottom-0 w-0.5 bg-blue-500/80 z-20 pointer-events-none"
-                            style={{ left: `${compareSliderPos}%` }}
-                          >
-                            <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-blue-600 border border-blue-400 shadow-md flex items-center justify-center pointer-events-none animate-pulse">
-                              <Sliders className="h-4 w-4 text-white rotate-90" />
-                            </div>
-                          </div>
-
-                          {/* Range slider input overlaid */}
-                          <input
-                            type="range"
-                            min="0"
-                            max="100"
-                            value={compareSliderPos}
-                            onChange={(e) => setCompareSliderPos(Number(e.target.value))}
-                            className="absolute inset-0 w-full h-full opacity-0 z-30 cursor-ew-resize"
-                          />
-                        </div>
-
-                        <div className="flex items-center justify-between text-[11px] px-1 font-mono text-slate-400">
-                          <span className="truncate max-w-[45%] italic" title={matchedA.prompt}>👈 A: {matchedA.prompt}</span>
-                          <span className="text-blue-400 font-bold">拉拽滑锁进行滑动对比 (Drag Slider)</span>
-                          <span className="truncate max-w-[45%] text-right italic" title={matchedB.prompt}>👉 B: {matchedB.prompt}</span>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  // Default / Side-by-Side grid contrast
-                  return (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {/* Frame A */}
-                      <div className="border border-white/5 rounded-2xl overflow-hidden bg-slate-950 p-3 flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-center justify-between gap-2 mb-2">
-                            <span className="text-[10px] font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20 font-mono">
-                              FRAME A: {matchedA.id.substring(0, 8)}
-                            </span>
-                            <span className="text-[9px] font-mono text-slate-500">
-                              🤖 {matchedA.model.replace("-preview", "").replace("lite-", "").replace("imagen-", "Imagen")}
-                            </span>
-                          </div>
-
-                          <div className="aspect-[4/3] relative w-full rounded-xl overflow-hidden bg-slate-900 border border-white/5 flex items-center justify-center">
-                            {matchedA.type === "image" ? (
-                              <PreviewImage src={matchedA.url} alt="A" className="w-full h-full object-cover" />
-                            ) : (
-                              <video src={matchedA.url} controls loop preload="metadata" className="w-full h-full object-cover" />
-                            )}
-                          </div>
-                        </div>
-
-                        <p className="text-[10px] text-slate-300 mt-2.5 line-clamp-2 leading-relaxed italic" title={matchedA.prompt}>
-                          &ldquo;{matchedA.prompt}&rdquo;
-                        </p>
-                      </div>
-
-                      {/* Frame B */}
-                      <div className="border border-white/5 rounded-2xl overflow-hidden bg-slate-950 p-3 flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-center justify-between gap-2 mb-2">
-                            <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/25 font-mono">
-                              FRAME B: {matchedB.id.substring(0, 8)}
-                            </span>
-                            <span className="text-[9px] font-mono text-slate-500">
-                              🤖 {matchedB.model.replace("-preview", "").replace("lite-", "").replace("imagen-", "Imagen")}
-                            </span>
-                          </div>
-
-                          <div className="aspect-[4/3] relative w-full rounded-xl overflow-hidden bg-slate-900 border border-white/5 flex items-center justify-center">
-                            {matchedB.type === "image" ? (
-                              <PreviewImage src={matchedB.url} alt="B" className="w-full h-full object-cover" />
-                            ) : (
-                              <video src={matchedB.url} controls loop preload="metadata" className="w-full h-full object-cover" />
-                            )}
-                          </div>
-                        </div>
-
-                        <p className="text-[10px] text-slate-300 mt-2.5 line-clamp-2 leading-relaxed italic" title={matchedB.prompt}>
-                          &ldquo;{matchedB.prompt}&rdquo;
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })()
-              )}
-            </div>
+            <ComparePanel
+              compareItemIds={compareItemIds}
+              first={compareItems.first}
+              second={compareItems.second}
+              sliderPos={compareSliderPos}
+              viewType={compareViewType}
+              onReset={() => {
+                setIsCompareMode(false);
+                setCompareItemIds([]);
+              }}
+              onSliderPosChange={setCompareSliderPos}
+              onViewTypeChange={setCompareViewType}
+            />
           )}
 
           {/* Main Gallery List */}
