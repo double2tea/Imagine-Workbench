@@ -111,7 +111,7 @@
   [class*="bg-[#0b0d13]"],
   [class*="bg-slate-950"],
   [class*="bg-slate-900"]
-):not([style*="background-image"]) {
+):not([style*="background-image"]):not(.imagine-asset-hover-scrim) {
   background-color: var(--iw-panel-solid, #ffffff) !important;
   background-image: none !important;
 }

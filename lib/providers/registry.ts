@@ -50,7 +50,7 @@ export const PROVIDER_REGISTRY = [
     defaultVideoBaseUrl: "https://api.xstx.info",
     apiKeyPlaceholder: "sk_your_xstx_key",
     hasEditableBaseUrl: true,
-    supportsImage: false,
+    supportsImage: true,
     supportsVideo: false,
     supportsChat: true,
   },
