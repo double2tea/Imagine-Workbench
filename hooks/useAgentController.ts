@@ -1,0 +1,303 @@
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import type { AgentToolAction, ChatMessage } from "@/components/agent/AgentDock";
+import type { CreationMode } from "@/components/creation/CreationModeTabs";
+import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
+import type { StorageItem } from "@/lib/db";
+import { DEFAULT_VISION_CHAT_MODEL } from "@/lib/providers/model-catalog";
+
+type NoticeType = "error" | "info" | "success";
+
+interface UseAgentControllerParams {
+  agentInput: string;
+  agentReferenceId: string | null;
+  agentReferences: ReferenceImageRef[];
+  agentReferenceUrl: string | null;
+  buildProviderHeaders: (target?: string) => Record<string, string>;
+  generateManualImage: () => Promise<void>;
+  generateManualVideo: () => Promise<void>;
+  handleSelectImageModel: (model: string) => void;
+  handleSelectVideoModel: (model: string) => void;
+  items: StorageItem[];
+  launchMaskEditor: (imageUrl: string, id: string, destination?: "creative" | "agent") => void;
+  optimizeActivePrompt: () => Promise<void>;
+  selectedChatModel: string;
+  setAgentInput: Dispatch<SetStateAction<string>>;
+  setAspectRatio: Dispatch<SetStateAction<string>>;
+  setIsAgentDockOpen: Dispatch<SetStateAction<boolean>>;
+  setPrompt: Dispatch<SetStateAction<string>>;
+  setReferenceImage: Dispatch<SetStateAction<string | null>>;
+  setReferenceImages: Dispatch<SetStateAction<ReferenceImageRef[]>>;
+  setTraditionalSubTab: Dispatch<SetStateAction<CreationMode>>;
+}
+
+function makeClientId(prefix: string): string {
+  return `${prefix}_${Date.now()}`;
+}
+
+const WELCOME_MESSAGE: ChatMessage = {
+  id: "welcome",
+  role: "assistant",
+  content: "您好！我是您的智能创意助手。您可以一边调整左侧创作参数，一边随时交办高阶创意任务。例如：「帮我做一套3张赛博朋克风战士的相册」或「帮我把上一部图片转成16:9的微短视频」。我会给出建议，并在确认后填入参数或执行生成。",
+  thought: "初始化底部 Agent Dock，准备读取画廊资产上下文...",
+  suggestedFollowUps: [
+    "优化并生成一张赛博朋克飞艇",
+    "我想做一段太空科幻题材视频",
+    "根据当前画廊给我三个延展方向",
+  ],
+};
+
+export function useAgentController({
+  agentInput,
+  agentReferenceId,
+  agentReferences,
+  agentReferenceUrl,
+  buildProviderHeaders,
+  generateManualImage,
+  generateManualVideo,
+  handleSelectImageModel,
+  handleSelectVideoModel,
+  items,
+  launchMaskEditor,
+  optimizeActivePrompt,
+  selectedChatModel,
+  setAgentInput,
+  setAspectRatio,
+  setIsAgentDockOpen,
+  setPrompt,
+  setReferenceImage,
+  setReferenceImages,
+  setTraditionalSubTab,
+}: UseAgentControllerParams) {
+  const [agentMessages, setAgentMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
+  const [isAgentLoading, setIsAgentLoading] = useState(false);
+  const [autoExecute, setAutoExecute] = useState(false);
+  const [activeCountdownId, setActiveCountdownId] = useState<string | null>(null);
+  const [countdownSeconds, setCountdownSeconds] = useState(3);
+  const chatBottomRef = useRef<HTMLDivElement | null>(null);
+  const autoCountdownInterval = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const restoreAgentState = window.setTimeout(() => {
+      const storedChat = localStorage.getItem("imagine_agent_chat");
+      if (storedChat) {
+        try {
+          const parsed: unknown = JSON.parse(storedChat);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setAgentMessages(parsed as ChatMessage[]);
+          }
+        } catch { /* ignore corrupt data */ }
+      }
+
+      const storedAutoExec = localStorage.getItem("imagine_auto_execute");
+      if (storedAutoExec) setAutoExecute(storedAutoExec === "true");
+    }, 0);
+
+    return () => window.clearTimeout(restoreAgentState);
+  }, []);
+
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [agentMessages, isAgentLoading]);
+
+  useEffect(() => {
+    if (agentMessages.length > 1) {
+      localStorage.setItem("imagine_agent_chat", JSON.stringify(agentMessages));
+    }
+  }, [agentMessages]);
+
+  const clearActiveCountdown = () => {
+    if (autoCountdownInterval.current) clearInterval(autoCountdownInterval.current);
+    setActiveCountdownId(null);
+    setCountdownSeconds(3);
+  };
+
+  const handleToggleAutoExecute = (value: boolean) => {
+    setAutoExecute(value);
+    localStorage.setItem("imagine_auto_execute", String(value));
+    if (!value) {
+      clearActiveCountdown();
+    }
+  };
+
+  const executeAgentToolAction = async (messageId: string, action: AgentToolAction) => {
+    clearActiveCountdown();
+    setAgentMessages(prev => prev.map(message => message.id === messageId ? { ...message, interactiveState: "completed" } : message));
+
+    const { type, params = {} } = action;
+
+    if (type === "optimize_prompt") {
+      setPrompt(params.prompt || "");
+      optimizeActivePrompt();
+    } else if (type === "generate_image") {
+      setPrompt(params.prompt || "");
+      if (params.aspectRatio) setAspectRatio(params.aspectRatio);
+      if (params.model) handleSelectImageModel(params.model);
+      setTraditionalSubTab("image");
+
+      setTimeout(() => {
+        generateManualImage();
+      }, 500);
+    } else if (type === "generate_video") {
+      setPrompt(params.prompt || "");
+      if (params.aspectRatio) setAspectRatio(params.aspectRatio);
+      if (params.model) handleSelectVideoModel(params.model);
+
+      if (params.referenceImageId) {
+        const matchedAsset = items.find(item => item.id === params.referenceImageId);
+        if (matchedAsset) {
+          setReferenceImage(matchedAsset.url);
+          setReferenceImages([{ id: matchedAsset.id, url: matchedAsset.url, role: "general" }]);
+        }
+      }
+
+      setTraditionalSubTab("video");
+      setTimeout(() => {
+        generateManualVideo();
+      }, 500);
+    } else if (type === "edit_image") {
+      setPrompt(params.prompt || "");
+      setTraditionalSubTab("image");
+      if (params.referenceImageId) {
+        const matchedAsset = items.find(item => item.id === params.referenceImageId);
+        if (matchedAsset) {
+          setReferenceImage(matchedAsset.url);
+          setReferenceImages([{ id: matchedAsset.id, url: matchedAsset.url, role: "general" }]);
+          launchMaskEditor(matchedAsset.url, matchedAsset.id);
+        }
+      }
+    }
+  };
+
+  const startAutoCountdown = (messageId: string, action: AgentToolAction) => {
+    clearActiveCountdown();
+    setActiveCountdownId(messageId);
+    let secondsLeft = 3;
+    setCountdownSeconds(secondsLeft);
+
+    autoCountdownInterval.current = setInterval(() => {
+      secondsLeft -= 1;
+      setCountdownSeconds(secondsLeft);
+      if (secondsLeft <= 0) {
+        if (autoCountdownInterval.current) clearInterval(autoCountdownInterval.current);
+        executeAgentToolAction(messageId, action);
+      }
+    }, 1000);
+  };
+
+  const submitAgentPrompt = async (forcedPrompt?: string) => {
+    const activeText = (forcedPrompt || agentInput).trim();
+    if (!activeText) return;
+
+    clearActiveCountdown();
+    setIsAgentDockOpen(true);
+
+    const userMessage: ChatMessage = {
+      id: makeClientId("usr"),
+      role: "user",
+      content: activeText,
+    };
+
+    setAgentMessages(prev => [...prev, userMessage]);
+    setAgentInput("");
+    setIsAgentLoading(true);
+
+    try {
+      const gallerySummary = items.map(item => ({
+        id: item.id,
+        type: item.type,
+        prompt: item.prompt,
+        aspectRatio: item.aspectRatio,
+        url: item.url,
+      }));
+
+      const activeAgentReferences =
+        agentReferences.length > 0
+          ? agentReferences
+          : agentReferenceId && agentReferenceUrl
+            ? [{ id: agentReferenceId, url: agentReferenceUrl }]
+            : [];
+      const hasAgentImageReference = activeAgentReferences.some(reference => reference.url.trim().length > 0);
+      const agentModel = hasAgentImageReference ? DEFAULT_VISION_CHAT_MODEL : selectedChatModel;
+      const headers = buildProviderHeaders(agentModel);
+
+      const requestHistory = agentMessages
+        .concat(userMessage)
+        .slice(-10)
+        .map(message => ({
+          role: message.role,
+          content: message.content,
+        }));
+
+      const response = await fetch("/api/gemini/agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({
+          messages: requestHistory,
+          gallerySummary,
+          agentReferences: activeAgentReferences.map(reference => ({ id: reference.id, url: reference.url })),
+          agentReferenceId: activeAgentReferences[0]?.id || agentReferenceId || undefined,
+          model: agentModel,
+        }),
+      });
+
+      if (response.ok) {
+        const agentResponse = await response.json();
+        const assistantMsgId = makeClientId("asst");
+
+        const assistantMessage: ChatMessage = {
+          id: assistantMsgId,
+          role: "assistant",
+          content: agentResponse.text || "我已收到指令，该项目可以怎么推进？",
+          thought: agentResponse.thought || "分析场景，规划后续设计合成步骤...",
+          recommendedAction: agentResponse.recommendedAction || { type: "none" },
+          suggestedFollowUps: agentResponse.suggestedFollowUps || [],
+          interactiveState: "idle",
+          activeSkills: agentResponse.activeSkills || [],
+          toolCalls: agentResponse.toolCalls || [],
+        };
+
+        setAgentMessages(prev => [...prev, assistantMessage]);
+
+        if (autoExecute && agentResponse.recommendedAction && agentResponse.recommendedAction.type !== "none") {
+          startAutoCountdown(assistantMsgId, agentResponse.recommendedAction);
+        }
+      }
+    } catch (error) {
+      console.error(error);
+      const message = error instanceof Error ? error.message : "请求过载";
+      setAgentMessages(prev => [...prev, {
+        id: makeClientId("asst_err"),
+        role: "assistant",
+        content: `抱歉，Agent 在网络调谐时出现异常 (${message}). 请检查网络、API Key 或重试。`,
+        suggestedFollowUps: ["重试我先前的请求", "根据当前参数重新规划"],
+      }]);
+    } finally {
+      setIsAgentLoading(false);
+    }
+  };
+
+  const declineAgentToolAction = (messageId: string) => {
+    clearActiveCountdown();
+    setAgentMessages(prev => prev.map(message => message.id === messageId ? { ...message, interactiveState: "declined" } : message));
+  };
+
+  const handleClearChat = () => {
+    setAgentMessages([WELCOME_MESSAGE]);
+    localStorage.removeItem("imagine_agent_chat");
+  };
+
+  return {
+    activeCountdownId,
+    agentMessages,
+    autoExecute,
+    chatBottomRef,
+    clearActiveCountdown,
+    countdownSeconds,
+    declineAgentToolAction,
+    executeAgentToolAction,
+    handleClearChat,
+    handleToggleAutoExecute,
+    isAgentLoading,
+    submitAgentPrompt,
+  };
+}
