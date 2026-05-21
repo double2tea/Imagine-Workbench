@@ -33,6 +33,7 @@ interface VideoGenerationPanelProps {
   onPromptChange: (value: string) => void;
   onPromptDropAsset: (event: DragEvent<HTMLTextAreaElement>) => void;
   onReferenceDropAsset: (asset: DraggedReferenceAsset) => void;
+  onReferenceDropFiles: (files: File[]) => void;
   onReferenceRemove: (id: string) => void;
   onReferenceRoleChange: (id: string, role: ReferenceImageRef["role"]) => void;
   onReferenceUpload: (event: ChangeEvent<HTMLInputElement>) => void;
@@ -63,6 +64,7 @@ export default function VideoGenerationPanel({
   onPromptChange,
   onPromptDropAsset,
   onReferenceDropAsset,
+  onReferenceDropFiles,
   onReferenceRemove,
   onReferenceRoleChange,
   onReferenceUpload,
@@ -160,6 +162,7 @@ export default function VideoGenerationPanel({
         uploadLabel="浏览上传"
         onClear={onClearReferences}
         onDropAsset={onReferenceDropAsset}
+        onDropFiles={onReferenceDropFiles}
         onRemove={onReferenceRemove}
         onRoleChange={onReferenceRoleChange}
         onUpload={onReferenceUpload}

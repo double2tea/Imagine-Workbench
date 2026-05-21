@@ -11,7 +11,7 @@ export type AtDropdownTarget = "image-prompt" | "video-prompt" | "agent-prompt";
 type PromptReferenceTarget = Exclude<AtDropdownTarget, "agent-prompt">;
 type NoticeType = "error" | "info" | "success";
 
-const IMAGE_REFERENCE_LIMIT = 4;
+export const IMAGE_REFERENCE_LIMIT = 4;
 
 interface AtDropdownState {
   visible: boolean;
@@ -139,6 +139,51 @@ export function useReferenceState({
     addDroppedReferenceAsset(asset, target);
   };
 
+  const addReferenceImageFile = (file: File, target: PromptReferenceTarget, id: string) => {
+    const limit = getReferenceLimitForTarget(target);
+    if (referenceImages.length >= limit) {
+      pushWorkspaceNotice("error", `参考图已达上限：最多 ${limit} 张`);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result;
+      if (typeof base64 !== "string") {
+        throw new Error("Unable to read reference image file");
+      }
+
+      setReferenceImages(prev => {
+        if (prev.some(reference => reference.id === id)) return prev;
+        if (prev.length >= limit) return prev;
+
+        const nextReference: ReferenceImageRef = {
+          id,
+          url: base64,
+          role: getDroppedReferenceRole(target, prev.length),
+        };
+        if (prev.length === 0) {
+          setReferenceImage(base64);
+        }
+        return [...prev, nextReference];
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleReferenceDropFiles = (files: File[], target: PromptReferenceTarget) => {
+    const limit = getReferenceLimitForTarget(target);
+    const availableSlots = limit - referenceImages.length;
+    if (availableSlots <= 0) {
+      pushWorkspaceNotice("error", `参考图已达上限：最多 ${limit} 张`);
+      return;
+    }
+
+    files.slice(0, availableSlots).forEach((file, index) => {
+      addReferenceImageFile(file, target, `${makeClientId("drop")}_${index}`);
+    });
+  };
+
   const handlePromptDropAsset = (event: DragEvent<HTMLTextAreaElement>, target: PromptReferenceTarget) => {
     const asset = readDraggedReferenceAsset(event.dataTransfer);
     if (!asset) return;
@@ -172,7 +217,10 @@ export function useReferenceState({
 
     const reader = new FileReader();
     reader.onloadend = () => {
-      const base64 = reader.result as string;
+      const base64 = reader.result;
+      if (typeof base64 !== "string") {
+        throw new Error("Unable to read reference image file");
+      }
       const newReferenceId = makeClientId("upload");
 
       setReferenceImage(base64);
@@ -277,6 +325,7 @@ export function useReferenceState({
     handleImageUpload,
     handlePromptDropAsset,
     handleReferenceDropAsset,
+    handleReferenceDropFiles,
     handleSelectAtItem,
     handleSelectPromptReference,
     handleTextareaChange,

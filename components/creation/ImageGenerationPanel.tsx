@@ -37,6 +37,7 @@ interface ImageGenerationPanelProps {
   onPromptChange: (value: string) => void;
   onPromptDropAsset: (event: DragEvent<HTMLTextAreaElement>) => void;
   onReferenceDropAsset: (asset: DraggedReferenceAsset) => void;
+  onReferenceDropFiles: (files: File[]) => void;
   onReferenceRemove: (id: string) => void;
   onReferenceUpload: (event: ChangeEvent<HTMLInputElement>) => void;
   onSelectAspectRatio: (value: string) => void;
@@ -70,6 +71,7 @@ export default function ImageGenerationPanel({
   onPromptChange,
   onPromptDropAsset,
   onReferenceDropAsset,
+  onReferenceDropFiles,
   onReferenceRemove,
   onReferenceUpload,
   onSelectAspectRatio,
@@ -275,6 +277,7 @@ export default function ImageGenerationPanel({
         uploadLabel="浏览上传"
         onClear={onClearReferences}
         onDropAsset={onReferenceDropAsset}
+        onDropFiles={onReferenceDropFiles}
         onRemove={onReferenceRemove}
         onUpload={onReferenceUpload}
       />
