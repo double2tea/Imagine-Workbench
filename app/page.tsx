@@ -15,7 +15,6 @@ import {
   RefreshCw,
   Play,
   Pause,
-  Search,
   Send,
   Layers,
   CloudUpload,
@@ -23,7 +22,6 @@ import {
   Image as ImageIcon,
   Video as VideoIcon,
   ChevronRight,
-  FileArchive,
   Maximize2,
   Info
 } from "lucide-react";
@@ -32,6 +30,9 @@ import JSZip from "jszip";
 import { VISUAL_PRESETS, VisualPreset } from "@/components/PresetStyles";
 import CanvasMaskEditor from "@/components/CanvasMaskEditor";
 import PreviewImage from "@/components/PreviewImage";
+import AssetCard from "@/components/assets/AssetCard";
+import AssetSelectionBar from "@/components/assets/AssetSelectionBar";
+import AssetToolbar, { type AssetStatusFilter, type AssetTypeFilter } from "@/components/assets/AssetToolbar";
 import { saveToDB, getAllFromDB, deleteFromDB, clearAllDB, StorageItem } from "@/lib/db";
 import {
   CHAT_MODEL_OPTIONS,
@@ -82,7 +83,6 @@ interface ChatMessage {
 type AgentToolAction = NonNullable<ChatMessage["recommendedAction"]>;
 type NoticeType = "error" | "info" | "success";
 type MaskDestination = "creative" | "agent";
-type AssetStatusFilter = "all" | StorageItem["status"];
 type ProviderConnection = AiProvider;
 type ModelCategory = "chat" | "image" | "video";
 type ThemeMode = "light" | "dark";
@@ -388,7 +388,7 @@ export default function Home() {
   };
 
   // Filter & UI Select States
-  const [filterType, setFilterType] = useState<"all" | "images" | "videos">("all");
+  const [filterType, setFilterType] = useState<AssetTypeFilter>("all");
   const [assetStatusFilter, setAssetStatusFilter] = useState<AssetStatusFilter>("all");
   const [assetModelFilter, setAssetModelFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -1442,6 +1442,15 @@ export default function Home() {
       pushWorkspaceNotice("error", toErrorMessage(err, "任务取消失败"));
     } finally {
       setCancelingItemIds(prev => prev.filter(id => id !== item.id));
+    }
+  };
+
+  const handleDeleteItem = async (item: StorageItem) => {
+    if (confirm("确定要删除此创意项吗？")) {
+      await deleteFromDB(item.id);
+      setItems(prev => prev.filter(current => current.id !== item.id));
+      setSelectedItemIds(prev => prev.filter(id => id !== item.id));
+      setCompareItemIds(prev => prev.filter(id => id !== item.id));
     }
   };
 
@@ -3026,155 +3035,31 @@ export default function Home() {
         {/* Right Studio Workspace (Gallery, Masonry & Comparative Canvas) (Col 8) */}
         <section className="imagine-gallery-panel flex min-w-0 flex-col gap-4">
 
-          {/* Controls Header toolbar */}
-          <div className="imagine-toolbar-surface rounded-xl dark-glass p-4">
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
-              <div className="flex min-w-0 flex-col gap-2.5">
-                <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center">
-                  <span className="w-10 shrink-0 text-[10px] font-semibold uppercase tracking-widest text-slate-500">类型</span>
-                  <div className="flex min-w-0 flex-wrap gap-1.5">
-                    {([
-                      { value: "all", label: "全部", count: items.length },
-                      { value: "images", label: "图片", count: assetStats.typeCounts.image },
-                      { value: "videos", label: "视频", count: assetStats.typeCounts.video },
-                    ] as const).map(option => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => setFilterType(option.value)}
-                        data-active={filterType === option.value}
-                        className={`imagine-filter-chip h-7 rounded-md border px-2.5 text-xs transition focus:outline-none cursor-pointer ${
-                          filterType === option.value
-                            ? "border-slate-700 bg-slate-800/80 text-slate-100"
-                            : "border-transparent text-slate-450 hover:border-slate-800 hover:bg-slate-900/70 hover:text-slate-200"
-                        }`}
-                      >
-                        <span>{option.label}</span>
-                        <span className="ml-1 font-mono text-[10px] text-slate-500">{option.count}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
+          <AssetToolbar
+            assetModelFilter={assetModelFilter}
+            assetStatusFilter={assetStatusFilter}
+            filterType={filterType}
+            itemsCount={items.length}
+            modelOptions={assetStats.modelOptions}
+            searchQuery={searchQuery}
+            selectedProvider={selectedProvider}
+            statusCounts={assetStats.statusCounts}
+            typeCounts={assetStats.typeCounts}
+            deleteItemsByStatus={deleteItemsByStatus}
+            exportMetadataJson={exportMetadataJson}
+            formatModelLabel={formatStoredModelLabel}
+            setAssetModelFilter={setAssetModelFilter}
+            setAssetStatusFilter={setAssetStatusFilter}
+            setFilterType={setFilterType}
+            setSearchQuery={setSearchQuery}
+          />
 
-                <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center">
-                  <span className="w-10 shrink-0 text-[10px] font-semibold uppercase tracking-widest text-slate-500">状态</span>
-                  <div className="flex min-w-0 flex-wrap gap-1.5">
-                    {([
-                      { value: "all", label: "全部", count: items.length },
-                      { value: "pending", label: "pending", count: assetStats.statusCounts.pending },
-                      { value: "processing", label: "processing", count: assetStats.statusCounts.processing },
-                      { value: "failed", label: "failed", count: assetStats.statusCounts.failed },
-                      { value: "complete", label: "complete", count: assetStats.statusCounts.complete },
-                    ] as const).map(option => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => setAssetStatusFilter(option.value)}
-                        data-active={assetStatusFilter === option.value}
-                        className={`imagine-filter-chip h-7 rounded-md border px-2.5 font-mono text-[10px] transition focus:outline-none cursor-pointer ${
-                          assetStatusFilter === option.value
-                            ? "border-slate-700 bg-slate-800/80 text-slate-100"
-                            : "border-transparent text-slate-500 hover:border-slate-800 hover:bg-slate-900/70 hover:text-slate-200"
-                        }`}
-                      >
-                        <span>{option.label}</span>
-                        <span className="ml-1 text-slate-500">{option.count}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
-                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-                  <select
-                    value={assetModelFilter}
-                    onChange={(e) => setAssetModelFilter(e.target.value)}
-                    className="imagine-toolbar-select h-9 min-w-0 rounded-lg border border-slate-800 bg-slate-950/55 px-3 font-mono text-[10px] text-slate-300 transition focus:border-blue-400/35 focus:outline-none"
-                  >
-                    <option value="all">全部模型</option>
-                    {assetStats.modelOptions.map(model => (
-                      <option key={model} value={model}>{formatStoredModelLabel(model, selectedProvider)}</option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={exportMetadataJson}
-                    className="imagine-secondary-action h-9 rounded-lg border border-slate-800 bg-slate-950/55 px-3 text-[10px] font-semibold text-slate-300 transition hover:bg-slate-900"
-                  >
-                    导出
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-                  <div className="relative min-w-0">
-                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="搜索提示词、模型..."
-                      className="imagine-toolbar-search h-9 w-full rounded-lg border border-slate-800 bg-slate-950/55 pl-9 pr-4 text-xs text-slate-200 placeholder-slate-600 transition focus:border-blue-400/35 focus:outline-none"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => deleteItemsByStatus(["failed", "pending"])}
-                    className="imagine-danger-action h-9 rounded-lg border border-red-500/20 bg-red-950/20 px-3 text-[10px] font-semibold text-red-300 transition hover:bg-red-950/35"
-                  >
-                    清失败
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <AnimatePresence initial={false}>
-            {selectedItemIds.length > 0 && (
-              <motion.div
-                initial={{ y: -8, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: -8, opacity: 0 }}
-                className="rounded-xl border border-blue-500/20 bg-slate-950/55 p-3 shadow-[0_14px_34px_rgba(0,0,0,0.28)] backdrop-blur-md"
-              >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="flex items-center gap-2 text-xs font-bold text-slate-100">
-                      <span className="inline-block h-2.5 w-2.5 rounded-full bg-blue-500" />
-                      已选中 {selectedItemIds.length} 项创意作品
-                    </p>
-                    <p className="mt-0.5 text-[10px] text-slate-500">可批量打包为 ZIP，或移除所选资产。</p>
-                  </div>
-
-                  <div className="flex shrink-0 items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleBatchDownloadZip}
-                      className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-blue-500"
-                    >
-                      <FileArchive className="h-3.5 w-3.5" />
-                      打包 ZIP
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleBatchDelete}
-                      className="rounded-lg border border-red-500/20 bg-red-950/20 px-3 py-2 text-xs font-bold text-red-300 transition hover:bg-red-950/35"
-                    >
-                      批量删除
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleClearSelection}
-                      className="rounded-lg p-2 text-slate-500 transition hover:bg-white/5 hover:text-slate-200"
-                      title="清空勾选"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <AssetSelectionBar
+            selectedCount={selectedItemIds.length}
+            onClear={handleClearSelection}
+            onDelete={handleBatchDelete}
+            onDownloadZip={handleBatchDownloadZip}
+          />
 
           {/* Active project Compare Slider workspace (Show if CompareMode on with exactly 2 items) */}
           {isCompareMode && (
@@ -3381,249 +3266,28 @@ export default function Home() {
             ) : (
               <div className="imagine-gallery-grid grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
                 {filteredItems.map((item) => (
-                  <div
+                  <AssetCard
                     key={item.id}
-                    data-status={item.status}
-                    data-type={item.type}
-                    className={`imagine-asset-card relative overflow-hidden rounded-2xl group border bg-slate-900 shadow-xl transition-all duration-300 flex flex-col justify-between ${
-                      selectedItemIdSet.has(item.id)
-                        ? "border-blue-500 ring-2 ring-blue-500/20"
-                        : "border-slate-850 hover:border-slate-750"
-                    }`}
-                  >
-
-                    {/* Visual creation node */}
-                    <div className="imagine-asset-media relative aspect-[4/3] w-full bg-slate-950 overflow-hidden flex items-center justify-center border-b border-white/5">
-
-                      {item.status === "processing" || item.status === "pending" ? (
-                        <div className="absolute inset-0 bg-[#07070a] flex flex-col items-center justify-center p-6 text-center select-none overflow-hidden">
-                          {/* Pulsing glow background elements */}
-                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-28 h-28 bg-blue-500/10 rounded-full blur-2xl animate-pulse" />
-                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-indigo-500/5 rounded-full blur-xl animate-ping" />
-
-                          <div className="relative z-10 flex flex-col items-center">
-                            <div className="h-9 w-9 rounded-xl bg-blue-600/10 border border-blue-500/30 flex items-center justify-center shadow-[0_0_15px_rgba(59,130,246,0.2)] mb-3 animate-spin duration-3000">
-                              <RefreshCw className="h-4.5 w-4.5 text-blue-400 animate-spin" />
-                            </div>
-                            <p className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
-                              {item.status === "pending"
-                                ? "任务已排队..."
-                                : item.type === "video"
-                                  ? "智影合成中..."
-                                  : "极精算色中..."}
-                            </p>
-                            <span className="text-[9px] font-mono text-slate-500 mt-1">
-                              模型: {item.model.replace("-preview", "").replace("lite-", "").replace("-generate", "").replace("imagen-", "Imagen")}
-                            </span>
-
-                            <div className="w-36 bg-white/5 h-1 rounded-full overflow-hidden mt-4 border border-white/5 shadow-inner">
-                              <div
-                                className="bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-600 h-full transition-all duration-300 shadow-[0_0_10px_rgba(59,130,246,0.5)]"
-                                style={{ width: `${item.progress}%` }}
-                              />
-                            </div>
-                            <span className="text-[10px] text-blue-400 mt-2 font-mono font-bold tracking-widest">
-                              {item.progress}% {item.status.toUpperCase()}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => cancelProcessingItem(item)}
-                              disabled={cancelingItemIdSet.has(item.id)}
-                              className="mt-3 flex items-center gap-1.5 rounded-lg border border-red-400/50 bg-red-500/10 px-3 py-1.5 text-[10px] font-bold text-red-200 transition hover:border-red-300 hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-55"
-                              title={item.operationName?.startsWith("12ai:video:") ? "取消 12AI 视频生成任务" : "从本地取消并停止等待"}
-                            >
-                              <X className="h-3 w-3" />
-                              {cancelingItemIdSet.has(item.id) ? "取消中" : "取消"}
-                            </button>
-                          </div>
-                        </div>
-                      ) : item.status === "failed" ? (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950 px-4 py-3 text-center text-red-400 select-none">
-                          <X className="mb-1.5 h-6 w-6 shrink-0 text-red-500/55" />
-                          <p className="text-xs font-semibold leading-5">生成失败 / 链接中断</p>
-                          <p className="mt-0.5 line-clamp-2 max-w-full break-words text-[10px] leading-4 text-slate-550">
-                            {item.errorMessage ?? "请核查 API Key 或重构参数。"}
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() => retryFailedItem(item)}
-                            className="mt-2 flex shrink-0 items-center gap-1.5 rounded-lg border border-red-400/60 bg-red-600 px-3 py-1.5 text-[10px] font-bold text-white shadow-sm shadow-red-950/20 transition hover:bg-red-500"
-                          >
-                            <RefreshCw className="h-3 w-3" />
-                            重试
-                          </button>
-                        </div>
-                      ) : (
-                        // Standard complete state display
-                        <div className="relative flex h-full w-full items-center justify-center bg-slate-950">
-                          {item.type === "image" ? (
-                            <PreviewImage
-                              src={item.url}
-                              alt={item.prompt}
-                              className="h-full w-full cursor-pointer object-contain transition duration-500"
-                              onClick={() => setFullscreenItem(item)}
-                            />
-                          ) : (
-                            <div className="relative flex h-full w-full items-center justify-center bg-slate-950">
-                              <video
-                                src={item.url}
-                                controls
-                                loop
-                                preload="metadata"
-                                className="h-full w-full object-contain"
-                              />
-                            </div>
-                          )}
-
-                          {/* Dynamic Top-Right Badge: Image vs Video */}
-                          <div className="absolute top-3 right-3 z-10 flex gap-1.5">
-                            {item.type === "image" ? (
-                              <span className="imagine-asset-type-badge flex items-center gap-1.5 px-2 py-1 text-[9px] font-bold tracking-wider uppercase rounded bg-blue-500/80 backdrop-blur-md text-white border border-blue-400/25">
-                                <ImageIcon className="h-3 w-3" />
-                                IMAGE
-                              </span>
-                            ) : (
-                              <span className="imagine-asset-type-badge flex items-center gap-1.5 px-2 py-1 text-[9px] font-bold tracking-wider uppercase rounded bg-purple-500/80 backdrop-blur-md text-white border border-purple-400/25">
-                                <span className="h-1.5 w-1.5 rounded-full bg-red-400 animate-ping" />
-                                VEO VIDEO
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Top-Left selection checkbox */}
-                          <div className="absolute top-3 left-3 z-10">
-                            <input
-                              type="checkbox"
-                              checked={selectedItemIdSet.has(item.id)}
-                              onChange={() => toggleSelectItem(item.id)}
-                              className="h-4.5 w-4.5 bg-slate-950/85 border-white/10 text-blue-500 focus:ring-0 rounded-md cursor-pointer checked:bg-blue-600 flex items-center justify-center transition"
-                            />
-                          </div>
-
-                          <div className="imagine-asset-hover-scrim absolute inset-0 bg-slate-950/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10 pointer-events-none" />
-                          <div className="absolute inset-x-3 bottom-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 pointer-events-none group-hover:pointer-events-auto">
-                            <div className="imagine-card-actions flex flex-wrap items-center justify-center gap-1 rounded-xl border border-white/10 bg-slate-950/80 p-1 backdrop-blur-md shadow-xl">
-
-                             {item.type === "image" && (
-                              <button
-                                onClick={() => applyAsVideoReference(item.url)}
-                                className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-purple-600 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
-                                title="以此图首帧生图动态 Veo 航拍影片"
-                              >
-                                <VideoIcon className="h-3 w-3 text-purple-450 group-hover:text-white" />
-                                <span className="text-[9px] font-bold">生视频</span>
-                              </button>
-                            )}
-
-                             {item.type === "image" && (
-                              <button
-                                onClick={() => {
-                                  setAgentReferenceId(item.id);
-                                  setAgentReferenceUrl(item.url);
-                                  setIsAgentDockOpen(true);
-                                }}
-                                className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-blue-600 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
-                                title="引用该图片至 Agent 智能代理进行对话与局部修改"
-                              >
-                                <Sparkles className="h-3 w-3 text-blue-455 text-blue-400 group-hover:text-white animate-pulse" />
-                                <span className="text-[9px] font-bold">Agent</span>
-                              </button>
-                            )}
-
-                            {item.type === "image" && (
-                              <button
-                                onClick={() => launchMaskEditor(item.url, item.id)}
-                                className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-amber-600 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
-                                title="对该图片局部进行笔刷遮罩修改 & 创意局部重绘"
-                              >
-                                <Paintbrush className="h-3 w-3 text-amber-500 group-hover:text-white" />
-                                <span className="text-[9px] font-bold">修改</span>
-                              </button>
-                            )}
-
-                            <button
-                              onClick={() => handleDownloadItem(item)}
-                              className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-emerald-600 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
-                              title="下载该文件到本地"
-                            >
-                              <Download className="h-3 w-3 text-emerald-400 group-hover:text-white" />
-                              <span className="text-[9px] font-bold">下载</span>
-                            </button>
-
-                            <button
-                              onClick={() => toggleCompare(item.id)}
-                              className={`imagine-card-action min-w-0 px-1.5 py-1 rounded-md border transition-all duration-200 shadow-lg flex items-center justify-center gap-0.5 cursor-pointer ${
-                                compareItemIdSet.has(item.id)
-                                  ? "bg-blue-600 border-blue-500 text-white"
-                                  : "bg-slate-900/90 border-white/5 text-slate-300 hover:text-white hover:bg-slate-800"
-                              }`}
-                              title="加入左右侧滑块对比面板"
-                            >
-                              <RefreshCw className="h-3 w-3 text-blue-400" />
-                              <span className="text-[9px] font-bold">对比</span>
-                            </button>
-
-                            <button
-                              onClick={() => setFullscreenItem(item)}
-                              className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-slate-800 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center cursor-pointer"
-                              title="全屏大画幅细节放大"
-                            >
-                              <Maximize2 className="h-3 w-3 text-slate-300" />
-                            </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Meta parameter details */}
-                    <div className="imagine-asset-meta p-3.5 bg-[#0e0e12] flex-1 flex flex-col justify-between">
-                      <div>
-                        <p className="text-[11px] text-slate-300 line-clamp-2 leading-relaxed font-sans" title={item.prompt}>
-                          {item.prompt}
-                        </p>
-                      </div>
-
-                      <div className="mt-3 pt-2.5 border-t border-slate-850 flex items-center justify-between">
-                        <div className="flex flex-wrap items-center gap-1.5 text-[9px] font-mono text-slate-500">
-                          <span className="imagine-meta-chip bg-white/5 px-2 py-0.5 rounded text-[9px]">
-                            {getProviderLabel(parseProviderModel(item.model, selectedProvider).provider)}
-                          </span>
-                          <span className="imagine-meta-chip bg-white/5 px-2 py-0.5 rounded text-[9px]" title={item.model}>
-                            🤖 {item.model.replace("-preview", "").replace("lite-", "").replace("-generate", "").replace("imagen-", "Imagen")}
-                          </span>
-                          <span className="imagine-meta-chip bg-white/5 px-2 py-0.5 rounded">📐 {item.aspectRatio}</span>
-                          <span className="imagine-meta-chip imagine-status-chip bg-white/5 px-2 py-0.5 rounded">{item.status}</span>
-                          {item.errorMessage && (
-                            <span className="max-w-[160px] truncate rounded bg-red-500/10 px-2 py-0.5 text-red-300" title={item.errorMessage}>
-                              last error: {item.errorMessage}
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <span className="text-[9px] font-mono text-slate-650">
-                            {new Date(item.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                          </span>
-
-                          <button
-                            onClick={async () => {
-                              if (confirm("确定要删除此创意项吗？")) {
-                                await deleteFromDB(item.id);
-                                setItems(prev => prev.filter(x => x.id !== item.id));
-                                setSelectedItemIds(prev => prev.filter(x => x !== item.id));
-                                setCompareItemIds(prev => prev.filter(x => x !== item.id));
-                              }
-                            }}
-                            className="text-slate-600 hover:text-red-400 p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer"
-                            title="单独移除此项"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                    canceling={cancelingItemIdSet.has(item.id)}
+                    inCompare={compareItemIdSet.has(item.id)}
+                    item={item}
+                    selected={selectedItemIdSet.has(item.id)}
+                    selectedProvider={selectedProvider}
+                    onApplyVideoReference={applyAsVideoReference}
+                    onCancel={cancelProcessingItem}
+                    onDelete={handleDeleteItem}
+                    onDownload={handleDownloadItem}
+                    onLaunchMaskEditor={launchMaskEditor}
+                    onOpenFullscreen={setFullscreenItem}
+                    onRetry={retryFailedItem}
+                    onToggleCompare={toggleCompare}
+                    onToggleSelect={toggleSelectItem}
+                    onUseAgentReference={(asset) => {
+                      setAgentReferenceId(asset.id);
+                      setAgentReferenceUrl(asset.url);
+                      setIsAgentDockOpen(true);
+                    }}
+                  />
                 ))}
               </div>
             )}
