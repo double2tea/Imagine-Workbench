@@ -9,7 +9,7 @@ The current app focuses on a browser-first creative loop:
 - Use Agent Mode to plan creative actions and trigger one recommended workstation action.
 - Store generated assets locally in browser IndexedDB.
 - Search, compare, preview, delete, and ZIP-export workspace assets.
-- Route model calls through internal provider adapters for 12AI and grok2api.
+- Route model calls through internal provider adapters for 12AI, grok2api, and xstx.
 
 ## Stack
 
@@ -62,7 +62,8 @@ Provider model IDs use this shape:
 12ai-async:gemini-3.1-flash-image-preview
 grok2api:grok-4.20-auto
 grok2api:grok-imagine-image
-xstx:claude-opus-4-5-20251101
+xstx:gpt-image-2
+xstx:gpt-5.4
 ```
 
 ### Adding a new provider
@@ -77,6 +78,8 @@ New providers are added through a centralized registry — no scattered if-else 
   envBaseUrl: "NEWPROVIDER_BASE_URL",
   defaultBaseUrl: "https://api.example.com",
   defaultVideoBaseUrl: "https://api.example.com",
+  apiKeyPlaceholder: "sk_your_key",
+  hasEditableBaseUrl: true,
   supportsImage: true | false,
   supportsVideo: true | false,
   supportsChat: true | false,
@@ -96,7 +99,7 @@ Current adapters:
 - 12AI async image: `/v1/images/async/generations`
 - 12AI Veo: `/v1/videos`
 - grok2api image/video/chat: OpenAI-compatible endpoints plus `/v1/videos`
-- 星途 (xstx): OpenAI-compatible chat and model listing — chat-only provider
+- 星途 (xstx): OpenAI-compatible chat, image, and model listing
 
 ## Model Defaults
 
@@ -127,22 +130,36 @@ Model-specific parameters are defined in the catalog so the UI can adapt control
 - `POST /api/gemini/video-download`: proxies completed video downloads.
 - `POST /api/gemini/optimize`: expands a visual prompt through the selected chat model.
 - `POST /api/gemini/agent`: Agent Mode response and recommended action.
-- `GET /api/models?provider=12ai|grok2api`: loads provider chat model options.
+- `GET /api/models?provider=<key>&kind=all|chat|image|video`: loads provider model options dynamically from `/v1/models`.
 
 ## Project Layout
 
 ```text
 app/
-  page.tsx                         Main workstation UI
+  page.tsx                         Main workstation composition shell
   api/gemini/*                     Generation, agent, status, download APIs
   api/models/route.ts              Provider model listing
 components/
+  agent/                           Agent dock and chat messages
+  assets/                          Gallery cards, compare panel, toolbar, fullscreen preview
+  creation/                        Image/video generation panels
+  reference/                       Reference image picker, drag-and-drop, @-mention dropdown
+  settings/                        Settings modal (tabbed: providers / models / system)
+  workbench/                       Workspace header, notices, gallery layout
   CanvasMaskEditor.tsx             In-browser mask editor
   PresetStyles.ts                  Visual preset definitions
 lib/
   db.ts                            IndexedDB asset store
-  providers/                       Provider adapters, registry, and model catalog
+  providers/                       Provider registry, adapters, model catalog, types
 hooks/
+  useAgentController.ts            Agent chat, tool actions, auto-execute countdown
+  useAssetActions.ts               Asset selection, delete, cancel, retry, export actions
+  useAssetWorkspaceState.ts        Gallery filters, stats, compare state
+  useClipboardImageImport.ts       Clipboard image reference import
+  useGenerationActions.ts          Image/video submit actions
+  useMediaPolling.ts               Async media polling and result download
+  useProviderSettings.ts           Provider credentials, model list, connection tests
+  useReferenceState.ts             Prompt/reference image state and drag/drop handling
   use-mobile.ts                    Mobile breakpoint helper
 ```
 
@@ -162,5 +179,6 @@ npm run start
 - Generated assets are stored in the browser, not in a server database.
 - Async operations are tracked with operation names in the form `provider:mediaType:id`.
 - Reference images are passed as data URI base64 strings.
-- Provider metadata lives in `lib/providers/registry.ts` — the single source of truth for keys, labels, env vars, and defaults.
+- Provider metadata lives in `lib/providers/registry.ts` — the single source of truth for keys, labels, env vars, defaults, and UI fields.
 - The app keeps provider integration logic in `lib/providers/*`; avoid putting provider-specific request details directly in UI components.
+- Built-in model capabilities in `MODEL_CAPABILITIES` serve as initial defaults. The "获取模型" button fetches the live model list from each provider's `/v1/models` endpoint and merges it into the dropdowns. Models are auto-classified as chat/image/video by name.
