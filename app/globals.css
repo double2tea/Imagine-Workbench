@@ -1093,7 +1093,11 @@
   }
 
   .imagine-mobile-asset-stream .imagine-card-actions-shell {
-    inset-inline: 6px !important;
+    display: none !important;
+  }
+
+  .imagine-mobile-asset-stream .imagine-asset-hover-scrim {
+    display: none !important;
   }
 
   .imagine-mobile-asset-stream .imagine-card-actions {
@@ -1126,6 +1130,93 @@
     min-width: 25px;
     min-height: 25px;
     padding-inline: 5px !important;
+  }
+
+  .imagine-mobile-asset-stream .imagine-mobile-action-trigger {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    z-index: 24;
+    display: flex !important;
+    width: 34px;
+    height: 34px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(15, 23, 42, 0.82);
+    padding: 0;
+    color: #e2e8f0;
+    backdrop-filter: blur(14px);
+    box-shadow: 0 10px 24px rgba(2, 6, 23, 0.28);
+  }
+
+  .imagine-mobile-action-sheet {
+    position: absolute;
+    inset: 0;
+    z-index: 32;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    background: linear-gradient(to top, rgba(2, 6, 23, 0.9), rgba(2, 6, 23, 0.28));
+    color: #e2e8f0;
+  }
+
+  .imagine-mobile-action-sheet > div:first-child {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+  }
+
+  .imagine-mobile-action-sheet-title {
+    color: #f1f5f9;
+  }
+
+  .imagine-mobile-action-sheet-close {
+    color: #cbd5e1;
+  }
+
+  .imagine-mobile-action-sheet > div:last-child button {
+    display: flex;
+    min-height: 34px;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(15, 23, 42, 0.72);
+    padding: 7px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #e2e8f0;
+  }
+
+  .imagine-theme-light .imagine-mobile-asset-stream .imagine-mobile-action-trigger {
+    border-color: rgba(15, 23, 42, 0.12);
+    background: rgba(255, 255, 255, 0.9);
+    color: #172033;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
+  }
+
+  .imagine-theme-light .imagine-mobile-action-sheet {
+    background: linear-gradient(to top, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.78), rgba(15, 23, 42, 0.14));
+    color: #172033;
+  }
+
+  .imagine-theme-light .imagine-mobile-action-sheet > div:first-child {
+    border-color: rgba(15, 23, 42, 0.1) !important;
+  }
+
+  .imagine-theme-light .imagine-mobile-action-sheet-title {
+    color: #172033;
+  }
+
+  .imagine-theme-light .imagine-mobile-action-sheet-close {
+    color: #667085;
+  }
+
+  .imagine-theme-light .imagine-mobile-action-sheet > div:last-child button {
+    border-color: rgba(15, 23, 42, 0.1);
+    background: rgba(255, 255, 255, 0.9);
+    color: #172033;
   }
 
   .imagine-mobile-asset-stream .imagine-asset-card[data-status="processing"] .imagine-asset-media span:first-of-type,
