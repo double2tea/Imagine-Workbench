@@ -236,6 +236,7 @@ export default function Home() {
     handleImageUpload,
     handlePromptDropAsset,
     handleReferenceDropAsset,
+    handleReferenceDropFiles,
     handleSelectAtItem,
     handleSelectPromptReference,
     handleTextareaChange,
@@ -664,6 +665,7 @@ export default function Home() {
                     onPromptChange={(value) => handleTextareaChange(value, "image-prompt")}
                     onPromptDropAsset={(event) => handlePromptDropAsset(event, "image-prompt")}
                     onReferenceDropAsset={(asset) => handleReferenceDropAsset(asset, "image-prompt")}
+                    onReferenceDropFiles={(files) => handleReferenceDropFiles(files, "image-prompt")}
                     onReferenceRemove={removeReferenceImage}
                     onReferenceUpload={handleImageUpload}
                     onSelectAspectRatio={setAspectRatio}
@@ -698,6 +700,7 @@ export default function Home() {
                     onPromptChange={(value) => handleTextareaChange(value, "video-prompt")}
                     onPromptDropAsset={(event) => handlePromptDropAsset(event, "video-prompt")}
                     onReferenceDropAsset={(asset) => handleReferenceDropAsset(asset, "video-prompt")}
+                    onReferenceDropFiles={(files) => handleReferenceDropFiles(files, "video-prompt")}
                     onReferenceRemove={removeReferenceImage}
                     onReferenceRoleChange={(id, role) => toggleReferenceRole(id, role ?? "general")}
                     onReferenceUpload={handleImageUpload}

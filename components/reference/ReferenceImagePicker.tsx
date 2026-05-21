@@ -25,6 +25,7 @@ interface ReferenceImagePickerProps {
   uploadLabel: string;
   onClear: () => void;
   onDropAsset?: (asset: DraggedReferenceAsset) => void;
+  onDropFiles?: (files: File[]) => void;
   onRemove: (id: string) => void;
   onRoleChange?: (id: string, role: ReferenceImageRef["role"]) => void;
   onUpload: (event: ChangeEvent<HTMLInputElement>) => void;
@@ -34,6 +35,23 @@ function getNextRole(reference: ReferenceImageRef): ReferenceImageRef["role"] {
   if (reference.role === "start") return "end";
   if (reference.role === "end") return "general";
   return "start";
+}
+
+function hasDraggedImageFile(dataTransfer: DataTransfer): boolean {
+  return (
+    Array.from(dataTransfer.items).some(item => item.kind === "file" && (item.type === "" || item.type.startsWith("image/"))) ||
+    Array.from(dataTransfer.files).some(file => file.type.startsWith("image/"))
+  );
+}
+
+function readDraggedImageFiles(dataTransfer: DataTransfer): File[] {
+  const itemFiles = Array.from(dataTransfer.items)
+    .filter(item => item.kind === "file")
+    .map(item => item.getAsFile())
+    .filter((file): file is File => file !== null && file.type.startsWith("image/"));
+
+  if (itemFiles.length > 0) return itemFiles;
+  return Array.from(dataTransfer.files).filter(file => file.type.startsWith("image/"));
 }
 
 export default function ReferenceImagePicker({
@@ -49,6 +67,7 @@ export default function ReferenceImagePicker({
   uploadLabel,
   onClear,
   onDropAsset,
+  onDropFiles,
   onRemove,
   onRoleChange,
   onUpload,
@@ -56,18 +75,28 @@ export default function ReferenceImagePicker({
   const visibleReferences = references.slice(0, maxCount);
 
   const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
-    if (!onDropAsset || !hasDraggedReferenceAsset(event.dataTransfer)) return;
+    const hasReferenceAsset = onDropAsset !== undefined && hasDraggedReferenceAsset(event.dataTransfer);
+    const hasImageFile = onDropFiles !== undefined && hasDraggedImageFile(event.dataTransfer);
+    if (!hasReferenceAsset && !hasImageFile) return;
+
     event.preventDefault();
     event.dataTransfer.dropEffect = "copy";
   };
 
   const handleDrop = (event: DragEvent<HTMLDivElement>) => {
-    if (!onDropAsset) return;
-    const asset = readDraggedReferenceAsset(event.dataTransfer);
-    if (!asset) return;
+    const handleDropAsset = onDropAsset;
+    const asset = handleDropAsset ? readDraggedReferenceAsset(event.dataTransfer) : null;
+    if (asset && handleDropAsset) {
+      event.preventDefault();
+      handleDropAsset(asset);
+      return;
+    }
+
+    const files = onDropFiles ? readDraggedImageFiles(event.dataTransfer) : [];
+    if (files.length === 0) return;
 
     event.preventDefault();
-    onDropAsset(asset);
+    onDropFiles?.(files);
   };
 
   return (
