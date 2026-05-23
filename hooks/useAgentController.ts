@@ -13,13 +13,13 @@ interface UseAgentControllerParams {
   agentReferences: ReferenceImageRef[];
   agentReferenceUrl: string | null;
   buildProviderHeaders: (target?: string) => Record<string, string>;
-  generateManualImage: () => Promise<void>;
-  generateManualVideo: () => Promise<void>;
+  generateManualImage: (overrides?: GenerationOverrides) => Promise<void>;
+  generateManualVideo: (overrides?: GenerationOverrides) => Promise<void>;
   handleSelectImageModel: (model: string) => void;
   handleSelectVideoModel: (model: string) => void;
   items: StorageItem[];
   launchMaskEditor: (imageUrl: string, id: string, destination?: "creative" | "agent") => void;
-  optimizeActivePrompt: () => Promise<void>;
+  optimizeActivePrompt: (promptOverride?: string) => Promise<void>;
   selectedChatModel: string;
   setAgentInput: Dispatch<SetStateAction<string>>;
   setAspectRatio: Dispatch<SetStateAction<string>>;
@@ -28,6 +28,12 @@ interface UseAgentControllerParams {
   setReferenceImage: Dispatch<SetStateAction<string | null>>;
   setReferenceImages: Dispatch<SetStateAction<ReferenceImageRef[]>>;
   setTraditionalSubTab: Dispatch<SetStateAction<CreationMode>>;
+}
+
+interface GenerationOverrides {
+  prompt?: string;
+  referenceImage?: string | null;
+  referenceImages?: ReferenceImageRef[];
 }
 
 function makeClientId(prefix: string): string {
@@ -119,51 +125,73 @@ export function useAgentController({
     }
   };
 
+  const getActiveAgentReferences = (): ReferenceImageRef[] => {
+    if (agentReferences.length > 0) return agentReferences;
+    if (agentReferenceId && agentReferenceUrl) return [{ id: agentReferenceId, url: agentReferenceUrl }];
+    return [];
+  };
+
+  const getActionReferenceImages = (referenceImageId?: string): ReferenceImageRef[] => {
+    const activeAgentReferences = getActiveAgentReferences();
+
+    if (referenceImageId) {
+      const agentReference = activeAgentReferences.find(reference => reference.id === referenceImageId);
+      if (agentReference) return [agentReference];
+
+      const matchedAsset = items.find(item => item.id === referenceImageId);
+      if (matchedAsset) return [{ id: matchedAsset.id, url: matchedAsset.url, role: "general" }];
+    }
+
+    return activeAgentReferences;
+  };
+
+  const bridgeActionReferences = (references: ReferenceImageRef[]) => {
+    if (references.length === 0) return;
+    setReferenceImage(references[0]?.url ?? null);
+    setReferenceImages(references);
+  };
+
   const executeAgentToolAction = async (messageId: string, action: AgentToolAction) => {
     clearActiveCountdown();
     setAgentMessages(prev => prev.map(message => message.id === messageId ? { ...message, interactiveState: "completed" } : message));
 
     const { type, params = {} } = action;
+    const actionReferences = getActionReferenceImages(params.referenceImageId);
+    const actionReferenceOverride: GenerationOverrides | undefined = actionReferences.length > 0
+      ? { referenceImage: actionReferences[0]?.url ?? null, referenceImages: actionReferences }
+      : undefined;
 
     if (type === "optimize_prompt") {
       setPrompt(params.prompt || "");
-      optimizeActivePrompt();
+      bridgeActionReferences(actionReferences);
+      optimizeActivePrompt(params.prompt || "");
     } else if (type === "generate_image") {
       setPrompt(params.prompt || "");
+      bridgeActionReferences(actionReferences);
       if (params.aspectRatio) setAspectRatio(params.aspectRatio);
       if (params.model) handleSelectImageModel(params.model);
       setTraditionalSubTab("image");
 
       setTimeout(() => {
-        generateManualImage();
+        generateManualImage({ ...actionReferenceOverride, prompt: params.prompt || "" });
       }, 500);
     } else if (type === "generate_video") {
       setPrompt(params.prompt || "");
       if (params.aspectRatio) setAspectRatio(params.aspectRatio);
       if (params.model) handleSelectVideoModel(params.model);
-
-      if (params.referenceImageId) {
-        const matchedAsset = items.find(item => item.id === params.referenceImageId);
-        if (matchedAsset) {
-          setReferenceImage(matchedAsset.url);
-          setReferenceImages([{ id: matchedAsset.id, url: matchedAsset.url, role: "general" }]);
-        }
-      }
+      bridgeActionReferences(actionReferences);
 
       setTraditionalSubTab("video");
       setTimeout(() => {
-        generateManualVideo();
+        generateManualVideo({ ...actionReferenceOverride, prompt: params.prompt || "" });
       }, 500);
     } else if (type === "edit_image") {
       setPrompt(params.prompt || "");
       setTraditionalSubTab("image");
-      if (params.referenceImageId) {
-        const matchedAsset = items.find(item => item.id === params.referenceImageId);
-        if (matchedAsset) {
-          setReferenceImage(matchedAsset.url);
-          setReferenceImages([{ id: matchedAsset.id, url: matchedAsset.url, role: "general" }]);
-          launchMaskEditor(matchedAsset.url, matchedAsset.id);
-        }
+      bridgeActionReferences(actionReferences);
+      const editReference = actionReferences[0];
+      if (editReference) {
+        launchMaskEditor(editReference.url, editReference.id);
       }
     }
   };

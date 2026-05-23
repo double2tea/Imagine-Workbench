@@ -498,8 +498,9 @@ export default function Home() {
   };
 
   // Optimize prompt inside text area utilizing Gemini client model
-  const optimizeActivePrompt = async () => {
-    if (!prompt.trim()) return;
+  const optimizeActivePrompt = async (promptOverride?: string) => {
+    const promptToOptimize = promptOverride ?? prompt;
+    if (!promptToOptimize.trim()) return;
     setIsOptimizing(true);
     try {
       const headers = buildProviderHeaders(selectedChatModel);
@@ -507,7 +508,7 @@ export default function Home() {
       const res = await fetch("/api/gemini/optimize", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
-        body: JSON.stringify({ prompt, model: selectedChatModel }),
+        body: JSON.stringify({ prompt: promptToOptimize, model: selectedChatModel }),
       });
 
       if (!res.ok) {
@@ -724,7 +725,9 @@ export default function Home() {
           </label>
           <button
             type="button"
-            onClick={optimizeActivePrompt}
+            onClick={() => {
+              optimizeActivePrompt();
+            }}
             disabled={isOptimizing || !prompt.trim()}
             className={`flex h-8 items-center gap-1 rounded-md border px-2.5 text-[11px] font-semibold transition ${
               isOptimizing || !prompt.trim()
@@ -800,7 +803,13 @@ export default function Home() {
 
         <button
           type="button"
-          onClick={isImageMode ? generateManualImage : generateManualVideo}
+          onClick={() => {
+            if (isImageMode) {
+              generateManualImage();
+            } else {
+              generateManualVideo();
+            }
+          }}
           disabled={!prompt.trim()}
           className={`imagine-primary-action mt-3 flex w-full items-center justify-center gap-2 rounded-lg py-3 text-sm font-bold transition ${
             !prompt.trim()
