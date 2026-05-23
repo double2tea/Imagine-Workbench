@@ -1,6 +1,6 @@
-import type { FormEvent, ReactNode, Ref } from "react";
+import type { ChangeEvent, FormEvent, ReactNode, Ref } from "react";
 import { forwardRef, useEffect, useRef } from "react";
-import { Check, ChevronRight, Paintbrush, RefreshCw, Send, Sparkles, X } from "lucide-react";
+import { Check, ChevronRight, ImagePlus, Paintbrush, RefreshCw, Send, Sparkles, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import PreviewImage from "@/components/PreviewImage";
 
@@ -51,6 +51,7 @@ interface AgentDockProps {
   onSuggestedPrompt: (prompt: string) => void;
   onToggleAutoExecute: (value: boolean) => void;
   onToggleOpen: () => void;
+  onUploadReference: (event: ChangeEvent<HTMLInputElement>) => void;
 }
 
 interface AgentContentLine {
@@ -363,6 +364,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
     onSuggestedPrompt,
     onToggleAutoExecute,
     onToggleOpen,
+    onUploadReference,
   },
   ref,
 ) {
@@ -563,12 +565,19 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
           <div className="relative min-w-0">
             {atDropdownNode}
             <form onSubmit={submit} className="relative flex items-center w-full">
+              <label
+                className="absolute left-2 flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-slate-700/70 bg-slate-900/72 text-slate-400 transition hover:border-blue-400/35 hover:bg-blue-500/10 hover:text-blue-200"
+                title="上传图片到 Agent 引用"
+              >
+                <ImagePlus className="h-3.5 w-3.5" />
+                <input type="file" accept="image/*" onChange={onUploadReference} className="hidden" />
+              </label>
               <input
                 type="text"
                 value={input}
                 onChange={(event) => onChangeInput(event.target.value)}
                 placeholder="问 Agent... 输入 @ 引用完成图"
-                className="w-full rounded-lg border border-slate-700/70 bg-slate-950/70 py-2.5 pl-3.5 pr-11 text-xs text-slate-100 placeholder-slate-500 transition focus:border-blue-400/45 focus:outline-none"
+                className="w-full rounded-lg border border-slate-700/70 bg-slate-950/70 py-2.5 pl-12 pr-11 text-xs text-slate-100 placeholder-slate-500 transition focus:border-blue-400/45 focus:outline-none"
               />
               <button
                 type="submit"
