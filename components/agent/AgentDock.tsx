@@ -1,6 +1,6 @@
 import type { ChangeEvent, FormEvent, ReactNode, Ref } from "react";
 import { forwardRef, useEffect, useRef } from "react";
-import { Check, ChevronRight, ImagePlus, Paintbrush, RefreshCw, Send, Sparkles, X } from "lucide-react";
+import { Check, ChevronRight, ImagePlus, Paintbrush, RefreshCw, Send, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import PreviewImage from "@/components/PreviewImage";
 
@@ -148,6 +148,22 @@ function renderAgentContent(content: string): ReactNode {
         );
       })}
     </div>
+  );
+}
+
+function AgentIdentityMark({ variant }: { variant: "orb" | "header" }) {
+  return (
+    <span className={`imagine-agent-mark imagine-agent-mark-${variant}`}>
+      <span className="imagine-agent-mark-face">
+        <span className="imagine-agent-mark-eye">
+          <span className="imagine-agent-mark-pupil" />
+        </span>
+        <span className="imagine-agent-mark-eye">
+          <span className="imagine-agent-mark-pupil" />
+        </span>
+        <span className="imagine-agent-mark-mouth" />
+      </span>
+    </span>
   );
 }
 
@@ -350,7 +366,6 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
     input,
     isLoading,
     isOpen,
-    isOverContent,
     messages,
     themeMode,
     onCancelCountdown,
@@ -425,18 +440,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
             aria-label="展开 Agent 对话"
           >
             <span className="imagine-agent-orb-aura" />
-            <span className="imagine-agent-orb-ring" />
-            <span className="imagine-agent-orb-core">
-              <span className="imagine-agent-orb-eye relative flex h-8 w-8 items-center justify-center rounded-full">
-                <span
-                  className="imagine-agent-orb-pupil block h-3.5 w-3.5 rounded-full transition-transform duration-75"
-                />
-                <span className="imagine-agent-orb-glint" />
-              </span>
-              <span className="imagine-agent-orb-smile" />
-            </span>
-            <span className="imagine-agent-orb-spark imagine-agent-orb-spark-one" />
-            <span className="imagine-agent-orb-spark imagine-agent-orb-spark-two" />
+            <AgentIdentityMark variant="orb" />
             <span className="imagine-agent-orb-reminder absolute right-14 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-full border px-2.5 py-1 text-[10px] font-semibold shadow-lg backdrop-blur">
               Agent
             </span>
@@ -447,10 +451,10 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
           key="agent-panel"
           ref={ref}
           initial={{ opacity: 0, scale: 0.98, y: 18 }}
-          animate={{ opacity: isOverContent ? 0.84 : 1, scale: 1, y: 0 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.99, y: 10 }}
           transition={{ duration: 0.16, ease: "easeOut" }}
-          className={`imagine-agent-dock imagine-agent-dock-panel imagine-theme-${themeMode} fixed inset-x-4 bottom-12 z-40 mx-auto w-[calc(100vw-32px)] max-w-5xl rounded-lg border border-slate-700/70 bg-[#0b0d13]/96 p-3 text-slate-200 shadow-[0_18px_54px_rgba(0,0,0,0.5)] backdrop-blur-xl hover:opacity-100 focus-within:opacity-100 sm:bottom-16 sm:w-[min(1040px,calc(100vw-40px))]`}
+          className={`imagine-agent-dock imagine-agent-dock-panel imagine-theme-${themeMode} fixed inset-x-4 bottom-12 z-40 mx-auto w-[calc(100vw-32px)] max-w-5xl rounded-lg border border-slate-700/70 bg-[#0b0d13] p-3 text-slate-200 shadow-[0_18px_54px_rgba(0,0,0,0.5)] sm:bottom-16 sm:w-[min(1040px,calc(100vw-40px))]`}
         >
       <div className={`${isOpen ? "mb-2.5" : "mb-1.5"} grid grid-cols-[auto_1fr_auto] items-center gap-2`}>
         <button
@@ -459,9 +463,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
           className="flex min-w-0 items-center gap-2 text-left text-sm font-semibold text-slate-200 transition hover:text-white"
           title={isOpen ? "收起 Agent 对话" : "展开 Agent 对话"}
         >
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-blue-400/20 bg-blue-500/12">
-            <Sparkles className="h-3.5 w-3.5 text-blue-200" />
-          </span>
+          <AgentIdentityMark variant="header" />
           <span className="min-w-0 truncate">Agent</span>
           <ChevronRight className={`h-3 w-3 text-slate-500 transition ${isOpen ? "rotate-90" : "-rotate-90"}`} />
         </button>
