@@ -26,6 +26,7 @@ import { useClipboardImageImport } from "@/hooks/useClipboardImageImport";
 import { useGenerationActions } from "@/hooks/useGenerationActions";
 import { useMediaPolling } from "@/hooks/useMediaPolling";
 import {
+  IMAGE_REFERENCE_LIMIT,
   removePromptReferenceTokens,
   useReferenceState,
   type AtDropdownTarget,
@@ -258,6 +259,7 @@ export default function Home() {
     setPrompt,
   });
   useClipboardImageImport({
+    agentReferenceCount: agentReferences.length,
     pushWorkspaceNotice,
     referenceImageCount: referenceImages.length,
     setAgentReferenceId,
@@ -266,6 +268,36 @@ export default function Home() {
     setReferenceImage,
     setReferenceImages,
   });
+
+  const handleAgentReferenceUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    if (agentReferences.length >= IMAGE_REFERENCE_LIMIT) {
+      pushWorkspaceNotice("error", `Agent 参考图已达上限：最多 ${IMAGE_REFERENCE_LIMIT} 张`);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result;
+      if (typeof base64 !== "string") {
+        throw new Error("Unable to read agent reference image file");
+      }
+
+      const newReferenceId = makeClientId("agent_upload");
+      setAgentReferenceId(newReferenceId);
+      setAgentReferenceUrl(base64);
+      setAgentReferences(prev => {
+        if (prev.length >= IMAGE_REFERENCE_LIMIT) return prev;
+        return [...prev, { id: newReferenceId, url: base64 }];
+      });
+      pushWorkspaceNotice("success", `已上传 Agent 参考图（${agentReferences.length + 1}/${IMAGE_REFERENCE_LIMIT}）`);
+    };
+    reader.readAsDataURL(file);
+  };
+
   useMediaPolling({
     buildProviderHeaders,
     items,
@@ -506,7 +538,10 @@ export default function Home() {
 
   const saveMaskOutput = (mergedImageBase64: string, maskBase64: string) => {
     if (maskDestination === "agent") {
+      const nextReferenceId = maskTargetId || "custom_ref";
       setAgentReferenceUrl(mergedImageBase64);
+      setAgentReferenceId(nextReferenceId);
+      setAgentReferences([{ id: nextReferenceId, url: mergedImageBase64 }]);
       if (!agentInput.includes("modify the marked region")) {
         setAgentInput(`In the marked region, change: `);
       }
@@ -647,6 +682,7 @@ export default function Home() {
       onUseAgentReference={(asset) => {
         setAgentReferenceId(asset.id);
         setAgentReferenceUrl(asset.url);
+        setAgentReferences([{ id: asset.id, url: asset.url }]);
         setIsAgentDockOpen(true);
       }}
       formatModelLabel={formatStoredModelLabel}
@@ -1029,6 +1065,7 @@ export default function Home() {
                 onClearReference={() => {
                   setAgentReferenceId(null);
                   setAgentReferenceUrl(null);
+                  setAgentReferences([]);
                 }}
                 onDeclineAction={declineAgentToolAction}
                 onExecuteAction={executeAgentToolAction}
@@ -1041,6 +1078,7 @@ export default function Home() {
                 onSuggestedPrompt={submitAgentPrompt}
                 onToggleAutoExecute={handleToggleAutoExecute}
                 onToggleOpen={() => setIsAgentDockOpen(prev => !prev)}
+                onUploadReference={handleAgentReferenceUpload}
               />,
               document.body,
             )}
