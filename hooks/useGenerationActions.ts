@@ -29,6 +29,12 @@ interface UseGenerationActionsParams {
   videoReferenceMode: VideoReferenceMode;
 }
 
+interface GenerationOverrides {
+  prompt?: string;
+  referenceImage?: string | null;
+  referenceImages?: ReferenceImageRef[];
+}
+
 function makeClientId(prefix: string): string {
   return `${prefix}_${Date.now()}`;
 }
@@ -116,8 +122,12 @@ export function useGenerationActions({
   videoReferenceLimit,
   videoReferenceMode,
 }: UseGenerationActionsParams) {
-  const generateManualImage = async () => {
-    if (!prompt.trim()) return;
+  const generateManualImage = async (overrides: GenerationOverrides = {}) => {
+    const activePrompt = overrides.prompt ?? prompt;
+    const activeReferenceImage = overrides.referenceImage ?? referenceImage;
+    const activeReferenceImages = overrides.referenceImages ?? referenceImages;
+
+    if (!activePrompt.trim()) return;
     if (isGptImageModel) {
       const sizeError = validateGptImageSize(activeImageSize);
       if (sizeError) {
@@ -126,14 +136,14 @@ export function useGenerationActions({
       }
     }
     setImageSubmitCount(prev => prev + 1);
-    const generationPrompt = buildPromptWithReferenceMap(prompt, referenceImages);
+    const generationPrompt = buildPromptWithReferenceMap(activePrompt, activeReferenceImages);
 
     const tempId = makeClientId("temp_img");
     const newItem: StorageItem = {
       id: tempId,
       type: "image",
       url: "https://picsum.photos/800/800",
-      prompt,
+      prompt: activePrompt,
       model: activeImageModel,
       aspectRatio: activeImageSize,
       createdAt: new Date().toISOString(),
@@ -159,8 +169,8 @@ export function useGenerationActions({
           aspectRatio: activeImageSize,
           imageSize,
           thinkingLevel: imageThinkingLevel,
-          referenceImage: referenceImages[0]?.url || referenceImage || undefined,
-          referenceImages: referenceImages.map(reference => reference.url),
+          referenceImage: activeReferenceImages[0]?.url || activeReferenceImage || undefined,
+          referenceImages: activeReferenceImages.map(reference => reference.url),
         }),
       });
 
@@ -219,8 +229,12 @@ export function useGenerationActions({
     }
   };
 
-  const generateManualVideo = async () => {
-    if (!prompt.trim()) return;
+  const generateManualVideo = async (overrides: GenerationOverrides = {}) => {
+    const activePrompt = overrides.prompt ?? prompt;
+    const activeReferenceImage = overrides.referenceImage ?? referenceImage;
+    const activeReferenceImages = overrides.referenceImages ?? referenceImages;
+
+    if (!activePrompt.trim()) return;
     setVideoSubmitCount(prev => prev + 1);
 
     const tempId = makeClientId("temp_vid");
@@ -228,7 +242,7 @@ export function useGenerationActions({
       id: tempId,
       type: "video",
       url: "",
-      prompt,
+      prompt: activePrompt,
       model: selectedVideoModel,
       aspectRatio: activeVideoSize,
       createdAt: new Date().toISOString(),
@@ -244,12 +258,12 @@ export function useGenerationActions({
     try {
       const headers = buildProviderHeaders(selectedVideoModel);
       const videoReferenceUrls = buildVideoReferenceUrls(
-        referenceImages,
-        referenceImage,
+        activeReferenceImages,
+        activeReferenceImage,
         videoReferenceMode,
         videoReferenceLimit,
       );
-      const generationPrompt = buildPromptWithReferenceMap(prompt, referenceImages, videoReferenceUrls);
+      const generationPrompt = buildPromptWithReferenceMap(activePrompt, activeReferenceImages, videoReferenceUrls);
 
       const res = await fetch("/api/gemini/generate-video", {
         method: "POST",
