@@ -17,7 +17,7 @@ export default function AtReferenceDropdown({ items, search, onSelect }: AtRefer
   if (filtered.length === 0) {
     return (
       <div className="absolute left-0 right-0 bottom-full mb-2 bg-[#0e0e12] border border-white/5 rounded-xl p-3 text-center text-[11px] text-slate-550 select-none shadow-xl z-50">
-        🔍 未找到可引用的完成图像
+        🔍 未找到可引用图片
       </div>
     );
   }

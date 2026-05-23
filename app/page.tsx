@@ -572,9 +572,26 @@ export default function Home() {
       );
     }
 
+    const agentReferenceItems: StorageItem[] = agentReferences.map((reference, index) => ({
+      id: reference.id,
+      type: "image",
+      url: reference.url,
+      prompt: `Agent 引用图 ${index + 1}`,
+      model: "agent-reference",
+      aspectRatio: "auto",
+      createdAt: "",
+      status: "complete",
+      progress: 100,
+    }));
+    const agentReferenceIdSet = new Set(agentReferences.map(reference => reference.id));
+    const agentAtItems = [
+      ...agentReferenceItems,
+      ...searchableReferenceImages.filter(item => !agentReferenceIdSet.has(item.id)),
+    ];
+
     return (
       <AtReferenceDropdown
-        items={searchableReferenceImages}
+        items={agentAtItems}
         search={atDropdown.search}
         onSelect={(item) => handleSelectAtItem(item.url, item.id, type)}
       />
