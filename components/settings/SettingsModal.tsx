@@ -44,6 +44,7 @@ interface ProviderCredentialCardProps {
 }
 
 interface SettingsModalProps {
+  assetFailedCount: number;
   assetStatusCounts: Record<StorageItem["type"], number>;
   chatModelGroups: ModelGroup[];
   fetchedModelOptions: FetchedModelOptions;
@@ -188,6 +189,7 @@ function ProviderCredentialCard({
 }
 
 export default function SettingsModal({
+  assetFailedCount,
   assetStatusCounts,
   chatModelGroups,
   fetchedModelOptions,
@@ -507,6 +509,8 @@ export default function SettingsModal({
                       <li>类型: Browser IndexedDB 离线隔离数据库</li>
                       <li>合成图片数量: {assetStatusCounts.image} 张</li>
                       <li>合成 Veo 视频: {assetStatusCounts.video} 个</li>
+                      <li>失败任务数量: {assetFailedCount} 个</li>
+                      <li>失败任务会保留重试快照，可能包含上传参考图；重试成功、删除失败项或复位数据后清除。</li>
                     </ul>
                   </div>
 

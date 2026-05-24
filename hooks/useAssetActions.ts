@@ -6,6 +6,17 @@ import { parseProviderModel, type AiProvider } from "@/lib/providers/model-catal
 
 type NoticeType = "error" | "info" | "success";
 
+interface RetryRequestBody {
+  prompt: string;
+  model: string;
+  aspectRatio: string;
+  imageSize?: string;
+  thinkingLevel?: string;
+  referenceImage?: string;
+  referenceImages?: string[];
+  images?: string[];
+}
+
 interface UseAssetActionsParams {
   buildProviderHeaders: (target?: string) => Record<string, string>;
   compareItemIds: string[];
@@ -49,6 +60,27 @@ async function readFetchError(response: Response, fallback: string): Promise<str
   } catch {
     return `${fallback} (HTTP ${response.status})`;
   }
+}
+
+function buildRetryRequestBody(item: StorageItem): RetryRequestBody {
+  const request = item.generationRequest;
+  const referenceImages = request?.referenceImages;
+  const body: RetryRequestBody = {
+    prompt: request?.prompt ?? item.prompt,
+    model: request?.model ?? item.model,
+    aspectRatio: request?.aspectRatio ?? item.aspectRatio,
+  };
+
+  if (item.type === "image") {
+    body.imageSize = request?.imageSize;
+    body.thinkingLevel = request?.thinkingLevel;
+    body.referenceImage = referenceImages?.[0];
+    body.referenceImages = referenceImages;
+  } else {
+    body.images = referenceImages;
+  }
+
+  return body;
 }
 
 export function useAssetActions({
@@ -226,16 +258,13 @@ export function useAssetActions({
     setItems(prev => prev.map(current => current.id === item.id ? retryingItem : current));
 
     try {
-      const headers = buildProviderHeaders(item.model);
+      const retryRequestBody = buildRetryRequestBody(item);
+      const headers = buildProviderHeaders(retryRequestBody.model);
       const endpoint = item.type === "image" ? "/api/gemini/generate-image" : "/api/gemini/generate-video";
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
-        body: JSON.stringify({
-          prompt: item.prompt,
-          model: item.model,
-          aspectRatio: item.aspectRatio,
-        }),
+        body: JSON.stringify(retryRequestBody),
       });
 
       if (!res.ok) {
@@ -264,6 +293,7 @@ export function useAssetActions({
           url: imageUrl,
           status: "complete",
           progress: 100,
+          generationRequest: undefined,
         };
         await saveToDB(completedItem);
         setItems(prev => prev.map(current => current.id === item.id ? completedItem : current));
@@ -274,7 +304,7 @@ export function useAssetActions({
     } catch (error) {
       const message = toErrorMessage(error, "任务重试失败");
       const failedItem: StorageItem = {
-        ...item,
+        ...retryingItem,
         status: "failed",
         progress: 100,
         errorMessage: message,

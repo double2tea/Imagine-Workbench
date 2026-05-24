@@ -111,6 +111,7 @@ export function useMediaPolling({
                     status: "complete",
                     progress: 100,
                     errorMessage: undefined,
+                    generationRequest: undefined,
                   };
                   await saveToDB(updatedList[index]);
                   setItems([...updatedList]);

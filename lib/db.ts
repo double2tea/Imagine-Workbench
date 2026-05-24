@@ -15,7 +15,17 @@ export interface StorageItem {
   progress: number;
   operationName?: string;
   errorMessage?: string;
+  generationRequest?: GenerationRequestSnapshot;
   maskOriginalId?: string; // If this was created by drawing on another image
+}
+
+export interface GenerationRequestSnapshot {
+  prompt: string;
+  model: string;
+  aspectRatio: string;
+  imageSize?: string;
+  thinkingLevel?: string;
+  referenceImages?: string[];
 }
 
 export function openDatabase(): Promise<IDBDatabase> {
