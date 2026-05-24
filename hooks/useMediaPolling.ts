@@ -72,6 +72,21 @@ export function useMediaPolling({
             const statusRecord = statusData as Record<string, unknown>;
             pollingFailuresRef.current[item.id] = 0;
 
+            if (statusRecord.done === true && statusRecord.status === "failed") {
+              const failedItem: StorageItem = {
+                ...item,
+                status: "failed",
+                progress: 100,
+                errorMessage: getStringField(statusData, "errorMessage") ?? "异步任务失败",
+              };
+              updatedList[index] = failedItem;
+              delete pollingFailuresRef.current[item.id];
+              await saveToDB(failedItem);
+              pushWorkspaceNotice("error", `异步任务失败：${failedItem.errorMessage}`);
+              changed = true;
+              continue;
+            }
+
             if (statusRecord.done === true) {
               const mediaType = statusRecord.mediaType === "image" ? "image" : "video";
               const downloadEndpoint =
@@ -95,6 +110,7 @@ export function useMediaPolling({
                     url: base64data,
                     status: "complete",
                     progress: 100,
+                    errorMessage: undefined,
                   };
                   await saveToDB(updatedList[index]);
                   setItems([...updatedList]);
@@ -110,6 +126,7 @@ export function useMediaPolling({
                 updatedList[index] = {
                   ...item,
                   progress: nextProgress,
+                  errorMessage: undefined,
                 };
                 await saveToDB(updatedList[index]);
                 changed = true;
@@ -121,17 +138,13 @@ export function useMediaPolling({
             pollingFailuresRef.current[item.id] = nextFailures;
             console.error(`Polling failed for ${item.id}:`, error);
 
-            if (nextFailures >= 3) {
-              const failedItem: StorageItem = {
+            if (nextFailures === 3) {
+              const waitingItem: StorageItem = {
                 ...item,
-                status: "failed",
-                progress: 100,
                 errorMessage: toErrorMessage(error, "任务轮询失败"),
               };
-              updatedList[index] = failedItem;
-              delete pollingFailuresRef.current[item.id];
-              await saveToDB(failedItem);
-              pushWorkspaceNotice("error", `异步任务失败：${failedItem.errorMessage}`);
+              updatedList[index] = waitingItem;
+              await saveToDB(waitingItem);
               changed = true;
             }
           }

@@ -91,7 +91,13 @@ export async function getAsyncImageStatus(config: ProviderConfig, taskId: string
   }
 
   if (response.status === "failed") {
-    throw new Error(response.error?.message ?? "Async image task failed");
+    return {
+      done: true,
+      mediaType: "image",
+      progress: 100,
+      status: "failed",
+      errorMessage: response.error?.message ?? "Async image task failed",
+    };
   }
 
   return {
