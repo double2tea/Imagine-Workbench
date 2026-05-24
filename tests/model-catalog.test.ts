@@ -69,6 +69,19 @@ test("image model selector hides duplicate async variants", () => {
   assert.equal(supportsAsyncImageGeneration("12ai:gpt-image-2"), false);
 });
 
+test("gpt image 2 exposes common portrait and landscape sizes", () => {
+  const capability = getModelCapability("12ai:gpt-image-2", "image");
+
+  assert.ok(capability.sizes.some(option => option.value === "1536x1024" && option.label.includes("3:2")));
+  assert.ok(capability.sizes.some(option => option.value === "1024x1536" && option.label.includes("2:3")));
+  assert.ok(capability.sizes.some(option => option.value === "2048x1536" && option.label.includes("4:3")));
+  assert.ok(capability.sizes.some(option => option.value === "1536x2048" && option.label.includes("3:4")));
+  assert.ok(capability.sizes.some(option => option.value === "3504x2336" && option.label.includes("3:2 4K")));
+  assert.ok(capability.sizes.some(option => option.value === "2336x3504" && option.label.includes("2:3 4K")));
+  assert.ok(capability.sizes.some(option => option.value === "3264x2448" && option.label.includes("4:3 4K")));
+  assert.ok(capability.sizes.some(option => option.value === "2448x3264" && option.label.includes("3:4 4K")));
+});
+
 test("agent chat defaults use 12AI Gemini 3.1 Flash Lite", () => {
   assert.equal(DEFAULT_CHAT_MODEL, "12ai:gemini-3.1-flash-lite-preview");
   assert.equal(DEFAULT_VISION_CHAT_MODEL, "12ai:gemini-3.1-flash-lite-preview");
