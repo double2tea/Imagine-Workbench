@@ -154,14 +154,8 @@ function renderAgentContent(content: string): ReactNode {
 function AgentIdentityMark({ variant }: { variant: "orb" | "header" }) {
   return (
     <span className={`imagine-agent-mark imagine-agent-mark-${variant}`}>
-      <span className="imagine-agent-mark-face">
-        <span className="imagine-agent-mark-eye">
-          <span className="imagine-agent-mark-pupil" />
-        </span>
-        <span className="imagine-agent-mark-eye">
-          <span className="imagine-agent-mark-pupil" />
-        </span>
-        <span className="imagine-agent-mark-mouth" />
+      <span className="imagine-agent-mark-glyph">
+        <span className="imagine-agent-mark-node" />
       </span>
     </span>
   );
@@ -393,7 +387,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
   useEffect(() => {
     if (!isIdleOrb) return;
 
-    const updateEyeOffset = (event: PointerEvent) => {
+    const updateMarkOffset = (event: PointerEvent) => {
       const orbButton = orbButtonRef.current;
       if (!orbButton) return;
 
@@ -405,18 +399,18 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
       const distance = Math.hypot(deltaX, deltaY);
 
       if (distance === 0) {
-        orbButton.style.setProperty("--agent-eye-x", "0px");
-        orbButton.style.setProperty("--agent-eye-y", "0px");
+        orbButton.style.setProperty("--agent-mark-x", "0px");
+        orbButton.style.setProperty("--agent-mark-y", "0px");
         return;
       }
 
       const gazeStrength = Math.min(distance / 180, 1);
-      orbButton.style.setProperty("--agent-eye-x", `${(deltaX / distance) * 5 * gazeStrength}px`);
-      orbButton.style.setProperty("--agent-eye-y", `${(deltaY / distance) * 4 * gazeStrength}px`);
+      orbButton.style.setProperty("--agent-mark-x", `${(deltaX / distance) * 4 * gazeStrength}px`);
+      orbButton.style.setProperty("--agent-mark-y", `${(deltaY / distance) * 3 * gazeStrength}px`);
     };
 
-    window.addEventListener("pointermove", updateEyeOffset, { passive: true });
-    return () => window.removeEventListener("pointermove", updateEyeOffset);
+    window.addEventListener("pointermove", updateMarkOffset, { passive: true });
+    return () => window.removeEventListener("pointermove", updateMarkOffset);
   }, [isIdleOrb]);
 
   return (
