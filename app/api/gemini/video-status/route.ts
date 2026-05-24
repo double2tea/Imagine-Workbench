@@ -23,6 +23,6 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to poll operation status";
     console.error("Poll media status failed:", err);
-    return NextResponse.json({ error: message, done: true, progress: 100, status: "failed" }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -57,7 +57,13 @@ export async function getVideoStatus(config: ProviderConfig, taskId: string): Pr
   const response = await getJson<VideoStatusResponse>(`${baseUrl}/v1/videos/${encodeURIComponent(taskId)}`, config);
   const status = response.status ?? "processing";
   if (status === "failed") {
-    throw new Error(response.error?.message ?? "Video task failed");
+    return {
+      done: true,
+      mediaType: "video",
+      progress: 100,
+      status,
+      errorMessage: response.error?.message ?? "Video task failed",
+    };
   }
 
   if (status === "completed" || status === "complete") {

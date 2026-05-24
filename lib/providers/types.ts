@@ -50,6 +50,7 @@ export interface MediaStatusResult {
   progress: number;
   status: string;
   url?: string;
+  errorMessage?: string;
 }
 
 export type ChatRole = "system" | "developer" | "user" | "assistant" | "tool";
