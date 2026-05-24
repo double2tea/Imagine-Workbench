@@ -1,6 +1,6 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
-import { saveToDB, type StorageItem } from "@/lib/db";
+import { saveToDB, type GenerationRequestSnapshot, type StorageItem } from "@/lib/db";
 import { buildPromptWithReferenceMap } from "@/hooks/useReferenceState";
 import type { VideoReferenceMode } from "@/lib/providers/model-catalog";
 
@@ -136,7 +136,19 @@ export function useGenerationActions({
       }
     }
     setImageSubmitCount(prev => prev + 1);
-    const generationPrompt = buildPromptWithReferenceMap(activePrompt, activeReferenceImages);
+    const imageReferenceUrls = activeReferenceImages.map(reference => reference.url);
+    if (imageReferenceUrls.length === 0 && activeReferenceImage) {
+      imageReferenceUrls.push(activeReferenceImage);
+    }
+    const generationPrompt = buildPromptWithReferenceMap(activePrompt, activeReferenceImages, imageReferenceUrls);
+    const generationRequest: GenerationRequestSnapshot = {
+      prompt: generationPrompt,
+      model: activeImageModel,
+      aspectRatio: activeImageSize,
+      imageSize,
+      thinkingLevel: imageThinkingLevel,
+      referenceImages: imageReferenceUrls,
+    };
 
     const tempId = makeClientId("temp_img");
     const newItem: StorageItem = {
@@ -149,6 +161,7 @@ export function useGenerationActions({
       createdAt: new Date().toISOString(),
       status: "pending",
       progress: 30,
+      generationRequest,
     };
 
     setItems(prev => [newItem, ...prev]);
@@ -164,13 +177,8 @@ export function useGenerationActions({
         headers: { "Content-Type": "application/json", ...headers },
         signal: controller.signal,
         body: JSON.stringify({
-          prompt: generationPrompt,
-          model: activeImageModel,
-          aspectRatio: activeImageSize,
-          imageSize,
-          thinkingLevel: imageThinkingLevel,
-          referenceImage: activeReferenceImages[0]?.url || activeReferenceImage || undefined,
-          referenceImages: activeReferenceImages.map(reference => reference.url),
+          ...generationRequest,
+          referenceImage: imageReferenceUrls[0],
         }),
       });
 
@@ -197,6 +205,7 @@ export function useGenerationActions({
           url: imageUrl ?? "",
           status: "complete",
           progress: 100,
+          generationRequest: undefined,
         };
         if (!imageUrl) {
           throw new Error("图片接口返回缺少 imageUrl 或 operationName");
@@ -236,6 +245,19 @@ export function useGenerationActions({
 
     if (!activePrompt.trim()) return;
     setVideoSubmitCount(prev => prev + 1);
+    const videoReferenceUrls = buildVideoReferenceUrls(
+      activeReferenceImages,
+      activeReferenceImage,
+      videoReferenceMode,
+      videoReferenceLimit,
+    );
+    const generationPrompt = buildPromptWithReferenceMap(activePrompt, activeReferenceImages, videoReferenceUrls);
+    const generationRequest: GenerationRequestSnapshot = {
+      prompt: generationPrompt,
+      model: selectedVideoModel,
+      aspectRatio: activeVideoSize,
+      referenceImages: videoReferenceUrls,
+    };
 
     const tempId = makeClientId("temp_vid");
     const newItem: StorageItem = {
@@ -248,6 +270,7 @@ export function useGenerationActions({
       createdAt: new Date().toISOString(),
       status: "processing",
       progress: 12,
+      generationRequest,
     };
 
     setItems(prev => [newItem, ...prev]);
@@ -257,23 +280,15 @@ export function useGenerationActions({
 
     try {
       const headers = buildProviderHeaders(selectedVideoModel);
-      const videoReferenceUrls = buildVideoReferenceUrls(
-        activeReferenceImages,
-        activeReferenceImage,
-        videoReferenceMode,
-        videoReferenceLimit,
-      );
-      const generationPrompt = buildPromptWithReferenceMap(activePrompt, activeReferenceImages, videoReferenceUrls);
-
       const res = await fetch("/api/gemini/generate-video", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
         signal: controller.signal,
         body: JSON.stringify({
-          prompt: generationPrompt,
+          prompt: generationRequest.prompt,
           images: videoReferenceUrls,
-          aspectRatio: activeVideoSize,
-          model: selectedVideoModel,
+          aspectRatio: generationRequest.aspectRatio,
+          model: generationRequest.model,
         }),
       });
 

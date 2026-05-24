@@ -1119,6 +1119,7 @@ export default function Home() {
       </main>
 
       <SettingsModal
+        assetFailedCount={assetStats.statusCounts.failed}
         assetStatusCounts={assetStats.typeCounts}
         chatModelGroups={chatModelGroups}
         fetchedModelOptions={fetchedModelOptions}
