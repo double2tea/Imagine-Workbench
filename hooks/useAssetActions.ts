@@ -3,6 +3,7 @@ import JSZip from "jszip";
 import type { CompareViewType } from "@/components/assets/ComparePanel";
 import { clearAllDB, deleteFromDB, saveToDB, type StorageItem } from "@/lib/db";
 import { parseProviderModel, type AiProvider } from "@/lib/providers/model-catalog";
+import { getReferenceImagePayloadError } from "@/lib/reference-images";
 
 type NoticeType = "error" | "info" | "success";
 
@@ -259,6 +260,11 @@ export function useAssetActions({
 
     try {
       const retryRequestBody = buildRetryRequestBody(item);
+      const retryPayloadError = getReferenceImagePayloadError(
+        retryRequestBody.referenceImages ?? retryRequestBody.images ?? [],
+      );
+      if (retryPayloadError) throw new Error(retryPayloadError);
+
       const headers = buildProviderHeaders(retryRequestBody.model);
       const endpoint = item.type === "image" ? "/api/gemini/generate-image" : "/api/gemini/generate-video";
       const res = await fetch(endpoint, {

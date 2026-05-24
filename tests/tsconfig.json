@@ -9,5 +9,10 @@
     "rootDir": "..",
     "types": ["node"]
   },
-  "include": ["./model-catalog.test.ts", "../lib/providers/model-catalog.ts"]
+  "include": [
+    "./model-catalog.test.ts",
+    "./reference-images.test.ts",
+    "../lib/providers/model-catalog.ts",
+    "../lib/reference-images.ts"
+  ]
 }

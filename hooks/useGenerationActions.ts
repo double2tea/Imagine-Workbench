@@ -3,6 +3,7 @@ import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePic
 import { saveToDB, type GenerationRequestSnapshot, type StorageItem } from "@/lib/db";
 import { buildPromptWithReferenceMap } from "@/hooks/useReferenceState";
 import type { VideoReferenceMode } from "@/lib/providers/model-catalog";
+import { getReferenceImagePayloadError } from "@/lib/reference-images";
 
 type NoticeType = "error" | "info" | "success";
 
@@ -140,6 +141,11 @@ export function useGenerationActions({
     if (imageReferenceUrls.length === 0 && activeReferenceImage) {
       imageReferenceUrls.push(activeReferenceImage);
     }
+    const imagePayloadError = getReferenceImagePayloadError(imageReferenceUrls);
+    if (imagePayloadError) {
+      pushWorkspaceNotice("error", imagePayloadError);
+      return;
+    }
     const generationPrompt = buildPromptWithReferenceMap(activePrompt, activeReferenceImages, imageReferenceUrls);
     const generationRequest: GenerationRequestSnapshot = {
       prompt: generationPrompt,
@@ -251,6 +257,11 @@ export function useGenerationActions({
       videoReferenceMode,
       videoReferenceLimit,
     );
+    const videoPayloadError = getReferenceImagePayloadError(videoReferenceUrls);
+    if (videoPayloadError) {
+      pushWorkspaceNotice("error", videoPayloadError);
+      return;
+    }
     const generationPrompt = buildPromptWithReferenceMap(activePrompt, activeReferenceImages, videoReferenceUrls);
     const generationRequest: GenerationRequestSnapshot = {
       prompt: generationPrompt,
