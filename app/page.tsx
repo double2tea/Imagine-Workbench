@@ -43,6 +43,7 @@ import {
   type ModelOption,
 } from "@/lib/providers/model-catalog";
 import { PROVIDER_KEYS, getProviderMeta } from "@/lib/providers/registry";
+import { compressReferenceImageDataUrl, compressReferenceImageFile } from "@/lib/reference-images";
 
 type NoticeType = "error" | "info" | "success";
 type MaskDestination = "creative" | "agent";
@@ -269,7 +270,7 @@ export default function Home() {
     setReferenceImages,
   });
 
-  const handleAgentReferenceUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAgentReferenceUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
@@ -279,23 +280,20 @@ export default function Home() {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64 = reader.result;
-      if (typeof base64 !== "string") {
-        throw new Error("Unable to read agent reference image file");
-      }
-
+    try {
+      const compressedDataUrl = await compressReferenceImageFile(file);
       const newReferenceId = makeClientId("agent_upload");
       setAgentReferenceId(newReferenceId);
-      setAgentReferenceUrl(base64);
+      setAgentReferenceUrl(compressedDataUrl);
       setAgentReferences(prev => {
         if (prev.length >= IMAGE_REFERENCE_LIMIT) return prev;
-        return [...prev, { id: newReferenceId, url: base64 }];
+        return [...prev, { id: newReferenceId, url: compressedDataUrl }];
       });
       pushWorkspaceNotice("success", `已上传 Agent 参考图（${agentReferences.length + 1}/${IMAGE_REFERENCE_LIMIT}）`);
-    };
-    reader.readAsDataURL(file);
+    } catch (error) {
+      console.error(error);
+      pushWorkspaceNotice("error", toErrorMessage(error, "Agent 参考图压缩失败，请换一张图片"));
+    }
   };
 
   useMediaPolling({
@@ -537,19 +535,28 @@ export default function Home() {
     setIsMaskOpen(true);
   };
 
-  const saveMaskOutput = (mergedImageBase64: string, maskBase64: string) => {
+  const saveMaskOutput = async (mergedImageBase64: string, maskBase64: string) => {
+    let compressedMergedImage: string;
+    try {
+      compressedMergedImage = await compressReferenceImageDataUrl(mergedImageBase64);
+    } catch (error) {
+      console.error(error);
+      pushWorkspaceNotice("error", toErrorMessage(error, "蒙版参考图压缩失败"));
+      return;
+    }
+
     if (maskDestination === "agent") {
       const nextReferenceId = maskTargetId || "custom_ref";
-      setAgentReferenceUrl(mergedImageBase64);
+      setAgentReferenceUrl(compressedMergedImage);
       setAgentReferenceId(nextReferenceId);
-      setAgentReferences([{ id: nextReferenceId, url: mergedImageBase64 }]);
+      setAgentReferences([{ id: nextReferenceId, url: compressedMergedImage }]);
       if (!agentInput.includes("modify the marked region")) {
         setAgentInput(`In the marked region, change: `);
       }
       setIsAgentDockOpen(true);
     } else {
       // Inject drew brush directly into reference seeds
-      setReferenceImage(mergedImageBase64);
+      setReferenceImage(compressedMergedImage);
       // Auto populate helper suggestions into Prompt box
       if (!prompt.includes("modify the marked region")) {
         setPrompt(`In the marked region of the image, change: ${prompt || "[输入你的新修改构想...]"}`);

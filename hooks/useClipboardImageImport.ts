@@ -1,6 +1,7 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 import { IMAGE_REFERENCE_LIMIT } from "@/hooks/useReferenceState";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
+import { compressReferenceImageFile } from "@/lib/reference-images";
 
 type NoticeType = "error" | "info" | "success";
 
@@ -26,19 +27,8 @@ function readPastedImageFile(dataTransfer: DataTransfer): File | null {
   return imageItem?.getAsFile() ?? null;
 }
 
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result !== "string") {
-        reject(new Error("Unable to read clipboard image as data URL"));
-        return;
-      }
-      resolve(reader.result);
-    };
-    reader.onerror = () => reject(new Error("Unable to read clipboard image"));
-    reader.readAsDataURL(file);
-  });
+function toErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message.trim() ? error.message : fallback;
 }
 
 export function useClipboardImageImport({
@@ -80,7 +70,7 @@ export function useClipboardImageImport({
       }
 
       try {
-        const base64 = await readFileAsDataUrl(file);
+        const compressedDataUrl = await compressReferenceImageFile(file);
         const latestReferenceCount = isAgentPaste ? agentReferenceCountRef.current : referenceImageCountRef.current;
         if (latestReferenceCount >= IMAGE_REFERENCE_LIMIT) {
           pushWorkspaceNotice("error", `参考图已达上限：最多 ${IMAGE_REFERENCE_LIMIT} 张，先移除一张再粘贴`);
@@ -93,25 +83,25 @@ export function useClipboardImageImport({
         if (isAgentPaste) {
           agentReferenceCountRef.current = nextReferenceCount;
           setAgentReferenceId(newReferenceId);
-          setAgentReferenceUrl(base64);
+          setAgentReferenceUrl(compressedDataUrl);
           setAgentReferences(prev => {
             if (prev.some(reference => reference.id === newReferenceId)) return prev;
-            return [...prev, { id: newReferenceId, url: base64 }];
+            return [...prev, { id: newReferenceId, url: compressedDataUrl }];
           });
           pushWorkspaceNotice("success", `已从剪贴板导入 Agent 参考图（${nextReferenceCount}/${IMAGE_REFERENCE_LIMIT}）`);
           return;
         }
 
         referenceImageCountRef.current = nextReferenceCount;
-        setReferenceImage(base64);
+        setReferenceImage(compressedDataUrl);
         setReferenceImages(prev => {
           if (prev.some(reference => reference.id === newReferenceId)) return prev;
-          return [...prev, { id: newReferenceId, url: base64, role: "general" }];
+          return [...prev, { id: newReferenceId, url: compressedDataUrl, role: "general" }];
         });
         pushWorkspaceNotice("success", `已从剪贴板导入参考图（${nextReferenceCount}/${IMAGE_REFERENCE_LIMIT}）`);
       } catch (error) {
         console.error(error);
-        pushWorkspaceNotice("error", "剪贴板图片读取失败，请重新复制图片后再试");
+        pushWorkspaceNotice("error", toErrorMessage(error, "剪贴板图片压缩失败，请重新复制图片后再试"));
       }
     };
     window.addEventListener("paste", handlePaste);

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getModelCapability, parseProviderModel } from "@/lib/providers/model-catalog";
 import { generateVideo } from "@/lib/providers/video";
 import { optionalText, requireText, resolveProviderConfig } from "@/lib/providers/utils";
+import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, getReferenceImagePayloadError } from "@/lib/reference-images";
 
 export const runtime = "edge";
 
@@ -16,12 +17,17 @@ interface GenerateVideoBody {
 
 export async function POST(req: NextRequest) {
   try {
+    const bodySizeError = getRequestBodySizeError(req);
+    if (bodySizeError) return NextResponse.json({ error: bodySizeError }, { status: 413 });
+
     const body = (await req.json()) as GenerateVideoBody;
     const modelValue = optionalText(body.model) ?? "12ai:veo_3_1-fast";
     const parsed = parseProviderModel(modelValue, "12ai");
     const config = resolveProviderConfig(req, parsed.provider);
     const capability = getModelCapability(modelValue, "video");
     const referenceImages = readReferenceImages(body.images, body.image, body.lastFrame);
+    const payloadError = getReferenceImagePayloadError(referenceImages);
+    if (payloadError) return NextResponse.json({ error: payloadError }, { status: 413 });
     validateReferenceCount(referenceImages.length, capability.minReferenceImages, capability.maxReferenceImages);
 
     const result = await generateVideo(config, {
@@ -37,6 +43,15 @@ export async function POST(req: NextRequest) {
     console.error("Generate video endpoint failed:", err);
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+function getRequestBodySizeError(req: NextRequest): string | null {
+  const contentLength = req.headers.get("content-length");
+  if (!contentLength) return null;
+
+  const bytes = Number(contentLength);
+  if (!Number.isFinite(bytes) || bytes <= REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES) return null;
+  return "参考图请求体过大，请压缩或减少参考图后重试";
 }
 
 function readReferenceImages(images: unknown, image: unknown, lastFrame: unknown): string[] {

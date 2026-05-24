@@ -6,6 +6,7 @@ import {
 } from "@/components/reference/referenceDrag";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import type { VideoReferenceMode } from "@/lib/providers/model-catalog";
+import { compressReferenceImageFile } from "@/lib/reference-images";
 
 export type AtDropdownTarget = "image-prompt" | "video-prompt" | "agent-prompt";
 type PromptReferenceTarget = Exclude<AtDropdownTarget, "agent-prompt">;
@@ -31,6 +32,10 @@ interface UseReferenceStateParams {
 
 function makeClientId(prefix: string): string {
   return `${prefix}_${Date.now()}`;
+}
+
+function toErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message.trim() ? error.message : fallback;
 }
 
 export function getReferencePromptToken(index: number): string {
@@ -139,36 +144,33 @@ export function useReferenceState({
     addDroppedReferenceAsset(asset, target);
   };
 
-  const addReferenceImageFile = (file: File, target: PromptReferenceTarget, id: string) => {
+  const addReferenceImageFile = async (file: File, target: PromptReferenceTarget, id: string) => {
     const limit = getReferenceLimitForTarget(target);
     if (referenceImages.length >= limit) {
       pushWorkspaceNotice("error", `参考图已达上限：最多 ${limit} 张`);
       return;
     }
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64 = reader.result;
-      if (typeof base64 !== "string") {
-        throw new Error("Unable to read reference image file");
-      }
-
+    try {
+      const compressedDataUrl = await compressReferenceImageFile(file);
       setReferenceImages(prev => {
         if (prev.some(reference => reference.id === id)) return prev;
         if (prev.length >= limit) return prev;
 
         const nextReference: ReferenceImageRef = {
           id,
-          url: base64,
+          url: compressedDataUrl,
           role: getDroppedReferenceRole(target, prev.length),
         };
         if (prev.length === 0) {
-          setReferenceImage(base64);
+          setReferenceImage(compressedDataUrl);
         }
         return [...prev, nextReference];
       });
-    };
-    reader.readAsDataURL(file);
+    } catch (error) {
+      console.error(error);
+      pushWorkspaceNotice("error", toErrorMessage(error, "参考图压缩失败，请换一张图片"));
+    }
   };
 
   const handleReferenceDropFiles = (files: File[], target: PromptReferenceTarget) => {
@@ -180,7 +182,7 @@ export function useReferenceState({
     }
 
     files.slice(0, availableSlots).forEach((file, index) => {
-      addReferenceImageFile(file, target, `${makeClientId("drop")}_${index}`);
+      void addReferenceImageFile(file, target, `${makeClientId("drop")}_${index}`);
     });
   };
 
@@ -213,23 +215,10 @@ export function useReferenceState({
 
   const handleImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
+    event.target.value = "";
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64 = reader.result;
-      if (typeof base64 !== "string") {
-        throw new Error("Unable to read reference image file");
-      }
-      const newReferenceId = makeClientId("upload");
-
-      setReferenceImage(base64);
-      setReferenceImages(prev => {
-        if (prev.some(reference => reference.id === newReferenceId)) return prev;
-        return [...prev, { id: newReferenceId, url: base64, role: "general" }];
-      });
-    };
-    reader.readAsDataURL(file);
+    void addReferenceImageFile(file, "image-prompt", makeClientId("upload"));
   };
 
   const removeReferenceImage = (id: string) => {

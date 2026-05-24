@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { parseProviderModel } from "@/lib/providers/model-catalog";
 import { generateImage } from "@/lib/providers/image";
 import { optionalText, requireText, resolveProviderConfig } from "@/lib/providers/utils";
+import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, getReferenceImagePayloadError } from "@/lib/reference-images";
 
 export const runtime = "edge";
 
@@ -17,11 +18,16 @@ interface GenerateImageBody {
 
 export async function POST(req: NextRequest) {
   try {
+    const bodySizeError = getRequestBodySizeError(req);
+    if (bodySizeError) return NextResponse.json({ error: bodySizeError }, { status: 413 });
+
     const body = (await req.json()) as GenerateImageBody;
     const modelValue = optionalText(body.model) ?? "12ai:gemini-3.1-flash-image-preview";
     const parsed = parseProviderModel(modelValue, "12ai");
     const config = resolveProviderConfig(req, parsed.provider);
     const referenceImages = readReferenceImages(body.referenceImages, body.referenceImage);
+    const payloadError = getReferenceImagePayloadError(referenceImages);
+    if (payloadError) return NextResponse.json({ error: payloadError }, { status: 413 });
 
     const result = await generateImage(config, {
       prompt: requireText(body.prompt, "Prompt"),
@@ -39,6 +45,15 @@ export async function POST(req: NextRequest) {
     console.error("Image generation route error:", err);
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+function getRequestBodySizeError(req: NextRequest): string | null {
+  const contentLength = req.headers.get("content-length");
+  if (!contentLength) return null;
+
+  const bytes = Number(contentLength);
+  if (!Number.isFinite(bytes) || bytes <= REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES) return null;
+  return "参考图请求体过大，请压缩或减少参考图后重试";
 }
 
 function readReferenceImages(referenceImages: unknown, referenceImage: unknown): string[] {
