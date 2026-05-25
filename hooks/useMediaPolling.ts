@@ -32,6 +32,21 @@ async function readFetchError(response: Response, fallback: string): Promise<str
   }
 }
 
+async function saveItemOrWarn(
+  item: StorageItem,
+  pushWorkspaceNotice: (type: NoticeType, message: string) => void,
+): Promise<boolean> {
+  try {
+    await saveToDB(item);
+    return true;
+  } catch (error) {
+    const message = toErrorMessage(error, "IndexedDB 写入失败");
+    console.error("IndexedDB Save Failed:", error);
+    pushWorkspaceNotice("error", `本地存储失败，刷新后可能丢失：${message}`);
+    return false;
+  }
+}
+
 export function useMediaPolling({
   buildProviderHeaders,
   items,
@@ -81,7 +96,7 @@ export function useMediaPolling({
               };
               updatedList[index] = failedItem;
               delete pollingFailuresRef.current[item.id];
-              await saveToDB(failedItem);
+              await saveItemOrWarn(failedItem, pushWorkspaceNotice);
               pushWorkspaceNotice("error", `异步任务失败：${failedItem.errorMessage}`);
               changed = true;
               continue;
@@ -113,7 +128,7 @@ export function useMediaPolling({
                     errorMessage: undefined,
                     generationRequest: undefined,
                   };
-                  await saveToDB(updatedList[index]);
+                  await saveItemOrWarn(updatedList[index], pushWorkspaceNotice);
                   setItems([...updatedList]);
                 };
                 reader.readAsDataURL(blob);
@@ -129,7 +144,7 @@ export function useMediaPolling({
                   progress: nextProgress,
                   errorMessage: undefined,
                 };
-                await saveToDB(updatedList[index]);
+                await saveItemOrWarn(updatedList[index], pushWorkspaceNotice);
                 changed = true;
               }
             }
@@ -145,7 +160,7 @@ export function useMediaPolling({
                 errorMessage: toErrorMessage(error, "任务轮询失败"),
               };
               updatedList[index] = waitingItem;
-              await saveToDB(waitingItem);
+              await saveItemOrWarn(waitingItem, pushWorkspaceNotice);
               changed = true;
             }
           }

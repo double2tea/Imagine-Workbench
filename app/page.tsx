@@ -444,8 +444,13 @@ export default function Home() {
   // Load items from database on mount
   useEffect(() => {
     async function loadWorkspace() {
-      const allItems = await getAllFromDB();
-      setItems(allItems);
+      try {
+        const allItems = await getAllFromDB();
+        setItems(allItems);
+      } catch (error) {
+        console.error("IndexedDB Read Failed:", error);
+        pushWorkspaceNotice("error", `本地项目库读取失败：${toErrorMessage(error, "IndexedDB 读取失败")}`);
+      }
     }
     loadWorkspace();
 
@@ -457,7 +462,7 @@ export default function Home() {
     }, 0);
 
     return () => clearTimeout(restoreSettings);
-  }, []);
+  }, [pushWorkspaceNotice]);
 
   // Preset quick injection
   const applyPreset = (preset: VisualPreset) => {
