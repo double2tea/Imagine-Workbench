@@ -88,12 +88,12 @@ export default function AssetCard({
     >
       <div className="imagine-asset-media relative aspect-[4/3] w-full bg-slate-950 overflow-hidden flex items-center justify-center border-b border-white/5">
         {item.status === "processing" || item.status === "pending" ? (
-          <div className="absolute inset-0 bg-[#07070a] flex flex-col items-center justify-center p-6 text-center select-none overflow-hidden">
+          <div className="absolute inset-0 bg-[#07070a] flex flex-col items-center justify-center p-4 text-center select-none overflow-hidden">
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-28 h-28 bg-blue-500/10 rounded-full blur-2xl animate-pulse" />
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-indigo-500/5 rounded-full blur-xl animate-ping" />
 
             <div className="relative z-10 flex flex-col items-center">
-              <div className="h-9 w-9 rounded-xl bg-blue-600/10 border border-blue-500/30 flex items-center justify-center shadow-[0_0_15px_rgba(59,130,246,0.2)] mb-3 animate-spin duration-3000">
+              <div className="h-8 w-8 rounded-xl bg-blue-600/10 border border-blue-500/30 flex items-center justify-center shadow-[0_0_15px_rgba(59,130,246,0.2)] mb-2 animate-spin duration-3000">
                 <RefreshCw className="h-4.5 w-4.5 text-blue-400 animate-spin" />
               </div>
               <p className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
@@ -101,20 +101,20 @@ export default function AssetCard({
               </p>
               <span className="text-[9px] font-mono text-slate-500 mt-1">模型: {formatModelName(item.model)}</span>
 
-              <div className="w-36 bg-white/5 h-1 rounded-full overflow-hidden mt-4 border border-white/5 shadow-inner">
+              <div className="w-36 bg-white/5 h-1 rounded-full overflow-hidden mt-3 border border-white/5 shadow-inner">
                 <div
                   className="bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-600 h-full transition-all duration-300 shadow-[0_0_10px_rgba(59,130,246,0.5)]"
                   style={{ width: `${item.progress}%` }}
                 />
               </div>
-              <span className="text-[10px] text-blue-400 mt-2 font-mono font-bold tracking-widest">
+              <span className="text-[10px] text-blue-400 mt-1.5 font-mono font-bold tracking-widest">
                 {item.progress}% {item.status.toUpperCase()}
               </span>
               <button
                 type="button"
                 onClick={() => onCancel(item)}
                 disabled={canceling}
-                className="mt-3 flex items-center gap-1.5 rounded-lg border border-red-400/50 bg-red-500/10 px-3 py-1.5 text-[10px] font-bold text-red-200 transition hover:border-red-300 hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-55"
+                className="mt-2 flex items-center gap-1.5 rounded-lg border border-red-400/50 bg-red-500/10 px-3 py-1.5 text-[10px] font-bold text-red-200 transition hover:border-red-300 hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-55"
                 title={item.operationName?.startsWith("12ai:video:") ? "取消 12AI 视频生成任务" : "从本地取消并停止等待"}
               >
                 <X className="h-3 w-3" />
