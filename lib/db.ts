@@ -56,43 +56,35 @@ export function openDatabase(): Promise<IDBDatabase> {
 
 // Save or Update item
 export async function saveToDB(item: StorageItem): Promise<void> {
-  try {
-    const db = await openDatabase();
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(STORE_NAME, "readwrite");
-      const store = transaction.objectStore(STORE_NAME);
-      const request = store.put(item);
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE_NAME, "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.put(item);
 
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
-  } catch (err) {
-    console.error("IndexedDB Save Failed:", err);
-  }
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error ?? request.error ?? new Error("IndexedDB save failed"));
+    transaction.onabort = () => reject(transaction.error ?? request.error ?? new Error("IndexedDB save aborted"));
+  });
 }
 
 // Retrieve all items
 export async function getAllFromDB(): Promise<StorageItem[]> {
-  try {
-    const db = await openDatabase();
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(STORE_NAME, "readonly");
-      const store = transaction.objectStore(STORE_NAME);
-      const request = store.getAll();
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE_NAME, "readonly");
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.getAll();
 
-      request.onsuccess = () => {
-        // Sort by dates descending
-        const sorted = (request.result as StorageItem[]).sort((a, b) => {
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        });
-        resolve(sorted);
-      };
-      request.onerror = () => reject(request.error);
-    });
-  } catch (err) {
-    console.error("IndexedDB Read Failed:", err);
-    return [];
-  }
+    request.onsuccess = () => {
+      // Sort by dates descending
+      const sorted = (request.result as StorageItem[]).sort((a, b) => {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+      resolve(sorted);
+    };
+    request.onerror = () => reject(request.error);
+  });
 }
 
 // Delete item

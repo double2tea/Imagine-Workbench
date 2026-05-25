@@ -84,6 +84,21 @@ function buildRetryRequestBody(item: StorageItem): RetryRequestBody {
   return body;
 }
 
+async function saveItemOrWarn(
+  item: StorageItem,
+  pushWorkspaceNotice: (type: NoticeType, message: string) => void,
+): Promise<boolean> {
+  try {
+    await saveToDB(item);
+    return true;
+  } catch (error) {
+    const message = toErrorMessage(error, "IndexedDB 写入失败");
+    console.error("IndexedDB Save Failed:", error);
+    pushWorkspaceNotice("error", `本地存储失败，刷新后可能丢失：${message}`);
+    return false;
+  }
+}
+
 export function useAssetActions({
   buildProviderHeaders,
   compareItemIds,
@@ -255,7 +270,7 @@ export function useAssetActions({
       errorMessage: undefined,
       operationName: undefined,
     };
-    await saveToDB(retryingItem);
+    if (!await saveItemOrWarn(retryingItem, pushWorkspaceNotice)) return;
     setItems(prev => prev.map(current => current.id === item.id ? retryingItem : current));
 
     try {
@@ -288,7 +303,10 @@ export function useAssetActions({
           progress: 15,
           operationName,
         };
-        await saveToDB(processingItem);
+        if (!await saveItemOrWarn(processingItem, pushWorkspaceNotice)) {
+          setItems(prev => prev.map(current => current.id === item.id ? processingItem : current));
+          return;
+        }
         setItems(prev => prev.map(current => current.id === item.id ? processingItem : current));
         return;
       }
@@ -301,7 +319,10 @@ export function useAssetActions({
           progress: 100,
           generationRequest: undefined,
         };
-        await saveToDB(completedItem);
+        if (!await saveItemOrWarn(completedItem, pushWorkspaceNotice)) {
+          setItems(prev => prev.map(current => current.id === item.id ? completedItem : current));
+          return;
+        }
         setItems(prev => prev.map(current => current.id === item.id ? completedItem : current));
         return;
       }
@@ -315,7 +336,7 @@ export function useAssetActions({
         progress: 100,
         errorMessage: message,
       };
-      await saveToDB(failedItem);
+      await saveItemOrWarn(failedItem, pushWorkspaceNotice);
       setItems(prev => prev.map(current => current.id === item.id ? failedItem : current));
       pushWorkspaceNotice("error", message);
     }

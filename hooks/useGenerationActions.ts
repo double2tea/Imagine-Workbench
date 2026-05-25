@@ -55,6 +55,21 @@ function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
+async function saveItemOrWarn(
+  item: StorageItem,
+  pushWorkspaceNotice: (type: NoticeType, message: string) => void,
+): Promise<boolean> {
+  try {
+    await saveToDB(item);
+    return true;
+  } catch (error) {
+    const message = toErrorMessage(error, "IndexedDB 写入失败");
+    console.error("IndexedDB Save Failed:", error);
+    pushWorkspaceNotice("error", `本地存储失败，刷新后可能丢失：${message}`);
+    return false;
+  }
+}
+
 async function readFetchError(response: Response, fallback: string): Promise<string> {
   try {
     const data: unknown = await response.json();
@@ -136,7 +151,6 @@ export function useGenerationActions({
         return;
       }
     }
-    setImageSubmitCount(prev => prev + 1);
     const imageReferenceUrls = activeReferenceImages.map(reference => reference.url);
     if (imageReferenceUrls.length === 0 && activeReferenceImage) {
       imageReferenceUrls.push(activeReferenceImage);
@@ -146,6 +160,7 @@ export function useGenerationActions({
       pushWorkspaceNotice("error", imagePayloadError);
       return;
     }
+    setImageSubmitCount(prev => prev + 1);
     const generationPrompt = buildPromptWithReferenceMap(activePrompt, activeReferenceImages, imageReferenceUrls);
     const generationRequest: GenerationRequestSnapshot = {
       prompt: generationPrompt,
@@ -200,7 +215,10 @@ export function useGenerationActions({
             status: "processing",
             progress: 15,
           };
-          await saveToDB(compilingItem);
+          if (!await saveItemOrWarn(compilingItem, pushWorkspaceNotice)) {
+            setItems(prev => [compilingItem, ...prev.filter(item => item.id !== tempId)]);
+            return;
+          }
           setItems(prev => [compilingItem, ...prev.filter(item => item.id !== tempId)]);
           return;
         }
@@ -217,7 +235,10 @@ export function useGenerationActions({
           throw new Error("图片接口返回缺少 imageUrl 或 operationName");
         }
 
-        await saveToDB(completedItem);
+        if (!await saveItemOrWarn(completedItem, pushWorkspaceNotice)) {
+          setItems(prev => [completedItem, ...prev.filter(item => item.id !== tempId)]);
+          return;
+        }
         setItems(prev => [completedItem, ...prev.filter(item => item.id !== tempId)]);
       } else {
         throw new Error(await readFetchError(res, "图片生成请求失败"));
@@ -235,7 +256,7 @@ export function useGenerationActions({
         progress: 100,
         errorMessage: message,
       };
-      await saveToDB(failedItem);
+      await saveItemOrWarn(failedItem, pushWorkspaceNotice);
       setItems(prev => [failedItem, ...prev.filter(item => item.id !== tempId)]);
       pushWorkspaceNotice("error", message);
     } finally {
@@ -250,7 +271,6 @@ export function useGenerationActions({
     const activeReferenceImages = overrides.referenceImages ?? referenceImages;
 
     if (!activePrompt.trim()) return;
-    setVideoSubmitCount(prev => prev + 1);
     const videoReferenceUrls = buildVideoReferenceUrls(
       activeReferenceImages,
       activeReferenceImage,
@@ -262,6 +282,7 @@ export function useGenerationActions({
       pushWorkspaceNotice("error", videoPayloadError);
       return;
     }
+    setVideoSubmitCount(prev => prev + 1);
     const generationPrompt = buildPromptWithReferenceMap(activePrompt, activeReferenceImages, videoReferenceUrls);
     const generationRequest: GenerationRequestSnapshot = {
       prompt: generationPrompt,
@@ -317,7 +338,10 @@ export function useGenerationActions({
           status: "processing",
         };
 
-        await saveToDB(compilingItem);
+        if (!await saveItemOrWarn(compilingItem, pushWorkspaceNotice)) {
+          setItems(prev => [compilingItem, ...prev.filter(item => item.id !== tempId)]);
+          return;
+        }
         setItems(prev => [compilingItem, ...prev.filter(item => item.id !== tempId)]);
       } else {
         throw new Error(await readFetchError(res, "视频生成请求失败"));
@@ -335,7 +359,7 @@ export function useGenerationActions({
         progress: 100,
         errorMessage: message,
       };
-      await saveToDB(failedItem);
+      await saveItemOrWarn(failedItem, pushWorkspaceNotice);
       setItems(prev => [failedItem, ...prev.filter(item => item.id !== tempId)]);
       pushWorkspaceNotice("error", message);
     } finally {
