@@ -1,6 +1,7 @@
 import type { Dispatch, MouseEvent, MutableRefObject, SetStateAction } from "react";
 import JSZip from "jszip";
 import type { CompareViewType } from "@/components/assets/ComparePanel";
+import { readImageGenerationPayload } from "@/lib/client-image-response";
 import { clearAllDB, deleteFromDB, saveToDB, type StorageItem } from "@/lib/db";
 import { parseProviderModel, type AiProvider } from "@/lib/providers/model-catalog";
 import { getReferenceImagePayloadError } from "@/lib/reference-images";
@@ -61,6 +62,13 @@ async function readFetchError(response: Response, fallback: string): Promise<str
   } catch {
     return `${fallback} (HTTP ${response.status})`;
   }
+}
+
+function readVideoGenerationPayload(data: unknown): { imageUrl: string | null; operationName: string | null } {
+  return {
+    imageUrl: getStringField(data, "imageUrl"),
+    operationName: getStringField(data, "operationName"),
+  };
 }
 
 function buildRetryRequestBody(item: StorageItem): RetryRequestBody {
@@ -292,9 +300,9 @@ export function useAssetActions({
         throw new Error(await readFetchError(res, "任务重试失败"));
       }
 
-      const data: unknown = await res.json();
-      const operationName = getStringField(data, "operationName");
-      const imageUrl = getStringField(data, "imageUrl");
+      const { operationName, imageUrl } = item.type === "image"
+        ? await readImageGenerationPayload(res)
+        : readVideoGenerationPayload(await res.json());
 
       if (operationName) {
         const processingItem: StorageItem = {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseProviderModel } from "@/lib/providers/model-catalog";
 import { generateImage } from "@/lib/providers/image";
-import { optionalText, requireText, resolveProviderConfig } from "@/lib/providers/utils";
+import { dataUriToBlob, optionalText, requireText, resolveProviderConfig } from "@/lib/providers/utils";
 import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, getReferenceImagePayloadError } from "@/lib/reference-images";
 
 export const runtime = "edge";
@@ -38,6 +38,17 @@ export async function POST(req: NextRequest) {
       referenceImages: referenceImages.map(dataUri => ({ dataUri })),
       async: parsed.async,
     });
+
+    if (result.imageUrl?.startsWith("data:")) {
+      const blob = dataUriToBlob(result.imageUrl);
+      return new Response(blob, {
+        headers: {
+          "Content-Type": blob.type || "image/png",
+          "Cache-Control": "no-store",
+          "x-image-source": result.source,
+        },
+      });
+    }
 
     return NextResponse.json(result);
   } catch (err) {
