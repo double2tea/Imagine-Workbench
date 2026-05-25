@@ -506,6 +506,13 @@
   aspect-ratio: 16 / 9;
 }
 
+@media (min-width: 641px) {
+  .imagine-asset-card[data-status="processing"] .imagine-asset-media,
+  .imagine-asset-card[data-status="pending"] .imagine-asset-media {
+    min-height: 312px;
+  }
+}
+
 .imagine-asset-type-badge {
   border-radius: 6px !important;
   letter-spacing: 0.02em !important;
