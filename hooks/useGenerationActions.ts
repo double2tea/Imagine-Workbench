@@ -1,5 +1,6 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
+import { readImageGenerationPayload } from "@/lib/client-image-response";
 import { saveToDB, type GenerationRequestSnapshot, type StorageItem } from "@/lib/db";
 import { buildPromptWithReferenceMap } from "@/hooks/useReferenceState";
 import type { VideoReferenceMode } from "@/lib/providers/model-catalog";
@@ -204,9 +205,7 @@ export function useGenerationActions({
       });
 
       if (res.ok) {
-        const data: unknown = await res.json();
-        const operationName = getStringField(data, "operationName");
-        const imageUrl = getStringField(data, "imageUrl");
+        const { operationName, imageUrl } = await readImageGenerationPayload(res);
         if (operationName) {
           const compilingItem: StorageItem = {
             ...newItem,
