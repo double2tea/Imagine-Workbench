@@ -10,8 +10,10 @@
     "types": ["node"]
   },
   "include": [
+    "./canvas-editor.test.ts",
     "./model-catalog.test.ts",
     "./reference-images.test.ts",
+    "../lib/canvas-editor.ts",
     "../lib/providers/model-catalog.ts",
     "../lib/reference-images.ts"
   ]
