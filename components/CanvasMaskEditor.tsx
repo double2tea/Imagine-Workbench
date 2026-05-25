@@ -1,13 +1,147 @@
 'use client';
 
-import React, { useRef, useState, useEffect } from "react";
-import { Paintbrush, Eraser, RotateCcw, Check, X, Sliders, RefreshCw } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  Check,
+  Crop,
+  Eraser,
+  Paintbrush,
+  RefreshCw,
+  RotateCcw,
+  Sliders,
+  Type,
+  X,
+} from "lucide-react";
+import {
+  clampRectToBounds,
+  createAspectRectFromDrag,
+  createCenteredAspectRect,
+  isUsableCrop,
+  moveRectWithinBounds,
+  normalizeRect,
+  pointInRect,
+  resizeRectFromHandle,
+  scaleToFitSize,
+  type AspectRatio,
+  type CanvasRect,
+  type CanvasSize,
+  type CropResizeHandle,
+} from "@/lib/canvas-editor";
 
 interface CanvasMaskEditorProps {
   imageUrl: string;
   isOpen: boolean;
   onClose: () => void;
   onSaveMask: (maskedImageBase64: string, maskBase64: string) => void;
+}
+
+type EditorMode = "mask" | "erase" | "text" | "crop";
+type CropPresetId = "free" | "original" | "1:1" | "4:5" | "3:4" | "4:3" | "16:9" | "9:16";
+type CropDragState =
+  | { type: "create"; start: CanvasPoint }
+  | { type: "move"; offsetX: number; offsetY: number }
+  | { type: "resize"; handle: CropResizeHandle };
+
+interface CanvasPoint {
+  x: number;
+  y: number;
+}
+
+interface TextOverlay {
+  id: number;
+  x: number;
+  y: number;
+  value: string;
+  size: number;
+  color: string;
+}
+
+const TEXT_COLORS = ["#ffffff", "#111827", "#f97316", "#38bdf8", "#facc15"] as const;
+const CROP_HANDLE_HIT_SIZE = 14;
+const CROP_MIN_SIZE = 16;
+const CROP_PRESETS: Array<{ id: CropPresetId; label: string; ratio: AspectRatio | null }> = [
+  { id: "free", label: "自由", ratio: null },
+  { id: "original", label: "原图", ratio: null },
+  { id: "1:1", label: "1:1", ratio: { width: 1, height: 1 } },
+  { id: "4:5", label: "4:5", ratio: { width: 4, height: 5 } },
+  { id: "3:4", label: "3:4", ratio: { width: 3, height: 4 } },
+  { id: "4:3", label: "4:3", ratio: { width: 4, height: 3 } },
+  { id: "16:9", label: "16:9", ratio: { width: 16, height: 9 } },
+  { id: "9:16", label: "9:16", ratio: { width: 9, height: 16 } },
+];
+const EDITOR_MODE_OPTIONS: Array<{ mode: EditorMode; label: string; hint: string; icon: React.ReactNode }> = [
+  { mode: "mask", label: "遮罩", hint: "标记需要重绘的区域", icon: <Paintbrush className="h-3.5 w-3.5" /> },
+  { mode: "erase", label: "橡皮", hint: "擦除已绘制遮罩", icon: <Eraser className="h-3.5 w-3.5" /> },
+  { mode: "text", label: "文字", hint: "点击画布放置文字", icon: <Type className="h-3.5 w-3.5" /> },
+  { mode: "crop", label: "裁切", hint: "拖动选框或把手调整构图", icon: <Crop className="h-3.5 w-3.5" /> },
+];
+
+function getCropPresetRatio(presetId: CropPresetId, canvasSize: CanvasSize): AspectRatio | null {
+  if (presetId === "original") return { width: canvasSize.width, height: canvasSize.height };
+
+  return CROP_PRESETS.find(preset => preset.id === presetId)?.ratio ?? null;
+}
+
+function getCanvasPoint(event: React.PointerEvent<HTMLCanvasElement>): CanvasPoint {
+  const canvas = event.currentTarget;
+  const rect = canvas.getBoundingClientRect();
+
+  return {
+    x: (event.clientX - rect.left) * (canvas.width / rect.width),
+    y: (event.clientY - rect.top) * (canvas.height / rect.height),
+  };
+}
+
+function getCropResizeHandle(point: CanvasPoint, rect: CanvasRect): CropResizeHandle | null {
+  const centerX = rect.x + rect.width / 2;
+  const centerY = rect.y + rect.height / 2;
+  const right = rect.x + rect.width;
+  const bottom = rect.y + rect.height;
+  const handles: Array<{ handle: CropResizeHandle; x: number; y: number }> = [
+    { handle: "nw", x: rect.x, y: rect.y },
+    { handle: "ne", x: right, y: rect.y },
+    { handle: "se", x: right, y: bottom },
+    { handle: "sw", x: rect.x, y: bottom },
+    { handle: "n", x: centerX, y: rect.y },
+    { handle: "e", x: right, y: centerY },
+    { handle: "s", x: centerX, y: bottom },
+    { handle: "w", x: rect.x, y: centerY },
+  ];
+
+  return handles.find(item => Math.abs(point.x - item.x) <= CROP_HANDLE_HIT_SIZE && Math.abs(point.y - item.y) <= CROP_HANDLE_HIT_SIZE)?.handle ?? null;
+}
+
+function getCropCursor(handle: CropResizeHandle | null): string {
+  if (handle === "n" || handle === "s") return "ns-resize";
+  if (handle === "e" || handle === "w") return "ew-resize";
+  if (handle === "nw" || handle === "se") return "nwse-resize";
+  if (handle === "ne" || handle === "sw") return "nesw-resize";
+
+  return "crosshair";
+}
+
+function drawTextOverlay(ctx: CanvasRenderingContext2D, item: TextOverlay): void {
+  ctx.fillStyle = item.color;
+  ctx.font = `700 ${item.size}px Inter, ui-sans-serif, system-ui, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = item.color === "#111827" ? "rgba(255,255,255,0.72)" : "rgba(0,0,0,0.65)";
+  ctx.lineWidth = Math.max(2, Math.round(item.size / 9));
+  ctx.strokeText(item.value, item.x, item.y);
+  ctx.fillText(item.value, item.x, item.y);
+}
+
+function canvasHasVisiblePixels(canvas: HTMLCanvasElement): boolean {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return false;
+
+  const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  for (let index = 3; index < data.length; index += 4) {
+    if (data[index] > 10) return true;
+  }
+
+  return false;
 }
 
 export default function CanvasMaskEditor({
@@ -18,329 +152,400 @@ export default function CanvasMaskEditor({
 }: CanvasMaskEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const bgImgRef = useRef<HTMLImageElement | null>(null);
-  
+  const cropDragStateRef = useRef<CropDragState | null>(null);
+  const pendingMaskDataUrlRef = useRef<string | null>(null);
+  const textIdRef = useRef(0);
+
+  const [workingImageUrl, setWorkingImageUrl] = useState(imageUrl);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [brushMode, setBrushMode] = useState<"draw" | "erase">("draw");
+  const [editorMode, setEditorMode] = useState<EditorMode>("mask");
   const [brushSize, setBrushSize] = useState(24);
   const [hasDrawn, setHasDrawn] = useState(false);
-  const [canvasSize, setCanvasSize] = useState({ width: 500, height: 500 });
+  const [hasLocalEdits, setHasLocalEdits] = useState(false);
+  const [canvasSize, setCanvasSize] = useState<CanvasSize>({ width: 500, height: 500 });
   const [imgLoaded, setImgLoaded] = useState(false);
+  const [textValue, setTextValue] = useState("新文字");
+  const [textSize, setTextSize] = useState(36);
+  const [textColor, setTextColor] = useState<(typeof TEXT_COLORS)[number]>("#ffffff");
+  const [textItems, setTextItems] = useState<TextOverlay[]>([]);
+  const [cropRect, setCropRect] = useState<CanvasRect | null>(null);
+  const [cropPresetId, setCropPresetId] = useState<CropPresetId>("free");
+  const [cropCursor, setCropCursor] = useState("crosshair");
 
-  // Initialize background image
+  const canApply = hasLocalEdits || hasDrawn || textItems.length > 0;
+  const canApplyCrop = cropRect !== null && isUsableCrop(cropRect);
+  const activeMode = EDITOR_MODE_OPTIONS.find(option => option.mode === editorMode) ?? EDITOR_MODE_OPTIONS[0];
+  const cropSizeLabel = cropRect ? `${Math.round(cropRect.width)} x ${Math.round(cropRect.height)}` : "未选择";
+
   useEffect(() => {
-    if (!isOpen || !imageUrl) return;
+    if (!isOpen || !workingImageUrl) return;
 
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => {
-      // Scale canvas to fit inside display viewport while keeping image aspect ratio
-      const maxWidth = Math.min(window.innerWidth - 64, 600);
-      const maxHeight = Math.min(window.innerHeight - 250, 500);
-      
-      let width = img.width;
-      let height = img.height;
-      const ratio = width / height;
+      const bounds = {
+        width: Math.min(window.innerWidth - 64, 720),
+        height: Math.min(window.innerHeight - 280, 560),
+      };
+      const nextSize = scaleToFitSize({ width: img.width, height: img.height }, bounds);
 
-      if (width > maxWidth) {
-        width = maxWidth;
-        height = width / ratio;
-      }
-      if (height > maxHeight) {
-        height = maxHeight;
-        width = height * ratio;
-      }
-
-      setCanvasSize({ width, height });
-      setImgLoaded(true);
       bgImgRef.current = img;
+      setCanvasSize(nextSize);
+      setImgLoaded(true);
     };
-    img.src = imageUrl;
+    img.src = workingImageUrl;
+  }, [isOpen, workingImageUrl]);
 
-    // Defending against cascading synchronous render warning
-    const t = setTimeout(() => {
-      setImgLoaded(false);
-    }, 0);
-
-    return () => clearTimeout(t);
-  }, [imageUrl, isOpen]);
-
-  // Setup canvas drawing context and draw background image once loaded
   useEffect(() => {
-    if (!imgLoaded || !canvasRef.current || !bgImgRef.current) return;
+    if (!imgLoaded || !canvasRef.current) return;
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Clear and draw image background
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(bgImgRef.current, 0, 0, canvas.width, canvas.height);
 
-    // We keep a separate overlay mask state on top of the image
-    // To do this elegantly, we can use a separate buffer canvas or just paint transparent red
-    // Since we need to output the mask, let's keep the raw strokes rendered as transparent red (#ff0000)
-    // with globalCompositeOperation = 'source-over'
-    setHasDrawn(false);
+    const pendingMask = pendingMaskDataUrlRef.current;
+    if (!pendingMask) {
+      setHasDrawn(false);
+      return;
+    }
+
+    const maskImg = new Image();
+    maskImg.onload = () => {
+      ctx.drawImage(maskImg, 0, 0, canvas.width, canvas.height);
+      setHasDrawn(canvasHasVisiblePixels(canvas));
+      pendingMaskDataUrlRef.current = null;
+    };
+    maskImg.src = pendingMask;
   }, [canvasSize, imgLoaded]);
 
   if (!isOpen) return null;
 
-  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    canvas.setPointerCapture(e.pointerId);
-    setIsDrawing(true);
-
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    ctx.beginPath();
-    ctx.moveTo(x, y);
+  const configureMaskStroke = (ctx: CanvasRenderingContext2D) => {
     ctx.lineWidth = brushSize;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-
-    // Adjust composite operation based on draw or erase
-    // Wait, to keep original image untouched on the background display but still draw red mask,
-    // we can draw transparent red. But wait: if we erase, we want to restore the background image!
-    // That means we can simply draw onto a temporary path or re-render background + strokes every paint!
-    // Let's implement background + paint-strokes stacking:
-    // It is super easy and extremely robust! We can keep an array of strokes
+    ctx.globalCompositeOperation = editorMode === "erase" ? "destination-out" : "source-over";
+    ctx.strokeStyle = "rgba(239, 68, 68, 0.62)";
   };
 
-  // We can track mouse movement to paint directly on the canvas.
-  // Let's write a simple canvas mask renderer which keeps path arrays
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+  const addTextOverlay = (point: CanvasPoint) => {
+    const value = textValue.trim();
+    if (!value) return;
+
+    textIdRef.current += 1;
+    setTextItems(prev => [
+      ...prev,
+      {
+        id: textIdRef.current,
+        x: point.x,
+        y: point.y,
+        value,
+        size: textSize,
+        color: textColor,
+      },
+    ]);
+    setHasLocalEdits(true);
+  };
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
+    const point = getCanvasPoint(event);
+
+    if (editorMode === "text") {
+      addTextOverlay(point);
+      return;
+    }
+
+    if (editorMode === "crop") {
+      event.currentTarget.setPointerCapture(event.pointerId);
+      const resizeHandle = cropRect ? getCropResizeHandle(point, cropRect) : null;
+      if (resizeHandle) {
+        cropDragStateRef.current = { type: "resize", handle: resizeHandle };
+        return;
+      }
+
+      if (cropRect && pointInRect(point.x, point.y, cropRect)) {
+        cropDragStateRef.current = {
+          type: "move",
+          offsetX: point.x - cropRect.x,
+          offsetY: point.y - cropRect.y,
+        };
+        return;
+      }
+
+      cropDragStateRef.current = { type: "create", start: point };
+      setCropRect({ ...point, width: 0, height: 0 });
+      return;
+    }
+
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    event.currentTarget.setPointerCapture(event.pointerId);
     setIsDrawing(true);
     setHasDrawn(true);
-
-    const rect = canvas.getBoundingClientRect();
-    let clientX = 0;
-    let clientY = 0;
-
-    if ("touches" in e) {
-      if (e.touches.length === 0) return;
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
-    } else {
-      clientX = e.clientX;
-      clientY = e.clientY;
-    }
-
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
-
+    configureMaskStroke(ctx);
     ctx.beginPath();
-    ctx.moveTo(x, y);
-
-    // Drawing configuration
-    ctx.lineWidth = brushSize;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-
-    if (brushMode === "draw") {
-      ctx.globalCompositeOperation = "source-over";
-      ctx.strokeStyle = "rgba(239, 68, 68, 0.75)"; // Highlight red with 75% opacity
-    } else {
-      // For eraser in inline background composite: we can redraw background over the erased area,
-      // but to be extremely simple: we can make a secondary overlay canvas or just redraw background then paint.
-      // Wait, a gorgeous technique is: use native canvas and keep a list of paths, then redraw background image, then redraw all mask paths!
-      // This is 100% bug-free and allows flawless infinite undo/erasing!
-    }
+    ctx.moveTo(point.x, point.y);
+    ctx.lineTo(point.x + 0.01, point.y + 0.01);
+    ctx.stroke();
   };
 
-  // To be super robust and bulletproof, let's paint directly onto the canvas with 'source-over'
-  // and for ERASER, we paint the background image pixel block or we just draw transparent black?
-  // Actually, we can implement canvas overlay directly! We can use a transparent white/red path.
-  // To keep it clean and robust, let's keep a history of stroke drawings or paint directly.
-  // Let's build a simple, reliable drawing method:
-  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+  const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    const point = getCanvasPoint(event);
+
+    if (editorMode === "crop" && cropDragStateRef.current) {
+      const dragState = cropDragStateRef.current;
+      const cropRatio = getCropPresetRatio(cropPresetId, canvasSize);
+
+      if (dragState.type === "move") {
+        setCropRect(prev =>
+          prev
+            ? moveRectWithinBounds(prev, point.x - dragState.offsetX, point.y - dragState.offsetY, canvasSize)
+            : prev,
+        );
+        return;
+      }
+
+      if (dragState.type === "resize") {
+        setCropRect(prev =>
+          prev
+            ? resizeRectFromHandle(prev, dragState.handle, point.x, point.y, canvasSize, cropRatio, CROP_MIN_SIZE)
+            : prev,
+        );
+        return;
+      }
+
+      const nextRect = cropRatio
+        ? createAspectRectFromDrag(dragState.start.x, dragState.start.y, point.x, point.y, cropRatio, canvasSize)
+        : clampRectToBounds(
+            normalizeRect(dragState.start.x, dragState.start.y, point.x, point.y),
+            canvasSize,
+          );
+      setCropRect(nextRect);
+      return;
+    }
+
+    if (editorMode === "crop" && cropRect) {
+      const resizeHandle = getCropResizeHandle(point, cropRect);
+      setCropCursor(resizeHandle ? getCropCursor(resizeHandle) : pointInRect(point.x, point.y, cropRect) ? "move" : "crosshair");
+      return;
+    }
+
     if (!isDrawing) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const rect = canvas.getBoundingClientRect();
-    let clientX = 0;
-    let clientY = 0;
-
-    if ("touches" in e) {
-      if (e.touches.length === 0) return;
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
-    } else {
-      clientX = e.clientX;
-      clientY = e.clientY;
-    }
-
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
-
-    ctx.lineTo(x, y);
-    ctx.lineWidth = brushSize;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-
-    if (brushMode === "draw") {
-      ctx.globalCompositeOperation = "source-over";
-      ctx.strokeStyle = "rgba(239, 68, 68, 0.6)"; // Transparent red overlay
-      ctx.stroke();
-    } else {
-      // Eraser: We want to 'erase' the red mask and show original image underneath.
-      // To simulate eraser easily on dynamic canvas without layers, we can redraw the image block!
-      // Or we can draw a clipped source image sector back! This is called destination-out on intermediate canvas.
-      // Let's implement intermediate layers, OR we can simply re-render background and red strokes.
-      // Let's do the ultimate robust trick:
-      // Paint with 'destination-out' to clear transparency, but since the background is drawn, destination-out would make it transparent.
-      // Actually, we can just paint the background image back onto that path!
-      // Better yet, we can draw a brush of the original image bytes.
-      // Wait, an extremely simple option is to define a white/black canvas for the mask and paint on that,
-      // and draw the original image on a wrapper div in CSS background-image!
-      // Oh my god! That is a genius design!
-      // If the canvas itself is transparent, and has ONLY the red brush drawn on it,
-      // and we lay the original image underneath the canvas using simple CSS overlay!
-      // Then:
-      // 1. Drawing on the canvas draws the solid/semitransparent red mask.
-      // 2. Erasing on the canvas just uses `ctx.globalCompositeOperation = 'destination-out'` to delete pixels!
-      // 3. Clear canvas is just `ctx.clearRect`!
-      // 4. Invert mask is just inverting the transparency!
-      // 5. To save, we read the canvas as a black-and-white mask, and return both!
-      // This is incredibly elegant, completely bug-free, and handles brushes/erasers natively!
-      ctx.globalCompositeOperation = "destination-out";
-      ctx.stroke();
-    }
+    configureMaskStroke(ctx);
+    ctx.lineTo(point.x, point.y);
+    ctx.stroke();
   };
 
-  const stopDrawing = () => {
+  const stopPointerAction = () => {
+    if (editorMode === "crop") {
+      cropDragStateRef.current = null;
+      setCropRect(prev => (prev && isUsableCrop(prev) ? prev : null));
+      return;
+    }
+
+    if (canvasRef.current) {
+      setHasDrawn(canvasHasVisiblePixels(canvasRef.current));
+    }
     setIsDrawing(false);
   };
 
-  // Clear mask canvas
   const clearMask = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     setHasDrawn(false);
   };
 
-  // Invert mask canvas
+  const resetEditor = () => {
+    clearMask();
+    setWorkingImageUrl(imageUrl);
+    setTextItems([]);
+    setCropRect(null);
+    setCropPresetId("free");
+    setCropCursor("crosshair");
+    setHasLocalEdits(false);
+  };
+
+  const clearText = () => {
+    setTextItems([]);
+    setHasLocalEdits(hasDrawn || workingImageUrl !== imageUrl);
+  };
+
+  const selectCropPreset = (presetId: CropPresetId) => {
+    setCropPresetId(presetId);
+    const cropRatio = getCropPresetRatio(presetId, canvasSize);
+    if (cropRatio) {
+      setCropRect(createCenteredAspectRect(canvasSize, cropRatio, 0.88));
+      setCropCursor("move");
+    }
+  };
+
   const invertMask = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // We can invert the alpha values of the canvas!
     const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imgData.data;
-    for (let i = 0; i < data.length; i += 4) {
-      // Check transparency of red brush.
-      const a = data[i + 3];
-      // Invert alpha: if transparent, make red mask. If masked, make transparent.
-      if (a === 0) {
-        data[i] = 239;     // r
-        data[i + 1] = 68;  // g
-        data[i + 2] = 68;  // b
-        data[i + 3] = 160; // opaque red
+    for (let index = 0; index < data.length; index += 4) {
+      if (data[index + 3] === 0) {
+        data[index] = 239;
+        data[index + 1] = 68;
+        data[index + 2] = 68;
+        data[index + 3] = 160;
       } else {
-        data[i + 3] = 0;   // completely transparent
+        data[index + 3] = 0;
       }
     }
     ctx.putImageData(imgData, 0, 0);
-    setHasDrawn(true);
+    setHasDrawn(canvasHasVisiblePixels(canvas));
+  };
+
+  const applyCrop = () => {
+    const canvas = canvasRef.current;
+    const img = bgImgRef.current;
+    if (!canvas || !img || !cropRect || !isUsableCrop(cropRect)) return;
+
+    const crop = clampRectToBounds(cropRect, canvasSize);
+    const nextBaseCanvas = document.createElement("canvas");
+    nextBaseCanvas.width = Math.round(crop.width);
+    nextBaseCanvas.height = Math.round(crop.height);
+    const nextBaseCtx = nextBaseCanvas.getContext("2d");
+    if (!nextBaseCtx) return;
+
+    const sourceWidth = img.naturalWidth || img.width;
+    const sourceHeight = img.naturalHeight || img.height;
+    nextBaseCtx.drawImage(
+      img,
+      (crop.x / canvas.width) * sourceWidth,
+      (crop.y / canvas.height) * sourceHeight,
+      (crop.width / canvas.width) * sourceWidth,
+      (crop.height / canvas.height) * sourceHeight,
+      0,
+      0,
+      nextBaseCanvas.width,
+      nextBaseCanvas.height,
+    );
+
+    const nextMaskCanvas = document.createElement("canvas");
+    nextMaskCanvas.width = nextBaseCanvas.width;
+    nextMaskCanvas.height = nextBaseCanvas.height;
+    const nextMaskCtx = nextMaskCanvas.getContext("2d");
+    if (!nextMaskCtx) return;
+    nextMaskCtx.drawImage(canvas, crop.x, crop.y, crop.width, crop.height, 0, 0, nextMaskCanvas.width, nextMaskCanvas.height);
+
+    const hasCroppedMask = canvasHasVisiblePixels(nextMaskCanvas);
+    pendingMaskDataUrlRef.current = hasCroppedMask ? nextMaskCanvas.toDataURL("image/png") : null;
+    setHasDrawn(hasCroppedMask);
+    setTextItems(prev =>
+      prev
+        .filter(item => item.x >= crop.x && item.x <= crop.x + crop.width && item.y >= crop.y && item.y <= crop.y + crop.height)
+        .map(item => ({ ...item, x: item.x - crop.x, y: item.y - crop.y })),
+    );
+    setCropRect(null);
+    setHasLocalEdits(true);
+    setImgLoaded(false);
+    setWorkingImageUrl(nextBaseCanvas.toDataURL("image/png"));
   };
 
   const handleApply = () => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const img = bgImgRef.current;
+    if (!canvas || !img) return;
 
-    // 1. Generate PNG mask. Inpainting models want a black & white mask: white for painting region, black for original contents.
-    // Create an offscreen canvas to compile the B&W mask
     const maskCanvas = document.createElement("canvas");
     maskCanvas.width = canvas.width;
     maskCanvas.height = canvas.height;
     const maskCtx = maskCanvas.getContext("2d");
     if (!maskCtx) return;
 
-    // Fill background with black (untouched)
     maskCtx.fillStyle = "#000000";
     maskCtx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
-
-    // Draw the drawn mask as white on top
     maskCtx.drawImage(canvas, 0, 0);
-    
-    // Convert red strokes to pure white (#ffffff)
+
     const imgData = maskCtx.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
     const data = imgData.data;
-    for (let i = 0; i < data.length; i += 4) {
-      const a = data[i + 3];
-      if (a > 10) {
-        data[i] = 255;   // R
-        data[i + 1] = 255; // G
-        data[i + 2] = 255; // B
-        data[i + 3] = 255; // Solid opaque white
+    for (let index = 0; index < data.length; index += 4) {
+      if (data[index + 3] > 10) {
+        data[index] = 255;
+        data[index + 1] = 255;
+        data[index + 2] = 255;
       } else {
-        data[i] = 0;
-        data[i + 1] = 0;
-        data[i + 2] = 0;
-        data[i + 3] = 255; // Solid opaque black
+        data[index] = 0;
+        data[index + 1] = 0;
+        data[index + 2] = 0;
       }
+      data[index + 3] = 255;
     }
     maskCtx.putImageData(imgData, 0, 0);
 
-    const maskBase64 = maskCanvas.toDataURL("image/png");
-
-    // 2. Merged canvas showing original + highlight overlay for local gallery reference
     const mergeCanvas = document.createElement("canvas");
     mergeCanvas.width = canvas.width;
     mergeCanvas.height = canvas.height;
     const mergeCtx = mergeCanvas.getContext("2d");
-    if (mergeCtx && bgImgRef.current) {
-      mergeCtx.drawImage(bgImgRef.current, 0, 0, canvas.width, canvas.height);
-      mergeCtx.drawImage(canvas, 0, 0);
-    }
-    const mergedBase64 = mergeCanvas.toDataURL("image/png");
+    if (!mergeCtx) return;
 
-    onSaveMask(mergedBase64, maskBase64);
+    mergeCtx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    textItems.forEach(item => drawTextOverlay(mergeCtx, item));
+    mergeCtx.drawImage(canvas, 0, 0);
+
+    onSaveMask(mergeCanvas.toDataURL("image/png"), maskCanvas.toDataURL("image/png"));
     onClose();
   };
 
+  const renderModeButton = ({ mode, label, hint, icon }: { mode: EditorMode; label: string; hint: string; icon: React.ReactNode }) => (
+    <button
+      key={mode}
+      type="button"
+      onClick={() => setEditorMode(mode)}
+      className={`flex h-9 min-w-16 items-center justify-center gap-1.5 rounded-md px-2.5 text-[11px] font-semibold transition ${
+        editorMode === mode
+          ? "bg-blue-600 text-white shadow-sm shadow-blue-950/40"
+          : "text-slate-400 hover:bg-slate-800 hover:text-slate-100"
+      }`}
+      title={hint}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4 animate-fade-in">
-      <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
-          <div>
-            <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
-              <Paintbrush className="h-5 w-5 text-red-500" />
-              创意遮罩笔刷 (Canvas Mask Editor)
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 p-4 backdrop-blur-md">
+      <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-900 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3 sm:px-5">
+          <div className="min-w-0">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-100">
+              <Paintbrush className="h-4 w-4 text-blue-300" />
+              图片编辑器
             </h3>
-            <p className="text-xs text-slate-400 mt-1">
-              在想要修改或添加元素的区域绘制遮罩后，输入新 Prompt 即可重新渲染该区域。
-            </p>
+            <p className="mt-1 text-xs text-slate-450">{activeMode.label}: {activeMode.hint}</p>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition"
+            className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-800 hover:text-slate-100"
+            aria-label="关闭图片编辑器"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Canvas Workspace wrapper */}
-        <div className="flex flex-col items-center justify-center p-6 bg-slate-950/40 min-h-[350px]">
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-auto bg-slate-950/40 p-4 sm:p-6">
           {!imgLoaded ? (
             <div className="flex flex-col items-center justify-center gap-2 text-slate-400">
               <RefreshCw className="h-8 w-8 animate-spin" />
@@ -348,105 +553,251 @@ export default function CanvasMaskEditor({
             </div>
           ) : (
             <div
-              className="relative shadow-inner rounded-lg border border-slate-800 max-w-full overflow-hidden shrink-0 select-none bg-slate-800"
+              className="relative shrink-0 select-none overflow-hidden rounded-lg border border-slate-800 bg-slate-800 shadow-inner"
               style={{
                 width: canvasSize.width,
                 height: canvasSize.height,
-                backgroundImage: `url(${imageUrl})`,
-                backgroundSize: "cover",
+                backgroundImage: `url(${workingImageUrl})`,
                 backgroundPosition: "center",
+                backgroundSize: "100% 100%",
               }}
             >
               <canvas
                 ref={canvasRef}
                 width={canvasSize.width}
                 height={canvasSize.height}
-                onMouseDown={startDrawing}
-                onMouseMove={draw}
-                onMouseUp={stopDrawing}
-                onMouseLeave={stopDrawing}
-                onTouchStart={startDrawing}
-                onTouchMove={draw}
-                onTouchEnd={stopDrawing}
-                className="absolute inset-0 cursor-crosshair z-10 touch-none"
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={stopPointerAction}
+                onPointerCancel={stopPointerAction}
+                onPointerLeave={stopPointerAction}
+                className="absolute inset-0 z-10 touch-none"
+                style={{ cursor: editorMode === "text" ? "text" : editorMode === "crop" ? cropCursor : "crosshair" }}
               />
+
+              {textItems.map(item => (
+                <span
+                  key={item.id}
+                  className="pointer-events-none absolute z-20 max-w-full whitespace-pre-wrap break-words px-1 text-center font-bold leading-none"
+                  style={{
+                    color: item.color,
+                    fontSize: item.size,
+                    left: item.x,
+                    top: item.y,
+                    textShadow: item.color === "#111827" ? "0 1px 4px rgba(255,255,255,0.8)" : "0 1px 5px rgba(0,0,0,0.8)",
+                    transform: "translate(-50%, -50%)",
+                  }}
+                >
+                  {item.value}
+                </span>
+              ))}
+
+              {cropRect && (
+                <div
+                  className="pointer-events-none absolute z-30 border border-blue-300 bg-blue-400/12 shadow-[0_0_0_9999px_rgba(2,6,23,0.45)]"
+                  style={{
+                    left: cropRect.x,
+                    top: cropRect.y,
+                    width: cropRect.width,
+                    height: cropRect.height,
+                  }}
+                >
+                  <span className="absolute left-1/3 top-0 h-full border-l border-blue-100/35" />
+                  <span className="absolute left-2/3 top-0 h-full border-l border-blue-100/35" />
+                  <span className="absolute left-0 top-1/3 w-full border-t border-blue-100/35" />
+                  <span className="absolute left-0 top-2/3 w-full border-t border-blue-100/35" />
+                  <span className="absolute left-2 top-2 rounded bg-slate-950/75 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-blue-100 shadow-sm">
+                    {cropSizeLabel}
+                  </span>
+                  {(["nw", "ne", "se", "sw", "n", "e", "s", "w"] as const).map(handle => {
+                    const isWest = handle.includes("w");
+                    const isEast = handle.includes("e");
+                    const isNorth = handle.includes("n");
+                    const isSouth = handle.includes("s");
+
+                    return (
+                      <span
+                        key={handle}
+                        className="absolute h-3 w-3 rounded-sm border border-blue-200 bg-slate-950 shadow-sm shadow-blue-950/40"
+                        style={{
+                          left: isWest ? 0 : isEast ? "100%" : "50%",
+                          top: isNorth ? 0 : isSouth ? "100%" : "50%",
+                          transform: "translate(-50%, -50%)",
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        {/* Draw Controls panel */}
-        <div className="border-t border-slate-800 bg-slate-900/45 px-6 py-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Mode Select */}
-            <div className="flex items-center p-0.5 rounded-lg bg-slate-800 text-sm border border-slate-700">
-              <button
-                type="button"
-                onClick={() => setBrushMode("draw")}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition ${
-                  brushMode === "draw"
-                    ? "bg-red-500 text-white shadow-sm"
-                    : "text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                <Paintbrush className="h-4 w-4" />
-                红色遮罩
-              </button>
-              <button
-                type="button"
-                onClick={() => setBrushMode("erase")}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition ${
-                  brushMode === "erase"
-                    ? "bg-slate-600 text-white shadow-sm"
-                    : "text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                <Eraser className="h-4 w-4" />
-                橡皮擦
-              </button>
+        <div className="border-t border-slate-800 bg-slate-900/60 px-4 py-3 sm:px-5">
+          <div className="grid gap-3 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-start">
+            <div className="min-w-0">
+              <span className="mb-1.5 block text-[10px] font-semibold tracking-widest text-slate-500">工具</span>
+              <div className="flex flex-wrap items-center rounded-lg border border-slate-700 bg-slate-800/80 p-0.5">
+                {EDITOR_MODE_OPTIONS.map(option => renderModeButton(option))}
+              </div>
             </div>
 
-            {/* Brush size controller */}
-            <div className="flex items-center gap-2 bg-slate-800/60 px-3 py-1.5 rounded-lg border border-slate-800 text-xs text-slate-300">
-              <Sliders className="h-3.5 w-3.5 text-slate-400" />
-              <span>笔刷大小: {brushSize}px</span>
-              <input
-                type="range"
-                min="5"
-                max="60"
-                value={brushSize}
-                onChange={(e) => setBrushSize(parseInt(e.target.value))}
-                className="w-20 accent-red-500 cursor-pointer h-1 rounded-md"
-              />
-            </div>
-          </div>
+            <div className="min-w-0">
+              <div className="mb-1.5 flex items-center justify-between gap-3">
+                <span className="text-[10px] font-semibold tracking-widest text-slate-500">参数</span>
+                <span className="truncate text-[10px] text-slate-500">{activeMode.hint}</span>
+              </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={invertMask}
-              className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-800 hover:bg-slate-700 px-3 py-2 text-xs font-medium text-slate-300 transition"
-              title="反选遮罩区域"
-            >
-              🔃 反选
-            </button>
-            <button
-              onClick={clearMask}
-              className="flex items-center gap-1.5 rounded-lg border border-slate-850 hover:bg-slate-800 px-3 py-2 text-xs font-medium text-slate-400 hover:text-slate-200 transition"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              清空
-            </button>
-            <button
-              onClick={handleApply}
-              disabled={!hasDrawn}
-              className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-medium text-white shadow-md transition ${
-                hasDrawn
-                  ? "bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 cursor-pointer"
-                  : "bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-850"
-              }`}
-            >
-              <Check className="h-4 w-4" />
-              应用遮罩
-            </button>
+              {(editorMode === "mask" || editorMode === "erase") && (
+                <div className="flex min-h-10 flex-wrap items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/35 px-3 py-2">
+                  <div className="flex items-center gap-2 text-xs text-slate-300">
+                    <Sliders className="h-3.5 w-3.5 text-slate-400" />
+                    <span className="w-11 font-mono">{brushSize}px</span>
+                    <input
+                      type="range"
+                      min="5"
+                      max="80"
+                      value={brushSize}
+                      onChange={(event) => setBrushSize(Number(event.target.value))}
+                      className="h-1 w-32 cursor-pointer accent-blue-500"
+                      aria-label="笔刷大小"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={invertMask}
+                    className="h-8 rounded-md border border-slate-800 bg-slate-900 px-2.5 text-xs font-semibold text-slate-300 transition hover:bg-slate-800"
+                    title="反选遮罩区域"
+                  >
+                    反选
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearMask}
+                    className="flex h-8 items-center gap-1.5 rounded-md border border-slate-800 bg-slate-900 px-2.5 text-xs font-semibold text-slate-400 transition hover:bg-slate-800 hover:text-slate-200"
+                  >
+                    <Eraser className="h-3.5 w-3.5" />
+                    清蒙版
+                  </button>
+                </div>
+              )}
+
+              {editorMode === "text" && (
+                <div className="flex min-h-10 flex-wrap items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/35 px-3 py-2">
+                  <input
+                    type="text"
+                    value={textValue}
+                    onChange={(event) => setTextValue(event.target.value)}
+                    className="h-8 w-40 rounded-md border border-slate-800 bg-slate-950/70 px-3 text-xs text-slate-100 outline-none transition focus:border-blue-400/45"
+                    aria-label="文字内容"
+                  />
+                  <div className="flex items-center gap-2">
+                    <span className="w-8 font-mono text-xs text-slate-400">{textSize}</span>
+                    <input
+                      type="range"
+                      min="16"
+                      max="72"
+                      value={textSize}
+                      onChange={(event) => setTextSize(Number(event.target.value))}
+                      className="h-1 w-24 cursor-pointer accent-blue-500"
+                      aria-label="文字大小"
+                    />
+                  </div>
+                  <div className="flex h-8 items-center gap-1 rounded-md border border-slate-800 bg-slate-950/60 px-2">
+                    {TEXT_COLORS.map(color => (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => setTextColor(color)}
+                        className={`h-5 w-5 rounded-full border transition ${
+                          textColor === color ? "border-blue-300 ring-2 ring-blue-400/30" : "border-white/20"
+                        }`}
+                        style={{ backgroundColor: color }}
+                        aria-label={`选择文字颜色 ${color}`}
+                      />
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={clearText}
+                    className="h-8 rounded-md border border-slate-800 bg-slate-900 px-2.5 text-xs font-semibold text-slate-400 transition hover:bg-slate-800 hover:text-slate-200"
+                  >
+                    清文字
+                  </button>
+                </div>
+              )}
+
+              {editorMode === "crop" && (
+                <div className="flex min-h-10 flex-wrap items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/35 px-3 py-2">
+                  <div className="flex h-8 max-w-full items-center gap-1 overflow-x-auto rounded-md border border-slate-800 bg-slate-950/60 px-1.5">
+                    {CROP_PRESETS.map(preset => (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => selectCropPreset(preset.id)}
+                        className={`h-6 shrink-0 rounded px-2 font-mono text-[10px] font-semibold transition ${
+                          cropPresetId === preset.id
+                            ? "bg-blue-600 text-white"
+                            : "text-slate-500 hover:bg-slate-800 hover:text-slate-200"
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                  <span className="rounded-md border border-slate-800 bg-slate-950/60 px-2.5 py-1.5 font-mono text-[10px] text-slate-400">
+                    {cropSizeLabel}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={applyCrop}
+                    disabled={!canApplyCrop}
+                    className={`flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition ${
+                      canApplyCrop
+                        ? "border border-blue-400/30 bg-blue-500/16 text-blue-100 hover:bg-blue-500/24"
+                        : "border border-slate-800 bg-slate-950/45 text-slate-600"
+                    }`}
+                  >
+                    <Crop className="h-3.5 w-3.5" />
+                    执行裁切
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCropRect(null)}
+                    className="h-8 rounded-md border border-slate-800 bg-slate-950/45 px-3 text-xs font-semibold text-slate-400 transition hover:text-slate-100"
+                  >
+                    清选区
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="min-w-0">
+              <span className="mb-1.5 block text-[10px] font-semibold tracking-widest text-slate-500">操作</span>
+              <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                <button
+                  type="button"
+                  onClick={resetEditor}
+                  className="flex h-10 items-center gap-1.5 rounded-lg border border-slate-800 px-3 text-xs font-semibold text-slate-400 transition hover:bg-slate-800 hover:text-slate-200"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  重置
+                </button>
+                <button
+                  type="button"
+                  onClick={handleApply}
+                  disabled={!canApply}
+                  className={`flex h-10 items-center gap-1.5 rounded-lg px-4 text-xs font-semibold text-white transition ${
+                    canApply
+                      ? "bg-blue-600 shadow-md shadow-blue-950/30 hover:bg-blue-500"
+                      : "cursor-not-allowed border border-slate-800 bg-slate-800 text-slate-500"
+                  }`}
+                >
+                  <Check className="h-4 w-4" />
+                  应用编辑
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
