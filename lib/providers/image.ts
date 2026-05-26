@@ -7,6 +7,7 @@ import {
   getJson,
   isRecord,
   mediaOperationName,
+  parseProviderResponseBody,
   parseDataUri,
   postForm,
   postJson,
@@ -150,7 +151,7 @@ async function generate12AiGeminiImage(config: ProviderConfig, input: GenerateIm
     },
   );
 
-  const json = (await response.json()) as unknown;
+  const json = parseProviderResponseBody(await response.text());
   if (!response.ok) {
     throw new Error(readProviderError(json) ?? `Gemini image request failed with HTTP ${response.status}`);
   }
