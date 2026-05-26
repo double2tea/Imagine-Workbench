@@ -141,11 +141,20 @@ function trimTrailingSlash(value: string): string {
 
 async function parseJsonResponse<T>(res: Response): Promise<T> {
   const text = await res.text();
-  const data = text ? (JSON.parse(text) as unknown) : {};
+  const data = parseProviderResponseBody(text);
   if (!res.ok) {
     throw new Error(readErrorMessage(data) ?? `HTTP ${res.status}`);
   }
   return data as T;
+}
+
+export function parseProviderResponseBody(text: string): unknown {
+  if (!text) return {};
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return { error: text.trim() || "Invalid JSON response" };
+  }
 }
 
 function readErrorMessage(value: unknown): string | undefined {

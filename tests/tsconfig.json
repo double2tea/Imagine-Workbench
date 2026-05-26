@@ -12,9 +12,11 @@
   "include": [
     "./canvas-editor.test.ts",
     "./model-catalog.test.ts",
+    "./provider-utils.test.ts",
     "./reference-images.test.ts",
     "../lib/canvas-editor.ts",
     "../lib/providers/model-catalog.ts",
+    "../lib/providers/utils.ts",
     "../lib/reference-images.ts"
   ]
 }
