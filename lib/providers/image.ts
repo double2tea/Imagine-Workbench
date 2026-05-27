@@ -44,6 +44,9 @@ interface GeminiGenerateContentResponse {
   }>;
 }
 
+const ASYNC_IMAGE_SUCCESS_STATUSES = new Set(["complete", "completed", "partial_complete", "succeeded", "success"]);
+const ASYNC_IMAGE_FAILED_STATUSES = new Set(["failed", "failure", "canceled", "cancelled", "expired"]);
+
 export async function generateImage(config: ProviderConfig, input: GenerateImageInput): Promise<GenerateImageResult> {
   if (config.provider === "grok2api") {
     return generateOpenAiCompatibleImage(config, input, "grok2api");
@@ -78,20 +81,21 @@ export async function getAsyncImageStatus(config: ProviderConfig, taskId: string
     `${config.baseUrl}/v1/images/async/generations/${encodeURIComponent(taskId)}`,
     config,
   );
+  const status = response.status?.toLowerCase() ?? "pending";
 
-  if (response.status === "complete" || response.status === "partial_complete") {
+  if (ASYNC_IMAGE_SUCCESS_STATUSES.has(status)) {
     const url = response.data?.find(item => typeof item.url === "string")?.url;
     if (!url) throw new Error("Async image task completed without an image URL");
     return {
       done: true,
       mediaType: "image",
       progress: 100,
-      status: response.status,
+      status,
       url,
     };
   }
 
-  if (response.status === "failed") {
+  if (ASYNC_IMAGE_FAILED_STATUSES.has(status)) {
     return {
       done: true,
       mediaType: "image",
@@ -105,7 +109,7 @@ export async function getAsyncImageStatus(config: ProviderConfig, taskId: string
     done: false,
     mediaType: "image",
     progress: response.progress ?? 50,
-    status: response.status ?? "pending",
+    status,
   };
 }
 

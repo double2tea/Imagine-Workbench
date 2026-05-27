@@ -2,6 +2,7 @@ import { useEffect, type Dispatch, type MutableRefObject, type SetStateAction } 
 import { saveToDB, type StorageItem } from "@/lib/db";
 
 type NoticeType = "error" | "info" | "success";
+const PROCESSING_TIMEOUT_MS = 2 * 60 * 60 * 1000;
 
 interface UseMediaPollingParams {
   buildProviderHeaders: (target?: string) => Record<string, string>;
@@ -21,6 +22,11 @@ function getStringField(value: unknown, field: string): string | null {
 
 function toErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message.trim() ? error.message : fallback;
+}
+
+function isProcessingTimedOut(item: StorageItem): boolean {
+  const createdAt = Date.parse(item.createdAt);
+  return Number.isFinite(createdAt) && Date.now() - createdAt > PROCESSING_TIMEOUT_MS;
 }
 
 async function readFetchError(response: Response, fallback: string): Promise<string> {
@@ -67,6 +73,21 @@ export function useMediaPolling({
         const item = updatedList[index];
         if (item.status === "processing" && item.operationName) {
           if (locallyCanceledItemIdsRef.current.has(item.id)) continue;
+          if (isProcessingTimedOut(item)) {
+            const timeoutMessage = "任务超过 2 小时仍未完成，已停止自动轮询。";
+            const failedItem: StorageItem = {
+              ...item,
+              status: "failed",
+              progress: 100,
+              errorMessage: timeoutMessage,
+            };
+            updatedList[index] = failedItem;
+            delete pollingFailuresRef.current[item.id];
+            await saveItemOrWarn(failedItem, pushWorkspaceNotice);
+            pushWorkspaceNotice("error", timeoutMessage);
+            changed = true;
+            continue;
+          }
           try {
             const headers = buildProviderHeaders(item.operationName);
 
