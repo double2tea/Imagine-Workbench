@@ -22,6 +22,9 @@ interface VideoDeleteResponse {
   message?: string;
 }
 
+const VIDEO_SUCCESS_STATUSES = new Set(["complete", "completed", "succeeded", "success"]);
+const VIDEO_FAILED_STATUSES = new Set(["failed", "failure", "canceled", "cancelled", "expired"]);
+
 export async function generateVideo(config: ProviderConfig, input: GenerateVideoInput): Promise<GenerateVideoResult> {
   const form = new FormData();
   form.set("model", input.model);
@@ -55,18 +58,18 @@ export async function generateVideo(config: ProviderConfig, input: GenerateVideo
 export async function getVideoStatus(config: ProviderConfig, taskId: string): Promise<MediaStatusResult> {
   const baseUrl = config.provider === "12ai" ? config.videoBaseUrl : config.baseUrl;
   const response = await getJson<VideoStatusResponse>(`${baseUrl}/v1/videos/${encodeURIComponent(taskId)}`, config);
-  const status = response.status ?? "processing";
-  if (status === "failed") {
+  const status = response.status?.toLowerCase() ?? "processing";
+  if (VIDEO_FAILED_STATUSES.has(status)) {
     return {
       done: true,
       mediaType: "video",
       progress: 100,
-      status,
+      status: "failed",
       errorMessage: response.error?.message ?? "Video task failed",
     };
   }
 
-  if (status === "completed" || status === "complete") {
+  if (VIDEO_SUCCESS_STATUSES.has(status)) {
     return {
       done: true,
       mediaType: "video",
