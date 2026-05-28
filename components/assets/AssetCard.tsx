@@ -39,6 +39,16 @@ function formatModelName(model: string): string {
   return model.replace("-preview", "").replace("lite-", "").replace("-generate", "").replace("imagen-", "Imagen");
 }
 
+function isContentSafetyError(message?: string): boolean {
+  if (!message) return false;
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("image_unsafe") ||
+    normalized.includes("content blocked") ||
+    normalized.includes("generated images appear to be unsafe")
+  );
+}
+
 export default function AssetCard({
   canceling,
   inCompare,
@@ -59,6 +69,7 @@ export default function AssetCard({
   const [isMobileActionsOpen, setIsMobileActionsOpen] = useState(false);
   const provider = parseProviderModel(item.model, selectedProvider).provider;
   const isDraggableReference = item.type === "image" && item.status === "complete";
+  const failedTitle = isContentSafetyError(item.errorMessage) ? "内容安全拦截" : "生成失败 / 链接中断";
 
   const handleDragStart = (event: DragEvent<HTMLDivElement>) => {
     if (!isDraggableReference) {
@@ -125,7 +136,7 @@ export default function AssetCard({
         ) : item.status === "failed" ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950 px-4 py-3 text-center text-red-400 select-none">
             <X className="mb-1.5 h-6 w-6 shrink-0 text-red-500/55" />
-            <p className="text-xs font-semibold leading-5">生成失败 / 链接中断</p>
+            <p className="text-xs font-semibold leading-5">{failedTitle}</p>
             <p className="mt-0.5 line-clamp-2 max-w-full break-words text-[10px] leading-4 text-slate-550">
               {item.errorMessage ?? "请核查 API Key 或重构参数。"}
             </p>
