@@ -13,7 +13,7 @@ import ImageGenerationPanel from "@/components/creation/ImageGenerationPanel";
 import VideoGenerationPanel from "@/components/creation/VideoGenerationPanel";
 import AtReferenceDropdown from "@/components/reference/AtReferenceDropdown";
 import PromptReferenceDropdown from "@/components/reference/PromptReferenceDropdown";
-import ReferenceImagePicker from "@/components/reference/ReferenceImagePicker";
+import ReferenceImagePicker, { type ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import SettingsModal from "@/components/settings/SettingsModal";
 import AssetGalleryWorkspace from "@/components/workbench/AssetGalleryWorkspace";
 import WorkspaceHeader, { type ThemeMode } from "@/components/workbench/WorkspaceHeader";
@@ -35,6 +35,7 @@ import { useProviderSettings } from "@/hooks/useProviderSettings";
 import {
   DEFAULT_IMAGE_MODEL,
   DEFAULT_VIDEO_MODEL,
+  formatProviderModel,
   getImageModelCapabilities,
   getVideoModelCapabilities,
   parseProviderModel,
@@ -93,6 +94,11 @@ function getProviderModelGroups(optionsByProvider: Record<AiProvider, ModelOptio
 function formatStoredModelLabel(value: string, fallbackProvider: AiProvider): string {
   const parsed = parseProviderModel(value, fallbackProvider);
   return `${getProviderLabel(parsed.provider)} ${parsed.model}`;
+}
+
+function getSelectableStoredImageModel(value: string, fallbackProvider: AiProvider): string {
+  const parsed = parseProviderModel(value, fallbackProvider);
+  return parsed.async ? formatProviderModel(parsed.provider, parsed.model) : value;
 }
 
 export default function Home() {
@@ -388,6 +394,50 @@ export default function Home() {
     if (!capabilities.sizes.some(option => option.value === aspectRatio)) {
       setAspectRatio(capabilities.sizes[0]?.value ?? "auto");
     }
+  };
+
+  const reuseTaskInComposer = (item: StorageItem) => {
+    const request = item.generationRequest;
+    const model = request?.model ?? item.model;
+    const references: ReferenceImageRef[] = (request?.referenceImages ?? []).map((url, index) => {
+      const videoMode = item.type === "video" ? getVideoModelCapabilities(model).referenceMode : "reference";
+      const role: ReferenceImageRef["role"] = videoMode === "firstLast"
+        ? index === 0
+          ? "start"
+          : index === 1
+            ? "end"
+            : "general"
+        : "general";
+      return { id: `${item.id}_reference_${index + 1}`, url, role };
+    });
+
+    setPrompt(item.prompt);
+    setReferenceImages(references);
+    setReferenceImage(references[0]?.url ?? null);
+
+    if (item.type === "image") {
+      const imageModel = getSelectableStoredImageModel(model, selectedProvider);
+      const nextAspectRatio = request?.aspectRatio ?? item.aspectRatio;
+      const capabilities = getImageModelCapabilities(imageModel);
+
+      handleSelectImageModel(imageModel);
+      if (capabilities.aspectRatios.some(option => option.value === nextAspectRatio)) {
+        setAspectRatio(nextAspectRatio);
+      } else {
+        setAspectRatio("custom");
+        setCustomGptImageSize(nextAspectRatio);
+      }
+      if (request?.imageSize) setImageSize(request.imageSize);
+      if (request?.thinkingLevel) setImageThinkingLevel(request.thinkingLevel);
+      setTraditionalSubTab("image");
+    } else {
+      handleSelectVideoModel(model);
+      setAspectRatio(request?.aspectRatio ?? item.aspectRatio);
+      setTraditionalSubTab("video");
+    }
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    pushWorkspaceNotice("success", "已回填任务参数到左侧工作面板");
   };
 
   useEffect(() => {
@@ -701,6 +751,7 @@ export default function Home() {
         setCompareItemIds([]);
       }}
       onRetryItem={retryFailedItem}
+      onReuseTask={reuseTaskInComposer}
       onSetAssetModelFilter={setAssetModelFilter}
       onSetAssetStatusFilter={setAssetStatusFilter}
       onSetCompareSliderPos={setCompareSliderPos}

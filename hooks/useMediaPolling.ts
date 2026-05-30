@@ -147,7 +147,6 @@ export function useMediaPolling({
                     status: "complete",
                     progress: 100,
                     errorMessage: undefined,
-                    generationRequest: undefined,
                   };
                   await saveItemOrWarn(updatedList[index], pushWorkspaceNotice);
                   setItems([...updatedList]);

@@ -325,7 +325,6 @@ export function useAssetActions({
           url: imageUrl,
           status: "complete",
           progress: 100,
-          generationRequest: undefined,
         };
         if (!await saveItemOrWarn(completedItem, pushWorkspaceNotice)) {
           setItems(prev => prev.map(current => current.id === item.id ? completedItem : current));
