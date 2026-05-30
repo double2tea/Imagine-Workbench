@@ -39,6 +39,7 @@ interface AssetGalleryWorkspaceProps {
   onOpenFullscreen: (item: StorageItem) => void;
   onResetCompare: () => void;
   onRetryItem: (item: StorageItem) => void;
+  onReuseTask: (item: StorageItem) => void;
   onSetAssetModelFilter: (value: string) => void;
   onSetAssetStatusFilter: (value: AssetStatusFilter) => void;
   onSetCompareSliderPos: (value: number) => void;
@@ -84,6 +85,7 @@ export default function AssetGalleryWorkspace({
   onOpenFullscreen,
   onResetCompare,
   onRetryItem,
+  onReuseTask,
   onSetAssetModelFilter,
   onSetAssetStatusFilter,
   onSetCompareSliderPos,
@@ -160,6 +162,7 @@ export default function AssetGalleryWorkspace({
                 onLaunchMaskEditor={onLaunchMaskEditor}
                 onOpenFullscreen={onOpenFullscreen}
                 onRetry={onRetryItem}
+                onReuseTask={onReuseTask}
                 onToggleCompare={onToggleCompare}
                 onToggleSelect={onToggleSelect}
                 onUseAgentReference={onUseAgentReference}

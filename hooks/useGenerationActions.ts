@@ -228,7 +228,6 @@ export function useGenerationActions({
           url: imageUrl ?? "",
           status: "complete",
           progress: 100,
-          generationRequest: undefined,
         };
         if (!imageUrl) {
           throw new Error("图片接口返回缺少 imageUrl 或 operationName");

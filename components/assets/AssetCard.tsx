@@ -5,6 +5,7 @@ import {
   MoreHorizontal,
   Paintbrush,
   RefreshCw,
+  SlidersHorizontal,
   Sparkles,
   Trash2,
   Video as VideoIcon,
@@ -30,6 +31,7 @@ interface AssetCardProps {
   onLaunchMaskEditor: (imageUrl: string, id: string) => void;
   onOpenFullscreen: (item: StorageItem) => void;
   onRetry: (item: StorageItem) => void;
+  onReuseTask: (item: StorageItem) => void;
   onToggleCompare: (id: string) => void;
   onToggleSelect: (id: string) => void;
   onUseAgentReference: (item: StorageItem) => void;
@@ -62,6 +64,7 @@ export default function AssetCard({
   onLaunchMaskEditor,
   onOpenFullscreen,
   onRetry,
+  onReuseTask,
   onToggleCompare,
   onToggleSelect,
   onUseAgentReference,
@@ -70,6 +73,7 @@ export default function AssetCard({
   const provider = parseProviderModel(item.model, selectedProvider).provider;
   const isDraggableReference = item.type === "image" && item.status === "complete";
   const failedTitle = isContentSafetyError(item.errorMessage) ? "内容安全拦截" : "生成失败 / 链接中断";
+  const referenceUrls = item.generationRequest?.referenceImages ?? [];
 
   const handleDragStart = (event: DragEvent<HTMLDivElement>) => {
     if (!isDraggableReference) {
@@ -147,6 +151,14 @@ export default function AssetCard({
             >
               <RefreshCw className="h-3 w-3" />
               重试
+            </button>
+            <button
+              type="button"
+              onClick={() => onReuseTask(item)}
+              className="mt-1 flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-900 px-3 py-1.5 text-[10px] font-bold text-slate-100 shadow-sm transition hover:bg-slate-800"
+            >
+              <SlidersHorizontal className="h-3 w-3" />
+              复用
             </button>
           </div>
         ) : (
@@ -234,6 +246,10 @@ export default function AssetCard({
                     <Download className="h-3.5 w-3.5 text-emerald-300" />
                     下载
                   </button>
+                  <button type="button" onClick={() => runMobileAction(() => onReuseTask(item))}>
+                    <SlidersHorizontal className="h-3.5 w-3.5 text-cyan-300" />
+                    复用
+                  </button>
                   <button type="button" onClick={() => runMobileAction(() => onToggleCompare(item.id))}>
                     <RefreshCw className="h-3.5 w-3.5 text-blue-300" />
                     {inCompare ? "取消对比" : "对比"}
@@ -287,6 +303,16 @@ export default function AssetCard({
                 )}
 
                 <button
+                  type="button"
+                  onClick={() => onReuseTask(item)}
+                  className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-cyan-600 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
+                  title="将此任务的提示词、模型、尺寸与参考图回填到左侧工作面板"
+                >
+                  <SlidersHorizontal className="h-3 w-3 text-cyan-300 group-hover:text-white" />
+                  <span className="text-[9px] font-bold">复用</span>
+                </button>
+
+                <button
                   onClick={() => onDownload(item)}
                   className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-emerald-600 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
                   title="下载该文件到本地"
@@ -334,6 +360,22 @@ export default function AssetCard({
           <p className="text-[11px] text-slate-300 line-clamp-2 leading-relaxed font-sans" title={item.prompt}>
             {item.prompt}
           </p>
+          {referenceUrls.length > 0 && (
+            <div className="mt-2 flex items-center gap-1.5">
+              <span className="shrink-0 font-mono text-[9px] text-slate-500">参考</span>
+              <div className="flex min-w-0 gap-1">
+                {referenceUrls.slice(0, 4).map((url, index) => (
+                  <div
+                    key={`${item.id}_reference_${index}`}
+                    className="h-8 w-8 overflow-hidden rounded-md border border-white/10 bg-slate-950"
+                    title={`参考图 ${index + 1}`}
+                  >
+                    <PreviewImage src={url} alt={`参考图 ${index + 1}`} className="h-full w-full object-cover" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="mt-3 pt-2.5 border-t border-slate-850 flex items-center justify-between">
@@ -357,6 +399,14 @@ export default function AssetCard({
             <span className="text-[9px] font-mono text-slate-650">
               {new Date(item.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
             </span>
+
+            <button
+              onClick={() => onReuseTask(item)}
+              className="text-slate-500 hover:text-cyan-300 p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer"
+              title="复用任务参数到左侧面板"
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+            </button>
 
             <button
               onClick={() => onDelete(item)}
