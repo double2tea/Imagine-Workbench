@@ -70,6 +70,7 @@ export default function AssetCard({
   onUseAgentReference,
 }: AssetCardProps) {
   const [isMobileActionsOpen, setIsMobileActionsOpen] = useState(false);
+  const [previewReferenceUrl, setPreviewReferenceUrl] = useState<string | null>(null);
   const provider = parseProviderModel(item.model, selectedProvider).provider;
   const isDraggableReference = item.type === "image" && item.status === "complete";
   const failedTitle = isContentSafetyError(item.errorMessage) ? "内容安全拦截" : "生成失败 / 链接中断";
@@ -365,13 +366,18 @@ export default function AssetCard({
               <span className="shrink-0 font-mono text-[9px] text-slate-500">参考</span>
               <div className="flex min-w-0 gap-1">
                 {referenceUrls.slice(0, 4).map((url, index) => (
-                  <div
+                  <button
+                    type="button"
                     key={`${item.id}_reference_${index}`}
-                    className="h-8 w-8 overflow-hidden rounded-md border border-white/10 bg-slate-950"
-                    title={`参考图 ${index + 1}`}
+                    onClick={() => setPreviewReferenceUrl(url)}
+                    className="relative h-10 w-10 overflow-hidden rounded-md border border-white/10 bg-slate-950 transition hover:border-cyan-300/70 focus:outline-none focus:ring-2 focus:ring-cyan-400/40"
+                    title={`点击放大参考图 ${index + 1}`}
                   >
                     <PreviewImage src={url} alt={`参考图 ${index + 1}`} className="h-full w-full object-cover" />
-                  </div>
+                    <span className="absolute bottom-0.5 right-0.5 rounded bg-slate-950/80 p-0.5 text-white">
+                      <Maximize2 className="h-2.5 w-2.5" />
+                    </span>
+                  </button>
                 ))}
               </div>
             </div>
@@ -418,6 +424,31 @@ export default function AssetCard({
           </div>
         </div>
       </div>
+      {previewReferenceUrl && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+          <button
+            type="button"
+            className="absolute inset-0 cursor-zoom-out"
+            aria-label="关闭参考图预览"
+            onClick={() => setPreviewReferenceUrl(null)}
+          />
+          <div className="relative max-h-[88vh] w-full max-w-5xl overflow-hidden rounded-xl border border-white/10 bg-slate-950 shadow-2xl">
+            <button
+              type="button"
+              onClick={() => setPreviewReferenceUrl(null)}
+              className="absolute right-3 top-3 z-10 rounded-lg border border-white/10 bg-slate-950/80 p-2 text-slate-200 transition hover:bg-slate-900"
+              aria-label="关闭参考图预览"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <PreviewImage
+              src={previewReferenceUrl}
+              alt="参考图预览"
+              className="max-h-[88vh] w-full object-contain"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
