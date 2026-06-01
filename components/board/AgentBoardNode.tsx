@@ -9,11 +9,11 @@ interface AgentBoardNodeProps {
 
 export default function AgentBoardNode({ node, onSend, onUpdate }: AgentBoardNodeProps) {
   return (
-    <div className="flex h-full min-h-0 flex-col gap-2 bg-slate-950 p-3">
+    <div className="flex h-full min-h-0 flex-col gap-2 p-3">
       <textarea
         value={node.instruction}
         onChange={(event) => onUpdate(event.target.value)}
-        className="nodrag nowheel min-h-0 flex-1 resize-none rounded-md border border-slate-800 bg-slate-900 p-2 text-xs leading-5 text-slate-100 outline-none placeholder:text-slate-600 focus:border-slate-600"
+        className="nodrag nowheel min-h-0 flex-1 resize-none rounded-md imagine-board-input p-2 text-xs leading-5 outline-none placeholder:text-[var(--iw-faint)] focus:border-[var(--iw-border)]"
         placeholder="给 Agent 的任务；可连接图片作为上下文"
       />
       <button

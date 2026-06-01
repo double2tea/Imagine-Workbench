@@ -10,7 +10,7 @@ export default function PromptBoardNode({ node, onChange }: PromptBoardNodeProps
     <textarea
       value={node.prompt}
       onChange={(event) => onChange(event.target.value)}
-      className="nodrag nowheel h-full w-full resize-none bg-slate-950 p-3 text-sm leading-6 text-slate-100 outline-none placeholder:text-slate-600"
+      className="nodrag nowheel h-full w-full resize-none imagine-board-input p-3 text-sm leading-6 outline-none placeholder:text-[var(--iw-faint)]"
       placeholder="写提示词，再连到生成节点"
     />
   );

@@ -80,9 +80,8 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
 
   return (
     <article
-      className={`board-node-shell h-full overflow-visible rounded-lg border bg-slate-900 shadow-2xl ${
-        selected ? "border-amber-300 ring-2 ring-amber-400/25" : "border-slate-700"
-      }`}
+      className={`board-node-shell imagine-board-node h-full overflow-visible rounded-lg ${selected ? "imagine-board-node-selected" : ""}`}
+      data-kind={node.kind}
       data-connecting={connectionInProgress ? "true" : "false"}
       data-selected={selected ? "true" : "false"}
       style={{ height: node.size.height, width: node.size.width }}
@@ -110,8 +109,8 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
         </>
       )}
 
-      <div className="flex h-9 items-center justify-between gap-2 rounded-t-lg border-b border-slate-800 bg-slate-950 px-3">
-        <h2 className="flex min-w-0 items-center gap-2 truncate text-xs font-semibold text-slate-100">
+      <div className="flex h-9 items-center justify-between gap-2 rounded-t-lg imagine-board-node-header px-3">
+        <h2 className="flex min-w-0 items-center gap-2 truncate text-xs font-semibold">
           {nodeIcon(node)}
           <span className="truncate">{node.title}</span>
         </h2>
@@ -121,7 +120,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             event.stopPropagation();
             data.onDelete(node.id);
           }}
-          className="nodrag flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-slate-500 transition hover:bg-red-500/10 hover:text-red-300"
+          className="nodrag flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[var(--iw-muted)] transition hover:bg-red-500/10 hover:text-red-300"
           title="删除节点"
         >
           <Trash2 className="h-3.5 w-3.5" />

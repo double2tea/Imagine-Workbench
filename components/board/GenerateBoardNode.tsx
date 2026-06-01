@@ -22,15 +22,15 @@ export default function GenerateBoardNode({ node, onExecute, onUpdate }: Generat
     ? `${node.model} / ${node.imageResolution === "custom" ? node.customImageResolution : node.imageResolution}`
     : `${node.model} / ${node.aspectRatio}${node.videoDuration ? ` / ${node.videoDuration}s` : ""}`;
   return (
-    <div className="flex h-full min-h-0 flex-col gap-2 bg-slate-950 p-3">
+    <div className="flex h-full min-h-0 flex-col gap-2 p-3">
       <textarea
         value={node.prompt}
         onChange={(event) => onUpdate({ prompt: event.target.value })}
-        className="nodrag nowheel min-h-0 flex-1 resize-none rounded-md border border-slate-800 bg-slate-900 p-2 text-xs leading-5 text-slate-100 outline-none placeholder:text-slate-600 focus:border-slate-600"
+        className="nodrag nowheel min-h-0 flex-1 resize-none rounded-md imagine-board-input p-2 text-xs leading-5 outline-none placeholder:text-[var(--iw-faint)] focus:border-[var(--iw-border)]"
         placeholder="可直接写提示词，或连接 Prompt 输入"
       />
       <div className="grid grid-cols-[1fr_auto] items-center gap-2">
-        <span className={`truncate text-[11px] ${node.status === "failed" ? "text-red-300" : "text-slate-500"}`}>
+        <span className={`imagine-status-chip truncate text-[11px] ${node.status === "failed" ? "text-red-300" : "text-[var(--iw-muted)]"}`}>
           {node.errorMessage ?? `${statusText(node)} / ${paramSummary}`}
         </span>
         <button
