@@ -1,6 +1,6 @@
 import type { AiProvider } from "./model-catalog";
 import type { ProviderConfig } from "./types";
-import { isKnownProvider, resolveProviderApiKey, resolveProviderBaseUrl, resolveProviderVideoBaseUrl } from "./registry";
+import { getProviderMeta, isKnownProvider, resolveProviderApiKey, resolveProviderBaseUrl, resolveProviderVideoBaseUrl } from "./registry";
 
 export function requireText(value: unknown, name: string): string {
   if (typeof value !== "string" || value.trim().length === 0) {
@@ -21,8 +21,9 @@ export function resolveProviderConfig(req: Request, provider: AiProvider): Provi
   const videoBaseUrl = resolveProviderVideoBaseUrl(provider);
 
   const apiKey = headerKey || envKey;
-  if (provider === "12ai" && !apiKey) {
-    throw new Error("12AI API key is required. Set TWELVE_AI_API_KEY or provide a custom API key.");
+  if ((provider === "12ai" || provider === "modelscope" || provider === "runninghub") && !apiKey) {
+    const meta = getProviderMeta(provider);
+    throw new Error(`${meta.label} API key is required. Set ${meta.envApiKey} or provide a custom API key.`);
   }
 
   return {

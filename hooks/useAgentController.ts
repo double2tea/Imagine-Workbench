@@ -13,8 +13,9 @@ interface UseAgentControllerParams {
   agentReferences: ReferenceImageRef[];
   agentReferenceUrl: string | null;
   buildProviderHeaders: (target?: string) => Record<string, string>;
-  generateManualImage: (overrides?: GenerationOverrides) => Promise<void>;
-  generateManualVideo: (overrides?: GenerationOverrides) => Promise<void>;
+  executeToolActionOverride?: (input: ExecuteToolActionOverrideInput) => Promise<boolean> | boolean;
+  generateManualImage: (overrides?: GenerationOverrides) => Promise<boolean>;
+  generateManualVideo: (overrides?: GenerationOverrides) => Promise<boolean>;
   handleSelectImageModel: (model: string) => void;
   handleSelectVideoModel: (model: string) => void;
   items: StorageItem[];
@@ -31,9 +32,16 @@ interface UseAgentControllerParams {
 }
 
 interface GenerationOverrides {
+  model?: string;
   prompt?: string;
   referenceImage?: string | null;
   referenceImages?: ReferenceImageRef[];
+  size?: string;
+}
+
+interface ExecuteToolActionOverrideInput {
+  action: AgentToolAction;
+  references: ReferenceImageRef[];
 }
 
 function makeClientId(prefix: string): string {
@@ -58,6 +66,7 @@ export function useAgentController({
   agentReferences,
   agentReferenceUrl,
   buildProviderHeaders,
+  executeToolActionOverride,
   generateManualImage,
   generateManualVideo,
   handleSelectImageModel,
@@ -160,6 +169,10 @@ export function useAgentController({
     const actionReferenceOverride: GenerationOverrides | undefined = actionReferences.length > 0
       ? { referenceImage: actionReferences[0]?.url ?? null, referenceImages: actionReferences }
       : undefined;
+    if (executeToolActionOverride) {
+      const wasHandled = await executeToolActionOverride({ action, references: actionReferences });
+      if (wasHandled) return;
+    }
 
     if (type === "optimize_prompt") {
       setPrompt(params.prompt || "");
@@ -173,7 +186,7 @@ export function useAgentController({
       setTraditionalSubTab("image");
 
       setTimeout(() => {
-        generateManualImage({ ...actionReferenceOverride, prompt: params.prompt || "" });
+        generateManualImage({ ...actionReferenceOverride, model: params.model, prompt: params.prompt || "", size: params.aspectRatio });
       }, 500);
     } else if (type === "generate_video") {
       setPrompt(params.prompt || "");
@@ -183,7 +196,7 @@ export function useAgentController({
 
       setTraditionalSubTab("video");
       setTimeout(() => {
-        generateManualVideo({ ...actionReferenceOverride, prompt: params.prompt || "" });
+        generateManualVideo({ ...actionReferenceOverride, model: params.model, prompt: params.prompt || "", size: params.aspectRatio });
       }, 500);
     } else if (type === "edit_image") {
       setPrompt(params.prompt || "");
@@ -212,7 +225,7 @@ export function useAgentController({
     }, 1000);
   };
 
-  const submitAgentPrompt = async (forcedPrompt?: string) => {
+  const submitAgentPrompt = async (forcedPrompt?: string, forcedReferences?: ReferenceImageRef[]) => {
     const activeText = (forcedPrompt || agentInput).trim();
     if (!activeText) return;
 
@@ -237,12 +250,12 @@ export function useAgentController({
         aspectRatio: item.aspectRatio,
       }));
 
-      const activeAgentReferences =
-        agentReferences.length > 0
+      const activeAgentReferences = forcedReferences ??
+        (agentReferences.length > 0
           ? agentReferences
           : agentReferenceId && agentReferenceUrl
             ? [{ id: agentReferenceId, url: agentReferenceUrl }]
-            : [];
+            : []);
       const hasAgentImageReference = activeAgentReferences.some(reference => reference.url.trim().length > 0);
       const agentModel = hasAgentImageReference ? DEFAULT_VISION_CHAT_MODEL : selectedChatModel;
       const headers = buildProviderHeaders(agentModel);

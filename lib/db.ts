@@ -17,13 +17,15 @@ export interface StorageItem {
   errorMessage?: string;
   generationRequest?: GenerationRequestSnapshot;
   maskOriginalId?: string; // If this was created by drawing on another image
+  sourceBoardNodeId?: string;
 }
 
 export interface GenerationRequestSnapshot {
   prompt: string;
   model: string;
   aspectRatio: string;
-  imageSize?: string;
+  imageResolution?: string;
+  imageQuality?: string;
   thinkingLevel?: string;
   videoDurationSeconds?: string;
   videoPreset?: string;

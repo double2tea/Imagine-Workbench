@@ -14,7 +14,8 @@ export interface ParameterOption {
 
 export interface ImageModelCapabilities {
   aspectRatios: ParameterOption[];
-  imageSizes: ParameterOption[];
+  resolutions: ParameterOption[];
+  qualities: ParameterOption[];
   thinkingLevels: ParameterOption[];
 }
 
@@ -76,36 +77,82 @@ const GEMINI_31_EXTRA_RATIOS: ParameterOption[] = [
   { value: "8:1", label: "8:1 Ultra Wide" },
 ];
 
+function imageResolutionOption(value: string): ParameterOption {
+  return { value, label: getImageResolutionLabel(value) };
+}
+
+function getImageResolutionLabel(value: string): string {
+  if (value === "auto") return "Auto";
+  if (value === "custom") return "自定义尺寸";
+  if (value === "512px") return "512p";
+  if (value === "1K" || value === "2K" || value === "4K") return value;
+
+  const match = value.match(/^(\d+)x(\d+)$/);
+  if (!match) return value;
+
+  const width = Number(match[1]);
+  const height = Number(match[2]);
+  const longSide = Math.max(width, height);
+  const shortSide = Math.min(width, height);
+
+  if (longSide >= 3200 || shortSide >= 2160) return "4K";
+  if (longSide >= 2500) return "2.5K";
+  if (longSide >= 1900) return "2K";
+  if (shortSide >= 900) return "1K";
+  if (shortSide >= 700) return "720p";
+  if (shortSide >= 500) return "512p";
+  return `${shortSide}p`;
+}
+
 const GPT_IMAGE_SIZES: ParameterOption[] = [
-  { value: "auto", label: "Auto" },
-  { value: "1024x1024", label: "1024x1024" },
-  { value: "1536x1024", label: "1536x1024 3:2" },
-  { value: "1024x1536", label: "1024x1536 2:3" },
-  { value: "2048x1536", label: "2048x1536 4:3" },
-  { value: "1536x2048", label: "1536x2048 3:4" },
-  { value: "2048x2048", label: "2048x2048" },
-  { value: "2048x1152", label: "2048x1152 16:9" },
-  { value: "2560x1440", label: "2560x1440 2.5K" },
-  { value: "1440x2560", label: "1440x2560 2.5K Vertical" },
-  { value: "3504x2336", label: "3504x2336 3:2 4K" },
-  { value: "2336x3504", label: "2336x3504 2:3 4K" },
-  { value: "3264x2448", label: "3264x2448 4:3 4K" },
-  { value: "2448x3264", label: "2448x3264 3:4 4K" },
-  { value: "3840x2160", label: "3840x2160 4K" },
-  { value: "2160x3840", label: "2160x3840 4K Vertical" },
-  { value: "custom", label: "Custom WxH" },
+  imageResolutionOption("auto"),
+  imageResolutionOption("1024x1024"),
+  imageResolutionOption("1536x1024"),
+  imageResolutionOption("1024x1536"),
+  imageResolutionOption("2048x1536"),
+  imageResolutionOption("1536x2048"),
+  imageResolutionOption("2048x2048"),
+  imageResolutionOption("2880x2880"),
+  imageResolutionOption("2048x1152"),
+  imageResolutionOption("2560x1440"),
+  imageResolutionOption("1440x2560"),
+  imageResolutionOption("3504x2336"),
+  imageResolutionOption("2336x3504"),
+  imageResolutionOption("3264x2448"),
+  imageResolutionOption("2448x3264"),
+  imageResolutionOption("3840x2160"),
+  imageResolutionOption("2160x3840"),
+  imageResolutionOption("custom"),
+];
+
+const GPT_IMAGE_RATIOS: ParameterOption[] = [
+  { value: "1:1", label: "1:1 Square" },
+  { value: "3:2", label: "3:2 Landscape" },
+  { value: "2:3", label: "2:3 Portrait" },
+  { value: "4:3", label: "4:3 Landscape" },
+  { value: "3:4", label: "3:4 Portrait" },
+  { value: "16:9", label: "16:9 Cinema" },
+  { value: "9:16", label: "9:16 Vertical" },
 ];
 
 const GROK_IMAGE_SIZES: ParameterOption[] = [
-  { value: "1280x720", label: "1280x720" },
-  { value: "720x1280", label: "720x1280" },
-  { value: "1792x1024", label: "1792x1024" },
-  { value: "1024x1792", label: "1024x1792" },
-  { value: "1024x1024", label: "1024x1024" },
+  imageResolutionOption("1280x720"),
+  imageResolutionOption("720x1280"),
+  imageResolutionOption("1792x1024"),
+  imageResolutionOption("1024x1792"),
+  imageResolutionOption("1024x1024"),
+];
+
+const GROK_IMAGE_RATIOS: ParameterOption[] = [
+  { value: "16:9", label: "16:9 Landscape" },
+  { value: "9:16", label: "9:16 Vertical" },
+  { value: "7:4", label: "7:4 Landscape" },
+  { value: "4:7", label: "4:7 Portrait" },
+  { value: "1:1", label: "1:1 Square" },
 ];
 
 const GEMINI_31_IMAGE_SIZES: ParameterOption[] = [
-  { value: "512px", label: "512px Preview" },
+  imageResolutionOption("512px"),
   { value: "1K", label: "1K" },
   { value: "2K", label: "2K" },
   { value: "4K", label: "4K" },
@@ -166,6 +213,24 @@ const TWELVE_AI_VIDEO_SIZES: ParameterOption[] = [
   { value: "1080x1920", label: "1080x1920 Vertical" },
 ];
 
+const MODELSCOPE_IMAGE_SIZES: ParameterOption[] = [
+  imageResolutionOption("1024x1024"),
+  imageResolutionOption("1328x1328"),
+  imageResolutionOption("1664x928"),
+  imageResolutionOption("928x1664"),
+];
+
+const RUNNINGHUB_VIDEO_SIZES: ParameterOption[] = [
+  { value: "auto", label: "Auto" },
+  { value: "1280x720", label: "1280x720" },
+  { value: "720x1280", label: "720x1280" },
+  { value: "1024x1024", label: "1024x1024" },
+];
+
+const RUNNINGHUB_IMAGE_SIZES: ParameterOption[] = RUNNINGHUB_VIDEO_SIZES.map(option =>
+  imageResolutionOption(option.value),
+);
+
 export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
   imageCapability({
     value: "12ai:gemini-3.1-flash-image-preview",
@@ -204,6 +269,7 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     model: "gpt-image-2",
     supportsAsync: false,
     supportsReferences: true,
+    aspectRatios: GPT_IMAGE_RATIOS,
     sizes: GPT_IMAGE_SIZES,
     qualityLevels: GPT_QUALITY_OPTIONS,
   }),
@@ -235,6 +301,7 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     model: "grok-imagine-image-lite",
     supportsAsync: false,
     supportsReferences: false,
+    aspectRatios: GROK_IMAGE_RATIOS,
     sizes: GROK_IMAGE_SIZES,
   }),
   imageCapability({
@@ -244,6 +311,7 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     model: "grok-imagine-image",
     supportsAsync: false,
     supportsReferences: false,
+    aspectRatios: GROK_IMAGE_RATIOS,
     sizes: GROK_IMAGE_SIZES,
   }),
   imageCapability({
@@ -253,6 +321,7 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     model: "grok-imagine-image-pro",
     supportsAsync: false,
     supportsReferences: false,
+    aspectRatios: GROK_IMAGE_RATIOS,
     sizes: GROK_IMAGE_SIZES,
   }),
   imageCapability({
@@ -262,7 +331,8 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     model: "grok-imagine-image-edit",
     supportsAsync: false,
     supportsReferences: true,
-    sizes: [{ value: "1024x1024", label: "1024x1024" }],
+    aspectRatios: [{ value: "1:1", label: "1:1 Square" }],
+    sizes: [imageResolutionOption("1024x1024")],
   }),
   videoCapability({
     value: "12ai:veo_3_1-fast",
@@ -487,6 +557,7 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     model: "gpt-image-2",
     supportsAsync: false,
     supportsReferences: true,
+    aspectRatios: GPT_IMAGE_RATIOS,
     sizes: GPT_IMAGE_SIZES,
     qualityLevels: GPT_QUALITY_OPTIONS,
   }),
@@ -497,6 +568,7 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     model: "gpt-image-2-2k",
     supportsAsync: false,
     supportsReferences: true,
+    aspectRatios: GPT_IMAGE_RATIOS,
     sizes: GPT_IMAGE_SIZES.filter(s => s.value !== "3840x2160" && s.value !== "2160x3840"),
   }),
   imageCapability({
@@ -506,7 +578,66 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     model: "gpt-image-2-4k",
     supportsAsync: false,
     supportsReferences: true,
+    aspectRatios: GPT_IMAGE_RATIOS,
     sizes: GPT_IMAGE_SIZES,
+  }),
+  imageCapability({
+    value: "modelscope:Qwen/Qwen-Image",
+    label: "ModelScope Qwen Image",
+    provider: "modelscope",
+    model: "Qwen/Qwen-Image",
+    supportsAsync: true,
+    supportsReferences: false,
+    sizes: MODELSCOPE_IMAGE_SIZES,
+  }),
+  imageCapability({
+    value: "modelscope:Qwen/Qwen-Image-Edit",
+    label: "ModelScope Qwen Image Edit",
+    provider: "modelscope",
+    model: "Qwen/Qwen-Image-Edit",
+    supportsAsync: true,
+    supportsReferences: true,
+    sizes: MODELSCOPE_IMAGE_SIZES,
+  }),
+  imageCapability({
+    value: "runninghub:ai-app-image:<webappId>",
+    label: "RunningHub AI App Image",
+    provider: "runninghub",
+    model: "ai-app-image:<webappId>",
+    supportsAsync: false,
+    supportsReferences: true,
+    sizes: RUNNINGHUB_IMAGE_SIZES,
+  }),
+  imageCapability({
+    value: "runninghub:workflow-image:<workflowId>",
+    label: "RunningHub Workflow Image",
+    provider: "runninghub",
+    model: "workflow-image:<workflowId>",
+    supportsAsync: false,
+    supportsReferences: true,
+    sizes: RUNNINGHUB_IMAGE_SIZES,
+  }),
+  videoCapability({
+    value: "runninghub:ai-app-video:<webappId>",
+    label: "RunningHub AI App Video",
+    provider: "runninghub",
+    model: "ai-app-video:<webappId>",
+    supportsReferences: true,
+    sizes: RUNNINGHUB_VIDEO_SIZES,
+    videoReferenceMode: "reference",
+    maxReferenceImages: 4,
+    minReferenceImages: 0,
+  }),
+  videoCapability({
+    value: "runninghub:workflow-video:<workflowId>",
+    label: "RunningHub Workflow Video",
+    provider: "runninghub",
+    model: "workflow-video:<workflowId>",
+    supportsReferences: true,
+    sizes: RUNNINGHUB_VIDEO_SIZES,
+    videoReferenceMode: "reference",
+    maxReferenceImages: 4,
+    minReferenceImages: 0,
   }),
 ];
 
@@ -520,17 +651,32 @@ export function getChatModelOptions(provider: AiProvider): ModelOption[] {
 
 export function getModelCapability(value: string, kind?: ModelKind): ProviderModelCapability {
   const parsed = parseProviderModel(value, "12ai");
-  const capability = MODEL_CAPABILITIES.find(
-    item =>
-      item.provider === parsed.provider &&
-      item.model === parsed.model &&
-      item.supportsAsync === parsed.async &&
-      (kind === undefined || item.kind === kind),
-  );
+  const capability = findModelCapability(parsed.provider, parsed.model, parsed.async, kind);
+  if (!capability && parsed.provider === "runninghub") {
+    return runningHubVirtualCapability(parsed.model, kind);
+  }
+  if (!capability && parsed.provider === "modelscope" && kind === "image") {
+    return modelScopeVirtualImageCapability(parsed.model);
+  }
   if (!capability) {
     throw new Error(`Unknown provider model capability: ${value}`);
   }
   return capability;
+}
+
+function findModelCapability(
+  provider: AiProvider,
+  model: string,
+  supportsAsync: boolean,
+  kind?: ModelKind,
+): ProviderModelCapability | undefined {
+  return MODEL_CAPABILITIES.find(
+    item =>
+      item.provider === provider &&
+      item.model === model &&
+      item.supportsAsync === supportsAsync &&
+      (kind === undefined || item.kind === kind),
+  );
 }
 
 export function getModelCapabilities(kind?: ModelKind, provider?: AiProvider): ProviderModelCapability[] {
@@ -572,16 +718,33 @@ export function getImageModelCapabilities(value: string): ImageModelCapabilities
   const capability = getKnownCapability(value, "image");
   if (capability) {
     return {
-      aspectRatios: capability.aspectRatios.length > 0 ? capability.aspectRatios : capability.sizes,
-      imageSizes: legacyImageSizeOptions(capability),
+      aspectRatios: capability.aspectRatios.length > 0 ? capability.aspectRatios : aspectRatiosFromSizes(capability.sizes),
+      resolutions: capability.sizes,
+      qualities: capability.qualityLevels,
       thinkingLevels: capability.thinkingLevels,
     };
   }
   return {
     aspectRatios: GEMINI_25_RATIOS,
-    imageSizes: [],
+    resolutions: [],
+    qualities: [],
     thinkingLevels: [],
   };
+}
+
+export function getImageResolutionOptions(value: string, aspectRatio: string): ParameterOption[] {
+  const capability = getKnownCapability(value, "image");
+  if (!capability) return [];
+  if (!capability.sizes.some(option => isPixelSize(option.value))) return capability.sizes;
+
+  return capability.sizes.filter(option => {
+    if (option.value === "auto" || option.value === "custom") return true;
+    return getPixelSizeAspectRatio(option.value) === aspectRatio;
+  });
+}
+
+export function getImageAspectRatioFromResolution(resolution: string): string | null {
+  return getPixelSizeAspectRatio(resolution);
 }
 
 export function getVideoModelCapabilities(value: string): VideoModelCapabilities {
@@ -734,17 +897,87 @@ function optionsForKind(kind: ModelKind, provider?: AiProvider, includeAsync = t
 
 function getKnownCapability(value: string, kind: ModelKind): ProviderModelCapability | undefined {
   const parsed = parseProviderModel(value, "12ai");
-  return MODEL_CAPABILITIES.find(
-    capability =>
-      capability.provider === parsed.provider &&
-      capability.model === parsed.model &&
-      capability.supportsAsync === parsed.async &&
-      capability.kind === kind,
-  );
+  const capability = findModelCapability(parsed.provider, parsed.model, parsed.async, kind);
+  if (capability) return capability;
+  if (parsed.provider === "runninghub" && kind !== "chat") return runningHubVirtualCapability(parsed.model, kind);
+  if (parsed.provider === "modelscope" && kind === "image") return modelScopeVirtualImageCapability(parsed.model);
+  return undefined;
 }
 
-function legacyImageSizeOptions(capability: ProviderModelCapability): ParameterOption[] {
-  if (capability.qualityLevels.length > 0) return capability.qualityLevels;
-  if (capability.provider === "grok2api") return [];
-  return capability.sizes;
+function modelScopeVirtualImageCapability(model: string): ProviderModelCapability {
+  return imageCapability({
+    value: formatProviderModel("modelscope", model),
+    label: `ModelScope ${model}`,
+    provider: "modelscope",
+    model,
+    supportsAsync: true,
+    supportsReferences: model.toLowerCase().includes("edit"),
+    sizes: MODELSCOPE_IMAGE_SIZES,
+  });
+}
+
+function aspectRatiosFromSizes(sizes: ParameterOption[]): ParameterOption[] {
+  const ratios = new Map<string, ParameterOption>();
+  for (const size of sizes) {
+    const ratio = getPixelSizeAspectRatio(size.value);
+    if (ratio && !ratios.has(ratio)) {
+      ratios.set(ratio, { value: ratio, label: ratio });
+    }
+  }
+  return Array.from(ratios.values());
+}
+
+function getPixelSizeAspectRatio(value: string): string | null {
+  const match = value.match(/^(\d+)x(\d+)$/);
+  if (!match) return null;
+  const width = Number(match[1]);
+  const height = Number(match[2]);
+  const divisor = greatestCommonDivisor(width, height);
+  return `${width / divisor}:${height / divisor}`;
+}
+
+function isPixelSize(value: string): boolean {
+  return /^\d+x\d+$/.test(value);
+}
+
+function greatestCommonDivisor(a: number, b: number): number {
+  let left = a;
+  let right = b;
+  while (right !== 0) {
+    const next = left % right;
+    left = right;
+    right = next;
+  }
+  return left;
+}
+
+function runningHubVirtualCapability(model: string, kind?: ModelKind): ProviderModelCapability {
+  const lower = model.toLowerCase();
+  const isVideo = lower.includes("video");
+  const resolvedKind: ModelKind = kind ?? (isVideo ? "video" : "image");
+  if (resolvedKind === "video") {
+    return videoCapability({
+      value: formatProviderModel("runninghub", model),
+      label: `RunningHub ${model}`,
+      provider: "runninghub",
+      model,
+      supportsReferences: true,
+      sizes: RUNNINGHUB_VIDEO_SIZES,
+      videoReferenceMode: "reference",
+      maxReferenceImages: 4,
+      minReferenceImages: 0,
+    });
+  }
+  if (resolvedKind === "image") {
+    return imageCapability({
+      value: formatProviderModel("runninghub", model),
+      label: `RunningHub ${model}`,
+      provider: "runninghub",
+      model,
+      supportsAsync: false,
+      supportsReferences: true,
+      sizes: RUNNINGHUB_IMAGE_SIZES,
+    });
+  }
+  throw new Error(`RunningHub does not support ${resolvedKind} models`);
 }

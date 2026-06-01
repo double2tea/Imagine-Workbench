@@ -20,7 +20,8 @@ export interface GenerateImageInput {
   prompt: string;
   model: string;
   aspectRatio: string;
-  imageSize: string;
+  imageResolution: string;
+  imageQuality?: string;
   thinkingLevel?: string;
   referenceImages: ReferenceImage[];
   async: boolean;

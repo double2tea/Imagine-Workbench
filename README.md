@@ -7,9 +7,10 @@ The current app focuses on a browser-first creative loop:
 - Generate images from prompts, reference images, or masked edits.
 - Generate videos from prompts, reference images, or start/end frames depending on the selected video model.
 - Use Agent Mode to plan creative actions and trigger one recommended workstation action.
+- Use the standalone `/board` canvas to arrange assets, notes, references, and Agent-driven generation in a spatial workflow.
 - Store generated assets locally in browser IndexedDB.
 - Search, compare, preview, delete, and ZIP-export workspace assets.
-- Route model calls through internal provider adapters for 12AI, grok2api, and xstx.
+- Route model calls through internal provider adapters for 12AI, grok2api, xstx, ModelScope, and RunningHub.
 
 ## Stack
 
@@ -48,6 +49,12 @@ GROK2API_BASE_URL="http://localhost:8000"
 
 XSTX_API_KEY="sk_your_xstx_key"
 XSTX_BASE_URL="https://api.xstx.info"
+
+MODELSCOPE_API_KEY="ms_your_modelscope_token"
+MODELSCOPE_BASE_URL="https://api-inference.modelscope.cn"
+
+RUNNINGHUB_API_KEY="your_runninghub_api_key"
+RUNNINGHUB_BASE_URL="https://www.runninghub.cn"
 ```
 
 The app can also accept provider credentials from the in-app settings panel. Request headers from the UI are resolved by `lib/providers/utils.ts`.
@@ -64,6 +71,11 @@ grok2api:grok-4.20-auto
 grok2api:grok-imagine-image
 xstx:gpt-image-2
 xstx:gpt-5.4
+modelscope:Qwen/Qwen-Image
+modelscope:Qwen/Qwen-Image-Edit
+runninghub:api:/openapi/v2/bytedance/jimeng-4.6/text-to-image
+runninghub:ai-app-image:<webappId>
+runninghub:workflow-video:<workflowId>
 ```
 
 ### Adding a new provider
@@ -100,6 +112,12 @@ Current adapters:
 - 12AI Veo: `/v1/videos`
 - grok2api image/video/chat: OpenAI-compatible endpoints plus `/v1/videos`
 - 星途 (xstx): OpenAI-compatible chat, image, and model listing
+- ModelScope image: API-Inference `/v1/images/generations` with async polling via `/v1/tasks/{task_id}`
+- RunningHub image/video: configured Standard Model API endpoints (`api:/openapi/v2/...`) or AI App / Workflow virtual models, polled through `/openapi/v2/query`
+
+ModelScope public REST video generation is not enabled by default because the public official docs verified for this implementation do not expose one stable unified REST video endpoint. Use a deployed OpenAI-compatible service or RunningHub for video.
+
+RunningHub support intentionally treats AI Apps and workflows as provider-backed virtual models. It does not add ComfyUI editing, local ComfyUI backends, or workflow JSON graph editing to Imagine Workbench.
 
 ## Model Defaults
 
@@ -123,6 +141,8 @@ Model-specific parameters are defined in the catalog so the UI can adapt control
 
 ## App Routes
 
+- `GET /`: main workstation.
+- `GET /board`: standalone canvas operation surface for assets, notes, generation, and Agent interaction.
 - `POST /api/gemini/generate-image`: image generation and image editing.
 - `POST /api/gemini/generate-video`: video generation.
 - `POST /api/gemini/video-status`: polls async image/video operations.
@@ -137,11 +157,13 @@ Model-specific parameters are defined in the catalog so the UI can adapt control
 ```text
 app/
   page.tsx                         Main workstation composition shell
+  board/page.tsx                   Standalone board operation shell
   api/gemini/*                     Generation, agent, status, download APIs
   api/models/route.ts              Provider model listing
 components/
   agent/                           Agent dock and chat messages
   assets/                          Gallery cards, compare panel, toolbar, fullscreen preview
+  board/                           Canvas toolbar, nodes, and board viewport
   creation/                        Image/video generation panels
   reference/                       Reference image picker, drag-and-drop, @-mention dropdown
   settings/                        Settings modal (tabbed: providers / models / system)
@@ -149,6 +171,7 @@ components/
   CanvasMaskEditor.tsx             In-browser mask editor
   PresetStyles.ts                  Visual preset definitions
 lib/
+  board/                           Board types, defaults, and IndexedDB persistence
   db.ts                            IndexedDB asset store
   providers/                       Provider registry, adapters, model catalog, types
 hooks/
@@ -182,3 +205,4 @@ npm run start
 - Provider metadata lives in `lib/providers/registry.ts` — the single source of truth for keys, labels, env vars, defaults, and UI fields.
 - The app keeps provider integration logic in `lib/providers/*`; avoid putting provider-specific request details directly in UI components.
 - Built-in model capabilities in `MODEL_CAPABILITIES` serve as initial defaults. The "获取模型" button fetches the live model list from each provider's `/v1/models` endpoint and merges it into the dropdowns. Models are auto-classified as chat/image/video by name.
+  useBoardState.ts                 Board document state and persistence

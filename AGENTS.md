@@ -19,6 +19,7 @@ Imagine Workbench is a Next.js App Router workstation for AI creative generation
 Current core surfaces:
 
 - `app/page.tsx`: main browser composition shell. It wires workstation state/hooks into creation panels, Agent Dock, gallery, settings, fullscreen preview, and mask editor.
+- `app/board/page.tsx`: standalone canvas operation shell. It reuses the existing asset store, generation hooks, provider settings, Agent Dock, mask editor, and media polling while presenting a spatial board workflow.
 - `app/api/gemini/*`: server routes for generation, optimization, Agent Mode, async polling, and media download proxying.
 - `app/api/gemini/agent/route.ts`: Agent Mode with tool-calling loop. Uses zod for request/response validation. Agent calls tools to query models, skills, and gallery assets before recommending actions. Model IDs are validated server-side against the catalog.
 - `app/api/gemini/agent/tools.ts`: Agent tool definitions and executors. Tools: `query_models`, `get_skill_info`, `get_gallery_assets`. Tool arg schemas defined with zod, JSON Schema introspected for OpenAI tool definitions.
@@ -33,6 +34,7 @@ Current core surfaces:
 - `hooks/useMediaPolling.ts`: async image/video status polling and final media download into IndexedDB.
 - `lib/providers/*`: provider adapters, model catalog, tool-calling chat completions, parsing, request helpers, and shared types.
 - `lib/db.ts`: browser IndexedDB persistence for generated assets.
+- `lib/board/*`: board document types, defaults, and IndexedDB persistence. Board data stores layout and references; generated media remains owned by `StorageItem` in `lib/db.ts`.
 - `components/CanvasMaskEditor.tsx`: local mask drawing UI.
 
 ## TypeScript Rules
@@ -81,6 +83,21 @@ Never hardcode provider strings (`"12ai"`, `"grok2api"`, `"xstx"`) in enumeratio
 - Model listing: `lib/providers/models.ts`
 
 Keep API routes thin: parse body, resolve provider config, call provider adapter, return response.
+
+### ModelScope and RunningHub
+
+- ModelScope image generation uses API-Inference (`/v1/images/generations`) and async task polling (`/v1/tasks/{task_id}`). Do not assume every ModelScope endpoint is OpenAI-compatible; SwingDeploy deployments may be OpenAI-compatible, but the public API-Inference image path is provider-specific.
+- ModelScope public REST video generation is not enabled unless a stable official REST endpoint is explicitly identified.
+- RunningHub support treats Standard Model API endpoints and AI App / Workflow IDs as virtual model IDs, such as `runninghub:api:/openapi/v2/...`, `runninghub:ai-app-image:<webappId>`, and `runninghub:workflow-video:<workflowId>`.
+- Do not add ComfyUI editing, workflow JSON visual editing, or local ComfyUI backend management. RunningHub workflows are provider-side execution targets only.
+
+## Board Surface
+
+- `/board` is an alternate operation surface, not a replacement for `/`.
+- Board nodes store spatial layout and references to generated assets. The asset store remains the source of truth for media URLs, prompts, model IDs, statuses, operation names, and generation snapshots.
+- Keep board logic in `components/board/*`, `hooks/useBoardState.ts`, and `lib/board/*`. Do not add board-specific state to `app/page.tsx`.
+- Agent actions on the board should reuse existing action types (`generate_image`, `generate_video`, `edit_image`, `optimize_prompt`) unless a new board-specific action is explicitly requested.
+- Board edges/nodes should express user organization and references, not a general DAG execution engine.
 
 ## Agent Tool Calling
 

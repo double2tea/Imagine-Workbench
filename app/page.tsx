@@ -36,7 +36,9 @@ import {
   DEFAULT_IMAGE_MODEL,
   DEFAULT_VIDEO_MODEL,
   formatProviderModel,
+  getImageAspectRatioFromResolution,
   getImageModelCapabilities,
+  getImageResolutionOptions,
   getVideoModelCapabilities,
   parseProviderModel,
   supportsAsyncImageGeneration,
@@ -132,12 +134,13 @@ export default function Home() {
   const [selectedModel, setSelectedModel] = useState(DEFAULT_IMAGE_MODEL);
   const [selectedVideoModel, setSelectedVideoModel] = useState(DEFAULT_VIDEO_MODEL);
   const [aspectRatio, setAspectRatio] = useState("1:1");
-  const [imageSize, setImageSize] = useState("1K");
+  const [imageResolution, setImageResolution] = useState("1K");
+  const [imageQuality, setImageQuality] = useState("auto");
   const [imageThinkingLevel, setImageThinkingLevel] = useState("minimal");
   const [videoDuration, setVideoDuration] = useState("10");
   const [videoPreset, setVideoPreset] = useState("normal");
   const [videoResolution, setVideoResolution] = useState("720p");
-  const [customGptImageSize, setCustomGptImageSize] = useState("2560x1440");
+  const [customImageSize, setCustomImageSize] = useState("2560x1440");
   const [traditionalSubTab, setTraditionalSubTab] = useState<CreationMode>("image");
   const [isAgentDockOpen, setIsAgentDockOpen] = useState(false);
   const [isAgentPortalReady, setIsAgentPortalReady] = useState(false);
@@ -244,14 +247,18 @@ export default function Home() {
   } = useProviderSettings({ pushWorkspaceNotice });
 
   const imageCapabilities = getImageModelCapabilities(selectedModel);
+  const imageResolutionOptions = getImageResolutionOptions(selectedModel, aspectRatio);
+  const presetImageResolutionOptions = imageResolutionOptions.filter(option => option.value !== "custom");
+  const supportsCustomImageSize = imageResolutionOptions.some(option => option.value === "custom");
   const videoCapabilities = getVideoModelCapabilities(selectedVideoModel);
   const isSubmittingImage = imageSubmitCount > 0;
   const isSubmittingVideo = videoSubmitCount > 0;
-  const isGptImageModel = parseProviderModel(selectedModel, selectedProvider).model === "gpt-image-2";
   const canUseAsyncImageGeneration = supportsAsyncImageGeneration(selectedModel);
-  const activeImageSize = isGptImageModel && aspectRatio === "custom" ? customGptImageSize.trim() : aspectRatio;
-  const activeImageModel = isSubmittingImage && canUseAsyncImageGeneration
-    ? `12ai-async:${parseProviderModel(selectedModel, selectedProvider).model}`
+  const activeImageResolution = imageResolution === "custom" ? customImageSize.trim() : imageResolution;
+  const activeImageQuality = imageCapabilities.qualities.some(option => option.value === imageQuality) ? imageQuality : undefined;
+  const selectedImageProviderModel = parseProviderModel(selectedModel, selectedProvider);
+  const activeImageModel = isSubmittingImage && canUseAsyncImageGeneration && selectedImageProviderModel.provider === "12ai"
+    ? `12ai-async:${selectedImageProviderModel.model}`
     : selectedModel;
   const activeVideoSize = videoCapabilities.sizes.some(option => option.value === aspectRatio) ? aspectRatio : "auto";
   const activeVideoResolution = videoCapabilities.resolutions.some(option => option.value === videoResolution)
@@ -353,17 +360,18 @@ export default function Home() {
     generateManualImage,
     generateManualVideo,
   } = useGenerationActions({
+    activeImageAspectRatio: aspectRatio,
     activeImageModel,
-    activeImageSize,
+    activeImageQuality,
+    activeImageResolution,
     activeVideoDuration,
     activeVideoPreset,
     activeVideoResolution,
     activeVideoSize,
     buildProviderHeaders,
     generationAbortControllersRef,
-    imageSize,
     imageThinkingLevel,
-    isGptImageModel,
+    isCustomImageResolution: imageResolution === "custom",
     locallyCanceledItemIdsRef,
     prompt,
     pushWorkspaceNotice,
@@ -415,18 +423,34 @@ export default function Home() {
   const chatModelGroups = getProviderModelGroups(chatModelOptions);
   const handleSelectImageModel = (model: string) => {
     const capabilities = getImageModelCapabilities(model);
+    const nextAspectRatio = capabilities.aspectRatios[0]?.value ?? "1:1";
+    const resolvedAspectRatio = capabilities.aspectRatios.some(option => option.value === aspectRatio)
+      ? aspectRatio
+      : nextAspectRatio;
+    const nextResolutionOptions = getImageResolutionOptions(model, resolvedAspectRatio);
     setSelectedModel(model);
     if (!capabilities.aspectRatios.some(option => option.value === aspectRatio)) {
-      setAspectRatio(capabilities.aspectRatios[0]?.value ?? "1:1");
+      setAspectRatio(resolvedAspectRatio);
     }
-    if (capabilities.imageSizes.length > 0 && !capabilities.imageSizes.some(option => option.value === imageSize)) {
-      setImageSize(capabilities.imageSizes[0].value);
+    if (nextResolutionOptions.length > 0 && !nextResolutionOptions.some(option => option.value === imageResolution)) {
+      setImageResolution(nextResolutionOptions[0].value);
+    }
+    if (capabilities.qualities.length > 0 && !capabilities.qualities.some(option => option.value === imageQuality)) {
+      setImageQuality(capabilities.qualities[0].value);
     }
     if (
       capabilities.thinkingLevels.length > 0 &&
       !capabilities.thinkingLevels.some(option => option.value === imageThinkingLevel)
     ) {
       setImageThinkingLevel(capabilities.thinkingLevels[0].value);
+    }
+  };
+
+  const handleSelectImageAspectRatio = (value: string) => {
+    setAspectRatio(value);
+    const nextResolutionOptions = getImageResolutionOptions(selectedModel, value);
+    if (nextResolutionOptions.length > 0 && !nextResolutionOptions.some(option => option.value === imageResolution)) {
+      setImageResolution(nextResolutionOptions[0].value);
     }
   };
 
@@ -470,15 +494,21 @@ export default function Home() {
       const imageModel = getSelectableStoredImageModel(model, selectedProvider);
       const nextAspectRatio = request?.aspectRatio ?? item.aspectRatio;
       const capabilities = getImageModelCapabilities(imageModel);
+      const nextResolution = request?.imageResolution ?? nextAspectRatio;
+      const resolvedAspectRatio = getImageAspectRatioFromResolution(nextResolution) ?? nextAspectRatio;
 
       handleSelectImageModel(imageModel);
-      if (capabilities.aspectRatios.some(option => option.value === nextAspectRatio)) {
-        setAspectRatio(nextAspectRatio);
-      } else {
-        setAspectRatio("custom");
-        setCustomGptImageSize(nextAspectRatio);
+      if (capabilities.aspectRatios.some(option => option.value === resolvedAspectRatio)) {
+        setAspectRatio(resolvedAspectRatio);
       }
-      if (request?.imageSize) setImageSize(request.imageSize);
+      const nextResolutionOptions = getImageResolutionOptions(imageModel, resolvedAspectRatio);
+      if (nextResolutionOptions.some(option => option.value === nextResolution)) {
+        setImageResolution(nextResolution);
+      } else if (/^\d+x\d+$/.test(nextResolution) && nextResolutionOptions.some(option => option.value === "custom")) {
+        setImageResolution("custom");
+        setCustomImageSize(nextResolution);
+      }
+      if (request?.imageQuality) setImageQuality(request.imageQuality);
       if (request?.thinkingLevel) setImageThinkingLevel(request.thinkingLevel);
       setTraditionalSubTab("image");
     } else {
@@ -1013,7 +1043,7 @@ export default function Home() {
 
               <select
                 value={aspectRatio}
-                onChange={(event) => setAspectRatio(event.target.value)}
+                onChange={(event) => handleSelectImageAspectRatio(event.target.value)}
                 className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 focus:border-blue-400/35 focus:outline-none"
               >
                 {imageCapabilities.aspectRatios.map(option => (
@@ -1022,14 +1052,49 @@ export default function Home() {
               </select>
             </div>
 
-            {imageCapabilities.imageSizes.length > 0 && (
+            {imageResolutionOptions.length > 0 && (
+              <>
+                {presetImageResolutionOptions.length > 0 && (
+                  <div className="grid grid-cols-4 gap-1.5 rounded-lg border border-slate-800 bg-slate-950/45 p-1.5">
+                    {presetImageResolutionOptions.map(option => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setImageResolution(option.value)}
+                        className={`min-h-8 rounded-md px-2 font-mono text-[10px] ${imageResolution === option.value ? "bg-blue-500/16 text-blue-100" : "text-slate-500"}`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {supportsCustomImageSize && (
+                  <button
+                    type="button"
+                    onClick={() => setImageResolution("custom")}
+                    className={`min-h-8 rounded-md border px-3 font-mono text-[10px] ${imageResolution === "custom" ? "bg-blue-500/16 text-blue-100" : "border-slate-800 bg-slate-950/45 text-slate-500"}`}
+                  >
+                    自定义尺寸
+                  </button>
+                )}
+              </>
+            )}
+            {imageResolution === "custom" && (
+              <input
+                value={customImageSize}
+                onChange={(event) => setCustomImageSize(event.target.value)}
+                placeholder="2560x1440"
+                className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 placeholder-slate-600 focus:border-blue-400/35 focus:outline-none"
+              />
+            )}
+            {imageCapabilities.qualities.length > 0 && (
               <div className="grid grid-cols-4 gap-1.5 rounded-lg border border-slate-800 bg-slate-950/45 p-1.5">
-                {imageCapabilities.imageSizes.map(option => (
+                {imageCapabilities.qualities.map(option => (
                   <button
                     key={option.value}
                     type="button"
-                    onClick={() => setImageSize(option.value)}
-                    className={`min-h-8 rounded-md px-2 font-mono text-[10px] ${imageSize === option.value ? "bg-blue-500/16 text-blue-100" : "text-slate-500"}`}
+                    onClick={() => setImageQuality(option.value)}
+                    className={`min-h-8 rounded-md px-2 font-mono text-[10px] ${imageQuality === option.value ? "bg-blue-500/16 text-blue-100" : "text-slate-500"}`}
                   >
                     {option.label}
                   </button>
@@ -1159,10 +1224,11 @@ export default function Home() {
                   <ImageGenerationPanel
                     atDropdownNode={atDropdown.visible && atDropdown.type === "image-prompt" ? renderAtDropdown("image-prompt") : null}
                     capabilities={imageCapabilities}
-                    customGptImageSize={customGptImageSize}
-                    imageSize={imageSize}
+                    customImageSize={customImageSize}
+                    imageQuality={imageQuality}
+                    imageResolution={imageResolution}
+                    imageResolutionOptions={imageResolutionOptions}
                     imageThinkingLevel={imageThinkingLevel}
-                    isGptImageModel={isGptImageModel}
                     isOptimizing={isOptimizing}
                     isSubmitting={isSubmittingImage}
                     modelGroups={imageModelGroups}
@@ -1178,9 +1244,10 @@ export default function Home() {
                       setReferenceImage(null);
                       setPrompt(removePromptReferenceTokens);
                     }}
-                    onCustomGptImageSizeChange={setCustomGptImageSize}
+                    onCustomImageSizeChange={setCustomImageSize}
                     onGenerate={generateManualImage}
-                    onImageSizeChange={setImageSize}
+                    onImageQualityChange={setImageQuality}
+                    onImageResolutionChange={setImageResolution}
                     onNegativePromptChange={setNegativePrompt}
                     onOptimizePrompt={optimizeActivePrompt}
                     onPromptChange={(value) => handleTextareaChange(value, "image-prompt")}
@@ -1189,7 +1256,7 @@ export default function Home() {
                     onReferenceDropFiles={(files) => handleReferenceDropFiles(files, "image-prompt")}
                     onReferenceRemove={removeReferenceImage}
                     onReferenceUpload={handleImageUpload}
-                    onSelectAspectRatio={setAspectRatio}
+                    onSelectAspectRatio={handleSelectImageAspectRatio}
                     onSelectModel={handleSelectImageModel}
                     onThinkingLevelChange={setImageThinkingLevel}
                   />

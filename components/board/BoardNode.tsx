@@ -1,0 +1,150 @@
+"use client";
+
+import { memo } from "react";
+import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
+import { Bot, ImagePlus, Trash2, Video } from "lucide-react";
+import type {
+  BoardAgentNode,
+  BoardGenerateNodeUpdate,
+  BoardNode as BoardNodeModel,
+  BoardPortKind,
+} from "@/lib/board";
+import AgentBoardNode from "@/components/board/AgentBoardNode";
+import AssetBoardNode from "@/components/board/AssetBoardNode";
+import GenerateBoardNode from "@/components/board/GenerateBoardNode";
+import NoteBoardNode from "@/components/board/NoteBoardNode";
+import PromptBoardNode from "@/components/board/PromptBoardNode";
+import { getModelCapability } from "@/lib/providers/model-catalog";
+
+export interface BoardFlowNodeData extends Record<string, unknown> {
+  node: BoardNodeModel;
+  onDelete: (nodeId: string) => void;
+  onExecuteGenerate: (nodeId: string) => void;
+  onSendAgent: (nodeId: string) => void;
+  onUpdateAgent: (nodeId: string, instruction: string) => void;
+  onUpdateGenerate: (nodeId: string, input: BoardGenerateNodeUpdate) => void;
+  onUpdateNote: (nodeId: string, body: string) => void;
+  onUpdatePrompt: (nodeId: string, prompt: string) => void;
+}
+
+export type BoardFlowNode = Node<BoardFlowNodeData, "board">;
+
+interface BoardHandleProps {
+  id: string;
+  kind: BoardPortKind;
+  label: string;
+  position: Position;
+  top?: number;
+  type: "source" | "target";
+}
+
+function nodeIcon(node: BoardNodeModel) {
+  if (node.kind === "image-generate") return <ImagePlus className="h-3.5 w-3.5 text-blue-300" />;
+  if (node.kind === "video-generate") return <Video className="h-3.5 w-3.5 text-violet-300" />;
+  if (node.kind === "agent") return <Bot className="h-3.5 w-3.5 text-purple-300" />;
+  return null;
+}
+
+function handleClass(kind: BoardPortKind): string {
+  if (kind === "prompt") return "!border-teal-200 !bg-teal-400";
+  if (kind === "agent") return "!border-purple-200 !bg-purple-400";
+  if (kind === "result") return "!border-emerald-200 !bg-emerald-400";
+  return "!border-blue-200 !bg-blue-400";
+}
+
+function BoardHandle({ id, kind, label, position, top, type }: BoardHandleProps) {
+  return (
+    <Handle
+      id={id}
+      type={type}
+      position={position}
+      className={`!h-4 !w-4 !border-2 !shadow-lg ${handleClass(kind)}`}
+      style={typeof top === "number" ? { top } : undefined}
+      title={label}
+    />
+  );
+}
+
+function supportsReferenceInput(node: BoardNodeModel): boolean {
+  if (node.kind !== "image-generate" && node.kind !== "video-generate") return false;
+  try {
+    return getModelCapability(node.model, node.kind === "image-generate" ? "image" : "video").supportsReferences;
+  } catch {
+    return false;
+  }
+}
+
+function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
+  const { node } = data;
+
+  return (
+    <article
+      className={`h-full overflow-visible rounded-lg border bg-slate-900 shadow-2xl ${
+        selected ? "border-amber-300 ring-2 ring-amber-400/25" : "border-slate-700"
+      }`}
+      style={{ height: node.size.height, width: node.size.width }}
+    >
+      {node.kind === "asset" && (
+        <>
+          <BoardHandle id="asset-in" type="target" position={Position.Left} kind="asset" label="asset input" />
+          <BoardHandle id="asset-out" type="source" position={Position.Right} kind="asset" label="asset output" />
+        </>
+      )}
+      {node.kind === "prompt" && (
+        <BoardHandle id="prompt-out" type="source" position={Position.Right} kind="prompt" label="prompt output" />
+      )}
+      {(node.kind === "image-generate" || node.kind === "video-generate") && (
+        <>
+          <BoardHandle id="prompt-in" type="target" position={Position.Left} kind="prompt" label="prompt input" top={78} />
+          {supportsReferenceInput(node) && <BoardHandle id="reference-in" type="target" position={Position.Left} kind="asset" label="reference input" top={126} />}
+          <BoardHandle id="result-out" type="source" position={Position.Right} kind="result" label="result output" />
+        </>
+      )}
+      {node.kind === "agent" && (
+        <>
+          <BoardHandle id="agent-context-in" type="target" position={Position.Left} kind="agent" label="agent context input" top={92} />
+          <BoardHandle id="agent-out" type="source" position={Position.Right} kind="agent" label="agent output" />
+        </>
+      )}
+
+      <div className="flex h-9 items-center justify-between gap-2 rounded-t-lg border-b border-slate-800 bg-slate-950 px-3">
+        <h2 className="flex min-w-0 items-center gap-2 truncate text-xs font-semibold text-slate-100">
+          {nodeIcon(node)}
+          <span className="truncate">{node.title}</span>
+        </h2>
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            data.onDelete(node.id);
+          }}
+          className="nodrag flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-slate-500 transition hover:bg-red-500/10 hover:text-red-300"
+          title="删除节点"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <div className="h-[calc(100%-2.25rem)] min-h-0 overflow-hidden rounded-b-lg">
+        {node.kind === "asset" && <AssetBoardNode node={node} />}
+        {node.kind === "prompt" && <PromptBoardNode node={node} onChange={prompt => data.onUpdatePrompt(node.id, prompt)} />}
+        {(node.kind === "image-generate" || node.kind === "video-generate") && (
+          <GenerateBoardNode
+            node={node}
+            onExecute={() => data.onExecuteGenerate(node.id)}
+            onUpdate={input => data.onUpdateGenerate(node.id, input)}
+          />
+        )}
+        {node.kind === "agent" && (
+          <AgentBoardNode
+            node={node as BoardAgentNode}
+            onSend={() => data.onSendAgent(node.id)}
+            onUpdate={(instruction) => data.onUpdateAgent(node.id, instruction)}
+          />
+        )}
+        {node.kind === "note" && <NoteBoardNode node={node} onChange={body => data.onUpdateNote(node.id, body)} />}
+      </div>
+    </article>
+  );
+}
+
+export default memo(BoardNode);

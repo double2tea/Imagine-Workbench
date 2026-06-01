@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getModelCapability, parseProviderModel } from "@/lib/providers/model-catalog";
+import { getVideoModelCapabilities, parseProviderModel } from "@/lib/providers/model-catalog";
 import { generateVideo } from "@/lib/providers/video";
 import { optionalText, requireText, resolveProviderConfig } from "@/lib/providers/utils";
 import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, getReferenceImagePayloadError } from "@/lib/reference-images";
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     const modelValue = optionalText(body.model) ?? "12ai:veo_3_1-fast";
     const parsed = parseProviderModel(modelValue, "12ai");
     const config = resolveProviderConfig(req, parsed.provider);
-    const capability = getModelCapability(modelValue, "video");
+    const capability = getVideoModelCapabilities(modelValue);
     const referenceImages = readReferenceImages(body.images, body.image, body.lastFrame);
     const payloadError = getReferenceImagePayloadError(referenceImages);
     if (payloadError) return NextResponse.json({ error: payloadError }, { status: 413 });

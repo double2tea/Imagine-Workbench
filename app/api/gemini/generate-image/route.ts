@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { parseProviderModel } from "@/lib/providers/model-catalog";
+import { getImageModelCapabilities, getImageResolutionOptions, parseProviderModel } from "@/lib/providers/model-catalog";
 import { generateImage } from "@/lib/providers/image";
 import { dataUriToBlob, optionalText, requireText, resolveProviderConfig } from "@/lib/providers/utils";
 import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, getReferenceImagePayloadError } from "@/lib/reference-images";
@@ -10,11 +10,14 @@ interface GenerateImageBody {
   prompt?: unknown;
   model?: unknown;
   aspectRatio?: unknown;
-  imageSize?: unknown;
+  imageResolution?: unknown;
+  imageQuality?: unknown;
   thinkingLevel?: unknown;
   referenceImage?: unknown;
   referenceImages?: unknown;
 }
+
+class ImageRequestValidationError extends Error {}
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,6 +28,9 @@ export async function POST(req: NextRequest) {
     const modelValue = optionalText(body.model) ?? "12ai:gemini-3.1-flash-image-preview";
     const parsed = parseProviderModel(modelValue, "12ai");
     const config = resolveProviderConfig(req, parsed.provider);
+    const aspectRatio = optionalText(body.aspectRatio) ?? "1:1";
+    const imageResolution = resolveImageResolution(modelValue, aspectRatio, optionalText(body.imageResolution));
+    const imageQuality = resolveImageQuality(modelValue, optionalText(body.imageQuality));
     const referenceImages = readReferenceImages(body.referenceImages, body.referenceImage);
     const payloadError = getReferenceImagePayloadError(referenceImages);
     if (payloadError) return NextResponse.json({ error: payloadError }, { status: 413 });
@@ -32,8 +38,9 @@ export async function POST(req: NextRequest) {
     const result = await generateImage(config, {
       prompt: requireText(body.prompt, "Prompt"),
       model: parsed.model,
-      aspectRatio: optionalText(body.aspectRatio) ?? "1:1",
-      imageSize: optionalText(body.imageSize) ?? "1K",
+      aspectRatio,
+      imageResolution,
+      imageQuality,
       thinkingLevel: optionalText(body.thinkingLevel),
       referenceImages: referenceImages.map(dataUri => ({ dataUri })),
       async: parsed.async,
@@ -53,9 +60,62 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to generate image";
+    if (err instanceof ImageRequestValidationError) {
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
     console.error("Image generation route error:", err);
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+function resolveImageResolution(modelValue: string, aspectRatio: string, imageResolution: string | undefined): string {
+  const options = getImageResolutionOptions(modelValue, aspectRatio);
+  if (options.length === 0) return imageResolution ?? "auto";
+  if (!imageResolution) {
+    throw new ImageRequestValidationError("imageResolution is required for this image model");
+  }
+  if (options.some(option => option.value === imageResolution)) return imageResolution;
+  if (options.some(option => option.value === "custom") && isValidCustomImageResolution(imageResolution, aspectRatio)) {
+    return imageResolution;
+  }
+  throw new ImageRequestValidationError(`Unsupported imageResolution "${imageResolution}" for aspectRatio "${aspectRatio}"`);
+}
+
+function resolveImageQuality(modelValue: string, imageQuality: string | undefined): string | undefined {
+  if (!imageQuality) return undefined;
+  const capabilities = getImageModelCapabilities(modelValue);
+  if (capabilities.qualities.some(option => option.value === imageQuality)) return imageQuality;
+  throw new ImageRequestValidationError(`Unsupported imageQuality "${imageQuality}" for this image model`);
+}
+
+function isValidCustomImageResolution(value: string, aspectRatio: string): boolean {
+  const match = value.match(/^(\d+)x(\d+)$/);
+  if (!match) return false;
+  const width = Number(match[1]);
+  const height = Number(match[2]);
+  if (width > 3840 || height > 3840) return false;
+  if (width % 16 !== 0 || height % 16 !== 0) return false;
+  const longSide = Math.max(width, height);
+  const shortSide = Math.min(width, height);
+  if (longSide / shortSide > 3) return false;
+  const pixels = width * height;
+  return pixels >= 655360 && pixels <= 8294400 && pixelSizeAspectRatio(width, height) === aspectRatio;
+}
+
+function pixelSizeAspectRatio(width: number, height: number): string {
+  const divisor = greatestCommonDivisor(width, height);
+  return `${width / divisor}:${height / divisor}`;
+}
+
+function greatestCommonDivisor(a: number, b: number): number {
+  let left = a;
+  let right = b;
+  while (right !== 0) {
+    const next = left % right;
+    left = right;
+    right = next;
+  }
+  return left;
 }
 
 function getRequestBodySizeError(req: NextRequest): string | null {

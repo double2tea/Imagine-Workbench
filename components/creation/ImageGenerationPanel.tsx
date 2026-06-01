@@ -14,10 +14,11 @@ interface ModelOptionGroup {
 interface ImageGenerationPanelProps {
   atDropdownNode: ReactNode;
   capabilities: ImageModelCapabilities;
-  customGptImageSize: string;
-  imageSize: string;
+  customImageSize: string;
+  imageQuality: string;
+  imageResolution: string;
+  imageResolutionOptions: ImageModelCapabilities["resolutions"];
   imageThinkingLevel: string;
-  isGptImageModel: boolean;
   isOptimizing: boolean;
   isSubmitting: boolean;
   modelGroups: ModelOptionGroup[];
@@ -29,9 +30,10 @@ interface ImageGenerationPanelProps {
   submitCount: number;
   onApplyPreset: (preset: VisualPreset) => void;
   onClearReferences: () => void;
-  onCustomGptImageSizeChange: (value: string) => void;
+  onCustomImageSizeChange: (value: string) => void;
   onGenerate: () => void;
-  onImageSizeChange: (value: string) => void;
+  onImageQualityChange: (value: string) => void;
+  onImageResolutionChange: (value: string) => void;
   onNegativePromptChange: (value: string) => void;
   onOptimizePrompt: () => void;
   onPromptChange: (value: string) => void;
@@ -48,10 +50,11 @@ interface ImageGenerationPanelProps {
 export default function ImageGenerationPanel({
   atDropdownNode,
   capabilities,
-  customGptImageSize,
-  imageSize,
+  customImageSize,
+  imageQuality,
+  imageResolution,
+  imageResolutionOptions,
   imageThinkingLevel,
-  isGptImageModel,
   isOptimizing,
   isSubmitting,
   modelGroups,
@@ -63,9 +66,10 @@ export default function ImageGenerationPanel({
   submitCount,
   onApplyPreset,
   onClearReferences,
-  onCustomGptImageSizeChange,
+  onCustomImageSizeChange,
   onGenerate,
-  onImageSizeChange,
+  onImageQualityChange,
+  onImageResolutionChange,
   onNegativePromptChange,
   onOptimizePrompt,
   onPromptChange,
@@ -78,6 +82,9 @@ export default function ImageGenerationPanel({
   onSelectModel,
   onThinkingLevelChange,
 }: ImageGenerationPanelProps) {
+  const presetResolutionOptions = imageResolutionOptions.filter(option => option.value !== "custom");
+  const supportsCustomImageSize = imageResolutionOptions.some(option => option.value === "custom");
+
   return (
     <div className="flex flex-col gap-3.5 animate-fade-in">
       <div>
@@ -187,7 +194,7 @@ export default function ImageGenerationPanel({
 
         <div>
           <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">
-            {isGptImageModel ? "输出分辨率" : "画面宽高比"} <span className="text-slate-500">(Size)</span>
+            画面宽高比 <span className="text-slate-500">(Aspect Ratio)</span>
           </label>
           <select
             value={selectedAspectRatio}
@@ -201,38 +208,75 @@ export default function ImageGenerationPanel({
         </div>
       </div>
 
-      {isGptImageModel && selectedAspectRatio === "custom" && (
-        <div>
-          <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">
-            自定义 GPT Image 2 分辨率
-          </label>
-          <input
-            type="text"
-            value={customGptImageSize}
-            onChange={(event) => onCustomGptImageSizeChange(event.target.value)}
-            placeholder="例如 2560x1440，宽高需为 16 的倍数"
-            className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 placeholder-slate-600 transition focus:border-blue-400/35 focus:outline-none"
-          />
-          <p className="mt-1.5 font-mono text-[10px] leading-relaxed text-slate-500">
-            约束：最大边 ≤ 3840px，宽高为 16 的倍数，比例 ≤ 3:1，总像素 655,360-8,294,400。
-          </p>
-        </div>
-      )}
-
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {capabilities.imageSizes.length > 0 && (
+        {imageResolutionOptions.length > 0 && (
           <div>
             <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">
-              {selectedModel.includes("gpt-image") ? "画质档位" : "高清合成分辨率"}
+              输出分辨率
+            </label>
+            {presetResolutionOptions.length > 0 && (
+              <div className="grid grid-cols-4 gap-1.5 rounded-lg border border-slate-800 bg-slate-950/45 p-1.5">
+                {presetResolutionOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => onImageResolutionChange(option.value)}
+                    className={`min-h-8 rounded-md px-2 font-mono text-[10px] transition cursor-pointer ${
+                      imageResolution === option.value
+                        ? "bg-blue-500/16 text-blue-100"
+                        : "text-slate-500 hover:bg-slate-900 hover:text-slate-300"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {supportsCustomImageSize && (
+              <div className="mt-2">
+                <button
+                  type="button"
+                  onClick={() => onImageResolutionChange("custom")}
+                  className={`min-h-8 rounded-md border px-3 font-mono text-[10px] transition cursor-pointer ${
+                    imageResolution === "custom"
+                      ? "bg-blue-500/16 text-blue-100"
+                      : "border-slate-800 bg-slate-950/45 text-slate-500 hover:bg-slate-900 hover:text-slate-300"
+                  }`}
+                >
+                  自定义尺寸
+                </button>
+              </div>
+            )}
+            {imageResolution === "custom" && (
+              <div className="mt-2">
+                <input
+                  type="text"
+                  value={customImageSize}
+                  onChange={(event) => onCustomImageSizeChange(event.target.value)}
+                  placeholder="例如 2560x1440，宽高需为 16 的倍数"
+                  className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 placeholder-slate-600 transition focus:border-blue-400/35 focus:outline-none"
+                />
+                <p className="mt-1.5 font-mono text-[10px] leading-relaxed text-slate-500">
+                  约束：最大边 ≤ 3840px，宽高为 16 的倍数，比例 ≤ 3:1，总像素 655,360-8,294,400。
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {capabilities.qualities.length > 0 && (
+          <div>
+            <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">
+              画质档位
             </label>
             <div className="grid grid-cols-4 gap-1.5 rounded-lg border border-slate-800 bg-slate-950/45 p-1.5">
-              {capabilities.imageSizes.map((option) => (
+              {capabilities.qualities.map((option) => (
                 <button
                   key={option.value}
                   type="button"
-                  onClick={() => onImageSizeChange(option.value)}
+                  onClick={() => onImageQualityChange(option.value)}
                   className={`min-h-8 rounded-md px-2 font-mono text-[10px] transition cursor-pointer ${
-                    imageSize === option.value
+                    imageQuality === option.value
                       ? "bg-blue-500/16 text-blue-100"
                       : "text-slate-500 hover:bg-slate-900 hover:text-slate-300"
                   }`}

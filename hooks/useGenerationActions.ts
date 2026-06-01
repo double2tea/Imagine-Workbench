@@ -3,23 +3,24 @@ import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePic
 import { readImageGenerationPayload } from "@/lib/client-image-response";
 import { saveToDB, type GenerationRequestSnapshot, type StorageItem } from "@/lib/db";
 import { buildPromptWithReferenceMap } from "@/hooks/useReferenceState";
-import type { VideoReferenceMode } from "@/lib/providers/model-catalog";
+import { getVideoModelCapabilities, type VideoReferenceMode } from "@/lib/providers/model-catalog";
 import { getReferenceImagePayloadError } from "@/lib/reference-images";
 
 type NoticeType = "error" | "info" | "success";
 
 interface UseGenerationActionsParams {
+  activeImageAspectRatio: string;
   activeImageModel: string;
-  activeImageSize: string;
+  activeImageQuality: string | undefined;
+  activeImageResolution: string;
   activeVideoDuration: string | undefined;
   activeVideoPreset: string | undefined;
   activeVideoResolution: string | undefined;
   activeVideoSize: string;
   buildProviderHeaders: (target?: string) => Record<string, string>;
   generationAbortControllersRef: MutableRefObject<Record<string, AbortController>>;
-  imageSize: string;
   imageThinkingLevel: string;
-  isGptImageModel: boolean;
+  isCustomImageResolution: boolean;
   locallyCanceledItemIdsRef: MutableRefObject<Set<string>>;
   prompt: string;
   pushWorkspaceNotice: (type: NoticeType, message: string) => void;
@@ -35,9 +36,19 @@ interface UseGenerationActionsParams {
 }
 
 interface GenerationOverrides {
+  boardNodeId?: string;
+  imageQuality?: string;
+  imageResolution?: string;
+  isCustomImageResolution?: boolean;
+  model?: string;
   prompt?: string;
   referenceImage?: string | null;
   referenceImages?: ReferenceImageRef[];
+  size?: string;
+  thinkingLevel?: string;
+  videoDuration?: string;
+  videoPreset?: string;
+  videoResolution?: string;
 }
 
 function makeClientId(prefix: string): string {
@@ -104,7 +115,7 @@ function buildVideoReferenceUrls(
   return urls.filter(url => url.length > 0).slice(0, maxCount);
 }
 
-function validateGptImageSize(size: string): string | null {
+function validateCustomImageSize(size: string, aspectRatio: string): string | null {
   if (size === "auto") return null;
   const match = size.match(/^(\d+)x(\d+)$/);
   if (!match) return "尺寸格式必须是 widthxheight，例如 2560x1440";
@@ -117,21 +128,39 @@ function validateGptImageSize(size: string): string | null {
   if (longSide / shortSide > 3) return "长短边比例不能超过 3:1";
   const pixels = width * height;
   if (pixels < 655360 || pixels > 8294400) return "总像素必须在 655,360 到 8,294,400 之间";
+  if (pixelSizeAspectRatio(width, height) !== aspectRatio) return `自定义尺寸比例必须匹配 ${aspectRatio}`;
   return null;
 }
 
+function pixelSizeAspectRatio(width: number, height: number): string {
+  const divisor = greatestCommonDivisor(width, height);
+  return `${width / divisor}:${height / divisor}`;
+}
+
+function greatestCommonDivisor(a: number, b: number): number {
+  let left = a;
+  let right = b;
+  while (right !== 0) {
+    const next = left % right;
+    left = right;
+    right = next;
+  }
+  return left;
+}
+
 export function useGenerationActions({
+  activeImageAspectRatio,
   activeImageModel,
-  activeImageSize,
+  activeImageQuality,
+  activeImageResolution,
   activeVideoDuration,
   activeVideoPreset,
   activeVideoResolution,
   activeVideoSize,
   buildProviderHeaders,
   generationAbortControllersRef,
-  imageSize,
   imageThinkingLevel,
-  isGptImageModel,
+  isCustomImageResolution,
   locallyCanceledItemIdsRef,
   prompt,
   pushWorkspaceNotice,
@@ -142,20 +171,24 @@ export function useGenerationActions({
   setImageSubmitCount,
   setItems,
   setVideoSubmitCount,
-  videoReferenceLimit,
-  videoReferenceMode,
 }: UseGenerationActionsParams) {
   const generateManualImage = async (overrides: GenerationOverrides = {}) => {
     const activePrompt = overrides.prompt ?? prompt;
     const activeReferenceImage = overrides.referenceImage ?? referenceImage;
     const activeReferenceImages = overrides.referenceImages ?? referenceImages;
+    const requestModel = overrides.model ?? activeImageModel;
+    const requestAspectRatio = overrides.size ?? activeImageAspectRatio;
+    const requestImageResolution = overrides.imageResolution ?? activeImageResolution;
+    const requestImageQuality = overrides.imageQuality ?? activeImageQuality;
+    const requestIsCustomImageResolution = overrides.isCustomImageResolution ?? isCustomImageResolution;
+    const requestThinkingLevel = overrides.thinkingLevel ?? imageThinkingLevel;
 
-    if (!activePrompt.trim()) return;
-    if (isGptImageModel) {
-      const sizeError = validateGptImageSize(activeImageSize);
+    if (!activePrompt.trim()) return false;
+    if (requestIsCustomImageResolution) {
+      const sizeError = validateCustomImageSize(requestImageResolution, requestAspectRatio);
       if (sizeError) {
-        pushWorkspaceNotice("error", `GPT Image 2 尺寸无效：${sizeError}`);
-        return;
+        pushWorkspaceNotice("error", `自定义图片尺寸无效：${sizeError}`);
+        return false;
       }
     }
     const imageReferenceUrls = activeReferenceImages.map(reference => reference.url);
@@ -165,18 +198,20 @@ export function useGenerationActions({
     const imagePayloadError = getReferenceImagePayloadError(imageReferenceUrls);
     if (imagePayloadError) {
       pushWorkspaceNotice("error", imagePayloadError);
-      return;
+      return false;
     }
     setImageSubmitCount(prev => prev + 1);
     const generationPrompt = buildPromptWithReferenceMap(activePrompt, activeReferenceImages, imageReferenceUrls);
     const generationRequest: GenerationRequestSnapshot = {
       prompt: generationPrompt,
-      model: activeImageModel,
-      aspectRatio: activeImageSize,
-      imageSize,
-      thinkingLevel: imageThinkingLevel,
+      model: requestModel,
+      aspectRatio: requestAspectRatio,
+      imageResolution: requestImageResolution,
+      imageQuality: requestImageQuality,
+      thinkingLevel: requestThinkingLevel,
       referenceImages: imageReferenceUrls,
     };
+    const displayedImageSize = /^\d+x\d+$/.test(requestImageResolution) ? requestImageResolution : requestAspectRatio;
 
     const tempId = makeClientId("temp_img");
     const newItem: StorageItem = {
@@ -184,12 +219,13 @@ export function useGenerationActions({
       type: "image",
       url: "https://picsum.photos/800/800",
       prompt: activePrompt,
-      model: activeImageModel,
-      aspectRatio: activeImageSize,
+      model: requestModel,
+      aspectRatio: displayedImageSize,
       createdAt: new Date().toISOString(),
       status: "pending",
       progress: 30,
       generationRequest,
+      sourceBoardNodeId: overrides.boardNodeId,
     };
 
     setItems(prev => [newItem, ...prev]);
@@ -198,7 +234,7 @@ export function useGenerationActions({
     generationAbortControllersRef.current[tempId] = controller;
 
     try {
-      const headers = buildProviderHeaders(selectedModel);
+      const headers = buildProviderHeaders(overrides.model ?? selectedModel);
 
       const res = await fetch("/api/gemini/generate-image", {
         method: "POST",
@@ -222,10 +258,10 @@ export function useGenerationActions({
           };
           if (!await saveItemOrWarn(compilingItem, pushWorkspaceNotice)) {
             setItems(prev => [compilingItem, ...prev.filter(item => item.id !== tempId)]);
-            return;
+            return true;
           }
           setItems(prev => [compilingItem, ...prev.filter(item => item.id !== tempId)]);
-          return;
+          return true;
         }
 
         const completedItem: StorageItem = {
@@ -241,7 +277,7 @@ export function useGenerationActions({
 
         if (!await saveItemOrWarn(completedItem, pushWorkspaceNotice)) {
           setItems(prev => [completedItem, ...prev.filter(item => item.id !== tempId)]);
-          return;
+          return true;
         }
         setItems(prev => [completedItem, ...prev.filter(item => item.id !== tempId)]);
       } else {
@@ -250,7 +286,7 @@ export function useGenerationActions({
     } catch (error) {
       if (locallyCanceledItemIdsRef.current.has(tempId) || isAbortError(error)) {
         locallyCanceledItemIdsRef.current.delete(tempId);
-        return;
+        return true;
       }
       console.error(error);
       const message = toErrorMessage(error, "图片生成失败");
@@ -263,38 +299,46 @@ export function useGenerationActions({
       await saveItemOrWarn(failedItem, pushWorkspaceNotice);
       setItems(prev => [failedItem, ...prev.filter(item => item.id !== tempId)]);
       pushWorkspaceNotice("error", message);
+      return true;
     } finally {
       delete generationAbortControllersRef.current[tempId];
       setImageSubmitCount(prev => Math.max(0, prev - 1));
     }
+    return true;
   };
 
   const generateManualVideo = async (overrides: GenerationOverrides = {}) => {
     const activePrompt = overrides.prompt ?? prompt;
     const activeReferenceImage = overrides.referenceImage ?? referenceImage;
     const activeReferenceImages = overrides.referenceImages ?? referenceImages;
+    const requestModel = overrides.model ?? selectedVideoModel;
+    const requestSize = overrides.size ?? activeVideoSize;
+    const requestVideoDuration = overrides.videoDuration ?? activeVideoDuration;
+    const requestVideoPreset = overrides.videoPreset ?? activeVideoPreset;
+    const requestVideoResolution = overrides.videoResolution ?? activeVideoResolution;
+    const requestVideoCapabilities = getVideoModelCapabilities(requestModel);
 
-    if (!activePrompt.trim()) return;
+    if (!activePrompt.trim()) return false;
     const videoReferenceUrls = buildVideoReferenceUrls(
       activeReferenceImages,
       activeReferenceImage,
-      videoReferenceMode,
-      videoReferenceLimit,
+      requestVideoCapabilities.referenceMode,
+      requestVideoCapabilities.maxReferenceImages,
     );
     const videoPayloadError = getReferenceImagePayloadError(videoReferenceUrls);
     if (videoPayloadError) {
       pushWorkspaceNotice("error", videoPayloadError);
-      return;
+      return false;
     }
     setVideoSubmitCount(prev => prev + 1);
     const generationPrompt = buildPromptWithReferenceMap(activePrompt, activeReferenceImages, videoReferenceUrls);
     const generationRequest: GenerationRequestSnapshot = {
       prompt: generationPrompt,
-      model: selectedVideoModel,
-      aspectRatio: activeVideoSize,
-      videoDurationSeconds: activeVideoDuration,
-      videoPreset: activeVideoPreset,
-      videoResolution: activeVideoResolution,
+      model: requestModel,
+      aspectRatio: requestSize,
+      videoDurationSeconds: requestVideoDuration,
+      videoPreset: requestVideoPreset,
+      videoResolution: requestVideoResolution,
       referenceImages: videoReferenceUrls,
     };
 
@@ -304,12 +348,13 @@ export function useGenerationActions({
       type: "video",
       url: "",
       prompt: activePrompt,
-      model: selectedVideoModel,
-      aspectRatio: activeVideoSize,
+      model: requestModel,
+      aspectRatio: requestSize,
       createdAt: new Date().toISOString(),
       status: "processing",
       progress: 12,
       generationRequest,
+      sourceBoardNodeId: overrides.boardNodeId,
     };
 
     setItems(prev => [newItem, ...prev]);
@@ -318,7 +363,7 @@ export function useGenerationActions({
     generationAbortControllersRef.current[tempId] = controller;
 
     try {
-      const headers = buildProviderHeaders(selectedVideoModel);
+      const headers = buildProviderHeaders(requestModel);
       const res = await fetch("/api/gemini/generate-video", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
@@ -350,7 +395,7 @@ export function useGenerationActions({
 
         if (!await saveItemOrWarn(compilingItem, pushWorkspaceNotice)) {
           setItems(prev => [compilingItem, ...prev.filter(item => item.id !== tempId)]);
-          return;
+          return true;
         }
         setItems(prev => [compilingItem, ...prev.filter(item => item.id !== tempId)]);
       } else {
@@ -359,7 +404,7 @@ export function useGenerationActions({
     } catch (error) {
       if (locallyCanceledItemIdsRef.current.has(tempId) || isAbortError(error)) {
         locallyCanceledItemIdsRef.current.delete(tempId);
-        return;
+        return true;
       }
       console.error(error);
       const message = toErrorMessage(error, "视频生成失败");
@@ -372,10 +417,12 @@ export function useGenerationActions({
       await saveItemOrWarn(failedItem, pushWorkspaceNotice);
       setItems(prev => [failedItem, ...prev.filter(item => item.id !== tempId)]);
       pushWorkspaceNotice("error", message);
+      return true;
     } finally {
       delete generationAbortControllersRef.current[tempId];
       setVideoSubmitCount(prev => Math.max(0, prev - 1));
     }
+    return true;
   };
 
   return {

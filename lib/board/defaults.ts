@@ -1,0 +1,51 @@
+import type { BoardDocument, BoardPoint, BoardSize, BoardViewport } from "@/lib/board/types";
+
+export const DEFAULT_BOARD_ID = "main";
+
+export const DEFAULT_BOARD_VIEWPORT: BoardViewport = {
+  x: 0,
+  y: 0,
+  zoom: 1,
+};
+
+export const DEFAULT_ASSET_NODE_SIZE: BoardSize = {
+  width: 320,
+  height: 280,
+};
+
+export const DEFAULT_NOTE_NODE_SIZE: BoardSize = {
+  width: 260,
+  height: 180,
+};
+
+export const DEFAULT_PROMPT_NODE_SIZE: BoardSize = {
+  width: 320,
+  height: 220,
+};
+
+export const DEFAULT_GENERATE_NODE_SIZE: BoardSize = {
+  width: 340,
+  height: 260,
+};
+
+export const DEFAULT_AGENT_NODE_SIZE: BoardSize = {
+  width: 320,
+  height: 220,
+};
+
+export const DEFAULT_NODE_POSITION: BoardPoint = {
+  x: 120,
+  y: 120,
+};
+
+export function createEmptyBoard(now: string = new Date().toISOString()): BoardDocument {
+  return {
+    id: DEFAULT_BOARD_ID,
+    title: "Board",
+    nodes: [],
+    edges: [],
+    viewport: DEFAULT_BOARD_VIEWPORT,
+    createdAt: now,
+    updatedAt: now,
+  };
+}

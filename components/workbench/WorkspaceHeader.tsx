@@ -1,4 +1,5 @@
-import { Moon, Settings, Sparkles, Sun, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { Grid2X2, Moon, Settings, Sparkles, Sun, Trash2 } from "lucide-react";
 
 export type ThemeMode = "light" | "dark";
 
@@ -31,6 +32,14 @@ export default function WorkspaceHeader({
       </div>
 
       <div className="flex shrink-0 items-center gap-2 z-10">
+        <Link
+          href="/board"
+          className="imagine-header-button flex h-9 items-center gap-1.5 rounded-lg border border-slate-700/80 bg-slate-900/80 px-3 text-xs font-semibold text-slate-200 transition hover:border-slate-600 hover:bg-slate-800"
+        >
+          <Grid2X2 className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">画板</span>
+        </Link>
+
         <button
           onClick={onOpenSettings}
           className="imagine-header-button flex h-9 items-center gap-1.5 rounded-lg border border-slate-700/80 bg-slate-900/80 px-3 text-xs font-semibold text-slate-200 transition hover:border-slate-600 hover:bg-slate-800 cursor-pointer"

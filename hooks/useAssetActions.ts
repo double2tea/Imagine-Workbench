@@ -13,7 +13,8 @@ interface RetryRequestBody {
   model: string;
   aspectRatio: string;
   durationSeconds?: string;
-  imageSize?: string;
+  imageQuality?: string;
+  imageResolution?: string;
   preset?: string;
   thinkingLevel?: string;
   resolutionName?: string;
@@ -84,7 +85,8 @@ function buildRetryRequestBody(item: StorageItem): RetryRequestBody {
   };
 
   if (item.type === "image") {
-    body.imageSize = request?.imageSize;
+    body.imageQuality = request?.imageQuality;
+    body.imageResolution = request?.imageResolution ?? request?.aspectRatio ?? item.aspectRatio;
     body.thinkingLevel = request?.thinkingLevel;
     body.referenceImage = referenceImages?.[0];
     body.referenceImages = referenceImages;

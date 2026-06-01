@@ -8,6 +8,7 @@ import {
   IMAGE_MODEL_OPTIONS,
   VIDEO_MODEL_OPTIONS,
   getImageModelCapabilities,
+  getImageResolutionOptions,
   getModelCapabilities,
   getModelCapability,
   getVideoModelCapabilities,
@@ -54,7 +55,7 @@ test("grok2api image references are limited to the edit model", () => {
 
   assert.equal(grokImage.supportsReferences, false);
   assert.equal(grokImageEdit.supportsReferences, true);
-  assert.deepEqual(grokImageEdit.sizes, [{ value: "1024x1024", label: "1024x1024" }]);
+  assert.deepEqual(grokImageEdit.sizes, [{ value: "1024x1024", label: "1K" }]);
 });
 
 test("unknown model capability fails fast", () => {
@@ -64,11 +65,14 @@ test("unknown model capability fails fast", () => {
   );
 });
 
-test("legacy image capability helper remains compatible", () => {
+test("image capability helper separates aspect ratios from requestable resolutions", () => {
   const capability = getImageModelCapabilities("grok2api:grok-imagine-image-edit");
 
-  assert.deepEqual(capability.aspectRatios, [{ value: "1024x1024", label: "1024x1024" }]);
-  assert.deepEqual(capability.imageSizes, []);
+  assert.deepEqual(capability.aspectRatios, [{ value: "1:1", label: "1:1 Square" }]);
+  assert.deepEqual(getImageResolutionOptions("grok2api:grok-imagine-image-edit", "1:1"), [
+    { value: "1024x1024", label: "1K" },
+  ]);
+  assert.deepEqual(capability.qualities, []);
   assert.deepEqual(capability.thinkingLevels, []);
 });
 
@@ -81,14 +85,40 @@ test("image model selector hides duplicate async variants", () => {
 test("gpt image 2 exposes common portrait and landscape sizes", () => {
   const capability = getModelCapability("12ai:gpt-image-2", "image");
 
-  assert.ok(capability.sizes.some(option => option.value === "1536x1024" && option.label.includes("3:2")));
-  assert.ok(capability.sizes.some(option => option.value === "1024x1536" && option.label.includes("2:3")));
-  assert.ok(capability.sizes.some(option => option.value === "2048x1536" && option.label.includes("4:3")));
-  assert.ok(capability.sizes.some(option => option.value === "1536x2048" && option.label.includes("3:4")));
-  assert.ok(capability.sizes.some(option => option.value === "3504x2336" && option.label.includes("3:2 4K")));
-  assert.ok(capability.sizes.some(option => option.value === "2336x3504" && option.label.includes("2:3 4K")));
-  assert.ok(capability.sizes.some(option => option.value === "3264x2448" && option.label.includes("4:3 4K")));
-  assert.ok(capability.sizes.some(option => option.value === "2448x3264" && option.label.includes("3:4 4K")));
+  assert.ok(capability.sizes.some(option => option.value === "1536x1024" && option.label === "1K"));
+  assert.ok(capability.sizes.some(option => option.value === "1024x1536" && option.label === "1K"));
+  assert.ok(capability.sizes.some(option => option.value === "2048x1536" && option.label === "2K"));
+  assert.ok(capability.sizes.some(option => option.value === "1536x2048" && option.label === "2K"));
+  assert.ok(capability.sizes.some(option => option.value === "2880x2880" && option.label === "4K"));
+  assert.ok(capability.sizes.some(option => option.value === "2560x1440" && option.label === "2.5K"));
+  assert.ok(capability.sizes.some(option => option.value === "3504x2336" && option.label === "4K"));
+  assert.ok(capability.sizes.some(option => option.value === "2336x3504" && option.label === "4K"));
+  assert.ok(capability.sizes.some(option => option.value === "3264x2448" && option.label === "4K"));
+  assert.ok(capability.sizes.some(option => option.value === "2448x3264" && option.label === "4K"));
+});
+
+test("image resolution labels hide pixel dimensions while keeping request values", () => {
+  assert.deepEqual(getImageResolutionOptions("12ai:gpt-image-2", "16:9"), [
+    { value: "auto", label: "Auto" },
+    { value: "2048x1152", label: "2K" },
+    { value: "2560x1440", label: "2.5K" },
+    { value: "3840x2160", label: "4K" },
+    { value: "custom", label: "自定义尺寸" },
+  ]);
+
+  assert.deepEqual(getImageResolutionOptions("12ai:gpt-image-2", "1:1"), [
+    { value: "auto", label: "Auto" },
+    { value: "1024x1024", label: "1K" },
+    { value: "2048x2048", label: "2K" },
+    { value: "2880x2880", label: "4K" },
+    { value: "custom", label: "自定义尺寸" },
+  ]);
+
+  const grokLandscapeLabels = getImageResolutionOptions("grok2api:grok-imagine-image", "16:9").map(
+    option => option.label,
+  );
+  assert.deepEqual(grokLandscapeLabels, ["720p"]);
+  assert.equal(grokLandscapeLabels.some(label => label.includes("x")), false);
 });
 
 test("agent chat defaults use 12AI Gemini 3.1 Flash Lite", () => {
