@@ -80,7 +80,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
 
   return (
     <article
-      className={`board-node-shell imagine-board-node h-full overflow-visible rounded-lg ${selected ? "imagine-board-node-selected" : ""}`}
+      className={`board-node-shell imagine-board-node h-full !overflow-visible !rounded-lg ${selected ? "imagine-board-node-selected" : ""}`}
       data-kind={node.kind}
       data-connecting={connectionInProgress ? "true" : "false"}
       data-selected={selected ? "true" : "false"}
