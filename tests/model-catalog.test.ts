@@ -144,14 +144,19 @@ test("video model selector exposes auto size", () => {
   assert.equal(VIDEO_MODEL_OPTIONS["12ai"].length > 0, true);
   const twelveAiVideo = getModelCapability("12ai:veo_3_1-fast", "video");
   const twelveAiFirstLastVideo = getModelCapability("12ai:veo_3_1-fast-fl", "video");
+  const twelveAiOmniVideo = getModelCapability("12ai:omni_flash-10s", "video");
   const grokVideo = getModelCapability("grok2api:grok-imagine-video", "video");
 
+  assert.equal(VIDEO_MODEL_OPTIONS["12ai"].some(option => option.value === "12ai:omni_flash-10s"), true);
   assert.equal(twelveAiVideo.sizes[0]?.value, "auto");
   assert.equal(twelveAiVideo.videoReferenceMode, "reference");
   assert.equal(twelveAiVideo.maxReferenceImages, 3);
   assert.equal(twelveAiFirstLastVideo.videoReferenceMode, "firstLast");
   assert.equal(twelveAiFirstLastVideo.minReferenceImages, 1);
   assert.equal(twelveAiFirstLastVideo.maxReferenceImages, 2);
+  assert.deepEqual(twelveAiOmniVideo.sizes.map(option => option.value), ["auto", "1280x720", "720x1280"]);
+  assert.equal(twelveAiOmniVideo.videoReferenceMode, "reference");
+  assert.equal(twelveAiOmniVideo.maxReferenceImages, 7);
   assert.equal(grokVideo.sizes[0]?.value, "auto");
   assert.equal(grokVideo.sizes.some(option => option.value === "1280x720" && option.label.includes("16:9")), true);
   assert.deepEqual(grokVideo.resolutions.map(option => option.value), ["720p", "480p"]);

@@ -34,6 +34,8 @@ interface VideoDeleteResponse {
 
 const VIDEO_SUCCESS_STATUSES = new Set(["complete", "completed", "succeeded", "success"]);
 const VIDEO_FAILED_STATUSES = new Set(["failed", "failure", "canceled", "cancelled", "expired"]);
+const TWELVE_AI_OMNI_VIDEO_MODEL = "omni_flash-10s";
+const TWELVE_AI_OMNI_TASK_PREFIX = "omni:";
 
 export async function generateVideo(config: ProviderConfig, input: GenerateVideoInput): Promise<GenerateVideoResult> {
   if (config.provider === "modelscope") {
@@ -71,18 +73,23 @@ export async function generateVideo(config: ProviderConfig, input: GenerateVideo
 
   input.referenceImages.forEach((reference, index) => {
     const blob = dataUriToBlob(reference.dataUri);
-    form.append("input_reference[]", blob, `reference_${index + 1}.png`);
+    form.append("input_reference[]", blob, referenceFileName(index, blob.type));
   });
 
+  const isTwelveAiOmni = config.provider === "12ai" && input.model === TWELVE_AI_OMNI_VIDEO_MODEL;
   const response = await postForm<VideoCreateResponse>(
-    `${config.provider === "12ai" ? config.videoBaseUrl : config.baseUrl}/v1/videos`,
+    `${getVideoBaseUrl(config, isTwelveAiOmni)}/v1/videos`,
     config,
     form,
   );
   if (!response.id) throw new Error("Video response did not include a task id");
 
   return {
-    operationName: mediaOperationName(config.provider, "video", response.id),
+    operationName: mediaOperationName(
+      config.provider,
+      "video",
+      isTwelveAiOmni ? `${TWELVE_AI_OMNI_TASK_PREFIX}${response.id}` : response.id,
+    ),
     source: input.model,
   };
 }
@@ -92,8 +99,9 @@ export async function getVideoStatus(config: ProviderConfig, taskId: string): Pr
     return getRunningHubMediaStatus(config, "video", taskId);
   }
 
-  const baseUrl = config.provider === "12ai" ? config.videoBaseUrl : config.baseUrl;
-  const response = await getJson<VideoStatusResponse>(`${baseUrl}/v1/videos/${encodeURIComponent(taskId)}`, config);
+  const task = parseVideoTaskId(config, taskId);
+  const baseUrl = getVideoBaseUrl(config, task.isTwelveAiOmni);
+  const response = await getJson<VideoStatusResponse>(`${baseUrl}/v1/videos/${encodeURIComponent(task.id)}`, config);
   const status = response.status?.toLowerCase() ?? "processing";
   if (VIDEO_FAILED_STATUSES.has(status)) {
     return {
@@ -124,11 +132,12 @@ export async function getVideoStatus(config: ProviderConfig, taskId: string): Pr
 }
 
 export async function downloadVideo(config: ProviderConfig, taskId: string): Promise<Response> {
-  const baseUrl = config.provider === "12ai" ? config.videoBaseUrl : config.baseUrl;
-  const status = await getJson<VideoStatusResponse>(`${baseUrl}/v1/videos/${encodeURIComponent(taskId)}`, config);
+  const task = parseVideoTaskId(config, taskId);
+  const baseUrl = getVideoBaseUrl(config, task.isTwelveAiOmni);
+  const status = await getJson<VideoStatusResponse>(`${baseUrl}/v1/videos/${encodeURIComponent(task.id)}`, config);
   const videoUrl =
     readVideoUrl(status) ??
-    (config.provider === "grok2api" ? `${baseUrl}/v1/videos/${encodeURIComponent(taskId)}/content` : undefined);
+    (config.provider === "grok2api" ? `${baseUrl}/v1/videos/${encodeURIComponent(task.id)}/content` : undefined);
   if (!videoUrl) throw new Error("Video task is complete but did not expose a video URL");
 
   const res = await fetch(videoUrl, {
@@ -146,11 +155,34 @@ export async function downloadVideo(config: ProviderConfig, taskId: string): Pro
 }
 
 export async function cancelVideo(config: ProviderConfig, taskId: string): Promise<void> {
-  const baseUrl = config.provider === "12ai" ? config.videoBaseUrl : config.baseUrl;
-  const response = await deleteJson<VideoDeleteResponse>(`${baseUrl}/v1/videos/${encodeURIComponent(taskId)}`, config);
+  const task = parseVideoTaskId(config, taskId);
+  const baseUrl = getVideoBaseUrl(config, task.isTwelveAiOmni);
+  const response = await deleteJson<VideoDeleteResponse>(`${baseUrl}/v1/videos/${encodeURIComponent(task.id)}`, config);
   if (response.success !== true) {
     throw new Error(response.message ?? "Video task cancel failed");
   }
+}
+
+function getVideoBaseUrl(config: ProviderConfig, isTwelveAiOmni: boolean): string {
+  if (config.provider !== "12ai") return config.baseUrl;
+  return isTwelveAiOmni ? config.baseUrl : config.videoBaseUrl;
+}
+
+function parseVideoTaskId(config: ProviderConfig, taskId: string): { id: string; isTwelveAiOmni: boolean } {
+  if (config.provider !== "12ai" || !taskId.startsWith(TWELVE_AI_OMNI_TASK_PREFIX)) {
+    return { id: taskId, isTwelveAiOmni: false };
+  }
+  return {
+    id: taskId.slice(TWELVE_AI_OMNI_TASK_PREFIX.length),
+    isTwelveAiOmni: true,
+  };
+}
+
+function referenceFileName(index: number, mimeType: string): string {
+  if (mimeType === "video/mp4") return `reference_${index + 1}.mp4`;
+  if (mimeType === "image/jpeg") return `reference_${index + 1}.jpg`;
+  if (mimeType === "image/webp") return `reference_${index + 1}.webp`;
+  return `reference_${index + 1}.png`;
 }
 
 function readVideoUrl(value: VideoStatusResponse): string | undefined {

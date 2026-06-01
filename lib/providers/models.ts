@@ -96,7 +96,7 @@ function matchesKind(model: string, kind: ModelKindFilter): boolean {
   if (kind === "chat") return isAgentCompatibleModelId(model);
   const lower = model.toLowerCase();
   if (kind === "video") {
-    return lower.includes("video") || lower.includes("veo") || lower.includes("-to-video");
+    return lower.includes("video") || lower.includes("veo") || lower.includes("-to-video") || lower.includes("omni_flash");
   }
   return lower.includes("image") || lower.includes("imagen") || lower.includes("imagine") || lower.includes("text-to-image");
 }

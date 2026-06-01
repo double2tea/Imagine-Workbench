@@ -103,7 +103,7 @@ function mergeRecordModelOptions(
 function classifyModelOption(option: ModelOption): ModelCategory {
   const parsed = parseProviderModel(option.value, "12ai");
   const model = parsed.model.toLowerCase();
-  if (model.includes("video") || model.includes("veo")) return "video";
+  if (model.includes("video") || model.includes("veo") || model.includes("omni_flash")) return "video";
   if (model.includes("image") || model.includes("imagen") || model.includes("imagine")) return "image";
   return "chat";
 }

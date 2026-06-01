@@ -213,6 +213,12 @@ const TWELVE_AI_VIDEO_SIZES: ParameterOption[] = [
   { value: "1080x1920", label: "1080x1920 Vertical" },
 ];
 
+const TWELVE_AI_OMNI_VIDEO_SIZES: ParameterOption[] = [
+  { value: "auto", label: "Auto (source/default)" },
+  { value: "1280x720", label: "1280x720 720p" },
+  { value: "720x1280", label: "720x1280 Vertical" },
+];
+
 const MODELSCOPE_IMAGE_SIZES: ParameterOption[] = [
   imageResolutionOption("1024x1024"),
   imageResolutionOption("1328x1328"),
@@ -355,6 +361,17 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     videoReferenceMode: "firstLast",
     maxReferenceImages: 2,
     minReferenceImages: 1,
+  }),
+  videoCapability({
+    value: "12ai:omni_flash-10s",
+    label: "12AI Omni Flash 10s",
+    provider: "12ai",
+    model: "omni_flash-10s",
+    supportsReferences: true,
+    sizes: TWELVE_AI_OMNI_VIDEO_SIZES,
+    videoReferenceMode: "reference",
+    maxReferenceImages: 7,
+    minReferenceImages: 0,
   }),
   videoCapability({
     value: "grok2api:grok-imagine-video",
@@ -708,6 +725,7 @@ export function isAgentCompatibleModelId(model: string): boolean {
   if (lower.includes("imagine")) return false;
   if (lower.includes("video")) return false;
   if (lower.includes("veo")) return false;
+  if (lower.includes("omni_flash")) return false;
   if (lower.includes("tts")) return false;
   if (lower.includes("audio")) return false;
   if (lower.includes("embedding")) return false;
