@@ -94,12 +94,12 @@ export async function generateVideo(config: ProviderConfig, input: GenerateVideo
   };
 }
 
-export async function getVideoStatus(config: ProviderConfig, taskId: string): Promise<MediaStatusResult> {
+export async function getVideoStatus(config: ProviderConfig, taskId: string, model?: string): Promise<MediaStatusResult> {
   if (config.provider === "runninghub") {
     return getRunningHubMediaStatus(config, "video", taskId);
   }
 
-  const task = parseVideoTaskId(config, taskId);
+  const task = parseVideoTaskId(config, taskId, model);
   const baseUrl = getVideoBaseUrl(config, task.isTwelveAiOmni);
   const response = await getJson<VideoStatusResponse>(`${baseUrl}/v1/videos/${encodeURIComponent(task.id)}`, config);
   const status = response.status?.toLowerCase() ?? "processing";
@@ -131,8 +131,8 @@ export async function getVideoStatus(config: ProviderConfig, taskId: string): Pr
   };
 }
 
-export async function downloadVideo(config: ProviderConfig, taskId: string): Promise<Response> {
-  const task = parseVideoTaskId(config, taskId);
+export async function downloadVideo(config: ProviderConfig, taskId: string, model?: string): Promise<Response> {
+  const task = parseVideoTaskId(config, taskId, model);
   const baseUrl = getVideoBaseUrl(config, task.isTwelveAiOmni);
   const status = await getJson<VideoStatusResponse>(`${baseUrl}/v1/videos/${encodeURIComponent(task.id)}`, config);
   const videoUrl =
@@ -168,14 +168,21 @@ function getVideoBaseUrl(config: ProviderConfig, isTwelveAiOmni: boolean): strin
   return isTwelveAiOmni ? config.baseUrl : config.videoBaseUrl;
 }
 
-function parseVideoTaskId(config: ProviderConfig, taskId: string): { id: string; isTwelveAiOmni: boolean } {
-  if (config.provider !== "12ai" || !taskId.startsWith(TWELVE_AI_OMNI_TASK_PREFIX)) {
+function parseVideoTaskId(config: ProviderConfig, taskId: string, model?: string): { id: string; isTwelveAiOmni: boolean } {
+  if (config.provider !== "12ai") {
     return { id: taskId, isTwelveAiOmni: false };
+  }
+  if (!taskId.startsWith(TWELVE_AI_OMNI_TASK_PREFIX)) {
+    return { id: taskId, isTwelveAiOmni: isTwelveAiOmniModel(model) };
   }
   return {
     id: taskId.slice(TWELVE_AI_OMNI_TASK_PREFIX.length),
     isTwelveAiOmni: true,
   };
+}
+
+function isTwelveAiOmniModel(model: string | undefined): boolean {
+  return model === TWELVE_AI_OMNI_VIDEO_MODEL || model === `12ai:${TWELVE_AI_OMNI_VIDEO_MODEL}`;
 }
 
 function referenceFileName(index: number, mimeType: string): string {

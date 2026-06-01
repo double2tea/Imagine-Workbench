@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAsyncImageStatus } from "@/lib/providers/image";
 import { getVideoStatus } from "@/lib/providers/video";
-import { parseMediaOperationName, requireText, resolveProviderConfig } from "@/lib/providers/utils";
+import { optionalText, parseMediaOperationName, requireText, resolveProviderConfig } from "@/lib/providers/utils";
 
 export const runtime = "edge";
 
 interface StatusBody {
   operationName?: unknown;
+  model?: unknown;
 }
 
 export async function POST(req: NextRequest) {
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest) {
     const result =
       operation.mediaType === "image"
         ? await getAsyncImageStatus(config, operation.id)
-        : await getVideoStatus(config, operation.id);
+        : await getVideoStatus(config, operation.id, optionalText(body.model));
 
     return NextResponse.json(result);
   } catch (err) {

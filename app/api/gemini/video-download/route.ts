@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { downloadVideo } from "@/lib/providers/video";
-import { parseMediaOperationName, requireText, resolveProviderConfig } from "@/lib/providers/utils";
+import { optionalText, parseMediaOperationName, requireText, resolveProviderConfig } from "@/lib/providers/utils";
 
 export const runtime = "edge";
 
 interface DownloadBody {
   operationName?: unknown;
+  model?: unknown;
 }
 
 export async function POST(req: NextRequest) {
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest) {
     }
 
     const config = resolveProviderConfig(req, operation.provider);
-    return await downloadVideo(config, operation.id);
+    return await downloadVideo(config, operation.id, optionalText(body.model));
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to download video file";
     console.error("Video proxy download failed:", err);

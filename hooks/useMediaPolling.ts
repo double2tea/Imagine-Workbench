@@ -94,7 +94,7 @@ export function useMediaPolling({
             const res = await fetch("/api/gemini/video-status", {
               method: "POST",
               headers: { "Content-Type": "application/json", ...headers },
-              body: JSON.stringify({ operationName: item.operationName }),
+              body: JSON.stringify({ operationName: item.operationName, model: item.model }),
             });
 
             if (!res.ok) {
@@ -133,7 +133,7 @@ export function useMediaPolling({
               const dlRes = await fetch(downloadEndpoint, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", ...headers },
-                body: JSON.stringify({ operationName: item.operationName }),
+                body: JSON.stringify({ operationName: item.operationName, model: item.model }),
               });
 
               if (dlRes.ok) {
