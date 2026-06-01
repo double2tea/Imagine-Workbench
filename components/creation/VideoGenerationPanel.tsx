@@ -93,9 +93,9 @@ export default function VideoGenerationPanel({
     Number(resolutionOptions.length > 0) + Number(durationOptions.length > 0) + Number(presetOptions.length > 0);
   const controlGridClass =
     extraControlCount >= 3
-      ? "sm:grid-cols-2 xl:grid-cols-5"
+      ? "sm:grid-cols-2 xl:grid-cols-3"
       : extraControlCount === 2
-        ? "sm:grid-cols-2 xl:grid-cols-4"
+        ? "sm:grid-cols-2"
         : extraControlCount === 1
           ? "sm:grid-cols-3"
           : "sm:grid-cols-2";
