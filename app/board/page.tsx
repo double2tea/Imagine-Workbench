@@ -915,7 +915,7 @@ export default function BoardPage() {
         onSendAgentNode={handleSendAgentNode}
         onToggleTheme={toggleThemeMode}
       >
-        <aside className="flex min-h-0 flex-col border-l border-slate-800 bg-slate-950">
+        <aside className="flex min-h-0 flex-col border-l border-[var(--iw-border)] bg-[var(--iw-panel)] text-[var(--iw-text)]">
           <BoardInspector
             imageModelGroups={imageModelGroups}
             incomingCount={selectedIncomingEdges.length}
@@ -932,10 +932,10 @@ export default function BoardPage() {
             onUpdateGenerate={boardController.updateGenerateNode}
           />
 
-          <div className="imagine-control-surface min-h-0 flex-1 overflow-y-auto p-3">
+          <div className="imagine-control-surface min-h-0 flex-1 overflow-y-auto !p-3">
             <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-xs font-semibold text-slate-200">项目资产</h2>
-              <span className="font-mono text-[10px] text-slate-500">{items.length}</span>
+              <h2 className="text-xs font-semibold text-[var(--iw-text)]">项目资产</h2>
+              <span className="font-mono text-[10px] text-[var(--iw-faint)]">{items.length}</span>
             </div>
             <div className="flex flex-col gap-2">
               {items.slice(0, 36).map(item => (
@@ -943,18 +943,18 @@ export default function BoardPage() {
                   key={item.id}
                   type="button"
                   onClick={() => addAssetToBoard(item)}
-                  className="grid grid-cols-[54px_1fr] gap-2 rounded-lg border border-slate-800 bg-slate-900/70 p-2 text-left transition hover:border-slate-700 hover:bg-slate-900"
+                  className="imagine-asset-card grid grid-cols-[54px_1fr] gap-2 !rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-2 text-left transition hover:border-[var(--iw-board-accent-amber)] hover:bg-[var(--iw-panel)]"
                 >
-                  <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-md bg-slate-950">
+                  <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg bg-[var(--iw-panel)]">
                     {item.type === "image" && item.status === "complete" ? (
                       <PreviewImage src={item.url} alt="" className="h-full w-full object-cover" />
                     ) : (
-                      <Video className="h-4 w-4 text-slate-500" />
+                      <Video className="h-4 w-4 text-[var(--iw-faint)]" />
                     )}
                   </div>
                   <span className="min-w-0">
-                    <span className="block truncate text-xs font-semibold text-slate-200">{item.prompt || item.model}</span>
-                    <span className="block truncate font-mono text-[10px] text-slate-500">{item.status} / {item.model}</span>
+                    <span className="block truncate text-xs font-semibold text-[var(--iw-text)]">{item.prompt || item.model}</span>
+                    <span className="block truncate font-mono text-[10px] text-[var(--iw-faint)]">{item.status} / {item.model}</span>
                   </span>
                 </button>
               ))}

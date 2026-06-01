@@ -43,6 +43,10 @@ interface BoardInspectorProps {
 }
 
 const DEFAULT_CUSTOM_IMAGE_RESOLUTION = "2560x1440";
+const inputClass = "imagine-board-input h-9 w-full !rounded-lg px-2 text-xs outline-none focus:border-[var(--iw-board-accent-amber)]";
+const monoInputClass = `${inputClass} font-mono`;
+const secondaryButtonClass = "imagine-secondary-action flex h-8 items-center justify-center !rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)] transition hover:bg-[var(--iw-panel)] hover:text-[var(--iw-text)]";
+const infoChipClass = "rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5 text-[11px] text-[var(--iw-muted)]";
 
 function isGenerateNode(node: BoardNode | undefined): node is BoardGenerateNode {
   return node?.kind === "image-generate" || node?.kind === "video-generate";
@@ -122,7 +126,7 @@ function ModelSelect({
   onChange: (value: string) => void;
 }) {
   return (
-    <select value={value} onChange={event => onChange(event.target.value)} className="h-9 w-full rounded-md border border-slate-800 bg-slate-900 px-2 text-xs text-slate-100 outline-none focus:border-slate-600">
+    <select value={value} onChange={event => onChange(event.target.value)} className={inputClass}>
       {groups.map(group => (
         <optgroup key={group.provider} label={group.label}>
           {group.options.map(option => (
@@ -137,7 +141,7 @@ function ModelSelect({
 function InspectorField({ children, title }: { children: ReactNode; title: string }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-[11px] font-semibold text-slate-500">{title}</span>
+      <span className="mb-1 block text-[11px] font-semibold text-[var(--iw-faint)]">{title}</span>
       {children}
     </label>
   );
@@ -174,7 +178,7 @@ function ImageGenerateInspector({
           <input
             value={node.model}
             onChange={event => onUpdateGenerate(node.id, imageModelPatch(event.target.value, node))}
-            className="h-9 w-full rounded-md border border-slate-800 bg-slate-900 px-2 font-mono text-xs text-slate-100 outline-none focus:border-slate-600"
+            className={monoInputClass}
           />
         </InspectorField>
       )}
@@ -184,8 +188,8 @@ function ImageGenerateInspector({
             value={node.imageResolution === "custom" ? "custom" : node.aspectRatio}
             onChange={event => onUpdateGenerate(node.id, imageAspectPatch(node.model, event.target.value, node))}
             disabled={node.imageResolution === "custom"}
-            className={`h-9 w-full rounded-md border border-slate-800 bg-slate-900 px-2 text-xs outline-none focus:border-slate-600 ${
-              node.imageResolution === "custom" ? "cursor-not-allowed text-slate-500 opacity-70" : "text-slate-100"
+            className={`${inputClass} ${
+              node.imageResolution === "custom" ? "cursor-not-allowed opacity-70" : ""
             }`}
           >
             {node.imageResolution === "custom" && <option value="custom">自定义尺寸决定比例</option>}
@@ -193,7 +197,7 @@ function ImageGenerateInspector({
           </select>
         </InspectorField>
         <InspectorField title="分辨率">
-          <select value={presetResolutionOptions.some(option => option.value === node.imageResolution) ? node.imageResolution : ""} onChange={event => onUpdateGenerate(node.id, { imageResolution: event.target.value })} className="h-9 w-full rounded-md border border-slate-800 bg-slate-900 px-2 text-xs text-slate-100 outline-none focus:border-slate-600">
+          <select value={presetResolutionOptions.some(option => option.value === node.imageResolution) ? node.imageResolution : ""} onChange={event => onUpdateGenerate(node.id, { imageResolution: event.target.value })} className={inputClass}>
             {!presetResolutionOptions.some(option => option.value === node.imageResolution) && <option value="">自定义尺寸</option>}
             {presetResolutionOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
@@ -203,7 +207,7 @@ function ImageGenerateInspector({
         <button
           type="button"
           onClick={() => onUpdateGenerate(node.id, { imageResolution: "custom" })}
-          className={`h-8 rounded-md border px-3 text-xs ${node.imageResolution === "custom" ? "border-blue-400/30 bg-blue-500/15 text-blue-100" : "border-slate-800 bg-slate-900 text-slate-400"}`}
+          className={`imagine-secondary-action h-8 !rounded-lg border px-3 text-xs ${node.imageResolution === "custom" ? "border-blue-400/30 bg-blue-500/15 text-blue-100" : "border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)]"}`}
         >
           自定义尺寸
         </button>
@@ -213,7 +217,7 @@ function ImageGenerateInspector({
           <input
             value={node.customImageResolution}
             onChange={event => onUpdateGenerate(node.id, { customImageResolution: event.target.value })}
-            className="h-9 w-full rounded-md border border-slate-800 bg-slate-900 px-2 font-mono text-xs text-slate-100 outline-none focus:border-slate-600"
+            className={monoInputClass}
           />
         </InspectorField>
       )}
@@ -221,24 +225,24 @@ function ImageGenerateInspector({
         <div className="grid grid-cols-2 gap-2">
           {capabilities.qualities.length > 0 && (
             <InspectorField title="质量">
-              <select value={node.imageQuality ?? ""} onChange={event => onUpdateGenerate(node.id, { imageQuality: event.target.value })} className="h-9 w-full rounded-md border border-slate-800 bg-slate-900 px-2 text-xs text-slate-100 outline-none focus:border-slate-600">
+              <select value={node.imageQuality ?? ""} onChange={event => onUpdateGenerate(node.id, { imageQuality: event.target.value })} className={inputClass}>
                 {capabilities.qualities.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </InspectorField>
           )}
           {capabilities.thinkingLevels.length > 0 && (
             <InspectorField title="Thinking">
-              <select value={node.thinkingLevel ?? ""} onChange={event => onUpdateGenerate(node.id, { thinkingLevel: event.target.value })} className="h-9 w-full rounded-md border border-slate-800 bg-slate-900 px-2 text-xs text-slate-100 outline-none focus:border-slate-600">
+              <select value={node.thinkingLevel ?? ""} onChange={event => onUpdateGenerate(node.id, { thinkingLevel: event.target.value })} className={inputClass}>
                 {capabilities.thinkingLevels.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </InspectorField>
           )}
         </div>
       )}
-      <p className="rounded-md border border-slate-800 bg-slate-900 px-2 py-1.5 text-[11px] text-slate-500">
+      <p className={infoChipClass}>
         参考图：{supportsReferences ? "支持" : "不支持"}
       </p>
-      <button type="button" onClick={() => onExecuteGenerate(node.id)} className="flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-blue-600 text-xs font-semibold text-white transition hover:bg-blue-500">
+      <button type="button" onClick={() => onExecuteGenerate(node.id)} className="imagine-primary-action flex !h-9 min-h-0 w-full items-center justify-center gap-2 !rounded-lg bg-blue-600 text-xs font-semibold text-white transition hover:bg-blue-500">
         <Play className="h-3.5 w-3.5" />
         执行图片节点
       </button>
@@ -270,12 +274,12 @@ function VideoGenerateInspector({
           <input
             value={node.model}
             onChange={event => onUpdateGenerate(node.id, videoModelPatch(event.target.value, node))}
-            className="h-9 w-full rounded-md border border-slate-800 bg-slate-900 px-2 font-mono text-xs text-slate-100 outline-none focus:border-slate-600"
+            className={monoInputClass}
           />
         </InspectorField>
       )}
       <InspectorField title="画幅 / 尺寸">
-        <select value={node.aspectRatio} onChange={event => onUpdateGenerate(node.id, { aspectRatio: event.target.value })} className="h-9 w-full rounded-md border border-slate-800 bg-slate-900 px-2 text-xs text-slate-100 outline-none focus:border-slate-600">
+        <select value={node.aspectRatio} onChange={event => onUpdateGenerate(node.id, { aspectRatio: event.target.value })} className={inputClass}>
           {capabilities.sizes.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
         </select>
       </InspectorField>
@@ -283,31 +287,31 @@ function VideoGenerateInspector({
         <div className="grid grid-cols-3 gap-2">
           {capabilities.durations.length > 0 && (
             <InspectorField title="时长">
-              <select value={node.videoDuration ?? ""} onChange={event => onUpdateGenerate(node.id, { videoDuration: event.target.value })} className="h-9 w-full rounded-md border border-slate-800 bg-slate-900 px-2 text-xs text-slate-100 outline-none focus:border-slate-600">
+              <select value={node.videoDuration ?? ""} onChange={event => onUpdateGenerate(node.id, { videoDuration: event.target.value })} className={inputClass}>
                 {capabilities.durations.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </InspectorField>
           )}
           {capabilities.resolutions.length > 0 && (
             <InspectorField title="清晰度">
-              <select value={node.videoResolution ?? ""} onChange={event => onUpdateGenerate(node.id, { videoResolution: event.target.value })} className="h-9 w-full rounded-md border border-slate-800 bg-slate-900 px-2 text-xs text-slate-100 outline-none focus:border-slate-600">
+              <select value={node.videoResolution ?? ""} onChange={event => onUpdateGenerate(node.id, { videoResolution: event.target.value })} className={inputClass}>
                 {capabilities.resolutions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </InspectorField>
           )}
           {capabilities.presets.length > 0 && (
             <InspectorField title="预设">
-              <select value={node.videoPreset ?? ""} onChange={event => onUpdateGenerate(node.id, { videoPreset: event.target.value })} className="h-9 w-full rounded-md border border-slate-800 bg-slate-900 px-2 text-xs text-slate-100 outline-none focus:border-slate-600">
+              <select value={node.videoPreset ?? ""} onChange={event => onUpdateGenerate(node.id, { videoPreset: event.target.value })} className={inputClass}>
                 {capabilities.presets.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </InspectorField>
           )}
         </div>
       )}
-      <p className="rounded-md border border-slate-800 bg-slate-900 px-2 py-1.5 text-[11px] text-slate-500">
+      <p className={infoChipClass}>
         参考图：{supportsReferences ? `${capabilities.referenceMode} / ${capabilities.maxReferenceImages}` : "不支持"}
       </p>
-      <button type="button" onClick={() => onExecuteGenerate(node.id)} className="flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-blue-600 text-xs font-semibold text-white transition hover:bg-blue-500">
+      <button type="button" onClick={() => onExecuteGenerate(node.id)} className="imagine-primary-action flex !h-9 min-h-0 w-full items-center justify-center gap-2 !rounded-lg bg-blue-600 text-xs font-semibold text-white transition hover:bg-blue-500">
         <Play className="h-3.5 w-3.5" />
         执行视频节点
       </button>
@@ -331,37 +335,37 @@ export default function BoardInspector({
   onUpdateGenerate,
 }: BoardInspectorProps) {
   return (
-    <div className="imagine-control-surface border-b border-slate-800 p-3">
+    <div className="imagine-control-surface border-b border-[var(--iw-border)] !p-3">
       <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-xs font-semibold text-slate-200">检查器</h2>
-        <button type="button" onClick={onOpenSettings} className="text-slate-500 hover:text-slate-200" title="设置">
+        <h2 className="text-xs font-semibold text-[var(--iw-text)]">检查器</h2>
+        <button type="button" onClick={onOpenSettings} className="text-[var(--iw-faint)] hover:text-[var(--iw-text)]" title="设置">
           <Settings className="h-3.5 w-3.5" />
         </button>
       </div>
       {node ? (
         <div className="space-y-3">
           <div>
-            <p className="truncate text-sm font-semibold text-slate-100">{node.title}</p>
-            <p className="font-mono text-[10px] text-slate-500">{node.kind}</p>
+            <p className="truncate text-sm font-semibold text-[var(--iw-text)]">{node.title}</p>
+            <p className="font-mono text-[10px] text-[var(--iw-faint)]">{node.kind}</p>
           </div>
-          <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-400">
-            <div className="rounded-md border border-slate-800 bg-slate-900 px-2 py-1.5">输入 {incomingCount}</div>
-            <div className="rounded-md border border-slate-800 bg-slate-900 px-2 py-1.5">输出 {outgoingCount}</div>
+          <div className="grid grid-cols-2 gap-2 text-[11px] text-[var(--iw-muted)]">
+            <div className="rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5">输入 {incomingCount}</div>
+            <div className="rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5">输出 {outgoingCount}</div>
           </div>
           {node.kind === "asset" && (
             <div className="space-y-2">
               <div className="grid grid-cols-3 gap-2">
-                <button type="button" onClick={() => onOpenFullscreen(items.find(item => item.id === node.asset.assetId) ?? null)} className="flex h-8 items-center justify-center rounded-lg border border-slate-800 bg-slate-900 text-slate-300">
+                <button type="button" onClick={() => onOpenFullscreen(items.find(item => item.id === node.asset.assetId) ?? null)} className={secondaryButtonClass}>
                   <Maximize2 className="h-3.5 w-3.5" />
                 </button>
-                <button type="button" onClick={() => onOpenMask(node.asset.url, node.asset.assetId)} className="flex h-8 items-center justify-center rounded-lg border border-slate-800 bg-slate-900 text-slate-300">
+                <button type="button" onClick={() => onOpenMask(node.asset.url, node.asset.assetId)} className={secondaryButtonClass}>
                   <Paintbrush className="h-3.5 w-3.5" />
                 </button>
-                <button type="button" onClick={onSendAssetToAgent} className="flex h-8 items-center justify-center rounded-lg border border-slate-800 bg-slate-900 text-slate-300">
+                <button type="button" onClick={onSendAssetToAgent} className={secondaryButtonClass}>
                   <Send className="h-3.5 w-3.5" />
                 </button>
               </div>
-              <button type="button" onClick={onSyncAssetReference} className="h-8 w-full rounded-lg border border-slate-800 bg-slate-900 text-[11px] font-semibold text-slate-300">
+              <button type="button" onClick={onSyncAssetReference} className={`${secondaryButtonClass} w-full text-[11px] font-semibold`}>
                 同步到传统参考槽
               </button>
             </div>
@@ -377,7 +381,7 @@ export default function BoardInspector({
           )}
         </div>
       ) : (
-        <p className="text-[11px] leading-5 text-slate-500">选择节点或连线后查看连接状态；生成与 Agent 动作优先在节点内执行。</p>
+        <p className="text-[11px] leading-5 text-[var(--iw-faint)]">选择节点或连线后查看连接状态；生成与 Agent 动作优先在节点内执行。</p>
       )}
     </div>
   );
