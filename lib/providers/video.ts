@@ -42,9 +42,13 @@ export async function generateVideo(config: ProviderConfig, input: GenerateVideo
   if (videoSize) form.set("size", videoSize);
 
   if (config.provider === "grok2api") {
-    form.set("seconds", "10");
-    form.set("resolution_name", "720p");
-    form.set("preset", "normal");
+    form.set("seconds", normalizeGrokVideoDuration(input.durationSeconds));
+    form.set("resolution_name", normalizeGrokVideoResolution(input.resolutionName));
+    form.set("preset", normalizeGrokVideoPreset(input.preset));
+  } else {
+    if (input.durationSeconds) form.set("seconds", input.durationSeconds);
+    if (input.resolutionName) form.set("resolution_name", input.resolutionName);
+    if (input.preset) form.set("preset", input.preset);
   }
 
   input.referenceImages.forEach((reference, index) => {
@@ -141,4 +145,22 @@ function readVideoUrl(value: VideoStatusResponse): string | undefined {
     }
   }
   return undefined;
+}
+
+function normalizeGrokVideoResolution(value: string | undefined): string {
+  if (value === undefined) return "720p";
+  if (value === "480p" || value === "720p") return value;
+  throw new Error("Grok2API video resolution must be 480p or 720p");
+}
+
+function normalizeGrokVideoDuration(value: string | undefined): string {
+  if (value === undefined) return "10";
+  if (value === "6" || value === "10" || value === "12" || value === "16" || value === "20") return value;
+  throw new Error("Grok2API video duration must be 6, 10, 12, 16, or 20 seconds");
+}
+
+function normalizeGrokVideoPreset(value: string | undefined): string {
+  if (value === undefined) return "normal";
+  if (value === "fun" || value === "normal" || value === "spicy" || value === "custom") return value;
+  throw new Error("Grok2API video preset must be fun, normal, spicy, or custom");
 }

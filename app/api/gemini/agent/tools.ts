@@ -354,9 +354,11 @@ function formatCapabilities(c: ProviderModelCapability): Record<string, unknown>
     aspectRatios: c.aspectRatios.map(a => a.value),
     sizes: c.sizes.map(s => s.value),
     thinkingLevels: c.thinkingLevels.map(t => t.value),
+    videoResolutions: c.resolutions.map(r => r.value),
+    videoDurations: c.durations.map(d => d.value),
+    videoPresets: c.presets.map(p => p.value),
     videoReferenceMode: c.videoReferenceMode,
     maxReferenceImages: c.maxReferenceImages,
     minReferenceImages: c.minReferenceImages,
   };
 }
-

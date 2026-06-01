@@ -2,7 +2,7 @@ import type { ChangeEvent, DragEvent, ReactNode } from "react";
 import { RefreshCw, Sparkles, Video as VideoIcon } from "lucide-react";
 import ReferenceImagePicker, { type ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import { type DraggedReferenceAsset, hasDraggedReferenceAsset } from "@/components/reference/referenceDrag";
-import type { ModelOption, VideoModelCapabilities, VideoReferenceMode } from "@/lib/providers/model-catalog";
+import type { ModelOption, ParameterOption, VideoModelCapabilities, VideoReferenceMode } from "@/lib/providers/model-catalog";
 
 interface ModelOptionGroup {
   provider: string;
@@ -17,6 +17,8 @@ interface VideoGenerationPanelProps {
   isOptimizing: boolean;
   isSubmitting: boolean;
   modelGroups: ModelOptionGroup[];
+  durationOptions: ParameterOption[];
+  presetOptions: ParameterOption[];
   prompt: string;
   promptPlaceholder: string;
   referenceHelp: string;
@@ -24,7 +26,11 @@ interface VideoGenerationPanelProps {
   referenceLabel: string;
   referenceLimit: number;
   referenceMode: VideoReferenceMode;
+  resolutionOptions: ParameterOption[];
+  selectedDuration: string;
   selectedModel: string;
+  selectedPreset: string;
+  selectedResolution: string;
   selectedSize: string;
   submitCount: number;
   onClearReferences: () => void;
@@ -37,7 +43,10 @@ interface VideoGenerationPanelProps {
   onReferenceRemove: (id: string) => void;
   onReferenceRoleChange: (id: string, role: ReferenceImageRef["role"]) => void;
   onReferenceUpload: (event: ChangeEvent<HTMLInputElement>) => void;
+  onSelectDuration: (value: string) => void;
+  onSelectResolution: (value: string) => void;
   onSelectModel: (value: string) => void;
+  onSelectPreset: (value: string) => void;
   onSelectSize: (value: string) => void;
 }
 
@@ -48,6 +57,8 @@ export default function VideoGenerationPanel({
   isOptimizing,
   isSubmitting,
   modelGroups,
+  durationOptions,
+  presetOptions,
   prompt,
   promptPlaceholder,
   referenceHelp,
@@ -55,7 +66,11 @@ export default function VideoGenerationPanel({
   referenceLabel,
   referenceLimit,
   referenceMode,
+  resolutionOptions,
+  selectedDuration,
   selectedModel,
+  selectedPreset,
+  selectedResolution,
   selectedSize,
   submitCount,
   onClearReferences,
@@ -68,9 +83,23 @@ export default function VideoGenerationPanel({
   onReferenceRemove,
   onReferenceRoleChange,
   onReferenceUpload,
+  onSelectDuration,
+  onSelectResolution,
   onSelectModel,
+  onSelectPreset,
   onSelectSize,
 }: VideoGenerationPanelProps) {
+  const extraControlCount =
+    Number(resolutionOptions.length > 0) + Number(durationOptions.length > 0) + Number(presetOptions.length > 0);
+  const controlGridClass =
+    extraControlCount >= 3
+      ? "sm:grid-cols-2 xl:grid-cols-5"
+      : extraControlCount === 2
+        ? "sm:grid-cols-2 xl:grid-cols-4"
+        : extraControlCount === 1
+          ? "sm:grid-cols-3"
+          : "sm:grid-cols-2";
+
   return (
     <div className="flex flex-col gap-3.5 animate-fade-in">
       <div>
@@ -119,7 +148,7 @@ export default function VideoGenerationPanel({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className={`grid grid-cols-1 gap-3 ${controlGridClass}`}>
         <div>
           <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">视频生成模型</label>
           <select
@@ -138,7 +167,7 @@ export default function VideoGenerationPanel({
         </div>
 
         <div>
-          <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">视频尺寸</label>
+          <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">画面比例</label>
           <select
             value={selectedSize}
             onChange={(event) => onSelectSize(event.target.value)}
@@ -149,6 +178,51 @@ export default function VideoGenerationPanel({
             ))}
           </select>
         </div>
+
+        {resolutionOptions.length > 0 && (
+          <div>
+            <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">分辨率</label>
+            <select
+              value={selectedResolution}
+              onChange={(event) => onSelectResolution(event.target.value)}
+              className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 transition focus:border-violet-400/35 focus:outline-none cursor-pointer"
+            >
+              {resolutionOptions.map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {durationOptions.length > 0 && (
+          <div>
+            <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">秒数</label>
+            <select
+              value={selectedDuration}
+              onChange={(event) => onSelectDuration(event.target.value)}
+              className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 transition focus:border-violet-400/35 focus:outline-none cursor-pointer"
+            >
+              {durationOptions.map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {presetOptions.length > 0 && (
+          <div>
+            <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">Preset</label>
+            <select
+              value={selectedPreset}
+              onChange={(event) => onSelectPreset(event.target.value)}
+              className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 transition focus:border-violet-400/35 focus:outline-none cursor-pointer"
+            >
+              {presetOptions.map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       <ReferenceImagePicker

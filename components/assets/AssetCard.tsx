@@ -15,6 +15,7 @@ import { useState, type DragEvent } from "react";
 import PreviewImage from "@/components/PreviewImage";
 import { makeReferenceDropToken, REFERENCE_ASSET_MIME } from "@/components/reference/referenceDrag";
 import type { StorageItem } from "@/lib/db";
+import { formatDisplayedAspectRatio } from "@/lib/media-display";
 import { parseProviderModel, type AiProvider } from "@/lib/providers/model-catalog";
 import { getProviderMeta } from "@/lib/providers/registry";
 
@@ -110,7 +111,7 @@ export default function AssetCard({
       data-status={item.status}
       data-type={item.type}
       onDragStart={handleDragStart}
-      className={`imagine-asset-card relative overflow-hidden rounded-2xl group border bg-slate-900 shadow-xl transition-all duration-300 flex flex-col ${
+      className={`imagine-asset-card relative flex h-full flex-col overflow-hidden rounded-2xl group border bg-slate-900 shadow-xl transition-all duration-300 ${
         selected ? "border-blue-500 ring-2 ring-blue-500/20" : "border-slate-850 hover:border-slate-750"
       }`}
     >
@@ -368,14 +369,14 @@ export default function AssetCard({
         )}
       </div>
 
-      <div className="imagine-asset-meta p-3.5 bg-[#0e0e12]">
+      <div className="imagine-asset-meta flex flex-1 flex-col p-3.5 bg-[#0e0e12]">
         <div>
-          <p className="text-[11px] text-slate-300 line-clamp-2 leading-relaxed font-sans" title={item.prompt}>
+          <p className="min-h-10 text-[11px] text-slate-300 line-clamp-2 leading-relaxed font-sans" title={item.prompt}>
             {item.prompt}
           </p>
-          {referenceUrls.length > 0 && (
-            <div className="mt-2 flex items-center gap-1.5">
-              <span className="shrink-0 font-mono text-[9px] text-slate-500">参考</span>
+          <div className="mt-2 flex h-11 items-center gap-1.5">
+            <span className="shrink-0 font-mono text-[9px] text-slate-500">参考</span>
+            {referenceUrls.length > 0 ? (
               <div className="no-scrollbar flex min-w-0 gap-1 overflow-x-auto">
                 {referenceUrls.map((url, index) => (
                   <button
@@ -384,19 +385,20 @@ export default function AssetCard({
                     onClick={() => onOpenReferencePreview(item, index)}
                     className="relative h-10 w-10 overflow-hidden rounded-md border border-white/10 bg-slate-950 transition hover:border-cyan-300/70 focus:outline-none focus:ring-2 focus:ring-cyan-400/40"
                     title={`点击放大参考图 ${index + 1}`}
-                  >
-                    <PreviewImage src={url} alt={`参考图 ${index + 1}`} className="h-full w-full object-cover" />
-                    <span className="absolute bottom-0.5 right-0.5 rounded bg-slate-950/80 p-0.5 text-white">
-                      <Maximize2 className="h-2.5 w-2.5" />
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+	                  >
+	                    <PreviewImage src={url} alt={`参考图 ${index + 1}`} className="h-full w-full object-cover" />
+	                  </button>
+	                ))}
+	              </div>
+            ) : (
+              <span className="rounded-md border border-dashed border-slate-800 px-2 py-1 font-mono text-[9px] text-slate-600">
+                无参考图
+              </span>
+            )}
+          </div>
         </div>
 
-        <div className="mt-3 pt-2.5 border-t border-slate-850 flex items-center justify-between">
+        <div className="mt-auto pt-2.5 border-t border-slate-850 flex items-center justify-between">
           <div className="flex flex-wrap items-center gap-1.5 text-[9px] font-mono text-slate-500">
             <span className="imagine-meta-chip bg-white/5 px-2 py-0.5 rounded text-[9px]">
               {getProviderMeta(provider).label}
@@ -404,7 +406,7 @@ export default function AssetCard({
             <span className="imagine-meta-chip bg-white/5 px-2 py-0.5 rounded text-[9px]" title={item.model}>
               🤖 {formatModelName(item.model)}
             </span>
-            <span className="imagine-meta-chip bg-white/5 px-2 py-0.5 rounded">📐 {item.aspectRatio}</span>
+            <span className="imagine-meta-chip bg-white/5 px-2 py-0.5 rounded">📐 {formatDisplayedAspectRatio(item)}</span>
             <span className="imagine-meta-chip imagine-status-chip bg-white/5 px-2 py-0.5 rounded">{item.status}</span>
             {item.errorMessage && (
               <span className="max-w-[160px] truncate rounded bg-red-500/10 px-2 py-0.5 text-red-300" title={item.errorMessage}>

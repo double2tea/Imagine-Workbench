@@ -36,6 +36,9 @@ export interface GenerateVideoInput {
   prompt: string;
   model: string;
   aspectRatio: string;
+  durationSeconds?: string;
+  preset?: string;
+  resolutionName?: string;
   referenceImages: ReferenceImage[];
 }
 

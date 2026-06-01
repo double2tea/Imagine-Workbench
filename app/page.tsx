@@ -113,6 +113,9 @@ export default function Home() {
   const [aspectRatio, setAspectRatio] = useState("1:1");
   const [imageSize, setImageSize] = useState("1K");
   const [imageThinkingLevel, setImageThinkingLevel] = useState("minimal");
+  const [videoDuration, setVideoDuration] = useState("10");
+  const [videoPreset, setVideoPreset] = useState("normal");
+  const [videoResolution, setVideoResolution] = useState("720p");
   const [customGptImageSize, setCustomGptImageSize] = useState("2560x1440");
   const [traditionalSubTab, setTraditionalSubTab] = useState<CreationMode>("image");
   const [isAgentDockOpen, setIsAgentDockOpen] = useState(false);
@@ -126,7 +129,9 @@ export default function Home() {
   };
 
   const {
-    assetDateFilter,
+    assetDateEnd,
+    assetDatePreset,
+    assetDateStart,
     assetModelFilter,
     assetStats,
     assetStatusFilter,
@@ -143,7 +148,9 @@ export default function Home() {
     searchableReferenceImages,
     selectedItemIdSet,
     selectedItemIds,
-    setAssetDateFilter,
+    setAssetDateEnd,
+    setAssetDatePreset,
+    setAssetDateStart,
     setAssetModelFilter,
     setAssetStatusFilter,
     setCancelingItemIds,
@@ -226,6 +233,15 @@ export default function Home() {
     ? `12ai-async:${parseProviderModel(selectedModel, selectedProvider).model}`
     : selectedModel;
   const activeVideoSize = videoCapabilities.sizes.some(option => option.value === aspectRatio) ? aspectRatio : "auto";
+  const activeVideoResolution = videoCapabilities.resolutions.some(option => option.value === videoResolution)
+    ? videoResolution
+    : undefined;
+  const activeVideoDuration = videoCapabilities.durations.some(option => option.value === videoDuration)
+    ? videoDuration
+    : undefined;
+  const activeVideoPreset = videoCapabilities.presets.some(option => option.value === videoPreset)
+    ? videoPreset
+    : undefined;
   const videoReferenceMode = videoCapabilities.referenceMode;
   const videoReferenceLimit = videoCapabilities.maxReferenceImages;
   const isFirstLastVideoMode = videoReferenceMode === "firstLast";
@@ -318,6 +334,9 @@ export default function Home() {
   } = useGenerationActions({
     activeImageModel,
     activeImageSize,
+    activeVideoDuration,
+    activeVideoPreset,
+    activeVideoResolution,
     activeVideoSize,
     buildProviderHeaders,
     generationAbortControllersRef,
@@ -396,6 +415,15 @@ export default function Home() {
     if (!capabilities.sizes.some(option => option.value === aspectRatio)) {
       setAspectRatio(capabilities.sizes[0]?.value ?? "auto");
     }
+    if (capabilities.resolutions.length > 0 && !capabilities.resolutions.some(option => option.value === videoResolution)) {
+      setVideoResolution(capabilities.resolutions[0].value);
+    }
+    if (capabilities.durations.length > 0 && !capabilities.durations.some(option => option.value === videoDuration)) {
+      setVideoDuration(capabilities.durations[0].value);
+    }
+    if (capabilities.presets.length > 0 && !capabilities.presets.some(option => option.value === videoPreset)) {
+      setVideoPreset(capabilities.presets[0].value);
+    }
   };
 
   const reuseTaskInComposer = (item: StorageItem) => {
@@ -435,6 +463,9 @@ export default function Home() {
     } else {
       handleSelectVideoModel(model);
       setAspectRatio(request?.aspectRatio ?? item.aspectRatio);
+      if (request?.videoDurationSeconds) setVideoDuration(request.videoDurationSeconds);
+      if (request?.videoPreset) setVideoPreset(request.videoPreset);
+      if (request?.videoResolution) setVideoResolution(request.videoResolution);
       setTraditionalSubTab("video");
     }
 
@@ -718,7 +749,9 @@ export default function Home() {
 
   const renderAssetGalleryWorkspace = () => (
     <AssetGalleryWorkspace
-      assetDateFilter={assetDateFilter}
+      assetDateEnd={assetDateEnd}
+      assetDatePreset={assetDatePreset}
+      assetDateStart={assetDateStart}
       assetModelFilter={assetModelFilter}
       assetStatusFilter={assetStatusFilter}
       cancelingItemIdSet={cancelingItemIdSet}
@@ -756,7 +789,9 @@ export default function Home() {
       }}
       onRetryItem={retryFailedItem}
       onReuseTask={reuseTaskInComposer}
-      onSetAssetDateFilter={setAssetDateFilter}
+      onSetAssetDateEnd={setAssetDateEnd}
+      onSetAssetDatePreset={setAssetDatePreset}
+      onSetAssetDateStart={setAssetDateStart}
       onSetAssetModelFilter={setAssetModelFilter}
       onSetAssetStatusFilter={setAssetStatusFilter}
       onSetCompareSliderPos={setCompareSliderPos}
@@ -1004,6 +1039,42 @@ export default function Home() {
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
+
+            {videoCapabilities.resolutions.length > 0 && (
+              <select
+                value={videoResolution}
+                onChange={(event) => setVideoResolution(event.target.value)}
+                className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 focus:border-violet-400/35 focus:outline-none"
+              >
+                {videoCapabilities.resolutions.map(option => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            )}
+
+            {videoCapabilities.durations.length > 0 && (
+              <select
+                value={videoDuration}
+                onChange={(event) => setVideoDuration(event.target.value)}
+                className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 focus:border-violet-400/35 focus:outline-none"
+              >
+                {videoCapabilities.durations.map(option => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            )}
+
+            {videoCapabilities.presets.length > 0 && (
+              <select
+                value={videoPreset}
+                onChange={(event) => setVideoPreset(event.target.value)}
+                className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 focus:border-violet-400/35 focus:outline-none"
+              >
+                {videoCapabilities.presets.map(option => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            )}
           </div>
         )}
       </details>
@@ -1102,9 +1173,11 @@ export default function Home() {
                     atDropdownNode={atDropdown.visible && atDropdown.type === "video-prompt" ? renderAtDropdown("video-prompt") : null}
                     capabilities={videoCapabilities}
                     clearReferenceLabel={videoClearReferenceLabel}
+                    durationOptions={videoCapabilities.durations}
                     isOptimizing={isOptimizing}
                     isSubmitting={isSubmittingVideo}
                     modelGroups={videoModelGroups}
+                    presetOptions={videoCapabilities.presets}
                     prompt={prompt}
                     promptPlaceholder={videoPromptPlaceholder}
                     referenceHelp={videoReferenceHelp}
@@ -1112,7 +1185,11 @@ export default function Home() {
                     referenceLabel={videoReferenceLabel}
                     referenceLimit={videoReferenceLimit}
                     referenceMode={videoReferenceMode}
+                    resolutionOptions={videoCapabilities.resolutions}
+                    selectedDuration={videoDuration}
                     selectedModel={selectedVideoModel}
+                    selectedPreset={videoPreset}
+                    selectedResolution={videoResolution}
                     selectedSize={aspectRatio}
                     submitCount={videoSubmitCount}
                     onClearReferences={() => {
@@ -1129,7 +1206,10 @@ export default function Home() {
                     onReferenceRemove={removeReferenceImage}
                     onReferenceRoleChange={(id, role) => toggleReferenceRole(id, role ?? "general")}
                     onReferenceUpload={handleImageUpload}
+                    onSelectDuration={setVideoDuration}
+                    onSelectResolution={setVideoResolution}
                     onSelectModel={handleSelectVideoModel}
+                    onSelectPreset={setVideoPreset}
                     onSelectSize={setAspectRatio}
                   />
                 )}

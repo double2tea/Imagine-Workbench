@@ -20,6 +20,9 @@ export interface ImageModelCapabilities {
 
 export interface VideoModelCapabilities {
   sizes: ParameterOption[];
+  resolutions: ParameterOption[];
+  durations: ParameterOption[];
+  presets: ParameterOption[];
   referenceMode: VideoReferenceMode;
   maxReferenceImages: number;
   minReferenceImages: number;
@@ -40,6 +43,9 @@ export interface ProviderModelCapability {
   sizes: ParameterOption[];
   thinkingLevels: ParameterOption[];
   qualityLevels: ParameterOption[];
+  resolutions: ParameterOption[];
+  durations: ParameterOption[];
+  presets: ParameterOption[];
   videoReferenceMode: VideoReferenceMode;
   maxReferenceImages: number;
   minReferenceImages: number;
@@ -124,12 +130,32 @@ const THINKING_LEVELS: ParameterOption[] = [
 ];
 
 const GROK_VIDEO_SIZES: ParameterOption[] = [
-  { value: "auto", label: "Auto (keep source)" },
-  { value: "720x1280", label: "720x1280 Vertical" },
-  { value: "1280x720", label: "1280x720 Landscape" },
-  { value: "1024x1024", label: "1024x1024 Square" },
-  { value: "1024x1792", label: "1024x1792 Portrait" },
-  { value: "1792x1024", label: "1792x1024 Landscape" },
+  { value: "auto", label: "Auto" },
+  { value: "720x1280", label: "9:16 Vertical" },
+  { value: "1280x720", label: "16:9 Landscape" },
+  { value: "1024x1024", label: "1:1 Square" },
+  { value: "1024x1792", label: "4:7 Portrait" },
+  { value: "1792x1024", label: "7:4 Landscape" },
+];
+
+const GROK_VIDEO_RESOLUTIONS: ParameterOption[] = [
+  { value: "720p", label: "720p" },
+  { value: "480p", label: "480p" },
+];
+
+const GROK_VIDEO_DURATIONS: ParameterOption[] = [
+  { value: "6", label: "6s" },
+  { value: "10", label: "10s" },
+  { value: "12", label: "12s" },
+  { value: "16", label: "16s" },
+  { value: "20", label: "20s" },
+];
+
+const GROK_VIDEO_PRESETS: ParameterOption[] = [
+  { value: "normal", label: "Normal" },
+  { value: "fun", label: "Fun" },
+  { value: "spicy", label: "Spicy" },
+  { value: "custom", label: "Custom" },
 ];
 
 const TWELVE_AI_VIDEO_SIZES: ParameterOption[] = [
@@ -267,6 +293,9 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     model: "grok-imagine-video",
     supportsReferences: true,
     sizes: GROK_VIDEO_SIZES,
+    resolutions: GROK_VIDEO_RESOLUTIONS,
+    durations: GROK_VIDEO_DURATIONS,
+    presets: GROK_VIDEO_PRESETS,
     videoReferenceMode: "reference",
     maxReferenceImages: 7,
     minReferenceImages: 0,
@@ -559,6 +588,9 @@ export function getVideoModelCapabilities(value: string): VideoModelCapabilities
   const capability = getKnownCapability(value, "video");
   return {
     sizes: capability?.sizes ?? TWELVE_AI_VIDEO_SIZES,
+    resolutions: capability?.resolutions ?? [],
+    durations: capability?.durations ?? [],
+    presets: capability?.presets ?? [],
     referenceMode: capability?.videoReferenceMode ?? "reference",
     maxReferenceImages: capability?.maxReferenceImages ?? 3,
     minReferenceImages: capability?.minReferenceImages ?? 0,
@@ -607,6 +639,9 @@ interface ImageCapabilityInput extends CapabilityInput {
 interface VideoCapabilityInput extends CapabilityInput {
   supportsReferences: boolean;
   sizes: ParameterOption[];
+  resolutions?: ParameterOption[];
+  durations?: ParameterOption[];
+  presets?: ParameterOption[];
   videoReferenceMode: VideoReferenceMode;
   maxReferenceImages: number;
   minReferenceImages: number;
@@ -625,6 +660,9 @@ function imageCapability(input: ImageCapabilityInput): ProviderModelCapability {
     sizes: input.sizes ?? [],
     thinkingLevels: input.thinkingLevels ?? [],
     qualityLevels: input.qualityLevels ?? [],
+    resolutions: [],
+    durations: [],
+    presets: [],
     videoReferenceMode: "none",
     maxReferenceImages: 0,
     minReferenceImages: 0,
@@ -644,6 +682,9 @@ function videoCapability(input: VideoCapabilityInput): ProviderModelCapability {
     sizes: input.sizes,
     thinkingLevels: [],
     qualityLevels: [],
+    resolutions: input.resolutions ?? [],
+    durations: input.durations ?? [],
+    presets: input.presets ?? [],
     videoReferenceMode: input.videoReferenceMode,
     maxReferenceImages: input.maxReferenceImages,
     minReferenceImages: input.minReferenceImages,
@@ -663,6 +704,9 @@ function chatCapability(input: CapabilityInput): ProviderModelCapability {
     sizes: [],
     thinkingLevels: [],
     qualityLevels: [],
+    resolutions: [],
+    durations: [],
+    presets: [],
     videoReferenceMode: "none",
     maxReferenceImages: 0,
     minReferenceImages: 0,

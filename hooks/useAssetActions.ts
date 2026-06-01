@@ -12,8 +12,11 @@ interface RetryRequestBody {
   prompt: string;
   model: string;
   aspectRatio: string;
+  durationSeconds?: string;
   imageSize?: string;
+  preset?: string;
   thinkingLevel?: string;
+  resolutionName?: string;
   referenceImage?: string;
   referenceImages?: string[];
   images?: string[];
@@ -86,6 +89,9 @@ function buildRetryRequestBody(item: StorageItem): RetryRequestBody {
     body.referenceImage = referenceImages?.[0];
     body.referenceImages = referenceImages;
   } else {
+    body.durationSeconds = request?.videoDurationSeconds;
+    body.preset = request?.videoPreset;
+    body.resolutionName = request?.videoResolution;
     body.images = referenceImages;
   }
 

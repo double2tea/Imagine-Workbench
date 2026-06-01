@@ -3,6 +3,7 @@ import { AnimatePresence } from "motion/react";
 import { useState } from "react";
 import PreviewImage from "@/components/PreviewImage";
 import type { StorageItem } from "@/lib/db";
+import { formatDisplayedAspectRatio } from "@/lib/media-display";
 
 interface FullscreenPreviewProps {
   item: StorageItem | null;
@@ -61,7 +62,7 @@ export default function FullscreenPreview({ item, onClose }: FullscreenPreviewPr
               <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-500">
                 <span className="font-mono">ID: {item.id}</span>
                 <span className="font-mono">模型: {item.model}</span>
-                <span className="font-mono">比例: {item.aspectRatio}</span>
+                <span className="font-mono">比例: {formatDisplayedAspectRatio(item)}</span>
                 <button
                   onClick={() => copyPrompt(item.id, item.prompt)}
                   className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-700 bg-slate-900 px-2.5 text-xs font-medium text-slate-200 transition hover:border-slate-500 hover:text-white"

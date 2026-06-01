@@ -11,6 +11,9 @@ type NoticeType = "error" | "info" | "success";
 interface UseGenerationActionsParams {
   activeImageModel: string;
   activeImageSize: string;
+  activeVideoDuration: string | undefined;
+  activeVideoPreset: string | undefined;
+  activeVideoResolution: string | undefined;
   activeVideoSize: string;
   buildProviderHeaders: (target?: string) => Record<string, string>;
   generationAbortControllersRef: MutableRefObject<Record<string, AbortController>>;
@@ -120,6 +123,9 @@ function validateGptImageSize(size: string): string | null {
 export function useGenerationActions({
   activeImageModel,
   activeImageSize,
+  activeVideoDuration,
+  activeVideoPreset,
+  activeVideoResolution,
   activeVideoSize,
   buildProviderHeaders,
   generationAbortControllersRef,
@@ -286,6 +292,9 @@ export function useGenerationActions({
       prompt: generationPrompt,
       model: selectedVideoModel,
       aspectRatio: activeVideoSize,
+      videoDurationSeconds: activeVideoDuration,
+      videoPreset: activeVideoPreset,
+      videoResolution: activeVideoResolution,
       referenceImages: videoReferenceUrls,
     };
 
@@ -318,6 +327,9 @@ export function useGenerationActions({
           prompt: generationRequest.prompt,
           images: videoReferenceUrls,
           aspectRatio: generationRequest.aspectRatio,
+          durationSeconds: generationRequest.videoDurationSeconds,
+          preset: generationRequest.videoPreset,
+          resolutionName: generationRequest.videoResolution,
           model: generationRequest.model,
         }),
       });

@@ -25,6 +25,9 @@ export interface GenerationRequestSnapshot {
   aspectRatio: string;
   imageSize?: string;
   thinkingLevel?: string;
+  videoDurationSeconds?: string;
+  videoPreset?: string;
+  videoResolution?: string;
   referenceImages?: string[];
 }
 

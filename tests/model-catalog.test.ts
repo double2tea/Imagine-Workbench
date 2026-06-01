@@ -123,6 +123,10 @@ test("video model selector exposes auto size", () => {
   assert.equal(twelveAiFirstLastVideo.minReferenceImages, 1);
   assert.equal(twelveAiFirstLastVideo.maxReferenceImages, 2);
   assert.equal(grokVideo.sizes[0]?.value, "auto");
+  assert.equal(grokVideo.sizes.some(option => option.value === "1280x720" && option.label.includes("16:9")), true);
+  assert.deepEqual(grokVideo.resolutions.map(option => option.value), ["720p", "480p"]);
+  assert.deepEqual(grokVideo.durations.map(option => option.value), ["6", "10", "12", "16", "20"]);
+  assert.deepEqual(grokVideo.presets.map(option => option.value), ["normal", "fun", "spicy", "custom"]);
   assert.equal(grokVideo.videoReferenceMode, "reference");
   assert.equal(grokVideo.maxReferenceImages, 7);
   assert.equal(getVideoModelCapabilities("12ai:veo_3_1-fast-fl").referenceMode, "firstLast");

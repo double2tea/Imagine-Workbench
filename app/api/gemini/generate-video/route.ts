@@ -10,6 +10,9 @@ interface GenerateVideoBody {
   prompt?: unknown;
   model?: unknown;
   aspectRatio?: unknown;
+  durationSeconds?: unknown;
+  preset?: unknown;
+  resolutionName?: unknown;
   image?: unknown;
   lastFrame?: unknown;
   images?: unknown;
@@ -34,6 +37,9 @@ export async function POST(req: NextRequest) {
       prompt: requireText(body.prompt, "Prompt"),
       model: parsed.model,
       aspectRatio: optionalText(body.aspectRatio) ?? "16:9",
+      durationSeconds: optionalText(body.durationSeconds),
+      preset: optionalText(body.preset),
+      resolutionName: optionalText(body.resolutionName),
       referenceImages: referenceImages.map(dataUri => ({ dataUri })),
     });
 
