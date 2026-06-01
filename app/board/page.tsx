@@ -11,6 +11,7 @@ import BoardWorkspace from "@/components/board/BoardWorkspace";
 import PreviewImage from "@/components/PreviewImage";
 import SettingsModal from "@/components/settings/SettingsModal";
 import WorkspaceNotices, { type WorkspaceNotice } from "@/components/workbench/WorkspaceNotices";
+import type { ThemeMode } from "@/components/workbench/WorkspaceHeader";
 import { useAgentController } from "@/hooks/useAgentController";
 import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
 import { useBoardState } from "@/hooks/useBoardState";
@@ -26,6 +27,7 @@ import { clearAllDB, getAllFromDB, type StorageItem } from "@/lib/db";
 import {
   DEFAULT_IMAGE_MODEL,
   DEFAULT_VIDEO_MODEL,
+  getImageAspectRatioFromResolution,
   getImageModelCapabilities,
   getImageResolutionOptions,
   getModelCapability,
@@ -168,6 +170,7 @@ export default function BoardPage() {
   const [agentInput, setAgentInput] = useState("");
   const [isAgentDockOpen, setIsAgentDockOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [themeMode, setThemeMode] = useState<ThemeMode>("light");
   const [, setIsOptimizing] = useState(false);
   const [imageSubmitCount, setImageSubmitCount] = useState(0);
   const [, setVideoSubmitCount] = useState(0);
@@ -221,6 +224,10 @@ export default function BoardPage() {
   const selectedImageProviderModel = parseProviderModel(selectedModel, selectedProvider);
   const canUseAsyncImageGeneration = supportsAsyncImageGeneration(selectedModel);
   const activeImageResolution = imageResolution === "custom" ? customImageSize.trim() : imageResolution;
+  const customImageAspectRatio = imageResolution === "custom"
+    ? getImageAspectRatioFromResolution(customImageSize.trim())
+    : null;
+  const activeImageAspectRatio = customImageAspectRatio ?? aspectRatio;
   const activeImageQuality = imageCapabilities.qualities.some(option => option.value === imageQuality) ? imageQuality : undefined;
   const activeImageModel = imageSubmitCount > 0 && canUseAsyncImageGeneration && selectedImageProviderModel.provider === "12ai"
     ? `12ai-async:${selectedImageProviderModel.model}`
@@ -291,7 +298,7 @@ export default function BoardPage() {
   });
 
   const { generateManualImage, generateManualVideo } = useGenerationActions({
-    activeImageAspectRatio: aspectRatio,
+    activeImageAspectRatio,
     activeImageModel,
     activeImageQuality,
     activeImageResolution,
@@ -814,6 +821,16 @@ export default function BoardPage() {
   }, [pushWorkspaceNotice]);
 
   useEffect(() => {
+    const restoreTheme = setTimeout(() => {
+      const stored = localStorage.getItem("imagine_theme_mode");
+      if (stored === "light" || stored === "dark") {
+        setThemeMode(stored);
+      }
+    }, 0);
+    return () => clearTimeout(restoreTheme);
+  }, []);
+
+  useEffect(() => {
     if (!loadedItemsRef.current) return;
     const known = knownItemIdsRef.current;
     const handledBoardItems = handledBoardItemIdsRef.current;
@@ -866,6 +883,14 @@ export default function BoardPage() {
     setItems([]);
   };
 
+  const toggleThemeMode = () => {
+    setThemeMode(prev => {
+      const next: ThemeMode = prev === "light" ? "dark" : "light";
+      localStorage.setItem("imagine_theme_mode", next);
+      return next;
+    });
+  };
+
   const selectedBoardNode = boardController.board.nodes.find(node => node.id === boardController.selectedNodeId);
   const selectedIncomingEdges = selectedBoardNode
     ? boardController.board.edges.filter(edge => edge.to.nodeId === selectedBoardNode.id)
@@ -878,15 +903,17 @@ export default function BoardPage() {
   const chatModelGroups = getProviderModelGroups(chatModelOptions);
 
   return (
-    <>
+    <div className={`imagine-workbench-shell imagine-theme-${themeMode}`}>
       <WorkspaceNotices notices={workspaceNotices} onDismiss={dismissWorkspaceNotice} />
       <BoardWorkspace
         controller={boardController}
+        themeMode={themeMode}
         onBack={() => router.push("/")}
         onConnectionError={(message) => pushWorkspaceNotice("error", message)}
         onExecuteGenerateNode={handleExecuteGenerateNode}
         onOpenSettings={() => setShowSettings(true)}
         onSendAgentNode={handleSendAgentNode}
+        onToggleTheme={toggleThemeMode}
       >
         <aside className="flex min-h-0 flex-col border-l border-slate-800 bg-slate-950">
           <BoardInspector
@@ -905,7 +932,7 @@ export default function BoardPage() {
             onUpdateGenerate={boardController.updateGenerateNode}
           />
 
-          <div className="min-h-0 flex-1 overflow-y-auto p-3">
+          <div className="imagine-control-surface min-h-0 flex-1 overflow-y-auto p-3">
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-xs font-semibold text-slate-200">项目资产</h2>
               <span className="font-mono text-[10px] text-slate-500">{items.length}</span>
@@ -950,7 +977,7 @@ export default function BoardPage() {
           isOpen={isAgentDockOpen}
           isOverContent={false}
           messages={agentMessages}
-          themeMode="dark"
+          themeMode={themeMode}
           onCancelCountdown={clearActiveCountdown}
           onChangeInput={setAgentInput}
           onClearChat={handleClearChat}
@@ -1007,6 +1034,6 @@ export default function BoardPage() {
           onSaveMask={saveMaskOutput}
         />
       )}
-    </>
+    </div>
   );
 }

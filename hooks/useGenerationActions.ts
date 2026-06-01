@@ -115,7 +115,7 @@ function buildVideoReferenceUrls(
   return urls.filter(url => url.length > 0).slice(0, maxCount);
 }
 
-function validateCustomImageSize(size: string, aspectRatio: string): string | null {
+function validateCustomImageSize(size: string): string | null {
   if (size === "auto") return null;
   const match = size.match(/^(\d+)x(\d+)$/);
   if (!match) return "尺寸格式必须是 widthxheight，例如 2560x1440";
@@ -128,8 +128,16 @@ function validateCustomImageSize(size: string, aspectRatio: string): string | nu
   if (longSide / shortSide > 3) return "长短边比例不能超过 3:1";
   const pixels = width * height;
   if (pixels < 655360 || pixels > 8294400) return "总像素必须在 655,360 到 8,294,400 之间";
-  if (pixelSizeAspectRatio(width, height) !== aspectRatio) return `自定义尺寸比例必须匹配 ${aspectRatio}`;
   return null;
+}
+
+function customImageSizeAspectRatio(size: string): string | null {
+  const match = size.match(/^(\d+)x(\d+)$/);
+  if (!match) return null;
+  const width = Number(match[1]);
+  const height = Number(match[2]);
+  if (width <= 0 || height <= 0) return null;
+  return pixelSizeAspectRatio(width, height);
 }
 
 function pixelSizeAspectRatio(width: number, height: number): string {
@@ -177,15 +185,18 @@ export function useGenerationActions({
     const activeReferenceImage = overrides.referenceImage ?? referenceImage;
     const activeReferenceImages = overrides.referenceImages ?? referenceImages;
     const requestModel = overrides.model ?? activeImageModel;
-    const requestAspectRatio = overrides.size ?? activeImageAspectRatio;
     const requestImageResolution = overrides.imageResolution ?? activeImageResolution;
     const requestImageQuality = overrides.imageQuality ?? activeImageQuality;
     const requestIsCustomImageResolution = overrides.isCustomImageResolution ?? isCustomImageResolution;
     const requestThinkingLevel = overrides.thinkingLevel ?? imageThinkingLevel;
+    const requestAspectRatio =
+      requestIsCustomImageResolution
+        ? customImageSizeAspectRatio(requestImageResolution) ?? (overrides.size ?? activeImageAspectRatio)
+        : overrides.size ?? activeImageAspectRatio;
 
     if (!activePrompt.trim()) return false;
     if (requestIsCustomImageResolution) {
-      const sizeError = validateCustomImageSize(requestImageResolution, requestAspectRatio);
+      const sizeError = validateCustomImageSize(requestImageResolution);
       if (sizeError) {
         pushWorkspaceNotice("error", `自定义图片尺寸无效：${sizeError}`);
         return false;

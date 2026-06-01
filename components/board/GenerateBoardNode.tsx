@@ -10,10 +10,10 @@ interface GenerateBoardNodeProps {
 }
 
 function statusText(node: GenerateNode): string {
-  if (node.status === "processing") return "Processing";
-  if (node.status === "complete") return "Complete";
-  if (node.status === "failed") return "Failed";
-  return node.kind === "image-generate" ? "Image" : "Video";
+  if (node.status === "processing") return "处理中";
+  if (node.status === "complete") return "已完成";
+  if (node.status === "failed") return "失败";
+  return node.kind === "image-generate" ? "图片" : "视频";
 }
 
 export default function GenerateBoardNode({ node, onExecute, onUpdate }: GenerateBoardNodeProps) {

@@ -28,8 +28,9 @@ export async function POST(req: NextRequest) {
     const modelValue = optionalText(body.model) ?? "12ai:gemini-3.1-flash-image-preview";
     const parsed = parseProviderModel(modelValue, "12ai");
     const config = resolveProviderConfig(req, parsed.provider);
-    const aspectRatio = optionalText(body.aspectRatio) ?? "1:1";
-    const imageResolution = resolveImageResolution(modelValue, aspectRatio, optionalText(body.imageResolution));
+    const requestImageResolution = optionalText(body.imageResolution);
+    const aspectRatio = customImageSizeAspectRatio(requestImageResolution) ?? optionalText(body.aspectRatio) ?? "1:1";
+    const imageResolution = resolveImageResolution(modelValue, aspectRatio, requestImageResolution);
     const imageQuality = resolveImageQuality(modelValue, optionalText(body.imageQuality));
     const referenceImages = readReferenceImages(body.referenceImages, body.referenceImage);
     const payloadError = getReferenceImagePayloadError(referenceImages);
@@ -100,6 +101,15 @@ function isValidCustomImageResolution(value: string, aspectRatio: string): boole
   if (longSide / shortSide > 3) return false;
   const pixels = width * height;
   return pixels >= 655360 && pixels <= 8294400 && pixelSizeAspectRatio(width, height) === aspectRatio;
+}
+
+function customImageSizeAspectRatio(value: string | undefined): string | null {
+  if (!value || !/^\d+x\d+$/.test(value)) return null;
+  const [widthText, heightText] = value.split("x");
+  const width = Number(widthText);
+  const height = Number(heightText);
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) return null;
+  return pixelSizeAspectRatio(width, height);
 }
 
 function pixelSizeAspectRatio(width: number, height: number): string {

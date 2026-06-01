@@ -51,7 +51,7 @@
 }
 
 .imagine-workbench-shell.imagine-theme-light {
-  --iw-bg: #f7f8fb;
+  --iw-bg: #eef3f8;
   --iw-header: rgba(255, 255, 255, 0.9);
   --iw-panel: rgba(255, 255, 255, 0.92);
   --iw-panel-solid: #ffffff;
@@ -61,6 +61,8 @@
   --iw-muted: #667085;
   --iw-faint: #98a2b3;
   --iw-card-shadow: 0 18px 48px rgba(15, 23, 42, 0.08);
+  background:
+    linear-gradient(180deg, #eef3f8 0%, #f8fafc 44%, #edf3f8 100%) !important;
   color-scheme: light;
 }
 
@@ -112,7 +114,7 @@
   [class*="bg-[#0b0d13]"],
   [class*="bg-slate-950"],
   [class*="bg-slate-900"]
-):not([style*="background-image"]):not(.imagine-asset-hover-scrim) {
+):not([style*="background-image"]):not(.imagine-asset-hover-scrim):not(.imagine-workbench-shell):not(.board-canvas) {
   background-color: var(--iw-panel-solid, #ffffff) !important;
   background-image: none !important;
 }
@@ -245,6 +247,74 @@
   color: #7e22ce !important;
 }
 
+/* Board light theme: Agent purple run button and blue execute buttons */
+.imagine-workbench-shell.imagine-theme-light [class*="bg-purple-500/15"],
+.imagine-workbench-shell.imagine-theme-light [class*="border-purple-400/30"] {
+  background-color: #f3e8ff !important;
+  border-color: rgba(124, 58, 237, 0.2) !important;
+  color: #6b21a8 !important;
+}
+
+.imagine-workbench-shell.imagine-theme-light [class*="bg-purple-500/15"]:hover {
+  background-color: #ede9fe !important;
+}
+
+.imagine-workbench-shell.imagine-theme-light .bg-blue-600 {
+  background-color: #4f46e5 !important;
+  color: #ffffff !important;
+}
+
+.imagine-workbench-shell.imagine-theme-light .bg-blue-600:hover {
+  background-color: #4338ca !important;
+}
+
+.imagine-workbench-shell.imagine-theme-light button[class*="bg-blue-600"]:disabled,
+.imagine-workbench-shell.imagine-theme-light button[class*="disabled:bg-slate-800"] {
+  background-color: #e2e8f0 !important;
+  color: #64748b !important;
+}
+
+/* Settings modal in light mode (better backdrop and internal panels) */
+.imagine-workbench-shell.imagine-theme-light > div.fixed.inset-0.z-50.flex {
+  background: rgba(15, 23, 42, 0.4) !important;
+}
+
+.imagine-workbench-shell.imagine-theme-light [class*="bg-red-950/20"],
+.imagine-workbench-shell.imagine-theme-light [class*="border-red-500/20"] {
+  background-color: #fef2f2 !important;
+  border-color: rgba(239, 68, 68, 0.2) !important;
+  color: #991b1b !important;
+}
+
+.imagine-workbench-shell.imagine-theme-light [class*="bg-amber-500/10"] {
+  background-color: #fffbeb !important;
+}
+
+.imagine-workbench-shell.imagine-theme-light [class*="bg-slate-950/45"],
+.imagine-workbench-shell.imagine-theme-light [class*="bg-slate-900/70"] {
+  background-color: #f8fafc !important;
+}
+
+.imagine-workbench-shell.imagine-theme-light [class*="bg-amber-500/15"] {
+  background-color: #fef3c7 !important;
+  color: #92400e !important;
+}
+
+.imagine-workbench-shell.imagine-theme-light [class*="bg-amber-500/15"]:hover {
+  background-color: #fde68a !important;
+}
+
+.imagine-workbench-shell.imagine-theme-light [class*="bg-slate-950/80"] {
+  background: rgba(15, 23, 42, 0.35) !important;
+}
+
+.imagine-workbench-shell.imagine-theme-light .flex.max-h-\[100dvh\].min-h-\[100dvh\].w-full.max-w-4xl,
+.imagine-workbench-shell.imagine-theme-light .flex.max-h-\[100dvh\].min-h-\[100dvh\].w-full {
+  background: #ffffff !important;
+  border-color: rgba(15, 23, 42, 0.1) !important;
+  color: #1e2937;
+}
+
 .imagine-workbench-shell.imagine-theme-light [class*="bg-amber-500/16"] {
   background-color: #fff3d7 !important;
   color: #92400e !important;
@@ -324,6 +394,219 @@
 .imagine-theme-dark .imagine-toolbar-surface {
   background:
     linear-gradient(180deg, rgba(17, 24, 39, 0.95), rgba(10, 14, 22, 0.95)) !important;
+}
+
+.board-node-handle {
+  --board-handle-scale: 0.72;
+  --board-handle-translate: translate(-50%, -50%);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.28);
+  opacity: 0 !important;
+  filter: saturate(0.8);
+  pointer-events: none !important;
+  transform: var(--board-handle-translate) scale(var(--board-handle-scale)) !important;
+  transition:
+    opacity 140ms ease,
+    filter 140ms ease,
+    box-shadow 140ms ease,
+    transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.board-node-handle.react-flow__handle-left {
+  --board-handle-translate: translate(-50%, -50%);
+}
+
+.board-node-handle.react-flow__handle-right {
+  --board-handle-translate: translate(50%, -50%);
+}
+
+.board-node-handle.react-flow__handle-top {
+  --board-handle-translate: translate(-50%, -50%);
+}
+
+.board-node-handle.react-flow__handle-bottom {
+  --board-handle-translate: translate(-50%, 50%);
+}
+
+.board-node-shell:is(:hover, :focus-within) .board-node-handle,
+.board-node-shell[data-selected="true"] .board-node-handle,
+.board-node-shell[data-connecting="true"] .board-node-handle.connectionindicator,
+.board-node-handle.connectingfrom,
+.board-node-handle.connectingto {
+  --board-handle-scale: 1;
+  opacity: 1 !important;
+  filter: saturate(1.1);
+}
+
+.board-node-shell:is(:hover, :focus-within) .board-node-handle.connectionindicator,
+.board-node-shell[data-selected="true"] .board-node-handle.connectionindicator,
+.board-node-shell[data-connecting="true"] .board-node-handle.connectionindicator,
+.board-node-handle.connectingfrom {
+  pointer-events: all !important;
+}
+
+.board-node-handle:hover {
+  --board-handle-scale: 1.16;
+}
+
+.board-node-handle.connectingfrom {
+  animation: imagine-board-handle-anchor 900ms ease-in-out infinite;
+  box-shadow:
+    0 0 0 4px rgba(96, 165, 250, 0.18),
+    0 0 20px rgba(96, 165, 250, 0.4) !important;
+}
+
+.board-node-shell[data-connecting="true"] .board-node-handle.connectionindicator:not(.connectingfrom) {
+  animation: imagine-board-handle-candidate 1200ms ease-in-out infinite;
+}
+
+.board-node-handle.connectingto.valid {
+  box-shadow:
+    0 0 0 5px rgba(45, 212, 191, 0.18),
+    0 0 22px rgba(45, 212, 191, 0.46) !important;
+}
+
+.board-node-handle.connectingto:not(.valid) {
+  box-shadow:
+    0 0 0 5px rgba(248, 113, 113, 0.14),
+    0 0 18px rgba(248, 113, 113, 0.32) !important;
+}
+
+.board-canvas .react-flow__connection-path {
+  animation: imagine-board-connection-dash 700ms linear infinite;
+  filter: drop-shadow(0 0 5px rgba(96, 165, 250, 0.5));
+}
+
+.board-canvas .react-flow__connection.valid .react-flow__connection-path {
+  stroke: #2dd4bf !important;
+  filter: drop-shadow(0 0 6px rgba(45, 212, 191, 0.52));
+}
+
+.board-canvas .react-flow__connection.invalid .react-flow__connection-path {
+  stroke: #f87171 !important;
+  filter: drop-shadow(0 0 6px rgba(248, 113, 113, 0.36));
+}
+
+.board-quick-insert-menu {
+  backdrop-filter: blur(18px);
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(2, 6, 23, 0.98)) !important;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 18px 44px rgba(2, 6, 23, 0.32),
+    0 36px 90px rgba(2, 6, 23, 0.28);
+  isolation: isolate;
+}
+
+.board-quick-insert-menu::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(45, 212, 191, 0.12), transparent 32%),
+    radial-gradient(circle at 82% 12%, rgba(96, 165, 250, 0.12), transparent 34%);
+  content: "";
+  pointer-events: none;
+}
+
+@keyframes imagine-board-handle-anchor {
+  0%,
+  100% {
+    filter: saturate(1.1) brightness(1);
+  }
+
+  50% {
+    filter: saturate(1.25) brightness(1.2);
+  }
+}
+
+@keyframes imagine-board-handle-candidate {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.08);
+  }
+
+  50% {
+    box-shadow: 0 0 0 6px rgba(45, 212, 191, 0.18);
+  }
+}
+
+@keyframes imagine-board-connection-dash {
+  to {
+    stroke-dashoffset: -12;
+  }
+}
+
+/* Board light theme optimizations: softer canvas for image observation, better node card separation */
+.imagine-workbench-shell.imagine-theme-light .board-canvas {
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.028), transparent 128px),
+    #e9eff6 !important;
+}
+
+.imagine-workbench-shell.imagine-theme-light .board-canvas .react-flow__pane {
+  background-color: #edf3f8 !important;
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.10) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.10) 1px, transparent 1px) !important;
+  background-size: 24px 24px;
+}
+
+.imagine-workbench-shell.imagine-theme-light article.rounded-lg.border.bg-slate-900 {
+  background: #ffffff !important;
+  border-color: rgba(15, 23, 42, 0.12) !important;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.04) !important;
+}
+
+.imagine-workbench-shell.imagine-theme-light article .flex.h-9.border-b.bg-slate-950 {
+  background: #f8fafc !important;
+  border-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+/* ReactFlow floating UI (Controls, MiniMap) in light board */
+.imagine-workbench-shell.imagine-theme-light .react-flow__panel {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border-color: rgba(15, 23, 42, 0.1) !important;
+}
+
+/* MiniMap specific light overrides (overcomes the !important dark classes on the element) */
+.imagine-workbench-shell.imagine-theme-light .board-canvas .react-flow__minimap {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: rgba(15, 23, 42, 0.12) !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06) !important;
+}
+
+.imagine-workbench-shell.imagine-theme-light .board-canvas .react-flow__edge-path {
+  stroke: #64748b !important;
+  opacity: 0.7;
+}
+
+/* Quick insert menu and toolbar refinements in light board */
+.imagine-workbench-shell.imagine-theme-light .board-quick-insert-menu {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.98)) !important;
+  border-color: rgba(15, 23, 42, 0.14) !important;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.86) inset,
+    0 18px 44px rgba(15, 23, 42, 0.12),
+    0 36px 90px rgba(15, 23, 42, 0.10);
+  color: #1e2937;
+}
+
+.imagine-workbench-shell.imagine-theme-light .board-quick-insert-menu button {
+  background: rgba(248, 250, 252, 0.9) !important;
+  border-color: rgba(15, 23, 42, 0.08) !important;
+  color: #172033 !important;
+}
+
+.imagine-workbench-shell.imagine-theme-light .board-quick-insert-menu button:hover {
+  background: #ffffff !important;
+  border-color: rgba(37, 99, 235, 0.18) !important;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.imagine-workbench-shell.imagine-theme-light .board-quick-insert-menu button span:first-child {
+  border-color: rgba(15, 23, 42, 0.08) !important;
 }
 
 .imagine-tabbar {

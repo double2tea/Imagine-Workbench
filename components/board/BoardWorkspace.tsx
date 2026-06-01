@@ -1,10 +1,19 @@
 "use client";
 
-import { useCallback, useMemo, type ReactNode } from "react";
+import { useCallback, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import {
+  Bot,
+  FileText,
+  ImagePlus,
+  MessageSquareText,
+  Video,
+  type LucideIcon,
+} from "lucide-react";
 import {
   Background,
   BackgroundVariant,
   ConnectionLineType,
+  ConnectionMode,
   Controls,
   MarkerType,
   MiniMap,
@@ -18,26 +27,59 @@ import {
   type OnEdgesDelete,
   type OnNodeDrag,
   type OnNodesDelete,
+  type ReactFlowInstance,
 } from "@xyflow/react";
 import type { BoardStateController } from "@/hooks/useBoardState";
 import BoardNode, { type BoardFlowNode } from "@/components/board/BoardNode";
 import BoardToolbar from "@/components/board/BoardToolbar";
-import type { BoardEdge, BoardEdgeKind, BoardNode as BoardNodeModel, BoardPortKind, BoardPortRef } from "@/lib/board";
+import type { ThemeMode } from "@/components/workbench/WorkspaceHeader";
+import {
+  DEFAULT_AGENT_NODE_SIZE,
+  DEFAULT_GENERATE_NODE_SIZE,
+  DEFAULT_NOTE_NODE_SIZE,
+  DEFAULT_PROMPT_NODE_SIZE,
+  type BoardEdge,
+  type BoardEdgeKind,
+  type BoardNode as BoardNodeModel,
+  type BoardPoint,
+  type BoardPortKind,
+  type BoardPortRef,
+  type BoardSize,
+} from "@/lib/board";
 import { DEFAULT_VIDEO_MODEL, getModelCapability } from "@/lib/providers/model-catalog";
 
 interface BoardWorkspaceProps {
   controller: BoardStateController;
   children?: ReactNode;
+  themeMode: ThemeMode;
   onBack: () => void;
   onConnectionError: (message: string) => void;
   onExecuteGenerateNode: (nodeId: string) => void;
   onOpenSettings: () => void;
   onSendAgentNode: (nodeId: string) => void;
+  onToggleTheme: () => void;
 }
 
 type BoardFlowEdge = Edge<{ kind: BoardEdgeKind }, "smoothstep">;
+type QuickInsertKind = "prompt" | "image-generate" | "video-generate" | "agent" | "note";
+type BoardHandleDirection = "input" | "output";
+
+interface QuickInsertMenu {
+  clientX: number;
+  clientY: number;
+  position: BoardPoint;
+}
 
 const nodeTypes = { board: BoardNode };
+const DEFAULT_BOARD_IMAGE_MODEL = "modelscope:Qwen/Qwen-Image";
+
+const quickInsertItems: Array<{ icon: LucideIcon; iconClassName: string; iconSurfaceClassName: string; kind: QuickInsertKind; label: string; size: BoardSize }> = [
+  { icon: MessageSquareText, iconClassName: "text-teal-300", iconSurfaceClassName: "bg-teal-500/10 border-teal-400/20", kind: "prompt", label: "提示", size: DEFAULT_PROMPT_NODE_SIZE },
+  { icon: ImagePlus, iconClassName: "text-blue-300", iconSurfaceClassName: "bg-blue-500/10 border-blue-400/20", kind: "image-generate", label: "图片", size: DEFAULT_GENERATE_NODE_SIZE },
+  { icon: Video, iconClassName: "text-violet-300", iconSurfaceClassName: "bg-violet-500/10 border-violet-400/20", kind: "video-generate", label: "视频", size: DEFAULT_GENERATE_NODE_SIZE },
+  { icon: Bot, iconClassName: "text-purple-300", iconSurfaceClassName: "bg-purple-500/10 border-purple-400/20", kind: "agent", label: "智能体", size: DEFAULT_AGENT_NODE_SIZE },
+  { icon: FileText, iconClassName: "text-amber-300", iconSurfaceClassName: "bg-amber-500/10 border-amber-400/20", kind: "note", label: "笔记", size: DEFAULT_NOTE_NODE_SIZE },
+];
 
 function portKindFromHandle(handleId: string | null | undefined): BoardPortKind | null {
   if (!handleId) return null;
@@ -45,6 +87,13 @@ function portKindFromHandle(handleId: string | null | undefined): BoardPortKind 
   if (handleId.startsWith("agent-")) return "agent";
   if (handleId.startsWith("result-")) return "result";
   if (handleId.startsWith("asset-") || handleId === "reference-in") return "asset";
+  return null;
+}
+
+function handleDirectionFromHandle(handleId: string | null | undefined): BoardHandleDirection | null {
+  if (!handleId) return null;
+  if (handleId.endsWith("-out")) return "output";
+  if (handleId.endsWith("-in") || handleId === "reference-in" || handleId === "agent-context-in") return "input";
   return null;
 }
 
@@ -56,11 +105,24 @@ function connectionPortRefs(connection: {
 }): { from: BoardPortRef; to: BoardPortRef } | null {
   const sourceKind = portKindFromHandle(connection.sourceHandle);
   const targetKind = portKindFromHandle(connection.targetHandle);
-  if (!connection.source || !connection.target || !connection.sourceHandle || !connection.targetHandle || !sourceKind || !targetKind) return null;
-  return {
-    from: { nodeId: connection.source, portId: connection.sourceHandle, portKind: sourceKind },
-    to: { nodeId: connection.target, portId: connection.targetHandle, portKind: targetKind },
-  };
+  const sourceDirection = handleDirectionFromHandle(connection.sourceHandle);
+  const targetDirection = handleDirectionFromHandle(connection.targetHandle);
+  if (
+    !connection.source ||
+    !connection.target ||
+    !connection.sourceHandle ||
+    !connection.targetHandle ||
+    !sourceKind ||
+    !targetKind ||
+    !sourceDirection ||
+    !targetDirection
+  ) return null;
+
+  const sourceRef: BoardPortRef = { nodeId: connection.source, portId: connection.sourceHandle, portKind: sourceKind };
+  const targetRef: BoardPortRef = { nodeId: connection.target, portId: connection.targetHandle, portKind: targetKind };
+  if (sourceDirection === "output" && targetDirection === "input") return { from: sourceRef, to: targetRef };
+  if (sourceDirection === "input" && targetDirection === "output") return { from: targetRef, to: sourceRef };
+  return null;
 }
 
 function isCompatiblePortConnection(refs: { from: BoardPortRef; to: BoardPortRef } | null): refs is { from: BoardPortRef; to: BoardPortRef } {
@@ -91,12 +153,17 @@ function edgeColor(kind: BoardEdge["kind"]): string {
 export default function BoardWorkspace({
   children,
   controller,
+  themeMode,
   onBack,
   onConnectionError,
   onExecuteGenerateNode,
   onOpenSettings,
   onSendAgentNode,
+  onToggleTheme,
 }: BoardWorkspaceProps) {
+  const flowInstanceRef = useRef<ReactFlowInstance<BoardFlowNode, BoardFlowEdge> | null>(null);
+  const flowHostRef = useRef<HTMLElement | null>(null);
+  const [quickInsertMenu, setQuickInsertMenu] = useState<QuickInsertMenu | null>(null);
   const {
     board,
     saveStatus,
@@ -217,34 +284,133 @@ export default function BoardWorkspace({
     for (const edge of edges) deleteEdge(edge.id);
   };
 
+  const flowPositionFromClient = useCallback((clientX: number, clientY: number): BoardPoint => {
+    const instance = flowInstanceRef.current;
+    if (instance) {
+      return instance.screenToFlowPosition({ x: clientX, y: clientY }, { snapToGrid: false });
+    }
+    const rect = flowHostRef.current?.getBoundingClientRect();
+    return {
+      x: ((clientX - (rect?.left ?? 0)) - board.viewport.x) / board.viewport.zoom,
+      y: ((clientY - (rect?.top ?? 0)) - board.viewport.y) / board.viewport.zoom,
+    };
+  }, [board.viewport]);
+
+  const centeredNodePosition = useCallback((point: BoardPoint, size: BoardSize): BoardPoint => ({
+    x: Math.round(point.x - size.width / 2),
+    y: Math.round(point.y - size.height / 2),
+  }), []);
+
+  const visibleCenterPosition = useCallback((size: BoardSize): BoardPoint | undefined => {
+    const rect = flowHostRef.current?.getBoundingClientRect();
+    if (!rect) return undefined;
+    const center = flowPositionFromClient(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    return centeredNodePosition(center, size);
+  }, [centeredNodePosition, flowPositionFromClient]);
+
+  const addQuickNode = useCallback((kind: QuickInsertKind, position: BoardPoint): string => {
+    if (kind === "prompt") return addPromptNode({ position });
+    if (kind === "agent") return addAgentNode({ position });
+    if (kind === "note") return addNoteNode({ position });
+    if (kind === "video-generate") {
+      return addGenerateNode({ kind: "video-generate", model: DEFAULT_VIDEO_MODEL, aspectRatio: "auto", position });
+    }
+    return addGenerateNode({
+      kind: "image-generate",
+      model: DEFAULT_BOARD_IMAGE_MODEL,
+      aspectRatio: "1:1",
+      imageResolution: "1024x1024",
+      position,
+    });
+  }, [addAgentNode, addGenerateNode, addNoteNode, addPromptNode]);
+
+  const addQuickNodeAtPoint = useCallback((kind: QuickInsertKind, point: BoardPoint): void => {
+    const item = quickInsertItems.find(current => current.kind === kind);
+    if (!item) return;
+    addQuickNode(kind, centeredNodePosition(point, item.size));
+    setQuickInsertMenu(null);
+  }, [addQuickNode, centeredNodePosition]);
+
+  const openQuickInsertMenu = useCallback((event: ReactMouseEvent | MouseEvent): void => {
+    event.preventDefault();
+    selectNode(null);
+    selectEdge(null);
+    setQuickInsertMenu({
+      clientX: event.clientX,
+      clientY: event.clientY,
+      position: flowPositionFromClient(event.clientX, event.clientY),
+    });
+  }, [flowPositionFromClient, selectEdge, selectNode]);
+
+  const handleFlowDoubleClick = useCallback((event: ReactMouseEvent<HTMLElement>): void => {
+    if (!(event.target instanceof Element) || !event.target.closest(".react-flow__pane")) return;
+    openQuickInsertMenu(event);
+  }, [openQuickInsertMenu]);
+
+  const addPromptAtCenter = useCallback(() => {
+    addPromptNode({ position: visibleCenterPosition(DEFAULT_PROMPT_NODE_SIZE) });
+  }, [addPromptNode, visibleCenterPosition]);
+
+  const addImageGenerateAtCenter = useCallback(() => {
+    addGenerateNode({
+      kind: "image-generate",
+      model: DEFAULT_BOARD_IMAGE_MODEL,
+      aspectRatio: "1:1",
+      imageResolution: "1024x1024",
+      position: visibleCenterPosition(DEFAULT_GENERATE_NODE_SIZE),
+    });
+  }, [addGenerateNode, visibleCenterPosition]);
+
+  const addVideoGenerateAtCenter = useCallback(() => {
+    addGenerateNode({
+      kind: "video-generate",
+      model: DEFAULT_VIDEO_MODEL,
+      aspectRatio: "auto",
+      position: visibleCenterPosition(DEFAULT_GENERATE_NODE_SIZE),
+    });
+  }, [addGenerateNode, visibleCenterPosition]);
+
+  const addAgentAtCenter = useCallback(() => {
+    addAgentNode({ position: visibleCenterPosition(DEFAULT_AGENT_NODE_SIZE) });
+  }, [addAgentNode, visibleCenterPosition]);
+
+  const addNoteAtCenter = useCallback(() => {
+    addNoteNode({ position: visibleCenterPosition(DEFAULT_NOTE_NODE_SIZE) });
+  }, [addNoteNode, visibleCenterPosition]);
+
   return (
-    <main className="flex h-screen min-h-0 flex-col bg-slate-950 text-slate-100">
+    <main className={`imagine-workbench-shell imagine-theme-${themeMode} flex h-screen min-h-0 flex-col bg-slate-950 text-slate-100`}>
       <BoardToolbar
         nodeCount={board.nodes.length}
         saveStatus={saveStatus}
-        onAddAgent={() => addAgentNode()}
-        onAddImageGenerate={() => addGenerateNode({ kind: "image-generate", model: "modelscope:Qwen/Qwen-Image", aspectRatio: "1:1", imageResolution: "1024x1024" })}
-        onAddNote={() => addNoteNode()}
-        onAddPrompt={() => addPromptNode()}
-        onAddVideoGenerate={() => addGenerateNode({ kind: "video-generate", model: DEFAULT_VIDEO_MODEL, aspectRatio: "auto" })}
+        themeMode={themeMode}
+        onAddAgent={addAgentAtCenter}
+        onAddImageGenerate={addImageGenerateAtCenter}
+        onAddNote={addNoteAtCenter}
+        onAddPrompt={addPromptAtCenter}
+        onAddVideoGenerate={addVideoGenerateAtCenter}
         onBack={onBack}
         onClear={clearBoard}
         onOpenSettings={onOpenSettings}
+        onToggleTheme={onToggleTheme}
       />
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <section className="min-h-0 bg-slate-950">
+        <section ref={flowHostRef} onDoubleClick={handleFlowDoubleClick} className="board-canvas relative min-h-0 bg-slate-950">
           <ReactFlow
             nodes={flowNodes}
             edges={flowEdges}
             nodeTypes={nodeTypes}
-            colorMode="dark"
+            colorMode={themeMode}
             defaultViewport={board.viewport}
             minZoom={0.25}
             maxZoom={1.8}
             fitView={board.nodes.length === 0}
             onlyRenderVisibleElements
             connectOnClick
+            connectionMode={ConnectionMode.Loose}
+            connectionRadius={28}
             connectionLineType={ConnectionLineType.SmoothStep}
+            connectionLineStyle={{ stroke: "#60a5fa", strokeDasharray: "7 5", strokeWidth: 2.5 }}
             defaultEdgeOptions={{ type: "smoothstep" }}
             deleteKeyCode={["Backspace", "Delete"]}
             isValidConnection={isValidBoardConnection}
@@ -257,26 +423,55 @@ export default function BoardWorkspace({
             onEdgeClick={handleEdgeClick}
             onEdgeDoubleClick={(_event, edge) => deleteEdge(edge.id)}
             onEdgesDelete={handleEdgesDelete}
+            onInit={(instance) => {
+              flowInstanceRef.current = instance;
+            }}
             onMoveEnd={(_event, viewport) => setViewport(viewport)}
             onNodeClick={handleNodeClick}
             onNodeDrag={handleNodeDrag}
             onNodesDelete={handleNodesDelete}
             onPaneClick={() => {
+              setQuickInsertMenu(null);
               selectNode(null);
               selectEdge(null);
             }}
+            onPaneContextMenu={openQuickInsertMenu}
             proOptions={{ hideAttribution: true }}
+            zoomOnDoubleClick={false}
           >
-            <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="rgba(148,163,184,0.32)" />
+            <Background variant={BackgroundVariant.Dots} gap={24} size={1} color={themeMode === "light" ? "rgba(148,163,184,0.25)" : "rgba(148,163,184,0.32)"} />
             <Controls className="!border-slate-700 !bg-slate-900 !text-slate-100" />
             <MiniMap
               className="!border !border-slate-800 !bg-slate-950"
-              nodeColor="#1d4ed8"
-              maskColor="rgba(2,6,23,0.66)"
+              nodeColor={themeMode === "light" ? "#1e40af" : "#1d4ed8"}
+              maskColor={themeMode === "light" ? "rgba(241, 245, 249, 0.75)" : "rgba(2,6,23,0.66)"}
               pannable
               zoomable
             />
           </ReactFlow>
+          {quickInsertMenu && (
+            <div
+              className="board-quick-insert-menu fixed z-50 grid w-44 gap-1.5 overflow-hidden rounded-xl border border-slate-800/80 p-2"
+              style={{ left: quickInsertMenu.clientX, top: quickInsertMenu.clientY }}
+            >
+              {quickInsertItems.map(item => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.kind}
+                    type="button"
+                    onClick={() => addQuickNodeAtPoint(item.kind, quickInsertMenu.position)}
+                    className="relative flex h-10 items-center gap-2.5 rounded-lg border border-white/5 bg-slate-900/70 px-2.5 text-left text-xs font-semibold text-slate-200 transition hover:border-slate-600 hover:bg-slate-800 hover:text-white"
+                  >
+                    <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border ${item.iconSurfaceClassName}`}>
+                      <Icon className={`h-3.5 w-3.5 ${item.iconClassName}`} />
+                    </span>
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </section>
         {children}
       </div>

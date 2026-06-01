@@ -84,6 +84,7 @@ export default function ImageGenerationPanel({
 }: ImageGenerationPanelProps) {
   const presetResolutionOptions = imageResolutionOptions.filter(option => option.value !== "custom");
   const supportsCustomImageSize = imageResolutionOptions.some(option => option.value === "custom");
+  const isCustomImageResolution = imageResolution === "custom";
 
   return (
     <div className="flex flex-col gap-3.5 animate-fade-in">
@@ -197,10 +198,14 @@ export default function ImageGenerationPanel({
             画面宽高比 <span className="text-slate-500">(Aspect Ratio)</span>
           </label>
           <select
-            value={selectedAspectRatio}
+            value={isCustomImageResolution ? "custom" : selectedAspectRatio}
             onChange={(event) => onSelectAspectRatio(event.target.value)}
-            className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 transition focus:border-blue-400/35 focus:outline-none cursor-pointer"
+            disabled={isCustomImageResolution}
+            className={`w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs transition focus:border-blue-400/35 focus:outline-none ${
+              isCustomImageResolution ? "cursor-not-allowed text-slate-500 opacity-70" : "cursor-pointer text-slate-200"
+            }`}
           >
+            {isCustomImageResolution && <option value="custom">自定义尺寸决定比例</option>}
             {capabilities.aspectRatios.map(option => (
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
@@ -222,7 +227,7 @@ export default function ImageGenerationPanel({
                     type="button"
                     onClick={() => onImageResolutionChange(option.value)}
                     className={`min-h-8 rounded-md px-2 font-mono text-[10px] transition cursor-pointer ${
-                      imageResolution === option.value
+                      isCustomImageResolution ? false : imageResolution === option.value
                         ? "bg-blue-500/16 text-blue-100"
                         : "text-slate-500 hover:bg-slate-900 hover:text-slate-300"
                     }`}
@@ -238,7 +243,7 @@ export default function ImageGenerationPanel({
                   type="button"
                   onClick={() => onImageResolutionChange("custom")}
                   className={`min-h-8 rounded-md border px-3 font-mono text-[10px] transition cursor-pointer ${
-                    imageResolution === "custom"
+                    isCustomImageResolution
                       ? "bg-blue-500/16 text-blue-100"
                       : "border-slate-800 bg-slate-950/45 text-slate-500 hover:bg-slate-900 hover:text-slate-300"
                   }`}
@@ -247,7 +252,7 @@ export default function ImageGenerationPanel({
                 </button>
               </div>
             )}
-            {imageResolution === "custom" && (
+            {isCustomImageResolution && (
               <div className="mt-2">
                 <input
                   type="text"
@@ -257,7 +262,7 @@ export default function ImageGenerationPanel({
                   className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 placeholder-slate-600 transition focus:border-blue-400/35 focus:outline-none"
                 />
                 <p className="mt-1.5 font-mono text-[10px] leading-relaxed text-slate-500">
-                  约束：最大边 ≤ 3840px，宽高为 16 的倍数，比例 ≤ 3:1，总像素 655,360-8,294,400。
+                  约束：最大边 ≤ 3840px，宽高为 16 的倍数，比例由尺寸决定且 ≤ 3:1，总像素 655,360-8,294,400。
                 </p>
               </div>
             )}

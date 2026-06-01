@@ -1,7 +1,7 @@
 "use client";
 
 import { memo } from "react";
-import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
+import { Handle, Position, useConnection, type Node, type NodeProps } from "@xyflow/react";
 import { Bot, ImagePlus, Trash2, Video } from "lucide-react";
 import type {
   BoardAgentNode,
@@ -58,7 +58,7 @@ function BoardHandle({ id, kind, label, position, top, type }: BoardHandleProps)
       id={id}
       type={type}
       position={position}
-      className={`!h-4 !w-4 !border-2 !shadow-lg ${handleClass(kind)}`}
+      className={`board-node-handle board-node-handle-${kind} !z-20 !h-5 !w-5 !border-2 ${handleClass(kind)}`}
       style={typeof top === "number" ? { top } : undefined}
       title={label}
     />
@@ -76,34 +76,37 @@ function supportsReferenceInput(node: BoardNodeModel): boolean {
 
 function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
   const { node } = data;
+  const connectionInProgress = useConnection(connection => connection.inProgress);
 
   return (
     <article
-      className={`h-full overflow-visible rounded-lg border bg-slate-900 shadow-2xl ${
+      className={`board-node-shell h-full overflow-visible rounded-lg border bg-slate-900 shadow-2xl ${
         selected ? "border-amber-300 ring-2 ring-amber-400/25" : "border-slate-700"
       }`}
+      data-connecting={connectionInProgress ? "true" : "false"}
+      data-selected={selected ? "true" : "false"}
       style={{ height: node.size.height, width: node.size.width }}
     >
       {node.kind === "asset" && (
         <>
-          <BoardHandle id="asset-in" type="target" position={Position.Left} kind="asset" label="asset input" />
-          <BoardHandle id="asset-out" type="source" position={Position.Right} kind="asset" label="asset output" />
+          <BoardHandle id="asset-in" type="target" position={Position.Left} kind="asset" label="资产输入" />
+          <BoardHandle id="asset-out" type="source" position={Position.Right} kind="asset" label="资产输出" />
         </>
       )}
       {node.kind === "prompt" && (
-        <BoardHandle id="prompt-out" type="source" position={Position.Right} kind="prompt" label="prompt output" />
+        <BoardHandle id="prompt-out" type="source" position={Position.Right} kind="prompt" label="提示输出" />
       )}
       {(node.kind === "image-generate" || node.kind === "video-generate") && (
         <>
-          <BoardHandle id="prompt-in" type="target" position={Position.Left} kind="prompt" label="prompt input" top={78} />
-          {supportsReferenceInput(node) && <BoardHandle id="reference-in" type="target" position={Position.Left} kind="asset" label="reference input" top={126} />}
-          <BoardHandle id="result-out" type="source" position={Position.Right} kind="result" label="result output" />
+          <BoardHandle id="prompt-in" type="target" position={Position.Left} kind="prompt" label="提示输入" top={78} />
+          {supportsReferenceInput(node) && <BoardHandle id="reference-in" type="target" position={Position.Left} kind="asset" label="参考输入" top={126} />}
+          <BoardHandle id="result-out" type="source" position={Position.Right} kind="result" label="结果输出" />
         </>
       )}
       {node.kind === "agent" && (
         <>
-          <BoardHandle id="agent-context-in" type="target" position={Position.Left} kind="agent" label="agent context input" top={92} />
-          <BoardHandle id="agent-out" type="source" position={Position.Right} kind="agent" label="agent output" />
+          <BoardHandle id="agent-context-in" type="target" position={Position.Left} kind="agent" label="Agent 上下文输入" top={92} />
+          <BoardHandle id="agent-out" type="source" position={Position.Right} kind="agent" label="Agent 输出" />
         </>
       )}
 

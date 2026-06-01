@@ -247,7 +247,11 @@ export default function Home() {
   } = useProviderSettings({ pushWorkspaceNotice });
 
   const imageCapabilities = getImageModelCapabilities(selectedModel);
-  const imageResolutionOptions = getImageResolutionOptions(selectedModel, aspectRatio);
+  const customImageAspectRatio = imageResolution === "custom"
+    ? getImageAspectRatioFromResolution(customImageSize.trim())
+    : null;
+  const activeImageAspectRatio = customImageAspectRatio ?? aspectRatio;
+  const imageResolutionOptions = getImageResolutionOptions(selectedModel, activeImageAspectRatio);
   const presetImageResolutionOptions = imageResolutionOptions.filter(option => option.value !== "custom");
   const supportsCustomImageSize = imageResolutionOptions.some(option => option.value === "custom");
   const videoCapabilities = getVideoModelCapabilities(selectedVideoModel);
@@ -360,7 +364,7 @@ export default function Home() {
     generateManualImage,
     generateManualVideo,
   } = useGenerationActions({
-    activeImageAspectRatio: aspectRatio,
+    activeImageAspectRatio,
     activeImageModel,
     activeImageQuality,
     activeImageResolution,
@@ -1042,10 +1046,14 @@ export default function Home() {
               </select>
 
               <select
-                value={aspectRatio}
+                value={imageResolution === "custom" ? "custom" : aspectRatio}
                 onChange={(event) => handleSelectImageAspectRatio(event.target.value)}
-                className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 focus:border-blue-400/35 focus:outline-none"
+                disabled={imageResolution === "custom"}
+                className={`w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs focus:border-blue-400/35 focus:outline-none ${
+                  imageResolution === "custom" ? "cursor-not-allowed text-slate-500 opacity-70" : "text-slate-200"
+                }`}
               >
+                {imageResolution === "custom" && <option value="custom">自定义尺寸决定比例</option>}
                 {imageCapabilities.aspectRatios.map(option => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
@@ -1061,7 +1069,7 @@ export default function Home() {
                         key={option.value}
                         type="button"
                         onClick={() => setImageResolution(option.value)}
-                        className={`min-h-8 rounded-md px-2 font-mono text-[10px] ${imageResolution === option.value ? "bg-blue-500/16 text-blue-100" : "text-slate-500"}`}
+                        className={`min-h-8 rounded-md px-2 font-mono text-[10px] ${imageResolution !== "custom" && imageResolution === option.value ? "bg-blue-500/16 text-blue-100" : "text-slate-500"}`}
                       >
                         {option.label}
                       </button>

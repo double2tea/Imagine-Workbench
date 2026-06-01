@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Maximize2, Paintbrush, Play, Send, Settings } from "lucide-react";
 import type { StorageItem } from "@/lib/db";
 import {
+  getImageAspectRatioFromResolution,
   getImageModelCapabilities,
   getImageResolutionOptions,
   getModelCapability,
@@ -154,7 +155,10 @@ function ImageGenerateInspector({
   onUpdateGenerate: (nodeId: string, input: BoardGenerateNodeUpdate) => void;
 }) {
   const capabilities = getImageModelCapabilities(node.model);
-  const resolutionOptions = getImageResolutionOptions(node.model, node.aspectRatio);
+  const customAspectRatio = node.imageResolution === "custom"
+    ? getImageAspectRatioFromResolution(node.customImageResolution.trim())
+    : null;
+  const resolutionOptions = getImageResolutionOptions(node.model, customAspectRatio ?? node.aspectRatio);
   const activeResolutionOptions = resolutionOptions.length > 0 ? resolutionOptions : capabilities.resolutions;
   const presetResolutionOptions = activeResolutionOptions.filter(option => option.value !== "custom");
   const supportsCustomImageSize = activeResolutionOptions.some(option => option.value === "custom");
@@ -176,7 +180,15 @@ function ImageGenerateInspector({
       )}
       <div className="grid grid-cols-2 gap-2">
         <InspectorField title="比例">
-          <select value={node.aspectRatio} onChange={event => onUpdateGenerate(node.id, imageAspectPatch(node.model, event.target.value, node))} className="h-9 w-full rounded-md border border-slate-800 bg-slate-900 px-2 text-xs text-slate-100 outline-none focus:border-slate-600">
+          <select
+            value={node.imageResolution === "custom" ? "custom" : node.aspectRatio}
+            onChange={event => onUpdateGenerate(node.id, imageAspectPatch(node.model, event.target.value, node))}
+            disabled={node.imageResolution === "custom"}
+            className={`h-9 w-full rounded-md border border-slate-800 bg-slate-900 px-2 text-xs outline-none focus:border-slate-600 ${
+              node.imageResolution === "custom" ? "cursor-not-allowed text-slate-500 opacity-70" : "text-slate-100"
+            }`}
+          >
+            {node.imageResolution === "custom" && <option value="custom">自定义尺寸决定比例</option>}
             {capabilities.aspectRatios.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </InspectorField>
@@ -284,7 +296,7 @@ function VideoGenerateInspector({
             </InspectorField>
           )}
           {capabilities.presets.length > 0 && (
-            <InspectorField title="Preset">
+            <InspectorField title="预设">
               <select value={node.videoPreset ?? ""} onChange={event => onUpdateGenerate(node.id, { videoPreset: event.target.value })} className="h-9 w-full rounded-md border border-slate-800 bg-slate-900 px-2 text-xs text-slate-100 outline-none focus:border-slate-600">
                 {capabilities.presets.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
@@ -319,9 +331,9 @@ export default function BoardInspector({
   onUpdateGenerate,
 }: BoardInspectorProps) {
   return (
-    <div className="border-b border-slate-800 p-3">
+    <div className="imagine-control-surface border-b border-slate-800 p-3">
       <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-xs font-semibold text-slate-200">Inspector</h2>
+        <h2 className="text-xs font-semibold text-slate-200">检查器</h2>
         <button type="button" onClick={onOpenSettings} className="text-slate-500 hover:text-slate-200" title="设置">
           <Settings className="h-3.5 w-3.5" />
         </button>
