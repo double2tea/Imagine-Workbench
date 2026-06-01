@@ -229,15 +229,15 @@ export default function AssetGalleryWorkspace({
             <p className="mt-1 max-w-sm text-xs leading-5 text-slate-600">写下创意设想并生成，文件将实时存档至本地 IndexedDB。</p>
           </div>
         ) : (
-          <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-4">
             {groupedItems.map(group => {
               const isCollapsed = collapsedDateKeys.has(group.dateKey);
               return (
-                <section key={group.dateKey} className="rounded-xl border border-slate-800/70 bg-slate-950/18">
+                <section key={group.dateKey} className="rounded-lg border border-slate-800/70 bg-slate-950/18">
                   <button
                     type="button"
                     onClick={() => toggleDateGroup(group.dateKey)}
-                    className="flex w-full items-center justify-between gap-3 border-b border-slate-800/70 px-4 py-3 text-left"
+                    className="flex w-full items-center justify-between gap-3 border-b border-slate-800/70 px-3 py-2.5 text-left"
                     aria-expanded={!isCollapsed}
                   >
                     <span className="flex items-center gap-2">
@@ -248,7 +248,7 @@ export default function AssetGalleryWorkspace({
                   </button>
 
                   {!isCollapsed && (
-                    <div className="imagine-gallery-grid grid grid-cols-1 items-stretch gap-6 p-4 sm:grid-cols-2 xl:grid-cols-3">
+                    <div className="imagine-gallery-grid grid grid-cols-1 items-stretch gap-3 p-3 sm:grid-cols-2 xl:grid-cols-3">
                       {group.items.map((item) => (
                         <AssetCard
                           key={item.id}

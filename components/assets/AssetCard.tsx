@@ -369,12 +369,12 @@ export default function AssetCard({
         )}
       </div>
 
-      <div className="imagine-asset-meta flex flex-1 flex-col p-3.5 bg-[#0e0e12]">
-        <div>
-          <p className="min-h-10 text-[11px] text-slate-300 line-clamp-2 leading-relaxed font-sans" title={item.prompt}>
+      <div className="imagine-asset-meta grid min-h-[146px] grid-rows-[auto_1fr] gap-2 bg-[#0e0e12] p-2.5">
+        <div className="imagine-asset-summary rounded-lg border border-white/5 bg-slate-950/25 p-2.5">
+          <p className="h-9 text-[11px] text-slate-300 line-clamp-2 leading-relaxed font-sans" title={item.prompt}>
             {item.prompt}
           </p>
-          <div className="mt-2 flex h-11 items-center gap-1.5">
+          <div className="mt-2 flex h-8 items-center gap-1.5">
             <span className="shrink-0 font-mono text-[9px] text-slate-500">参考</span>
             {referenceUrls.length > 0 ? (
               <div className="no-scrollbar flex min-w-0 gap-1 overflow-x-auto">
@@ -383,13 +383,13 @@ export default function AssetCard({
                     type="button"
                     key={`${item.id}_reference_${index}`}
                     onClick={() => onOpenReferencePreview(item, index)}
-                    className="relative h-10 w-10 overflow-hidden rounded-md border border-white/10 bg-slate-950 transition hover:border-cyan-300/70 focus:outline-none focus:ring-2 focus:ring-cyan-400/40"
+                    className="relative h-8 w-8 overflow-hidden rounded-md border border-white/10 bg-slate-950 transition hover:border-cyan-300/70 focus:outline-none focus:ring-2 focus:ring-cyan-400/40"
                     title={`点击放大参考图 ${index + 1}`}
-	                  >
-	                    <PreviewImage src={url} alt={`参考图 ${index + 1}`} className="h-full w-full object-cover" />
-	                  </button>
-	                ))}
-	              </div>
+                  >
+                    <PreviewImage src={url} alt={`参考图 ${index + 1}`} className="h-full w-full object-cover" />
+                  </button>
+                ))}
+              </div>
             ) : (
               <span className="rounded-md border border-dashed border-slate-800 px-2 py-1 font-mono text-[9px] text-slate-600">
                 无参考图
@@ -398,7 +398,7 @@ export default function AssetCard({
           </div>
         </div>
 
-        <div className="mt-auto pt-2.5 border-t border-slate-850 flex items-center justify-between">
+        <div className="imagine-asset-details flex min-h-0 flex-col justify-between rounded-lg border border-white/5 bg-slate-950/15 p-2">
           <div className="flex flex-wrap items-center gap-1.5 text-[9px] font-mono text-slate-500">
             <span className="imagine-meta-chip bg-white/5 px-2 py-0.5 rounded text-[9px]">
               {getProviderMeta(provider).label}
@@ -415,26 +415,28 @@ export default function AssetCard({
             )}
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-[9px] font-mono text-slate-650">
+          <div className="mt-2 flex items-center justify-between gap-2 border-t border-slate-800 pt-2">
+            <span className="text-[9px] font-mono text-slate-500">
               {formatCreatedAt(item.createdAt)}
             </span>
 
-            <button
-              onClick={() => onReuseTask(item)}
-              className="text-slate-500 hover:text-cyan-300 p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer"
-              title="复用任务参数到左侧面板"
-            >
-              <SlidersHorizontal className="h-3.5 w-3.5" />
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => onReuseTask(item)}
+                className="text-slate-500 hover:text-cyan-300 p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer"
+                title="复用任务参数到左侧面板"
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+              </button>
 
-            <button
-              onClick={() => onDelete(item)}
-              className="text-slate-600 hover:text-red-400 p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer"
-              title="单独移除此项"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
+              <button
+                onClick={() => onDelete(item)}
+                className="text-slate-600 hover:text-red-400 p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer"
+                title="单独移除此项"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
         </div>
       </div>

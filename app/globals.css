@@ -470,7 +470,7 @@
 }
 
 .imagine-gallery-grid {
-  gap: 16px !important;
+  gap: 12px !important;
 }
 
 @media (min-width: 1280px) {
@@ -569,6 +569,12 @@
 .imagine-theme-light .imagine-asset-meta {
   background: #ffffff !important;
   border-top: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.imagine-theme-light .imagine-asset-summary,
+.imagine-theme-light .imagine-asset-details {
+  background: #f8fafc !important;
+  border-color: rgba(15, 23, 42, 0.08) !important;
 }
 
 .imagine-theme-light .imagine-asset-type-badge {
