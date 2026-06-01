@@ -92,7 +92,7 @@ export default function BoardToolbar({
           type="button"
           onClick={onToggleTheme}
           aria-pressed={themeMode === "dark"}
-          className={`${iconButtonClass} hover:border-blue-500/40 hover:bg-blue-950/30 hover:text-blue-300`}
+          className={`${iconButtonClass} hover:border-blue-500/40 hover:bg-blue-500/10 hover:text-blue-300`}
           title={themeMode === "light" ? "切换深色模式" : "切换浅色模式"}
         >
           {themeMode === "light" ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
