@@ -235,7 +235,6 @@ export function useAgentController({
         type: item.type,
         prompt: item.prompt,
         aspectRatio: item.aspectRatio,
-        url: item.url,
       }));
 
       const activeAgentReferences =

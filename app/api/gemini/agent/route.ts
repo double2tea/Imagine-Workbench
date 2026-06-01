@@ -30,7 +30,6 @@ const agentBodySchema = z.object({
         type: z.string(),
         prompt: z.string(),
         aspectRatio: z.string(),
-        url: z.string().optional(),
       }),
     )
     .optional()
@@ -113,8 +112,7 @@ export async function POST(req: NextRequest) {
 
     const normalizedAgentRefs = [...agentReferences];
     if (normalizedAgentRefs.length === 0 && agentReferenceId) {
-      const match = galleryItems.find(item => item.id === agentReferenceId);
-      normalizedAgentRefs.push({ id: agentReferenceId, url: match?.url ?? "" });
+      normalizedAgentRefs.push({ id: agentReferenceId, url: "" });
     }
 
     const hasImageReference = normalizedAgentRefs.some(item => item.url.length > 0);
