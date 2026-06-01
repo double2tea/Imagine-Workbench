@@ -45,8 +45,8 @@ export default function BoardToolbar({
   onToggleTheme,
 }: BoardToolbarProps) {
   return (
-    <div className="imagine-toolbar-surface flex h-12 shrink-0 items-center justify-between gap-3 !rounded-none border-b border-[var(--iw-border)] bg-[var(--iw-header)] !px-4 !py-0 text-[var(--iw-text)]">
-      <div className="flex min-w-0 items-center gap-3">
+    <div className="imagine-toolbar-surface flex h-12 shrink-0 items-center justify-start gap-3 overflow-x-auto !rounded-none border-b border-[var(--iw-border)] bg-[var(--iw-header)] !px-4 !py-0 text-[var(--iw-text)] lg:justify-between">
+      <div className="flex shrink-0 items-center gap-3">
         <button
           type="button"
           onClick={onBack}

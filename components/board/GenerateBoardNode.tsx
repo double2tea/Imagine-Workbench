@@ -37,7 +37,7 @@ export default function GenerateBoardNode({ node, onExecute, onUpdate }: Generat
           type="button"
           onClick={onExecute}
           disabled={isProcessing}
-          className="nodrag flex h-8 items-center justify-center gap-1.5 rounded-md bg-blue-600 px-3 text-xs font-semibold text-white transition hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-500"
+          className="nodrag flex h-8 items-center justify-center gap-1.5 rounded-md bg-blue-600 px-3 text-xs font-semibold text-white transition hover:bg-blue-500 disabled:bg-[var(--iw-panel-soft)] disabled:text-[var(--iw-faint)]"
         >
           {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : node.kind === "image-generate" ? <ImagePlus className="h-3.5 w-3.5" /> : <Video className="h-3.5 w-3.5" />}
           <Play className="h-3 w-3" />

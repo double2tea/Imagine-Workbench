@@ -143,7 +143,8 @@ function targetAcceptsReference(nodes: BoardNodeModel[], targetNodeId: string): 
   }
 }
 
-function edgeColor(kind: BoardEdge["kind"]): string {
+function edgeColor(kind: BoardEdge["kind"], themeMode: ThemeMode): string {
+  void themeMode;
   const varNames: Record<BoardEdge["kind"], string> = { prompt: "--iw-board-edge-prompt", reference: "--iw-board-edge-reference", "agent-context": "--iw-board-edge-agent-context", result: "--iw-board-edge-result" };
   if (typeof document === "undefined") return { prompt: "#2dd4bf", reference: "#60a5fa", "agent-context": "#a78bfa", result: "#34d399" }[kind];
   const cs = getComputedStyle(document.querySelector(".imagine-workbench-shell") || document.documentElement);
@@ -233,8 +234,8 @@ export default function BoardWorkspace({
         selected: selectedEdgeId === edge.id,
         animated: edge.kind === "result",
         data: { kind: edge.kind },
-        domAttributes: { "data-edge-kind": edge.kind },
-        markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor(edge.kind), width: 18, height: 18 },
+        className: `imagine-board-edge imagine-board-edge-${edge.kind}`,
+        markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor(edge.kind, themeMode), width: 18, height: 18 },
         style: { strokeWidth: selectedEdgeId === edge.id ? 3 : 2 },
       })),
     [board.edges, selectedEdgeId, themeMode],
@@ -381,7 +382,7 @@ export default function BoardWorkspace({
   }, [addNoteNode, visibleCenterPosition]);
 
   return (
-    <main className={`imagine-workbench-shell imagine-theme-${themeMode} flex h-screen min-h-0 flex-col bg-slate-950 text-slate-100`}>
+    <main className={`imagine-workbench-shell imagine-theme-${themeMode} flex h-screen min-h-0 flex-col bg-[var(--iw-bg)] text-[var(--iw-text)]`}>
       <BoardToolbar
         nodeCount={board.nodes.length}
         saveStatus={saveStatus}
@@ -397,7 +398,7 @@ export default function BoardWorkspace({
         onToggleTheme={onToggleTheme}
       />
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <section ref={flowHostRef} onDoubleClick={handleFlowDoubleClick} className="board-canvas relative min-h-0 bg-slate-950">
+        <section ref={flowHostRef} onDoubleClick={handleFlowDoubleClick} className="board-canvas relative min-h-0 bg-[var(--iw-board-canvas-bg)]">
           <ReactFlow
             nodes={flowNodes}
             edges={flowEdges}
