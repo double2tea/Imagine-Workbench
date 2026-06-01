@@ -451,7 +451,7 @@ export default function BoardWorkspace({
           </ReactFlow>
           {quickInsertMenu && (
             <div
-              className="imagine-board-quick-insert fixed z-50 grid w-44 gap-1.5 rounded-lg p-2"
+              className="imagine-board-quick-insert fixed z-50 grid w-44 gap-1.5 !rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)] p-2 text-[var(--iw-text)]"
               style={{ left: quickInsertMenu.clientX, top: quickInsertMenu.clientY }}
             >
               {quickInsertItems.map(item => {
@@ -461,7 +461,7 @@ export default function BoardWorkspace({
                     key={item.kind}
                     type="button"
                     onClick={() => addQuickNodeAtPoint(item.kind, quickInsertMenu.position)}
-                    className="imagine-header-button relative flex h-10 items-center gap-2.5 rounded-lg px-2.5 text-left text-xs font-semibold transition"
+                    className="imagine-header-button relative flex !h-10 !min-h-10 items-center gap-2.5 !rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2.5 text-left text-xs font-semibold text-[var(--iw-text)] transition hover:border-[var(--iw-board-accent-amber)] hover:bg-[var(--iw-panel)]"
                   >
                     <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border ${item.iconSurfaceClassName}`}>
                       <Icon className={`h-3.5 w-3.5 ${item.iconClassName}`} />
