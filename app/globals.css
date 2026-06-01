@@ -43,6 +43,16 @@
   --iw-muted: #94a3b8;
   --iw-faint: #64748b;
   --iw-card-shadow: 0 18px 50px rgba(0, 0, 0, 0.34);
+  --iw-board-canvas-bg: #07080b;
+  --iw-board-node-bg: var(--iw-panel);
+  --iw-board-node-header-bg: rgba(7, 8, 11, 0.6);
+  --iw-board-border: var(--iw-border);
+  --iw-board-edge-prompt: #2dd4bf;
+  --iw-board-edge-reference: #60a5fa;
+  --iw-board-edge-agent-context: #a78bfa;
+  --iw-board-edge-result: #34d399;
+  --iw-board-accent-amber: #f59e0b;
+  --iw-board-handle: #64748b;
   background: var(--iw-bg) !important;
   color: var(--iw-text);
   color-scheme: dark;
@@ -61,9 +71,79 @@
   --iw-muted: #667085;
   --iw-faint: #98a2b3;
   --iw-card-shadow: 0 18px 48px rgba(15, 23, 42, 0.08);
+  --iw-board-canvas-bg: #e9eff6;
+  --iw-board-node-bg: #ffffff;
+  --iw-board-node-header-bg: #f8fafc;
+  --iw-board-border: rgba(15, 23, 42, 0.12);
+  --iw-board-edge-prompt: #14b8a6;
+  --iw-board-edge-reference: #3b82f6;
+  --iw-board-edge-agent-context: #8b5cf6;
+  --iw-board-edge-result: #10b981;
+  --iw-board-accent-amber: #d97706;
+  --iw-board-handle: #64748b;
   background:
     linear-gradient(180deg, #eef3f8 0%, #f8fafc 44%, #edf3f8 100%) !important;
   color-scheme: light;
+}
+
+/* Board Design System Foundations (PR 1): --iw-board-* vars + .imagine-board-* primitives.
+   Base (dark) near shell for cascade. Light variants + data-[edge-kind] after existing board light block (~610).
+   Reuses imagine-* elevation/border patterns, canvas-tuned for spatial (nodes/edges/minimap).
+   No --iw-board-font-* (typography via Tailwind arbitrary under .imagine-board-* per spec).
+   Preserves all prior board light rules (grid, article overrides, quick-insert, handles, edges) exactly. */
+.imagine-board-surface {
+  /* extension point for canvas root */
+}
+
+.imagine-board-node {
+  background: var(--iw-board-node-bg);
+  border: 1px solid var(--iw-board-border);
+  box-shadow: var(--iw-card-shadow);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.imagine-board-node-header {
+  background: var(--iw-board-node-header-bg);
+  border-bottom: 1px solid var(--iw-board-border);
+  min-height: 36px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.imagine-board-node-selected,
+.imagine-board-node[data-selected="true"] {
+  border-color: var(--iw-board-accent-amber);
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25), var(--iw-card-shadow);
+}
+
+.imagine-board-quick-insert {
+  border-radius: 12px;
+  border: 1px solid var(--iw-border);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.imagine-board-input,
+.imagine-board-select {
+  border-radius: 8px;
+  border: 1px solid var(--iw-border);
+  background: var(--iw-panel-soft);
+  color: var(--iw-text);
+  font-size: 12px;
+  padding: 6px 10px;
+}
+
+.imagine-board-controls,
+.imagine-board-minimap {
+  border-radius: 10px;
+  border: 1px solid var(--iw-border);
+  background: var(--iw-panel);
+}
+
+.imagine-board-edge {
+  /* hook for future per-kind refinements */
 }
 
 .imagine-workbench-shell > .absolute {
@@ -607,6 +687,73 @@
 
 .imagine-workbench-shell.imagine-theme-light .board-quick-insert-menu button span:first-child {
   border-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+/* Light-mode overrides + data-[edge-kind] hooks for board foundations (placed after existing board light block
+   to win specificity vs article/edge !important rules at ~555-580). Enhances for vars on new primitives.
+   All prior grid texture, article, minimap, quick-insert, handle, connection rules preserved verbatim. */
+.imagine-workbench-shell.imagine-theme-light .imagine-board-node {
+  background: var(--iw-board-node-bg) !important;
+  border-color: var(--iw-board-border) !important;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.04) !important;
+}
+
+.imagine-workbench-shell.imagine-theme-light .imagine-board-node-header {
+  background: var(--iw-board-node-header-bg) !important;
+  border-color: var(--iw-board-border) !important;
+}
+
+.imagine-workbench-shell.imagine-theme-light .imagine-board-node-selected,
+.imagine-workbench-shell.imagine-theme-light .imagine-board-node[data-selected="true"] {
+  border-color: var(--iw-board-accent-amber) !important;
+  box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.2), 0 4px 12px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.04) !important;
+}
+
+.imagine-workbench-shell.imagine-theme-light .imagine-board-quick-insert {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.98)) !important;
+  border-color: rgba(15, 23, 42, 0.14) !important;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.86) inset,
+    0 18px 44px rgba(15, 23, 42, 0.12),
+    0 36px 90px rgba(15, 23, 42, 0.10);
+  color: #1e2937;
+}
+
+.imagine-workbench-shell.imagine-theme-light .imagine-board-input,
+.imagine-workbench-shell.imagine-theme-light .imagine-board-select {
+  background: #fbfcff !important;
+  border-color: rgba(15, 23, 42, 0.11) !important;
+  color: #172033 !important;
+}
+
+.imagine-workbench-shell.imagine-theme-light .imagine-board-controls,
+.imagine-workbench-shell.imagine-theme-light .imagine-board-minimap {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: rgba(15, 23, 42, 0.12) !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06) !important;
+}
+
+/* data-[edge-kind] CSS var hooks (foundational; supports PR5 edgeColor migration path; paths via CSS vars,
+   markerEnd arrows retain tiny getComputedStyle JS per Key Decision #2 & design doc). */
+.react-flow__edge[data-edge-kind="prompt"] .react-flow__edge-path {
+  stroke: var(--iw-board-edge-prompt) !important;
+}
+.react-flow__edge[data-edge-kind="reference"] .react-flow__edge-path {
+  stroke: var(--iw-board-edge-reference) !important;
+}
+.react-flow__edge[data-edge-kind="agent-context"] .react-flow__edge-path {
+  stroke: var(--iw-board-edge-agent-context) !important;
+}
+.react-flow__edge[data-edge-kind="result"] .react-flow__edge-path {
+  stroke: var(--iw-board-edge-result) !important;
+}
+
+.imagine-workbench-shell.imagine-theme-light .react-flow__edge[data-edge-kind="prompt"] .react-flow__edge-path,
+.imagine-workbench-shell.imagine-theme-light .react-flow__edge[data-edge-kind="reference"] .react-flow__edge-path,
+.imagine-workbench-shell.imagine-theme-light .react-flow__edge[data-edge-kind="agent-context"] .react-flow__edge-path,
+.imagine-workbench-shell.imagine-theme-light .react-flow__edge[data-edge-kind="result"] .react-flow__edge-path {
+  opacity: 0.88;
 }
 
 .imagine-tabbar {
