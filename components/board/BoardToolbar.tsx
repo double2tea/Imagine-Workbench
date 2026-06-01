@@ -27,8 +27,8 @@ function formatSaveStatus(status: BoardSaveStatus): string {
   return "就绪";
 }
 
-const toolButtonClass = "imagine-header-button flex !h-8 !min-h-8 items-center gap-1.5 !rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-3 text-xs font-semibold text-[var(--iw-text)] transition hover:border-[var(--iw-board-accent-amber)] hover:bg-[var(--iw-panel)]";
-const iconButtonClass = "imagine-icon-button flex !h-8 !w-8 !min-w-8 items-center justify-center !rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)] transition hover:border-[var(--iw-board-accent-amber)] hover:bg-[var(--iw-panel)] hover:text-[var(--iw-text)]";
+const toolButtonClass = "imagine-header-button !min-h-8 flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition";
+const iconButtonClass = "imagine-icon-button flex h-8 w-8 items-center justify-center rounded-lg transition";
 
 export default function BoardToolbar({
   nodeCount,
@@ -45,7 +45,7 @@ export default function BoardToolbar({
   onToggleTheme,
 }: BoardToolbarProps) {
   return (
-    <div className="imagine-toolbar-surface flex h-12 shrink-0 items-center justify-between gap-3 !rounded-none border-b border-[var(--iw-border)] bg-[var(--iw-header)] !px-4 !py-0 text-[var(--iw-text)]">
+    <div className="imagine-toolbar-surface flex h-12 shrink-0 items-center justify-between gap-3 px-4">
       <div className="flex min-w-0 items-center gap-3">
         <button
           type="button"
@@ -55,9 +55,9 @@ export default function BoardToolbar({
         >
           <ArrowLeft className="h-3.5 w-3.5" />
         </button>
-        <h1 className="truncate text-sm font-semibold text-[var(--iw-text)]">画板</h1>
-        <span className="rounded border border-[var(--iw-border)] px-2 py-1 text-[11px] text-[var(--iw-muted)]">{nodeCount} 节点</span>
-        <span className="hidden text-[11px] text-[var(--iw-faint)] sm:inline">{formatSaveStatus(saveStatus)}</span>
+        <h1 className="truncate text-sm font-semibold">画板</h1>
+        <span className="rounded border px-2 py-1 text-[11px]">{nodeCount} 节点</span>
+        <span className="hidden text-[11px] sm:inline">{formatSaveStatus(saveStatus)}</span>
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <button type="button" onClick={onAddPrompt} className={toolButtonClass}>
@@ -92,7 +92,7 @@ export default function BoardToolbar({
           type="button"
           onClick={onToggleTheme}
           aria-pressed={themeMode === "dark"}
-          className={`${iconButtonClass} hover:border-blue-500/40 hover:text-blue-300`}
+          className={`${iconButtonClass} hover:border-blue-500/40 hover:bg-blue-950/30 hover:text-blue-300`}
           title={themeMode === "light" ? "切换深色模式" : "切换浅色模式"}
         >
           {themeMode === "light" ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
@@ -100,7 +100,7 @@ export default function BoardToolbar({
         <button
           type="button"
           onClick={onClear}
-          className={`${iconButtonClass} hover:border-red-500/50 hover:text-red-300`}
+          className={`${iconButtonClass} hover:border-red-500/50 hover:bg-red-500/10 hover:text-red-300`}
           title="清空画板"
         >
           <Trash2 className="h-3.5 w-3.5" />
