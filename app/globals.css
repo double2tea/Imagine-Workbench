@@ -571,12 +571,6 @@
   border-top: 1px solid rgba(15, 23, 42, 0.08);
 }
 
-.imagine-theme-light .imagine-asset-summary,
-.imagine-theme-light .imagine-asset-details {
-  background: #f8fafc !important;
-  border-color: rgba(15, 23, 42, 0.08) !important;
-}
-
 .imagine-theme-light .imagine-asset-type-badge {
   background: rgba(255, 255, 255, 0.9) !important;
   border-color: rgba(15, 23, 42, 0.12) !important;

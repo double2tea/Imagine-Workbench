@@ -369,45 +369,41 @@ export default function AssetCard({
         )}
       </div>
 
-      <div className="imagine-asset-meta grid min-h-[146px] grid-rows-[auto_1fr] gap-2 bg-[#0e0e12] p-2.5">
-        <div className="imagine-asset-summary rounded-lg border border-white/5 bg-slate-950/25 p-2.5">
-          <p className="h-9 text-[11px] text-slate-300 line-clamp-2 leading-relaxed font-sans" title={item.prompt}>
+      <div className="imagine-asset-meta flex min-h-[88px] flex-col gap-1.5 bg-[#0e0e12] p-2">
+        <div className="flex items-center gap-2">
+          <p className="min-w-0 flex-1 truncate font-sans text-[11px] font-medium text-slate-300" title={item.prompt}>
             {item.prompt}
           </p>
-          <div className="mt-2 flex h-8 items-center gap-1.5">
-            <span className="shrink-0 font-mono text-[9px] text-slate-500">参考</span>
-            {referenceUrls.length > 0 ? (
-              <div className="no-scrollbar flex min-w-0 gap-1 overflow-x-auto">
+          {referenceUrls.length > 0 && (
+            <div className="flex shrink-0 items-center gap-1">
+              <span className="font-mono text-[9px] text-slate-500">参考</span>
+              <div className="no-scrollbar flex max-w-[96px] gap-1 overflow-x-auto">
                 {referenceUrls.map((url, index) => (
                   <button
                     type="button"
                     key={`${item.id}_reference_${index}`}
                     onClick={() => onOpenReferencePreview(item, index)}
-                    className="relative h-8 w-8 overflow-hidden rounded-md border border-white/10 bg-slate-950 transition hover:border-cyan-300/70 focus:outline-none focus:ring-2 focus:ring-cyan-400/40"
+                    className="relative h-7 w-7 overflow-hidden rounded-md border border-white/10 bg-slate-950 transition hover:border-cyan-300/70 focus:outline-none focus:ring-2 focus:ring-cyan-400/40"
                     title={`点击放大参考图 ${index + 1}`}
                   >
                     <PreviewImage src={url} alt={`参考图 ${index + 1}`} className="h-full w-full object-cover" />
                   </button>
                 ))}
               </div>
-            ) : (
-              <span className="rounded-md border border-dashed border-slate-800 px-2 py-1 font-mono text-[9px] text-slate-600">
-                无参考图
-              </span>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
-        <div className="imagine-asset-details flex min-h-0 flex-col justify-between rounded-lg border border-white/5 bg-slate-950/15 p-2">
-          <div className="flex flex-wrap items-center gap-1.5 text-[9px] font-mono text-slate-500">
-            <span className="imagine-meta-chip bg-white/5 px-2 py-0.5 rounded text-[9px]">
+        <div className="flex min-h-0 flex-1 flex-col justify-end border-t border-slate-800 pt-1.5">
+          <div className="flex max-h-10 flex-wrap items-center gap-1 overflow-hidden font-mono text-[9px] text-slate-500">
+            <span className="imagine-meta-chip rounded bg-white/5 px-1.5 py-0.5 text-[9px]">
               {getProviderMeta(provider).label}
             </span>
-            <span className="imagine-meta-chip bg-white/5 px-2 py-0.5 rounded text-[9px]" title={item.model}>
+            <span className="imagine-meta-chip max-w-[150px] truncate rounded bg-white/5 px-1.5 py-0.5 text-[9px]" title={item.model}>
               🤖 {formatModelName(item.model)}
             </span>
-            <span className="imagine-meta-chip bg-white/5 px-2 py-0.5 rounded">📐 {formatDisplayedAspectRatio(item)}</span>
-            <span className="imagine-meta-chip imagine-status-chip bg-white/5 px-2 py-0.5 rounded">{item.status}</span>
+            <span className="imagine-meta-chip rounded bg-white/5 px-1.5 py-0.5">📐 {formatDisplayedAspectRatio(item)}</span>
+            <span className="imagine-meta-chip imagine-status-chip rounded bg-white/5 px-1.5 py-0.5">{item.status}</span>
             {item.errorMessage && (
               <span className="max-w-[160px] truncate rounded bg-red-500/10 px-2 py-0.5 text-red-300" title={item.errorMessage}>
                 last error: {item.errorMessage}
@@ -415,7 +411,7 @@ export default function AssetCard({
             )}
           </div>
 
-          <div className="mt-2 flex items-center justify-between gap-2 border-t border-slate-800 pt-2">
+          <div className="mt-1.5 flex items-center justify-between gap-2">
             <span className="text-[9px] font-mono text-slate-500">
               {formatCreatedAt(item.createdAt)}
             </span>
