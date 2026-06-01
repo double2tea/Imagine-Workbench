@@ -4,10 +4,12 @@ import type { AiProvider } from "@/lib/providers/model-catalog";
 
 export type AssetTypeFilter = "all" | "images" | "videos";
 export type AssetStatusFilter = "all" | StorageItem["status"];
-export type AssetDateFilter = "all" | string;
+export type AssetDatePreset = "all" | "today" | "7d" | "30d" | "custom";
 
 interface AssetToolbarProps {
-  assetDateFilter: AssetDateFilter;
+  assetDateEnd: string;
+  assetDatePreset: AssetDatePreset;
+  assetDateStart: string;
   assetModelFilter: string;
   assetStatusFilter: AssetStatusFilter;
   dateOptions: Array<{ value: string; label: string; count: number }>;
@@ -21,7 +23,9 @@ interface AssetToolbarProps {
   deleteItemsByStatus: (statuses: StorageItem["status"][]) => void;
   exportMetadataJson: () => void;
   formatModelLabel: (value: string, fallbackProvider: AiProvider) => string;
-  setAssetDateFilter: (value: AssetDateFilter) => void;
+  setAssetDateEnd: (value: string) => void;
+  setAssetDatePreset: (value: AssetDatePreset) => void;
+  setAssetDateStart: (value: string) => void;
   setAssetModelFilter: (value: string) => void;
   setAssetStatusFilter: (value: AssetStatusFilter) => void;
   setFilterType: (value: AssetTypeFilter) => void;
@@ -42,8 +46,17 @@ const STATUS_FILTER_OPTIONS = [
   { value: "complete", label: "complete" },
 ] as const;
 
+const DATE_PRESET_OPTIONS = [
+  { value: "all", label: "全部" },
+  { value: "today", label: "今天" },
+  { value: "7d", label: "近 7 天" },
+  { value: "30d", label: "近 30 天" },
+] as const;
+
 export default function AssetToolbar({
-  assetDateFilter,
+  assetDateEnd,
+  assetDatePreset,
+  assetDateStart,
   assetModelFilter,
   assetStatusFilter,
   dateOptions,
@@ -57,7 +70,9 @@ export default function AssetToolbar({
   deleteItemsByStatus,
   exportMetadataJson,
   formatModelLabel,
-  setAssetDateFilter,
+  setAssetDateEnd,
+  setAssetDatePreset,
+  setAssetDateStart,
   setAssetModelFilter,
   setAssetStatusFilter,
   setFilterType,
@@ -72,6 +87,16 @@ export default function AssetToolbar({
   const getStatusCount = (value: AssetStatusFilter): number => {
     if (value === "all") return itemsCount;
     return statusCounts[value];
+  };
+
+  const handleDateStartChange = (value: string) => {
+    setAssetDatePreset("custom");
+    setAssetDateStart(value);
+  };
+
+  const handleDateEndChange = (value: string) => {
+    setAssetDatePreset("custom");
+    setAssetDateEnd(value);
   };
 
   return (
@@ -124,16 +149,43 @@ export default function AssetToolbar({
 
           <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center">
             <span className="w-10 shrink-0 text-[10px] font-semibold uppercase tracking-widest text-slate-500">日期</span>
-            <select
-              value={assetDateFilter}
-              onChange={(event) => setAssetDateFilter(event.target.value)}
-              className="imagine-toolbar-select h-8 min-w-[180px] rounded-lg border border-slate-800 bg-slate-950/55 px-3 font-mono text-[10px] text-slate-300 transition focus:border-blue-400/35 focus:outline-none"
-            >
-              <option value="all">全部日期 {itemsCount}</option>
-              {dateOptions.map(option => (
-                <option key={option.value} value={option.value}>{option.label} {option.count}</option>
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+              {DATE_PRESET_OPTIONS.map(option => (
+                <button
+                  key={option.value}
+                  type="button"
+                  data-active={assetDatePreset === option.value}
+                  onClick={() => {
+                    setAssetDatePreset(option.value);
+                    setAssetDateStart("");
+                    setAssetDateEnd("");
+                  }}
+                  className={`imagine-filter-chip h-7 rounded-md border px-2.5 text-xs transition focus:outline-none cursor-pointer ${
+                    assetDatePreset === option.value
+                      ? "border-slate-700 bg-slate-800/80 text-slate-100"
+                      : "border-transparent text-slate-500 hover:border-slate-800 hover:bg-slate-900/70 hover:text-slate-200"
+                  }`}
+                >
+                  {option.label}
+                </button>
               ))}
-            </select>
+              <input
+                type="date"
+                value={assetDateStart}
+                onChange={(event) => handleDateStartChange(event.target.value)}
+                className="h-7 rounded-md border border-slate-800 bg-slate-950/55 px-2 font-mono text-[10px] text-slate-300 focus:border-blue-400/35 focus:outline-none"
+                aria-label="开始日期"
+              />
+              <span className="font-mono text-[10px] text-slate-600">至</span>
+              <input
+                type="date"
+                value={assetDateEnd}
+                onChange={(event) => handleDateEndChange(event.target.value)}
+                className="h-7 rounded-md border border-slate-800 bg-slate-950/55 px-2 font-mono text-[10px] text-slate-300 focus:border-blue-400/35 focus:outline-none"
+                aria-label="结束日期"
+              />
+              <span className="font-mono text-[10px] text-slate-500">{dateOptions.length} 天</span>
+            </div>
           </div>
         </div>
 

@@ -1,5 +1,5 @@
 import { useDeferredValue, useMemo, useState } from "react";
-import type { AssetDateFilter, AssetStatusFilter, AssetTypeFilter } from "@/components/assets/AssetToolbar";
+import type { AssetDatePreset, AssetStatusFilter, AssetTypeFilter } from "@/components/assets/AssetToolbar";
 import type { CompareViewType } from "@/components/assets/ComparePanel";
 import type { StorageItem } from "@/lib/db";
 
@@ -24,11 +24,29 @@ function formatAssetDateLabel(value: string): string {
   return value;
 }
 
+function todayDateKey(): string {
+  return getAssetDateKey(new Date().toISOString());
+}
+
+function isInPresetRange(dateKey: string, preset: AssetDatePreset): boolean {
+  if (preset === "all" || preset === "custom") return true;
+  if (dateKey === "unknown") return false;
+  const date = new Date(`${dateKey}T00:00:00`);
+  if (!Number.isFinite(date.getTime())) return false;
+  const today = new Date(`${todayDateKey()}T00:00:00`);
+  const days = Math.floor((today.getTime() - date.getTime()) / 86400000);
+  if (preset === "today") return days === 0;
+  if (preset === "7d") return days >= 0 && days <= 6;
+  return days >= 0 && days <= 29;
+}
+
 export function useAssetWorkspaceState(items: StorageItem[]) {
   const [filterType, setFilterType] = useState<AssetTypeFilter>("all");
   const [assetStatusFilter, setAssetStatusFilter] = useState<AssetStatusFilter>("all");
   const [assetModelFilter, setAssetModelFilter] = useState("all");
-  const [assetDateFilter, setAssetDateFilter] = useState<AssetDateFilter>("all");
+  const [assetDatePreset, setAssetDatePreset] = useState<AssetDatePreset>("all");
+  const [assetDateStart, setAssetDateStart] = useState("");
+  const [assetDateEnd, setAssetDateEnd] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [isCompareMode, setIsCompareMode] = useState(false);
@@ -83,12 +101,15 @@ export function useAssetWorkspaceState(items: StorageItem[]) {
       if (filterType === "videos" && item.type !== "video") return false;
       if (assetStatusFilter !== "all" && item.status !== assetStatusFilter) return false;
       if (assetModelFilter !== "all" && item.model !== assetModelFilter) return false;
-      if (assetDateFilter !== "all" && getAssetDateKey(item.createdAt) !== assetDateFilter) return false;
+      const dateKey = getAssetDateKey(item.createdAt);
+      if (!isInPresetRange(dateKey, assetDatePreset)) return false;
+      if (assetDateStart && dateKey < assetDateStart) return false;
+      if (assetDateEnd && dateKey > assetDateEnd) return false;
       if (!query) return true;
 
       return item.prompt.toLowerCase().includes(query) || item.model.toLowerCase().includes(query);
     });
-  }, [assetDateFilter, assetModelFilter, assetStatusFilter, deferredSearchQuery, filterType, items]);
+  }, [assetDateEnd, assetDatePreset, assetDateStart, assetModelFilter, assetStatusFilter, deferredSearchQuery, filterType, items]);
 
   const searchableReferenceImages = useMemo(
     () => items.filter(item => item.type === "image" && item.status === "complete"),
@@ -104,7 +125,9 @@ export function useAssetWorkspaceState(items: StorageItem[]) {
   }, [compareItemIds, items]);
 
   return {
-    assetDateFilter,
+    assetDateEnd,
+    assetDatePreset,
+    assetDateStart,
     assetModelFilter,
     assetStats,
     assetStatusFilter,
@@ -122,7 +145,9 @@ export function useAssetWorkspaceState(items: StorageItem[]) {
     searchableReferenceImages,
     selectedItemIdSet,
     selectedItemIds,
-    setAssetDateFilter,
+    setAssetDateEnd,
+    setAssetDatePreset,
+    setAssetDateStart,
     setAssetModelFilter,
     setAssetStatusFilter,
     setCancelingItemIds,

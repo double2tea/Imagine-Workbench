@@ -1,15 +1,17 @@
-import { ChevronLeft, ChevronRight, Image as ImageIcon, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Image as ImageIcon, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import AssetCard from "@/components/assets/AssetCard";
 import AssetSelectionBar from "@/components/assets/AssetSelectionBar";
-import AssetToolbar, { type AssetDateFilter, type AssetStatusFilter, type AssetTypeFilter } from "@/components/assets/AssetToolbar";
+import AssetToolbar, { type AssetDatePreset, type AssetStatusFilter, type AssetTypeFilter } from "@/components/assets/AssetToolbar";
 import ComparePanel, { type CompareViewType } from "@/components/assets/ComparePanel";
 import PreviewImage from "@/components/PreviewImage";
 import type { StorageItem } from "@/lib/db";
 import type { AiProvider } from "@/lib/providers/model-catalog";
 
 interface AssetGalleryWorkspaceProps {
-  assetDateFilter: AssetDateFilter;
+  assetDateEnd: string;
+  assetDatePreset: AssetDatePreset;
+  assetDateStart: string;
   assetModelFilter: string;
   assetStatusFilter: AssetStatusFilter;
   cancelingItemIdSet: ReadonlySet<string>;
@@ -44,7 +46,9 @@ interface AssetGalleryWorkspaceProps {
   onResetCompare: () => void;
   onRetryItem: (item: StorageItem) => void;
   onReuseTask: (item: StorageItem) => void;
-  onSetAssetDateFilter: (value: AssetDateFilter) => void;
+  onSetAssetDateEnd: (value: string) => void;
+  onSetAssetDatePreset: (value: AssetDatePreset) => void;
+  onSetAssetDateStart: (value: string) => void;
   onSetAssetModelFilter: (value: string) => void;
   onSetAssetStatusFilter: (value: AssetStatusFilter) => void;
   onSetCompareSliderPos: (value: number) => void;
@@ -58,7 +62,9 @@ interface AssetGalleryWorkspaceProps {
 }
 
 export default function AssetGalleryWorkspace({
-  assetDateFilter,
+  assetDateEnd,
+  assetDatePreset,
+  assetDateStart,
   assetModelFilter,
   assetStatusFilter,
   cancelingItemIdSet,
@@ -93,7 +99,9 @@ export default function AssetGalleryWorkspace({
   onResetCompare,
   onRetryItem,
   onReuseTask,
-  onSetAssetDateFilter,
+  onSetAssetDateEnd,
+  onSetAssetDatePreset,
+  onSetAssetDateStart,
   onSetAssetModelFilter,
   onSetAssetStatusFilter,
   onSetCompareSliderPos,
@@ -106,6 +114,7 @@ export default function AssetGalleryWorkspace({
   formatModelLabel,
 }: AssetGalleryWorkspaceProps) {
   const [referencePreview, setReferencePreview] = useState<{ itemId: string; index: number } | null>(null);
+  const [collapsedDateKeys, setCollapsedDateKeys] = useState<Set<string>>(() => new Set());
   const referencePreviewItem = useMemo(
     () => filteredItems.find(item => item.id === referencePreview?.itemId),
     [filteredItems, referencePreview?.itemId],
@@ -129,11 +138,47 @@ export default function AssetGalleryWorkspace({
       return { ...current, index: (referencePreviewIndex + 1) % referencePreviewUrls.length };
     });
   };
+  const groupedItems = useMemo(() => {
+    const groups = new Map<string, StorageItem[]>();
+    for (const item of filteredItems) {
+      const date = new Date(item.createdAt);
+      const dateKey = Number.isFinite(date.getTime())
+        ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
+        : "unknown";
+      const current = groups.get(dateKey) ?? [];
+      current.push(item);
+      groups.set(dateKey, current);
+    }
+    return Array.from(groups)
+      .map(([dateKey, groupItems]) => ({
+        dateKey,
+        label: dateKey === "unknown" ? "未知日期" : dateKey,
+        items: groupItems,
+      }))
+      .sort((a, b) => {
+        if (a.dateKey === "unknown") return 1;
+        if (b.dateKey === "unknown") return -1;
+        return b.dateKey.localeCompare(a.dateKey);
+      });
+  }, [filteredItems]);
+  const toggleDateGroup = (dateKey: string) => {
+    setCollapsedDateKeys(current => {
+      const next = new Set(current);
+      if (next.has(dateKey)) {
+        next.delete(dateKey);
+      } else {
+        next.add(dateKey);
+      }
+      return next;
+    });
+  };
 
   return (
     <section className="imagine-gallery-panel flex min-w-0 flex-col gap-4">
       <AssetToolbar
-        assetDateFilter={assetDateFilter}
+        assetDateEnd={assetDateEnd}
+        assetDatePreset={assetDatePreset}
+        assetDateStart={assetDateStart}
         assetModelFilter={assetModelFilter}
         assetStatusFilter={assetStatusFilter}
         dateOptions={dateOptions}
@@ -147,7 +192,9 @@ export default function AssetGalleryWorkspace({
         deleteItemsByStatus={onDeleteItemsByStatus}
         exportMetadataJson={onExportMetadata}
         formatModelLabel={formatModelLabel}
-        setAssetDateFilter={onSetAssetDateFilter}
+        setAssetDateEnd={onSetAssetDateEnd}
+        setAssetDatePreset={onSetAssetDatePreset}
+        setAssetDateStart={onSetAssetDateStart}
         setAssetModelFilter={onSetAssetModelFilter}
         setAssetStatusFilter={onSetAssetStatusFilter}
         setFilterType={onSetFilterType}
@@ -182,29 +229,53 @@ export default function AssetGalleryWorkspace({
             <p className="mt-1 max-w-sm text-xs leading-5 text-slate-600">写下创意设想并生成，文件将实时存档至本地 IndexedDB。</p>
           </div>
         ) : (
-          <div className="imagine-gallery-grid grid grid-cols-1 items-start gap-6 sm:grid-cols-2 xl:grid-cols-3">
-            {filteredItems.map((item) => (
-              <AssetCard
-                key={item.id}
-                canceling={cancelingItemIdSet.has(item.id)}
-                inCompare={compareItemIdSet.has(item.id)}
-                item={item}
-                selected={selectedItemIdSet.has(item.id)}
-                selectedProvider={selectedProvider}
-                onApplyVideoReference={onApplyVideoReference}
-                onCancel={onCancelItem}
-                onDelete={onDeleteItem}
-                onDownload={onDownloadItem}
-                onLaunchMaskEditor={onLaunchMaskEditor}
-                onOpenFullscreen={onOpenFullscreen}
-                onOpenReferencePreview={(previewItem, index) => setReferencePreview({ itemId: previewItem.id, index })}
-                onRetry={onRetryItem}
-                onReuseTask={onReuseTask}
-                onToggleCompare={onToggleCompare}
-                onToggleSelect={onToggleSelect}
-                onUseAgentReference={onUseAgentReference}
-              />
-            ))}
+          <div className="flex flex-col gap-5">
+            {groupedItems.map(group => {
+              const isCollapsed = collapsedDateKeys.has(group.dateKey);
+              return (
+                <section key={group.dateKey} className="rounded-xl border border-slate-800/70 bg-slate-950/18">
+                  <button
+                    type="button"
+                    onClick={() => toggleDateGroup(group.dateKey)}
+                    className="flex w-full items-center justify-between gap-3 border-b border-slate-800/70 px-4 py-3 text-left"
+                    aria-expanded={!isCollapsed}
+                  >
+                    <span className="flex items-center gap-2">
+                      <ChevronDown className={`h-4 w-4 text-slate-500 transition ${isCollapsed ? "-rotate-90" : ""}`} />
+                      <span className="text-xs font-semibold text-slate-300">{group.label}</span>
+                    </span>
+                    <span className="rounded-md bg-slate-900 px-2 py-1 font-mono text-[10px] text-slate-500">{group.items.length} 项</span>
+                  </button>
+
+                  {!isCollapsed && (
+                    <div className="imagine-gallery-grid grid grid-cols-1 items-stretch gap-6 p-4 sm:grid-cols-2 xl:grid-cols-3">
+                      {group.items.map((item) => (
+                        <AssetCard
+                          key={item.id}
+                          canceling={cancelingItemIdSet.has(item.id)}
+                          inCompare={compareItemIdSet.has(item.id)}
+                          item={item}
+                          selected={selectedItemIdSet.has(item.id)}
+                          selectedProvider={selectedProvider}
+                          onApplyVideoReference={onApplyVideoReference}
+                          onCancel={onCancelItem}
+                          onDelete={onDeleteItem}
+                          onDownload={onDownloadItem}
+                          onLaunchMaskEditor={onLaunchMaskEditor}
+                          onOpenFullscreen={onOpenFullscreen}
+                          onOpenReferencePreview={(previewItem, index) => setReferencePreview({ itemId: previewItem.id, index })}
+                          onRetry={onRetryItem}
+                          onReuseTask={onReuseTask}
+                          onToggleCompare={onToggleCompare}
+                          onToggleSelect={onToggleSelect}
+                          onUseAgentReference={onUseAgentReference}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </section>
+              );
+            })}
           </div>
         )}
       </div>
