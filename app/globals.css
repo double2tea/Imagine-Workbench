@@ -140,6 +140,7 @@
   border-radius: 10px;
   border: 1px solid var(--iw-border);
   background: var(--iw-panel);
+  color: var(--iw-text);
 }
 
 .imagine-board-edge {
@@ -557,7 +558,7 @@
 }
 
 .board-canvas .react-flow__connection.valid .react-flow__connection-path {
-  stroke: #2dd4bf !important;
+  stroke: var(--iw-board-edge-prompt) !important;
   filter: drop-shadow(0 0 6px rgba(45, 212, 191, 0.52));
 }
 
@@ -617,6 +618,11 @@
   }
 }
 
+/* Canvas polish (PR5): var-driven bg for theme consistency on RF chrome + empty viewport states (no layout change, metrics preserved) */
+.board-canvas {
+  background: var(--iw-board-canvas-bg);
+}
+
 /* Board light theme optimizations: softer canvas for image observation, better node card separation */
 .imagine-workbench-shell.imagine-theme-light .board-canvas {
   background:
@@ -657,7 +663,6 @@
 }
 
 .imagine-workbench-shell.imagine-theme-light .board-canvas .react-flow__edge-path {
-  stroke: #64748b !important;
   opacity: 0.7;
 }
 
@@ -736,16 +741,16 @@
 
 /* data-[edge-kind] CSS var hooks (foundational; supports PR5 edgeColor migration path; paths via CSS vars,
    markerEnd arrows retain tiny getComputedStyle JS per Key Decision #2 & design doc). */
-.react-flow__edge[data-edge-kind="prompt"] .react-flow__edge-path {
+.board-canvas .react-flow__edge[data-edge-kind="prompt"] .react-flow__edge-path {
   stroke: var(--iw-board-edge-prompt) !important;
 }
-.react-flow__edge[data-edge-kind="reference"] .react-flow__edge-path {
+.board-canvas .react-flow__edge[data-edge-kind="reference"] .react-flow__edge-path {
   stroke: var(--iw-board-edge-reference) !important;
 }
-.react-flow__edge[data-edge-kind="agent-context"] .react-flow__edge-path {
+.board-canvas .react-flow__edge[data-edge-kind="agent-context"] .react-flow__edge-path {
   stroke: var(--iw-board-edge-agent-context) !important;
 }
-.react-flow__edge[data-edge-kind="result"] .react-flow__edge-path {
+.board-canvas .react-flow__edge[data-edge-kind="result"] .react-flow__edge-path {
   stroke: var(--iw-board-edge-result) !important;
 }
 

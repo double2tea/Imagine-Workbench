@@ -144,10 +144,11 @@ function targetAcceptsReference(nodes: BoardNodeModel[], targetNodeId: string): 
 }
 
 function edgeColor(kind: BoardEdge["kind"]): string {
-  if (kind === "prompt") return "#2dd4bf";
-  if (kind === "reference") return "#60a5fa";
-  if (kind === "agent-context") return "#a78bfa";
-  return "#34d399";
+  const varNames: Record<BoardEdge["kind"], string> = { prompt: "--iw-board-edge-prompt", reference: "--iw-board-edge-reference", "agent-context": "--iw-board-edge-agent-context", result: "--iw-board-edge-result" };
+  if (typeof document === "undefined") return { prompt: "#2dd4bf", reference: "#60a5fa", "agent-context": "#a78bfa", result: "#34d399" }[kind];
+  const cs = getComputedStyle(document.querySelector(".imagine-workbench-shell") || document.documentElement);
+  const val = cs.getPropertyValue(varNames[kind]).trim();
+  return val || { prompt: "#2dd4bf", reference: "#60a5fa", "agent-context": "#a78bfa", result: "#34d399" }[kind];
 }
 
 export default function BoardWorkspace({
@@ -232,10 +233,11 @@ export default function BoardWorkspace({
         selected: selectedEdgeId === edge.id,
         animated: edge.kind === "result",
         data: { kind: edge.kind },
+        domAttributes: { "data-edge-kind": edge.kind },
         markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor(edge.kind), width: 18, height: 18 },
-        style: { stroke: edgeColor(edge.kind), strokeWidth: selectedEdgeId === edge.id ? 3 : 2 },
+        style: { strokeWidth: selectedEdgeId === edge.id ? 3 : 2 },
       })),
-    [board.edges, selectedEdgeId],
+    [board.edges, selectedEdgeId, themeMode],
   );
 
   const isValidBoardConnection = useCallback<IsValidConnection<BoardFlowEdge>>((connection) => {
@@ -439,10 +441,10 @@ export default function BoardWorkspace({
             proOptions={{ hideAttribution: true }}
             zoomOnDoubleClick={false}
           >
-            <Background variant={BackgroundVariant.Dots} gap={24} size={1} color={themeMode === "light" ? "rgba(148,163,184,0.25)" : "rgba(148,163,184,0.32)"} />
-            <Controls className="!border-slate-700 !bg-slate-900 !text-slate-100" />
+            <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="var(--iw-board-handle)" />
+            <Controls className="imagine-board-controls" />
             <MiniMap
-              className="!border !border-slate-800 !bg-slate-950"
+              className="imagine-board-minimap"
               nodeColor={themeMode === "light" ? "#1e40af" : "#1d4ed8"}
               maskColor={themeMode === "light" ? "rgba(241, 245, 249, 0.75)" : "rgba(2,6,23,0.66)"}
               pannable
