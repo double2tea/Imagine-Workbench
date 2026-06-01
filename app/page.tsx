@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useState, useEffect, useRef } from "react";
+import React, { useCallback, useState, useEffect, useRef, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { RefreshCw, SlidersHorizontal, Sparkles, Video } from "lucide-react";
 import AgentDock from "@/components/agent/AgentDock";
@@ -48,6 +48,21 @@ import { compressReferenceImageDataUrl, compressReferenceImageFile } from "@/lib
 
 type NoticeType = "error" | "info" | "success";
 type MaskDestination = "creative" | "agent";
+const DESKTOP_LAYOUT_QUERY = "(min-width: 1024px)";
+
+function subscribeDesktopLayout(onStoreChange: () => void): () => void {
+  const mediaQuery = window.matchMedia(DESKTOP_LAYOUT_QUERY);
+  mediaQuery.addEventListener("change", onStoreChange);
+  return () => mediaQuery.removeEventListener("change", onStoreChange);
+}
+
+function getDesktopLayoutSnapshot(): boolean {
+  return window.matchMedia(DESKTOP_LAYOUT_QUERY).matches;
+}
+
+function getServerDesktopLayoutSnapshot(): boolean {
+  return false;
+}
 
 function makeClientId(prefix: string): string {
   return `${prefix}_${Date.now()}`;
@@ -102,6 +117,12 @@ function getSelectableStoredImageModel(value: string, fallbackProvider: AiProvid
 }
 
 export default function Home() {
+  const isDesktopLayout = useSyncExternalStore(
+    subscribeDesktopLayout,
+    getDesktopLayoutSnapshot,
+    getServerDesktopLayoutSnapshot,
+  );
+
   // Database State
   const [items, setItems] = useState<StorageItem[]>([]);
 
@@ -772,6 +793,7 @@ export default function Home() {
       statusCounts={assetStats.statusCounts}
       typeCounts={assetStats.typeCounts}
       isCompareMode={isCompareMode}
+      initialVisibleItems={isDesktopLayout ? 48 : 18}
       onApplyVideoReference={applyAsVideoReference}
       onBatchDelete={handleBatchDelete}
       onBatchDownloadZip={handleBatchDownloadZip}
@@ -806,6 +828,7 @@ export default function Home() {
         setAgentReferences([{ id: asset.id, url: asset.url }]);
         setIsAgentDockOpen(true);
       }}
+      visibleItemsStep={isDesktopLayout ? 48 : 18}
       formatModelLabel={formatStoredModelLabel}
     />
   );
@@ -1108,19 +1131,21 @@ export default function Home() {
 
         {/* Creation Controls sidebar container (Col 4) */}
         <section className="imagine-creator-panel flex flex-col gap-4">
-          <section className="imagine-mobile-workflow flex flex-col gap-3 lg:hidden">
-            <section className="imagine-mobile-asset-stream">
-              <div className="mb-2 flex items-center justify-between px-1">
-                <h2 className="text-xs font-semibold text-slate-300">任务与结果</h2>
-                <span className="font-mono text-[10px] text-slate-500">{items.length} 项</span>
-              </div>
-              {renderAssetGalleryWorkspace()}
+          {!isDesktopLayout && (
+            <section className="imagine-mobile-workflow flex flex-col gap-3 lg:hidden">
+              <section className="imagine-mobile-asset-stream">
+                <div className="mb-2 flex items-center justify-between px-1">
+                  <h2 className="text-xs font-semibold text-slate-300">任务与结果</h2>
+                  <span className="font-mono text-[10px] text-slate-500">{items.length} 项</span>
+                </div>
+                {renderAssetGalleryWorkspace()}
+              </section>
+
+              {renderMobileQuickComposer()}
+
+              {renderMobileAdvancedSettings()}
             </section>
-
-            {renderMobileQuickComposer()}
-
-            {renderMobileAdvancedSettings()}
-          </section>
+          )}
 
           {/* Active Creative Panel switch */}
           <div className="imagine-control-surface hidden rounded-xl dark-glass p-4 lg:flex flex-col gap-4 min-h-[500px]">
@@ -1260,9 +1285,11 @@ export default function Home() {
           </div>
         </section>
 
-        <div className="hidden min-w-0 lg:block">
-          {renderAssetGalleryWorkspace()}
-        </div>
+        {isDesktopLayout && (
+          <div className="hidden min-w-0 lg:block">
+            {renderAssetGalleryWorkspace()}
+          </div>
+        )}
 
       </main>
 

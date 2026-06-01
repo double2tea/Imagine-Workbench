@@ -32,6 +32,7 @@ interface AssetGalleryWorkspaceProps {
   statusCounts: Record<StorageItem["status"], number>;
   typeCounts: Record<StorageItem["type"], number>;
   isCompareMode: boolean;
+  initialVisibleItems?: number;
   onApplyVideoReference: (item: StorageItem) => void;
   onBatchDelete: () => void;
   onBatchDownloadZip: () => void;
@@ -58,8 +59,11 @@ interface AssetGalleryWorkspaceProps {
   onToggleCompare: (id: string) => void;
   onToggleSelect: (id: string) => void;
   onUseAgentReference: (item: StorageItem) => void;
+  visibleItemsStep?: number;
   formatModelLabel: (value: string, fallbackProvider: AiProvider) => string;
 }
+
+const DEFAULT_VISIBLE_ITEMS = 48;
 
 export default function AssetGalleryWorkspace({
   assetDateEnd,
@@ -85,6 +89,7 @@ export default function AssetGalleryWorkspace({
   statusCounts,
   typeCounts,
   isCompareMode,
+  initialVisibleItems = DEFAULT_VISIBLE_ITEMS,
   onApplyVideoReference,
   onBatchDelete,
   onBatchDownloadZip,
@@ -111,10 +116,26 @@ export default function AssetGalleryWorkspace({
   onToggleCompare,
   onToggleSelect,
   onUseAgentReference,
+  visibleItemsStep = initialVisibleItems,
   formatModelLabel,
 }: AssetGalleryWorkspaceProps) {
   const [referencePreview, setReferencePreview] = useState<{ itemId: string; index: number } | null>(null);
   const [collapsedDateKeys, setCollapsedDateKeys] = useState<Set<string>>(() => new Set());
+  const [visibleItemState, setVisibleItemState] = useState<{ filterKey: string; limit: number }>({
+    filterKey: "",
+    limit: initialVisibleItems,
+  });
+  const filterKey = `${filterType}|${assetStatusFilter}|${assetModelFilter}|${assetDatePreset}|${assetDateStart}|${assetDateEnd}|${searchQuery}`;
+  const visibleItemLimit = visibleItemState.filterKey === filterKey ? visibleItemState.limit : initialVisibleItems;
+  const visibleItems = useMemo(
+    () => filteredItems.slice(0, visibleItemLimit),
+    [filteredItems, visibleItemLimit],
+  );
+  const priorityItemIdSet = useMemo(
+    () => new Set(visibleItems.slice(0, 6).map(item => item.id)),
+    [visibleItems],
+  );
+  const hasMoreItems = visibleItemLimit < filteredItems.length;
   const referencePreviewItem = useMemo(
     () => filteredItems.find(item => item.id === referencePreview?.itemId),
     [filteredItems, referencePreview?.itemId],
@@ -138,9 +159,10 @@ export default function AssetGalleryWorkspace({
       return { ...current, index: (referencePreviewIndex + 1) % referencePreviewUrls.length };
     });
   };
+
   const groupedItems = useMemo(() => {
     const groups = new Map<string, StorageItem[]>();
-    for (const item of filteredItems) {
+    for (const item of visibleItems) {
       const date = new Date(item.createdAt);
       const dateKey = Number.isFinite(date.getTime())
         ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
@@ -160,7 +182,7 @@ export default function AssetGalleryWorkspace({
         if (b.dateKey === "unknown") return -1;
         return b.dateKey.localeCompare(a.dateKey);
       });
-  }, [filteredItems]);
+  }, [visibleItems]);
   const toggleDateGroup = (dateKey: string) => {
     setCollapsedDateKeys(current => {
       const next = new Set(current);
@@ -233,7 +255,7 @@ export default function AssetGalleryWorkspace({
             {groupedItems.map(group => {
               const isCollapsed = collapsedDateKeys.has(group.dateKey);
               return (
-                <section key={group.dateKey} className="rounded-lg border border-slate-800/70 bg-slate-950/18">
+                <section key={group.dateKey} className="imagine-gallery-date-group rounded-lg border border-slate-800/70 bg-slate-950/18">
                   <button
                     type="button"
                     onClick={() => toggleDateGroup(group.dateKey)}
@@ -255,6 +277,7 @@ export default function AssetGalleryWorkspace({
                           canceling={cancelingItemIdSet.has(item.id)}
                           inCompare={compareItemIdSet.has(item.id)}
                           item={item}
+                          priority={priorityItemIdSet.has(item.id)}
                           selected={selectedItemIdSet.has(item.id)}
                           selectedProvider={selectedProvider}
                           onApplyVideoReference={onApplyVideoReference}
@@ -276,6 +299,21 @@ export default function AssetGalleryWorkspace({
                 </section>
               );
             })}
+
+            {hasMoreItems && (
+              <button
+                type="button"
+                onClick={() =>
+                  setVisibleItemState({
+                    filterKey,
+                    limit: Math.min(visibleItemLimit + visibleItemsStep, filteredItems.length),
+                  })
+                }
+                className="mx-auto mb-2 rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-xs font-semibold text-slate-300 transition hover:border-blue-400/45 hover:text-blue-100"
+              >
+                加载更多 {Math.min(visibleItemLimit, filteredItems.length)} / {filteredItems.length}
+              </button>
+            )}
           </div>
         )}
       </div>

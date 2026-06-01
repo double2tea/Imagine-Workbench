@@ -473,6 +473,11 @@
   gap: 12px !important;
 }
 
+.imagine-gallery-date-group {
+  content-visibility: auto;
+  contain-intrinsic-size: 720px;
+}
+
 @media (min-width: 1280px) {
   .imagine-gallery-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
@@ -486,6 +491,8 @@
 }
 
 .imagine-asset-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 390px;
   border-radius: 10px !important;
   min-width: 0;
 }

@@ -23,6 +23,7 @@ interface AssetCardProps {
   canceling: boolean;
   inCompare: boolean;
   item: StorageItem;
+  priority?: boolean;
   selected: boolean;
   selectedProvider: AiProvider;
   onApplyVideoReference: (item: StorageItem) => void;
@@ -68,6 +69,7 @@ export default function AssetCard({
   canceling,
   inCompare,
   item,
+  priority = false,
   selected,
   selectedProvider,
   onApplyVideoReference,
@@ -182,6 +184,8 @@ export default function AssetCard({
                 src={item.url}
                 alt={item.prompt}
                 className="h-full w-full cursor-pointer object-contain transition duration-500"
+                fetchPriority={priority ? "high" : "auto"}
+                loading={priority ? "eager" : "lazy"}
                 onClick={() => onOpenFullscreen(item)}
               />
             ) : (
