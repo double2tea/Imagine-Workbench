@@ -229,6 +229,10 @@ async function editOpenAiCompatibleImage(
   input: GenerateImageInput,
   provider: AiProvider,
 ): Promise<OpenAiImageResponse> {
+  if (provider === "grok2api" && input.model !== "grok-imagine-image-edit") {
+    throw new Error("Grok2API image references require the grok-imagine-image-edit model");
+  }
+
   const form = new FormData();
   form.set("model", input.model);
   form.set("prompt", input.prompt);

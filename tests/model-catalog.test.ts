@@ -48,6 +48,15 @@ test("getModelCapabilities filters by kind and provider", () => {
   assert.ok(grokImageCapabilities.every(capability => capability.provider === "grok2api"));
 });
 
+test("grok2api image references are limited to the edit model", () => {
+  const grokImage = getModelCapability("grok2api:grok-imagine-image", "image");
+  const grokImageEdit = getModelCapability("grok2api:grok-imagine-image-edit", "image");
+
+  assert.equal(grokImage.supportsReferences, false);
+  assert.equal(grokImageEdit.supportsReferences, true);
+  assert.deepEqual(grokImageEdit.sizes, [{ value: "1024x1024", label: "1024x1024" }]);
+});
+
 test("unknown model capability fails fast", () => {
   assert.throws(
     () => getModelCapability("12ai:not-a-real-model", "image"),

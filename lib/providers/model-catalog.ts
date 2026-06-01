@@ -208,7 +208,7 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     provider: "grok2api",
     model: "grok-imagine-image-lite",
     supportsAsync: false,
-    supportsReferences: true,
+    supportsReferences: false,
     sizes: GROK_IMAGE_SIZES,
   }),
   imageCapability({
@@ -217,7 +217,7 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     provider: "grok2api",
     model: "grok-imagine-image",
     supportsAsync: false,
-    supportsReferences: true,
+    supportsReferences: false,
     sizes: GROK_IMAGE_SIZES,
   }),
   imageCapability({
@@ -226,7 +226,7 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     provider: "grok2api",
     model: "grok-imagine-image-pro",
     supportsAsync: false,
-    supportsReferences: true,
+    supportsReferences: false,
     sizes: GROK_IMAGE_SIZES,
   }),
   imageCapability({

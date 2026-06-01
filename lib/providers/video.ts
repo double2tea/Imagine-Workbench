@@ -1,5 +1,14 @@
 import type { GenerateVideoInput, GenerateVideoResult, MediaStatusResult, ProviderConfig } from "./types";
-import { aspectRatioToVideoSize, authHeaders, deleteJson, getJson, isRecord, mediaOperationName, postForm } from "./utils";
+import {
+  aspectRatioToVideoSize,
+  authHeaders,
+  dataUriToBlob,
+  deleteJson,
+  getJson,
+  isRecord,
+  mediaOperationName,
+  postForm,
+} from "./utils";
 
 interface VideoCreateResponse {
   id?: string;
@@ -38,8 +47,9 @@ export async function generateVideo(config: ProviderConfig, input: GenerateVideo
     form.set("preset", "normal");
   }
 
-  input.referenceImages.forEach(reference => {
-    form.append("input_reference[]", reference.dataUri);
+  input.referenceImages.forEach((reference, index) => {
+    const blob = dataUriToBlob(reference.dataUri);
+    form.append("input_reference[]", blob, `reference_${index + 1}.png`);
   });
 
   const response = await postForm<VideoCreateResponse>(
