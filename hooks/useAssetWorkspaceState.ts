@@ -1,18 +1,34 @@
 import { useDeferredValue, useMemo, useState } from "react";
-import type { AssetStatusFilter, AssetTypeFilter } from "@/components/assets/AssetToolbar";
+import type { AssetDateFilter, AssetStatusFilter, AssetTypeFilter } from "@/components/assets/AssetToolbar";
 import type { CompareViewType } from "@/components/assets/ComparePanel";
 import type { StorageItem } from "@/lib/db";
 
 interface AssetStats {
+  dateOptions: Array<{ value: string; label: string; count: number }>;
   modelOptions: string[];
   typeCounts: Record<StorageItem["type"], number>;
   statusCounts: Record<StorageItem["status"], number>;
+}
+
+function getAssetDateKey(createdAt: string): string {
+  const date = new Date(createdAt);
+  if (!Number.isFinite(date.getTime())) return "unknown";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatAssetDateLabel(value: string): string {
+  if (value === "unknown") return "未知日期";
+  return value;
 }
 
 export function useAssetWorkspaceState(items: StorageItem[]) {
   const [filterType, setFilterType] = useState<AssetTypeFilter>("all");
   const [assetStatusFilter, setAssetStatusFilter] = useState<AssetStatusFilter>("all");
   const [assetModelFilter, setAssetModelFilter] = useState("all");
+  const [assetDateFilter, setAssetDateFilter] = useState<AssetDateFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [isCompareMode, setIsCompareMode] = useState(false);
@@ -27,6 +43,7 @@ export function useAssetWorkspaceState(items: StorageItem[]) {
   const cancelingItemIdSet = useMemo(() => new Set(cancelingItemIds), [cancelingItemIds]);
 
   const assetStats = useMemo<AssetStats>(() => {
+    const dateCounts = new Map<string, number>();
     const models = new Set<string>();
     const typeCounts: Record<StorageItem["type"], number> = { image: 0, video: 0 };
     const statusCounts: Record<StorageItem["status"], number> = {
@@ -37,12 +54,21 @@ export function useAssetWorkspaceState(items: StorageItem[]) {
     };
 
     for (const item of items) {
+      const dateKey = getAssetDateKey(item.createdAt);
+      dateCounts.set(dateKey, (dateCounts.get(dateKey) ?? 0) + 1);
       models.add(item.model);
       typeCounts[item.type] += 1;
       statusCounts[item.status] += 1;
     }
 
     return {
+      dateOptions: Array.from(dateCounts)
+        .map(([value, count]) => ({ value, label: formatAssetDateLabel(value), count }))
+        .sort((a, b) => {
+          if (a.value === "unknown") return 1;
+          if (b.value === "unknown") return -1;
+          return b.value.localeCompare(a.value);
+        }),
       modelOptions: Array.from(models).sort(),
       typeCounts,
       statusCounts,
@@ -57,11 +83,12 @@ export function useAssetWorkspaceState(items: StorageItem[]) {
       if (filterType === "videos" && item.type !== "video") return false;
       if (assetStatusFilter !== "all" && item.status !== assetStatusFilter) return false;
       if (assetModelFilter !== "all" && item.model !== assetModelFilter) return false;
+      if (assetDateFilter !== "all" && getAssetDateKey(item.createdAt) !== assetDateFilter) return false;
       if (!query) return true;
 
       return item.prompt.toLowerCase().includes(query) || item.model.toLowerCase().includes(query);
     });
-  }, [assetModelFilter, assetStatusFilter, deferredSearchQuery, filterType, items]);
+  }, [assetDateFilter, assetModelFilter, assetStatusFilter, deferredSearchQuery, filterType, items]);
 
   const searchableReferenceImages = useMemo(
     () => items.filter(item => item.type === "image" && item.status === "complete"),
@@ -77,6 +104,7 @@ export function useAssetWorkspaceState(items: StorageItem[]) {
   }, [compareItemIds, items]);
 
   return {
+    assetDateFilter,
     assetModelFilter,
     assetStats,
     assetStatusFilter,
@@ -94,6 +122,7 @@ export function useAssetWorkspaceState(items: StorageItem[]) {
     searchableReferenceImages,
     selectedItemIdSet,
     selectedItemIds,
+    setAssetDateFilter,
     setAssetModelFilter,
     setAssetStatusFilter,
     setCancelingItemIds,

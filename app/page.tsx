@@ -126,6 +126,7 @@ export default function Home() {
   };
 
   const {
+    assetDateFilter,
     assetModelFilter,
     assetStats,
     assetStatusFilter,
@@ -142,6 +143,7 @@ export default function Home() {
     searchableReferenceImages,
     selectedItemIdSet,
     selectedItemIds,
+    setAssetDateFilter,
     setAssetModelFilter,
     setAssetStatusFilter,
     setCancelingItemIds,
@@ -716,6 +718,7 @@ export default function Home() {
 
   const renderAssetGalleryWorkspace = () => (
     <AssetGalleryWorkspace
+      assetDateFilter={assetDateFilter}
       assetModelFilter={assetModelFilter}
       assetStatusFilter={assetStatusFilter}
       cancelingItemIdSet={cancelingItemIdSet}
@@ -727,6 +730,7 @@ export default function Home() {
       filterType={filterType}
       filteredItems={filteredItems}
       itemsCount={items.length}
+      dateOptions={assetStats.dateOptions}
       modelOptions={assetStats.modelOptions}
       searchQuery={searchQuery}
       selectedCount={selectedItemIds.length}
@@ -752,6 +756,7 @@ export default function Home() {
       }}
       onRetryItem={retryFailedItem}
       onReuseTask={reuseTaskInComposer}
+      onSetAssetDateFilter={setAssetDateFilter}
       onSetAssetModelFilter={setAssetModelFilter}
       onSetAssetStatusFilter={setAssetStatusFilter}
       onSetCompareSliderPos={setCompareSliderPos}

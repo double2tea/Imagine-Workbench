@@ -1,12 +1,15 @@
-import { Image as ImageIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, Image as ImageIcon, X } from "lucide-react";
+import { useMemo, useState } from "react";
 import AssetCard from "@/components/assets/AssetCard";
 import AssetSelectionBar from "@/components/assets/AssetSelectionBar";
-import AssetToolbar, { type AssetStatusFilter, type AssetTypeFilter } from "@/components/assets/AssetToolbar";
+import AssetToolbar, { type AssetDateFilter, type AssetStatusFilter, type AssetTypeFilter } from "@/components/assets/AssetToolbar";
 import ComparePanel, { type CompareViewType } from "@/components/assets/ComparePanel";
+import PreviewImage from "@/components/PreviewImage";
 import type { StorageItem } from "@/lib/db";
 import type { AiProvider } from "@/lib/providers/model-catalog";
 
 interface AssetGalleryWorkspaceProps {
+  assetDateFilter: AssetDateFilter;
   assetModelFilter: string;
   assetStatusFilter: AssetStatusFilter;
   cancelingItemIdSet: ReadonlySet<string>;
@@ -18,6 +21,7 @@ interface AssetGalleryWorkspaceProps {
   filterType: AssetTypeFilter;
   filteredItems: StorageItem[];
   itemsCount: number;
+  dateOptions: Array<{ value: string; label: string; count: number }>;
   modelOptions: string[];
   searchQuery: string;
   selectedCount: number;
@@ -40,6 +44,7 @@ interface AssetGalleryWorkspaceProps {
   onResetCompare: () => void;
   onRetryItem: (item: StorageItem) => void;
   onReuseTask: (item: StorageItem) => void;
+  onSetAssetDateFilter: (value: AssetDateFilter) => void;
   onSetAssetModelFilter: (value: string) => void;
   onSetAssetStatusFilter: (value: AssetStatusFilter) => void;
   onSetCompareSliderPos: (value: number) => void;
@@ -53,6 +58,7 @@ interface AssetGalleryWorkspaceProps {
 }
 
 export default function AssetGalleryWorkspace({
+  assetDateFilter,
   assetModelFilter,
   assetStatusFilter,
   cancelingItemIdSet,
@@ -64,6 +70,7 @@ export default function AssetGalleryWorkspace({
   filterType,
   filteredItems,
   itemsCount,
+  dateOptions,
   modelOptions,
   searchQuery,
   selectedCount,
@@ -86,6 +93,7 @@ export default function AssetGalleryWorkspace({
   onResetCompare,
   onRetryItem,
   onReuseTask,
+  onSetAssetDateFilter,
   onSetAssetModelFilter,
   onSetAssetStatusFilter,
   onSetCompareSliderPos,
@@ -97,11 +105,38 @@ export default function AssetGalleryWorkspace({
   onUseAgentReference,
   formatModelLabel,
 }: AssetGalleryWorkspaceProps) {
+  const [referencePreview, setReferencePreview] = useState<{ itemId: string; index: number } | null>(null);
+  const referencePreviewItem = useMemo(
+    () => filteredItems.find(item => item.id === referencePreview?.itemId),
+    [filteredItems, referencePreview?.itemId],
+  );
+  const referencePreviewUrls = referencePreviewItem?.generationRequest?.referenceImages ?? [];
+  const referencePreviewIndex =
+    referencePreview && referencePreviewUrls.length > 0
+      ? Math.min(referencePreview.index, referencePreviewUrls.length - 1)
+      : 0;
+  const referencePreviewUrl = referencePreviewUrls[referencePreviewIndex];
+  const hasMultipleReferencePreviews = referencePreviewUrls.length > 1;
+  const showPreviousReference = () => {
+    setReferencePreview(current => {
+      if (!current || referencePreviewUrls.length === 0) return current;
+      return { ...current, index: (referencePreviewIndex - 1 + referencePreviewUrls.length) % referencePreviewUrls.length };
+    });
+  };
+  const showNextReference = () => {
+    setReferencePreview(current => {
+      if (!current || referencePreviewUrls.length === 0) return current;
+      return { ...current, index: (referencePreviewIndex + 1) % referencePreviewUrls.length };
+    });
+  };
+
   return (
     <section className="imagine-gallery-panel flex min-w-0 flex-col gap-4">
       <AssetToolbar
+        assetDateFilter={assetDateFilter}
         assetModelFilter={assetModelFilter}
         assetStatusFilter={assetStatusFilter}
+        dateOptions={dateOptions}
         filterType={filterType}
         itemsCount={itemsCount}
         modelOptions={modelOptions}
@@ -112,6 +147,7 @@ export default function AssetGalleryWorkspace({
         deleteItemsByStatus={onDeleteItemsByStatus}
         exportMetadataJson={onExportMetadata}
         formatModelLabel={formatModelLabel}
+        setAssetDateFilter={onSetAssetDateFilter}
         setAssetModelFilter={onSetAssetModelFilter}
         setAssetStatusFilter={onSetAssetStatusFilter}
         setFilterType={onSetFilterType}
@@ -146,7 +182,7 @@ export default function AssetGalleryWorkspace({
             <p className="mt-1 max-w-sm text-xs leading-5 text-slate-600">写下创意设想并生成，文件将实时存档至本地 IndexedDB。</p>
           </div>
         ) : (
-          <div className="imagine-gallery-grid grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div className="imagine-gallery-grid grid grid-cols-1 items-start gap-6 sm:grid-cols-2 xl:grid-cols-3">
             {filteredItems.map((item) => (
               <AssetCard
                 key={item.id}
@@ -161,6 +197,7 @@ export default function AssetGalleryWorkspace({
                 onDownload={onDownloadItem}
                 onLaunchMaskEditor={onLaunchMaskEditor}
                 onOpenFullscreen={onOpenFullscreen}
+                onOpenReferencePreview={(previewItem, index) => setReferencePreview({ itemId: previewItem.id, index })}
                 onRetry={onRetryItem}
                 onReuseTask={onReuseTask}
                 onToggleCompare={onToggleCompare}
@@ -171,6 +208,78 @@ export default function AssetGalleryWorkspace({
           </div>
         )}
       </div>
+
+      {referencePreviewUrl && (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+          <button
+            type="button"
+            className="absolute inset-0 cursor-zoom-out"
+            aria-label="关闭参考图预览"
+            onClick={() => setReferencePreview(null)}
+          />
+          <div className="relative flex max-h-[92vh] w-[min(1200px,calc(100vw-32px))] flex-col overflow-hidden rounded-xl border border-white/10 bg-slate-950 shadow-2xl">
+            <div className="flex h-12 items-center justify-between border-b border-white/10 px-4">
+              <span className="font-mono text-xs text-slate-300">
+                {referencePreviewIndex + 1} / {referencePreviewUrls.length}
+              </span>
+              <button
+                type="button"
+                onClick={() => setReferencePreview(null)}
+                className="rounded-lg border border-white/10 bg-slate-900/80 p-2 text-slate-200 transition hover:bg-slate-800"
+                aria-label="关闭参考图预览"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="relative flex min-h-0 flex-1 items-center justify-center bg-black">
+              {hasMultipleReferencePreviews && (
+                <button
+                  type="button"
+                  onClick={showPreviousReference}
+                  className="absolute left-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-slate-950/75 text-slate-100 transition hover:bg-slate-900"
+                  aria-label="上一张参考图"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+              )}
+              <PreviewImage
+                src={referencePreviewUrl}
+                alt={`参考图 ${referencePreviewIndex + 1}`}
+                className="max-h-[72vh] w-full object-contain"
+              />
+              {hasMultipleReferencePreviews && (
+                <button
+                  type="button"
+                  onClick={showNextReference}
+                  className="absolute right-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-slate-950/75 text-slate-100 transition hover:bg-slate-900"
+                  aria-label="下一张参考图"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+              )}
+            </div>
+
+            <div className="no-scrollbar flex gap-2 overflow-x-auto border-t border-white/10 bg-slate-950 p-3">
+              {referencePreviewUrls.map((url, index) => (
+                <button
+                  key={`${referencePreviewItem?.id ?? "reference"}_${index}`}
+                  type="button"
+                  onClick={() => setReferencePreview(current => current ? { ...current, index } : current)}
+                  className={`h-14 w-14 shrink-0 overflow-hidden rounded-lg border bg-slate-900 transition ${
+                    index === referencePreviewIndex
+                      ? "border-cyan-300 ring-2 ring-cyan-300/30"
+                      : "border-white/10 opacity-65 hover:opacity-100"
+                  }`}
+                  aria-label={`查看参考图 ${index + 1}`}
+                >
+                  <PreviewImage src={url} alt={`参考图 ${index + 1}`} className="h-full w-full object-cover" />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

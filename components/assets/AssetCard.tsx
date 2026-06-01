@@ -30,6 +30,7 @@ interface AssetCardProps {
   onDownload: (item: StorageItem) => void;
   onLaunchMaskEditor: (imageUrl: string, id: string) => void;
   onOpenFullscreen: (item: StorageItem) => void;
+  onOpenReferencePreview: (item: StorageItem, index: number) => void;
   onRetry: (item: StorageItem) => void;
   onReuseTask: (item: StorageItem) => void;
   onToggleCompare: (id: string) => void;
@@ -51,6 +52,17 @@ function isContentSafetyError(message?: string): boolean {
   );
 }
 
+function formatCreatedAt(value: string): string {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return value;
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hour = String(date.getHours()).padStart(2, "0");
+  const minute = String(date.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day} ${hour}:${minute}`;
+}
+
 export default function AssetCard({
   canceling,
   inCompare,
@@ -63,6 +75,7 @@ export default function AssetCard({
   onDownload,
   onLaunchMaskEditor,
   onOpenFullscreen,
+  onOpenReferencePreview,
   onRetry,
   onReuseTask,
   onToggleCompare,
@@ -70,7 +83,6 @@ export default function AssetCard({
   onUseAgentReference,
 }: AssetCardProps) {
   const [isMobileActionsOpen, setIsMobileActionsOpen] = useState(false);
-  const [previewReferenceUrl, setPreviewReferenceUrl] = useState<string | null>(null);
   const provider = parseProviderModel(item.model, selectedProvider).provider;
   const isDraggableReference = item.type === "image" && item.status === "complete";
   const failedTitle = isContentSafetyError(item.errorMessage) ? "内容安全拦截" : "生成失败 / 链接中断";
@@ -98,7 +110,7 @@ export default function AssetCard({
       data-status={item.status}
       data-type={item.type}
       onDragStart={handleDragStart}
-      className={`imagine-asset-card relative overflow-hidden rounded-2xl group border bg-slate-900 shadow-xl transition-all duration-300 flex flex-col justify-between ${
+      className={`imagine-asset-card relative overflow-hidden rounded-2xl group border bg-slate-900 shadow-xl transition-all duration-300 flex flex-col ${
         selected ? "border-blue-500 ring-2 ring-blue-500/20" : "border-slate-850 hover:border-slate-750"
       }`}
     >
@@ -356,7 +368,7 @@ export default function AssetCard({
         )}
       </div>
 
-      <div className="imagine-asset-meta p-3.5 bg-[#0e0e12] flex-1 flex flex-col justify-between">
+      <div className="imagine-asset-meta p-3.5 bg-[#0e0e12]">
         <div>
           <p className="text-[11px] text-slate-300 line-clamp-2 leading-relaxed font-sans" title={item.prompt}>
             {item.prompt}
@@ -364,12 +376,12 @@ export default function AssetCard({
           {referenceUrls.length > 0 && (
             <div className="mt-2 flex items-center gap-1.5">
               <span className="shrink-0 font-mono text-[9px] text-slate-500">参考</span>
-              <div className="flex min-w-0 gap-1">
-                {referenceUrls.slice(0, 4).map((url, index) => (
+              <div className="no-scrollbar flex min-w-0 gap-1 overflow-x-auto">
+                {referenceUrls.map((url, index) => (
                   <button
                     type="button"
                     key={`${item.id}_reference_${index}`}
-                    onClick={() => setPreviewReferenceUrl(url)}
+                    onClick={() => onOpenReferencePreview(item, index)}
                     className="relative h-10 w-10 overflow-hidden rounded-md border border-white/10 bg-slate-950 transition hover:border-cyan-300/70 focus:outline-none focus:ring-2 focus:ring-cyan-400/40"
                     title={`点击放大参考图 ${index + 1}`}
                   >
@@ -403,7 +415,7 @@ export default function AssetCard({
 
           <div className="flex items-center gap-2">
             <span className="text-[9px] font-mono text-slate-650">
-              {new Date(item.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              {formatCreatedAt(item.createdAt)}
             </span>
 
             <button
@@ -424,31 +436,6 @@ export default function AssetCard({
           </div>
         </div>
       </div>
-      {previewReferenceUrl && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
-          <button
-            type="button"
-            className="absolute inset-0 cursor-zoom-out"
-            aria-label="关闭参考图预览"
-            onClick={() => setPreviewReferenceUrl(null)}
-          />
-          <div className="relative max-h-[88vh] w-full max-w-5xl overflow-hidden rounded-xl border border-white/10 bg-slate-950 shadow-2xl">
-            <button
-              type="button"
-              onClick={() => setPreviewReferenceUrl(null)}
-              className="absolute right-3 top-3 z-10 rounded-lg border border-white/10 bg-slate-950/80 p-2 text-slate-200 transition hover:bg-slate-900"
-              aria-label="关闭参考图预览"
-            >
-              <X className="h-4 w-4" />
-            </button>
-            <PreviewImage
-              src={previewReferenceUrl}
-              alt="参考图预览"
-              className="max-h-[88vh] w-full object-contain"
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }

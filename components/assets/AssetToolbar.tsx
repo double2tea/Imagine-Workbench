@@ -4,10 +4,13 @@ import type { AiProvider } from "@/lib/providers/model-catalog";
 
 export type AssetTypeFilter = "all" | "images" | "videos";
 export type AssetStatusFilter = "all" | StorageItem["status"];
+export type AssetDateFilter = "all" | string;
 
 interface AssetToolbarProps {
+  assetDateFilter: AssetDateFilter;
   assetModelFilter: string;
   assetStatusFilter: AssetStatusFilter;
+  dateOptions: Array<{ value: string; label: string; count: number }>;
   filterType: AssetTypeFilter;
   itemsCount: number;
   modelOptions: string[];
@@ -18,6 +21,7 @@ interface AssetToolbarProps {
   deleteItemsByStatus: (statuses: StorageItem["status"][]) => void;
   exportMetadataJson: () => void;
   formatModelLabel: (value: string, fallbackProvider: AiProvider) => string;
+  setAssetDateFilter: (value: AssetDateFilter) => void;
   setAssetModelFilter: (value: string) => void;
   setAssetStatusFilter: (value: AssetStatusFilter) => void;
   setFilterType: (value: AssetTypeFilter) => void;
@@ -39,8 +43,10 @@ const STATUS_FILTER_OPTIONS = [
 ] as const;
 
 export default function AssetToolbar({
+  assetDateFilter,
   assetModelFilter,
   assetStatusFilter,
+  dateOptions,
   filterType,
   itemsCount,
   modelOptions,
@@ -51,6 +57,7 @@ export default function AssetToolbar({
   deleteItemsByStatus,
   exportMetadataJson,
   formatModelLabel,
+  setAssetDateFilter,
   setAssetModelFilter,
   setAssetStatusFilter,
   setFilterType,
@@ -113,6 +120,20 @@ export default function AssetToolbar({
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center">
+            <span className="w-10 shrink-0 text-[10px] font-semibold uppercase tracking-widest text-slate-500">日期</span>
+            <select
+              value={assetDateFilter}
+              onChange={(event) => setAssetDateFilter(event.target.value)}
+              className="imagine-toolbar-select h-8 min-w-[180px] rounded-lg border border-slate-800 bg-slate-950/55 px-3 font-mono text-[10px] text-slate-300 transition focus:border-blue-400/35 focus:outline-none"
+            >
+              <option value="all">全部日期 {itemsCount}</option>
+              {dateOptions.map(option => (
+                <option key={option.value} value={option.value}>{option.label} {option.count}</option>
+              ))}
+            </select>
           </div>
         </div>
 
