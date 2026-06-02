@@ -419,14 +419,24 @@ async function generate12AiGeminiImage(config: ProviderConfig, input: GenerateIm
 }
 
 async function generate12AiAsyncImage(config: ProviderConfig, input: GenerateImageInput): Promise<GenerateImageResult> {
-  const response = await postJson<AsyncImageCreateResponse>(`${config.baseUrl}/v1/images/async/generations`, config, {
-    model: input.model,
-    prompt: input.prompt,
-    n: 1,
-    size: input.aspectRatio,
-    quality: input.imageResolution,
-    images: input.referenceImages.map(reference => reference.dataUri),
-  });
+  const body: Record<string, unknown> =
+    input.model === "gpt-image-2"
+      ? {
+          model: input.model,
+          prompt: input.prompt,
+          n: 1,
+          size: input.imageResolution,
+          quality: input.imageQuality,
+        }
+      : {
+          model: input.model,
+          prompt: input.prompt,
+          n: 1,
+          size: input.aspectRatio,
+          quality: input.imageResolution,
+          images: input.referenceImages.map(reference => reference.dataUri),
+        };
+  const response = await postJson<AsyncImageCreateResponse>(`${config.baseUrl}/v1/images/async/generations`, config, body);
 
   if (!response.id) throw new Error("Async image response did not include a task id");
   return {

@@ -243,9 +243,6 @@ export default function BoardPage() {
     : null;
   const activeImageAspectRatio = customImageAspectRatio ?? aspectRatio;
   const activeImageQuality = imageCapabilities.qualities.some(option => option.value === imageQuality) ? imageQuality : undefined;
-  const activeImageModel = imageSubmitCount > 0 && canUseAsyncImageGeneration && selectedImageProviderModel.provider === "12ai"
-    ? `12ai-async:${selectedImageProviderModel.model}`
-    : selectedModel;
   const activeVideoSize = videoCapabilities.sizes.some(option => option.value === aspectRatio) ? aspectRatio : "auto";
   const activeVideoResolution = videoCapabilities.resolutions.some(option => option.value === videoResolution) ? videoResolution : undefined;
   const activeVideoDuration = videoCapabilities.durations.some(option => option.value === videoDuration) ? videoDuration : undefined;
@@ -279,6 +276,14 @@ export default function BoardPage() {
     setAgentInput,
     setPrompt,
   });
+
+  const canUseBackgroundImageGeneration =
+    canUseAsyncImageGeneration &&
+    selectedImageProviderModel.provider === "12ai" &&
+    (selectedImageProviderModel.model !== "gpt-image-2" || referenceImages.length === 0);
+  const activeImageModel = imageSubmitCount > 0 && canUseBackgroundImageGeneration
+    ? `12ai-async:${selectedImageProviderModel.model}`
+    : selectedModel;
 
   useClipboardImageImport({
     agentReferenceCount: agentReferences.length,

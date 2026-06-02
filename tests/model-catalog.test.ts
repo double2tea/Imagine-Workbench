@@ -80,18 +80,28 @@ test("image model selector hides duplicate async variants", () => {
   assert.equal(IMAGE_MODEL_OPTIONS["12ai"].some(option => option.value.startsWith("12ai-async:")), false);
   assert.equal(supportsAsyncImageGeneration("12ai:gemini-2.5-flash-image"), true);
   assert.equal(supportsAsyncImageGeneration("12ai:gemini-3.1-flash-image-preview"), true);
-  assert.equal(supportsAsyncImageGeneration("12ai:gpt-image-2"), false);
+  assert.equal(supportsAsyncImageGeneration("12ai:gpt-image-2"), true);
+  assert.equal(getModelCapability("12ai-async:gpt-image-2", "image").supportsReferences, false);
 });
 
 test("gpt image 2 exposes common portrait and landscape sizes", () => {
   const capability = getModelCapability("12ai:gpt-image-2", "image");
 
+  assert.ok(capability.sizes.some(option => option.value === "512x512" && option.label === "512p"));
   assert.ok(capability.sizes.some(option => option.value === "1536x1024" && option.label === "1K"));
   assert.ok(capability.sizes.some(option => option.value === "1024x1536" && option.label === "1K"));
+  assert.ok(capability.sizes.some(option => option.value === "1792x1008" && option.label === "1K"));
+  assert.ok(capability.sizes.some(option => option.value === "1008x1792" && option.label === "1K"));
+  assert.ok(capability.sizes.some(option => option.value === "1792x1024" && option.label === "1K"));
+  assert.ok(capability.sizes.some(option => option.value === "1024x1792" && option.label === "1K"));
   assert.ok(capability.sizes.some(option => option.value === "2048x1536" && option.label === "2K"));
   assert.ok(capability.sizes.some(option => option.value === "1536x2048" && option.label === "2K"));
+  assert.ok(capability.sizes.some(option => option.value === "2304x1728" && option.label === "2K"));
+  assert.ok(capability.sizes.some(option => option.value === "1728x2304" && option.label === "2K"));
   assert.ok(capability.sizes.some(option => option.value === "2880x2880" && option.label === "4K"));
   assert.ok(capability.sizes.some(option => option.value === "2560x1440" && option.label === "2.5K"));
+  assert.ok(capability.sizes.some(option => option.value === "2496x1664" && option.label === "2K"));
+  assert.ok(capability.sizes.some(option => option.value === "1664x2496" && option.label === "2K"));
   assert.ok(capability.sizes.some(option => option.value === "3504x2336" && option.label === "4K"));
   assert.ok(capability.sizes.some(option => option.value === "2336x3504" && option.label === "4K"));
   assert.ok(capability.sizes.some(option => option.value === "3264x2448" && option.label === "4K"));
@@ -101,6 +111,7 @@ test("gpt image 2 exposes common portrait and landscape sizes", () => {
 test("image resolution labels hide pixel dimensions while keeping request values", () => {
   assert.deepEqual(getImageResolutionOptions("12ai:gpt-image-2", "16:9"), [
     { value: "auto", label: "Auto" },
+    { value: "1792x1008", label: "1K" },
     { value: "2048x1152", label: "2K" },
     { value: "2560x1440", label: "2.5K" },
     { value: "3840x2160", label: "4K" },
@@ -109,9 +120,16 @@ test("image resolution labels hide pixel dimensions while keeping request values
 
   assert.deepEqual(getImageResolutionOptions("12ai:gpt-image-2", "1:1"), [
     { value: "auto", label: "Auto" },
+    { value: "512x512", label: "512p" },
     { value: "1024x1024", label: "1K" },
     { value: "2048x2048", label: "2K" },
     { value: "2880x2880", label: "4K" },
+    { value: "custom", label: "自定义尺寸" },
+  ]);
+
+  assert.deepEqual(getImageResolutionOptions("12ai:gpt-image-2", "7:4"), [
+    { value: "auto", label: "Auto" },
+    { value: "1792x1024", label: "1K" },
     { value: "custom", label: "自定义尺寸" },
   ]);
 
@@ -120,6 +138,21 @@ test("image resolution labels hide pixel dimensions while keeping request values
   );
   assert.deepEqual(grokLandscapeLabels, ["720p"]);
   assert.equal(grokLandscapeLabels.some(label => label.includes("x")), false);
+});
+
+test("modelscope qwen image exposes documented aspect ratio sizes", () => {
+  assert.deepEqual(getImageResolutionOptions("modelscope:Qwen/Qwen-Image", "4:3"), [
+    { value: "1472x1140", label: "1K" },
+  ]);
+  assert.deepEqual(getImageResolutionOptions("modelscope:Qwen/Qwen-Image", "3:4"), [
+    { value: "1140x1472", label: "1K" },
+  ]);
+  assert.deepEqual(getImageResolutionOptions("modelscope:Qwen/Qwen-Image", "3:2"), [
+    { value: "1584x1056", label: "1K" },
+  ]);
+  assert.deepEqual(getImageResolutionOptions("modelscope:Qwen/Qwen-Image", "2:3"), [
+    { value: "1056x1584", label: "1K" },
+  ]);
 });
 
 test("agent chat defaults use 12AI Gemini 3.1 Flash Lite", () => {

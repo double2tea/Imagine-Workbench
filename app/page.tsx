@@ -262,10 +262,6 @@ export default function Home() {
   const activeImageResolution = imageResolution === "custom" ? customImageSize.trim() : imageResolution;
   const activeImageQuality = imageCapabilities.qualities.some(option => option.value === imageQuality) ? imageQuality : undefined;
   const selectedImageProviderModel = parseProviderModel(selectedModel, selectedProvider);
-  const shouldUseAsyncImageGeneration = (imageBackgroundGeneration || isSubmittingImage) && canUseAsyncImageGeneration;
-  const activeImageModel = shouldUseAsyncImageGeneration && selectedImageProviderModel.provider === "12ai"
-    ? `12ai-async:${selectedImageProviderModel.model}`
-    : selectedModel;
   const activeVideoSize = videoCapabilities.sizes.some(option => option.value === aspectRatio) ? aspectRatio : "auto";
   const activeVideoResolution = videoCapabilities.resolutions.some(option => option.value === videoResolution)
     ? videoResolution
@@ -317,6 +313,16 @@ export default function Home() {
     setAgentInput,
     setPrompt,
   });
+
+  const canUseBackgroundImageGeneration =
+    canUseAsyncImageGeneration &&
+    selectedImageProviderModel.provider === "12ai" &&
+    (selectedImageProviderModel.model !== "gpt-image-2" || referenceImages.length === 0);
+  const shouldUseAsyncImageGeneration = (imageBackgroundGeneration || isSubmittingImage) && canUseBackgroundImageGeneration;
+  const activeImageModel = shouldUseAsyncImageGeneration && selectedImageProviderModel.provider === "12ai"
+    ? `12ai-async:${selectedImageProviderModel.model}`
+    : selectedModel;
+
   useClipboardImageImport({
     agentReferenceCount: agentReferences.length,
     pushWorkspaceNotice,
@@ -1035,7 +1041,7 @@ export default function Home() {
             />
 
             <div className="grid grid-cols-1 gap-3">
-              {canUseAsyncImageGeneration && selectedImageProviderModel.provider === "12ai" && (
+              {canUseBackgroundImageGeneration && (
                 <label className="flex h-6 w-fit items-center gap-1.5 rounded-md border border-slate-800 bg-slate-950/45 px-2 text-[10px] font-semibold text-slate-400">
                   <input
                     type="checkbox"
@@ -1262,7 +1268,7 @@ export default function Home() {
                     selectedAspectRatio={aspectRatio}
                     selectedModel={selectedModel}
                     submitCount={imageSubmitCount}
-                    supportsBackgroundGeneration={canUseAsyncImageGeneration && selectedImageProviderModel.provider === "12ai"}
+                    supportsBackgroundGeneration={canUseBackgroundImageGeneration}
                     onApplyPreset={applyPreset}
                     onClearReferences={() => {
                       setReferenceImages([]);

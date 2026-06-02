@@ -106,16 +106,25 @@ function getImageResolutionLabel(value: string): string {
 
 const GPT_IMAGE_SIZES: ParameterOption[] = [
   imageResolutionOption("auto"),
+  imageResolutionOption("512x512"),
   imageResolutionOption("1024x1024"),
   imageResolutionOption("1536x1024"),
   imageResolutionOption("1024x1536"),
+  imageResolutionOption("1792x1008"),
+  imageResolutionOption("1008x1792"),
+  imageResolutionOption("1792x1024"),
+  imageResolutionOption("1024x1792"),
   imageResolutionOption("2048x1536"),
   imageResolutionOption("1536x2048"),
   imageResolutionOption("2048x2048"),
+  imageResolutionOption("2304x1728"),
+  imageResolutionOption("1728x2304"),
   imageResolutionOption("2880x2880"),
   imageResolutionOption("2048x1152"),
   imageResolutionOption("2560x1440"),
   imageResolutionOption("1440x2560"),
+  imageResolutionOption("2496x1664"),
+  imageResolutionOption("1664x2496"),
   imageResolutionOption("3504x2336"),
   imageResolutionOption("2336x3504"),
   imageResolutionOption("3264x2448"),
@@ -131,6 +140,8 @@ const GPT_IMAGE_RATIOS: ParameterOption[] = [
   { value: "2:3", label: "2:3 Portrait" },
   { value: "4:3", label: "4:3 Landscape" },
   { value: "3:4", label: "3:4 Portrait" },
+  { value: "7:4", label: "7:4 Landscape" },
+  { value: "4:7", label: "4:7 Portrait" },
   { value: "16:9", label: "16:9 Cinema" },
   { value: "9:16", label: "9:16 Vertical" },
 ];
@@ -224,7 +235,20 @@ const MODELSCOPE_IMAGE_SIZES: ParameterOption[] = [
   imageResolutionOption("1328x1328"),
   imageResolutionOption("1664x928"),
   imageResolutionOption("928x1664"),
+  imageResolutionOption("1472x1140"),
+  imageResolutionOption("1140x1472"),
+  imageResolutionOption("1584x1056"),
+  imageResolutionOption("1056x1584"),
 ];
+
+const DOCUMENTED_IMAGE_SIZE_RATIOS: Record<string, string> = {
+  "1664x928": "16:9",
+  "928x1664": "9:16",
+  "1472x1140": "4:3",
+  "1140x1472": "3:4",
+  "1584x1056": "3:2",
+  "1056x1584": "2:3",
+};
 
 const RUNNINGHUB_VIDEO_SIZES: ParameterOption[] = [
   { value: "auto", label: "Auto" },
@@ -275,6 +299,17 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     model: "gpt-image-2",
     supportsAsync: false,
     supportsReferences: true,
+    aspectRatios: GPT_IMAGE_RATIOS,
+    sizes: GPT_IMAGE_SIZES,
+    qualityLevels: GPT_QUALITY_OPTIONS,
+  }),
+  imageCapability({
+    value: "12ai-async:gpt-image-2",
+    label: "12AI Async GPT Image 2",
+    provider: "12ai",
+    model: "gpt-image-2",
+    supportsAsync: true,
+    supportsReferences: false,
     aspectRatios: GPT_IMAGE_RATIOS,
     sizes: GPT_IMAGE_SIZES,
     qualityLevels: GPT_QUALITY_OPTIONS,
@@ -955,6 +990,9 @@ function aspectRatiosFromSizes(sizes: ParameterOption[]): ParameterOption[] {
 }
 
 function getPixelSizeAspectRatio(value: string): string | null {
+  const documentedRatio = DOCUMENTED_IMAGE_SIZE_RATIOS[value];
+  if (documentedRatio) return documentedRatio;
+
   const match = value.match(/^(\d+)x(\d+)$/);
   if (!match) return null;
   const width = Number(match[1]);
