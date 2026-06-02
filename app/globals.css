@@ -205,8 +205,7 @@
   [class*="bg-slate-950"],
   [class*="bg-slate-900"]
 ):not([style*="background-image"]):not(.imagine-asset-hover-scrim):not(.imagine-workbench-shell):not(.board-canvas) {
-  /* U-PR6 selector hygiene (audit): broad attr selectors for legacy slate/hex remain required while components emit raw classes mixed with imagine-* primitives.
-     Future tightening candidate (once slate removed from TSX): add :not(.imagine-*) inside matchers or not-chain to scope away new primitives. Safe as-is; preserves light/dark. */
+>>>>>>> f5ab342 (fix: preserve light theme legacy slate overrides after U-PR6 audit)
   background-color: var(--iw-panel-solid, #ffffff) !important;
   background-image: none !important;
 }
@@ -236,8 +235,10 @@
   color: var(--iw-muted) !important;
 }
 
+<<<<<<< HEAD
 /* U-PR6 hygiene note: [class*="border-slate-"] + .text-slate-* overrides are broad catchers for legacy; candidate future :not(.imagine-*) once full cross-surface slate removal in parallel PRs. Current form required for mixed elements; light/dark verified. */
 
+=======
 .imagine-workbench-shell.imagine-theme-light [class*="border-slate-"],
 .imagine-workbench-shell.imagine-theme-light [class*="border-white/"] {
   border-color: var(--iw-border) !important;
@@ -304,7 +305,7 @@
   [class*="bg-slate-950"],
   [class*="bg-slate-900"]
 ):not([style*="background-image"]) {
-  /* U-PR6 selector hygiene (audit): see workbench note above re: :not(.imagine-*) future; agent-dock bg overrides kept broad for its internal legacy classes + imagine-agent-dock-panel mixing. */
+>>>>>>> f5ab342 (fix: preserve light theme legacy slate overrides after U-PR6 audit)
   background-color: #ffffff !important;
   background-image: none !important;
 }
@@ -388,7 +389,9 @@
 
 .imagine-workbench-shell.imagine-theme-light [class*="bg-slate-950/45"],
 .imagine-workbench-shell.imagine-theme-light [class*="bg-slate-900/70"] {
+<<<<<<< HEAD
   /* U-PR6 hygiene: opacity-slate catchers; add :not(.imagine-*) in future when no more raw in class attr of imagine-* elems (see AssetToolbar etc which mix). */
+=======
   background-color: #f8fafc !important;
 }
 
@@ -402,7 +405,10 @@
 }
 
 .imagine-workbench-shell.imagine-theme-light [class*="bg-slate-950/80"] {
+<<<<<<< HEAD
   /* U-PR6 hygiene comment: broad /80 slate (used in legacy modals etc); :not(.imagine-*) safe to consider later. */
+=======
+>>>>>>> f5ab342 (fix: preserve light theme legacy slate overrides after U-PR6 audit)
   background: rgba(15, 23, 42, 0.35) !important;
 }
 
