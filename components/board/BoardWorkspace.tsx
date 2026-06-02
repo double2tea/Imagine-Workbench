@@ -159,7 +159,21 @@ function targetAcceptsReference(nodes: BoardNodeModel[], targetNodeId: string): 
 }
 
 function importableFiles(dataTransfer: DataTransfer): File[] {
-  return Array.from(dataTransfer.files).filter(file => file.type.startsWith("image/") || file.type.startsWith("video/"));
+  const transferFiles = Array.from(dataTransfer.files).filter(file => file.type.startsWith("image/") || file.type.startsWith("video/"));
+  if (transferFiles.length > 0) return transferFiles;
+  return Array.from(dataTransfer.items)
+    .filter(item => item.kind === "file")
+    .map(item => item.getAsFile())
+    .filter((file): file is File => file !== null && (file.type.startsWith("image/") || file.type.startsWith("video/")));
+}
+
+function hasImportableFile(dataTransfer: DataTransfer): boolean {
+  return (
+    Array.from(dataTransfer.files).some(file => file.type.startsWith("image/") || file.type.startsWith("video/")) ||
+    Array.from(dataTransfer.items).some(item =>
+      item.kind === "file" && (item.type === "" || item.type.startsWith("image/") || item.type.startsWith("video/")),
+    )
+  );
 }
 
 function pasteImageFiles(dataTransfer: DataTransfer): File[] {
@@ -199,14 +213,32 @@ function uniqueReferences(references: ReferenceImageRef[]): ReferenceImageRef[] 
   return unique;
 }
 
+function referenceSignature(references: ReferenceImageRef[]): string {
+  return references
+    .map(reference => `${reference.id}:${reference.role ?? "general"}:${reference.url}`)
+    .join("\n");
+}
+
+function generateReferenceCandidates(nodes: BoardNodeModel[], edges: BoardEdge[], generateNodeId: string): ReferenceImageRef[] {
+  return uniqueReferences(
+    edges
+      .filter(edge => edge.to.nodeId === generateNodeId && edge.to.portId === "reference-in")
+      .flatMap(edge => boardNodeReferences(nodes.find(node => node.id === edge.from.nodeId))),
+  );
+}
+
 function promptReferenceCandidates(nodes: BoardNodeModel[], edges: BoardEdge[], promptNodeId: string): ReferenceImageRef[] {
-  const targetGenerateIds = edges
-    .filter(edge => edge.from.nodeId === promptNodeId && edge.to.portId === "prompt-in")
-    .map(edge => edge.to.nodeId);
-  const connectedReferences = edges
-    .filter(edge => targetGenerateIds.includes(edge.to.nodeId) && edge.to.portId === "reference-in")
-    .flatMap(edge => boardNodeReferences(nodes.find(node => node.id === edge.from.nodeId)));
-  if (connectedReferences.length > 0) return uniqueReferences(connectedReferences);
+  const targetGenerateIds = Array.from(new Set(
+    edges
+      .filter(edge => edge.from.nodeId === promptNodeId && edge.to.portId === "prompt-in")
+      .map(edge => edge.to.nodeId),
+  ));
+  if (targetGenerateIds.length === 1) return generateReferenceCandidates(nodes, edges, targetGenerateIds[0]);
+  if (targetGenerateIds.length > 1) {
+    const candidateGroups = targetGenerateIds.map(generateNodeId => generateReferenceCandidates(nodes, edges, generateNodeId));
+    const firstSignature = referenceSignature(candidateGroups[0] ?? []);
+    return candidateGroups.every(references => referenceSignature(references) === firstSignature) ? candidateGroups[0] ?? [] : [];
+  }
   return uniqueReferences(nodes.flatMap(node => boardNodeReferences(node)));
 }
 
@@ -604,7 +636,7 @@ export default function BoardWorkspace({
   }, [flowPositionFromClient, importFilesAtPoint]);
 
   const handleBoardDragOver = useCallback((event: ReactDragEvent<HTMLElement>): void => {
-    if (importableFiles(event.dataTransfer).length === 0) return;
+    if (!hasImportableFile(event.dataTransfer)) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = "copy";
   }, []);

@@ -411,13 +411,41 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
   }, []);
 
   const deleteNode = useCallback((nodeId: string) => {
-    setBoard(currentBoard =>
-      touchBoard(
+    setBoard(currentBoard => {
+      const deletedNode = currentBoard.nodes.find(node => node.id === nodeId);
+      const updatedAt = nowIso();
+      const removedGroupReferences = deletedNode?.kind === "asset"
+        ? currentBoard.edges
+          .filter(edge => edge.from.nodeId === nodeId && edge.to.portId === "asset-in")
+          .map(edge => ({ assetId: deletedNode.asset.assetId, groupNodeId: edge.to.nodeId }))
+        : [];
+      const remainingNodes = currentBoard.nodes.filter(node => node.id !== nodeId);
+      const remainingEdges = currentBoard.edges.filter(edge => edge.from.nodeId !== nodeId && edge.to.nodeId !== nodeId);
+      return touchBoard(
         currentBoard,
-        currentBoard.nodes.filter(node => node.id !== nodeId),
-        currentBoard.edges.filter(edge => edge.from.nodeId !== nodeId && edge.to.nodeId !== nodeId),
-      ),
-    );
+        remainingNodes
+          .map(node => {
+            if (node.kind !== "reference-group") return node;
+            const removedAssetIds = removedGroupReferences
+              .filter(reference => reference.groupNodeId === node.id)
+              .map(reference => reference.assetId);
+            if (removedAssetIds.length === 0) return node;
+            return {
+              ...node,
+              references: node.references.filter(reference => {
+                if (!removedAssetIds.includes(reference.assetId)) return true;
+                return remainingEdges.some(edge => {
+                  if (edge.to.nodeId !== node.id || edge.to.portId !== "asset-in") return false;
+                  const sourceNode = remainingNodes.find(item => item.id === edge.from.nodeId);
+                  return sourceNode?.kind === "asset" && sourceNode.asset.assetId === reference.assetId;
+                });
+              }),
+              updatedAt,
+            };
+          }),
+        remainingEdges,
+      );
+    });
     setSelectedNodeId(currentId => (currentId === nodeId ? null : currentId));
   }, []);
 
