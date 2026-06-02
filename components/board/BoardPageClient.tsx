@@ -1491,6 +1491,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       >
         <BoardSidePanel
           assetCount={items.length}
+          revealKey={boardController.selectedNodeId ?? boardController.selectedEdgeId}
           inspectorPanel={(
             <BoardInspector
               imageModelGroups={imageModelGroups}

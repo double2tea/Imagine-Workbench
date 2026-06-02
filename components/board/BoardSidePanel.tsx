@@ -1,14 +1,18 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useCallback, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight, PanelRight } from "lucide-react";
 
 const BOARD_SIDE_COLLAPSED_KEY = "imagine_board_side_collapsed";
+const BOARD_SIDE_INSPECTOR_HEIGHT_KEY = "imagine_board_inspector_height";
+const DEFAULT_INSPECTOR_HEIGHT = 320;
+const MIN_PANEL_SECTION_HEIGHT = 180;
 
 interface BoardSidePanelProps {
   assetCount: number;
   assetsPanel: ReactNode;
   inspectorPanel: ReactNode;
+  revealKey?: string | null;
 }
 
 function readCollapsedPreference(): boolean {
@@ -16,29 +20,78 @@ function readCollapsedPreference(): boolean {
   return window.localStorage.getItem(BOARD_SIDE_COLLAPSED_KEY) === "1";
 }
 
-export default function BoardSidePanel({ assetCount, assetsPanel, inspectorPanel }: BoardSidePanelProps) {
-  const [collapsed, setCollapsed] = useState(readCollapsedPreference);
+function readInspectorHeightPreference(): number {
+  if (typeof window === "undefined") return DEFAULT_INSPECTOR_HEIGHT;
+  const stored = Number(window.localStorage.getItem(BOARD_SIDE_INSPECTOR_HEIGHT_KEY));
+  return Number.isFinite(stored) && stored >= MIN_PANEL_SECTION_HEIGHT ? stored : DEFAULT_INSPECTOR_HEIGHT;
+}
+
+function clampInspectorHeight(value: number, panelHeight: number): number {
+  const maxHeight = Math.max(MIN_PANEL_SECTION_HEIGHT, panelHeight - MIN_PANEL_SECTION_HEIGHT);
+  return Math.min(Math.max(value, MIN_PANEL_SECTION_HEIGHT), maxHeight);
+}
+
+export default function BoardSidePanel({ assetCount, assetsPanel, inspectorPanel, revealKey }: BoardSidePanelProps) {
+  const panelBodyRef = useRef<HTMLDivElement | null>(null);
+  const [collapsedPreference, setCollapsedPreference] = useState(readCollapsedPreference);
+  const [inspectorHeight, setInspectorHeight] = useState(readInspectorHeightPreference);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const collapsed = collapsedPreference && !revealKey;
 
   const toggleCollapsed = () => {
-    setCollapsed(prev => {
-      const next = !prev;
+    setCollapsedPreference(() => {
+      const next = !collapsed;
       window.localStorage.setItem(BOARD_SIDE_COLLAPSED_KEY, next ? "1" : "0");
       return next;
     });
   };
 
+  const handleDividerPointerDown = useCallback((event: PointerEvent<HTMLButtonElement>) => {
+    const panelBody = panelBodyRef.current;
+    if (!panelBody) return;
+    event.preventDefault();
+    const panelHeight = panelBody.getBoundingClientRect().height;
+    const startY = event.clientY;
+    const startHeight = inspectorHeight;
+
+    const handlePointerMove = (moveEvent: globalThis.PointerEvent): void => {
+      const nextHeight = clampInspectorHeight(startHeight + moveEvent.clientY - startY, panelHeight);
+      setInspectorHeight(nextHeight);
+    };
+    const handlePointerUp = (upEvent: globalThis.PointerEvent): void => {
+      const nextHeight = clampInspectorHeight(startHeight + upEvent.clientY - startY, panelHeight);
+      setInspectorHeight(nextHeight);
+      window.localStorage.setItem(BOARD_SIDE_INSPECTOR_HEIGHT_KEY, String(Math.round(nextHeight)));
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp, { once: true });
+  }, [inspectorHeight]);
+
   const panelBody = (
-    <div className="imagine-board-side-panel-body flex min-h-0 min-w-0 flex-1 flex-col">
-      <div className="imagine-board-side-panel-scroll min-h-0 flex-1 overflow-y-auto">
+    <div ref={panelBodyRef} className="imagine-board-side-panel-body flex min-h-0 min-w-0 flex-1 flex-col">
+      <section className="min-h-[180px] shrink-0 overflow-y-auto" style={{ flexBasis: inspectorHeight }}>
         {inspectorPanel}
-        <div className="border-t border-[var(--iw-border)] px-3 py-2">
+      </section>
+      <button
+        type="button"
+        className="h-2 shrink-0 cursor-row-resize border-y border-[var(--iw-border)] bg-[var(--iw-panel-soft)] transition hover:bg-[var(--iw-panel)]"
+        title="调整检查器和本地资产高度"
+        aria-label="调整检查器和本地资产高度"
+        onPointerDown={handleDividerPointerDown}
+      />
+      <section className="flex min-h-0 flex-1 flex-col">
+        <div className="shrink-0 px-3 py-2">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--iw-faint)]">
             本地资产 <span className="font-mono normal-case tracking-normal text-[var(--iw-muted)]">{assetCount}</span>
           </p>
         </div>
-        {assetsPanel}
-      </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {assetsPanel}
+        </div>
+      </section>
     </div>
   );
 
