@@ -41,9 +41,15 @@ import BoardNode, { type BoardFlowNode } from "@/components/board/BoardNode";
 import type { BoardGenerateInputSummary } from "@/components/board/GenerateBoardNode";
 import BoardEmptyHint from "@/components/board/BoardEmptyHint";
 import BoardToolbar from "@/components/board/BoardToolbar";
-import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
-import type { ThemeMode } from "@/components/workbench/WorkspaceHeader";
+import BoardAssetCompareOverlay from "@/components/board/BoardAssetCompareOverlay";
 import type { StorageItem } from "@/lib/db";
+import {
+  assetCompareReferenceUrl,
+  buildBoardPromptReferences,
+  generateReferenceCandidates,
+  isGenerateEdgeProcessing,
+} from "@/lib/board/prompt-references";
+import type { ThemeMode } from "@/components/workbench/WorkspaceHeader";
 import type { CapturedVideoFrame } from "@/lib/video-frame";
 import {
   DEFAULT_AGENT_NODE_SIZE,
@@ -67,6 +73,7 @@ interface BoardWorkspaceProps {
   boardSummaries: BoardSummary[];
   controller: BoardStateController;
   children?: ReactNode;
+  galleryItems?: StorageItem[];
   themeMode: ThemeMode;
   onBack: () => void;
   onCaptureVideoFrame: (nodeId: string, item: StorageItem, frame: CapturedVideoFrame) => void | Promise<void>;
@@ -323,51 +330,6 @@ function isTextEntryTarget(target: EventTarget | null): boolean {
   );
 }
 
-function boardNodeReferences(node: BoardNodeModel | undefined): ReferenceImageRef[] {
-  if (node?.kind === "asset" && node.asset.type === "image") {
-    return [{ id: node.asset.assetId, role: "general", url: node.asset.url }];
-  }
-  if (node?.kind === "reference-group") {
-    return node.references.map(reference => ({ id: reference.assetId, role: reference.role, url: reference.url }));
-  }
-  return [];
-}
-
-function uniqueReferences(references: ReferenceImageRef[]): ReferenceImageRef[] {
-  const seen = new Set<string>();
-  const unique: ReferenceImageRef[] = [];
-  for (const reference of references) {
-    const key = `${reference.id}:${reference.url}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    unique.push(reference);
-  }
-  return unique;
-}
-
-function generateReferenceCandidates(nodes: BoardNodeModel[], edges: BoardEdge[], generateNodeId: string): ReferenceImageRef[] {
-  return uniqueReferences(
-    edges
-      .filter(edge => edge.to.nodeId === generateNodeId && edge.to.portId === "reference-in")
-      .flatMap(edge => boardNodeReferences(nodes.find(node => node.id === edge.from.nodeId))),
-  );
-}
-
-function promptReferenceCandidates(nodes: BoardNodeModel[], edges: BoardEdge[], promptNodeId: string): ReferenceImageRef[] {
-  const targetGenerateIds = Array.from(new Set(
-    edges
-      .filter(edge => edge.from.nodeId === promptNodeId && edge.to.portId === "prompt-in")
-      .map(edge => edge.to.nodeId),
-  ));
-  if (targetGenerateIds.length === 1) return generateReferenceCandidates(nodes, edges, targetGenerateIds[0]);
-  if (targetGenerateIds.length > 1) {
-    return uniqueReferences(
-      targetGenerateIds.flatMap(generateNodeId => generateReferenceCandidates(nodes, edges, generateNodeId)),
-    );
-  }
-  return uniqueReferences(nodes.flatMap(node => boardNodeReferences(node)));
-}
-
 function getBoardVar(varName: string, fallback: string): string {
   if (typeof document === "undefined") return fallback;
   const cs = getComputedStyle(document.querySelector(".imagine-workbench-shell") || document.documentElement);
@@ -416,6 +378,7 @@ export default function BoardWorkspace({
   boardSummaries,
   children,
   controller,
+  galleryItems = [],
   themeMode,
   onBack,
   onCaptureVideoFrame,
@@ -437,11 +400,20 @@ export default function BoardWorkspace({
   const flowHostRef = useRef<HTMLElement | null>(null);
   const copiedNodeRef = useRef<CopiedBoardNode | null>(null);
   const [quickInsertMenu, setQuickInsertMenu] = useState<QuickInsertMenu | null>(null);
+  const [assetCompare, setAssetCompare] = useState<{ originalUrl: string; resultUrl: string } | null>(null);
+  const galleryReferenceItems = useMemo(
+    () => galleryItems.map(item => ({ id: item.id, status: item.status, type: item.type, url: item.url })),
+    [galleryItems],
+  );
   const {
     board,
+    canUndo,
     saveStatus,
     selectedEdgeId,
     selectedNodeId,
+    beginUndoGesture,
+    endUndoGesture,
+    undo,
     addAgentNode,
     addAssetNode,
     addAssetToReferenceGroup,
@@ -482,10 +454,34 @@ export default function BoardWorkspace({
           node,
           generateReferences:
             node.kind === "image-generate" || node.kind === "video-generate"
-              ? generateReferenceCandidates(board.nodes, board.edges, node.id)
+              ? buildBoardPromptReferences({
+                nodes: board.nodes,
+                edges: board.edges,
+                focus: { kind: "generate", nodeId: node.id },
+                galleryItems: galleryReferenceItems,
+              })
               : [],
-          promptReferences: node.kind === "prompt" ? promptReferenceCandidates(board.nodes, board.edges, node.id) : [],
+          promptReferences:
+            node.kind === "prompt"
+              ? buildBoardPromptReferences({
+                nodes: board.nodes,
+                edges: board.edges,
+                focus: { kind: "prompt", nodeId: node.id },
+                galleryItems: galleryReferenceItems,
+              })
+              : [],
+          compareReferenceUrl:
+            node.kind === "asset" && node.asset.type === "image"
+              ? assetCompareReferenceUrl(node.id, board.nodes, board.edges)
+              : null,
           onCaptureVideoFrame,
+          onOpenAssetCompare: (nodeId: string) => {
+            const assetNode = board.nodes.find(item => item.id === nodeId);
+            if (assetNode?.kind !== "asset" || assetNode.asset.type !== "image") return;
+            const originalUrl = assetCompareReferenceUrl(nodeId, board.nodes, board.edges);
+            if (!originalUrl) return;
+            setAssetCompare({ originalUrl, resultUrl: assetNode.asset.url });
+          },
           onDelete: deleteNode,
           onEditAssetImage,
           onExecuteGenerate: onExecuteGenerateNode,
@@ -504,6 +500,7 @@ export default function BoardWorkspace({
     [
       board.nodes,
       board.edges,
+      galleryReferenceItems,
       deleteNode,
       onCaptureVideoFrame,
       onEditAssetImage,
@@ -532,13 +529,13 @@ export default function BoardWorkspace({
         targetHandle: edge.to.portId,
         type: "smoothstep",
         selected: selectedEdgeId === edge.id,
-        animated: edge.kind === "result",
+        animated: edge.kind === "result" || isGenerateEdgeProcessing(edge, board.nodes),
         data: { kind: edge.kind },
         className: `imagine-board-edge imagine-board-edge-${edge.kind}`,
         markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor(edge.kind, themeMode), width: 18, height: 18 },
         style: { strokeWidth: selectedEdgeId === edge.id ? 3 : 2 },
       })),
-    [board.edges, selectedEdgeId, themeMode],
+    [board.edges, board.nodes, selectedEdgeId, themeMode],
   );
 
   const isValidBoardConnection = useCallback<IsValidConnection<BoardFlowEdge>>((connection) => {
@@ -906,12 +903,18 @@ export default function BoardWorkspace({
         if (!copiedNodeRef.current) return;
         pasteCopiedNode();
         event.preventDefault();
+        return;
+      }
+      if (key === "z" && !event.shiftKey) {
+        if (!canUndo) return;
+        undo();
+        event.preventDefault();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [board.nodes, pasteCopiedNode, selectedNodeId]);
+  }, [board.nodes, canUndo, pasteCopiedNode, selectedNodeId, undo]);
 
   return (
     <main className={`imagine-workbench-shell imagine-theme-${themeMode} flex h-screen min-h-0 flex-col bg-[var(--iw-bg)] text-[var(--iw-text)]`}>
@@ -922,9 +925,11 @@ export default function BoardWorkspace({
         showGrid={board.config.showGrid}
         showMiniMap={board.config.showMiniMap}
         nodeCount={board.nodes.length}
+        canUndo={canUndo}
         saveStatus={saveStatus}
         themeMode={themeMode}
         onAddAgent={addAgentAtCenter}
+        onUndo={undo}
         onAddImageGenerate={addImageGenerateAtCenter}
         onAddNote={addNoteAtCenter}
         onAddPrompt={addPromptAtCenter}
@@ -984,6 +989,8 @@ export default function BoardWorkspace({
             }}
             onMoveEnd={(_event, viewport) => setViewport(viewport)}
             onNodeClick={handleNodeClick}
+            onNodeDragStart={() => beginUndoGesture()}
+            onNodeDragStop={() => endUndoGesture()}
             onNodesChange={handleNodesChange}
             onNodesDelete={handleNodesDelete}
             onPaneClick={() => {
@@ -1036,6 +1043,13 @@ export default function BoardWorkspace({
         </section>
         {children}
       </div>
+      {assetCompare && (
+        <BoardAssetCompareOverlay
+          originalUrl={assetCompare.originalUrl}
+          resultUrl={assetCompare.resultUrl}
+          onClose={() => setAssetCompare(null)}
+        />
+      )}
     </main>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BOARD_UNDO_LIMIT, cloneBoardHistory, type BoardHistorySnapshot } from "@/lib/board/history";
 import {
   DEFAULT_AGENT_NODE_SIZE,
   DEFAULT_ASSET_NODE_SIZE,
@@ -49,10 +50,14 @@ const DEFAULT_VARIANT_COUNT: BoardGenerateVariantCount = 1;
 
 export interface BoardStateController {
   board: BoardDocument;
+  canUndo: boolean;
   saveStatus: BoardSaveStatus;
   selectedEdgeId: string | null;
   selectedNodeId: string | null;
   saveError: string | null;
+  beginUndoGesture: () => void;
+  endUndoGesture: () => void;
+  undo: () => void;
   addAgentNode: (input?: CreateAgentNodeInput) => string;
   addAssetNode: (input: CreateAssetNodeInput) => string;
   addGenerateNode: (input: CreateGenerateNodeInput) => string;
@@ -206,12 +211,66 @@ function isCompatibleConnection(from: BoardPortRef, to: BoardPortRef): BoardEdge
 }
 
 export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateController {
-  const [board, setBoard] = useState<BoardDocument>(() => createEmptyBoard(boardId));
+  const [board, setBoardState] = useState<BoardDocument>(() => createEmptyBoard(boardId));
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<BoardSaveStatus>("loading");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [canUndo, setCanUndo] = useState(false);
+  const undoStackRef = useRef<BoardHistorySnapshot[]>([]);
+  const dragUndoCapturedRef = useRef(false);
+
+  const clearUndoHistory = useCallback(() => {
+    undoStackRef.current = [];
+    dragUndoCapturedRef.current = false;
+    setCanUndo(false);
+  }, []);
+
+  const pushUndoSnapshot = useCallback((snapshot: BoardDocument) => {
+    const stack = undoStackRef.current;
+    stack.push(cloneBoardHistory(snapshot));
+    if (stack.length > BOARD_UNDO_LIMIT) stack.shift();
+    setCanUndo(stack.length > 0);
+  }, []);
+
+  const mutateBoard = useCallback((
+    updater: (current: BoardDocument) => BoardDocument,
+    options?: { skipUndo?: boolean },
+  ) => {
+    setBoardState(current => {
+      if (!options?.skipUndo && hasLoaded) pushUndoSnapshot(current);
+      return updater(current);
+    });
+  }, [hasLoaded, pushUndoSnapshot]);
+
+  const beginUndoGesture = useCallback(() => {
+    if (!hasLoaded || dragUndoCapturedRef.current) return;
+    dragUndoCapturedRef.current = true;
+    pushUndoSnapshot(board);
+  }, [board, hasLoaded, pushUndoSnapshot]);
+
+  const endUndoGesture = useCallback(() => {
+    dragUndoCapturedRef.current = false;
+  }, []);
+
+  const undo = useCallback(() => {
+    const snapshot = undoStackRef.current.pop();
+    if (!snapshot) {
+      setCanUndo(false);
+      return;
+    }
+    setCanUndo(undoStackRef.current.length > 0);
+    dragUndoCapturedRef.current = false;
+    setBoardState(current => ({
+      ...current,
+      nodes: snapshot.nodes,
+      edges: snapshot.edges,
+      config: snapshot.config,
+      viewport: snapshot.viewport,
+      updatedAt: nowIso(),
+    }));
+  }, []);
 
   useEffect(() => {
     let isActive = true;
@@ -222,7 +281,8 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       const storedBoard = await getBoardFromDB(boardId);
       if (!isActive) return;
 
-      setBoard(storedBoard ? normalizeBoard(storedBoard) : createEmptyBoard(boardId));
+      clearUndoHistory();
+      setBoardState(storedBoard ? normalizeBoard(storedBoard) : createEmptyBoard(boardId));
       setSaveError(null);
       setSaveStatus("idle");
       setHasLoaded(true);
@@ -238,7 +298,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     return () => {
       isActive = false;
     };
-  }, [boardId]);
+  }, [boardId, clearUndoHistory]);
 
   useEffect(() => {
     if (!hasLoaded) return;
@@ -280,11 +340,11 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       updatedAt: createdAt,
     };
 
-    setBoard(currentBoard => touchBoard(currentBoard, [...currentBoard.nodes, node]));
+    mutateBoard(currentBoard => touchBoard(currentBoard, [...currentBoard.nodes, node]));
     setSelectedNodeId(nodeId);
     setSelectedEdgeId(null);
     return nodeId;
-  }, [board.nodes]);
+  }, [board.nodes, mutateBoard]);
 
   const addPromptNode = useCallback((input: CreatePromptNodeInput = {}): string => {
     const createdAt = nowIso();
@@ -300,11 +360,11 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       updatedAt: createdAt,
     };
 
-    setBoard(currentBoard => touchBoard(currentBoard, [...currentBoard.nodes, node]));
+    mutateBoard(currentBoard => touchBoard(currentBoard, [...currentBoard.nodes, node]));
     setSelectedNodeId(nodeId);
     setSelectedEdgeId(null);
     return nodeId;
-  }, [board.nodes]);
+  }, [board.nodes, mutateBoard]);
 
   const addReferenceGroupNode = useCallback((input: CreateReferenceGroupNodeInput = {}): string => {
     const createdAt = nowIso();
@@ -320,11 +380,11 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       updatedAt: createdAt,
     };
 
-    setBoard(currentBoard => touchBoard(currentBoard, [...currentBoard.nodes, node]));
+    mutateBoard(currentBoard => touchBoard(currentBoard, [...currentBoard.nodes, node]));
     setSelectedNodeId(nodeId);
     setSelectedEdgeId(null);
     return nodeId;
-  }, [board.nodes]);
+  }, [board.nodes, mutateBoard]);
 
   const addGenerateNode = useCallback((input: CreateGenerateNodeInput): string => {
     const createdAt = nowIso();
@@ -365,11 +425,11 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       };
     }
 
-    setBoard(currentBoard => touchBoard(currentBoard, [...currentBoard.nodes, node]));
+    mutateBoard(currentBoard => touchBoard(currentBoard, [...currentBoard.nodes, node]));
     setSelectedNodeId(nodeId);
     setSelectedEdgeId(null);
     return nodeId;
-  }, [board.nodes]);
+  }, [board.nodes, mutateBoard]);
 
   const addAgentNode = useCallback((input: CreateAgentNodeInput = {}): string => {
     const createdAt = nowIso();
@@ -385,11 +445,11 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       updatedAt: createdAt,
     };
 
-    setBoard(currentBoard => touchBoard(currentBoard, [...currentBoard.nodes, node]));
+    mutateBoard(currentBoard => touchBoard(currentBoard, [...currentBoard.nodes, node]));
     setSelectedNodeId(nodeId);
     setSelectedEdgeId(null);
     return nodeId;
-  }, [board.nodes]);
+  }, [board.nodes, mutateBoard]);
 
   const addNoteNode = useCallback((input: CreateNoteNodeInput = {}): string => {
     const createdAt = nowIso();
@@ -405,20 +465,20 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       updatedAt: createdAt,
     };
 
-    setBoard(currentBoard => touchBoard(currentBoard, [...currentBoard.nodes, node]));
+    mutateBoard(currentBoard => touchBoard(currentBoard, [...currentBoard.nodes, node]));
     setSelectedNodeId(nodeId);
     setSelectedEdgeId(null);
     return nodeId;
-  }, [board.nodes]);
+  }, [board.nodes, mutateBoard]);
 
   const clearBoard = useCallback(() => {
-    setBoard(currentBoard => touchBoard(currentBoard, [], []));
+    mutateBoard(currentBoard => touchBoard(currentBoard, [], []));
     setSelectedNodeId(null);
     setSelectedEdgeId(null);
-  }, []);
+  }, [mutateBoard]);
 
   const deleteNode = useCallback((nodeId: string) => {
-    setBoard(currentBoard => {
+    mutateBoard(currentBoard => {
       const deletedNode = currentBoard.nodes.find(node => node.id === nodeId);
       const updatedAt = nowIso();
       const removedGroupReferences = deletedNode?.kind === "asset"
@@ -454,12 +514,12 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       );
     });
     setSelectedNodeId(currentId => (currentId === nodeId ? null : currentId));
-  }, []);
+  }, [mutateBoard]);
 
   const deleteEdge = useCallback((edgeId: string) => {
-    setBoard(currentBoard => touchBoard(currentBoard, currentBoard.nodes, currentBoard.edges.filter(edge => edge.id !== edgeId)));
+    mutateBoard(currentBoard => touchBoard(currentBoard, currentBoard.nodes, currentBoard.edges.filter(edge => edge.id !== edgeId)));
     setSelectedEdgeId(currentId => (currentId === edgeId ? null : currentId));
-  }, []);
+  }, [mutateBoard]);
 
   const connectPorts = useCallback((from: BoardPortRef, to: BoardPortRef) => {
     const kind = isCompatibleConnection(from, to);
@@ -471,7 +531,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       to,
       createdAt,
     };
-    setBoard(currentBoard => {
+    mutateBoard(currentBoard => {
       const withoutDuplicate = currentBoard.edges.filter(
         currentEdge =>
           !(
@@ -485,11 +545,11 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     });
     setSelectedEdgeId(edge.id);
     setSelectedNodeId(null);
-  }, []);
+  }, [mutateBoard]);
 
   const addAssetToReferenceGroup = useCallback((assetNodeId: string, groupNodeId: string) => {
     const updatedAt = nowIso();
-    setBoard(currentBoard => {
+    mutateBoard(currentBoard => {
       const assetNode = currentBoard.nodes.find(node => node.id === assetNodeId);
       if (assetNode?.kind !== "asset" || assetNode.asset.type !== "image") {
         throw new Error("参考组只支持图片资产");
@@ -511,11 +571,11 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
         }),
       );
     });
-  }, []);
+  }, [mutateBoard]);
 
   const removeReferenceGroupItem = useCallback((groupNodeId: string, assetId: string) => {
     const updatedAt = nowIso();
-    setBoard(currentBoard => {
+    mutateBoard(currentBoard => {
       const assetNodeIds = currentBoard.nodes
         .filter(node => node.kind === "asset" && node.asset.assetId === assetId)
         .map(node => node.id);
@@ -535,11 +595,11 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
         ),
       );
     });
-  }, []);
+  }, [mutateBoard]);
 
   const moveReferenceGroupItem = useCallback((groupNodeId: string, assetId: string, direction: "up" | "down") => {
     const updatedAt = nowIso();
-    setBoard(currentBoard =>
+    mutateBoard(currentBoard =>
       touchBoard(
         currentBoard,
         currentBoard.nodes.map(node => {
@@ -554,11 +614,11 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
         }),
       ),
     );
-  }, []);
+  }, [mutateBoard]);
 
   const updateReferenceGroupItemRole = useCallback((groupNodeId: string, assetId: string, role: BoardReferenceRole) => {
     const updatedAt = nowIso();
-    setBoard(currentBoard =>
+    mutateBoard(currentBoard =>
       touchBoard(
         currentBoard,
         currentBoard.nodes.map(node =>
@@ -568,7 +628,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
         ),
       ),
     );
-  }, []);
+  }, [mutateBoard]);
 
   const selectNode = useCallback((nodeId: string | null) => {
     setSelectedNodeId(nodeId);
@@ -581,67 +641,70 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
   }, []);
 
   const setViewport = useCallback((viewport: BoardViewport) => {
-    setBoard(currentBoard => ({
+    mutateBoard(currentBoard => ({
       ...currentBoard,
       viewport,
       updatedAt: nowIso(),
-    }));
-  }, []);
+    }), { skipUndo: true });
+  }, [mutateBoard]);
 
   const updateBoardTitle = useCallback((title: string) => {
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
       throw new Error("画板名称不能为空");
     }
-    setBoard(currentBoard => ({
+    mutateBoard(currentBoard => ({
       ...currentBoard,
       title: trimmedTitle,
       updatedAt: nowIso(),
     }));
-  }, []);
+  }, [mutateBoard]);
 
   const updateBoardConfig = useCallback((config: Partial<BoardConfig>) => {
-    setBoard(currentBoard => ({
+    mutateBoard(currentBoard => ({
       ...currentBoard,
       config: { ...currentBoard.config, ...config },
       updatedAt: nowIso(),
-    }));
-  }, []);
+    }), { skipUndo: true });
+  }, [mutateBoard]);
 
   const updateNodePosition = useCallback((nodeId: string, position: BoardPoint) => {
     const updatedAt = nowIso();
-    setBoard(currentBoard =>
-      touchBoard(
+    mutateBoard(
+      currentBoard => touchBoard(
         currentBoard,
         currentBoard.nodes.map(node => (node.id === nodeId ? { ...node, position, updatedAt } : node)),
       ),
+      { skipUndo: true },
     );
-  }, []);
+  }, [mutateBoard]);
 
   const updateNodeSize = useCallback((nodeId: string, size: BoardSize) => {
     const updatedAt = nowIso();
-    setBoard(currentBoard =>
-      touchBoard(
+    mutateBoard(
+      currentBoard => touchBoard(
         currentBoard,
         currentBoard.nodes.map(node => (node.id === nodeId ? { ...node, size, updatedAt } : node)),
       ),
+      { skipUndo: true },
     );
-  }, []);
+  }, [mutateBoard]);
 
   const updatePromptNode = useCallback((nodeId: string, prompt: string) => {
     const updatedAt = nowIso();
-    setBoard(currentBoard =>
-      touchBoard(
+    mutateBoard(
+      currentBoard => touchBoard(
         currentBoard,
         currentBoard.nodes.map(node => (node.id === nodeId && node.kind === "prompt" ? { ...node, prompt, updatedAt } : node)),
       ),
+      { skipUndo: true },
     );
-  }, []);
+  }, [mutateBoard]);
 
   const updateGenerateNode = useCallback((nodeId: string, input: BoardGenerateNodeUpdate) => {
     const updatedAt = nowIso();
-    setBoard(currentBoard =>
-      touchBoard(
+    mutateBoard(
+      currentBoard => touchBoard(
         currentBoard,
         currentBoard.nodes.map(node =>
           node.id === nodeId && (node.kind === "image-generate" || node.kind === "video-generate")
@@ -649,36 +712,43 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
             : node,
         ),
       ),
+      { skipUndo: true },
     );
-  }, []);
+  }, [mutateBoard]);
 
   const updateAgentInstruction = useCallback((nodeId: string, instruction: string) => {
     const updatedAt = nowIso();
-    setBoard(currentBoard =>
-      touchBoard(
+    mutateBoard(
+      currentBoard => touchBoard(
         currentBoard,
         currentBoard.nodes.map(node => (node.id === nodeId && node.kind === "agent" ? { ...node, instruction, updatedAt } : node)),
       ),
+      { skipUndo: true },
     );
-  }, []);
+  }, [mutateBoard]);
 
   const updateNoteBody = useCallback((nodeId: string, body: string) => {
     const updatedAt = nowIso();
-    setBoard(currentBoard =>
-      touchBoard(
+    mutateBoard(
+      currentBoard => touchBoard(
         currentBoard,
         currentBoard.nodes.map(node => (node.id === nodeId && node.kind === "note" ? { ...node, body, updatedAt } : node)),
       ),
+      { skipUndo: true },
     );
-  }, []);
+  }, [mutateBoard]);
 
   return useMemo(
     () => ({
       board,
+      canUndo,
       saveStatus,
       selectedEdgeId,
       selectedNodeId,
       saveError,
+      beginUndoGesture,
+      endUndoGesture,
+      undo,
       addAgentNode,
       addAssetNode,
       addGenerateNode,
@@ -713,7 +783,10 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       addPromptNode,
       addReferenceGroupNode,
       addAssetToReferenceGroup,
+      beginUndoGesture,
+      endUndoGesture,
       board,
+      canUndo,
       clearBoard,
       connectPorts,
       deleteEdge,
@@ -734,6 +807,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       updateGenerateNode,
       updateNodePosition,
       updateNodeSize,
+      undo,
       updateNoteBody,
       updatePromptNode,
     ],

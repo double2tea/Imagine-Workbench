@@ -11,7 +11,16 @@ export {
   DEFAULT_REFERENCE_GROUP_NODE_SIZE,
   createEmptyBoard,
 } from "@/lib/board/defaults";
+export { BOARD_UNDO_LIMIT, cloneBoardHistory, type BoardHistorySnapshot } from "@/lib/board/history";
 export { deleteBoardFromDB, getBoardFromDB, listBoardSummariesFromDB, saveBoardToDB } from "@/lib/board/persistence";
+export {
+  assetCompareReferenceUrl,
+  buildBoardPromptReferences,
+  generateReferenceCandidates,
+  isGenerateEdgeProcessing,
+  type BoardGalleryReferenceItem,
+  type BoardPromptReference,
+} from "@/lib/board/prompt-references";
 export type {
   BoardAssetNode,
   BoardAssetReference,

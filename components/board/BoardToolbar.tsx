@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Bot, Check, ChevronDown, FileText, Grid3X3, ImagePlus, Layers, Map, MessageSquareText, Moon, Pencil, Plus, Settings, Sun, Trash2, Video } from "lucide-react";
+import { ArrowLeft, Bot, Check, ChevronDown, FileText, Grid3X3, ImagePlus, Layers, Map, MessageSquareText, Moon, Pencil, Plus, RotateCcw, Settings, Sun, Trash2, Video } from "lucide-react";
 import type { BoardSaveStatus } from "@/hooks/useBoardState";
 import type { ThemeMode } from "@/components/workbench/WorkspaceHeader";
 import type { BoardSummary } from "@/lib/board";
@@ -10,6 +10,7 @@ interface BoardToolbarProps {
   boardId: string;
   boardSummaries: BoardSummary[];
   boardTitle: string;
+  canUndo: boolean;
   nodeCount: number;
   saveStatus: BoardSaveStatus;
   showGrid: boolean;
@@ -28,6 +29,7 @@ interface BoardToolbarProps {
   onOpenSettings: () => void;
   onRenameBoard: () => void;
   onSelectBoard: (boardId: string) => void;
+  onUndo: () => void;
   onToggleGrid: () => void;
   onToggleMiniMap: () => void;
   onToggleTheme: () => void;
@@ -48,6 +50,7 @@ export default function BoardToolbar({
   boardId,
   boardSummaries,
   boardTitle,
+  canUndo,
   nodeCount,
   saveStatus,
   showGrid,
@@ -66,6 +69,7 @@ export default function BoardToolbar({
   onOpenSettings,
   onRenameBoard,
   onSelectBoard,
+  onUndo,
   onToggleGrid,
   onToggleMiniMap,
   onToggleTheme,
@@ -223,6 +227,15 @@ export default function BoardToolbar({
         <button type="button" onClick={onAddNote} className={toolButtonClass} data-accent="amber">
           <FileText className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">笔记</span>
+        </button>
+        <button
+          type="button"
+          onClick={onUndo}
+          disabled={!canUndo}
+          className={`${iconButtonClass} disabled:cursor-not-allowed disabled:opacity-40`}
+          title="撤销 (Ctrl+Z)"
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
         </button>
         <button
           type="button"

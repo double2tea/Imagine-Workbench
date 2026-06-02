@@ -1,4 +1,4 @@
-import { Bot, Clock3, Download, ImageDown, ImageIcon, Paintbrush, Send, type LucideIcon, SkipBack, SkipForward, VideoIcon } from "lucide-react";
+import { Bot, Clock3, Download, ImageDown, ImageIcon, Paintbrush, Send, SlidersHorizontal, type LucideIcon, SkipBack, SkipForward, VideoIcon } from "lucide-react";
 import { useRef, useState } from "react";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
 import PreviewImage from "@/components/PreviewImage";
@@ -7,8 +7,10 @@ import type { StorageItem } from "@/lib/db";
 import { getVideoFrameCaptureLabel, type CapturedVideoFrame, type VideoFrameCaptureMode } from "@/lib/video-frame";
 
 interface AssetBoardNodeProps {
+  compareReferenceUrl?: string | null;
   node: BoardAssetNode;
   onCaptureVideoFrame?: (nodeId: string, item: StorageItem, frame: CapturedVideoFrame) => void | Promise<void>;
+  onCompare?: () => void;
   onEditImage?: (nodeId: string) => void;
   onSendToAgent?: (nodeId: string) => void;
   onSetAsReference?: (nodeId: string) => void;
@@ -37,7 +39,15 @@ const frameCaptureActions: Array<{
   { icon: SkipForward, mode: "last" },
 ];
 
-export default function AssetBoardNode({ node, onCaptureVideoFrame, onEditImage, onSendToAgent, onSetAsReference }: AssetBoardNodeProps) {
+export default function AssetBoardNode({
+  compareReferenceUrl,
+  node,
+  onCaptureVideoFrame,
+  onCompare,
+  onEditImage,
+  onSendToAgent,
+  onSetAsReference,
+}: AssetBoardNodeProps) {
   const item = boardAssetToStorageItem(node);
   const [isFrameMenuOpen, setIsFrameMenuOpen] = useState(false);
   const captureVideoFrameRef = useRef<VideoFrameCaptureRequest | null>(null);
@@ -53,6 +63,16 @@ export default function AssetBoardNode({ node, onCaptureVideoFrame, onEditImage,
         <div className="absolute right-2 top-2 z-30 flex gap-1 opacity-0 transition-opacity duration-200 hover:opacity-100 group-hover/board-video:opacity-100">
           {node.asset.type === "image" && (
             <>
+              {compareReferenceUrl && onCompare && (
+                <button
+                  type="button"
+                  onClick={onCompare}
+                  className="imagine-board-asset-action nodrag text-blue-200 hover:border-blue-500/40 hover:bg-blue-600 hover:text-white"
+                  title="对比参考图"
+                >
+                  <SlidersHorizontal className="h-3.5 w-3.5" />
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => onSetAsReference?.(node.id)}

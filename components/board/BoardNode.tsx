@@ -22,11 +22,13 @@ import { getModelCapability } from "@/lib/providers/model-catalog";
 import type { CapturedVideoFrame } from "@/lib/video-frame";
 
 export interface BoardFlowNodeData extends Record<string, unknown> {
+  compareReferenceUrl?: string | null;
   generateInputSummary?: BoardGenerateInputSummary;
   generateReferences: ReferenceImageRef[];
   hasResultConnection?: boolean;
   node: BoardNodeModel;
   onDelete: (nodeId: string) => void;
+  onOpenAssetCompare?: (nodeId: string) => void;
   promptReferences: ReferenceImageRef[];
   onCaptureVideoFrame: (nodeId: string, item: StorageItem, frame: CapturedVideoFrame) => void | Promise<void>;
   onEditAssetImage: (nodeId: string) => void;
@@ -159,7 +161,9 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
         {node.kind === "asset" && (
           <AssetBoardNode
             node={node}
+            compareReferenceUrl={data.compareReferenceUrl}
             onCaptureVideoFrame={data.onCaptureVideoFrame}
+            onCompare={data.onOpenAssetCompare ? () => data.onOpenAssetCompare?.(node.id) : undefined}
             onEditImage={data.onEditAssetImage}
             onSendToAgent={data.onSendAssetToAgent}
             onSetAsReference={data.onSetAssetAsReference}

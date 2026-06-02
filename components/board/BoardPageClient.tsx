@@ -1248,6 +1248,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       <BoardWorkspace
         boardSummaries={boardSummariesForToolbar}
         controller={boardController}
+        galleryItems={items}
         themeMode={themeMode}
         onBack={() => router.push("/")}
         onCaptureVideoFrame={handleCaptureVideoFrame}

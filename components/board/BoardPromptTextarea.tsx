@@ -29,7 +29,7 @@ const BoardPromptTextarea = forwardRef<HTMLTextAreaElement, BoardPromptTextareaP
     headerRight,
     onChange,
     onSlashCommand,
-    placeholder = "写提示词，输入 @ 引用参考图",
+    placeholder = "写提示词，输入 @ 引用连线/画板/画廊参考图",
     readOnly = false,
     references,
     value,

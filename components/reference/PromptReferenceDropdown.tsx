@@ -1,8 +1,9 @@
 import PreviewImage from "@/components/PreviewImage";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
+import type { BoardPromptReference } from "@/lib/board/prompt-references";
 
 interface PromptReferenceDropdownProps {
-  references: ReferenceImageRef[];
+  references: Array<ReferenceImageRef | BoardPromptReference>;
   search: string;
   onSelect: (index: number) => void;
 }
@@ -16,7 +17,7 @@ export default function PromptReferenceDropdown({ references, search, onSelect }
   if (references.length === 0) {
     return (
       <div className="imagine-at-dropdown imagine-at-dropdown-empty">
-        先拖入或上传参考图，再用 @图片N 指定引用位置
+        连接参考图、拖入画板资产，或从画廊生成作品后，用 @图片N 指定引用
       </div>
     );
   }
@@ -32,7 +33,7 @@ export default function PromptReferenceDropdown({ references, search, onSelect }
   return (
     <div className="imagine-at-dropdown">
       <p className="mb-1 flex items-center justify-between px-1 text-[9px] font-bold uppercase tracking-wider text-[var(--iw-accent-strong)]">
-        <span>选择已导入参考图</span>
+        <span>选择引用对象</span>
         <span className="font-mono text-[8px] font-normal normal-case tracking-normal text-[var(--iw-faint)]">
           {filtered.length} 张
         </span>
@@ -50,7 +51,9 @@ export default function PromptReferenceDropdown({ references, search, onSelect }
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate font-mono text-[10px] font-bold text-[var(--iw-accent-strong)]">@{token}</p>
-            <p className="truncate text-[9px] text-[var(--iw-faint)]">{reference.id}</p>
+            <p className="truncate text-[9px] text-[var(--iw-faint)]">
+              {"sourceLabel" in reference && reference.sourceLabel ? reference.sourceLabel : reference.id}
+            </p>
           </div>
         </button>
       ))}
