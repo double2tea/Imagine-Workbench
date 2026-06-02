@@ -73,21 +73,6 @@ export function useMediaPolling({
         const item = updatedList[index];
         if (item.status === "processing" && item.operationName) {
           if (locallyCanceledItemIdsRef.current.has(item.id)) continue;
-          if (isProcessingTimedOut(item)) {
-            const timeoutMessage = "任务超过 2 小时仍未完成，已停止自动轮询。";
-            const failedItem: StorageItem = {
-              ...item,
-              status: "failed",
-              progress: 100,
-              errorMessage: timeoutMessage,
-            };
-            updatedList[index] = failedItem;
-            delete pollingFailuresRef.current[item.id];
-            await saveItemOrWarn(failedItem, pushWorkspaceNotice);
-            pushWorkspaceNotice("error", timeoutMessage);
-            changed = true;
-            continue;
-          }
           try {
             const headers = buildProviderHeaders(item.operationName);
 
@@ -157,6 +142,22 @@ export function useMediaPolling({
                 throw new Error(await readFetchError(dlRes, "结果下载失败"));
               }
             } else {
+              if (isProcessingTimedOut(item)) {
+                const timeoutMessage = "任务超过 2 小时仍未完成，已停止自动轮询。";
+                const failedItem: StorageItem = {
+                  ...item,
+                  status: "failed",
+                  progress: 100,
+                  errorMessage: timeoutMessage,
+                };
+                updatedList[index] = failedItem;
+                delete pollingFailuresRef.current[item.id];
+                await saveItemOrWarn(failedItem, pushWorkspaceNotice);
+                pushWorkspaceNotice("error", timeoutMessage);
+                changed = true;
+                continue;
+              }
+
               const nextProgress = typeof statusRecord.progress === "number" ? statusRecord.progress : item.progress;
               if (item.progress !== nextProgress) {
                 updatedList[index] = {
