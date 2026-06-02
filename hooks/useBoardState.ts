@@ -195,11 +195,12 @@ function cloneBoardNodeForDuplicate(source: BoardNode, stackIndex: number): Boar
 }
 
 function normalizeBoard(board: BoardDocument): BoardDocument {
+  const nodes = Array.isArray(board.nodes) ? board.nodes.map(normalizeBoardNode) : [];
   return {
     ...board,
     config: { ...DEFAULT_BOARD_CONFIG, ...board.config },
-    nodes: Array.isArray(board.nodes) ? board.nodes.map(normalizeBoardNode) : [],
-    edges: Array.isArray(board.edges) ? board.edges : [],
+    nodes,
+    edges: Array.isArray(board.edges) ? filterValidBoardEdges(nodes, board.edges) : [],
   };
 }
 
@@ -992,14 +993,14 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
   const updateGenerateNode = useCallback((nodeId: string, input: BoardGenerateNodeUpdate) => {
     const updatedAt = nowIso();
     mutateBoard(
-      currentBoard => touchBoard(
-        currentBoard,
-        currentBoard.nodes.map(node =>
+      currentBoard => {
+        const nextNodes = currentBoard.nodes.map(node =>
           node.id === nodeId && (node.kind === "image-generate" || node.kind === "video-generate")
             ? { ...node, ...input, updatedAt }
             : node,
-        ),
-      ),
+        );
+        return touchBoard(currentBoard, nextNodes, filterValidBoardEdges(nextNodes, currentBoard.edges));
+      },
       { skipUndo: true },
     );
   }, [mutateBoard]);

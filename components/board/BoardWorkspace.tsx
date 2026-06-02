@@ -216,17 +216,26 @@ const quickInsertItems: Array<{ icon: LucideIcon; iconClassName: string; iconSur
 
 function portKindFromHandle(handleId: string | null | undefined): BoardPortKind | null {
   if (!handleId) return null;
-  if (handleId.startsWith("prompt-")) return "prompt";
-  if (handleId.startsWith("agent-")) return "agent";
-  if (handleId.startsWith("result-")) return "result";
-  if (handleId.startsWith("asset-") || handleId === "reference-in") return "asset";
+  if (handleId === BOARD_PORT_IDS.promptIn || handleId === BOARD_PORT_IDS.promptOut) return "prompt";
+  if (handleId === BOARD_PORT_IDS.agentContextIn) return "agent";
+  if (handleId === BOARD_PORT_IDS.resultOut) return "result";
+  if (handleId === BOARD_PORT_IDS.assetIn || handleId === BOARD_PORT_IDS.assetOut || handleId === BOARD_PORT_IDS.referenceIn) return "asset";
   return null;
 }
 
 function handleDirectionFromHandle(handleId: string | null | undefined): BoardHandleDirection | null {
   if (!handleId) return null;
-  if (handleId.endsWith("-out")) return "output";
-  if (handleId.endsWith("-in") || handleId === "reference-in" || handleId === "agent-context-in") return "input";
+  if (
+    handleId === BOARD_PORT_IDS.assetOut ||
+    handleId === BOARD_PORT_IDS.promptOut ||
+    handleId === BOARD_PORT_IDS.resultOut
+  ) return "output";
+  if (
+    handleId === BOARD_PORT_IDS.assetIn ||
+    handleId === BOARD_PORT_IDS.promptIn ||
+    handleId === BOARD_PORT_IDS.referenceIn ||
+    handleId === BOARD_PORT_IDS.agentContextIn
+  ) return "input";
   return null;
 }
 
@@ -256,24 +265,6 @@ function connectionPortRefs(connection: {
   if (sourceDirection === "output" && targetDirection === "input") return { from: sourceRef, to: targetRef };
   if (sourceDirection === "input" && targetDirection === "output") return { from: targetRef, to: sourceRef };
   return null;
-}
-
-function isCompatiblePortConnection(refs: { from: BoardPortRef; to: BoardPortRef } | null): refs is { from: BoardPortRef; to: BoardPortRef } {
-  if (!refs || refs.from.nodeId === refs.to.nodeId) return false;
-  if (refs.from.portKind === "asset" && refs.to.portKind === "asset") return true;
-  if (refs.from.portKind === "prompt" && refs.to.portKind === "prompt") return true;
-  if (refs.from.portKind === "result" && refs.to.portKind === "asset") return true;
-  return refs.from.portKind === "asset" && refs.to.portKind === "agent";
-}
-
-function targetAcceptsReference(nodes: BoardNodeModel[], targetNodeId: string): boolean {
-  const targetNode = nodes.find(node => node.id === targetNodeId);
-  if (targetNode?.kind !== "image-generate" && targetNode?.kind !== "video-generate") return true;
-  try {
-    return getModelCapability(targetNode.model, targetNode.kind === "image-generate" ? "image" : "video").supportsReferences;
-  } catch {
-    return false;
-  }
 }
 
 function importableFiles(dataTransfer: DataTransfer): File[] {
@@ -490,11 +481,14 @@ export default function BoardWorkspace({
     restoreNodeWithEdges,
     addAgentNode,
     addAssetNode,
+    addAssetNodeWithConnection,
     addAssetToReferenceGroup,
     addGenerateNode,
+    addGenerateNodeWithConnection,
     addNoteNode,
     addPromptNode,
     addReferenceGroupNode,
+    addReferenceGroupNodeWithAsset,
     clearBoard,
     connectPorts,
     deleteEdge,
@@ -682,24 +676,13 @@ export default function BoardWorkspace({
 
   const isValidBoardConnection = useCallback<IsValidConnection<BoardFlowEdge>>((connection) => {
     const refs = connectionPortRefs(connection);
-    if (!isCompatiblePortConnection(refs)) return false;
-    const targetNode = board.nodes.find(node => node.id === refs.to.nodeId);
-    if (targetNode?.kind === "reference-group") {
-      const sourceNode = board.nodes.find(node => node.id === refs.from.nodeId);
-      return refs.to.portId === "asset-in" && sourceNode?.kind === "asset" && sourceNode.asset.type === "image";
-    }
-    if (refs.to.portId !== "reference-in") return true;
-    return targetAcceptsReference(board.nodes, refs.to.nodeId);
+    return refs ? isValidBoardPortConnection(board.nodes, refs.from, refs.to) : false;
   }, [board.nodes]);
 
   const handleConnect: OnConnect = (connection) => {
     const refs = connectionPortRefs(connection);
-    if (!refs || !isCompatiblePortConnection(refs)) {
+    if (!refs || !isValidBoardPortConnection(board.nodes, refs.from, refs.to)) {
       onConnectionError("端口类型不兼容：图片可连参考/Agent，Prompt 可连生成，生成结果可连资产。");
-      return;
-    }
-    if (refs.to.portId === "reference-in" && !targetAcceptsReference(board.nodes, refs.to.nodeId)) {
-      onConnectionError("当前生成模型不支持参考图输入。");
       return;
     }
     try {
@@ -746,12 +729,8 @@ export default function BoardWorkspace({
 
   const handleReconnect = useCallback<OnReconnect<BoardFlowEdge>>((oldEdge, newConnection) => {
     const refs = connectionPortRefs(newConnection);
-    if (!refs || !isCompatiblePortConnection(refs)) {
+    if (!refs || !isValidBoardPortConnection(board.nodes, refs.from, refs.to)) {
       onConnectionError("端口类型不兼容：图片可连参考/Agent，Prompt 可连生成，生成结果可连资产。");
-      return;
-    }
-    if (refs.to.portId === "reference-in" && !targetAcceptsReference(board.nodes, refs.to.nodeId)) {
-      onConnectionError("当前生成模型不支持参考图输入。");
       return;
     }
     try {
@@ -944,10 +923,16 @@ export default function BoardWorkspace({
 
     const flowPoint = flowPositionFromClient(clientPoint.x, clientPoint.y);
     if (sourceKind === "prompt") {
-      const nodeId = addQuickNode("image-generate", centeredNodePosition(flowPoint, DEFAULT_GENERATE_NODE_SIZE));
-      connectPorts(
+      addGenerateNodeWithConnection(
+        {
+          kind: "image-generate",
+          model: DEFAULT_BOARD_IMAGE_MODEL,
+          aspectRatio: "1:1",
+          imageResolution: "1024x1024",
+          position: centeredNodePosition(flowPoint, DEFAULT_GENERATE_NODE_SIZE),
+        },
         { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "prompt" },
-        { nodeId, portId: "prompt-in", portKind: "prompt" },
+        BOARD_PORT_IDS.promptIn,
       );
       return;
     }
@@ -959,26 +944,33 @@ export default function BoardWorkspace({
           return;
         }
         if (sourceHandleId === "asset-out") {
-          const nodeId = addQuickNode("image-generate", centeredNodePosition(flowPoint, DEFAULT_GENERATE_NODE_SIZE));
-          connectPorts(
+          addGenerateNodeWithConnection(
+            {
+              kind: "image-generate",
+              model: DEFAULT_BOARD_REFERENCE_IMAGE_MODEL,
+              aspectRatio: "1:1",
+              imageResolution: "1024x1024",
+              position: centeredNodePosition(flowPoint, DEFAULT_GENERATE_NODE_SIZE),
+            },
             { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "asset" },
-            { nodeId, portId: "reference-in", portKind: "asset" },
+            BOARD_PORT_IDS.referenceIn,
           );
           return;
         }
-        const nodeId = addQuickNode("reference-group", centeredNodePosition(flowPoint, DEFAULT_REFERENCE_GROUP_NODE_SIZE));
-        addAssetToReferenceGroup(sourceNodeId, nodeId);
-        connectPorts(
-          { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "asset" },
-          { nodeId, portId: "asset-in", portKind: "asset" },
-        );
+        addReferenceGroupNodeWithAsset({ position: centeredNodePosition(flowPoint, DEFAULT_REFERENCE_GROUP_NODE_SIZE) }, sourceNodeId);
         return;
       }
       if (sourceNode?.kind !== "reference-group") return;
-      const nodeId = addQuickNode("image-generate", centeredNodePosition(flowPoint, DEFAULT_GENERATE_NODE_SIZE));
-      connectPorts(
+      addGenerateNodeWithConnection(
+        {
+          kind: "image-generate",
+          model: DEFAULT_BOARD_REFERENCE_IMAGE_MODEL,
+          aspectRatio: "1:1",
+          imageResolution: "1024x1024",
+          position: centeredNodePosition(flowPoint, DEFAULT_GENERATE_NODE_SIZE),
+        },
         { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "asset" },
-        { nodeId, portId: "reference-in", portKind: "asset" },
+        BOARD_PORT_IDS.referenceIn,
       );
       return;
     }
@@ -994,18 +986,16 @@ export default function BoardWorkspace({
         onConnectionError("找不到生成结果资产");
         return;
       }
-      const nodeId = addAssetNode({
+      addAssetNodeWithConnection({
         position: centeredNodePosition(flowPoint, DEFAULT_ASSET_NODE_SIZE),
         asset: storageItemToBoardAsset(item),
         title: item.prompt,
-      });
-      connectPorts(
+      },
         { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "result" },
-        { nodeId, portId: "asset-in", portKind: "asset" },
       );
       return;
     }
-  }, [addAssetNode, addAssetToReferenceGroup, addQuickNode, board.nodes, centeredNodePosition, connectPorts, flowPositionFromClient, galleryItems, onConnectionError]);
+  }, [addAssetNodeWithConnection, addGenerateNodeWithConnection, addReferenceGroupNodeWithAsset, board.nodes, centeredNodePosition, flowPositionFromClient, galleryItems, onConnectionError]);
 
   const openQuickInsertMenu = useCallback((event: ReactMouseEvent | MouseEvent): void => {
     event.preventDefault();
