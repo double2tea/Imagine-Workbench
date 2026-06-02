@@ -1,4 +1,4 @@
-import type { BoardDocument, BoardPoint, BoardSize, BoardViewport } from "@/lib/board/types";
+import type { BoardConfig, BoardDocument, BoardPoint, BoardSize, BoardViewport } from "@/lib/board/types";
 
 export const DEFAULT_BOARD_ID = "main";
 
@@ -6,6 +6,11 @@ export const DEFAULT_BOARD_VIEWPORT: BoardViewport = {
   x: 0,
   y: 0,
   zoom: 1,
+};
+
+export const DEFAULT_BOARD_CONFIG: BoardConfig = {
+  showGrid: true,
+  showMiniMap: true,
 };
 
 export const DEFAULT_ASSET_NODE_SIZE: BoardSize = {
@@ -43,10 +48,15 @@ export const DEFAULT_NODE_POSITION: BoardPoint = {
   y: 120,
 };
 
-export function createEmptyBoard(now: string = new Date().toISOString()): BoardDocument {
+export function createEmptyBoard(
+  id: string = DEFAULT_BOARD_ID,
+  title: string = "Board",
+  now: string = new Date().toISOString(),
+): BoardDocument {
   return {
-    id: DEFAULT_BOARD_ID,
-    title: "Board",
+    id,
+    title,
+    config: DEFAULT_BOARD_CONFIG,
     nodes: [],
     edges: [],
     viewport: DEFAULT_BOARD_VIEWPORT,

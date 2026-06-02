@@ -1,6 +1,7 @@
 export {
   DEFAULT_ASSET_NODE_SIZE,
   DEFAULT_AGENT_NODE_SIZE,
+  DEFAULT_BOARD_CONFIG,
   DEFAULT_BOARD_ID,
   DEFAULT_BOARD_VIEWPORT,
   DEFAULT_GENERATE_NODE_SIZE,
@@ -10,11 +11,12 @@ export {
   DEFAULT_REFERENCE_GROUP_NODE_SIZE,
   createEmptyBoard,
 } from "@/lib/board/defaults";
-export { deleteBoardFromDB, getBoardFromDB, saveBoardToDB } from "@/lib/board/persistence";
+export { deleteBoardFromDB, getBoardFromDB, listBoardSummariesFromDB, saveBoardToDB } from "@/lib/board/persistence";
 export type {
   BoardAssetNode,
   BoardAssetReference,
   BoardAssetType,
+  BoardConfig,
   BoardDocument,
   BoardEdge,
   BoardEdgeKind,
@@ -38,6 +40,7 @@ export type {
   BoardReferenceGroupNode,
   BoardReferenceRole,
   BoardSize,
+  BoardSummary,
   BoardVideoGenerateNode,
   CreateAgentNodeInput,
   BoardViewport,

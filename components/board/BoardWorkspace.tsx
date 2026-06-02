@@ -59,10 +59,12 @@ import {
   type BoardPortKind,
   type BoardPortRef,
   type BoardSize,
+  type BoardSummary,
 } from "@/lib/board";
 import { DEFAULT_VIDEO_MODEL, getModelCapability } from "@/lib/providers/model-catalog";
 
 interface BoardWorkspaceProps {
+  boardSummaries: BoardSummary[];
   controller: BoardStateController;
   children?: ReactNode;
   themeMode: ThemeMode;
@@ -72,7 +74,11 @@ interface BoardWorkspaceProps {
   onEditAssetImage: (nodeId: string) => void;
   onExecuteGenerateNode: (nodeId: string) => void;
   onImportBoardFiles: (files: File[], position: BoardPoint) => void | Promise<void>;
+  onCreateBoard: () => void;
+  onDeleteBoard: () => void;
   onOpenSettings: () => void;
+  onRenameBoard: () => void;
+  onSelectBoard: (boardId: string) => void;
   onSendAssetToAgent: (nodeId: string) => void;
   onSendAgentNode: (nodeId: string) => void;
   onSetAssetAsReference: (nodeId: string) => void;
@@ -345,6 +351,7 @@ function hasResultConnection(nodeId: string, edges: BoardEdge[]): boolean {
 }
 
 export default function BoardWorkspace({
+  boardSummaries,
   children,
   controller,
   themeMode,
@@ -354,7 +361,11 @@ export default function BoardWorkspace({
   onEditAssetImage,
   onExecuteGenerateNode,
   onImportBoardFiles,
+  onCreateBoard,
+  onDeleteBoard,
   onOpenSettings,
+  onRenameBoard,
+  onSelectBoard,
   onSendAssetToAgent,
   onSendAgentNode,
   onSetAssetAsReference,
@@ -383,6 +394,7 @@ export default function BoardWorkspace({
     selectEdge,
     selectNode,
     setViewport,
+    updateBoardConfig,
     updateReferenceGroupItemRole,
     updateAgentInstruction,
     updateGenerateNode,
@@ -723,6 +735,11 @@ export default function BoardWorkspace({
   return (
     <main className={`imagine-workbench-shell imagine-theme-${themeMode} flex h-screen min-h-0 flex-col bg-[var(--iw-bg)] text-[var(--iw-text)]`}>
       <BoardToolbar
+        boardId={board.id}
+        boardSummaries={boardSummaries}
+        boardTitle={board.title}
+        showGrid={board.config.showGrid}
+        showMiniMap={board.config.showMiniMap}
         nodeCount={board.nodes.length}
         saveStatus={saveStatus}
         themeMode={themeMode}
@@ -734,7 +751,13 @@ export default function BoardWorkspace({
         onAddVideoGenerate={addVideoGenerateAtCenter}
         onBack={onBack}
         onClear={clearBoard}
+        onCreateBoard={onCreateBoard}
+        onDeleteBoard={onDeleteBoard}
         onOpenSettings={onOpenSettings}
+        onRenameBoard={onRenameBoard}
+        onSelectBoard={onSelectBoard}
+        onToggleGrid={() => updateBoardConfig({ showGrid: !board.config.showGrid })}
+        onToggleMiniMap={() => updateBoardConfig({ showMiniMap: !board.config.showMiniMap })}
         onToggleTheme={onToggleTheme}
       />
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto]">
@@ -792,15 +815,17 @@ export default function BoardWorkspace({
             proOptions={{ hideAttribution: true }}
             zoomOnDoubleClick={false}
           >
-            <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="var(--iw-board-handle)" />
+            {board.config.showGrid && <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="var(--iw-board-handle)" />}
             <Controls className="imagine-board-controls" />
-            <MiniMap
-              className="imagine-board-minimap"
-              nodeColor={getBoardVar("--iw-board-minimap-node", themeMode === "light" ? "#1e40af" : "#1d4ed8")}
-              maskColor={getBoardVar("--iw-board-minimap-mask", themeMode === "light" ? "rgba(241, 245, 249, 0.75)" : "rgba(2,6,23,0.66)")}
-              pannable
-              zoomable
-            />
+            {board.config.showMiniMap && (
+              <MiniMap
+                className="imagine-board-minimap"
+                nodeColor={getBoardVar("--iw-board-minimap-node", themeMode === "light" ? "#1e40af" : "#1d4ed8")}
+                maskColor={getBoardVar("--iw-board-minimap-mask", themeMode === "light" ? "rgba(241, 245, 249, 0.75)" : "rgba(2,6,23,0.66)")}
+                pannable
+                zoomable
+              />
+            )}
           </ReactFlow>
           {board.nodes.length === 0 && <BoardEmptyHint />}
           {quickInsertMenu && (

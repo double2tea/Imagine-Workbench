@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   DEFAULT_AGENT_NODE_SIZE,
   DEFAULT_ASSET_NODE_SIZE,
+  DEFAULT_BOARD_CONFIG,
   DEFAULT_BOARD_ID,
   DEFAULT_GENERATE_NODE_SIZE,
   DEFAULT_NODE_POSITION,
@@ -14,6 +15,7 @@ import {
   getBoardFromDB,
   saveBoardToDB,
   type BoardAgentNode,
+  type BoardConfig,
   type BoardDocument,
   type BoardEdge,
   type BoardEdgeKind,
@@ -67,6 +69,8 @@ export interface BoardStateController {
   selectEdge: (edgeId: string | null) => void;
   selectNode: (nodeId: string | null) => void;
   setViewport: (viewport: BoardViewport) => void;
+  updateBoardConfig: (config: Partial<BoardConfig>) => void;
+  updateBoardTitle: (title: string) => void;
   updateReferenceGroupItemRole: (groupNodeId: string, assetId: string, role: BoardReferenceRole) => void;
   updateAgentInstruction: (nodeId: string, instruction: string) => void;
   updateGenerateNode: (nodeId: string, input: BoardGenerateNodeUpdate) => void;
@@ -102,6 +106,7 @@ function nowIso(): string {
 function normalizeBoard(board: BoardDocument): BoardDocument {
   return {
     ...board,
+    config: { ...DEFAULT_BOARD_CONFIG, ...board.config },
     nodes: Array.isArray(board.nodes) ? board.nodes.map(normalizeBoardNode) : [],
     edges: Array.isArray(board.edges) ? board.edges : [],
   };
@@ -201,7 +206,7 @@ function isCompatibleConnection(from: BoardPortRef, to: BoardPortRef): BoardEdge
 }
 
 export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateController {
-  const [board, setBoard] = useState<BoardDocument>(() => createEmptyBoard());
+  const [board, setBoard] = useState<BoardDocument>(() => createEmptyBoard(boardId));
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<BoardSaveStatus>("loading");
@@ -212,11 +217,12 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     let isActive = true;
 
     async function loadBoard(): Promise<void> {
+      setHasLoaded(false);
       setSaveStatus("loading");
       const storedBoard = await getBoardFromDB(boardId);
       if (!isActive) return;
 
-      setBoard(storedBoard ? normalizeBoard(storedBoard) : createEmptyBoard());
+      setBoard(storedBoard ? normalizeBoard(storedBoard) : createEmptyBoard(boardId));
       setSaveError(null);
       setSaveStatus("idle");
       setHasLoaded(true);
@@ -236,6 +242,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
 
   useEffect(() => {
     if (!hasLoaded) return;
+    if (board.id !== boardId) return;
 
     let isActive = true;
     const saveTimer = window.setTimeout(() => {
@@ -257,7 +264,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       isActive = false;
       window.clearTimeout(saveTimer);
     };
-  }, [board, hasLoaded]);
+  }, [board, boardId, hasLoaded]);
 
   const addAssetNode = useCallback((input: CreateAssetNodeInput): string => {
     const createdAt = nowIso();
@@ -581,6 +588,26 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     }));
   }, []);
 
+  const updateBoardTitle = useCallback((title: string) => {
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) {
+      throw new Error("画板名称不能为空");
+    }
+    setBoard(currentBoard => ({
+      ...currentBoard,
+      title: trimmedTitle,
+      updatedAt: nowIso(),
+    }));
+  }, []);
+
+  const updateBoardConfig = useCallback((config: Partial<BoardConfig>) => {
+    setBoard(currentBoard => ({
+      ...currentBoard,
+      config: { ...currentBoard.config, ...config },
+      updatedAt: nowIso(),
+    }));
+  }, []);
+
   const updateNodePosition = useCallback((nodeId: string, position: BoardPoint) => {
     const updatedAt = nowIso();
     setBoard(currentBoard =>
@@ -668,6 +695,8 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       selectEdge,
       selectNode,
       setViewport,
+      updateBoardConfig,
+      updateBoardTitle,
       updateReferenceGroupItemRole,
       updateAgentInstruction,
       updateGenerateNode,
@@ -698,6 +727,8 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       selectEdge,
       selectNode,
       setViewport,
+      updateBoardConfig,
+      updateBoardTitle,
       updateReferenceGroupItemRole,
       updateAgentInstruction,
       updateGenerateNode,

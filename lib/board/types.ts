@@ -21,6 +21,19 @@ export interface BoardViewport extends BoardPoint {
   zoom: number;
 }
 
+export interface BoardConfig {
+  showGrid: boolean;
+  showMiniMap: boolean;
+}
+
+export interface BoardSummary {
+  id: string;
+  title: string;
+  nodeCount: number;
+  updatedAt: string;
+  createdAt: string;
+}
+
 export interface BoardAssetReference {
   assetId: string;
   type: BoardAssetType;
@@ -145,6 +158,7 @@ export interface BoardEdge {
 export interface BoardDocument {
   id: string;
   title: string;
+  config: BoardConfig;
   nodes: BoardNode[];
   edges: BoardEdge[];
   viewport: BoardViewport;

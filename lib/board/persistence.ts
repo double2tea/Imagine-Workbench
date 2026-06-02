@@ -1,4 +1,4 @@
-import type { BoardDocument } from "@/lib/board/types";
+import type { BoardDocument, BoardSummary } from "@/lib/board/types";
 
 const DB_NAME = "ImagineWorkbenchBoardDB";
 const STORE_NAME = "boards";
@@ -62,6 +62,19 @@ export async function getBoardFromDB(id: string): Promise<BoardDocument | null> 
 
 export async function saveBoardToDB(board: BoardDocument): Promise<void> {
   await writeStore("readwrite", (store) => store.put(board));
+}
+
+export async function listBoardSummariesFromDB(): Promise<BoardSummary[]> {
+  const boards = await readStore<BoardDocument[]>("readonly", (store) => store.getAll());
+  return boards
+    .map(board => ({
+      id: board.id,
+      title: board.title,
+      nodeCount: Array.isArray(board.nodes) ? board.nodes.length : 0,
+      updatedAt: board.updatedAt,
+      createdAt: board.createdAt,
+    }))
+    .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime());
 }
 
 export async function deleteBoardFromDB(id: string): Promise<void> {
