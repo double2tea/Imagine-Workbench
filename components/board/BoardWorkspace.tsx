@@ -95,6 +95,10 @@ interface QuickInsertMenu {
   position: BoardPoint;
 }
 
+interface CopiedBoardNode {
+  node: BoardNodeModel;
+}
+
 const nodeTypes = { board: BoardNode };
 const DEFAULT_BOARD_IMAGE_MODEL = "modelscope:Qwen/Qwen-Image";
 
@@ -247,6 +251,63 @@ function hasImportableFile(dataTransfer: DataTransfer): boolean {
   );
 }
 
+function hasImportableImageUrl(dataTransfer: DataTransfer): boolean {
+  return Array.from(dataTransfer.types).some(type => type === "text/uri-list" || type === "text/html" || type === "text/plain");
+}
+
+function imageUrlsFromDataTransfer(dataTransfer: DataTransfer): string[] {
+  const urls: string[] = [];
+  const uriList = dataTransfer.getData("text/uri-list");
+  for (const line of uriList.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith("#")) urls.push(trimmed);
+  }
+
+  const html = dataTransfer.getData("text/html");
+  if (html.trim()) {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const src = doc.querySelector("img")?.getAttribute("src");
+    if (src) urls.push(src);
+  }
+
+  const plain = dataTransfer.getData("text/plain").trim();
+  if (plain.startsWith("http://") || plain.startsWith("https://") || plain.startsWith("data:image/")) {
+    urls.push(plain);
+  }
+
+  return Array.from(new Set(urls));
+}
+
+function extensionFromImageType(type: string): string {
+  if (type === "image/jpeg") return "jpg";
+  if (type === "image/png") return "png";
+  if (type === "image/webp") return "webp";
+  if (type === "image/gif") return "gif";
+  return "img";
+}
+
+async function imageUrlToFile(url: string, index: number): Promise<File> {
+  if (url.startsWith("data:image/")) {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return new File([blob], `board-drag-image-${index}.${extensionFromImageType(blob.type)}`, { type: blob.type });
+  }
+
+  const response = await fetch("/api/board/import-image", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+  if (!response.ok) {
+    throw new Error(`图片拖入失败 (HTTP ${response.status})`);
+  }
+  const blob = await response.blob();
+  if (!blob.type.startsWith("image/")) {
+    throw new Error("拖入地址不是图片");
+  }
+  return new File([blob], `board-drag-image-${index}.${extensionFromImageType(blob.type)}`, { type: blob.type });
+}
+
 function pasteImageFiles(dataTransfer: DataTransfer): File[] {
   return Array.from(dataTransfer.items)
     .filter(item => item.kind === "file" && item.type.startsWith("image/"))
@@ -350,6 +411,13 @@ function hasResultConnection(nodeId: string, edges: BoardEdge[]): boolean {
   return edges.some(edge => edge.from.nodeId === nodeId && edge.from.portId === "result-out");
 }
 
+function pastedNodePosition(node: BoardNodeModel): BoardPoint {
+  return {
+    x: node.position.x + 36,
+    y: node.position.y + 36,
+  };
+}
+
 export default function BoardWorkspace({
   boardSummaries,
   children,
@@ -373,6 +441,7 @@ export default function BoardWorkspace({
 }: BoardWorkspaceProps) {
   const flowInstanceRef = useRef<ReactFlowInstance<BoardFlowNode, BoardFlowEdge> | null>(null);
   const flowHostRef = useRef<HTMLElement | null>(null);
+  const copiedNodeRef = useRef<CopiedBoardNode | null>(null);
   const [quickInsertMenu, setQuickInsertMenu] = useState<QuickInsertMenu | null>(null);
   const {
     board,
@@ -380,6 +449,7 @@ export default function BoardWorkspace({
     selectedEdgeId,
     selectedNodeId,
     addAgentNode,
+    addAssetNode,
     addAssetToReferenceGroup,
     addGenerateNode,
     addNoteNode,
@@ -596,6 +666,79 @@ export default function BoardWorkspace({
     setQuickInsertMenu(null);
   }, [addQuickNode, centeredNodePosition]);
 
+  const pasteCopiedNode = useCallback((): void => {
+    const copied = copiedNodeRef.current;
+    if (!copied) return;
+    const { node } = copied;
+    const position = pastedNodePosition(node);
+    const rememberPastedPosition = (): void => {
+      copiedNodeRef.current = {
+        node: {
+          ...node,
+          position,
+          updatedAt: new Date().toISOString(),
+        },
+      };
+    };
+    if (node.kind === "asset") {
+      addAssetNode({ asset: node.asset, position, size: node.size, title: node.title });
+      rememberPastedPosition();
+      return;
+    }
+    if (node.kind === "prompt") {
+      addPromptNode({ position, prompt: node.prompt, size: node.size, title: node.title });
+      rememberPastedPosition();
+      return;
+    }
+    if (node.kind === "reference-group") {
+      addReferenceGroupNode({ position, references: node.references, size: node.size, title: node.title });
+      rememberPastedPosition();
+      return;
+    }
+    if (node.kind === "image-generate") {
+      addGenerateNode({
+        kind: "image-generate",
+        aspectRatio: node.aspectRatio,
+        customImageResolution: node.customImageResolution,
+        imageQuality: node.imageQuality,
+        imageResolution: node.imageResolution,
+        model: node.model,
+        position,
+        prompt: node.prompt,
+        size: node.size,
+        thinkingLevel: node.thinkingLevel,
+        title: node.title,
+        variantCount: node.variantCount,
+      });
+      rememberPastedPosition();
+      return;
+    }
+    if (node.kind === "video-generate") {
+      addGenerateNode({
+        kind: "video-generate",
+        aspectRatio: node.aspectRatio,
+        model: node.model,
+        position,
+        prompt: node.prompt,
+        size: node.size,
+        title: node.title,
+        variantCount: node.variantCount,
+        videoDuration: node.videoDuration,
+        videoPreset: node.videoPreset,
+        videoResolution: node.videoResolution,
+      });
+      rememberPastedPosition();
+      return;
+    }
+    if (node.kind === "agent") {
+      addAgentNode({ instruction: node.instruction, position, size: node.size, title: node.title });
+      rememberPastedPosition();
+      return;
+    }
+    addNoteNode({ body: node.body, position, size: node.size, title: node.title });
+    rememberPastedPosition();
+  }, [addAgentNode, addAssetNode, addGenerateNode, addNoteNode, addPromptNode, addReferenceGroupNode]);
+
   const handleConnectEnd = useCallback<OnConnectEnd>((event, connectionState) => {
     if (connectionState.isValid || !connectionState.fromNode || !connectionState.fromHandle) return;
     if (!(event instanceof MouseEvent) && !(event instanceof TouchEvent)) return;
@@ -702,15 +845,31 @@ export default function BoardWorkspace({
     setQuickInsertMenu(null);
   }, [centeredNodePosition, onImportBoardFiles]);
 
+  const importImageUrlsAtPoint = useCallback((urls: string[], point: BoardPoint): void => {
+    if (urls.length === 0) return;
+    void Promise.all(urls.map((url, index) => imageUrlToFile(url, index)))
+      .then(files => onImportBoardFiles(files, centeredNodePosition(point, DEFAULT_ASSET_NODE_SIZE)))
+      .catch(error => onConnectionError(error instanceof Error ? error.message : "图片拖入失败"));
+    setQuickInsertMenu(null);
+  }, [centeredNodePosition, onConnectionError, onImportBoardFiles]);
+
   const handleBoardDrop = useCallback((event: ReactDragEvent<HTMLElement>): void => {
     const files = importableFiles(event.dataTransfer);
-    if (files.length === 0) return;
+    const point = flowPositionFromClient(event.clientX, event.clientY);
+    if (files.length > 0) {
+      event.preventDefault();
+      importFilesAtPoint(files, point);
+      return;
+    }
+
+    const urls = imageUrlsFromDataTransfer(event.dataTransfer);
+    if (urls.length === 0) return;
     event.preventDefault();
-    importFilesAtPoint(files, flowPositionFromClient(event.clientX, event.clientY));
-  }, [flowPositionFromClient, importFilesAtPoint]);
+    importImageUrlsAtPoint(urls, point);
+  }, [flowPositionFromClient, importFilesAtPoint, importImageUrlsAtPoint]);
 
   const handleBoardDragOver = useCallback((event: ReactDragEvent<HTMLElement>): void => {
-    if (!hasImportableFile(event.dataTransfer)) return;
+    if (!hasImportableFile(event.dataTransfer) && !hasImportableImageUrl(event.dataTransfer)) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = "copy";
   }, []);
@@ -731,6 +890,30 @@ export default function BoardWorkspace({
     window.addEventListener("paste", handlePaste);
     return () => window.removeEventListener("paste", handlePaste);
   }, [onImportBoardFiles, visibleCenterPosition]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.defaultPrevented || isTextEntryTarget(event.target)) return;
+      const usesModifier = event.metaKey || event.ctrlKey;
+      if (!usesModifier) return;
+      const key = event.key.toLowerCase();
+      if (key === "c") {
+        const selectedNode = board.nodes.find(node => node.id === selectedNodeId);
+        if (!selectedNode) return;
+        copiedNodeRef.current = { node: selectedNode };
+        event.preventDefault();
+        return;
+      }
+      if (key === "v") {
+        if (!copiedNodeRef.current) return;
+        pasteCopiedNode();
+        event.preventDefault();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [board.nodes, pasteCopiedNode, selectedNodeId]);
 
   return (
     <main className={`imagine-workbench-shell imagine-theme-${themeMode} flex h-screen min-h-0 flex-col bg-[var(--iw-bg)] text-[var(--iw-text)]`}>
