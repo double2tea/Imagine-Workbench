@@ -42,7 +42,12 @@ async function importImageUrl(value: string): Promise<Response> {
     if (byteSize === null || byteSize > REFERENCE_IMAGE_MAX_BYTES) {
       return NextResponse.json({ error: "Image data URI is too large" }, { status: 413 });
     }
-    const binary = atob(parsed.base64);
+    let binary: string;
+    try {
+      binary = atob(parsed.base64);
+    } catch {
+      return NextResponse.json({ error: "Invalid image data URI" }, { status: 400 });
+    }
     const bytes = new Uint8Array(binary.length);
     for (let index = 0; index < binary.length; index += 1) {
       bytes[index] = binary.charCodeAt(index);
