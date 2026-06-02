@@ -118,39 +118,39 @@ function ProviderCredentialCard({
   const isTesting = providerTest.status === "testing" && providerTest.provider === provider;
 
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-950/45 p-4">
+    <div className="imagine-settings-card">
       <div className="flex items-center justify-between mb-3">
-        <h4 className="font-semibold text-slate-200">{title}</h4>
+        <h4 className="imagine-settings-card-title">{title}</h4>
         {apiKey && <span className="text-[10px] text-emerald-400">Key 已保存</span>}
       </div>
-      <label className="font-semibold text-slate-400 block mb-1.5">API Key</label>
+      <label className="imagine-settings-label">API Key</label>
       <input
         type="password"
         value={apiKey}
         onChange={(e) => onSaveApiKey(provider, e.target.value)}
         placeholder={apiPlaceholder}
-        className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 px-3 text-xs text-slate-200 placeholder-slate-650 focus:outline-none focus:border-slate-700 font-mono transition"
+        className="imagine-input font-mono"
       />
       {showBaseUrl && (
         <>
-          <label className="font-semibold text-slate-400 block mt-3 mb-1.5">Base URL</label>
+          <label className="imagine-settings-label mt-3">Base URL</label>
           <input
             type="url"
             value={baseUrl}
             onChange={(e) => onSaveBaseUrl(provider, e.target.value)}
             placeholder={baseUrlPlaceholder}
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 px-3 text-xs text-slate-200 placeholder-slate-650 focus:outline-none focus:border-slate-700 font-mono transition"
+            className="imagine-input font-mono"
           />
         </>
       )}
       {endpoints && (
-        <div className="mt-3 rounded-lg bg-slate-900/70 border border-slate-800 px-3 py-2 font-mono text-[10px] text-slate-400 leading-relaxed">
+        <div className="imagine-settings-endpoints">
           {endpoints.map(endpoint => <div key={endpoint}>{endpoint}</div>)}
         </div>
       )}
       {registerUrl && (
         <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2">
-          <span className="text-[10px] font-semibold text-slate-400">需要填入令牌后使用</span>
+          <span className="imagine-settings-hint">需要填入令牌后使用</span>
           <a
             href={registerUrl}
             target="_blank"
@@ -166,7 +166,7 @@ function ProviderCredentialCard({
           type="button"
           onClick={() => onTest(provider)}
           disabled={isTesting}
-          className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-950 px-3 text-[10px] font-semibold text-slate-300 transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:text-slate-600"
+          className="imagine-settings-toolbar-btn"
         >
           <RefreshCw className={`h-3 w-3 ${isTesting ? "animate-spin" : ""}`} />
           测试
@@ -261,36 +261,33 @@ export default function SettingsModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-stretch justify-end bg-slate-950/80 backdrop-blur-sm p-0 sm:items-center sm:justify-center sm:p-4"
+          className="imagine-settings-overlay fixed inset-0 z-50 flex items-stretch justify-end p-0 sm:items-center sm:justify-center sm:p-4"
         >
           <motion.div
             initial={{ scale: 0.95 }}
             animate={{ scale: 1 }}
             exit={{ scale: 0.95 }}
-            className="flex max-h-[100dvh] min-h-[100dvh] w-full max-w-4xl flex-col overflow-hidden border border-slate-800 bg-slate-900 shadow-2xl sm:min-h-0 sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl"
+            className="imagine-settings-panel flex max-h-[100dvh] min-h-[100dvh] w-full max-w-4xl flex-col overflow-hidden sm:min-h-0 sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl"
           >
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-850 px-4 py-3 sm:px-6 sm:py-4">
-              <h3 className="font-bold text-slate-100 flex items-center gap-2">
+            <div className="imagine-settings-header flex shrink-0 items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
+              <h3 className="imagine-settings-title flex items-center gap-2">
                 <Settings className="h-5 w-5 text-amber-500" />
                 设置
               </h3>
-              <button onClick={onClose} className="text-slate-400 hover:text-slate-100">
+              <button type="button" onClick={onClose} className="imagine-settings-close-btn">
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             {/* Tab bar */}
-            <div className="flex shrink-0 overflow-x-auto border-b border-slate-850 px-4 sm:px-6">
+            <div className="imagine-settings-tabs flex shrink-0 overflow-x-auto px-4 sm:px-6">
               {TABS.map(t => (
                 <button
                   key={t.key}
                   type="button"
                   onClick={() => setTab(t.key)}
-                  className={`shrink-0 px-4 py-2.5 text-xs font-semibold transition border-b-2 -mb-[1px] ${
-                    tab === t.key
-                      ? "text-amber-400 border-amber-400"
-                      : "text-slate-500 border-transparent hover:text-slate-300"
-                  }`}
+                  data-active={tab === t.key ? "true" : "false"}
+                  className="imagine-settings-tab"
                 >
                   {t.label}
                 </button>
@@ -330,23 +327,21 @@ export default function SettingsModal({
               {tab === "models" && (
                 <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-[180px_1fr]">
                   <div className="flex flex-col gap-3">
-                    <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-slate-800 bg-slate-950">
+                    <div className="imagine-settings-segment grid grid-cols-3">
                       {MODEL_CATEGORY_OPTIONS.map(option => (
                         <button
                           key={option.key}
                           type="button"
+                          data-active={modelCategory === option.key ? "true" : "false"}
+                          data-tone="amber"
                           onClick={() => setModelCategory(option.key)}
-                          className={`h-9 text-[10px] font-semibold transition ${
-                            modelCategory === option.key
-                              ? "bg-amber-500/15 text-amber-300"
-                              : "text-slate-500 hover:bg-slate-900 hover:text-slate-300"
-                          }`}
+                          className="imagine-segment-btn h-9"
                         >
                           {option.label}
                         </button>
                       ))}
                     </div>
-                    <div className="flex gap-2 overflow-x-auto rounded-xl border border-slate-800 bg-slate-950/45 p-2 lg:max-h-64 lg:flex-col lg:gap-1 lg:overflow-y-auto">
+                    <div className="imagine-settings-provider-sidebar lg:max-h-64 lg:flex-col lg:gap-1 lg:overflow-y-auto">
                       {PROVIDER_KEYS.map(provider => {
                         const count = activeModelGroups.find(group => group.provider === provider)?.options.length ?? 0;
                         const selected = provider === selectedProvider;
@@ -356,14 +351,10 @@ export default function SettingsModal({
                             type="button"
                             data-active={selected ? "true" : "false"}
                             onClick={() => onSelectProvider(provider)}
-                            className={`imagine-settings-provider-button flex h-9 min-w-28 items-center justify-between rounded-lg px-2 text-left transition lg:min-w-0 ${
-                              selected
-                                ? "bg-slate-800 text-slate-100"
-                                : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
-                            }`}
+                            className="imagine-settings-provider-button lg:min-w-0"
                           >
                             <span className="font-semibold">{getProviderMeta(provider).label}</span>
-                            <span className="font-mono text-[10px] text-slate-500">{count}</span>
+                            <span className="imagine-settings-provider-count">{count}</span>
                           </button>
                         );
                       })}
@@ -371,13 +362,13 @@ export default function SettingsModal({
                   </div>
 
                   <div className="flex min-h-0 flex-col gap-3">
-                    <div className="flex flex-col gap-2 rounded-xl border border-slate-800 bg-slate-950/45 p-3">
+                    <div className="imagine-settings-section">
                       <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                          <div className="imagine-settings-section-kicker">
                             {MODEL_CATEGORY_OPTIONS.find(option => option.key === modelCategory)?.label}
                           </div>
-                          <div className="truncate text-sm font-semibold text-slate-200">
+                          <div className="imagine-settings-section-title">
                             {getProviderMeta(selectedProvider).label} 模型
                           </div>
                         </div>
@@ -385,22 +376,18 @@ export default function SettingsModal({
                           type="button"
                           onClick={refreshProviderModels}
                           disabled={isLoadingModels}
-                          className={`flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-[10px] font-semibold transition ${
-                            isLoadingModels
-                              ? "border-slate-800 bg-slate-950 text-slate-600 cursor-not-allowed"
-                              : "border-slate-800 bg-slate-900 text-slate-300 hover:bg-slate-850 cursor-pointer"
-                          }`}
+                          className="imagine-settings-toolbar-btn shrink-0"
                         >
                           <RefreshCw className={`h-3.5 w-3.5 ${isLoadingModels ? "animate-spin" : ""}`} />
                           获取模型
                         </button>
                       </div>
                       {modelListMessage && (
-                        <p className="font-mono text-[10px] text-slate-500">{modelListMessage}</p>
+                        <p className="font-mono text-[10px] text-[var(--iw-faint)]">{modelListMessage}</p>
                       )}
-                      <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-800 bg-slate-950 sm:max-h-56">
+                      <div className="imagine-settings-list max-h-48 sm:max-h-56">
                         {activeModelOptions.length === 0 ? (
-                          <div className="px-3 py-6 text-center text-[11px] text-slate-600">暂无模型</div>
+                          <div className="imagine-settings-empty">暂无模型</div>
                         ) : (
                           activeModelOptions.map(option => {
                             const isSelectedChat = modelCategory === "chat" && option.value === selectedChatModel;
@@ -408,16 +395,18 @@ export default function SettingsModal({
                               <button
                                 key={option.value}
                                 type="button"
+                                data-interactive={modelCategory === "chat" ? "true" : "false"}
+                                data-selected={isSelectedChat ? "true" : "false"}
                                 onClick={() => {
                                   if (modelCategory === "chat") onSelectChatModel(option.value);
                                 }}
-                                className={`flex min-h-10 w-full items-center justify-between gap-3 border-b border-slate-900 px-3 py-2 text-left last:border-b-0 ${
-                                  modelCategory === "chat" ? "hover:bg-slate-900" : "cursor-default"
+                                className={`imagine-settings-list-row ${
+                                  modelCategory === "chat" ? "" : "cursor-default"
                                 }`}
                               >
                                 <span className="min-w-0">
-                                  <span className="block truncate text-xs font-semibold text-slate-200">{option.label}</span>
-                                  <span className="block break-all font-mono text-[10px] text-slate-500">{option.value}</span>
+                                  <span className="imagine-settings-list-label">{option.label}</span>
+                                  <span className="imagine-settings-list-value">{option.value}</span>
                                 </span>
                                 {isSelectedChat && <Check className="h-4 w-4 shrink-0 text-amber-300" />}
                               </button>
@@ -428,34 +417,34 @@ export default function SettingsModal({
                     </div>
 
                     {fetchedOptions.length > 0 && (
-                      <div className="rounded-xl border border-slate-800 bg-slate-950/45 p-3">
+                      <div className="imagine-settings-section">
                         <div className="mb-2 flex items-center justify-between gap-3">
-                          <div className="text-xs font-semibold text-slate-300">获取结果</div>
+                          <div className="imagine-settings-section-title text-xs">获取结果</div>
                           <button
                             type="button"
                             onClick={submitFetchedModels}
                             disabled={selectedFetchedModels.length === 0}
-                            className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900 px-3 text-[10px] font-semibold text-slate-300 transition hover:bg-slate-850 disabled:cursor-not-allowed disabled:text-slate-600"
+                            className="imagine-settings-toolbar-btn"
                           >
                             <ListPlus className="h-3.5 w-3.5" />
                             添加选中
                           </button>
                         </div>
-                        <div className="max-h-40 overflow-y-auto rounded-lg border border-slate-800 bg-slate-950 sm:max-h-44">
+                        <div className="imagine-settings-list max-h-40 sm:max-h-44">
                           {fetchedOptions.map(option => {
                             const selected = selectedFetchedModels.includes(option.value);
                             return (
                               <button
                                 key={option.value}
                                 type="button"
+                                data-interactive="true"
+                                data-selected={selected ? "true" : "false"}
                                 onClick={() => toggleFetchedModel(option.value)}
-                                className={`flex min-h-10 w-full items-center justify-between gap-3 border-b border-slate-900 px-3 py-2 text-left last:border-b-0 ${
-                                  selected ? "bg-amber-500/10" : "hover:bg-slate-900"
-                                }`}
+                                className="imagine-settings-list-row"
                               >
                                 <span className="min-w-0">
-                                  <span className="block truncate text-xs font-semibold text-slate-200">{option.label}</span>
-                                  <span className="block break-all font-mono text-[10px] text-slate-500">{option.value}</span>
+                                  <span className="imagine-settings-list-label">{option.label}</span>
+                                  <span className="imagine-settings-list-value">{option.value}</span>
                                 </span>
                                 {selected && <Check className="h-4 w-4 shrink-0 text-amber-300" />}
                               </button>
@@ -465,19 +454,19 @@ export default function SettingsModal({
                       </div>
                     )}
 
-                    <div className="rounded-xl border border-slate-800 bg-slate-950/45 p-3">
+                    <div className="imagine-settings-section">
                       <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto]">
                         <textarea
                           value={manualModels}
                           onChange={(e) => setManualModels(e.target.value)}
                           placeholder={`${getProviderMeta(selectedProvider).label}: model-a, model-b`}
-                          className="min-h-16 resize-y rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-200 placeholder-slate-650 focus:border-slate-700 focus:outline-none sm:min-h-20"
+                          className="imagine-field-textarea min-h-16 resize-y font-mono text-xs sm:min-h-20"
                         />
                         <button
                           type="button"
                           onClick={submitManualModels}
                           disabled={!manualModels.trim()}
-                          className="flex h-9 items-center justify-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900 px-3 text-[10px] font-semibold text-slate-300 transition hover:bg-slate-850 disabled:cursor-not-allowed disabled:text-slate-600 md:self-start"
+                          className="imagine-settings-toolbar-btn h-9 md:self-start"
                         >
                           <ListPlus className="h-3.5 w-3.5" />
                           添加
@@ -491,22 +480,22 @@ export default function SettingsModal({
               {tab === "system" && (
                 <>
                   <div>
-                    <label className="font-semibold text-slate-400 block mb-1">📡 Web 异步任务轮询间隔</label>
-                    <p className="font-mono text-[10px] text-slate-300">自动侦测间隔: 4秒 (指数退避保护算法)</p>
+                    <label className="imagine-settings-label">📡 Web 异步任务轮询间隔</label>
+                    <p className="font-mono text-[10px] text-[var(--iw-muted)]">自动侦测间隔: 4秒 (指数退避保护算法)</p>
                   </div>
 
-                  <div className="bg-slate-950/50 rounded-xl p-3 border border-slate-850/50">
+                  <div className="imagine-settings-info-panel">
                     <div className="flex items-center justify-between">
-                      <span className="text-slate-450 font-semibold flex items-center gap-1 text-[11px]">
-                        <Info className="h-3.5 w-3.5 text-slate-500" />
+                      <span className="imagine-settings-info-title">
+                        <Info className="h-3.5 w-3.5 text-[var(--iw-faint)]" />
                         当前本地项目库概要:
                       </span>
-                      <button onClick={onResetData} className="text-[10px] text-red-400 hover:text-red-300 underline">
+                      <button type="button" onClick={onResetData} className="text-[10px] text-red-400 hover:text-red-300 underline">
                         安全复位数据
                       </button>
                     </div>
-                    <ul className="mt-2 text-[10px] text-slate-500 font-mono flex flex-col gap-1 list-disc pl-3">
-                      <li>类型: Browser IndexedDB 离线隔离数据库</li>
+                    <ul className="imagine-settings-info-list">
+                      <li>类型: 浏览器本地离线存储</li>
                       <li>合成图片数量: {assetStatusCounts.image} 张</li>
                       <li>合成 Veo 视频: {assetStatusCounts.video} 个</li>
                       <li>失败任务数量: {assetFailedCount} 个</li>
@@ -514,7 +503,7 @@ export default function SettingsModal({
                     </ul>
                   </div>
 
-                  <div className="text-[10px] text-slate-500 mt-2 flex items-start gap-1.5 leading-normal">
+                  <div className="imagine-settings-footnote">
                     <span>ℹ️</span>
                     <span>
                       Imagine Workbench 通过统一 provider adapter 接入服务商。图片、异步图片、视频与 Agent 对话都走同一组密钥和 Base URL 规则。新增服务商只需在 registry.ts 中添加一行配置。
@@ -524,11 +513,11 @@ export default function SettingsModal({
               )}
             </div>
 
-            <div className="shrink-0 border-t border-slate-850 bg-slate-900/50 px-4 py-3 text-right sm:px-6 sm:py-4">
+            <div className="imagine-settings-footer sm:px-6 sm:py-4">
               <button
                 type="button"
                 onClick={onClose}
-                className="imagine-settings-save-button bg-slate-800 hover:bg-slate-750 text-slate-350 font-semibold px-4 py-2 rounded-lg text-xs cursor-pointer transition"
+                className="imagine-settings-save-button"
               >
                 保存并关闭
               </button>

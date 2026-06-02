@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import {
   Bot,
   FileText,
   ImagePlus,
+  Layers,
   MessageSquareText,
   Video,
   type LucideIcon,
@@ -24,23 +25,28 @@ import {
   type IsValidConnection,
   type NodeMouseHandler,
   type OnConnect,
+  type OnConnectEnd,
   type OnEdgesDelete,
-  type OnNodeDrag,
+  type OnNodesChange,
   type OnNodesDelete,
   type ReactFlowInstance,
 } from "@xyflow/react";
 import type { BoardStateController } from "@/hooks/useBoardState";
 import BoardNode, { type BoardFlowNode } from "@/components/board/BoardNode";
 import type { BoardGenerateInputSummary } from "@/components/board/GenerateBoardNode";
+import BoardEmptyHint from "@/components/board/BoardEmptyHint";
 import BoardToolbar from "@/components/board/BoardToolbar";
+import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import type { ThemeMode } from "@/components/workbench/WorkspaceHeader";
 import type { StorageItem } from "@/lib/db";
 import type { CapturedVideoFrame } from "@/lib/video-frame";
 import {
   DEFAULT_AGENT_NODE_SIZE,
+  DEFAULT_ASSET_NODE_SIZE,
   DEFAULT_GENERATE_NODE_SIZE,
   DEFAULT_NOTE_NODE_SIZE,
   DEFAULT_PROMPT_NODE_SIZE,
+  DEFAULT_REFERENCE_GROUP_NODE_SIZE,
   type BoardEdge,
   type BoardEdgeKind,
   type BoardNode as BoardNodeModel,
@@ -58,14 +64,18 @@ interface BoardWorkspaceProps {
   onBack: () => void;
   onCaptureVideoFrame: (nodeId: string, item: StorageItem, frame: CapturedVideoFrame) => void | Promise<void>;
   onConnectionError: (message: string) => void;
+  onEditAssetImage: (nodeId: string) => void;
   onExecuteGenerateNode: (nodeId: string) => void;
+  onImportBoardFiles: (files: File[], position: BoardPoint) => void | Promise<void>;
   onOpenSettings: () => void;
+  onSendAssetToAgent: (nodeId: string) => void;
   onSendAgentNode: (nodeId: string) => void;
+  onSetAssetAsReference: (nodeId: string) => void;
   onToggleTheme: () => void;
 }
 
 type BoardFlowEdge = Edge<{ kind: BoardEdgeKind }, "smoothstep">;
-type QuickInsertKind = "prompt" | "image-generate" | "video-generate" | "agent" | "note";
+type QuickInsertKind = "prompt" | "reference-group" | "image-generate" | "video-generate" | "agent" | "note";
 type BoardHandleDirection = "input" | "output";
 
 interface QuickInsertMenu {
@@ -79,6 +89,7 @@ const DEFAULT_BOARD_IMAGE_MODEL = "modelscope:Qwen/Qwen-Image";
 
 const quickInsertItems: Array<{ icon: LucideIcon; iconClassName: string; iconSurfaceClassName: string; kind: QuickInsertKind; label: string; size: BoardSize }> = [
   { icon: MessageSquareText, iconClassName: "text-teal-300", iconSurfaceClassName: "bg-teal-500/10 border-teal-400/20", kind: "prompt", label: "提示", size: DEFAULT_PROMPT_NODE_SIZE },
+  { icon: Layers, iconClassName: "text-cyan-300", iconSurfaceClassName: "bg-cyan-500/10 border-cyan-400/20", kind: "reference-group", label: "参考组", size: DEFAULT_REFERENCE_GROUP_NODE_SIZE },
   { icon: ImagePlus, iconClassName: "text-blue-300", iconSurfaceClassName: "bg-blue-500/10 border-blue-400/20", kind: "image-generate", label: "图片", size: DEFAULT_GENERATE_NODE_SIZE },
   { icon: Video, iconClassName: "text-violet-300", iconSurfaceClassName: "bg-violet-500/10 border-violet-400/20", kind: "video-generate", label: "视频", size: DEFAULT_GENERATE_NODE_SIZE },
   { icon: Bot, iconClassName: "text-purple-300", iconSurfaceClassName: "bg-purple-500/10 border-purple-400/20", kind: "agent", label: "智能体", size: DEFAULT_AGENT_NODE_SIZE },
@@ -147,6 +158,58 @@ function targetAcceptsReference(nodes: BoardNodeModel[], targetNodeId: string): 
   }
 }
 
+function importableFiles(dataTransfer: DataTransfer): File[] {
+  return Array.from(dataTransfer.files).filter(file => file.type.startsWith("image/") || file.type.startsWith("video/"));
+}
+
+function pasteImageFiles(dataTransfer: DataTransfer): File[] {
+  return Array.from(dataTransfer.items)
+    .filter(item => item.kind === "file" && item.type.startsWith("image/"))
+    .map(item => item.getAsFile())
+    .filter((file): file is File => file !== null);
+}
+
+function isTextEntryTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && (
+    target.closest("textarea") !== null ||
+    target.closest("input") !== null ||
+    target.closest("[contenteditable='true']") !== null
+  );
+}
+
+function boardNodeReferences(node: BoardNodeModel | undefined): ReferenceImageRef[] {
+  if (node?.kind === "asset" && node.asset.type === "image") {
+    return [{ id: node.asset.assetId, role: "general", url: node.asset.url }];
+  }
+  if (node?.kind === "reference-group") {
+    return node.references.map(reference => ({ id: reference.assetId, role: reference.role, url: reference.url }));
+  }
+  return [];
+}
+
+function uniqueReferences(references: ReferenceImageRef[]): ReferenceImageRef[] {
+  const seen = new Set<string>();
+  const unique: ReferenceImageRef[] = [];
+  for (const reference of references) {
+    const key = `${reference.id}:${reference.url}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(reference);
+  }
+  return unique;
+}
+
+function promptReferenceCandidates(nodes: BoardNodeModel[], edges: BoardEdge[], promptNodeId: string): ReferenceImageRef[] {
+  const targetGenerateIds = edges
+    .filter(edge => edge.from.nodeId === promptNodeId && edge.to.portId === "prompt-in")
+    .map(edge => edge.to.nodeId);
+  const connectedReferences = edges
+    .filter(edge => targetGenerateIds.includes(edge.to.nodeId) && edge.to.portId === "reference-in")
+    .flatMap(edge => boardNodeReferences(nodes.find(node => node.id === edge.from.nodeId)));
+  if (connectedReferences.length > 0) return uniqueReferences(connectedReferences);
+  return uniqueReferences(nodes.flatMap(node => boardNodeReferences(node)));
+}
+
 function getBoardVar(varName: string, fallback: string): string {
   if (typeof document === "undefined") return fallback;
   const cs = getComputedStyle(document.querySelector(".imagine-workbench-shell") || document.documentElement);
@@ -174,6 +237,7 @@ function generateInputSummaryForNode(node: BoardNodeModel, nodes: BoardNodeModel
     .map(edge => nodes.find(item => item.id === edge.from.nodeId))
     .forEach(item => {
       if (item?.kind === "asset" && item.asset.type === "image") referenceAssetIds.add(item.asset.assetId);
+      if (item?.kind === "reference-group") item.references.forEach(reference => referenceAssetIds.add(reference.assetId));
     });
 
   return {
@@ -193,9 +257,13 @@ export default function BoardWorkspace({
   onBack,
   onCaptureVideoFrame,
   onConnectionError,
+  onEditAssetImage,
   onExecuteGenerateNode,
+  onImportBoardFiles,
   onOpenSettings,
+  onSendAssetToAgent,
   onSendAgentNode,
+  onSetAssetAsReference,
   onToggleTheme,
 }: BoardWorkspaceProps) {
   const flowInstanceRef = useRef<ReactFlowInstance<BoardFlowNode, BoardFlowEdge> | null>(null);
@@ -207,16 +275,21 @@ export default function BoardWorkspace({
     selectedEdgeId,
     selectedNodeId,
     addAgentNode,
+    addAssetToReferenceGroup,
     addGenerateNode,
     addNoteNode,
     addPromptNode,
+    addReferenceGroupNode,
     clearBoard,
     connectPorts,
     deleteEdge,
     deleteNode,
+    moveReferenceGroupItem,
+    removeReferenceGroupItem,
     selectEdge,
     selectNode,
     setViewport,
+    updateReferenceGroupItemRole,
     updateAgentInstruction,
     updateGenerateNode,
     updateNodePosition,
@@ -237,10 +310,17 @@ export default function BoardWorkspace({
           generateInputSummary: generateInputSummaryForNode(node, board.nodes, board.edges),
           hasResultConnection: hasResultConnection(node.id, board.edges),
           node,
+          promptReferences: node.kind === "prompt" ? promptReferenceCandidates(board.nodes, board.edges, node.id) : [],
           onCaptureVideoFrame,
           onDelete: deleteNode,
+          onEditAssetImage,
           onExecuteGenerate: onExecuteGenerateNode,
+          onMoveReferenceGroupItem: moveReferenceGroupItem,
+          onRemoveReferenceGroupItem: removeReferenceGroupItem,
           onSendAgent: onSendAgentNode,
+          onSendAssetToAgent,
+          onSetAssetAsReference,
+          onUpdateReferenceGroupItemRole: updateReferenceGroupItemRole,
           onUpdateAgent: updateAgentInstruction,
           onUpdateGenerate: updateGenerateNode,
           onUpdateNote: updateNoteBody,
@@ -252,9 +332,15 @@ export default function BoardWorkspace({
       board.edges,
       deleteNode,
       onCaptureVideoFrame,
+      onEditAssetImage,
       onExecuteGenerateNode,
+      moveReferenceGroupItem,
+      removeReferenceGroupItem,
+      onSendAssetToAgent,
       onSendAgentNode,
+      onSetAssetAsReference,
       selectedNodeId,
+      updateReferenceGroupItemRole,
       updateAgentInstruction,
       updateGenerateNode,
       updateNoteBody,
@@ -284,6 +370,11 @@ export default function BoardWorkspace({
   const isValidBoardConnection = useCallback<IsValidConnection<BoardFlowEdge>>((connection) => {
     const refs = connectionPortRefs(connection);
     if (!isCompatiblePortConnection(refs)) return false;
+    const targetNode = board.nodes.find(node => node.id === refs.to.nodeId);
+    if (targetNode?.kind === "reference-group") {
+      const sourceNode = board.nodes.find(node => node.id === refs.from.nodeId);
+      return refs.to.portId === "asset-in" && sourceNode?.kind === "asset" && sourceNode.asset.type === "image";
+    }
     if (refs.to.portId !== "reference-in") return true;
     return targetAcceptsReference(board.nodes, refs.to.nodeId);
   }, [board.nodes]);
@@ -299,6 +390,10 @@ export default function BoardWorkspace({
       return;
     }
     try {
+      const targetNode = board.nodes.find(node => node.id === refs.to.nodeId);
+      if (targetNode?.kind === "reference-group") {
+        addAssetToReferenceGroup(refs.from.nodeId, refs.to.nodeId);
+      }
       connectPorts(refs.from, refs.to);
     } catch (error) {
       onConnectionError(error instanceof Error ? error.message : "连接失败");
@@ -315,16 +410,36 @@ export default function BoardWorkspace({
     selectNode(null);
   };
 
-  const handleNodeDrag: OnNodeDrag<BoardFlowNode> = (_event, node) => {
-    updateNodePosition(node.id, node.position);
-  };
+  const handleNodesChange = useCallback<OnNodesChange<BoardFlowNode>>((changes) => {
+    for (const change of changes) {
+      if (change.type === "position" && change.position) {
+        updateNodePosition(change.id, change.position);
+      }
+    }
+  }, [updateNodePosition]);
+
 
   const handleNodesDelete: OnNodesDelete<BoardFlowNode> = nodes => {
     for (const node of nodes) deleteNode(node.id);
   };
 
+  const deleteBoardEdge = useCallback((edgeId: string): void => {
+    const edge = board.edges.find(item => item.id === edgeId);
+    if (!edge) {
+      deleteEdge(edgeId);
+      return;
+    }
+    const targetNode = board.nodes.find(node => node.id === edge.to.nodeId);
+    const sourceNode = board.nodes.find(node => node.id === edge.from.nodeId);
+    if (targetNode?.kind === "reference-group" && sourceNode?.kind === "asset") {
+      removeReferenceGroupItem(targetNode.id, sourceNode.asset.assetId);
+      return;
+    }
+    deleteEdge(edgeId);
+  }, [board.edges, board.nodes, deleteEdge, removeReferenceGroupItem]);
+
   const handleEdgesDelete: OnEdgesDelete<BoardFlowEdge> = edges => {
-    for (const edge of edges) deleteEdge(edge.id);
+    for (const edge of edges) deleteBoardEdge(edge.id);
   };
 
   const flowPositionFromClient = useCallback((clientX: number, clientY: number): BoardPoint => {
@@ -353,6 +468,7 @@ export default function BoardWorkspace({
 
   const addQuickNode = useCallback((kind: QuickInsertKind, position: BoardPoint): string => {
     if (kind === "prompt") return addPromptNode({ position });
+    if (kind === "reference-group") return addReferenceGroupNode({ position });
     if (kind === "agent") return addAgentNode({ position });
     if (kind === "note") return addNoteNode({ position });
     if (kind === "video-generate") {
@@ -365,7 +481,7 @@ export default function BoardWorkspace({
       imageResolution: "1024x1024",
       position,
     });
-  }, [addAgentNode, addGenerateNode, addNoteNode, addPromptNode]);
+  }, [addAgentNode, addGenerateNode, addNoteNode, addPromptNode, addReferenceGroupNode]);
 
   const addQuickNodeAtPoint = useCallback((kind: QuickInsertKind, point: BoardPoint): void => {
     const item = quickInsertItems.find(current => current.kind === kind);
@@ -373,6 +489,55 @@ export default function BoardWorkspace({
     addQuickNode(kind, centeredNodePosition(point, item.size));
     setQuickInsertMenu(null);
   }, [addQuickNode, centeredNodePosition]);
+
+  const handleConnectEnd = useCallback<OnConnectEnd>((event, connectionState) => {
+    if (connectionState.isValid || !connectionState.fromNode || !connectionState.fromHandle) return;
+    if (!(event instanceof MouseEvent) && !(event instanceof TouchEvent)) return;
+    const clientPoint = event instanceof MouseEvent
+      ? { x: event.clientX, y: event.clientY }
+      : { x: event.changedTouches[0]?.clientX, y: event.changedTouches[0]?.clientY };
+    if (typeof clientPoint.x !== "number" || typeof clientPoint.y !== "number") return;
+
+    const sourceNodeId = connectionState.fromNode.id;
+    const sourceHandleId = connectionState.fromHandle.id;
+    if (!sourceNodeId || !sourceHandleId) return;
+    const sourceKind = portKindFromHandle(sourceHandleId);
+    const sourceDirection = handleDirectionFromHandle(sourceHandleId);
+    if (sourceDirection !== "output") return;
+
+    const flowPoint = flowPositionFromClient(clientPoint.x, clientPoint.y);
+    if (sourceKind === "prompt") {
+      const nodeId = addQuickNode("image-generate", centeredNodePosition(flowPoint, DEFAULT_GENERATE_NODE_SIZE));
+      connectPorts(
+        { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "prompt" },
+        { nodeId, portId: "prompt-in", portKind: "prompt" },
+      );
+      return;
+    }
+    if (sourceKind === "asset") {
+      const sourceNode = board.nodes.find(node => node.id === sourceNodeId);
+      if (sourceNode?.kind === "asset") {
+        if (sourceNode.asset.type !== "image") {
+          onConnectionError("参考组只支持图片资产。");
+          return;
+        }
+        const nodeId = addQuickNode("reference-group", centeredNodePosition(flowPoint, DEFAULT_REFERENCE_GROUP_NODE_SIZE));
+        addAssetToReferenceGroup(sourceNodeId, nodeId);
+        connectPorts(
+          { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "asset" },
+          { nodeId, portId: "asset-in", portKind: "asset" },
+        );
+        return;
+      }
+      if (sourceNode?.kind !== "reference-group") return;
+      const nodeId = addQuickNode("image-generate", centeredNodePosition(flowPoint, DEFAULT_GENERATE_NODE_SIZE));
+      connectPorts(
+        { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "asset" },
+        { nodeId, portId: "reference-in", portKind: "asset" },
+      );
+      return;
+    }
+  }, [addAssetToReferenceGroup, addQuickNode, board.nodes, centeredNodePosition, connectPorts, flowPositionFromClient, onConnectionError]);
 
   const openQuickInsertMenu = useCallback((event: ReactMouseEvent | MouseEvent): void => {
     event.preventDefault();
@@ -393,6 +558,10 @@ export default function BoardWorkspace({
   const addPromptAtCenter = useCallback(() => {
     addPromptNode({ position: visibleCenterPosition(DEFAULT_PROMPT_NODE_SIZE) });
   }, [addPromptNode, visibleCenterPosition]);
+
+  const addReferenceGroupAtCenter = useCallback(() => {
+    addReferenceGroupNode({ position: visibleCenterPosition(DEFAULT_REFERENCE_GROUP_NODE_SIZE) });
+  }, [addReferenceGroupNode, visibleCenterPosition]);
 
   const addImageGenerateAtCenter = useCallback(() => {
     addGenerateNode({
@@ -421,6 +590,42 @@ export default function BoardWorkspace({
     addNoteNode({ position: visibleCenterPosition(DEFAULT_NOTE_NODE_SIZE) });
   }, [addNoteNode, visibleCenterPosition]);
 
+  const importFilesAtPoint = useCallback((files: File[], point: BoardPoint): void => {
+    if (files.length === 0) return;
+    void onImportBoardFiles(files, centeredNodePosition(point, DEFAULT_ASSET_NODE_SIZE));
+    setQuickInsertMenu(null);
+  }, [centeredNodePosition, onImportBoardFiles]);
+
+  const handleBoardDrop = useCallback((event: ReactDragEvent<HTMLElement>): void => {
+    const files = importableFiles(event.dataTransfer);
+    if (files.length === 0) return;
+    event.preventDefault();
+    importFilesAtPoint(files, flowPositionFromClient(event.clientX, event.clientY));
+  }, [flowPositionFromClient, importFilesAtPoint]);
+
+  const handleBoardDragOver = useCallback((event: ReactDragEvent<HTMLElement>): void => {
+    if (importableFiles(event.dataTransfer).length === 0) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+  }, []);
+
+  useEffect(() => {
+    const handlePaste = (event: ClipboardEvent): void => {
+      if (event.defaultPrevented || isTextEntryTarget(event.target)) return;
+      const clipboardData = event.clipboardData;
+      if (!clipboardData) return;
+      const files = pasteImageFiles(clipboardData);
+      if (files.length === 0) return;
+      const position = visibleCenterPosition(DEFAULT_ASSET_NODE_SIZE);
+      if (!position) return;
+      event.preventDefault();
+      void onImportBoardFiles(files, position);
+    };
+
+    window.addEventListener("paste", handlePaste);
+    return () => window.removeEventListener("paste", handlePaste);
+  }, [onImportBoardFiles, visibleCenterPosition]);
+
   return (
     <main className={`imagine-workbench-shell imagine-theme-${themeMode} flex h-screen min-h-0 flex-col bg-[var(--iw-bg)] text-[var(--iw-text)]`}>
       <BoardToolbar
@@ -431,14 +636,22 @@ export default function BoardWorkspace({
         onAddImageGenerate={addImageGenerateAtCenter}
         onAddNote={addNoteAtCenter}
         onAddPrompt={addPromptAtCenter}
+        onAddReferenceGroup={addReferenceGroupAtCenter}
         onAddVideoGenerate={addVideoGenerateAtCenter}
         onBack={onBack}
         onClear={clearBoard}
         onOpenSettings={onOpenSettings}
         onToggleTheme={onToggleTheme}
       />
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <section ref={flowHostRef} onDoubleClick={handleFlowDoubleClick} className="board-canvas relative min-h-0 bg-[var(--iw-board-canvas-bg)]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto]">
+        <section
+          ref={flowHostRef}
+          tabIndex={-1}
+          onDoubleClick={handleFlowDoubleClick}
+          onDragOver={handleBoardDragOver}
+          onDrop={handleBoardDrop}
+          className="board-canvas relative min-h-0 bg-[var(--iw-board-canvas-bg)]"
+        >
           <ReactFlow
             nodes={flowNodes}
             edges={flowEdges}
@@ -463,17 +676,19 @@ export default function BoardWorkspace({
             edgesFocusable
             edgesReconnectable={false}
             onConnect={handleConnect}
+            onConnectEnd={handleConnectEnd}
             onEdgeClick={handleEdgeClick}
-            onEdgeDoubleClick={(_event, edge) => deleteEdge(edge.id)}
+            onEdgeDoubleClick={(_event, edge) => deleteBoardEdge(edge.id)}
             onEdgesDelete={handleEdgesDelete}
             onInit={(instance) => {
               flowInstanceRef.current = instance;
             }}
             onMoveEnd={(_event, viewport) => setViewport(viewport)}
             onNodeClick={handleNodeClick}
-            onNodeDrag={handleNodeDrag}
+            onNodesChange={handleNodesChange}
             onNodesDelete={handleNodesDelete}
             onPaneClick={() => {
+              flowHostRef.current?.focus();
               setQuickInsertMenu(null);
               selectNode(null);
               selectEdge(null);
@@ -492,6 +707,7 @@ export default function BoardWorkspace({
               zoomable
             />
           </ReactFlow>
+          {board.nodes.length === 0 && <BoardEmptyHint />}
           {quickInsertMenu && (
             <div
               className="imagine-board-quick-insert fixed z-50 grid w-44 gap-1.5 !rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)] p-2 text-[var(--iw-text)]"

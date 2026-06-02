@@ -15,7 +15,7 @@ export default function PromptReferenceDropdown({ references, search, onSelect }
 
   if (references.length === 0) {
     return (
-      <div className="absolute left-0 right-0 bottom-full mb-2 rounded-xl border border-white/5 bg-[#0e0e12] p-3 text-center text-[11px] text-slate-500 shadow-xl z-50">
+      <div className="imagine-at-dropdown imagine-at-dropdown-empty">
         先拖入或上传参考图，再用 @图片N 指定引用位置
       </div>
     );
@@ -23,31 +23,33 @@ export default function PromptReferenceDropdown({ references, search, onSelect }
 
   if (filtered.length === 0) {
     return (
-      <div className="absolute left-0 right-0 bottom-full mb-2 rounded-xl border border-white/5 bg-[#0e0e12] p-3 text-center text-[11px] text-slate-500 shadow-xl z-50">
+      <div className="imagine-at-dropdown imagine-at-dropdown-empty">
         未找到匹配的已导入参考图
       </div>
     );
   }
 
   return (
-    <div className="absolute left-0 right-0 bottom-full mb-2 flex max-h-52 w-full select-none flex-col gap-1.5 overflow-y-auto rounded-xl border border-blue-500/30 bg-[#0e0e15]/95 p-2.5 shadow-2xl backdrop-blur-md z-50">
-      <p className="mb-1 flex items-center justify-between px-2 text-[9px] font-bold uppercase tracking-wider text-blue-400">
+    <div className="imagine-at-dropdown">
+      <p className="mb-1 flex items-center justify-between px-1 text-[9px] font-bold uppercase tracking-wider text-[var(--iw-accent-strong)]">
         <span>选择已导入参考图</span>
-        <span className="font-mono text-[8px] text-slate-400">共 {filtered.length} 张</span>
+        <span className="font-mono text-[8px] font-normal normal-case tracking-normal text-[var(--iw-faint)]">
+          {filtered.length} 张
+        </span>
       </p>
       {filtered.map(({ reference, index, token }) => (
         <button
           key={reference.id}
           type="button"
           onClick={() => onSelect(index)}
-          className="flex w-full cursor-pointer select-none items-center gap-2.5 rounded-lg border border-transparent p-1.5 text-left transition hover:border-white/10 hover:bg-white/5"
+          className="imagine-at-dropdown-item"
         >
-          <div className="h-8 w-8 shrink-0 overflow-hidden rounded border border-white/5 bg-slate-950">
+          <div className="imagine-at-dropdown-thumb">
             <PreviewImage src={reference.url} alt={token} className="h-full w-full object-cover" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate font-mono text-[10px] font-bold text-blue-400">@{token}</p>
-            <p className="truncate text-[9px] text-slate-400">{reference.id}</p>
+            <p className="truncate font-mono text-[10px] font-bold text-[var(--iw-accent-strong)]">@{token}</p>
+            <p className="truncate text-[9px] text-[var(--iw-faint)]">{reference.id}</p>
           </div>
         </button>
       ))}

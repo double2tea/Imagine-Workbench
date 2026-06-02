@@ -102,8 +102,8 @@ export default function ReferenceImagePicker({
   return (
     <div onDragOver={handleDragOver} onDrop={handleDrop}>
       <div className="flex items-center justify-between mb-2">
-        <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-300">
-          <Layers className="h-3.5 w-3.5 text-slate-400" />
+        <label className="imagine-reference-label">
+          <Layers className="h-3.5 w-3.5 text-[var(--iw-faint)]" />
           {label}
         </label>
         {references.length > 0 && (
@@ -118,7 +118,7 @@ export default function ReferenceImagePicker({
       </div>
 
       {references.length > 0 ? (
-        <div className="grid grid-cols-4 gap-2 rounded-lg border border-slate-800 bg-slate-950/45 p-2">
+        <div className="imagine-reference-grid">
           {visibleReferences.map((reference, index) => {
             const isStart = roleMode && reference.role === "start";
             const isEnd = roleMode && reference.role === "end";
@@ -166,24 +166,24 @@ export default function ReferenceImagePicker({
           })}
 
           {references.length < maxCount && (
-            <label className="relative aspect-square rounded-lg border border-dashed border-slate-700 bg-slate-900/40 transition hover:border-slate-500 hover:bg-slate-900 flex flex-col items-center justify-center cursor-pointer select-none">
-              <span className="text-slate-400 font-bold text-lg leading-none">+</span>
-              <span className="text-[8px] text-slate-500 font-semibold mt-0.5">{addLabel}</span>
+            <label className="imagine-reference-add-tile">
+              <span className="font-bold text-lg leading-none">+</span>
+              <span className="mt-0.5 text-[8px] font-semibold">{addLabel}</span>
               <input type="file" accept="image/*" onChange={onUpload} className="hidden" />
             </label>
           )}
         </div>
       ) : (
-        <div className="imagine-upload-zone relative flex min-h-[76px] flex-col items-center justify-center rounded-lg border border-dashed border-slate-700 bg-slate-950/35 p-3 text-center transition hover:border-slate-600 hover:bg-slate-950/60">
-          <CloudUpload className="mb-1.5 h-5 w-5 text-slate-500" />
-          <span className="text-xs text-slate-300">
+        <div className="imagine-upload-zone relative flex min-h-[76px] flex-col items-center justify-center rounded-lg border border-dashed p-3 text-center transition">
+          <CloudUpload className="mb-1.5 h-5 w-5 text-[var(--iw-faint)]" />
+          <span className="text-xs text-[var(--iw-muted)]">
             {emptyLabel}，或{" "}
             <label className={browseClassName}>
               {uploadLabel}
               <input type="file" accept="image/*" onChange={onUpload} className="hidden" />
             </label>
           </span>
-          <span className="mt-1 hidden text-[9px] text-slate-500 sm:inline">{emptyHelp}</span>
+          <span className="mt-1 hidden text-[9px] text-[var(--iw-faint)] sm:inline">{emptyHelp}</span>
         </div>
       )}
     </div>

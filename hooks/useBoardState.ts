@@ -9,6 +9,7 @@ import {
   DEFAULT_NODE_POSITION,
   DEFAULT_NOTE_NODE_SIZE,
   DEFAULT_PROMPT_NODE_SIZE,
+  DEFAULT_REFERENCE_GROUP_NODE_SIZE,
   createEmptyBoard,
   getBoardFromDB,
   saveBoardToDB,
@@ -17,11 +18,15 @@ import {
   type BoardEdge,
   type BoardEdgeKind,
   type BoardGenerateNodeUpdate,
+  type BoardGenerateVariantCount,
   type BoardGenerationStatus,
   type BoardImageGenerateNode,
   type BoardNode,
   type BoardPoint,
   type BoardPortRef,
+  type BoardReferenceGroupItem,
+  type BoardReferenceGroupNode,
+  type BoardReferenceRole,
   type BoardPromptNode,
   type BoardSize,
   type BoardVideoGenerateNode,
@@ -31,12 +36,14 @@ import {
   type CreateGenerateNodeInput,
   type CreateNoteNodeInput,
   type CreatePromptNodeInput,
+  type CreateReferenceGroupNodeInput,
 } from "@/lib/board";
 import { getImageModelCapabilities, getImageResolutionOptions, getVideoModelCapabilities } from "@/lib/providers/model-catalog";
 
 export type BoardSaveStatus = "idle" | "loading" | "saving" | "saved" | "error";
 
 const DEFAULT_CUSTOM_IMAGE_RESOLUTION = "2560x1440";
+const DEFAULT_VARIANT_COUNT: BoardGenerateVariantCount = 1;
 
 export interface BoardStateController {
   board: BoardDocument;
@@ -49,13 +56,18 @@ export interface BoardStateController {
   addGenerateNode: (input: CreateGenerateNodeInput) => string;
   addNoteNode: (input?: CreateNoteNodeInput) => string;
   addPromptNode: (input?: CreatePromptNodeInput) => string;
+  addReferenceGroupNode: (input?: CreateReferenceGroupNodeInput) => string;
+  addAssetToReferenceGroup: (assetNodeId: string, groupNodeId: string) => void;
   clearBoard: () => void;
   connectPorts: (from: BoardPortRef, to: BoardPortRef) => void;
   deleteEdge: (edgeId: string) => void;
   deleteNode: (nodeId: string) => void;
+  moveReferenceGroupItem: (groupNodeId: string, assetId: string, direction: "up" | "down") => void;
+  removeReferenceGroupItem: (groupNodeId: string, assetId: string) => void;
   selectEdge: (edgeId: string | null) => void;
   selectNode: (nodeId: string | null) => void;
   setViewport: (viewport: BoardViewport) => void;
+  updateReferenceGroupItemRole: (groupNodeId: string, assetId: string, role: BoardReferenceRole) => void;
   updateAgentInstruction: (nodeId: string, instruction: string) => void;
   updateGenerateNode: (nodeId: string, input: BoardGenerateNodeUpdate) => void;
   updateNodePosition: (nodeId: string, position: BoardPoint) => void;
@@ -147,6 +159,7 @@ function normalizeBoardNode(node: BoardNode): BoardNode {
       imageQuality: node.imageQuality ?? defaults.imageQuality,
       imageResolution: node.imageResolution || defaults.imageResolution,
       thinkingLevel: node.thinkingLevel ?? defaults.thinkingLevel,
+      variantCount: node.variantCount || DEFAULT_VARIANT_COUNT,
     };
   }
   if (node.kind === "video-generate") {
@@ -157,6 +170,7 @@ function normalizeBoardNode(node: BoardNode): BoardNode {
       videoDuration: node.videoDuration ?? defaults.videoDuration,
       videoPreset: node.videoPreset ?? defaults.videoPreset,
       videoResolution: node.videoResolution ?? defaults.videoResolution,
+      variantCount: node.variantCount || DEFAULT_VARIANT_COUNT,
     };
   }
   return node;
@@ -285,6 +299,26 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     return nodeId;
   }, [board.nodes]);
 
+  const addReferenceGroupNode = useCallback((input: CreateReferenceGroupNodeInput = {}): string => {
+    const createdAt = nowIso();
+    const nodeId = createBoardId("ref_group");
+    const node: BoardReferenceGroupNode = {
+      id: nodeId,
+      kind: "reference-group",
+      title: input.title ?? "Reference Group",
+      references: input.references ?? [],
+      position: input.position ?? moveDefaultPosition(board.nodes),
+      size: input.size ?? DEFAULT_REFERENCE_GROUP_NODE_SIZE,
+      createdAt,
+      updatedAt: createdAt,
+    };
+
+    setBoard(currentBoard => touchBoard(currentBoard, [...currentBoard.nodes, node]));
+    setSelectedNodeId(nodeId);
+    setSelectedEdgeId(null);
+    return nodeId;
+  }, [board.nodes]);
+
   const addGenerateNode = useCallback((input: CreateGenerateNodeInput): string => {
     const createdAt = nowIso();
     const nodeId = createBoardId(input.kind === "image-generate" ? "image_gen" : "video_gen");
@@ -294,6 +328,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       prompt: input.prompt ?? "",
       model: input.model,
       status: "idle" as BoardGenerationStatus,
+      variantCount: input.variantCount ?? DEFAULT_VARIANT_COUNT,
       position: input.position ?? moveDefaultPosition(board.nodes),
       size: input.size ?? DEFAULT_GENERATE_NODE_SIZE,
       createdAt,
@@ -417,6 +452,89 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     setSelectedNodeId(null);
   }, []);
 
+  const addAssetToReferenceGroup = useCallback((assetNodeId: string, groupNodeId: string) => {
+    const updatedAt = nowIso();
+    setBoard(currentBoard => {
+      const assetNode = currentBoard.nodes.find(node => node.id === assetNodeId);
+      if (assetNode?.kind !== "asset" || assetNode.asset.type !== "image") {
+        throw new Error("参考组只支持图片资产");
+      }
+      const reference: BoardReferenceGroupItem = {
+        assetId: assetNode.asset.assetId,
+        model: assetNode.asset.model,
+        prompt: assetNode.asset.prompt,
+        role: "general",
+        url: assetNode.asset.url,
+      };
+      return touchBoard(
+        currentBoard,
+        currentBoard.nodes.map(node => {
+          if (node.id !== groupNodeId) return node;
+          if (node.kind !== "reference-group") throw new Error("目标节点不是参考组");
+          if (node.references.some(item => item.assetId === reference.assetId)) return node;
+          return { ...node, references: [...node.references, reference], updatedAt };
+        }),
+      );
+    });
+  }, []);
+
+  const removeReferenceGroupItem = useCallback((groupNodeId: string, assetId: string) => {
+    const updatedAt = nowIso();
+    setBoard(currentBoard => {
+      const assetNodeIds = currentBoard.nodes
+        .filter(node => node.kind === "asset" && node.asset.assetId === assetId)
+        .map(node => node.id);
+      return touchBoard(
+        currentBoard,
+        currentBoard.nodes.map(node =>
+          node.id === groupNodeId && node.kind === "reference-group"
+            ? { ...node, references: node.references.filter(item => item.assetId !== assetId), updatedAt }
+            : node,
+        ),
+        currentBoard.edges.filter(edge =>
+          !(
+            edge.to.nodeId === groupNodeId &&
+            edge.to.portId === "asset-in" &&
+            assetNodeIds.includes(edge.from.nodeId)
+          ),
+        ),
+      );
+    });
+  }, []);
+
+  const moveReferenceGroupItem = useCallback((groupNodeId: string, assetId: string, direction: "up" | "down") => {
+    const updatedAt = nowIso();
+    setBoard(currentBoard =>
+      touchBoard(
+        currentBoard,
+        currentBoard.nodes.map(node => {
+          if (node.id !== groupNodeId || node.kind !== "reference-group") return node;
+          const index = node.references.findIndex(item => item.assetId === assetId);
+          const targetIndex = direction === "up" ? index - 1 : index + 1;
+          if (index < 0 || targetIndex < 0 || targetIndex >= node.references.length) return node;
+          const references = [...node.references];
+          const [item] = references.splice(index, 1);
+          references.splice(targetIndex, 0, item);
+          return { ...node, references, updatedAt };
+        }),
+      ),
+    );
+  }, []);
+
+  const updateReferenceGroupItemRole = useCallback((groupNodeId: string, assetId: string, role: BoardReferenceRole) => {
+    const updatedAt = nowIso();
+    setBoard(currentBoard =>
+      touchBoard(
+        currentBoard,
+        currentBoard.nodes.map(node =>
+          node.id === groupNodeId && node.kind === "reference-group"
+            ? { ...node, references: node.references.map(item => (item.assetId === assetId ? { ...item, role } : item)), updatedAt }
+            : node,
+        ),
+      ),
+    );
+  }, []);
+
   const selectNode = useCallback((nodeId: string | null) => {
     setSelectedNodeId(nodeId);
     if (nodeId) setSelectedEdgeId(null);
@@ -511,13 +629,18 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       addGenerateNode,
       addNoteNode,
       addPromptNode,
+      addReferenceGroupNode,
+      addAssetToReferenceGroup,
       clearBoard,
       connectPorts,
       deleteEdge,
       deleteNode,
+      moveReferenceGroupItem,
+      removeReferenceGroupItem,
       selectEdge,
       selectNode,
       setViewport,
+      updateReferenceGroupItemRole,
       updateAgentInstruction,
       updateGenerateNode,
       updateNodePosition,
@@ -531,11 +654,15 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       addGenerateNode,
       addNoteNode,
       addPromptNode,
+      addReferenceGroupNode,
+      addAssetToReferenceGroup,
       board,
       clearBoard,
       connectPorts,
       deleteEdge,
       deleteNode,
+      moveReferenceGroupItem,
+      removeReferenceGroupItem,
       saveError,
       saveStatus,
       selectedEdgeId,
@@ -543,6 +670,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       selectEdge,
       selectNode,
       setViewport,
+      updateReferenceGroupItemRole,
       updateAgentInstruction,
       updateGenerateNode,
       updateNodePosition,

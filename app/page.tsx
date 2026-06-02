@@ -9,6 +9,7 @@ import CanvasMaskEditor from "@/components/CanvasMaskEditor";
 import FloatingCompareButton from "@/components/assets/FloatingCompareButton";
 import FullscreenPreview from "@/components/assets/FullscreenPreview";
 import CreationModeTabs, { type CreationMode } from "@/components/creation/CreationModeTabs";
+import CreatorGenerateButton from "@/components/creation/CreatorGenerateButton";
 import ImageGenerationPanel from "@/components/creation/ImageGenerationPanel";
 import VideoGenerationPanel from "@/components/creation/VideoGenerationPanel";
 import AtReferenceDropdown from "@/components/reference/AtReferenceDropdown";
@@ -16,7 +17,10 @@ import PromptReferenceDropdown from "@/components/reference/PromptReferenceDropd
 import ReferenceImagePicker, { type ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import SettingsModal from "@/components/settings/SettingsModal";
 import AssetGalleryWorkspace from "@/components/workbench/AssetGalleryWorkspace";
-import WorkspaceHeader, { type ThemeMode } from "@/components/workbench/WorkspaceHeader";
+import MobileWorkbenchTabs, { type MobileWorkbenchPanel } from "@/components/workbench/MobileWorkbenchTabs";
+
+import WorkspaceHeader from "@/components/workbench/WorkspaceHeader";
+import { persistThemeMode, readStoredThemeMode, type ThemeMode } from "@/lib/theme-mode";
 import WorkspaceNotices, { type WorkspaceNotice } from "@/components/workbench/WorkspaceNotices";
 import { getAllFromDB, clearAllDB, StorageItem } from "@/lib/db";
 import { useAgentController } from "@/hooks/useAgentController";
@@ -146,6 +150,7 @@ export default function Home() {
   const [isAgentDockOpen, setIsAgentDockOpen] = useState(false);
   const [isAgentPortalReady, setIsAgentPortalReady] = useState(false);
   const [isAgentDockOverContent, setIsAgentDockOverContent] = useState(false);
+  const [mobileWorkbenchPanel, setMobileWorkbenchPanel] = useState<MobileWorkbenchPanel>("create");
 
   const applyAsVideoReference = (asset: StorageItem) => {
     setReferenceImage(asset.url);
@@ -602,9 +607,10 @@ export default function Home() {
     loadWorkspace();
 
     const restoreSettings = setTimeout(() => {
-      const storedThemeMode = localStorage.getItem("imagine_theme_mode");
-      if (storedThemeMode === "light" || storedThemeMode === "dark") {
+      const storedThemeMode = readStoredThemeMode();
+      if (storedThemeMode) {
         setThemeMode(storedThemeMode);
+        document.documentElement.setAttribute("data-imagine-theme", storedThemeMode);
       }
     }, 0);
 
@@ -806,7 +812,7 @@ export default function Home() {
   const toggleThemeMode = () => {
     setThemeMode(prev => {
       const next: ThemeMode = prev === "light" ? "dark" : "light";
-      localStorage.setItem("imagine_theme_mode", next);
+      persistThemeMode(next);
       return next;
     });
   };
@@ -826,6 +832,7 @@ export default function Home() {
       compareViewType={compareViewType}
       filterType={filterType}
       filteredItems={filteredItems}
+      inFlightCount={assetStats.statusCounts.processing + assetStats.statusCounts.pending}
       itemsCount={items.length}
       dateOptions={assetStats.dateOptions}
       modelOptions={assetStats.modelOptions}
@@ -859,7 +866,12 @@ export default function Home() {
       onSetAssetDatePreset={setAssetDatePreset}
       onSetAssetDateStart={setAssetDateStart}
       onSetAssetModelFilter={setAssetModelFilter}
-      onSetAssetStatusFilter={setAssetStatusFilter}
+      onSetAssetStatusFilter={(value) => {
+        setAssetStatusFilter(value);
+        if (!isDesktopLayout && value !== "all") {
+          setMobileWorkbenchPanel("gallery");
+        }
+      }}
       onSetCompareSliderPos={setCompareSliderPos}
       onSetCompareViewType={setCompareViewType}
       onSetFilterType={setFilterType}
@@ -1199,7 +1211,7 @@ export default function Home() {
   };
 
   return (
-    <div className={`imagine-workbench-shell imagine-theme-${themeMode} min-h-screen flex flex-col bg-[#07080b] text-slate-100 font-sans selection:bg-blue-500/30 selection:text-slate-100 relative overflow-hidden`}>
+    <div className={`imagine-workbench-shell imagine-theme-${themeMode} min-h-screen flex flex-col bg-[var(--iw-bg)] text-[var(--iw-text)] font-sans selection:bg-blue-500/30 selection:text-[var(--iw-text)] relative overflow-hidden`}>
 
       {/* Workbench depth layer */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
@@ -1223,34 +1235,44 @@ export default function Home() {
         } flex-1 w-full max-w-[1880px] mx-auto px-4 pt-5 sm:px-6 sm:pt-6 grid grid-cols-1 lg:grid-cols-[minmax(360px,420px)_minmax(0,1fr)] xl:grid-cols-[minmax(390px,440px)_minmax(0,1fr)] gap-5 xl:gap-6 items-start z-10`}
       >
 
-        {/* Creation Controls sidebar container (Col 4) */}
-        <section className="imagine-creator-panel flex flex-col gap-4">
+        <section className="imagine-creator-panel imagine-creation-sidebar flex flex-col gap-4 min-w-0">
           {!isDesktopLayout && (
             <section className="imagine-mobile-workflow flex flex-col gap-3 lg:hidden">
-              <section className="imagine-mobile-asset-stream">
-                <div className="mb-2 flex items-center justify-between px-1">
-                  <h2 className="text-sm font-semibold text-[var(--iw-muted)]">任务与结果</h2>
-                  <span className="font-mono text-[10px] text-[var(--iw-faint)]">{items.length} 项</span>
-                </div>
-                {renderAssetGalleryWorkspace()}
-              </section>
+              <MobileWorkbenchTabs
+                activePanel={mobileWorkbenchPanel}
+                galleryCount={items.length}
+                inFlightCount={assetStats.statusCounts.processing + assetStats.statusCounts.pending}
+                onChange={setMobileWorkbenchPanel}
+              />
 
-              {renderMobileQuickComposer()}
-
-              {renderMobileAdvancedSettings()}
+              {mobileWorkbenchPanel === "create" ? (
+                <>
+                  {renderMobileQuickComposer()}
+                  {renderMobileAdvancedSettings()}
+                </>
+              ) : (
+                <section className="imagine-mobile-asset-stream">
+                  {renderAssetGalleryWorkspace()}
+                </section>
+              )}
             </section>
           )}
 
           {/* Active Creative Panel switch */}
-          <div className="imagine-control-surface hidden rounded-xl dark-glass p-4 lg:flex flex-col gap-4 min-h-[500px]">
-
-            {/* Creative workflow controls */}
-              <div className="flex flex-col gap-3.5 animate-fade-in">
-
+          <div className="imagine-control-surface hidden rounded-xl dark-glass p-4 lg:flex flex-col gap-4 min-h-[500px] max-h-[calc(100vh-5.5rem)] overflow-hidden">
+            <div className="imagine-creator-scroll flex min-h-0 flex-1 flex-col gap-3.5">
                 <CreationModeTabs value={traditionalSubTab} onChange={setTraditionalSubTab} />
+                <div className="imagine-creator-meta">
+                  <span className="imagine-meta-chip font-mono text-[10px]">
+                    {assetStats.statusCounts.processing + assetStats.statusCounts.pending > 0
+                      ? `${assetStats.statusCounts.processing + assetStats.statusCounts.pending} 进行中 · ${items.length} 项`
+                      : `${items.length} 项本地资产`}
+                  </span>
+                </div>
 
                 {traditionalSubTab === "image" ? (
                   <ImageGenerationPanel
+                    showGenerateButton={false}
                     atDropdownNode={atDropdown.visible && atDropdown.type === "image-prompt" ? renderAtDropdown("image-prompt") : null}
                     capabilities={imageCapabilities}
                     customImageSize={customImageSize}
@@ -1294,6 +1316,7 @@ export default function Home() {
                   />
                 ) : (
                   <VideoGenerationPanel
+                    showGenerateButton={false}
                     atDropdownNode={atDropdown.visible && atDropdown.type === "video-prompt" ? renderAtDropdown("video-prompt") : null}
                     capabilities={videoCapabilities}
                     clearReferenceLabel={videoClearReferenceLabel}
@@ -1340,6 +1363,15 @@ export default function Home() {
 
               </div>
 
+            <div className="imagine-creator-generate-footer hidden shrink-0 lg:block">
+              <CreatorGenerateButton
+                mode={traditionalSubTab}
+                disabled={!prompt.trim()}
+                isSubmitting={traditionalSubTab === "image" ? isSubmittingImage : isSubmittingVideo}
+                submitCount={traditionalSubTab === "image" ? imageSubmitCount : videoSubmitCount}
+                onGenerate={traditionalSubTab === "image" ? generateManualImage : generateManualVideo}
+              />
+            </div>
 
             {isAgentPortalReady && !isAgentDockSuppressed && createPortal(
               <AgentDock

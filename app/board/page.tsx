@@ -7,11 +7,12 @@ import AgentDock, { type AgentToolAction } from "@/components/agent/AgentDock";
 import CanvasMaskEditor from "@/components/CanvasMaskEditor";
 import FullscreenPreview from "@/components/assets/FullscreenPreview";
 import BoardInspector from "@/components/board/BoardInspector";
+import BoardSidePanel from "@/components/board/BoardSidePanel";
 import BoardWorkspace from "@/components/board/BoardWorkspace";
 import PreviewImage from "@/components/PreviewImage";
 import SettingsModal from "@/components/settings/SettingsModal";
 import WorkspaceNotices, { type WorkspaceNotice } from "@/components/workbench/WorkspaceNotices";
-import type { ThemeMode } from "@/components/workbench/WorkspaceHeader";
+import { persistThemeMode, readStoredThemeMode, type ThemeMode } from "@/lib/theme-mode";
 import { useAgentController } from "@/hooks/useAgentController";
 import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
 import { useBoardState } from "@/hooks/useBoardState";
@@ -39,7 +40,7 @@ import {
 } from "@/lib/providers/model-catalog";
 import { getProviderMeta, PROVIDER_KEYS } from "@/lib/providers/registry";
 import { compressReferenceImageDataUrl, compressReferenceImageFile } from "@/lib/reference-images";
-import type { BoardDocument, BoardImageGenerateNode, BoardPoint, BoardVideoGenerateNode } from "@/lib/board";
+import type { BoardDocument, BoardGenerationStatus, BoardImageGenerateNode, BoardPoint, BoardVideoGenerateNode } from "@/lib/board";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import { createVideoFrameStorageItem, getVideoFrameCaptureLabel, type CapturedVideoFrame } from "@/lib/video-frame";
 
@@ -86,6 +87,43 @@ async function saveItemOrWarn(
   }
 }
 
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== "string") {
+        reject(new Error("文件读取结果不是 Data URL"));
+        return;
+      }
+      resolve(reader.result);
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("文件读取失败"));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function createBoardUploadItem(file: File, id: string): Promise<StorageItem> {
+  const isImage = file.type.startsWith("image/");
+  const isVideo = file.type.startsWith("video/");
+  if (!isImage && !isVideo) {
+    throw new Error("画板只支持导入图片或视频文件");
+  }
+  const url = isImage ? await compressReferenceImageFile(file) : await readFileAsDataUrl(file);
+  const createdAt = new Date().toISOString();
+  return {
+    id,
+    type: isImage ? "image" : "video",
+    url,
+    prompt: file.name || "Board upload",
+    model: "local-upload",
+    aspectRatio: "auto",
+    createdAt,
+    status: "complete",
+    progress: 100,
+    operationName: "board-upload",
+  };
+}
+
 function getProviderLabel(provider: AiProvider): string {
   return getProviderMeta(provider).label;
 }
@@ -108,6 +146,20 @@ function activeBoardReference(nodes: ReturnType<typeof useBoardState>["board"]["
   const node = nodes.find(item => item.id === selectedNodeId);
   if (!node || node.kind !== "asset" || node.asset.type !== "image") return [];
   return [{ id: node.asset.assetId, url: node.asset.url, role: "general" }];
+}
+
+function boardNodeReferences(node: BoardDocument["nodes"][number] | undefined): ReferenceImageRef[] {
+  if (node?.kind === "asset" && node.asset.type === "image") {
+    return [{ id: node.asset.assetId, url: node.asset.url, role: "general" }];
+  }
+  if (node?.kind === "reference-group") {
+    return node.references.map(reference => ({
+      id: reference.assetId,
+      role: reference.role,
+      url: reference.url,
+    }));
+  }
+  return [];
 }
 
 function isGenerateBoardNode(node: BoardDocument["nodes"][number] | undefined): node is GenerateBoardNode {
@@ -172,6 +224,31 @@ function findBoardAssetNodeByAssetId(nodes: BoardDocument["nodes"], assetId: str
 function findGenerateNodeById(nodes: BoardDocument["nodes"], nodeId: string): GenerateBoardNode | undefined {
   const node = nodes.find(item => item.id === nodeId);
   return isGenerateBoardNode(node) ? node : undefined;
+}
+
+function completedSourceItemIndex(items: StorageItem[], sourceBoardNodeId: string, itemId: string): number {
+  const sourceItems = items
+    .filter(item => item.sourceBoardNodeId === sourceBoardNodeId && item.status === "complete")
+    .sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime());
+  const index = sourceItems.findIndex(item => item.id === itemId);
+  return index < 0 ? 0 : index;
+}
+
+function resultAssetPosition(sourceNode: GenerateBoardNode, resultIndex: number): BoardPoint {
+  return {
+    x: sourceNode.position.x + sourceNode.size.width + 140,
+    y: sourceNode.position.y + resultIndex * 320,
+  };
+}
+
+function hasActiveSourceItems(items: StorageItem[], sourceBoardNodeId: string): boolean {
+  return items.some(item => item.sourceBoardNodeId === sourceBoardNodeId && (item.status === "pending" || item.status === "processing"));
+}
+
+function nextSourceNodeStatus(items: StorageItem[], sourceBoardNodeId: string, itemStatus: StorageItem["status"]): BoardGenerationStatus {
+  if (hasActiveSourceItems(items, sourceBoardNodeId)) return "processing";
+  if (items.some(item => item.sourceBoardNodeId === sourceBoardNodeId && item.status === "complete")) return "complete";
+  return itemStatus === "failed" ? "failed" : "complete";
 }
 
 export default function BoardPage() {
@@ -413,12 +490,12 @@ export default function BoardPage() {
     }
   };
 
-  const launchMaskEditor = (imageUrl: string, id: string, destination: MaskDestination = "creative") => {
+  const launchMaskEditor = useCallback((imageUrl: string, id: string, destination: MaskDestination = "creative") => {
     setMaskTargetUrl(imageUrl);
     setMaskTargetId(id);
     setMaskDestination(destination);
     setIsMaskOpen(true);
-  };
+  }, []);
 
   const saveMaskOutput = async (mergedImageBase64: string) => {
     let compressedMergedImage: string;
@@ -684,6 +761,37 @@ export default function BoardPage() {
     pushWorkspaceNotice("success", `已保存${getVideoFrameCaptureLabel(frame.mode)}并插入画板`);
   }, [addAssetToBoard, boardController.board.nodes, pushWorkspaceNotice]);
 
+  const handleImportBoardFiles = useCallback(async (files: File[], position: BoardPoint): Promise<void> => {
+    const boardFiles = files.filter(file => file.type.startsWith("image/") || file.type.startsWith("video/"));
+    if (boardFiles.length === 0) {
+      pushWorkspaceNotice("info", "画板只支持导入图片或视频文件");
+      return;
+    }
+
+    const importedItems: StorageItem[] = [];
+    for (let index = 0; index < boardFiles.length; index += 1) {
+      const file = boardFiles[index];
+      try {
+        const item = await createBoardUploadItem(
+          file,
+          makeClientId(file.type.startsWith("video/") ? `board_video_${index}` : `board_image_${index}`),
+        );
+        if (!await saveItemOrWarn(item, pushWorkspaceNotice)) continue;
+        importedItems.push(item);
+        addAssetToBoard(item, { x: position.x + index * 36, y: position.y + index * 36 });
+      } catch (error) {
+        pushWorkspaceNotice("error", toErrorMessage(error, `${file.name || "文件"} 导入失败`));
+      }
+    }
+
+    if (importedItems.length === 0) return;
+    setItems(prev => [
+      ...importedItems,
+      ...prev.filter(item => !importedItems.some(importedItem => importedItem.id === item.id)),
+    ]);
+    pushWorkspaceNotice("success", `已导入 ${importedItems.length} 个文件到画板`);
+  }, [addAssetToBoard, pushWorkspaceNotice]);
+
   const useSelectedBoardAssetAsReference = () => {
     const references = activeBoardReference(boardController.board.nodes, boardController.selectedNodeId);
     if (references.length === 0) {
@@ -694,6 +802,17 @@ export default function BoardPage() {
     setReferenceImages(references);
     pushWorkspaceNotice("success", "已将选中节点作为生成参考图");
   };
+
+  const useBoardAssetAsReference = useCallback((nodeId: string) => {
+    const references = activeBoardReference(boardController.board.nodes, nodeId);
+    if (references.length === 0) {
+      pushWorkspaceNotice("info", "请选择一个图片资产节点");
+      return;
+    }
+    setReferenceImage(references[0].url);
+    setReferenceImages(references);
+    pushWorkspaceNotice("success", "已将节点作为生成参考图");
+  }, [boardController.board.nodes, pushWorkspaceNotice, setReferenceImage, setReferenceImages]);
 
   const useSelectedBoardAssetForAgent = () => {
     const references = activeBoardReference(boardController.board.nodes, boardController.selectedNodeId);
@@ -706,6 +825,33 @@ export default function BoardPage() {
     setAgentReferences(references);
     setIsAgentDockOpen(true);
   };
+
+  const useBoardAssetForAgent = useCallback((nodeId: string) => {
+    const references = activeBoardReference(boardController.board.nodes, nodeId);
+    if (references.length === 0) {
+      pushWorkspaceNotice("info", "请选择一个图片资产节点");
+      return;
+    }
+    setAgentReferenceId(references[0].id);
+    setAgentReferenceUrl(references[0].url);
+    setAgentReferences(references);
+    setIsAgentDockOpen(true);
+  }, [
+    boardController.board.nodes,
+    pushWorkspaceNotice,
+    setAgentReferenceId,
+    setAgentReferenceUrl,
+    setAgentReferences,
+  ]);
+
+  const editBoardAssetImage = useCallback((nodeId: string) => {
+    const node = boardController.board.nodes.find(item => item.id === nodeId);
+    if (node?.kind !== "asset" || node.asset.type !== "image") {
+      pushWorkspaceNotice("info", "请选择一个图片资产节点");
+      return;
+    }
+    launchMaskEditor(node.asset.url, node.asset.assetId);
+  }, [boardController.board.nodes, launchMaskEditor, pushWorkspaceNotice]);
 
   const resolveGenerateNodeInputs = useCallback((nodeId: string) => {
     const node = boardController.board.nodes.find(item => item.id === nodeId);
@@ -721,8 +867,7 @@ export default function BoardPage() {
     const references: ReferenceImageRef[] = boardController.board.edges
       .filter(edge => edge.to.nodeId === nodeId && edge.to.portId === "reference-in")
       .map(edge => boardController.board.nodes.find(item => item.id === edge.from.nodeId))
-      .filter((item): item is BoardDocument["nodes"][number] & { kind: "asset" } => item?.kind === "asset" && item.asset.type === "image")
-      .map(item => ({ id: item.asset.assetId, url: item.asset.url, role: "general" }));
+      .flatMap(item => boardNodeReferences(item));
 
     return { node, prompt: resolvedPrompt, references };
   }, [boardController.board.edges, boardController.board.nodes]);
@@ -762,37 +907,47 @@ export default function BoardPage() {
 
       if (node.kind === "image-generate") {
         const nodeImageResolution = node.imageResolution === "custom" ? node.customImageResolution.trim() : node.imageResolution;
-        const didStart = await generateManualImage({
-          boardNodeId: nodeId,
-          imageQuality: node.imageQuality,
-          imageResolution: nodeImageResolution,
-          isCustomImageResolution: node.imageResolution === "custom",
-          model: node.model,
-          prompt: nextPrompt,
-          referenceImage: references[0]?.url ?? null,
-          referenceImages: references,
-          size: node.aspectRatio,
-          thinkingLevel: node.thinkingLevel,
-        });
-        if (!didStart) {
+        let didStartAny = false;
+        for (let remaining = node.variantCount; remaining > 0; remaining -= 1) {
+          const didStart = await generateManualImage({
+            boardNodeId: nodeId,
+            imageQuality: node.imageQuality,
+            imageResolution: nodeImageResolution,
+            isCustomImageResolution: node.imageResolution === "custom",
+            model: node.model,
+            prompt: nextPrompt,
+            referenceImage: references[0]?.url ?? null,
+            referenceImages: references,
+            size: node.aspectRatio,
+            thinkingLevel: node.thinkingLevel,
+          });
+          if (!didStart) break;
+          didStartAny = true;
+        }
+        if (!didStartAny) {
           boardController.updateGenerateNode(nodeId, {
             errorMessage: "图片生成请求未启动，请检查节点参数",
             status: "failed",
           });
         }
       } else {
-        const didStart = await generateManualVideo({
-          boardNodeId: nodeId,
-          model: node.model,
-          prompt: nextPrompt,
-          referenceImage: references[0]?.url ?? null,
-          referenceImages: references,
-          size: node.aspectRatio,
-          videoDuration: node.videoDuration,
-          videoPreset: node.videoPreset,
-          videoResolution: node.videoResolution,
-        });
-        if (!didStart) {
+        let didStartAny = false;
+        for (let remaining = node.variantCount; remaining > 0; remaining -= 1) {
+          const didStart = await generateManualVideo({
+            boardNodeId: nodeId,
+            model: node.model,
+            prompt: nextPrompt,
+            referenceImage: references[0]?.url ?? null,
+            referenceImages: references,
+            size: node.aspectRatio,
+            videoDuration: node.videoDuration,
+            videoPreset: node.videoPreset,
+            videoResolution: node.videoResolution,
+          });
+          if (!didStart) break;
+          didStartAny = true;
+        }
+        if (!didStartAny) {
           boardController.updateGenerateNode(nodeId, {
             errorMessage: "视频生成请求未启动，请检查节点参数",
             status: "failed",
@@ -820,8 +975,7 @@ export default function BoardPage() {
     const references = boardController.board.edges
       .filter(edge => edge.to.nodeId === nodeId && edge.to.portId === "agent-context-in")
       .map(edge => boardController.board.nodes.find(item => item.id === edge.from.nodeId))
-      .filter((item): item is BoardDocument["nodes"][number] & { kind: "asset" } => item?.kind === "asset" && item.asset.type === "image")
-      .map(item => ({ id: item.asset.assetId, url: item.asset.url }))
+      .flatMap(item => boardNodeReferences(item))
       .slice(0, IMAGE_REFERENCE_LIMIT);
 
     setAgentReferences(references);
@@ -871,9 +1025,10 @@ export default function BoardPage() {
 
   useEffect(() => {
     const restoreTheme = setTimeout(() => {
-      const stored = localStorage.getItem("imagine_theme_mode");
-      if (stored === "light" || stored === "dark") {
+      const stored = readStoredThemeMode();
+      if (stored) {
         setThemeMode(stored);
+        document.documentElement.setAttribute("data-imagine-theme", stored);
       }
     }, 0);
     return () => clearTimeout(restoreTheme);
@@ -899,6 +1054,7 @@ export default function BoardPage() {
         known.add(item.id);
         handledBoardItems.add(item.id);
         const sourceNode = findGenerateNodeById(boardController.board.nodes, sourceBoardNodeId);
+        const nextStatus = nextSourceNodeStatus(items, sourceBoardNodeId, item.status);
         const existingAssetNode = findBoardAssetNodeByAssetId(boardController.board.nodes, item.id);
         if (existingAssetNode) {
           boardController.connectPorts(
@@ -907,14 +1063,15 @@ export default function BoardPage() {
           );
           boardController.updateGenerateNode(sourceBoardNodeId, {
             resultAssetId: item.id,
-            status: "complete",
+            status: nextStatus,
           });
           continue;
         }
         if (sourceNode?.resultAssetId === item.id) continue;
+        const resultIndex = completedSourceItemIndex(items, sourceBoardNodeId, item.id);
         const assetNodeId = addAssetToBoard(
           item,
-          sourceNode ? { x: sourceNode.position.x + sourceNode.size.width + 140, y: sourceNode.position.y } : undefined,
+          sourceNode ? resultAssetPosition(sourceNode, resultIndex) : undefined,
         );
         boardController.connectPorts(
           { nodeId: sourceBoardNodeId, portId: "result-out", portKind: "result" },
@@ -922,7 +1079,7 @@ export default function BoardPage() {
         );
         boardController.updateGenerateNode(sourceBoardNodeId, {
           resultAssetId: item.id,
-          status: "complete",
+          status: nextStatus,
         });
         continue;
       }
@@ -930,9 +1087,10 @@ export default function BoardPage() {
       if (sourceBoardNodeId && item.status === "failed") {
         known.add(item.id);
         handledBoardItems.add(item.id);
+        const nextStatus = nextSourceNodeStatus(items, sourceBoardNodeId, item.status);
         boardController.updateGenerateNode(sourceBoardNodeId, {
-          errorMessage: item.errorMessage ?? "生成失败",
-          status: "failed",
+          errorMessage: nextStatus === "failed" ? item.errorMessage ?? "生成失败" : undefined,
+          status: nextStatus,
         });
         continue;
       }
@@ -956,7 +1114,7 @@ export default function BoardPage() {
   const toggleThemeMode = () => {
     setThemeMode(prev => {
       const next: ThemeMode = prev === "light" ? "dark" : "light";
-      localStorage.setItem("imagine_theme_mode", next);
+      persistThemeMode(next);
       return next;
     });
   };
@@ -981,58 +1139,67 @@ export default function BoardPage() {
         onBack={() => router.push("/")}
         onCaptureVideoFrame={handleCaptureVideoFrame}
         onConnectionError={(message) => pushWorkspaceNotice("error", message)}
+        onEditAssetImage={editBoardAssetImage}
         onExecuteGenerateNode={handleExecuteGenerateNode}
+        onImportBoardFiles={handleImportBoardFiles}
         onOpenSettings={() => setShowSettings(true)}
+        onSendAssetToAgent={useBoardAssetForAgent}
         onSendAgentNode={handleSendAgentNode}
+        onSetAssetAsReference={useBoardAssetAsReference}
         onToggleTheme={toggleThemeMode}
       >
-        <aside className="flex min-h-0 flex-col border-l border-[var(--iw-border)] bg-[var(--iw-panel)] text-[var(--iw-text)]">
-          {/* sidebar children (inspector + project assets list) consistency per U-PR4 design: both sections use .imagine-control-surface / vars / imagine-* primitives for headers, cards, text; headers match text-xs font-semibold exactly */}
-          <BoardInspector
-            imageModelGroups={imageModelGroups}
-            incomingCount={selectedIncomingEdges.length}
-            items={items}
-            node={selectedBoardNode}
-            outgoingCount={selectedOutgoingEdges.length}
-            videoModelGroups={videoModelGroups}
-            onExecuteGenerate={(nodeId) => void handleExecuteGenerateNode(nodeId)}
-            onOpenFullscreen={setFullscreenItem}
-            onOpenMask={(imageUrl, assetId) => launchMaskEditor(imageUrl, assetId)}
-            onOpenSettings={() => setShowSettings(true)}
-            onSendAssetToAgent={useSelectedBoardAssetForAgent}
-            onSyncAssetReference={useSelectedBoardAssetAsReference}
-            onUpdateGenerate={boardController.updateGenerateNode}
-          />
-
-          <div className="imagine-control-surface min-h-0 flex-1 overflow-y-auto !p-3">
-            <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-xs font-semibold text-[var(--iw-text)]">项目资产</h2>
-              <span className="font-mono text-[10px] text-[var(--iw-faint)]">{items.length}</span>
-            </div>
-            <div className="flex flex-col gap-2">
-              {items.slice(0, 36).map(item => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => addAssetToBoard(item)}
-                  className="imagine-asset-card grid grid-cols-[54px_1fr] gap-2 !rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-2 text-left transition hover:border-[var(--iw-board-accent-amber)] hover:bg-[var(--iw-panel)]"
-                >
-                  <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg bg-[var(--iw-panel)]">
-                    {item.type === "image" && item.status === "complete" ? (
-                      <PreviewImage src={item.url} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      <Video className="h-4 w-4 text-[var(--iw-faint)]" />
-                    )}
-                  </div>
-                  <span className="min-w-0">
-                    <span className="block truncate text-xs font-semibold text-[var(--iw-text)]">{item.prompt || item.model}</span>
-                    <span className="block truncate font-mono text-[10px] text-[var(--iw-faint)]">{item.status} / {item.model}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </aside>
+        <BoardSidePanel
+          assetCount={items.length}
+          inspectorPanel={(
+            <BoardInspector
+              imageModelGroups={imageModelGroups}
+              incomingCount={selectedIncomingEdges.length}
+              items={items}
+              node={selectedBoardNode}
+              outgoingCount={selectedOutgoingEdges.length}
+              videoModelGroups={videoModelGroups}
+              onExecuteGenerate={(nodeId) => void handleExecuteGenerateNode(nodeId)}
+              onOpenFullscreen={setFullscreenItem}
+              onOpenMask={(imageUrl, assetId) => launchMaskEditor(imageUrl, assetId)}
+              onOpenSettings={() => setShowSettings(true)}
+              onSendAssetToAgent={useSelectedBoardAssetForAgent}
+              onSyncAssetReference={useSelectedBoardAssetAsReference}
+              onUpdateGenerate={boardController.updateGenerateNode}
+            />
+          )}
+          assetsPanel={(
+              <div className="flex flex-col gap-2 px-3 pb-3">
+                {items.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-[var(--iw-border)] px-3 py-6 text-center text-xs text-[var(--iw-muted)]">
+                    暂无本地资产，请先在首页生成作品
+                  </p>
+                ) : (
+                  items.slice(0, 36).map(item => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => addAssetToBoard(item)}
+                      className="imagine-asset-card grid grid-cols-[54px_1fr] gap-2 !rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-2 text-left transition hover:border-[var(--iw-board-accent-amber)] hover:bg-[var(--iw-panel)]"
+                    >
+                      <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg bg-[var(--iw-panel)]">
+                        {item.type === "image" && item.status === "complete" ? (
+                          <PreviewImage src={item.url} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <Video className="h-4 w-4 text-[var(--iw-faint)]" />
+                        )}
+                      </div>
+                      <span className="min-w-0">
+                        <span className="block truncate text-xs font-semibold text-[var(--iw-text)]">{item.prompt || item.model}</span>
+                        <span className="imagine-status-chip block truncate font-mono text-[10px]" data-status={item.status}>
+                          {item.status}
+                        </span>
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
+          )}
+        />
       </BoardWorkspace>
 
       {!showSettings && !isMaskOpen && !fullscreenItem && (

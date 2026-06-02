@@ -15,6 +15,7 @@ import {
 import type {
   BoardGenerateNode,
   BoardGenerateNodeUpdate,
+  BoardGenerateVariantCount,
   BoardImageGenerateNode,
   BoardNode,
   BoardVideoGenerateNode,
@@ -43,6 +44,7 @@ interface BoardInspectorProps {
 }
 
 const DEFAULT_CUSTOM_IMAGE_RESOLUTION = "2560x1440";
+const variantCountOptions: BoardGenerateVariantCount[] = [1, 2, 4];
 const inputClass = "imagine-board-input h-9 w-full !rounded-lg px-2 text-xs outline-none focus:border-[var(--iw-board-accent-amber)]";
 const monoInputClass = `${inputClass} font-mono`;
 const secondaryButtonClass = "imagine-secondary-action flex h-8 items-center justify-center !rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)] transition hover:bg-[var(--iw-panel)] hover:text-[var(--iw-text)]";
@@ -147,6 +149,27 @@ function InspectorField({ children, title }: { children: ReactNode; title: strin
   );
 }
 
+function parseVariantCount(value: string): BoardGenerateVariantCount {
+  if (value === "1") return 1;
+  if (value === "2") return 2;
+  if (value === "4") return 4;
+  throw new Error(`Unsupported variant count: ${value}`);
+}
+
+function VariantCountSelect({
+  value,
+  onChange,
+}: {
+  value: BoardGenerateVariantCount;
+  onChange: (value: BoardGenerateVariantCount) => void;
+}) {
+  return (
+    <select value={value} onChange={event => onChange(parseVariantCount(event.target.value))} className={inputClass}>
+      {variantCountOptions.map(option => <option key={option} value={option}>{option} 个变体</option>)}
+    </select>
+  );
+}
+
 function ImageGenerateInspector({
   imageModelGroups,
   node,
@@ -240,6 +263,9 @@ function ImageGenerateInspector({
           )}
         </div>
       )}
+      <InspectorField title="变体">
+        <VariantCountSelect value={node.variantCount} onChange={variantCount => onUpdateGenerate(node.id, { variantCount })} />
+      </InspectorField>
       <p className={infoChipClass}>
         参考图：{supportsReferences ? "支持" : "不支持"}
       </p>
@@ -310,6 +336,9 @@ function VideoGenerateInspector({
           )}
         </div>
       )}
+      <InspectorField title="变体">
+        <VariantCountSelect value={node.variantCount} onChange={variantCount => onUpdateGenerate(node.id, { variantCount })} />
+      </InspectorField>
       <p className={infoChipClass}>
         参考图：{supportsReferences ? `${capabilities.referenceMode} / ${capabilities.maxReferenceImages}` : "不支持"}
       </p>
@@ -337,19 +366,29 @@ export default function BoardInspector({
   onUpdateGenerate,
 }: BoardInspectorProps) {
   return (
-    <div className="imagine-control-surface border-b border-[var(--iw-border)] !p-3">
-      <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-[var(--iw-text)]">检查器</h2>
-        <button type="button" onClick={onOpenSettings} className="text-[var(--iw-faint)] hover:text-[var(--iw-text)]" title="设置">
+    <div className="imagine-inspector-shell imagine-control-surface !p-3">
+      <div className="mb-3 flex items-start justify-between gap-2">
+        {node ? (
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-[var(--iw-text)]">{node.title}</p>
+            <p className="imagine-status-chip mt-1 inline-block font-mono text-[10px]" data-status={isGenerateNode(node) ? node.status : "complete"}>
+              {node.kind}
+            </p>
+          </div>
+        ) : (
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-[var(--iw-text)]">检查器</p>
+            <p className="mt-1 text-[11px] leading-5 text-[var(--iw-muted)]">
+              选中节点或连线后编辑参数；生成与 Agent 动作在节点内执行。
+            </p>
+          </div>
+        )}
+        <button type="button" onClick={onOpenSettings} className="imagine-icon-button flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[var(--iw-border)] text-[var(--iw-faint)] transition" title="设置">
           <Settings className="h-3.5 w-3.5" />
         </button>
       </div>
       {node ? (
         <div className="space-y-3">
-          <div>
-            <p className="truncate text-sm font-semibold text-[var(--iw-text)]">{node.title}</p>
-            <p className="font-mono text-[10px] text-[var(--iw-faint)]">{node.kind}</p>
-          </div>
           <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-[var(--iw-muted)]">
             <div className="imagine-meta-chip rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5">输入 {incomingCount}</div>
             <div className="imagine-meta-chip rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5">输出 {outgoingCount}</div>
@@ -383,7 +422,7 @@ export default function BoardInspector({
           )}
         </div>
       ) : (
-        <p className="text-xs leading-5 text-[var(--iw-faint)]">选择节点或连线后查看连接状态；生成与 Agent 动作优先在节点内执行。</p>
+        <p className="text-xs leading-5 text-[var(--iw-faint)]">点击画布节点查看连线与参数；双击空白处可快速插入。</p>
       )}
     </div>
   );

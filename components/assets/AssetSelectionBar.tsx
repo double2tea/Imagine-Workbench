@@ -21,7 +21,7 @@ export default function AssetSelectionBar({
           initial={{ y: -8, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: -8, opacity: 0 }}
-          className="rounded-xl border border-blue-500/20 bg-slate-950/55 p-3 shadow-[0_14px_34px_rgba(0,0,0,0.28)] backdrop-blur-md"
+          className="imagine-selection-bar p-3 backdrop-blur-md"
         >
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>

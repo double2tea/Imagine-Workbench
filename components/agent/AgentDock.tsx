@@ -115,7 +115,7 @@ function renderInlineEmphasis(text: string): ReactNode[] {
     .map((part, index) => {
       if (part.startsWith("**") && part.endsWith("**")) {
         return (
-          <strong key={`${part}-${index}`} className="font-semibold text-slate-100">
+          <strong key={`${part}-${index}`} className="imagine-agent-emphasis">
             {part.slice(2, -2)}
           </strong>
         );
@@ -180,10 +180,10 @@ function AgentMessage({
 }) {
   return (
     <div className={`flex flex-col gap-1.5 ${message.role === "user" ? "self-end ml-10" : "self-start mr-10"}`}>
-      <span className={`text-[10px] font-mono tracking-widest ${
-        message.role === "user" ? "text-right text-slate-500" : "text-left text-blue-400 font-bold"
+      <span className={`imagine-agent-role-label ${
+        message.role === "user" ? "text-right text-[var(--iw-faint)]" : "text-left text-indigo-300"
       }`}>
-        {message.role === "user" ? "YOU" : "CREATIVE AGENT"}
+        {message.role === "user" ? "你" : "Agent"}
       </span>
 
       {message.role === "assistant" && message.activeSkills && message.activeSkills.length > 0 && (
@@ -214,7 +214,7 @@ function AgentMessage({
             return (
               <span
                 key={`${toolCall.name}-${index}`}
-                className="text-[10px] px-1.5 py-0.5 rounded border border-slate-700 bg-slate-900/80 text-slate-400 font-mono"
+                className="imagine-agent-tool-chip"
                 title={JSON.stringify(toolCall.args)}
               >
                 {label}
@@ -224,31 +224,31 @@ function AgentMessage({
         </div>
       )}
 
-      <div className={`overflow-y-auto rounded-lg px-3 py-2 text-xs inline-block leading-relaxed ${
+      <div className={`overflow-y-auto px-3 py-2 text-xs inline-block leading-relaxed ${
         message.role === "user"
-          ? "max-w-[min(620px,86vw)] bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-medium rounded-tr-none shadow-[0_4px_15px_rgba(37,99,235,0.25)]"
-          : "max-h-64 w-[min(760px,calc(100vw-72px))] bg-slate-900/82 border border-slate-700/60 text-slate-200 rounded-tl-none"
+          ? "imagine-agent-bubble-user font-medium"
+          : "imagine-agent-bubble-assistant"
       }`}>
         {message.role === "assistant" ? renderAgentContent(message.content) : message.content}
       </div>
 
       {message.role === "assistant" && message.thought && (
         <details className="group self-start outline-none">
-          <summary className="text-[10px] text-slate-500 select-none cursor-pointer outline-none hover:text-slate-350 group-open:text-blue-400 flex items-center gap-1">
+          <summary className="imagine-agent-thought-summary outline-none">
             <span className="font-mono">思考过程</span>
-            <ChevronRight className="h-3 w-3 transform transition group-open:rotate-90 text-slate-500" />
+            <ChevronRight className="h-3 w-3 transform transition group-open:rotate-90" />
           </summary>
-          <div className="mt-1.5 max-w-[min(760px,calc(100vw-72px))] p-2.5 bg-black/40 rounded-lg border border-white/5 text-[10px] font-mono text-slate-400 whitespace-pre-line leading-normal">
+          <div className="imagine-agent-thought-body">
             {message.thought}
           </div>
         </details>
       )}
 
       {message.role === "assistant" && message.recommendedAction && message.recommendedAction.type !== "none" && (
-        <div className="mt-2.5 w-[min(760px,calc(100vw-72px))] rounded-lg border border-blue-500/20 bg-blue-500/5 p-3 shadow-inner">
-          <span className="text-[10px] text-blue-400 font-mono tracking-widest font-bold block mb-2">建议动作</span>
+        <div className="imagine-agent-action-panel">
+          <span className="imagine-agent-action-panel-title">建议动作</span>
 
-          <div className="text-xs text-slate-200 flex flex-col gap-1.5">
+          <div className="imagine-agent-action-panel-body">
             <p>
               <strong className="text-blue-400">操作:</strong>{" "}
               <code className="bg-black/30 px-1 py-0.5 rounded text-[10px] font-mono text-blue-300">
@@ -259,7 +259,7 @@ function AgentMessage({
             {message.recommendedAction.params?.prompt && (
               <p className="leading-normal">
                 <strong className="text-blue-400">规划提示词:</strong>{" "}
-                <span className="italic text-slate-300">
+                <span className="imagine-agent-action-muted">
                   &ldquo;{message.recommendedAction.params.prompt}&rdquo;
                 </span>
               </p>
@@ -307,7 +307,7 @@ function AgentMessage({
             )}
 
             {message.interactiveState === "declined" && (
-              <span className="text-[10px] text-slate-600 italic">方案已被拒绝/驳回</span>
+              <span className="imagine-agent-action-declined">方案已被拒绝/驳回</span>
             )}
           </div>
 
@@ -322,7 +322,7 @@ function AgentMessage({
                 />
               </div>
               <div className="flex items-center justify-between text-[10px] mt-1.5 font-mono">
-                <span className="text-blue-400">⏱️ 自动模式: 将在 {countdownSeconds} 秒后自主运行</span>
+                <span className="text-blue-400">自动模式: {countdownSeconds} 秒后执行</span>
                 <button onClick={onCancelCountdown} className="text-red-400 hover:text-red-300 underline cursor-pointer">
                   取消自动
                 </button>
@@ -338,7 +338,7 @@ function AgentMessage({
             <button
               key={`${prompt}-${index}`}
               onClick={() => onSuggestedPrompt(prompt)}
-              className="text-[10px] rounded-full border border-white/5 hover:border-blue-500/25 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-slate-200 px-3 py-1 transition text-left cursor-pointer"
+              className="imagine-agent-follow-up"
             >
               {prompt}
             </button>
@@ -424,7 +424,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.94, y: 8 }}
           transition={{ duration: 0.16, ease: "easeOut" }}
-          className={`imagine-agent-dock imagine-agent-dock-idle-orb imagine-theme-${themeMode} fixed bottom-6 right-5 z-40 text-slate-200`}
+          className={`imagine-agent-dock imagine-agent-dock-idle-orb imagine-theme-${themeMode} fixed bottom-6 right-5 z-40`}
         >
           <button
             ref={orbButtonRef}
@@ -449,24 +449,24 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.99, y: 10 }}
           transition={{ duration: 0.16, ease: "easeOut" }}
-          className={`imagine-agent-dock imagine-agent-dock-panel imagine-theme-${themeMode} fixed inset-x-4 bottom-12 z-40 mx-auto w-[calc(100vw-32px)] max-w-5xl rounded-lg border border-slate-700/70 bg-[#0b0d13] p-3 text-slate-200 shadow-[0_18px_54px_rgba(0,0,0,0.5)] sm:bottom-16 sm:w-[min(1040px,calc(100vw-40px))]`}
+          className={`imagine-agent-dock imagine-agent-dock-panel imagine-theme-${themeMode} fixed inset-x-4 bottom-12 z-40 mx-auto w-[calc(100vw-32px)] max-w-5xl rounded-lg p-3 sm:bottom-16 sm:w-[min(1040px,calc(100vw-40px))]`}
         >
       <div className={`${isOpen ? "mb-2.5" : "mb-1.5"} grid grid-cols-[auto_1fr_auto] items-center gap-2`}>
         <button
           type="button"
           onClick={onToggleOpen}
-          className="flex min-w-0 items-center gap-2 text-left text-sm font-semibold text-slate-200 transition hover:text-white"
+          className="imagine-agent-dock-header-btn flex min-w-0 items-center gap-2 text-left text-sm font-semibold"
           title={isOpen ? "收起 Agent 对话" : "展开 Agent 对话"}
         >
           <AgentIdentityMark variant="header" />
           <span className="min-w-0 truncate">Agent</span>
-          <ChevronRight className={`h-3 w-3 text-slate-500 transition ${isOpen ? "rotate-90" : "-rotate-90"}`} />
+          <ChevronRight className={`h-3 w-3 text-[var(--iw-faint)] transition ${isOpen ? "rotate-90" : "-rotate-90"}`} />
         </button>
 
-        <span className="h-px bg-gradient-to-r from-slate-700/60 via-slate-800/40 to-transparent" />
+        <span className="imagine-agent-dock-divider h-px" />
 
         <span className="flex shrink-0 items-center gap-2">
-          <span className="hidden items-center gap-1.5 font-mono text-[10px] text-slate-500 sm:flex">
+          <span className="imagine-agent-dock-status hidden items-center gap-1.5 sm:flex">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400/70" />
             {agentReferenceId || agentReferenceUrl ? "引用中" : "画廊"}
           </span>
@@ -506,13 +506,11 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
             ))}
 
             {isLoading && (
-              <div className="flex flex-col max-w-[90%] gap-1.5 self-start">
-                <span className="text-[10px] font-mono tracking-widest text-blue-400 animate-pulse">
-                  AGENT COMPILING THOUGHTS
-                </span>
-                <div className="rounded-xl px-4 py-3 bg-slate-900/80 border border-slate-700/60 text-slate-300 text-xs flex items-center gap-2">
-                  <RefreshCw className="h-3.5 w-3.5 animate-spin text-blue-400" />
-                  <span>智囊团正在研判画廊状态，筹备提示词设计框架...</span>
+              <div className="flex max-w-[90%] flex-col gap-1.5 self-start">
+                <span className="imagine-agent-role-label text-indigo-300">Agent</span>
+                <div className="imagine-agent-loading px-4 py-3 text-xs text-[var(--iw-muted)] flex items-center gap-2">
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin text-indigo-400" />
+                  <span>正在分析画廊与技能，整理下一步建议...</span>
                 </div>
               </div>
             )}
@@ -522,16 +520,16 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
         )}
       </AnimatePresence>
 
-      <div className={`${isOpen ? "border-t border-white/5 pt-3 mt-2" : ""} flex flex-col gap-3`}>
+      <div className={`${isOpen ? "imagine-agent-dock-input-divider pt-3 mt-2" : ""} flex flex-col gap-3`}>
         {(agentReferenceId || agentReferenceUrl) && (
-          <div className="flex items-center justify-between gap-3 p-2 bg-blue-500/10 border border-blue-500/20 rounded-xl animate-fade-in mb-1">
+          <div className="imagine-agent-reference-strip flex items-center justify-between gap-3 p-2 animate-fade-in mb-1">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="relative h-10 w-10 shrink-0 rounded-lg overflow-hidden border border-blue-500/30 bg-slate-950">
+              <div className="imagine-agent-ref-thumb relative h-10 w-10 shrink-0 overflow-hidden rounded-lg">
                 <PreviewImage src={agentReferenceUrl || ""} alt="agent ref" className="h-full w-full object-cover" />
               </div>
               <div className="flex flex-col min-w-0">
-                <span className="text-[10px] font-bold text-blue-400">📎 局部编辑参考图 (Referenced Image)</span>
-                <span className="text-[9px] font-mono text-slate-400 truncate max-w-[150px]">
+                <span className="text-[10px] font-bold text-indigo-300">局部编辑参考图</span>
+                <span className="max-w-[150px] truncate font-mono text-[9px] text-[var(--iw-faint)]">
                   ID: {agentReferenceId ? agentReferenceId.substring(0, 16) : "Pasted Custom File"}
                 </span>
               </div>
@@ -565,7 +563,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
             {atDropdownNode}
             <form onSubmit={submit} className="relative flex items-center w-full">
               <label
-                className="absolute left-2 flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-slate-700/70 bg-slate-900/72 text-slate-400 transition hover:border-blue-400/35 hover:bg-blue-500/10 hover:text-blue-200"
+                className="imagine-agent-attach-btn absolute left-2 flex h-7 w-7 cursor-pointer items-center justify-center rounded-md"
                 title="上传图片到 Agent 引用"
               >
                 <ImagePlus className="h-3.5 w-3.5" />
@@ -576,17 +574,17 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
                 value={input}
                 onChange={(event) => onChangeInput(event.target.value)}
                 placeholder="问 Agent... 输入 @ 引用完成图"
-                className="w-full rounded-lg border border-slate-700/70 bg-slate-950/70 py-2.5 pl-12 pr-11 text-xs text-slate-100 placeholder-slate-500 transition focus:border-blue-400/45 focus:outline-none"
+                className="imagine-agent-input w-full py-2.5 pl-12 pr-11 text-xs text-[var(--iw-text)] placeholder:text-[var(--iw-faint)]"
               />
               <button
                 type="submit"
                 disabled={isLoading || !input.trim()}
-                className={`absolute right-2 px-3 py-1.5 rounded-lg text-white font-bold transition flex items-center justify-center ${
-                  isLoading || !input.trim()
-                    ? "bg-white/5 text-slate-600"
-                    : "bg-blue-600 hover:bg-blue-500 active:scale-95 cursor-pointer shadow-md shadow-blue-500/10"
-                }`}
-              >
+                  className={`absolute right-2 flex items-center justify-center rounded-lg px-3 py-1.5 font-bold text-white transition ${
+                    isLoading || !input.trim()
+                      ? "cursor-not-allowed bg-[var(--iw-panel-soft)] text-[var(--iw-faint)]"
+                    : "cursor-pointer bg-blue-600 shadow-md shadow-blue-500/10 hover:bg-blue-500 active:scale-95"
+                  }`}
+                >
                 <Send className="h-3 w-3" />
               </button>
             </form>
@@ -594,14 +592,11 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
 
           <label
             htmlFor="auto_trigger"
-            className={`flex h-9 shrink-0 cursor-pointer select-none items-center justify-center gap-2 rounded-lg border px-3 text-[11px] font-medium transition ${
-              autoExecute
-                ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
-                : "border-slate-700/70 bg-slate-950/45 text-slate-400 hover:text-slate-200"
-            }`}
+            className="imagine-agent-auto-toggle flex h-9 shrink-0 cursor-pointer select-none items-center justify-center gap-2 rounded-lg border px-3 text-[11px] font-medium transition"
+            data-active={autoExecute ? "true" : "false"}
             title="自动执行 Agent action"
           >
-            <span className={`h-2 w-2 rounded-full ${autoExecute ? "bg-emerald-300" : "bg-slate-600"}`} />
+            <span className={`h-2 w-2 rounded-full ${autoExecute ? "bg-emerald-300" : "bg-[var(--iw-faint)]"}`} />
             <span>自动</span>
             <input
               type="checkbox"

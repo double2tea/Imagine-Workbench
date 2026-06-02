@@ -137,6 +137,7 @@ export default function AssetCard({
   return (
     <div
       draggable={isDraggableReference}
+      data-asset-id={item.id}
       data-status={item.status}
       data-type={item.type}
       onDragStart={handleDragStart}
@@ -146,63 +147,57 @@ export default function AssetCard({
     >
       <div className="imagine-asset-media relative aspect-[4/3] w-full bg-slate-950 overflow-hidden flex items-center justify-center border-b border-white/5">
         {item.status === "processing" || item.status === "pending" ? (
-          <div className="absolute inset-0 bg-[#07070a] flex flex-col items-center justify-center p-4 text-center select-none overflow-hidden">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-28 h-28 bg-blue-500/10 rounded-full blur-2xl animate-pulse" />
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-indigo-500/5 rounded-full blur-xl animate-ping" />
-
-            <div className="relative z-10 flex flex-col items-center">
-              <div className="h-8 w-8 rounded-xl bg-blue-600/10 border border-blue-500/30 flex items-center justify-center shadow-[0_0_15px_rgba(59,130,246,0.2)] mb-2 animate-spin duration-3000">
-                <RefreshCw className="h-4.5 w-4.5 text-blue-400 animate-spin" />
-              </div>
-              <p className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
-                {item.status === "pending" ? "任务已排队..." : item.type === "video" ? "智影合成中..." : "极精算色中..."}
-              </p>
-              <span className="mt-1 font-mono text-[10px] text-[var(--iw-faint)]">模型: {formatModelName(item.model)}</span>
-
-              <div className="w-36 bg-white/5 h-1 rounded-full overflow-hidden mt-3 border border-white/5 shadow-inner">
-                <div
-                  className="bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-600 h-full transition-all duration-300 shadow-[0_0_10px_rgba(59,130,246,0.5)]"
-                  style={{ width: `${item.progress}%` }}
-                />
-              </div>
-              <span className="text-[10px] text-blue-400 mt-1.5 font-mono font-bold tracking-widest">
-                {item.progress}% {item.status.toUpperCase()}
-              </span>
-              <button
-                type="button"
-                onClick={() => onCancel(item)}
-                disabled={canceling}
-                className="mt-2 flex items-center gap-1.5 rounded-lg border border-red-400/50 bg-red-500/10 px-3 py-1.5 text-[10px] font-bold text-red-200 transition hover:border-red-300 hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-55"
-                title={item.operationName?.startsWith("12ai:video:") ? "取消 12AI 视频生成任务" : "从本地取消并停止等待"}
-              >
-                <X className="h-3 w-3" />
-                {canceling ? "取消中" : "取消"}
-              </button>
+          <div className="imagine-generation-stage overflow-hidden">
+            <span className="imagine-generation-stage-glow" aria-hidden />
+            <div className="imagine-generation-stage-icon">
+              <RefreshCw className="h-4 w-4 text-indigo-300 animate-spin" />
             </div>
+            <p className="imagine-generation-stage-title">
+              {item.status === "pending" ? "任务已排队" : item.type === "video" ? "视频合成中" : "图像生成中"}
+            </p>
+            <span className="imagine-generation-stage-meta">模型 {formatModelName(item.model)}</span>
+            <div className="imagine-generation-progress" role="progressbar" aria-valuenow={item.progress} aria-valuemin={0} aria-valuemax={100}>
+              <div className="imagine-generation-progress-fill" style={{ width: `${item.progress}%` }} />
+            </div>
+            <span className="imagine-generation-progress-label">
+              {item.progress}% · {item.status === "pending" ? "排队" : "处理中"}
+            </span>
+            <button
+              type="button"
+              onClick={() => onCancel(item)}
+              disabled={canceling}
+              className="imagine-danger-action relative z-10 mt-3 flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[10px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-55"
+              title={item.operationName?.startsWith("12ai:video:") ? "取消 12AI 视频生成任务" : "从本地取消并停止等待"}
+            >
+              <X className="h-3 w-3" />
+              {canceling ? "取消中" : "取消任务"}
+            </button>
           </div>
         ) : item.status === "failed" ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950 px-4 py-3 text-center text-red-400 select-none">
-            <X className="mb-1.5 h-6 w-6 shrink-0 text-red-500/55" />
-            <p className="text-xs font-semibold leading-5">{failedTitle}</p>
-            <p className="mt-0.5 line-clamp-2 max-w-full break-words text-[10px] leading-4 text-slate-550">
+          <div className="imagine-asset-failed-stage select-none text-red-300">
+            <X className="mb-2 h-6 w-6 shrink-0 text-red-400/70" />
+            <p className="text-xs font-semibold leading-5 text-[var(--iw-text)]">{failedTitle}</p>
+            <p className="mt-1 line-clamp-2 max-w-full break-words text-[10px] leading-4 text-[var(--iw-muted)]">
               {item.errorMessage ?? "请核查 API Key 或重构参数。"}
             </p>
-            <button
-              type="button"
-              onClick={() => onRetry(item)}
-              className="mt-2 flex shrink-0 items-center gap-1.5 rounded-lg border border-red-400/60 bg-red-600 px-3 py-1.5 text-[10px] font-bold text-white shadow-sm shadow-red-950/20 transition hover:bg-red-500"
-            >
-              <RefreshCw className="h-3 w-3" />
-              重试
-            </button>
-            <button
-              type="button"
-              onClick={() => onReuseTask(item)}
-              className="mt-1 flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-900 px-3 py-1.5 text-[10px] font-bold text-slate-100 shadow-sm transition hover:bg-slate-800"
-            >
-              <SlidersHorizontal className="h-3 w-3" />
-              复用
-            </button>
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => onRetry(item)}
+                className="imagine-primary-action flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-semibold !min-h-0"
+              >
+                <RefreshCw className="h-3 w-3" />
+                重试
+              </button>
+              <button
+                type="button"
+                onClick={() => onReuseTask(item)}
+                className="imagine-secondary-action flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-semibold !min-h-0"
+              >
+                <SlidersHorizontal className="h-3 w-3" />
+                复用参数
+              </button>
+            </div>
           </div>
         ) : (
           <div className="relative flex h-full w-full items-center justify-center bg-slate-950">

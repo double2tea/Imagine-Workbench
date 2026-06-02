@@ -48,6 +48,7 @@ interface ImageGenerationPanelProps {
   onSelectAspectRatio: (value: string) => void;
   onSelectModel: (value: string) => void;
   onThinkingLevelChange: (value: string) => void;
+  showGenerateButton?: boolean;
 }
 
 export default function ImageGenerationPanel({
@@ -87,6 +88,7 @@ export default function ImageGenerationPanel({
   onSelectAspectRatio,
   onSelectModel,
   onThinkingLevelChange,
+  showGenerateButton = true,
 }: ImageGenerationPanelProps) {
   const presetResolutionOptions = imageResolutionOptions.filter(option => option.value !== "custom");
   const supportsCustomImageSize = imageResolutionOptions.some(option => option.value === "custom");
@@ -107,11 +109,8 @@ export default function ImageGenerationPanel({
                 key={preset.id}
                 type="button"
                 onClick={() => onApplyPreset(preset)}
-                className={`imagine-preset-chip flex h-8 items-center gap-1.5 shrink-0 rounded-lg border px-3 text-xs transition duration-200 cursor-pointer ${
-                  isActive
-                    ? "bg-blue-500/14 border-blue-400/35 text-blue-100"
-                    : "bg-slate-950/50 border-slate-800 text-slate-300 hover:border-slate-700 hover:bg-slate-900"
-                }`}
+                data-active={isActive}
+                className="imagine-preset-chip flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-xs transition duration-200 cursor-pointer"
               >
                 <span>{preset.emoji}</span>
                 <span>{preset.name}</span>
@@ -124,17 +123,17 @@ export default function ImageGenerationPanel({
 
       <div>
         <div className="flex items-center justify-between mb-2">
-          <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-300">
+          <label className="flex items-center gap-1.5 imagine-section-label">
             <Sparkles className="h-3.5 w-3.5 text-blue-300" />
-            提示词 <span className="hidden text-slate-500 sm:inline">(Prompt)</span>
+            提示词
           </label>
           <button
             onClick={onOptimizePrompt}
             disabled={isOptimizing || !prompt.trim()}
-            className={`flex h-7 items-center gap-1 rounded-md border px-2.5 text-[11px] font-semibold transition ${
+            className={`imagine-secondary-action flex h-7 items-center gap-1 rounded-md border px-2.5 text-[11px] font-semibold transition ${
               isOptimizing || !prompt.trim()
-                ? "bg-slate-900/70 text-slate-600 border-slate-800 cursor-not-allowed"
-                : "bg-blue-500/12 text-blue-200 border-blue-400/25 hover:bg-blue-500/18 cursor-pointer"
+                ? "cursor-not-allowed opacity-50"
+                : "cursor-pointer border-blue-400/25 bg-blue-500/12 text-blue-200 hover:bg-blue-500/18"
             }`}
           >
             {isOptimizing ? (
@@ -143,11 +142,11 @@ export default function ImageGenerationPanel({
               <Sparkles className="h-3 w-3 text-blue-300" />
             )}
             <span className="sm:hidden">优化</span>
-            <span className="hidden sm:inline">一键智能优化</span>
+            <span className="hidden sm:inline">优化提示词</span>
           </button>
         </div>
 
-        <div className="imagine-field-shell relative rounded-lg border border-slate-800 bg-slate-950/55 p-3 transition focus-within:border-blue-400/35 focus-within:bg-slate-950/75">
+        <div className="imagine-field-shell relative p-3">
           {atDropdownNode}
           <textarea
             value={prompt}
@@ -158,9 +157,9 @@ export default function ImageGenerationPanel({
             }}
             onDrop={onPromptDropAsset}
             placeholder="写下你想创造的图片奇思妙想... 输入 @ 可引用作品"
-            className="w-full h-24 resize-none border-0 bg-transparent text-sm leading-6 text-slate-100 placeholder-slate-500 outline-0 ring-0 focus:ring-0"
+            className="imagine-field-textarea h-24 text-sm leading-6"
           />
-          <div className="mt-2 flex items-center justify-between border-t border-slate-800 pt-2 font-mono text-[10px] text-slate-500">
+          <div className="imagine-field-shell-footer mt-2 flex items-center justify-between pt-2">
             <span className="hidden sm:inline">拖入资产到此处插入 @图片N | 拖入下方只作为参考图</span>
             <span className="sm:hidden">@ 可引用作品</span>
             <span>{prompt.length} 字符</span>
@@ -168,25 +167,12 @@ export default function ImageGenerationPanel({
         </div>
       </div>
 
-      <div>
-        <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">
-          反向提示词 <span className="hidden text-slate-500 sm:inline">(Negative Prompt)</span>
-        </label>
-        <input
-          type="text"
-          value={negativePrompt}
-          onChange={(event) => onNegativePromptChange(event.target.value)}
-          placeholder="不希望出现在作品里的元素，例如：blurred, ugly, deformed, text"
-          className="w-full rounded-lg border border-slate-800 bg-slate-950/55 px-3 py-2.5 text-xs text-slate-200 placeholder-slate-600 transition focus:border-blue-400/35 focus:outline-none"
-        />
-      </div>
-
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <div className="mb-1.5 flex items-center justify-between gap-3">
-            <label className="text-[11px] font-semibold text-slate-300">图片生成模型</label>
+            <label className="imagine-section-label">图片生成模型</label>
             {supportsBackgroundGeneration && (
-              <label className="flex h-6 shrink-0 items-center gap-1.5 rounded-md border border-slate-800 bg-slate-950/45 px-2 text-[10px] font-semibold text-slate-400">
+              <label className="imagine-inline-chip-toggle shrink-0">
                 <input
                   type="checkbox"
                   checked={imageBackgroundGeneration}
@@ -200,7 +186,7 @@ export default function ImageGenerationPanel({
           <select
             value={selectedModel}
             onChange={(event) => onSelectModel(event.target.value)}
-            className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 transition focus:border-blue-400/35 focus:outline-none cursor-pointer"
+            className="imagine-select py-2.5"
           >
             {modelGroups.map(group => (
               <optgroup key={group.provider} label={group.label}>
@@ -213,16 +199,15 @@ export default function ImageGenerationPanel({
         </div>
 
         <div>
-          <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">
-            画面宽高比 <span className="text-slate-500">(Aspect Ratio)</span>
+          <label className="mb-1.5 block imagine-section-label">
+            画面宽高比
           </label>
           <select
             value={isCustomImageResolution ? "custom" : selectedAspectRatio}
             onChange={(event) => onSelectAspectRatio(event.target.value)}
             disabled={isCustomImageResolution}
-            className={`w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs transition focus:border-blue-400/35 focus:outline-none ${
-              isCustomImageResolution ? "cursor-not-allowed text-slate-500 opacity-70" : "cursor-pointer text-slate-200"
-            }`}
+            className="imagine-select py-2.5"
+            aria-disabled={isCustomImageResolution}
           >
             {isCustomImageResolution && <option value="custom">自定义尺寸决定比例</option>}
             {capabilities.aspectRatios.map(option => (
@@ -232,24 +217,37 @@ export default function ImageGenerationPanel({
         </div>
       </div>
 
+      <details className="imagine-inline-disclosure">
+        <summary className="imagine-inline-disclosure-summary">
+          <span>高级参数</span>
+          <span className="font-mono text-[10px] text-[var(--iw-faint)]">反向词 · 分辨率 · 画质</span>
+        </summary>
+        <div className="imagine-inline-disclosure-panel">
+          <div>
+            <label className="mb-1.5 block imagine-section-label">反向提示词</label>
+            <input
+              type="text"
+              value={negativePrompt}
+              onChange={(event) => onNegativePromptChange(event.target.value)}
+              placeholder="不希望出现的元素，例如 blurred, text"
+              className="imagine-input py-2.5"
+            />
+          </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {imageResolutionOptions.length > 0 && (
           <div>
-            <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">
+            <label className="mb-1.5 block imagine-section-label">
               输出分辨率
             </label>
             {presetResolutionOptions.length > 0 && (
-              <div className="grid grid-cols-4 gap-1.5 rounded-lg border border-slate-800 bg-slate-950/45 p-1.5">
+              <div className="imagine-option-group grid-cols-4">
                 {presetResolutionOptions.map((option) => (
                   <button
                     key={option.value}
                     type="button"
+                    data-active={!isCustomImageResolution && imageResolution === option.value}
                     onClick={() => onImageResolutionChange(option.value)}
-                    className={`min-h-8 rounded-md px-2 font-mono text-[10px] transition cursor-pointer ${
-                      isCustomImageResolution ? false : imageResolution === option.value
-                        ? "bg-blue-500/16 text-blue-100"
-                        : "text-slate-500 hover:bg-slate-900 hover:text-slate-300"
-                    }`}
+                    className="imagine-segment-btn"
                   >
                     {option.label}
                   </button>
@@ -261,11 +259,8 @@ export default function ImageGenerationPanel({
                 <button
                   type="button"
                   onClick={() => onImageResolutionChange("custom")}
-                  className={`min-h-8 rounded-md border px-3 font-mono text-[10px] transition cursor-pointer ${
-                    isCustomImageResolution
-                      ? "bg-blue-500/16 text-blue-100"
-                      : "border-slate-800 bg-slate-950/45 text-slate-500 hover:bg-slate-900 hover:text-slate-300"
-                  }`}
+                  data-active={isCustomImageResolution}
+                  className="imagine-segment-btn border border-[var(--iw-border)]"
                 >
                   自定义尺寸
                 </button>
@@ -278,9 +273,9 @@ export default function ImageGenerationPanel({
                   value={customImageSize}
                   onChange={(event) => onCustomImageSizeChange(event.target.value)}
                   placeholder="例如 2560x1440，宽高需为 16 的倍数"
-                  className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 placeholder-slate-600 transition focus:border-blue-400/35 focus:outline-none"
+                  className="imagine-input py-2.5 font-mono"
                 />
-                <p className="mt-1.5 font-mono text-[10px] leading-relaxed text-slate-500">
+                <p className="mt-1.5 font-mono text-[10px] leading-relaxed text-[var(--iw-faint)]">
                   约束：最大边 ≤ 3840px，宽高为 16 的倍数，比例由尺寸决定且 ≤ 3:1，总像素 655,360-8,294,400。
                 </p>
               </div>
@@ -290,20 +285,17 @@ export default function ImageGenerationPanel({
 
         {capabilities.qualities.length > 0 && (
           <div>
-            <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">
+            <label className="mb-1.5 block imagine-section-label">
               画质档位
             </label>
-            <div className="grid grid-cols-4 gap-1.5 rounded-lg border border-slate-800 bg-slate-950/45 p-1.5">
+            <div className="imagine-option-group grid-cols-4">
               {capabilities.qualities.map((option) => (
                 <button
                   key={option.value}
                   type="button"
+                  data-active={imageQuality === option.value}
                   onClick={() => onImageQualityChange(option.value)}
-                  className={`min-h-8 rounded-md px-2 font-mono text-[10px] transition cursor-pointer ${
-                    imageQuality === option.value
-                      ? "bg-blue-500/16 text-blue-100"
-                      : "text-slate-500 hover:bg-slate-900 hover:text-slate-300"
-                  }`}
+                  className="imagine-segment-btn"
                 >
                   {option.label}
                 </button>
@@ -314,18 +306,16 @@ export default function ImageGenerationPanel({
 
         {capabilities.thinkingLevels.length > 0 && (
           <div>
-            <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">图片思考等级</label>
-            <div className="grid grid-cols-2 gap-1.5 rounded-lg border border-slate-800 bg-slate-950/45 p-1.5">
+            <label className="mb-1.5 block imagine-section-label">图片思考等级</label>
+            <div className="imagine-option-group grid-cols-2">
               {capabilities.thinkingLevels.map(option => (
                 <button
                   key={option.value}
                   type="button"
+                  data-active={imageThinkingLevel === option.value}
+                  data-tone="amber"
                   onClick={() => onThinkingLevelChange(option.value)}
-                  className={`min-h-8 rounded-md px-2 font-mono text-[10px] transition cursor-pointer ${
-                    imageThinkingLevel === option.value
-                      ? "bg-amber-500/16 text-amber-100"
-                      : "text-slate-500 hover:bg-slate-900 hover:text-slate-300"
-                  }`}
+                  className="imagine-segment-btn"
                 >
                   {option.label}
                 </button>
@@ -335,6 +325,8 @@ export default function ImageGenerationPanel({
         )}
 
       </div>
+        </div>
+      </details>
 
       <ReferenceImagePicker
         addLabel="多图垫"
@@ -353,29 +345,25 @@ export default function ImageGenerationPanel({
         onUpload={onReferenceUpload}
       />
 
-      <button
-        onClick={onGenerate}
-        disabled={!prompt.trim()}
-        className={`imagine-primary-action mt-1 flex w-full items-center justify-center gap-2 rounded-lg py-3 text-xs font-bold transition duration-200 ${
-          !prompt.trim()
-            ? "bg-slate-900/70 text-slate-600 border border-slate-800 cursor-not-allowed"
-            : "bg-blue-600 hover:bg-blue-500 text-white active:scale-95 shadow-lg shadow-blue-950/30 cursor-pointer"
-        }`}
-      >
-        {isSubmitting ? (
-          <RefreshCw className="h-4 w-4 animate-spin text-white" />
-        ) : (
-          <Sparkles className="h-4 w-4 text-white" />
-        )}
-        {isSubmitting ? (
-          `提交中 (${submitCount})，可继续排队`
-        ) : (
-          <>
-            <span className="sm:hidden">生成图片</span>
-            <span className="hidden sm:inline">一键渲染合成全新图片 (Render Image)</span>
-          </>
-        )}
-      </button>
+      {showGenerateButton && (
+        <button
+          type="button"
+          onClick={onGenerate}
+          disabled={!prompt.trim()}
+          className={`imagine-primary-action mt-1 flex w-full items-center justify-center gap-2 rounded-lg py-3 text-xs font-bold transition duration-200 ${
+            !prompt.trim()
+              ? "cursor-not-allowed opacity-60"
+              : "cursor-pointer bg-blue-600 text-white shadow-lg shadow-blue-950/30 hover:bg-blue-500 active:scale-[0.98]"
+          }`}
+        >
+          {isSubmitting ? (
+            <RefreshCw className="h-4 w-4 animate-spin text-white" />
+          ) : (
+            <Sparkles className="h-4 w-4 text-white" />
+          )}
+          {isSubmitting ? `提交中 (${submitCount})，可继续排队` : "生成图片"}
+        </button>
+      )}
     </div>
   );
 }

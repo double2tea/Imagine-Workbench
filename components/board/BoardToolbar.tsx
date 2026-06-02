@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Bot, FileText, ImagePlus, MessageSquareText, Moon, Settings, Sun, Trash2, Video } from "lucide-react";
+import { ArrowLeft, Bot, FileText, ImagePlus, Layers, MessageSquareText, Moon, Settings, Sun, Trash2, Video } from "lucide-react";
 import type { BoardSaveStatus } from "@/hooks/useBoardState";
 import type { ThemeMode } from "@/components/workbench/WorkspaceHeader";
 
@@ -12,6 +12,7 @@ interface BoardToolbarProps {
   onAddImageGenerate: () => void;
   onAddNote: () => void;
   onAddPrompt: () => void;
+  onAddReferenceGroup: () => void;
   onAddVideoGenerate: () => void;
   onBack: () => void;
   onClear: () => void;
@@ -38,6 +39,7 @@ export default function BoardToolbar({
   onAddImageGenerate,
   onAddNote,
   onAddPrompt,
+  onAddReferenceGroup,
   onAddVideoGenerate,
   onBack,
   onClear,
@@ -60,7 +62,7 @@ export default function BoardToolbar({
         <span className="imagine-meta-chip rounded border border-[var(--iw-border)] px-2 py-1 text-[10px] font-mono text-[var(--iw-muted)]">{nodeCount} 节点</span>
         <span className="hidden text-[10px] font-mono text-[var(--iw-faint)] sm:inline">{formatSaveStatus(saveStatus)}</span>
       </div>
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="no-scrollbar flex shrink-0 items-center gap-2 overflow-x-auto">
         <button type="button" onClick={onAddPrompt} className={toolButtonClass} data-accent="amber">
           <MessageSquareText className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">提示</span>
@@ -68,6 +70,10 @@ export default function BoardToolbar({
         <button type="button" onClick={onAddImageGenerate} className={toolButtonClass} data-accent="amber">
           <ImagePlus className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">图片</span>
+        </button>
+        <button type="button" onClick={onAddReferenceGroup} className={toolButtonClass} data-accent="amber">
+          <Layers className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">参考组</span>
         </button>
         <button type="button" onClick={onAddVideoGenerate} className={toolButtonClass} data-accent="amber">
           <Video className="h-3.5 w-3.5" />

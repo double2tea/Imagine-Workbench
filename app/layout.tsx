@@ -19,10 +19,15 @@ export const metadata: Metadata = {
   description: 'A professional and elegant AI-powered Image and Video Generation studio workspace featuring advanced prompt optimization, precise canvas masking, batch operation downloading, and an interactive chat-driven Agent Mode.',
 };
 
+const themeBootstrapScript = `(function(){try{var t=localStorage.getItem("imagine_theme_mode");if(t==="dark"||t==="light"){document.documentElement.setAttribute("data-imagine-theme",t);}}catch(e){}})();`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh" suppressHydrationWarning className={`${inter.variable} ${jetbrainsMono.variable}`}>
-      <body suppressHydrationWarning className="font-sans antialiased text-slate-100 bg-slate-950">
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript }} />
+      </head>
+      <body suppressHydrationWarning className="imagine-root-body font-sans antialiased">
         {children}
       </body>
     </html>

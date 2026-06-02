@@ -14,10 +14,12 @@ interface AssetToolbarProps {
   assetStatusFilter: AssetStatusFilter;
   dateOptions: Array<{ value: string; label: string; count: number }>;
   filterType: AssetTypeFilter;
+  inFlightCount?: number;
   itemsCount: number;
   modelOptions: string[];
   searchQuery: string;
   selectedProvider: AiProvider;
+  showGalleryHeader?: boolean;
   statusCounts: Record<StorageItem["status"], number>;
   typeCounts: Record<StorageItem["type"], number>;
   deleteItemsByStatus: (statuses: StorageItem["status"][]) => void;
@@ -40,18 +42,41 @@ const TYPE_FILTER_OPTIONS = [
 
 const STATUS_FILTER_OPTIONS = [
   { value: "all", label: "全部" },
-  { value: "pending", label: "pending" },
-  { value: "processing", label: "processing" },
-  { value: "failed", label: "failed" },
-  { value: "complete", label: "complete" },
+  { value: "processing", label: "生成中" },
+  { value: "pending", label: "排队" },
+  { value: "failed", label: "失败" },
+  { value: "complete", label: "已完成" },
 ] as const;
 
 const DATE_PRESET_OPTIONS = [
-  { value: "all", label: "全部" },
+  { value: "all", label: "不限" },
   { value: "today", label: "今天" },
-  { value: "7d", label: "近 7 天" },
-  { value: "30d", label: "近 30 天" },
+  { value: "7d", label: "7 天" },
+  { value: "30d", label: "30 天" },
 ] as const;
+
+interface FilterChipProps {
+  active: boolean;
+  count?: number;
+  empty?: boolean;
+  label: string;
+  onClick: () => void;
+}
+
+function FilterChip({ active, count, empty = false, label, onClick }: FilterChipProps) {
+  return (
+    <button
+      type="button"
+      data-active={active}
+      data-empty={empty}
+      onClick={onClick}
+      className="imagine-filter-chip cursor-pointer transition focus:outline-none"
+    >
+      <span>{label}</span>
+      {count !== undefined && <span className="imagine-filter-chip-count">{count}</span>}
+    </button>
+  );
+}
 
 export default function AssetToolbar({
   assetDateEnd,
@@ -61,10 +86,12 @@ export default function AssetToolbar({
   assetStatusFilter,
   dateOptions,
   filterType,
+  inFlightCount = 0,
   itemsCount,
   modelOptions,
   searchQuery,
   selectedProvider,
+  showGalleryHeader = false,
   statusCounts,
   typeCounts,
   deleteItemsByStatus,
@@ -89,6 +116,10 @@ export default function AssetToolbar({
     return statusCounts[value];
   };
 
+  const showCustomDateRange =
+    assetDatePreset === "custom" || assetDateStart.length > 0 || assetDateEnd.length > 0;
+  const showFilterRows = itemsCount > 0 || searchQuery.trim().length > 0;
+
   const handleDateStartChange = (value: string) => {
     setAssetDatePreset("custom");
     setAssetDateStart(value);
@@ -101,136 +132,166 @@ export default function AssetToolbar({
 
   return (
     <div className="imagine-toolbar-surface rounded-xl dark-glass p-4">
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
-        <div className="flex min-w-0 flex-col gap-2.5">
-          <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center">
-            <span className="w-10 shrink-0 text-[10px] font-semibold uppercase tracking-widest text-slate-500">类型</span>
-            <div className="flex min-w-0 flex-wrap gap-1.5">
-              {TYPE_FILTER_OPTIONS.map(option => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => setFilterType(option.value)}
-                  data-active={filterType === option.value}
-                  className={`imagine-filter-chip h-7 rounded-md border px-2.5 text-xs transition focus:outline-none cursor-pointer ${
-                    filterType === option.value
-                      ? "border-slate-700 bg-slate-800/80 text-slate-100"
-                      : "border-transparent text-slate-450 hover:border-slate-800 hover:bg-slate-900/70 hover:text-slate-200"
-                  }`}
-                >
-                  <span>{option.label}</span>
-                  <span className="ml-1 font-mono text-[10px] text-slate-500">{getTypeCount(option.value)}</span>
-                </button>
-              ))}
+      {showGalleryHeader && (
+        <>
+          <div className="imagine-toolbar-header hidden lg:flex">
+            <div>
+              <h2 className="text-sm font-semibold tracking-tight text-[var(--iw-text)]">作品画廊</h2>
+              <p className="imagine-workspace-subtitle mt-0.5">按日期分组 · 悬停卡片操作</p>
+            </div>
+            <div className="flex shrink-0 flex-col items-end gap-1">
+              {inFlightCount > 0 && (
+                <span className="font-mono text-[10px] text-indigo-300">{inFlightCount} 项进行中</span>
+              )}
+              <span className="imagine-meta-chip font-mono text-[10px]">{itemsCount} 项资产</span>
             </div>
           </div>
+          <div className="mb-3 flex items-center justify-between gap-2 lg:hidden">
+            <span className="text-sm font-semibold text-[var(--iw-text)]">画廊</span>
+            <span className="imagine-meta-chip font-mono text-[10px]">
+              {inFlightCount > 0 ? `${inFlightCount} 进行中 · ` : ""}
+              {itemsCount} 项
+            </span>
+          </div>
+        </>
+      )}
 
-          <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center">
-            <span className="w-10 shrink-0 text-[10px] font-semibold uppercase tracking-widest text-slate-500">状态</span>
-            <div className="flex min-w-0 flex-wrap gap-1.5">
-              {STATUS_FILTER_OPTIONS.map(option => (
-                <button
+      <div className="imagine-gallery-toolbar-actions">
+        <div className="imagine-gallery-search">
+          <Search className="h-4 w-4" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="搜索提示词、模型..."
+            className="imagine-toolbar-search h-9 rounded-lg border border-slate-800 bg-slate-950/55 pr-4 text-xs text-slate-200 placeholder-slate-600 transition focus:border-blue-400/35 focus:outline-none"
+          />
+        </div>
+        <select
+          value={assetModelFilter}
+          onChange={(e) => setAssetModelFilter(e.target.value)}
+          className="imagine-toolbar-select h-9 min-w-0 rounded-lg border border-slate-800 bg-slate-950/55 px-3 font-mono text-[10px] text-slate-300 transition focus:border-blue-400/35 focus:outline-none sm:min-w-[9rem]"
+          aria-label="按模型筛选"
+        >
+          <option value="all">全部模型</option>
+          {modelOptions.map(model => (
+            <option key={model} value={model}>{formatModelLabel(model, selectedProvider)}</option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={exportMetadataJson}
+          className="imagine-secondary-action h-9 shrink-0 rounded-lg border border-slate-800 bg-slate-950/55 px-3 text-[10px] font-semibold text-slate-300 transition hover:bg-slate-900"
+        >
+          导出
+        </button>
+        <button
+          type="button"
+          onClick={() => deleteItemsByStatus(["failed", "pending"])}
+          className="imagine-danger-action h-9 shrink-0 rounded-lg border border-red-500/20 bg-red-950/20 px-3 text-[10px] font-semibold text-red-300 transition hover:bg-red-950/35"
+        >
+          清失败
+        </button>
+      </div>
+
+      {showFilterRows ? (
+      <div className="imagine-gallery-filters">
+        <div className="imagine-filter-row">
+          <span className="imagine-filter-row-label">状态</span>
+          <div className="imagine-filter-track" role="group" aria-label="按状态筛选">
+            {STATUS_FILTER_OPTIONS.map(option => {
+              const count = getStatusCount(option.value);
+              return (
+                <FilterChip
                   key={option.value}
-                  type="button"
+                  active={assetStatusFilter === option.value}
+                  count={count}
+                  empty={option.value !== "all" && count === 0}
+                  label={option.label}
                   onClick={() => setAssetStatusFilter(option.value)}
-                  data-active={assetStatusFilter === option.value}
-                  className={`imagine-filter-chip h-7 rounded-md border px-2.5 font-mono text-[10px] transition focus:outline-none cursor-pointer ${
-                    assetStatusFilter === option.value
-                      ? "border-slate-700 bg-slate-800/80 text-slate-100"
-                      : "border-transparent text-slate-500 hover:border-slate-800 hover:bg-slate-900/70 hover:text-slate-200"
-                  }`}
-                >
-                  <span>{option.label}</span>
-                  <span className="ml-1 text-slate-500">{getStatusCount(option.value)}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center">
-            <span className="w-10 shrink-0 text-[10px] font-semibold uppercase tracking-widest text-slate-500">日期</span>
-            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-              {DATE_PRESET_OPTIONS.map(option => (
-                <button
-                  key={option.value}
-                  type="button"
-                  data-active={assetDatePreset === option.value}
-                  onClick={() => {
-                    setAssetDatePreset(option.value);
-                    setAssetDateStart("");
-                    setAssetDateEnd("");
-                  }}
-                  className={`imagine-filter-chip h-7 rounded-md border px-2.5 text-xs transition focus:outline-none cursor-pointer ${
-                    assetDatePreset === option.value
-                      ? "border-slate-700 bg-slate-800/80 text-slate-100"
-                      : "border-transparent text-slate-500 hover:border-slate-800 hover:bg-slate-900/70 hover:text-slate-200"
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-              <input
-                type="date"
-                value={assetDateStart}
-                onChange={(event) => handleDateStartChange(event.target.value)}
-                className="h-7 rounded-md border border-slate-800 bg-slate-950/55 px-2 font-mono text-[10px] text-slate-300 focus:border-blue-400/35 focus:outline-none"
-                aria-label="开始日期"
-              />
-              <span className="font-mono text-[10px] text-slate-600">至</span>
-              <input
-                type="date"
-                value={assetDateEnd}
-                onChange={(event) => handleDateEndChange(event.target.value)}
-                className="h-7 rounded-md border border-slate-800 bg-slate-950/55 px-2 font-mono text-[10px] text-slate-300 focus:border-blue-400/35 focus:outline-none"
-                aria-label="结束日期"
-              />
-              <span className="font-mono text-[10px] text-slate-500">{dateOptions.length} 天</span>
-            </div>
+                />
+              );
+            })}
           </div>
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-            <select
-              value={assetModelFilter}
-              onChange={(e) => setAssetModelFilter(e.target.value)}
-              className="imagine-toolbar-select h-9 min-w-0 rounded-lg border border-slate-800 bg-slate-950/55 px-3 font-mono text-[10px] text-slate-300 transition focus:border-blue-400/35 focus:outline-none"
-            >
-              <option value="all">全部模型</option>
-              {modelOptions.map(model => (
-                <option key={model} value={model}>{formatModelLabel(model, selectedProvider)}</option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={exportMetadataJson}
-              className="imagine-secondary-action h-9 rounded-lg border border-slate-800 bg-slate-950/55 px-3 text-[10px] font-semibold text-slate-300 transition hover:bg-slate-900"
-            >
-              导出
-            </button>
+        <div className="imagine-filter-row">
+          <span className="imagine-filter-row-label">类型</span>
+          <div className="imagine-filter-track" role="group" aria-label="按媒体类型筛选">
+            {TYPE_FILTER_OPTIONS.map(option => {
+              const count = getTypeCount(option.value);
+              return (
+                <FilterChip
+                  key={option.value}
+                  active={filterType === option.value}
+                  count={count}
+                  empty={option.value !== "all" && count === 0}
+                  label={option.label}
+                  onClick={() => setFilterType(option.value)}
+                />
+              );
+            })}
           </div>
+        </div>
 
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-            <div className="relative min-w-0">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="搜索提示词、模型..."
-                className="imagine-toolbar-search h-9 w-full rounded-lg border border-slate-800 bg-slate-950/55 pl-9 pr-4 text-xs text-slate-200 placeholder-slate-600 transition focus:border-blue-400/35 focus:outline-none"
+        <div className="imagine-filter-row">
+          <span className="imagine-filter-row-label">
+            时间
+            <span className="mt-1 block font-mono text-[9px] font-normal normal-case tracking-normal text-[var(--iw-faint)]">
+              {dateOptions.length} 天
+            </span>
+          </span>
+          <div className="imagine-filter-track">
+            {DATE_PRESET_OPTIONS.map(option => (
+              <FilterChip
+                key={option.value}
+                active={
+                  assetDatePreset === option.value && !assetDateStart && !assetDateEnd
+                }
+                label={option.label}
+                onClick={() => {
+                  setAssetDatePreset(option.value);
+                  setAssetDateStart("");
+                  setAssetDateEnd("");
+                }}
               />
-            </div>
-            <button
-              type="button"
-              onClick={() => deleteItemsByStatus(["failed", "pending"])}
-              className="imagine-danger-action h-9 rounded-lg border border-red-500/20 bg-red-950/20 px-3 text-[10px] font-semibold text-red-300 transition hover:bg-red-950/35"
-            >
-              清失败
-            </button>
+            ))}
+            <FilterChip
+              active={showCustomDateRange}
+              label="自定义"
+              onClick={() => {
+                if (!showCustomDateRange) {
+                  setAssetDatePreset("custom");
+                }
+              }}
+            />
+            {showCustomDateRange && (
+              <div className="imagine-filter-date-range">
+                <input
+                  type="date"
+                  value={assetDateStart}
+                  onChange={(event) => handleDateStartChange(event.target.value)}
+                  className="imagine-filter-date-input"
+                  aria-label="开始日期"
+                />
+                <span className="font-mono text-[10px] text-[var(--iw-faint)]">至</span>
+                <input
+                  type="date"
+                  value={assetDateEnd}
+                  onChange={(event) => handleDateEndChange(event.target.value)}
+                  className="imagine-filter-date-input"
+                  aria-label="结束日期"
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>
+      ) : (
+        <p className="mt-2 text-[11px] leading-5 text-[var(--iw-faint)]">
+          生成作品后，可按状态、类型与时间筛选。
+        </p>
+      )}
     </div>
   );
 }

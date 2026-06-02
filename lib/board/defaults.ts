@@ -23,6 +23,11 @@ export const DEFAULT_PROMPT_NODE_SIZE: BoardSize = {
   height: 220,
 };
 
+export const DEFAULT_REFERENCE_GROUP_NODE_SIZE: BoardSize = {
+  width: 340,
+  height: 260,
+};
+
 export const DEFAULT_GENERATE_NODE_SIZE: BoardSize = {
   width: 340,
   height: 260,

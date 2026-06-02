@@ -54,6 +54,7 @@ export function useClipboardImageImport({
 
   useEffect(() => {
     const handlePaste = async (event: ClipboardEvent) => {
+      if (event.defaultPrevented) return;
       const clipboardData = event.clipboardData;
       if (!clipboardData) return;
 

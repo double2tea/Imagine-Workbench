@@ -7,6 +7,7 @@ export {
   DEFAULT_NODE_POSITION,
   DEFAULT_NOTE_NODE_SIZE,
   DEFAULT_PROMPT_NODE_SIZE,
+  DEFAULT_REFERENCE_GROUP_NODE_SIZE,
   createEmptyBoard,
 } from "@/lib/board/defaults";
 export { deleteBoardFromDB, getBoardFromDB, saveBoardToDB } from "@/lib/board/persistence";
@@ -19,6 +20,7 @@ export type {
   BoardEdgeKind,
   BoardGenerateNode,
   BoardGenerateNodeUpdate,
+  BoardGenerateVariantCount,
   BoardGenerationStatus,
   BoardImageGenerateNode,
   BoardNode,
@@ -32,6 +34,9 @@ export type {
   BoardPortKind,
   BoardPortRef,
   BoardPromptNode,
+  BoardReferenceGroupItem,
+  BoardReferenceGroupNode,
+  BoardReferenceRole,
   BoardSize,
   BoardVideoGenerateNode,
   CreateAgentNodeInput,
@@ -40,4 +45,5 @@ export type {
   CreateGenerateNodeInput,
   CreateNoteNodeInput,
   CreatePromptNodeInput,
+  CreateReferenceGroupNodeInput,
 } from "@/lib/board/types";

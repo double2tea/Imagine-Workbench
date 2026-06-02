@@ -1,9 +1,11 @@
-export type BoardNodeKind = "asset" | "prompt" | "image-generate" | "video-generate" | "agent" | "note";
+export type BoardNodeKind = "asset" | "prompt" | "reference-group" | "image-generate" | "video-generate" | "agent" | "note";
 export type BoardAssetType = "image" | "video";
 export type BoardEdgeKind = "reference" | "prompt" | "result" | "agent-context";
 export type BoardPortKind = "asset" | "prompt" | "result" | "agent";
 export type BoardPortDirection = "input" | "output";
 export type BoardGenerationStatus = "idle" | "processing" | "complete" | "failed";
+export type BoardGenerateVariantCount = 1 | 2 | 4;
+export type BoardReferenceRole = "general" | "start" | "end";
 
 export interface BoardPoint {
   x: number;
@@ -46,6 +48,19 @@ export interface BoardPromptNode extends BoardNodeBase {
   prompt: string;
 }
 
+export interface BoardReferenceGroupItem {
+  assetId: string;
+  model: string;
+  prompt: string;
+  role: BoardReferenceRole;
+  url: string;
+}
+
+export interface BoardReferenceGroupNode extends BoardNodeBase {
+  kind: "reference-group";
+  references: BoardReferenceGroupItem[];
+}
+
 export interface BoardImageGenerateNode extends BoardNodeBase {
   kind: "image-generate";
   prompt: string;
@@ -55,6 +70,7 @@ export interface BoardImageGenerateNode extends BoardNodeBase {
   imageQuality?: string;
   imageResolution: string;
   thinkingLevel?: string;
+  variantCount: BoardGenerateVariantCount;
   status: BoardGenerationStatus;
   resultAssetId?: string;
   errorMessage?: string;
@@ -68,6 +84,7 @@ export interface BoardVideoGenerateNode extends BoardNodeBase {
   videoDuration?: string;
   videoPreset?: string;
   videoResolution?: string;
+  variantCount: BoardGenerateVariantCount;
   status: BoardGenerationStatus;
   resultAssetId?: string;
   errorMessage?: string;
@@ -86,6 +103,7 @@ export interface BoardNoteNode extends BoardNodeBase {
 export type BoardNode =
   | BoardAssetNode
   | BoardPromptNode
+  | BoardReferenceGroupNode
   | BoardImageGenerateNode
   | BoardVideoGenerateNode
   | BoardAgentNode
@@ -104,6 +122,7 @@ export type BoardGenerateNodeUpdate = Partial<{
   resultAssetId: string;
   status: BoardGenerationStatus;
   thinkingLevel: string;
+  variantCount: BoardGenerateVariantCount;
   videoDuration: string;
   videoPreset: string;
   videoResolution: string;
@@ -154,6 +173,13 @@ export interface CreatePromptNodeInput {
   title?: string;
 }
 
+export interface CreateReferenceGroupNodeInput {
+  position?: BoardPoint;
+  references?: BoardReferenceGroupItem[];
+  size?: BoardSize;
+  title?: string;
+}
+
 export interface CreateGenerateNodeInput {
   kind: "image-generate" | "video-generate";
   prompt?: string;
@@ -163,6 +189,7 @@ export interface CreateGenerateNodeInput {
   imageQuality?: string;
   imageResolution?: string;
   thinkingLevel?: string;
+  variantCount?: BoardGenerateVariantCount;
   videoDuration?: string;
   videoPreset?: string;
   videoResolution?: string;

@@ -7,3 +7,4 @@ export { default as BoardWorkspace } from "@/components/board/BoardWorkspace";
 export { default as GenerateBoardNode } from "@/components/board/GenerateBoardNode";
 export { default as NoteBoardNode } from "@/components/board/NoteBoardNode";
 export { default as PromptBoardNode } from "@/components/board/PromptBoardNode";
+export { default as ReferenceGroupBoardNode } from "@/components/board/ReferenceGroupBoardNode";

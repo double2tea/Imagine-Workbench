@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { Grid2X2, Moon, Settings, Sparkles, Sun, Trash2 } from "lucide-react";
 
-export type ThemeMode = "light" | "dark";
+import type { ThemeMode } from "@/lib/theme-mode";
+
+export type { ThemeMode };
 
 interface WorkspaceHeaderProps {
   themeMode: ThemeMode;
@@ -17,17 +19,17 @@ export default function WorkspaceHeader({
   onToggleTheme,
 }: WorkspaceHeaderProps) {
   return (
-    <header className="imagine-app-header sticky top-0 z-40 flex min-w-0 items-center justify-between gap-2 overflow-hidden border-b border-slate-800/80 bg-[#07080b]/86 px-4 py-3 backdrop-blur-xl sm:gap-3 sm:px-6 select-none">
+    <header className="imagine-app-header sticky top-0 z-40 flex min-w-0 items-center justify-between gap-2 overflow-hidden border-b border-[var(--iw-border)] bg-[var(--iw-header)] px-4 py-3 backdrop-blur-xl sm:gap-3 sm:px-6 select-none">
       <div className="z-10 flex min-w-0 flex-1 items-center gap-3">
         <div className="imagine-brand-mark relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-blue-400/20 bg-blue-500/12 shadow-sm">
           <Sparkles className="h-4.5 w-4.5 text-blue-200" />
         </div>
         <div className="min-w-0">
-          <h1 className="flex min-w-0 items-center gap-2 text-sm font-semibold tracking-tight text-white">
+          <h1 className="flex min-w-0 items-center gap-2 text-sm font-semibold tracking-tight text-[var(--iw-text)]">
             <span className="truncate">Imagine Workbench</span>
-            <span className="shrink-0 rounded border border-blue-400/20 bg-blue-400/10 px-1.5 py-0.5 text-[9px] font-mono font-normal tracking-widest text-blue-300">v1.2 PRO</span>
+            <span className="imagine-workspace-badge shrink-0">v1.2</span>
           </h1>
-          <p className="truncate text-[11px] font-medium text-slate-400">智能图像与视频生成工作台</p>
+          <p className="imagine-workspace-subtitle truncate">智能图像与视频生成工作台</p>
         </div>
       </div>
 

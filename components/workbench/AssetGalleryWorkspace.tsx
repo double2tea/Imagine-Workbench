@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronLeft, ChevronRight, Image as ImageIcon, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import AssetCard from "@/components/assets/AssetCard";
 import AssetSelectionBar from "@/components/assets/AssetSelectionBar";
 import AssetToolbar, { type AssetDatePreset, type AssetStatusFilter, type AssetTypeFilter } from "@/components/assets/AssetToolbar";
@@ -23,6 +23,7 @@ interface AssetGalleryWorkspaceProps {
   compareViewType: CompareViewType;
   filterType: AssetTypeFilter;
   filteredItems: StorageItem[];
+  inFlightCount: number;
   itemsCount: number;
   dateOptions: Array<{ value: string; label: string; count: number }>;
   modelOptions: string[];
@@ -81,6 +82,7 @@ export default function AssetGalleryWorkspace({
   compareViewType,
   filterType,
   filteredItems,
+  inFlightCount,
   itemsCount,
   dateOptions,
   modelOptions,
@@ -186,6 +188,19 @@ export default function AssetGalleryWorkspace({
         return b.dateKey.localeCompare(a.dateKey);
       });
   }, [visibleItems]);
+  useEffect(() => {
+    if (assetStatusFilter !== "processing" && assetStatusFilter !== "pending") {
+      return;
+    }
+    const frameId = window.requestAnimationFrame(() => {
+      const target = document.querySelector<HTMLElement>(
+        `.imagine-gallery-scroll [data-asset-id][data-status="${assetStatusFilter}"]`,
+      );
+      target?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [assetStatusFilter, filteredItems.length]);
+
   const toggleDateGroup = (dateKey: string) => {
     setCollapsedDateKeys(current => {
       const next = new Set(current);
@@ -199,8 +214,11 @@ export default function AssetGalleryWorkspace({
   };
 
   return (
-    <section className="imagine-gallery-panel flex min-w-0 flex-col gap-4">
+    <section className="imagine-gallery-panel flex min-w-0 flex-col gap-3">
+      <div className="imagine-gallery-toolbar-sticky">
       <AssetToolbar
+        showGalleryHeader
+        inFlightCount={inFlightCount}
         assetDateEnd={assetDateEnd}
         assetDatePreset={assetDatePreset}
         assetDateStart={assetDateStart}
@@ -225,6 +243,7 @@ export default function AssetGalleryWorkspace({
         setFilterType={onSetFilterType}
         setSearchQuery={onSetSearchQuery}
       />
+      </div>
 
       <AssetSelectionBar
         selectedCount={selectedCount}
@@ -248,28 +267,46 @@ export default function AssetGalleryWorkspace({
 
       <div className="imagine-gallery-scroll min-h-[calc(100vh-360px)]">
         {filteredItems.length === 0 ? (
-          <div className="imagine-gallery-empty flex min-h-[calc(100vh-390px)] flex-col items-center justify-center rounded-xl border border-dashed border-slate-800 bg-slate-950/28 p-6 text-center text-slate-500">
-            <ImageIcon className="mb-3 h-9 w-9 text-slate-700" />
-            <p className="text-sm font-semibold text-slate-400">暂无生成的创意文件</p>
-            <p className="mt-1 max-w-sm text-xs leading-5 text-slate-600">写下创意设想并生成，文件将实时存档至本地 IndexedDB。</p>
+          <div className="imagine-gallery-empty flex min-h-[calc(100vh-390px)] flex-col items-center justify-center rounded-xl p-8 text-center">
+            <div className="imagine-gallery-empty-icon">
+              <ImageIcon className="h-6 w-6" />
+            </div>
+            <p className="mt-4 text-sm font-semibold text-[var(--iw-text)]">画廊还是空的</p>
+            <p className="mt-1 max-w-sm text-xs leading-5 text-[var(--iw-muted)]">
+              在左侧写下提示词并生成，作品会按日期分组出现在这里，并自动保存在本机浏览器中。
+            </p>
+            <div className="imagine-gallery-empty-steps">
+              <div className="imagine-gallery-empty-step">
+                <span className="imagine-gallery-empty-step-index">1</span>
+                <span>选择图片或视频模式，填写提示词与模型参数</span>
+              </div>
+              <div className="imagine-gallery-empty-step">
+                <span className="imagine-gallery-empty-step-index">2</span>
+                <span>点击生成后，进度会在卡片上实时更新</span>
+              </div>
+              <div className="imagine-gallery-empty-step">
+                <span className="imagine-gallery-empty-step-index">3</span>
+                <span>完成后可对比、复用参数，或发送给 Agent 继续编辑</span>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="flex flex-col gap-4">
             {groupedItems.map(group => {
               const isCollapsed = collapsedDateKeys.has(group.dateKey);
               return (
-                <section key={group.dateKey} className="imagine-gallery-date-group rounded-lg border border-slate-800/70 bg-slate-950/18">
+                <section key={group.dateKey} className="imagine-gallery-date-group rounded-lg border">
                   <button
                     type="button"
                     onClick={() => toggleDateGroup(group.dateKey)}
-                    className="flex w-full items-center justify-between gap-3 border-b border-slate-800/70 px-3 py-2.5 text-left"
+                    className="imagine-gallery-date-header flex w-full items-center justify-between gap-3 border-b border-[var(--iw-border)] px-3 py-2.5 text-left"
                     aria-expanded={!isCollapsed}
                   >
                     <span className="flex items-center gap-2">
-                      <ChevronDown className={`h-4 w-4 text-slate-500 transition ${isCollapsed ? "-rotate-90" : ""}`} />
-                      <span className="text-xs font-semibold text-slate-300">{group.label}</span>
+                      <ChevronDown className={`h-4 w-4 text-[var(--iw-faint)] transition ${isCollapsed ? "-rotate-90" : ""}`} />
+                      <span className="text-xs font-semibold text-[var(--iw-text)]">{group.label}</span>
                     </span>
-                    <span className="rounded-md bg-slate-900 px-2 py-1 font-mono text-[10px] text-slate-500">{group.items.length} 项</span>
+                    <span className="imagine-meta-chip rounded-md px-2 py-1 font-mono text-[10px]">{group.items.length} 项</span>
                   </button>
 
                   {!isCollapsed && (
