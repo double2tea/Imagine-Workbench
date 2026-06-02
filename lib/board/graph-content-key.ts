@@ -1,15 +1,44 @@
 import type { BoardEdge, BoardNode, BoardReferenceGroupItem } from "@/lib/board/types";
 
+const FNV_OFFSET_BASIS = 2_166_136_261;
+const FNV_PRIME = 16_777_619;
+const INLINE_TEXT_LIMIT = 240;
+
+function fnv1aUpdate(hash: number, text: string): number {
+  let next = hash;
+  for (let index = 0; index < text.length; index += 1) {
+    next ^= text.charCodeAt(index);
+    next = Math.imul(next, FNV_PRIME);
+  }
+  return next >>> 0;
+}
+
+/** Compact stable digest for large text (e.g. data URLs, long prompts). */
+function fingerprintLargeText(value: string): string {
+  if (value.length === 0) return "";
+  if (value.length <= INLINE_TEXT_LIMIT) return value;
+  return `L${value.length}:H${fnv1aUpdate(FNV_OFFSET_BASIS, value).toString(16)}`;
+}
+
+function digestParts(parts: string[]): string {
+  let hash = FNV_OFFSET_BASIS;
+  for (const part of parts) {
+    hash = fnv1aUpdate(hash, part);
+    hash = fnv1aUpdate(hash, "\n");
+  }
+  return hash.toString(16);
+}
+
 function serializeReferenceGroupItem(item: BoardReferenceGroupItem): string {
-  return `${item.assetId}:${item.role}:${item.url}`;
+  return `${item.assetId}:${item.role}:${fingerprintLargeText(item.url)}`;
 }
 
 function serializeNodeContent(node: BoardNode): string {
   switch (node.kind) {
     case "asset":
-      return `asset|${node.id}|${node.asset.assetId}|${node.asset.type}|${node.asset.url}`;
+      return `asset|${node.id}|${node.asset.assetId}|${node.asset.type}|${fingerprintLargeText(node.asset.url)}`;
     case "prompt":
-      return `prompt|${node.id}|${node.prompt}`;
+      return `prompt|${node.id}|${fingerprintLargeText(node.prompt)}`;
     case "reference-group":
       return `refgroup|${node.id}|${node.references.map(serializeReferenceGroupItem).join(",")}`;
     case "image-generate":
@@ -18,7 +47,7 @@ function serializeNodeContent(node: BoardNode): string {
         node.id,
         node.model,
         node.status,
-        node.prompt,
+        fingerprintLargeText(node.prompt),
         node.aspectRatio,
         node.imageResolution,
         node.customImageResolution,
@@ -26,7 +55,7 @@ function serializeNodeContent(node: BoardNode): string {
         node.thinkingLevel ?? "",
         node.variantCount,
         node.resultAssetId ?? "",
-        node.errorMessage ?? "",
+        fingerprintLargeText(node.errorMessage ?? ""),
       ].join("|");
     case "video-generate":
       return [
@@ -34,19 +63,19 @@ function serializeNodeContent(node: BoardNode): string {
         node.id,
         node.model,
         node.status,
-        node.prompt,
+        fingerprintLargeText(node.prompt),
         node.aspectRatio,
         node.videoDuration ?? "",
         node.videoPreset ?? "",
         node.videoResolution ?? "",
         node.variantCount,
         node.resultAssetId ?? "",
-        node.errorMessage ?? "",
+        fingerprintLargeText(node.errorMessage ?? ""),
       ].join("|");
     case "agent":
-      return `agent|${node.id}|${node.instruction}`;
+      return `agent|${node.id}|${fingerprintLargeText(node.instruction)}`;
     case "note":
-      return `note|${node.id}|${node.body}`;
+      return `note|${node.id}|${fingerprintLargeText(node.body)}`;
     default: {
       const exhaustive: never = node;
       return exhaustive;
@@ -58,35 +87,35 @@ function serializeEdge(edge: BoardEdge): string {
   return `${edge.id}|${edge.kind}|${edge.from.nodeId}|${edge.from.portId}|${edge.to.nodeId}|${edge.to.portId}`;
 }
 
-/** Stable key for graph-derived node data; ignores position, size, and viewport. */
+/** Stable digest for graph-derived node data; ignores position, size, and viewport. */
 export function buildBoardGraphContentKey(nodes: BoardNode[], edges: BoardEdge[]): string {
-  const nodePart = [...nodes]
+  const nodeLines = [...nodes]
     .sort((left, right) => left.id.localeCompare(right.id))
-    .map(serializeNodeContent)
-    .join("\n");
-  const edgePart = [...edges]
+    .map(serializeNodeContent);
+  const edgeLines = [...edges]
     .sort((left, right) => left.id.localeCompare(right.id))
-    .map(serializeEdge)
-    .join("\n");
-  return `${nodePart}\n---\n${edgePart}`;
+    .map(serializeEdge);
+  const nodeDigest = digestParts(nodeLines);
+  const edgeDigest = digestParts(edgeLines);
+  return `n${nodes.length}:e${edges.length}:nh${nodeDigest}:eh${edgeDigest}`;
 }
 
 export function buildGalleryReferenceFingerprint(
   items: Array<{ id: string; status: string; type: string; url: string }>,
 ): string {
-  return items
+  const lines = items
     .filter(item => item.type === "image")
-    .map(item => `${item.id}\t${item.status}\t${item.url}`)
-    .sort()
-    .join("\n");
+    .map(item => `${item.id}\t${item.status}\t${fingerprintLargeText(item.url)}`)
+    .sort();
+  return `n${lines.length}:h${digestParts(lines)}`;
 }
 
 export function buildGalleryTaskFingerprint(
   items: Array<{ id: string; progress: number; sourceBoardNodeId?: string; status: string }>,
 ): string {
-  return items
+  const lines = items
     .filter(item => item.sourceBoardNodeId && (item.status === "pending" || item.status === "processing"))
     .map(item => `${item.sourceBoardNodeId}\t${item.id}\t${item.status}\t${item.progress}`)
-    .sort()
-    .join("\n");
+    .sort();
+  return `n${lines.length}:h${digestParts(lines)}`;
 }
