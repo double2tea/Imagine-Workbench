@@ -283,7 +283,7 @@ function AgentMessage({
                   onClick={() => {
                     if (message.recommendedAction) onExecuteAction(message.id, message.recommendedAction);
                   }}
-                  className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-1.5 px-3 rounded-lg text-[10px] flex items-center justify-center gap-1 shadow-md hover:shadow-[0_0_15px_rgba(37,99,235,0.3)] cursor-pointer transition"
+                  className="imagine-primary-action flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-1.5 px-3 rounded-lg text-[10px] flex items-center justify-center gap-1 shadow-md hover:shadow-[0_0_15px_rgba(37,99,235,0.3)] cursor-pointer transition"
                 >
                   <Check className="h-3 w-3" />
                   执行
@@ -291,7 +291,8 @@ function AgentMessage({
                 <button
                   type="button"
                   onClick={() => onDeclineAction(message.id)}
-                  className="border border-white/5 hover:border-white/10 bg-white/5 text-slate-400 hover:text-slate-200 py-1.5 px-3 rounded-lg text-[10px] cursor-pointer transition"
+                  className="imagine-secondary-action border border-[var(--iw-border)] hover:border-[var(--iw-muted)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)] hover:text-[var(--iw-text)] py-1.5 px-3 rounded-lg text-[10px] cursor-pointer transition"
+                  data-action="danger"
                 >
                   拒绝
                 </button>
@@ -473,7 +474,8 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
             <button
               type="button"
               onClick={onClearChat}
-              className="flex h-5 w-5 items-center justify-center rounded border border-slate-700/60 text-slate-500 transition hover:border-red-500/30 hover:text-red-400"
+              className="imagine-icon-button flex h-5 w-5 items-center justify-center rounded border border-[var(--iw-border)] text-[var(--iw-faint)] transition hover:border-red-500/30 hover:text-red-400"
+              data-action="danger"
               title="清空对话"
             >
               <X className="h-2.5 w-2.5" />
@@ -548,7 +550,8 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
               <button
                 type="button"
                 onClick={onClearReference}
-                className="p-1 bg-white/5 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded-lg transition border border-white/5 cursor-pointer"
+                className="imagine-icon-button p-1 bg-[var(--iw-panel-soft)] hover:bg-red-500/20 text-[var(--iw-muted)] hover:text-red-400 rounded-lg transition border border-[var(--iw-border)] cursor-pointer"
+                data-action="danger"
                 title="取消引用"
               >
                 <X className="h-3.5 w-3.5" />

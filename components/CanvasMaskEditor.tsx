@@ -512,7 +512,7 @@ export default function CanvasMaskEditor({
       key={mode}
       type="button"
       onClick={() => setEditorMode(mode)}
-      className={`flex h-9 min-w-16 items-center justify-center gap-1.5 rounded-md px-2.5 text-[11px] font-semibold transition ${
+      className={`imagine-secondary-action flex h-9 min-w-16 items-center justify-center gap-1.5 rounded-md px-2.5 text-[11px] font-semibold transition ${
         editorMode === mode
           ? "bg-blue-600 text-white shadow-sm shadow-blue-950/40"
           : "text-slate-400 hover:bg-slate-800 hover:text-slate-100"
@@ -538,7 +538,7 @@ export default function CanvasMaskEditor({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-800 hover:text-slate-100"
+            className="imagine-icon-button rounded-lg p-1.5 text-[var(--iw-muted)] transition hover:bg-[var(--iw-panel-soft)] hover:text-[var(--iw-text)]"
             aria-label="关闭图片编辑器"
           >
             <X className="h-5 w-5" />
@@ -666,7 +666,7 @@ export default function CanvasMaskEditor({
                   <button
                     type="button"
                     onClick={invertMask}
-                    className="h-8 rounded-md border border-slate-800 bg-slate-900 px-2.5 text-xs font-semibold text-slate-300 transition hover:bg-slate-800"
+                    className="imagine-secondary-action h-8 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)] px-2.5 text-xs font-semibold text-[var(--iw-text)] transition hover:bg-[var(--iw-panel-soft)]"
                     title="反选遮罩区域"
                   >
                     反选
@@ -674,7 +674,8 @@ export default function CanvasMaskEditor({
                   <button
                     type="button"
                     onClick={clearMask}
-                    className="flex h-8 items-center gap-1.5 rounded-md border border-slate-800 bg-slate-900 px-2.5 text-xs font-semibold text-slate-400 transition hover:bg-slate-800 hover:text-slate-200"
+                    className="imagine-secondary-action flex h-8 items-center gap-1.5 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)] px-2.5 text-xs font-semibold text-[var(--iw-muted)] transition hover:bg-[var(--iw-panel-soft)] hover:text-[var(--iw-text)]"
+                    data-action="danger"
                   >
                     <Eraser className="h-3.5 w-3.5" />
                     清蒙版
@@ -720,7 +721,8 @@ export default function CanvasMaskEditor({
                   <button
                     type="button"
                     onClick={clearText}
-                    className="h-8 rounded-md border border-slate-800 bg-slate-900 px-2.5 text-xs font-semibold text-slate-400 transition hover:bg-slate-800 hover:text-slate-200"
+                    className="imagine-secondary-action h-8 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)] px-2.5 text-xs font-semibold text-[var(--iw-muted)] transition hover:bg-[var(--iw-panel-soft)] hover:text-[var(--iw-text)]"
+                    data-action="danger"
                   >
                     清文字
                   </button>
@@ -752,7 +754,7 @@ export default function CanvasMaskEditor({
                     type="button"
                     onClick={applyCrop}
                     disabled={!canApplyCrop}
-                    className={`flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition ${
+                    className={`imagine-secondary-action flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition ${
                       canApplyCrop
                         ? "border border-blue-400/30 bg-blue-500/16 text-blue-100 hover:bg-blue-500/24"
                         : "border border-slate-800 bg-slate-950/45 text-slate-600"
@@ -764,7 +766,8 @@ export default function CanvasMaskEditor({
                   <button
                     type="button"
                     onClick={() => setCropRect(null)}
-                    className="h-8 rounded-md border border-slate-800 bg-slate-950/45 px-3 text-xs font-semibold text-slate-400 transition hover:text-slate-100"
+                    className="imagine-secondary-action h-8 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)]/45 px-3 text-xs font-semibold text-[var(--iw-muted)] transition hover:text-[var(--iw-text)]"
+                    data-action="danger"
                   >
                     清选区
                   </button>
@@ -778,7 +781,8 @@ export default function CanvasMaskEditor({
                 <button
                   type="button"
                   onClick={resetEditor}
-                  className="flex h-10 items-center gap-1.5 rounded-lg border border-slate-800 px-3 text-xs font-semibold text-slate-400 transition hover:bg-slate-800 hover:text-slate-200"
+                  className="imagine-secondary-action flex h-10 items-center gap-1.5 rounded-lg border border-[var(--iw-border)] px-3 text-xs font-semibold text-[var(--iw-muted)] transition hover:bg-[var(--iw-panel-soft)] hover:text-[var(--iw-text)]"
+                  data-action="danger"
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
                   重置
@@ -787,7 +791,7 @@ export default function CanvasMaskEditor({
                   type="button"
                   onClick={handleApply}
                   disabled={!canApply}
-                  className={`flex h-10 items-center gap-1.5 rounded-lg px-4 text-xs font-semibold text-white transition ${
+                  className={`imagine-primary-action flex h-10 items-center gap-1.5 rounded-lg px-4 text-xs font-semibold text-white transition ${
                     canApply
                       ? "bg-blue-600 shadow-md shadow-blue-950/30 hover:bg-blue-500"
                       : "cursor-not-allowed border border-slate-800 bg-slate-800 text-slate-500"

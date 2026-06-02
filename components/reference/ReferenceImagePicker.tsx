@@ -135,6 +135,7 @@ export default function ReferenceImagePicker({
                 }`}
                 style={{ backgroundImage: `url(${reference.url})` }}
               >
+                {/* intentional image-overlay for contrast on arbitrary generated thumbs; black + white + role colors (emerald/amber/red) ensure legibility independent of theme vars (see design + pr1 review) */}
                 <button
                   type="button"
                   onClick={() => onRemove(reference.id)}
