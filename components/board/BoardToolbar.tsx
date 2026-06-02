@@ -76,7 +76,6 @@ const iconBtn =
   "imagine-board-header-icon flex h-9 w-9 min-w-9 items-center justify-center rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)] transition disabled:cursor-not-allowed disabled:opacity-40";
 
 function resolveHeaderMenuPortalRoot(): HTMLElement {
-  if (typeof document === "undefined") return document.body;
   const boardMain = document.querySelector("main.imagine-workbench-shell");
   if (boardMain instanceof HTMLElement) return boardMain;
   const shell = document.querySelector(".imagine-workbench-shell");

@@ -106,6 +106,9 @@ const SKILL_LABELS: Record<string, { label: string; className: string }> = {
   ExportManager: { label: "批量导出", className: "bg-red-500/12 text-red-300 border-red-500/20" },
 };
 
+const AGENT_DOCK_SHELL_CLASS =
+  "pointer-events-none fixed inset-x-4 bottom-6 z-40 mx-auto flex w-[calc(100vw-32px)] max-w-5xl justify-end sm:bottom-8 sm:w-[min(1040px,calc(100vw-40px))]";
+
 const ACTION_LABELS: Record<AgentToolAction["type"], string> = {
   none: "无操作",
   optimize_prompt: "优化提示词",
@@ -407,6 +410,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
     input,
     isLoading,
     isOpen,
+    isOverContent,
     messages,
     selectedChatModel,
     themeMode,
@@ -478,13 +482,13 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.94, y: 8 }}
           transition={{ duration: 0.16, ease: "easeOut" }}
-          className={`imagine-agent-dock imagine-agent-dock-idle-orb imagine-theme-${themeMode} fixed bottom-6 right-5 z-40`}
+          className={`imagine-agent-dock imagine-agent-dock-idle-orb imagine-theme-${themeMode} ${AGENT_DOCK_SHELL_CLASS}`}
         >
           <button
             ref={orbButtonRef}
             type="button"
             onClick={onToggleOpen}
-            className="imagine-agent-orb-button group relative flex h-16 w-16 items-center justify-center rounded-full"
+            className="imagine-agent-orb-button pointer-events-auto group relative flex h-16 w-16 items-center justify-center rounded-full"
             title="展开 Agent 对话"
             aria-label="展开 Agent 对话"
           >
@@ -500,7 +504,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
           key="agent-panel"
           ref={ref}
           initial={{ opacity: 0, scale: 0.98, y: 18 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
+          animate={{ opacity: isOverContent ? 0.84 : 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.99, y: 10 }}
           transition={{ duration: 0.16, ease: "easeOut" }}
           className={`imagine-agent-dock imagine-agent-dock-panel imagine-theme-${themeMode} fixed inset-x-4 bottom-12 z-40 mx-auto w-[calc(100vw-32px)] max-w-5xl rounded-lg p-3 sm:bottom-16 sm:w-[min(1040px,calc(100vw-40px))]`}

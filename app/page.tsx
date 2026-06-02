@@ -159,6 +159,8 @@ export default function Home() {
   const [isAgentPortalReady, setIsAgentPortalReady] = useState(false);
   const [isAgentDockOverContent, setIsAgentDockOverContent] = useState(false);
   const [mobileWorkbenchPanel, setMobileWorkbenchPanel] = useState<MobileWorkbenchPanel>("create");
+  const workbenchShellRef = useRef<HTMLDivElement>(null);
+  const [agentPortalHost, setAgentPortalHost] = useState<HTMLElement | null>(null);
   const mobilePromptTemplatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
   const [mobilePromptTemplateSlashCommand, setMobilePromptTemplateSlashCommand] =
     useState<PromptTemplateSlashCommand | null>(null);
@@ -554,7 +556,10 @@ export default function Home() {
   };
 
   useEffect(() => {
-    const readyTimer = window.setTimeout(() => setIsAgentPortalReady(true), 0);
+    const readyTimer = window.setTimeout(() => {
+      setIsAgentPortalReady(true);
+      setAgentPortalHost(workbenchShellRef.current);
+    }, 0);
     return () => window.clearTimeout(readyTimer);
   }, []);
 
@@ -1198,7 +1203,10 @@ export default function Home() {
   };
 
   return (
-    <div className={`imagine-workbench-shell imagine-theme-${themeMode} min-h-screen flex flex-col bg-[var(--iw-bg)] text-[var(--iw-text)] font-sans selection:bg-blue-500/30 selection:text-[var(--iw-text)] relative overflow-hidden`}>
+    <div
+      ref={workbenchShellRef}
+      className={`imagine-workbench-shell imagine-theme-${themeMode} min-h-screen flex flex-col bg-[var(--iw-bg)] text-[var(--iw-text)] font-sans selection:bg-blue-500/30 selection:text-[var(--iw-text)] relative overflow-hidden`}
+    >
 
       {/* Workbench depth layer */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
@@ -1359,7 +1367,7 @@ export default function Home() {
               />
             </div>
 
-            {isAgentPortalReady && !isAgentDockSuppressed && createPortal(
+            {isAgentPortalReady && !isAgentDockSuppressed && agentPortalHost && createPortal(
               <AgentDock
                 ref={agentDockRef}
                 activeCountdownId={activeCountdownId}
@@ -1406,7 +1414,7 @@ export default function Home() {
                 onToggleOpen={() => setIsAgentDockOpen(prev => !prev)}
                 onUploadReference={handleAgentReferenceUpload}
               />,
-              document.body,
+              agentPortalHost,
             )}
 
           </div>

@@ -2116,10 +2116,16 @@ html[data-imagine-theme="dark"] .imagine-root-body {
 }
 
 .imagine-workbench-shell.imagine-theme-light .fixed.bottom-6 > div,
-.imagine-workbench-shell.imagine-theme-light section.fixed {
+.imagine-workbench-shell.imagine-theme-light section.fixed:not(.imagine-agent-dock-idle-orb) {
   background: rgba(255, 255, 255, 0.92) !important;
   border-color: rgba(15, 23, 42, 0.12) !important;
   box-shadow: 0 18px 44px rgba(15, 23, 42, 0.12) !important;
+}
+
+.imagine-workbench-shell.imagine-theme-light section.imagine-agent-dock-idle-orb {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
 }
 
 .imagine-agent-dock.imagine-theme-light {
@@ -3750,6 +3756,36 @@ html[data-imagine-theme="dark"] .imagine-root-body {
     radial-gradient(circle at 68% 36%, rgba(244, 114, 182, 0.06), transparent 42%);
 }
 
+.imagine-agent-dock-idle-orb.imagine-theme-dark .imagine-agent-mark {
+  border-color: rgba(129, 140, 248, 0.34);
+  background:
+    radial-gradient(circle at 32% 22%, rgba(255, 255, 255, 0.14), transparent 18%),
+    radial-gradient(circle at 78% 78%, rgba(99, 102, 241, 0.34), transparent 30%),
+    linear-gradient(145deg, #1e293b, #111827 48%, #0f172a);
+  box-shadow:
+    0 12px 28px rgba(79, 70, 229, 0.24),
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset,
+    0 -12px 24px rgba(79, 70, 229, 0.14) inset;
+}
+
+.imagine-agent-dock-idle-orb.imagine-theme-dark .imagine-agent-orb-button::before {
+  border-color: rgba(129, 140, 248, 0.24);
+  box-shadow: 0 0 0 6px rgba(99, 102, 241, 0.1);
+}
+
+.imagine-agent-dock-idle-orb.imagine-theme-dark .imagine-agent-orb-aura {
+  background:
+    radial-gradient(circle, rgba(99, 102, 241, 0.24), transparent 58%),
+    radial-gradient(circle at 68% 36%, rgba(244, 114, 182, 0.12), transparent 42%);
+  opacity: 0.92;
+}
+
+.imagine-agent-dock-idle-orb.imagine-theme-dark .imagine-agent-orb-reminder {
+  background: rgba(17, 24, 39, 0.88) !important;
+  border-color: rgba(129, 140, 248, 0.28) !important;
+  color: #e0e7ff !important;
+}
+
 @keyframes imagine-agent-orb-breathe {
   0%,
   100% {
@@ -4517,10 +4553,12 @@ html[data-imagine-theme="dark"] .imagine-root-body {
 @media (max-width: 860px) {
   .imagine-agent-dock.imagine-agent-dock-idle-orb {
     bottom: calc(16px + env(safe-area-inset-bottom)) !important;
-    inset-inline: auto 16px !important;
-    width: auto !important;
+    inset-inline: 16px !important;
+    width: calc(100vw - 32px) !important;
+    max-width: none !important;
+    justify-content: flex-end !important;
     border: 0 !important;
-    border-radius: 999px !important;
+    border-radius: 0 !important;
     padding: 0 !important;
   }
 }
