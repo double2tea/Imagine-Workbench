@@ -1,5 +1,7 @@
 import BoardPageClient from "@/components/board/BoardPageClient";
 
+export const runtime = "edge";
+
 interface BoardRoutePageProps {
   params: Promise<{
     boardId: string;
