@@ -221,6 +221,11 @@ function BoardEdgeComponent({
 }
 
 const edgeTypes = { smoothstep: BoardEdgeComponent };
+const reactFlowConnectionLineStyle = { stroke: "#60a5fa", strokeDasharray: "7 5", strokeWidth: 2.5 };
+const reactFlowDefaultEdgeOptions = { type: "smoothstep" };
+const reactFlowDeleteKeyCode = ["Backspace", "Delete"];
+const reactFlowPanOnDrag = [1, 2];
+const reactFlowProOptions = { hideAttribution: true };
 
 function portKindFromHandle(handleId: string | null | undefined): BoardPortKind | null {
   if (!handleId) return null;
@@ -716,15 +721,20 @@ export default function BoardWorkspace({
 
   const handleSelectionChange = useCallback<OnSelectionChangeFunc<BoardFlowNode, BoardFlowEdge>>(({ nodes, edges }) => {
     const ids = nodes.map(node => node.id);
-    updateSelectedNodeIds(ids);
-    if (edges.length > 0) {
-      selectEdge(edges[0]?.id ?? null);
+    const edgeId = edges[0]?.id ?? null;
+    if (edgeId) {
+      if (sameStringList(selectedNodeIds, ids) && selectedEdgeId === edgeId && selectedNodeId === null) return;
+      updateSelectedNodeIds(ids);
+      selectEdge(edgeId);
       selectNode(null);
       return;
     }
+    const nodeId = ids[0] ?? null;
+    if (sameStringList(selectedNodeIds, ids) && selectedEdgeId === null && selectedNodeId === nodeId) return;
+    updateSelectedNodeIds(ids);
     selectEdge(null);
-    selectNode(ids[0] ?? null);
-  }, [selectEdge, selectNode, updateSelectedNodeIds]);
+    selectNode(nodeId);
+  }, [selectEdge, selectNode, selectedEdgeId, selectedNodeId, selectedNodeIds, updateSelectedNodeIds]);
 
   const handleNodeClick: NodeMouseHandler<BoardFlowNode> = () => {
     closeOverlayMenus();
@@ -1302,9 +1312,9 @@ export default function BoardWorkspace({
             connectionMode={ConnectionMode.Loose}
             connectionRadius={48}
             connectionLineType={ConnectionLineType.SmoothStep}
-            connectionLineStyle={{ stroke: "#60a5fa", strokeDasharray: "7 5", strokeWidth: 2.5 }}
-            defaultEdgeOptions={{ type: "smoothstep" }}
-            deleteKeyCode={["Backspace", "Delete"]}
+            connectionLineStyle={reactFlowConnectionLineStyle}
+            defaultEdgeOptions={reactFlowDefaultEdgeOptions}
+            deleteKeyCode={reactFlowDeleteKeyCode}
             isValidConnection={isValidBoardConnection}
             nodesConnectable
             nodesDraggable
@@ -1315,7 +1325,7 @@ export default function BoardWorkspace({
             multiSelectionKeyCode="Shift"
             onReconnect={handleReconnect}
             onSelectionChange={handleSelectionChange}
-            panOnDrag={[1, 2]}
+            panOnDrag={reactFlowPanOnDrag}
             selectionOnDrag
             onConnect={handleConnect}
             onConnectEnd={handleConnectEnd}
@@ -1341,7 +1351,7 @@ export default function BoardWorkspace({
               updateSelectedNodeIds([]);
             }}
             onPaneContextMenu={openQuickInsertMenu}
-            proOptions={{ hideAttribution: true }}
+            proOptions={reactFlowProOptions}
             zoomOnDoubleClick={false}
           >
             {board.config.showGrid && <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="var(--iw-board-handle)" />}
