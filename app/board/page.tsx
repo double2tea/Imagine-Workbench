@@ -165,6 +165,15 @@ function isPlaceholderRunningHubModel(model: string): boolean {
   return model.includes("<webappId>") || model.includes("<workflowId>");
 }
 
+function findBoardAssetNodeByAssetId(nodes: BoardDocument["nodes"], assetId: string) {
+  return nodes.find(node => node.kind === "asset" && node.asset.assetId === assetId);
+}
+
+function findGenerateNodeById(nodes: BoardDocument["nodes"], nodeId: string): GenerateBoardNode | undefined {
+  const node = nodes.find(item => item.id === nodeId);
+  return isGenerateBoardNode(node) ? node : undefined;
+}
+
 export default function BoardPage() {
   const router = useRouter();
   const boardController = useBoardState();
@@ -872,16 +881,37 @@ export default function BoardPage() {
 
   useEffect(() => {
     if (!loadedItemsRef.current) return;
+    if (boardController.saveStatus === "loading") return;
     const known = knownItemIdsRef.current;
     const handledBoardItems = handledBoardItemIdsRef.current;
     for (const item of items) {
       const sourceBoardNodeId = item.sourceBoardNodeId;
-      if (sourceBoardNodeId && !handledBoardItems.has(item.id) && item.status === "complete") {
+      if (sourceBoardNodeId) {
+        if (known.has(item.id)) {
+          handledBoardItems.add(item.id);
+          continue;
+        }
+        if (handledBoardItems.has(item.id)) continue;
+        if (item.status !== "complete" && item.status !== "failed") continue;
+      }
+
+      if (sourceBoardNodeId && item.status === "complete") {
         known.add(item.id);
         handledBoardItems.add(item.id);
-        const sourceNode = sourceBoardNodeId
-          ? boardController.board.nodes.find(node => node.id === sourceBoardNodeId)
-          : undefined;
+        const sourceNode = findGenerateNodeById(boardController.board.nodes, sourceBoardNodeId);
+        const existingAssetNode = findBoardAssetNodeByAssetId(boardController.board.nodes, item.id);
+        if (existingAssetNode) {
+          boardController.connectPorts(
+            { nodeId: sourceBoardNodeId, portId: "result-out", portKind: "result" },
+            { nodeId: existingAssetNode.id, portId: "asset-in", portKind: "asset" },
+          );
+          boardController.updateGenerateNode(sourceBoardNodeId, {
+            resultAssetId: item.id,
+            status: "complete",
+          });
+          continue;
+        }
+        if (sourceNode?.resultAssetId === item.id) continue;
         const assetNodeId = addAssetToBoard(
           item,
           sourceNode ? { x: sourceNode.position.x + sourceNode.size.width + 140, y: sourceNode.position.y } : undefined,
@@ -897,7 +927,7 @@ export default function BoardPage() {
         continue;
       }
 
-      if (sourceBoardNodeId && !handledBoardItems.has(item.id) && item.status === "failed") {
+      if (sourceBoardNodeId && item.status === "failed") {
         known.add(item.id);
         handledBoardItems.add(item.id);
         boardController.updateGenerateNode(sourceBoardNodeId, {
@@ -909,7 +939,7 @@ export default function BoardPage() {
 
       if (known.has(item.id)) continue;
       known.add(item.id);
-      if (item.status === "complete") {
+      if (item.status === "complete" && !findBoardAssetNodeByAssetId(boardController.board.nodes, item.id)) {
         addAssetToBoard(item);
       }
     }
