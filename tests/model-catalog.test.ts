@@ -174,6 +174,22 @@ test("xstx chat defaults use pricing model identifiers", () => {
   assert.equal(CHAT_MODEL_OPTIONS["xstx"].some(option => option.value === "xstx:claude-haiku-4-5-20251001"), false);
 });
 
+test("agnes provider exposes documented chat image and video models", () => {
+  assert.equal(CHAT_MODEL_OPTIONS["agnes"].some(option => option.value === "agnes:agnes-2.0-flash"), true);
+  assert.equal(CHAT_MODEL_OPTIONS["agnes"].some(option => option.value === "agnes:agnes-1.5-flash"), true);
+  assert.equal(IMAGE_MODEL_OPTIONS["agnes"].some(option => option.value === "agnes:agnes-image-2.1-flash"), true);
+  assert.equal(VIDEO_MODEL_OPTIONS["agnes"].some(option => option.value === "agnes:agnes-video-v2.0"), true);
+
+  const image = getModelCapability("agnes:agnes-image-2.1-flash", "image");
+  const video = getModelCapability("agnes:agnes-video-v2.0", "video");
+  assert.equal(image.supportsReferences, true);
+  assert.deepEqual(getImageResolutionOptions("agnes:agnes-image-2.1-flash", "4:3"), [
+    { value: "custom", label: "自定义尺寸" },
+  ]);
+  assert.equal(video.sizes.some(option => option.value === "1152x768"), true);
+  assert.equal(video.maxReferenceImages, 2);
+});
+
 test("video model selector exposes auto size", () => {
   assert.equal(VIDEO_MODEL_OPTIONS["12ai"].length > 0, true);
   const twelveAiVideo = getModelCapability("12ai:veo_3_1-fast", "video");

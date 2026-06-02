@@ -16,6 +16,8 @@ interface OpenAiImageResponse {
     b64_json?: string;
     url?: string;
   }>;
+  image_url?: string;
+  url?: string;
 }
 
 interface AsyncImageCreateResponse {
@@ -100,6 +102,9 @@ export async function generateImage(config: ProviderConfig, input: GenerateImage
   }
   if (config.provider === "runninghub") {
     return generateRunningHubMedia(config, input, "image");
+  }
+  if (config.provider === "agnes") {
+    return generateAgnesImage(config, input);
   }
   if (config.provider === "grok2api") {
     return generateOpenAiCompatibleImage(config, input, "grok2api");
@@ -445,6 +450,23 @@ async function generate12AiAsyncImage(config: ProviderConfig, input: GenerateIma
   };
 }
 
+async function generateAgnesImage(config: ProviderConfig, input: GenerateImageInput): Promise<GenerateImageResult> {
+  const referenceUrls = input.referenceImages.map(reference => reference.dataUri);
+  const response = await postJson<OpenAiImageResponse>(`${config.baseUrl}/v1/images/generations`, config, {
+    model: input.model,
+    prompt: input.prompt,
+    size: input.imageResolution,
+    extra_body: {
+      response_format: "url",
+      ...(referenceUrls.length > 0 ? { image: referenceUrls } : {}),
+    },
+  });
+
+  const imageUrl = readOpenAiImageUrl(response);
+  if (imageUrl) return { imageUrl, source: input.model };
+  throw new Error("Agnes image response did not include b64_json or url");
+}
+
 async function generateOpenAiCompatibleImage(
   config: ProviderConfig,
   input: GenerateImageInput,
@@ -455,14 +477,15 @@ async function generateOpenAiCompatibleImage(
       ? await editOpenAiCompatibleImage(config, input, provider)
       : await createOpenAiCompatibleImage(config, input, provider);
 
-  const first = response.data?.[0];
-  if (first?.b64_json) {
-    return { imageUrl: `data:image/png;base64,${first.b64_json}`, source: input.model };
-  }
-  if (first?.url) {
-    return { imageUrl: first.url, source: input.model };
-  }
+  const imageUrl = readOpenAiImageUrl(response);
+  if (imageUrl) return { imageUrl, source: input.model };
   throw new Error("Image response did not include b64_json or url");
+}
+
+function readOpenAiImageUrl(response: OpenAiImageResponse): string | undefined {
+  const first = response.data?.[0];
+  if (first?.b64_json) return `data:image/png;base64,${first.b64_json}`;
+  return first?.url ?? response.image_url ?? response.url;
 }
 
 async function createOpenAiCompatibleImage(

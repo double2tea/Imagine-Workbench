@@ -21,7 +21,7 @@ export function resolveProviderConfig(req: Request, provider: AiProvider): Provi
   const videoBaseUrl = resolveProviderVideoBaseUrl(provider);
 
   const apiKey = headerKey || envKey;
-  if ((provider === "12ai" || provider === "modelscope" || provider === "runninghub") && !apiKey) {
+  if ((provider === "12ai" || provider === "agnes" || provider === "modelscope" || provider === "runninghub") && !apiKey) {
     const meta = getProviderMeta(provider);
     throw new Error(`${meta.label} API key is required. Set ${meta.envApiKey} or provide a custom API key.`);
   }

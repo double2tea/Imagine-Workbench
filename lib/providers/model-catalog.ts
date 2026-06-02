@@ -261,6 +261,16 @@ const RUNNINGHUB_IMAGE_SIZES: ParameterOption[] = RUNNINGHUB_VIDEO_SIZES.map(opt
   imageResolutionOption(option.value),
 );
 
+const AGNES_IMAGE_SIZES: ParameterOption[] = [imageResolutionOption("custom")];
+
+const AGNES_VIDEO_SIZES: ParameterOption[] = [
+  { value: "auto", label: "Auto" },
+  { value: "1152x768", label: "1152x768" },
+  { value: "768x1152", label: "768x1152" },
+  { value: "1280x720", label: "1280x720" },
+  { value: "720x1280", label: "720x1280" },
+];
+
 export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
   imageCapability({
     value: "12ai:gemini-3.1-flash-image-preview",
@@ -454,6 +464,39 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     label: "Grok2API Grok 4.20 Expert",
     provider: "grok2api",
     model: "grok-4.20-expert",
+  }),
+  chatCapability({
+    value: "agnes:agnes-2.0-flash",
+    label: "Agnes AI Agnes 2.0 Flash",
+    provider: "agnes",
+    model: "agnes-2.0-flash",
+  }),
+  chatCapability({
+    value: "agnes:agnes-1.5-flash",
+    label: "Agnes AI Agnes 1.5 Flash",
+    provider: "agnes",
+    model: "agnes-1.5-flash",
+  }),
+  imageCapability({
+    value: "agnes:agnes-image-2.1-flash",
+    label: "Agnes AI Image 2.1 Flash",
+    provider: "agnes",
+    model: "agnes-image-2.1-flash",
+    supportsAsync: false,
+    supportsReferences: true,
+    aspectRatios: GPT_IMAGE_RATIOS,
+    sizes: AGNES_IMAGE_SIZES,
+  }),
+  videoCapability({
+    value: "agnes:agnes-video-v2.0",
+    label: "Agnes AI Video V2.0",
+    provider: "agnes",
+    model: "agnes-video-v2.0",
+    supportsReferences: true,
+    sizes: AGNES_VIDEO_SIZES,
+    videoReferenceMode: "reference",
+    maxReferenceImages: 2,
+    minReferenceImages: 0,
   }),
   chatCapability({
     value: "xstx:claude-opus-4-7",

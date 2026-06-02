@@ -9,6 +9,7 @@ import {
   isRecord,
   mediaOperationName,
   postForm,
+  postJson,
 } from "./utils";
 
 interface VideoCreateResponse {
@@ -54,6 +55,9 @@ export async function generateVideo(config: ProviderConfig, input: GenerateVideo
       source: result.source,
     };
   }
+  if (config.provider === "agnes") {
+    return generateAgnesVideo(config, input);
+  }
 
   const form = new FormData();
   form.set("model", input.model);
@@ -90,6 +94,25 @@ export async function generateVideo(config: ProviderConfig, input: GenerateVideo
       "video",
       isTwelveAiOmni ? `${TWELVE_AI_OMNI_TASK_PREFIX}${response.id}` : response.id,
     ),
+    source: input.model,
+  };
+}
+
+async function generateAgnesVideo(config: ProviderConfig, input: GenerateVideoInput): Promise<GenerateVideoResult> {
+  const size = aspectRatioToVideoSize(input.aspectRatio, config.provider);
+  const dimensions = size ? parseVideoDimensions(size) : undefined;
+  const referenceUrls = input.referenceImages.map(reference => reference.dataUri);
+  const response = await postJson<VideoCreateResponse>(`${config.baseUrl}/v1/videos`, config, {
+    model: input.model,
+    prompt: input.prompt,
+    ...(dimensions ? { width: dimensions.width, height: dimensions.height } : {}),
+    ...(referenceUrls.length === 1 ? { image: referenceUrls[0] } : {}),
+    ...(referenceUrls.length > 1 ? { extra_body: { image: referenceUrls } } : {}),
+  });
+  if (!response.id) throw new Error("Agnes video response did not include a task id");
+
+  return {
+    operationName: mediaOperationName(config.provider, "video", response.id),
     source: input.model,
   };
 }
@@ -178,6 +201,15 @@ function parseVideoTaskId(config: ProviderConfig, taskId: string, model?: string
   return {
     id: taskId.slice(TWELVE_AI_OMNI_TASK_PREFIX.length),
     isTwelveAiOmni: true,
+  };
+}
+
+function parseVideoDimensions(size: string): { width: number; height: number } {
+  const match = size.match(/^(\d+)x(\d+)$/);
+  if (!match) throw new Error(`Unsupported Agnes video size: ${size}`);
+  return {
+    width: Number(match[1]),
+    height: Number(match[2]),
   };
 }
 

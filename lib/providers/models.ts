@@ -20,6 +20,9 @@ export async function listProviderModels(config: ProviderConfig, kind: ModelKind
   if (config.provider === "modelscope") {
     return listModelScopeModels(config, kind);
   }
+  if (config.provider === "agnes") {
+    return staticProviderModels(config.provider, kind);
+  }
 
   const response = await getJson<OpenAiModelsResponse>(`${config.baseUrl}/v1/models`, config);
   if (!Array.isArray(response.data)) {
@@ -57,6 +60,10 @@ async function listRunningHubModels(config: ProviderConfig, kind: ModelKindFilte
 function staticProviderModels(provider: AiProvider, kind: ModelKindFilter): ModelOption[] {
   const options = [
     { value: "modelscope:Qwen/Qwen-Image", label: "ModelScope Qwen Image" },
+    { value: "agnes:agnes-2.0-flash", label: "Agnes AI Agnes 2.0 Flash" },
+    { value: "agnes:agnes-1.5-flash", label: "Agnes AI Agnes 1.5 Flash" },
+    { value: "agnes:agnes-image-2.1-flash", label: "Agnes AI Image 2.1 Flash" },
+    { value: "agnes:agnes-video-v2.0", label: "Agnes AI Video V2.0" },
     { value: "modelscope:Qwen/Qwen-Image-Edit", label: "ModelScope Qwen Image Edit" },
     { value: "runninghub:ai-app-image:<webappId>", label: "RunningHub AI App Image" },
     { value: "runninghub:ai-app-video:<webappId>", label: "RunningHub AI App Video" },
@@ -71,7 +78,7 @@ function parseOptionProvider(value: string): AiProvider | null {
   const separator = value.indexOf(":");
   if (separator === -1) return null;
   const provider = value.slice(0, separator);
-  return provider === "modelscope" || provider === "runninghub" ? provider : null;
+  return provider === "agnes" || provider === "modelscope" || provider === "runninghub" ? provider : null;
 }
 
 function readModelId(value: unknown, provider: AiProvider, kind: ModelKindFilter): ModelOption[] {
