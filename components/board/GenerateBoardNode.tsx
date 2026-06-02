@@ -1,9 +1,16 @@
 import { ImagePlus, Loader2, Play, Video } from "lucide-react";
-import type { BoardGenerateNodeUpdate, BoardImageGenerateNode, BoardVideoGenerateNode } from "@/lib/board";
+import type { BoardGenerateNodeUpdate, BoardGenerateVariantCount, BoardImageGenerateNode, BoardVideoGenerateNode } from "@/lib/board";
 
 type GenerateNode = BoardImageGenerateNode | BoardVideoGenerateNode;
+const variantCountOptions: BoardGenerateVariantCount[] = [1, 2, 4];
+
+export interface BoardGenerateInputSummary {
+  promptPreview: string | null;
+  referenceCount: number;
+}
 
 interface GenerateBoardNodeProps {
+  inputSummary?: BoardGenerateInputSummary;
   node: GenerateNode;
   onExecute: () => void;
   onUpdate: (input: BoardGenerateNodeUpdate) => void;
@@ -16,23 +23,71 @@ function statusText(node: GenerateNode): string {
   return node.kind === "image-generate" ? "图片" : "视频";
 }
 
-export default function GenerateBoardNode({ node, onExecute, onUpdate }: GenerateBoardNodeProps) {
+function statusSteps(status: GenerateNode["status"]): Array<{ key: string; label: string; state: "done" | "active" | "idle" | "failed" }> {
+  const activeIndex = status === "idle" ? 0 : status === "processing" ? 1 : 2;
+  return ["准备", "生成", "结果"].map((label, index) => {
+    if (status === "failed") return { key: label, label, state: index === activeIndex ? "failed" : index < activeIndex ? "done" : "idle" };
+    if (status === "complete") return { key: label, label, state: "done" };
+    if (index < activeIndex) return { key: label, label, state: "done" };
+    if (index === activeIndex) return { key: label, label, state: "active" };
+    return { key: label, label, state: "idle" };
+  });
+}
+
+export default function GenerateBoardNode({ inputSummary, node, onExecute, onUpdate }: GenerateBoardNodeProps) {
   const isProcessing = node.status === "processing";
+  const promptPreview = inputSummary?.promptPreview ?? null;
+  const referenceCount = inputSummary?.referenceCount ?? 0;
+  const steps = statusSteps(node.status);
   const paramSummary = node.kind === "image-generate"
-    ? `${node.model} / ${node.imageResolution === "custom" ? node.customImageResolution : node.imageResolution}`
-    : `${node.model} / ${node.aspectRatio}${node.videoDuration ? ` / ${node.videoDuration}s` : ""}`;
+    ? `${node.model} / ${node.imageResolution === "custom" ? node.customImageResolution : node.imageResolution} / x${node.variantCount}`
+    : `${node.model} / ${node.aspectRatio}${node.videoDuration ? ` / ${node.videoDuration}s` : ""} / x${node.variantCount}`;
   return (
     <div className="flex h-full min-h-0 flex-col gap-2 p-3">
       <textarea
-        value={node.prompt}
+        value={promptPreview ?? node.prompt}
         onChange={(event) => onUpdate({ prompt: event.target.value })}
-        className="nodrag nowheel min-h-0 flex-1 resize-none rounded-md imagine-board-input p-2 text-xs leading-5 outline-none placeholder:text-[var(--iw-faint)] focus:border-[var(--iw-border)]"
+        readOnly={promptPreview !== null}
+        className={`nodrag nowheel min-h-0 flex-1 resize-none rounded-md imagine-board-input p-2 text-xs leading-5 outline-none placeholder:text-[var(--iw-faint)] focus:border-[var(--iw-border)] ${
+          promptPreview !== null ? "cursor-default opacity-85" : ""
+        }`}
         placeholder="可直接写提示词，或连接 Prompt 输入"
       />
-      <div className="grid grid-cols-[1fr_auto] items-center gap-2">
+      {(promptPreview !== null || referenceCount > 0) && (
+        <div className="flex min-h-6 flex-wrap items-center gap-1.5">
+          {promptPreview !== null && (
+            <span className="imagine-meta-chip rounded-md border border-teal-400/20 bg-teal-500/10 px-2 py-1 text-[10px] font-semibold text-[var(--iw-text)]">
+              Prompt 输入
+            </span>
+          )}
+          {referenceCount > 0 && (
+            <span className="imagine-meta-chip rounded-md border border-blue-400/20 bg-blue-500/10 px-2 py-1 text-[10px] font-semibold text-[var(--iw-text)]">
+              参考 {referenceCount}
+            </span>
+          )}
+        </div>
+      )}
+      <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
         <span className={`imagine-status-chip truncate text-[10px] font-mono ${node.status === "failed" ? "text-red-300" : "text-[var(--iw-muted)]"}`} data-status={node.status}>
           {node.errorMessage ?? `${statusText(node)} / ${paramSummary}`}
         </span>
+        <div className="nodrag flex h-8 overflow-hidden rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)]" title="变体数量">
+          {variantCountOptions.map(count => (
+            <button
+              key={count}
+              type="button"
+              onClick={() => onUpdate({ variantCount: count })}
+              disabled={isProcessing}
+              className={`w-7 text-[10px] font-semibold transition ${
+                node.variantCount === count
+                  ? "bg-blue-600 text-white"
+                  : "text-[var(--iw-muted)] hover:bg-[var(--iw-panel)] hover:text-[var(--iw-text)]"
+              }`}
+            >
+              {count}
+            </button>
+          ))}
+        </div>
         <button
           type="button"
           onClick={onExecute}
@@ -42,6 +97,18 @@ export default function GenerateBoardNode({ node, onExecute, onUpdate }: Generat
           {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : node.kind === "image-generate" ? <ImagePlus className="h-3.5 w-3.5" /> : <Video className="h-3.5 w-3.5" />}
           <Play className="h-3 w-3" />
         </button>
+      </div>
+      <div className="grid grid-cols-3 gap-1.5" role="list" aria-label="生成进度">
+        {steps.map(step => (
+          <span
+            key={step.key}
+            className="imagine-board-progress-step h-1.5 rounded-full"
+            data-state={step.state}
+            title={step.label}
+            aria-label={step.label}
+            role="listitem"
+          />
+        ))}
       </div>
     </div>
   );

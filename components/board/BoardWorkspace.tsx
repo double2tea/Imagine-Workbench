@@ -31,6 +31,7 @@ import {
 } from "@xyflow/react";
 import type { BoardStateController } from "@/hooks/useBoardState";
 import BoardNode, { type BoardFlowNode } from "@/components/board/BoardNode";
+import type { BoardGenerateInputSummary } from "@/components/board/GenerateBoardNode";
 import BoardToolbar from "@/components/board/BoardToolbar";
 import type { ThemeMode } from "@/components/workbench/WorkspaceHeader";
 import type { StorageItem } from "@/lib/db";
@@ -160,6 +161,31 @@ function edgeColor(kind: BoardEdge["kind"], themeMode: ThemeMode): string {
   return getBoardVar(varNames[kind], fallbacks[kind]);
 }
 
+function generateInputSummaryForNode(node: BoardNodeModel, nodes: BoardNodeModel[], edges: BoardEdge[]): BoardGenerateInputSummary | undefined {
+  if (node.kind !== "image-generate" && node.kind !== "video-generate") return undefined;
+
+  const promptEdge = edges.find(edge => edge.to.nodeId === node.id && edge.to.portId === "prompt-in");
+  const promptNode = promptEdge ? nodes.find(item => item.id === promptEdge.from.nodeId) : undefined;
+  const promptPreview = promptNode?.kind === "prompt" ? promptNode.prompt : null;
+  const referenceAssetIds = new Set<string>();
+
+  edges
+    .filter(edge => edge.to.nodeId === node.id && edge.to.portId === "reference-in")
+    .map(edge => nodes.find(item => item.id === edge.from.nodeId))
+    .forEach(item => {
+      if (item?.kind === "asset" && item.asset.type === "image") referenceAssetIds.add(item.asset.assetId);
+    });
+
+  return {
+    promptPreview,
+    referenceCount: referenceAssetIds.size,
+  };
+}
+
+function hasResultConnection(nodeId: string, edges: BoardEdge[]): boolean {
+  return edges.some(edge => edge.from.nodeId === nodeId && edge.from.portId === "result-out");
+}
+
 export default function BoardWorkspace({
   children,
   controller,
@@ -208,6 +234,8 @@ export default function BoardWorkspace({
         height: node.size.height,
         selected: selectedNodeId === node.id,
         data: {
+          generateInputSummary: generateInputSummaryForNode(node, board.nodes, board.edges),
+          hasResultConnection: hasResultConnection(node.id, board.edges),
           node,
           onCaptureVideoFrame,
           onDelete: deleteNode,
@@ -221,6 +249,7 @@ export default function BoardWorkspace({
       })),
     [
       board.nodes,
+      board.edges,
       deleteNode,
       onCaptureVideoFrame,
       onExecuteGenerateNode,
