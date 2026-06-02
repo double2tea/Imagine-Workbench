@@ -46,7 +46,7 @@ const DEFAULT_CUSTOM_IMAGE_RESOLUTION = "2560x1440";
 const inputClass = "imagine-board-input h-9 w-full !rounded-lg px-2 text-xs outline-none focus:border-[var(--iw-board-accent-amber)]";
 const monoInputClass = `${inputClass} font-mono`;
 const secondaryButtonClass = "imagine-secondary-action flex h-8 items-center justify-center !rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)] transition hover:bg-[var(--iw-panel)] hover:text-[var(--iw-text)]";
-const infoChipClass = "rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5 text-[11px] text-[var(--iw-muted)]";
+const infoChipClass = "imagine-meta-chip rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5 text-[10px] font-mono text-[var(--iw-muted)]";
 
 function isGenerateNode(node: BoardNode | undefined): node is BoardGenerateNode {
   return node?.kind === "image-generate" || node?.kind === "video-generate";
@@ -141,7 +141,7 @@ function ModelSelect({
 function InspectorField({ children, title }: { children: ReactNode; title: string }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-[11px] font-semibold text-[var(--iw-faint)]">{title}</span>
+      <span className="mb-1.5 block text-[11px] font-semibold text-[var(--iw-faint)]">{title}</span>
       {children}
     </label>
   );
@@ -339,7 +339,7 @@ export default function BoardInspector({
   return (
     <div className="imagine-control-surface border-b border-[var(--iw-border)] !p-3">
       <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-xs font-semibold text-[var(--iw-text)]">检查器</h2>
+        <h2 className="text-sm font-semibold text-[var(--iw-text)]">检查器</h2>
         <button type="button" onClick={onOpenSettings} className="text-[var(--iw-faint)] hover:text-[var(--iw-text)]" title="设置">
           <Settings className="h-3.5 w-3.5" />
         </button>
@@ -350,9 +350,9 @@ export default function BoardInspector({
             <p className="truncate text-sm font-semibold text-[var(--iw-text)]">{node.title}</p>
             <p className="font-mono text-[10px] text-[var(--iw-faint)]">{node.kind}</p>
           </div>
-          <div className="grid grid-cols-2 gap-2 text-[11px] text-[var(--iw-muted)]">
-            <div className="rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5">输入 {incomingCount}</div>
-            <div className="rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5">输出 {outgoingCount}</div>
+          <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-[var(--iw-muted)]">
+            <div className="imagine-meta-chip rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5">输入 {incomingCount}</div>
+            <div className="imagine-meta-chip rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5">输出 {outgoingCount}</div>
           </div>
           {node.kind === "asset" && (
             <div className="space-y-2">
@@ -367,7 +367,7 @@ export default function BoardInspector({
                   <Send className="h-3.5 w-3.5" />
                 </button>
               </div>
-              <button type="button" onClick={onSyncAssetReference} className={`${secondaryButtonClass} w-full text-[11px] font-semibold`}>
+              <button type="button" onClick={onSyncAssetReference} className={`${secondaryButtonClass} w-full text-xs font-semibold`}>
                 同步到传统参考槽
               </button>
             </div>
@@ -379,11 +379,15 @@ export default function BoardInspector({
             <VideoGenerateInspector node={node} onExecuteGenerate={onExecuteGenerate} onUpdateGenerate={onUpdateGenerate} videoModelGroups={videoModelGroups} />
           )}
           {isGenerateNode(node) && node.status === "failed" && node.errorMessage && (
+<<<<<<< HEAD
             <p className="imagine-status-chip rounded-md border border-red-400/30 bg-red-500/10 px-2 py-1.5 text-[11px] text-red-200">{node.errorMessage}</p>
+=======
+            <p className="rounded-md border border-red-400/30 bg-red-500/10 px-2 py-1.5 text-[10px] text-red-200">{node.errorMessage}</p>
+>>>>>>> 5aa3ad0 (feat(uiux): U-PR3 Typography Unification, Spacing Audit, and State/Label Consistency Across Surfaces (design doc /tmp/grok-design-doc-b94818e8.md plan e62945a8))
           )}
         </div>
       ) : (
-        <p className="text-[11px] leading-5 text-[var(--iw-faint)]">选择节点或连线后查看连接状态；生成与 Agent 动作优先在节点内执行。</p>
+        <p className="text-xs leading-5 text-[var(--iw-faint)]">选择节点或连线后查看连接状态；生成与 Agent 动作优先在节点内执行。</p>
       )}
     </div>
   );

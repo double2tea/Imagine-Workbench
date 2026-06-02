@@ -30,7 +30,7 @@ export default function GenerateBoardNode({ node, onExecute, onUpdate }: Generat
         placeholder="可直接写提示词，或连接 Prompt 输入"
       />
       <div className="grid grid-cols-[1fr_auto] items-center gap-2">
-        <span className={`imagine-status-chip truncate text-[11px] ${node.status === "failed" ? "text-red-300" : "text-[var(--iw-muted)]"}`}>
+        <span className={`imagine-status-chip truncate text-[10px] font-mono ${node.status === "failed" ? "text-red-300" : "text-[var(--iw-muted)]"}`} data-status={node.status}>
           {node.errorMessage ?? `${statusText(node)} / ${paramSummary}`}
         </span>
         <button

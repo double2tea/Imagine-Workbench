@@ -1103,6 +1103,27 @@
   color: #b42318 !important;
 }
 
+/* U-PR3: status chip colors for board nodes (and any direct chip[data-status]) to match asset-card states via data-attrs; processing/failed/pending/ complete consistent across surfaces */
+.imagine-theme-light .imagine-status-chip[data-status="complete"] {
+  background: #ecfdf3 !important;
+  color: #027a48 !important;
+}
+
+.imagine-theme-light .imagine-status-chip[data-status="processing"] {
+  background: #eff8ff !important;
+  color: #175cd3 !important;
+}
+
+.imagine-theme-light .imagine-status-chip[data-status="pending"] {
+  background: #fffaeb !important;
+  color: #b54708 !important;
+}
+
+.imagine-theme-light .imagine-status-chip[data-status="failed"] {
+  background: #fef3f2 !important;
+  color: #b42318 !important;
+}
+
 .imagine-theme-light .imagine-gallery-empty svg {
   color: #c4cad6 !important;
 }

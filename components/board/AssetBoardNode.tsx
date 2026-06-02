@@ -96,7 +96,7 @@ export default function AssetBoardNode({ node, onCaptureVideoFrame }: AssetBoard
           </div>
         )}
       </div>
-      <div className="flex h-9 shrink-0 items-center gap-2 border-t border-[var(--iw-border)] px-3 text-[11px] text-[var(--iw-faint)]">
+      <div className="flex h-9 shrink-0 items-center gap-2 border-t border-[var(--iw-border)] px-3 text-[10px] text-[var(--iw-faint)]">
         {node.asset.type === "image" ? <ImageIcon className="h-3.5 w-3.5" /> : <VideoIcon className="h-3.5 w-3.5" />}
         <span className="truncate">{node.asset.prompt}</span>
       </div>

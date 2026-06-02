@@ -57,8 +57,8 @@ export default function BoardToolbar({
           <ArrowLeft className="h-3.5 w-3.5" />
         </button>
         <h1 className="truncate text-sm font-semibold text-[var(--iw-text)]">画板</h1>
-        <span className="rounded border border-[var(--iw-border)] px-2 py-1 text-[11px] text-[var(--iw-muted)]">{nodeCount} 节点</span>
-        <span className="hidden text-[11px] text-[var(--iw-faint)] sm:inline">{formatSaveStatus(saveStatus)}</span>
+        <span className="imagine-meta-chip rounded border border-[var(--iw-border)] px-2 py-1 text-[10px] font-mono text-[var(--iw-muted)]">{nodeCount} 节点</span>
+        <span className="hidden text-[10px] font-mono text-[var(--iw-faint)] sm:inline">{formatSaveStatus(saveStatus)}</span>
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <button type="button" onClick={onAddPrompt} className={toolButtonClass} data-accent="amber">
