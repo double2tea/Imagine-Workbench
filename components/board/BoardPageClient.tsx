@@ -57,6 +57,7 @@ import {
   type BoardVideoGenerateNode,
 } from "@/lib/board";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
+import { flushBoardTextForGenerateNode, getBoardTextDraft } from "@/lib/board/text-flush-registry";
 import { createVideoFrameStorageItem, getVideoFrameCaptureLabel, type CapturedVideoFrame } from "@/lib/video-frame";
 
 type NoticeType = "error" | "info" | "success";
@@ -1134,7 +1135,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     const promptNode = promptEdge
       ? boardController.board.nodes.find(item => item.id === promptEdge.from.nodeId)
       : undefined;
-    const resolvedPrompt = promptNode?.kind === "prompt" ? promptNode.prompt : node.prompt;
+    const resolvedPrompt = promptNode?.kind === "prompt"
+      ? (getBoardTextDraft(promptNode.id) ?? promptNode.prompt)
+      : (getBoardTextDraft(node.id) ?? node.prompt);
     const references: ReferenceImageRef[] = boardController.board.edges
       .filter(edge => edge.to.nodeId === nodeId && edge.to.portId === "reference-in")
       .map(edge => boardController.board.nodes.find(item => item.id === edge.from.nodeId))
@@ -1146,6 +1149,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const handleExecuteGenerateNode = useCallback(async (nodeId: string) => {
     try {
       const { node, prompt: nodePrompt, references } = resolveGenerateNodeInputs(nodeId);
+      flushBoardTextForGenerateNode(boardController.board.nodes, boardController.board.edges, nodeId);
       const nextPrompt = nodePrompt.trim();
       if (!nextPrompt) {
         boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: "生成节点需要提示词输入" });

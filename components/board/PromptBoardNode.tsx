@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import BoardPromptTextarea from "@/components/board/BoardPromptTextarea";
+import BoardPromptTextarea, { type BoardPromptTextareaHandle } from "@/components/board/BoardPromptTextarea";
 import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import type { BoardPromptNode } from "@/lib/board";
@@ -18,36 +18,30 @@ interface PromptBoardNodeProps {
 }
 
 export default function PromptBoardNode({ node, onChange, references }: PromptBoardNodeProps) {
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const textareaRef = useRef<BoardPromptTextareaHandle | null>(null);
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
   const slashCommandRef = useRef<PromptTemplateSlashCommand | null>(null);
 
   const handleApplyPromptTemplate = (template: PromptTemplate, mode: PromptTemplateApplyMode): void => {
     const textarea = textareaRef.current;
+    const currentPrompt = textarea?.getValue() ?? node.prompt;
     const slashCommand = slashCommandRef.current;
     if (slashCommand && mode === "insert") {
-      const result = insertPromptTemplateText(node.prompt, template.positivePrompt, slashCommand.start, slashCommand.end);
-      onChange(result.prompt);
+      const result = insertPromptTemplateText(currentPrompt, template.positivePrompt, slashCommand.start, slashCommand.end);
+      textarea?.setValue(result.prompt);
       slashCommandRef.current = null;
-      window.requestAnimationFrame(() => {
-        textarea?.focus();
-        textarea?.setSelectionRange(result.caret, result.caret);
-      });
+      window.requestAnimationFrame(() => textareaRef.current?.focusAt(result.caret));
       return;
     }
     if (mode === "replace") {
-      onChange(applyPromptTemplateText(node.prompt, template.positivePrompt, mode));
+      textarea?.setValue(applyPromptTemplateText(currentPrompt, template.positivePrompt, mode));
       slashCommandRef.current = null;
       return;
     }
-    const selectionStart = textarea?.selectionStart ?? node.prompt.length;
-    const selectionEnd = textarea?.selectionEnd ?? node.prompt.length;
-    const result = insertPromptTemplateText(node.prompt, template.positivePrompt, selectionStart, selectionEnd);
-    onChange(result.prompt);
-    window.requestAnimationFrame(() => {
-      textarea?.focus();
-      textarea?.setSelectionRange(result.caret, result.caret);
-    });
+    const selection = textarea?.getSelectionRange() ?? { start: currentPrompt.length, end: currentPrompt.length };
+    const result = insertPromptTemplateText(currentPrompt, template.positivePrompt, selection.start, selection.end);
+    textarea?.setValue(result.prompt);
+    window.requestAnimationFrame(() => textareaRef.current?.focusAt(result.caret));
   };
 
   const handleSlashCommand = (command: PromptTemplateSlashCommand | null): void => {
@@ -58,6 +52,7 @@ export default function PromptBoardNode({ node, onChange, references }: PromptBo
   return (
     <BoardPromptTextarea
       ref={textareaRef}
+      commitId={node.id}
       value={node.prompt}
       onChange={onChange}
       onSlashCommand={handleSlashCommand}

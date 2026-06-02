@@ -12,6 +12,7 @@ export default function AgentBoardNode({ node, onSend, onUpdate }: AgentBoardNod
   return (
     <div className="flex h-full min-h-0 flex-col gap-2 p-3">
       <DebouncedBoardTextarea
+        commitId={node.id}
         value={node.instruction}
         onChange={onUpdate}
         className="nodrag nowheel min-h-0 flex-1 resize-none rounded-md imagine-board-input p-2 text-xs leading-5 outline-none placeholder:text-[var(--iw-faint)] focus:border-[var(--iw-border)]"

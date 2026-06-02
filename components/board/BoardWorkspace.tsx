@@ -53,6 +53,7 @@ import {
   buildGalleryTaskFingerprint,
   buildBoardGraphContentKey,
 } from "@/lib/board/graph-content-key";
+import { flushAllBoardText } from "@/lib/board/text-flush-registry";
 import {
   assetCompareReferenceUrl,
   buildBoardPromptReferences,
@@ -1165,12 +1166,14 @@ export default function BoardWorkspace({
       }
       if (key === "z" && event.shiftKey) {
         if (!canRedo) return;
+        flushAllBoardText();
         redo();
         event.preventDefault();
         return;
       }
       if (key === "z" && !event.shiftKey) {
         if (!canUndo) return;
+        flushAllBoardText();
         undo();
         event.preventDefault();
       }

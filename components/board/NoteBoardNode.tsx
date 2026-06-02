@@ -9,6 +9,7 @@ interface NoteBoardNodeProps {
 export default function NoteBoardNode({ node, onChange }: NoteBoardNodeProps) {
   return (
     <DebouncedBoardTextarea
+      commitId={node.id}
       value={node.body}
       onChange={onChange}
       className="h-full w-full resize-none bg-amber-50 p-3 text-sm leading-6 text-slate-950 outline-none imagine-board-node-note"

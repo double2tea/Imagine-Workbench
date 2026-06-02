@@ -1,11 +1,12 @@
 "use client";
 
-import { forwardRef, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import PromptReferenceDropdown from "@/components/reference/PromptReferenceDropdown";
 import { useDebouncedTextCommit } from "@/hooks/useDebouncedTextCommit";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import { getReferencePromptToken } from "@/hooks/useReferenceState";
+import { registerBoardTextCommit, unregisterBoardTextCommit } from "@/lib/board/text-flush-registry";
 import { detectPromptTemplateSlashCommand, type PromptTemplateSlashCommand } from "@/lib/prompt-templates";
 
 function detectAtSearch(value: string, caret: number): string | null {
@@ -14,8 +15,17 @@ function detectAtSearch(value: string, caret: number): string | null {
   return match ? match[1] : null;
 }
 
+export interface BoardPromptTextareaHandle {
+  flush: () => void;
+  focusAt: (caret: number) => void;
+  getSelectionRange: () => { end: number; start: number };
+  getValue: () => string;
+  setValue: (value: string) => void;
+}
+
 interface BoardPromptTextareaProps {
   className?: string;
+  commitId?: string;
   headerRight?: ReactNode;
   onChange: (value: string) => void;
   onSlashCommand?: (command: PromptTemplateSlashCommand | null) => void;
@@ -25,9 +35,10 @@ interface BoardPromptTextareaProps {
   value: string;
 }
 
-const BoardPromptTextarea = forwardRef<HTMLTextAreaElement, BoardPromptTextareaProps>(function BoardPromptTextarea(
+const BoardPromptTextarea = forwardRef<BoardPromptTextareaHandle, BoardPromptTextareaProps>(function BoardPromptTextarea(
   {
     className = "nodrag nowheel h-full w-full resize-none imagine-board-input p-3 pr-20 text-xs leading-5 outline-none placeholder:text-[var(--iw-faint)]",
+    commitId,
     headerRight,
     onChange,
     onSlashCommand,
@@ -42,10 +53,37 @@ const BoardPromptTextarea = forwardRef<HTMLTextAreaElement, BoardPromptTextareaP
   const shellRef = useRef<HTMLDivElement | null>(null);
   const [atSearch, setAtSearch] = useState<string | null>(null);
   const [dropdownAnchor, setDropdownAnchor] = useState<{ left: number; top: number; width: number } | null>(null);
-  const { flush, setValue, value: draftValue } = useDebouncedTextCommit(value, onChange);
+  const { flush, getValue, setValue, value: draftValue } = useDebouncedTextCommit(value, onChange);
   const displayValue = readOnly ? value : draftValue;
 
-  useImperativeHandle(forwardedRef, () => textareaRef.current as HTMLTextAreaElement, []);
+  useEffect(() => {
+    if (!commitId || readOnly) return;
+    registerBoardTextCommit(commitId, { flush, getValue: () => (readOnly ? value : getValue()) });
+    return () => unregisterBoardTextCommit(commitId);
+  }, [commitId, flush, getValue, readOnly, value]);
+
+  useImperativeHandle(
+    forwardedRef,
+    () => ({
+      flush,
+      getValue: () => (readOnly ? value : getValue()),
+      setValue: (next: string) => {
+        if (readOnly) return;
+        setValue(next);
+        flush();
+      },
+      getSelectionRange: () => ({
+        start: textareaRef.current?.selectionStart ?? displayValue.length,
+        end: textareaRef.current?.selectionEnd ?? displayValue.length,
+      }),
+      focusAt: (caret: number) => {
+        const element = textareaRef.current;
+        element?.focus();
+        element?.setSelectionRange(caret, caret);
+      },
+    }),
+    [displayValue.length, flush, getValue, readOnly, setValue, value],
+  );
 
   useLayoutEffect(() => {
     if (atSearch === null) {

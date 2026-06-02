@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { ImagePlus, Loader2, Play, Video, X } from "lucide-react";
-import BoardPromptTextarea from "@/components/board/BoardPromptTextarea";
+import BoardPromptTextarea, { type BoardPromptTextareaHandle } from "@/components/board/BoardPromptTextarea";
 import PreviewImage from "@/components/PreviewImage";
 import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
@@ -63,6 +63,7 @@ function statusSteps(status: GenerateNode["status"]): Array<{ key: string; label
 }
 
 export default function GenerateBoardNode({ inputSummary, node, onCancel, onExecute, onUpdate, references, taskSummary }: GenerateBoardNodeProps) {
+  const promptTextareaRef = useRef<BoardPromptTextareaHandle | null>(null);
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
   const slashCommandRef = useRef<PromptTemplateSlashCommand | null>(null);
   const isProcessing = node.status === "processing" || taskSummary?.status === "processing" || taskSummary?.status === "pending";
@@ -77,15 +78,25 @@ export default function GenerateBoardNode({ inputSummary, node, onCancel, onExec
     ? `${taskSummary.status === "pending" ? "排队" : "处理中"} ${taskSummary.progress}% / ${paramSummary}`
     : `${statusText(node)} / ${paramSummary}`;
   const handleApplyPromptTemplate = (template: PromptTemplate, mode: PromptTemplateApplyMode): void => {
+    const textarea = promptTextareaRef.current;
+    const currentPrompt = textarea?.getValue() ?? node.prompt;
     const slashCommand = slashCommandRef.current;
     if (slashCommand && mode === "insert") {
-      const result = insertPromptTemplateText(node.prompt, template.positivePrompt, slashCommand.start, slashCommand.end);
-      onUpdate({ prompt: result.prompt });
+      const result = insertPromptTemplateText(currentPrompt, template.positivePrompt, slashCommand.start, slashCommand.end);
+      textarea?.setValue(result.prompt);
+      slashCommandRef.current = null;
+      window.requestAnimationFrame(() => promptTextareaRef.current?.focusAt(result.caret));
+      return;
+    }
+    if (mode === "replace") {
+      textarea?.setValue(applyPromptTemplateText(currentPrompt, template.positivePrompt, mode));
       slashCommandRef.current = null;
       return;
     }
-    onUpdate({ prompt: applyPromptTemplateText(node.prompt, template.positivePrompt, mode) });
-    slashCommandRef.current = null;
+    const selection = textarea?.getSelectionRange() ?? { start: currentPrompt.length, end: currentPrompt.length };
+    const result = insertPromptTemplateText(currentPrompt, template.positivePrompt, selection.start, selection.end);
+    textarea?.setValue(result.prompt);
+    window.requestAnimationFrame(() => promptTextareaRef.current?.focusAt(result.caret));
   };
   const handleSlashCommand = (command: PromptTemplateSlashCommand | null): void => {
     slashCommandRef.current = command;
@@ -95,6 +106,8 @@ export default function GenerateBoardNode({ inputSummary, node, onCancel, onExec
     <div className="flex h-full min-h-0 flex-col gap-2 p-3">
       <div className="relative min-h-0 flex-1 overflow-visible">
         <BoardPromptTextarea
+          ref={promptTextareaRef}
+          commitId={promptPreview === null ? node.id : undefined}
           value={promptPreview ?? node.prompt}
           onChange={(prompt) => onUpdate({ prompt })}
           onSlashCommand={handleSlashCommand}

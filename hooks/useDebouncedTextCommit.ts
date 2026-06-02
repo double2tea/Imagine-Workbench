@@ -10,17 +10,23 @@ export function useDebouncedTextCommit(
   delayMs: number = DEFAULT_DELAY_MS,
 ): {
   flush: () => void;
+  getValue: () => string;
   setValue: (value: string) => void;
   value: string;
 } {
   const [draft, setDraft] = useState(committedValue);
   const timerRef = useRef<number | null>(null);
   const committedRef = useRef(committedValue);
+  const draftRef = useRef(committedValue);
   const onCommitRef = useRef(onCommit);
 
   useEffect(() => {
     onCommitRef.current = onCommit;
   }, [onCommit]);
+
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
 
   useLayoutEffect(() => {
     committedRef.current = committedValue;
@@ -34,11 +40,11 @@ export function useDebouncedTextCommit(
       window.clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    if (draft !== committedRef.current) {
-      committedRef.current = draft;
-      onCommitRef.current(draft);
+    if (draftRef.current !== committedRef.current) {
+      committedRef.current = draftRef.current;
+      onCommitRef.current(draftRef.current);
     }
-  }, [draft]);
+  }, []);
 
   const setValue = useCallback((next: string) => {
     setDraft(next);
@@ -54,11 +60,19 @@ export function useDebouncedTextCommit(
     }, delayMs);
   }, [delayMs]);
 
+  const getValue = useCallback(() => draft, [draft]);
+
   useEffect(() => () => {
     if (timerRef.current !== null) {
       window.clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    const pending = draftRef.current;
+    if (pending !== committedRef.current) {
+      committedRef.current = pending;
+      onCommitRef.current(pending);
     }
   }, []);
 
-  return { flush, setValue, value: draft };
+  return { flush, getValue, setValue, value: draft };
 }

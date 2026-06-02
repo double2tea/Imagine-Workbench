@@ -1,16 +1,24 @@
 "use client";
 
+import { useEffect } from "react";
 import { useDebouncedTextCommit } from "@/hooks/useDebouncedTextCommit";
+import { registerBoardTextCommit, unregisterBoardTextCommit } from "@/lib/board/text-flush-registry";
 
 interface DebouncedBoardTextareaProps {
   className: string;
+  commitId: string;
   onChange: (value: string) => void;
   placeholder: string;
   value: string;
 }
 
-export default function DebouncedBoardTextarea({ className, onChange, placeholder, value }: DebouncedBoardTextareaProps) {
-  const { flush, setValue, value: draftValue } = useDebouncedTextCommit(value, onChange);
+export default function DebouncedBoardTextarea({ className, commitId, onChange, placeholder, value }: DebouncedBoardTextareaProps) {
+  const { flush, getValue, setValue, value: draftValue } = useDebouncedTextCommit(value, onChange);
+
+  useEffect(() => {
+    registerBoardTextCommit(commitId, { flush, getValue });
+    return () => unregisterBoardTextCommit(commitId);
+  }, [commitId, flush, getValue]);
 
   return (
     <textarea
