@@ -474,8 +474,8 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
             <button
               type="button"
               onClick={onClearChat}
-              className="imagine-icon-button flex h-5 w-5 items-center justify-center rounded border border-[var(--iw-border)] text-[var(--iw-faint)] transition" data-action="danger"
               data-action="danger"
+              className="imagine-icon-button flex h-5 w-5 items-center justify-center rounded border border-[var(--iw-border)] text-[var(--iw-faint)] transition"
               title="清空对话"
             >
               <X className="h-2.5 w-2.5" />
@@ -550,8 +550,8 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
               <button
                 type="button"
                 onClick={onClearReference}
-                className="imagine-icon-button p-1 bg-[var(--iw-panel-soft)] text-[var(--iw-muted)] rounded-lg transition border border-[var(--iw-border)] cursor-pointer" data-action="danger"
                 data-action="danger"
+                className="imagine-icon-button p-1 bg-[var(--iw-panel-soft)] text-[var(--iw-muted)] rounded-lg transition border border-[var(--iw-border)] cursor-pointer"
                 title="取消引用"
               >
                 <X className="h-3.5 w-3.5" />
