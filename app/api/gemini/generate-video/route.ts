@@ -47,8 +47,12 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to generate video";
     console.error("Generate video endpoint failed:", err);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: videoErrorStatus(message) });
   }
+}
+
+function videoErrorStatus(message: string): number {
+  return message.includes("No available channel") ? 503 : 500;
 }
 
 function getRequestBodySizeError(req: NextRequest): string | null {

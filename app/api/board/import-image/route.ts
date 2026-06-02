@@ -7,6 +7,12 @@ const importImageBodySchema = z.object({
   url: z.string().url(),
 });
 
+export async function GET(req: NextRequest) {
+  const url = req.nextUrl.searchParams.get("url");
+  if (!url) return NextResponse.json({ error: "Image URL is required" }, { status: 400 });
+  return importImageUrl(url);
+}
+
 export async function POST(req: NextRequest) {
   try {
     const parsedBody = importImageBodySchema.safeParse(await req.json());
@@ -14,7 +20,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid image URL" }, { status: 400 });
     }
 
-    const url = new URL(parsedBody.data.url);
+    return importImageUrl(parsedBody.data.url);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Image import failed";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+async function importImageUrl(value: string): Promise<Response> {
+  try {
+    const url = new URL(value);
     if (url.protocol !== "http:" && url.protocol !== "https:") {
       return NextResponse.json({ error: "Only http(s) image URLs can be imported" }, { status: 400 });
     }
@@ -31,6 +46,7 @@ export async function POST(req: NextRequest) {
 
     return new NextResponse(response.body, {
       headers: {
+        "Cache-Control": "public, max-age=86400",
         "Content-Type": contentType,
       },
     });

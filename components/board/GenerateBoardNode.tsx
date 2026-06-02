@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { ImagePlus, Loader2, Play, Video, X } from "lucide-react";
 import BoardPromptTextarea, { type BoardPromptTextareaHandle } from "@/components/board/BoardPromptTextarea";
 import PreviewImage from "@/components/PreviewImage";
@@ -102,6 +102,14 @@ export default function GenerateBoardNode({ inputSummary, node, onCancel, onExec
     slashCommandRef.current = command;
     if (command) templatePickerRef.current?.open(command.search);
   };
+  const stopBoardControlPointer = (event: ReactPointerEvent<HTMLButtonElement>): void => {
+    event.stopPropagation();
+  };
+  const updateVariantCount = (event: ReactMouseEvent<HTMLButtonElement>, count: BoardGenerateVariantCount): void => {
+    event.stopPropagation();
+    if (node.variantCount === count) return;
+    onUpdate({ variantCount: count });
+  };
   return (
     <div className="flex h-full min-h-0 flex-col gap-2 p-3">
       <div className="relative min-h-0 flex-1 overflow-visible">
@@ -163,7 +171,8 @@ export default function GenerateBoardNode({ inputSummary, node, onCancel, onExec
             <button
               key={count}
               type="button"
-              onClick={() => onUpdate({ variantCount: count })}
+              onClick={(event) => updateVariantCount(event, count)}
+              onPointerDown={stopBoardControlPointer}
               disabled={isProcessing}
               className={`w-7 text-[10px] font-semibold transition ${
                 node.variantCount === count
