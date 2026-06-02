@@ -5,7 +5,7 @@ import { readFetchError } from "@/lib/client-fetch-error";
 import { readImageGenerationPayload } from "@/lib/client-image-response";
 import { clearAllDB, deleteFromDB, saveToDB, type StorageItem } from "@/lib/db";
 import { parseProviderModel, type AiProvider } from "@/lib/providers/model-catalog";
-import { getReferenceImagePayloadError } from "@/lib/reference-images";
+import { getReferenceImagePayloadError, prepareReferenceImageUrlForRequest } from "@/lib/reference-images";
 import { createVideoFrameStorageItem, getVideoFrameCaptureLabel, type CapturedVideoFrame } from "@/lib/video-frame";
 
 type NoticeType = "error" | "info" | "success";
@@ -91,6 +91,17 @@ function buildRetryRequestBody(item: StorageItem): RetryRequestBody {
   }
 
   return body;
+}
+
+async function prepareRetryReferenceImages(body: RetryRequestBody): Promise<void> {
+  if (body.referenceImages) {
+    const referenceImages = await Promise.all(body.referenceImages.map(prepareReferenceImageUrlForRequest));
+    body.referenceImages = referenceImages;
+    body.referenceImage = referenceImages[0];
+  }
+  if (body.images) {
+    body.images = await Promise.all(body.images.map(prepareReferenceImageUrlForRequest));
+  }
 }
 
 async function saveItemOrWarn(
@@ -284,6 +295,7 @@ export function useAssetActions({
 
     try {
       const retryRequestBody = buildRetryRequestBody(item);
+      await prepareRetryReferenceImages(retryRequestBody);
       const retryPayloadError = getReferenceImagePayloadError(
         retryRequestBody.referenceImages ?? retryRequestBody.images ?? [],
       );

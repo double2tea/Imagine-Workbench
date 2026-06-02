@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getVideoModelCapabilities, parseProviderModel } from "@/lib/providers/model-catalog";
 import { generateVideo } from "@/lib/providers/video";
 import { optionalText, requireText, resolveProviderConfig } from "@/lib/providers/utils";
-import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, getReferenceImagePayloadError } from "@/lib/reference-images";
+import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, getReferenceImagePayloadError, isImageDataUri } from "@/lib/reference-images";
 
 export const runtime = "edge";
 
@@ -29,6 +29,8 @@ export async function POST(req: NextRequest) {
     const config = resolveProviderConfig(req, parsed.provider);
     const capability = getVideoModelCapabilities(modelValue);
     const referenceImages = readReferenceImages(body.images, body.image, body.lastFrame);
+    const formatError = getReferenceImageFormatError(referenceImages);
+    if (formatError) return NextResponse.json({ error: formatError }, { status: 400 });
     const payloadError = getReferenceImagePayloadError(referenceImages);
     if (payloadError) return NextResponse.json({ error: payloadError }, { status: 413 });
     validateReferenceCount(referenceImages.length, capability.minReferenceImages, capability.maxReferenceImages);
@@ -52,6 +54,7 @@ export async function POST(req: NextRequest) {
 }
 
 function videoErrorStatus(message: string): number {
+  if (message.includes("Video reference images must be data:image/* base64 data URIs")) return 400;
   return message.includes("No available channel") ? 503 : 500;
 }
 
@@ -73,6 +76,12 @@ function readReferenceImages(images: unknown, image: unknown, lastFrame: unknown
   if (typeof image === "string" && image.length > 0) refs.push(image);
   if (typeof lastFrame === "string" && lastFrame.length > 0) refs.push(lastFrame);
   return refs;
+}
+
+function getReferenceImageFormatError(referenceImages: string[]): string | null {
+  return referenceImages.some(reference => !isImageDataUri(reference))
+    ? "Video reference images must be data:image/* base64 data URIs"
+    : null;
 }
 
 function validateReferenceCount(count: number, min: number, max: number): void {
