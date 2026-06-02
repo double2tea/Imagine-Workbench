@@ -18,7 +18,7 @@ import PromptBoardNode from "@/components/board/PromptBoardNode";
 import ReferenceGroupBoardNode from "@/components/board/ReferenceGroupBoardNode";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import type { StorageItem } from "@/lib/db";
-import { getModelCapability } from "@/lib/providers/model-catalog";
+import { BOARD_PORT_IDS, getBoardNodePortDefinitions } from "@/lib/board/ports";
 import type { CapturedVideoFrame } from "@/lib/video-frame";
 
 export interface BoardFlowNodeData extends Record<string, unknown> {
@@ -109,18 +109,31 @@ function nodeBodyOverflowClass(kind: BoardNodeModel["kind"]): string {
   return "overflow-hidden";
 }
 
-function supportsReferenceInput(node: BoardNodeModel): boolean {
-  if (node.kind !== "image-generate" && node.kind !== "video-generate") return false;
-  try {
-    return getModelCapability(node.model, node.kind === "image-generate" ? "image" : "video").supportsReferences;
-  } catch {
-    return false;
-  }
-}
-
 function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
   const { node } = data;
   const connectionInProgress = useConnection(connection => connection.inProgress);
+  const ports = getBoardNodePortDefinitions(node, { hasResultConnection: data.hasResultConnection });
+  const handleForPort = (port: (typeof ports)[number]) => {
+    if (port.id === BOARD_PORT_IDS.promptIn) {
+      return <BoardHandle key={port.id} id={port.id} type="target" position={Position.Left} kind={port.kind} label={port.label} top={78} zone="segment" zoneHeight={64} />;
+    }
+    if (port.id === BOARD_PORT_IDS.referenceIn) {
+      return <BoardHandle key={port.id} id={port.id} type="target" position={Position.Left} kind={port.kind} label={port.label} top={126} zone="segment" zoneHeight={64} />;
+    }
+    if (port.id === BOARD_PORT_IDS.agentContextIn) {
+      return <BoardHandle key={port.id} id={port.id} type="target" position={Position.Left} kind={port.kind} label={port.label} top={92} zone="segment" zoneHeight={72} />;
+    }
+    return (
+      <BoardHandle
+        key={port.id}
+        id={port.id}
+        type={port.direction === "output" ? "source" : "target"}
+        position={port.direction === "output" ? Position.Right : Position.Left}
+        kind={port.kind}
+        label={port.label}
+      />
+    );
+  };
 
   return (
     <article
@@ -130,35 +143,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
       data-selected={selected ? "true" : "false"}
       style={{ height: node.size.height, width: node.size.width }}
     >
-      {node.kind === "asset" && (
-        <>
-          <BoardHandle id="asset-in" type="target" position={Position.Left} kind="asset" label="资产输入" />
-          <BoardHandle id="asset-out" type="source" position={Position.Right} kind="asset" label="资产输出" />
-        </>
-      )}
-      {node.kind === "prompt" && (
-        <BoardHandle id="prompt-out" type="source" position={Position.Right} kind="prompt" label="提示输出" />
-      )}
-      {node.kind === "reference-group" && (
-        <>
-          <BoardHandle id="asset-in" type="target" position={Position.Left} kind="asset" label="图片输入" />
-          <BoardHandle id="asset-out" type="source" position={Position.Right} kind="asset" label="参考组输出" />
-        </>
-      )}
-      {(node.kind === "image-generate" || node.kind === "video-generate") && (
-        <>
-          <BoardHandle id="prompt-in" type="target" position={Position.Left} kind="prompt" label="提示输入" top={78} zone="segment" zoneHeight={64} />
-          {supportsReferenceInput(node) && (
-            <BoardHandle id="reference-in" type="target" position={Position.Left} kind="asset" label="参考输入" top={126} zone="segment" zoneHeight={64} />
-          )}
-          {(node.status === "complete" || Boolean(node.resultAssetId) || data.hasResultConnection) && (
-            <BoardHandle id="result-out" type="source" position={Position.Right} kind="result" label="结果输出" />
-          )}
-        </>
-      )}
-      {node.kind === "agent" && (
-        <BoardHandle id="agent-context-in" type="target" position={Position.Left} kind="agent" label="Agent 上下文输入" top={92} zone="segment" zoneHeight={72} />
-      )}
+      {ports.map(handleForPort)}
 
       <div className="flex h-9 items-center justify-between gap-2 rounded-t-lg imagine-board-node-header px-3">
         <h2 className="flex min-w-0 items-center gap-2 truncate text-xs font-semibold">

@@ -14,6 +14,15 @@ export {
 export { BOARD_UNDO_LIMIT, cloneBoardHistory, type BoardHistorySnapshot } from "@/lib/board/history";
 export { deleteBoardFromDB, getBoardFromDB, listBoardSummariesFromDB, saveBoardToDB } from "@/lib/board/persistence";
 export {
+  BOARD_PORT_IDS,
+  boardNodeSupportsReferenceInput,
+  filterValidBoardEdges,
+  getBoardNodePortDefinition,
+  getBoardNodePortDefinitions,
+  isValidBoardConnection,
+  resolveBoardConnectionKind,
+} from "@/lib/board/ports";
+export {
   assetCompareReferenceUrl,
   buildBoardPromptReferences,
   generateReferenceCandidates,

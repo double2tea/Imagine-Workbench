@@ -41,3 +41,7 @@ export function flushBoardTextForGenerateNode(
   if (promptEdge) nodeIds.add(promptEdge.from.nodeId);
   flushBoardText([...nodeIds]);
 }
+
+export function flushBoardTextForAgentNode(nodeId: string): void {
+  flushBoardText([nodeId]);
+}

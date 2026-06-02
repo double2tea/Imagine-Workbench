@@ -3,6 +3,7 @@ import type { BoardEdge, BoardNode, BoardReferenceGroupItem } from "@/lib/board/
 const FNV_OFFSET_BASIS = 2_166_136_261;
 const FNV_PRIME = 16_777_619;
 const INLINE_TEXT_LIMIT = 240;
+const HASH_SAMPLE_CHARS = 4_096;
 
 function fnv1aUpdate(hash: number, text: string): number {
   let next = hash;
@@ -13,11 +14,20 @@ function fnv1aUpdate(hash: number, text: string): number {
   return next >>> 0;
 }
 
+function hashSampledText(value: string): number {
+  if (value.length <= HASH_SAMPLE_CHARS * 2) {
+    return fnv1aUpdate(FNV_OFFSET_BASIS, value);
+  }
+  const head = value.slice(0, HASH_SAMPLE_CHARS);
+  const tail = value.slice(-HASH_SAMPLE_CHARS);
+  return fnv1aUpdate(fnv1aUpdate(FNV_OFFSET_BASIS, head), tail);
+}
+
 /** Compact stable digest for large text (e.g. data URLs, long prompts). */
 function fingerprintLargeText(value: string): string {
   if (value.length === 0) return "";
   if (value.length <= INLINE_TEXT_LIMIT) return value;
-  return `L${value.length}:H${fnv1aUpdate(FNV_OFFSET_BASIS, value).toString(16)}`;
+  return `L${value.length}:H${hashSampledText(value).toString(16)}`;
 }
 
 function digestParts(parts: string[]): string {
@@ -36,15 +46,17 @@ function serializeReferenceGroupItem(item: BoardReferenceGroupItem): string {
 function serializeNodeContent(node: BoardNode): string {
   switch (node.kind) {
     case "asset":
-      return `asset|${node.id}|${node.asset.assetId}|${node.asset.type}|${fingerprintLargeText(node.asset.url)}`;
+      return `asset|${node.id}|${node.title}|${node.size.width}x${node.size.height}|${node.asset.assetId}|${node.asset.type}|${fingerprintLargeText(node.asset.url)}`;
     case "prompt":
-      return `prompt|${node.id}|${fingerprintLargeText(node.prompt)}`;
+      return `prompt|${node.id}|${node.title}|${fingerprintLargeText(node.prompt)}`;
     case "reference-group":
-      return `refgroup|${node.id}|${node.references.map(serializeReferenceGroupItem).join(",")}`;
+      return `refgroup|${node.id}|${node.title}|${node.references.map(serializeReferenceGroupItem).join(",")}`;
     case "image-generate":
       return [
         "image-gen",
         node.id,
+        node.title,
+        `${node.size.width}x${node.size.height}`,
         node.model,
         node.status,
         fingerprintLargeText(node.prompt),
@@ -61,6 +73,8 @@ function serializeNodeContent(node: BoardNode): string {
       return [
         "video-gen",
         node.id,
+        node.title,
+        `${node.size.width}x${node.size.height}`,
         node.model,
         node.status,
         fingerprintLargeText(node.prompt),
@@ -73,9 +87,9 @@ function serializeNodeContent(node: BoardNode): string {
         fingerprintLargeText(node.errorMessage ?? ""),
       ].join("|");
     case "agent":
-      return `agent|${node.id}|${fingerprintLargeText(node.instruction)}`;
+      return `agent|${node.id}|${node.title}|${fingerprintLargeText(node.instruction)}`;
     case "note":
-      return `note|${node.id}|${fingerprintLargeText(node.body)}`;
+      return `note|${node.id}|${node.title}|${fingerprintLargeText(node.body)}`;
     default: {
       const exhaustive: never = node;
       return exhaustive;

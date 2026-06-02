@@ -57,7 +57,11 @@ import {
   type BoardVideoGenerateNode,
 } from "@/lib/board";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
-import { flushBoardTextForGenerateNode, getBoardTextDraft } from "@/lib/board/text-flush-registry";
+import {
+  flushBoardTextForAgentNode,
+  flushBoardTextForGenerateNode,
+  getBoardTextDraft,
+} from "@/lib/board/text-flush-registry";
 import { createVideoFrameStorageItem, getVideoFrameCaptureLabel, type CapturedVideoFrame } from "@/lib/video-frame";
 
 type NoticeType = "error" | "info" | "success";
@@ -1247,6 +1251,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       return;
     }
 
+    const instruction = (getBoardTextDraft(nodeId) ?? node.instruction).trim();
+    flushBoardTextForAgentNode(nodeId);
+
     const references = boardController.board.edges
       .filter(edge => edge.to.nodeId === nodeId && edge.to.portId === "agent-context-in")
       .map(edge => boardController.board.nodes.find(item => item.id === edge.from.nodeId))
@@ -1256,9 +1263,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     setAgentReferences(references);
     setAgentReferenceId(references[0]?.id ?? null);
     setAgentReferenceUrl(references[0]?.url ?? null);
-    setAgentInput(node.instruction);
+    setAgentInput(instruction);
     setIsAgentDockOpen(true);
-    if (node.instruction.trim()) void submitAgentPrompt(node.instruction, references);
+    if (instruction) void submitAgentPrompt(instruction, references);
   }, [
     boardController.board.edges,
     boardController.board.nodes,

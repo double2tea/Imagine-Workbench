@@ -79,7 +79,8 @@ import {
   type BoardSummary,
   type CreateAssetNodeInput,
 } from "@/lib/board";
-import { DEFAULT_VIDEO_MODEL, getModelCapability } from "@/lib/providers/model-catalog";
+import { BOARD_PORT_IDS, isValidBoardConnection as isValidBoardPortConnection } from "@/lib/board/ports";
+import { DEFAULT_VIDEO_MODEL } from "@/lib/providers/model-catalog";
 
 interface BoardWorkspaceProps {
   boardSummaries: BoardSummary[];
@@ -132,6 +133,7 @@ interface BoardNodeContextMenuState {
 
 const nodeTypes = { board: BoardNode };
 const DEFAULT_BOARD_IMAGE_MODEL = "modelscope:Qwen/Qwen-Image";
+const DEFAULT_BOARD_REFERENCE_IMAGE_MODEL = "modelscope:Qwen/Qwen-Image-Edit";
 
 function BoardEdgeComponent({
   data,
@@ -633,21 +635,28 @@ export default function BoardWorkspace({
 
   const flowNodes = useMemo<BoardFlowNode[]>(
     () =>
-      board.nodes.map(node => ({
-        id: node.id,
-        type: "board",
-        position: node.position,
-        width: node.size.width,
-        height: node.size.height,
-        selected: selectedNodeIdSet.has(node.id),
-        data: {
-          ...flowNodeDataById.get(node.id)!,
-          generateTaskSummary:
-            node.kind === "image-generate" || node.kind === "video-generate"
-              ? generateTaskByNodeId.get(node.id)
-              : undefined,
-        },
-      })),
+      board.nodes.map(node => {
+        const cachedData = flowNodeDataById.get(node.id);
+        if (!cachedData) {
+          throw new Error(`Missing flow data for board node ${node.id}`);
+        }
+        return {
+          id: node.id,
+          type: "board",
+          position: node.position,
+          width: node.size.width,
+          height: node.size.height,
+          selected: selectedNodeIdSet.has(node.id),
+          data: {
+            ...cachedData,
+            node,
+            generateTaskSummary:
+              node.kind === "image-generate" || node.kind === "video-generate"
+                ? generateTaskByNodeId.get(node.id)
+                : undefined,
+          },
+        };
+      }),
     [board.nodes, flowNodeDataById, generateTaskByNodeId, selectedNodeIdSet],
   );
 

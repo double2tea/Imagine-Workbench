@@ -42,6 +42,7 @@ import {
   type CreateReferenceGroupNodeInput,
 } from "@/lib/board";
 import { getImageModelCapabilities, getImageResolutionOptions, getVideoModelCapabilities } from "@/lib/providers/model-catalog";
+import { BOARD_PORT_IDS, filterValidBoardEdges, resolveBoardConnectionKind } from "@/lib/board/ports";
 
 export type BoardSaveStatus = "idle" | "loading" | "saving" | "saved" | "error";
 
@@ -66,10 +67,17 @@ export interface BoardStateController {
   restoreNodeWithEdges: (node: BoardNode, edges: BoardEdge[]) => void;
   addAgentNode: (input?: CreateAgentNodeInput) => string;
   addAssetNode: (input: CreateAssetNodeInput) => string;
+  addAssetNodeWithConnection: (input: CreateAssetNodeInput, from: BoardPortRef) => string;
   addGenerateNode: (input: CreateGenerateNodeInput) => string;
+  addGenerateNodeWithConnection: (
+    input: CreateGenerateNodeInput,
+    from: BoardPortRef,
+    targetPortId: typeof BOARD_PORT_IDS.promptIn | typeof BOARD_PORT_IDS.referenceIn,
+  ) => string;
   addNoteNode: (input?: CreateNoteNodeInput) => string;
   addPromptNode: (input?: CreatePromptNodeInput) => string;
   addReferenceGroupNode: (input?: CreateReferenceGroupNodeInput) => string;
+  addReferenceGroupNodeWithAsset: (input: CreateReferenceGroupNodeInput, assetNodeId: string) => string;
   addAssetToReferenceGroup: (assetNodeId: string, groupNodeId: string) => void;
   clearBoard: () => void;
   connectPorts: (from: BoardPortRef, to: BoardPortRef) => void;
@@ -273,6 +281,77 @@ function touchBoard(board: BoardDocument, nodes: BoardNode[] = board.nodes, edge
   };
 }
 
+function createAssetBoardNode(input: CreateAssetNodeInput, nodes: BoardNode[]): BoardNode {
+  const createdAt = nowIso();
+  return {
+    id: createBoardId("asset"),
+    kind: "asset",
+    title: input.title ?? input.asset.prompt,
+    asset: input.asset,
+    position: input.position ?? moveDefaultPosition(nodes),
+    size: input.size ?? DEFAULT_ASSET_NODE_SIZE,
+    createdAt,
+    updatedAt: createdAt,
+  };
+}
+
+function createReferenceGroupBoardNode(
+  input: CreateReferenceGroupNodeInput,
+  nodes: BoardNode[],
+): BoardReferenceGroupNode {
+  const createdAt = nowIso();
+  return {
+    id: createBoardId("ref_group"),
+    kind: "reference-group",
+    title: input.title ?? "Reference Group",
+    references: input.references ?? [],
+    position: input.position ?? moveDefaultPosition(nodes),
+    size: input.size ?? DEFAULT_REFERENCE_GROUP_NODE_SIZE,
+    createdAt,
+    updatedAt: createdAt,
+  };
+}
+
+function createGenerateBoardNode(input: CreateGenerateNodeInput, nodes: BoardNode[]): BoardImageGenerateNode | BoardVideoGenerateNode {
+  const createdAt = nowIso();
+  const nodeId = createBoardId(input.kind === "image-generate" ? "image_gen" : "video_gen");
+  const baseNode = {
+    id: nodeId,
+    title: input.title ?? (input.kind === "image-generate" ? "Image Generate" : "Video Generate"),
+    prompt: input.prompt ?? "",
+    model: input.model,
+    status: "idle" as BoardGenerationStatus,
+    variantCount: input.variantCount ?? DEFAULT_VARIANT_COUNT,
+    position: input.position ?? moveDefaultPosition(nodes),
+    size: input.size ?? DEFAULT_GENERATE_NODE_SIZE,
+    createdAt,
+    updatedAt: createdAt,
+  };
+
+  if (input.kind === "image-generate") {
+    const imageDefaults = defaultImageParams(input.model, input.aspectRatio);
+    return {
+      ...baseNode,
+      kind: "image-generate",
+      aspectRatio: input.aspectRatio || imageDefaults.aspectRatio,
+      customImageResolution: input.customImageResolution ?? imageDefaults.customImageResolution,
+      imageQuality: input.imageQuality ?? imageDefaults.imageQuality,
+      imageResolution: input.imageResolution ?? imageDefaults.imageResolution,
+      thinkingLevel: input.thinkingLevel ?? imageDefaults.thinkingLevel,
+    };
+  }
+
+  const videoDefaults = defaultVideoParams(input.model, input.aspectRatio);
+  return {
+    ...baseNode,
+    kind: "video-generate",
+    aspectRatio: input.aspectRatio || videoDefaults.aspectRatio,
+    videoDuration: input.videoDuration ?? videoDefaults.videoDuration,
+    videoPreset: input.videoPreset ?? videoDefaults.videoPreset,
+    videoResolution: input.videoResolution ?? videoDefaults.videoResolution,
+  };
+}
+
 function moveDefaultPosition(nodes: BoardNode[]): BoardPoint {
   return {
     x: DEFAULT_NODE_POSITION.x + nodes.length * 36,
@@ -280,12 +359,27 @@ function moveDefaultPosition(nodes: BoardNode[]): BoardPoint {
   };
 }
 
-function isCompatibleConnection(from: BoardPortRef, to: BoardPortRef): BoardEdgeKind {
-  if (from.portKind === "asset" && to.portKind === "asset") return "reference";
-  if (from.portKind === "prompt" && to.portKind === "prompt") return "prompt";
-  if (from.portKind === "result" && to.portKind === "asset") return "result";
-  if (from.portKind === "asset" && to.portKind === "agent") return "agent-context";
-  throw new Error(`Cannot connect ${from.portKind} output to ${to.portKind} input`);
+function createBoardEdge(nodes: BoardNode[], from: BoardPortRef, to: BoardPortRef): BoardEdge {
+  return {
+    id: createBoardId("edge"),
+    kind: resolveBoardConnectionKind(nodes, from, to),
+    from,
+    to,
+    createdAt: nowIso(),
+  };
+}
+
+function connectEdge(nodes: BoardNode[], edges: BoardEdge[], edge: BoardEdge): BoardEdge[] {
+  const withoutDuplicate = edges.filter(
+    currentEdge =>
+      !(
+        currentEdge.from.nodeId === edge.from.nodeId &&
+        currentEdge.from.portId === edge.from.portId &&
+        currentEdge.to.nodeId === edge.to.nodeId &&
+        currentEdge.to.portId === edge.to.portId
+      ),
+  );
+  return [...withoutDuplicate, edge];
 }
 
 export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateController {
@@ -444,23 +538,31 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
   }, [board, boardId, hasLoaded]);
 
   const addAssetNode = useCallback((input: CreateAssetNodeInput): string => {
-    const createdAt = nowIso();
-    const nodeId = createBoardId("asset");
-    const node: BoardNode = {
-      id: nodeId,
-      kind: "asset",
-      title: input.title ?? input.asset.prompt,
-      asset: input.asset,
-      position: input.position ?? moveDefaultPosition(board.nodes),
-      size: input.size ?? DEFAULT_ASSET_NODE_SIZE,
-      createdAt,
-      updatedAt: createdAt,
-    };
-
+    const node = createAssetBoardNode(input, board.nodes);
     mutateBoard(currentBoard => touchBoard(currentBoard, [...currentBoard.nodes, node]));
-    setSelectedNodeId(nodeId);
+    setSelectedNodeId(node.id);
     setSelectedEdgeId(null);
-    return nodeId;
+    return node.id;
+  }, [board.nodes, mutateBoard]);
+
+  const addAssetNodeWithConnection = useCallback((input: CreateAssetNodeInput, from: BoardPortRef): string => {
+    const node = createAssetBoardNode(input, board.nodes);
+    const to: BoardPortRef = { nodeId: node.id, portId: BOARD_PORT_IDS.assetIn, portKind: "asset" };
+    const edgeId = createBoardId("edge");
+    mutateBoard(currentBoard => {
+      const nextNodes = [...currentBoard.nodes, node];
+      const edge: BoardEdge = {
+        id: edgeId,
+        kind: resolveBoardConnectionKind(nextNodes, from, to),
+        from,
+        to,
+        createdAt: nowIso(),
+      };
+      return touchBoard(currentBoard, nextNodes, connectEdge(nextNodes, currentBoard.edges, edge));
+    });
+    setSelectedNodeId(null);
+    setSelectedEdgeId(edgeId);
+    return node.id;
   }, [board.nodes, mutateBoard]);
 
   const addPromptNode = useCallback((input: CreatePromptNodeInput = {}): string => {
@@ -484,68 +586,80 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
   }, [board.nodes, mutateBoard]);
 
   const addReferenceGroupNode = useCallback((input: CreateReferenceGroupNodeInput = {}): string => {
-    const createdAt = nowIso();
-    const nodeId = createBoardId("ref_group");
-    const node: BoardReferenceGroupNode = {
-      id: nodeId,
-      kind: "reference-group",
-      title: input.title ?? "Reference Group",
-      references: input.references ?? [],
-      position: input.position ?? moveDefaultPosition(board.nodes),
-      size: input.size ?? DEFAULT_REFERENCE_GROUP_NODE_SIZE,
-      createdAt,
-      updatedAt: createdAt,
-    };
-
+    const node = createReferenceGroupBoardNode(input, board.nodes);
     mutateBoard(currentBoard => touchBoard(currentBoard, [...currentBoard.nodes, node]));
-    setSelectedNodeId(nodeId);
+    setSelectedNodeId(node.id);
     setSelectedEdgeId(null);
-    return nodeId;
+    return node.id;
+  }, [board.nodes, mutateBoard]);
+
+  const addReferenceGroupNodeWithAsset = useCallback((input: CreateReferenceGroupNodeInput, assetNodeId: string): string => {
+    const node = createReferenceGroupBoardNode(input, board.nodes);
+    const from: BoardPortRef = { nodeId: assetNodeId, portId: BOARD_PORT_IDS.assetOut, portKind: "asset" };
+    const to: BoardPortRef = { nodeId: node.id, portId: BOARD_PORT_IDS.assetIn, portKind: "asset" };
+    const edgeId = createBoardId("edge");
+    mutateBoard(currentBoard => {
+      const assetNode = currentBoard.nodes.find(currentNode => currentNode.id === assetNodeId);
+      if (assetNode?.kind !== "asset" || assetNode.asset.type !== "image") {
+        throw new Error("参考组只支持图片资产");
+      }
+      const reference: BoardReferenceGroupItem = {
+        assetId: assetNode.asset.assetId,
+        model: assetNode.asset.model,
+        prompt: assetNode.asset.prompt,
+        role: "general",
+        url: assetNode.asset.url,
+      };
+      const nextNode: BoardReferenceGroupNode = { ...node, references: [reference, ...node.references] };
+      const nextNodes = [...currentBoard.nodes, nextNode];
+      const edge: BoardEdge = {
+        id: edgeId,
+        kind: resolveBoardConnectionKind(nextNodes, from, to),
+        from,
+        to,
+        createdAt: nowIso(),
+      };
+      return touchBoard(currentBoard, nextNodes, connectEdge(nextNodes, currentBoard.edges, edge));
+    });
+    setSelectedNodeId(null);
+    setSelectedEdgeId(edgeId);
+    return node.id;
   }, [board.nodes, mutateBoard]);
 
   const addGenerateNode = useCallback((input: CreateGenerateNodeInput): string => {
-    const createdAt = nowIso();
-    const nodeId = createBoardId(input.kind === "image-generate" ? "image_gen" : "video_gen");
-    const baseNode = {
-      id: nodeId,
-      title: input.title ?? (input.kind === "image-generate" ? "Image Generate" : "Video Generate"),
-      prompt: input.prompt ?? "",
-      model: input.model,
-      status: "idle" as BoardGenerationStatus,
-      variantCount: input.variantCount ?? DEFAULT_VARIANT_COUNT,
-      position: input.position ?? moveDefaultPosition(board.nodes),
-      size: input.size ?? DEFAULT_GENERATE_NODE_SIZE,
-      createdAt,
-      updatedAt: createdAt,
-    };
-    let node: BoardImageGenerateNode | BoardVideoGenerateNode;
-    if (input.kind === "image-generate") {
-      const imageDefaults = defaultImageParams(input.model, input.aspectRatio);
-      node = {
-        ...baseNode,
-        kind: "image-generate",
-        aspectRatio: input.aspectRatio || imageDefaults.aspectRatio,
-        customImageResolution: input.customImageResolution ?? imageDefaults.customImageResolution,
-        imageQuality: input.imageQuality ?? imageDefaults.imageQuality,
-        imageResolution: input.imageResolution ?? imageDefaults.imageResolution,
-        thinkingLevel: input.thinkingLevel ?? imageDefaults.thinkingLevel,
-      };
-    } else {
-      const videoDefaults = defaultVideoParams(input.model, input.aspectRatio);
-      node = {
-        ...baseNode,
-        kind: "video-generate",
-        aspectRatio: input.aspectRatio || videoDefaults.aspectRatio,
-        videoDuration: input.videoDuration ?? videoDefaults.videoDuration,
-        videoPreset: input.videoPreset ?? videoDefaults.videoPreset,
-        videoResolution: input.videoResolution ?? videoDefaults.videoResolution,
-      };
-    }
-
+    const node = createGenerateBoardNode(input, board.nodes);
     mutateBoard(currentBoard => touchBoard(currentBoard, [...currentBoard.nodes, node]));
-    setSelectedNodeId(nodeId);
+    setSelectedNodeId(node.id);
     setSelectedEdgeId(null);
-    return nodeId;
+    return node.id;
+  }, [board.nodes, mutateBoard]);
+
+  const addGenerateNodeWithConnection = useCallback((
+    input: CreateGenerateNodeInput,
+    from: BoardPortRef,
+    targetPortId: typeof BOARD_PORT_IDS.promptIn | typeof BOARD_PORT_IDS.referenceIn,
+  ): string => {
+    const node = createGenerateBoardNode(input, board.nodes);
+    const to: BoardPortRef = {
+      nodeId: node.id,
+      portId: targetPortId,
+      portKind: targetPortId === BOARD_PORT_IDS.promptIn ? "prompt" : "asset",
+    };
+    const edgeId = createBoardId("edge");
+    mutateBoard(currentBoard => {
+      const nextNodes = [...currentBoard.nodes, node];
+      const edge: BoardEdge = {
+        id: edgeId,
+        kind: resolveBoardConnectionKind(nextNodes, from, to),
+        from,
+        to,
+        createdAt: nowIso(),
+      };
+      return touchBoard(currentBoard, nextNodes, connectEdge(nextNodes, currentBoard.edges, edge));
+    });
+    setSelectedNodeId(null);
+    setSelectedEdgeId(edgeId);
+    return node.id;
   }, [board.nodes, mutateBoard]);
 
   const addAgentNode = useCallback((input: CreateAgentNodeInput = {}): string => {
@@ -639,11 +753,11 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
   }, [mutateBoard]);
 
   const reconnectEdge = useCallback((edgeId: string, from: BoardPortRef, to: BoardPortRef) => {
-    const kind = isCompatibleConnection(from, to);
     mutateBoard(currentBoard => {
       if (!currentBoard.edges.some(edge => edge.id === edgeId)) {
         throw new Error("连接不存在");
       }
+      const kind = resolveBoardConnectionKind(currentBoard.nodes, from, to);
       const withoutDuplicate = currentBoard.edges.filter(currentEdge => {
         if (currentEdge.id === edgeId) return true;
         return !(
@@ -668,9 +782,10 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
         throw new Error("节点已存在");
       }
       const nodeIds = new Set([...currentBoard.nodes.map(item => item.id), node.id]);
-      const restoredEdges = edges.filter(
+      const possibleEdges = edges.filter(
         edge => nodeIds.has(edge.from.nodeId) && nodeIds.has(edge.to.nodeId),
       );
+      const restoredEdges = filterValidBoardEdges([...currentBoard.nodes, node], possibleEdges);
       return touchBoard(currentBoard, [...currentBoard.nodes, node], [...currentBoard.edges, ...restoredEdges]);
     });
     setSelectedNodeId(node.id);
@@ -699,28 +814,15 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
   }, [duplicateNodes]);
 
   const connectPorts = useCallback((from: BoardPortRef, to: BoardPortRef) => {
-    const kind = isCompatibleConnection(from, to);
-    const createdAt = nowIso();
-    const edge: BoardEdge = {
-      id: createBoardId("edge"),
-      kind,
-      from,
-      to,
-      createdAt,
-    };
+    const edgeId = createBoardId("edge");
     mutateBoard(currentBoard => {
-      const withoutDuplicate = currentBoard.edges.filter(
-        currentEdge =>
-          !(
-            currentEdge.from.nodeId === from.nodeId &&
-            currentEdge.from.portId === from.portId &&
-            currentEdge.to.nodeId === to.nodeId &&
-            currentEdge.to.portId === to.portId
-          ),
-      );
-      return touchBoard(currentBoard, currentBoard.nodes, [...withoutDuplicate, edge]);
+      const edge: BoardEdge = {
+        ...createBoardEdge(currentBoard.nodes, from, to),
+        id: edgeId,
+      };
+      return touchBoard(currentBoard, currentBoard.nodes, connectEdge(currentBoard.nodes, currentBoard.edges, edge));
     });
-    setSelectedEdgeId(edge.id);
+    setSelectedEdgeId(edgeId);
     setSelectedNodeId(null);
   }, [mutateBoard]);
 
@@ -943,10 +1045,13 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       restoreNodeWithEdges,
       addAgentNode,
       addAssetNode,
+      addAssetNodeWithConnection,
       addGenerateNode,
+      addGenerateNodeWithConnection,
       addNoteNode,
       addPromptNode,
       addReferenceGroupNode,
+      addReferenceGroupNodeWithAsset,
       addAssetToReferenceGroup,
       clearBoard,
       connectPorts,
@@ -971,10 +1076,13 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     [
       addAgentNode,
       addAssetNode,
+      addAssetNodeWithConnection,
       addGenerateNode,
+      addGenerateNodeWithConnection,
       addNoteNode,
       addPromptNode,
       addReferenceGroupNode,
+      addReferenceGroupNodeWithAsset,
       addAssetToReferenceGroup,
       beginUndoGesture,
       endUndoGesture,
