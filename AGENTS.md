@@ -23,6 +23,7 @@ Current core surfaces:
 - `app/board/[boardId]/page.tsx`: specific persisted board route.
 - `app/api/board/import-image/route.ts`: board image import route for `data:image/*` base64 data URI capture into local assets.
 - `app/api/gemini/*`: server routes for generation, optimization, Agent Mode, async polling, and media download proxying.
+- `app/api/gemini/reference-image/route.ts`: narrow server-side fetch path for legacy provider image result URLs used as retry/reference inputs.
 - `app/api/gemini/agent/route.ts`: Agent Mode with tool-calling loop. Uses zod for request/response validation. Agent calls tools to query models, skills, and gallery assets before recommending actions. Model IDs are validated server-side against the catalog.
 - `app/api/gemini/agent/tools.ts`: Agent tool definitions and executors. Tools: `query_models`, `get_skill_info`, `get_gallery_assets`, `get_prompt_blueprint`. Tool arg schemas defined with zod, JSON Schema introspected for OpenAI tool definitions.
 - `app/api/gemini/agent/skills.ts`: Skill registry (static descriptions). Agent activates skills at runtime via tools rather than a pre-routed LLM call.
@@ -89,7 +90,7 @@ Never hardcode provider strings (`"12ai"`, `"grok2api"`, `"xstx"`) in enumeratio
 
 Keep API routes thin: parse body, resolve provider config, call provider adapter, return response.
 
-Video reference image API/provider boundaries accept `data:image/*` base64 data URIs only. Generated remote image results must be downloaded by the image route before client storage, and board references should resolve the latest asset-store URL by asset ID before submission.
+Video reference image API/provider boundaries accept `data:image/*` base64 data URIs only. Generated remote image results must be downloaded by the image route before client storage, and board references should resolve the latest asset-store URL by asset ID before submission. Legacy remote provider image URLs may only be localized through the narrow `/api/gemini/reference-image` route.
 
 ### ModelScope and RunningHub
 

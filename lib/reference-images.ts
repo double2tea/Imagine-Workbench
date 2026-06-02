@@ -71,9 +71,9 @@ export async function prepareReferenceImageUrlForRequest(url: string): Promise<s
   if (isImageDataUri(url)) return url;
   if (url.startsWith("data:")) throw new Error("参考图必须是 data:image/* base64 图片");
 
-  const response = await fetch(url);
+  const response = await fetchReferenceImageUrl(url);
   if (!response.ok) {
-    throw new Error(`参考图读取失败：HTTP ${response.status}`);
+    throw new Error(await readReferenceImageFetchError(response));
   }
 
   const blob = await response.blob();
@@ -81,6 +81,30 @@ export async function prepareReferenceImageUrlForRequest(url: string): Promise<s
     throw new Error("参考图必须是图片文件");
   }
   return compressReferenceImageBlob(blob);
+}
+
+async function fetchReferenceImageUrl(url: string): Promise<Response> {
+  if (url.startsWith("blob:")) return fetch(url);
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return fetch("/api/gemini/reference-image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+  }
+  throw new Error("参考图必须是 data:image/*、blob: 或受支持的图片结果地址");
+}
+
+async function readReferenceImageFetchError(response: Response): Promise<string> {
+  try {
+    const data: unknown = await response.json();
+    if (typeof data === "object" && data !== null && "error" in data) {
+      const error = (data as { error?: unknown }).error;
+      if (typeof error === "string" && error.trim().length > 0) return error;
+    }
+  } catch {
+  }
+  return `参考图读取失败：HTTP ${response.status}`;
 }
 
 async function compressReferenceImageBlob(blob: Blob): Promise<string> {
