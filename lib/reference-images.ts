@@ -63,6 +63,21 @@ export async function compressReferenceImageDataUrl(dataUrl: string): Promise<st
   return compressReferenceImageBlob(blob);
 }
 
+export async function prepareReferenceImageUrlForRequest(url: string): Promise<string> {
+  if (url.startsWith("data:") || /^https?:\/\//.test(url)) return url;
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`参考图读取失败：HTTP ${response.status}`);
+  }
+
+  const blob = await response.blob();
+  if (!blob.type.startsWith("image/")) {
+    throw new Error("参考图必须是图片文件");
+  }
+  return compressReferenceImageBlob(blob);
+}
+
 async function compressReferenceImageBlob(blob: Blob): Promise<string> {
   const bitmap = await createImageBitmap(blob);
   try {

@@ -4,7 +4,7 @@ import { readImageGenerationPayload } from "@/lib/client-image-response";
 import { saveToDB, type GenerationRequestSnapshot, type StorageItem } from "@/lib/db";
 import { buildPromptWithReferenceMap } from "@/hooks/useReferenceState";
 import { getVideoModelCapabilities, type VideoReferenceMode } from "@/lib/providers/model-catalog";
-import { getReferenceImagePayloadError } from "@/lib/reference-images";
+import { getReferenceImagePayloadError, prepareReferenceImageUrlForRequest } from "@/lib/reference-images";
 
 type NoticeType = "error" | "info" | "success";
 
@@ -336,7 +336,14 @@ export function useGenerationActions({
       requestVideoCapabilities.referenceMode,
       requestVideoCapabilities.maxReferenceImages,
     );
-    const videoPayloadError = getReferenceImagePayloadError(videoReferenceUrls);
+    let videoReferencePayloads: string[];
+    try {
+      videoReferencePayloads = await Promise.all(videoReferenceUrls.map(prepareReferenceImageUrlForRequest));
+    } catch (error) {
+      pushWorkspaceNotice("error", toErrorMessage(error, "参考图读取失败"));
+      return false;
+    }
+    const videoPayloadError = getReferenceImagePayloadError(videoReferencePayloads);
     if (videoPayloadError) {
       pushWorkspaceNotice("error", videoPayloadError);
       return false;
@@ -350,7 +357,7 @@ export function useGenerationActions({
       videoDurationSeconds: requestVideoDuration,
       videoPreset: requestVideoPreset,
       videoResolution: requestVideoResolution,
-      referenceImages: videoReferenceUrls,
+      referenceImages: videoReferencePayloads,
     };
 
     const tempId = makeClientId("temp_vid");
@@ -381,7 +388,7 @@ export function useGenerationActions({
         signal: controller.signal,
         body: JSON.stringify({
           prompt: generationRequest.prompt,
-          images: videoReferenceUrls,
+          images: videoReferencePayloads,
           aspectRatio: generationRequest.aspectRatio,
           durationSeconds: generationRequest.videoDurationSeconds,
           preset: generationRequest.videoPreset,

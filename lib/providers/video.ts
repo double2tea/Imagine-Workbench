@@ -71,10 +71,10 @@ export async function generateVideo(config: ProviderConfig, input: GenerateVideo
     if (input.preset) form.set("preset", input.preset);
   }
 
-  input.referenceImages.forEach((reference, index) => {
-    const blob = dataUriToBlob(reference.dataUri);
+  for (const [index, reference] of input.referenceImages.entries()) {
+    const blob = await referenceToBlob(reference);
     form.append("input_reference[]", blob, referenceFileName(index, blob.type));
-  });
+  }
 
   const isTwelveAiOmni = config.provider === "12ai" && input.model === TWELVE_AI_OMNI_VIDEO_MODEL;
   const response = await postForm<VideoCreateResponse>(
@@ -190,6 +190,22 @@ function referenceFileName(index: number, mimeType: string): string {
   if (mimeType === "image/jpeg") return `reference_${index + 1}.jpg`;
   if (mimeType === "image/webp") return `reference_${index + 1}.webp`;
   return `reference_${index + 1}.png`;
+}
+
+async function referenceToBlob(reference: GenerateVideoInput["referenceImages"][number]): Promise<Blob> {
+  const source = reference.dataUri;
+  if (source.startsWith("data:")) return dataUriToBlob(source);
+
+  const response = await fetch(source);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch video reference image: HTTP ${response.status}`);
+  }
+
+  const blob = await response.blob();
+  if (!blob.type.startsWith("image/")) {
+    throw new Error("Video reference must resolve to an image file");
+  }
+  return blob;
 }
 
 function readVideoUrl(value: VideoStatusResponse): string | undefined {
