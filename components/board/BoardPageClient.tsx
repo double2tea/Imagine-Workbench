@@ -357,7 +357,7 @@ function activeSourceItemForNode(items: StorageItem[], sourceBoardNodeId: string
 }
 
 function boardRoute(id: string): string {
-  return id === DEFAULT_BOARD_ID ? "/board" : `/board/${encodeURIComponent(id)}`;
+  return id === DEFAULT_BOARD_ID ? "/board" : `/board?boardId=${encodeURIComponent(id)}`;
 }
 
 function boardSummaryFromDocument(board: BoardDocument): BoardSummary {
@@ -372,7 +372,15 @@ function boardSummaryFromDocument(board: BoardDocument): BoardSummary {
 
 export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps) {
   const router = useRouter();
-  const boardController = useBoardState(boardId);
+  const [resolvedBoardId, setResolvedBoardId] = useState(boardId);
+  useEffect(() => {
+    const queryBoardId = new URLSearchParams(window.location.search).get("boardId");
+    const nextBoardId = boardId !== DEFAULT_BOARD_ID ? boardId : queryBoardId?.trim() || DEFAULT_BOARD_ID;
+    if (nextBoardId === resolvedBoardId) return;
+    const frame = window.requestAnimationFrame(() => setResolvedBoardId(nextBoardId));
+    return () => window.cancelAnimationFrame(frame);
+  }, [boardId, resolvedBoardId]);
+  const boardController = useBoardState(resolvedBoardId);
   const [items, setItems] = useState<StorageItem[]>([]);
   const [boardSummaries, setBoardSummaries] = useState<BoardSummary[]>([]);
   const [, setMode] = useState<BoardMode>("image");
@@ -1424,10 +1432,12 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     const nextBoard = createEmptyBoard(nextId, `画板 ${nextIndex}`);
     await saveBoardToDB(nextBoard);
     setBoardSummaries(prev => [boardSummaryFromDocument(nextBoard), ...prev]);
+    setResolvedBoardId(nextId);
     router.push(boardRoute(nextId));
   }, [boardSummaries.length, router]);
 
   const selectBoardPage = useCallback((nextBoardId: string) => {
+    setResolvedBoardId(nextBoardId);
     router.push(boardRoute(nextBoardId));
   }, [router]);
 
@@ -1450,7 +1460,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     await deleteBoardFromDB(boardController.board.id);
     const nextBoard = boardSummaries.find(item => item.id !== boardController.board.id);
     setBoardSummaries(prev => prev.filter(item => item.id !== boardController.board.id));
-    router.push(boardRoute(nextBoard?.id ?? DEFAULT_BOARD_ID));
+    const nextBoardId = nextBoard?.id ?? DEFAULT_BOARD_ID;
+    setResolvedBoardId(nextBoardId);
+    router.push(boardRoute(nextBoardId));
   }, [boardController.board.id, boardController.board.title, boardSummaries, pushWorkspaceNotice, router]);
 
   const toggleThemeMode = () => {
