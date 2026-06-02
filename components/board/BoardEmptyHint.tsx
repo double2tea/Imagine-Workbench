@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const BOARD_HANDLES_HINT_KEY = "imagine_board_handles_hint_seen";
 
@@ -10,7 +10,14 @@ function readHandlesHintSeen(): boolean {
 }
 
 export default function BoardEmptyHint() {
-  const [handlesHintSeen, setHandlesHintSeen] = useState(readHandlesHintSeen);
+  const [handlesHintSeen, setHandlesHintSeen] = useState(true);
+
+  useEffect(() => {
+    const restoreTimer = window.setTimeout(() => {
+      setHandlesHintSeen(readHandlesHintSeen());
+    }, 0);
+    return () => window.clearTimeout(restoreTimer);
+  }, []);
 
   const dismissHandlesHint = () => {
     window.localStorage.setItem(BOARD_HANDLES_HINT_KEY, "1");
