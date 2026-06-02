@@ -95,11 +95,7 @@ export default function ImageGenerationPanel({
   return (
     <div className="flex flex-col gap-3.5 animate-fade-in">
       <div>
-<<<<<<< HEAD
-        <label className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold text-slate-300">
-=======
         <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-[var(--iw-muted)]">
->>>>>>> 5aa3ad0 (feat(uiux): U-PR3 Typography Unification, Spacing Audit, and State/Label Consistency Across Surfaces (design doc /tmp/grok-design-doc-b94818e8.md plan e62945a8))
           <Paintbrush className="h-3.5 w-3.5 text-blue-300" />
           艺术预设
         </label>
