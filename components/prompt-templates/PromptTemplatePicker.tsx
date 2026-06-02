@@ -28,15 +28,21 @@ const accentClass: Record<NonNullable<PromptTemplatePickerProps["accent"]>, stri
   violet: "border-violet-400/25 bg-violet-500/12 text-violet-200 hover:bg-violet-500/18",
 };
 
-const panelWidth = 480;
+const panelWidth = 420;
 const panelGap = 8;
+const panelMaxHeight = 440;
 
 function getPanelPosition(anchor: HTMLButtonElement): { left: number; top: number } {
   const rect = anchor.getBoundingClientRect();
   const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const belowTop = rect.bottom + panelGap;
+  const top = belowTop + panelMaxHeight > viewportHeight - panelGap
+    ? Math.max(panelGap, rect.top - panelMaxHeight - panelGap)
+    : belowTop;
   return {
     left: Math.max(panelGap, Math.min(rect.right - panelWidth, viewportWidth - panelWidth - panelGap)),
-    top: rect.bottom + panelGap,
+    top,
   };
 }
 
@@ -105,94 +111,106 @@ const PromptTemplatePicker = forwardRef<PromptTemplatePickerHandle, PromptTempla
   const panel = isOpen && position
     ? createPortal(
       <div
-        className="fixed z-[120] grid w-[min(30rem,calc(100vw-2rem))] grid-cols-1 gap-2 rounded-xl border border-[var(--iw-border)] bg-[var(--iw-panel)] p-3 shadow-2xl lg:grid-cols-[11rem_minmax(0,1fr)]"
+        className="fixed z-[120] flex max-h-[min(27.5rem,calc(100vh-1rem))] w-[min(26.25rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-lg border border-[var(--iw-border)] bg-[var(--iw-surface-raised)] shadow-[0_22px_60px_rgba(15,23,42,0.28)] backdrop-blur-xl"
         style={{ left: position.left, top: position.top }}
       >
-        <div className="lg:col-span-2 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 text-xs font-semibold text-[var(--iw-text)]">
+        <div className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-[var(--iw-border)] px-3">
+          <div className="flex min-w-0 items-center gap-2 text-xs font-semibold text-[var(--iw-text)]">
             <BookOpenText className="h-4 w-4 text-[var(--iw-muted)]" />
-            <span>提示词模板库</span>
+            <span className="truncate">提示词模板库</span>
           </div>
           <button
             type="button"
             onClick={() => setIsOpen(false)}
-            className="flex h-7 w-7 items-center justify-center rounded-md border border-transparent text-[var(--iw-muted)] hover:border-[var(--iw-border)] hover:bg-[var(--iw-panel-soft)] hover:text-[var(--iw-text)]"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-transparent text-[var(--iw-muted)] hover:border-[var(--iw-border)] hover:bg-[var(--iw-panel-soft)] hover:text-[var(--iw-text)]"
             aria-label="关闭提示词模板库"
           >
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
 
-        <label className="lg:col-span-2 flex h-8 items-center gap-2 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 text-[var(--iw-muted)]">
-          <Search className="h-3.5 w-3.5" />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="搜索模板"
-            className="min-w-0 flex-1 border-0 bg-transparent text-xs text-[var(--iw-text)] outline-none placeholder:text-[var(--iw-faint)]"
-          />
-        </label>
+        <div className="grid min-h-0 flex-1 grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-2 p-3">
+          <label className="flex h-9 items-center gap-2 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2.5 text-[var(--iw-muted)]">
+            <Search className="h-3.5 w-3.5 shrink-0" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="搜索模板"
+              className="min-w-0 flex-1 border-0 bg-transparent text-xs text-[var(--iw-text)] outline-none placeholder:text-[var(--iw-faint)]"
+            />
+          </label>
 
-        <div className="no-scrollbar flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
-          <button
-            type="button"
-            onClick={() => setCategoryId("all")}
-            data-active={categoryId === "all"}
-            className="h-8 shrink-0 rounded-lg border border-[var(--iw-border)] px-2 text-left text-[11px] font-semibold text-[var(--iw-muted)] data-[active=true]:bg-[var(--iw-panel-soft)] data-[active=true]:text-[var(--iw-text)]"
-          >
-            全部
-          </button>
-          {PROMPT_TEMPLATE_CATEGORIES.map(category => (
+          <div className="no-scrollbar flex gap-1 overflow-x-auto">
             <button
-              key={category.id}
               type="button"
-              onClick={() => setCategoryId(category.id)}
-              data-active={categoryId === category.id}
-              className="h-8 shrink-0 rounded-lg border border-[var(--iw-border)] px-2 text-left text-[11px] font-semibold text-[var(--iw-muted)] data-[active=true]:bg-[var(--iw-panel-soft)] data-[active=true]:text-[var(--iw-text)]"
+              onClick={() => setCategoryId("all")}
+              data-active={categoryId === "all"}
+              className="h-7 shrink-0 rounded-md border border-transparent px-2.5 text-[11px] font-semibold text-[var(--iw-muted)] transition hover:bg-[var(--iw-panel-soft)] data-[active=true]:border-blue-400/25 data-[active=true]:bg-blue-500/12 data-[active=true]:text-blue-500"
             >
-              {category.label}
+              全部
             </button>
-          ))}
-        </div>
-
-        <div className="grid min-h-0 gap-2">
-          <div className="no-scrollbar flex max-h-36 flex-col gap-1 overflow-auto">
-            {visibleTemplates.map(template => (
+            {PROMPT_TEMPLATE_CATEGORIES.map(category => (
               <button
-                key={template.id}
+                key={category.id}
                 type="button"
-                onClick={() => setSelectedId(template.id)}
-                data-active={selectedTemplate?.id === template.id}
-                className="rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-2 text-left transition data-[active=true]:border-blue-400/35 data-[active=true]:bg-blue-500/10"
+                onClick={() => setCategoryId(category.id)}
+                data-active={categoryId === category.id}
+                className="h-7 shrink-0 rounded-md border border-transparent px-2.5 text-[11px] font-semibold text-[var(--iw-muted)] transition hover:bg-[var(--iw-panel-soft)] data-[active=true]:border-blue-400/25 data-[active=true]:bg-blue-500/12 data-[active=true]:text-blue-500"
               >
-                <span className="block truncate text-xs font-semibold text-[var(--iw-text)]">{template.title}</span>
-                <span className="mt-0.5 block truncate text-[10px] text-[var(--iw-muted)]">{template.scene}</span>
+                {category.label}
               </button>
             ))}
-            {visibleTemplates.length === 0 && (
-              <div className="rounded-lg border border-dashed border-[var(--iw-border)] p-3 text-center text-[11px] text-[var(--iw-muted)]">
-                没有匹配模板
+          </div>
+
+          <div className="grid min-h-0 grid-cols-[9.5rem_minmax(0,1fr)] gap-2">
+            <div className="no-scrollbar min-h-0 overflow-auto rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-1">
+              {visibleTemplates.map(template => (
+                <button
+                  key={template.id}
+                  type="button"
+                  onClick={() => setSelectedId(template.id)}
+                  data-active={selectedTemplate?.id === template.id}
+                  className="w-full rounded-md px-2 py-1.5 text-left transition hover:bg-[var(--iw-panel)] data-[active=true]:bg-blue-500/12"
+                >
+                  <span className="block truncate text-[11px] font-semibold text-[var(--iw-text)]">{template.title}</span>
+                  <span className="mt-0.5 block truncate text-[9px] text-[var(--iw-muted)]">{template.scene}</span>
+                </button>
+              ))}
+              {visibleTemplates.length === 0 && (
+                <div className="rounded-md border border-dashed border-[var(--iw-border)] p-3 text-center text-[11px] text-[var(--iw-muted)]">
+                  没有匹配模板
+                </div>
+              )}
+            </div>
+
+            <div className="min-h-0 overflow-hidden rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)]">
+              <div className="border-b border-[var(--iw-border)] px-3 py-2">
+                <p className="truncate text-xs font-semibold text-[var(--iw-text)]">
+                  {selectedTemplate?.title ?? "选择模板"}
+                </p>
+                {selectedTemplate?.parameterHint && (
+                  <p className="mt-0.5 truncate text-[9px] text-[var(--iw-muted)]">{selectedTemplate.parameterHint}</p>
+                )}
               </div>
-            )}
+              <div className="no-scrollbar max-h-44 overflow-auto px-3 py-2">
+                <p className="whitespace-pre-wrap text-[11px] leading-5 text-[var(--iw-text)]">
+                  {selectedTemplate?.positivePrompt ?? "选择模板后预览内容"}
+                </p>
+                {selectedTemplate?.negativePrompt && (
+                  <p className="mt-2 border-t border-[var(--iw-border)] pt-2 text-[10px] leading-4 text-[var(--iw-muted)]">
+                    反向：{selectedTemplate.negativePrompt}
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
 
-          <div className="rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-2">
-            <p className="line-clamp-4 whitespace-pre-wrap text-[11px] leading-5 text-[var(--iw-text)]">
-              {selectedTemplate?.positivePrompt ?? "选择模板后预览内容"}
-            </p>
-            {selectedTemplate?.negativePrompt && (
-              <p className="mt-2 line-clamp-2 text-[10px] leading-4 text-[var(--iw-muted)]">
-                反向：{selectedTemplate.negativePrompt}
-              </p>
-            )}
-          </div>
-
-          <div className="flex justify-end gap-2">
+          <div className="flex shrink-0 justify-end gap-2 border-t border-[var(--iw-border)] pt-2">
             <button
               type="button"
               onClick={() => applyTemplate("insert")}
               disabled={!selectedTemplate}
-              className="flex h-8 items-center gap-1.5 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2.5 text-[11px] font-semibold text-[var(--iw-text)] hover:bg-[var(--iw-panel)] disabled:text-[var(--iw-faint)]"
+              className="flex h-8 items-center gap-1.5 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-3 text-[11px] font-semibold text-[var(--iw-text)] hover:bg-[var(--iw-panel)] disabled:text-[var(--iw-faint)]"
             >
               <CornerDownLeft className="h-3.5 w-3.5" />
               插入
@@ -201,7 +219,7 @@ const PromptTemplatePicker = forwardRef<PromptTemplatePickerHandle, PromptTempla
               type="button"
               onClick={() => applyTemplate("replace")}
               disabled={!selectedTemplate}
-              className="flex h-8 items-center gap-1.5 rounded-md bg-blue-600 px-2.5 text-[11px] font-semibold text-white hover:bg-blue-500 disabled:bg-[var(--iw-panel-soft)] disabled:text-[var(--iw-faint)]"
+              className="flex h-8 items-center gap-1.5 rounded-md bg-blue-600 px-3 text-[11px] font-semibold text-white hover:bg-blue-500 disabled:bg-[var(--iw-panel-soft)] disabled:text-[var(--iw-faint)]"
             >
               <WandSparkles className="h-3.5 w-3.5" />
               替换
