@@ -85,6 +85,7 @@ export interface BoardStateController {
   updateAgentInstruction: (nodeId: string, instruction: string) => void;
   updateGenerateNode: (nodeId: string, input: BoardGenerateNodeUpdate) => void;
   updateNodePosition: (nodeId: string, position: BoardPoint) => void;
+  updateNodesPositions: (updates: Array<{ nodeId: string; position: BoardPoint }>) => void;
   updateNodeSize: (nodeId: string, size: BoardSize) => void;
   updateNoteBody: (nodeId: string, body: string) => void;
   updatePromptNode: (nodeId: string, prompt: string) => void;
@@ -804,16 +805,25 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     }), { skipUndo: true });
   }, [mutateBoard]);
 
-  const updateNodePosition = useCallback((nodeId: string, position: BoardPoint) => {
+  const updateNodesPositions = useCallback((updates: Array<{ nodeId: string; position: BoardPoint }>) => {
+    if (updates.length === 0) return;
+    const positionById = new Map(updates.map(update => [update.nodeId, update.position]));
     const updatedAt = nowIso();
     mutateBoard(
       currentBoard => touchBoard(
         currentBoard,
-        currentBoard.nodes.map(node => (node.id === nodeId ? { ...node, position, updatedAt } : node)),
+        currentBoard.nodes.map(node => {
+          const position = positionById.get(node.id);
+          return position ? { ...node, position, updatedAt } : node;
+        }),
       ),
       { skipUndo: true },
     );
   }, [mutateBoard]);
+
+  const updateNodePosition = useCallback((nodeId: string, position: BoardPoint) => {
+    updateNodesPositions([{ nodeId, position }]);
+  }, [updateNodesPositions]);
 
   const updateNodeSize = useCallback((nodeId: string, size: BoardSize) => {
     const updatedAt = nowIso();
@@ -912,6 +922,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       updateAgentInstruction,
       updateGenerateNode,
       updateNodePosition,
+      updateNodesPositions,
       updateNodeSize,
       updateNoteBody,
       updatePromptNode,
@@ -952,6 +963,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       updateAgentInstruction,
       updateGenerateNode,
       updateNodePosition,
+      updateNodesPositions,
       updateNodeSize,
       undo,
       updateNoteBody,

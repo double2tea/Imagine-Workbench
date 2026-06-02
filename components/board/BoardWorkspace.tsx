@@ -472,7 +472,7 @@ export default function BoardWorkspace({
     updateReferenceGroupItemRole,
     updateAgentInstruction,
     updateGenerateNode,
-    updateNodePosition,
+    updateNodesPositions,
     updateNoteBody,
     updatePromptNode,
   } = controller;
@@ -503,6 +503,81 @@ export default function BoardWorkspace({
     }
   }, [onConnectionError, restoreNodeWithEdges, trashedNodes]);
 
+  const selectedNodeIdSet = useMemo(() => new Set(selectedNodeIds), [selectedNodeIds]);
+
+  const flowNodeDataById = useMemo(() => {
+    const dataById = new Map<string, BoardFlowNode["data"]>();
+    for (const node of board.nodes) {
+      dataById.set(node.id, {
+        generateInputSummary: generateInputSummaryForNode(node, board.nodes, board.edges),
+        hasResultConnection: hasResultConnection(node.id, board.edges),
+        node,
+        generateReferences:
+          node.kind === "image-generate" || node.kind === "video-generate"
+            ? buildBoardPromptReferences({
+              nodes: board.nodes,
+              edges: board.edges,
+              focus: { kind: "generate", nodeId: node.id },
+              galleryItems: galleryReferenceItems,
+            })
+            : [],
+        promptReferences:
+          node.kind === "prompt"
+            ? buildBoardPromptReferences({
+              nodes: board.nodes,
+              edges: board.edges,
+              focus: { kind: "prompt", nodeId: node.id },
+              galleryItems: galleryReferenceItems,
+            })
+            : [],
+        compareReferenceUrl:
+          node.kind === "asset" && node.asset.type === "image"
+            ? assetCompareReferenceUrl(node.id, board.nodes, board.edges)
+            : null,
+        onCaptureVideoFrame,
+        onOpenAssetCompare: (nodeId: string) => {
+          const assetNode = board.nodes.find(item => item.id === nodeId);
+          if (assetNode?.kind !== "asset" || assetNode.asset.type !== "image") return;
+          const originalUrl = assetCompareReferenceUrl(nodeId, board.nodes, board.edges);
+          if (!originalUrl) return;
+          setAssetCompare({ originalUrl, resultUrl: assetNode.asset.url });
+        },
+        onDelete: trashAndDeleteNode,
+        onEditAssetImage,
+        onExecuteGenerate: onExecuteGenerateNode,
+        onMoveReferenceGroupItem: moveReferenceGroupItem,
+        onRemoveReferenceGroupItem: removeReferenceGroupItem,
+        onSendAgent: onSendAgentNode,
+        onSendAssetToAgent,
+        onSetAssetAsReference,
+        onUpdateReferenceGroupItemRole: updateReferenceGroupItemRole,
+        onUpdateAgent: updateAgentInstruction,
+        onUpdateGenerate: updateGenerateNode,
+        onUpdateNote: updateNoteBody,
+        onUpdatePrompt: updatePromptNode,
+      });
+    }
+    return dataById;
+  }, [
+    board.nodes,
+    board.edges,
+    galleryReferenceItems,
+    onCaptureVideoFrame,
+    onEditAssetImage,
+    onExecuteGenerateNode,
+    moveReferenceGroupItem,
+    removeReferenceGroupItem,
+    onSendAssetToAgent,
+    onSendAgentNode,
+    onSetAssetAsReference,
+    trashAndDeleteNode,
+    updateReferenceGroupItemRole,
+    updateAgentInstruction,
+    updateGenerateNode,
+    updateNoteBody,
+    updatePromptNode,
+  ]);
+
   const flowNodes = useMemo<BoardFlowNode[]>(
     () =>
       board.nodes.map(node => ({
@@ -511,76 +586,10 @@ export default function BoardWorkspace({
         position: node.position,
         width: node.size.width,
         height: node.size.height,
-        selected: selectedNodeIds.includes(node.id),
-        data: {
-          generateInputSummary: generateInputSummaryForNode(node, board.nodes, board.edges),
-          hasResultConnection: hasResultConnection(node.id, board.edges),
-          node,
-          generateReferences:
-            node.kind === "image-generate" || node.kind === "video-generate"
-              ? buildBoardPromptReferences({
-                nodes: board.nodes,
-                edges: board.edges,
-                focus: { kind: "generate", nodeId: node.id },
-                galleryItems: galleryReferenceItems,
-              })
-              : [],
-          promptReferences:
-            node.kind === "prompt"
-              ? buildBoardPromptReferences({
-                nodes: board.nodes,
-                edges: board.edges,
-                focus: { kind: "prompt", nodeId: node.id },
-                galleryItems: galleryReferenceItems,
-              })
-              : [],
-          compareReferenceUrl:
-            node.kind === "asset" && node.asset.type === "image"
-              ? assetCompareReferenceUrl(node.id, board.nodes, board.edges)
-              : null,
-          onCaptureVideoFrame,
-          onOpenAssetCompare: (nodeId: string) => {
-            const assetNode = board.nodes.find(item => item.id === nodeId);
-            if (assetNode?.kind !== "asset" || assetNode.asset.type !== "image") return;
-            const originalUrl = assetCompareReferenceUrl(nodeId, board.nodes, board.edges);
-            if (!originalUrl) return;
-            setAssetCompare({ originalUrl, resultUrl: assetNode.asset.url });
-          },
-          onDelete: trashAndDeleteNode,
-          onEditAssetImage,
-          onExecuteGenerate: onExecuteGenerateNode,
-          onMoveReferenceGroupItem: moveReferenceGroupItem,
-          onRemoveReferenceGroupItem: removeReferenceGroupItem,
-          onSendAgent: onSendAgentNode,
-          onSendAssetToAgent,
-          onSetAssetAsReference,
-          onUpdateReferenceGroupItemRole: updateReferenceGroupItemRole,
-          onUpdateAgent: updateAgentInstruction,
-          onUpdateGenerate: updateGenerateNode,
-          onUpdateNote: updateNoteBody,
-          onUpdatePrompt: updatePromptNode,
-        },
+        selected: selectedNodeIdSet.has(node.id),
+        data: flowNodeDataById.get(node.id)!,
       })),
-    [
-      board.nodes,
-      board.edges,
-      galleryReferenceItems,
-      onCaptureVideoFrame,
-      onEditAssetImage,
-      onExecuteGenerateNode,
-      moveReferenceGroupItem,
-      removeReferenceGroupItem,
-      onSendAssetToAgent,
-      onSendAgentNode,
-      onSetAssetAsReference,
-      selectedNodeIds,
-      trashAndDeleteNode,
-      updateReferenceGroupItemRole,
-      updateAgentInstruction,
-      updateGenerateNode,
-      updateNoteBody,
-      updatePromptNode,
-    ],
+    [board.nodes, flowNodeDataById, selectedNodeIdSet],
   );
 
   const flowEdges = useMemo<BoardFlowEdge[]>(
@@ -695,12 +704,13 @@ export default function BoardWorkspace({
   };
 
   const handleNodesChange = useCallback<OnNodesChange<BoardFlowNode>>((changes) => {
-    for (const change of changes) {
-      if (change.type === "position" && change.position) {
-        updateNodePosition(change.id, change.position);
-      }
-    }
-  }, [updateNodePosition]);
+    const settledPositions = changes.flatMap(change => {
+      if (change.type !== "position" || !change.position || change.dragging === true) return [];
+      return [{ nodeId: change.id, position: change.position }];
+    });
+    if (settledPositions.length === 0) return;
+    updateNodesPositions(settledPositions);
+  }, [updateNodesPositions]);
 
 
   const handleNodesDelete: OnNodesDelete<BoardFlowNode> = nodes => {
