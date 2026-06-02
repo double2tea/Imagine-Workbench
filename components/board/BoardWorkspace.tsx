@@ -635,23 +635,20 @@ export default function BoardWorkspace({
     }
   };
 
-  const handleSelectionChange = useCallback<OnSelectionChangeFunc<BoardFlowNode, BoardFlowEdge>>(({ nodes }) => {
+  const handleSelectionChange = useCallback<OnSelectionChangeFunc<BoardFlowNode, BoardFlowEdge>>(({ nodes, edges }) => {
     const ids = nodes.map(node => node.id);
     setSelectedNodeIds(ids);
-    selectNode(ids[0] ?? null);
-  }, [selectNode]);
-
-  const handleNodeClick: NodeMouseHandler<BoardFlowNode> = (event, node) => {
-    closeOverlayMenus();
-    if (event.shiftKey) {
-      setSelectedNodeIds(current => (
-        current.includes(node.id) ? current.filter(id => id !== node.id) : [...current, node.id]
-      ));
-    } else {
-      setSelectedNodeIds([node.id]);
+    if (edges.length > 0) {
+      selectEdge(edges[0]?.id ?? null);
+      selectNode(null);
+      return;
     }
-    selectNode(node.id);
     selectEdge(null);
+    selectNode(ids[0] ?? null);
+  }, [selectEdge, selectNode]);
+
+  const handleNodeClick: NodeMouseHandler<BoardFlowNode> = () => {
+    closeOverlayMenus();
   };
 
   const handleNodeDoubleClick: NodeMouseHandler<BoardFlowNode> = (_event, node) => {
@@ -680,11 +677,15 @@ export default function BoardWorkspace({
       return;
     }
     try {
+      const targetNode = board.nodes.find(node => node.id === refs.to.nodeId);
+      if (targetNode?.kind === "reference-group") {
+        addAssetToReferenceGroup(refs.from.nodeId, refs.to.nodeId);
+      }
       reconnectEdge(oldEdge.id, refs.from, refs.to);
     } catch (error) {
       onConnectionError(error instanceof Error ? error.message : "重连失败");
     }
-  }, [board.nodes, onConnectionError, reconnectEdge]);
+  }, [addAssetToReferenceGroup, board.nodes, onConnectionError, reconnectEdge]);
 
   const handleEdgeClick: EdgeMouseHandler<BoardFlowEdge> = (_event, edge) => {
     closeOverlayMenus();
@@ -1071,29 +1072,11 @@ export default function BoardWorkspace({
       }
       if (event.defaultPrevented || isTextEntryTarget(event.target)) return;
 
-      if (event.key === "Delete" || event.key === "Backspace") {
-        if (selectedEdgeId) {
-          deleteBoardEdge(selectedEdgeId);
-          event.preventDefault();
-          return;
-        }
-        const targets = selectedNodeIds.length > 0
-          ? selectedNodeIds
-          : selectedNodeId
-            ? [selectedNodeId]
-            : [];
-        if (targets.length === 0) return;
-        for (const nodeId of targets) trashAndDeleteNode(nodeId);
-        setSelectedNodeIds([]);
-        event.preventDefault();
-        return;
-      }
-
       const usesModifier = event.metaKey || event.ctrlKey;
       if (!usesModifier) return;
       const key = event.key.toLowerCase();
       if (key === "c") {
-        const selectedNode = board.nodes.find(node => node.id === (selectedNodeIds[0] ?? selectedNodeId));
+        const selectedNode = board.nodes.find(node => node.id === selectedNodeIds[0]);
         if (!selectedNode) return;
         copiedNodeRef.current = { node: selectedNode };
         event.preventDefault();
@@ -1106,13 +1089,8 @@ export default function BoardWorkspace({
         return;
       }
       if (key === "d") {
-        const targets = selectedNodeIds.length > 0
-          ? selectedNodeIds
-          : selectedNodeId
-            ? [selectedNodeId]
-            : [];
-        if (targets.length === 0) return;
-        for (const nodeId of targets) duplicateNode(nodeId);
+        if (selectedNodeIds.length === 0) return;
+        for (const nodeId of selectedNodeIds) duplicateNode(nodeId);
         event.preventDefault();
         return;
       }
@@ -1136,14 +1114,10 @@ export default function BoardWorkspace({
     canRedo,
     canUndo,
     closeOverlayMenus,
-    deleteBoardEdge,
     duplicateNode,
     pasteCopiedNode,
     redo,
-    selectedEdgeId,
-    selectedNodeId,
     selectedNodeIds,
-    trashAndDeleteNode,
     undo,
   ]);
 
@@ -1273,13 +1247,14 @@ export default function BoardWorkspace({
           {nodeContextMenu ? (() => {
             const node = board.nodes.find(item => item.id === nodeContextMenu.nodeId);
             if (!node) return null;
+            const compareReferenceUrl = node.kind === "asset" && node.asset.type === "image"
+              ? assetCompareReferenceUrl(node.id, board.nodes, board.edges)
+              : null;
             const actions = buildBoardNodeContextMenuActions({
               node,
-              onCompare: node.kind === "asset" && node.asset.type === "image"
+              onCompare: compareReferenceUrl && node.kind === "asset"
                 ? () => {
-                  const originalUrl = assetCompareReferenceUrl(node.id, board.nodes, board.edges);
-                  if (!originalUrl) return;
-                  setAssetCompare({ originalUrl, resultUrl: node.asset.url });
+                  setAssetCompare({ originalUrl: compareReferenceUrl, resultUrl: node.asset.url });
                   closeOverlayMenus();
                 }
                 : undefined,

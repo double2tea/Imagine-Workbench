@@ -30,8 +30,8 @@ export function buildBoardNodeContextMenuActions(input: {
   const actions: BoardNodeContextMenuAction[] = [
     { id: "duplicate", label: "复制节点", onSelect: input.onDuplicate },
   ];
-  if (input.node.kind === "image-generate" || input.node.kind === "video-generate") {
-    actions.push({ id: "execute", label: "执行生成", onSelect: input.onExecute ?? (() => undefined) });
+  if ((input.node.kind === "image-generate" || input.node.kind === "video-generate") && input.onExecute) {
+    actions.push({ id: "execute", label: "执行生成", onSelect: input.onExecute });
   }
   if (input.node.kind === "asset" && input.node.asset.type === "image") {
     if (input.onCompare) actions.push({ id: "compare", label: "对比参考", onSelect: input.onCompare });
@@ -39,8 +39,8 @@ export function buildBoardNodeContextMenuActions(input: {
     if (input.onSetReference) actions.push({ id: "reference", label: "设为参考", onSelect: input.onSetReference });
     if (input.onSendAgent) actions.push({ id: "agent", label: "发送到 Agent", onSelect: input.onSendAgent });
   }
-  if (input.node.kind === "agent") {
-    actions.push({ id: "agent-send", label: "发送到 Agent", onSelect: input.onSendAgent ?? (() => undefined) });
+  if (input.node.kind === "agent" && input.onSendAgent) {
+    actions.push({ id: "agent-send", label: "发送到 Agent", onSelect: input.onSendAgent });
   }
   actions.push({ id: "delete", label: "删除节点", onSelect: input.onDelete, tone: "danger" });
   return actions;

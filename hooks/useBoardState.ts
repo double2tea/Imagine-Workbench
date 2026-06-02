@@ -594,7 +594,11 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       if (currentBoard.nodes.some(item => item.id === node.id)) {
         throw new Error("节点已存在");
       }
-      return touchBoard(currentBoard, [...currentBoard.nodes, node], [...currentBoard.edges, ...edges]);
+      const nodeIds = new Set([...currentBoard.nodes.map(item => item.id), node.id]);
+      const restoredEdges = edges.filter(
+        edge => nodeIds.has(edge.from.nodeId) && nodeIds.has(edge.to.nodeId),
+      );
+      return touchBoard(currentBoard, [...currentBoard.nodes, node], [...currentBoard.edges, ...restoredEdges]);
     });
     setSelectedNodeId(node.id);
     setSelectedEdgeId(null);
