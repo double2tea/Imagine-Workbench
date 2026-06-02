@@ -167,9 +167,9 @@ export default function ImageGenerationPanel({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div>
-          <div className="mb-1.5 flex items-center justify-between gap-3">
+      <div className="imagine-parameter-grid grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="imagine-parameter-field">
+          <div className="imagine-parameter-label-row">
             <label className="imagine-section-label">图片生成模型</label>
             {supportsBackgroundGeneration && (
               <label className="imagine-inline-chip-toggle shrink-0">
@@ -198,8 +198,8 @@ export default function ImageGenerationPanel({
           </select>
         </div>
 
-        <div>
-          <label className="mb-1.5 block imagine-section-label">
+        <div className="imagine-parameter-field">
+          <label className="imagine-parameter-label-row imagine-section-label">
             画面宽高比
           </label>
           <select

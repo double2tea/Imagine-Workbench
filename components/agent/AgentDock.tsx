@@ -490,7 +490,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="max-h-[min(46vh,440px)] overflow-y-auto pr-1 flex flex-col gap-3 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent"
+            className="imagine-agent-message-stream max-h-[min(46vh,440px)] overflow-y-auto pr-1 flex flex-col gap-3 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent"
           >
             {messages.map((message) => (
               <AgentMessage
