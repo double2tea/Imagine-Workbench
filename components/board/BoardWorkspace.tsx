@@ -140,7 +140,10 @@ function sameFlowNodeShell(left: BoardFlowNode, right: BoardFlowNode): boolean {
     left.dragging === right.dragging &&
     left.width === right.width &&
     left.height === right.height &&
-    left.data === right.data
+    left.data.node === right.data.node &&
+    left.data.generateTaskSummary?.id === right.data.generateTaskSummary?.id &&
+    left.data.generateTaskSummary?.progress === right.data.generateTaskSummary?.progress &&
+    left.data.generateTaskSummary?.status === right.data.generateTaskSummary?.status
   );
 }
 
@@ -785,7 +788,7 @@ export default function BoardWorkspace({
   }, [beginUndoGesture, endUndoGesture, updateNodesPositions]);
 
   const handleNodesChange = useCallback<OnNodesChange<BoardFlowNode>>((changes) => {
-    const visualChanges = changes.filter(change => change.type !== "dimensions");
+    const visualChanges = changes.filter(change => change.type !== "dimensions" && change.type !== "select");
     if (visualChanges.length > 0) {
       setRenderNodes(currentNodes => applyNodeChanges(visualChanges, currentNodes));
     }

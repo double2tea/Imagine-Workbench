@@ -167,13 +167,17 @@ export function useMediaPolling({
             pollingFailuresRef.current[item.id] = nextFailures;
             console.error(`Polling failed for ${item.id}:`, error);
 
-            if (nextFailures === 3) {
+            if (nextFailures >= 3) {
               const waitingItem: StorageItem = {
                 ...item,
+                status: "failed",
+                progress: 100,
                 errorMessage: toErrorMessage(error, "任务轮询失败"),
               };
               updatedList[index] = waitingItem;
+              delete pollingFailuresRef.current[item.id];
               await saveItemOrWarn(waitingItem, pushWorkspaceNotice);
+              pushWorkspaceNotice("error", `任务轮询失败：${waitingItem.errorMessage}`);
               changed = true;
             }
           }

@@ -157,6 +157,12 @@ export async function getVideoStatus(config: ProviderConfig, taskId: string, mod
 }
 
 export async function downloadVideo(config: ProviderConfig, taskId: string, model?: string): Promise<Response> {
+  if (config.provider === "runninghub") {
+    const result = await getRunningHubMediaStatus(config, "video", taskId);
+    if (!result.url) throw new Error("Video task is complete but did not expose a video URL");
+    return downloadVideoUrl(config, config.baseUrl, result.url);
+  }
+
   const task = parseVideoTaskId(config, taskId, model);
   const baseUrl = getVideoBaseUrl(config, task.isTwelveAiOmni);
   const status = await getJson<VideoStatusResponse>(`${baseUrl}/v1/videos/${encodeURIComponent(task.id)}`, config);
@@ -165,6 +171,10 @@ export async function downloadVideo(config: ProviderConfig, taskId: string, mode
     videoContentEndpointUrl(config, baseUrl, task.id);
   if (!videoUrl) throw new Error("Video task is complete but did not expose a video URL");
 
+  return downloadVideoUrl(config, baseUrl, videoUrl);
+}
+
+async function downloadVideoUrl(config: ProviderConfig, baseUrl: string, videoUrl: string): Promise<Response> {
   const res = await fetch(videoUrl, {
     headers: videoUrl.startsWith(baseUrl) ? authHeaders(config) : {},
   });
