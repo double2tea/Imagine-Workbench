@@ -29,6 +29,10 @@ function formatTime(value: number): string {
   return `${minutes}:${seconds}`;
 }
 
+function isPlayInterruptedError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
 export default function VideoAssetPlayer({
   autoPlay = false,
   className = "h-full w-full object-contain",
@@ -70,7 +74,10 @@ export default function VideoAssetPlayer({
     const video = videoRef.current;
     if (!video) return;
     if (video.paused) {
-      void video.play();
+      void video.play().catch(error => {
+        if (isPlayInterruptedError(error)) return;
+        console.error("Video play failed:", error);
+      });
     } else {
       video.pause();
     }

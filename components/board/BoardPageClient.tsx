@@ -171,21 +171,30 @@ function getProviderModelGroups(optionsByProvider: Record<AiProvider, ModelOptio
     .filter(group => group.options.length > 0);
 }
 
-function activeBoardReference(nodes: ReturnType<typeof useBoardState>["board"]["nodes"], selectedNodeId: string | null): ReferenceImageRef[] {
+type BoardReferenceUrlResolver = (assetId: string, fallbackUrl: string) => string;
+
+function activeBoardReference(
+  nodes: ReturnType<typeof useBoardState>["board"]["nodes"],
+  selectedNodeId: string | null,
+  resolveUrl: BoardReferenceUrlResolver,
+): ReferenceImageRef[] {
   const node = nodes.find(item => item.id === selectedNodeId);
   if (!node || node.kind !== "asset" || node.asset.type !== "image") return [];
-  return [{ id: node.asset.assetId, url: node.asset.url, role: "general" }];
+  return [{ id: node.asset.assetId, url: resolveUrl(node.asset.assetId, node.asset.url), role: "general" }];
 }
 
-function boardNodeReferences(node: BoardDocument["nodes"][number] | undefined): ReferenceImageRef[] {
+function boardNodeReferences(
+  node: BoardDocument["nodes"][number] | undefined,
+  resolveUrl: BoardReferenceUrlResolver,
+): ReferenceImageRef[] {
   if (node?.kind === "asset" && node.asset.type === "image") {
-    return [{ id: node.asset.assetId, url: node.asset.url, role: "general" }];
+    return [{ id: node.asset.assetId, url: resolveUrl(node.asset.assetId, node.asset.url), role: "general" }];
   }
   if (node?.kind === "reference-group") {
     return node.references.map(reference => ({
       id: reference.assetId,
       role: reference.role,
-      url: reference.url,
+      url: resolveUrl(reference.assetId, reference.url),
     }));
   }
   return [];
@@ -529,6 +538,10 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   });
 
   const { assetStats, searchableReferenceImages } = useAssetWorkspaceState(items);
+  const resolveBoardReferenceUrl = useCallback<BoardReferenceUrlResolver>((assetId, fallbackUrl) => {
+    const item = items.find(entry => entry.id === assetId);
+    return item?.type === "image" && item.status === "complete" && item.url.trim() ? item.url : fallbackUrl;
+  }, [items]);
   void handleImageUpload;
   void handleReferenceDropAsset;
   void handleReferenceDropFiles;
@@ -1094,7 +1107,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   }, [addAssetToBoard, pushWorkspaceNotice]);
 
   const useSelectedBoardAssetAsReference = () => {
-    const references = activeBoardReference(boardController.board.nodes, boardController.selectedNodeId);
+    const references = activeBoardReference(boardController.board.nodes, boardController.selectedNodeId, resolveBoardReferenceUrl);
     if (references.length === 0) {
       pushWorkspaceNotice("info", "请选择一个图片资产节点");
       return;
@@ -1105,7 +1118,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   };
 
   const useBoardAssetAsReference = useCallback((nodeId: string) => {
-    const references = activeBoardReference(boardController.board.nodes, nodeId);
+    const references = activeBoardReference(boardController.board.nodes, nodeId, resolveBoardReferenceUrl);
     if (references.length === 0) {
       pushWorkspaceNotice("info", "请选择一个图片资产节点");
       return;
@@ -1113,10 +1126,10 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     setReferenceImage(references[0].url);
     setReferenceImages(references);
     pushWorkspaceNotice("success", "已将节点作为生成参考图");
-  }, [boardController.board.nodes, pushWorkspaceNotice, setReferenceImage, setReferenceImages]);
+  }, [boardController.board.nodes, pushWorkspaceNotice, resolveBoardReferenceUrl, setReferenceImage, setReferenceImages]);
 
   const useSelectedBoardAssetForAgent = () => {
-    const references = activeBoardReference(boardController.board.nodes, boardController.selectedNodeId);
+    const references = activeBoardReference(boardController.board.nodes, boardController.selectedNodeId, resolveBoardReferenceUrl);
     if (references.length === 0) {
       pushWorkspaceNotice("info", "请选择一个图片资产节点");
       return;
@@ -1128,7 +1141,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   };
 
   const useBoardAssetForAgent = useCallback((nodeId: string) => {
-    const references = activeBoardReference(boardController.board.nodes, nodeId);
+    const references = activeBoardReference(boardController.board.nodes, nodeId, resolveBoardReferenceUrl);
     if (references.length === 0) {
       pushWorkspaceNotice("info", "请选择一个图片资产节点");
       return;
@@ -1140,6 +1153,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   }, [
     boardController.board.nodes,
     pushWorkspaceNotice,
+    resolveBoardReferenceUrl,
     setAgentReferenceId,
     setAgentReferenceUrl,
     setAgentReferences,
@@ -1170,10 +1184,10 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     const references: ReferenceImageRef[] = boardController.board.edges
       .filter(edge => edge.to.nodeId === nodeId && edge.to.portId === "reference-in")
       .map(edge => boardController.board.nodes.find(item => item.id === edge.from.nodeId))
-      .flatMap(item => boardNodeReferences(item));
+      .flatMap(item => boardNodeReferences(item, resolveBoardReferenceUrl));
 
     return { node, prompt: resolvedPrompt, references };
-  }, [boardController.board.edges, boardController.board.nodes]);
+  }, [boardController.board.edges, boardController.board.nodes, resolveBoardReferenceUrl]);
 
   const handleExecuteGenerateNode = useCallback(async (nodeId: string) => {
     try {
@@ -1282,7 +1296,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     const references = boardController.board.edges
       .filter(edge => edge.to.nodeId === nodeId && edge.to.portId === "agent-context-in")
       .map(edge => boardController.board.nodes.find(item => item.id === edge.from.nodeId))
-      .flatMap(item => boardNodeReferences(item))
+      .flatMap(item => boardNodeReferences(item, resolveBoardReferenceUrl))
       .slice(0, IMAGE_REFERENCE_LIMIT);
 
     setAgentReferences(references);
@@ -1295,6 +1309,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     boardController.board.edges,
     boardController.board.nodes,
     pushWorkspaceNotice,
+    resolveBoardReferenceUrl,
     setAgentReferenceId,
     setAgentReferenceUrl,
     setAgentReferences,

@@ -57,6 +57,9 @@ export async function POST(req: NextRequest) {
         },
       });
     }
+    if (result.imageUrl?.startsWith("http://") || result.imageUrl?.startsWith("https://")) {
+      return imageUrlResponse(result.imageUrl, result.source);
+    }
 
     return NextResponse.json(result);
   } catch (err) {
@@ -67,6 +70,26 @@ export async function POST(req: NextRequest) {
     console.error("Image generation route error:", err);
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+async function imageUrlResponse(imageUrl: string, source: string): Promise<Response> {
+  const response = await fetch(imageUrl);
+  if (!response.ok) {
+    throw new Error(`图片结果下载失败：HTTP ${response.status}`);
+  }
+
+  const contentType = response.headers.get("Content-Type") ?? "image/png";
+  if (!contentType.startsWith("image/")) {
+    throw new Error("图片结果不是图片响应");
+  }
+
+  return new Response(response.body, {
+    headers: {
+      "Content-Type": contentType,
+      "Cache-Control": "no-store",
+      "x-image-source": source,
+    },
+  });
 }
 
 function resolveImageResolution(modelValue: string, aspectRatio: string, imageResolution: string | undefined): string {

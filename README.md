@@ -149,7 +149,7 @@ Model-specific parameters are defined in the catalog so the UI can adapt control
 - `12ai:veo_3_1-fast` supports text-to-video and reference-image mode with 0-3 images.
 - `12ai:veo_3_1-fast-fl` is the only built-in 12AI first/last-frame mode and requires 1-2 images.
 - `grok2api:grok-imagine-video` supports optional reference images with the grok2api video parameters.
-- Video reference image API/provider payloads accept `data:image/*` base64 data URIs only. Remote images must be read and compressed in the browser before submission.
+- Video reference image API/provider payloads accept `data:image/*` base64 data URIs only. Generated remote image results are downloaded by the image route before client storage so later image-to-video references avoid browser CORS fetches.
 
 ## Prompt Templates
 
@@ -252,3 +252,4 @@ npm run test:providers
 - The app keeps provider integration logic in `lib/providers/*`; avoid putting provider-specific request details directly in UI components.
 - Built-in model capabilities in `MODEL_CAPABILITIES` serve as initial defaults. The "获取模型" button fetches the live model list from each provider's `/v1/models` endpoint and merges it into the dropdowns. Models are auto-classified as chat/image/video by name.
 - Board documents are persisted separately from generated media. Board nodes reference assets by ID/url, while generated media remains owned by the IndexedDB asset store.
+- Board generation resolves connected image references against the latest IndexedDB asset item before submission.

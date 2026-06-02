@@ -89,7 +89,7 @@ Never hardcode provider strings (`"12ai"`, `"grok2api"`, `"xstx"`) in enumeratio
 
 Keep API routes thin: parse body, resolve provider config, call provider adapter, return response.
 
-Video reference image API/provider boundaries accept `data:image/*` base64 data URIs only. Remote images must be read and compressed on the browser side before submission.
+Video reference image API/provider boundaries accept `data:image/*` base64 data URIs only. Generated remote image results must be downloaded by the image route before client storage, and board references should resolve the latest asset-store URL by asset ID before submission.
 
 ### ModelScope and RunningHub
 
@@ -103,6 +103,7 @@ Video reference image API/provider boundaries accept `data:image/*` base64 data 
 - `/board` is an alternate operation surface, not a replacement for `/`.
 - `/board/[boardId]` opens a specific board document; keep multi-board behavior inside board modules.
 - Board nodes store spatial layout and references to generated assets. The asset store remains the source of truth for media URLs, prompts, model IDs, statuses, operation names, and generation snapshots.
+- When executing board generation, resolve connected asset/reference nodes against the current asset store before using their URLs.
 - Flush pending board text edits and save the board before leaving or switching boards.
 - Keep board logic in `components/board/*`, `hooks/useBoardState.ts`, and `lib/board/*`. Do not add board-specific state to `app/page.tsx`.
 - Agent actions on the board should reuse existing action types (`generate_image`, `generate_video`, `edit_image`, `optimize_prompt`) unless a new board-specific action is explicitly requested.
