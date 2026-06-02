@@ -112,6 +112,7 @@ type BoardHandleDirection = "input" | "output";
 
 interface QuickInsertMenu {
   clientX: number;
+  connectionFrom?: BoardPortRef;
   clientY: number;
   position: BoardPoint;
 }
@@ -833,6 +834,55 @@ export default function BoardWorkspace({
     setQuickInsertMenu(null);
   }, [addQuickNode, centeredNodePosition]);
 
+  const addConnectedQuickNodeAtPoint = useCallback((kind: QuickInsertKind, point: BoardPoint, from: BoardPortRef): void => {
+    if (kind === "image-generate") {
+      addGenerateNodeWithConnection(
+        {
+          kind: "image-generate",
+          model: from.portKind === "asset" ? DEFAULT_BOARD_REFERENCE_IMAGE_MODEL : DEFAULT_BOARD_IMAGE_MODEL,
+          aspectRatio: "1:1",
+          imageResolution: "1024x1024",
+          position: centeredNodePosition(point, DEFAULT_GENERATE_NODE_SIZE),
+        },
+        from,
+        from.portKind === "prompt" ? BOARD_PORT_IDS.promptIn : BOARD_PORT_IDS.referenceIn,
+      );
+      setQuickInsertMenu(null);
+      return;
+    }
+    if (kind === "video-generate") {
+      addGenerateNodeWithConnection(
+        { kind: "video-generate", model: DEFAULT_VIDEO_MODEL, aspectRatio: "auto", position: centeredNodePosition(point, DEFAULT_GENERATE_NODE_SIZE) },
+        from,
+        from.portKind === "prompt" ? BOARD_PORT_IDS.promptIn : BOARD_PORT_IDS.referenceIn,
+      );
+      setQuickInsertMenu(null);
+      return;
+    }
+    if (kind === "reference-group") {
+      addReferenceGroupNodeWithAsset({ position: centeredNodePosition(point, DEFAULT_REFERENCE_GROUP_NODE_SIZE) }, from.nodeId);
+      setQuickInsertMenu(null);
+      return;
+    }
+  }, [addGenerateNodeWithConnection, addReferenceGroupNodeWithAsset, centeredNodePosition]);
+
+  const quickInsertMenuItems = useMemo(() => {
+    const from = quickInsertMenu?.connectionFrom;
+    if (!from) return quickInsertItems;
+    const sourceNode = board.nodes.find(node => node.id === from.nodeId);
+    if (from.portKind === "prompt") {
+      return quickInsertItems.filter(item => item.kind === "image-generate" || item.kind === "video-generate");
+    }
+    if (from.portKind !== "asset") return [];
+    if (sourceNode?.kind === "asset") {
+      return quickInsertItems.filter(item => item.kind === "image-generate" || item.kind === "video-generate" || item.kind === "reference-group");
+    }
+    if (sourceNode?.kind === "reference-group") {
+      return quickInsertItems.filter(item => item.kind === "image-generate" || item.kind === "video-generate");
+    }
+    return [];
+  }, [board.nodes, quickInsertMenu?.connectionFrom]);
+
   const pasteCopiedNode = useCallback((): void => {
     const copied = copiedNodeRef.current;
     if (!copied) return;
@@ -923,17 +973,12 @@ export default function BoardWorkspace({
 
     const flowPoint = flowPositionFromClient(clientPoint.x, clientPoint.y);
     if (sourceKind === "prompt") {
-      addGenerateNodeWithConnection(
-        {
-          kind: "image-generate",
-          model: DEFAULT_BOARD_IMAGE_MODEL,
-          aspectRatio: "1:1",
-          imageResolution: "1024x1024",
-          position: centeredNodePosition(flowPoint, DEFAULT_GENERATE_NODE_SIZE),
-        },
-        { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "prompt" },
-        BOARD_PORT_IDS.promptIn,
-      );
+      setQuickInsertMenu({
+        clientX: clientPoint.x,
+        clientY: clientPoint.y,
+        connectionFrom: { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "prompt" },
+        position: flowPoint,
+      });
       return;
     }
     if (sourceKind === "asset") {
@@ -944,34 +989,23 @@ export default function BoardWorkspace({
           return;
         }
         if (sourceHandleId === "asset-out") {
-          addGenerateNodeWithConnection(
-            {
-              kind: "image-generate",
-              model: DEFAULT_BOARD_REFERENCE_IMAGE_MODEL,
-              aspectRatio: "1:1",
-              imageResolution: "1024x1024",
-              position: centeredNodePosition(flowPoint, DEFAULT_GENERATE_NODE_SIZE),
-            },
-            { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "asset" },
-            BOARD_PORT_IDS.referenceIn,
-          );
+          setQuickInsertMenu({
+            clientX: clientPoint.x,
+            clientY: clientPoint.y,
+            connectionFrom: { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "asset" },
+            position: flowPoint,
+          });
           return;
         }
-        addReferenceGroupNodeWithAsset({ position: centeredNodePosition(flowPoint, DEFAULT_REFERENCE_GROUP_NODE_SIZE) }, sourceNodeId);
         return;
       }
       if (sourceNode?.kind !== "reference-group") return;
-      addGenerateNodeWithConnection(
-        {
-          kind: "image-generate",
-          model: DEFAULT_BOARD_REFERENCE_IMAGE_MODEL,
-          aspectRatio: "1:1",
-          imageResolution: "1024x1024",
-          position: centeredNodePosition(flowPoint, DEFAULT_GENERATE_NODE_SIZE),
-        },
-        { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "asset" },
-        BOARD_PORT_IDS.referenceIn,
-      );
+      setQuickInsertMenu({
+        clientX: clientPoint.x,
+        clientY: clientPoint.y,
+        connectionFrom: { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "asset" },
+        position: flowPoint,
+      });
       return;
     }
     if (sourceKind === "result") {
@@ -986,16 +1020,17 @@ export default function BoardWorkspace({
         onConnectionError("找不到生成结果资产");
         return;
       }
-      addAssetNodeWithConnection({
-        position: centeredNodePosition(flowPoint, DEFAULT_ASSET_NODE_SIZE),
-        asset: storageItemToBoardAsset(item),
-        title: item.prompt,
-      },
+      addAssetNodeWithConnection(
+        {
+          position: centeredNodePosition(flowPoint, DEFAULT_ASSET_NODE_SIZE),
+          asset: storageItemToBoardAsset(item),
+          title: item.prompt,
+        },
         { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "result" },
       );
       return;
     }
-  }, [addAssetNodeWithConnection, addGenerateNodeWithConnection, addReferenceGroupNodeWithAsset, board.nodes, centeredNodePosition, flowPositionFromClient, galleryItems, onConnectionError]);
+  }, [addAssetNodeWithConnection, board.nodes, centeredNodePosition, flowPositionFromClient, galleryItems, onConnectionError]);
 
   const openQuickInsertMenu = useCallback((event: ReactMouseEvent | MouseEvent): void => {
     event.preventDefault();
@@ -1311,9 +1346,16 @@ export default function BoardWorkspace({
             <BoardQuickInsertMenu
               clientX={quickInsertMenu.clientX}
               clientY={quickInsertMenu.clientY}
-              items={quickInsertItems}
+              items={quickInsertMenuItems}
               position={quickInsertMenu.position}
-              onPick={(kind, position) => addQuickNodeAtPoint(kind as QuickInsertKind, position)}
+              onPick={(kind, position) => {
+                const quickKind = kind as QuickInsertKind;
+                if (quickInsertMenu.connectionFrom) {
+                  addConnectedQuickNodeAtPoint(quickKind, position, quickInsertMenu.connectionFrom);
+                  return;
+                }
+                addQuickNodeAtPoint(quickKind, position);
+              }}
             />
           ) : null}
           {nodeContextMenu ? (() => {
