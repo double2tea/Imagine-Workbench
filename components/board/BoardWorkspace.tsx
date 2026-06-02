@@ -131,27 +131,6 @@ function sameStringList(left: string[], right: string[]): boolean {
   return left.every((value, index) => value === right[index]);
 }
 
-function sameFlowNodeShell(left: BoardFlowNode, right: BoardFlowNode): boolean {
-  return (
-    left.id === right.id &&
-    left.selected === right.selected &&
-    left.position.x === right.position.x &&
-    left.position.y === right.position.y &&
-    left.dragging === right.dragging &&
-    left.width === right.width &&
-    left.height === right.height &&
-    left.data.node === right.data.node &&
-    left.data.generateTaskSummary?.id === right.data.generateTaskSummary?.id &&
-    left.data.generateTaskSummary?.progress === right.data.generateTaskSummary?.progress &&
-    left.data.generateTaskSummary?.status === right.data.generateTaskSummary?.status
-  );
-}
-
-function sameFlowNodes(left: BoardFlowNode[], right: BoardFlowNode[]): boolean {
-  if (left.length !== right.length) return false;
-  return left.every((node, index) => sameFlowNodeShell(node, right[index]));
-}
-
 function BoardEdgeComponent({
   data,
   id,
@@ -555,7 +534,10 @@ export default function BoardWorkspace({
     }
   }, [onConnectionError, restoreNodeWithEdges, trashedNodes]);
 
-  const selectedNodeIdSet = useMemo(() => new Set(selectedNodeIds), [selectedNodeIds]);
+  const selectedNodeIdSet = useMemo(() => {
+    const boardNodeIds = new Set(board.nodes.map(node => node.id));
+    return new Set(selectedNodeIds.filter(id => boardNodeIds.has(id)));
+  }, [board.nodes, selectedNodeIds]);
 
   const flowNodeDataById = useMemo(() => {
     const dataById = new Map<string, BoardFlowNode["data"]>();
@@ -670,13 +652,8 @@ export default function BoardWorkspace({
       }),
     [board.nodes, flowNodeDataById, generateTaskByNodeId, selectedNodeIdSet],
   );
-  const [renderNodes, setRenderNodes] = useState<BoardFlowNode[]>(flowNodes);
-
-  useEffect(() => {
-    if (isNodeDragActiveRef.current) return;
-    setRenderNodes(currentNodes => (sameFlowNodes(currentNodes, flowNodes) ? currentNodes : flowNodes));
-  }, [flowNodes]);
-
+  const [visualNodes, setVisualNodes] = useState<BoardFlowNode[] | null>(null);
+  const displayedNodes = visualNodes ?? flowNodes;
   const flowEdges = useMemo<BoardFlowEdge[]>(
     () =>
       board.edges.map(edge => ({
@@ -782,7 +759,8 @@ export default function BoardWorkspace({
   const handleNodeDragStart = useCallback<OnNodeDrag<BoardFlowNode>>(() => {
     isNodeDragActiveRef.current = true;
     pendingDragPositionByIdRef.current.clear();
-  }, []);
+    setVisualNodes(flowNodes);
+  }, [flowNodes]);
 
   const handleNodeDragStop = useCallback<OnNodeDrag<BoardFlowNode>>((_event, node, nodes) => {
     isNodeDragActiveRef.current = false;
@@ -795,15 +773,15 @@ export default function BoardWorkspace({
     beginUndoGesture();
     updateNodesPositions(Array.from(positionById, ([nodeId, position]) => ({ nodeId, position })));
     endUndoGesture();
+    setVisualNodes(null);
   }, [beginUndoGesture, endUndoGesture, updateNodesPositions]);
 
   const handleNodesChange = useCallback<OnNodesChange<BoardFlowNode>>((changes) => {
-    const visualChanges = changes.filter(change => change.type !== "dimensions" && change.type !== "select");
-    if (visualChanges.length > 0) {
-      setRenderNodes(currentNodes => {
-        const nextNodes = applyNodeChanges(visualChanges, currentNodes);
-        return sameFlowNodes(currentNodes, nextNodes) ? currentNodes : nextNodes;
-      });
+    if (isNodeDragActiveRef.current) {
+      const visualChanges = changes.filter(change => change.type !== "dimensions" && change.type !== "select");
+      if (visualChanges.length > 0) {
+        setVisualNodes(currentNodes => (currentNodes ? applyNodeChanges(visualChanges, currentNodes) : currentNodes));
+      }
     }
     const settledPositions: Array<{ nodeId: string; position: BoardPoint }> = [];
     for (const change of changes) {
@@ -1298,7 +1276,7 @@ export default function BoardWorkspace({
           className="board-canvas relative min-h-0 bg-[var(--iw-board-canvas-bg)]"
         >
           <ReactFlow
-            nodes={renderNodes}
+            nodes={displayedNodes}
             edges={flowEdges}
             edgeTypes={edgeTypes}
             nodeTypes={nodeTypes}

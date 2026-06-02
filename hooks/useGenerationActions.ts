@@ -198,7 +198,14 @@ export function useGenerationActions({
     if (imageReferenceUrls.length === 0 && activeReferenceImage) {
       imageReferenceUrls.push(activeReferenceImage);
     }
-    const imagePayloadError = getReferenceImagePayloadError(imageReferenceUrls);
+    let imageReferencePayloads: string[];
+    try {
+      imageReferencePayloads = await Promise.all(imageReferenceUrls.map(prepareReferenceImageUrlForRequest));
+    } catch (error) {
+      pushWorkspaceNotice("error", toErrorMessage(error, "参考图读取失败"));
+      return false;
+    }
+    const imagePayloadError = getReferenceImagePayloadError(imageReferencePayloads);
     if (imagePayloadError) {
       pushWorkspaceNotice("error", imagePayloadError);
       return false;
@@ -212,7 +219,7 @@ export function useGenerationActions({
       imageResolution: requestImageResolution,
       imageQuality: requestImageQuality,
       thinkingLevel: requestThinkingLevel,
-      referenceImages: imageReferenceUrls,
+      referenceImages: imageReferencePayloads,
     };
     const displayedImageSize = /^\d+x\d+$/.test(requestImageResolution) ? requestImageResolution : requestAspectRatio;
 
@@ -245,7 +252,7 @@ export function useGenerationActions({
         signal: controller.signal,
         body: JSON.stringify({
           ...generationRequest,
-          referenceImage: imageReferenceUrls[0],
+          referenceImage: imageReferencePayloads[0],
         }),
       });
 

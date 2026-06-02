@@ -48,6 +48,17 @@ export type BoardSaveStatus = "idle" | "loading" | "saving" | "saved" | "error";
 
 const DEFAULT_CUSTOM_IMAGE_RESOLUTION = "2560x1440";
 const DEFAULT_VARIANT_COUNT: BoardGenerateVariantCount = 1;
+const DEFAULT_BOARD_IMAGE_MODEL = "modelscope:Qwen/Qwen-Image";
+const DEFAULT_BOARD_VIDEO_MODEL = "12ai:veo_3_1-fast";
+const BOARD_NODE_KINDS = new Set<BoardNode["kind"]>([
+  "agent",
+  "asset",
+  "image-generate",
+  "note",
+  "prompt",
+  "reference-group",
+  "video-generate",
+]);
 
 export interface BoardStateController {
   board: BoardDocument;
@@ -195,14 +206,132 @@ function cloneBoardNodeForDuplicate(source: BoardNode, stackIndex: number): Boar
   }
 }
 
-function normalizeBoard(board: BoardDocument): BoardDocument {
-  const nodes = Array.isArray(board.nodes) ? board.nodes.map(normalizeBoardNode) : [];
+function normalizeBoard(board: unknown): BoardDocument {
+  const boardRecord = isRecord(board) ? board : {};
+  const nodes = Array.isArray(boardRecord.nodes) ? normalizeBoardNodes(boardRecord.nodes) : [];
   return {
-    ...board,
-    config: { ...DEFAULT_BOARD_CONFIG, ...board.config },
+    ...boardRecord,
+    id: readNonEmptyString(boardRecord.id, DEFAULT_BOARD_ID),
+    title: readNonEmptyString(boardRecord.title, "Board"),
+    config: normalizeBoardConfig(boardRecord.config),
     nodes,
-    edges: Array.isArray(board.edges) ? filterValidBoardEdges(nodes, board.edges) : [],
+    edges: Array.isArray(boardRecord.edges) ? normalizeBoardEdges(nodes, boardRecord.edges) : [],
+    viewport: normalizeBoardViewport(boardRecord.viewport),
+    createdAt: readNonEmptyString(boardRecord.createdAt, nowIso()),
+    updatedAt: readNonEmptyString(boardRecord.updatedAt, nowIso()),
   };
+}
+
+function normalizeBoardNodes(nodes: unknown[]): BoardNode[] {
+  const seenIds = new Set<string>();
+  const normalizedNodes: BoardNode[] = [];
+
+  nodes.forEach((node, index) => {
+    const normalizedNode = normalizeBoardNode(node, index);
+    if (!normalizedNode || seenIds.has(normalizedNode.id)) return;
+    seenIds.add(normalizedNode.id);
+    normalizedNodes.push(normalizedNode);
+  });
+
+  return normalizedNodes;
+}
+
+function normalizeBoardEdges(nodes: BoardNode[], edges: unknown[]): BoardEdge[] {
+  const normalizedEdges: BoardEdge[] = [];
+  const seenIds = new Set<string>();
+
+  edges.forEach((edge, index) => {
+    const normalizedEdge = normalizeBoardEdge(nodes, edge, index);
+    if (!normalizedEdge || seenIds.has(normalizedEdge.id)) return;
+    seenIds.add(normalizedEdge.id);
+    normalizedEdges.push(normalizedEdge);
+  });
+
+  return filterValidBoardEdges(nodes, normalizedEdges);
+}
+
+function normalizeBoardEdge(nodes: BoardNode[], edge: unknown, index: number): BoardEdge | null {
+  if (!isRecord(edge)) return null;
+  const from = normalizeBoardPortRef(edge.from);
+  const to = normalizeBoardPortRef(edge.to);
+  if (!from || !to) return null;
+
+  try {
+    return {
+      id: readNonEmptyString(edge.id, `edge_legacy_${index}`),
+      kind: resolveBoardConnectionKind(nodes, from, to),
+      from,
+      to,
+      createdAt: readNonEmptyString(edge.createdAt, nowIso()),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function normalizeBoardPortRef(ref: unknown): BoardPortRef | null {
+  if (!isRecord(ref)) return null;
+  const nodeId = readOptionalString(ref.nodeId);
+  const portId = readOptionalString(ref.portId);
+  if (!nodeId || !portId || !isBoardPortKind(ref.portKind)) return null;
+  return { nodeId, portId, portKind: ref.portKind };
+}
+
+function normalizeBoardConfig(config: unknown): BoardConfig {
+  const configRecord = isRecord(config) ? config : {};
+  return {
+    showGrid: typeof configRecord.showGrid === "boolean" ? configRecord.showGrid : DEFAULT_BOARD_CONFIG.showGrid,
+    showMiniMap: typeof configRecord.showMiniMap === "boolean" ? configRecord.showMiniMap : DEFAULT_BOARD_CONFIG.showMiniMap,
+  };
+}
+
+function normalizeBoardViewport(viewport: unknown): BoardViewport {
+  const viewportRecord = isRecord(viewport) ? viewport : {};
+  return {
+    x: readFiniteNumber(viewportRecord.x, 0),
+    y: readFiniteNumber(viewportRecord.y, 0),
+    zoom: Math.max(0.25, Math.min(1.8, readFiniteNumber(viewportRecord.zoom, 1))),
+  };
+}
+
+function normalizeBoardPoint(point: unknown, index: number): BoardPoint {
+  const pointRecord = isRecord(point) ? point : {};
+  return {
+    x: readFiniteNumber(pointRecord.x, DEFAULT_NODE_POSITION.x + index * 36),
+    y: readFiniteNumber(pointRecord.y, DEFAULT_NODE_POSITION.y + index * 28),
+  };
+}
+
+function normalizeBoardSize(size: unknown, fallback: BoardSize): BoardSize {
+  const sizeRecord = isRecord(size) ? size : {};
+  return {
+    width: Math.max(120, readFiniteNumber(sizeRecord.width, fallback.width)),
+    height: Math.max(120, readFiniteNumber(sizeRecord.height, fallback.height)),
+  };
+}
+
+function readFiniteNumber(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function readNonEmptyString(value: unknown, fallback: string): string {
+  return typeof value === "string" && value.trim().length > 0 ? value : fallback;
+}
+
+function readOptionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim().length > 0 ? value : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isBoardNodeKind(value: unknown): value is BoardNode["kind"] {
+  return typeof value === "string" && BOARD_NODE_KINDS.has(value as BoardNode["kind"]);
+}
+
+function isBoardPortKind(value: unknown): value is BoardPortRef["portKind"] {
+  return value === "asset" || value === "prompt" || value === "result" || value === "agent";
 }
 
 function firstOptionValue(options: Array<{ value: string }>, fallback: string): string {
@@ -247,31 +376,160 @@ function defaultVideoParams(model: string, aspectRatio?: string): {
   };
 }
 
-function normalizeBoardNode(node: BoardNode): BoardNode {
-  if (node.kind === "image-generate") {
-    const defaults = defaultImageParams(node.model, node.aspectRatio);
+function normalizeBoardNode(node: unknown, index: number): BoardNode | null {
+  if (!isRecord(node) || !isBoardNodeKind(node.kind)) return null;
+  const shell = {
+    id: readNonEmptyString(node.id, `${duplicateNodeIdPrefix(node.kind)}_legacy_${index}`),
+    position: normalizeBoardPoint(node.position, index),
+    size: normalizeBoardSize(node.size, defaultNodeSize(node.kind)),
+    title: readNonEmptyString(node.title, defaultNodeTitle(node.kind)),
+    createdAt: readNonEmptyString(node.createdAt, nowIso()),
+    updatedAt: readNonEmptyString(node.updatedAt, nowIso()),
+  };
+
+  if (node.kind === "asset") {
+    const asset = isRecord(node.asset) ? node.asset : null;
+    if (!asset || (asset.type !== "image" && asset.type !== "video")) return null;
     return {
-      ...node,
-      aspectRatio: node.aspectRatio || defaults.aspectRatio,
-      customImageResolution: node.customImageResolution || defaults.customImageResolution,
-      imageQuality: node.imageQuality ?? defaults.imageQuality,
-      imageResolution: node.imageResolution || defaults.imageResolution,
-      thinkingLevel: node.thinkingLevel ?? defaults.thinkingLevel,
-      variantCount: node.variantCount || DEFAULT_VARIANT_COUNT,
+      ...shell,
+      kind: "asset",
+      asset: {
+        assetId: readNonEmptyString(asset.assetId, shell.id),
+        model: readNonEmptyString(asset.model, "unknown"),
+        prompt: readNonEmptyString(asset.prompt, shell.title),
+        type: asset.type,
+        url: readNonEmptyString(asset.url, ""),
+      },
+    };
+  }
+  if (node.kind === "prompt") {
+    return {
+      ...shell,
+      kind: "prompt",
+      prompt: typeof node.prompt === "string" ? node.prompt : "",
+    };
+  }
+  if (node.kind === "reference-group") {
+    return {
+      ...shell,
+      kind: "reference-group",
+      references: Array.isArray(node.references) ? normalizeReferenceGroupItems(node.references) : [],
+    };
+  }
+  if (node.kind === "image-generate") {
+    const model = normalizeImageModel(node.model);
+    const aspectRatio = readOptionalString(node.aspectRatio);
+    const defaults = defaultImageParams(model, aspectRatio);
+    return {
+      ...shell,
+      kind: "image-generate",
+      model,
+      prompt: typeof node.prompt === "string" ? node.prompt : "",
+      aspectRatio: aspectRatio || defaults.aspectRatio,
+      customImageResolution: readOptionalString(node.customImageResolution) || defaults.customImageResolution,
+      imageQuality: readOptionalString(node.imageQuality) ?? defaults.imageQuality,
+      imageResolution: readOptionalString(node.imageResolution) || defaults.imageResolution,
+      resultAssetId: typeof node.resultAssetId === "string" ? node.resultAssetId : undefined,
+      status: normalizeGenerationStatus(node.status),
+      thinkingLevel: readOptionalString(node.thinkingLevel) ?? defaults.thinkingLevel,
+      variantCount: normalizeVariantCount(node.variantCount),
+      errorMessage: typeof node.errorMessage === "string" ? node.errorMessage : undefined,
     };
   }
   if (node.kind === "video-generate") {
-    const defaults = defaultVideoParams(node.model, node.aspectRatio);
+    const model = normalizeVideoModel(node.model);
+    const aspectRatio = readOptionalString(node.aspectRatio);
+    const defaults = defaultVideoParams(model, aspectRatio);
     return {
-      ...node,
-      aspectRatio: node.aspectRatio || defaults.aspectRatio,
-      videoDuration: node.videoDuration ?? defaults.videoDuration,
-      videoPreset: node.videoPreset ?? defaults.videoPreset,
-      videoResolution: node.videoResolution ?? defaults.videoResolution,
-      variantCount: node.variantCount || DEFAULT_VARIANT_COUNT,
+      ...shell,
+      kind: "video-generate",
+      model,
+      prompt: typeof node.prompt === "string" ? node.prompt : "",
+      aspectRatio: aspectRatio || defaults.aspectRatio,
+      resultAssetId: typeof node.resultAssetId === "string" ? node.resultAssetId : undefined,
+      status: normalizeGenerationStatus(node.status),
+      videoDuration: readOptionalString(node.videoDuration) ?? defaults.videoDuration,
+      videoPreset: readOptionalString(node.videoPreset) ?? defaults.videoPreset,
+      videoResolution: readOptionalString(node.videoResolution) ?? defaults.videoResolution,
+      variantCount: normalizeVariantCount(node.variantCount),
+      errorMessage: typeof node.errorMessage === "string" ? node.errorMessage : undefined,
     };
   }
-  return node;
+  if (node.kind === "agent") {
+    return {
+      ...shell,
+      kind: "agent",
+      instruction: typeof node.instruction === "string" ? node.instruction : "",
+    };
+  }
+  return {
+    ...shell,
+    kind: "note",
+    body: typeof node.body === "string" ? node.body : "",
+  };
+}
+
+function defaultNodeSize(kind: BoardNode["kind"]): BoardSize {
+  if (kind === "asset") return DEFAULT_ASSET_NODE_SIZE;
+  if (kind === "prompt") return DEFAULT_PROMPT_NODE_SIZE;
+  if (kind === "reference-group") return DEFAULT_REFERENCE_GROUP_NODE_SIZE;
+  if (kind === "image-generate" || kind === "video-generate") return DEFAULT_GENERATE_NODE_SIZE;
+  if (kind === "agent") return DEFAULT_AGENT_NODE_SIZE;
+  return DEFAULT_NOTE_NODE_SIZE;
+}
+
+function defaultNodeTitle(kind: BoardNode["kind"]): string {
+  if (kind === "asset") return "Asset";
+  if (kind === "prompt") return "Prompt";
+  if (kind === "reference-group") return "Reference Group";
+  if (kind === "image-generate") return "Image Generate";
+  if (kind === "video-generate") return "Video Generate";
+  if (kind === "agent") return "Agent";
+  return "Note";
+}
+
+function normalizeImageModel(value: unknown): string {
+  const model = readNonEmptyString(value, DEFAULT_BOARD_IMAGE_MODEL);
+  try {
+    getImageModelCapabilities(model);
+    return model;
+  } catch {
+    return DEFAULT_BOARD_IMAGE_MODEL;
+  }
+}
+
+function normalizeVideoModel(value: unknown): string {
+  const model = readNonEmptyString(value, DEFAULT_BOARD_VIDEO_MODEL);
+  try {
+    getVideoModelCapabilities(model);
+    return model;
+  } catch {
+    return DEFAULT_BOARD_VIDEO_MODEL;
+  }
+}
+
+function normalizeReferenceGroupItems(items: unknown[]): BoardReferenceGroupItem[] {
+  const normalizedItems: BoardReferenceGroupItem[] = [];
+  for (const item of items) {
+    if (!isRecord(item) || typeof item.assetId !== "string" || item.assetId.length === 0) continue;
+    normalizedItems.push({
+      assetId: item.assetId,
+      model: readNonEmptyString(item.model, "unknown"),
+      prompt: readNonEmptyString(item.prompt, "Reference"),
+      role: item.role === "start" || item.role === "end" ? item.role : "general",
+      url: readNonEmptyString(item.url, ""),
+    });
+  }
+  return normalizedItems;
+}
+
+function normalizeGenerationStatus(status: unknown): BoardGenerationStatus {
+  if (status === "processing" || status === "complete" || status === "failed") return status;
+  return "idle";
+}
+
+function normalizeVariantCount(value: unknown): BoardGenerateVariantCount {
+  return value === 2 || value === 4 ? value : DEFAULT_VARIANT_COUNT;
 }
 
 function touchBoard(board: BoardDocument, nodes: BoardNode[] = board.nodes, edges: BoardEdge[] = board.edges): BoardDocument {
@@ -503,6 +761,8 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
 
       clearUndoHistory();
       setBoardState(storedBoard ? normalizeBoard(storedBoard) : createEmptyBoard(boardId));
+      setSelectedNodeId(null);
+      setSelectedEdgeId(null);
       setSaveError(null);
       setSaveStatus("idle");
       setHasLoaded(true);

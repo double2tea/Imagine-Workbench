@@ -35,7 +35,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "参考图文件过大" }, { status: 413 });
     }
 
-    return new Response(response.body, {
+    const imageBlob = await readLimitedImageBlob(response, contentType);
+    if (!imageBlob) {
+      return NextResponse.json({ error: "参考图文件过大" }, { status: 413 });
+    }
+
+    return new Response(imageBlob, {
       headers: {
         "Cache-Control": "no-store",
         "Content-Type": contentType,
@@ -53,6 +58,32 @@ function parseReferenceImageUrl(value: string): URL | null {
   } catch {
     return null;
   }
+}
+
+async function readLimitedImageBlob(response: Response, contentType: string): Promise<Blob | null> {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    const blob = await response.blob();
+    return blob.size > REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES ? null : blob;
+  }
+
+  const chunks: ArrayBuffer[] = [];
+  let totalBytes = 0;
+  while (true) {
+    const result = await reader.read();
+    if (result.done) break;
+    totalBytes += result.value.byteLength;
+    if (totalBytes > REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(result.value.buffer.slice(
+      result.value.byteOffset,
+      result.value.byteOffset + result.value.byteLength,
+    ) as ArrayBuffer);
+  }
+
+  return new Blob(chunks, { type: contentType });
 }
 
 function getAllowedReferenceImageError(url: URL): string | null {
