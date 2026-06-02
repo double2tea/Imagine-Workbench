@@ -447,6 +447,42 @@
   padding-inline: 0 !important;
 }
 
+/* Centralized adaptive hovers for imagine-* primitives + data- attrs (U-PR1 design CSS Note + KD6).
+   Inserted post board/shared reviewer 0-sev findings on missing central rules (globals post-448).
+   Covers icon/header base, light variants, danger (clear), amber (board quick/selection).
+   Uses !important for light to match surrounding hygiene/light rules; vars for dark/adaptive.
+   Allows listed files to drop per-JSX hover:hex and rely on data- (shortest, central). */
+.imagine-header-button:hover,
+.imagine-icon-button:hover {
+  border-color: var(--iw-border);
+  background: var(--iw-panel);
+  color: var(--iw-text);
+}
+.imagine-theme-light .imagine-header-button:hover,
+.imagine-theme-light .imagine-icon-button:hover {
+  background: #f8fafc !important;
+  border-color: rgba(15, 23, 42, 0.12) !important;
+  color: #344054 !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+.imagine-header-button[data-action="danger"]:hover,
+.imagine-icon-button[data-action="danger"]:hover {
+  border-color: rgba(239, 68, 68, 0.32);
+  background: rgba(239, 68, 68, 0.1);
+  color: #b42318;
+}
+.imagine-theme-light .imagine-header-button[data-action="danger"]:hover,
+.imagine-theme-light .imagine-icon-button[data-action="danger"]:hover {
+  background: #fff5f5 !important;
+  border-color: rgba(239, 68, 68, 0.32) !important;
+  color: #b42318 !important;
+}
+.imagine-header-button[data-accent="amber"]:hover,
+.imagine-icon-button[data-accent="amber"]:hover {
+  border-color: var(--iw-board-accent-amber);
+  background: rgba(245, 158, 11, 0.1);
+}
+
 .imagine-main-grid {
   --iw-workbench-bottom-space: 48px;
   grid-auto-rows: min-content;
@@ -1554,10 +1590,41 @@
     opacity: 0.36;
   }
 
+  .imagine-workbench-shell,
+  .imagine-app-header,
+  .imagine-main-grid,
+  .imagine-creator-panel,
+  .imagine-mobile-workflow,
+  .imagine-mobile-asset-stream,
+  .imagine-mobile-composer,
+  .imagine-mobile-advanced {
+    max-width: 100vw !important;
+    min-width: 0 !important;
+  }
+
+  .imagine-app-header,
+  .imagine-main-grid {
+    width: 100vw !important;
+  }
+
   .imagine-app-header {
     min-height: 48px;
     padding-inline: 10px !important;
     padding-block: 7px !important;
+  }
+
+  .imagine-app-header > div:first-child {
+    flex: 1 1 auto;
+  }
+
+  .imagine-app-header > div:last-child {
+    max-width: 148px;
+  }
+
+  .imagine-app-header .imagine-header-button {
+    width: 32px !important;
+    justify-content: center !important;
+    padding-inline: 0 !important;
   }
 
   .imagine-app-header h1 {
@@ -1624,13 +1691,42 @@
   }
 
   .imagine-tabbar {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     height: 34px;
+    max-width: 100%;
+    overflow: hidden;
   }
 
   .imagine-tab-button {
     gap: 5px !important;
+    min-width: 0 !important;
     font-size: 10px !important;
     padding-block: 5px !important;
+  }
+
+  .imagine-tab-button span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .imagine-workbench-shell > .imagine-toolbar-surface {
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr);
+    overflow: hidden !important;
+  }
+
+  .imagine-workbench-shell > .imagine-toolbar-surface > div:last-child {
+    min-width: 0;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .imagine-workbench-shell > .imagine-toolbar-surface > div:last-child::-webkit-scrollbar {
+    display: none;
   }
 
   .imagine-field-shell {

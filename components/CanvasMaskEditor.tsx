@@ -538,7 +538,7 @@ export default function CanvasMaskEditor({
           <button
             type="button"
             onClick={onClose}
-            className="imagine-icon-button rounded-lg p-1.5 text-[var(--iw-muted)] transition hover:bg-[var(--iw-panel-soft)] hover:text-[var(--iw-text)]"
+            className="imagine-icon-button rounded-lg p-1.5 text-[var(--iw-muted)] transition"
             aria-label="关闭图片编辑器"
           >
             <X className="h-5 w-5" />

@@ -9,32 +9,32 @@ interface CreationModeTabsProps {
 
 export default function CreationModeTabs({ value, onChange }: CreationModeTabsProps) {
   return (
-    <div className="imagine-tabbar flex rounded-lg border border-slate-800 bg-slate-950/60 p-1">
+    <div className="imagine-tabbar flex min-w-0 rounded-lg border border-slate-800 bg-slate-950/60 p-1">
       <button
         type="button"
         onClick={() => onChange("image")}
         data-active={value === "image"}
-        className={`imagine-tab-button flex-1 flex items-center justify-center gap-2 rounded-md py-2 text-xs font-semibold select-none cursor-pointer transition-all duration-200 ${
+        className={`imagine-tab-button flex min-w-0 flex-1 items-center justify-center gap-2 rounded-md py-2 text-xs font-semibold transition-all duration-200 select-none cursor-pointer ${
           value === "image"
             ? "bg-blue-500/14 text-blue-200"
             : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
         }`}
       >
-        <ImageIcon className="h-3.5 w-3.5" />
-        智能绘图 <span className="hidden sm:inline text-slate-500">Image Studio</span>
+        <ImageIcon className="h-3.5 w-3.5 shrink-0" />
+        <span className="truncate">智能绘图</span> <span className="hidden text-slate-500 sm:inline">Image Studio</span>
       </button>
       <button
         type="button"
         onClick={() => onChange("video")}
         data-active={value === "video"}
-        className={`imagine-tab-button flex-1 flex items-center justify-center gap-2 rounded-md py-2 text-xs font-semibold select-none cursor-pointer transition-all duration-200 ${
+        className={`imagine-tab-button flex min-w-0 flex-1 items-center justify-center gap-2 rounded-md py-2 text-xs font-semibold transition-all duration-200 select-none cursor-pointer ${
           value === "video"
             ? "bg-violet-500/14 text-violet-200"
             : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
         }`}
       >
-        <VideoIcon className="h-3.5 w-3.5" />
-        视频合成 <span className="hidden sm:inline text-slate-500">Video Studio</span>
+        <VideoIcon className="h-3.5 w-3.5 shrink-0" />
+        <span className="truncate">视频合成</span> <span className="hidden text-slate-500 sm:inline">Video Studio</span>
       </button>
     </div>
   );

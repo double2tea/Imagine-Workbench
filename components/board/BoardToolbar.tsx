@@ -27,7 +27,7 @@ function formatSaveStatus(status: BoardSaveStatus): string {
   return "就绪";
 }
 
-const toolButtonClass = "imagine-header-button flex !h-8 !min-h-8 items-center gap-1.5 !rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-3 text-xs font-semibold text-[var(--iw-text)] transition";
+const toolButtonClass = "imagine-header-button flex !h-8 !min-h-8 items-center gap-1.5 !rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2.5 text-xs font-semibold text-[var(--iw-text)] transition sm:px-3";
 const iconButtonClass = "imagine-icon-button flex !h-8 !w-8 !min-w-8 items-center justify-center !rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)] transition";
 
 export default function BoardToolbar({
@@ -45,8 +45,8 @@ export default function BoardToolbar({
   onToggleTheme,
 }: BoardToolbarProps) {
   return (
-    <div className="imagine-toolbar-surface flex h-12 shrink-0 items-center justify-start gap-3 overflow-x-auto !rounded-none border-b border-[var(--iw-border)] bg-[var(--iw-header)] !px-4 !py-0 text-[var(--iw-text)] lg:justify-between">
-      <div className="flex shrink-0 items-center gap-3">
+    <div className="imagine-toolbar-surface no-scrollbar flex h-12 w-full min-w-0 shrink-0 items-center justify-start gap-2 overflow-x-auto overscroll-x-contain !rounded-none border-b border-[var(--iw-border)] bg-[var(--iw-header)] !px-3 !py-0 text-[var(--iw-text)] sm:gap-3 sm:!px-4 lg:justify-between">
+      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
         <button
           type="button"
           onClick={onBack}
@@ -63,23 +63,23 @@ export default function BoardToolbar({
       <div className="flex shrink-0 items-center gap-2">
         <button type="button" onClick={onAddPrompt} className={toolButtonClass} data-accent="amber">
           <MessageSquareText className="h-3.5 w-3.5" />
-          提示
+          <span className="hidden sm:inline">提示</span>
         </button>
         <button type="button" onClick={onAddImageGenerate} className={toolButtonClass} data-accent="amber">
           <ImagePlus className="h-3.5 w-3.5" />
-          图片
+          <span className="hidden sm:inline">图片</span>
         </button>
         <button type="button" onClick={onAddVideoGenerate} className={toolButtonClass} data-accent="amber">
           <Video className="h-3.5 w-3.5" />
-          视频
+          <span className="hidden sm:inline">视频</span>
         </button>
         <button type="button" onClick={onAddAgent} className={toolButtonClass} data-accent="amber">
           <Bot className="h-3.5 w-3.5" />
-          智能体
+          <span className="hidden sm:inline">智能体</span>
         </button>
         <button type="button" onClick={onAddNote} className={toolButtonClass} data-accent="amber">
           <FileText className="h-3.5 w-3.5" />
-          笔记
+          <span className="hidden sm:inline">笔记</span>
         </button>
         <button
           type="button"

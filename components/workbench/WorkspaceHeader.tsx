@@ -17,8 +17,8 @@ export default function WorkspaceHeader({
   onToggleTheme,
 }: WorkspaceHeaderProps) {
   return (
-    <header className="imagine-app-header sticky top-0 z-40 bg-[#07080b]/86 backdrop-blur-xl border-b border-slate-800/80 px-4 py-3 sm:px-6 flex items-center justify-between gap-3 select-none">
-      <div className="flex min-w-0 items-center gap-3 z-10">
+    <header className="imagine-app-header sticky top-0 z-40 flex min-w-0 items-center justify-between gap-2 overflow-hidden border-b border-slate-800/80 bg-[#07080b]/86 px-4 py-3 backdrop-blur-xl sm:gap-3 sm:px-6 select-none">
+      <div className="z-10 flex min-w-0 flex-1 items-center gap-3">
         <div className="imagine-brand-mark relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-blue-400/20 bg-blue-500/12 shadow-sm">
           <Sparkles className="h-4.5 w-4.5 text-blue-200" />
         </div>
@@ -31,10 +31,10 @@ export default function WorkspaceHeader({
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-2 z-10">
+      <div className="z-10 flex shrink-0 items-center gap-1.5 sm:gap-2">
         <Link
           href="/board"
-          className="imagine-header-button flex h-9 items-center gap-1.5 rounded-lg border border-slate-700/80 bg-slate-900/80 px-3 text-xs font-semibold text-slate-200 transition hover:border-slate-600 hover:bg-slate-800"
+          className="imagine-header-button flex h-9 items-center gap-1.5 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)] px-3 text-xs font-semibold text-[var(--iw-text)] transition"
         >
           <Grid2X2 className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">画板</span>
@@ -42,7 +42,7 @@ export default function WorkspaceHeader({
 
         <button
           onClick={onOpenSettings}
-          className="imagine-header-button flex h-9 items-center gap-1.5 rounded-lg border border-slate-700/80 bg-slate-900/80 px-3 text-xs font-semibold text-slate-200 transition hover:border-slate-600 hover:bg-slate-800 cursor-pointer"
+          className="imagine-header-button flex h-9 items-center gap-1.5 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)] px-3 text-xs font-semibold text-[var(--iw-text)] transition cursor-pointer"
         >
           <Settings className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">设置</span>
@@ -52,7 +52,7 @@ export default function WorkspaceHeader({
           type="button"
           onClick={onToggleTheme}
           aria-pressed={themeMode === "dark"}
-          className="imagine-header-button imagine-icon-button flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700/80 bg-slate-900/80 text-slate-400 transition hover:border-blue-500/40 hover:bg-blue-950/30 hover:text-blue-300 cursor-pointer"
+          className="imagine-header-button imagine-icon-button flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)] text-[var(--iw-muted)] transition cursor-pointer"
           title={themeMode === "light" ? "切换深色模式" : "切换浅色模式"}
         >
           {themeMode === "light" ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
@@ -60,7 +60,7 @@ export default function WorkspaceHeader({
 
         <button
           onClick={onClearProject}
-          className="imagine-header-button imagine-icon-button flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700/80 bg-slate-900/80 text-slate-400 transition hover:border-red-500/40 hover:bg-red-950/30 hover:text-red-300 cursor-pointer"
+          className="imagine-header-button imagine-icon-button flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)] text-[var(--iw-muted)] transition cursor-pointer" data-action="danger"
           title="清空当前项目"
         >
           <Trash2 className="h-3.5 w-3.5" />
