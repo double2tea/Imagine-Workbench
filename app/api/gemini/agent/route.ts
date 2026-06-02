@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { NextRequest, NextResponse } from "next/server";
+import type { AgentSurface } from "@/lib/agent-context";
 import { createChatCompletionText, createChatCompletionWithTools, parseJsonObjectText } from "@/lib/providers/chat";
 import {
   DEFAULT_CHAT_MODEL,
@@ -21,8 +22,43 @@ const agentMessageSchema = z.object({
   content: z.string(),
 });
 
+const boardPortRefSchema = z.object({
+  nodeId: z.string(),
+  portId: z.string(),
+  portKind: z.enum(["asset", "prompt", "result", "agent"]),
+});
+
+const boardContextSchema = z.object({
+  boardId: z.string(),
+  title: z.string(),
+  selectedNodeId: z.string().nullable(),
+  selectedEdgeId: z.string().nullable(),
+  nodes: z.array(z.object({
+    id: z.string(),
+    kind: z.enum(["asset", "prompt", "reference-group", "image-generate", "video-generate", "agent", "note"]),
+    title: z.string(),
+    prompt: z.string().optional(),
+    model: z.string().optional(),
+    aspectRatio: z.string().optional(),
+    status: z.string().optional(),
+    resultAssetId: z.string().optional(),
+    assetId: z.string().optional(),
+    assetType: z.string().optional(),
+    body: z.string().optional(),
+    instruction: z.string().optional(),
+  })),
+  edges: z.array(z.object({
+    id: z.string(),
+    kind: z.enum(["reference", "prompt", "result", "agent-context"]),
+    from: boardPortRefSchema,
+    to: boardPortRefSchema,
+  })),
+});
+
 const agentBodySchema = z.object({
   messages: z.array(agentMessageSchema).min(1),
+  surface: z.enum(["workbench", "board"]).optional().default("workbench"),
+  boardContext: boardContextSchema.optional(),
   gallerySummary: z
     .array(
       z.object({
@@ -59,11 +95,27 @@ const agentActionSchema = z.object({
     .optional(),
 });
 
+const agentBoardActionSchema = z.object({
+  type: z.enum(["none", "create_board_image_flow", "create_board_video_flow", "create_board_note"]),
+  params: z
+    .object({
+      prompt: z.string().optional(),
+      model: z.string().optional(),
+      aspectRatio: z.string().optional(),
+      referenceImageId: z.string().optional(),
+      title: z.string().optional(),
+      body: z.string().optional(),
+      run: z.boolean().optional(),
+    })
+    .optional(),
+});
+
 const agentResponseSchema = z.object({
   thought: z.string().default("已分析当前创作上下文。"),
   text: z.string().default("我已整理好下一步建议。"),
   activeSkills: z.array(z.string()).default([]),
   recommendedAction: agentActionSchema.default({ type: "none" }),
+  boardAction: agentBoardActionSchema.default({ type: "none" }),
   suggestedFollowUps: z.array(z.string()).default([]),
 });
 
@@ -105,6 +157,7 @@ export async function POST(req: NextRequest) {
     const galleryItems = body.gallerySummary;
     const agentReferences = body.agentReferences;
     const agentReferenceId = body.agentReferenceId;
+    const surface: AgentSurface = body.surface;
 
     const latestUserMessage = [...messages].reverse().find(m => m.role === "user");
     const latestUserMsg =
@@ -146,17 +199,28 @@ export async function POST(req: NextRequest) {
             .map((item, idx) => `- Ref [${idx + 1}]: ID "${item.id}"`)
             .join("\n")}\n`
         : "";
+    const boardMsg = surface === "board"
+      ? "\n## Board Surface\n" +
+        "The user is operating a spatial board. Use get_board_context / get_connected_context before recommending board changes.\n" +
+        "For board mutations, prefer boardAction over recommendedAction. Do not invent a general DAG or ComfyUI workflow.\n" +
+        "Allowed boardAction.type values: none, create_board_image_flow, create_board_video_flow, create_board_note.\n" +
+        "create_board_image_flow/create_board_video_flow should include params.prompt and may include params.model, params.aspectRatio, params.referenceImageId, params.run.\n"
+      : "\n## Workbench Surface\nUse recommendedAction for normal workstation actions. Keep boardAction.type as none.\n";
 
     const systemInstruction =
       "You are the senior Creative Agent of the Imagine Workbench.\n" +
-      "Collaborate with the user on visual creative projects and recommend exactly one workstation action when useful.\n\n" +
+      "Collaborate with the user on visual creative projects and recommend exactly one executable action when useful.\n\n" +
       "## Tools\n" +
       "Use tool calls to inspect skills, model capabilities, and gallery assets before recommending an action.\n" +
       "- Call get_skill_info before activating a skill whose details matter.\n" +
       "- Call query_models before recommending a generation model.\n" +
       "- Call get_gallery_assets when the user references previous assets.\n\n" +
+      "- On board surface, call get_board_context or get_connected_context before returning boardAction.\n" +
+      "- Call get_prompt_templates when the user asks for reusable prompt templates.\n\n" +
       "## Skill Registry\n" +
       `${skillsText}\n\n` +
+      boardMsg +
+      "\n" +
       "## Model Catalog\n" +
       "Use only these model IDs when recommending a workstation action. Do not guess model IDs.\n" +
       `${modelsText}\n\n` +
@@ -164,11 +228,11 @@ export async function POST(req: NextRequest) {
       `${galleryText}\n\n` +
       "## Output\n" +
       "Return ONLY valid JSON:\n" +
-      '{"thought":"...","text":"Chinese user-facing reply","activeSkills":["..."],"recommendedAction":{"type":"none|optimize_prompt|generate_image|edit_image|generate_video","params":{"prompt":"...","model":"...","aspectRatio":"...","referenceImageId":"..."}},"suggestedFollowUps":["...","..."]}\n\n' +
+      '{"thought":"...","text":"Chinese user-facing reply","activeSkills":["..."],"recommendedAction":{"type":"none|optimize_prompt|generate_image|edit_image|generate_video","params":{"prompt":"...","model":"...","aspectRatio":"...","referenceImageId":"..."}},"boardAction":{"type":"none|create_board_image_flow|create_board_video_flow|create_board_note","params":{"prompt":"...","model":"...","aspectRatio":"...","referenceImageId":"...","title":"...","body":"...","run":true}},"suggestedFollowUps":["...","..."]}\n\n' +
       referenceMsg;
 
     const tools = getAgentTools();
-    const toolCtx: ToolContext = { galleryItems };
+    const toolCtx: ToolContext = { boardContext: body.boardContext, galleryItems };
     const { payload, toolCalls } = await runAgentLoop(
       config,
       parsed.model,
@@ -180,10 +244,18 @@ export async function POST(req: NextRequest) {
 
     const parsedResponse = agentResponseSchema.parse(payload);
     validateActionModel(parsedResponse.recommendedAction);
+    validateActionModel(parsedResponse.boardAction);
+    if (surface === "board") {
+      parsedResponse.recommendedAction = { type: "none" };
+    } else {
+      parsedResponse.boardAction = { type: "none" };
+    }
     parsedResponse.activeSkills = validateActiveSkills(parsedResponse.activeSkills);
 
     if (parsedResponse.activeSkills.length === 0) {
-      parsedResponse.activeSkills = ["PromptEngineer", "ImageGenerator"];
+      parsedResponse.activeSkills = surface === "board"
+        ? ["BoardContextRetriever", "BoardComposer"]
+        : ["PromptEngineer", "ImageGenerator"];
     }
 
     return NextResponse.json({ ...parsedResponse, toolCalls });

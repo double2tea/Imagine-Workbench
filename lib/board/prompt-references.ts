@@ -1,8 +1,27 @@
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import type { BoardEdge, BoardNode } from "@/lib/board/types";
 
+export type BoardPromptReferenceSource = "连线" | "画板" | "库";
+
+export const BOARD_PROMPT_REFERENCE_GROUP_ORDER: readonly BoardPromptReferenceSource[] = [
+  "连线",
+  "画板",
+  "库",
+];
+
 export interface BoardPromptReference extends ReferenceImageRef {
-  sourceLabel?: string;
+  sourceLabel?: BoardPromptReferenceSource | "画廊";
+}
+
+export function resolveBoardPromptReferenceGroup(
+  reference: BoardPromptReference | ReferenceImageRef,
+): BoardPromptReferenceSource | null {
+  if (!("sourceLabel" in reference) || !reference.sourceLabel) return null;
+  if (reference.sourceLabel === "画廊") return "库";
+  if (reference.sourceLabel === "连线" || reference.sourceLabel === "画板" || reference.sourceLabel === "库") {
+    return reference.sourceLabel;
+  }
+  return null;
 }
 
 export interface BoardGalleryReferenceItem {
@@ -79,7 +98,7 @@ function galleryReferences(items: BoardGalleryReferenceItem[] | undefined): Boar
       id: item.id,
       role: "general" as const,
       url: item.url,
-      sourceLabel: "画廊",
+      sourceLabel: "库",
     }));
 }
 
@@ -93,18 +112,24 @@ export function buildBoardPromptReferences(input: {
     ? promptReferenceCandidates(input.nodes, input.edges, input.focus.nodeId)
     : generateReferenceCandidates(input.nodes, input.edges, input.focus.nodeId);
 
-  const wired = wiredRaw.map(reference => ({ ...reference, sourceLabel: "连线" }));
+  const wired: BoardPromptReference[] = wiredRaw.map(reference => ({ ...reference, sourceLabel: "连线" }));
   const seen = new Set(wired.map(reference => `${reference.id}:${reference.url}`));
 
-  const extras: BoardPromptReference[] = [];
-  for (const reference of [...boardImageAssetReferences(input.nodes), ...galleryReferences(input.galleryItems)]) {
+  const board = boardImageAssetReferences(input.nodes).filter(reference => {
     const key = `${reference.id}:${reference.url}`;
-    if (seen.has(key)) continue;
+    if (seen.has(key)) return false;
     seen.add(key);
-    extras.push(reference);
-  }
+    return true;
+  });
 
-  return [...wired, ...extras];
+  const library = galleryReferences(input.galleryItems).filter(reference => {
+    const key = `${reference.id}:${reference.url}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  return [...wired, ...board, ...library];
 }
 
 export function assetCompareReferenceUrl(

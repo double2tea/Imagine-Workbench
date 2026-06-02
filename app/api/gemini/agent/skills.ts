@@ -1,6 +1,6 @@
 export interface Skill {
   name: string;
-  category: 'prompt' | 'image' | 'video' | 'edit' | 'planning' | 'retrieval' | 'export' | 'system';
+  category: 'prompt' | 'image' | 'video' | 'edit' | 'planning' | 'retrieval' | 'export' | 'system' | 'board';
   description: string;
   whenToUse: string;
   examples: string[];
@@ -31,6 +31,42 @@ export const SKILL_REGISTRY: Skill[] = [
       "用户: '帮我优化这段提示词' -> 增加氛围、光线、构图、风格标注，必要时转结构化格式",
       "用户: '参考这张图帮我写提示词' -> 先提取主体、风格锚点、构图和色彩，再生成可执行提示词",
       "用户: '做个产品宣传图' -> 调用 get_prompt_blueprint 获取产品营销模板后填充",
+    ],
+  },
+  {
+    name: "PromptTemplateLibrarian",
+    category: "prompt",
+    description:
+      "提示词模板库检索器。负责从界面通用模板库中挑选可插入的 prompt 片段，帮助用户快速补足视角、分镜、角色一致性、产品主视觉和光影描述。",
+    whenToUse:
+      "当用户要求套用模板、插入提示词模板、寻找某类 prompt 写法，或当前提示词缺少视角/光影/产品/角色结构时。应调用 get_prompt_templates 查询真实模板。",
+    examples: [
+      "用户: '给这个角色提示词加一点一致性模板' -> 调用 get_prompt_templates 搜索 character 后融合",
+      "用户: '帮我找产品主视觉模板' -> 查询 product 类模板并说明可插入内容",
+    ],
+  },
+  {
+    name: "BoardContextRetriever",
+    category: "board",
+    description:
+      "画板上下文读取器。负责读取当前画板的节点、连线、选中节点和上下游引用关系，判断用户所说的“这个节点”“这条线”“上游提示词”“参考图”具体指向哪里。",
+    whenToUse:
+      "当前 surface 为 board，且用户提到画板、节点、连线、选中项、参考图、上游、下游、结果资产或 Agent 节点时。应调用 get_board_context 或 get_connected_context。",
+    examples: [
+      "用户: '把当前这个生成节点接上参考图' -> 先调用 get_connected_context 判断选中节点",
+      "用户: '总结一下这个画板现在有什么' -> 调用 get_board_context 读取节点和连线摘要",
+    ],
+  },
+  {
+    name: "BoardComposer",
+    category: "board",
+    description:
+      "画板编排助手。负责把用户创作意图转成画板原生动作，例如创建 Prompt 节点、创建图像/视频生成节点、连接 prompt 到生成节点、创建说明 Note。它不是通用 DAG 或 ComfyUI 工作流引擎。",
+    whenToUse:
+      "当前 surface 为 board，且用户要求在画板上新增创作流程、把想法落成节点、创建图像/视频生成链路、或记录规划笔记时。",
+    examples: [
+      "用户: '在画板上帮我生成一条产品海报流程' -> 返回 create_board_image_flow",
+      "用户: '先把这个项目思路记下来' -> 返回 create_board_note",
     ],
   },
   {

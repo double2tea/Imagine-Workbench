@@ -47,6 +47,8 @@ export interface BoardFlowNodeData extends Record<string, unknown> {
 
 export type BoardFlowNode = Node<BoardFlowNodeData, "board">;
 
+type BoardHandleZone = "edge" | "segment";
+
 interface BoardHandleProps {
   id: string;
   kind: BoardPortKind;
@@ -54,6 +56,8 @@ interface BoardHandleProps {
   position: Position;
   top?: number;
   type: "source" | "target";
+  zone?: BoardHandleZone;
+  zoneHeight?: number;
 }
 
 function nodeIcon(node: BoardNodeModel) {
@@ -71,14 +75,26 @@ function handleClass(kind: BoardPortKind): string {
   return "!border-blue-200 !bg-blue-400";
 }
 
-function BoardHandle({ id, kind, label, position, top, type }: BoardHandleProps) {
+function BoardHandle({ id, kind, label, position, top, type, zone = "edge", zoneHeight }: BoardHandleProps) {
+  const isEdgeZone = zone === "edge";
+  const segmentHeight = zoneHeight ?? 72;
   return (
     <Handle
       id={id}
       type={type}
       position={position}
-      className={`board-node-handle board-node-handle-${kind} !z-20 !h-5 !w-5 !border-2 ${handleClass(kind)}`}
-      style={typeof top === "number" ? { top } : undefined}
+      className={[
+        "board-node-handle",
+        `board-node-handle-${kind}`,
+        isEdgeZone ? "board-connection-zone-edge" : "board-connection-zone-segment",
+        "!z-20 !border-2",
+        handleClass(kind),
+      ].join(" ")}
+      style={{
+        ...(typeof top === "number" ? { top } : isEdgeZone ? { top: "50%" } : undefined),
+        height: isEdgeZone ? "calc(100% - 2.25rem)" : segmentHeight,
+        width: isEdgeZone ? 18 : 16,
+      }}
       title={label}
     />
   );
@@ -129,15 +145,17 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
       )}
       {(node.kind === "image-generate" || node.kind === "video-generate") && (
         <>
-          <BoardHandle id="prompt-in" type="target" position={Position.Left} kind="prompt" label="提示输入" top={78} />
-          {supportsReferenceInput(node) && <BoardHandle id="reference-in" type="target" position={Position.Left} kind="asset" label="参考输入" top={126} />}
+          <BoardHandle id="prompt-in" type="target" position={Position.Left} kind="prompt" label="提示输入" top={78} zone="segment" zoneHeight={64} />
+          {supportsReferenceInput(node) && (
+            <BoardHandle id="reference-in" type="target" position={Position.Left} kind="asset" label="参考输入" top={126} zone="segment" zoneHeight={64} />
+          )}
           {(node.status === "complete" || Boolean(node.resultAssetId) || data.hasResultConnection) && (
             <BoardHandle id="result-out" type="source" position={Position.Right} kind="result" label="结果输出" />
           )}
         </>
       )}
       {node.kind === "agent" && (
-        <BoardHandle id="agent-context-in" type="target" position={Position.Left} kind="agent" label="Agent 上下文输入" top={92} />
+        <BoardHandle id="agent-context-in" type="target" position={Position.Left} kind="agent" label="Agent 上下文输入" top={92} zone="segment" zoneHeight={72} />
       )}
 
       <div className="flex h-9 items-center justify-between gap-2 rounded-t-lg imagine-board-node-header px-3">

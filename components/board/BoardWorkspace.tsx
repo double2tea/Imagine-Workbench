@@ -968,7 +968,7 @@ export default function BoardWorkspace({
             onlyRenderVisibleElements
             connectOnClick
             connectionMode={ConnectionMode.Loose}
-            connectionRadius={28}
+            connectionRadius={48}
             connectionLineType={ConnectionLineType.SmoothStep}
             connectionLineStyle={{ stroke: "#60a5fa", strokeDasharray: "7 5", strokeWidth: 2.5 }}
             defaultEdgeOptions={{ type: "smoothstep" }}

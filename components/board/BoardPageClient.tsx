@@ -13,6 +13,7 @@ import BoardWorkspace from "@/components/board/BoardWorkspace";
 import PreviewImage from "@/components/PreviewImage";
 import SettingsModal from "@/components/settings/SettingsModal";
 import WorkspaceNotices, { type WorkspaceNotice } from "@/components/workbench/WorkspaceNotices";
+import type { AgentBoardContext, AgentBoardNodeSummary } from "@/lib/agent-context";
 import { persistThemeMode, readStoredThemeMode, type ThemeMode } from "@/lib/theme-mode";
 import { useAgentController } from "@/hooks/useAgentController";
 import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
@@ -62,6 +63,8 @@ type MaskDestination = "creative" | "agent";
 type BoardMode = "image" | "video";
 type GenerateBoardNode = BoardImageGenerateNode | BoardVideoGenerateNode;
 type AgentGenerateAction = AgentToolAction & { type: "generate_image" | "generate_video" };
+type AgentBoardFlowAction = AgentToolAction & { type: "create_board_image_flow" | "create_board_video_flow" };
+type AgentBoardNoteAction = AgentToolAction & { type: "create_board_note" };
 
 interface BoardPageProps {
   boardId?: string;
@@ -230,8 +233,80 @@ function isAgentGenerateAction(action: AgentToolAction): action is AgentGenerate
   return action.type === "generate_image" || action.type === "generate_video";
 }
 
+function isAgentBoardFlowAction(action: AgentToolAction): action is AgentBoardFlowAction {
+  return action.type === "create_board_image_flow" || action.type === "create_board_video_flow";
+}
+
+function isAgentBoardNoteAction(action: AgentToolAction): action is AgentBoardNoteAction {
+  return action.type === "create_board_note";
+}
+
+function shouldRunAgentBoardFlow(action: AgentGenerateAction | AgentBoardFlowAction): boolean {
+  if (isAgentBoardFlowAction(action)) return action.params?.run !== false;
+  return true;
+}
+
 function isPlaceholderRunningHubModel(model: string): boolean {
   return model.includes("<webappId>") || model.includes("<workflowId>");
+}
+
+function sliceAgentText(value: string): string {
+  return value.trim().slice(0, 240);
+}
+
+function summarizeBoardNodeForAgent(node: BoardDocument["nodes"][number]): AgentBoardNodeSummary {
+  switch (node.kind) {
+    case "asset":
+      return {
+        id: node.id,
+        kind: node.kind,
+        title: node.title,
+        assetId: node.asset.assetId,
+        assetType: node.asset.type,
+        model: node.asset.model,
+        prompt: sliceAgentText(node.asset.prompt),
+      };
+    case "prompt":
+      return {
+        id: node.id,
+        kind: node.kind,
+        title: node.title,
+        prompt: sliceAgentText(node.prompt),
+      };
+    case "reference-group":
+      return {
+        id: node.id,
+        kind: node.kind,
+        title: node.title,
+        body: `${node.references.length} references`,
+      };
+    case "image-generate":
+    case "video-generate":
+      return {
+        id: node.id,
+        kind: node.kind,
+        title: node.title,
+        prompt: sliceAgentText(node.prompt),
+        model: node.model,
+        aspectRatio: node.aspectRatio,
+        status: node.status,
+        resultAssetId: node.resultAssetId,
+      };
+    case "agent":
+      return {
+        id: node.id,
+        kind: node.kind,
+        title: node.title,
+        instruction: sliceAgentText(node.instruction),
+      };
+    case "note":
+      return {
+        id: node.id,
+        kind: node.kind,
+        title: node.title,
+        body: sliceAgentText(node.body),
+      };
+  }
 }
 
 function findBoardAssetNodeByAssetId(nodes: BoardDocument["nodes"], assetId: string) {
@@ -594,6 +669,27 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     setIsMaskOpen(false);
   };
 
+  const buildAgentBoardContext = useCallback((): AgentBoardContext => ({
+    boardId: boardController.board.id,
+    title: boardController.board.title,
+    selectedNodeId: boardController.selectedNodeId,
+    selectedEdgeId: boardController.selectedEdgeId,
+    nodes: boardController.board.nodes.slice(0, 60).map(summarizeBoardNodeForAgent),
+    edges: boardController.board.edges.slice(0, 100).map(edge => ({
+      id: edge.id,
+      kind: edge.kind,
+      from: edge.from,
+      to: edge.to,
+    })),
+  }), [
+    boardController.board.edges,
+    boardController.board.id,
+    boardController.board.nodes,
+    boardController.board.title,
+    boardController.selectedEdgeId,
+    boardController.selectedNodeId,
+  ]);
+
   const executeBoardAgentToolAction = useCallback(async ({
     action,
     references,
@@ -601,7 +697,25 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     action: AgentToolAction;
     references: ReferenceImageRef[];
   }): Promise<boolean> => {
-    if (!isAgentGenerateAction(action)) return false;
+    if (isAgentBoardNoteAction(action)) {
+      const body = action.params?.body?.trim() || action.params?.prompt?.trim();
+      if (!body) {
+        pushWorkspaceNotice("error", "Agent 画板笔记缺少内容");
+        return true;
+      }
+      boardController.addNoteNode({
+        body,
+        title: action.params?.title || "Agent Note",
+        position: {
+          x: 160 + boardController.board.nodes.length * 28,
+          y: 180 + boardController.board.nodes.length * 24,
+        },
+      });
+      pushWorkspaceNotice("success", "已创建 Agent 画板笔记");
+      return true;
+    }
+
+    if (!isAgentGenerateAction(action) && !isAgentBoardFlowAction(action)) return false;
 
     const promptFromAgent = action.params?.prompt?.trim() ?? "";
     if (!promptFromAgent) {
@@ -609,12 +723,13 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       return true;
     }
 
-    const kind = action.type === "generate_image" ? "image-generate" : "video-generate";
+    const kind = action.type === "generate_image" || action.type === "create_board_image_flow" ? "image-generate" : "video-generate";
     const model = action.params?.model || (kind === "image-generate" ? DEFAULT_IMAGE_MODEL : DEFAULT_VIDEO_MODEL);
     if (isPlaceholderRunningHubModel(model)) {
       pushWorkspaceNotice("error", "请先填写真实的 RunningHub webappId 或 workflowId");
       return true;
     }
+    const shouldRun = shouldRunAgentBoardFlow(action);
     const baseIndex = boardController.board.nodes.length;
     const promptNodeId = boardController.addPromptNode({
       prompt: promptFromAgent,
@@ -663,6 +778,11 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           { nodeId: generateNodeId, portId: "reference-in", portKind: "asset" },
         );
       });
+
+      if (!shouldRun) {
+        pushWorkspaceNotice("success", "已创建 Agent 图片生成节点流程");
+        return true;
+      }
 
       boardController.updateGenerateNode(generateNodeId, { errorMessage: undefined, status: "processing" });
       const didStart = await generateManualImage({
@@ -733,6 +853,11 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       );
     });
 
+    if (!shouldRun) {
+      pushWorkspaceNotice("success", "已创建 Agent 视频生成节点流程");
+      return true;
+    }
+
     boardController.updateGenerateNode(generateNodeId, { errorMessage: undefined, status: "processing" });
     const didStart = await generateManualVideo({
       boardNodeId: generateNodeId,
@@ -779,7 +904,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     agentReferences,
     agentReferenceUrl,
     buildProviderHeaders,
+    chatStorageKey: `imagine_agent_chat:${boardController.board.id}`,
     executeToolActionOverride: executeBoardAgentToolAction,
+    getBoardContext: buildAgentBoardContext,
     generateManualImage,
     generateManualVideo,
     handleSelectImageModel,
@@ -788,6 +915,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     launchMaskEditor,
     optimizeActivePrompt,
     selectedChatModel,
+    surface: "board",
     setAgentInput,
     setAspectRatio,
     setIsAgentDockOpen,

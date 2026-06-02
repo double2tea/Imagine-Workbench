@@ -18,13 +18,27 @@ export interface ChatMessage {
       referenceImageId?: string;
     };
   };
+  boardAction?: {
+    type: "none" | "create_board_image_flow" | "create_board_video_flow" | "create_board_note";
+    params?: {
+      prompt?: string;
+      model?: string;
+      aspectRatio?: string;
+      referenceImageId?: string;
+      title?: string;
+      body?: string;
+      run?: boolean;
+    };
+  };
   suggestedFollowUps?: string[];
   interactiveState?: "idle" | "executing" | "completed" | "declined";
   activeSkills?: string[];
   toolCalls?: Array<{ name: string; args: Record<string, unknown> }>;
 }
 
-export type AgentToolAction = NonNullable<ChatMessage["recommendedAction"]>;
+export type AgentWorkbenchAction = NonNullable<ChatMessage["recommendedAction"]>;
+export type AgentBoardAction = NonNullable<ChatMessage["boardAction"]>;
+export type AgentToolAction = AgentWorkbenchAction | AgentBoardAction;
 
 interface AgentDockProps {
   activeCountdownId: string | null;
@@ -65,10 +79,16 @@ const TOOL_LABELS: Record<string, string> = {
   get_skill_info: "查询技能",
   get_gallery_assets: "搜索资产",
   get_prompt_blueprint: "获取模板",
+  get_prompt_templates: "查询模板库",
+  get_board_context: "读取画板",
+  get_connected_context: "读取连接",
 };
 
 const SKILL_LABELS: Record<string, { label: string; className: string }> = {
   PromptEngineer: { label: "提示词工程", className: "bg-teal-500/12 text-teal-300 border-teal-500/20" },
+  PromptTemplateLibrarian: { label: "模板库", className: "bg-lime-500/12 text-lime-300 border-lime-500/20" },
+  BoardContextRetriever: { label: "画板上下文", className: "bg-blue-500/12 text-blue-300 border-blue-500/20" },
+  BoardComposer: { label: "画板编排", className: "bg-fuchsia-500/12 text-fuchsia-300 border-fuchsia-500/20" },
   ImageGenerator: { label: "智能生图", className: "bg-rose-500/12 text-rose-300 border-rose-500/20" },
   VideoGenerator: { label: "视频合成", className: "bg-purple-500/12 text-purple-300 border-purple-500/20" },
   ImageEditor: { label: "局部重绘", className: "bg-amber-500/12 text-amber-300 border-amber-500/20" },
@@ -86,7 +106,21 @@ const ACTION_LABELS: Record<AgentToolAction["type"], string> = {
   generate_image: "生成图片",
   edit_image: "编辑图片",
   generate_video: "生成视频",
+  create_board_image_flow: "创建图片节点流程",
+  create_board_video_flow: "创建视频节点流程",
+  create_board_note: "创建画板笔记",
 };
+
+function getExecutableAction(message: ChatMessage): AgentToolAction | null {
+  if (message.boardAction && message.boardAction.type !== "none") return message.boardAction;
+  if (message.recommendedAction && message.recommendedAction.type !== "none") return message.recommendedAction;
+  return null;
+}
+
+function getBoardActionBody(action: AgentToolAction): string | undefined {
+  if (action.type !== "create_board_note") return undefined;
+  return action.params?.body;
+}
 
 function parseAgentContent(content: string): AgentContentLine[] {
   const normalized = content
@@ -178,6 +212,9 @@ function AgentMessage({
   onExecuteAction: (messageId: string, action: AgentToolAction) => void;
   onSuggestedPrompt: (prompt: string) => void;
 }) {
+  const executableAction = getExecutableAction(message);
+  const boardActionBody = executableAction ? getBoardActionBody(executableAction) : undefined;
+
   return (
     <div className={`flex flex-col gap-1.5 ${message.role === "user" ? "self-end ml-10" : "self-start mr-10"}`}>
       <span className={`imagine-agent-role-label ${
@@ -244,7 +281,7 @@ function AgentMessage({
         </details>
       )}
 
-      {message.role === "assistant" && message.recommendedAction && message.recommendedAction.type !== "none" && (
+      {message.role === "assistant" && executableAction && (
         <div className="imagine-agent-action-panel">
           <span className="imagine-agent-action-panel-title">建议动作</span>
 
@@ -252,24 +289,33 @@ function AgentMessage({
             <p>
               <strong className="text-blue-400">操作:</strong>{" "}
               <code className="bg-black/30 px-1 py-0.5 rounded text-[10px] font-mono text-blue-300">
-                {ACTION_LABELS[message.recommendedAction.type]}
+                {ACTION_LABELS[executableAction.type]}
               </code>
             </p>
 
-            {message.recommendedAction.params?.prompt && (
+            {executableAction.params?.prompt && (
               <p className="leading-normal">
                 <strong className="text-blue-400">规划提示词:</strong>{" "}
                 <span className="imagine-agent-action-muted">
-                  &ldquo;{message.recommendedAction.params.prompt}&rdquo;
+                  &ldquo;{executableAction.params.prompt}&rdquo;
                 </span>
               </p>
             )}
 
-            {message.recommendedAction.params?.aspectRatio && (
+            {executableAction.params?.aspectRatio && (
               <p>
                 <strong className="text-blue-400">画素尺寸:</strong>{" "}
                 <span className="text-[10px] bg-black/30 px-1 py-0.5 rounded font-mono text-blue-300">
-                  {message.recommendedAction.params.aspectRatio}
+                  {executableAction.params.aspectRatio}
+                </span>
+              </p>
+            )}
+
+            {boardActionBody && (
+              <p className="leading-normal">
+                <strong className="text-blue-400">笔记:</strong>{" "}
+                <span className="imagine-agent-action-muted">
+                  &ldquo;{boardActionBody}&rdquo;
                 </span>
               </p>
             )}
@@ -281,7 +327,7 @@ function AgentMessage({
                 <button
                   type="button"
                   onClick={() => {
-                    if (message.recommendedAction) onExecuteAction(message.id, message.recommendedAction);
+                    onExecuteAction(message.id, executableAction);
                   }}
                   className="imagine-primary-action flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-1.5 px-3 rounded-lg text-[10px] flex items-center justify-center gap-1 shadow-md hover:shadow-[0_0_15px_rgba(37,99,235,0.3)] cursor-pointer transition"
                 >

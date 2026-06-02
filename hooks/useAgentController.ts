@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { AgentToolAction, ChatMessage } from "@/components/agent/AgentDock";
+import type { AgentBoardContext, AgentSurface } from "@/lib/agent-context";
 import type { CreationMode } from "@/components/creation/CreationModeTabs";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import type { StorageItem } from "@/lib/db";
@@ -13,7 +14,9 @@ interface UseAgentControllerParams {
   agentReferences: ReferenceImageRef[];
   agentReferenceUrl: string | null;
   buildProviderHeaders: (target?: string) => Record<string, string>;
+  chatStorageKey?: string;
   executeToolActionOverride?: (input: ExecuteToolActionOverrideInput) => Promise<boolean> | boolean;
+  getBoardContext?: () => AgentBoardContext;
   generateManualImage: (overrides?: GenerationOverrides) => Promise<boolean>;
   generateManualVideo: (overrides?: GenerationOverrides) => Promise<boolean>;
   handleSelectImageModel: (model: string) => void;
@@ -22,6 +25,7 @@ interface UseAgentControllerParams {
   launchMaskEditor: (imageUrl: string, id: string, destination?: "creative" | "agent") => void;
   optimizeActivePrompt: (promptOverride?: string) => Promise<void>;
   selectedChatModel: string;
+  surface?: AgentSurface;
   setAgentInput: Dispatch<SetStateAction<string>>;
   setAspectRatio: Dispatch<SetStateAction<string>>;
   setIsAgentDockOpen: Dispatch<SetStateAction<boolean>>;
@@ -42,6 +46,23 @@ interface GenerationOverrides {
 interface ExecuteToolActionOverrideInput {
   action: AgentToolAction;
   references: ReferenceImageRef[];
+}
+
+interface AgentResponsePayload {
+  activeSkills?: string[];
+  boardAction?: ChatMessage["boardAction"];
+  recommendedAction?: ChatMessage["recommendedAction"];
+  suggestedFollowUps?: string[];
+  text?: string;
+  thought?: string;
+  toolCalls?: ChatMessage["toolCalls"];
+}
+
+function canAutoExecuteAgentAction(action: AgentToolAction): boolean {
+  return action.type === "optimize_prompt" ||
+    action.type === "generate_image" ||
+    action.type === "edit_image" ||
+    action.type === "generate_video";
 }
 
 function makeClientId(prefix: string): string {
@@ -66,7 +87,9 @@ export function useAgentController({
   agentReferences,
   agentReferenceUrl,
   buildProviderHeaders,
+  chatStorageKey = "imagine_agent_chat",
   executeToolActionOverride,
+  getBoardContext,
   generateManualImage,
   generateManualVideo,
   handleSelectImageModel,
@@ -75,6 +98,7 @@ export function useAgentController({
   launchMaskEditor,
   optimizeActivePrompt,
   selectedChatModel,
+  surface = "workbench",
   setAgentInput,
   setAspectRatio,
   setIsAgentDockOpen,
@@ -93,14 +117,20 @@ export function useAgentController({
 
   useEffect(() => {
     const restoreAgentState = window.setTimeout(() => {
-      const storedChat = localStorage.getItem("imagine_agent_chat");
-      if (storedChat) {
+      const storedChat = localStorage.getItem(chatStorageKey);
+      if (!storedChat) {
+        setAgentMessages([WELCOME_MESSAGE]);
+      } else {
         try {
           const parsed: unknown = JSON.parse(storedChat);
           if (Array.isArray(parsed) && parsed.length > 0) {
             setAgentMessages(parsed as ChatMessage[]);
+          } else {
+            setAgentMessages([WELCOME_MESSAGE]);
           }
-        } catch { /* ignore corrupt data */ }
+        } catch {
+          setAgentMessages([WELCOME_MESSAGE]);
+        }
       }
 
       const storedAutoExec = localStorage.getItem("imagine_auto_execute");
@@ -108,7 +138,7 @@ export function useAgentController({
     }, 0);
 
     return () => window.clearTimeout(restoreAgentState);
-  }, []);
+  }, [chatStorageKey]);
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -116,9 +146,9 @@ export function useAgentController({
 
   useEffect(() => {
     if (agentMessages.length > 1) {
-      localStorage.setItem("imagine_agent_chat", JSON.stringify(agentMessages));
+      localStorage.setItem(chatStorageKey, JSON.stringify(agentMessages));
     }
-  }, [agentMessages]);
+  }, [agentMessages, chatStorageKey]);
 
   const clearActiveCountdown = () => {
     if (autoCountdownInterval.current) clearInterval(autoCountdownInterval.current);
@@ -273,6 +303,8 @@ export function useAgentController({
         headers: { "Content-Type": "application/json", ...headers },
         body: JSON.stringify({
           messages: requestHistory,
+          surface,
+          boardContext: getBoardContext?.(),
           gallerySummary,
           agentReferences: activeAgentReferences.map(reference => ({ id: reference.id, url: reference.url })),
           agentReferenceId: activeAgentReferences[0]?.id || agentReferenceId || undefined,
@@ -281,15 +313,19 @@ export function useAgentController({
       });
 
       if (response.ok) {
-        const agentResponse = await response.json();
+        const agentResponse = await response.json() as AgentResponsePayload;
         const assistantMsgId = makeClientId("asst");
+        const recommendedAction = agentResponse.recommendedAction || { type: "none" as const };
+        const boardAction = agentResponse.boardAction || { type: "none" as const };
+        const executableAction = boardAction.type !== "none" ? boardAction : recommendedAction;
 
         const assistantMessage: ChatMessage = {
           id: assistantMsgId,
           role: "assistant",
           content: agentResponse.text || "我已收到指令，该项目可以怎么推进？",
           thought: agentResponse.thought || "分析场景，规划后续设计合成步骤...",
-          recommendedAction: agentResponse.recommendedAction || { type: "none" },
+          recommendedAction,
+          boardAction,
           suggestedFollowUps: agentResponse.suggestedFollowUps || [],
           interactiveState: "idle",
           activeSkills: agentResponse.activeSkills || [],
@@ -298,8 +334,8 @@ export function useAgentController({
 
         setAgentMessages(prev => [...prev, assistantMessage]);
 
-        if (autoExecute && agentResponse.recommendedAction && agentResponse.recommendedAction.type !== "none") {
-          startAutoCountdown(assistantMsgId, agentResponse.recommendedAction);
+        if (autoExecute && canAutoExecuteAgentAction(executableAction)) {
+          startAutoCountdown(assistantMsgId, executableAction);
         }
       }
     } catch (error) {
@@ -323,7 +359,7 @@ export function useAgentController({
 
   const handleClearChat = () => {
     setAgentMessages([WELCOME_MESSAGE]);
-    localStorage.removeItem("imagine_agent_chat");
+    localStorage.removeItem(chatStorageKey);
   };
 
   return {

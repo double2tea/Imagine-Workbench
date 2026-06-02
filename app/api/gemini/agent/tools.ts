@@ -1,4 +1,6 @@
 import { z } from "zod";
+import type { AgentBoardContext } from "@/lib/agent-context";
+import { PROMPT_TEMPLATES } from "@/lib/prompt-templates";
 import { MODEL_CAPABILITIES, type ProviderModelCapability } from "@/lib/providers/model-catalog";
 import type { ToolDefinition } from "@/lib/providers/types";
 import { SKILL_REGISTRY } from "./skills";
@@ -31,6 +33,19 @@ const getPromptBlueprintSchema = z.object({
     "poster-flyer",
     "app-web-design",
   ]),
+});
+
+const getPromptTemplatesSchema = z.object({
+  category: z.enum(["view", "storyboard", "character", "product", "lighting", "custom"]).optional(),
+  search: z.string().optional(),
+});
+
+const getBoardContextSchema = z.object({
+  scope: z.enum(["summary", "full"]).optional(),
+});
+
+const getConnectedContextSchema = z.object({
+  nodeId: z.string().optional(),
 });
 
 // -- Tool definitions (JSON Schema hand-written for OpenAI compatibility) --
@@ -130,11 +145,72 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "get_prompt_templates",
+      description:
+        "查询用户界面通用提示词模板库。可按模板类别或关键词过滤，返回模板标题、场景、正向提示词、反向提示词和参数提示。",
+      parameters: {
+        type: "object",
+        properties: {
+          category: {
+            type: "string",
+            enum: ["view", "storyboard", "character", "product", "lighting", "custom"],
+            description: "模板类别，不传返回全部",
+          },
+          search: {
+            type: "string",
+            description: "按标题、场景、提示词关键词搜索",
+          },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_board_context",
+      description:
+        "读取当前画板上下文。用于理解节点、连线、选中节点、生成节点参数和资产关系。仅当当前 surface 是 board 时有效。",
+      parameters: {
+        type: "object",
+        properties: {
+          scope: {
+            type: "string",
+            enum: ["summary", "full"],
+            description: "summary 返回计数与选中项；full 返回节点和连线摘要",
+          },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_connected_context",
+      description:
+        "读取某个画板节点的上下游连接上下文。不传 nodeId 时读取当前选中节点。用于判断 prompt/reference/result/agent-context 连线。",
+      parameters: {
+        type: "object",
+        properties: {
+          nodeId: {
+            type: "string",
+            description: "画板节点 ID；不传使用 selectedNodeId",
+          },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
 ];
 
 // -- Tool context (per-request dynamic data) --
 
 export interface ToolContext {
+  boardContext?: AgentBoardContext;
   galleryItems: Array<{
     id: string;
     type: string;
@@ -201,9 +277,61 @@ export function executeToolCall(name: string, args: string, ctx: ToolContext): s
       const bp = PROMPT_BLUEPRINTS[category];
       return JSON.stringify(bp);
     }
+    case "get_prompt_templates": {
+      const { category, search } = getPromptTemplatesSchema.parse(JSON.parse(args));
+      const q = search?.trim().toLowerCase();
+      const templates = PROMPT_TEMPLATES.filter(template => {
+        if (category && template.category !== category) return false;
+        if (!q) return true;
+        return [
+          template.title,
+          template.scene,
+          template.positivePrompt,
+          template.negativePrompt ?? "",
+          template.parameterHint ?? "",
+        ].some(value => value.toLowerCase().includes(q));
+      });
+      return JSON.stringify(templates.slice(0, 12));
+    }
+    case "get_board_context": {
+      const { scope } = getBoardContextSchema.parse(JSON.parse(args));
+      if (!ctx.boardContext) return JSON.stringify({ error: "No board context in this request" });
+      if (scope === "summary") {
+        return JSON.stringify({
+          boardId: ctx.boardContext.boardId,
+          title: ctx.boardContext.title,
+          selectedNodeId: ctx.boardContext.selectedNodeId,
+          selectedEdgeId: ctx.boardContext.selectedEdgeId,
+          nodeCount: ctx.boardContext.nodes.length,
+          edgeCount: ctx.boardContext.edges.length,
+          nodeKinds: countBy(ctx.boardContext.nodes.map(node => node.kind)),
+        });
+      }
+      return JSON.stringify(ctx.boardContext);
+    }
+    case "get_connected_context": {
+      const { nodeId } = getConnectedContextSchema.parse(JSON.parse(args));
+      if (!ctx.boardContext) return JSON.stringify({ error: "No board context in this request" });
+      const targetNodeId = nodeId ?? ctx.boardContext.selectedNodeId;
+      if (!targetNodeId) return JSON.stringify({ error: "No node selected" });
+      const edges = ctx.boardContext.edges.filter(edge => edge.from.nodeId === targetNodeId || edge.to.nodeId === targetNodeId);
+      const connectedNodeIds = new Set(edges.flatMap(edge => [edge.from.nodeId, edge.to.nodeId]));
+      return JSON.stringify({
+        node: ctx.boardContext.nodes.find(node => node.id === targetNodeId) ?? null,
+        connectedNodes: ctx.boardContext.nodes.filter(node => connectedNodeIds.has(node.id) && node.id !== targetNodeId),
+        edges,
+      });
+    }
     default:
       return JSON.stringify({ error: `Unknown tool: ${name}` });
   }
+}
+
+function countBy(values: string[]): Record<string, number> {
+  return values.reduce<Record<string, number>>((acc, value) => {
+    acc[value] = (acc[value] ?? 0) + 1;
+    return acc;
+  }, {});
 }
 
 // -- Prompt blueprints --

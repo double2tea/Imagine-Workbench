@@ -1399,23 +1399,80 @@ html[data-imagine-theme="dark"] .imagine-root-body {
   z-index: 50;
   margin-bottom: 8px;
   display: flex;
-  max-height: 13rem;
+  max-height: 14rem;
   width: 100%;
   flex-direction: column;
-  gap: 6px;
-  overflow-y: auto;
+  min-height: 0;
+  overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--iw-accent) 28%, var(--iw-border));
   border-radius: var(--iw-radius-lg);
   background: color-mix(in srgb, var(--iw-panel) 96%, transparent);
-  padding: 10px;
+  padding: 0;
   color: var(--iw-text);
   box-shadow: var(--iw-card-shadow);
   backdrop-filter: blur(12px);
+  touch-action: pan-y;
+}
+
+.imagine-at-dropdown-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0;
+  padding: 10px 12px 6px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--iw-accent-strong);
+}
+
+.imagine-at-dropdown-header-meta {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 8px;
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--iw-faint);
+}
+
+.imagine-at-dropdown-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 2px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .imagine-at-dropdown-empty {
+  padding: 10px;
   text-align: center;
   font-size: 11px;
+  color: var(--iw-muted);
+}
+
+.imagine-at-dropdown-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.imagine-at-dropdown-group + .imagine-at-dropdown-group {
+  margin-top: 2px;
+  padding-top: 6px;
+  border-top: 1px solid color-mix(in srgb, var(--iw-border) 65%, transparent);
+}
+
+.imagine-at-dropdown-group-label {
+  padding: 0 4px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   color: var(--iw-muted);
 }
 
@@ -2155,6 +2212,9 @@ html[data-imagine-theme="dark"] .imagine-root-body {
 .board-node-handle {
   --board-handle-scale: 0.72;
   --board-handle-translate: translate(-50%, -50%);
+  min-height: 44px;
+  min-width: 14px;
+  border-radius: 9999px;
   box-shadow: 0 4px 14px rgba(15, 23, 42, 0.28);
   opacity: 0 !important;
   filter: saturate(0.8);
@@ -2164,7 +2224,40 @@ html[data-imagine-theme="dark"] .imagine-root-body {
     opacity 140ms ease,
     filter 140ms ease,
     box-shadow 140ms ease,
-    transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    background-color 140ms ease,
+    border-color 140ms ease;
+}
+
+.board-connection-zone-edge {
+  --board-handle-translate: translate(-50%, -50%);
+  border-radius: 10px !important;
+  min-height: calc(100% - 2.25rem);
+}
+
+.board-connection-zone-edge.react-flow__handle-left {
+  --board-handle-translate: translate(-58%, -50%);
+  left: 0 !important;
+}
+
+.board-connection-zone-edge.react-flow__handle-right {
+  --board-handle-translate: translate(58%, -50%);
+  right: 0 !important;
+}
+
+.board-connection-zone-segment {
+  border-radius: 10px !important;
+  min-height: 56px;
+}
+
+.board-connection-zone-segment.react-flow__handle-left {
+  --board-handle-translate: translate(-58%, -50%);
+  left: 0 !important;
+}
+
+.board-connection-zone-segment.react-flow__handle-right {
+  --board-handle-translate: translate(58%, -50%);
+  right: 0 !important;
 }
 
 .board-node-handle.react-flow__handle-left {
@@ -2191,6 +2284,24 @@ html[data-imagine-theme="dark"] .imagine-root-body {
   --board-handle-scale: 1;
   opacity: 1 !important;
   filter: saturate(1.1);
+  pointer-events: all !important;
+}
+
+.board-node-shell:is(:hover, :focus-within) .board-connection-zone-edge,
+.board-node-shell[data-selected="true"] .board-connection-zone-edge,
+.board-node-shell:is(:hover, :focus-within) .board-connection-zone-segment,
+.board-node-shell[data-selected="true"] .board-connection-zone-segment,
+.board-node-shell[data-connecting="true"] .board-connection-zone-edge.connectionindicator,
+.board-node-shell[data-connecting="true"] .board-connection-zone-segment.connectionindicator {
+  opacity: 0.24 !important;
+  background: color-mix(in srgb, var(--iw-panel) 8%, transparent) !important;
+  border-color: color-mix(in srgb, var(--iw-border) 28%, transparent) !important;
+  box-shadow: none;
+}
+
+.board-node-shell[data-connecting="true"] .board-connection-zone-edge.connectionindicator,
+.board-node-shell[data-connecting="true"] .board-connection-zone-segment.connectionindicator {
+  opacity: 0.32 !important;
 }
 
 .board-node-shell:is(:hover, :focus-within) .board-node-handle.connectionindicator,
@@ -2198,6 +2309,32 @@ html[data-imagine-theme="dark"] .imagine-root-body {
 .board-node-shell[data-connecting="true"] .board-node-handle.connectionindicator,
 .board-node-handle.connectingfrom {
   pointer-events: all !important;
+}
+
+.board-node-handle.board-node-handle-prompt:is(:hover, .connectionindicator, .connectingfrom, .connectingto),
+.board-node-shell:is(:hover, :focus-within) .board-node-handle-prompt.board-connection-zone-edge,
+.board-node-shell:is(:hover, :focus-within) .board-node-handle-prompt.board-connection-zone-segment {
+  background: color-mix(in srgb, #2dd4bf 8%, transparent) !important;
+  border-color: color-mix(in srgb, #2dd4bf 22%, transparent) !important;
+}
+
+.board-node-handle.board-node-handle-asset:is(:hover, .connectionindicator, .connectingfrom, .connectingto),
+.board-node-shell:is(:hover, :focus-within) .board-node-handle-asset.board-connection-zone-edge,
+.board-node-shell:is(:hover, :focus-within) .board-node-handle-asset.board-connection-zone-segment {
+  background: color-mix(in srgb, #60a5fa 8%, transparent) !important;
+  border-color: color-mix(in srgb, #60a5fa 22%, transparent) !important;
+}
+
+.board-node-handle.board-node-handle-result:is(:hover, .connectionindicator, .connectingfrom, .connectingto),
+.board-node-shell:is(:hover, :focus-within) .board-node-handle-result.board-connection-zone-edge {
+  background: color-mix(in srgb, #34d399 8%, transparent) !important;
+  border-color: color-mix(in srgb, #34d399 22%, transparent) !important;
+}
+
+.board-node-handle.board-node-handle-agent:is(:hover, .connectionindicator, .connectingfrom, .connectingto),
+.board-node-shell:is(:hover, :focus-within) .board-node-handle-agent.board-connection-zone-segment {
+  background: color-mix(in srgb, #a78bfa 8%, transparent) !important;
+  border-color: color-mix(in srgb, #a78bfa 22%, transparent) !important;
 }
 
 .board-node-handle:hover {
