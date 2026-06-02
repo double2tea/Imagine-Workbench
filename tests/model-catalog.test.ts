@@ -184,6 +184,15 @@ test("agnes provider exposes documented chat image and video models", () => {
   const video = getModelCapability("agnes:agnes-video-v2.0", "video");
   assert.equal(image.supportsReferences, true);
   assert.deepEqual(getImageResolutionOptions("agnes:agnes-image-2.1-flash", "4:3"), [
+    { value: "1024x768", label: "720p" },
+    { value: "custom", label: "自定义尺寸" },
+  ]);
+  assert.deepEqual(getImageResolutionOptions("agnes:agnes-image-2.1-flash", "16:9"), [
+    { value: "1280x720", label: "720p" },
+    { value: "custom", label: "自定义尺寸" },
+  ]);
+  assert.deepEqual(getImageResolutionOptions("agnes:agnes-image-2.1-flash", "3:2"), [
+    { value: "1152x768", label: "720p" },
     { value: "custom", label: "自定义尺寸" },
   ]);
   assert.equal(video.sizes.some(option => option.value === "1152x768"), true);

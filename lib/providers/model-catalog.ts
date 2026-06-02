@@ -261,7 +261,23 @@ const RUNNINGHUB_IMAGE_SIZES: ParameterOption[] = RUNNINGHUB_VIDEO_SIZES.map(opt
   imageResolutionOption(option.value),
 );
 
-const AGNES_IMAGE_SIZES: ParameterOption[] = [imageResolutionOption("custom")];
+const AGNES_IMAGE_SIZES: ParameterOption[] = [
+  imageResolutionOption("1024x1024"),
+  imageResolutionOption("1024x768"),
+  imageResolutionOption("768x1024"),
+  imageResolutionOption("1152x768"),
+  imageResolutionOption("768x1152"),
+  imageResolutionOption("1280x720"),
+  imageResolutionOption("720x1280"),
+  imageResolutionOption("custom"),
+];
+
+const AGNES_IMAGE_SIZE_RATIOS: Record<string, string> = {
+  "1024x768": "4:3",
+  "768x1024": "3:4",
+  "1152x768": "3:2",
+  "768x1152": "2:3",
+};
 
 const AGNES_VIDEO_SIZES: ParameterOption[] = [
   { value: "auto", label: "Auto" },
@@ -1035,6 +1051,8 @@ function aspectRatiosFromSizes(sizes: ParameterOption[]): ParameterOption[] {
 function getPixelSizeAspectRatio(value: string): string | null {
   const documentedRatio = DOCUMENTED_IMAGE_SIZE_RATIOS[value];
   if (documentedRatio) return documentedRatio;
+  const agnesRatio = AGNES_IMAGE_SIZE_RATIOS[value];
+  if (agnesRatio) return agnesRatio;
 
   const match = value.match(/^(\d+)x(\d+)$/);
   if (!match) return null;
