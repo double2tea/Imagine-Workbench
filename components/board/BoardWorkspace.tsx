@@ -126,6 +126,29 @@ const nodeTypes = { board: BoardNode };
 const DEFAULT_BOARD_IMAGE_MODEL = "modelscope:Qwen/Qwen-Image";
 const DEFAULT_BOARD_REFERENCE_IMAGE_MODEL = "modelscope:Qwen/Qwen-Image-Edit";
 
+function sameStringList(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((value, index) => value === right[index]);
+}
+
+function sameFlowNodeShell(left: BoardFlowNode, right: BoardFlowNode): boolean {
+  return (
+    left.id === right.id &&
+    left.selected === right.selected &&
+    left.position.x === right.position.x &&
+    left.position.y === right.position.y &&
+    left.dragging === right.dragging &&
+    left.width === right.width &&
+    left.height === right.height &&
+    left.data === right.data
+  );
+}
+
+function sameFlowNodes(left: BoardFlowNode[], right: BoardFlowNode[]): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((node, index) => sameFlowNodeShell(node, right[index]));
+}
+
 function BoardEdgeComponent({
   data,
   id,
@@ -434,6 +457,9 @@ export default function BoardWorkspace({
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
   const [trashedNodes, setTrashedNodes] = useState<BoardTrashEntry[]>([]);
   const [assetCompare, setAssetCompare] = useState<{ originalUrl: string; resultUrl: string } | null>(null);
+  const updateSelectedNodeIds = useCallback((nextIds: string[]): void => {
+    setSelectedNodeIds(currentIds => (sameStringList(currentIds, nextIds) ? currentIds : nextIds));
+  }, []);
   const galleryReferenceFingerprint = useMemo(
     () => buildGalleryReferenceFingerprint(galleryItems),
     [galleryItems],
@@ -508,7 +534,10 @@ export default function BoardWorkspace({
       setTrashedNodes(current => [{ node: structuredClone(node), edges: structuredClone(edges) }, ...current].slice(0, BOARD_TRASH_LIMIT));
     }
     deleteNode(nodeId);
-    setSelectedNodeIds(current => current.filter(id => id !== nodeId));
+    setSelectedNodeIds(current => {
+      const next = current.filter(id => id !== nodeId);
+      return sameStringList(current, next) ? current : next;
+    });
   }, [board.edges, board.nodes, deleteNode]);
 
   const restoreTrashedNode = useCallback((index: number) => {
@@ -641,7 +670,7 @@ export default function BoardWorkspace({
 
   useEffect(() => {
     if (isNodeDragActiveRef.current) return;
-    setRenderNodes(flowNodes);
+    setRenderNodes(currentNodes => (sameFlowNodes(currentNodes, flowNodes) ? currentNodes : flowNodes));
   }, [flowNodes]);
 
   const flowEdges = useMemo<BoardFlowEdge[]>(
@@ -688,7 +717,7 @@ export default function BoardWorkspace({
 
   const handleSelectionChange = useCallback<OnSelectionChangeFunc<BoardFlowNode, BoardFlowEdge>>(({ nodes, edges }) => {
     const ids = nodes.map(node => node.id);
-    setSelectedNodeIds(ids);
+    updateSelectedNodeIds(ids);
     if (edges.length > 0) {
       selectEdge(edges[0]?.id ?? null);
       selectNode(null);
@@ -696,7 +725,7 @@ export default function BoardWorkspace({
     }
     selectEdge(null);
     selectNode(ids[0] ?? null);
-  }, [selectEdge, selectNode]);
+  }, [selectEdge, selectNode, updateSelectedNodeIds]);
 
   const handleNodeClick: NodeMouseHandler<BoardFlowNode> = () => {
     closeOverlayMenus();
@@ -714,7 +743,7 @@ export default function BoardWorkspace({
     setNodeContextMenu({ nodeId: node.id, clientX: event.clientX, clientY: event.clientY });
     selectNode(node.id);
     selectEdge(null);
-    setSelectedNodeIds([node.id]);
+    updateSelectedNodeIds([node.id]);
   };
 
   const handleReconnect = useCallback<OnReconnect<BoardFlowEdge>>((oldEdge, newConnection) => {
@@ -738,7 +767,7 @@ export default function BoardWorkspace({
     closeOverlayMenus();
     selectEdge(edge.id);
     selectNode(null);
-    setSelectedNodeIds([]);
+    updateSelectedNodeIds([]);
   };
 
   const handleNodeDragStart = useCallback<OnNodeDrag<BoardFlowNode>>(() => {
@@ -760,7 +789,10 @@ export default function BoardWorkspace({
   }, [beginUndoGesture, endUndoGesture, updateNodesPositions]);
 
   const handleNodesChange = useCallback<OnNodesChange<BoardFlowNode>>((changes) => {
-    setRenderNodes(currentNodes => applyNodeChanges(changes, currentNodes));
+    setRenderNodes(currentNodes => {
+      const nextNodes = applyNodeChanges(changes, currentNodes);
+      return sameFlowNodes(currentNodes, nextNodes) ? currentNodes : nextNodes;
+    });
     const settledPositions: Array<{ nodeId: string; position: BoardPoint }> = [];
     for (const change of changes) {
       if (change.type !== "position" || !change.position || change.dragging === true) continue;
@@ -777,7 +809,7 @@ export default function BoardWorkspace({
 
   const handleNodesDelete: OnNodesDelete<BoardFlowNode> = nodes => {
     for (const node of nodes) trashAndDeleteNode(node.id);
-    setSelectedNodeIds([]);
+    updateSelectedNodeIds([]);
   };
 
   const deleteBoardEdge = useCallback((edgeId: string): void => {
@@ -1050,13 +1082,13 @@ export default function BoardWorkspace({
     setNodeContextMenu(null);
     selectNode(null);
     selectEdge(null);
-    setSelectedNodeIds([]);
+    updateSelectedNodeIds([]);
     setQuickInsertMenu({
       clientX: event.clientX,
       clientY: event.clientY,
       position: flowPositionFromClient(event.clientX, event.clientY),
     });
-  }, [flowPositionFromClient, selectEdge, selectNode]);
+  }, [flowPositionFromClient, selectEdge, selectNode, updateSelectedNodeIds]);
 
   const handleFlowDoubleClick = useCallback((event: ReactMouseEvent<HTMLElement>): void => {
     if (!(event.target instanceof Element) || !event.target.closest(".react-flow__pane")) return;
@@ -1304,7 +1336,7 @@ export default function BoardWorkspace({
               closeOverlayMenus();
               selectNode(null);
               selectEdge(null);
-              setSelectedNodeIds([]);
+              updateSelectedNodeIds([]);
             }}
             onPaneContextMenu={openQuickInsertMenu}
             proOptions={{ hideAttribution: true }}
