@@ -20,11 +20,15 @@ Current core surfaces:
 
 - `app/page.tsx`: main browser composition shell. It wires workstation state/hooks into creation panels, Agent Dock, gallery, settings, fullscreen preview, and mask editor.
 - `app/board/page.tsx`: standalone canvas operation shell. It reuses the existing asset store, generation hooks, provider settings, Agent Dock, mask editor, and media polling while presenting a spatial board workflow.
+- `app/board/[boardId]/page.tsx`: specific persisted board route.
+- `app/api/board/import-image/route.ts`: board image import route for remote/data URL image capture into local assets.
 - `app/api/gemini/*`: server routes for generation, optimization, Agent Mode, async polling, and media download proxying.
 - `app/api/gemini/agent/route.ts`: Agent Mode with tool-calling loop. Uses zod for request/response validation. Agent calls tools to query models, skills, and gallery assets before recommending actions. Model IDs are validated server-side against the catalog.
-- `app/api/gemini/agent/tools.ts`: Agent tool definitions and executors. Tools: `query_models`, `get_skill_info`, `get_gallery_assets`. Tool arg schemas defined with zod, JSON Schema introspected for OpenAI tool definitions.
+- `app/api/gemini/agent/tools.ts`: Agent tool definitions and executors. Tools: `query_models`, `get_skill_info`, `get_gallery_assets`, `get_prompt_blueprint`. Tool arg schemas defined with zod, JSON Schema introspected for OpenAI tool definitions.
 - `app/api/gemini/agent/skills.ts`: Skill registry (static descriptions). Agent activates skills at runtime via tools rather than a pre-routed LLM call.
 - `app/api/models/route.ts`: provider model listing.
+- `components/prompt-templates/PromptTemplatePicker.tsx`: reusable prompt template picker, including slash-command opening and portal-based floating panel.
+- `lib/prompt-templates.ts`: built-in template catalog, categories, slash-command detection, and insertion helpers.
 - `hooks/useAgentController.ts`: Agent chat state, localStorage persistence, tool action execution, auto-execute countdown, and Agent API submission.
 - `hooks/useAssetActions.ts`: gallery actions for selection, delete, cancel, retry, metadata export, ZIP export, and compare toggles.
 - `hooks/useAssetWorkspaceState.ts`: gallery filters, counts, search, selected IDs, compare state, and derived reference-image lists.
@@ -33,6 +37,7 @@ Current core surfaces:
 - `hooks/useReferenceState.ts`: reference image upload/drop handling, prompt `@` references, and role toggling.
 - `hooks/useMediaPolling.ts`: async image/video status polling and final media download into IndexedDB.
 - `lib/providers/*`: provider adapters, model catalog, tool-calling chat completions, parsing, request helpers, and shared types.
+- `lib/client-fetch-error.ts`: shared client-side helper for JSON and non-JSON provider error responses.
 - `lib/db.ts`: browser IndexedDB persistence for generated assets.
 - `lib/board/*`: board document types, defaults, and IndexedDB persistence. Board data stores layout and references; generated media remains owned by `StorageItem` in `lib/db.ts`.
 - `components/CanvasMaskEditor.tsx`: local mask drawing UI.
@@ -94,10 +99,21 @@ Keep API routes thin: parse body, resolve provider config, call provider adapter
 ## Board Surface
 
 - `/board` is an alternate operation surface, not a replacement for `/`.
+- `/board/[boardId]` opens a specific board document; keep multi-board behavior inside board modules.
 - Board nodes store spatial layout and references to generated assets. The asset store remains the source of truth for media URLs, prompts, model IDs, statuses, operation names, and generation snapshots.
 - Keep board logic in `components/board/*`, `hooks/useBoardState.ts`, and `lib/board/*`. Do not add board-specific state to `app/page.tsx`.
 - Agent actions on the board should reuse existing action types (`generate_image`, `generate_video`, `edit_image`, `optimize_prompt`) unless a new board-specific action is explicitly requested.
 - Board edges/nodes should express user organization and references, not a general DAG execution engine.
+- Prompt editing on the board uses `BoardPromptTextarea`; keep `@` reference insertion and `/` template commands working consistently for Prompt nodes and generation nodes.
+
+## Prompt Templates
+
+- Art preset chips have been removed. Do not reintroduce `PresetStyles.ts` or model-agnostic style suffix toggles.
+- Built-in prompt templates live in `lib/prompt-templates.ts`.
+- UI access uses `components/prompt-templates/PromptTemplatePicker.tsx`.
+- Supported prompt surfaces: main image panel, main video panel, mobile composer, board Prompt nodes, and board image/video generation nodes.
+- Slash commands use `detectPromptTemplateSlashCommand()`. Insert mode should replace the active slash token when present; replace mode should replace the full prompt.
+- Image prompts may apply a template negative prompt. Video and board prompt insertion should only use the positive prompt unless explicitly expanded.
 
 ## Agent Tool Calling
 

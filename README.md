@@ -6,11 +6,12 @@ The current app focuses on a browser-first creative loop:
 
 - Generate images from prompts, reference images, or masked edits.
 - Generate videos from prompts, reference images, or start/end frames depending on the selected video model.
+- Insert shared prompt templates from the template picker or by typing `/` in supported prompt fields.
 - Use Agent Mode to plan creative actions and trigger one recommended workstation action.
-- Use the standalone `/board` canvas to arrange assets, notes, references, and Agent-driven generation in a spatial workflow.
+- Use `/board` and `/board/[boardId]` canvases to arrange assets, notes, references, and Agent-driven generation in spatial workflows.
 - Store generated assets locally in browser IndexedDB.
 - Search, compare, preview, delete, and ZIP-export workspace assets.
-- Route model calls through internal provider adapters for 12AI, grok2api, xstx, ModelScope, and RunningHub.
+- Route model calls through internal provider adapters for 12AI, grok2api, xstx, Agnes AI, ModelScope, and RunningHub.
 
 ## Stack
 
@@ -50,6 +51,9 @@ GROK2API_BASE_URL="http://localhost:8000"
 XSTX_API_KEY="sk_your_xstx_key"
 XSTX_BASE_URL="https://api.xstx.info"
 
+AGNES_AI_API_KEY="your_agnes_ai_key"
+AGNES_AI_BASE_URL="https://apihub.agnes-ai.com"
+
 MODELSCOPE_API_KEY="ms_your_modelscope_token"
 MODELSCOPE_BASE_URL="https://api-inference.modelscope.cn"
 
@@ -71,6 +75,9 @@ grok2api:grok-4.20-auto
 grok2api:grok-imagine-image
 xstx:gpt-image-2
 xstx:gpt-5.4
+agnes:agnes-2.0-flash
+agnes:agnes-image-2.1-flash
+agnes:agnes-video-v2.0
 modelscope:Qwen/Qwen-Image
 modelscope:Qwen/Qwen-Image-Edit
 runninghub:api:/openapi/v2/bytedance/jimeng-4.6/text-to-image
@@ -112,6 +119,7 @@ Current adapters:
 - 12AI Veo: `/v1/videos`
 - grok2api image/video/chat: OpenAI-compatible endpoints plus `/v1/videos`
 - 星途 (xstx): OpenAI-compatible chat, image, and model listing
+- Agnes AI: OpenAI-compatible chat, image, video, and model listing
 - ModelScope image: API-Inference `/v1/images/generations` with async polling via `/v1/tasks/{task_id}`
 - RunningHub image/video: configured Standard Model API endpoints (`api:/openapi/v2/...`) or AI App / Workflow virtual models, polled through `/openapi/v2/query`
 
@@ -134,15 +142,41 @@ Model-specific parameters are defined in the catalog so the UI can adapt control
 
 - Gemini image models expose aspect ratio, output size, and thinking-level controls when supported.
 - GPT Image models expose explicit pixel sizes and quality.
+- GPT Image 2 resolution labels are normalized in the UI as `1K`, `2K`, `4K`, etc. while request payloads still use provider-valid dimensions.
 - Video models expose `auto` size first, so image-to-video can preserve the source image size when the upstream service supports it.
 - `12ai:veo_3_1-fast` supports text-to-video and reference-image mode with 0-3 images.
 - `12ai:veo_3_1-fast-fl` is the only built-in 12AI first/last-frame mode and requires 1-2 images.
 - `grok2api:grok-imagine-video` supports optional reference images with the grok2api video parameters.
 
+## Prompt Templates
+
+Prompt templates replaced the older art preset chip system. The shared template source lives in `lib/prompt-templates.ts`, and the reusable picker lives in `components/prompt-templates/PromptTemplatePicker.tsx`.
+
+Current template categories:
+
+- 视角
+- 分镜
+- 角色
+- 产品
+- 光影
+- 自定义
+
+Supported insertion surfaces:
+
+- Main image prompt panel
+- Main video prompt panel
+- Mobile composer prompt
+- Board Prompt nodes
+- Board image/video generation nodes
+
+Users can open the picker with the template button or type `/` in supported prompt text areas. Selecting "插入" replaces the active slash command token when one is present; selecting "替换" replaces the full prompt. Image prompts also apply a template's negative prompt when provided.
+
 ## App Routes
 
 - `GET /`: main workstation.
 - `GET /board`: standalone canvas operation surface for assets, notes, generation, and Agent interaction.
+- `GET /board/[boardId]`: opens a specific persisted board document.
+- `POST /api/board/import-image`: imports a remote or data URL image into the local asset store for board workflows.
 - `POST /api/gemini/generate-image`: image generation and image editing.
 - `POST /api/gemini/generate-video`: video generation.
 - `POST /api/gemini/video-status`: polls async image/video operations.
@@ -158,6 +192,8 @@ Model-specific parameters are defined in the catalog so the UI can adapt control
 app/
   page.tsx                         Main workstation composition shell
   board/page.tsx                   Standalone board operation shell
+  board/[boardId]/page.tsx         Specific board route
+  api/board/import-image/route.ts   Board image import API
   api/gemini/*                     Generation, agent, status, download APIs
   api/models/route.ts              Provider model listing
 components/
@@ -165,14 +201,16 @@ components/
   assets/                          Gallery cards, compare panel, toolbar, fullscreen preview
   board/                           Canvas toolbar, nodes, and board viewport
   creation/                        Image/video generation panels
+  prompt-templates/                Shared prompt template picker
   reference/                       Reference image picker, drag-and-drop, @-mention dropdown
   settings/                        Settings modal (tabbed: providers / models / system)
   workbench/                       Workspace header, notices, gallery layout
   CanvasMaskEditor.tsx             In-browser mask editor
-  PresetStyles.ts                  Visual preset definitions
 lib/
   board/                           Board types, defaults, and IndexedDB persistence
+  client-fetch-error.ts            Shared client-side fetch error reader
   db.ts                            IndexedDB asset store
+  prompt-templates.ts              Built-in template catalog and insertion helpers
   providers/                       Provider registry, adapters, model catalog, types
 hooks/
   useAgentController.ts            Agent chat, tool actions, auto-execute countdown
@@ -184,6 +222,8 @@ hooks/
   useProviderSettings.ts           Provider credentials, model list, connection tests
   useReferenceState.ts             Prompt/reference image state and drag/drop handling
   use-mobile.ts                    Mobile breakpoint helper
+tests/
+  *.test.ts                        Node test suite for helpers and provider behavior
 ```
 
 ## Development Commands
@@ -193,9 +233,10 @@ npm run dev
 npm run lint
 npm run build
 npm run start
+npm run test:providers
 ```
 
-`next.config.ts` enables standalone output, React strict mode, and strict TypeScript build checking. ESLint is ignored during builds but should still be run during development.
+`next.config.ts` enables standalone output, React strict mode, and strict TypeScript build checking. ESLint is ignored during builds but should still be run during development. For production standalone output, build first and run the generated standalone server when needed.
 
 ## Notes
 
@@ -205,4 +246,4 @@ npm run start
 - Provider metadata lives in `lib/providers/registry.ts` — the single source of truth for keys, labels, env vars, defaults, and UI fields.
 - The app keeps provider integration logic in `lib/providers/*`; avoid putting provider-specific request details directly in UI components.
 - Built-in model capabilities in `MODEL_CAPABILITIES` serve as initial defaults. The "获取模型" button fetches the live model list from each provider's `/v1/models` endpoint and merges it into the dropdowns. Models are auto-classified as chat/image/video by name.
-  useBoardState.ts                 Board document state and persistence
+- Board documents are persisted separately from generated media. Board nodes reference assets by ID/url, while generated media remains owned by the IndexedDB asset store.
