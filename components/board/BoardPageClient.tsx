@@ -1340,9 +1340,10 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       }
 
       if (sourceBoardNodeId && item.status === "complete") {
+        const sourceNode = findGenerateNodeById(boardController.board.nodes, sourceBoardNodeId);
+        if (!sourceNode) continue;
         known.add(item.id);
         handledBoardItems.add(item.id);
-        const sourceNode = findGenerateNodeById(boardController.board.nodes, sourceBoardNodeId);
         const nextStatus = nextSourceNodeStatus(items, sourceBoardNodeId, item.status);
         const existingAssetNode = findBoardAssetNodeByAssetId(boardController.board.nodes, item.id);
         if (existingAssetNode) {
@@ -1360,7 +1361,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         const resultIndex = completedSourceItemIndex(items, sourceBoardNodeId, item.id);
         const assetNodeId = addAssetToBoard(
           item,
-          sourceNode ? resultAssetPosition(sourceNode, resultIndex) : undefined,
+          resultAssetPosition(sourceNode, resultIndex),
         );
         boardController.connectPorts(
           { nodeId: sourceBoardNodeId, portId: "result-out", portKind: "result" },
@@ -1374,6 +1375,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       }
 
       if (sourceBoardNodeId && item.status === "failed") {
+        const sourceNode = findGenerateNodeById(boardController.board.nodes, sourceBoardNodeId);
+        if (!sourceNode) continue;
         known.add(item.id);
         handledBoardItems.add(item.id);
         const nextStatus = nextSourceNodeStatus(items, sourceBoardNodeId, item.status);
@@ -1558,13 +1561,20 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           atDropdownNode={atDropdown.visible && atDropdown.type === "agent-prompt" ? renderAgentAtDropdown() : null}
           autoExecute={autoExecute}
           chatBottomRef={chatBottomRef}
+          chatModelGroups={chatModelGroups}
           countdownSeconds={countdownSeconds}
           input={agentInput}
           isLoading={isAgentLoading}
           isOpen={isAgentDockOpen}
           isOverContent={false}
           messages={agentMessages}
+          selectedChatModel={selectedChatModel}
           themeMode={themeMode}
+          usesVisionModel={Boolean(
+            agentReferenceUrl ||
+              agentReferences.some(reference => reference.url.trim().length > 0),
+          )}
+          onSelectChatModel={handleSelectChatModel}
           onCancelCountdown={clearActiveCountdown}
           onChangeInput={(value) => handleTextareaChange(value, "agent-prompt")}
           onClearChat={handleClearChat}

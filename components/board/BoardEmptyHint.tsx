@@ -29,7 +29,7 @@ export default function BoardEmptyHint() {
       <div className="imagine-board-empty-hint-card pointer-events-auto">
         <p className="text-sm font-semibold text-[var(--iw-text)]">空白画板</p>
         <p className="mt-2 text-xs leading-5 text-[var(--iw-muted)]">
-          双击画布打开快速插入，或从工具栏添加提示、生成与 Agent 节点。拖出连线到空白处可自动创建目标节点。
+          双击画布打开快速插入，或点顶栏「插入」添加节点。拖出连线到空白处可自动创建目标节点。
         </p>
         {!handlesHintSeen && (
           <p className="mt-3 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-3 py-2 text-[11px] leading-5 text-[var(--iw-muted)]">

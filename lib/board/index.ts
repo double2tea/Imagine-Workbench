@@ -1,4 +1,11 @@
 export {
+  BOARD_INSERT_CATALOG,
+  readLastBoardInsertKind,
+  writeLastBoardInsertKind,
+  type BoardInsertCatalogItem,
+  type BoardInsertKind,
+} from "@/lib/board/insert-catalog";
+export {
   DEFAULT_ASSET_NODE_SIZE,
   DEFAULT_AGENT_NODE_SIZE,
   DEFAULT_BOARD_CONFIG,

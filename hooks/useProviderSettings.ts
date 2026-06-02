@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
-import type { ProviderTestState } from "@/components/settings/SettingsModal";
+import type { ProviderTestState } from "@/components/settings/provider-settings-types";
 import {
   CHAT_MODEL_OPTIONS,
   DEFAULT_CHAT_MODEL,
@@ -184,6 +184,11 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
   const handleSelectChatModel = (model: string) => {
     setSelectedChatModel(model);
     localStorage.setItem("imagine_chat_model", model);
+    const parsed = parseProviderModel(model, selectedProvider);
+    if (parsed.provider !== selectedProvider) {
+      setSelectedProvider(parsed.provider);
+      localStorage.setItem("imagine_ai_provider", parsed.provider);
+    }
   };
 
   const saveModelOptions = (

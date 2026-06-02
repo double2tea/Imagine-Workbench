@@ -1366,13 +1366,20 @@ export default function Home() {
                 atDropdownNode={atDropdown.visible && atDropdown.type === "agent-prompt" ? renderAtDropdown("agent-prompt") : null}
                 autoExecute={autoExecute}
                 chatBottomRef={chatBottomRef}
+                chatModelGroups={chatModelGroups}
                 countdownSeconds={countdownSeconds}
                 input={agentInput}
                 isLoading={isAgentLoading}
                 isOpen={isAgentDockOpen}
                 isOverContent={isAgentDockOverContent}
                 messages={agentMessages}
+                selectedChatModel={selectedChatModel}
                 themeMode={themeMode}
+                usesVisionModel={Boolean(
+                  agentReferenceUrl ||
+                    agentReferences.some(reference => reference.url.trim().length > 0),
+                )}
+                onSelectChatModel={handleSelectChatModel}
                 onCancelCountdown={clearActiveCountdown}
                 onChangeInput={(value) => handleTextareaChange(value, "agent-prompt")}
                 onClearChat={handleClearChat}

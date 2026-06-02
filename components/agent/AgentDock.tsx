@@ -3,6 +3,8 @@ import { forwardRef, useEffect, useRef } from "react";
 import { Check, ChevronRight, ImagePlus, Paintbrush, RefreshCw, Send, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import PreviewImage from "@/components/PreviewImage";
+import { AgentModelSelect } from "@/components/agent/AgentModelSelect";
+import { DEFAULT_VISION_CHAT_MODEL, type AiProvider, type ModelOption } from "@/lib/providers/model-catalog";
 
 export interface ChatMessage {
   id: string;
@@ -40,6 +42,12 @@ export type AgentWorkbenchAction = NonNullable<ChatMessage["recommendedAction"]>
 export type AgentBoardAction = NonNullable<ChatMessage["boardAction"]>;
 export type AgentToolAction = AgentWorkbenchAction | AgentBoardAction;
 
+interface AgentModelGroup {
+  provider: AiProvider;
+  label: string;
+  options: ModelOption[];
+}
+
 interface AgentDockProps {
   activeCountdownId: string | null;
   agentReferenceId: string | null;
@@ -47,13 +55,17 @@ interface AgentDockProps {
   atDropdownNode: ReactNode;
   autoExecute: boolean;
   chatBottomRef: Ref<HTMLDivElement>;
+  chatModelGroups: AgentModelGroup[];
   countdownSeconds: number;
   input: string;
   isLoading: boolean;
   isOpen: boolean;
   isOverContent: boolean;
   messages: ChatMessage[];
+  selectedChatModel: string;
   themeMode: "light" | "dark";
+  usesVisionModel: boolean;
+  onSelectChatModel: (value: string) => void;
   onCancelCountdown: () => void;
   onChangeInput: (value: string) => void;
   onClearChat: () => void;
@@ -403,12 +415,16 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
     atDropdownNode,
     autoExecute,
     chatBottomRef,
+    chatModelGroups,
     countdownSeconds,
     input,
     isLoading,
     isOpen,
     messages,
+    selectedChatModel,
     themeMode,
+    usesVisionModel,
+    onSelectChatModel,
     onCancelCountdown,
     onChangeInput,
     onClearChat,
@@ -428,6 +444,8 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
     event.preventDefault();
     onSubmit();
   };
+  const activeAgentModel = usesVisionModel ? DEFAULT_VISION_CHAT_MODEL : selectedChatModel;
+  const visionModelHint = `含图参考时将使用 ${DEFAULT_VISION_CHAT_MODEL}`;
   const isIdleOrb = !isOpen && !isLoading && input.trim().length === 0 && !agentReferenceId && !agentReferenceUrl;
   const orbButtonRef = useRef<HTMLButtonElement | null>(null);
 
@@ -497,7 +515,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
           transition={{ duration: 0.16, ease: "easeOut" }}
           className={`imagine-agent-dock imagine-agent-dock-panel imagine-theme-${themeMode} fixed inset-x-4 bottom-12 z-40 mx-auto w-[calc(100vw-32px)] max-w-5xl rounded-lg p-3 sm:bottom-16 sm:w-[min(1040px,calc(100vw-40px))]`}
         >
-      <div className={`${isOpen ? "mb-2.5" : "mb-1.5"} grid grid-cols-[auto_1fr_auto] items-center gap-2`}>
+      <div className={`${isOpen ? "mb-2.5" : "mb-1.5"} flex flex-wrap items-center gap-2`}>
         <button
           type="button"
           onClick={onToggleOpen}
@@ -509,10 +527,26 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
           <ChevronRight className={`h-3 w-3 text-[var(--iw-faint)] transition ${isOpen ? "rotate-90" : "-rotate-90"}`} />
         </button>
 
-        <span className="imagine-agent-dock-divider h-px" />
+        <div className="imagine-agent-dock-toolbar hidden min-w-0 flex-1 items-center justify-center gap-2 sm:flex">
+          {chatModelGroups.length > 0 || activeAgentModel ? (
+            <AgentModelSelect
+              disabled={usesVisionModel}
+              disabledHint={visionModelHint}
+              groups={chatModelGroups}
+              value={activeAgentModel}
+              onChange={onSelectChatModel}
+              className="max-w-[min(12rem,100%)]"
+            />
+          ) : null}
+          {usesVisionModel ? (
+            <span className="max-w-[10rem] truncate text-[10px] text-indigo-300/90" title={visionModelHint}>
+              视觉模型
+            </span>
+          ) : null}
+        </div>
 
-        <span className="flex shrink-0 items-center gap-2">
-          <span className="imagine-agent-dock-status hidden items-center gap-1.5 sm:flex">
+        <span className="ml-auto flex shrink-0 items-center gap-2">
+          <span className="imagine-agent-dock-status hidden items-center gap-1.5 lg:flex">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400/70" />
             {agentReferenceId || agentReferenceUrl ? "引用中" : "画廊"}
           </span>
@@ -603,6 +637,28 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
             </div>
           </div>
         )}
+
+        {chatModelGroups.length > 0 || activeAgentModel ? (
+          <div className="flex flex-wrap items-center gap-2 sm:hidden">
+            <label htmlFor="agent-model-select-mobile" className="text-[10px] font-semibold text-[var(--iw-faint)]">
+              模型
+            </label>
+            <AgentModelSelect
+              id="agent-model-select-mobile"
+              disabled={usesVisionModel}
+              disabledHint={visionModelHint}
+              groups={chatModelGroups}
+              value={activeAgentModel}
+              onChange={onSelectChatModel}
+              className="min-w-0 flex-1"
+            />
+            {usesVisionModel ? (
+              <span className="text-[10px] text-indigo-300/90" title={visionModelHint}>
+                含图参考，已锁定视觉模型
+              </span>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="imagine-agent-input-row grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
           <div className="relative min-w-0">

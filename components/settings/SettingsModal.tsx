@@ -1,16 +1,13 @@
-import { Check, Info, ListPlus, RefreshCw, Settings, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Info, Settings, X } from "lucide-react";
+import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { StorageItem } from "@/lib/db";
 import type { AiProvider, ModelOption } from "@/lib/providers/model-catalog";
-import { PROVIDER_KEYS, getProviderMeta } from "@/lib/providers/registry";
+import { ConnectionSettingsWorkspace } from "@/components/settings/ConnectionSettingsWorkspace";
+import type { ProviderTestState } from "@/components/settings/provider-settings-types";
 import type { ProviderCredentials } from "@/lib/providers/types";
 
-export interface ProviderTestState {
-  provider: AiProvider;
-  status: "idle" | "testing" | "success" | "error";
-  message: string;
-}
+export type { ProviderTestState };
 
 interface ModelGroup {
   provider: AiProvider;
@@ -20,28 +17,6 @@ interface ModelGroup {
 
 type ModelCategory = "chat" | "image" | "video";
 type FetchedModelOptions = Record<AiProvider, Record<ModelCategory, ModelOption[]>>;
-interface FetchedSelection {
-  scope: string;
-  values: string[];
-}
-
-interface ProviderCredentialCardProps {
-  apiKey: string;
-  apiPlaceholder: string;
-  baseUrl: string;
-  baseUrlPlaceholder: string;
-  clearLabel: string;
-  endpoints?: string[];
-  provider: AiProvider;
-  providerTest: ProviderTestState;
-  registerUrl?: string;
-  showBaseUrl: boolean;
-  title: string;
-  onClear: (provider: AiProvider) => void;
-  onSaveApiKey: (provider: AiProvider, value: string) => void;
-  onSaveBaseUrl: (provider: AiProvider, value: string) => void;
-  onTest: (provider: AiProvider) => void;
-}
 
 interface SettingsModalProps {
   assetFailedCount: number;
@@ -69,124 +44,12 @@ interface SettingsModalProps {
   testProviderConnection: (provider: AiProvider) => void;
 }
 
-type SettingsTab = "providers" | "models" | "system";
+type SettingsTab = "connections" | "system";
 
 const TABS: { key: SettingsTab; label: string }[] = [
-  { key: "providers", label: "服务商" },
-  { key: "models", label: "模型" },
+  { key: "connections", label: "连接" },
   { key: "system", label: "系统" },
 ];
-
-const MODEL_CATEGORY_OPTIONS: { key: ModelCategory; label: string }[] = [
-  { key: "chat", label: "Chat" },
-  { key: "image", label: "Image" },
-  { key: "video", label: "Video" },
-];
-
-function providerEndpointInfo(provider: AiProvider): string[] | undefined {
-  const meta = getProviderMeta(provider);
-  if (provider === "12ai") {
-    return [`Chat/Image: ${meta.defaultBaseUrl}`, `Veo: ${meta.defaultVideoBaseUrl}`];
-  }
-  if (!meta.supportsImage && !meta.supportsVideo) {
-    return [`Chat: ${meta.defaultBaseUrl}/v1`];
-  }
-  return undefined;
-}
-
-function providerClearLabel(provider: AiProvider): string {
-  return getProviderMeta(provider).hasEditableBaseUrl ? "清除 Key/Base URL" : "清除 Key";
-}
-
-function ProviderCredentialCard({
-  apiKey,
-  apiPlaceholder,
-  baseUrl,
-  baseUrlPlaceholder,
-  clearLabel,
-  endpoints,
-  provider,
-  providerTest,
-  registerUrl,
-  showBaseUrl,
-  title,
-  onClear,
-  onSaveApiKey,
-  onSaveBaseUrl,
-  onTest,
-}: ProviderCredentialCardProps) {
-  const isTesting = providerTest.status === "testing" && providerTest.provider === provider;
-
-  return (
-    <div className="imagine-settings-card">
-      <div className="flex items-center justify-between mb-3">
-        <h4 className="imagine-settings-card-title">{title}</h4>
-        {apiKey && <span className="text-[10px] text-emerald-400">Key 已保存</span>}
-      </div>
-      <label className="imagine-settings-label">API Key</label>
-      <input
-        type="password"
-        value={apiKey}
-        onChange={(e) => onSaveApiKey(provider, e.target.value)}
-        placeholder={apiPlaceholder}
-        className="imagine-input font-mono"
-      />
-      {showBaseUrl && (
-        <>
-          <label className="imagine-settings-label mt-3">Base URL</label>
-          <input
-            type="url"
-            value={baseUrl}
-            onChange={(e) => onSaveBaseUrl(provider, e.target.value)}
-            placeholder={baseUrlPlaceholder}
-            className="imagine-input font-mono"
-          />
-        </>
-      )}
-      {endpoints && (
-        <div className="imagine-settings-endpoints">
-          {endpoints.map(endpoint => <div key={endpoint}>{endpoint}</div>)}
-        </div>
-      )}
-      {registerUrl && (
-        <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2">
-          <span className="imagine-settings-hint">需要填入令牌后使用</span>
-          <a
-            href={registerUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex h-7 items-center rounded-lg border border-amber-400/25 bg-amber-500/15 px-2.5 text-[10px] font-semibold text-amber-300 transition hover:bg-amber-500/20 hover:text-amber-200"
-          >
-            前往获取令牌
-          </a>
-        </div>
-      )}
-      <div className="mt-3 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => onTest(provider)}
-          disabled={isTesting}
-          className="imagine-settings-toolbar-btn"
-        >
-          <RefreshCw className={`h-3 w-3 ${isTesting ? "animate-spin" : ""}`} />
-          测试
-        </button>
-        <button
-          type="button"
-          onClick={() => onClear(provider)}
-          className="h-8 rounded-lg border border-red-500/20 bg-red-950/20 px-3 text-[10px] font-semibold text-red-300 transition hover:bg-red-950/35"
-        >
-          {clearLabel}
-        </button>
-      </div>
-      {providerTest.provider === provider && providerTest.message && (
-        <p className={`mt-2 font-mono text-[10px] ${providerTest.status === "error" ? "text-red-300" : "text-emerald-300"}`}>
-          {providerTest.message}
-        </p>
-      )}
-    </div>
-  );
-}
 
 export default function SettingsModal({
   assetFailedCount,
@@ -213,46 +76,7 @@ export default function SettingsModal({
   refreshProviderModels,
   testProviderConnection,
 }: SettingsModalProps) {
-  const [tab, setTab] = useState<SettingsTab>("providers");
-  const [modelCategory, setModelCategory] = useState<ModelCategory>("chat");
-  const [manualModels, setManualModels] = useState("");
-  const [fetchedSelection, setFetchedSelection] = useState<FetchedSelection>({ scope: "", values: [] });
-
-  const submitManualModels = () => {
-    onAddManualModels(modelCategory, manualModels);
-    setManualModels("");
-  };
-
-  const activeModelGroups = modelCategory === "chat"
-    ? chatModelGroups
-    : modelCategory === "image"
-      ? imageModelGroups
-      : videoModelGroups;
-  const activeModelOptions = useMemo(
-    () => activeModelGroups.find(group => group.provider === selectedProvider)?.options ?? [],
-    [activeModelGroups, selectedProvider],
-  );
-  const activeModelValues = useMemo(() => new Set(activeModelOptions.map(option => option.value)), [activeModelOptions]);
-  const fetchedOptions = fetchedModelOptions[selectedProvider][modelCategory].filter(option => !activeModelValues.has(option.value));
-  const fetchedSelectionScope = `${selectedProvider}:${modelCategory}`;
-  const selectedFetchedModels = fetchedSelection.scope === fetchedSelectionScope ? fetchedSelection.values : [];
-
-  const toggleFetchedModel = (value: string) => {
-    setFetchedSelection(prev => {
-      const values = prev.scope === fetchedSelectionScope ? prev.values : [];
-      return {
-        scope: fetchedSelectionScope,
-        values: values.includes(value)
-          ? values.filter(item => item !== value)
-          : [...values, value],
-      };
-    });
-  };
-
-  const submitFetchedModels = () => {
-    onAddFetchedModels(modelCategory, selectedFetchedModels);
-    setFetchedSelection({ scope: fetchedSelectionScope, values: [] });
-  };
+  const [tab, setTab] = useState<SettingsTab>("connections");
 
   return (
     <AnimatePresence>
@@ -279,246 +103,88 @@ export default function SettingsModal({
               </button>
             </div>
 
-            {/* Tab bar */}
             <div className="imagine-settings-tabs flex shrink-0 overflow-x-auto px-4 sm:px-6">
-              {TABS.map(t => (
+              {TABS.map(item => (
                 <button
-                  key={t.key}
+                  key={item.key}
                   type="button"
-                  onClick={() => setTab(t.key)}
-                  data-active={tab === t.key ? "true" : "false"}
+                  onClick={() => setTab(item.key)}
+                  data-active={tab === item.key ? "true" : "false"}
                   className="imagine-settings-tab"
                 >
-                  {t.label}
+                  {item.label}
                 </button>
               ))}
             </div>
 
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 font-sans text-xs sm:p-6">
-              {tab === "providers" && (
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 sm:gap-4">
-                  {PROVIDER_KEYS.map(provider => {
-                    const creds = providerCredentials[provider];
-                    const meta = getProviderMeta(provider);
-                    return (
-                      <ProviderCredentialCard
-                        key={provider}
-                        apiKey={creds.apiKey}
-                        apiPlaceholder={meta.apiKeyPlaceholder}
-                        baseUrl={creds.baseUrl}
-                        baseUrlPlaceholder={meta.defaultBaseUrl}
-                        clearLabel={providerClearLabel(provider)}
-                        endpoints={providerEndpointInfo(provider)}
-                        provider={provider}
-                        providerTest={providerTest}
-                        registerUrl={meta.registerUrl}
-                        showBaseUrl={meta.hasEditableBaseUrl}
-                        title={meta.label}
-                        onClear={onClearCredentials}
-                        onSaveApiKey={(p, v) => onSaveCredential(p, "apiKey", v)}
-                        onSaveBaseUrl={(p, v) => onSaveCredential(p, "baseUrl", v)}
-                        onTest={testProviderConnection}
-                      />
-                    );
-                  })}
-                </div>
-              )}
-
-              {tab === "models" && (
-                <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-[180px_1fr]">
-                  <div className="flex flex-col gap-3">
-                    <div className="imagine-settings-segment grid grid-cols-3">
-                      {MODEL_CATEGORY_OPTIONS.map(option => (
-                        <button
-                          key={option.key}
-                          type="button"
-                          data-active={modelCategory === option.key ? "true" : "false"}
-                          data-tone="amber"
-                          onClick={() => setModelCategory(option.key)}
-                          className="imagine-segment-btn h-9"
-                        >
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="imagine-settings-provider-sidebar lg:max-h-64 lg:flex-col lg:gap-1 lg:overflow-y-auto">
-                      {PROVIDER_KEYS.map(provider => {
-                        const count = activeModelGroups.find(group => group.provider === provider)?.options.length ?? 0;
-                        const selected = provider === selectedProvider;
-                        return (
-                          <button
-                            key={provider}
-                            type="button"
-                            data-active={selected ? "true" : "false"}
-                            onClick={() => onSelectProvider(provider)}
-                            className="imagine-settings-provider-button lg:min-w-0"
-                          >
-                            <span className="font-semibold">{getProviderMeta(provider).label}</span>
-                            <span className="imagine-settings-provider-count">{count}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="flex min-h-0 flex-col gap-3">
-                    <div className="imagine-settings-section">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="imagine-settings-section-kicker">
-                            {MODEL_CATEGORY_OPTIONS.find(option => option.key === modelCategory)?.label}
-                          </div>
-                          <div className="imagine-settings-section-title">
-                            {getProviderMeta(selectedProvider).label} 模型
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={refreshProviderModels}
-                          disabled={isLoadingModels}
-                          className="imagine-settings-toolbar-btn shrink-0"
-                        >
-                          <RefreshCw className={`h-3.5 w-3.5 ${isLoadingModels ? "animate-spin" : ""}`} />
-                          获取模型
-                        </button>
-                      </div>
-                      {modelListMessage && (
-                        <p className="font-mono text-[10px] text-[var(--iw-faint)]">{modelListMessage}</p>
-                      )}
-                      <div className="imagine-settings-list max-h-48 sm:max-h-56">
-                        {activeModelOptions.length === 0 ? (
-                          <div className="imagine-settings-empty">暂无模型</div>
-                        ) : (
-                          activeModelOptions.map(option => {
-                            const isSelectedChat = modelCategory === "chat" && option.value === selectedChatModel;
-                            return (
-                              <button
-                                key={option.value}
-                                type="button"
-                                data-interactive={modelCategory === "chat" ? "true" : "false"}
-                                data-selected={isSelectedChat ? "true" : "false"}
-                                onClick={() => {
-                                  if (modelCategory === "chat") onSelectChatModel(option.value);
-                                }}
-                                className={`imagine-settings-list-row ${
-                                  modelCategory === "chat" ? "" : "cursor-default"
-                                }`}
-                              >
-                                <span className="min-w-0">
-                                  <span className="imagine-settings-list-label">{option.label}</span>
-                                  <span className="imagine-settings-list-value">{option.value}</span>
-                                </span>
-                                {isSelectedChat && <Check className="h-4 w-4 shrink-0 text-amber-300" />}
-                              </button>
-                            );
-                          })
-                        )}
-                      </div>
-                    </div>
-
-                    {fetchedOptions.length > 0 && (
-                      <div className="imagine-settings-section">
-                        <div className="mb-2 flex items-center justify-between gap-3">
-                          <div className="imagine-settings-section-title text-xs">获取结果</div>
-                          <button
-                            type="button"
-                            onClick={submitFetchedModels}
-                            disabled={selectedFetchedModels.length === 0}
-                            className="imagine-settings-toolbar-btn"
-                          >
-                            <ListPlus className="h-3.5 w-3.5" />
-                            添加选中
-                          </button>
-                        </div>
-                        <div className="imagine-settings-list max-h-40 sm:max-h-44">
-                          {fetchedOptions.map(option => {
-                            const selected = selectedFetchedModels.includes(option.value);
-                            return (
-                              <button
-                                key={option.value}
-                                type="button"
-                                data-interactive="true"
-                                data-selected={selected ? "true" : "false"}
-                                onClick={() => toggleFetchedModel(option.value)}
-                                className="imagine-settings-list-row"
-                              >
-                                <span className="min-w-0">
-                                  <span className="imagine-settings-list-label">{option.label}</span>
-                                  <span className="imagine-settings-list-value">{option.value}</span>
-                                </span>
-                                {selected && <Check className="h-4 w-4 shrink-0 text-amber-300" />}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="imagine-settings-section">
-                      <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto]">
-                        <textarea
-                          value={manualModels}
-                          onChange={(e) => setManualModels(e.target.value)}
-                          placeholder={`${getProviderMeta(selectedProvider).label}: model-a, model-b`}
-                          className="imagine-field-textarea min-h-16 resize-y font-mono text-xs sm:min-h-20"
-                        />
-                        <button
-                          type="button"
-                          onClick={submitManualModels}
-                          disabled={!manualModels.trim()}
-                          className="imagine-settings-toolbar-btn h-9 md:self-start"
-                        >
-                          <ListPlus className="h-3.5 w-3.5" />
-                          添加
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 font-sans text-xs sm:p-6">
+              {tab === "connections" && (
+                <ConnectionSettingsWorkspace
+                  chatModelGroups={chatModelGroups}
+                  fetchedModelOptions={fetchedModelOptions}
+                  imageModelGroups={imageModelGroups}
+                  isLoadingModels={isLoadingModels}
+                  modelListMessage={modelListMessage}
+                  providerCredentials={providerCredentials}
+                  providerTest={providerTest}
+                  selectedChatModel={selectedChatModel}
+                  selectedProvider={selectedProvider}
+                  videoModelGroups={videoModelGroups}
+                  onAddFetchedModels={onAddFetchedModels}
+                  onAddManualModels={onAddManualModels}
+                  onClearCredentials={onClearCredentials}
+                  onSaveCredential={onSaveCredential}
+                  onSelectChatModel={onSelectChatModel}
+                  onSelectProvider={onSelectProvider}
+                  refreshProviderModels={refreshProviderModels}
+                  testProviderConnection={testProviderConnection}
+                />
               )}
 
               {tab === "system" && (
-                <>
+                <div className="flex max-w-xl flex-col gap-4">
                   <div>
-                    <label className="imagine-settings-label">📡 Web 异步任务轮询间隔</label>
-                    <p className="font-mono text-[10px] text-[var(--iw-muted)]">自动侦测间隔: 4秒 (指数退避保护算法)</p>
+                    <label className="imagine-settings-label">Web 异步任务轮询</label>
+                    <p className="font-mono text-[10px] text-[var(--iw-muted)]">
+                      自动侦测间隔 4 秒，指数退避保护
+                    </p>
                   </div>
 
                   <div className="imagine-settings-info-panel">
                     <div className="flex items-center justify-between">
                       <span className="imagine-settings-info-title">
                         <Info className="h-3.5 w-3.5 text-[var(--iw-faint)]" />
-                        当前本地项目库概要:
+                        本地项目库概要
                       </span>
-                      <button type="button" onClick={onResetData} className="text-[10px] text-red-400 hover:text-red-300 underline">
+                      <button
+                        type="button"
+                        onClick={onResetData}
+                        className="text-[10px] text-red-400 underline transition hover:text-red-300"
+                      >
                         安全复位数据
                       </button>
                     </div>
                     <ul className="imagine-settings-info-list">
                       <li>类型: 浏览器本地离线存储</li>
                       <li>合成图片数量: {assetStatusCounts.image} 张</li>
-                      <li>合成 Veo 视频: {assetStatusCounts.video} 个</li>
+                      <li>合成视频: {assetStatusCounts.video} 个</li>
                       <li>失败任务数量: {assetFailedCount} 个</li>
-                      <li>失败任务会保留重试快照，可能包含上传参考图；重试成功、删除失败项或复位数据后清除。</li>
+                      <li>
+                        失败任务会保留重试快照，可能包含上传参考图；重试成功、删除失败项或复位数据后清除。
+                      </li>
                     </ul>
                   </div>
 
-                  <div className="imagine-settings-footnote">
-                    <span>ℹ️</span>
-                    <span>
-                      Imagine Workbench 通过统一 provider adapter 接入服务商。图片、异步图片、视频与 Agent 对话都走同一组密钥和 Base URL 规则。新增服务商只需在 registry.ts 中添加一行配置。
-                    </span>
-                  </div>
-                </>
+                  <p className="text-[10px] leading-relaxed text-[var(--iw-faint)]">
+                    Imagine Workbench 通过统一 provider adapter 接入服务商。图片、视频与 Agent
+                    对话共用密钥与 Base URL 规则；新增服务商只需在 registry.ts 添加配置。
+                  </p>
+                </div>
               )}
             </div>
 
             <div className="imagine-settings-footer sm:px-6 sm:py-4">
-              <button
-                type="button"
-                onClick={onClose}
-                className="imagine-settings-save-button"
-              >
+              <button type="button" onClick={onClose} className="imagine-settings-save-button">
                 保存并关闭
               </button>
             </div>
