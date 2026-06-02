@@ -3,6 +3,7 @@
 import { forwardRef, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import PromptReferenceDropdown from "@/components/reference/PromptReferenceDropdown";
+import { useDebouncedTextCommit } from "@/hooks/useDebouncedTextCommit";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import { getReferencePromptToken } from "@/hooks/useReferenceState";
 import { detectPromptTemplateSlashCommand, type PromptTemplateSlashCommand } from "@/lib/prompt-templates";
@@ -41,6 +42,8 @@ const BoardPromptTextarea = forwardRef<HTMLTextAreaElement, BoardPromptTextareaP
   const shellRef = useRef<HTMLDivElement | null>(null);
   const [atSearch, setAtSearch] = useState<string | null>(null);
   const [dropdownAnchor, setDropdownAnchor] = useState<{ left: number; top: number; width: number } | null>(null);
+  const { flush, setValue, value: draftValue } = useDebouncedTextCommit(value, onChange);
+  const displayValue = readOnly ? value : draftValue;
 
   useImperativeHandle(forwardedRef, () => textareaRef.current as HTMLTextAreaElement, []);
 
@@ -53,11 +56,11 @@ const BoardPromptTextarea = forwardRef<HTMLTextAreaElement, BoardPromptTextareaP
     if (!shell) return;
     const rect = shell.getBoundingClientRect();
     setDropdownAnchor({ left: rect.left, top: rect.top, width: rect.width });
-  }, [atSearch, value]);
+  }, [atSearch, displayValue]);
 
   const handleChange = (nextValue: string, caret: number | null): void => {
     if (readOnly) return;
-    onChange(nextValue);
+    setValue(nextValue);
     if (caret === null) {
       setAtSearch(null);
       onSlashCommand?.(null);
@@ -69,13 +72,14 @@ const BoardPromptTextarea = forwardRef<HTMLTextAreaElement, BoardPromptTextareaP
 
   const handleSelectReference = (index: number): void => {
     const textarea = textareaRef.current;
-    const caret = textarea?.selectionStart ?? value.length;
+    const caret = textarea?.selectionStart ?? displayValue.length;
     const searchLength = atSearch?.length ?? 0;
     const start = Math.max(0, caret - searchLength - 1);
     const token = getReferencePromptToken(index);
-    const nextPrompt = `${value.slice(0, start)}${token} ${value.slice(caret)}`;
+    const nextPrompt = `${displayValue.slice(0, start)}${token} ${displayValue.slice(caret)}`;
     const nextCaret = start + `${token} `.length;
-    onChange(nextPrompt);
+    setValue(nextPrompt);
+    flush();
     setAtSearch(null);
     window.requestAnimationFrame(() => {
       textarea?.focus();
@@ -109,11 +113,12 @@ const BoardPromptTextarea = forwardRef<HTMLTextAreaElement, BoardPromptTextareaP
         {atDropdownPortal}
         <textarea
           ref={textareaRef}
-          value={value}
+          value={displayValue}
           readOnly={readOnly}
           onChange={(event) => handleChange(event.target.value, event.target.selectionStart)}
           onBlur={() => {
             if (readOnly) return;
+            flush();
             window.setTimeout(() => {
               setAtSearch(null);
               onSlashCommand?.(null);

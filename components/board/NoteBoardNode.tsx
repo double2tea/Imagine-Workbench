@@ -1,3 +1,4 @@
+import DebouncedBoardTextarea from "@/components/board/DebouncedBoardTextarea";
 import type { BoardNoteNode } from "@/lib/board";
 
 interface NoteBoardNodeProps {
@@ -7,9 +8,9 @@ interface NoteBoardNodeProps {
 
 export default function NoteBoardNode({ node, onChange }: NoteBoardNodeProps) {
   return (
-    <textarea
+    <DebouncedBoardTextarea
       value={node.body}
-      onChange={(event) => onChange(event.target.value)}
+      onChange={onChange}
       className="h-full w-full resize-none bg-amber-50 p-3 text-sm leading-6 text-slate-950 outline-none imagine-board-node-note"
       placeholder="笔记"
     />

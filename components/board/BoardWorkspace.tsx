@@ -49,6 +49,11 @@ import BoardToolbar from "@/components/board/BoardToolbar";
 import BoardAssetCompareOverlay from "@/components/board/BoardAssetCompareOverlay";
 import type { StorageItem } from "@/lib/db";
 import {
+  buildGalleryReferenceFingerprint,
+  buildGalleryTaskFingerprint,
+  buildBoardGraphContentKey,
+} from "@/lib/board/graph-content-key";
+import {
   assetCompareReferenceUrl,
   buildBoardPromptReferences,
   generateReferenceCandidates,
@@ -451,8 +456,17 @@ export default function BoardWorkspace({
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
   const [trashedNodes, setTrashedNodes] = useState<BoardTrashEntry[]>([]);
   const [assetCompare, setAssetCompare] = useState<{ originalUrl: string; resultUrl: string } | null>(null);
+  const galleryReferenceFingerprint = useMemo(
+    () => buildGalleryReferenceFingerprint(galleryItems),
+    [galleryItems],
+  );
   const galleryReferenceItems = useMemo(
     () => galleryItems.map(item => ({ id: item.id, status: item.status, type: item.type, url: item.url })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fingerprint gates rebuild on progress-only polls
+    [galleryReferenceFingerprint],
+  );
+  const galleryTaskFingerprint = useMemo(
+    () => buildGalleryTaskFingerprint(galleryItems),
     [galleryItems],
   );
   const {
@@ -468,6 +482,7 @@ export default function BoardWorkspace({
     redo,
     undo,
     duplicateNode,
+    duplicateNodes,
     reconnectEdge,
     restoreNodeWithEdges,
     addAgentNode,
@@ -494,6 +509,11 @@ export default function BoardWorkspace({
     updateNoteBody,
     updatePromptNode,
   } = controller;
+
+  const boardGraphContentKey = useMemo(
+    () => buildBoardGraphContentKey(board.nodes, board.edges),
+    [board.nodes, board.edges],
+  );
 
   const closeOverlayMenus = useCallback(() => {
     setQuickInsertMenu(null);
@@ -528,10 +548,6 @@ export default function BoardWorkspace({
     for (const node of board.nodes) {
       dataById.set(node.id, {
         generateInputSummary: generateInputSummaryForNode(node, board.nodes, board.edges),
-        generateTaskSummary:
-          node.kind === "image-generate" || node.kind === "video-generate"
-            ? activeGenerateTaskForNode(galleryItems, node.id)
-            : undefined,
         hasResultConnection: hasResultConnection(node.id, board.edges),
         node,
         generateReferences:
@@ -581,11 +597,11 @@ export default function BoardWorkspace({
       });
     }
     return dataById;
+    // board.nodes / board.edges read when graph content changes; omit to skip position-only updates
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    board.nodes,
-    board.edges,
+    boardGraphContentKey,
     galleryReferenceItems,
-    galleryItems,
     onCancelGenerateNode,
     onCaptureVideoFrame,
     onEditAssetImage,
@@ -603,6 +619,17 @@ export default function BoardWorkspace({
     updatePromptNode,
   ]);
 
+  const generateTaskByNodeId = useMemo(() => {
+    const map = new Map<string, BoardGenerateTaskSummary>();
+    for (const node of board.nodes) {
+      if (node.kind !== "image-generate" && node.kind !== "video-generate") continue;
+      const task = activeGenerateTaskForNode(galleryItems, node.id);
+      if (task) map.set(node.id, task);
+    }
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- task fingerprint gates progress-only polls
+  }, [galleryTaskFingerprint]);
+
   const flowNodes = useMemo<BoardFlowNode[]>(
     () =>
       board.nodes.map(node => ({
@@ -612,9 +639,15 @@ export default function BoardWorkspace({
         width: node.size.width,
         height: node.size.height,
         selected: selectedNodeIdSet.has(node.id),
-        data: flowNodeDataById.get(node.id)!,
+        data: {
+          ...flowNodeDataById.get(node.id)!,
+          generateTaskSummary:
+            node.kind === "image-generate" || node.kind === "video-generate"
+              ? generateTaskByNodeId.get(node.id)
+              : undefined,
+        },
       })),
-    [board.nodes, flowNodeDataById, selectedNodeIdSet],
+    [board.nodes, flowNodeDataById, generateTaskByNodeId, selectedNodeIdSet],
   );
 
   const flowEdges = useMemo<BoardFlowEdge[]>(
@@ -633,7 +666,8 @@ export default function BoardWorkspace({
         markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor(edge.kind, themeMode), width: 18, height: 18 },
         style: { strokeWidth: selectedEdgeId === edge.id ? 3 : 2 },
       })),
-    [board.edges, board.nodes, selectedEdgeId, themeMode],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- graph key gates processing animation without position churn
+    [boardGraphContentKey, selectedEdgeId, themeMode],
   );
 
   const isValidBoardConnection = useCallback<IsValidConnection<BoardFlowEdge>>((connection) => {
@@ -1125,7 +1159,7 @@ export default function BoardWorkspace({
       }
       if (key === "d") {
         if (selectedNodeIds.length === 0) return;
-        for (const nodeId of selectedNodeIds) duplicateNode(nodeId);
+        duplicateNodes(selectedNodeIds);
         event.preventDefault();
         return;
       }
@@ -1150,6 +1184,7 @@ export default function BoardWorkspace({
     canUndo,
     closeOverlayMenus,
     duplicateNode,
+    duplicateNodes,
     pasteCopiedNode,
     redo,
     selectedNodeIds,

@@ -61,6 +61,7 @@ export interface BoardStateController {
   redo: () => void;
   undo: () => void;
   duplicateNode: (nodeId: string) => string | null;
+  duplicateNodes: (nodeIds: string[]) => string[];
   reconnectEdge: (edgeId: string, from: BoardPortRef, to: BoardPortRef) => void;
   restoreNodeWithEdges: (node: BoardNode, edges: BoardEdge[]) => void;
   addAgentNode: (input?: CreateAgentNodeInput) => string;
@@ -112,6 +113,77 @@ function createBoardId(prefix: string): string {
 
 function nowIso(): string {
   return new Date().toISOString();
+}
+
+function duplicateNodeIdPrefix(kind: BoardNode["kind"]): string {
+  if (kind === "asset") return "asset";
+  if (kind === "prompt") return "prompt";
+  if (kind === "reference-group") return "ref_group";
+  if (kind === "image-generate") return "image_gen";
+  if (kind === "video-generate") return "video_gen";
+  if (kind === "agent") return "agent";
+  return "note";
+}
+
+function cloneBoardNodeForDuplicate(source: BoardNode, stackIndex: number): BoardNode {
+  const createdAt = nowIso();
+  const offset = 28 * (stackIndex + 1);
+  const position = {
+    x: source.position.x + offset,
+    y: source.position.y + offset,
+  };
+  const shell = {
+    id: createBoardId(duplicateNodeIdPrefix(source.kind)),
+    title: source.title,
+    position,
+    size: source.size,
+    createdAt,
+    updatedAt: createdAt,
+  };
+
+  switch (source.kind) {
+    case "asset":
+      return { ...shell, kind: "asset", asset: source.asset };
+    case "prompt":
+      return { ...shell, kind: "prompt", prompt: source.prompt };
+    case "reference-group":
+      return { ...shell, kind: "reference-group", references: structuredClone(source.references) };
+    case "image-generate":
+      return {
+        ...shell,
+        kind: "image-generate",
+        aspectRatio: source.aspectRatio,
+        customImageResolution: source.customImageResolution,
+        imageQuality: source.imageQuality,
+        imageResolution: source.imageResolution,
+        model: source.model,
+        prompt: source.prompt,
+        status: "idle",
+        thinkingLevel: source.thinkingLevel,
+        variantCount: source.variantCount,
+      };
+    case "video-generate":
+      return {
+        ...shell,
+        kind: "video-generate",
+        aspectRatio: source.aspectRatio,
+        model: source.model,
+        prompt: source.prompt,
+        status: "idle",
+        variantCount: source.variantCount,
+        videoDuration: source.videoDuration,
+        videoPreset: source.videoPreset,
+        videoResolution: source.videoResolution,
+      };
+    case "agent":
+      return { ...shell, kind: "agent", instruction: source.instruction };
+    case "note":
+      return { ...shell, kind: "note", body: source.body };
+    default: {
+      const exhaustive: never = source;
+      return exhaustive;
+    }
+  }
 }
 
 function normalizeBoard(board: BoardDocument): BoardDocument {
@@ -605,58 +677,26 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     setSelectedEdgeId(null);
   }, [mutateBoard]);
 
+  const duplicateNodes = useCallback((nodeIds: string[]): string[] => {
+    const sources = nodeIds
+      .map(nodeId => board.nodes.find(node => node.id === nodeId))
+      .filter((node): node is BoardNode => node !== undefined);
+    if (sources.length === 0) return [];
+
+    const clones = sources.map((source, index) => cloneBoardNodeForDuplicate(source, index));
+    mutateBoard(currentBoard => touchBoard(currentBoard, [...currentBoard.nodes, ...clones]));
+    const lastClone = clones[clones.length - 1];
+    if (lastClone) {
+      setSelectedNodeId(lastClone.id);
+      setSelectedEdgeId(null);
+    }
+    return clones.map(clone => clone.id);
+  }, [board.nodes, mutateBoard]);
+
   const duplicateNode = useCallback((nodeId: string): string | null => {
-    const source = board.nodes.find(node => node.id === nodeId);
-    if (!source) return null;
-    const position = {
-      x: source.position.x + 28,
-      y: source.position.y + 28,
-    };
-    if (source.kind === "asset") {
-      return addAssetNode({ asset: source.asset, position, size: source.size, title: source.title });
-    }
-    if (source.kind === "prompt") {
-      return addPromptNode({ position, prompt: source.prompt, size: source.size, title: source.title });
-    }
-    if (source.kind === "reference-group") {
-      return addReferenceGroupNode({ position, references: structuredClone(source.references), size: source.size, title: source.title });
-    }
-    if (source.kind === "image-generate") {
-      return addGenerateNode({
-        kind: "image-generate",
-        aspectRatio: source.aspectRatio,
-        customImageResolution: source.customImageResolution,
-        imageQuality: source.imageQuality,
-        imageResolution: source.imageResolution,
-        model: source.model,
-        position,
-        prompt: source.prompt,
-        size: source.size,
-        thinkingLevel: source.thinkingLevel,
-        title: source.title,
-        variantCount: source.variantCount,
-      });
-    }
-    if (source.kind === "video-generate") {
-      return addGenerateNode({
-        kind: "video-generate",
-        aspectRatio: source.aspectRatio,
-        model: source.model,
-        position,
-        prompt: source.prompt,
-        size: source.size,
-        title: source.title,
-        variantCount: source.variantCount,
-        videoDuration: source.videoDuration,
-        videoPreset: source.videoPreset,
-        videoResolution: source.videoResolution,
-      });
-    }
-    if (source.kind === "agent") {
-      return addAgentNode({ instruction: source.instruction, position, size: source.size, title: source.title });
-    }
-    return addNoteNode({ body: source.body, position, size: source.size, title: source.title });
-  }, [addAgentNode, addAssetNode, addGenerateNode, addNoteNode, addPromptNode, addReferenceGroupNode, board.nodes]);
+    const ids = duplicateNodes([nodeId]);
+    return ids[0] ?? null;
+  }, [duplicateNodes]);
 
   const connectPorts = useCallback((from: BoardPortRef, to: BoardPortRef) => {
     const kind = isCompatibleConnection(from, to);
@@ -898,6 +938,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       redo,
       undo,
       duplicateNode,
+      duplicateNodes,
       reconnectEdge,
       restoreNodeWithEdges,
       addAgentNode,
@@ -945,6 +986,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       deleteEdge,
       deleteNode,
       duplicateNode,
+      duplicateNodes,
       moveReferenceGroupItem,
       reconnectEdge,
       restoreNodeWithEdges,
