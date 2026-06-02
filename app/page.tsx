@@ -752,6 +752,7 @@ export default function Home() {
     handleToggleAutoExecute,
     isAgentLoading,
     submitAgentPrompt,
+    updateAgentActionDraft,
   } = useAgentController({
     agentInput,
     agentReferenceId,
@@ -773,6 +774,7 @@ export default function Home() {
     setReferenceImage,
     setReferenceImages,
     setTraditionalSubTab,
+    onActionValidationError: message => pushWorkspaceNotice("error", message),
   });
 
   const handleClearProject = async () => {
@@ -1388,8 +1390,11 @@ export default function Home() {
                   setAgentReferenceUrl(null);
                   setAgentReferences([]);
                 }}
+                imageModelGroups={imageModelGroups}
+                videoModelGroups={videoModelGroups}
                 onDeclineAction={declineAgentToolAction}
                 onExecuteAction={executeAgentToolAction}
+                onUpdateActionDraft={updateAgentActionDraft}
                 onMaskReference={() => {
                   if (agentReferenceUrl) {
                     launchMaskEditor(agentReferenceUrl, agentReferenceId || "custom_ref", "agent");

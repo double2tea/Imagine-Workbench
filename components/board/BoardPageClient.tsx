@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Maximize2, Paintbrush, Send, Settings, Video } from "lucide-react";
 import AgentDock, { type AgentToolAction } from "@/components/agent/AgentDock";
+import { isCustomImageResolutionValue } from "@/lib/agent-tool-action";
 import AtReferenceDropdown from "@/components/reference/AtReferenceDropdown";
 import CanvasMaskEditor from "@/components/CanvasMaskEditor";
 import FullscreenPreview from "@/components/assets/FullscreenPreview";
@@ -752,7 +753,13 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     const generatePosition = { x: 520 + baseIndex * 32, y: 120 + baseIndex * 24 };
 
     if (kind === "image-generate") {
-      const defaults = imageActionDefaults(model, action.params?.aspectRatio);
+      const defaults = {
+        ...imageActionDefaults(model, action.params?.aspectRatio),
+        ...(action.params?.aspectRatio ? { aspectRatio: action.params.aspectRatio } : {}),
+        ...(action.params?.imageResolution ? { imageResolution: action.params.imageResolution } : {}),
+        ...(action.params?.imageQuality ? { imageQuality: action.params.imageQuality } : {}),
+        ...(action.params?.thinkingLevel ? { thinkingLevel: action.params.thinkingLevel } : {}),
+      };
       const generateNodeId = boardController.addGenerateNode({
         kind,
         model,
@@ -802,7 +809,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         boardNodeId: generateNodeId,
         imageQuality: defaults.imageQuality,
         imageResolution: defaults.imageResolution,
-        isCustomImageResolution: defaults.imageResolution === "custom",
+        isCustomImageResolution: isCustomImageResolutionValue(defaults.imageResolution),
         model,
         prompt: promptFromAgent,
         referenceImage: references[0]?.url ?? null,
@@ -819,7 +826,13 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       return true;
     }
 
-    const defaults = videoActionDefaults(model, action.params?.aspectRatio);
+    const defaults = {
+      ...videoActionDefaults(model, action.params?.aspectRatio),
+      ...(action.params?.aspectRatio ? { aspectRatio: action.params.aspectRatio } : {}),
+      ...(action.params?.videoResolution ? { videoResolution: action.params.videoResolution } : {}),
+      ...(action.params?.videoDuration ? { videoDuration: action.params.videoDuration } : {}),
+      ...(action.params?.videoPreset ? { videoPreset: action.params.videoPreset } : {}),
+    };
     const generateNodeId = boardController.addGenerateNode({
       kind,
       model,
@@ -911,6 +924,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     handleToggleAutoExecute,
     isAgentLoading,
     submitAgentPrompt,
+    updateAgentActionDraft,
   } = useAgentController({
     agentInput,
     agentReferenceId,
@@ -936,6 +950,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     setReferenceImage,
     setReferenceImages,
     setTraditionalSubTab: value => setMode(value),
+    onActionValidationError: message => pushWorkspaceNotice("error", message),
   });
 
   const cancelBoardGenerationNode = useCallback(async (nodeId: string): Promise<void> => {
@@ -1583,8 +1598,11 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             setAgentReferenceUrl(null);
             setAgentReferences([]);
           }}
+          imageModelGroups={imageModelGroups}
+          videoModelGroups={videoModelGroups}
           onDeclineAction={declineAgentToolAction}
           onExecuteAction={executeAgentToolAction}
+          onUpdateActionDraft={updateAgentActionDraft}
           onMaskReference={() => {
             if (agentReferenceUrl) launchMaskEditor(agentReferenceUrl, agentReferenceId || "custom_ref", "agent");
           }}

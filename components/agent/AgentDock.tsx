@@ -4,6 +4,9 @@ import { Check, ChevronRight, ImagePlus, Paintbrush, RefreshCw, Send, X } from "
 import { AnimatePresence, motion } from "motion/react";
 import PreviewImage from "@/components/PreviewImage";
 import { AgentModelSelect } from "@/components/agent/AgentModelSelect";
+import { AgentActionSummary } from "@/components/agent/AgentActionSummary";
+import { AgentPendingActionEditor } from "@/components/agent/AgentPendingActionEditor";
+import type { AgentGenerationParams } from "@/lib/agent-tool-action";
 import { DEFAULT_VISION_CHAT_MODEL, type AiProvider, type ModelOption } from "@/lib/providers/model-catalog";
 
 export interface ChatMessage {
@@ -13,25 +16,13 @@ export interface ChatMessage {
   thought?: string;
   recommendedAction?: {
     type: "none" | "optimize_prompt" | "generate_image" | "edit_image" | "generate_video";
-    params?: {
-      prompt?: string;
-      model?: string;
-      aspectRatio?: string;
-      referenceImageId?: string;
-    };
+    params?: AgentGenerationParams;
   };
   boardAction?: {
     type: "none" | "create_board_image_flow" | "create_board_video_flow" | "create_board_note";
-    params?: {
-      prompt?: string;
-      model?: string;
-      aspectRatio?: string;
-      referenceImageId?: string;
-      title?: string;
-      body?: string;
-      run?: boolean;
-    };
+    params?: AgentGenerationParams;
   };
+  actionDraft?: AgentToolAction;
   suggestedFollowUps?: string[];
   interactiveState?: "idle" | "executing" | "completed" | "declined";
   activeSkills?: string[];
@@ -57,6 +48,7 @@ interface AgentDockProps {
   chatBottomRef: Ref<HTMLDivElement>;
   chatModelGroups: AgentModelGroup[];
   countdownSeconds: number;
+  imageModelGroups: AgentModelGroup[];
   input: string;
   isLoading: boolean;
   isOpen: boolean;
@@ -65,6 +57,7 @@ interface AgentDockProps {
   selectedChatModel: string;
   themeMode: "light" | "dark";
   usesVisionModel: boolean;
+  videoModelGroups: AgentModelGroup[];
   onSelectChatModel: (value: string) => void;
   onCancelCountdown: () => void;
   onChangeInput: (value: string) => void;
@@ -72,6 +65,7 @@ interface AgentDockProps {
   onClearReference: () => void;
   onDeclineAction: (messageId: string) => void;
   onExecuteAction: (messageId: string, action: AgentToolAction) => void;
+  onUpdateActionDraft: (messageId: string, action: AgentToolAction) => void;
   onMaskReference: () => void;
   onSubmit: () => void;
   onSuggestedPrompt: (prompt: string) => void;
@@ -123,15 +117,15 @@ const ACTION_LABELS: Record<AgentToolAction["type"], string> = {
   create_board_note: "创建画板笔记",
 };
 
-function getExecutableAction(message: ChatMessage): AgentToolAction | null {
+export function getExecutableAction(message: ChatMessage): AgentToolAction | null {
   if (message.boardAction && message.boardAction.type !== "none") return message.boardAction;
   if (message.recommendedAction && message.recommendedAction.type !== "none") return message.recommendedAction;
   return null;
 }
 
-function getBoardActionBody(action: AgentToolAction): string | undefined {
-  if (action.type !== "create_board_note") return undefined;
-  return action.params?.body;
+export function getPendingAgentAction(message: ChatMessage): AgentToolAction | null {
+  if (message.actionDraft && message.actionDraft.type !== "none") return message.actionDraft;
+  return getExecutableAction(message);
 }
 
 function parseAgentContent(content: string): AgentContentLine[] {
@@ -212,20 +206,27 @@ function AgentMessage({
   countdownSeconds,
   message,
   onCancelCountdown,
+  imageModelGroups,
+  videoModelGroups,
   onDeclineAction,
   onExecuteAction,
+  onUpdateActionDraft,
   onSuggestedPrompt,
 }: {
   activeCountdownId: string | null;
   countdownSeconds: number;
+  imageModelGroups: AgentModelGroup[];
+  videoModelGroups: AgentModelGroup[];
   message: ChatMessage;
   onCancelCountdown: () => void;
   onDeclineAction: (messageId: string) => void;
   onExecuteAction: (messageId: string, action: AgentToolAction) => void;
+  onUpdateActionDraft: (messageId: string, action: AgentToolAction) => void;
   onSuggestedPrompt: (prompt: string) => void;
 }) {
   const executableAction = getExecutableAction(message);
-  const boardActionBody = executableAction ? getBoardActionBody(executableAction) : undefined;
+  const pendingAction = getPendingAgentAction(message);
+  const canEditAction = message.interactiveState === "idle";
 
   return (
     <div className={`flex flex-col gap-1.5 ${message.role === "user" ? "self-end ml-10" : "self-start mr-10"}`}>
@@ -293,9 +294,11 @@ function AgentMessage({
         </details>
       )}
 
-      {message.role === "assistant" && executableAction && (
+      {message.role === "assistant" && executableAction && pendingAction && (
         <div className="imagine-agent-action-panel">
-          <span className="imagine-agent-action-panel-title">建议动作</span>
+          <span className="imagine-agent-action-panel-title">
+            {canEditAction ? "建议动作 · 执行前可调整" : "建议动作 · 参数摘要"}
+          </span>
 
           <div className="imagine-agent-action-panel-body">
             <p>
@@ -304,42 +307,26 @@ function AgentMessage({
                 {ACTION_LABELS[executableAction.type]}
               </code>
             </p>
-
-            {executableAction.params?.prompt && (
-              <p className="leading-normal">
-                <strong className="text-blue-400">规划提示词:</strong>{" "}
-                <span className="imagine-agent-action-muted">
-                  &ldquo;{executableAction.params.prompt}&rdquo;
-                </span>
-              </p>
-            )}
-
-            {executableAction.params?.aspectRatio && (
-              <p>
-                <strong className="text-blue-400">画素尺寸:</strong>{" "}
-                <span className="text-[10px] bg-black/30 px-1 py-0.5 rounded font-mono text-blue-300">
-                  {executableAction.params.aspectRatio}
-                </span>
-              </p>
-            )}
-
-            {boardActionBody && (
-              <p className="leading-normal">
-                <strong className="text-blue-400">笔记:</strong>{" "}
-                <span className="imagine-agent-action-muted">
-                  &ldquo;{boardActionBody}&rdquo;
-                </span>
-              </p>
-            )}
           </div>
 
+          {canEditAction ? (
+            <AgentPendingActionEditor
+              action={pendingAction}
+              imageModelGroups={imageModelGroups}
+              videoModelGroups={videoModelGroups}
+              onChange={nextAction => onUpdateActionDraft(message.id, nextAction)}
+            />
+          ) : (
+            <AgentActionSummary action={pendingAction} />
+          )}
+
           <div className="flex gap-2.5 mt-3 pt-2.5 border-t border-white/5">
-            {message.interactiveState === "idle" && (
+            {canEditAction && (
               <>
                 <button
                   type="button"
                   onClick={() => {
-                    onExecuteAction(message.id, executableAction);
+                    onExecuteAction(message.id, pendingAction);
                   }}
                   className="imagine-primary-action flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-1.5 px-3 rounded-lg text-[10px] flex items-center justify-center gap-1 shadow-md hover:shadow-[0_0_15px_rgba(37,99,235,0.3)] cursor-pointer transition"
                 >
@@ -429,8 +416,11 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
     onChangeInput,
     onClearChat,
     onClearReference,
+    imageModelGroups,
+    videoModelGroups,
     onDeclineAction,
     onExecuteAction,
+    onUpdateActionDraft,
     onMaskReference,
     onSubmit,
     onSuggestedPrompt,
@@ -579,8 +569,11 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
                 countdownSeconds={countdownSeconds}
                 message={message}
                 onCancelCountdown={onCancelCountdown}
+                imageModelGroups={imageModelGroups}
+                videoModelGroups={videoModelGroups}
                 onDeclineAction={onDeclineAction}
                 onExecuteAction={onExecuteAction}
+                onUpdateActionDraft={onUpdateActionDraft}
                 onSuggestedPrompt={onSuggestedPrompt}
               />
             ))}

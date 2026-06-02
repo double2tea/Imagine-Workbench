@@ -942,6 +942,61 @@ details.group[open] > .imagine-agent-thought-summary {
   color: var(--iw-faint);
 }
 
+.imagine-agent-action-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.imagine-agent-action-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.imagine-agent-action-field-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: color-mix(in srgb, var(--iw-accent) 65%, #93c5fd);
+}
+
+.imagine-agent-action-textarea,
+.imagine-agent-action-input {
+  width: 100%;
+  border-radius: var(--iw-radius-md);
+  border: 1px solid var(--iw-border);
+  background: color-mix(in srgb, var(--iw-bg) 35%, var(--iw-panel));
+  padding: 8px 10px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--iw-text);
+  resize: vertical;
+}
+
+.imagine-agent-action-textarea:focus-visible,
+.imagine-agent-action-input:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--iw-accent) 55%, transparent);
+  outline-offset: 1px;
+}
+
+.imagine-agent-action-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: var(--iw-radius-md);
+  border: 1px solid var(--iw-border);
+  background: color-mix(in srgb, var(--iw-bg) 30%, var(--iw-panel));
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--iw-muted);
+  list-style: none;
+}
+
 .imagine-agent-follow-up {
   border-radius: 999px;
   border: 1px solid var(--iw-border);

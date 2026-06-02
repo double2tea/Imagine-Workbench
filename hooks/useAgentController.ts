@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import type { AgentToolAction, ChatMessage } from "@/components/agent/AgentDock";
+import { getExecutableAction, getPendingAgentAction, type AgentToolAction, type ChatMessage } from "@/components/agent/AgentDock";
+import {
+  isCustomImageResolutionValue,
+  prepareAgentActionDraft,
+  validateAgentToolAction,
+  type AgentGenerationParams,
+} from "@/lib/agent-tool-action";
 import type { AgentBoardContext, AgentSurface } from "@/lib/agent-context";
 import type { CreationMode } from "@/components/creation/CreationModeTabs";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
@@ -33,14 +39,42 @@ interface UseAgentControllerParams {
   setReferenceImage: Dispatch<SetStateAction<string | null>>;
   setReferenceImages: Dispatch<SetStateAction<ReferenceImageRef[]>>;
   setTraditionalSubTab: Dispatch<SetStateAction<CreationMode>>;
+  onActionValidationError?: (message: string) => void;
+}
+
+function normalizeRestoredAgentMessage(message: ChatMessage): ChatMessage {
+  if (message.role !== "assistant") return message;
+
+  const executableAction = getExecutableAction(message);
+  if (!executableAction) return message;
+
+  const interactiveState = message.interactiveState ?? "completed";
+  const actionDraft = message.actionDraft ?? prepareAgentActionDraft(executableAction);
+
+  if (message.interactiveState === interactiveState && message.actionDraft === actionDraft) {
+    return message;
+  }
+
+  return { ...message, interactiveState, actionDraft };
+}
+
+function normalizeRestoredAgentMessages(messages: ChatMessage[]): ChatMessage[] {
+  return messages.map(normalizeRestoredAgentMessage);
 }
 
 interface GenerationOverrides {
+  imageQuality?: string;
+  imageResolution?: string;
+  isCustomImageResolution?: boolean;
   model?: string;
   prompt?: string;
   referenceImage?: string | null;
   referenceImages?: ReferenceImageRef[];
   size?: string;
+  thinkingLevel?: string;
+  videoDuration?: string;
+  videoPreset?: string;
+  videoResolution?: string;
 }
 
 interface ExecuteToolActionOverrideInput {
@@ -106,6 +140,7 @@ export function useAgentController({
   setReferenceImage,
   setReferenceImages,
   setTraditionalSubTab,
+  onActionValidationError,
 }: UseAgentControllerParams) {
   const [agentMessages, setAgentMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
   const [isAgentLoading, setIsAgentLoading] = useState(false);
@@ -114,6 +149,11 @@ export function useAgentController({
   const [countdownSeconds, setCountdownSeconds] = useState(3);
   const chatBottomRef = useRef<HTMLDivElement | null>(null);
   const autoCountdownInterval = useRef<NodeJS.Timeout | null>(null);
+  const agentMessagesRef = useRef(agentMessages);
+
+  useEffect(() => {
+    agentMessagesRef.current = agentMessages;
+  }, [agentMessages]);
 
   useEffect(() => {
     const restoreAgentState = window.setTimeout(() => {
@@ -124,7 +164,7 @@ export function useAgentController({
         try {
           const parsed: unknown = JSON.parse(storedChat);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setAgentMessages(parsed as ChatMessage[]);
+            setAgentMessages(normalizeRestoredAgentMessages(parsed as ChatMessage[]));
           } else {
             setAgentMessages([WELCOME_MESSAGE]);
           }
@@ -191,11 +231,18 @@ export function useAgentController({
   };
 
   const executeAgentToolAction = async (messageId: string, action: AgentToolAction) => {
+    const { type, params = {} } = action as AgentToolAction & { params: AgentGenerationParams };
+    const actionReferences = getActionReferenceImages(params.referenceImageId);
+    const validationError = validateAgentToolAction(action, {
+      hasEditReference: type !== "edit_image" || actionReferences.length > 0,
+    });
+    if (validationError) {
+      onActionValidationError?.(validationError);
+      return;
+    }
+
     clearActiveCountdown();
     setAgentMessages(prev => prev.map(message => message.id === messageId ? { ...message, interactiveState: "completed" } : message));
-
-    const { type, params = {} } = action;
-    const actionReferences = getActionReferenceImages(params.referenceImageId);
     const actionReferenceOverride: GenerationOverrides | undefined = actionReferences.length > 0
       ? { referenceImage: actionReferences[0]?.url ?? null, referenceImages: actionReferences }
       : undefined;
@@ -216,7 +263,16 @@ export function useAgentController({
       setTraditionalSubTab("image");
 
       setTimeout(() => {
-        generateManualImage({ ...actionReferenceOverride, model: params.model, prompt: params.prompt || "", size: params.aspectRatio });
+        generateManualImage({
+          ...actionReferenceOverride,
+          model: params.model,
+          prompt: params.prompt || "",
+          size: params.aspectRatio,
+          imageResolution: params.imageResolution,
+          imageQuality: params.imageQuality,
+          thinkingLevel: params.thinkingLevel,
+          isCustomImageResolution: isCustomImageResolutionValue(params.imageResolution),
+        });
       }, 500);
     } else if (type === "generate_video") {
       setPrompt(params.prompt || "");
@@ -226,7 +282,15 @@ export function useAgentController({
 
       setTraditionalSubTab("video");
       setTimeout(() => {
-        generateManualVideo({ ...actionReferenceOverride, model: params.model, prompt: params.prompt || "", size: params.aspectRatio });
+        generateManualVideo({
+          ...actionReferenceOverride,
+          model: params.model,
+          prompt: params.prompt || "",
+          size: params.aspectRatio,
+          videoResolution: params.videoResolution,
+          videoDuration: params.videoDuration,
+          videoPreset: params.videoPreset,
+        });
       }, 500);
     } else if (type === "edit_image") {
       setPrompt(params.prompt || "");
@@ -250,7 +314,9 @@ export function useAgentController({
       setCountdownSeconds(secondsLeft);
       if (secondsLeft <= 0) {
         if (autoCountdownInterval.current) clearInterval(autoCountdownInterval.current);
-        executeAgentToolAction(messageId, action);
+        const message = agentMessagesRef.current.find(entry => entry.id === messageId);
+        const pendingAction = message ? getPendingAgentAction(message) : action;
+        if (pendingAction) executeAgentToolAction(messageId, pendingAction);
       }
     }, 1000);
   };
@@ -318,6 +384,9 @@ export function useAgentController({
         const recommendedAction = agentResponse.recommendedAction || { type: "none" as const };
         const boardAction = agentResponse.boardAction || { type: "none" as const };
         const executableAction = boardAction.type !== "none" ? boardAction : recommendedAction;
+        const actionDraft = executableAction.type !== "none"
+          ? prepareAgentActionDraft(executableAction)
+          : undefined;
 
         const assistantMessage: ChatMessage = {
           id: assistantMsgId,
@@ -326,6 +395,7 @@ export function useAgentController({
           thought: agentResponse.thought || "分析场景，规划后续设计合成步骤...",
           recommendedAction,
           boardAction,
+          actionDraft,
           suggestedFollowUps: agentResponse.suggestedFollowUps || [],
           interactiveState: "idle",
           activeSkills: agentResponse.activeSkills || [],
@@ -334,8 +404,8 @@ export function useAgentController({
 
         setAgentMessages(prev => [...prev, assistantMessage]);
 
-        if (autoExecute && canAutoExecuteAgentAction(executableAction)) {
-          startAutoCountdown(assistantMsgId, executableAction);
+        if (autoExecute && actionDraft && canAutoExecuteAgentAction(actionDraft)) {
+          startAutoCountdown(assistantMsgId, actionDraft);
         }
       }
     } catch (error) {
@@ -350,6 +420,12 @@ export function useAgentController({
     } finally {
       setIsAgentLoading(false);
     }
+  };
+
+  const updateAgentActionDraft = (messageId: string, action: AgentToolAction) => {
+    setAgentMessages(prev => prev.map(message => (
+      message.id === messageId ? { ...message, actionDraft: action } : message
+    )));
   };
 
   const declineAgentToolAction = (messageId: string) => {
@@ -375,5 +451,6 @@ export function useAgentController({
     handleToggleAutoExecute,
     isAgentLoading,
     submitAgentPrompt,
+    updateAgentActionDraft,
   };
 }
