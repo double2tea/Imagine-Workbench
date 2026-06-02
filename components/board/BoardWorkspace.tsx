@@ -789,7 +789,10 @@ export default function BoardWorkspace({
   }, [beginUndoGesture, endUndoGesture, updateNodesPositions]);
 
   const handleNodesChange = useCallback<OnNodesChange<BoardFlowNode>>((changes) => {
-    setRenderNodes(currentNodes => applyNodeChanges(changes, currentNodes));
+    const visualChanges = changes.filter(change => change.type !== "dimensions");
+    if (visualChanges.length > 0) {
+      setRenderNodes(currentNodes => applyNodeChanges(visualChanges, currentNodes));
+    }
     const settledPositions: Array<{ nodeId: string; position: BoardPoint }> = [];
     for (const change of changes) {
       if (change.type !== "position" || !change.position || change.dragging === true) continue;
