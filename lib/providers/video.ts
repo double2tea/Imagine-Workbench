@@ -23,8 +23,9 @@ interface VideoStatusResponse {
   url?: string;
   video_url?: string;
   content_url?: string;
-  data?: { url?: string };
-  output?: { url?: string };
+  data?: unknown;
+  output?: unknown;
+  result?: unknown;
   error?: { message?: string };
 }
 
@@ -160,7 +161,7 @@ export async function downloadVideo(config: ProviderConfig, taskId: string, mode
   const status = await getJson<VideoStatusResponse>(`${baseUrl}/v1/videos/${encodeURIComponent(task.id)}`, config);
   const videoUrl =
     readVideoUrl(status) ??
-    (config.provider === "grok2api" ? `${baseUrl}/v1/videos/${encodeURIComponent(task.id)}/content` : undefined);
+    videoContentEndpointUrl(config, baseUrl, task.id);
   if (!videoUrl) throw new Error("Video task is complete but did not expose a video URL");
 
   const res = await fetch(videoUrl, {
@@ -240,17 +241,31 @@ async function referenceToBlob(reference: GenerateVideoInput["referenceImages"][
   return blob;
 }
 
-function readVideoUrl(value: VideoStatusResponse): string | undefined {
-  const candidates = [value.url, value.video_url, value.content_url, value.data?.url, value.output?.url];
-  const direct = candidates.find(candidate => typeof candidate === "string" && candidate.length > 0);
-  if (direct) return direct;
+function videoContentEndpointUrl(config: ProviderConfig, baseUrl: string, taskId: string): string | undefined {
+  if (config.provider !== "12ai" && config.provider !== "grok2api") return undefined;
+  return `${baseUrl}/v1/videos/${encodeURIComponent(taskId)}/content`;
+}
 
+function readVideoUrl(value: VideoStatusResponse): string | undefined {
+  return readVideoUrlCandidate(value);
+}
+
+function readVideoUrlCandidate(value: unknown): string | undefined {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const nested = readVideoUrlCandidate(item);
+      if (nested) return nested;
+    }
+    return undefined;
+  }
   if (isRecord(value)) {
-    const nestedData = value.data;
-    if (Array.isArray(nestedData)) {
-      for (const item of nestedData) {
-        if (isRecord(item) && typeof item.url === "string") return item.url;
-      }
+    const candidates = [value.url, value.video_url, value.content_url];
+    const direct = candidates.find(candidate => typeof candidate === "string" && candidate.trim().length > 0);
+    if (typeof direct === "string") return direct.trim();
+
+    for (const key of ["data", "output", "result"]) {
+      const nested = readVideoUrlCandidate(value[key]);
+      if (nested) return nested;
     }
   }
   return undefined;
