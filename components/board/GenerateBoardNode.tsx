@@ -1,12 +1,20 @@
 import { ImagePlus, Loader2, Play, Video } from "lucide-react";
+import PreviewImage from "@/components/PreviewImage";
 import type { BoardGenerateNodeUpdate, BoardGenerateVariantCount, BoardImageGenerateNode, BoardVideoGenerateNode } from "@/lib/board";
 
 type GenerateNode = BoardImageGenerateNode | BoardVideoGenerateNode;
 const variantCountOptions: BoardGenerateVariantCount[] = [1, 2, 4];
 
+export interface BoardGenerateReferencePreview {
+  id: string;
+  role?: string;
+  url: string;
+}
+
 export interface BoardGenerateInputSummary {
   promptPreview: string | null;
   referenceCount: number;
+  referencePreviews: BoardGenerateReferencePreview[];
 }
 
 interface GenerateBoardNodeProps {
@@ -38,6 +46,7 @@ export default function GenerateBoardNode({ inputSummary, node, onExecute, onUpd
   const isProcessing = node.status === "processing";
   const promptPreview = inputSummary?.promptPreview ?? null;
   const referenceCount = inputSummary?.referenceCount ?? 0;
+  const referencePreviews = inputSummary?.referencePreviews ?? [];
   const steps = statusSteps(node.status);
   const paramSummary = node.kind === "image-generate"
     ? `${node.model} / ${node.imageResolution === "custom" ? node.customImageResolution : node.imageResolution} / x${node.variantCount}`
@@ -55,15 +64,35 @@ export default function GenerateBoardNode({ inputSummary, node, onExecute, onUpd
       />
       {(promptPreview !== null || referenceCount > 0) && (
         <div className="flex min-h-6 flex-wrap items-center gap-1.5">
-          {promptPreview !== null && (
-            <span className="imagine-meta-chip rounded-md border border-teal-400/20 bg-teal-500/10 px-2 py-1 text-[10px] font-semibold text-[var(--iw-text)]">
-              Prompt 输入
-            </span>
-          )}
-          {referenceCount > 0 && (
-            <span className="imagine-meta-chip rounded-md border border-blue-400/20 bg-blue-500/10 px-2 py-1 text-[10px] font-semibold text-[var(--iw-text)]">
-              参考 {referenceCount}
-            </span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {promptPreview !== null && (
+              <span className="imagine-meta-chip rounded-md border border-teal-400/20 bg-teal-500/10 px-2 py-1 text-[10px] font-semibold text-[var(--iw-text)]">
+                Prompt 输入
+              </span>
+            )}
+            {referenceCount > 0 && (
+              <span className="imagine-meta-chip rounded-md border border-blue-400/20 bg-blue-500/10 px-2 py-1 text-[10px] font-semibold text-[var(--iw-text)]">
+                参考 {referenceCount}
+              </span>
+            )}
+          </div>
+          {referencePreviews.length > 0 && (
+            <div className="nodrag flex min-w-0 items-center gap-1">
+              {referencePreviews.slice(0, 4).map(reference => (
+                <div
+                  key={`${reference.id}:${reference.url}`}
+                  className="h-6 w-6 overflow-hidden rounded border border-blue-400/30 bg-[var(--iw-panel-soft)]"
+                  title={reference.role ? `参考图 · ${reference.role}` : "参考图"}
+                >
+                  <PreviewImage src={reference.url} alt="" className="h-full w-full object-cover" />
+                </div>
+              ))}
+              {referencePreviews.length > 4 && (
+                <span className="rounded border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-1.5 py-1 font-mono text-[10px] text-[var(--iw-muted)]">
+                  +{referencePreviews.length - 4}
+                </span>
+              )}
+            </div>
           )}
         </div>
       )}

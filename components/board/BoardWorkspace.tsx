@@ -11,17 +11,21 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import {
+  BaseEdge,
   Background,
   BackgroundVariant,
   ConnectionLineType,
   ConnectionMode,
   Controls,
+  EdgeLabelRenderer,
   MarkerType,
   MiniMap,
   ReactFlow,
+  getSmoothStepPath,
   type Connection,
   type Edge,
   type EdgeMouseHandler,
+  type EdgeProps,
   type IsValidConnection,
   type NodeMouseHandler,
   type OnConnect,
@@ -30,6 +34,7 @@ import {
   type OnNodesChange,
   type OnNodesDelete,
   type ReactFlowInstance,
+  useReactFlow,
 } from "@xyflow/react";
 import type { BoardStateController } from "@/hooks/useBoardState";
 import BoardNode, { type BoardFlowNode } from "@/components/board/BoardNode";
@@ -86,6 +91,66 @@ interface QuickInsertMenu {
 
 const nodeTypes = { board: BoardNode };
 const DEFAULT_BOARD_IMAGE_MODEL = "modelscope:Qwen/Qwen-Image";
+
+function BoardEdgeComponent({
+  data,
+  id,
+  markerEnd,
+  markerStart,
+  selected,
+  sourcePosition,
+  sourceX,
+  sourceY,
+  style,
+  targetPosition,
+  targetX,
+  targetY,
+}: EdgeProps<BoardFlowEdge>) {
+  const { deleteElements } = useReactFlow<BoardFlowNode, BoardFlowEdge>();
+  const [edgePath, labelX, labelY] = getSmoothStepPath({
+    sourcePosition,
+    sourceX,
+    sourceY,
+    targetPosition,
+    targetX,
+    targetY,
+  });
+  const kind = data?.kind ?? "reference";
+
+  return (
+    <>
+      <BaseEdge
+        id={id}
+        path={edgePath}
+        markerEnd={markerEnd}
+        markerStart={markerStart}
+        style={style}
+        interactionWidth={18}
+        className={`imagine-board-edge-path imagine-board-edge-path-${kind}`}
+      />
+      <EdgeLabelRenderer>
+        <button
+          type="button"
+          aria-label="删除连接"
+          title="删除连接"
+          onClick={() => void deleteElements({ edges: [{ id }] })}
+          className={`nodrag nopan flex h-6 w-6 items-center justify-center rounded-full border border-[var(--iw-border)] bg-[var(--iw-panel)] text-[var(--iw-muted)] shadow-lg transition hover:border-red-400/40 hover:bg-red-500 hover:text-white ${
+            selected ? "opacity-100" : "opacity-70"
+          }`}
+          style={{
+            pointerEvents: "all",
+            position: "absolute",
+            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+          }}
+        >
+          <span className="text-sm leading-none">×</span>
+        </button>
+      </EdgeLabelRenderer>
+    </>
+  );
+}
+
+const edgeTypes = { smoothstep: BoardEdgeComponent };
 
 const quickInsertItems: Array<{ icon: LucideIcon; iconClassName: string; iconSurfaceClassName: string; kind: QuickInsertKind; label: string; size: BoardSize }> = [
   { icon: MessageSquareText, iconClassName: "text-teal-300", iconSurfaceClassName: "bg-teal-500/10 border-teal-400/20", kind: "prompt", label: "提示", size: DEFAULT_PROMPT_NODE_SIZE },
@@ -262,19 +327,16 @@ function generateInputSummaryForNode(node: BoardNodeModel, nodes: BoardNodeModel
   const promptEdge = edges.find(edge => edge.to.nodeId === node.id && edge.to.portId === "prompt-in");
   const promptNode = promptEdge ? nodes.find(item => item.id === promptEdge.from.nodeId) : undefined;
   const promptPreview = promptNode?.kind === "prompt" ? promptNode.prompt : null;
-  const referenceAssetIds = new Set<string>();
-
-  edges
-    .filter(edge => edge.to.nodeId === node.id && edge.to.portId === "reference-in")
-    .map(edge => nodes.find(item => item.id === edge.from.nodeId))
-    .forEach(item => {
-      if (item?.kind === "asset" && item.asset.type === "image") referenceAssetIds.add(item.asset.assetId);
-      if (item?.kind === "reference-group") item.references.forEach(reference => referenceAssetIds.add(reference.assetId));
-    });
+  const references = generateReferenceCandidates(nodes, edges, node.id);
 
   return {
     promptPreview,
-    referenceCount: referenceAssetIds.size,
+    referenceCount: references.length,
+    referencePreviews: references.map(reference => ({
+      id: reference.id,
+      role: reference.role,
+      url: reference.url,
+    })),
   };
 }
 
@@ -687,6 +749,7 @@ export default function BoardWorkspace({
           <ReactFlow
             nodes={flowNodes}
             edges={flowEdges}
+            edgeTypes={edgeTypes}
             nodeTypes={nodeTypes}
             colorMode={themeMode}
             defaultViewport={board.viewport}

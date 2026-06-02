@@ -276,8 +276,8 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: 12px;
-  padding-bottom: 12px;
-  margin-bottom: 12px;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
   border-bottom: 1px solid var(--iw-border);
 }
 
@@ -292,8 +292,8 @@
 .imagine-gallery-toolbar-actions {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
-  margin-bottom: 10px;
+  gap: 6px;
+  margin-bottom: 8px;
 }
 
 @media (min-width: 640px) {
@@ -324,15 +324,16 @@
 
 .imagine-gallery-filters {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
 }
 
 .imagine-filter-row {
-  display: grid;
-  grid-template-columns: 2.25rem minmax(0, 1fr);
-  gap: 8px;
-  align-items: start;
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
 }
 
 @media (max-width: 639px) {
@@ -343,10 +344,10 @@
 }
 
 .imagine-filter-row-label {
-  padding-top: 7px;
+  padding-top: 0;
   font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.02em;
   color: var(--iw-faint);
   line-height: 1;
 }
@@ -359,29 +360,29 @@
 
 .imagine-filter-track {
   display: flex;
-  min-height: 34px;
+  min-height: 28px;
   flex-wrap: wrap;
   align-items: center;
-  gap: 5px;
-  padding: 4px 6px;
-  border-radius: var(--iw-radius-md);
-  border: 1px solid var(--iw-border);
-  background: color-mix(in srgb, var(--iw-bg) 28%, var(--iw-panel-soft));
+  gap: 3px;
+  padding: 0;
+  border-radius: 0;
+  border: 0;
+  background: transparent;
 }
 
 .imagine-filter-date-range {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
-  padding: 2px 4px;
+  gap: 4px;
+  padding: 0 2px;
   border-radius: var(--iw-radius-sm);
-  border: 1px dashed color-mix(in srgb, var(--iw-border) 85%, transparent);
+  border: 0;
 }
 
 .imagine-filter-date-input {
-  height: 28px;
-  width: 7.25rem;
+  height: 26px;
+  width: 6.8rem;
   border-radius: var(--iw-radius-sm);
   border: 1px solid var(--iw-border);
   background: color-mix(in srgb, var(--iw-bg) 40%, var(--iw-panel));
@@ -400,11 +401,11 @@
 .imagine-filter-chip {
   display: inline-flex !important;
   align-items: center;
-  gap: 5px;
-  min-height: 26px !important;
-  padding: 0 8px !important;
+  gap: 4px;
+  min-height: 24px !important;
+  padding: 0 7px !important;
   border: 1px solid transparent !important;
-  font-size: 11px !important;
+  font-size: 10.5px !important;
   font-weight: 500;
   line-height: 1;
   white-space: nowrap;
@@ -1678,8 +1679,8 @@ html[data-imagine-theme="dark"] .imagine-root-body {
 @media (min-width: 1024px) {
   .imagine-creation-sidebar {
     position: sticky;
-    top: 3.5rem;
-    max-height: calc(100vh - 3.5rem);
+    top: 0;
+    max-height: 100%;
   }
 }
 
@@ -2095,7 +2096,7 @@ html[data-imagine-theme="dark"] .imagine-root-body {
 }
 
 .imagine-toolbar-surface {
-  padding: 16px !important;
+  padding: 12px !important;
 }
 
 .imagine-theme-light .imagine-control-surface,
@@ -2649,7 +2650,7 @@ html[data-imagine-theme="dark"] .imagine-root-body {
 
 .imagine-filter-chip {
   border-radius: 7px !important;
-  min-height: 32px;
+  min-height: 24px !important;
 }
 
 .imagine-theme-light .imagine-filter-chip {
