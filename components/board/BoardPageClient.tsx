@@ -27,7 +27,7 @@ import {
   useReferenceState,
 } from "@/hooks/useReferenceState";
 import { useProviderSettings } from "@/hooks/useProviderSettings";
-import { clearAllDB, getAllFromDB, saveToDB, type StorageItem } from "@/lib/db";
+import { clearAllDB, deleteFromDB, getAllFromDB, saveToDB, type StorageItem } from "@/lib/db";
 import {
   DEFAULT_IMAGE_MODEL,
   DEFAULT_VIDEO_MODEL,
@@ -344,6 +344,12 @@ function nextSourceNodeStatus(items: StorageItem[], sourceBoardNodeId: string, i
   return itemStatus === "failed" ? "failed" : "complete";
 }
 
+function activeSourceItemForNode(items: StorageItem[], sourceBoardNodeId: string): StorageItem | undefined {
+  return items
+    .filter(item => item.sourceBoardNodeId === sourceBoardNodeId && (item.status === "pending" || item.status === "processing"))
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0];
+}
+
 function boardRoute(id: string): string {
   return id === DEFAULT_BOARD_ID ? "/board" : `/board/${encodeURIComponent(id)}`;
 }
@@ -388,6 +394,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const [maskTargetId, setMaskTargetId] = useState("");
   const [maskDestination, setMaskDestination] = useState<MaskDestination>("creative");
   const [fullscreenItem, setFullscreenItem] = useState<StorageItem | null>(null);
+  const [cancelingBoardItemIds, setCancelingBoardItemIds] = useState<string[]>([]);
   const knownItemIdsRef = useRef<Set<string>>(new Set());
   const handledBoardItemIdsRef = useRef<Set<string>>(new Set());
   const loadedItemsRef = useRef(false);
@@ -926,6 +933,70 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     setTraditionalSubTab: value => setMode(value),
   });
 
+  const cancelBoardGenerationNode = useCallback(async (nodeId: string): Promise<void> => {
+    const item = activeSourceItemForNode(items, nodeId);
+    if (!item) {
+      boardController.updateGenerateNode(nodeId, {
+        errorMessage: "未找到可取消的关联任务",
+        status: "failed",
+      });
+      return;
+    }
+
+    const operationName = item.operationName;
+    if (cancelingBoardItemIds.includes(item.id)) return;
+    const canCancelRemote = operationName?.startsWith("12ai:video:") === true;
+    const confirmText = canCancelRemote
+      ? "确定要取消这个视频生成任务吗？"
+      : "确定要本地取消这个任务吗？远端生成可能仍会继续。";
+    if (!window.confirm(confirmText)) return;
+
+    setCancelingBoardItemIds(prev => [...prev, item.id]);
+    try {
+      const controller = generationAbortControllersRef.current[item.id];
+      if (controller) {
+        locallyCanceledItemIdsRef.current.add(item.id);
+        controller.abort();
+      }
+      if (!canCancelRemote) {
+        locallyCanceledItemIdsRef.current.add(item.id);
+      }
+
+      if (canCancelRemote && operationName) {
+        const response = await fetch("/api/gemini/cancel-media", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...buildProviderHeaders(operationName) },
+          body: JSON.stringify({ operationName }),
+        });
+        if (!response.ok) {
+          throw new Error(await readFetchError(response, "任务取消失败"));
+        }
+      }
+
+      await deleteFromDB(item.id);
+      delete pollingFailuresRef.current[item.id];
+      setItems(prev => prev.filter(current => current.id !== item.id));
+      boardController.updateGenerateNode(nodeId, {
+        errorMessage: canCancelRemote ? "远端生成任务已取消" : "任务已从本地取消",
+        status: "failed",
+      });
+      pushWorkspaceNotice("success", canCancelRemote ? "视频生成任务已取消" : "任务已从本地取消");
+    } catch (error) {
+      pushWorkspaceNotice("error", toErrorMessage(error, "任务取消失败"));
+    } finally {
+      setCancelingBoardItemIds(prev => prev.filter(id => id !== item.id));
+    }
+  }, [
+    boardController,
+    buildProviderHeaders,
+    cancelingBoardItemIds,
+    generationAbortControllersRef,
+    items,
+    locallyCanceledItemIdsRef,
+    pollingFailuresRef,
+    pushWorkspaceNotice,
+  ]);
+
   const addAssetToBoard = useCallback((asset: StorageItem, position?: BoardPoint): string => {
     return boardController.addAssetNode({
       asset: {
@@ -1242,8 +1313,15 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     for (const item of items) {
       const sourceBoardNodeId = item.sourceBoardNodeId;
       if (sourceBoardNodeId) {
-        if (known.has(item.id)) {
-          handledBoardItems.add(item.id);
+        if (item.status === "pending" || item.status === "processing") {
+          known.add(item.id);
+          const sourceNode = findGenerateNodeById(boardController.board.nodes, sourceBoardNodeId);
+          if (sourceNode && (sourceNode.status !== "processing" || sourceNode.errorMessage)) {
+            boardController.updateGenerateNode(sourceBoardNodeId, {
+              errorMessage: undefined,
+              status: "processing",
+            });
+          }
           continue;
         }
         if (handledBoardItems.has(item.id)) continue;
@@ -1380,6 +1458,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         galleryItems={items}
         themeMode={themeMode}
         onBack={() => router.push("/")}
+        onCancelGenerateNode={(nodeId) => void cancelBoardGenerationNode(nodeId)}
         onCaptureVideoFrame={handleCaptureVideoFrame}
         onConnectionError={(message) => pushWorkspaceNotice("error", message)}
         onCreateBoard={() => {

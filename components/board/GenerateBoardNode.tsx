@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { ImagePlus, Loader2, Play, Video } from "lucide-react";
+import { ImagePlus, Loader2, Play, Video, X } from "lucide-react";
 import BoardPromptTextarea from "@/components/board/BoardPromptTextarea";
 import PreviewImage from "@/components/PreviewImage";
 import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
@@ -28,9 +28,17 @@ export interface BoardGenerateInputSummary {
   referencePreviews: BoardGenerateReferencePreview[];
 }
 
+export interface BoardGenerateTaskSummary {
+  id: string;
+  progress: number;
+  status: "processing" | "pending";
+}
+
 interface GenerateBoardNodeProps {
   inputSummary?: BoardGenerateInputSummary;
   node: GenerateNode;
+  taskSummary?: BoardGenerateTaskSummary;
+  onCancel?: () => void;
   onExecute: () => void;
   onUpdate: (input: BoardGenerateNodeUpdate) => void;
   references: ReferenceImageRef[];
@@ -54,10 +62,10 @@ function statusSteps(status: GenerateNode["status"]): Array<{ key: string; label
   });
 }
 
-export default function GenerateBoardNode({ inputSummary, node, onExecute, onUpdate, references }: GenerateBoardNodeProps) {
+export default function GenerateBoardNode({ inputSummary, node, onCancel, onExecute, onUpdate, references, taskSummary }: GenerateBoardNodeProps) {
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
   const slashCommandRef = useRef<PromptTemplateSlashCommand | null>(null);
-  const isProcessing = node.status === "processing";
+  const isProcessing = node.status === "processing" || taskSummary?.status === "processing" || taskSummary?.status === "pending";
   const promptPreview = inputSummary?.promptPreview ?? null;
   const referenceCount = inputSummary?.referenceCount ?? 0;
   const referencePreviews = inputSummary?.referencePreviews ?? [];
@@ -65,6 +73,9 @@ export default function GenerateBoardNode({ inputSummary, node, onExecute, onUpd
   const paramSummary = node.kind === "image-generate"
     ? `${node.model} / ${node.imageResolution === "custom" ? node.customImageResolution : node.imageResolution} / x${node.variantCount}`
     : `${node.model} / ${node.aspectRatio}${node.videoDuration ? ` / ${node.videoDuration}s` : ""} / x${node.variantCount}`;
+  const statusLabel = taskSummary
+    ? `${taskSummary.status === "pending" ? "排队" : "处理中"} ${taskSummary.progress}% / ${paramSummary}`
+    : `${statusText(node)} / ${paramSummary}`;
   const handleApplyPromptTemplate = (template: PromptTemplate, mode: PromptTemplateApplyMode): void => {
     const slashCommand = slashCommandRef.current;
     if (slashCommand && mode === "insert") {
@@ -132,7 +143,7 @@ export default function GenerateBoardNode({ inputSummary, node, onExecute, onUpd
       )}
       <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
         <span className={`imagine-status-chip truncate text-[10px] font-mono ${node.status === "failed" ? "text-red-300" : "text-[var(--iw-muted)]"}`} data-status={node.status}>
-          {node.errorMessage ?? `${statusText(node)} / ${paramSummary}`}
+          {node.errorMessage ?? statusLabel}
         </span>
         <div className="nodrag flex h-8 overflow-hidden rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)]" title="变体数量">
           {variantCountOptions.map(count => (
@@ -151,16 +162,33 @@ export default function GenerateBoardNode({ inputSummary, node, onExecute, onUpd
             </button>
           ))}
         </div>
-        <button
-          type="button"
-          onClick={onExecute}
-          disabled={isProcessing}
-          className="nodrag flex h-8 items-center justify-center gap-1.5 rounded-md bg-blue-600 px-3 text-xs font-semibold text-white transition hover:bg-blue-500 disabled:bg-[var(--iw-panel-soft)] disabled:text-[var(--iw-faint)]"
-        >
-          {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : node.kind === "image-generate" ? <ImagePlus className="h-3.5 w-3.5" /> : <Video className="h-3.5 w-3.5" />}
-          <Play className="h-3 w-3" />
-        </button>
+        {isProcessing && onCancel ? (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="nodrag flex h-8 items-center justify-center gap-1.5 rounded-md border border-red-400/25 bg-red-500/10 px-3 text-xs font-semibold text-red-300 transition hover:bg-red-500/15"
+            title="取消关联生成任务"
+          >
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <X className="h-3 w-3" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onExecute}
+            disabled={isProcessing}
+            className="nodrag flex h-8 items-center justify-center gap-1.5 rounded-md bg-blue-600 px-3 text-xs font-semibold text-white transition hover:bg-blue-500 disabled:bg-[var(--iw-panel-soft)] disabled:text-[var(--iw-faint)]"
+          >
+            {node.kind === "image-generate" ? <ImagePlus className="h-3.5 w-3.5" /> : <Video className="h-3.5 w-3.5" />}
+            <Play className="h-3 w-3" />
+          </button>
+        )}
       </div>
+      {taskSummary && (
+        <div className="h-1.5 overflow-hidden rounded-full bg-[var(--iw-panel-soft)]" title={`任务进度 ${taskSummary.progress}%`}>
+          <div className="h-full rounded-full bg-blue-500 transition-[width]" style={{ width: `${taskSummary.progress}%` }} />
+        </div>
+      )}
       <div className="grid grid-cols-3 gap-1.5" role="list" aria-label="生成进度">
         {steps.map(step => (
           <span

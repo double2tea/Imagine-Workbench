@@ -43,7 +43,7 @@ import BoardNodeContextMenu, { buildBoardNodeContextMenuActions } from "@/compon
 import { BOARD_TRASH_LIMIT, IMAGINE_BOARD_ASSET_DRAG_TYPE, isTextEntryTarget } from "@/lib/board/interaction";
 import type { BoardStateController } from "@/hooks/useBoardState";
 import BoardNode, { type BoardFlowNode } from "@/components/board/BoardNode";
-import type { BoardGenerateInputSummary } from "@/components/board/GenerateBoardNode";
+import type { BoardGenerateInputSummary, BoardGenerateTaskSummary } from "@/components/board/GenerateBoardNode";
 import BoardEmptyHint from "@/components/board/BoardEmptyHint";
 import BoardToolbar from "@/components/board/BoardToolbar";
 import BoardAssetCompareOverlay from "@/components/board/BoardAssetCompareOverlay";
@@ -84,6 +84,7 @@ interface BoardWorkspaceProps {
   onBack: () => void;
   onCaptureVideoFrame: (nodeId: string, item: StorageItem, frame: CapturedVideoFrame) => void | Promise<void>;
   onConnectionError: (message: string) => void;
+  onCancelGenerateNode: (nodeId: string) => void;
   onEditAssetImage: (nodeId: string) => void;
   onExecuteGenerateNode: (nodeId: string) => void;
   onImportBoardFiles: (files: File[], position: BoardPoint) => void | Promise<void>;
@@ -392,6 +393,22 @@ function generateInputSummaryForNode(node: BoardNodeModel, nodes: BoardNodeModel
   };
 }
 
+function isActiveGenerateTask(item: StorageItem): item is StorageItem & { status: "pending" | "processing" } {
+  return item.status === "pending" || item.status === "processing";
+}
+
+function activeGenerateTaskForNode(items: StorageItem[], nodeId: string): BoardGenerateTaskSummary | undefined {
+  const item = items
+    .filter((candidate): candidate is StorageItem & { status: "pending" | "processing" } => candidate.sourceBoardNodeId === nodeId && isActiveGenerateTask(candidate))
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0];
+  if (!item) return undefined;
+  return {
+    id: item.id,
+    progress: Math.max(0, Math.min(100, item.progress)),
+    status: item.status,
+  };
+}
+
 function hasResultConnection(nodeId: string, edges: BoardEdge[]): boolean {
   return edges.some(edge => edge.from.nodeId === nodeId && edge.from.portId === "result-out");
 }
@@ -410,6 +427,7 @@ export default function BoardWorkspace({
   galleryItems = [],
   themeMode,
   onBack,
+  onCancelGenerateNode,
   onCaptureVideoFrame,
   onConnectionError,
   onEditAssetImage,
@@ -510,6 +528,10 @@ export default function BoardWorkspace({
     for (const node of board.nodes) {
       dataById.set(node.id, {
         generateInputSummary: generateInputSummaryForNode(node, board.nodes, board.edges),
+        generateTaskSummary:
+          node.kind === "image-generate" || node.kind === "video-generate"
+            ? activeGenerateTaskForNode(galleryItems, node.id)
+            : undefined,
         hasResultConnection: hasResultConnection(node.id, board.edges),
         node,
         generateReferences:
@@ -535,6 +557,7 @@ export default function BoardWorkspace({
             ? assetCompareReferenceUrl(node.id, board.nodes, board.edges)
             : null,
         onCaptureVideoFrame,
+        onCancelGenerate: onCancelGenerateNode,
         onOpenAssetCompare: (nodeId: string) => {
           const assetNode = board.nodes.find(item => item.id === nodeId);
           if (assetNode?.kind !== "asset" || assetNode.asset.type !== "image") return;
@@ -562,6 +585,8 @@ export default function BoardWorkspace({
     board.nodes,
     board.edges,
     galleryReferenceItems,
+    galleryItems,
+    onCancelGenerateNode,
     onCaptureVideoFrame,
     onEditAssetImage,
     onExecuteGenerateNode,

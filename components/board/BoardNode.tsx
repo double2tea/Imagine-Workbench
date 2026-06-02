@@ -12,7 +12,7 @@ import type {
 } from "@/lib/board";
 import AgentBoardNode from "@/components/board/AgentBoardNode";
 import AssetBoardNode from "@/components/board/AssetBoardNode";
-import GenerateBoardNode, { type BoardGenerateInputSummary } from "@/components/board/GenerateBoardNode";
+import GenerateBoardNode, { type BoardGenerateInputSummary, type BoardGenerateTaskSummary } from "@/components/board/GenerateBoardNode";
 import NoteBoardNode from "@/components/board/NoteBoardNode";
 import PromptBoardNode from "@/components/board/PromptBoardNode";
 import ReferenceGroupBoardNode from "@/components/board/ReferenceGroupBoardNode";
@@ -25,9 +25,11 @@ export interface BoardFlowNodeData extends Record<string, unknown> {
   compareReferenceUrl?: string | null;
   generateInputSummary?: BoardGenerateInputSummary;
   generateReferences: ReferenceImageRef[];
+  generateTaskSummary?: BoardGenerateTaskSummary;
   hasResultConnection?: boolean;
   node: BoardNodeModel;
   onDelete: (nodeId: string) => void;
+  onCancelGenerate: (nodeId: string) => void;
   onOpenAssetCompare?: (nodeId: string) => void;
   promptReferences: ReferenceImageRef[];
   onCaptureVideoFrame: (nodeId: string, item: StorageItem, frame: CapturedVideoFrame) => void | Promise<void>;
@@ -207,6 +209,8 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             inputSummary={data.generateInputSummary}
             node={node}
             references={data.generateReferences}
+            taskSummary={data.generateTaskSummary}
+            onCancel={() => data.onCancelGenerate(node.id)}
             onExecute={() => data.onExecuteGenerate(node.id)}
             onUpdate={input => data.onUpdateGenerate(node.id, input)}
           />
