@@ -379,11 +379,7 @@ export default function BoardInspector({
             <VideoGenerateInspector node={node} onExecuteGenerate={onExecuteGenerate} onUpdateGenerate={onUpdateGenerate} videoModelGroups={videoModelGroups} />
           )}
           {isGenerateNode(node) && node.status === "failed" && node.errorMessage && (
-<<<<<<< HEAD
-            <p className="imagine-status-chip rounded-md border border-red-400/30 bg-red-500/10 px-2 py-1.5 text-[11px] text-red-200">{node.errorMessage}</p>
-=======
             <p className="rounded-md border border-red-400/30 bg-red-500/10 px-2 py-1.5 text-[10px] text-red-200">{node.errorMessage}</p>
->>>>>>> 610fbc0 (feat(uiux): U-PR3 Typography Unification, Spacing Audit, and State/Label Consistency Across Surfaces (design doc /tmp/grok-design-doc-b94818e8.md plan e62945a8))
           )}
         </div>
       ) : (

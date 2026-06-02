@@ -889,11 +889,7 @@ export default function Home() {
         <CreationModeTabs value={traditionalSubTab} onChange={setTraditionalSubTab} />
 
         <div className="mt-3 flex items-center justify-between gap-3">
-<<<<<<< HEAD
-          <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-200">
-=======
           <label className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--iw-text)]">
->>>>>>> 610fbc0 (feat(uiux): U-PR3 Typography Unification, Spacing Audit, and State/Label Consistency Across Surfaces (design doc /tmp/grok-design-doc-b94818e8.md plan e62945a8))
             {isImageMode ? <Sparkles className="h-3.5 w-3.5 text-blue-300" /> : <Video className="h-3.5 w-3.5 text-violet-300" />}
             描述
           </label>
@@ -1004,13 +1000,8 @@ export default function Home() {
     const isImageMode = traditionalSubTab === "image";
 
     return (
-<<<<<<< HEAD
-      <details className="imagine-mobile-advanced rounded-xl border border-slate-800 bg-slate-950/35 p-3">
-        <summary className="flex cursor-pointer list-none items-center justify-between text-xs font-semibold text-slate-300">
-=======
       <details className="imagine-mobile-advanced rounded-xl border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-3">
         <summary className="flex cursor-pointer list-none items-center justify-between text-[11px] font-semibold text-[var(--iw-muted)]">
->>>>>>> 610fbc0 (feat(uiux): U-PR3 Typography Unification, Spacing Audit, and State/Label Consistency Across Surfaces (design doc /tmp/grok-design-doc-b94818e8.md plan e62945a8))
           <span className="flex items-center gap-2">
             <SlidersHorizontal className="h-3.5 w-3.5 text-slate-400" />
             高级参数
@@ -1238,13 +1229,8 @@ export default function Home() {
             <section className="imagine-mobile-workflow flex flex-col gap-3 lg:hidden">
               <section className="imagine-mobile-asset-stream">
                 <div className="mb-2 flex items-center justify-between px-1">
-<<<<<<< HEAD
-                  <h2 className="text-xs font-semibold text-slate-300">任务与结果</h2>
-                  <span className="font-mono text-[10px] text-slate-500">{items.length} 项</span>
-=======
                   <h2 className="text-sm font-semibold text-[var(--iw-muted)]">任务与结果</h2>
                   <span className="font-mono text-[10px] text-[var(--iw-faint)]">{items.length} 项</span>
->>>>>>> 610fbc0 (feat(uiux): U-PR3 Typography Unification, Spacing Audit, and State/Label Consistency Across Surfaces (design doc /tmp/grok-design-doc-b94818e8.md plan e62945a8))
                 </div>
                 {renderAssetGalleryWorkspace()}
               </section>

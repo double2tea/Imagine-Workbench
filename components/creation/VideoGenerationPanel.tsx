@@ -103,13 +103,8 @@ export default function VideoGenerationPanel({
   return (
     <div className="flex flex-col gap-3.5 animate-fade-in">
       <div>
-<<<<<<< HEAD
-        <div className="flex items-center justify-between mb-2">
-          <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-300">
-=======
         <div className="flex items-center justify-between mb-1.5">
           <label className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--iw-muted)]">
->>>>>>> 610fbc0 (feat(uiux): U-PR3 Typography Unification, Spacing Audit, and State/Label Consistency Across Surfaces (design doc /tmp/grok-design-doc-b94818e8.md plan e62945a8))
             <VideoIcon className="h-3.5 w-3.5 text-violet-300" />
             视频场景运动描述 <span className="hidden text-slate-500 sm:inline">(Video Motion Prompt)</span>
           </label>

@@ -157,11 +157,7 @@ export default function AssetCard({
               <p className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
                 {item.status === "pending" ? "任务已排队..." : item.type === "video" ? "智影合成中..." : "极精算色中..."}
               </p>
-<<<<<<< HEAD
-              <span className="text-[9px] font-mono text-slate-500 mt-1">模型: {formatModelName(item.model)}</span>
-=======
               <span className="mt-1 font-mono text-[10px] text-[var(--iw-faint)]">模型: {formatModelName(item.model)}</span>
->>>>>>> 610fbc0 (feat(uiux): U-PR3 Typography Unification, Spacing Audit, and State/Label Consistency Across Surfaces (design doc /tmp/grok-design-doc-b94818e8.md plan e62945a8))
 
               <div className="w-36 bg-white/5 h-1 rounded-full overflow-hidden mt-3 border border-white/5 shadow-inner">
                 <div
@@ -449,11 +445,7 @@ export default function AssetCard({
           </p>
           {referenceUrls.length > 0 && (
             <div className="flex shrink-0 items-center gap-1">
-<<<<<<< HEAD
-              <span className="font-mono text-[9px] text-slate-500">参考</span>
-=======
               <span className="font-mono text-[10px] text-[var(--iw-faint)]">参考</span>
->>>>>>> 610fbc0 (feat(uiux): U-PR3 Typography Unification, Spacing Audit, and State/Label Consistency Across Surfaces (design doc /tmp/grok-design-doc-b94818e8.md plan e62945a8))
               <div className="no-scrollbar flex max-w-[96px] gap-1 overflow-x-auto">
                 {referenceUrls.map((url, index) => (
                   <button
@@ -471,15 +463,9 @@ export default function AssetCard({
           )}
         </div>
 
-<<<<<<< HEAD
-        <div className="flex min-h-0 flex-1 flex-col justify-end border-t border-slate-800 pt-1.5">
-          <div className="flex max-h-10 flex-wrap items-center gap-1 overflow-hidden font-mono text-[9px] text-slate-500">
-            <span className="imagine-meta-chip rounded bg-white/5 px-1.5 py-0.5 text-[9px]">
-=======
         <div className="flex min-h-0 flex-1 flex-col justify-end border-t border-[var(--iw-border)] pt-1.5">
           <div className="flex max-h-10 flex-wrap items-center gap-1 overflow-hidden font-mono text-[10px] text-[var(--iw-faint)]">
             <span className="imagine-meta-chip rounded bg-white/5 px-1.5 py-0.5">
->>>>>>> 610fbc0 (feat(uiux): U-PR3 Typography Unification, Spacing Audit, and State/Label Consistency Across Surfaces (design doc /tmp/grok-design-doc-b94818e8.md plan e62945a8))
               {getProviderMeta(provider).label}
             </span>
             <span className="imagine-meta-chip max-w-[150px] truncate rounded bg-white/5 px-1.5 py-0.5" title={item.model}>
@@ -495,11 +481,7 @@ export default function AssetCard({
           </div>
 
           <div className="mt-1.5 flex items-center justify-between gap-2">
-<<<<<<< HEAD
-            <span className="text-[9px] font-mono text-slate-500">
-=======
             <span className="font-mono text-[10px] text-[var(--iw-faint)]">
->>>>>>> 610fbc0 (feat(uiux): U-PR3 Typography Unification, Spacing Audit, and State/Label Consistency Across Surfaces (design doc /tmp/grok-design-doc-b94818e8.md plan e62945a8))
               {formatCreatedAt(item.createdAt)}
             </span>
 

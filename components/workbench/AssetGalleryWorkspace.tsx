@@ -332,11 +332,7 @@ export default function AssetGalleryWorkspace({
           />
           <div className="relative flex max-h-[92vh] w-[min(1200px,calc(100vw-32px))] flex-col overflow-hidden rounded-xl border border-white/10 bg-slate-950 shadow-2xl">
             <div className="flex h-12 items-center justify-between border-b border-white/10 px-4">
-<<<<<<< HEAD
-              <span className="font-mono text-xs text-slate-300">
-=======
               <span className="font-mono text-[10px] text-[var(--iw-muted)]">
->>>>>>> 610fbc0 (feat(uiux): U-PR3 Typography Unification, Spacing Audit, and State/Label Consistency Across Surfaces (design doc /tmp/grok-design-doc-b94818e8.md plan e62945a8))
                 {referencePreviewIndex + 1} / {referencePreviewUrls.length}
               </span>
               <button
