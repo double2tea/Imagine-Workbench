@@ -16,11 +16,13 @@ interface ImageGenerationPanelProps {
   capabilities: ImageModelCapabilities;
   customImageSize: string;
   imageQuality: string;
+  imageBackgroundGeneration: boolean;
   imageResolution: string;
   imageResolutionOptions: ImageModelCapabilities["resolutions"];
   imageThinkingLevel: string;
   isOptimizing: boolean;
   isSubmitting: boolean;
+  supportsBackgroundGeneration: boolean;
   modelGroups: ModelOptionGroup[];
   negativePrompt: string;
   prompt: string;
@@ -32,6 +34,7 @@ interface ImageGenerationPanelProps {
   onClearReferences: () => void;
   onCustomImageSizeChange: (value: string) => void;
   onGenerate: () => void;
+  onImageBackgroundGenerationChange: (value: boolean) => void;
   onImageQualityChange: (value: string) => void;
   onImageResolutionChange: (value: string) => void;
   onNegativePromptChange: (value: string) => void;
@@ -52,6 +55,7 @@ export default function ImageGenerationPanel({
   capabilities,
   customImageSize,
   imageQuality,
+  imageBackgroundGeneration,
   imageResolution,
   imageResolutionOptions,
   imageThinkingLevel,
@@ -64,10 +68,12 @@ export default function ImageGenerationPanel({
   selectedAspectRatio,
   selectedModel,
   submitCount,
+  supportsBackgroundGeneration,
   onApplyPreset,
   onClearReferences,
   onCustomImageSizeChange,
   onGenerate,
+  onImageBackgroundGenerationChange,
   onImageQualityChange,
   onImageResolutionChange,
   onNegativePromptChange,
@@ -177,7 +183,20 @@ export default function ImageGenerationPanel({
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">图片生成模型</label>
+          <div className="mb-1.5 flex items-center justify-between gap-3">
+            <label className="text-[11px] font-semibold text-slate-300">图片生成模型</label>
+            {supportsBackgroundGeneration && (
+              <label className="flex h-6 shrink-0 items-center gap-1.5 rounded-md border border-slate-800 bg-slate-950/45 px-2 text-[10px] font-semibold text-slate-400">
+                <input
+                  type="checkbox"
+                  checked={imageBackgroundGeneration}
+                  onChange={(event) => onImageBackgroundGenerationChange(event.target.checked)}
+                  className="h-3 w-3 cursor-pointer accent-blue-500"
+                />
+                <span>后台</span>
+              </label>
+            )}
+          </div>
           <select
             value={selectedModel}
             onChange={(event) => onSelectModel(event.target.value)}
@@ -314,6 +333,7 @@ export default function ImageGenerationPanel({
             </div>
           </div>
         )}
+
       </div>
 
       <ReferenceImagePicker

@@ -1,23 +1,30 @@
 import {
+  Clock3,
   Download,
+  ImageDown,
   Image as ImageIcon,
+  type LucideIcon,
   Maximize2,
   MoreHorizontal,
   Paintbrush,
   RefreshCw,
   SlidersHorizontal,
   Sparkles,
+  SkipBack,
+  SkipForward,
   Trash2,
   Video as VideoIcon,
   X,
 } from "lucide-react";
-import { useState, type DragEvent } from "react";
+import { useRef, useState, type DragEvent } from "react";
+import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
 import PreviewImage from "@/components/PreviewImage";
 import { makeReferenceDropToken, REFERENCE_ASSET_MIME } from "@/components/reference/referenceDrag";
 import type { StorageItem } from "@/lib/db";
 import { formatDisplayedAspectRatio } from "@/lib/media-display";
 import { parseProviderModel, type AiProvider } from "@/lib/providers/model-catalog";
 import { getProviderMeta } from "@/lib/providers/registry";
+import { getVideoFrameCaptureLabel, type CapturedVideoFrame, type VideoFrameCaptureMode } from "@/lib/video-frame";
 
 interface AssetCardProps {
   canceling: boolean;
@@ -28,6 +35,7 @@ interface AssetCardProps {
   selectedProvider: AiProvider;
   onApplyVideoReference: (item: StorageItem) => void;
   onCancel: (item: StorageItem) => void;
+  onCaptureVideoFrame: (item: StorageItem, frame: CapturedVideoFrame) => void | Promise<unknown>;
   onDelete: (item: StorageItem) => void;
   onDownload: (item: StorageItem) => void;
   onLaunchMaskEditor: (imageUrl: string, id: string) => void;
@@ -65,6 +73,17 @@ function formatCreatedAt(value: string): string {
   return `${year}-${month}-${day} ${hour}:${minute}`;
 }
 
+const frameCaptureActions: Array<{
+  icon: LucideIcon;
+  mode: VideoFrameCaptureMode;
+}> = [
+  { icon: SkipBack, mode: "first" },
+  { icon: Clock3, mode: "current" },
+  { icon: SkipForward, mode: "last" },
+];
+
+type FrameMenuPlacement = "hover" | "meta";
+
 export default function AssetCard({
   canceling,
   inCompare,
@@ -74,6 +93,7 @@ export default function AssetCard({
   selectedProvider,
   onApplyVideoReference,
   onCancel,
+  onCaptureVideoFrame,
   onDelete,
   onDownload,
   onLaunchMaskEditor,
@@ -86,6 +106,8 @@ export default function AssetCard({
   onUseAgentReference,
 }: AssetCardProps) {
   const [isMobileActionsOpen, setIsMobileActionsOpen] = useState(false);
+  const [frameMenuPlacement, setFrameMenuPlacement] = useState<FrameMenuPlacement | null>(null);
+  const captureVideoFrameRef = useRef<VideoFrameCaptureRequest | null>(null);
   const provider = parseProviderModel(item.model, selectedProvider).provider;
   const isDraggableReference = item.type === "image" && item.status === "complete";
   const failedTitle = isContentSafetyError(item.errorMessage) ? "内容安全拦截" : "生成失败 / 链接中断";
@@ -105,6 +127,11 @@ export default function AssetCard({
   const runMobileAction = (action: () => void) => {
     setIsMobileActionsOpen(false);
     action();
+  };
+
+  const captureVideoFrame = (mode: VideoFrameCaptureMode) => {
+    setFrameMenuPlacement(null);
+    void captureVideoFrameRef.current?.(mode);
   };
 
   return (
@@ -189,9 +216,13 @@ export default function AssetCard({
                 onClick={() => onOpenFullscreen(item)}
               />
             ) : (
-              <div className="relative flex h-full w-full items-center justify-center bg-slate-950">
-                <video src={item.url} controls loop preload="metadata" className="h-full w-full object-contain" />
-              </div>
+              <VideoAssetPlayer
+                item={item}
+                onCaptureFrame={onCaptureVideoFrame}
+                onCaptureFrameRequestReady={request => {
+                  captureVideoFrameRef.current = request;
+                }}
+              />
             )}
 
             <div className="absolute top-3 right-3 z-10 flex gap-1.5">
@@ -203,7 +234,7 @@ export default function AssetCard({
               ) : (
                 <span className="imagine-asset-type-badge flex items-center gap-1.5 px-2 py-1 text-[9px] font-bold tracking-wider uppercase rounded bg-purple-500/80 backdrop-blur-md text-white border border-purple-400/25">
                   <span className="h-1.5 w-1.5 rounded-full bg-red-400 animate-ping" />
-                  VEO VIDEO
+                  VIDEO
                 </span>
               )}
             </div>
@@ -285,8 +316,42 @@ export default function AssetCard({
             )}
 
             <div className="imagine-asset-hover-scrim absolute inset-0 bg-slate-950/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10 pointer-events-none" />
-            <div className="imagine-card-actions-shell absolute inset-x-3 bottom-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 pointer-events-none group-hover:pointer-events-auto">
+            <div className={`imagine-card-actions-shell absolute inset-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-30 pointer-events-none group-hover:pointer-events-auto ${
+              item.type === "video" ? "bottom-[2.85rem]" : "bottom-3"
+            }`}>
               <div className="imagine-card-actions flex flex-wrap items-center justify-center gap-1 rounded-xl border border-white/10 bg-slate-950/80 p-1 backdrop-blur-md shadow-xl">
+                {item.type === "video" && (
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setFrameMenuPlacement(prev => prev === "hover" ? null : "hover")}
+                      className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-cyan-600 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
+                      title="截取视频帧"
+                    >
+                      <ImageDown className="h-3 w-3 text-cyan-200 group-hover:text-white" />
+                      <span className="text-[9px] font-bold">截帧</span>
+                    </button>
+                    {frameMenuPlacement === "hover" && (
+                      <div className="absolute bottom-full left-0 mb-1 grid min-w-24 gap-1 rounded-lg border border-white/12 bg-slate-950/94 p-1 text-xs text-slate-100 shadow-xl backdrop-blur">
+                        {frameCaptureActions.map(action => {
+                          const Icon = action.icon;
+                          return (
+                            <button
+                              key={action.mode}
+                              type="button"
+                              onClick={() => captureVideoFrame(action.mode)}
+                              className="flex h-8 items-center gap-2 rounded-md px-2 text-left transition hover:bg-white/10"
+                            >
+                              <Icon className="h-3.5 w-3.5 text-cyan-200" />
+                              <span className="whitespace-nowrap">{getVideoFrameCaptureLabel(action.mode)}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {item.type === "image" && (
                   <button
                     onClick={() => onApplyVideoReference(item)}
@@ -421,6 +486,37 @@ export default function AssetCard({
             </span>
 
             <div className="flex items-center gap-1.5">
+              {item.type === "video" && (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setFrameMenuPlacement(prev => prev === "meta" ? null : "meta")}
+                    className="text-slate-500 hover:text-cyan-300 p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer"
+                    title="截取视频帧"
+                  >
+                    <ImageDown className="h-3.5 w-3.5" />
+                  </button>
+                  {frameMenuPlacement === "meta" && (
+                    <div className="absolute bottom-full right-0 mb-1 grid min-w-24 gap-1 rounded-lg border border-slate-200 bg-white p-1 text-xs text-slate-700 shadow-xl">
+                      {frameCaptureActions.map(action => {
+                        const Icon = action.icon;
+                        return (
+                          <button
+                            key={action.mode}
+                            type="button"
+                            onClick={() => captureVideoFrame(action.mode)}
+                            className="flex h-8 items-center gap-2 rounded-md px-2 text-left transition hover:bg-slate-100"
+                          >
+                            <Icon className="h-3.5 w-3.5 text-cyan-500" />
+                            <span className="whitespace-nowrap">{getVideoFrameCaptureLabel(action.mode)}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <button
                 onClick={() => onReuseTask(item)}
                 className="text-slate-500 hover:text-cyan-300 p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer"

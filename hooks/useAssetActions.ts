@@ -5,6 +5,7 @@ import { readImageGenerationPayload } from "@/lib/client-image-response";
 import { clearAllDB, deleteFromDB, saveToDB, type StorageItem } from "@/lib/db";
 import { parseProviderModel, type AiProvider } from "@/lib/providers/model-catalog";
 import { getReferenceImagePayloadError } from "@/lib/reference-images";
+import { createVideoFrameStorageItem, getVideoFrameCaptureLabel, type CapturedVideoFrame } from "@/lib/video-frame";
 
 type NoticeType = "error" | "info" | "success";
 
@@ -395,6 +396,18 @@ export function useAssetActions({
     }
   };
 
+  const handleCaptureVideoFrame = async (item: StorageItem, frame: CapturedVideoFrame): Promise<StorageItem | null> => {
+    if (item.type !== "video") {
+      throw new Error("只有视频资产可以截帧");
+    }
+
+    const frameItem = createVideoFrameStorageItem(item, frame, makeClientId("frame"));
+    if (!await saveItemOrWarn(frameItem, pushWorkspaceNotice)) return null;
+    setItems(prev => [frameItem, ...prev]);
+    pushWorkspaceNotice("success", `已保存${getVideoFrameCaptureLabel(frame.mode)}为图片资产`);
+    return frameItem;
+  };
+
   const handleBatchDownloadZip = async () => {
     if (selectedItemIds.length === 0) return;
     const itemsToExport = items.filter(item => selectedItemIds.includes(item.id));
@@ -486,6 +499,7 @@ export function useAssetActions({
     exportMetadataJson,
     handleBatchDelete,
     handleBatchDownloadZip,
+    handleCaptureVideoFrame,
     handleClearSelection,
     handleDeleteItem,
     handleDownloadItem,

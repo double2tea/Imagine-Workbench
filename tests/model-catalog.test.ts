@@ -78,6 +78,7 @@ test("image capability helper separates aspect ratios from requestable resolutio
 
 test("image model selector hides duplicate async variants", () => {
   assert.equal(IMAGE_MODEL_OPTIONS["12ai"].some(option => option.value.startsWith("12ai-async:")), false);
+  assert.equal(supportsAsyncImageGeneration("12ai:gemini-2.5-flash-image"), true);
   assert.equal(supportsAsyncImageGeneration("12ai:gemini-3.1-flash-image-preview"), true);
   assert.equal(supportsAsyncImageGeneration("12ai:gpt-image-2"), false);
 });

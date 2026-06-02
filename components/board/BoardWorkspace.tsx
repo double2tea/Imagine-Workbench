@@ -33,6 +33,8 @@ import type { BoardStateController } from "@/hooks/useBoardState";
 import BoardNode, { type BoardFlowNode } from "@/components/board/BoardNode";
 import BoardToolbar from "@/components/board/BoardToolbar";
 import type { ThemeMode } from "@/components/workbench/WorkspaceHeader";
+import type { StorageItem } from "@/lib/db";
+import type { CapturedVideoFrame } from "@/lib/video-frame";
 import {
   DEFAULT_AGENT_NODE_SIZE,
   DEFAULT_GENERATE_NODE_SIZE,
@@ -53,6 +55,7 @@ interface BoardWorkspaceProps {
   children?: ReactNode;
   themeMode: ThemeMode;
   onBack: () => void;
+  onCaptureVideoFrame: (nodeId: string, item: StorageItem, frame: CapturedVideoFrame) => void | Promise<void>;
   onConnectionError: (message: string) => void;
   onExecuteGenerateNode: (nodeId: string) => void;
   onOpenSettings: () => void;
@@ -157,6 +160,7 @@ export default function BoardWorkspace({
   controller,
   themeMode,
   onBack,
+  onCaptureVideoFrame,
   onConnectionError,
   onExecuteGenerateNode,
   onOpenSettings,
@@ -200,6 +204,7 @@ export default function BoardWorkspace({
         selected: selectedNodeId === node.id,
         data: {
           node,
+          onCaptureVideoFrame,
           onDelete: deleteNode,
           onExecuteGenerate: onExecuteGenerateNode,
           onSendAgent: onSendAgentNode,
@@ -212,6 +217,7 @@ export default function BoardWorkspace({
     [
       board.nodes,
       deleteNode,
+      onCaptureVideoFrame,
       onExecuteGenerateNode,
       onSendAgentNode,
       selectedNodeId,

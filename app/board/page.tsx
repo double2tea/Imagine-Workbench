@@ -23,7 +23,7 @@ import {
   useReferenceState,
 } from "@/hooks/useReferenceState";
 import { useProviderSettings } from "@/hooks/useProviderSettings";
-import { clearAllDB, getAllFromDB, type StorageItem } from "@/lib/db";
+import { clearAllDB, getAllFromDB, saveToDB, type StorageItem } from "@/lib/db";
 import {
   DEFAULT_IMAGE_MODEL,
   DEFAULT_VIDEO_MODEL,
@@ -41,6 +41,7 @@ import { getProviderMeta, PROVIDER_KEYS } from "@/lib/providers/registry";
 import { compressReferenceImageDataUrl, compressReferenceImageFile } from "@/lib/reference-images";
 import type { BoardDocument, BoardImageGenerateNode, BoardPoint, BoardVideoGenerateNode } from "@/lib/board";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
+import { createVideoFrameStorageItem, getVideoFrameCaptureLabel, type CapturedVideoFrame } from "@/lib/video-frame";
 
 type NoticeType = "error" | "info" | "success";
 type MaskDestination = "creative" | "agent";
@@ -69,6 +70,19 @@ async function readFetchError(response: Response, fallback: string): Promise<str
     return getStringField(data, "error") ?? getStringField(data, "message") ?? `${fallback} (HTTP ${response.status})`;
   } catch {
     return `${fallback} (HTTP ${response.status})`;
+  }
+}
+
+async function saveItemOrWarn(
+  item: StorageItem,
+  pushWorkspaceNotice: (type: NoticeType, message: string) => void,
+): Promise<boolean> {
+  try {
+    await saveToDB(item);
+    return true;
+  } catch (error) {
+    pushWorkspaceNotice("error", `本地存储失败，刷新后可能丢失：${toErrorMessage(error, "IndexedDB 写入失败")}`);
+    return false;
   }
 }
 
@@ -635,6 +649,27 @@ export default function BoardPage() {
     });
   }, [boardController]);
 
+  const handleCaptureVideoFrame = useCallback(async (
+    sourceNodeId: string,
+    item: StorageItem,
+    frame: CapturedVideoFrame,
+  ): Promise<void> => {
+    if (item.type !== "video") {
+      throw new Error("只有视频资产可以截帧");
+    }
+
+    const frameItem = createVideoFrameStorageItem(item, frame, makeClientId("frame"));
+    if (!await saveItemOrWarn(frameItem, pushWorkspaceNotice)) return;
+    setItems(prev => [frameItem, ...prev]);
+
+    const sourceNode = boardController.board.nodes.find(node => node.id === sourceNodeId);
+    const position = sourceNode
+      ? { x: sourceNode.position.x + sourceNode.size.width + 40, y: sourceNode.position.y }
+      : undefined;
+    addAssetToBoard(frameItem, position);
+    pushWorkspaceNotice("success", `已保存${getVideoFrameCaptureLabel(frame.mode)}并插入画板`);
+  }, [addAssetToBoard, boardController.board.nodes, pushWorkspaceNotice]);
+
   const useSelectedBoardAssetAsReference = () => {
     const references = activeBoardReference(boardController.board.nodes, boardController.selectedNodeId);
     if (references.length === 0) {
@@ -909,6 +944,7 @@ export default function BoardPage() {
         controller={boardController}
         themeMode={themeMode}
         onBack={() => router.push("/")}
+        onCaptureVideoFrame={handleCaptureVideoFrame}
         onConnectionError={(message) => pushWorkspaceNotice("error", message)}
         onExecuteGenerateNode={handleExecuteGenerateNode}
         onOpenSettings={() => setShowSettings(true)}
@@ -1025,7 +1061,13 @@ export default function BoardPage() {
         testProviderConnection={testProviderConnection}
       />
 
-      <FullscreenPreview item={fullscreenItem} onClose={() => setFullscreenItem(null)} />
+      <FullscreenPreview
+        item={fullscreenItem}
+        onCaptureVideoFrame={(item, frame) =>
+          handleCaptureVideoFrame(boardController.selectedNodeId ?? "", item, frame)
+        }
+        onClose={() => setFullscreenItem(null)}
+      />
       {isMaskOpen && (
         <CanvasMaskEditor
           imageUrl={maskTargetUrl}

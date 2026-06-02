@@ -137,6 +137,7 @@ export default function Home() {
   const [imageResolution, setImageResolution] = useState("1K");
   const [imageQuality, setImageQuality] = useState("auto");
   const [imageThinkingLevel, setImageThinkingLevel] = useState("minimal");
+  const [imageBackgroundGeneration, setImageBackgroundGeneration] = useState(false);
   const [videoDuration, setVideoDuration] = useState("10");
   const [videoPreset, setVideoPreset] = useState("normal");
   const [videoResolution, setVideoResolution] = useState("720p");
@@ -261,7 +262,8 @@ export default function Home() {
   const activeImageResolution = imageResolution === "custom" ? customImageSize.trim() : imageResolution;
   const activeImageQuality = imageCapabilities.qualities.some(option => option.value === imageQuality) ? imageQuality : undefined;
   const selectedImageProviderModel = parseProviderModel(selectedModel, selectedProvider);
-  const activeImageModel = isSubmittingImage && canUseAsyncImageGeneration && selectedImageProviderModel.provider === "12ai"
+  const shouldUseAsyncImageGeneration = (imageBackgroundGeneration || isSubmittingImage) && canUseAsyncImageGeneration;
+  const activeImageModel = shouldUseAsyncImageGeneration && selectedImageProviderModel.provider === "12ai"
     ? `12ai-async:${selectedImageProviderModel.model}`
     : selectedModel;
   const activeVideoSize = videoCapabilities.sizes.some(option => option.value === aspectRatio) ? aspectRatio : "auto";
@@ -395,6 +397,7 @@ export default function Home() {
     exportMetadataJson,
     handleBatchDelete,
     handleBatchDownloadZip,
+    handleCaptureVideoFrame,
     handleClearSelection,
     handleDeleteItem,
     handleDownloadItem,
@@ -832,6 +835,7 @@ export default function Home() {
       onBatchDelete={handleBatchDelete}
       onBatchDownloadZip={handleBatchDownloadZip}
       onCancelItem={cancelProcessingItem}
+      onCaptureVideoFrame={handleCaptureVideoFrame}
       onClearSelection={handleClearSelection}
       onDeleteItem={handleDeleteItem}
       onDeleteItemsByStatus={deleteItemsByStatus}
@@ -1031,6 +1035,17 @@ export default function Home() {
             />
 
             <div className="grid grid-cols-1 gap-3">
+              {canUseAsyncImageGeneration && selectedImageProviderModel.provider === "12ai" && (
+                <label className="flex h-6 w-fit items-center gap-1.5 rounded-md border border-slate-800 bg-slate-950/45 px-2 text-[10px] font-semibold text-slate-400">
+                  <input
+                    type="checkbox"
+                    checked={imageBackgroundGeneration}
+                    onChange={(event) => setImageBackgroundGeneration(event.target.checked)}
+                    className="h-3 w-3 cursor-pointer accent-blue-500"
+                  />
+                  <span>后台</span>
+                </label>
+              )}
               <select
                 value={selectedModel}
                 onChange={(event) => handleSelectImageModel(event.target.value)}
@@ -1233,6 +1248,7 @@ export default function Home() {
                     atDropdownNode={atDropdown.visible && atDropdown.type === "image-prompt" ? renderAtDropdown("image-prompt") : null}
                     capabilities={imageCapabilities}
                     customImageSize={customImageSize}
+                    imageBackgroundGeneration={imageBackgroundGeneration}
                     imageQuality={imageQuality}
                     imageResolution={imageResolution}
                     imageResolutionOptions={imageResolutionOptions}
@@ -1246,6 +1262,7 @@ export default function Home() {
                     selectedAspectRatio={aspectRatio}
                     selectedModel={selectedModel}
                     submitCount={imageSubmitCount}
+                    supportsBackgroundGeneration={canUseAsyncImageGeneration && selectedImageProviderModel.provider === "12ai"}
                     onApplyPreset={applyPreset}
                     onClearReferences={() => {
                       setReferenceImages([]);
@@ -1254,6 +1271,7 @@ export default function Home() {
                     }}
                     onCustomImageSizeChange={setCustomImageSize}
                     onGenerate={generateManualImage}
+                    onImageBackgroundGenerationChange={setImageBackgroundGeneration}
                     onImageQualityChange={setImageQuality}
                     onImageResolutionChange={setImageResolution}
                     onNegativePromptChange={setNegativePrompt}
@@ -1394,7 +1412,7 @@ export default function Home() {
         testProviderConnection={testProviderConnection}
       />
 
-      <FullscreenPreview item={fullscreenItem} onClose={() => setFullscreenItem(null)} />
+      <FullscreenPreview item={fullscreenItem} onCaptureVideoFrame={handleCaptureVideoFrame} onClose={() => setFullscreenItem(null)} />
 
       {/* Inpainting Mask Drawer overlay loader */}
       {isMaskOpen && (

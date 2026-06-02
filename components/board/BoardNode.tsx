@@ -14,11 +14,14 @@ import AssetBoardNode from "@/components/board/AssetBoardNode";
 import GenerateBoardNode from "@/components/board/GenerateBoardNode";
 import NoteBoardNode from "@/components/board/NoteBoardNode";
 import PromptBoardNode from "@/components/board/PromptBoardNode";
+import type { StorageItem } from "@/lib/db";
 import { getModelCapability } from "@/lib/providers/model-catalog";
+import type { CapturedVideoFrame } from "@/lib/video-frame";
 
 export interface BoardFlowNodeData extends Record<string, unknown> {
   node: BoardNodeModel;
   onDelete: (nodeId: string) => void;
+  onCaptureVideoFrame: (nodeId: string, item: StorageItem, frame: CapturedVideoFrame) => void | Promise<void>;
   onExecuteGenerate: (nodeId: string) => void;
   onSendAgent: (nodeId: string) => void;
   onUpdateAgent: (nodeId: string, instruction: string) => void;
@@ -127,7 +130,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
         </button>
       </div>
       <div className="h-[calc(100%-2.25rem)] min-h-0 overflow-hidden rounded-b-lg">
-        {node.kind === "asset" && <AssetBoardNode node={node} />}
+        {node.kind === "asset" && <AssetBoardNode node={node} onCaptureVideoFrame={data.onCaptureVideoFrame} />}
         {node.kind === "prompt" && <PromptBoardNode node={node} onChange={prompt => data.onUpdatePrompt(node.id, prompt)} />}
         {(node.kind === "image-generate" || node.kind === "video-generate") && (
           <GenerateBoardNode

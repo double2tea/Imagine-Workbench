@@ -7,6 +7,7 @@ import ComparePanel, { type CompareViewType } from "@/components/assets/CompareP
 import PreviewImage from "@/components/PreviewImage";
 import type { StorageItem } from "@/lib/db";
 import type { AiProvider } from "@/lib/providers/model-catalog";
+import type { CapturedVideoFrame } from "@/lib/video-frame";
 
 interface AssetGalleryWorkspaceProps {
   assetDateEnd: string;
@@ -37,6 +38,7 @@ interface AssetGalleryWorkspaceProps {
   onBatchDelete: () => void;
   onBatchDownloadZip: () => void;
   onCancelItem: (item: StorageItem) => void;
+  onCaptureVideoFrame: (item: StorageItem, frame: CapturedVideoFrame) => void | Promise<unknown>;
   onClearSelection: () => void;
   onDeleteItem: (item: StorageItem) => void;
   onDeleteItemsByStatus: (statuses: StorageItem["status"][]) => void;
@@ -94,6 +96,7 @@ export default function AssetGalleryWorkspace({
   onBatchDelete,
   onBatchDownloadZip,
   onCancelItem,
+  onCaptureVideoFrame,
   onClearSelection,
   onDeleteItem,
   onDeleteItemsByStatus,
@@ -282,6 +285,7 @@ export default function AssetGalleryWorkspace({
                           selectedProvider={selectedProvider}
                           onApplyVideoReference={onApplyVideoReference}
                           onCancel={onCancelItem}
+                          onCaptureVideoFrame={onCaptureVideoFrame}
                           onDelete={onDeleteItem}
                           onDownload={onDownloadItem}
                           onLaunchMaskEditor={onLaunchMaskEditor}

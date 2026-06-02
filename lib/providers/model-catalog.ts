@@ -291,6 +291,15 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     thinkingLevels: THINKING_LEVELS,
   }),
   imageCapability({
+    value: "12ai-async:gemini-2.5-flash-image",
+    label: "12AI Async Gemini 2.5 Image",
+    provider: "12ai",
+    model: "gemini-2.5-flash-image",
+    supportsAsync: true,
+    supportsReferences: true,
+    aspectRatios: GEMINI_25_RATIOS,
+  }),
+  imageCapability({
     value: "12ai-async:gemini-3-pro-image-preview",
     label: "12AI Async Gemini 3 Pro Image",
     provider: "12ai",
