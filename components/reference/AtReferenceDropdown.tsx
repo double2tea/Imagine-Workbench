@@ -34,8 +34,9 @@ export default function AtReferenceDropdown({ items, search, onSelect }: AtRefer
         <button
           key={item.id}
           type="button"
+          onMouseDown={(event) => event.preventDefault()}
           onClick={() => onSelect(item)}
-          className="imagine-at-dropdown-item"
+          className="imagine-at-dropdown-item nodrag"
         >
           <div className="imagine-at-dropdown-thumb">
             <PreviewImage src={item.url} alt="at option" className="h-full w-full object-cover" />

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Maximize2, Paintbrush, Send, Settings, Video } from "lucide-react";
 import AgentDock, { type AgentToolAction } from "@/components/agent/AgentDock";
+import AtReferenceDropdown from "@/components/reference/AtReferenceDropdown";
 import CanvasMaskEditor from "@/components/CanvasMaskEditor";
 import FullscreenPreview from "@/components/assets/FullscreenPreview";
 import BoardInspector from "@/components/board/BoardInspector";
@@ -383,6 +384,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     agentReferenceId,
     agentReferences,
     agentReferenceUrl,
+    atDropdown,
     handleImageUpload,
     handleReferenceDropAsset,
     handleReferenceDropFiles,
@@ -428,15 +430,39 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   });
 
   const { assetStats, searchableReferenceImages } = useAssetWorkspaceState(items);
-  void searchableReferenceImages;
   void handleImageUpload;
   void handleReferenceDropAsset;
   void handleReferenceDropFiles;
-  void handleSelectAtItem;
   void handleSelectPromptReference;
-  void handleTextareaChange;
   void removeReferenceImage;
   void toggleReferenceRole;
+
+  const renderAgentAtDropdown = useCallback(() => {
+    const agentReferenceItems: StorageItem[] = agentReferences.map((reference, index) => ({
+      id: reference.id,
+      type: "image",
+      url: reference.url,
+      prompt: `Agent 引用图 ${index + 1}`,
+      model: "agent-reference",
+      aspectRatio: "auto",
+      createdAt: "",
+      status: "complete",
+      progress: 100,
+    }));
+    const agentReferenceIdSet = new Set(agentReferences.map(reference => reference.id));
+    const agentAtItems = [
+      ...agentReferenceItems,
+      ...searchableReferenceImages.filter(item => !agentReferenceIdSet.has(item.id)),
+    ];
+
+    return (
+      <AtReferenceDropdown
+        items={agentAtItems}
+        search={atDropdown.search}
+        onSelect={(item) => handleSelectAtItem(item.url, item.id, "agent-prompt")}
+      />
+    );
+  }, [agentReferences, atDropdown.search, handleSelectAtItem, searchableReferenceImages]);
 
   useMediaPolling({
     buildProviderHeaders,
@@ -1302,7 +1328,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           activeCountdownId={activeCountdownId}
           agentReferenceId={agentReferenceId}
           agentReferenceUrl={agentReferenceUrl}
-          atDropdownNode={null}
+          atDropdownNode={atDropdown.visible && atDropdown.type === "agent-prompt" ? renderAgentAtDropdown() : null}
           autoExecute={autoExecute}
           chatBottomRef={chatBottomRef}
           countdownSeconds={countdownSeconds}
@@ -1313,7 +1339,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           messages={agentMessages}
           themeMode={themeMode}
           onCancelCountdown={clearActiveCountdown}
-          onChangeInput={setAgentInput}
+          onChangeInput={(value) => handleTextareaChange(value, "agent-prompt")}
           onClearChat={handleClearChat}
           onClearReference={() => {
             setAgentReferenceId(null);

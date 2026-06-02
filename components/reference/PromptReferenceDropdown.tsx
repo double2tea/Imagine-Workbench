@@ -41,8 +41,9 @@ export default function PromptReferenceDropdown({ references, search, onSelect }
         <button
           key={reference.id}
           type="button"
+          onMouseDown={(event) => event.preventDefault()}
           onClick={() => onSelect(index)}
-          className="imagine-at-dropdown-item"
+          className="imagine-at-dropdown-item nodrag"
         >
           <div className="imagine-at-dropdown-thumb">
             <PreviewImage src={reference.url} alt={token} className="h-full w-full object-cover" />

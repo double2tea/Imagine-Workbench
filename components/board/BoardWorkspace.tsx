@@ -345,12 +345,6 @@ function uniqueReferences(references: ReferenceImageRef[]): ReferenceImageRef[] 
   return unique;
 }
 
-function referenceSignature(references: ReferenceImageRef[]): string {
-  return references
-    .map(reference => `${reference.id}:${reference.role ?? "general"}:${reference.url}`)
-    .join("\n");
-}
-
 function generateReferenceCandidates(nodes: BoardNodeModel[], edges: BoardEdge[], generateNodeId: string): ReferenceImageRef[] {
   return uniqueReferences(
     edges
@@ -367,9 +361,9 @@ function promptReferenceCandidates(nodes: BoardNodeModel[], edges: BoardEdge[], 
   ));
   if (targetGenerateIds.length === 1) return generateReferenceCandidates(nodes, edges, targetGenerateIds[0]);
   if (targetGenerateIds.length > 1) {
-    const candidateGroups = targetGenerateIds.map(generateNodeId => generateReferenceCandidates(nodes, edges, generateNodeId));
-    const firstSignature = referenceSignature(candidateGroups[0] ?? []);
-    return candidateGroups.every(references => referenceSignature(references) === firstSignature) ? candidateGroups[0] ?? [] : [];
+    return uniqueReferences(
+      targetGenerateIds.flatMap(generateNodeId => generateReferenceCandidates(nodes, edges, generateNodeId)),
+    );
   }
   return uniqueReferences(nodes.flatMap(node => boardNodeReferences(node)));
 }
@@ -486,6 +480,10 @@ export default function BoardWorkspace({
           generateInputSummary: generateInputSummaryForNode(node, board.nodes, board.edges),
           hasResultConnection: hasResultConnection(node.id, board.edges),
           node,
+          generateReferences:
+            node.kind === "image-generate" || node.kind === "video-generate"
+              ? generateReferenceCandidates(board.nodes, board.edges, node.id)
+              : [],
           promptReferences: node.kind === "prompt" ? promptReferenceCandidates(board.nodes, board.edges, node.id) : [],
           onCaptureVideoFrame,
           onDelete: deleteNode,

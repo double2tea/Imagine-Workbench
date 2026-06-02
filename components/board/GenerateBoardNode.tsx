@@ -1,6 +1,10 @@
 import { ImagePlus, Loader2, Play, Video } from "lucide-react";
+import BoardPromptTextarea from "@/components/board/BoardPromptTextarea";
 import PreviewImage from "@/components/PreviewImage";
+import PromptTemplatePicker from "@/components/prompt-templates/PromptTemplatePicker";
+import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import type { BoardGenerateNodeUpdate, BoardGenerateVariantCount, BoardImageGenerateNode, BoardVideoGenerateNode } from "@/lib/board";
+import { applyPromptTemplateText, type PromptTemplate, type PromptTemplateApplyMode } from "@/lib/prompt-templates";
 
 type GenerateNode = BoardImageGenerateNode | BoardVideoGenerateNode;
 const variantCountOptions: BoardGenerateVariantCount[] = [1, 2, 4];
@@ -22,6 +26,7 @@ interface GenerateBoardNodeProps {
   node: GenerateNode;
   onExecute: () => void;
   onUpdate: (input: BoardGenerateNodeUpdate) => void;
+  references: ReferenceImageRef[];
 }
 
 function statusText(node: GenerateNode): string {
@@ -42,7 +47,7 @@ function statusSteps(status: GenerateNode["status"]): Array<{ key: string; label
   });
 }
 
-export default function GenerateBoardNode({ inputSummary, node, onExecute, onUpdate }: GenerateBoardNodeProps) {
+export default function GenerateBoardNode({ inputSummary, node, onExecute, onUpdate, references }: GenerateBoardNodeProps) {
   const isProcessing = node.status === "processing";
   const promptPreview = inputSummary?.promptPreview ?? null;
   const referenceCount = inputSummary?.referenceCount ?? 0;
@@ -51,17 +56,24 @@ export default function GenerateBoardNode({ inputSummary, node, onExecute, onUpd
   const paramSummary = node.kind === "image-generate"
     ? `${node.model} / ${node.imageResolution === "custom" ? node.customImageResolution : node.imageResolution} / x${node.variantCount}`
     : `${node.model} / ${node.aspectRatio}${node.videoDuration ? ` / ${node.videoDuration}s` : ""} / x${node.variantCount}`;
+  const handleApplyPromptTemplate = (template: PromptTemplate, mode: PromptTemplateApplyMode): void => {
+    onUpdate({ prompt: applyPromptTemplateText(node.prompt, template.positivePrompt, mode) });
+  };
   return (
     <div className="flex h-full min-h-0 flex-col gap-2 p-3">
-      <textarea
-        value={promptPreview ?? node.prompt}
-        onChange={(event) => onUpdate({ prompt: event.target.value })}
-        readOnly={promptPreview !== null}
-        className={`nodrag nowheel min-h-0 flex-1 resize-none rounded-md imagine-board-input p-2 text-xs leading-5 outline-none placeholder:text-[var(--iw-faint)] focus:border-[var(--iw-border)] ${
-          promptPreview !== null ? "cursor-default opacity-85" : ""
-        }`}
-        placeholder="可直接写提示词，或连接 Prompt 输入"
-      />
+      <div className="relative min-h-0 flex-1 overflow-visible">
+        <BoardPromptTextarea
+          value={promptPreview ?? node.prompt}
+          onChange={(prompt) => onUpdate({ prompt })}
+          references={references}
+          readOnly={promptPreview !== null}
+          headerRight={promptPreview === null ? <PromptTemplatePicker compact onApply={handleApplyPromptTemplate} /> : undefined}
+          className={`nodrag nowheel h-full w-full resize-none rounded-md imagine-board-input p-2 pr-20 text-xs leading-5 outline-none placeholder:text-[var(--iw-faint)] focus:border-[var(--iw-border)] ${
+            promptPreview !== null ? "cursor-default opacity-85" : ""
+          }`}
+          placeholder={promptPreview !== null ? "已连接 Prompt 节点，请在提示节点编辑" : "可直接写提示词，输入 @ 引用参考图"}
+        />
+      </div>
       {(promptPreview !== null || referenceCount > 0) && (
         <div className="flex min-h-6 flex-wrap items-center gap-1.5">
           <div className="flex flex-wrap items-center gap-1.5">

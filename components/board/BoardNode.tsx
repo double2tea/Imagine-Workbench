@@ -23,6 +23,7 @@ import type { CapturedVideoFrame } from "@/lib/video-frame";
 
 export interface BoardFlowNodeData extends Record<string, unknown> {
   generateInputSummary?: BoardGenerateInputSummary;
+  generateReferences: ReferenceImageRef[];
   hasResultConnection?: boolean;
   node: BoardNodeModel;
   onDelete: (nodeId: string) => void;
@@ -79,6 +80,13 @@ function BoardHandle({ id, kind, label, position, top, type }: BoardHandleProps)
       title={label}
     />
   );
+}
+
+function nodeBodyOverflowClass(kind: BoardNodeModel["kind"]): string {
+  if (kind === "prompt" || kind === "image-generate" || kind === "video-generate") {
+    return "overflow-visible";
+  }
+  return "overflow-hidden";
 }
 
 function supportsReferenceInput(node: BoardNodeModel): boolean {
@@ -147,7 +155,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       </div>
-      <div className="h-[calc(100%-2.25rem)] min-h-0 overflow-hidden rounded-b-lg">
+      <div className={`h-[calc(100%-2.25rem)] min-h-0 rounded-b-lg ${nodeBodyOverflowClass(node.kind)}`}>
         {node.kind === "asset" && (
           <AssetBoardNode
             node={node}
@@ -176,6 +184,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
           <GenerateBoardNode
             inputSummary={data.generateInputSummary}
             node={node}
+            references={data.generateReferences}
             onExecute={() => data.onExecuteGenerate(node.id)}
             onUpdate={input => data.onUpdateGenerate(node.id, input)}
           />
