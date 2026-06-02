@@ -1488,13 +1488,46 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     setBoardSummaries(prev => prev.filter(item => item.id !== deletedBoardId));
   }, [boardController.board.id, boardController.board.title, boardSummaries, pushWorkspaceNotice, router]);
 
-  const toggleThemeMode = () => {
+  const saveBoardNow = boardController.saveNow;
+
+  const handleBackToWorkbench = useCallback(() => {
+    flushSync(() => flushAllBoardText());
+    void saveBoardNow()
+      .then(() => router.push("/"))
+      .catch(error => pushWorkspaceNotice("error", toErrorMessage(error, "画板保存失败")));
+  }, [pushWorkspaceNotice, router, saveBoardNow]);
+
+  const handleCancelGenerateNode = useCallback((nodeId: string) => {
+    void cancelBoardGenerationNode(nodeId);
+  }, [cancelBoardGenerationNode]);
+
+  const handleBoardConnectionError = useCallback((message: string) => {
+    pushWorkspaceNotice("error", message);
+  }, [pushWorkspaceNotice]);
+
+  const handleCreateBoard = useCallback(() => {
+    void createBoardPage().catch(error => pushWorkspaceNotice("error", toErrorMessage(error, "新建画板失败")));
+  }, [createBoardPage, pushWorkspaceNotice]);
+
+  const handleDeleteBoard = useCallback(() => {
+    void deleteBoardPage().catch(error => pushWorkspaceNotice("error", toErrorMessage(error, "删除画板失败")));
+  }, [deleteBoardPage, pushWorkspaceNotice]);
+
+  const handleOpenSettings = useCallback(() => {
+    setShowSettings(true);
+  }, []);
+
+  const handleSelectBoard = useCallback((nextBoardId: string) => {
+    void selectBoardPage(nextBoardId).catch(error => pushWorkspaceNotice("error", toErrorMessage(error, "画板切换失败")));
+  }, [pushWorkspaceNotice, selectBoardPage]);
+
+  const toggleThemeMode = useCallback(() => {
     setThemeMode(prev => {
       const next: ThemeMode = prev === "light" ? "dark" : "light";
       persistThemeMode(next);
       return next;
     });
-  };
+  }, []);
 
   const selectedBoardNode = boardController.board.nodes.find(node => node.id === boardController.selectedNodeId);
   const selectedIncomingEdges = selectedBoardNode
@@ -1521,29 +1554,18 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         controller={boardController}
         galleryItems={items}
         themeMode={themeMode}
-        onBack={() => {
-          flushSync(() => flushAllBoardText());
-          void boardController.saveNow()
-            .then(() => router.push("/"))
-            .catch(error => pushWorkspaceNotice("error", toErrorMessage(error, "画板保存失败")));
-        }}
-        onCancelGenerateNode={(nodeId) => void cancelBoardGenerationNode(nodeId)}
+        onBack={handleBackToWorkbench}
+        onCancelGenerateNode={handleCancelGenerateNode}
         onCaptureVideoFrame={handleCaptureVideoFrame}
-        onConnectionError={(message) => pushWorkspaceNotice("error", message)}
-        onCreateBoard={() => {
-          void createBoardPage().catch(error => pushWorkspaceNotice("error", toErrorMessage(error, "新建画板失败")));
-        }}
-        onDeleteBoard={() => {
-          void deleteBoardPage().catch(error => pushWorkspaceNotice("error", toErrorMessage(error, "删除画板失败")));
-        }}
+        onConnectionError={handleBoardConnectionError}
+        onCreateBoard={handleCreateBoard}
+        onDeleteBoard={handleDeleteBoard}
         onEditAssetImage={editBoardAssetImage}
         onExecuteGenerateNode={handleExecuteGenerateNode}
         onImportBoardFiles={handleImportBoardFiles}
-        onOpenSettings={() => setShowSettings(true)}
+        onOpenSettings={handleOpenSettings}
         onRenameBoard={renameBoardPage}
-        onSelectBoard={(nextBoardId) => {
-          void selectBoardPage(nextBoardId).catch(error => pushWorkspaceNotice("error", toErrorMessage(error, "画板切换失败")));
-        }}
+        onSelectBoard={handleSelectBoard}
         onSendAssetToAgent={useBoardAssetForAgent}
         onSendAgentNode={handleSendAgentNode}
         onSetAssetAsReference={useBoardAssetAsReference}

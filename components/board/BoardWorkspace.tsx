@@ -790,7 +790,10 @@ export default function BoardWorkspace({
   const handleNodesChange = useCallback<OnNodesChange<BoardFlowNode>>((changes) => {
     const visualChanges = changes.filter(change => change.type !== "dimensions" && change.type !== "select");
     if (visualChanges.length > 0) {
-      setRenderNodes(currentNodes => applyNodeChanges(visualChanges, currentNodes));
+      setRenderNodes(currentNodes => {
+        const nextNodes = applyNodeChanges(visualChanges, currentNodes);
+        return sameFlowNodes(currentNodes, nextNodes) ? currentNodes : nextNodes;
+      });
     }
     const settledPositions: Array<{ nodeId: string; position: BoardPoint }> = [];
     for (const change of changes) {

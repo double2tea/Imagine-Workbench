@@ -969,21 +969,27 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
   }, [mutateBoard]);
 
   const selectNode = useCallback((nodeId: string | null) => {
-    setSelectedNodeId(nodeId);
-    if (nodeId) setSelectedEdgeId(null);
+    setSelectedNodeId(current => (current === nodeId ? current : nodeId));
+    if (nodeId) setSelectedEdgeId(current => (current === null ? current : null));
   }, []);
 
   const selectEdge = useCallback((edgeId: string | null) => {
-    setSelectedEdgeId(edgeId);
-    if (edgeId) setSelectedNodeId(null);
+    setSelectedEdgeId(current => (current === edgeId ? current : edgeId));
+    if (edgeId) setSelectedNodeId(current => (current === null ? current : null));
   }, []);
 
   const setViewport = useCallback((viewport: BoardViewport) => {
-    mutateBoard(currentBoard => ({
-      ...currentBoard,
-      viewport,
-      updatedAt: nowIso(),
-    }), { skipUndo: true });
+    mutateBoard(currentBoard => (
+      currentBoard.viewport.x === viewport.x &&
+      currentBoard.viewport.y === viewport.y &&
+      currentBoard.viewport.zoom === viewport.zoom
+        ? currentBoard
+        : {
+          ...currentBoard,
+          viewport,
+          updatedAt: nowIso(),
+        }
+    ), { skipUndo: true });
   }, [mutateBoard]);
 
   const updateBoardTitle = useCallback((title: string) => {
@@ -1011,13 +1017,17 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     const positionById = new Map(updates.map(update => [update.nodeId, update.position]));
     const updatedAt = nowIso();
     mutateBoard(
-      currentBoard => touchBoard(
-        currentBoard,
-        currentBoard.nodes.map(node => {
+      currentBoard => {
+        let didChange = false;
+        const nextNodes = currentBoard.nodes.map(node => {
           const position = positionById.get(node.id);
-          return position ? { ...node, position, updatedAt } : node;
-        }),
-      ),
+          if (!position) return node;
+          if (node.position.x === position.x && node.position.y === position.y) return node;
+          didChange = true;
+          return { ...node, position, updatedAt };
+        });
+        return didChange ? touchBoard(currentBoard, nextNodes) : currentBoard;
+      },
       { skipUndo: true },
     );
   }, [mutateBoard]);
