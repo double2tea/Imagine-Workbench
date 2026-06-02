@@ -146,13 +146,18 @@ function targetAcceptsReference(nodes: BoardNodeModel[], targetNodeId: string): 
   }
 }
 
+function getBoardVar(varName: string, fallback: string): string {
+  if (typeof document === "undefined") return fallback;
+  const cs = getComputedStyle(document.querySelector(".imagine-workbench-shell") || document.documentElement);
+  const val = cs.getPropertyValue(varName).trim();
+  return val || fallback;
+}
+
 function edgeColor(kind: BoardEdge["kind"], themeMode: ThemeMode): string {
   void themeMode;
   const varNames: Record<BoardEdge["kind"], string> = { prompt: "--iw-board-edge-prompt", reference: "--iw-board-edge-reference", "agent-context": "--iw-board-edge-agent-context", result: "--iw-board-edge-result" };
-  if (typeof document === "undefined") return { prompt: "#2dd4bf", reference: "#60a5fa", "agent-context": "#a78bfa", result: "#34d399" }[kind];
-  const cs = getComputedStyle(document.querySelector(".imagine-workbench-shell") || document.documentElement);
-  const val = cs.getPropertyValue(varNames[kind]).trim();
-  return val || { prompt: "#2dd4bf", reference: "#60a5fa", "agent-context": "#a78bfa", result: "#34d399" }[kind];
+  const fallbacks: Record<BoardEdge["kind"], string> = { prompt: "#2dd4bf", reference: "#60a5fa", "agent-context": "#a78bfa", result: "#34d399" };
+  return getBoardVar(varNames[kind], fallbacks[kind]);
 }
 
 export default function BoardWorkspace({
@@ -452,8 +457,8 @@ export default function BoardWorkspace({
             <Controls className="imagine-board-controls" />
             <MiniMap
               className="imagine-board-minimap"
-              nodeColor={themeMode === "light" ? "#1e40af" : "#1d4ed8"}
-              maskColor={themeMode === "light" ? "rgba(241, 245, 249, 0.75)" : "rgba(2,6,23,0.66)"}
+              nodeColor={getBoardVar("--iw-board-minimap-node", themeMode === "light" ? "#1e40af" : "#1d4ed8")}
+              maskColor={getBoardVar("--iw-board-minimap-mask", themeMode === "light" ? "rgba(241, 245, 249, 0.75)" : "rgba(2,6,23,0.66)")}
               pannable
               zoomable
             />
@@ -470,7 +475,8 @@ export default function BoardWorkspace({
                     key={item.kind}
                     type="button"
                     onClick={() => addQuickNodeAtPoint(item.kind, quickInsertMenu.position)}
-                    className="imagine-header-button relative flex !h-10 !min-h-10 items-center gap-2.5 !rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2.5 text-left text-xs font-semibold text-[var(--iw-text)] transition hover:border-[var(--iw-board-accent-amber)] hover:bg-[var(--iw-panel)]"
+                    className="imagine-header-button relative flex !h-10 !min-h-10 items-center gap-2.5 !rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2.5 text-left text-xs font-semibold text-[var(--iw-text)] transition"
+                    data-accent="amber"
                   >
                     <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border ${item.iconSurfaceClassName}`}>
                       <Icon className={`h-3.5 w-3.5 ${item.iconClassName}`} />

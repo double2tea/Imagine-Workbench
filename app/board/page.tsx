@@ -957,6 +957,7 @@ export default function BoardPage() {
         onToggleTheme={toggleThemeMode}
       >
         <aside className="flex min-h-0 flex-col border-l border-[var(--iw-border)] bg-[var(--iw-panel)] text-[var(--iw-text)]">
+          {/* sidebar children (inspector + project assets list) consistency per U-PR4 design: both sections use .imagine-control-surface / vars / imagine-* primitives for headers, cards, text; headers match text-xs font-semibold exactly */}
           <BoardInspector
             imageModelGroups={imageModelGroups}
             incomingCount={selectedIncomingEdges.length}

@@ -53,6 +53,8 @@
   --iw-board-edge-result: #34d399;
   --iw-board-accent-amber: #f59e0b;
   --iw-board-handle: #64748b;
+  --iw-board-minimap-node: #1d4ed8;
+  --iw-board-minimap-mask: rgba(2,6,23,0.66);
   background: var(--iw-bg) !important;
   color: var(--iw-text);
   color-scheme: dark;
@@ -81,6 +83,8 @@
   --iw-board-edge-result: #10b981;
   --iw-board-accent-amber: #d97706;
   --iw-board-handle: #64748b;
+  --iw-board-minimap-node: #1e40af;
+  --iw-board-minimap-mask: rgba(241, 245, 249, 0.75);
   background:
     linear-gradient(180deg, #eef3f8 0%, #f8fafc 44%, #edf3f8 100%) !important;
   color-scheme: light;
