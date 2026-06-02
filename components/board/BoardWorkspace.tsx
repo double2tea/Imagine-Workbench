@@ -332,11 +332,7 @@ async function imageUrlToFile(url: string, index: number): Promise<File> {
     return new File([blob], `board-drag-image-${index}.${extensionFromImageType(blob.type)}`, { type: blob.type });
   }
 
-  const response = await fetch("/api/board/import-image", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url }),
-  });
+  const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`图片拖入失败 (HTTP ${response.status})`);
   }

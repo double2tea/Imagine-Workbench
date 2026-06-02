@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Check, CheckCircle2, ListPlus, RefreshCw, Search, XCircle } from "lucide-react";
 import { ProviderCredentialCard } from "@/components/settings/ProviderCredentialCard";
 import type { ProviderTestState } from "@/components/settings/provider-settings-types";
@@ -90,12 +90,6 @@ export function ConnectionSettingsWorkspace({
       );
     });
   }, [providerQuery]);
-
-  useEffect(() => {
-    if (filteredProviders.includes(selectedProvider)) return;
-    const next = filteredProviders[0];
-    if (next) onSelectProvider(next);
-  }, [filteredProviders, onSelectProvider, selectedProvider]);
 
   const modelGroupsBySection = useMemo(
     () => ({

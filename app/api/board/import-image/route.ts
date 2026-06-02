@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { dataUriByteSize, isImageDataUri, REFERENCE_IMAGE_MAX_BYTES } from "@/lib/reference-images";
 
 export const runtime = "edge";
 
 const importImageBodySchema = z.object({
-  url: z.string().url(),
+  url: z.string().min(1),
 });
 
 export async function GET(req: NextRequest) {
@@ -29,29 +30,38 @@ export async function POST(req: NextRequest) {
 
 async function importImageUrl(value: string): Promise<Response> {
   try {
-    const url = new URL(value);
-    if (url.protocol !== "http:" && url.protocol !== "https:") {
-      return NextResponse.json({ error: "Only http(s) image URLs can be imported" }, { status: 400 });
+    if (!isImageDataUri(value)) {
+      return NextResponse.json({ error: "Only data:image/* base64 data URIs can be imported" }, { status: 400 });
     }
 
-    const response = await fetch(url);
-    if (!response.ok) {
-      return NextResponse.json({ error: `Image fetch failed with HTTP ${response.status}` }, { status: 502 });
+    const parsed = parseImageDataUri(value);
+    if (parsed.mimeType.toLowerCase() === "image/svg+xml") {
+      return NextResponse.json({ error: "SVG data URIs cannot be imported" }, { status: 400 });
+    }
+    const byteSize = dataUriByteSize(value);
+    if (byteSize === null || byteSize > REFERENCE_IMAGE_MAX_BYTES) {
+      return NextResponse.json({ error: "Image data URI is too large" }, { status: 413 });
+    }
+    const binary = atob(parsed.base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index);
     }
 
-    const contentType = response.headers.get("content-type") ?? "";
-    if (!contentType.startsWith("image/")) {
-      return NextResponse.json({ error: "URL does not point to an image" }, { status: 400 });
-    }
-
-    return new NextResponse(response.body, {
+    return new NextResponse(bytes, {
       headers: {
-        "Cache-Control": "public, max-age=86400",
-        "Content-Type": contentType,
+        "Cache-Control": "no-store",
+        "Content-Type": parsed.mimeType,
       },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Image import failed";
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+function parseImageDataUri(value: string): { mimeType: string; base64: string } {
+  const match = value.match(/^data:(image\/[a-z0-9.+-]+);base64,(.+)$/i);
+  if (!match) throw new Error("Only data:image/* base64 data URIs can be imported");
+  return { mimeType: match[1], base64: match[2] };
 }

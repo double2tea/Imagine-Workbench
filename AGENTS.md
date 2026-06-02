@@ -21,7 +21,7 @@ Current core surfaces:
 - `app/page.tsx`: main browser composition shell. It wires workstation state/hooks into creation panels, Agent Dock, gallery, settings, fullscreen preview, and mask editor.
 - `app/board/page.tsx`: standalone canvas operation shell. It reuses the existing asset store, generation hooks, provider settings, Agent Dock, mask editor, and media polling while presenting a spatial board workflow.
 - `app/board/[boardId]/page.tsx`: specific persisted board route.
-- `app/api/board/import-image/route.ts`: board image import route for remote/data URL image capture into local assets.
+- `app/api/board/import-image/route.ts`: board image import route for `data:image/*` base64 data URI capture into local assets.
 - `app/api/gemini/*`: server routes for generation, optimization, Agent Mode, async polling, and media download proxying.
 - `app/api/gemini/agent/route.ts`: Agent Mode with tool-calling loop. Uses zod for request/response validation. Agent calls tools to query models, skills, and gallery assets before recommending actions. Model IDs are validated server-side against the catalog.
 - `app/api/gemini/agent/tools.ts`: Agent tool definitions and executors. Tools: `query_models`, `get_skill_info`, `get_gallery_assets`, `get_prompt_blueprint`. Tool arg schemas defined with zod, JSON Schema introspected for OpenAI tool definitions.
@@ -89,6 +89,8 @@ Never hardcode provider strings (`"12ai"`, `"grok2api"`, `"xstx"`) in enumeratio
 
 Keep API routes thin: parse body, resolve provider config, call provider adapter, return response.
 
+Video reference image API/provider boundaries accept `data:image/*` base64 data URIs only. Remote images must be read and compressed on the browser side before submission.
+
 ### ModelScope and RunningHub
 
 - ModelScope image generation uses API-Inference (`/v1/images/generations`) and async task polling (`/v1/tasks/{task_id}`). Do not assume every ModelScope endpoint is OpenAI-compatible; SwingDeploy deployments may be OpenAI-compatible, but the public API-Inference image path is provider-specific.
@@ -101,6 +103,7 @@ Keep API routes thin: parse body, resolve provider config, call provider adapter
 - `/board` is an alternate operation surface, not a replacement for `/`.
 - `/board/[boardId]` opens a specific board document; keep multi-board behavior inside board modules.
 - Board nodes store spatial layout and references to generated assets. The asset store remains the source of truth for media URLs, prompts, model IDs, statuses, operation names, and generation snapshots.
+- Flush pending board text edits and save the board before leaving or switching boards.
 - Keep board logic in `components/board/*`, `hooks/useBoardState.ts`, and `lib/board/*`. Do not add board-specific state to `app/page.tsx`.
 - Agent actions on the board should reuse existing action types (`generate_image`, `generate_video`, `edit_image`, `optimize_prompt`) unless a new board-specific action is explicitly requested.
 - Board edges/nodes should express user organization and references, not a general DAG execution engine.
@@ -127,6 +130,8 @@ The Agent Mode uses OpenAI-compatible function calling with a bounded loop (max 
 6. `validateActionModel` checks the recommended model ID against `MODEL_CAPABILITIES` — invalid IDs are stripped.
 7. `validateActiveSkills` filters skill names to known registry entries.
 
+Agent action schemas support image/video parameter fields: `imageResolution`, `imageQuality`, `thinkingLevel`, `videoResolution`, `videoDuration`, and `videoPreset`.
+
 Adding a new tool:
 - Add a zod schema for its arguments in `tools.ts`.
 - Add the tool definition to `TOOL_DEFINITIONS`.
@@ -151,6 +156,7 @@ The `PromptEngineer` skill and `get_prompt_blueprint` tool encode knowledge from
 - Use lucide-react icons where suitable.
 - Do not add explanatory in-app text unless it directly supports the workflow.
 - Ensure controls remain usable on mobile and desktop.
+- Provider search in settings filters the list only; it should not automatically switch the selected provider.
 - For generated assets, preserve the existing gallery/search/compare/export mental model.
 
 ## Verification

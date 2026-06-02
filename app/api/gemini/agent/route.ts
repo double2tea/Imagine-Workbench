@@ -91,6 +91,12 @@ const agentActionSchema = z.object({
       model: z.string().optional(),
       aspectRatio: z.string().optional(),
       referenceImageId: z.string().optional(),
+      imageResolution: z.string().optional(),
+      imageQuality: z.string().optional(),
+      thinkingLevel: z.string().optional(),
+      videoResolution: z.string().optional(),
+      videoDuration: z.string().optional(),
+      videoPreset: z.string().optional(),
     })
     .optional(),
 });
@@ -103,6 +109,12 @@ const agentBoardActionSchema = z.object({
       model: z.string().optional(),
       aspectRatio: z.string().optional(),
       referenceImageId: z.string().optional(),
+      imageResolution: z.string().optional(),
+      imageQuality: z.string().optional(),
+      thinkingLevel: z.string().optional(),
+      videoResolution: z.string().optional(),
+      videoDuration: z.string().optional(),
+      videoPreset: z.string().optional(),
       title: z.string().optional(),
       body: z.string().optional(),
       run: z.boolean().optional(),
@@ -228,7 +240,7 @@ export async function POST(req: NextRequest) {
       `${galleryText}\n\n` +
       "## Output\n" +
       "Return ONLY valid JSON:\n" +
-      '{"thought":"...","text":"Chinese user-facing reply","activeSkills":["..."],"recommendedAction":{"type":"none|optimize_prompt|generate_image|edit_image|generate_video","params":{"prompt":"...","model":"...","aspectRatio":"...","referenceImageId":"..."}},"boardAction":{"type":"none|create_board_image_flow|create_board_video_flow|create_board_note","params":{"prompt":"...","model":"...","aspectRatio":"...","referenceImageId":"...","title":"...","body":"...","run":true}},"suggestedFollowUps":["...","..."]}\n\n' +
+      '{"thought":"...","text":"Chinese user-facing reply","activeSkills":["..."],"recommendedAction":{"type":"none|optimize_prompt|generate_image|edit_image|generate_video","params":{"prompt":"...","model":"...","aspectRatio":"...","referenceImageId":"...","imageResolution":"...","imageQuality":"...","thinkingLevel":"...","videoResolution":"...","videoDuration":"...","videoPreset":"..."}},"boardAction":{"type":"none|create_board_image_flow|create_board_video_flow|create_board_note","params":{"prompt":"...","model":"...","aspectRatio":"...","referenceImageId":"...","imageResolution":"...","imageQuality":"...","thinkingLevel":"...","videoResolution":"...","videoDuration":"...","videoPreset":"...","title":"...","body":"...","run":true}},"suggestedFollowUps":["...","..."]}\n\n' +
       referenceMsg;
 
     const tools = getAgentTools();

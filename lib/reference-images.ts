@@ -5,6 +5,10 @@ export const REFERENCE_IMAGE_MAX_BYTES = 8 * 1024 * 1024;
 export const REFERENCE_IMAGES_MAX_TOTAL_BYTES = 15 * 1024 * 1024;
 export const REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES = 24 * 1024 * 1024;
 
+export function isImageDataUri(value: string): boolean {
+  return /^data:image\/[a-z0-9.+-]+;base64,/i.test(value);
+}
+
 export function scaleImageDimensions(
   width: number,
   height: number,
@@ -64,7 +68,8 @@ export async function compressReferenceImageDataUrl(dataUrl: string): Promise<st
 }
 
 export async function prepareReferenceImageUrlForRequest(url: string): Promise<string> {
-  if (url.startsWith("data:") || /^https?:\/\//.test(url)) return url;
+  if (isImageDataUri(url)) return url;
+  if (url.startsWith("data:")) throw new Error("参考图必须是 data:image/* base64 图片");
 
   const response = await fetch(url);
   if (!response.ok) {

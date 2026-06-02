@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { flushSync } from "react-dom";
 import { Maximize2, Paintbrush, Send, Settings, Video } from "lucide-react";
 import AgentDock, { type AgentToolAction } from "@/components/agent/AgentDock";
 import { isCustomImageResolutionValue } from "@/lib/agent-tool-action";
@@ -59,6 +60,7 @@ import {
 } from "@/lib/board";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import {
+  flushAllBoardText,
   flushBoardTextForAgentNode,
   flushBoardTextForGenerateNode,
   getBoardTextDraft,
@@ -1427,6 +1429,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   };
 
   const createBoardPage = useCallback(async () => {
+    flushSync(() => flushAllBoardText());
+    await boardController.saveNow();
     const nextIndex = boardSummaries.length + 1;
     const nextId = makeClientId("board");
     const nextBoard = createEmptyBoard(nextId, `画板 ${nextIndex}`);
@@ -1434,12 +1438,14 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     setBoardSummaries(prev => [boardSummaryFromDocument(nextBoard), ...prev]);
     setResolvedBoardId(nextId);
     router.push(boardRoute(nextId));
-  }, [boardSummaries.length, router]);
+  }, [boardController, boardSummaries.length, router]);
 
-  const selectBoardPage = useCallback((nextBoardId: string) => {
+  const selectBoardPage = useCallback(async (nextBoardId: string): Promise<void> => {
+    flushSync(() => flushAllBoardText());
+    await boardController.saveNow();
     setResolvedBoardId(nextBoardId);
     router.push(boardRoute(nextBoardId));
-  }, [router]);
+  }, [boardController, router]);
 
   const renameBoardPage = useCallback(() => {
     const nextTitle = window.prompt("重命名画板", boardController.board.title);
@@ -1457,12 +1463,14 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       return;
     }
     if (!window.confirm(`确认删除「${boardController.board.title}」吗？`)) return;
-    await deleteBoardFromDB(boardController.board.id);
-    const nextBoard = boardSummaries.find(item => item.id !== boardController.board.id);
-    setBoardSummaries(prev => prev.filter(item => item.id !== boardController.board.id));
+    flushSync(() => flushAllBoardText());
+    const deletedBoardId = boardController.board.id;
+    const nextBoard = boardSummaries.find(item => item.id !== deletedBoardId);
     const nextBoardId = nextBoard?.id ?? DEFAULT_BOARD_ID;
     setResolvedBoardId(nextBoardId);
     router.push(boardRoute(nextBoardId));
+    await deleteBoardFromDB(deletedBoardId);
+    setBoardSummaries(prev => prev.filter(item => item.id !== deletedBoardId));
   }, [boardController.board.id, boardController.board.title, boardSummaries, pushWorkspaceNotice, router]);
 
   const toggleThemeMode = () => {
@@ -1498,7 +1506,12 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         controller={boardController}
         galleryItems={items}
         themeMode={themeMode}
-        onBack={() => router.push("/")}
+        onBack={() => {
+          flushSync(() => flushAllBoardText());
+          void boardController.saveNow()
+            .then(() => router.push("/"))
+            .catch(error => pushWorkspaceNotice("error", toErrorMessage(error, "画板保存失败")));
+        }}
         onCancelGenerateNode={(nodeId) => void cancelBoardGenerationNode(nodeId)}
         onCaptureVideoFrame={handleCaptureVideoFrame}
         onConnectionError={(message) => pushWorkspaceNotice("error", message)}
@@ -1513,7 +1526,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onImportBoardFiles={handleImportBoardFiles}
         onOpenSettings={() => setShowSettings(true)}
         onRenameBoard={renameBoardPage}
-        onSelectBoard={selectBoardPage}
+        onSelectBoard={(nextBoardId) => {
+          void selectBoardPage(nextBoardId).catch(error => pushWorkspaceNotice("error", toErrorMessage(error, "画板切换失败")));
+        }}
         onSendAssetToAgent={useBoardAssetForAgent}
         onSendAgentNode={handleSendAgentNode}
         onSetAssetAsReference={useBoardAssetAsReference}

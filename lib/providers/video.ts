@@ -1,4 +1,5 @@
 import type { GenerateVideoInput, GenerateVideoResult, MediaStatusResult, ProviderConfig } from "./types";
+import { isImageDataUri } from "@/lib/reference-images";
 import { generateRunningHubMedia, getRunningHubMediaStatus } from "./image";
 import {
   aspectRatioToVideoSize,
@@ -227,16 +228,13 @@ function referenceFileName(index: number, mimeType: string): string {
 
 async function referenceToBlob(reference: GenerateVideoInput["referenceImages"][number]): Promise<Blob> {
   const source = reference.dataUri;
-  if (source.startsWith("data:")) return dataUriToBlob(source);
-
-  const response = await fetch(source);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch video reference image: HTTP ${response.status}`);
+  if (!isImageDataUri(source)) {
+    throw new Error("Video reference images must be data:image/* base64 data URIs");
   }
 
-  const blob = await response.blob();
+  const blob = dataUriToBlob(source);
   if (!blob.type.startsWith("image/")) {
-    throw new Error("Video reference must resolve to an image file");
+    throw new Error("Video reference must be an image file");
   }
   return blob;
 }

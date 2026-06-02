@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { BOARD_UNDO_LIMIT, cloneBoardHistory, type BoardHistorySnapshot } from "@/lib/board/history";
 import {
   DEFAULT_AGENT_NODE_SIZE,
@@ -57,6 +57,7 @@ export interface BoardStateController {
   selectedEdgeId: string | null;
   selectedNodeId: string | null;
   saveError: string | null;
+  saveNow: () => Promise<void>;
   beginUndoGesture: () => void;
   endUndoGesture: () => void;
   redo: () => void;
@@ -395,6 +396,11 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
   const undoStackRef = useRef<BoardHistorySnapshot[]>([]);
   const redoStackRef = useRef<BoardHistorySnapshot[]>([]);
   const dragUndoCapturedRef = useRef(false);
+  const boardRef = useRef(board);
+
+  useLayoutEffect(() => {
+    boardRef.current = board;
+  }, [board]);
 
   const syncUndoRedoFlags = useCallback(() => {
     setCanUndo(undoStackRef.current.length > 0);
@@ -422,7 +428,9 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
   ) => {
     setBoardState(current => {
       if (!options?.skipUndo && hasLoaded) pushUndoSnapshot(current);
-      return updater(current);
+      const nextBoard = updater(current);
+      boardRef.current = nextBoard;
+      return nextBoard;
     });
   }, [hasLoaded, pushUndoSnapshot]);
 
@@ -537,6 +545,21 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       window.clearTimeout(saveTimer);
     };
   }, [board, boardId, hasLoaded]);
+
+  const saveNow = useCallback(async () => {
+    const currentBoard = boardRef.current;
+    if (!hasLoaded || currentBoard.id !== boardId) return;
+    setSaveStatus("saving");
+    try {
+      await saveBoardToDB(currentBoard);
+      setSaveError(null);
+      setSaveStatus("saved");
+    } catch (error: unknown) {
+      setSaveError(error instanceof Error ? error.message : "Board save failed");
+      setSaveStatus("error");
+      throw error;
+    }
+  }, [boardId, hasLoaded]);
 
   const addAssetNode = useCallback((input: CreateAssetNodeInput): string => {
     const node = createAssetBoardNode(input, board.nodes);
@@ -755,7 +778,8 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
 
   const reconnectEdge = useCallback((edgeId: string, from: BoardPortRef, to: BoardPortRef) => {
     mutateBoard(currentBoard => {
-      if (!currentBoard.edges.some(edge => edge.id === edgeId)) {
+      const oldEdge = currentBoard.edges.find(edge => edge.id === edgeId);
+      if (!oldEdge) {
         throw new Error("连接不存在");
       }
       const kind = resolveBoardConnectionKind(currentBoard.nodes, from, to);
@@ -771,7 +795,41 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       const nextEdges = withoutDuplicate.map(edge =>
         edge.id === edgeId ? { ...edge, kind, from, to } : edge,
       );
-      return touchBoard(currentBoard, currentBoard.nodes, nextEdges);
+      const oldSourceNode = currentBoard.nodes.find(node => node.id === oldEdge.from.nodeId);
+      const nextSourceNode = currentBoard.nodes.find(node => node.id === from.nodeId);
+      const oldReference: BoardReferenceGroupItem | null = oldSourceNode?.kind === "asset" && oldSourceNode.asset.type === "image"
+        ? {
+          assetId: oldSourceNode.asset.assetId,
+          model: oldSourceNode.asset.model,
+          prompt: oldSourceNode.asset.prompt,
+          role: "general",
+          url: oldSourceNode.asset.url,
+        }
+        : null;
+      const nextReference: BoardReferenceGroupItem | null = nextSourceNode?.kind === "asset" && nextSourceNode.asset.type === "image"
+        ? {
+          assetId: nextSourceNode.asset.assetId,
+          model: nextSourceNode.asset.model,
+          prompt: nextSourceNode.asset.prompt,
+          role: "general",
+          url: nextSourceNode.asset.url,
+        }
+        : null;
+      if (!oldReference && !nextReference) return touchBoard(currentBoard, currentBoard.nodes, nextEdges);
+
+      const updatedAt = nowIso();
+      const nextNodes = currentBoard.nodes.map(node => {
+        if (node.kind !== "reference-group") return node;
+        let references = node.references;
+        if (node.id === oldEdge.to.nodeId && oldEdge.to.portId === BOARD_PORT_IDS.assetIn) {
+          references = oldReference ? references.filter(item => item.assetId !== oldReference.assetId) : references;
+        }
+        if (node.id === to.nodeId && to.portId === BOARD_PORT_IDS.assetIn && nextReference && !references.some(item => item.assetId === nextReference.assetId)) {
+          references = [...references, nextReference];
+        }
+        return references === node.references ? node : { ...node, references, updatedAt };
+      });
+      return touchBoard(currentBoard, nextNodes, nextEdges);
     });
     setSelectedEdgeId(edgeId);
     setSelectedNodeId(null);
@@ -1036,6 +1094,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       selectedEdgeId,
       selectedNodeId,
       saveError,
+      saveNow,
       beginUndoGesture,
       endUndoGesture,
       redo,
@@ -1103,6 +1162,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       redo,
       saveError,
       saveStatus,
+      saveNow,
       selectedEdgeId,
       selectedNodeId,
       selectEdge,

@@ -16,7 +16,7 @@ function detectAtSearch(value: string, caret: number): string | null {
 }
 
 export interface BoardPromptTextareaHandle {
-  flush: () => void;
+  flush: (value?: string) => void;
   focusAt: (caret: number) => void;
   getSelectionRange: () => { end: number; start: number };
   getValue: () => string;
@@ -69,8 +69,7 @@ const BoardPromptTextarea = forwardRef<BoardPromptTextareaHandle, BoardPromptTex
       getValue: () => (readOnly ? value : getValue()),
       setValue: (next: string) => {
         if (readOnly) return;
-        setValue(next);
-        flush();
+        flush(next);
       },
       getSelectionRange: () => ({
         start: textareaRef.current?.selectionStart ?? displayValue.length,
@@ -82,7 +81,7 @@ const BoardPromptTextarea = forwardRef<BoardPromptTextareaHandle, BoardPromptTex
         element?.setSelectionRange(caret, caret);
       },
     }),
-    [displayValue.length, flush, getValue, readOnly, setValue, value],
+    [displayValue.length, flush, getValue, readOnly, value],
   );
 
   useLayoutEffect(() => {
@@ -116,8 +115,7 @@ const BoardPromptTextarea = forwardRef<BoardPromptTextareaHandle, BoardPromptTex
     const token = getReferencePromptToken(index);
     const nextPrompt = `${displayValue.slice(0, start)}${token} ${displayValue.slice(caret)}`;
     const nextCaret = start + `${token} `.length;
-    setValue(nextPrompt);
-    flush();
+    flush(nextPrompt);
     setAtSearch(null);
     window.requestAnimationFrame(() => {
       textarea?.focus();

@@ -87,7 +87,7 @@ export function resolveVideoActionParams(
 }
 
 function isImageActionType(type: AgentToolAction["type"]): boolean {
-  return type === "generate_image" || type === "edit_image" || type === "create_board_image_flow";
+  return type === "generate_image" || type === "create_board_image_flow";
 }
 
 function isVideoActionType(type: AgentToolAction["type"]): boolean {
@@ -97,6 +97,15 @@ function isVideoActionType(type: AgentToolAction["type"]): boolean {
 export function prepareAgentActionDraft(action: AgentToolAction): AgentToolAction {
   const draft = cloneAgentToolAction(action);
   const params = draft.params ?? {};
+  if (draft.type === "edit_image") {
+    return {
+      type: draft.type,
+      params: {
+        prompt: params.prompt,
+        referenceImageId: params.referenceImageId,
+      },
+    };
+  }
   if (isImageActionType(draft.type) && params.model) {
     return patchAgentToolAction(draft, resolveImageActionParams(params.model, params));
   }

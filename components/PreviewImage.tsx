@@ -7,8 +7,7 @@ type PreviewImageProps = Pick<
 >;
 
 function previewImageSrc(src: PreviewImageProps["src"]): PreviewImageProps["src"] {
-  if (typeof src !== "string" || !/^https?:\/\//.test(src)) return src;
-  return `/api/board/import-image?url=${encodeURIComponent(src)}`;
+  return src;
 }
 
 export default function PreviewImage({

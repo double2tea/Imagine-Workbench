@@ -24,7 +24,7 @@ export default function DebouncedBoardTextarea({ className, commitId, onChange, 
     <textarea
       value={draftValue}
       onChange={(event) => setValue(event.target.value)}
-      onBlur={flush}
+      onBlur={() => flush()}
       className={className}
       placeholder={placeholder}
     />

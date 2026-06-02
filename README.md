@@ -62,6 +62,7 @@ RUNNINGHUB_BASE_URL="https://www.runninghub.cn"
 ```
 
 The app can also accept provider credentials from the in-app settings panel. Request headers from the UI are resolved by `lib/providers/utils.ts`.
+Provider search in settings filters the provider list only; it does not auto-switch the selected provider.
 
 ## Provider Support
 
@@ -137,6 +138,7 @@ RunningHub support intentionally treats AI Apps and workflows as provider-backed
 Agent Mode automatically switches to the vision chat model when the request carries a selected or pasted reference image. The UI does not expose sync/async as a user-facing choice; image requests stay synchronous by default, and repeat submissions use the async 12AI endpoint only when the selected image model supports it.
 
 Agent recommendations can query the local model catalog before choosing a generation target, so recommended actions stay aligned with the capabilities currently defined in the app.
+Agent action params can carry image/video model controls such as image resolution, image quality, thinking level, video resolution, duration, and preset.
 
 Model-specific parameters are defined in the catalog so the UI can adapt controls per model:
 
@@ -147,6 +149,7 @@ Model-specific parameters are defined in the catalog so the UI can adapt control
 - `12ai:veo_3_1-fast` supports text-to-video and reference-image mode with 0-3 images.
 - `12ai:veo_3_1-fast-fl` is the only built-in 12AI first/last-frame mode and requires 1-2 images.
 - `grok2api:grok-imagine-video` supports optional reference images with the grok2api video parameters.
+- Video reference image API/provider payloads accept `data:image/*` base64 data URIs only. Remote images must be read and compressed in the browser before submission.
 
 ## Prompt Templates
 
@@ -176,7 +179,7 @@ Users can open the picker with the template button or type `/` in supported prom
 - `GET /`: main workstation.
 - `GET /board`: standalone canvas operation surface for assets, notes, generation, and Agent interaction.
 - `GET /board/[boardId]`: opens a specific persisted board document.
-- `POST /api/board/import-image`: imports a remote or data URL image into the local asset store for board workflows.
+- `POST /api/board/import-image`: imports a `data:image/*` base64 data URI into the local asset store for board workflows.
 - `POST /api/gemini/generate-image`: image generation and image editing.
 - `POST /api/gemini/generate-video`: video generation.
 - `POST /api/gemini/video-status`: polls async image/video operations.
@@ -225,6 +228,8 @@ hooks/
 tests/
   *.test.ts                        Node test suite for helpers and provider behavior
 ```
+
+Board text edits are flushed and the board is saved before leaving or switching boards.
 
 ## Development Commands
 

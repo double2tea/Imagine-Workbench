@@ -9,7 +9,7 @@ export function useDebouncedTextCommit(
   onCommit: (value: string) => void,
   delayMs: number = DEFAULT_DELAY_MS,
 ): {
-  flush: () => void;
+  flush: (value?: string) => void;
   getValue: () => string;
   setValue: (value: string) => void;
   value: string;
@@ -35,14 +35,19 @@ export function useDebouncedTextCommit(
     }
   }, [committedValue]);
 
-  const flush = useCallback(() => {
+  const flush = useCallback((value?: string) => {
+    const pending = value ?? draftRef.current;
+    if (value !== undefined) {
+      draftRef.current = value;
+      setDraft(value);
+    }
     if (timerRef.current !== null) {
       window.clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    if (draftRef.current !== committedRef.current) {
-      committedRef.current = draftRef.current;
-      onCommitRef.current(draftRef.current);
+    if (pending !== committedRef.current) {
+      committedRef.current = pending;
+      onCommitRef.current(pending);
     }
   }, []);
 
