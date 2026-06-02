@@ -11,10 +11,12 @@
   },
   "include": [
     "./canvas-editor.test.ts",
+    "./client-fetch-error.test.ts",
     "./model-catalog.test.ts",
     "./provider-utils.test.ts",
     "./reference-images.test.ts",
     "../lib/canvas-editor.ts",
+    "../lib/client-fetch-error.ts",
     "../lib/providers/model-catalog.ts",
     "../lib/providers/utils.ts",
     "../lib/reference-images.ts"

@@ -1,8 +1,16 @@
-import type { ChangeEvent, DragEvent, ReactNode } from "react";
-import { Paintbrush, RefreshCw, Sparkles } from "lucide-react";
-import { VISUAL_PRESETS, type VisualPreset } from "@/components/PresetStyles";
+import { useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from "react";
+import { RefreshCw, Sparkles } from "lucide-react";
+import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
 import ReferenceImagePicker, { type ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import { type DraggedReferenceAsset, hasDraggedReferenceAsset } from "@/components/reference/referenceDrag";
+import {
+  applyPromptTemplateText,
+  detectPromptTemplateSlashCommand,
+  insertPromptTemplateText,
+  type PromptTemplate,
+  type PromptTemplateApplyMode,
+  type PromptTemplateSlashCommand,
+} from "@/lib/prompt-templates";
 import type { ImageModelCapabilities, ModelOption } from "@/lib/providers/model-catalog";
 
 interface ModelOptionGroup {
@@ -30,7 +38,6 @@ interface ImageGenerationPanelProps {
   selectedAspectRatio: string;
   selectedModel: string;
   submitCount: number;
-  onApplyPreset: (preset: VisualPreset) => void;
   onClearReferences: () => void;
   onCustomImageSizeChange: (value: string) => void;
   onGenerate: () => void;
@@ -70,7 +77,6 @@ export default function ImageGenerationPanel({
   selectedModel,
   submitCount,
   supportsBackgroundGeneration,
-  onApplyPreset,
   onClearReferences,
   onCustomImageSizeChange,
   onGenerate,
@@ -90,67 +96,67 @@ export default function ImageGenerationPanel({
   onThinkingLevelChange,
   showGenerateButton = true,
 }: ImageGenerationPanelProps) {
+  const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
+  const [slashCommand, setSlashCommand] = useState<PromptTemplateSlashCommand | null>(null);
   const presetResolutionOptions = imageResolutionOptions.filter(option => option.value !== "custom");
   const supportsCustomImageSize = imageResolutionOptions.some(option => option.value === "custom");
   const isCustomImageResolution = imageResolution === "custom";
 
+  const handleApplyPromptTemplate = (template: PromptTemplate, mode: PromptTemplateApplyMode): void => {
+    if (slashCommand && mode === "insert") {
+      const result = insertPromptTemplateText(prompt, template.positivePrompt, slashCommand.start, slashCommand.end);
+      onPromptChange(result.prompt);
+      setSlashCommand(null);
+      if (template.negativePrompt) onNegativePromptChange(template.negativePrompt);
+      return;
+    }
+    onPromptChange(applyPromptTemplateText(prompt, template.positivePrompt, mode));
+    setSlashCommand(null);
+    if (template.negativePrompt) onNegativePromptChange(template.negativePrompt);
+  };
+
+  const handlePromptChange = (value: string, caret: number): void => {
+    onPromptChange(value);
+    const command = detectPromptTemplateSlashCommand(value, caret);
+    setSlashCommand(command);
+    if (command) templatePickerRef.current?.open(command.search);
+  };
+
   return (
     <div className="flex flex-col gap-3.5 animate-fade-in">
-      <div>
-        <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-[var(--iw-muted)]">
-          <Paintbrush className="h-3.5 w-3.5 text-blue-300" />
-          艺术预设
-        </label>
-        <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
-          {VISUAL_PRESETS.map((preset) => {
-            const isActive = prompt.includes(preset.promptSuffix);
-            return (
-              <button
-                key={preset.id}
-                type="button"
-                onClick={() => onApplyPreset(preset)}
-                data-active={isActive}
-                className="imagine-preset-chip flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-xs transition duration-200 cursor-pointer"
-              >
-                <span>{preset.emoji}</span>
-                <span>{preset.name}</span>
-                {isActive && <span className="h-1.5 w-1.5 rounded-full bg-blue-300" />}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
       <div>
         <div className="flex items-center justify-between mb-2">
           <label className="flex items-center gap-1.5 imagine-section-label">
             <Sparkles className="h-3.5 w-3.5 text-blue-300" />
             提示词
           </label>
-          <button
-            onClick={onOptimizePrompt}
-            disabled={isOptimizing || !prompt.trim()}
-            className={`imagine-secondary-action flex h-7 items-center gap-1 rounded-md border px-2.5 text-[11px] font-semibold transition ${
-              isOptimizing || !prompt.trim()
-                ? "cursor-not-allowed opacity-50"
-                : "cursor-pointer border-blue-400/25 bg-blue-500/12 text-blue-200 hover:bg-blue-500/18"
-            }`}
-          >
-            {isOptimizing ? (
-              <RefreshCw className="h-3 w-3 animate-spin text-blue-400" />
-            ) : (
-              <Sparkles className="h-3 w-3 text-blue-300" />
-            )}
-            <span className="sm:hidden">优化</span>
-            <span className="hidden sm:inline">优化提示词</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <PromptTemplatePicker ref={templatePickerRef} compact onApply={handleApplyPromptTemplate} />
+            <button
+              onClick={onOptimizePrompt}
+              disabled={isOptimizing || !prompt.trim()}
+              className={`imagine-secondary-action flex h-7 items-center gap-1 rounded-md border px-2.5 text-[11px] font-semibold transition ${
+                isOptimizing || !prompt.trim()
+                  ? "cursor-not-allowed opacity-50"
+                  : "cursor-pointer border-blue-400/25 bg-blue-500/12 text-blue-200 hover:bg-blue-500/18"
+              }`}
+            >
+              {isOptimizing ? (
+                <RefreshCw className="h-3 w-3 animate-spin text-blue-400" />
+              ) : (
+                <Sparkles className="h-3 w-3 text-blue-300" />
+              )}
+              <span className="sm:hidden">优化</span>
+              <span className="hidden sm:inline">优化提示词</span>
+            </button>
+          </div>
         </div>
 
         <div className="imagine-field-shell relative p-3">
           {atDropdownNode}
           <textarea
             value={prompt}
-            onChange={(event) => onPromptChange(event.target.value)}
+            onChange={(event) => handlePromptChange(event.target.value, event.target.selectionStart)}
             onDragOver={(event) => {
               if (!hasDraggedReferenceAsset(event.dataTransfer)) return;
               event.dataTransfer.dropEffect = "copy";

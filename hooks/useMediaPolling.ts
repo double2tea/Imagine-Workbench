@@ -1,4 +1,5 @@
 import { useEffect, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
+import { readFetchError } from "@/lib/client-fetch-error";
 import { saveToDB, type StorageItem } from "@/lib/db";
 
 type NoticeType = "error" | "info" | "success";
@@ -13,6 +14,10 @@ interface UseMediaPollingParams {
   setItems: Dispatch<SetStateAction<StorageItem[]>>;
 }
 
+function toErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message.trim() ? error.message : fallback;
+}
+
 function getStringField(value: unknown, field: string): string | null {
   if (typeof value !== "object" || value === null || !(field in value)) return null;
   const record = value as Record<string, unknown>;
@@ -20,22 +25,9 @@ function getStringField(value: unknown, field: string): string | null {
   return typeof fieldValue === "string" && fieldValue.trim() ? fieldValue : null;
 }
 
-function toErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message.trim() ? error.message : fallback;
-}
-
 function isProcessingTimedOut(item: StorageItem): boolean {
   const createdAt = Date.parse(item.createdAt);
   return Number.isFinite(createdAt) && Date.now() - createdAt > PROCESSING_TIMEOUT_MS;
-}
-
-async function readFetchError(response: Response, fallback: string): Promise<string> {
-  try {
-    const data: unknown = await response.json();
-    return getStringField(data, "error") ?? getStringField(data, "message") ?? `${fallback} (HTTP ${response.status})`;
-  } catch {
-    return `${fallback} (HTTP ${response.status})`;
-  }
 }
 
 async function saveItemOrWarn(

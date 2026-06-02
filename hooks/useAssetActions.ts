@@ -1,6 +1,7 @@
 import type { Dispatch, MouseEvent, MutableRefObject, SetStateAction } from "react";
 import JSZip from "jszip";
 import type { CompareViewType } from "@/components/assets/ComparePanel";
+import { readFetchError } from "@/lib/client-fetch-error";
 import { readImageGenerationPayload } from "@/lib/client-image-response";
 import { clearAllDB, deleteFromDB, saveToDB, type StorageItem } from "@/lib/db";
 import { parseProviderModel, type AiProvider } from "@/lib/providers/model-catalog";
@@ -58,15 +59,6 @@ function getStringField(value: unknown, field: string): string | null {
 
 function toErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message.trim() ? error.message : fallback;
-}
-
-async function readFetchError(response: Response, fallback: string): Promise<string> {
-  try {
-    const data: unknown = await response.json();
-    return getStringField(data, "error") ?? getStringField(data, "message") ?? `${fallback} (HTTP ${response.status})`;
-  } catch {
-    return `${fallback} (HTTP ${response.status})`;
-  }
 }
 
 function readVideoGenerationPayload(data: unknown): { imageUrl: string | null; operationName: string | null } {

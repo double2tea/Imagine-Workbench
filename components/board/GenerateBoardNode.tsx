@@ -1,10 +1,17 @@
+import { useRef } from "react";
 import { ImagePlus, Loader2, Play, Video } from "lucide-react";
 import BoardPromptTextarea from "@/components/board/BoardPromptTextarea";
 import PreviewImage from "@/components/PreviewImage";
-import PromptTemplatePicker from "@/components/prompt-templates/PromptTemplatePicker";
+import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import type { BoardGenerateNodeUpdate, BoardGenerateVariantCount, BoardImageGenerateNode, BoardVideoGenerateNode } from "@/lib/board";
-import { applyPromptTemplateText, type PromptTemplate, type PromptTemplateApplyMode } from "@/lib/prompt-templates";
+import {
+  applyPromptTemplateText,
+  insertPromptTemplateText,
+  type PromptTemplate,
+  type PromptTemplateApplyMode,
+  type PromptTemplateSlashCommand,
+} from "@/lib/prompt-templates";
 
 type GenerateNode = BoardImageGenerateNode | BoardVideoGenerateNode;
 const variantCountOptions: BoardGenerateVariantCount[] = [1, 2, 4];
@@ -48,6 +55,8 @@ function statusSteps(status: GenerateNode["status"]): Array<{ key: string; label
 }
 
 export default function GenerateBoardNode({ inputSummary, node, onExecute, onUpdate, references }: GenerateBoardNodeProps) {
+  const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
+  const slashCommandRef = useRef<PromptTemplateSlashCommand | null>(null);
   const isProcessing = node.status === "processing";
   const promptPreview = inputSummary?.promptPreview ?? null;
   const referenceCount = inputSummary?.referenceCount ?? 0;
@@ -57,7 +66,19 @@ export default function GenerateBoardNode({ inputSummary, node, onExecute, onUpd
     ? `${node.model} / ${node.imageResolution === "custom" ? node.customImageResolution : node.imageResolution} / x${node.variantCount}`
     : `${node.model} / ${node.aspectRatio}${node.videoDuration ? ` / ${node.videoDuration}s` : ""} / x${node.variantCount}`;
   const handleApplyPromptTemplate = (template: PromptTemplate, mode: PromptTemplateApplyMode): void => {
+    const slashCommand = slashCommandRef.current;
+    if (slashCommand && mode === "insert") {
+      const result = insertPromptTemplateText(node.prompt, template.positivePrompt, slashCommand.start, slashCommand.end);
+      onUpdate({ prompt: result.prompt });
+      slashCommandRef.current = null;
+      return;
+    }
     onUpdate({ prompt: applyPromptTemplateText(node.prompt, template.positivePrompt, mode) });
+    slashCommandRef.current = null;
+  };
+  const handleSlashCommand = (command: PromptTemplateSlashCommand | null): void => {
+    slashCommandRef.current = command;
+    if (command) templatePickerRef.current?.open(command.search);
   };
   return (
     <div className="flex h-full min-h-0 flex-col gap-2 p-3">
@@ -65,9 +86,10 @@ export default function GenerateBoardNode({ inputSummary, node, onExecute, onUpd
         <BoardPromptTextarea
           value={promptPreview ?? node.prompt}
           onChange={(prompt) => onUpdate({ prompt })}
+          onSlashCommand={handleSlashCommand}
           references={references}
           readOnly={promptPreview !== null}
-          headerRight={promptPreview === null ? <PromptTemplatePicker compact onApply={handleApplyPromptTemplate} /> : undefined}
+          headerRight={promptPreview === null ? <PromptTemplatePicker ref={templatePickerRef} compact onApply={handleApplyPromptTemplate} /> : undefined}
           className={`nodrag nowheel h-full w-full resize-none rounded-md imagine-board-input p-2 pr-20 text-xs leading-5 outline-none placeholder:text-[var(--iw-faint)] focus:border-[var(--iw-border)] ${
             promptPreview !== null ? "cursor-default opacity-85" : ""
           }`}

@@ -4,7 +4,6 @@ import React, { useCallback, useState, useEffect, useRef, useSyncExternalStore }
 import { createPortal } from "react-dom";
 import { RefreshCw, SlidersHorizontal, Sparkles, Video } from "lucide-react";
 import AgentDock from "@/components/agent/AgentDock";
-import { VISUAL_PRESETS, type VisualPreset } from "@/components/PresetStyles";
 import CanvasMaskEditor from "@/components/CanvasMaskEditor";
 import FloatingCompareButton from "@/components/assets/FloatingCompareButton";
 import FullscreenPreview from "@/components/assets/FullscreenPreview";
@@ -12,6 +11,7 @@ import CreationModeTabs, { type CreationMode } from "@/components/creation/Creat
 import CreatorGenerateButton from "@/components/creation/CreatorGenerateButton";
 import ImageGenerationPanel from "@/components/creation/ImageGenerationPanel";
 import VideoGenerationPanel from "@/components/creation/VideoGenerationPanel";
+import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
 import AtReferenceDropdown from "@/components/reference/AtReferenceDropdown";
 import PromptReferenceDropdown from "@/components/reference/PromptReferenceDropdown";
 import ReferenceImagePicker, { type ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
@@ -23,6 +23,14 @@ import WorkspaceHeader from "@/components/workbench/WorkspaceHeader";
 import { persistThemeMode, readStoredThemeMode, type ThemeMode } from "@/lib/theme-mode";
 import WorkspaceNotices, { type WorkspaceNotice } from "@/components/workbench/WorkspaceNotices";
 import { getAllFromDB, clearAllDB, StorageItem } from "@/lib/db";
+import {
+  applyPromptTemplateText,
+  detectPromptTemplateSlashCommand,
+  insertPromptTemplateText,
+  type PromptTemplate,
+  type PromptTemplateApplyMode,
+  type PromptTemplateSlashCommand,
+} from "@/lib/prompt-templates";
 import { useAgentController } from "@/hooks/useAgentController";
 import { useAssetActions } from "@/hooks/useAssetActions";
 import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
@@ -151,6 +159,9 @@ export default function Home() {
   const [isAgentPortalReady, setIsAgentPortalReady] = useState(false);
   const [isAgentDockOverContent, setIsAgentDockOverContent] = useState(false);
   const [mobileWorkbenchPanel, setMobileWorkbenchPanel] = useState<MobileWorkbenchPanel>("create");
+  const mobilePromptTemplatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
+  const [mobilePromptTemplateSlashCommand, setMobilePromptTemplateSlashCommand] =
+    useState<PromptTemplateSlashCommand | null>(null);
 
   const applyAsVideoReference = (asset: StorageItem) => {
     setReferenceImage(asset.url);
@@ -617,42 +628,6 @@ export default function Home() {
     return () => clearTimeout(restoreSettings);
   }, [pushWorkspaceNotice]);
 
-  // Preset quick injection
-  const applyPreset = (preset: VisualPreset) => {
-    let base = prompt.trim();
-    const hasPreset = base.includes(preset.promptSuffix);
-
-    // Remove any previously appended preset suffixes to allow seamless switching
-    VISUAL_PRESETS.forEach(p => {
-      if (base.includes(`, ${p.promptSuffix}`)) {
-        base = base.replace(`, ${p.promptSuffix}`, "");
-      } else if (base.includes(p.promptSuffix)) {
-        base = base.replace(p.promptSuffix, "");
-      }
-    });
-
-    // Clean up trailing/leading commas or whitespace
-    base = base.trim().replace(/^,|,$/g, "").trim();
-
-    if (hasPreset) {
-      // Toggle off
-      setPrompt(base);
-      if (preset.negativePrompt && negativePrompt === preset.negativePrompt) {
-        setNegativePrompt("");
-      }
-    } else {
-      // Toggle on and apply new suffix
-      if (base) {
-        setPrompt(`${base}, ${preset.promptSuffix}`);
-      } else {
-        setPrompt(preset.promptSuffix);
-      }
-      if (preset.negativePrompt) {
-        setNegativePrompt(preset.negativePrompt);
-      }
-    }
-  };
-
   // Optimize prompt inside text area utilizing Gemini client model
   const optimizeActivePrompt = async (promptOverride?: string) => {
     const promptToOptimize = promptOverride ?? prompt;
@@ -895,6 +870,29 @@ export default function Home() {
     const activeSubmitCount = isImageMode ? imageSubmitCount : videoSubmitCount;
     const isSubmitting = isImageMode ? isSubmittingImage : isSubmittingVideo;
     const promptType: AtDropdownTarget = isImageMode ? "image-prompt" : "video-prompt";
+    const handleApplyPromptTemplate = (template: PromptTemplate, mode: PromptTemplateApplyMode): void => {
+      if (mobilePromptTemplateSlashCommand && mode === "insert") {
+        const result = insertPromptTemplateText(
+          prompt,
+          template.positivePrompt,
+          mobilePromptTemplateSlashCommand.start,
+          mobilePromptTemplateSlashCommand.end,
+        );
+        setPrompt(result.prompt);
+        setMobilePromptTemplateSlashCommand(null);
+        if (isImageMode && template.negativePrompt) setNegativePrompt(template.negativePrompt);
+        return;
+      }
+      setPrompt(current => applyPromptTemplateText(current, template.positivePrompt, mode));
+      setMobilePromptTemplateSlashCommand(null);
+      if (isImageMode && template.negativePrompt) setNegativePrompt(template.negativePrompt);
+    };
+    const handleMobilePromptChange = (value: string, caret: number): void => {
+      handleTextareaChange(value, promptType);
+      const command = detectPromptTemplateSlashCommand(value, caret);
+      setMobilePromptTemplateSlashCommand(command);
+      if (command) mobilePromptTemplatePickerRef.current?.open(command.search);
+    };
 
     return (
       <section className="imagine-mobile-composer rounded-xl dark-glass p-3">
@@ -905,28 +903,36 @@ export default function Home() {
             {isImageMode ? <Sparkles className="h-3.5 w-3.5 text-blue-300" /> : <Video className="h-3.5 w-3.5 text-violet-300" />}
             描述
           </label>
-          <button
-            type="button"
-            onClick={() => {
-              optimizeActivePrompt();
-            }}
-            disabled={isOptimizing || !prompt.trim()}
-            className={`flex h-8 items-center gap-1 rounded-md border px-2.5 text-[11px] font-semibold transition ${
-              isOptimizing || !prompt.trim()
-                ? "border-slate-800 bg-slate-900/70 text-slate-600"
-                : "border-blue-400/25 bg-blue-500/12 text-blue-200"
-            }`}
-          >
-            {isOptimizing ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-            {activeOptimizeLabel}
-          </button>
+          <div className="flex items-center gap-2">
+            <PromptTemplatePicker
+              ref={mobilePromptTemplatePickerRef}
+              accent={isImageMode ? "blue" : "violet"}
+              compact
+              onApply={handleApplyPromptTemplate}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                optimizeActivePrompt();
+              }}
+              disabled={isOptimizing || !prompt.trim()}
+              className={`flex h-8 items-center gap-1 rounded-md border px-2.5 text-[11px] font-semibold transition ${
+                isOptimizing || !prompt.trim()
+                  ? "border-slate-800 bg-slate-900/70 text-slate-600"
+                  : "border-blue-400/25 bg-blue-500/12 text-blue-200"
+              }`}
+            >
+              {isOptimizing ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+              {activeOptimizeLabel}
+            </button>
+          </div>
         </div>
 
         <div className="imagine-field-shell relative mt-2 rounded-lg border border-slate-800 bg-slate-950/55 p-3 transition focus-within:border-blue-400/35">
           {atDropdown.visible && atDropdown.type === promptType ? renderAtDropdown(promptType) : null}
           <textarea
             value={prompt}
-            onChange={(event) => handleTextareaChange(event.target.value, promptType)}
+            onChange={(event) => handleMobilePromptChange(event.target.value, event.target.selectionStart)}
             onDrop={(event) => handlePromptDropAsset(event, promptType)}
             placeholder={isImageMode ? "描述你想生成的画面，输入 @ 引用作品" : videoPromptPlaceholder}
             className="h-32 w-full resize-none border-0 bg-transparent text-base leading-6 text-slate-100 placeholder-slate-500 outline-0 ring-0 focus:ring-0"
@@ -1023,27 +1029,6 @@ export default function Home() {
 
         {isImageMode ? (
           <div className="mt-3 flex flex-col gap-3">
-            <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
-              {VISUAL_PRESETS.map((preset) => {
-                const isActive = prompt.includes(preset.promptSuffix);
-                return (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    onClick={() => applyPreset(preset)}
-                    className={`imagine-preset-chip flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-xs ${
-                      isActive
-                        ? "border-blue-400/35 bg-blue-500/14 text-blue-100"
-                        : "border-slate-800 bg-slate-950/50 text-slate-300"
-                    }`}
-                  >
-                    <span>{preset.emoji}</span>
-                    <span>{preset.name}</span>
-                  </button>
-                );
-              })}
-            </div>
-
             <input
               type="text"
               value={negativePrompt}
@@ -1291,7 +1276,6 @@ export default function Home() {
                     selectedModel={selectedModel}
                     submitCount={imageSubmitCount}
                     supportsBackgroundGeneration={canUseBackgroundImageGeneration}
-                    onApplyPreset={applyPreset}
                     onClearReferences={() => {
                       setReferenceImages([]);
                       setReferenceImage(null);

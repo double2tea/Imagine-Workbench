@@ -1,7 +1,16 @@
-import type { ChangeEvent, DragEvent, ReactNode } from "react";
+import { useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from "react";
 import { RefreshCw, Sparkles, Video as VideoIcon } from "lucide-react";
+import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
 import ReferenceImagePicker, { type ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import { type DraggedReferenceAsset, hasDraggedReferenceAsset } from "@/components/reference/referenceDrag";
+import {
+  applyPromptTemplateText,
+  detectPromptTemplateSlashCommand,
+  insertPromptTemplateText,
+  type PromptTemplate,
+  type PromptTemplateApplyMode,
+  type PromptTemplateSlashCommand,
+} from "@/lib/prompt-templates";
 import type { ModelOption, ParameterOption, VideoModelCapabilities, VideoReferenceMode } from "@/lib/providers/model-catalog";
 
 interface ModelOptionGroup {
@@ -91,6 +100,8 @@ export default function VideoGenerationPanel({
   onSelectSize,
   showGenerateButton = true,
 }: VideoGenerationPanelProps) {
+  const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
+  const [slashCommand, setSlashCommand] = useState<PromptTemplateSlashCommand | null>(null);
   const extraControlCount =
     Number(resolutionOptions.length > 0) + Number(durationOptions.length > 0) + Number(presetOptions.length > 0);
   const controlGridClass =
@@ -102,6 +113,24 @@ export default function VideoGenerationPanel({
           ? "sm:grid-cols-3"
           : "sm:grid-cols-2";
 
+  const handleApplyPromptTemplate = (template: PromptTemplate, mode: PromptTemplateApplyMode): void => {
+    if (slashCommand && mode === "insert") {
+      const result = insertPromptTemplateText(prompt, template.positivePrompt, slashCommand.start, slashCommand.end);
+      onPromptChange(result.prompt);
+      setSlashCommand(null);
+      return;
+    }
+    onPromptChange(applyPromptTemplateText(prompt, template.positivePrompt, mode));
+    setSlashCommand(null);
+  };
+
+  const handlePromptChange = (value: string, caret: number): void => {
+    onPromptChange(value);
+    const command = detectPromptTemplateSlashCommand(value, caret);
+    setSlashCommand(command);
+    if (command) templatePickerRef.current?.open(command.search);
+  };
+
   return (
     <div className="flex flex-col gap-3.5 animate-fade-in">
       <div>
@@ -110,30 +139,33 @@ export default function VideoGenerationPanel({
             <VideoIcon className="h-3.5 w-3.5 text-violet-300" />
             视频场景运动描述
           </label>
-          <button
-            onClick={onOptimizePrompt}
-            disabled={isOptimizing || !prompt.trim()}
-            className={`imagine-secondary-action flex h-7 items-center gap-1 rounded-md border px-2.5 text-[11px] font-semibold transition ${
-              isOptimizing || !prompt.trim()
-                ? "cursor-not-allowed opacity-50"
-                : "cursor-pointer border-violet-400/25 bg-violet-500/12 text-violet-200 hover:bg-violet-500/18"
-            }`}
-          >
-            {isOptimizing ? (
-              <RefreshCw className="h-3 w-3 animate-spin text-purple-400" />
-            ) : (
-              <Sparkles className="h-3 w-3 text-violet-300" />
-            )}
-            <span className="sm:hidden">润色</span>
-            <span className="hidden sm:inline">提示词动态润色</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <PromptTemplatePicker ref={templatePickerRef} accent="violet" compact onApply={handleApplyPromptTemplate} />
+            <button
+              onClick={onOptimizePrompt}
+              disabled={isOptimizing || !prompt.trim()}
+              className={`imagine-secondary-action flex h-7 items-center gap-1 rounded-md border px-2.5 text-[11px] font-semibold transition ${
+                isOptimizing || !prompt.trim()
+                  ? "cursor-not-allowed opacity-50"
+                  : "cursor-pointer border-violet-400/25 bg-violet-500/12 text-violet-200 hover:bg-violet-500/18"
+              }`}
+            >
+              {isOptimizing ? (
+                <RefreshCw className="h-3 w-3 animate-spin text-purple-400" />
+              ) : (
+                <Sparkles className="h-3 w-3 text-violet-300" />
+              )}
+              <span className="sm:hidden">润色</span>
+              <span className="hidden sm:inline">提示词动态润色</span>
+            </button>
+          </div>
         </div>
 
         <div className="imagine-field-shell relative p-3">
           {atDropdownNode}
           <textarea
             value={prompt}
-            onChange={(event) => onPromptChange(event.target.value)}
+            onChange={(event) => handlePromptChange(event.target.value, event.target.selectionStart)}
             onDragOver={(event) => {
               if (!hasDraggedReferenceAsset(event.dataTransfer)) return;
               event.dataTransfer.dropEffect = "copy";

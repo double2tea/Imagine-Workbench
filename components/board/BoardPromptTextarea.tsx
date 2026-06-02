@@ -4,6 +4,7 @@ import { forwardRef, useImperativeHandle, useRef, useState, type ReactNode } fro
 import PromptReferenceDropdown from "@/components/reference/PromptReferenceDropdown";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import { getReferencePromptToken } from "@/hooks/useReferenceState";
+import { detectPromptTemplateSlashCommand, type PromptTemplateSlashCommand } from "@/lib/prompt-templates";
 
 function detectAtSearch(value: string, caret: number): string | null {
   const beforeCaret = value.slice(0, caret);
@@ -15,6 +16,7 @@ interface BoardPromptTextareaProps {
   className?: string;
   headerRight?: ReactNode;
   onChange: (value: string) => void;
+  onSlashCommand?: (command: PromptTemplateSlashCommand | null) => void;
   placeholder?: string;
   readOnly?: boolean;
   references: ReferenceImageRef[];
@@ -26,6 +28,7 @@ const BoardPromptTextarea = forwardRef<HTMLTextAreaElement, BoardPromptTextareaP
     className = "nodrag nowheel h-full w-full resize-none imagine-board-input p-3 pr-20 text-xs leading-5 outline-none placeholder:text-[var(--iw-faint)]",
     headerRight,
     onChange,
+    onSlashCommand,
     placeholder = "写提示词，输入 @ 引用参考图",
     readOnly = false,
     references,
@@ -43,9 +46,11 @@ const BoardPromptTextarea = forwardRef<HTMLTextAreaElement, BoardPromptTextareaP
     onChange(nextValue);
     if (caret === null) {
       setAtSearch(null);
+      onSlashCommand?.(null);
       return;
     }
     setAtSearch(detectAtSearch(nextValue, caret));
+    onSlashCommand?.(detectPromptTemplateSlashCommand(nextValue, caret));
   };
 
   const handleSelectReference = (index: number): void => {
@@ -78,7 +83,10 @@ const BoardPromptTextarea = forwardRef<HTMLTextAreaElement, BoardPromptTextareaP
           onChange={(event) => handleChange(event.target.value, event.target.selectionStart)}
           onBlur={() => {
             if (readOnly) return;
-            window.setTimeout(() => setAtSearch(null), 120);
+            window.setTimeout(() => {
+              setAtSearch(null);
+              onSlashCommand?.(null);
+            }, 120);
           }}
           className={className}
           placeholder={placeholder}
