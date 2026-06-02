@@ -1,6 +1,7 @@
 "use client";
 
-import { forwardRef, useImperativeHandle, useRef, useState, type ReactNode } from "react";
+import { forwardRef, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import PromptReferenceDropdown from "@/components/reference/PromptReferenceDropdown";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import { getReferencePromptToken } from "@/hooks/useReferenceState";
@@ -37,9 +38,22 @@ const BoardPromptTextarea = forwardRef<HTMLTextAreaElement, BoardPromptTextareaP
   forwardedRef,
 ) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const shellRef = useRef<HTMLDivElement | null>(null);
   const [atSearch, setAtSearch] = useState<string | null>(null);
+  const [dropdownAnchor, setDropdownAnchor] = useState<{ left: number; top: number; width: number } | null>(null);
 
   useImperativeHandle(forwardedRef, () => textareaRef.current as HTMLTextAreaElement, []);
+
+  useLayoutEffect(() => {
+    if (atSearch === null) {
+      setDropdownAnchor(null);
+      return;
+    }
+    const shell = shellRef.current;
+    if (!shell) return;
+    const rect = shell.getBoundingClientRect();
+    setDropdownAnchor({ left: rect.left, top: rect.top, width: rect.width });
+  }, [atSearch, value]);
 
   const handleChange = (nextValue: string, caret: number | null): void => {
     if (readOnly) return;
@@ -69,13 +83,30 @@ const BoardPromptTextarea = forwardRef<HTMLTextAreaElement, BoardPromptTextareaP
     });
   };
 
+  const atDropdownPortal = !readOnly && atSearch !== null && dropdownAnchor && typeof document !== "undefined"
+    ? createPortal(
+      <div
+        className="nowheel nodrag"
+        style={{
+          position: "fixed",
+          left: dropdownAnchor.left,
+          top: dropdownAnchor.top,
+          width: dropdownAnchor.width,
+          zIndex: 80,
+          transform: "translateY(calc(-100% - 8px))",
+        }}
+      >
+        <PromptReferenceDropdown references={references} search={atSearch} onSelect={handleSelectReference} />
+      </div>,
+      document.body,
+    )
+    : null;
+
   return (
-    <div className="relative h-full min-h-0">
+    <div ref={shellRef} className="relative h-full min-h-0">
       {headerRight ? <div className="pointer-events-none absolute right-2 top-2 z-20 [&>*]:pointer-events-auto">{headerRight}</div> : null}
       <div className="relative flex h-full min-h-0 flex-col p-2 pt-2">
-        {!readOnly && atSearch !== null ? (
-          <PromptReferenceDropdown references={references} search={atSearch} onSelect={handleSelectReference} />
-        ) : null}
+        {atDropdownPortal}
         <textarea
           ref={textareaRef}
           value={value}

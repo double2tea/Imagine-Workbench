@@ -50,6 +50,7 @@ const DEFAULT_VARIANT_COUNT: BoardGenerateVariantCount = 1;
 
 export interface BoardStateController {
   board: BoardDocument;
+  canRedo: boolean;
   canUndo: boolean;
   saveStatus: BoardSaveStatus;
   selectedEdgeId: string | null;
@@ -57,7 +58,11 @@ export interface BoardStateController {
   saveError: string | null;
   beginUndoGesture: () => void;
   endUndoGesture: () => void;
+  redo: () => void;
   undo: () => void;
+  duplicateNode: (nodeId: string) => string | null;
+  reconnectEdge: (edgeId: string, from: BoardPortRef, to: BoardPortRef) => void;
+  restoreNodeWithEdges: (node: BoardNode, edges: BoardEdge[]) => void;
   addAgentNode: (input?: CreateAgentNodeInput) => string;
   addAssetNode: (input: CreateAssetNodeInput) => string;
   addGenerateNode: (input: CreateGenerateNodeInput) => string;
@@ -218,21 +223,30 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
   const [saveError, setSaveError] = useState<string | null>(null);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
   const undoStackRef = useRef<BoardHistorySnapshot[]>([]);
+  const redoStackRef = useRef<BoardHistorySnapshot[]>([]);
   const dragUndoCapturedRef = useRef(false);
+
+  const syncUndoRedoFlags = useCallback(() => {
+    setCanUndo(undoStackRef.current.length > 0);
+    setCanRedo(redoStackRef.current.length > 0);
+  }, []);
 
   const clearUndoHistory = useCallback(() => {
     undoStackRef.current = [];
+    redoStackRef.current = [];
     dragUndoCapturedRef.current = false;
-    setCanUndo(false);
-  }, []);
+    syncUndoRedoFlags();
+  }, [syncUndoRedoFlags]);
 
   const pushUndoSnapshot = useCallback((snapshot: BoardDocument) => {
     const stack = undoStackRef.current;
     stack.push(cloneBoardHistory(snapshot));
     if (stack.length > BOARD_UNDO_LIMIT) stack.shift();
-    setCanUndo(stack.length > 0);
-  }, []);
+    redoStackRef.current = [];
+    syncUndoRedoFlags();
+  }, [syncUndoRedoFlags]);
 
   const mutateBoard = useCallback((
     updater: (current: BoardDocument) => BoardDocument,
@@ -257,20 +271,50 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
   const undo = useCallback(() => {
     const snapshot = undoStackRef.current.pop();
     if (!snapshot) {
-      setCanUndo(false);
+      syncUndoRedoFlags();
       return;
     }
-    setCanUndo(undoStackRef.current.length > 0);
+    setBoardState(current => {
+      redoStackRef.current.push(cloneBoardHistory(current));
+      if (redoStackRef.current.length > BOARD_UNDO_LIMIT) redoStackRef.current.shift();
+      return {
+        ...current,
+        nodes: snapshot.nodes,
+        edges: snapshot.edges,
+        config: snapshot.config,
+        viewport: snapshot.viewport,
+        updatedAt: nowIso(),
+      };
+    });
     dragUndoCapturedRef.current = false;
-    setBoardState(current => ({
-      ...current,
-      nodes: snapshot.nodes,
-      edges: snapshot.edges,
-      config: snapshot.config,
-      viewport: snapshot.viewport,
-      updatedAt: nowIso(),
-    }));
-  }, []);
+    setSelectedNodeId(null);
+    setSelectedEdgeId(null);
+    syncUndoRedoFlags();
+  }, [syncUndoRedoFlags]);
+
+  const redo = useCallback(() => {
+    const snapshot = redoStackRef.current.pop();
+    if (!snapshot) {
+      syncUndoRedoFlags();
+      return;
+    }
+    setBoardState(current => {
+      undoStackRef.current.push(cloneBoardHistory(current));
+      if (undoStackRef.current.length > BOARD_UNDO_LIMIT) undoStackRef.current.shift();
+      return {
+        ...current,
+        nodes: snapshot.nodes,
+        edges: snapshot.edges,
+        config: snapshot.config,
+        viewport: snapshot.viewport,
+        updatedAt: nowIso(),
+      };
+    });
+    dragUndoCapturedRef.current = false;
+    setSelectedNodeId(null);
+    setSelectedEdgeId(null);
+    syncUndoRedoFlags();
+  }, [syncUndoRedoFlags]);
 
   useEffect(() => {
     let isActive = true;
@@ -521,6 +565,94 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     setSelectedEdgeId(currentId => (currentId === edgeId ? null : currentId));
   }, [mutateBoard]);
 
+  const reconnectEdge = useCallback((edgeId: string, from: BoardPortRef, to: BoardPortRef) => {
+    const kind = isCompatibleConnection(from, to);
+    mutateBoard(currentBoard => {
+      if (!currentBoard.edges.some(edge => edge.id === edgeId)) {
+        throw new Error("连接不存在");
+      }
+      const withoutDuplicate = currentBoard.edges.filter(currentEdge => {
+        if (currentEdge.id === edgeId) return true;
+        return !(
+          currentEdge.from.nodeId === from.nodeId &&
+          currentEdge.from.portId === from.portId &&
+          currentEdge.to.nodeId === to.nodeId &&
+          currentEdge.to.portId === to.portId
+        );
+      });
+      const nextEdges = withoutDuplicate.map(edge =>
+        edge.id === edgeId ? { ...edge, kind, from, to } : edge,
+      );
+      return touchBoard(currentBoard, currentBoard.nodes, nextEdges);
+    });
+    setSelectedEdgeId(edgeId);
+    setSelectedNodeId(null);
+  }, [mutateBoard]);
+
+  const restoreNodeWithEdges = useCallback((node: BoardNode, edges: BoardEdge[]) => {
+    mutateBoard(currentBoard => {
+      if (currentBoard.nodes.some(item => item.id === node.id)) {
+        throw new Error("节点已存在");
+      }
+      return touchBoard(currentBoard, [...currentBoard.nodes, node], [...currentBoard.edges, ...edges]);
+    });
+    setSelectedNodeId(node.id);
+    setSelectedEdgeId(null);
+  }, [mutateBoard]);
+
+  const duplicateNode = useCallback((nodeId: string): string | null => {
+    const source = board.nodes.find(node => node.id === nodeId);
+    if (!source) return null;
+    const position = {
+      x: source.position.x + 28,
+      y: source.position.y + 28,
+    };
+    if (source.kind === "asset") {
+      return addAssetNode({ asset: source.asset, position, size: source.size, title: source.title });
+    }
+    if (source.kind === "prompt") {
+      return addPromptNode({ position, prompt: source.prompt, size: source.size, title: source.title });
+    }
+    if (source.kind === "reference-group") {
+      return addReferenceGroupNode({ position, references: structuredClone(source.references), size: source.size, title: source.title });
+    }
+    if (source.kind === "image-generate") {
+      return addGenerateNode({
+        kind: "image-generate",
+        aspectRatio: source.aspectRatio,
+        customImageResolution: source.customImageResolution,
+        imageQuality: source.imageQuality,
+        imageResolution: source.imageResolution,
+        model: source.model,
+        position,
+        prompt: source.prompt,
+        size: source.size,
+        thinkingLevel: source.thinkingLevel,
+        title: source.title,
+        variantCount: source.variantCount,
+      });
+    }
+    if (source.kind === "video-generate") {
+      return addGenerateNode({
+        kind: "video-generate",
+        aspectRatio: source.aspectRatio,
+        model: source.model,
+        position,
+        prompt: source.prompt,
+        size: source.size,
+        title: source.title,
+        variantCount: source.variantCount,
+        videoDuration: source.videoDuration,
+        videoPreset: source.videoPreset,
+        videoResolution: source.videoResolution,
+      });
+    }
+    if (source.kind === "agent") {
+      return addAgentNode({ instruction: source.instruction, position, size: source.size, title: source.title });
+    }
+    return addNoteNode({ body: source.body, position, size: source.size, title: source.title });
+  }, [addAgentNode, addAssetNode, addGenerateNode, addNoteNode, addPromptNode, addReferenceGroupNode, board.nodes]);
+
   const connectPorts = useCallback((from: BoardPortRef, to: BoardPortRef) => {
     const kind = isCompatibleConnection(from, to);
     const createdAt = nowIso();
@@ -741,6 +873,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
   return useMemo(
     () => ({
       board,
+      canRedo,
       canUndo,
       saveStatus,
       selectedEdgeId,
@@ -748,7 +881,11 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       saveError,
       beginUndoGesture,
       endUndoGesture,
+      redo,
       undo,
+      duplicateNode,
+      reconnectEdge,
+      restoreNodeWithEdges,
       addAgentNode,
       addAssetNode,
       addGenerateNode,
@@ -786,13 +923,18 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       beginUndoGesture,
       endUndoGesture,
       board,
+      canRedo,
       canUndo,
       clearBoard,
       connectPorts,
       deleteEdge,
       deleteNode,
+      duplicateNode,
       moveReferenceGroupItem,
+      reconnectEdge,
+      restoreNodeWithEdges,
       removeReferenceGroupItem,
+      redo,
       saveError,
       saveStatus,
       selectedEdgeId,

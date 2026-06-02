@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Bot, Check, ChevronDown, FileText, Grid3X3, ImagePlus, Layers, Map, MessageSquareText, Moon, Pencil, Plus, RotateCcw, Settings, Sun, Trash2, Video } from "lucide-react";
+import { ArrowLeft, Bot, Check, ChevronDown, FileText, Grid3X3, ImagePlus, Layers, Map, MessageSquareText, Moon, Pencil, Plus, RotateCcw, RotateCw, Settings, Sun, Trash2, Video } from "lucide-react";
 import type { BoardSaveStatus } from "@/hooks/useBoardState";
 import type { ThemeMode } from "@/components/workbench/WorkspaceHeader";
 import type { BoardSummary } from "@/lib/board";
@@ -10,9 +10,12 @@ interface BoardToolbarProps {
   boardId: string;
   boardSummaries: BoardSummary[];
   boardTitle: string;
+  canRedo: boolean;
   canUndo: boolean;
   nodeCount: number;
+  saveError: string | null;
   saveStatus: BoardSaveStatus;
+  trashedCount: number;
   showGrid: boolean;
   showMiniMap: boolean;
   themeMode: ThemeMode;
@@ -29,6 +32,8 @@ interface BoardToolbarProps {
   onOpenSettings: () => void;
   onRenameBoard: () => void;
   onSelectBoard: (boardId: string) => void;
+  onRedo: () => void;
+  onRestoreTrash?: () => void;
   onUndo: () => void;
   onToggleGrid: () => void;
   onToggleMiniMap: () => void;
@@ -50,9 +55,12 @@ export default function BoardToolbar({
   boardId,
   boardSummaries,
   boardTitle,
+  canRedo,
   canUndo,
   nodeCount,
+  saveError,
   saveStatus,
+  trashedCount,
   showGrid,
   showMiniMap,
   themeMode,
@@ -69,6 +77,8 @@ export default function BoardToolbar({
   onOpenSettings,
   onRenameBoard,
   onSelectBoard,
+  onRedo,
+  onRestoreTrash,
   onUndo,
   onToggleGrid,
   onToggleMiniMap,
@@ -201,7 +211,12 @@ export default function BoardToolbar({
           )}
         </div>
         <span className="imagine-meta-chip rounded border border-[var(--iw-border)] px-2 py-1 text-[10px] font-mono text-[var(--iw-muted)]">{nodeCount} 节点</span>
-        <span className="hidden text-[10px] font-mono text-[var(--iw-faint)] sm:inline">{formatSaveStatus(saveStatus)}</span>
+        <span
+          className={`hidden text-[10px] font-mono sm:inline ${saveStatus === "error" ? "text-red-300" : "text-[var(--iw-faint)]"}`}
+          title={saveError ?? undefined}
+        >
+          {saveStatus === "error" && saveError ? saveError : formatSaveStatus(saveStatus)}
+        </span>
       </div>
       <div className="no-scrollbar flex min-w-0 flex-1 items-center justify-end gap-2 overflow-x-auto overscroll-x-contain">
         <button type="button" onClick={onAddPrompt} className={toolButtonClass} data-accent="amber">
@@ -237,6 +252,26 @@ export default function BoardToolbar({
         >
           <RotateCcw className="h-3.5 w-3.5" />
         </button>
+        <button
+          type="button"
+          onClick={onRedo}
+          disabled={!canRedo}
+          className={`${iconButtonClass} disabled:cursor-not-allowed disabled:opacity-40`}
+          title="重做 (Ctrl+Shift+Z)"
+        >
+          <RotateCw className="h-3.5 w-3.5" />
+        </button>
+        {trashedCount > 0 && onRestoreTrash ? (
+          <button
+            type="button"
+            onClick={onRestoreTrash}
+            className={toolButtonClass}
+            title="恢复最近删除的节点"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">恢复 ({trashedCount})</span>
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={onToggleGrid}

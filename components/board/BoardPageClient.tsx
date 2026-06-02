@@ -14,6 +14,7 @@ import PreviewImage from "@/components/PreviewImage";
 import SettingsModal from "@/components/settings/SettingsModal";
 import WorkspaceNotices, { type WorkspaceNotice } from "@/components/workbench/WorkspaceNotices";
 import type { AgentBoardContext, AgentBoardNodeSummary } from "@/lib/agent-context";
+import { IMAGINE_BOARD_ASSET_DRAG_TYPE } from "@/lib/board/interaction";
 import { persistThemeMode, readStoredThemeMode, type ThemeMode } from "@/lib/theme-mode";
 import { useAgentController } from "@/hooks/useAgentController";
 import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
@@ -1428,6 +1429,12 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
                     <button
                       key={item.id}
                       type="button"
+                      draggable={item.type === "image" && item.status === "complete"}
+                      onDragStart={(event) => {
+                        if (item.type !== "image" || item.status !== "complete") return;
+                        event.dataTransfer.setData(IMAGINE_BOARD_ASSET_DRAG_TYPE, item.id);
+                        event.dataTransfer.effectAllowed = "copy";
+                      }}
                       onClick={() => addAssetToBoard(item)}
                       className="imagine-asset-card grid grid-cols-[54px_1fr] gap-2 !rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-2 text-left transition hover:border-[var(--iw-board-accent-amber)] hover:bg-[var(--iw-panel)]"
                     >
