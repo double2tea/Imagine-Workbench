@@ -22,11 +22,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
+          run_install: false
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Check Cloudflare credentials
         run: |
@@ -36,17 +43,17 @@ jobs:
           fi
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Lint
-        run: npm run lint
+        run: pnpm run lint
 
       - name: Build Cloudflare Pages output
-        run: npm run pages:build
+        run: pnpm run pages:build
 
       - name: Deploy to Cloudflare Pages
         run: |
-          npx wrangler pages deploy .vercel/output/static \
+          pnpm exec vp dlx wrangler pages deploy .vercel/output/static \
             --project-name=imagine-workbench \
             --branch=main \
             --commit-hash="$GITHUB_SHA" \
