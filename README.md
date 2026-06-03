@@ -182,6 +182,7 @@ Users can open the picker with the template button or type `/` in supported prom
 - `POST /api/board/import-image`: imports a `data:image/*` base64 data URI into the local asset store for board workflows.
 - `POST /api/gemini/generate-image`: image generation and image editing.
 - `POST /api/gemini/generate-video`: video generation.
+- `POST /api/gemini/reference-image`: server-side localization path for supported legacy remote image result URLs before they are reused as references.
 - `POST /api/gemini/video-status`: polls async image/video operations.
 - `POST /api/gemini/image-download`: proxies completed async image downloads.
 - `POST /api/gemini/video-download`: proxies completed video downloads.
@@ -230,6 +231,8 @@ tests/
 ```
 
 Board text edits are flushed and the board is saved before leaving or switching boards.
+Board documents loaded from IndexedDB are normalized at runtime before they reach React Flow. The loader drops invalid or duplicate nodes, recomputes valid edge kinds from current port definitions, clamps viewport/size values, and clears stale selections after board switches.
+Board generation resolves connected image references against the latest asset store URL, then converts `blob:`, `data:image/*`, or supported legacy remote result URLs into compressed `data:image/*` payloads before calling provider routes. This keeps board image/video references inside the same API boundary as the main workstation and avoids browser-side CORS fetches against provider storage.
 
 ## Development Commands
 
@@ -253,3 +256,4 @@ npm run test:providers
 - Built-in model capabilities in `MODEL_CAPABILITIES` serve as initial defaults. The "获取模型" button fetches the live model list from each provider's `/v1/models` endpoint and merges it into the dropdowns. Models are auto-classified as chat/image/video by name.
 - Board documents are persisted separately from generated media. Board nodes reference assets by ID/url, while generated media remains owned by the IndexedDB asset store.
 - Board generation resolves connected image references against the latest IndexedDB asset item before submission.
+- React Flow node state on the board should stay single-source from the normalized board document. Use transient visual state only for active drag feedback, then write settled positions back to `useBoardState`.
