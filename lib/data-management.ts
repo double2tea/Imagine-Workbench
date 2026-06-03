@@ -1,6 +1,6 @@
 import JSZip from "jszip";
 import { clearBoardsFromDB, listBoardsFromDB, saveBoardToDB } from "@/lib/board/persistence";
-import { createEmptyBoard, DEFAULT_BOARD_ID } from "@/lib/board/defaults";
+import { createEmptyBoard, DEFAULT_BOARD_CONFIG, DEFAULT_BOARD_ID } from "@/lib/board/defaults";
 import { resolveBoardConnectionKind } from "@/lib/board/ports";
 import type {
   BoardConfig,
@@ -654,6 +654,8 @@ function parseBoardConfig(value: unknown): BoardConfig {
   return {
     showGrid: readBoolean(value, "showGrid"),
     showMiniMap: readBoolean(value, "showMiniMap"),
+    snapToGrid:
+      typeof value.snapToGrid === "boolean" ? value.snapToGrid : DEFAULT_BOARD_CONFIG.snapToGrid,
   };
 }
 

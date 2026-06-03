@@ -11,6 +11,7 @@ export const DEFAULT_BOARD_VIEWPORT: BoardViewport = {
 export const DEFAULT_BOARD_CONFIG: BoardConfig = {
   showGrid: true,
   showMiniMap: true,
+  snapToGrid: false,
 };
 
 export const DEFAULT_ASSET_NODE_SIZE: BoardSize = {

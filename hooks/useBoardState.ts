@@ -284,6 +284,7 @@ function normalizeBoardConfig(config: unknown): BoardConfig {
   return {
     showGrid: typeof configRecord.showGrid === "boolean" ? configRecord.showGrid : DEFAULT_BOARD_CONFIG.showGrid,
     showMiniMap: typeof configRecord.showMiniMap === "boolean" ? configRecord.showMiniMap : DEFAULT_BOARD_CONFIG.showMiniMap,
+    snapToGrid: typeof configRecord.snapToGrid === "boolean" ? configRecord.snapToGrid : DEFAULT_BOARD_CONFIG.snapToGrid,
   };
 }
 

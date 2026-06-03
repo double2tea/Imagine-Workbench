@@ -24,6 +24,8 @@ export interface BoardViewport extends BoardPoint {
 export interface BoardConfig {
   showGrid: boolean;
   showMiniMap: boolean;
+  /** Snap node drag and placement to {@link BOARD_SNAP_GRID}. */
+  snapToGrid: boolean;
 }
 
 export interface BoardSummary {

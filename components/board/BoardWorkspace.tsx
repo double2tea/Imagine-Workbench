@@ -56,9 +56,11 @@ import {
 import { useThemeModeSnapshot } from "@/lib/theme-mode";
 import type { CapturedVideoFrame } from "@/lib/video-frame";
 import {
+  BOARD_SNAP_GRID,
   DEFAULT_ASSET_NODE_SIZE,
   DEFAULT_GENERATE_NODE_SIZE,
   DEFAULT_REFERENCE_GROUP_NODE_SIZE,
+  snapBoardPoint,
   type BoardEdge,
   type BoardEdgeKind,
   type BoardNode as BoardNodeModel,
@@ -67,6 +69,7 @@ import {
   type BoardPortRef,
   type BoardSize,
   type BoardSummary,
+  type BoardViewport,
   type CreateAssetNodeInput,
 } from "@/lib/board";
 import { BOARD_PORT_IDS, isValidBoardConnection as isValidBoardPortConnection } from "@/lib/board/ports";
@@ -123,6 +126,14 @@ interface BoardNodeContextMenuState {
 const nodeTypes = { board: BoardNode };
 const DEFAULT_BOARD_IMAGE_MODEL = "modelscope:Qwen/Qwen-Image";
 const DEFAULT_BOARD_REFERENCE_IMAGE_MODEL = "modelscope:Qwen/Qwen-Image-Edit";
+const BOARD_VIEWPORT_POSITION_EPSILON = 0.5;
+const BOARD_VIEWPORT_ZOOM_EPSILON = 0.001;
+
+interface BoardSelectionSnapshot {
+  edgeId: string | null;
+  nodeId: string | null;
+  nodeIds: string[];
+}
 
 function sameStringList(left: string[], right: string[]): boolean {
   if (left.length !== right.length) return false;
@@ -131,6 +142,32 @@ function sameStringList(left: string[], right: string[]): boolean {
 
 function sameOptionalNumber(left: number | undefined, right: number | undefined): boolean {
   return left === right;
+}
+
+function sameBoardViewportModel(left: BoardViewport, right: BoardViewport): boolean {
+  return (
+    Math.abs(left.x - right.x) < BOARD_VIEWPORT_POSITION_EPSILON &&
+    Math.abs(left.y - right.y) < BOARD_VIEWPORT_POSITION_EPSILON &&
+    Math.abs(left.zoom - right.zoom) < BOARD_VIEWPORT_ZOOM_EPSILON
+  );
+}
+
+function sameBoardSelectionSnapshot(left: BoardSelectionSnapshot, right: BoardSelectionSnapshot): boolean {
+  return left.edgeId === right.edgeId && left.nodeId === right.nodeId && sameStringList(left.nodeIds, right.nodeIds);
+}
+
+function sameBoardNodeRenderModel(left: BoardNodeModel, right: BoardNodeModel): boolean {
+  return (
+    left === right ||
+    (
+      left.id === right.id &&
+      left.kind === right.kind &&
+      left.title === right.title &&
+      left.updatedAt === right.updatedAt &&
+      left.size.width === right.size.width &&
+      left.size.height === right.size.height
+    )
+  );
 }
 
 function sameFlowNodeState(left: BoardFlowNode, right: BoardFlowNode): boolean {
@@ -154,6 +191,56 @@ function sameFlowNodeList(left: BoardFlowNode[], right: BoardFlowNode[]): boolea
   return left.every((node, index) => sameFlowNodeState(node, right[index]));
 }
 
+function sameReferenceList(
+  left: BoardFlowNode["data"]["generateReferences"],
+  right: BoardFlowNode["data"]["generateReferences"],
+): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((reference, index) => {
+    const other = right[index];
+    return reference.id === other.id && reference.url === other.url && reference.role === other.role;
+  });
+}
+
+function sameGenerateInputSummary(
+  left: BoardGenerateInputSummary | undefined,
+  right: BoardGenerateInputSummary | undefined,
+): boolean {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  if (
+    left.promptPreview !== right.promptPreview ||
+    left.promptSourceTitle !== right.promptSourceTitle ||
+    left.referenceCount !== right.referenceCount ||
+    left.referencePreviews.length !== right.referencePreviews.length
+  ) return false;
+  return left.referencePreviews.every((reference, index) => {
+    const other = right.referencePreviews[index];
+    return reference.id === other.id && reference.url === other.url && reference.role === other.role;
+  });
+}
+
+function sameGenerateTaskSummary(
+  left: BoardGenerateTaskSummary | undefined,
+  right: BoardGenerateTaskSummary | undefined,
+): boolean {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  return left.id === right.id && left.progress === right.progress && left.status === right.status;
+}
+
+function sameFlowNodeDataModel(left: BoardFlowNode["data"], right: BoardFlowNode["data"]): boolean {
+  return (
+    sameBoardNodeRenderModel(left.node, right.node) &&
+    left.hasResultConnection === right.hasResultConnection &&
+    left.compareReferenceUrl === right.compareReferenceUrl &&
+    sameGenerateInputSummary(left.generateInputSummary, right.generateInputSummary) &&
+    sameGenerateTaskSummary(left.generateTaskSummary, right.generateTaskSummary) &&
+    sameReferenceList(left.generateReferences, right.generateReferences) &&
+    sameReferenceList(left.promptReferences, right.promptReferences)
+  );
+}
+
 function sameFlowNodeModelList(left: BoardFlowNode[], right: BoardFlowNode[]): boolean {
   if (left.length !== right.length) return false;
   return left.every((node, index) => {
@@ -161,7 +248,7 @@ function sameFlowNodeModelList(left: BoardFlowNode[], right: BoardFlowNode[]): b
     return (
       node.id === other.id &&
       node.type === other.type &&
-      node.data === other.data &&
+      sameFlowNodeDataModel(node.data, other.data) &&
       node.position.x === other.position.x &&
       node.position.y === other.position.y
     );
@@ -471,6 +558,7 @@ export default function BoardWorkspace({
   const copiedNodeRef = useRef<CopiedBoardNode | null>(null);
   const isNodeDragActiveRef = useRef(false);
   const pendingDragPositionByIdRef = useRef<Map<string, BoardPoint>>(new Map());
+  const selectionRef = useRef<BoardSelectionSnapshot>({ edgeId: null, nodeId: null, nodeIds: [] });
   const [quickInsertMenu, setQuickInsertMenu] = useState<QuickInsertMenu | null>(null);
   const [nodeContextMenu, setNodeContextMenu] = useState<BoardNodeContextMenuState | null>(null);
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
@@ -535,6 +623,11 @@ export default function BoardWorkspace({
     updateNoteBody,
     updatePromptNode,
   } = controller;
+  const viewportRef = useRef<BoardViewport>(board.viewport);
+  useLayoutEffect(() => {
+    viewportRef.current = board.viewport;
+    selectionRef.current = { edgeId: selectedEdgeId, nodeId: selectedNodeId, nodeIds: selectedNodeIds };
+  }, [board.viewport, selectedEdgeId, selectedNodeId, selectedNodeIds]);
 
   const boardGraphContentKey = useMemo(
     () => buildBoardGraphContentKey(board.nodes, board.edges),
@@ -681,9 +774,12 @@ export default function BoardWorkspace({
     [board.nodes, flowNodeDataById, generateTaskByNodeId],
   );
   const [reactFlowNodes, setReactFlowNodes] = useState<BoardFlowNode[]>(flowNodes);
+  const reactFlowNodesRef = useRef<BoardFlowNode[]>(flowNodes);
   useLayoutEffect(() => {
     if (isNodeDragActiveRef.current) return;
-    setReactFlowNodes(currentNodes => (sameFlowNodeModelList(currentNodes, flowNodes) ? currentNodes : flowNodes));
+    if (sameFlowNodeModelList(reactFlowNodesRef.current, flowNodes)) return;
+    reactFlowNodesRef.current = flowNodes;
+    setReactFlowNodes(flowNodes);
   }, [flowNodes]);
   const flowEdges = useMemo<BoardFlowEdge[]>(
     () =>
@@ -694,7 +790,6 @@ export default function BoardWorkspace({
         sourceHandle: edge.from.portId,
         targetHandle: edge.to.portId,
         type: "smoothstep",
-        selected: selectedEdgeId === edge.id,
         animated: edge.kind === "result" || isGenerateEdgeProcessing(edge, board.nodes),
         data: { kind: edge.kind, processing: isGenerateEdgeProcessing(edge, board.nodes) },
         className: `imagine-board-edge imagine-board-edge-${edge.kind}`,
@@ -730,19 +825,16 @@ export default function BoardWorkspace({
   const handleSelectionChange = useCallback<OnSelectionChangeFunc<BoardFlowNode, BoardFlowEdge>>(({ nodes, edges }) => {
     const ids = nodes.map(node => node.id);
     const edgeId = edges[0]?.id ?? null;
-    if (edgeId) {
-      if (sameStringList(selectedNodeIds, ids) && selectedEdgeId === edgeId && selectedNodeId === null) return;
-      updateSelectedNodeIds(ids);
-      selectEdge(edgeId);
-      selectNode(null);
-      return;
-    }
     const nodeId = ids[0] ?? null;
-    if (sameStringList(selectedNodeIds, ids) && selectedEdgeId === null && selectedNodeId === nodeId) return;
+    const nextSelection = edgeId
+      ? { edgeId, nodeId: null, nodeIds: ids }
+      : { edgeId: null, nodeId, nodeIds: ids };
+    if (sameBoardSelectionSnapshot(selectionRef.current, nextSelection)) return;
+    selectionRef.current = nextSelection;
     updateSelectedNodeIds(ids);
-    selectEdge(null);
-    selectNode(nodeId);
-  }, [selectEdge, selectNode, selectedEdgeId, selectedNodeId, selectedNodeIds, updateSelectedNodeIds]);
+    selectEdge(nextSelection.edgeId);
+    selectNode(nextSelection.nodeId);
+  }, [selectEdge, selectNode, updateSelectedNodeIds]);
 
   const handleNodeClick: NodeMouseHandler<BoardFlowNode> = () => {
     closeOverlayMenus();
@@ -808,7 +900,9 @@ export default function BoardWorkspace({
   const handleNodesChange = useCallback<OnNodesChange<BoardFlowNode>>((changes) => {
     setReactFlowNodes(currentNodes => {
       const nextNodes = applyNodeChanges(changes, currentNodes);
-      return sameFlowNodeList(currentNodes, nextNodes) ? currentNodes : nextNodes;
+      const resolvedNodes = sameFlowNodeList(currentNodes, nextNodes) ? currentNodes : nextNodes;
+      reactFlowNodesRef.current = resolvedNodes;
+      return resolvedNodes;
     });
     const settledPositions: Array<{ nodeId: string; position: BoardPoint }> = [];
     for (const change of changes) {
@@ -822,6 +916,12 @@ export default function BoardWorkspace({
     if (settledPositions.length === 0) return;
     updateNodesPositions(settledPositions);
   }, [updateNodesPositions]);
+
+  const handleMoveEnd = useCallback((_event: MouseEvent | TouchEvent | null, viewport: BoardViewport): void => {
+    if (sameBoardViewportModel(viewportRef.current, viewport)) return;
+    viewportRef.current = viewport;
+    setViewport(viewport);
+  }, [setViewport]);
 
 
   const handleNodesDelete: OnNodesDelete<BoardFlowNode> = nodes => {
@@ -848,22 +948,35 @@ export default function BoardWorkspace({
     for (const edge of edges) deleteBoardEdge(edge.id);
   };
 
+  const snapToGrid = board.config.snapToGrid;
+
   const flowPositionFromClient = useCallback((clientX: number, clientY: number): BoardPoint => {
     const instance = flowInstanceRef.current;
     if (instance) {
-      return instance.screenToFlowPosition({ x: clientX, y: clientY }, { snapToGrid: false });
+      return instance.screenToFlowPosition(
+        { x: clientX, y: clientY },
+        { snapToGrid, snapGrid: BOARD_SNAP_GRID },
+      );
     }
     const rect = flowHostRef.current?.getBoundingClientRect();
-    return {
+    const point = {
       x: ((clientX - (rect?.left ?? 0)) - board.viewport.x) / board.viewport.zoom,
       y: ((clientY - (rect?.top ?? 0)) - board.viewport.y) / board.viewport.zoom,
     };
-  }, [board.viewport]);
+    return snapBoardPoint(point, snapToGrid);
+  }, [board.viewport.x, board.viewport.y, board.viewport.zoom, snapToGrid]);
 
-  const centeredNodePosition = useCallback((point: BoardPoint, size: BoardSize): BoardPoint => ({
-    x: Math.round(point.x - size.width / 2),
-    y: Math.round(point.y - size.height / 2),
-  }), []);
+  const centeredNodePosition = useCallback((point: BoardPoint, size: BoardSize): BoardPoint => {
+    const centered = {
+      x: point.x - size.width / 2,
+      y: point.y - size.height / 2,
+    };
+    if (snapToGrid) return snapBoardPoint(centered, true);
+    return {
+      x: Math.round(centered.x),
+      y: Math.round(centered.y),
+    };
+  }, [snapToGrid]);
 
   const visibleCenterPosition = useCallback((size: BoardSize): BoardPoint | undefined => {
     const rect = flowHostRef.current?.getBoundingClientRect();
@@ -1271,6 +1384,7 @@ export default function BoardWorkspace({
         boardTitle={board.title}
         showGrid={board.config.showGrid}
         showMiniMap={board.config.showMiniMap}
+        snapToGrid={board.config.snapToGrid}
         nodeCount={board.nodes.length}
         canRedo={canRedo}
         canUndo={canUndo}
@@ -1290,6 +1404,7 @@ export default function BoardWorkspace({
         onSelectBoard={onSelectBoard}
         onToggleGrid={() => updateBoardConfig({ showGrid: !board.config.showGrid })}
         onToggleMiniMap={() => updateBoardConfig({ showMiniMap: !board.config.showMiniMap })}
+        onToggleSnapToGrid={() => updateBoardConfig({ snapToGrid: !board.config.snapToGrid })}
       />
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto]">
         <section
@@ -1320,6 +1435,8 @@ export default function BoardWorkspace({
             isValidConnection={isValidBoardConnection}
             nodesConnectable
             nodesDraggable
+            snapToGrid={snapToGrid}
+            snapGrid={BOARD_SNAP_GRID}
             nodesFocusable
             edgesFocusable
             edgesReconnectable
@@ -1337,7 +1454,7 @@ export default function BoardWorkspace({
             onInit={(instance) => {
               flowInstanceRef.current = instance;
             }}
-            onMoveEnd={(_event, viewport) => setViewport(viewport)}
+            onMoveEnd={handleMoveEnd}
             onNodeClick={handleNodeClick}
             onNodeContextMenu={handleNodeContextMenu}
             onNodeDoubleClick={handleNodeDoubleClick}

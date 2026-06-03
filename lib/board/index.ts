@@ -27,6 +27,7 @@ export {
   listBoardSummariesFromDB,
   saveBoardToDB,
 } from "@/lib/board/persistence";
+export { BOARD_SNAP_GRID, snapBoardPoint } from "@/lib/board/snap-grid";
 export {
   BOARD_PORT_IDS,
   boardNodeSupportsReferenceInput,

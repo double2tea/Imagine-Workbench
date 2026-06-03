@@ -7,6 +7,7 @@ import {
   Check,
   ChevronDown,
   Layers,
+  Magnet,
   MoreHorizontal,
   CircleHelp,
   Moon,
@@ -42,6 +43,7 @@ interface BoardToolbarProps {
   saveStatus: BoardSaveStatus;
   showGrid: boolean;
   showMiniMap: boolean;
+  snapToGrid: boolean;
   trashedCount: number;
   onBack: () => void;
   onClear: () => void;
@@ -56,6 +58,7 @@ interface BoardToolbarProps {
   onUndo: () => void;
   onToggleGrid: () => void;
   onToggleMiniMap: () => void;
+  onToggleSnapToGrid: () => void;
 }
 
 function saveStatusMeta(status: BoardSaveStatus, error: string | null): {
@@ -116,6 +119,7 @@ export default function BoardToolbar({
   saveStatus,
   showGrid,
   showMiniMap,
+  snapToGrid,
   trashedCount,
   onBack,
   onClear,
@@ -130,6 +134,7 @@ export default function BoardToolbar({
   onUndo,
   onToggleGrid,
   onToggleMiniMap,
+  onToggleSnapToGrid,
 }: BoardToolbarProps) {
   const { themeMode, toggleThemeMode } = useThemeMode();
   const showAlert = useAlert();
@@ -486,6 +491,18 @@ export default function BoardToolbar({
                 aria-pressed={showGrid}
               >
                 {showGrid ? "隐藏网格" : "显示网格"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onToggleSnapToGrid();
+                  setIsOverflowOpen(false);
+                }}
+                className="imagine-board-header-menu-action"
+                aria-pressed={snapToGrid}
+              >
+                <Magnet className="h-3.5 w-3.5" />
+                {snapToGrid ? "关闭磁吸" : "开启磁吸"}
               </button>
               <button
                 type="button"
