@@ -53,7 +53,7 @@ import {
   generateReferenceCandidates,
   isGenerateEdgeProcessing,
 } from "@/lib/board/prompt-references";
-import type { ThemeMode } from "@/components/workbench/WorkspaceHeader";
+import { useThemeModeSnapshot } from "@/lib/theme-mode";
 import type { CapturedVideoFrame } from "@/lib/video-frame";
 import {
   DEFAULT_ASSET_NODE_SIZE,
@@ -78,7 +78,6 @@ interface BoardWorkspaceProps {
   controller: BoardStateController;
   children?: ReactNode;
   galleryItems?: StorageItem[];
-  themeMode: ThemeMode;
   onBack: () => void;
   onCaptureVideoFrame: (nodeId: string, item: StorageItem, frame: CapturedVideoFrame) => void | Promise<void>;
   onConnectionError: (message: string) => void;
@@ -94,7 +93,6 @@ interface BoardWorkspaceProps {
   onSendAssetToAgent: (nodeId: string) => void;
   onSendAgentNode: (nodeId: string) => void;
   onSetAssetAsReference: (nodeId: string) => void;
-  onToggleTheme: () => void;
 }
 
 type BoardFlowEdge = Edge<{ kind: BoardEdgeKind; processing?: boolean }, "smoothstep">;
@@ -379,8 +377,7 @@ function getBoardVar(varName: string, fallback: string): string {
   return val || fallback;
 }
 
-function edgeColor(kind: BoardEdge["kind"], themeMode: ThemeMode): string {
-  void themeMode;
+function edgeColor(kind: BoardEdge["kind"]): string {
   const varNames: Record<BoardEdge["kind"], string> = { prompt: "--iw-board-edge-prompt", reference: "--iw-board-edge-reference", "agent-context": "--iw-board-edge-agent-context", result: "--iw-board-edge-result" };
   const fallbacks: Record<BoardEdge["kind"], string> = { prompt: "#2dd4bf", reference: "#60a5fa", "agent-context": "#a78bfa", result: "#34d399" };
   return getBoardVar(varNames[kind], fallbacks[kind]);
@@ -438,7 +435,6 @@ export default function BoardWorkspace({
   children,
   controller,
   galleryItems = [],
-  themeMode,
   onBack,
   onCancelGenerateNode,
   onCaptureVideoFrame,
@@ -454,8 +450,8 @@ export default function BoardWorkspace({
   onSendAssetToAgent,
   onSendAgentNode,
   onSetAssetAsReference,
-  onToggleTheme,
 }: BoardWorkspaceProps) {
+  const themeMode = useThemeModeSnapshot();
   const flowInstanceRef = useRef<ReactFlowInstance<BoardFlowNode, BoardFlowEdge> | null>(null);
   const flowHostRef = useRef<HTMLElement | null>(null);
   const copiedNodeRef = useRef<CopiedBoardNode | null>(null);
@@ -688,7 +684,7 @@ export default function BoardWorkspace({
         animated: edge.kind === "result" || isGenerateEdgeProcessing(edge, board.nodes),
         data: { kind: edge.kind, processing: isGenerateEdgeProcessing(edge, board.nodes) },
         className: `imagine-board-edge imagine-board-edge-${edge.kind}`,
-        markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor(edge.kind, themeMode), width: 18, height: 18 },
+        markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor(edge.kind), width: 18, height: 18 },
         style: { strokeWidth: selectedEdgeId === edge.id ? 3 : 2 },
       })),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- graph key gates processing animation without position churn
@@ -1254,7 +1250,7 @@ export default function BoardWorkspace({
   ]);
 
   return (
-    <main className={`imagine-workbench-shell imagine-theme-${themeMode} flex h-screen min-h-0 flex-col bg-[var(--iw-bg)] text-[var(--iw-text)]`}>
+    <main className="imagine-workbench-shell imagine-theme-dark flex h-screen min-h-0 flex-col bg-[var(--iw-bg)] text-[var(--iw-text)]">
       <BoardToolbar
         boardId={board.id}
         boardSummaries={boardSummaries}
@@ -1269,7 +1265,6 @@ export default function BoardWorkspace({
         trashedCount={trashedNodes.length}
         onRedo={redo}
         onRestoreTrash={trashedNodes.length > 0 ? () => restoreTrashedNode(0) : undefined}
-        themeMode={themeMode}
         onInsert={insertFromToolbar}
         onUndo={undo}
         onBack={onBack}
@@ -1281,7 +1276,6 @@ export default function BoardWorkspace({
         onSelectBoard={onSelectBoard}
         onToggleGrid={() => updateBoardConfig({ showGrid: !board.config.showGrid })}
         onToggleMiniMap={() => updateBoardConfig({ showMiniMap: !board.config.showMiniMap })}
-        onToggleTheme={onToggleTheme}
       />
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto]">
         <section

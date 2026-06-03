@@ -29,9 +29,9 @@ The current app focuses on a browser-first creative loop:
 
 - **Brand mark:** Header, Agent dock, and board Agent nodes share `components/brand/ImagineMark.tsx` via `components/agent/AgentIdentityMark.tsx`. The browser tab icon is `public/icon.svg` (served as a static asset; do not add `app/icon.svg` — Cloudflare Pages requires edge routes for App Router metadata icons).
 - **Theme modes:** Light and dark. Preference is stored in `localStorage` under `imagine_theme_mode` (default `dark`). `app/layout.tsx` runs an inline bootstrap script before paint to set `html[data-imagine-theme]` and `color-scheme`, so the first frame matches the saved mode.
-- **In-app toggle:** Main workstation and board shells call `useThemeMode()` from `lib/theme-mode.ts`, which keeps `html`, `localStorage`, and the shell class `imagine-theme-{light|dark}` in sync through `useSyncExternalStore`.
+- **In-app toggle:** Header/board toolbar call `useThemeMode()`; `persistThemeMode()` updates `html`, `localStorage`, and shell/agent classes via DOM (`applyThemeClassesToDom`) without re-rendering the main workstation tree. `ThemeDomSync` in `WorkbenchProviders` applies stored classes on first paint. Board React Flow uses `useThemeModeSnapshot()` only where `colorMode` must react.
 - **Design tokens:** Semantic colors use `--iw-*` CSS variables on both `html` and `.imagine-workbench-shell`. Body-level UI (for example `ConfirmProvider` confirm/alert overlays) reads the same variables from `html`, so dialogs are not transparent when opened outside the shell.
-- **Expectations:** Theme switching is optimized to avoid flash and mismatched overlays, not animated “perfect” transitions. Legacy light-mode `!important` overrides in `app/globals.css` remain for older Tailwind utility classes; new UI should prefer `--iw-*` tokens.
+- **Expectations:** Theme switching targets instant DOM/token updates without page-wide React re-renders or `html { transition: color }` (both caused multi-second jank). Legacy light-mode `!important` overrides remain for older Tailwind classes; new UI should prefer `--iw-*` tokens.
 
 ## Run Locally
 

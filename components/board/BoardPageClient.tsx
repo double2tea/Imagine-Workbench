@@ -18,7 +18,7 @@ import PreviewImage from "@/components/PreviewImage";
 import SettingsModal from "@/components/settings/SettingsModal";
 import WorkspaceNotices, { type WorkspaceNotice } from "@/components/workbench/WorkspaceNotices";
 import type { AgentBoardContext, AgentBoardNodeSummary } from "@/lib/agent-context";
-import { useThemeMode } from "@/lib/theme-mode";
+
 import { useAgentController } from "@/hooks/useAgentController";
 import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
 import { useBoardState } from "@/hooks/useBoardState";
@@ -424,7 +424,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const [agentInput, setAgentInput] = useState("");
   const [isAgentDockOpen, setIsAgentDockOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const { themeMode, toggleThemeMode } = useThemeMode();
+
   const [, setIsOptimizing] = useState(false);
   const [imageSubmitCount, setImageSubmitCount] = useState(0);
   const [, setVideoSubmitCount] = useState(0);
@@ -1714,13 +1714,12 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   }, [boardController.board, boardController.saveStatus, boardSummaries]);
 
   return (
-    <div className={`imagine-workbench-shell imagine-theme-${themeMode}`} suppressHydrationWarning>
+    <div className="imagine-workbench-shell imagine-theme-dark">
       <WorkspaceNotices notices={workspaceNotices} onDismiss={dismissWorkspaceNotice} />
       <BoardWorkspace
         boardSummaries={boardSummariesForToolbar}
         controller={boardController}
         galleryItems={items}
-        themeMode={themeMode}
         onBack={handleBackToWorkbench}
         onCancelGenerateNode={handleCancelGenerateNode}
         onCaptureVideoFrame={handleCaptureVideoFrame}
@@ -1736,7 +1735,6 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onSendAssetToAgent={useBoardAssetForAgent}
         onSendAgentNode={handleSendAgentNode}
         onSetAssetAsReference={useBoardAssetAsReference}
-        onToggleTheme={toggleThemeMode}
       >
         <BoardSidePanel
           assetCount={items.length}
@@ -1785,7 +1783,6 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           isOverContent={false}
           messages={agentMessages}
           selectedChatModel={selectedChatModel}
-          themeMode={themeMode}
 
           onSelectChatModel={handleSelectChatModel}
           onCancelCountdown={clearActiveCountdown}

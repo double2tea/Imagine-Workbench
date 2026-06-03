@@ -27,7 +27,7 @@ import {
   type BoardInsertKind,
 } from "@/lib/board/insert-catalog";
 import type { BoardSaveStatus } from "@/hooks/useBoardState";
-import type { ThemeMode } from "@/components/workbench/WorkspaceHeader";
+import { useThemeMode } from "@/lib/theme-mode";
 import type { BoardSummary } from "@/lib/board";
 import BoardInsertIcon from "@/components/board/BoardInsertIcon";
 
@@ -42,7 +42,6 @@ interface BoardToolbarProps {
   saveStatus: BoardSaveStatus;
   showGrid: boolean;
   showMiniMap: boolean;
-  themeMode: ThemeMode;
   trashedCount: number;
   onBack: () => void;
   onClear: () => void;
@@ -57,7 +56,6 @@ interface BoardToolbarProps {
   onUndo: () => void;
   onToggleGrid: () => void;
   onToggleMiniMap: () => void;
-  onToggleTheme: () => void;
 }
 
 function saveStatusMeta(status: BoardSaveStatus, error: string | null): {
@@ -118,7 +116,6 @@ export default function BoardToolbar({
   saveStatus,
   showGrid,
   showMiniMap,
-  themeMode,
   trashedCount,
   onBack,
   onClear,
@@ -133,8 +130,8 @@ export default function BoardToolbar({
   onUndo,
   onToggleGrid,
   onToggleMiniMap,
-  onToggleTheme,
 }: BoardToolbarProps) {
+  const { themeMode, toggleThemeMode } = useThemeMode();
   const showAlert = useAlert();
   const [isBoardMenuOpen, setIsBoardMenuOpen] = useState(false);
   const [isInsertMenuOpen, setIsInsertMenuOpen] = useState(false);
@@ -528,7 +525,7 @@ export default function BoardToolbar({
               <button
                 type="button"
                 onClick={() => {
-                  onToggleTheme();
+                  toggleThemeMode();
                   setIsOverflowOpen(false);
                 }}
                 className="imagine-board-header-menu-action"

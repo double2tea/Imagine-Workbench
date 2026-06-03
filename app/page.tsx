@@ -20,7 +20,7 @@ import AssetGalleryWorkspace from "@/components/workbench/AssetGalleryWorkspace"
 import MobileWorkbenchTabs, { type MobileWorkbenchPanel } from "@/components/workbench/MobileWorkbenchTabs";
 
 import WorkspaceHeader from "@/components/workbench/WorkspaceHeader";
-import { useThemeMode } from "@/lib/theme-mode";
+
 import WorkspaceNotices, { type WorkspaceNotice } from "@/components/workbench/WorkspaceNotices";
 import { clearAllDB, getAllFromDB, saveToDB, type StorageItem } from "@/lib/db";
 import { useAgentController } from "@/hooks/useAgentController";
@@ -213,7 +213,7 @@ export default function Home() {
   const [agentInput, setAgentInput] = useState("");
 
   const [showSettings, setShowSettings] = useState(false);
-  const { themeMode, toggleThemeMode } = useThemeMode();
+
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [imageSubmitCount, setImageSubmitCount] = useState(0);
   const [videoSubmitCount, setVideoSubmitCount] = useState(0);
@@ -1082,8 +1082,7 @@ export default function Home() {
   return (
     <div
       ref={workbenchShellRef}
-      className={`imagine-workbench-shell imagine-theme-${themeMode} min-h-screen flex flex-col bg-[var(--iw-bg)] text-[var(--iw-text)] font-sans selection:bg-blue-500/30 selection:text-[var(--iw-text)] relative overflow-hidden`}
-      suppressHydrationWarning
+      className="imagine-workbench-shell imagine-theme-dark min-h-screen flex flex-col bg-[var(--iw-bg)] text-[var(--iw-text)] font-sans selection:bg-blue-500/30 selection:text-[var(--iw-text)] relative overflow-hidden"
     >
 
       {/* Workbench depth layer */}
@@ -1095,10 +1094,8 @@ export default function Home() {
       <WorkspaceNotices notices={workspaceNotices} onDismiss={dismissWorkspaceNotice} />
 
       <WorkspaceHeader
-        themeMode={themeMode}
         onClearProject={handleClearProject}
         onOpenSettings={() => setShowSettings(prev => !prev)}
-        onToggleTheme={toggleThemeMode}
       />
 
       {/* Main Multi-panel Layout grid */}
@@ -1182,7 +1179,6 @@ export default function Home() {
                 isOverContent={isAgentDockOverContent}
                 messages={agentMessages}
                 selectedChatModel={selectedChatModel}
-                themeMode={themeMode}
 
                 onSelectChatModel={handleSelectChatModel}
                 onCancelCountdown={clearActiveCountdown}

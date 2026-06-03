@@ -62,7 +62,6 @@ interface AgentDockProps {
   isOverContent: boolean;
   messages: ChatMessage[];
   selectedChatModel: string;
-  themeMode: "light" | "dark";
 
   videoModelGroups: AgentModelGroup[];
   onSelectChatModel: (value: string) => void;
@@ -411,7 +410,6 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
     isOverContent,
     messages,
     selectedChatModel,
-    themeMode,
 
     onSelectChatModel,
     onCancelCountdown,
@@ -498,7 +496,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.94, y: 8 }}
           transition={{ duration: 0.16, ease: "easeOut" }}
-          className={`imagine-agent-dock imagine-agent-dock-idle-orb imagine-theme-${themeMode} ${AGENT_DOCK_SHELL_CLASS}`}
+          className={`imagine-agent-dock imagine-agent-dock-idle-orb imagine-theme-dark ${AGENT_DOCK_SHELL_CLASS}`}
         >
           <button
             type="button"
@@ -522,7 +520,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
           animate={{ opacity: isOverContent ? 0.84 : 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.99, y: 10 }}
           transition={{ duration: 0.16, ease: "easeOut" }}
-          className={`imagine-agent-dock imagine-agent-dock-panel pointer-events-auto imagine-theme-${themeMode} fixed inset-x-4 bottom-12 z-50 mx-auto w-[calc(100vw-32px)] max-w-5xl rounded-lg p-3 sm:bottom-16 sm:w-[min(1040px,calc(100vw-40px))]`}
+          className="imagine-agent-dock imagine-agent-dock-panel imagine-theme-dark pointer-events-auto fixed inset-x-4 bottom-12 z-50 mx-auto w-[calc(100vw-32px)] max-w-5xl rounded-lg p-3 sm:bottom-16 sm:w-[min(1040px,calc(100vw-40px))]"
         >
       <div className={`${isOpen ? "mb-2.5" : "mb-1.5"} flex flex-wrap items-center gap-2`}>
         <button

@@ -1,24 +1,20 @@
+"use client";
+
 import Link from "next/link";
 import { Grid2X2, Moon, Settings, Sun, Trash2 } from "lucide-react";
 import ImagineMark from "@/components/brand/ImagineMark";
-
-import type { ThemeMode } from "@/lib/theme-mode";
+import { useThemeMode, type ThemeMode } from "@/lib/theme-mode";
 
 export type { ThemeMode };
 
 interface WorkspaceHeaderProps {
-  themeMode: ThemeMode;
   onClearProject: () => void;
   onOpenSettings: () => void;
-  onToggleTheme: () => void;
 }
 
-export default function WorkspaceHeader({
-  themeMode,
-  onClearProject,
-  onOpenSettings,
-  onToggleTheme,
-}: WorkspaceHeaderProps) {
+export default function WorkspaceHeader({ onClearProject, onOpenSettings }: WorkspaceHeaderProps) {
+  const { themeMode, toggleThemeMode } = useThemeMode();
+
   return (
     <header className="imagine-app-header sticky top-0 z-40 flex min-w-0 items-center justify-between gap-2 overflow-hidden border-b border-[var(--iw-border)] bg-[var(--iw-header)] px-4 py-3 backdrop-blur-xl sm:gap-3 sm:px-6 select-none">
       <div className="z-10 flex min-w-0 flex-1 items-center gap-3">
@@ -53,7 +49,7 @@ export default function WorkspaceHeader({
 
         <button
           type="button"
-          onClick={onToggleTheme}
+          onClick={toggleThemeMode}
           aria-pressed={themeMode === "dark"}
           className="imagine-header-button imagine-icon-button flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)] text-[var(--iw-muted)] transition cursor-pointer"
           title={themeMode === "light" ? "切换深色模式" : "切换浅色模式"}
