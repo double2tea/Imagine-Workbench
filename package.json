@@ -17,7 +17,8 @@
     "pages:deploy": "vp run pages:build && vp dlx wrangler pages deploy .vercel/output/static --project-name=imagine-workbench --commit-dirty=true",
     "test:providers": "vp exec tsc -p tests/tsconfig.json && node --test .tmp/provider-tests/tests/*.test.js",
     "trellis": "trellis",
-    "clean": "next clean"
+    "clean": "next clean",
+    "local": "bash scripts/run-local.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",
