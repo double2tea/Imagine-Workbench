@@ -11,6 +11,7 @@ The current app focuses on a browser-first creative loop:
 - Use `/board` and `/board/[boardId]` canvases to arrange assets, notes, references, and Agent-driven generation in spatial workflows.
 - Store generated assets locally in browser IndexedDB.
 - Search, compare, preview, delete, and ZIP-export workspace assets.
+- Export, import, and clean workspace data (assets, boards, settings) from Settings → 数据.
 - Route model calls through internal provider adapters for 12AI, grok2api, xstx, Agnes AI, ModelScope, and RunningHub.
 
 ## Stack
@@ -132,10 +133,13 @@ RunningHub support intentionally treats AI Apps and workflows as provider-backed
 
 - Image: `12ai:gemini-3.1-flash-image-preview`
 - Video: `12ai:veo_3_1-fast`
-- Agent text chat: `12ai:gemini-3.1-flash-lite-preview`
-- Agent vision chat: `12ai:gemini-3.1-flash-lite-preview`
+- Agent chat: `12ai:gemini-3.1-flash-lite-preview`
 
-Agent Mode automatically switches to the vision chat model when the request carries a selected or pasted reference image. The UI does not expose sync/async as a user-facing choice; image requests stay synchronous by default, and repeat submissions use the async 12AI endpoint only when the selected image model supports it.
+Agent Mode always uses the chat model you select in the Agent dock. It does not auto-switch models when reference images are present. Sendable references (`http://`, `https://`, or `data:image/*`) are attached to the Agent request; `blob:` and other non-sendable URLs are skipped. If the provider rejects image input, the API error surfaces as usual.
+
+When references are present, the dock may show an OpenRouter-based vision hint (`GET /api/model-vision-support?model=...`). Hints use fuzzy ID matching against OpenRouter `input_modalities` (image). `supportsVision: true|false` is informational only; `null` means no catalog match. Hints never block model selection or change the submitted model.
+
+The UI does not expose sync/async as a user-facing choice; image requests stay synchronous by default, and repeat submissions use the async 12AI endpoint only when the selected image model supports it.
 
 Agent recommendations can query the local model catalog before choosing a generation target, so recommended actions stay aligned with the capabilities currently defined in the app.
 Agent action params can carry image/video model controls such as image resolution, image quality, thinking level, video resolution, duration, and preset.
@@ -188,6 +192,7 @@ Users can open the picker with the template button or type `/` in supported prom
 - `POST /api/gemini/video-download`: proxies completed video downloads.
 - `POST /api/gemini/optimize`: expands a visual prompt through the selected chat model.
 - `POST /api/gemini/agent`: Agent Mode response and recommended action.
+- `GET /api/model-vision-support?model=<id>`: OpenRouter vision hint for Agent dock (`supportsVision`, `source`).
 - `GET /api/models?provider=<key>&kind=all|chat|image|video`: loads provider model options dynamically from `/v1/models`.
 
 ## Project Layout
@@ -201,19 +206,22 @@ app/
   api/gemini/*                     Generation, agent, status, download APIs
   api/models/route.ts              Provider model listing
 components/
-  agent/                           Agent dock and chat messages
+  agent/                           Agent dock, shared identity mark, chat messages
   assets/                          Gallery cards, compare panel, toolbar, fullscreen preview
   board/                           Canvas toolbar, nodes, and board viewport
   creation/                        Image/video generation panels
   prompt-templates/                Shared prompt template picker
   reference/                       Reference image picker, drag-and-drop, @-mention dropdown
-  settings/                        Settings modal (tabbed: providers / models / system)
+  settings/                        Settings modal (connections + 数据 management)
   workbench/                       Workspace header, notices, gallery layout
   CanvasMaskEditor.tsx             In-browser mask editor
 lib/
+  agent-chat-model.ts              Agent reference normalization and sendable URL rules
   board/                           Board types, defaults, and IndexedDB persistence
   client-fetch-error.ts            Shared client-side fetch error reader
+  data-management.ts               Workspace backup, import, cleanup, board reset
   db.ts                            IndexedDB asset store
+  openrouter/                      OpenRouter model catalog cache for vision hints
   prompt-templates.ts              Built-in template catalog and insertion helpers
   providers/                       Provider registry, adapters, model catalog, types
 hooks/
@@ -227,6 +235,8 @@ hooks/
   useReferenceState.ts             Prompt/reference image state and drag/drop handling
   use-mobile.ts                    Mobile breakpoint helper
 tests/
+  agent-chat-model.test.ts         Agent sendable reference helpers
+  openrouter-capabilities.test.ts  OpenRouter vision index matching
   *.test.ts                        Node test suite for helpers and provider behavior
 ```
 
@@ -257,3 +267,5 @@ npm run test:providers
 - Board documents are persisted separately from generated media. Board nodes reference assets by ID/url, while generated media remains owned by the IndexedDB asset store.
 - Board generation resolves connected image references against the latest IndexedDB asset item before submission.
 - React Flow node state on the board should stay single-source from the normalized board document. Use transient visual state only for active drag feedback, then write settled positions back to `useBoardState`.
+- Settings → 数据 can export/import a ZIP workspace backup, clear asset or board stores, reset boards to the default document, and remove selected localStorage groups. Optional credential export is explicit and off by default.
+- Agent UI and board Agent nodes share `components/agent/AgentIdentityMark.tsx` for the same visual mark.

@@ -24,13 +24,19 @@ Current core surfaces:
 - `app/api/board/import-image/route.ts`: board image import route for `data:image/*` base64 data URI capture into local assets.
 - `app/api/gemini/*`: server routes for generation, optimization, Agent Mode, async polling, and media download proxying.
 - `app/api/gemini/reference-image/route.ts`: narrow server-side fetch path for legacy provider image result URLs used as retry/reference inputs.
-- `app/api/gemini/agent/route.ts`: Agent Mode with tool-calling loop. Uses zod for request/response validation. Agent calls tools to query models, skills, and gallery assets before recommending actions. Model IDs are validated server-side against the catalog.
+- `app/api/gemini/agent/route.ts`: Agent Mode with tool-calling loop. Uses zod for request/response validation. Agent calls tools to query models, skills, and gallery assets before recommending actions. Model IDs are validated server-side against the catalog. Chat model is always user-selected; reference images attach only when URLs are sendable (`lib/agent-chat-model.ts`).
+- `app/api/model-vision-support/route.ts`: `GET ?model=` returns OpenRouter-based vision hint (`supportsVision: true | false | null`). Hint only; never changes the submitted model.
 - `app/api/gemini/agent/tools.ts`: Agent tool definitions and executors. Tools: `query_models`, `get_skill_info`, `get_gallery_assets`, `get_prompt_blueprint`. Tool arg schemas defined with zod, JSON Schema introspected for OpenAI tool definitions.
 - `app/api/gemini/agent/skills.ts`: Skill registry (static descriptions). Agent activates skills at runtime via tools rather than a pre-routed LLM call.
 - `app/api/models/route.ts`: provider model listing.
 - `components/prompt-templates/PromptTemplatePicker.tsx`: reusable prompt template picker, including slash-command opening and portal-based floating panel.
 - `lib/prompt-templates.ts`: built-in template catalog, categories, slash-command detection, and insertion helpers.
-- `hooks/useAgentController.ts`: Agent chat state, localStorage persistence, tool action execution, auto-execute countdown, and Agent API submission.
+- `hooks/useAgentController.ts`: Agent chat state, localStorage persistence, tool action execution, auto-execute countdown, and Agent API submission. Uses `getSendableAgentImageReferences` before submit.
+- `lib/agent-chat-model.ts`: Agent reference normalization, sendable URL rules (`http(s)` / `data:image/*`), and hint message formatting.
+- `lib/openrouter/capabilities.ts`: Fetches and caches OpenRouter model list; vision = `image` in `input_modalities`; fuzzy match by stripped id, substring, token overlap. Unknown → `null`.
+- `lib/data-management.ts`: Workspace ZIP export/import, IndexedDB cleanup, board reset, localStorage group cleanup.
+- `components/agent/AgentIdentityMark.tsx`: Shared Agent SVG mark (dock orb/header, board inline nodes). Optional `trackPointer` for gaze CSS vars.
+- `components/settings/DataManagementWorkspace.tsx`: Settings → 数据 tab UI wired from main page and board shell.
 - `hooks/useAssetActions.ts`: gallery actions for selection, delete, cancel, retry, metadata export, ZIP export, and compare toggles.
 - `hooks/useAssetWorkspaceState.ts`: gallery filters, counts, search, selected IDs, compare state, and derived reference-image lists.
 - `hooks/useGenerationActions.ts`: manual image/video submission, temporary asset records, async operation handles, and generation abort controllers.
@@ -144,6 +150,14 @@ Adding a new tool:
 
 The system prompt is kept lean: no hardcoded model recommendations, no gallery summary, no full skill descriptions. All data is fetched on demand through tools (progressive disclosure).
 
+### Agent chat model and reference images
+
+- Do not auto-switch Agent chat model for vision. No client-side vision whitelist or `DEFAULT_VISION_CHAT_MODEL` override path.
+- `isSendableAgentImageUrl`: only `http://`, `https://`, and `data:image/*` are attached to Agent chat payloads. Skip `blob:` and empty URLs.
+- `AgentDock` may call `/api/model-vision-support` when sendable references exist; show hint text only. `supportsVision: null` is valid (unknown catalog match).
+- Do not block model selection or rewrite `chatModel` based on vision hints. Let unsupported models fail at the provider.
+- OpenRouter vision index is a cross-provider hint layer, not a capability registry for generation models.
+
 ### Prompt Engineering
 
 The `PromptEngineer` skill and `get_prompt_blueprint` tool encode knowledge from prompt libraries:
@@ -161,7 +175,9 @@ The `PromptEngineer` skill and `get_prompt_blueprint` tool encode knowledge from
 - Do not add explanatory in-app text unless it directly supports the workflow.
 - Ensure controls remain usable on mobile and desktop.
 - Provider search in settings filters the list only; it should not automatically switch the selected provider.
+- Settings tabs: `connections` (providers/models) and `data` (workspace backup, cleanup). Keep destructive actions behind confirm dialogs.
 - For generated assets, preserve the existing gallery/search/compare/export mental model.
+- Board Agent UI uses the same `AgentIdentityMark` as the dock; do not fork a separate board-only icon.
 
 ## Verification
 
