@@ -16,38 +16,15 @@ Also self-assess whether delegation is useful. Use subagents only when the task 
 
 Imagine Workbench is a Next.js App Router workstation for AI creative generation.
 
-Current core surfaces:
+Keep this file for durable agent-facing rules. Use `README.md` for feature descriptions, route catalogs, and user-facing behavior.
 
-- `app/page.tsx`: main browser composition shell. It wires workstation state/hooks into creation panels, Agent Dock, gallery, settings, fullscreen preview, and mask editor.
-- `app/board/page.tsx`: standalone canvas operation shell. It reuses the existing asset store, generation hooks, provider settings, Agent Dock, mask editor, and media polling while presenting a spatial board workflow.
-- `app/board/[boardId]/page.tsx`: specific persisted board route.
-- `app/api/board/import-image/route.ts`: board image import route for `data:image/*` base64 data URI capture into local assets.
-- `app/api/gemini/*`: server routes for generation, optimization, Agent Mode, async polling, and media download proxying.
-- `app/api/gemini/reference-image/route.ts`: narrow server-side fetch path for legacy provider image result URLs used as retry/reference inputs.
-- `app/api/gemini/agent/route.ts`: Agent Mode with tool-calling loop. Uses zod for request/response validation. Agent calls tools to query models, skills, and gallery assets before recommending actions. Model IDs are validated server-side against the catalog. Chat model is always user-selected; reference images attach only when URLs are sendable (`lib/agent-chat-model.ts`).
-- `app/api/model-vision-support/route.ts`: `GET ?model=` returns OpenRouter-based vision hint (`supportsVision: true | false | null`). Hint only; never changes the submitted model.
-- `app/api/gemini/agent/tools.ts`: Agent tool definitions and executors. Tools: `query_models`, `get_skill_info`, `get_gallery_assets`, `get_prompt_blueprint`. Tool arg schemas defined with zod, JSON Schema introspected for OpenAI tool definitions.
-- `app/api/gemini/agent/skills.ts`: Skill registry (static descriptions). Agent activates skills at runtime via tools rather than a pre-routed LLM call.
-- `app/api/models/route.ts`: provider model listing.
-- `components/prompt-templates/PromptTemplatePicker.tsx`: reusable prompt template picker, including slash-command opening and portal-based floating panel.
-- `lib/prompt-templates.ts`: built-in template catalog, categories, slash-command detection, and insertion helpers.
-- `hooks/useAgentController.ts`: Agent chat state, localStorage persistence, tool action execution, auto-execute countdown, and Agent API submission. Uses `getSendableAgentImageReferences` before submit.
-- `lib/agent-chat-model.ts`: Agent reference normalization, sendable URL rules (`http(s)` / `data:image/*`), and hint message formatting.
-- `lib/openrouter/capabilities.ts`: Fetches and caches OpenRouter model list; vision = `image` in `input_modalities`; fuzzy match by stripped id, substring, token overlap. Unknown → `null`.
-- `lib/data-management.ts`: Workspace ZIP export/import, IndexedDB cleanup, board reset, localStorage group cleanup.
-- `components/agent/AgentIdentityMark.tsx`: Shared Agent SVG mark (dock orb/header, board inline nodes). Optional `trackPointer` for gaze CSS vars.
-- `components/settings/DataManagementWorkspace.tsx`: Settings → 数据 tab UI wired from main page and board shell.
-- `hooks/useAssetActions.ts`: gallery actions for selection, delete, cancel, retry, metadata export, ZIP export, and compare toggles.
-- `hooks/useAssetWorkspaceState.ts`: gallery filters, counts, search, selected IDs, compare state, and derived reference-image lists.
-- `hooks/useGenerationActions.ts`: manual image/video submission, temporary asset records, async operation handles, and generation abort controllers.
-- `hooks/useProviderSettings.ts`: provider credentials, base URLs, model-list fetching, connection tests, and header construction.
-- `hooks/useReferenceState.ts`: reference image upload/drop handling, prompt `@` references, and role toggling.
-- `hooks/useMediaPolling.ts`: async image/video status polling and final media download into IndexedDB.
-- `lib/providers/*`: provider adapters, model catalog, tool-calling chat completions, parsing, request helpers, and shared types.
-- `lib/client-fetch-error.ts`: shared client-side helper for JSON and non-JSON provider error responses.
-- `lib/db.ts`: browser IndexedDB persistence for generated assets.
-- `lib/board/*`: board document types, defaults, and IndexedDB persistence. Board data stores layout and references; generated media remains owned by `StorageItem` in `lib/db.ts`.
-- `components/CanvasMaskEditor.tsx`: local mask drawing UI.
+Core boundaries:
+
+- `app/page.tsx` owns the main workstation shell.
+- `app/board/*`, `components/board/*`, `hooks/useBoardState.ts`, and `lib/board/*` own board workflows.
+- `app/api/*` routes should stay thin; provider-specific behavior belongs in `lib/providers/*`.
+- Generated media lives in the IndexedDB asset store (`lib/db.ts`); board documents store layout and references.
+- Shared settings/data-management UI belongs in `components/settings/*`; workspace data operations belong in `lib/data-management.ts`.
 
 ## TypeScript Rules
 
@@ -121,26 +98,13 @@ Video reference image API/provider boundaries accept `data:image/*` base64 data 
 
 ## Prompt Templates
 
-- Art preset chips have been removed. Do not reintroduce `PresetStyles.ts` or model-agnostic style suffix toggles.
-- Built-in prompt templates live in `lib/prompt-templates.ts`.
-- UI access uses `components/prompt-templates/PromptTemplatePicker.tsx`.
-- Supported prompt surfaces: main image panel, main video panel, mobile composer, board Prompt nodes, and board image/video generation nodes.
-- Slash commands use `detectPromptTemplateSlashCommand()`. Insert mode should replace the active slash token when present; replace mode should replace the full prompt.
-- Image prompts may apply a template negative prompt. Video and board prompt insertion should only use the positive prompt unless explicitly expanded.
+- Do not reintroduce art preset chips, `PresetStyles.ts`, or model-agnostic style suffix toggles.
+- Prompt templates live in `lib/prompt-templates.ts`; UI access uses `components/prompt-templates/PromptTemplatePicker.tsx`.
+- Keep `/` template insertion consistent across main, mobile, and board prompt surfaces. Image prompts may apply a template negative prompt; other surfaces use positive prompt unless explicitly expanded.
 
 ## Agent Tool Calling
 
-The Agent Mode uses OpenAI-compatible function calling with a bounded loop (max 3 rounds). The flow:
-
-1. Request body is validated with a zod schema (`agentBodySchema`).
-2. Skill names only (not full descriptions) are injected into the system prompt.
-3. Gallery assets are NOT injected — the agent queries them via `get_gallery_assets` when needed.
-4. The agent loop calls `createChatCompletionWithTools`; if the model returns `tool_calls`, each is executed and results fed back.
-5. After the loop, the final LLM text response is parsed with `agentResponseSchema` (zod).
-6. `validateActionModel` checks the recommended model ID against `MODEL_CAPABILITIES` — invalid IDs are stripped.
-7. `validateActiveSkills` filters skill names to known registry entries.
-
-Agent action schemas support image/video parameter fields: `imageResolution`, `imageQuality`, `thinkingLevel`, `videoResolution`, `videoDuration`, and `videoPreset`.
+The Agent Mode uses OpenAI-compatible function calling with a bounded loop. Keep the system prompt lean and fetch data through tools when needed.
 
 Adding a new tool:
 - Add a zod schema for its arguments in `tools.ts`.
@@ -148,24 +112,11 @@ Adding a new tool:
 - Add a case to `executeToolCall`.
 - For data-driven tools (blueprints, templates), store data in the tool file rather than system prompt.
 
-The system prompt is kept lean: no hardcoded model recommendations, no gallery summary, no full skill descriptions. All data is fetched on demand through tools (progressive disclosure).
-
 ### Agent chat model and reference images
 
-- Do not auto-switch Agent chat model for vision. No client-side vision whitelist or `DEFAULT_VISION_CHAT_MODEL` override path.
-- `isSendableAgentImageUrl`: only `http://`, `https://`, and `data:image/*` are attached to Agent chat payloads. Skip `blob:` and empty URLs.
-- `AgentDock` may call `/api/model-vision-support` when sendable references exist; show hint text only. `supportsVision: null` is valid (unknown catalog match).
-- Do not block model selection or rewrite `chatModel` based on vision hints. Let unsupported models fail at the provider.
-- OpenRouter vision index is a cross-provider hint layer, not a capability registry for generation models.
-
-### Prompt Engineering
-
-The `PromptEngineer` skill and `get_prompt_blueprint` tool encode knowledge from prompt libraries:
-
-- **Structured JSON format** for complex compositions (infographics, UI mockups, posters) — use explicit `type`/`style`/`subject`/`sections`/`callouts` fields
-- **Use case taxonomy** (10 categories): portrait, social-media, infographic, youtube-thumbnail, comic-storyboard, product-marketing, ecommerce, game-asset, poster-flyer, app-web-design
-- **Style taxonomy** (16 categories): photography, cinematic, anime, illustration, sketch, 3D-render, chibi, isometric, pixel-art, oil-painting, watercolor, ink/chinese, retro/vintage, cyberpunk/sci-fi, minimalism
-- **GPT Image 2 notes**: pixel-perfect text rendering, multi-language support, cross-image consistency — prefer for infographics, posters, and storyboards
+- Do not auto-switch, block, or rewrite the user-selected Agent chat model for vision.
+- Attach only sendable image references (`http://`, `https://`, `data:image/*`) to Agent chat payloads; skip `blob:` and empty URLs.
+- Vision support lookup is informational UI only. Let unsupported models fail at the provider.
 
 ## UI Rules
 

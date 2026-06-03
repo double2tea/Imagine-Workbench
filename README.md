@@ -63,7 +63,20 @@ RUNNINGHUB_BASE_URL="https://www.runninghub.cn"
 ```
 
 The app can also accept provider credentials from the in-app settings panel. Request headers from the UI are resolved by `lib/providers/utils.ts`.
+Settings has two tabs: `连接` for provider/model configuration and `数据` for local workspace data management. The older standalone `系统` tab was removed after its asset summary/reset controls moved into `数据`.
 Provider search in settings filters the provider list only; it does not auto-switch the selected provider.
+
+## Data Management
+
+Open Settings → `数据` to inspect and manage local browser data:
+
+- Summary cards cover assets, boards, managed localStorage keys, and browser storage quota when the browser exposes it.
+- `完整备份` exports a ZIP with a manifest, asset index, media files, board documents, and optional local settings/provider credentials.
+- `当前画板` exports only the active board plus the assets it references, and is shown on board routes.
+- `恢复备份` previews the backup counts before overwriting local assets, boards, and managed settings. Provider credentials import only when the credentials checkbox is enabled.
+- `导入图片/视频` stores selected local media files as completed local assets in IndexedDB.
+- Cleanup actions remove failed tasks, stale processing/queued tasks older than two hours, completed records without media URLs, or completed assets not referenced by any board.
+- The danger zone can clear all assets, reset boards to a default empty board, or clear Agent history, model cache, provider credentials, and UI preferences from localStorage.
 
 ## Provider Support
 
