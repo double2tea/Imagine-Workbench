@@ -33,6 +33,12 @@
   }
 }
 
+html {
+  transition:
+    background-color 0.16s var(--iw-ease-out, ease),
+    color 0.16s var(--iw-ease-out, ease);
+}
+
 html,
 .imagine-workbench-shell {
   --iw-bg: #07080b;
@@ -74,8 +80,18 @@ html,
   background: var(--iw-bg) !important;
   color: var(--iw-text);
   color-scheme: dark;
+  transition:
+    background-color 0.16s var(--iw-ease-out),
+    color 0.16s var(--iw-ease-out);
   overflow-x: hidden !important;
   overflow-y: visible !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html,
+  .imagine-workbench-shell {
+    transition: none;
+  }
 }
 
 html[data-imagine-theme="light"],
@@ -1508,13 +1524,13 @@ html[data-imagine-theme="light"] .imagine-settings-overlay {
 }
 
 .imagine-root-body {
-  background: #eef3f8;
-  color: #172033;
-}
-
-html[data-imagine-theme="dark"] .imagine-root-body {
   background: #07080b;
   color: #e5e7eb;
+}
+
+html[data-imagine-theme="light"] .imagine-root-body {
+  background: #eef3f8;
+  color: #172033;
 }
 
 .imagine-reference-label {

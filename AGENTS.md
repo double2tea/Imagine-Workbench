@@ -25,6 +25,9 @@ Core boundaries:
 - `app/api/*` routes should stay thin; provider-specific behavior belongs in `lib/providers/*`.
 - Generated media lives in the IndexedDB asset store (`lib/db.ts`); board documents store layout and references.
 - Shared settings/data-management UI belongs in `components/settings/*`; workspace data operations belong in `lib/data-management.ts`.
+- App-root wrappers live in `components/workbench/WorkbenchProviders.tsx` (`ConfirmProvider` for confirm/alert dialogs).
+- Theme persistence and toggling live in `lib/theme-mode.ts` (`useThemeMode`, `persistThemeMode`, `imagine_theme_mode` in localStorage). Do not restore theme with delayed `setTimeout`; keep `html[data-imagine-theme]` aligned with the shell class.
+- Shared branding lives in `components/brand/ImagineMark.tsx`. Favicon is `public/icon.svg` only — do not add `app/icon.svg` (Cloudflare Pages `@cloudflare/next-on-pages` rejects non-edge App Router icon routes).
 
 ## TypeScript Rules
 
@@ -127,9 +130,11 @@ Adding a new tool:
 - Do not add explanatory in-app text unless it directly supports the workflow.
 - Ensure controls remain usable on mobile and desktop.
 - Provider search in settings filters the list only; it should not automatically switch the selected provider.
-- Settings tabs: `connections` (providers/models) and `data` (workspace backup, cleanup). Keep destructive actions behind confirm dialogs.
+- Settings tabs: `connections` (providers/models) and `data` (workspace backup, cleanup). Keep destructive actions behind `useConfirm()` / `useAlert()` from `ConfirmProvider`; do not use blocking `window.confirm`.
 - For generated assets, preserve the existing gallery/search/compare/export mental model.
-- Board Agent UI uses the same `AgentIdentityMark` as the dock; do not fork a separate board-only icon.
+- Board Agent UI uses the same `AgentIdentityMark` → `ImagineMark` as the dock; do not fork a separate board-only icon or purple-only legacy mark.
+- Theme: default `dark`. Define or consume `--iw-*` on `html` when UI can render outside `.imagine-workbench-shell` (confirm overlays, settings backdrop). New surfaces should use semantic tokens; avoid expanding light-mode `[class*="..."]` `!important` overrides unless fixing a specific legacy control.
+- Theme switching targets no flash and consistent overlays, not full animated transitions. Do not start a repo-wide “theme smoothness” refactor unless explicitly requested.
 
 ## Verification
 

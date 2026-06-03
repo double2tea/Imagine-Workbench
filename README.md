@@ -25,6 +25,14 @@ The current app focuses on a browser-first creative loop:
 - JSZip
 - Browser IndexedDB for local asset storage
 
+## Appearance and Theme
+
+- **Brand mark:** Header, Agent dock, and board Agent nodes share `components/brand/ImagineMark.tsx` via `components/agent/AgentIdentityMark.tsx`. The browser tab icon is `public/icon.svg` (served as a static asset; do not add `app/icon.svg` — Cloudflare Pages requires edge routes for App Router metadata icons).
+- **Theme modes:** Light and dark. Preference is stored in `localStorage` under `imagine_theme_mode` (default `dark`). `app/layout.tsx` runs an inline bootstrap script before paint to set `html[data-imagine-theme]` and `color-scheme`, so the first frame matches the saved mode.
+- **In-app toggle:** Main workstation and board shells call `useThemeMode()` from `lib/theme-mode.ts`, which keeps `html`, `localStorage`, and the shell class `imagine-theme-{light|dark}` in sync through `useSyncExternalStore`.
+- **Design tokens:** Semantic colors use `--iw-*` CSS variables on both `html` and `.imagine-workbench-shell`. Body-level UI (for example `ConfirmProvider` confirm/alert overlays) reads the same variables from `html`, so dialogs are not transparent when opened outside the shell.
+- **Expectations:** Theme switching is optimized to avoid flash and mismatched overlays, not animated “perfect” transitions. Legacy light-mode `!important` overrides in `app/globals.css` remain for older Tailwind utility classes; new UI should prefer `--iw-*` tokens.
+
 ## Run Locally
 
 Prerequisite: Node.js.
@@ -220,17 +228,20 @@ app/
   api/gemini/*                     Generation, agent, status, download APIs
   api/models/route.ts              Provider model listing
 components/
-  agent/                           Agent dock, shared identity mark, chat messages
+  agent/                           Agent dock, AgentIdentityMark wrapper, chat messages
   assets/                          Gallery cards, compare panel, toolbar, fullscreen preview
   board/                           Canvas toolbar, nodes, and board viewport
+  brand/                           Shared ImagineMark SVG brand component
+  confirm/                         ConfirmProvider, useConfirm, useAlert for destructive actions
   creation/                        Image/video generation panels
   prompt-templates/                Shared prompt template picker
   reference/                       Reference image picker, drag-and-drop, @-mention dropdown
   settings/                        Settings modal (connections + 数据 management)
-  workbench/                       Workspace header, notices, gallery layout
+  workbench/                       Workspace header, WorkbenchProviders, notices, gallery layout
   CanvasMaskEditor.tsx             In-browser mask editor
 lib/
   agent-chat-model.ts              Agent reference normalization and sendable URL rules
+  theme-mode.ts                    Theme persistence, html bootstrap sync, useThemeMode hook
   board/                           Board types, defaults, and IndexedDB persistence
   client-fetch-error.ts            Shared client-side fetch error reader
   data-management.ts               Workspace backup, import, cleanup, board reset
@@ -282,4 +293,5 @@ npm run test:providers
 - Board generation resolves connected image references against the latest IndexedDB asset item before submission.
 - React Flow node state on the board should stay single-source from the normalized board document. Use transient visual state only for active drag feedback, then write settled positions back to `useBoardState`.
 - Settings → 数据 can export/import a ZIP workspace backup, clear asset or board stores, reset boards to the default document, and remove selected localStorage groups. Optional credential export is explicit and off by default.
-- Agent UI and board Agent nodes share `components/agent/AgentIdentityMark.tsx` for the same visual mark.
+- Agent UI and board Agent nodes share `components/agent/AgentIdentityMark.tsx`, which renders `components/brand/ImagineMark.tsx`.
+- Destructive or irreversible actions use `useConfirm()` / `useAlert()` from `components/confirm/ConfirmProvider.tsx` (wrapped at the app root by `components/workbench/WorkbenchProviders.tsx`).

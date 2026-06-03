@@ -18,7 +18,7 @@ import PreviewImage from "@/components/PreviewImage";
 import SettingsModal from "@/components/settings/SettingsModal";
 import WorkspaceNotices, { type WorkspaceNotice } from "@/components/workbench/WorkspaceNotices";
 import type { AgentBoardContext, AgentBoardNodeSummary } from "@/lib/agent-context";
-import { persistThemeMode, readStoredThemeMode, type ThemeMode } from "@/lib/theme-mode";
+import { useThemeMode } from "@/lib/theme-mode";
 import { useAgentController } from "@/hooks/useAgentController";
 import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
 import { useBoardState } from "@/hooks/useBoardState";
@@ -424,7 +424,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const [agentInput, setAgentInput] = useState("");
   const [isAgentDockOpen, setIsAgentDockOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [themeMode, setThemeMode] = useState<ThemeMode>("light");
+  const { themeMode, toggleThemeMode } = useThemeMode();
   const [, setIsOptimizing] = useState(false);
   const [imageSubmitCount, setImageSubmitCount] = useState(0);
   const [, setVideoSubmitCount] = useState(0);
@@ -1369,17 +1369,6 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   }, [pushWorkspaceNotice]);
 
   useEffect(() => {
-    const restoreTheme = setTimeout(() => {
-      const stored = readStoredThemeMode();
-      if (stored) {
-        setThemeMode(stored);
-        document.documentElement.setAttribute("data-imagine-theme", stored);
-      }
-    }, 0);
-    return () => clearTimeout(restoreTheme);
-  }, []);
-
-  useEffect(() => {
     if (!loadedItemsRef.current) return;
     if (boardController.saveStatus === "loading") return;
     const known = knownItemIdsRef.current;
@@ -1707,14 +1696,6 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     void selectBoardPage(nextBoardId).catch(error => pushWorkspaceNotice("error", toErrorMessage(error, "画板切换失败")));
   }, [pushWorkspaceNotice, selectBoardPage]);
 
-  const toggleThemeMode = useCallback(() => {
-    setThemeMode(prev => {
-      const next: ThemeMode = prev === "light" ? "dark" : "light";
-      persistThemeMode(next);
-      return next;
-    });
-  }, []);
-
   const selectedBoardNode = boardController.board.nodes.find(node => node.id === boardController.selectedNodeId);
   const selectedIncomingEdges = selectedBoardNode
     ? boardController.board.edges.filter(edge => edge.to.nodeId === selectedBoardNode.id)
@@ -1733,7 +1714,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   }, [boardController.board, boardController.saveStatus, boardSummaries]);
 
   return (
-    <div className={`imagine-workbench-shell imagine-theme-${themeMode}`}>
+    <div className={`imagine-workbench-shell imagine-theme-${themeMode}`} suppressHydrationWarning>
       <WorkspaceNotices notices={workspaceNotices} onDismiss={dismissWorkspaceNotice} />
       <BoardWorkspace
         boardSummaries={boardSummariesForToolbar}

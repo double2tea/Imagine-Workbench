@@ -20,7 +20,7 @@ import AssetGalleryWorkspace from "@/components/workbench/AssetGalleryWorkspace"
 import MobileWorkbenchTabs, { type MobileWorkbenchPanel } from "@/components/workbench/MobileWorkbenchTabs";
 
 import WorkspaceHeader from "@/components/workbench/WorkspaceHeader";
-import { persistThemeMode, readStoredThemeMode, type ThemeMode } from "@/lib/theme-mode";
+import { useThemeMode } from "@/lib/theme-mode";
 import WorkspaceNotices, { type WorkspaceNotice } from "@/components/workbench/WorkspaceNotices";
 import { clearAllDB, getAllFromDB, saveToDB, type StorageItem } from "@/lib/db";
 import { useAgentController } from "@/hooks/useAgentController";
@@ -213,7 +213,7 @@ export default function Home() {
   const [agentInput, setAgentInput] = useState("");
 
   const [showSettings, setShowSettings] = useState(false);
-  const [themeMode, setThemeMode] = useState<ThemeMode>("light");
+  const { themeMode, toggleThemeMode } = useThemeMode();
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [imageSubmitCount, setImageSubmitCount] = useState(0);
   const [videoSubmitCount, setVideoSubmitCount] = useState(0);
@@ -624,15 +624,6 @@ export default function Home() {
     }
     loadWorkspace();
 
-    const restoreSettings = setTimeout(() => {
-      const storedThemeMode = readStoredThemeMode();
-      if (storedThemeMode) {
-        setThemeMode(storedThemeMode);
-        document.documentElement.setAttribute("data-imagine-theme", storedThemeMode);
-      }
-    }, 0);
-
-    return () => clearTimeout(restoreSettings);
   }, [pushWorkspaceNotice]);
 
   // Optimize prompt inside text area utilizing Gemini client model
@@ -925,14 +916,6 @@ export default function Home() {
     }
   }, [confirmAction, pushWorkspaceNotice]);
 
-  const toggleThemeMode = () => {
-    setThemeMode(prev => {
-      const next: ThemeMode = prev === "light" ? "dark" : "light";
-      persistThemeMode(next);
-      return next;
-    });
-  };
-
   const renderAssetGalleryWorkspace = () => (
     <AssetGalleryWorkspace
       assetDateEnd={assetDateEnd}
@@ -1100,6 +1083,7 @@ export default function Home() {
     <div
       ref={workbenchShellRef}
       className={`imagine-workbench-shell imagine-theme-${themeMode} min-h-screen flex flex-col bg-[var(--iw-bg)] text-[var(--iw-text)] font-sans selection:bg-blue-500/30 selection:text-[var(--iw-text)] relative overflow-hidden`}
+      suppressHydrationWarning
     >
 
       {/* Workbench depth layer */}

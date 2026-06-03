@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   },
 };
 
-const themeBootstrapScript = `(function(){try{var t=localStorage.getItem("imagine_theme_mode");if(t==="dark"||t==="light"){document.documentElement.setAttribute("data-imagine-theme",t);}}catch(e){}})();`;
+const themeBootstrapScript = `(function(){try{var t=localStorage.getItem("imagine_theme_mode");if(t!=="dark"&&t!=="light"){t="dark";}document.documentElement.setAttribute("data-imagine-theme",t);document.documentElement.style.colorScheme=t;}catch(e){}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
