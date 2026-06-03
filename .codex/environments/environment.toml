@@ -1,0 +1,17 @@
+# Codex local environment for Imagine Workbench.
+# setup: runs once per new worktree (must finish). actions: toolbar shortcuts in the app.
+version = 1
+name = "Imagine-Workbench"
+
+[setup]
+script = "bash scripts/codex-setup.sh"
+
+[[actions]]
+name = "Dev"
+icon = "run"
+command = "pnpm run dev"
+
+[[actions]]
+name = "Check"
+icon = "test"
+command = "pnpm run check"
