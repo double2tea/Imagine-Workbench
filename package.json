@@ -12,7 +12,7 @@
     "lint:eslint": "eslint .",
     "typecheck": "vp exec tsc --noEmit",
     "check": "vp run lint && vp run typecheck",
-    "pages:build": "vp run build && vp dlx @cloudflare/next-on-pages@1 --skip-build",
+    "pages:build": "vp dlx @cloudflare/next-on-pages@1",
     "pages:preview": "vp run pages:build && vp dlx wrangler pages dev .vercel/output/static",
     "pages:deploy": "vp run pages:build && vp dlx wrangler pages deploy .vercel/output/static --project-name=imagine-workbench --commit-dirty=true",
     "test:providers": "vp exec tsc -p tests/tsconfig.json && node --test .tmp/provider-tests/tests/*.test.js",
