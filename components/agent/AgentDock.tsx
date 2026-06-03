@@ -1,5 +1,5 @@
 import type { ChangeEvent, FormEvent, ReactNode, Ref } from "react";
-import { forwardRef, useEffect, useRef } from "react";
+import { forwardRef } from "react";
 import { Check, ChevronRight, ImagePlus, Paintbrush, RefreshCw, Send, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import PreviewImage from "@/components/PreviewImage";
@@ -432,36 +432,6 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
   const activeAgentModel = usesVisionModel ? DEFAULT_VISION_CHAT_MODEL : selectedChatModel;
   const visionModelHint = `含图参考时将使用 ${DEFAULT_VISION_CHAT_MODEL}`;
   const isIdleOrb = !isOpen && !isLoading && input.trim().length === 0 && !agentReferenceId && !agentReferenceUrl;
-  const orbButtonRef = useRef<HTMLButtonElement | null>(null);
-
-  useEffect(() => {
-    if (!isIdleOrb) return;
-
-    const updateMarkOffset = (event: PointerEvent) => {
-      const orbButton = orbButtonRef.current;
-      if (!orbButton) return;
-
-      const rect = orbButton.getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
-      const deltaX = event.clientX - centerX;
-      const deltaY = event.clientY - centerY;
-      const distance = Math.hypot(deltaX, deltaY);
-
-      if (distance === 0) {
-        orbButton.style.setProperty("--agent-mark-pupil-x", "0px");
-        orbButton.style.setProperty("--agent-mark-pupil-y", "0px");
-        return;
-      }
-
-      const gazeStrength = Math.min(distance / 180, 1);
-      orbButton.style.setProperty("--agent-mark-pupil-x", `${(deltaX / distance) * 5 * gazeStrength}px`);
-      orbButton.style.setProperty("--agent-mark-pupil-y", `${(deltaY / distance) * 4 * gazeStrength}px`);
-    };
-
-    window.addEventListener("pointermove", updateMarkOffset, { passive: true });
-    return () => window.removeEventListener("pointermove", updateMarkOffset);
-  }, [isIdleOrb]);
 
   return (
     <AnimatePresence initial={false} mode="wait">
@@ -476,7 +446,6 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
           className={`imagine-agent-dock imagine-agent-dock-idle-orb imagine-theme-${themeMode} ${AGENT_DOCK_SHELL_CLASS}`}
         >
           <button
-            ref={orbButtonRef}
             type="button"
             onClick={onToggleOpen}
             className="imagine-agent-orb-button pointer-events-auto group relative flex h-16 w-16 items-center justify-center rounded-full"
@@ -484,7 +453,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
             aria-label="展开 Agent 对话"
           >
             <span className="imagine-agent-orb-aura" />
-            <AgentIdentityMark variant="orb" />
+            <AgentIdentityMark variant="orb" trackPointer />
             <span className="imagine-agent-orb-reminder absolute right-14 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-full border px-2.5 py-1 text-[10px] font-semibold shadow-lg backdrop-blur">
               Agent
             </span>
@@ -507,7 +476,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
           className="imagine-agent-dock-header-btn flex min-w-0 items-center gap-2 text-left text-sm font-semibold"
           title={isOpen ? "收起 Agent 对话" : "展开 Agent 对话"}
         >
-          <AgentIdentityMark variant="header" />
+          <AgentIdentityMark variant="header" trackPointer />
           <span className="min-w-0 truncate">Agent</span>
           <ChevronRight className={`h-3 w-3 text-[var(--iw-faint)] transition ${isOpen ? "rotate-90" : "-rotate-90"}`} />
         </button>

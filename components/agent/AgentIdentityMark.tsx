@@ -1,19 +1,75 @@
 "use client";
 
-import { useId } from "react";
+import { useEffect, useId, useRef } from "react";
 
 interface AgentIdentityMarkProps {
   variant: "orb" | "header" | "inline";
+  trackPointer?: boolean;
 }
 
-export default function AgentIdentityMark({ variant }: AgentIdentityMarkProps) {
+const GAZE_RANGE: Record<AgentIdentityMarkProps["variant"], { x: number; y: number; reach: number }> = {
+  orb: { x: 7, y: 6, reach: 220 },
+  header: { x: 4.5, y: 3.5, reach: 160 },
+  inline: { x: 0, y: 0, reach: 0 },
+};
+
+export default function AgentIdentityMark({ variant, trackPointer }: AgentIdentityMarkProps) {
+  const markRef = useRef<HTMLSpanElement>(null);
   const uid = useId().replace(/:/g, "");
-  const bg = `agentMarkBg-${uid}`;
+  const shell = `agentMarkShell-${uid}`;
   const shine = `agentMarkShine-${uid}`;
-  const glow = `agentMarkGlow-${uid}`;
+  const depth = `agentMarkDepth-${uid}`;
+  const shouldTrack = trackPointer ?? variant !== "inline";
+  const gaze = GAZE_RANGE[variant];
+
+  useEffect(() => {
+    if (!shouldTrack || gaze.reach === 0) return;
+
+    const mark = markRef.current;
+    if (!mark) return;
+
+    const resetGaze = () => {
+      mark.style.setProperty("--agent-mark-pupil-x", "0px");
+      mark.style.setProperty("--agent-mark-pupil-y", "0px");
+    };
+
+    const updateGaze = (event: PointerEvent) => {
+      const rect = mark.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const deltaX = event.clientX - centerX;
+      const deltaY = event.clientY - centerY;
+      const distance = Math.hypot(deltaX, deltaY);
+      if (distance === 0) {
+        resetGaze();
+        return;
+      }
+
+      const strength = Math.min(distance / gaze.reach, 1);
+      mark.style.setProperty(
+        "--agent-mark-pupil-x",
+        `${(deltaX / distance) * gaze.x * strength}px`,
+      );
+      mark.style.setProperty(
+        "--agent-mark-pupil-y",
+        `${(deltaY / distance) * gaze.y * strength}px`,
+      );
+    };
+
+    window.addEventListener("pointermove", updateGaze, { passive: true });
+    return () => {
+      window.removeEventListener("pointermove", updateGaze);
+      resetGaze();
+    };
+  }, [gaze.reach, gaze.x, gaze.y, shouldTrack]);
 
   return (
-    <span className={`imagine-agent-mark imagine-agent-mark-${variant}`} aria-hidden>
+    <span
+      ref={markRef}
+      className={`imagine-agent-mark imagine-agent-mark-${variant}`}
+      data-track-pointer={shouldTrack ? "true" : "false"}
+      aria-hidden
+    >
       <svg
         className="imagine-agent-mark-svg"
         viewBox="0 0 32 32"
@@ -21,9 +77,9 @@ export default function AgentIdentityMark({ variant }: AgentIdentityMarkProps) {
         xmlns="http://www.w3.org/2000/svg"
       >
         <defs>
-          <linearGradient id={bg} x1="7" y1="5" x2="25" y2="27" gradientUnits="userSpaceOnUse">
-            <stop stopColor="var(--agent-mark-bg-1, #4338ca)" />
-            <stop offset="0.45" stopColor="var(--agent-mark-bg-2, #7c3aed)" />
+          <linearGradient id={shell} x1="6" y1="4" x2="26" y2="28" gradientUnits="userSpaceOnUse">
+            <stop stopColor="var(--agent-mark-bg-1, #4f46e5)" />
+            <stop offset="0.55" stopColor="var(--agent-mark-bg-2, #6366f1)" />
             <stop offset="1" stopColor="var(--agent-mark-bg-3, #312e81)" />
           </linearGradient>
           <radialGradient
@@ -32,55 +88,52 @@ export default function AgentIdentityMark({ variant }: AgentIdentityMarkProps) {
             cy="0"
             r="1"
             gradientUnits="userSpaceOnUse"
-            gradientTransform="translate(11 9) rotate(-24) scale(9 6)"
+            gradientTransform="translate(10.5 8.5) rotate(-18) scale(11 7)"
           >
-            <stop stopColor="var(--agent-mark-shine, rgba(255,255,255,0.62))" />
+            <stop stopColor="var(--agent-mark-shine, rgba(255,255,255,0.55))" />
             <stop offset="1" stopColor="var(--agent-mark-shine, rgba(255,255,255,0))" stopOpacity="0" />
           </radialGradient>
           <radialGradient
-            id={glow}
+            id={depth}
             cx="0"
             cy="0"
             r="1"
             gradientUnits="userSpaceOnUse"
-            gradientTransform="translate(21 23) scale(11)"
+            gradientTransform="translate(22 24) scale(10)"
           >
-            <stop stopColor="var(--agent-mark-glow, rgba(245,158,11,0.42))" />
-            <stop offset="1" stopColor="var(--agent-mark-glow, rgba(245,158,11,0))" stopOpacity="0" />
+            <stop stopColor="var(--agent-mark-depth, rgba(15,23,42,0.28))" />
+            <stop offset="1" stopColor="var(--agent-mark-depth, rgba(15,23,42,0))" stopOpacity="0" />
           </radialGradient>
         </defs>
-        <circle cx="16" cy="16" r="14" fill={`url(#${bg})`} />
-        <circle cx="16" cy="16" r="14" fill={`url(#${glow})`} />
-        <circle cx="16" cy="16" r="14" fill={`url(#${shine})`} />
+        <rect x="3" y="3" width="26" height="26" rx="9" fill={`url(#${shell})`} />
+        <rect x="3" y="3" width="26" height="26" rx="9" fill={`url(#${depth})`} />
+        <rect x="3" y="3" width="26" height="26" rx="9" fill={`url(#${shine})`} />
+        <rect
+          x="3.5"
+          y="3.5"
+          width="25"
+          height="25"
+          rx="8.5"
+          stroke="var(--agent-mark-border, rgba(255,255,255,0.34))"
+          strokeWidth="0.85"
+        />
         <circle
           cx="16"
           cy="16"
-          r="12.75"
-          stroke="var(--agent-mark-ring, rgba(255,255,255,0.28))"
-          strokeWidth="0.75"
+          r="7.25"
+          stroke="var(--agent-mark-iris, rgba(255,255,255,0.26))"
+          strokeWidth="0.85"
+          fill="var(--agent-mark-iris-fill, rgba(255,255,255,0.08))"
         />
         <path
-          d="M21.2 10.4a9.2 9.2 0 0 0-10.8 8.1"
-          stroke="var(--agent-mark-arc, rgba(255,255,255,0.42))"
-          strokeWidth="1.35"
+          d="M10.2 11.4c2.8-1.6 6.1-1.4 8.4.2"
+          stroke="var(--agent-mark-glint, rgba(255,255,255,0.42))"
+          strokeWidth="1.1"
           strokeLinecap="round"
         />
-        <g stroke="var(--agent-mark-spark, rgba(255,255,255,0.72))" strokeLinecap="round">
-          <path d="M16 6.2v2.6" strokeWidth="1.35" />
-          <path d="M22.8 9.1l-1.8 1.8" strokeWidth="1.1" />
-          <path d="M9.2 9.1l1.8 1.8" strokeWidth="1.1" />
-        </g>
-        <circle
-          cx="16"
-          cy="16"
-          r="6.25"
-          stroke="var(--agent-mark-core-ring, rgba(255,255,255,0.22))"
-          strokeWidth="0.7"
-          fill="var(--agent-mark-core-fill, rgba(255,255,255,0.1))"
-        />
-        <circle cx="16" cy="16" r="2.15" fill="var(--agent-mark-core-dot, rgba(255,255,255,0.38))" />
       </svg>
       <span className="imagine-agent-mark-pupil" />
+      <span className="imagine-agent-mark-pupil-shine" />
     </span>
   );
 }
