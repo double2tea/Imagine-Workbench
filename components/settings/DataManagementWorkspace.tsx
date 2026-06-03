@@ -14,6 +14,7 @@ interface DataManagementWorkspaceProps {
   onImportLocalAssets: (files: File[]) => Promise<void>;
   onImportWorkspace: (file: File, includeCredentials: boolean) => Promise<void>;
   onRefreshSummary: () => Promise<void>;
+  onRepairAssetSources: () => Promise<void>;
   onResetBoards: () => Promise<void>;
 }
 
@@ -45,6 +46,7 @@ export default function DataManagementWorkspace({
   onImportLocalAssets,
   onImportWorkspace,
   onRefreshSummary,
+  onRepairAssetSources,
   onResetBoards,
 }: DataManagementWorkspaceProps) {
   const backupInputRef = useRef<HTMLInputElement | null>(null);
@@ -233,6 +235,13 @@ export default function DataManagementWorkspace({
             className="imagine-secondary-action h-9 rounded-lg border border-[var(--iw-border)] px-3 text-[11px] font-semibold text-[var(--iw-text)]"
           >
             清孤立资产 {assetSummary?.orphaned ?? 0}
+          </button>
+          <button
+            type="button"
+            onClick={() => void runAction("修复来源链接中", onRepairAssetSources)}
+            className="imagine-secondary-action h-9 rounded-lg border border-[var(--iw-border)] px-3 text-[11px] font-semibold text-[var(--iw-text)]"
+          >
+            修复来源链接
           </button>
           {hasCurrentBoard && onDuplicateCurrentBoard ? (
             <button

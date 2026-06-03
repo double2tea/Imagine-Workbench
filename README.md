@@ -76,6 +76,7 @@ Open Settings → `数据` to inspect and manage local browser data:
 - `恢复备份` previews the backup counts before overwriting local assets, boards, and managed settings. Provider credentials import only when the credentials checkbox is enabled.
 - `导入图片/视频` stores selected local media files as completed local assets in IndexedDB.
 - Cleanup actions remove failed tasks, stale processing/queued tasks older than two hours, completed records without media URLs, or completed assets not referenced by any board.
+- `修复来源链接` scans all board nodes and clears asset `sourceBoardNodeId` values that point to deleted board nodes; it keeps asset files, prompts, results, and statuses intact.
 - The danger zone can clear all assets, reset boards to a default empty board, or clear Agent history, model cache, provider credentials, and UI preferences from localStorage.
 
 ## Provider Support

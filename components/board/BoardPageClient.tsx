@@ -75,6 +75,7 @@ import {
   exportCompleteWorkspaceBackup,
   importWorkspaceBackup,
   previewWorkspaceBackup,
+  repairStaleAssetSourceLinks,
   resetBoardsToDefault,
   type LocalStorageCleanupKind,
   type WorkspaceCleanupKind,
@@ -1561,6 +1562,20 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     }
   }, [confirmAction, pushWorkspaceNotice, reloadBoardAssetsFromDB]);
 
+  const handleDataRepairAssetSources = useCallback(async () => {
+    if (!(await confirmAction({
+      message: "将扫描所有画板，并清除资产中指向已不存在画板节点的来源链接。资产文件、提示词和生成结果不会删除。确认继续？",
+      confirmLabel: "修复",
+    }))) return;
+    try {
+      const result = await repairStaleAssetSourceLinks();
+      await reloadBoardAssetsFromDB();
+      pushWorkspaceNotice("success", `已修复 ${result.repairedIds.length} 项来源链接`);
+    } catch (error) {
+      pushWorkspaceNotice("error", toErrorMessage(error, "来源链接修复失败"));
+    }
+  }, [confirmAction, pushWorkspaceNotice, reloadBoardAssetsFromDB]);
+
   const handleDataClearLocalStorage = useCallback(async (kind: LocalStorageCleanupKind) => {
     const labelByKind: Record<LocalStorageCleanupKind, string> = {
       agent: "Agent 会话",
@@ -1841,6 +1856,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onExportWorkspace={handleDataExportWorkspace}
         onImportLocalAssets={handleDataImportLocalAssets}
         onImportWorkspace={handleDataImportWorkspace}
+        onRepairAssetSources={handleDataRepairAssetSources}
         onResetBoards={handleDataResetBoards}
         onSaveCredential={handleSaveCredential}
         onSelectChatModel={handleSelectChatModel}

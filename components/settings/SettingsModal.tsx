@@ -47,6 +47,7 @@ interface SettingsModalProps {
   onExportWorkspace: (includeCredentials: boolean) => Promise<void>;
   onImportLocalAssets: (files: File[]) => Promise<void>;
   onImportWorkspace: (file: File, includeCredentials: boolean) => Promise<void>;
+  onRepairAssetSources: () => Promise<void>;
   onResetBoards: () => Promise<void>;
   onAddFetchedModels: (category: ModelCategory, values: string[]) => void;
   onAddManualModels: (category: ModelCategory, value: string) => void;
@@ -87,6 +88,7 @@ export default function SettingsModal({
   onExportWorkspace,
   onImportLocalAssets,
   onImportWorkspace,
+  onRepairAssetSources,
   onResetBoards,
   onAddFetchedModels,
   onAddManualModels,
@@ -187,6 +189,7 @@ export default function SettingsModal({
                   onImportLocalAssets={onImportLocalAssets}
                   onImportWorkspace={onImportWorkspace}
                   onRefreshSummary={refreshDataSummary}
+                  onRepairAssetSources={onRepairAssetSources}
                   onResetBoards={onResetBoards}
                 />
               )}

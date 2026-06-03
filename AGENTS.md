@@ -90,6 +90,7 @@ Video reference image API/provider boundaries accept `data:image/*` base64 data 
 - When executing board generation, resolve connected asset/reference nodes against the current asset store before using their URLs.
 - Board loading must normalize persisted IndexedDB documents before passing nodes/edges to React Flow. Drop invalid or duplicate nodes, validate port refs, recompute edge kinds from `resolveBoardConnectionKind`, clamp viewport/size values, and clear stale selections after switching boards.
 - Board React Flow nodes should be derived from the normalized board document as the single source of truth. Only use transient local node state for active drag visuals, then persist settled positions through `useBoardState`.
+- Repairs for asset `sourceBoardNodeId` links must be explicit user-triggered data actions. Do not run source-link cleanup automatically during board/page load.
 - Flush pending board text edits and save the board before leaving or switching boards.
 - Keep board logic in `components/board/*`, `hooks/useBoardState.ts`, and `lib/board/*`. Do not add board-specific state to `app/page.tsx`.
 - Agent actions on the board should reuse existing action types (`generate_image`, `generate_video`, `edit_image`, `optimize_prompt`) unless a new board-specific action is explicitly requested.

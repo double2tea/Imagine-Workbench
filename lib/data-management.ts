@@ -126,6 +126,10 @@ export interface WorkspaceCleanupResult {
   kind: WorkspaceCleanupKind;
 }
 
+export interface WorkspaceAssetSourceRepairResult {
+  repairedIds: string[];
+}
+
 export interface WorkspaceDataSummary {
   assets: {
     brokenComplete: number;
@@ -315,6 +319,18 @@ export async function cleanupWorkspaceAssets(kind: WorkspaceCleanupKind): Promis
   return { deletedIds: ids, kind };
 }
 
+export async function repairStaleAssetSourceLinks(): Promise<WorkspaceAssetSourceRepairResult> {
+  const [assets, boards] = await Promise.all([getAllFromDB(), listBoardsFromDB()]);
+  const boardNodeIds = collectBoardNodeIds(boards);
+  const staleAssets = assets.filter(item => item.sourceBoardNodeId && !boardNodeIds.has(item.sourceBoardNodeId));
+
+  for (const item of staleAssets) {
+    await saveToDB({ ...item, sourceBoardNodeId: undefined });
+  }
+
+  return { repairedIds: staleAssets.map(item => item.id) };
+}
+
 export function clearLocalStorageGroup(kind: LocalStorageCleanupKind): number {
   const before = readManagedLocalStorage(true);
   const keys = Object.keys(before).filter(key => {
@@ -365,6 +381,16 @@ export function collectBoardAssetIds(boards: BoardDocument[]): Set<string> {
       if ((node.kind === "image-generate" || node.kind === "video-generate") && node.resultAssetId) {
         ids.add(node.resultAssetId);
       }
+    }
+  }
+  return ids;
+}
+
+export function collectBoardNodeIds(boards: BoardDocument[]): Set<string> {
+  const ids = new Set<string>();
+  for (const board of boards) {
+    for (const node of board.nodes) {
+      ids.add(node.id);
     }
   }
   return ids;
