@@ -154,6 +154,20 @@ function sameFlowNodeList(left: BoardFlowNode[], right: BoardFlowNode[]): boolea
   return left.every((node, index) => sameFlowNodeState(node, right[index]));
 }
 
+function sameFlowNodeModelList(left: BoardFlowNode[], right: BoardFlowNode[]): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((node, index) => {
+    const other = right[index];
+    return (
+      node.id === other.id &&
+      node.type === other.type &&
+      node.data === other.data &&
+      node.position.x === other.position.x &&
+      node.position.y === other.position.y
+    );
+  });
+}
+
 function BoardEdgeComponent({
   data,
   id,
@@ -669,7 +683,7 @@ export default function BoardWorkspace({
   const [reactFlowNodes, setReactFlowNodes] = useState<BoardFlowNode[]>(flowNodes);
   useLayoutEffect(() => {
     if (isNodeDragActiveRef.current) return;
-    setReactFlowNodes(currentNodes => (sameFlowNodeList(currentNodes, flowNodes) ? currentNodes : flowNodes));
+    setReactFlowNodes(currentNodes => (sameFlowNodeModelList(currentNodes, flowNodes) ? currentNodes : flowNodes));
   }, [flowNodes]);
   const flowEdges = useMemo<BoardFlowEdge[]>(
     () =>

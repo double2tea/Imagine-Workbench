@@ -1,7 +1,7 @@
 import type { ChangeEvent, FormEvent, ReactNode, Ref } from "react";
 import { forwardRef, useEffect, useState } from "react";
 import { Check, ChevronRight, ImagePlus, Paintbrush, RefreshCw, Send, X } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
 import PreviewImage from "@/components/PreviewImage";
 import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
@@ -113,7 +113,7 @@ const SKILL_LABELS: Record<string, { label: string; className: string }> = {
 };
 
 const AGENT_DOCK_SHELL_CLASS =
-  "pointer-events-none fixed inset-x-4 bottom-6 z-40 mx-auto flex w-[calc(100vw-32px)] max-w-5xl justify-end sm:bottom-8 sm:w-[min(1040px,calc(100vw-40px))]";
+  "pointer-events-none fixed inset-x-4 bottom-12 z-40 mx-auto flex w-[calc(100vw-32px)] max-w-5xl justify-end sm:bottom-16 sm:w-[min(1040px,calc(100vw-40px))]";
 
 const ACTION_LABELS: Record<AgentToolAction["type"], string> = {
   none: "无操作",
@@ -486,42 +486,32 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
   const agentReferenceHint = formatAgentReferenceHint(sendableAgentReferences, openRouterVisionSupport);
   const isIdleOrb = !isOpen && !isLoading && input.trim().length === 0 && !hasSendableAgentImages;
 
+  const dockShellClass = isIdleOrb
+    ? `imagine-agent-dock imagine-agent-dock-idle-orb imagine-theme-dark ${AGENT_DOCK_SHELL_CLASS}`
+    : "imagine-agent-dock imagine-agent-dock-panel imagine-theme-dark pointer-events-auto fixed inset-x-4 bottom-12 z-50 mx-auto w-[calc(100vw-32px)] max-w-5xl rounded-lg p-3 sm:bottom-16 sm:w-[min(1040px,calc(100vw-40px))]";
+
   return (
-    <AnimatePresence initial={false} mode="wait">
+    <section
+      ref={ref}
+      className={`${dockShellClass}${!isIdleOrb && isOverContent ? " imagine-agent-dock-over-content" : ""}`}
+      style={!isIdleOrb && isOverContent ? { opacity: 0.84 } : undefined}
+    >
       {isIdleOrb ? (
-        <motion.section
-          key="agent-orb"
-          ref={ref}
-          initial={{ opacity: 0, scale: 0.92, y: 8 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.94, y: 8 }}
-          transition={{ duration: 0.16, ease: "easeOut" }}
-          className={`imagine-agent-dock imagine-agent-dock-idle-orb imagine-theme-dark ${AGENT_DOCK_SHELL_CLASS}`}
+        <button
+          type="button"
+          onClick={onToggleOpen}
+          className="imagine-agent-orb-button pointer-events-auto group relative flex h-16 w-16 items-center justify-center rounded-full"
+          title="展开 Agent 对话"
+          aria-label="展开 Agent 对话"
         >
-          <button
-            type="button"
-            onClick={onToggleOpen}
-            className="imagine-agent-orb-button pointer-events-auto group relative flex h-16 w-16 items-center justify-center rounded-full"
-            title="展开 Agent 对话"
-            aria-label="展开 Agent 对话"
-          >
-            <span className="imagine-agent-orb-aura" />
-            <AgentIdentityMark variant="orb" />
-            <span className="imagine-agent-orb-reminder absolute right-14 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-full border px-2.5 py-1 text-[10px] font-semibold shadow-lg backdrop-blur">
-              Agent
-            </span>
-          </button>
-        </motion.section>
+          <span className="imagine-agent-orb-aura" />
+          <AgentIdentityMark variant="orb" />
+          <span className="imagine-agent-orb-reminder absolute right-14 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-full border px-2.5 py-1 text-[10px] font-semibold shadow-lg backdrop-blur">
+            Agent
+          </span>
+        </button>
       ) : (
-        <motion.section
-          key="agent-panel"
-          ref={ref}
-          initial={{ opacity: 0, scale: 0.98, y: 18 }}
-          animate={{ opacity: isOverContent ? 0.84 : 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.99, y: 10 }}
-          transition={{ duration: 0.16, ease: "easeOut" }}
-          className="imagine-agent-dock imagine-agent-dock-panel imagine-theme-dark pointer-events-auto fixed inset-x-4 bottom-12 z-50 mx-auto w-[calc(100vw-32px)] max-w-5xl rounded-lg p-3 sm:bottom-16 sm:w-[min(1040px,calc(100vw-40px))]"
-        >
+        <>
       <div className={`${isOpen ? "mb-2.5" : "mb-1.5"} flex flex-wrap items-center gap-2`}>
         <button
           type="button"
@@ -565,44 +555,44 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
         </span>
       </div>
 
-      <AnimatePresence initial={false}>
-        {isOpen && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="imagine-agent-message-stream max-h-[min(46vh,440px)] overflow-y-auto pr-1 flex flex-col gap-3 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent"
-          >
-            {messages.map((message) => (
-              <AgentMessage
-                key={message.id}
-                activeCountdownId={activeCountdownId}
-                countdownSeconds={countdownSeconds}
-                message={message}
-                onCancelCountdown={onCancelCountdown}
-                imageModelGroups={imageModelGroups}
-                videoModelGroups={videoModelGroups}
-                onDeclineAction={onDeclineAction}
-                onExecuteAction={onExecuteAction}
-                onUpdateActionDraft={onUpdateActionDraft}
-                onSuggestedPrompt={onSuggestedPrompt}
-              />
-            ))}
+      <div
+        className={`imagine-agent-message-stream max-h-[min(46vh,440px)] pr-1 ${isOpen ? "is-open" : ""}`}
+        aria-hidden={!isOpen}
+      >
+        <div className="imagine-agent-message-stream-inner max-h-[min(46vh,440px)] overflow-y-auto flex flex-col gap-3 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+          {isOpen ? (
+            <>
+              {messages.map((message) => (
+                <AgentMessage
+                  key={message.id}
+                  activeCountdownId={activeCountdownId}
+                  countdownSeconds={countdownSeconds}
+                  message={message}
+                  onCancelCountdown={onCancelCountdown}
+                  imageModelGroups={imageModelGroups}
+                  videoModelGroups={videoModelGroups}
+                  onDeclineAction={onDeclineAction}
+                  onExecuteAction={onExecuteAction}
+                  onUpdateActionDraft={onUpdateActionDraft}
+                  onSuggestedPrompt={onSuggestedPrompt}
+                />
+              ))}
 
-            {isLoading && (
-              <div className="flex max-w-[90%] flex-col gap-1.5 self-start">
-                <span className="imagine-agent-role-label text-indigo-300">Agent</span>
-                <div className="imagine-agent-loading px-4 py-3 text-xs text-[var(--iw-muted)] flex items-center gap-2">
-                  <RefreshCw className="h-3.5 w-3.5 animate-spin text-indigo-400" />
-                  <span>正在分析画廊与技能，整理下一步建议...</span>
+              {isLoading && (
+                <div className="flex max-w-[90%] flex-col gap-1.5 self-start">
+                  <span className="imagine-agent-role-label text-indigo-300">Agent</span>
+                  <div className="imagine-agent-loading px-4 py-3 text-xs text-[var(--iw-muted)] flex items-center gap-2">
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin text-indigo-400" />
+                    <span>正在分析画廊与技能，整理下一步建议...</span>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            <div ref={chatBottomRef} />
-          </motion.div>
-        )}
-      </AnimatePresence>
+              <div ref={chatBottomRef} />
+            </>
+          ) : null}
+        </div>
+      </div>
 
       <div className={`${isOpen ? "imagine-agent-dock-input-divider pt-3 mt-2" : ""} flex flex-col gap-3`}>
         {hasSendableAgentImages && (
@@ -712,9 +702,9 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
           </label>
         </div>
       </div>
-        </motion.section>
+        </>
       )}
-    </AnimatePresence>
+    </section>
   );
 });
 

@@ -1,16 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
   <defs>
-    <linearGradient id="iw" x1="6" y1="5" x2="26" y2="27" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#1c212b"/>
-      <stop offset="0.55" stop-color="#12161d"/>
-      <stop offset="1" stop-color="#080a0f"/>
+    <linearGradient id="iw-shell" x1="7" y1="5" x2="25" y2="27" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1a2332"/>
+      <stop offset="1" stop-color="#121820"/>
+    </linearGradient>
+    <linearGradient id="iw-arc" x1="10" y1="8" x2="22" y2="24" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#c7e2f5"/>
+      <stop offset="1" stop-color="#6eb0e8"/>
     </linearGradient>
   </defs>
-  <rect x="2" y="2" width="28" height="28" rx="8" fill="url(#iw)"/>
-  <rect x="2.5" y="2.5" width="27" height="27" rx="7.5" stroke="rgba(226,232,240,0.2)" stroke-width="0.75"/>
-  <path d="M7.5 8.5h4.2" stroke="rgba(255,255,255,0.42)" stroke-width="1" stroke-linecap="round"/>
-  <path d="M12.25 9.25v13.5" stroke="rgba(248,250,252,0.92)" stroke-width="2.15" stroke-linecap="round"/>
-  <path d="M20.5 11.25h3.25v3.25" stroke="rgba(226,232,240,0.72)" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M20.5 20.75h3.25v-3.25" stroke="rgba(226,232,240,0.72)" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="22.35" cy="16" r="1.55" fill="#2dd4bf"/>
+  <rect x="2" y="2" width="28" height="28" rx="9" fill="url(#iw-shell)"/>
+  <rect x="2.5" y="2.5" width="27" height="27" rx="8.5" stroke="rgba(148,163,184,0.28)" stroke-width="0.75"/>
+  <g stroke="url(#iw-arc)" stroke-width="2.35" stroke-linecap="round" fill="none">
+    <path d="M16 7.2 A9.2 9.2 0 0 1 24.1 19.4"/>
+    <path d="M16 7.2 A9.2 9.2 0 0 1 24.1 19.4" transform="rotate(120 16 16)"/>
+    <path d="M16 7.2 A9.2 9.2 0 0 1 24.1 19.4" transform="rotate(240 16 16)"/>
+  </g>
+  <circle cx="16" cy="16" r="2.15" fill="#0b1219"/>
 </svg>

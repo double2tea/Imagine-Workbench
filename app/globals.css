@@ -2512,6 +2512,7 @@ html[data-imagine-theme="light"] .imagine-root-body {
   --iw-workbench-bottom-space: 48px;
   grid-auto-rows: min-content;
   padding-bottom: var(--iw-workbench-bottom-space) !important;
+  transition: padding-bottom 0.26s var(--iw-ease-out);
 }
 
 .imagine-main-grid-agent-open {
@@ -3538,7 +3539,6 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
     0 24px 64px rgba(0, 0, 0, 0.52),
     0 0 0 1px rgba(255, 255, 255, 0.04) inset !important;
   opacity: 1 !important;
-  will-change: transform;
 }
 
 .imagine-agent-dock-panel:not(:focus-within):not(:hover) {
@@ -3564,6 +3564,27 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 
 .imagine-agent-dock-panel.imagine-theme-light .imagine-agent-dock-divider {
   background: linear-gradient(90deg, rgba(79, 70, 229, 0.18), transparent);
+}
+
+.imagine-agent-message-stream {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    grid-template-rows 0.26s var(--iw-ease-out),
+    opacity 0.2s var(--iw-ease-out);
+}
+
+.imagine-agent-message-stream.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.imagine-agent-message-stream > .imagine-agent-message-stream-inner {
+  min-height: 0;
+  overflow: hidden;
 }
 
 .imagine-agent-dock-panel.imagine-theme-light .imagine-agent-message-stream {
@@ -3648,19 +3669,17 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 }
 
 .imagine-mark {
-  --imagine-mark-bg-1: #1c212b;
-  --imagine-mark-bg-2: #12161d;
-  --imagine-mark-bg-3: #080a0f;
-  --imagine-mark-border: rgba(226, 232, 240, 0.2);
-  --imagine-mark-glint: rgba(255, 255, 255, 0.42);
-  --imagine-mark-stem: rgba(248, 250, 252, 0.92);
-  --imagine-mark-corner: rgba(226, 232, 240, 0.72);
-  --imagine-mark-accent: #2dd4bf;
+  --imagine-mark-bg-1: #1f2a3a;
+  --imagine-mark-bg-2: #121820;
+  --imagine-mark-border: rgba(148, 163, 184, 0.22);
+  --imagine-mark-arc-1: #c7e2f5;
+  --imagine-mark-arc-2: #6eb0e8;
+  --imagine-mark-core: #0b1219;
   position: relative;
   z-index: 1;
   display: block;
   flex-shrink: 0;
-  filter: drop-shadow(0 6px 14px rgba(2, 6, 23, 0.42));
+  filter: drop-shadow(0 3px 10px rgba(15, 23, 42, 0.45));
   transition:
     transform 180ms var(--iw-ease-out),
     filter 180ms var(--iw-ease-out);
@@ -3673,7 +3692,7 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 }
 
 .imagine-mark-xs {
-  filter: drop-shadow(0 2px 5px rgba(2, 6, 23, 0.28));
+  filter: drop-shadow(0 2px 5px rgba(15, 23, 42, 0.28));
 }
 
 .imagine-agent-orb-button:hover .imagine-mark {
@@ -3693,15 +3712,13 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 html[data-imagine-theme="light"] .imagine-mark,
 .imagine-workbench-shell.imagine-theme-light .imagine-mark,
 .imagine-agent-dock.imagine-theme-light .imagine-mark {
-  --imagine-mark-bg-1: #f8fafc;
-  --imagine-mark-bg-2: #e2e8f0;
-  --imagine-mark-bg-3: #cbd5e1;
-  --imagine-mark-border: rgba(15, 23, 42, 0.1);
-  --imagine-mark-glint: rgba(15, 23, 42, 0.22);
-  --imagine-mark-stem: #0f172a;
-  --imagine-mark-corner: rgba(15, 23, 42, 0.58);
-  --imagine-mark-accent: #0d9488;
-  filter: drop-shadow(0 6px 16px rgba(15, 23, 42, 0.12));
+  --imagine-mark-bg-1: #eef4fa;
+  --imagine-mark-bg-2: #d7e6f4;
+  --imagine-mark-border: rgba(255, 255, 255, 0.82);
+  --imagine-mark-arc-1: #5b9fd4;
+  --imagine-mark-arc-2: #2f7fbf;
+  --imagine-mark-core: #f8fafc;
+  filter: drop-shadow(0 3px 10px rgba(15, 23, 42, 0.12));
 }
 
 html[data-imagine-theme="light"] .imagine-mark-xs,
@@ -3722,7 +3739,7 @@ html[data-imagine-theme="light"] .imagine-mark-xs,
 }
 
 .imagine-agent-dock-idle-orb.imagine-theme-dark .imagine-mark {
-  filter: drop-shadow(0 10px 24px rgba(2, 6, 23, 0.55));
+  filter: drop-shadow(0 6px 16px rgba(15, 23, 42, 0.55));
 }
 
 .imagine-agent-dock-idle-orb.imagine-theme-dark .imagine-agent-orb-button::before {
