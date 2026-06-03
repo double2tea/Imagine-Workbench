@@ -4,7 +4,6 @@ import ImagineMark, { type ImagineMarkSize } from "@/components/brand/ImagineMar
 
 interface AgentIdentityMarkProps {
   variant: "orb" | "header" | "inline";
-  trackPointer?: boolean;
 }
 
 const SIZE_BY_VARIANT: Record<AgentIdentityMarkProps["variant"], ImagineMarkSize> = {
@@ -13,9 +12,6 @@ const SIZE_BY_VARIANT: Record<AgentIdentityMarkProps["variant"], ImagineMarkSize
   inline: "xs",
 };
 
-export default function AgentIdentityMark({ variant, trackPointer }: AgentIdentityMarkProps) {
-  const size = SIZE_BY_VARIANT[variant];
-  const shouldTrack = trackPointer ?? variant !== "inline";
-
-  return <ImagineMark size={size} trackPointer={shouldTrack} />;
+export default function AgentIdentityMark({ variant }: AgentIdentityMarkProps) {
+  return <ImagineMark size={SIZE_BY_VARIANT[variant]} />;
 }

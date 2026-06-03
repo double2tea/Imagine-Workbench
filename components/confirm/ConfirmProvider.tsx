@@ -131,7 +131,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
               initial={{ scale: 0.96, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.96, opacity: 0 }}
-              className="imagine-confirm-dialog w-full max-w-md rounded-xl border border-[var(--iw-border)] bg-[var(--iw-panel)] p-4 shadow-2xl"
+              className="imagine-confirm-dialog w-full max-w-md rounded-xl border p-4"
               onClick={event => event.stopPropagation()}
             >
               <h2 id="imagine-confirm-title" className="text-sm font-semibold text-[var(--iw-text)]">
@@ -156,7 +156,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                   className={`h-9 rounded-lg px-3 text-[11px] font-semibold transition ${
                     tone === "danger" && !isAlert
                       ? "imagine-danger-action border border-red-500/30"
-                      : "imagine-primary-action border border-indigo-400/25"
+                      : "imagine-primary-action"
                   }`}
                   onClick={() => close(true)}
                 >

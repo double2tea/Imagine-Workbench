@@ -1,15 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
   <defs>
-    <linearGradient id="iw" x1="5" y1="4" x2="27" y2="28" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#4f46e5"/>
-      <stop offset="0.55" stop-color="#6366f1"/>
-      <stop offset="1" stop-color="#312e81"/>
+    <linearGradient id="iw" x1="6" y1="5" x2="26" y2="27" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1c212b"/>
+      <stop offset="0.55" stop-color="#12161d"/>
+      <stop offset="1" stop-color="#080a0f"/>
     </linearGradient>
   </defs>
-  <rect x="2" y="2" width="28" height="28" rx="9" fill="url(#iw)"/>
-  <rect x="2.5" y="2.5" width="27" height="27" rx="8.5" stroke="rgba(255,255,255,0.34)" stroke-width="0.75"/>
-  <path d="M8.5 9.2h5.2" stroke="rgba(255,255,255,0.48)" stroke-width="1.05" stroke-linecap="round"/>
-  <circle cx="16" cy="17" r="6.25" stroke="rgba(255,255,255,0.28)" stroke-width="1.05" fill="rgba(255,255,255,0.06)"/>
-  <circle cx="16" cy="17" r="2.35" fill="rgba(255,255,255,0.96)"/>
-  <circle cx="15.1" cy="16.1" r="0.65" fill="rgba(255,255,255,0.55)"/>
+  <rect x="2" y="2" width="28" height="28" rx="8" fill="url(#iw)"/>
+  <rect x="2.5" y="2.5" width="27" height="27" rx="7.5" stroke="rgba(226,232,240,0.2)" stroke-width="0.75"/>
+  <path d="M7.5 8.5h4.2" stroke="rgba(255,255,255,0.42)" stroke-width="1" stroke-linecap="round"/>
+  <path d="M12.25 9.25v13.5" stroke="rgba(248,250,252,0.92)" stroke-width="2.15" stroke-linecap="round"/>
+  <path d="M20.5 11.25h3.25v3.25" stroke="rgba(226,232,240,0.72)" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M20.5 20.75h3.25v-3.25" stroke="rgba(226,232,240,0.72)" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="22.35" cy="16" r="1.55" fill="#2dd4bf"/>
 </svg>

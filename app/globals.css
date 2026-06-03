@@ -33,10 +33,12 @@
   }
 }
 
+html,
 .imagine-workbench-shell {
   --iw-bg: #07080b;
   --iw-header: rgba(7, 8, 11, 0.86);
   --iw-panel: rgba(14, 18, 27, 0.94);
+  --iw-panel-solid: #0e121b;
   --iw-panel-soft: rgba(15, 23, 42, 0.7);
   --iw-border: rgba(148, 163, 184, 0.14);
   --iw-text: #e5e7eb;
@@ -76,6 +78,7 @@
   overflow-y: visible !important;
 }
 
+html[data-imagine-theme="light"],
 .imagine-workbench-shell.imagine-theme-light {
   --iw-bg: #eef3f8;
   --iw-header: rgba(255, 255, 255, 0.9);
@@ -1024,8 +1027,12 @@ details.group[open] > .imagine-agent-thought-summary {
 }
 
 .imagine-settings-overlay {
-  background: color-mix(in srgb, var(--iw-bg) 55%, transparent);
+  background: color-mix(in srgb, var(--iw-bg, #07080b) 62%, transparent);
   backdrop-filter: blur(6px);
+}
+
+html[data-imagine-theme="light"] .imagine-settings-overlay {
+  background: color-mix(in srgb, var(--iw-bg, #eef3f8) 72%, transparent);
 }
 
 .imagine-settings-panel {
@@ -2453,18 +2460,6 @@ html[data-imagine-theme="dark"] .imagine-root-body {
 .imagine-brand-mark {
   height: 42px !important;
   width: 42px !important;
-  border-radius: 12px !important;
-}
-
-.imagine-theme-light .imagine-brand-mark {
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(239, 242, 255, 0.98)) !important;
-  border-color: rgba(88, 101, 242, 0.28) !important;
-  box-shadow: 0 10px 26px rgba(79, 70, 229, 0.1) !important;
-}
-
-.imagine-theme-light .imagine-brand-mark svg {
-  color: #4f46e5 !important;
 }
 
 .imagine-header-button {
@@ -2558,7 +2553,18 @@ html[data-imagine-theme="dark"] .imagine-root-body {
 }
 
 .imagine-confirm-overlay {
-  background: color-mix(in srgb, var(--iw-bg) 62%, transparent);
+  background: color-mix(in srgb, var(--iw-bg, #07080b) 72%, transparent);
+}
+
+.imagine-confirm-dialog {
+  background: var(--iw-panel, rgba(14, 18, 27, 0.94));
+  border-color: var(--iw-border, rgba(148, 163, 184, 0.14));
+  color: var(--iw-text, #e5e7eb);
+  box-shadow: var(--iw-card-shadow, 0 18px 50px rgba(0, 0, 0, 0.34));
+}
+
+html[data-imagine-theme="light"] .imagine-confirm-overlay {
+  background: color-mix(in srgb, var(--iw-bg, #eef3f8) 78%, transparent);
 }
 
 .react-flow__node.selected .board-node-handle,
@@ -3642,22 +3648,19 @@ html[data-imagine-theme="dark"] .imagine-root-body {
 }
 
 .imagine-mark {
-  --imagine-mark-core-x: 0px;
-  --imagine-mark-core-y: 0px;
-  --imagine-mark-bg-1: #4338ca;
-  --imagine-mark-bg-2: #6366f1;
-  --imagine-mark-bg-3: #1e1b4b;
-  --imagine-mark-border: rgba(255, 255, 255, 0.32);
-  --imagine-mark-glint: rgba(255, 255, 255, 0.4);
-  --imagine-mark-ring: rgba(255, 255, 255, 0.28);
-  --imagine-mark-ring-fill: rgba(255, 255, 255, 0.1);
-  --imagine-mark-core: #eef2ff;
-  --imagine-mark-core-shine: rgba(255, 255, 255, 0.82);
+  --imagine-mark-bg-1: #1c212b;
+  --imagine-mark-bg-2: #12161d;
+  --imagine-mark-bg-3: #080a0f;
+  --imagine-mark-border: rgba(226, 232, 240, 0.2);
+  --imagine-mark-glint: rgba(255, 255, 255, 0.42);
+  --imagine-mark-stem: rgba(248, 250, 252, 0.92);
+  --imagine-mark-corner: rgba(226, 232, 240, 0.72);
+  --imagine-mark-accent: #2dd4bf;
   position: relative;
   z-index: 1;
   display: block;
   flex-shrink: 0;
-  filter: drop-shadow(0 8px 18px rgba(67, 56, 202, 0.32));
+  filter: drop-shadow(0 6px 14px rgba(2, 6, 23, 0.42));
   transition:
     transform 180ms var(--iw-ease-out),
     filter 180ms var(--iw-ease-out);
@@ -3669,17 +3672,13 @@ html[data-imagine-theme="dark"] .imagine-root-body {
   height: 100%;
 }
 
-.imagine-mark-core {
-  transition: transform 55ms linear;
-}
-
 .imagine-mark-xs {
-  filter: drop-shadow(0 2px 6px rgba(67, 56, 202, 0.24));
+  filter: drop-shadow(0 2px 5px rgba(2, 6, 23, 0.28));
 }
 
 .imagine-agent-orb-button:hover .imagine-mark {
   transform: translateY(-2px) scale(1.03);
-  filter: drop-shadow(0 14px 28px rgba(99, 102, 241, 0.38));
+  filter: drop-shadow(0 10px 22px rgba(2, 6, 23, 0.5));
 }
 
 .imagine-agent-orb-reminder {
@@ -3691,37 +3690,23 @@ html[data-imagine-theme="dark"] .imagine-root-body {
   pointer-events: none;
 }
 
-.imagine-workbench-shell.imagine-theme-light .imagine-mark {
-  --imagine-mark-bg-1: #6366f1;
-  --imagine-mark-bg-2: #818cf8;
-  --imagine-mark-bg-3: #4338ca;
-  --imagine-mark-border: rgba(255, 255, 255, 0.46);
-  --imagine-mark-glint: rgba(255, 255, 255, 0.52);
-  --imagine-mark-ring: rgba(255, 255, 255, 0.34);
-  --imagine-mark-ring-fill: rgba(255, 255, 255, 0.14);
-  --imagine-mark-core: #ffffff;
-  --imagine-mark-core-shine: rgba(255, 255, 255, 0.9);
-  filter: drop-shadow(0 8px 20px rgba(79, 70, 229, 0.22));
-}
-
-.imagine-workbench-shell.imagine-theme-light .imagine-mark-xs {
-  filter: drop-shadow(0 3px 8px rgba(79, 70, 229, 0.18));
-}
-
-.imagine-workbench-shell.imagine-theme-dark .imagine-mark {
-  --imagine-mark-bg-1: #3730a3;
-  --imagine-mark-bg-2: #5b21b6;
-  --imagine-mark-bg-3: #0f172a;
-  --imagine-mark-border: rgba(255, 255, 255, 0.24);
-  --imagine-mark-glint: rgba(255, 255, 255, 0.34);
-  --imagine-mark-ring: rgba(255, 255, 255, 0.22);
-  --imagine-mark-ring-fill: rgba(255, 255, 255, 0.06);
-  --imagine-mark-core: #eef2ff;
-  --imagine-mark-core-shine: rgba(255, 255, 255, 0.78);
-}
-
+html[data-imagine-theme="light"] .imagine-mark,
+.imagine-workbench-shell.imagine-theme-light .imagine-mark,
 .imagine-agent-dock.imagine-theme-light .imagine-mark {
-  filter: drop-shadow(0 8px 20px rgba(79, 70, 229, 0.22));
+  --imagine-mark-bg-1: #f8fafc;
+  --imagine-mark-bg-2: #e2e8f0;
+  --imagine-mark-bg-3: #cbd5e1;
+  --imagine-mark-border: rgba(15, 23, 42, 0.1);
+  --imagine-mark-glint: rgba(15, 23, 42, 0.22);
+  --imagine-mark-stem: #0f172a;
+  --imagine-mark-corner: rgba(15, 23, 42, 0.58);
+  --imagine-mark-accent: #0d9488;
+  filter: drop-shadow(0 6px 16px rgba(15, 23, 42, 0.12));
+}
+
+html[data-imagine-theme="light"] .imagine-mark-xs,
+.imagine-workbench-shell.imagine-theme-light .imagine-mark-xs {
+  filter: drop-shadow(0 2px 6px rgba(15, 23, 42, 0.1));
 }
 
 .imagine-agent-dock-idle-orb.imagine-theme-light .imagine-agent-orb-reminder {
@@ -3737,11 +3722,7 @@ html[data-imagine-theme="dark"] .imagine-root-body {
 }
 
 .imagine-agent-dock-idle-orb.imagine-theme-dark .imagine-mark {
-  filter: drop-shadow(0 12px 26px rgba(67, 56, 202, 0.45));
-}
-
-.imagine-mark[data-track-pointer="true"]:hover {
-  filter: drop-shadow(0 10px 22px rgba(99, 102, 241, 0.38));
+  filter: drop-shadow(0 10px 24px rgba(2, 6, 23, 0.55));
 }
 
 .imagine-agent-dock-idle-orb.imagine-theme-dark .imagine-agent-orb-button::before {

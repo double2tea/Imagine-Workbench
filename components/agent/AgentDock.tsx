@@ -508,7 +508,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
             aria-label="展开 Agent 对话"
           >
             <span className="imagine-agent-orb-aura" />
-            <AgentIdentityMark variant="orb" trackPointer />
+            <AgentIdentityMark variant="orb" />
             <span className="imagine-agent-orb-reminder absolute right-14 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-full border px-2.5 py-1 text-[10px] font-semibold shadow-lg backdrop-blur">
               Agent
             </span>
@@ -531,7 +531,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
           className="imagine-agent-dock-header-btn flex min-w-0 items-center gap-2 text-left text-sm font-semibold"
           title={isOpen ? "收起 Agent 对话" : "展开 Agent 对话"}
         >
-          <AgentIdentityMark variant="header" trackPointer />
+          <AgentIdentityMark variant="header" />
           <span className="min-w-0 truncate">Agent</span>
           <ChevronRight className={`h-3 w-3 text-[var(--iw-faint)] transition ${isOpen ? "rotate-90" : "-rotate-90"}`} />
         </button>
