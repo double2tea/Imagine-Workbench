@@ -1276,7 +1276,6 @@ export default function BoardWorkspace({
             defaultViewport={board.viewport}
             minZoom={0.25}
             maxZoom={1.8}
-            fitView={board.nodes.length === 0}
             onlyRenderVisibleElements
             connectOnClick={false}
             connectionMode={ConnectionMode.Loose}

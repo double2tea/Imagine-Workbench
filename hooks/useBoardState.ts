@@ -50,6 +50,8 @@ const DEFAULT_CUSTOM_IMAGE_RESOLUTION = "2560x1440";
 const DEFAULT_VARIANT_COUNT: BoardGenerateVariantCount = 1;
 const DEFAULT_BOARD_IMAGE_MODEL = "modelscope:Qwen/Qwen-Image";
 const DEFAULT_BOARD_VIDEO_MODEL = "12ai:veo_3_1-fast";
+const BOARD_VIEWPORT_POSITION_EPSILON = 0.5;
+const BOARD_VIEWPORT_ZOOM_EPSILON = 0.001;
 const BOARD_NODE_KINDS = new Set<BoardNode["kind"]>([
   "agent",
   "asset",
@@ -292,6 +294,14 @@ function normalizeBoardViewport(viewport: unknown): BoardViewport {
     y: readFiniteNumber(viewportRecord.y, 0),
     zoom: Math.max(0.25, Math.min(1.8, readFiniteNumber(viewportRecord.zoom, 1))),
   };
+}
+
+function sameBoardViewport(left: BoardViewport, right: BoardViewport): boolean {
+  return (
+    Math.abs(left.x - right.x) < BOARD_VIEWPORT_POSITION_EPSILON &&
+    Math.abs(left.y - right.y) < BOARD_VIEWPORT_POSITION_EPSILON &&
+    Math.abs(left.zoom - right.zoom) < BOARD_VIEWPORT_ZOOM_EPSILON
+  );
 }
 
 function normalizeBoardPoint(point: unknown, index: number): BoardPoint {
@@ -1240,9 +1250,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
 
   const setViewport = useCallback((viewport: BoardViewport) => {
     mutateBoard(currentBoard => (
-      currentBoard.viewport.x === viewport.x &&
-      currentBoard.viewport.y === viewport.y &&
-      currentBoard.viewport.zoom === viewport.zoom
+      sameBoardViewport(currentBoard.viewport, viewport)
         ? currentBoard
         : {
           ...currentBoard,
