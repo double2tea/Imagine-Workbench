@@ -1381,29 +1381,6 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   useEffect(() => {
     if (!loadedItemsRef.current) return;
     if (boardController.saveStatus === "loading") return;
-    if (boardSummaries.length > 1) return;
-    const boardNodeIds = new Set(boardController.board.nodes.map(node => node.id));
-    const staleSourceItems = items.filter(item => item.sourceBoardNodeId && !boardNodeIds.has(item.sourceBoardNodeId));
-    if (staleSourceItems.length === 0) return;
-
-    const staleItemIds = new Set(staleSourceItems.map(item => item.id));
-    const repairedItems = items.map(item => (
-      staleItemIds.has(item.id)
-        ? { ...item, sourceBoardNodeId: undefined }
-        : item
-    ));
-    const repairTimer = window.setTimeout(() => {
-      setItems(repairedItems);
-      staleSourceItems.forEach(item => {
-        void saveItemOrWarn({ ...item, sourceBoardNodeId: undefined }, pushWorkspaceNotice);
-      });
-    }, 0);
-    return () => window.clearTimeout(repairTimer);
-  }, [boardController.board.nodes, boardController.saveStatus, boardSummaries.length, items, pushWorkspaceNotice]);
-
-  useEffect(() => {
-    if (!loadedItemsRef.current) return;
-    if (boardController.saveStatus === "loading") return;
     const known = knownItemIdsRef.current;
     const handledBoardItems = handledBoardItemIdsRef.current;
     for (const item of items) {
