@@ -652,6 +652,40 @@ function connectEdge(nodes: BoardNode[], edges: BoardEdge[], edge: BoardEdge): B
   return [...withoutDuplicate, edge];
 }
 
+function findMatchingEdge(edges: BoardEdge[], from: BoardPortRef, to: BoardPortRef): BoardEdge | undefined {
+  return edges.find(edge =>
+    edge.from.nodeId === from.nodeId &&
+    edge.from.portId === from.portId &&
+    edge.to.nodeId === to.nodeId &&
+    edge.to.portId === to.portId
+  );
+}
+
+function sameGenerateUpdate(node: BoardImageGenerateNode | BoardVideoGenerateNode, input: BoardGenerateNodeUpdate): boolean {
+  if ("aspectRatio" in input && node.aspectRatio !== input.aspectRatio) return false;
+  if ("errorMessage" in input && node.errorMessage !== input.errorMessage) return false;
+  if ("model" in input && node.model !== input.model) return false;
+  if ("prompt" in input && node.prompt !== input.prompt) return false;
+  if ("resultAssetId" in input && node.resultAssetId !== input.resultAssetId) return false;
+  if ("status" in input && node.status !== input.status) return false;
+  if ("variantCount" in input && node.variantCount !== input.variantCount) return false;
+
+  if (node.kind === "image-generate") {
+    if ("customImageResolution" in input && node.customImageResolution !== input.customImageResolution) return false;
+    if ("imageQuality" in input && node.imageQuality !== input.imageQuality) return false;
+    if ("imageResolution" in input && node.imageResolution !== input.imageResolution) return false;
+    if ("thinkingLevel" in input && node.thinkingLevel !== input.thinkingLevel) return false;
+  }
+
+  if (node.kind === "video-generate") {
+    if ("videoDuration" in input && node.videoDuration !== input.videoDuration) return false;
+    if ("videoPreset" in input && node.videoPreset !== input.videoPreset) return false;
+    if ("videoResolution" in input && node.videoResolution !== input.videoResolution) return false;
+  }
+
+  return true;
+}
+
 export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateController {
   const [board, setBoardState] = useState<BoardDocument>(() => createEmptyBoard(boardId));
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -1143,8 +1177,15 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
   }, [duplicateNodes]);
 
   const connectPorts = useCallback((from: BoardPortRef, to: BoardPortRef) => {
+    const existingEdge = findMatchingEdge(boardRef.current.edges, from, to);
+    if (existingEdge) {
+      setSelectedEdgeId(existingEdge.id);
+      setSelectedNodeId(null);
+      return;
+    }
     const edgeId = createBoardId("edge");
     mutateBoard(currentBoard => {
+      if (findMatchingEdge(currentBoard.edges, from, to)) return currentBoard;
       const edge: BoardEdge = {
         ...createBoardEdge(currentBoard.nodes, from, to),
         id: edgeId,
@@ -1330,11 +1371,18 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     const updatedAt = nowIso();
     mutateBoard(
       currentBoard => {
+        let didChange = false;
         const nextNodes = currentBoard.nodes.map(node =>
           node.id === nodeId && (node.kind === "image-generate" || node.kind === "video-generate")
-            ? { ...node, ...input, updatedAt }
-            : node,
+            ? sameGenerateUpdate(node, input)
+              ? node
+              : (() => {
+                didChange = true;
+                return { ...node, ...input, updatedAt };
+              })()
+            : node
         );
+        if (!didChange) return currentBoard;
         return touchBoard(currentBoard, nextNodes, filterValidBoardEdges(nextNodes, currentBoard.edges));
       },
       { skipUndo: true },

@@ -131,6 +131,31 @@ function sameStringList(left: string[], right: string[]): boolean {
   return left.every((value, index) => value === right[index]);
 }
 
+function sameOptionalNumber(left: number | undefined, right: number | undefined): boolean {
+  return left === right;
+}
+
+function sameFlowNodeState(left: BoardFlowNode, right: BoardFlowNode): boolean {
+  return (
+    left.id === right.id &&
+    left.type === right.type &&
+    left.data === right.data &&
+    left.position.x === right.position.x &&
+    left.position.y === right.position.y &&
+    left.selected === right.selected &&
+    left.dragging === right.dragging &&
+    sameOptionalNumber(left.measured?.width, right.measured?.width) &&
+    sameOptionalNumber(left.measured?.height, right.measured?.height) &&
+    sameOptionalNumber(left.width, right.width) &&
+    sameOptionalNumber(left.height, right.height)
+  );
+}
+
+function sameFlowNodeList(left: BoardFlowNode[], right: BoardFlowNode[]): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((node, index) => sameFlowNodeState(node, right[index]));
+}
+
 function BoardEdgeComponent({
   data,
   id,
@@ -647,7 +672,7 @@ export default function BoardWorkspace({
   const [reactFlowNodes, setReactFlowNodes] = useState<BoardFlowNode[]>(flowNodes);
   useLayoutEffect(() => {
     if (isNodeDragActiveRef.current) return;
-    setReactFlowNodes(flowNodes);
+    setReactFlowNodes(currentNodes => (sameFlowNodeList(currentNodes, flowNodes) ? currentNodes : flowNodes));
   }, [flowNodes]);
   const flowEdges = useMemo<BoardFlowEdge[]>(
     () =>
@@ -770,7 +795,10 @@ export default function BoardWorkspace({
   }, [beginUndoGesture, endUndoGesture, updateNodesPositions]);
 
   const handleNodesChange = useCallback<OnNodesChange<BoardFlowNode>>((changes) => {
-    setReactFlowNodes(currentNodes => applyNodeChanges(changes, currentNodes));
+    setReactFlowNodes(currentNodes => {
+      const nextNodes = applyNodeChanges(changes, currentNodes);
+      return sameFlowNodeList(currentNodes, nextNodes) ? currentNodes : nextNodes;
+    });
     const settledPositions: Array<{ nodeId: string; position: BoardPoint }> = [];
     for (const change of changes) {
       if (change.type !== "position" || !change.position || change.dragging === true) continue;
