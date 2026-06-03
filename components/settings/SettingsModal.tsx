@@ -131,7 +131,7 @@ export default function SettingsModal({
                 <Settings className="h-5 w-5 text-amber-500" />
                 设置
               </h3>
-              <button type="button" onClick={onClose} className="imagine-settings-close-btn">
+              <button type="button" onClick={onClose} className="imagine-settings-close-btn" aria-label="关闭设置">
                 <X className="h-5 w-5" />
               </button>
             </div>

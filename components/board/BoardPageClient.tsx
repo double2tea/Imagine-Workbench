@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { flushSync } from "react-dom";
 import { Maximize2, Paintbrush, Send, Settings, Video } from "lucide-react";
+import { useConfirm } from "@/components/confirm/ConfirmProvider";
 import AgentDock, { type AgentToolAction } from "@/components/agent/AgentDock";
 import { isCustomImageResolutionValue } from "@/lib/agent-tool-action";
 import AtReferenceDropdown from "@/components/reference/AtReferenceDropdown";
@@ -11,12 +12,12 @@ import CanvasMaskEditor from "@/components/CanvasMaskEditor";
 import FullscreenPreview from "@/components/assets/FullscreenPreview";
 import BoardInspector from "@/components/board/BoardInspector";
 import BoardSidePanel from "@/components/board/BoardSidePanel";
+import BoardSideAssetList from "@/components/board/BoardSideAssetList";
 import BoardWorkspace from "@/components/board/BoardWorkspace";
 import PreviewImage from "@/components/PreviewImage";
 import SettingsModal from "@/components/settings/SettingsModal";
 import WorkspaceNotices, { type WorkspaceNotice } from "@/components/workbench/WorkspaceNotices";
 import type { AgentBoardContext, AgentBoardNodeSummary } from "@/lib/agent-context";
-import { IMAGINE_BOARD_ASSET_DRAG_TYPE } from "@/lib/board/interaction";
 import { persistThemeMode, readStoredThemeMode, type ThemeMode } from "@/lib/theme-mode";
 import { useAgentController } from "@/hooks/useAgentController";
 import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
@@ -78,6 +79,7 @@ import {
   type LocalStorageCleanupKind,
   type WorkspaceCleanupKind,
 } from "@/lib/data-management";
+import { CLEAR_WORKSPACE_ASSETS_MESSAGE } from "@/lib/workspace-messages";
 
 type NoticeType = "error" | "info" | "success";
 type MaskDestination = "creative" | "agent";
@@ -438,6 +440,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const pollingFailuresRef = useRef<Record<string, number>>({});
   const generationAbortControllersRef = useRef<Record<string, AbortController>>({});
   const locallyCanceledItemIdsRef = useRef<Set<string>>(new Set());
+  const confirmAction = useConfirm();
 
   const dismissWorkspaceNotice = useCallback((id: string) => {
     setWorkspaceNotices(prev => prev.filter(notice => notice.id !== id));
@@ -716,6 +719,12 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       setMode("image");
     }
     setIsMaskOpen(false);
+    pushWorkspaceNotice(
+      "success",
+      maskDestination === "agent"
+        ? "蒙版已应用到 Agent 参考图，可在对话中继续描述修改"
+        : "蒙版已写入参考图，可继续编辑提示词并生成",
+    );
   };
 
   const buildAgentBoardContext = useCallback((): AgentBoardContext => ({
@@ -1004,7 +1013,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     const confirmText = canCancelRemote
       ? "确定要取消这个视频生成任务吗？"
       : "确定要本地取消这个任务吗？远端生成可能仍会继续。";
-    if (!window.confirm(confirmText)) return;
+    if (!(await confirmAction({ message: confirmText, tone: "danger", confirmLabel: "取消任务" }))) return;
 
     setCancelingBoardItemIds(prev => [...prev, item.id]);
     try {
@@ -1045,6 +1054,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     boardController,
     buildProviderHeaders,
     cancelingBoardItemIds,
+    confirmAction,
     generationAbortControllersRef,
     items,
     locallyCanceledItemIdsRef,
@@ -1448,7 +1458,11 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   }, [addAssetToBoard, boardController, items]);
 
   const handleClearProject = async () => {
-    if (!confirm("确认清空本地项目库资产吗？画板节点不会自动清空。")) return;
+    if (!(await confirmAction({
+      message: CLEAR_WORKSPACE_ASSETS_MESSAGE,
+      tone: "danger",
+      confirmLabel: "清空资产",
+    }))) return;
     try {
       await clearAllDB();
       knownItemIdsRef.current = new Set();
@@ -1492,9 +1506,11 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       const credentialNote = preview.includesCredentials && !includeCredentials
         ? "\n备份包含 provider 密钥；当前未勾选，将不会导入密钥。"
         : "";
-      if (!window.confirm(
-        `确认覆盖恢复此工作区？\n资产 ${preview.assetCount} 项，画板 ${preview.boardCount} 个，设置 ${preview.settingsKeyCount} 项。${credentialNote}`,
-      )) {
+      if (!(await confirmAction({
+        message: `确认覆盖恢复此工作区？\n资产 ${preview.assetCount} 项，画板 ${preview.boardCount} 个，设置 ${preview.settingsKeyCount} 项。${credentialNote}`,
+        tone: "danger",
+        confirmLabel: "恢复",
+      }))) {
         return;
       }
       const result = await importWorkspaceBackup(file, includeCredentials);
@@ -1503,7 +1519,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, "工作区恢复失败"));
     }
-  }, [pushWorkspaceNotice]);
+  }, [confirmAction, pushWorkspaceNotice]);
 
   const handleDataImportLocalAssets = useCallback(async (files: File[]) => {
     const importedItems: StorageItem[] = [];
@@ -1535,7 +1551,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       "broken-complete": "无媒体 URL 的完成记录",
       orphaned: "未被任何画板引用的完成资产",
     };
-    if (!window.confirm(`确认清理${labelByKind[kind]}吗？`)) return;
+    if (!(await confirmAction({ message: `确认清理${labelByKind[kind]}吗？`, tone: "danger", confirmLabel: "清理" }))) return;
     try {
       const result = await cleanupWorkspaceAssets(kind);
       await reloadBoardAssetsFromDB();
@@ -1543,7 +1559,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, "资产清理失败"));
     }
-  }, [pushWorkspaceNotice, reloadBoardAssetsFromDB]);
+  }, [confirmAction, pushWorkspaceNotice, reloadBoardAssetsFromDB]);
 
   const handleDataClearLocalStorage = useCallback(async (kind: LocalStorageCleanupKind) => {
     const labelByKind: Record<LocalStorageCleanupKind, string> = {
@@ -1552,13 +1568,17 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       "provider-credentials": "provider 密钥",
       "ui-preferences": "UI 偏好",
     };
-    if (!window.confirm(`确认清理${labelByKind[kind]}吗？`)) return;
+    if (!(await confirmAction({ message: `确认清理${labelByKind[kind]}吗？`, tone: "danger", confirmLabel: "清理" }))) return;
     const count = clearLocalStorageGroup(kind);
     pushWorkspaceNotice("success", `已清理 ${count} 个本地键，刷新后完全生效`);
-  }, [pushWorkspaceNotice]);
+  }, [confirmAction, pushWorkspaceNotice]);
 
   const handleDataResetBoards = useCallback(async () => {
-    if (!window.confirm("确认重置所有画板为一个空白默认画板吗？")) return;
+    if (!(await confirmAction({
+      message: "确认重置所有画板为一个空白默认画板吗？",
+      tone: "danger",
+      confirmLabel: "重置",
+    }))) return;
     try {
       await resetBoardsToDefault();
       pushWorkspaceNotice("success", "画板已重置");
@@ -1566,7 +1586,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, "画板重置失败"));
     }
-  }, [pushWorkspaceNotice]);
+  }, [confirmAction, pushWorkspaceNotice]);
 
   const duplicateCurrentBoard = useCallback(async () => {
     try {
@@ -1624,7 +1644,11 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       pushWorkspaceNotice("info", "至少保留一个画板");
       return;
     }
-    if (!window.confirm(`确认删除「${boardController.board.title}」吗？`)) return;
+    if (!(await confirmAction({
+      message: `确认删除「${boardController.board.title}」吗？`,
+      tone: "danger",
+      confirmLabel: "删除",
+    }))) return;
     flushSync(() => flushAllBoardText());
     const deletedBoardId = boardController.board.id;
     const nextBoard = boardSummaries.find(item => item.id !== deletedBoardId);
@@ -1633,7 +1657,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     router.push(boardRoute(nextBoardId));
     await deleteBoardFromDB(deletedBoardId);
     setBoardSummaries(prev => prev.filter(item => item.id !== deletedBoardId));
-  }, [boardController.board.id, boardController.board.title, boardSummaries, pushWorkspaceNotice, router]);
+  }, [boardController.board.id, boardController.board.title, boardSummaries, confirmAction, pushWorkspaceNotice, router]);
 
   const saveBoardNow = boardController.saveNow;
 
@@ -1739,42 +1763,11 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             />
           )}
           assetsPanel={(
-              <div className="flex flex-col gap-2 px-3 pb-3">
-                {items.length === 0 ? (
-                  <p className="rounded-lg border border-dashed border-[var(--iw-border)] px-3 py-6 text-center text-xs text-[var(--iw-muted)]">
-                    暂无本地资产，请先在首页生成作品
-                  </p>
-                ) : (
-                  items.slice(0, 36).map(item => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      draggable={item.type === "image" && item.status === "complete"}
-                      onDragStart={(event) => {
-                        if (item.type !== "image" || item.status !== "complete") return;
-                        event.dataTransfer.setData(IMAGINE_BOARD_ASSET_DRAG_TYPE, item.id);
-                        event.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => addAssetToBoard(item)}
-                      className="imagine-asset-card grid grid-cols-[54px_1fr] gap-2 !rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-2 text-left transition hover:border-[var(--iw-board-accent-amber)] hover:bg-[var(--iw-panel)]"
-                    >
-                      <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg bg-[var(--iw-panel)]">
-                        {item.type === "image" && item.status === "complete" ? (
-                          <PreviewImage src={item.url} alt="" className="h-full w-full object-cover" />
-                        ) : (
-                          <Video className="h-4 w-4 text-[var(--iw-faint)]" />
-                        )}
-                      </div>
-                      <span className="min-w-0">
-                        <span className="block truncate text-xs font-semibold text-[var(--iw-text)]">{item.prompt || item.model}</span>
-                        <span className="imagine-status-chip block truncate font-mono text-[10px]" data-status={item.status}>
-                          {item.status}
-                        </span>
-                      </span>
-                    </button>
-                  ))
-                )}
-              </div>
+            <BoardSideAssetList
+              key={resolvedBoardId}
+              items={items}
+              onAddToBoard={addAssetToBoard}
+            />
           )}
         />
       </BoardWorkspace>

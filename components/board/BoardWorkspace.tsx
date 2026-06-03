@@ -396,6 +396,7 @@ function generateInputSummaryForNode(node: BoardNodeModel, nodes: BoardNodeModel
 
   return {
     promptPreview,
+    promptSourceTitle: promptNode?.kind === "prompt" ? promptNode.title : undefined,
     referenceCount: references.length,
     referencePreviews: references.map(reference => ({
       id: reference.id,

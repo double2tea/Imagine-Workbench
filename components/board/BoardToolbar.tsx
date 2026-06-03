@@ -8,6 +8,7 @@ import {
   ChevronDown,
   Layers,
   MoreHorizontal,
+  CircleHelp,
   Moon,
   Pencil,
   Plus,
@@ -17,6 +18,8 @@ import {
   Sun,
   Trash2,
 } from "lucide-react";
+import { useAlert } from "@/components/confirm/ConfirmProvider";
+import { BOARD_CONNECTION_HELP } from "@/lib/workspace-messages";
 import {
   BOARD_INSERT_CATALOG,
   readLastBoardInsertKind,
@@ -132,6 +135,7 @@ export default function BoardToolbar({
   onToggleMiniMap,
   onToggleTheme,
 }: BoardToolbarProps) {
+  const showAlert = useAlert();
   const [isBoardMenuOpen, setIsBoardMenuOpen] = useState(false);
   const [isInsertMenuOpen, setIsInsertMenuOpen] = useState(false);
   const [isOverflowOpen, setIsOverflowOpen] = useState(false);
@@ -464,6 +468,17 @@ export default function BoardToolbar({
             overflowMenuPosition,
             "imagine-board-header-menu fixed z-[60] w-[13.5rem] p-1.5",
             <>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsOverflowOpen(false);
+                  void showAlert({ title: "连线说明", message: BOARD_CONNECTION_HELP });
+                }}
+                className="imagine-board-header-menu-action"
+              >
+                <CircleHelp className="h-3.5 w-3.5" />
+                连线说明
+              </button>
               <button
                 type="button"
                 onClick={() => {

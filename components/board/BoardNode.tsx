@@ -192,6 +192,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
         )}
         {(node.kind === "image-generate" || node.kind === "video-generate") && (
           <GenerateBoardNode
+            hasResultConnection={data.hasResultConnection}
             inputSummary={data.generateInputSummary}
             node={node}
             references={data.generateReferences}

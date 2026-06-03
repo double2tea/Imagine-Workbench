@@ -2,7 +2,8 @@
 
 import React, { useCallback, useState, useEffect, useRef, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { RefreshCw, SlidersHorizontal, Sparkles, Video } from "lucide-react";
+import { RefreshCw, Sparkles, Video } from "lucide-react";
+import { useConfirm } from "@/components/confirm/ConfirmProvider";
 import AgentDock from "@/components/agent/AgentDock";
 import CanvasMaskEditor from "@/components/CanvasMaskEditor";
 import FloatingCompareButton from "@/components/assets/FloatingCompareButton";
@@ -11,7 +12,6 @@ import CreationModeTabs, { type CreationMode } from "@/components/creation/Creat
 import CreatorGenerateButton from "@/components/creation/CreatorGenerateButton";
 import ImageGenerationPanel from "@/components/creation/ImageGenerationPanel";
 import VideoGenerationPanel from "@/components/creation/VideoGenerationPanel";
-import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
 import AtReferenceDropdown from "@/components/reference/AtReferenceDropdown";
 import PromptReferenceDropdown from "@/components/reference/PromptReferenceDropdown";
 import ReferenceImagePicker, { type ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
@@ -23,14 +23,6 @@ import WorkspaceHeader from "@/components/workbench/WorkspaceHeader";
 import { persistThemeMode, readStoredThemeMode, type ThemeMode } from "@/lib/theme-mode";
 import WorkspaceNotices, { type WorkspaceNotice } from "@/components/workbench/WorkspaceNotices";
 import { clearAllDB, getAllFromDB, saveToDB, type StorageItem } from "@/lib/db";
-import {
-  applyPromptTemplateText,
-  detectPromptTemplateSlashCommand,
-  insertPromptTemplateText,
-  type PromptTemplate,
-  type PromptTemplateApplyMode,
-  type PromptTemplateSlashCommand,
-} from "@/lib/prompt-templates";
 import { useAgentController } from "@/hooks/useAgentController";
 import { useAssetActions } from "@/hooks/useAssetActions";
 import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
@@ -70,6 +62,7 @@ import {
   type LocalStorageCleanupKind,
   type WorkspaceCleanupKind,
 } from "@/lib/data-management";
+import { CLEAR_WORKSPACE_ASSETS_MESSAGE } from "@/lib/workspace-messages";
 
 type NoticeType = "error" | "info" | "success";
 type MaskDestination = "creative" | "agent";
@@ -172,9 +165,7 @@ export default function Home() {
   const [mobileWorkbenchPanel, setMobileWorkbenchPanel] = useState<MobileWorkbenchPanel>("create");
   const workbenchShellRef = useRef<HTMLDivElement>(null);
   const [agentPortalHost, setAgentPortalHost] = useState<HTMLElement | null>(null);
-  const mobilePromptTemplatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
-  const [mobilePromptTemplateSlashCommand, setMobilePromptTemplateSlashCommand] =
-    useState<PromptTemplateSlashCommand | null>(null);
+  const confirmAction = useConfirm();
 
   const applyAsVideoReference = (asset: StorageItem) => {
     setReferenceImage(asset.url);
@@ -715,6 +706,12 @@ export default function Home() {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
     setIsMaskOpen(false);
+    pushWorkspaceNotice(
+      "success",
+      maskDestination === "agent"
+        ? "蒙版已应用到 Agent 参考图，可在对话中继续描述修改"
+        : "蒙版已写入参考图，可继续编辑提示词并生成",
+    );
   };
 
   const renderAtDropdown = (type: AtDropdownTarget) => {
@@ -793,16 +790,21 @@ export default function Home() {
   });
 
   const handleClearProject = async () => {
-    if (confirm("🚨 注意：此操作将清空本地 IndexedDB 存储的所有创意图片与视频。已被下载的文件不会受影响。确认清空吗？")) {
-      try {
-        await clearAllDB();
-        setItems([]);
-        setSelectedItemIds([]);
-        setCompareItemIds([]);
-        pushWorkspaceNotice("success", "本地资产库已清空");
-      } catch (error) {
-        pushWorkspaceNotice("error", toErrorMessage(error, "本地资产库清空失败"));
-      }
+    if (!(await confirmAction({
+      message: CLEAR_WORKSPACE_ASSETS_MESSAGE,
+      tone: "danger",
+      confirmLabel: "清空资产",
+    }))) {
+      return;
+    }
+    try {
+      await clearAllDB();
+      setItems([]);
+      setSelectedItemIds([]);
+      setCompareItemIds([]);
+      pushWorkspaceNotice("success", "本地资产库已清空");
+    } catch (error) {
+      pushWorkspaceNotice("error", toErrorMessage(error, "本地资产库清空失败"));
     }
   };
 
@@ -825,9 +827,11 @@ export default function Home() {
       const credentialNote = preview.includesCredentials && !includeCredentials
         ? "\n备份包含 provider 密钥；当前未勾选，将不会导入密钥。"
         : "";
-      if (!window.confirm(
-        `确认覆盖恢复此工作区？\n资产 ${preview.assetCount} 项，画板 ${preview.boardCount} 个，设置 ${preview.settingsKeyCount} 项。${credentialNote}`,
-      )) {
+      if (!(await confirmAction({
+        message: `确认覆盖恢复此工作区？\n资产 ${preview.assetCount} 项，画板 ${preview.boardCount} 个，设置 ${preview.settingsKeyCount} 项。${credentialNote}`,
+        tone: "danger",
+        confirmLabel: "恢复",
+      }))) {
         return;
       }
       const result = await importWorkspaceBackup(file, includeCredentials);
@@ -836,7 +840,7 @@ export default function Home() {
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, "工作区恢复失败"));
     }
-  }, [pushWorkspaceNotice]);
+  }, [confirmAction, pushWorkspaceNotice]);
 
   const handleDataImportLocalAssets = useCallback(async (files: File[]) => {
     const importedItems: StorageItem[] = [];
@@ -868,7 +872,7 @@ export default function Home() {
       "broken-complete": "无媒体 URL 的完成记录",
       orphaned: "未被任何画板引用的完成资产",
     };
-    if (!window.confirm(`确认清理${labelByKind[kind]}吗？`)) return;
+    if (!(await confirmAction({ message: `确认清理${labelByKind[kind]}吗？`, tone: "danger", confirmLabel: "清理" }))) return;
     try {
       const result = await cleanupWorkspaceAssets(kind);
       await reloadAssetsFromDB();
@@ -878,7 +882,7 @@ export default function Home() {
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, "资产清理失败"));
     }
-  }, [pushWorkspaceNotice, reloadAssetsFromDB, setCompareItemIds, setSelectedItemIds]);
+  }, [confirmAction, pushWorkspaceNotice, reloadAssetsFromDB, setCompareItemIds, setSelectedItemIds]);
 
   const handleDataClearLocalStorage = useCallback(async (kind: LocalStorageCleanupKind) => {
     const labelByKind: Record<LocalStorageCleanupKind, string> = {
@@ -887,20 +891,24 @@ export default function Home() {
       "provider-credentials": "provider 密钥",
       "ui-preferences": "UI 偏好",
     };
-    if (!window.confirm(`确认清理${labelByKind[kind]}吗？`)) return;
+    if (!(await confirmAction({ message: `确认清理${labelByKind[kind]}吗？`, tone: "danger", confirmLabel: "清理" }))) return;
     const count = clearLocalStorageGroup(kind);
     pushWorkspaceNotice("success", `已清理 ${count} 个本地键，刷新后完全生效`);
-  }, [pushWorkspaceNotice]);
+  }, [confirmAction, pushWorkspaceNotice]);
 
   const handleDataResetBoards = useCallback(async () => {
-    if (!window.confirm("确认重置所有画板为一个空白默认画板吗？")) return;
+    if (!(await confirmAction({
+      message: "确认重置所有画板为一个空白默认画板吗？",
+      tone: "danger",
+      confirmLabel: "重置",
+    }))) return;
     try {
       await resetBoardsToDefault();
       pushWorkspaceNotice("success", "画板已重置");
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, "画板重置失败"));
     }
-  }, [pushWorkspaceNotice]);
+  }, [confirmAction, pushWorkspaceNotice]);
 
   const toggleThemeMode = () => {
     setThemeMode(prev => {
@@ -982,336 +990,96 @@ export default function Home() {
     />
   );
 
-  const renderMobileQuickComposer = () => {
-    const isImageMode = traditionalSubTab === "image";
-    const activeOptimizeLabel = isImageMode ? "优化" : "润色";
-    const activeSubmitCount = isImageMode ? imageSubmitCount : videoSubmitCount;
-    const isSubmitting = isImageMode ? isSubmittingImage : isSubmittingVideo;
-    const promptType: AtDropdownTarget = isImageMode ? "image-prompt" : "video-prompt";
-    const handleApplyPromptTemplate = (template: PromptTemplate, mode: PromptTemplateApplyMode): void => {
-      if (mobilePromptTemplateSlashCommand && mode === "insert") {
-        const result = insertPromptTemplateText(
-          prompt,
-          template.positivePrompt,
-          mobilePromptTemplateSlashCommand.start,
-          mobilePromptTemplateSlashCommand.end,
-        );
-        setPrompt(result.prompt);
-        setMobilePromptTemplateSlashCommand(null);
-        if (isImageMode && template.negativePrompt) setNegativePrompt(template.negativePrompt);
-        return;
-      }
-      setPrompt(current => applyPromptTemplateText(current, template.positivePrompt, mode));
-      setMobilePromptTemplateSlashCommand(null);
-      if (isImageMode && template.negativePrompt) setNegativePrompt(template.negativePrompt);
-    };
-    const handleMobilePromptChange = (value: string, caret: number): void => {
-      handleTextareaChange(value, promptType);
-      const command = detectPromptTemplateSlashCommand(value, caret);
-      setMobilePromptTemplateSlashCommand(command);
-      if (command) mobilePromptTemplatePickerRef.current?.open(command.search);
-    };
-
-    return (
-      <section className="imagine-mobile-composer rounded-xl dark-glass p-3">
-        <CreationModeTabs value={traditionalSubTab} onChange={setTraditionalSubTab} />
-
-        <div className="mt-3 flex items-center justify-between gap-3">
-          <label className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--iw-text)]">
-            {isImageMode ? <Sparkles className="h-3.5 w-3.5 text-blue-300" /> : <Video className="h-3.5 w-3.5 text-violet-300" />}
-            描述
-          </label>
-          <div className="flex items-center gap-2">
-            <PromptTemplatePicker
-              ref={mobilePromptTemplatePickerRef}
-              accent={isImageMode ? "blue" : "violet"}
-              compact
-              onApply={handleApplyPromptTemplate}
-            />
-            <button
-              type="button"
-              onClick={() => {
-                optimizeActivePrompt();
-              }}
-              disabled={isOptimizing || !prompt.trim()}
-              className={`flex h-8 items-center gap-1 rounded-md border px-2.5 text-[11px] font-semibold transition ${
-                isOptimizing || !prompt.trim()
-                  ? "border-slate-800 bg-slate-900/70 text-slate-600"
-                  : "border-blue-400/25 bg-blue-500/12 text-blue-200"
-              }`}
-            >
-              {isOptimizing ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-              {activeOptimizeLabel}
-            </button>
-          </div>
-        </div>
-
-        <div className="imagine-field-shell relative mt-2 rounded-lg border border-slate-800 bg-slate-950/55 p-3 transition focus-within:border-blue-400/35">
-          {atDropdown.visible && atDropdown.type === promptType ? renderAtDropdown(promptType) : null}
-          <textarea
-            value={prompt}
-            onChange={(event) => handleMobilePromptChange(event.target.value, event.target.selectionStart)}
-            onDrop={(event) => handlePromptDropAsset(event, promptType)}
-            placeholder={isImageMode ? "描述你想生成的画面，输入 @ 引用作品" : videoPromptPlaceholder}
-            className="h-32 w-full resize-none border-0 bg-transparent text-base leading-6 text-slate-100 placeholder-slate-500 outline-0 ring-0 focus:ring-0"
-          />
-          <div className="mt-2 flex items-center justify-between border-t border-slate-800 pt-2 font-mono text-[10px] text-slate-500">
-            <span>@ 引用作品</span>
-            <span>{prompt.length} 字符</span>
-          </div>
-        </div>
-
-        {isImageMode ? (
-          <ReferenceImagePicker
-            addLabel="多图垫"
-            browseClassName="font-medium text-blue-300 underline-offset-4 hover:text-blue-200 hover:underline cursor-pointer"
-            clearLabel="清空"
-            emptyHelp="支持 JPG / PNG / WEBP"
-            emptyLabel="添加图片"
-            label={`参考图 ${referenceImages.length > 0 ? `(${referenceImages.length})` : ""}`}
-            maxCount={4}
-            references={referenceImages}
-            uploadLabel="上传"
-            onClear={() => {
-              setReferenceImages([]);
-              setReferenceImage(null);
-              setPrompt(removePromptReferenceTokens);
-            }}
-            onDropAsset={(asset) => handleReferenceDropAsset(asset, "image-prompt")}
-            onDropFiles={(files) => handleReferenceDropFiles(files, "image-prompt")}
-            onRemove={removeReferenceImage}
-            onUpload={handleImageUpload}
-          />
-        ) : (
-          <ReferenceImagePicker
-            addLabel="添加参考"
-            browseClassName="font-medium text-violet-300 underline-offset-4 hover:text-violet-200 hover:underline cursor-pointer"
-            clearLabel={videoClearReferenceLabel}
-            emptyHelp={videoReferenceHelp}
-            emptyLabel={`添加${videoReferenceLabel}`}
-            label={`${videoReferenceLabel} ${referenceImages.length > 0 ? `(${Math.min(referenceImages.length, videoReferenceLimit)}/${videoReferenceLimit})` : ""}`}
-            maxCount={videoReferenceLimit}
-            references={referenceImages}
-            roleMode={isFirstLastVideoMode}
-            uploadLabel="上传"
-            onClear={() => {
-              setReferenceImages([]);
-              setReferenceImage(null);
-              setPrompt(removePromptReferenceTokens);
-            }}
-            onDropAsset={(asset) => handleReferenceDropAsset(asset, "video-prompt")}
-            onDropFiles={(files) => handleReferenceDropFiles(files, "video-prompt")}
-            onRemove={removeReferenceImage}
-            onRoleChange={(id, role) => toggleReferenceRole(id, role ?? "general")}
-            onUpload={handleImageUpload}
-          />
-        )}
-
-        <button
-          type="button"
-          onClick={() => {
-            if (isImageMode) {
-              generateManualImage();
-            } else {
-              generateManualVideo();
-            }
-          }}
-          disabled={!prompt.trim()}
-          className={`imagine-primary-action mt-3 flex w-full items-center justify-center gap-2 rounded-lg py-3 text-sm font-bold transition ${
-            !prompt.trim()
-              ? "cursor-not-allowed border border-slate-800 bg-slate-900/70 text-slate-600"
-              : isImageMode
-              ? "bg-blue-600 text-white active:scale-95"
-              : "bg-violet-600 text-white active:scale-95"
-          }`}
-        >
-          {isSubmitting ? <RefreshCw className="h-4 w-4 animate-spin" /> : isImageMode ? <Sparkles className="h-4 w-4" /> : <Video className="h-4 w-4" />}
-          {isSubmitting ? `提交中 (${activeSubmitCount})` : isImageMode ? "生成图片" : "生成视频"}
-        </button>
-      </section>
+  const renderCreationPanel = (showGenerateButton: boolean) =>
+    traditionalSubTab === "image" ? (
+      <ImageGenerationPanel
+        showGenerateButton={showGenerateButton}
+        atDropdownNode={atDropdown.visible && atDropdown.type === "image-prompt" ? renderAtDropdown("image-prompt") : null}
+        capabilities={imageCapabilities}
+        customImageSize={customImageSize}
+        imageBackgroundGeneration={imageBackgroundGeneration}
+        imageQuality={imageQuality}
+        imageResolution={imageResolution}
+        imageResolutionOptions={imageResolutionOptions}
+        imageThinkingLevel={imageThinkingLevel}
+        isOptimizing={isOptimizing}
+        isSubmitting={isSubmittingImage}
+        modelGroups={imageModelGroups}
+        negativePrompt={negativePrompt}
+        prompt={prompt}
+        referenceImages={referenceImages}
+        selectedAspectRatio={aspectRatio}
+        selectedModel={selectedModel}
+        submitCount={imageSubmitCount}
+        supportsBackgroundGeneration={canUseBackgroundImageGeneration}
+        onClearReferences={() => {
+          setReferenceImages([]);
+          setReferenceImage(null);
+          setPrompt(removePromptReferenceTokens);
+        }}
+        onCustomImageSizeChange={setCustomImageSize}
+        onGenerate={generateManualImage}
+        onImageBackgroundGenerationChange={setImageBackgroundGeneration}
+        onImageQualityChange={setImageQuality}
+        onImageResolutionChange={setImageResolution}
+        onNegativePromptChange={setNegativePrompt}
+        onOptimizePrompt={optimizeActivePrompt}
+        onPromptChange={value => handleTextareaChange(value, "image-prompt")}
+        onPromptDropAsset={event => handlePromptDropAsset(event, "image-prompt")}
+        onReferenceDropAsset={asset => handleReferenceDropAsset(asset, "image-prompt")}
+        onReferenceDropFiles={files => handleReferenceDropFiles(files, "image-prompt")}
+        onReferenceRemove={removeReferenceImage}
+        onReferenceUpload={handleImageUpload}
+        onSelectAspectRatio={handleSelectImageAspectRatio}
+        onSelectModel={handleSelectImageModel}
+        onThinkingLevelChange={setImageThinkingLevel}
+      />
+    ) : (
+      <VideoGenerationPanel
+        showGenerateButton={showGenerateButton}
+        atDropdownNode={atDropdown.visible && atDropdown.type === "video-prompt" ? renderAtDropdown("video-prompt") : null}
+        capabilities={videoCapabilities}
+        clearReferenceLabel={videoClearReferenceLabel}
+        durationOptions={videoCapabilities.durations}
+        isOptimizing={isOptimizing}
+        isSubmitting={isSubmittingVideo}
+        modelGroups={videoModelGroups}
+        presetOptions={videoCapabilities.presets}
+        prompt={prompt}
+        promptPlaceholder={videoPromptPlaceholder}
+        referenceHelp={videoReferenceHelp}
+        referenceImages={referenceImages}
+        referenceLabel={videoReferenceLabel}
+        referenceLimit={videoReferenceLimit}
+        referenceMode={videoReferenceMode}
+        resolutionOptions={videoCapabilities.resolutions}
+        selectedDuration={videoDuration}
+        selectedModel={selectedVideoModel}
+        selectedPreset={videoPreset}
+        selectedResolution={videoResolution}
+        selectedSize={aspectRatio}
+        submitCount={videoSubmitCount}
+        onClearReferences={() => {
+          setReferenceImages([]);
+          setReferenceImage(null);
+          setPrompt(removePromptReferenceTokens);
+        }}
+        onGenerate={generateManualVideo}
+        onOptimizePrompt={optimizeActivePrompt}
+        onPromptChange={value => handleTextareaChange(value, "video-prompt")}
+        onPromptDropAsset={event => handlePromptDropAsset(event, "video-prompt")}
+        onReferenceDropAsset={asset => handleReferenceDropAsset(asset, "video-prompt")}
+        onReferenceDropFiles={files => handleReferenceDropFiles(files, "video-prompt")}
+        onReferenceRemove={removeReferenceImage}
+        onReferenceRoleChange={(id, role) => toggleReferenceRole(id, role ?? "general")}
+        onReferenceUpload={handleImageUpload}
+        onSelectDuration={setVideoDuration}
+        onSelectResolution={setVideoResolution}
+        onSelectModel={handleSelectVideoModel}
+        onSelectPreset={setVideoPreset}
+        onSelectSize={setAspectRatio}
+      />
     );
-  };
-
-  const renderMobileAdvancedSettings = () => {
-    const isImageMode = traditionalSubTab === "image";
-
-    return (
-      <details className="imagine-mobile-advanced rounded-xl border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-3">
-        <summary className="flex cursor-pointer list-none items-center justify-between text-[11px] font-semibold text-[var(--iw-muted)]">
-          <span className="flex items-center gap-2">
-            <SlidersHorizontal className="h-3.5 w-3.5 text-slate-400" />
-            高级参数
-          </span>
-          <span className="font-mono text-[10px] text-slate-500">{isImageMode ? "图像" : "视频"}</span>
-        </summary>
-
-        {isImageMode ? (
-          <div className="mt-3 flex flex-col gap-3">
-            <input
-              type="text"
-              value={negativePrompt}
-              onChange={(event) => setNegativePrompt(event.target.value)}
-              placeholder="反向提示词"
-              className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 text-xs text-slate-200 placeholder-slate-600 focus:border-blue-400/35 focus:outline-none"
-            />
-
-            <div className="grid grid-cols-1 gap-3">
-              {canUseBackgroundImageGeneration && (
-                <label className="flex h-6 w-fit items-center gap-1.5 rounded-md border border-slate-800 bg-slate-950/45 px-2 text-[10px] font-semibold text-slate-400">
-                  <input
-                    type="checkbox"
-                    checked={imageBackgroundGeneration}
-                    onChange={(event) => setImageBackgroundGeneration(event.target.checked)}
-                    className="h-3 w-3 cursor-pointer accent-blue-500"
-                  />
-                  <span>后台</span>
-                </label>
-              )}
-              <select
-                value={selectedModel}
-                onChange={(event) => handleSelectImageModel(event.target.value)}
-                className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 focus:border-blue-400/35 focus:outline-none"
-              >
-                {imageModelGroups.map(group => (
-                  <optgroup key={group.provider} label={group.label}>
-                    {group.options.map(option => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-
-              <select
-                value={imageResolution === "custom" ? "custom" : aspectRatio}
-                onChange={(event) => handleSelectImageAspectRatio(event.target.value)}
-                disabled={imageResolution === "custom"}
-                className={`w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs focus:border-blue-400/35 focus:outline-none ${
-                  imageResolution === "custom" ? "cursor-not-allowed text-slate-500 opacity-70" : "text-slate-200"
-                }`}
-              >
-                {imageResolution === "custom" && <option value="custom">自定义尺寸决定比例</option>}
-                {imageCapabilities.aspectRatios.map(option => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </div>
-
-            {imageResolutionOptions.length > 0 && (
-              <>
-                {presetImageResolutionOptions.length > 0 && (
-                  <div className="grid grid-cols-4 gap-1.5 rounded-lg border border-slate-800 bg-slate-950/45 p-1.5">
-                    {presetImageResolutionOptions.map(option => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => setImageResolution(option.value)}
-                        className={`min-h-8 rounded-md px-2 font-mono text-[10px] ${imageResolution !== "custom" && imageResolution === option.value ? "bg-blue-500/16 text-blue-100" : "text-slate-500"}`}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {supportsCustomImageSize && (
-                  <button
-                    type="button"
-                    onClick={() => setImageResolution("custom")}
-                    className={`min-h-8 rounded-md border px-3 font-mono text-[10px] ${imageResolution === "custom" ? "bg-blue-500/16 text-blue-100" : "border-slate-800 bg-slate-950/45 text-slate-500"}`}
-                  >
-                    自定义尺寸
-                  </button>
-                )}
-              </>
-            )}
-            {imageResolution === "custom" && (
-              <input
-                value={customImageSize}
-                onChange={(event) => setCustomImageSize(event.target.value)}
-                placeholder="2560x1440"
-                className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 placeholder-slate-600 focus:border-blue-400/35 focus:outline-none"
-              />
-            )}
-            {imageCapabilities.qualities.length > 0 && (
-              <div className="grid grid-cols-4 gap-1.5 rounded-lg border border-slate-800 bg-slate-950/45 p-1.5">
-                {imageCapabilities.qualities.map(option => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setImageQuality(option.value)}
-                    className={`min-h-8 rounded-md px-2 font-mono text-[10px] ${imageQuality === option.value ? "bg-blue-500/16 text-blue-100" : "text-slate-500"}`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="mt-3 grid grid-cols-1 gap-3">
-            <select
-              value={selectedVideoModel}
-              onChange={(event) => handleSelectVideoModel(event.target.value)}
-              className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 focus:border-violet-400/35 focus:outline-none"
-            >
-              {videoModelGroups.map(group => (
-                <optgroup key={group.provider} label={group.label}>
-                  {group.options.map(option => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-
-            <select
-              value={aspectRatio}
-              onChange={(event) => setAspectRatio(event.target.value)}
-              className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 focus:border-violet-400/35 focus:outline-none"
-            >
-              {videoCapabilities.sizes.map(option => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-
-            {videoCapabilities.resolutions.length > 0 && (
-              <select
-                value={videoResolution}
-                onChange={(event) => setVideoResolution(event.target.value)}
-                className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 focus:border-violet-400/35 focus:outline-none"
-              >
-                {videoCapabilities.resolutions.map(option => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            )}
-
-            {videoCapabilities.durations.length > 0 && (
-              <select
-                value={videoDuration}
-                onChange={(event) => setVideoDuration(event.target.value)}
-                className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 focus:border-violet-400/35 focus:outline-none"
-              >
-                {videoCapabilities.durations.map(option => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            )}
-
-            {videoCapabilities.presets.length > 0 && (
-              <select
-                value={videoPreset}
-                onChange={(event) => setVideoPreset(event.target.value)}
-                className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2.5 font-mono text-xs text-slate-200 focus:border-violet-400/35 focus:outline-none"
-              >
-                {videoCapabilities.presets.map(option => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            )}
-          </div>
-        )}
-      </details>
-    );
-  };
 
   return (
     <div
@@ -1352,10 +1120,17 @@ export default function Home() {
               />
 
               {mobileWorkbenchPanel === "create" ? (
-                <>
-                  {renderMobileQuickComposer()}
-                  {renderMobileAdvancedSettings()}
-                </>
+                <section className="imagine-mobile-composer imagine-control-surface flex flex-col gap-3 rounded-xl p-3">
+                  <CreationModeTabs value={traditionalSubTab} onChange={setTraditionalSubTab} />
+                  <div className="imagine-creator-meta flex justify-end">
+                    <span className="imagine-meta-chip font-mono text-[10px]">
+                      {assetStats.statusCounts.processing + assetStats.statusCounts.pending > 0
+                        ? `${assetStats.statusCounts.processing + assetStats.statusCounts.pending} 进行中 · ${items.length} 项`
+                        : `${items.length} 项本地资产`}
+                    </span>
+                  </div>
+                  {renderCreationPanel(true)}
+                </section>
               ) : (
                 <section className="imagine-mobile-asset-stream">
                   {renderAssetGalleryWorkspace()}
@@ -1376,95 +1151,7 @@ export default function Home() {
                   </span>
                 </div>
 
-                {traditionalSubTab === "image" ? (
-                  <ImageGenerationPanel
-                    showGenerateButton={false}
-                    atDropdownNode={atDropdown.visible && atDropdown.type === "image-prompt" ? renderAtDropdown("image-prompt") : null}
-                    capabilities={imageCapabilities}
-                    customImageSize={customImageSize}
-                    imageBackgroundGeneration={imageBackgroundGeneration}
-                    imageQuality={imageQuality}
-                    imageResolution={imageResolution}
-                    imageResolutionOptions={imageResolutionOptions}
-                    imageThinkingLevel={imageThinkingLevel}
-                    isOptimizing={isOptimizing}
-                    isSubmitting={isSubmittingImage}
-                    modelGroups={imageModelGroups}
-                    negativePrompt={negativePrompt}
-                    prompt={prompt}
-                    referenceImages={referenceImages}
-                    selectedAspectRatio={aspectRatio}
-                    selectedModel={selectedModel}
-                    submitCount={imageSubmitCount}
-                    supportsBackgroundGeneration={canUseBackgroundImageGeneration}
-                    onClearReferences={() => {
-                      setReferenceImages([]);
-                      setReferenceImage(null);
-                      setPrompt(removePromptReferenceTokens);
-                    }}
-                    onCustomImageSizeChange={setCustomImageSize}
-                    onGenerate={generateManualImage}
-                    onImageBackgroundGenerationChange={setImageBackgroundGeneration}
-                    onImageQualityChange={setImageQuality}
-                    onImageResolutionChange={setImageResolution}
-                    onNegativePromptChange={setNegativePrompt}
-                    onOptimizePrompt={optimizeActivePrompt}
-                    onPromptChange={(value) => handleTextareaChange(value, "image-prompt")}
-                    onPromptDropAsset={(event) => handlePromptDropAsset(event, "image-prompt")}
-                    onReferenceDropAsset={(asset) => handleReferenceDropAsset(asset, "image-prompt")}
-                    onReferenceDropFiles={(files) => handleReferenceDropFiles(files, "image-prompt")}
-                    onReferenceRemove={removeReferenceImage}
-                    onReferenceUpload={handleImageUpload}
-                    onSelectAspectRatio={handleSelectImageAspectRatio}
-                    onSelectModel={handleSelectImageModel}
-                    onThinkingLevelChange={setImageThinkingLevel}
-                  />
-                ) : (
-                  <VideoGenerationPanel
-                    showGenerateButton={false}
-                    atDropdownNode={atDropdown.visible && atDropdown.type === "video-prompt" ? renderAtDropdown("video-prompt") : null}
-                    capabilities={videoCapabilities}
-                    clearReferenceLabel={videoClearReferenceLabel}
-                    durationOptions={videoCapabilities.durations}
-                    isOptimizing={isOptimizing}
-                    isSubmitting={isSubmittingVideo}
-                    modelGroups={videoModelGroups}
-                    presetOptions={videoCapabilities.presets}
-                    prompt={prompt}
-                    promptPlaceholder={videoPromptPlaceholder}
-                    referenceHelp={videoReferenceHelp}
-                    referenceImages={referenceImages}
-                    referenceLabel={videoReferenceLabel}
-                    referenceLimit={videoReferenceLimit}
-                    referenceMode={videoReferenceMode}
-                    resolutionOptions={videoCapabilities.resolutions}
-                    selectedDuration={videoDuration}
-                    selectedModel={selectedVideoModel}
-                    selectedPreset={videoPreset}
-                    selectedResolution={videoResolution}
-                    selectedSize={aspectRatio}
-                    submitCount={videoSubmitCount}
-                    onClearReferences={() => {
-                      setReferenceImages([]);
-                      setReferenceImage(null);
-                      setPrompt(removePromptReferenceTokens);
-                    }}
-                    onGenerate={generateManualVideo}
-                    onOptimizePrompt={optimizeActivePrompt}
-                    onPromptChange={(value) => handleTextareaChange(value, "video-prompt")}
-                    onPromptDropAsset={(event) => handlePromptDropAsset(event, "video-prompt")}
-                    onReferenceDropAsset={(asset) => handleReferenceDropAsset(asset, "video-prompt")}
-                    onReferenceDropFiles={(files) => handleReferenceDropFiles(files, "video-prompt")}
-                    onReferenceRemove={removeReferenceImage}
-                    onReferenceRoleChange={(id, role) => toggleReferenceRole(id, role ?? "general")}
-                    onReferenceUpload={handleImageUpload}
-                    onSelectDuration={setVideoDuration}
-                    onSelectResolution={setVideoResolution}
-                    onSelectModel={handleSelectVideoModel}
-                    onSelectPreset={setVideoPreset}
-                    onSelectSize={setAspectRatio}
-                  />
-                )}
+                {renderCreationPanel(false)}
 
               </div>
 

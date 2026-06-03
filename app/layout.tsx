@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
+import WorkbenchProviders from '@/components/workbench/WorkbenchProviders';
 import './globals.css'; // Global styles
 
 const inter = Inter({
@@ -28,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript }} />
       </head>
       <body suppressHydrationWarning className="imagine-root-body font-sans antialiased">
-        {children}
+        <WorkbenchProviders>{children}</WorkbenchProviders>
       </body>
     </html>
   );

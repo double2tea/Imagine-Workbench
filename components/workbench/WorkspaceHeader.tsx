@@ -61,9 +61,11 @@ export default function WorkspaceHeader({
         </button>
 
         <button
+          type="button"
           onClick={onClearProject}
           className="imagine-header-button imagine-icon-button flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)] text-[var(--iw-muted)] transition cursor-pointer" data-action="danger"
-          title="清空当前项目"
+          title="清空本地资产"
+          aria-label="清空本地资产"
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>

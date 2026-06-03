@@ -1,5 +1,6 @@
 import type { Dispatch, MouseEvent, MutableRefObject, SetStateAction } from "react";
 import JSZip from "jszip";
+import { useConfirm } from "@/components/confirm/ConfirmProvider";
 import type { CompareViewType } from "@/components/assets/ComparePanel";
 import { readFetchError } from "@/lib/client-fetch-error";
 import { readImageGenerationPayload } from "@/lib/client-image-response";
@@ -139,6 +140,8 @@ export function useAssetActions({
   setItems,
   setSelectedItemIds,
 }: UseAssetActionsParams) {
+  const confirmAction = useConfirm();
+
   const toggleSelectItem = (id: string, event?: MouseEvent) => {
     if (event?.shiftKey && selectedItemIds.length > 0) {
       const lastSelectedIdx = filteredItems.findIndex(item => item.id === selectedItemIds[selectedItemIds.length - 1]);
@@ -167,7 +170,11 @@ export function useAssetActions({
 
   const handleBatchDelete = async () => {
     if (selectedItemIds.length === 0) return;
-    if (confirm(`确定要彻底删除已选中的 ${selectedItemIds.length} 项创意资产吗？`)) {
+    if (await confirmAction({
+      message: `确定要彻底删除已选中的 ${selectedItemIds.length} 项创意资产吗？`,
+      tone: "danger",
+      confirmLabel: "删除",
+    })) {
       for (const id of selectedItemIds) {
         await deleteFromDB(id);
       }
@@ -180,7 +187,11 @@ export function useAssetActions({
   const deleteItemsByStatus = async (statuses: StorageItem["status"][]) => {
     const ids = items.filter(item => statuses.includes(item.status)).map(item => item.id);
     if (ids.length === 0) return;
-    if (confirm(`确定要删除 ${ids.length} 个 ${statuses.join("/")} 任务吗？`)) {
+    if (await confirmAction({
+      message: `确定要删除 ${ids.length} 个 ${statuses.join("/")} 任务吗？`,
+      tone: "danger",
+      confirmLabel: "删除",
+    })) {
       for (const id of ids) {
         await deleteFromDB(id);
       }
@@ -196,7 +207,7 @@ export function useAssetActions({
     const confirmText = canCancelRemote
       ? "确定要取消这个视频生成任务吗？"
       : "确定要本地取消这个任务吗？远端生成可能仍会继续。";
-    if (!confirm(confirmText)) return;
+    if (!(await confirmAction({ message: confirmText, tone: "danger", confirmLabel: "取消任务" }))) return;
 
     setCancelingItemIds(prev => [...prev, item.id]);
     try {
@@ -235,7 +246,7 @@ export function useAssetActions({
   };
 
   const handleDeleteItem = async (item: StorageItem) => {
-    if (confirm("确定要删除此创意项吗？")) {
+    if (await confirmAction({ message: "确定要删除此创意项吗？", tone: "danger", confirmLabel: "删除" })) {
       await deleteFromDB(item.id);
       setItems(prev => prev.filter(current => current.id !== item.id));
       setSelectedItemIds(prev => prev.filter(id => id !== item.id));
@@ -244,7 +255,11 @@ export function useAssetActions({
   };
 
   const handleResetLocalData = async () => {
-    if (confirm("这会清空所有生成的历史卡片，无法恢复！")) {
+    if (await confirmAction({
+      message: "这会清空所有生成的历史卡片，无法恢复！",
+      tone: "danger",
+      confirmLabel: "清空",
+    })) {
       await clearAllDB();
       setItems([]);
       setCompareItemIds([]);

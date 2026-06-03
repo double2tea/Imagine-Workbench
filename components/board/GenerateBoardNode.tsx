@@ -24,6 +24,7 @@ export interface BoardGenerateReferencePreview {
 
 export interface BoardGenerateInputSummary {
   promptPreview: string | null;
+  promptSourceTitle?: string;
   referenceCount: number;
   referencePreviews: BoardGenerateReferencePreview[];
 }
@@ -35,6 +36,7 @@ export interface BoardGenerateTaskSummary {
 }
 
 interface GenerateBoardNodeProps {
+  hasResultConnection?: boolean;
   inputSummary?: BoardGenerateInputSummary;
   node: GenerateNode;
   taskSummary?: BoardGenerateTaskSummary;
@@ -43,6 +45,8 @@ interface GenerateBoardNodeProps {
   onUpdate: (input: BoardGenerateNodeUpdate) => void;
   references: ReferenceImageRef[];
 }
+
+type GenerateContextTone = "failed" | "neutral" | "ok" | "processing" | "prompt" | "reference" | "result";
 
 function statusText(node: GenerateNode): string {
   if (node.status === "processing") return "处理中";
@@ -62,15 +66,69 @@ function statusSteps(status: GenerateNode["status"]): Array<{ key: string; label
   });
 }
 
-export default function GenerateBoardNode({ inputSummary, node, onCancel, onExecute, onUpdate, references, taskSummary }: GenerateBoardNodeProps) {
+function contextToneClass(tone: GenerateContextTone): string {
+  if (tone === "prompt") return "border-teal-400/20 bg-teal-500/10 text-teal-100";
+  if (tone === "reference") return "border-blue-400/20 bg-blue-500/10 text-blue-100";
+  if (tone === "result") return "border-emerald-400/20 bg-emerald-500/10 text-emerald-100";
+  if (tone === "processing") return "border-sky-400/20 bg-sky-500/10 text-sky-100";
+  if (tone === "ok") return "border-emerald-400/20 bg-emerald-500/10 text-emerald-100";
+  if (tone === "failed") return "border-red-400/25 bg-red-500/10 text-red-200";
+  return "border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)]";
+}
+
+function resultContext(node: GenerateNode, hasResultConnection: boolean): { title: string; tone: GenerateContextTone } {
+  if (node.resultAssetId && hasResultConnection) return { title: "已连接", tone: "result" };
+  if (node.resultAssetId) return { title: "已生成", tone: "ok" };
+  if (node.status === "processing") return { title: "等待", tone: "processing" };
+  if (node.status === "failed") return { title: "未输出", tone: "failed" };
+  return { title: "未生成", tone: "neutral" };
+}
+
+function runContext(node: GenerateNode, taskSummary: BoardGenerateTaskSummary | undefined): { title: string; tone: GenerateContextTone } {
+  if (taskSummary?.status === "pending") return { title: "排队", tone: "processing" };
+  if (taskSummary?.status === "processing") return { title: `${taskSummary.progress}%`, tone: "processing" };
+  if (node.status === "complete") return { title: "完成", tone: "ok" };
+  if (node.status === "failed") return { title: "失败", tone: "failed" };
+  if (node.status === "processing") return { title: "处理中", tone: "processing" };
+  return { title: "待运行", tone: "neutral" };
+}
+
+export default function GenerateBoardNode({ hasResultConnection = false, inputSummary, node, onCancel, onExecute, onUpdate, references, taskSummary }: GenerateBoardNodeProps) {
   const promptTextareaRef = useRef<BoardPromptTextareaHandle | null>(null);
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
   const slashCommandRef = useRef<PromptTemplateSlashCommand | null>(null);
   const isProcessing = node.status === "processing" || taskSummary?.status === "processing" || taskSummary?.status === "pending";
   const promptPreview = inputSummary?.promptPreview ?? null;
+  const promptSourceTitle = inputSummary?.promptSourceTitle;
   const referenceCount = inputSummary?.referenceCount ?? 0;
   const referencePreviews = inputSummary?.referencePreviews ?? [];
   const steps = statusSteps(node.status);
+  const result = resultContext(node, hasResultConnection);
+  const run = runContext(node, taskSummary);
+  const promptContext = promptPreview !== null
+    ? { title: promptSourceTitle ?? "已连接", tone: "prompt" as const }
+    : { title: "节点内", tone: "neutral" as const };
+  const referenceContext = referenceCount > 0
+    ? { title: `${referenceCount} 张`, tone: "reference" as const }
+    : { title: "无", tone: "neutral" as const };
+  const contextItems: Array<{ key: string; label: string; title: string; tone: GenerateContextTone; tooltip?: string }> = [
+    {
+      key: "prompt",
+      label: "Prompt",
+      title: promptContext.title,
+      tone: promptContext.tone,
+      tooltip: promptPreview !== null ? `来自 ${promptSourceTitle ?? "Prompt 节点"}` : "使用节点内提示词",
+    },
+    { key: "references", label: "参考", title: referenceContext.title, tone: referenceContext.tone },
+    { key: "result", label: "结果", title: result.title, tone: result.tone },
+    {
+      key: "run",
+      label: "运行",
+      title: run.title,
+      tone: run.tone,
+      tooltip: taskSummary ? `任务 ${taskSummary.id}` : undefined,
+    },
+  ];
   const paramSummary = node.kind === "image-generate"
     ? `${node.model} / ${node.imageResolution === "custom" ? node.customImageResolution : node.imageResolution} / x${node.variantCount}`
     : `${node.model} / ${node.aspectRatio}${node.videoDuration ? ` / ${node.videoDuration}s` : ""} / x${node.variantCount}`;
@@ -128,38 +186,36 @@ export default function GenerateBoardNode({ inputSummary, node, onCancel, onExec
           placeholder={promptPreview !== null ? "已连接 Prompt 节点，请在提示节点编辑" : "可直接写提示词，输入 @ 引用参考图"}
         />
       </div>
-      {(promptPreview !== null || referenceCount > 0) && (
-        <div className="flex min-h-6 flex-wrap items-center gap-1.5">
-          <div className="flex flex-wrap items-center gap-1.5">
-            {promptPreview !== null && (
-              <span className="imagine-meta-chip rounded-md border border-teal-400/20 bg-teal-500/10 px-2 py-1 text-[10px] font-semibold text-[var(--iw-text)]">
-                Prompt 输入
-              </span>
-            )}
-            {referenceCount > 0 && (
-              <span className="imagine-meta-chip rounded-md border border-blue-400/20 bg-blue-500/10 px-2 py-1 text-[10px] font-semibold text-[var(--iw-text)]">
-                参考 {referenceCount}
+      <div className="grid grid-cols-4 gap-1.5">
+        {contextItems.map(item => (
+          <div
+            key={item.key}
+            className={`min-w-0 rounded-md border px-1.5 py-1 ${contextToneClass(item.tone)}`}
+            title={item.tooltip}
+          >
+            <span className="block truncate text-[8px] font-semibold uppercase opacity-70">{item.label}</span>
+            <span className="block truncate text-[10px] font-semibold">{item.title}</span>
+          </div>
+        ))}
+      </div>
+      {referencePreviews.length > 0 && (
+        <div className="flex min-h-6 min-w-0 items-center gap-1.5">
+          <div className="nodrag flex min-w-0 items-center gap-1">
+            {referencePreviews.slice(0, 4).map(reference => (
+              <div
+                key={`${reference.id}:${reference.url}`}
+                className="h-6 w-6 overflow-hidden rounded border border-blue-400/30 bg-[var(--iw-panel-soft)]"
+                title={reference.role ? `参考图 · ${reference.role}` : "参考图"}
+              >
+                <PreviewImage src={reference.url} alt="" className="h-full w-full object-cover" />
+              </div>
+            ))}
+            {referencePreviews.length > 4 && (
+              <span className="rounded border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-1.5 py-1 font-mono text-[10px] text-[var(--iw-muted)]">
+                +{referencePreviews.length - 4}
               </span>
             )}
           </div>
-          {referencePreviews.length > 0 && (
-            <div className="nodrag flex min-w-0 items-center gap-1">
-              {referencePreviews.slice(0, 4).map(reference => (
-                <div
-                  key={`${reference.id}:${reference.url}`}
-                  className="h-6 w-6 overflow-hidden rounded border border-blue-400/30 bg-[var(--iw-panel-soft)]"
-                  title={reference.role ? `参考图 · ${reference.role}` : "参考图"}
-                >
-                  <PreviewImage src={reference.url} alt="" className="h-full w-full object-cover" />
-                </div>
-              ))}
-              {referencePreviews.length > 4 && (
-                <span className="rounded border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-1.5 py-1 font-mono text-[10px] text-[var(--iw-muted)]">
-                  +{referencePreviews.length - 4}
-                </span>
-              )}
-            </div>
-          )}
         </div>
       )}
       <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
