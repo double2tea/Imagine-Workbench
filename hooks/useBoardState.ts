@@ -208,12 +208,12 @@ function cloneBoardNodeForDuplicate(source: BoardNode, stackIndex: number): Boar
   }
 }
 
-function normalizeBoard(board: unknown): BoardDocument {
+function normalizeBoard(board: unknown, fallbackId: string = DEFAULT_BOARD_ID): BoardDocument {
   const boardRecord = isRecord(board) ? board : {};
   const nodes = Array.isArray(boardRecord.nodes) ? normalizeBoardNodes(boardRecord.nodes) : [];
   return {
     ...boardRecord,
-    id: readNonEmptyString(boardRecord.id, DEFAULT_BOARD_ID),
+    id: fallbackId,
     title: readNonEmptyString(boardRecord.title, "Board"),
     config: normalizeBoardConfig(boardRecord.config),
     nodes,
@@ -804,7 +804,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       if (!isActive) return;
 
       clearUndoHistory();
-      setBoardState(storedBoard ? normalizeBoard(storedBoard) : createEmptyBoard(boardId));
+      setBoardState(storedBoard ? normalizeBoard(storedBoard, boardId) : createEmptyBoard(boardId));
       setSelectedNodeId(null);
       setSelectedEdgeId(null);
       setSaveError(null);

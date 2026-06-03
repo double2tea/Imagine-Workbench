@@ -1,4 +1,5 @@
 import type { BoardEdge, BoardEdgeKind, BoardNode, BoardPortDefinition, BoardPortRef } from "@/lib/board/types";
+import { dedupeBoardEdgesByEndpoints } from "@/lib/board/edge-dedupe";
 import { getModelCapability } from "@/lib/providers/model-catalog";
 
 export const BOARD_PORT_IDS = {
@@ -157,5 +158,5 @@ export function isValidBoardConnection(nodes: BoardNode[], from: BoardPortRef, t
 }
 
 export function filterValidBoardEdges(nodes: BoardNode[], edges: BoardEdge[]): BoardEdge[] {
-  return edges.filter(edge => isValidBoardConnection(nodes, edge.from, edge.to));
+  return dedupeBoardEdgesByEndpoints(edges.filter(edge => isValidBoardConnection(nodes, edge.from, edge.to)));
 }
