@@ -1,14 +1,19 @@
 import type { ChangeEvent, FormEvent, ReactNode, Ref } from "react";
-import { forwardRef } from "react";
+import { forwardRef, useEffect, useState } from "react";
 import { Check, ChevronRight, ImagePlus, Paintbrush, RefreshCw, Send, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import PreviewImage from "@/components/PreviewImage";
 import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
+import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
+import {
+  formatAgentReferenceHint,
+  getSendableAgentImageReferences,
+} from "@/lib/agent-chat-model";
 import { AgentModelSelect } from "@/components/agent/AgentModelSelect";
 import { AgentActionSummary } from "@/components/agent/AgentActionSummary";
 import { AgentPendingActionEditor } from "@/components/agent/AgentPendingActionEditor";
 import type { AgentGenerationParams } from "@/lib/agent-tool-action";
-import { DEFAULT_VISION_CHAT_MODEL, type AiProvider, type ModelOption } from "@/lib/providers/model-catalog";
+import type { AiProvider, ModelOption } from "@/lib/providers/model-catalog";
 
 export interface ChatMessage {
   id: string;
@@ -43,6 +48,7 @@ interface AgentModelGroup {
 interface AgentDockProps {
   activeCountdownId: string | null;
   agentReferenceId: string | null;
+  agentReferences: ReferenceImageRef[];
   agentReferenceUrl: string | null;
   atDropdownNode: ReactNode;
   autoExecute: boolean;
@@ -57,7 +63,7 @@ interface AgentDockProps {
   messages: ChatMessage[];
   selectedChatModel: string;
   themeMode: "light" | "dark";
-  usesVisionModel: boolean;
+
   videoModelGroups: AgentModelGroup[];
   onSelectChatModel: (value: string) => void;
   onCancelCountdown: () => void;
@@ -392,6 +398,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
   {
     activeCountdownId,
     agentReferenceId,
+    agentReferences,
     agentReferenceUrl,
     atDropdownNode,
     autoExecute,
@@ -405,7 +412,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
     messages,
     selectedChatModel,
     themeMode,
-    usesVisionModel,
+
     onSelectChatModel,
     onCancelCountdown,
     onChangeInput,
@@ -429,9 +436,57 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
     event.preventDefault();
     onSubmit();
   };
-  const activeAgentModel = usesVisionModel ? DEFAULT_VISION_CHAT_MODEL : selectedChatModel;
-  const visionModelHint = `含图参考时将使用 ${DEFAULT_VISION_CHAT_MODEL}`;
-  const isIdleOrb = !isOpen && !isLoading && input.trim().length === 0 && !agentReferenceId && !agentReferenceUrl;
+  const sendableAgentReferences = getSendableAgentImageReferences(
+    agentReferences,
+    agentReferenceId,
+    agentReferenceUrl,
+  );
+  const hasSendableAgentImages = sendableAgentReferences.length > 0;
+  const [visionLookup, setVisionLookup] = useState<{
+    model: string;
+    supportsVision: boolean | null;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!hasSendableAgentImages || !selectedChatModel.trim()) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const model = selectedChatModel;
+    void fetch(`/api/model-vision-support?model=${encodeURIComponent(model)}`, {
+      signal: controller.signal,
+    })
+      .then(async response => {
+        if (!response.ok) return null;
+        const payload: unknown = await response.json();
+        if (typeof payload !== "object" || payload === null || !("supportsVision" in payload)) {
+          return null;
+        }
+        const value = payload.supportsVision;
+        return typeof value === "boolean" ? value : null;
+      })
+      .then(supportsVision => {
+        if (!controller.signal.aborted) {
+          setVisionLookup({ model, supportsVision });
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setVisionLookup({ model, supportsVision: null });
+        }
+      });
+
+    return () => controller.abort();
+  }, [hasSendableAgentImages, selectedChatModel]);
+
+  const openRouterVisionSupport =
+    hasSendableAgentImages && visionLookup?.model === selectedChatModel
+      ? visionLookup.supportsVision
+      : null;
+
+  const agentReferenceHint = formatAgentReferenceHint(sendableAgentReferences, openRouterVisionSupport);
+  const isIdleOrb = !isOpen && !isLoading && input.trim().length === 0 && !hasSendableAgentImages;
 
   return (
     <AnimatePresence initial={false} mode="wait">
@@ -467,7 +522,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
           animate={{ opacity: isOverContent ? 0.84 : 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.99, y: 10 }}
           transition={{ duration: 0.16, ease: "easeOut" }}
-          className={`imagine-agent-dock imagine-agent-dock-panel imagine-theme-${themeMode} fixed inset-x-4 bottom-12 z-40 mx-auto w-[calc(100vw-32px)] max-w-5xl rounded-lg p-3 sm:bottom-16 sm:w-[min(1040px,calc(100vw-40px))]`}
+          className={`imagine-agent-dock imagine-agent-dock-panel pointer-events-auto imagine-theme-${themeMode} fixed inset-x-4 bottom-12 z-50 mx-auto w-[calc(100vw-32px)] max-w-5xl rounded-lg p-3 sm:bottom-16 sm:w-[min(1040px,calc(100vw-40px))]`}
         >
       <div className={`${isOpen ? "mb-2.5" : "mb-1.5"} flex flex-wrap items-center gap-2`}>
         <button
@@ -481,28 +536,22 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
           <ChevronRight className={`h-3 w-3 text-[var(--iw-faint)] transition ${isOpen ? "rotate-90" : "-rotate-90"}`} />
         </button>
 
-        <div className="imagine-agent-dock-toolbar hidden min-w-0 flex-1 items-center justify-center gap-2 sm:flex">
-          {chatModelGroups.length > 0 || activeAgentModel ? (
+        <div className="imagine-agent-dock-toolbar pointer-events-auto hidden min-w-0 flex-1 items-center justify-center gap-2 sm:flex">
+          {chatModelGroups.length > 0 || selectedChatModel ? (
             <AgentModelSelect
-              disabled={usesVisionModel}
-              disabledHint={visionModelHint}
               groups={chatModelGroups}
-              value={activeAgentModel}
+              hint={agentReferenceHint}
+              value={selectedChatModel}
               onChange={onSelectChatModel}
-              className="max-w-[min(12rem,100%)]"
+              className="max-w-[min(14rem,100%)]"
             />
-          ) : null}
-          {usesVisionModel ? (
-            <span className="max-w-[10rem] truncate text-[10px] text-indigo-300/90" title={visionModelHint}>
-              视觉模型
-            </span>
           ) : null}
         </div>
 
         <span className="ml-auto flex shrink-0 items-center gap-2">
           <span className="imagine-agent-dock-status hidden items-center gap-1.5 lg:flex">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400/70" />
-            {agentReferenceId || agentReferenceUrl ? "引用中" : "画廊"}
+            {hasSendableAgentImages ? "引用中" : "画廊"}
           </span>
           {messages.length > 1 && (
             <button
@@ -558,7 +607,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
       </AnimatePresence>
 
       <div className={`${isOpen ? "imagine-agent-dock-input-divider pt-3 mt-2" : ""} flex flex-col gap-3`}>
-        {(agentReferenceId || agentReferenceUrl) && (
+        {hasSendableAgentImages && (
           <div className="imagine-agent-reference-strip flex items-center justify-between gap-3 p-2 animate-fade-in mb-1">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="imagine-agent-ref-thumb relative h-10 w-10 shrink-0 overflow-hidden rounded-lg">
@@ -595,24 +644,22 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
           </div>
         )}
 
-        {chatModelGroups.length > 0 || activeAgentModel ? (
-          <div className="flex flex-wrap items-center gap-2 sm:hidden">
-            <label htmlFor="agent-model-select-mobile" className="text-[10px] font-semibold text-[var(--iw-faint)]">
-              模型
-            </label>
-            <AgentModelSelect
-              id="agent-model-select-mobile"
-              disabled={usesVisionModel}
-              disabledHint={visionModelHint}
-              groups={chatModelGroups}
-              value={activeAgentModel}
-              onChange={onSelectChatModel}
-              className="min-w-0 flex-1"
-            />
-            {usesVisionModel ? (
-              <span className="text-[10px] text-indigo-300/90" title={visionModelHint}>
-                含图参考，已锁定视觉模型
-              </span>
+        {chatModelGroups.length > 0 || selectedChatModel ? (
+          <div className="pointer-events-auto flex flex-col gap-1.5 sm:hidden">
+            <div className="flex flex-wrap items-center gap-2">
+              <label htmlFor="agent-model-select-mobile" className="text-[10px] font-semibold text-[var(--iw-faint)]">
+                模型
+              </label>
+              <AgentModelSelect
+                id="agent-model-select-mobile"
+                groups={chatModelGroups}
+                value={selectedChatModel}
+                onChange={onSelectChatModel}
+                className="min-w-0 flex-1"
+              />
+            </div>
+            {agentReferenceHint ? (
+              <span className="text-[10px] leading-snug text-indigo-300/90">{agentReferenceHint}</span>
             ) : null}
           </div>
         ) : null}

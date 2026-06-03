@@ -94,34 +94,30 @@ export async function getAllFromDB(): Promise<StorageItem[]> {
 
 // Delete item
 export async function deleteFromDB(id: string): Promise<void> {
-  try {
-    const db = await openDatabase();
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(STORE_NAME, "readwrite");
-      const store = transaction.objectStore(STORE_NAME);
-      const request = store.delete(id);
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE_NAME, "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.delete(id);
 
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
-  } catch (err) {
-    console.error("IndexedDB Delete Failed:", err);
-  }
+    transaction.oncomplete = () => resolve();
+    request.onerror = () => reject(request.error ?? new Error("IndexedDB delete failed"));
+    transaction.onerror = () => reject(transaction.error ?? request.error ?? new Error("IndexedDB delete transaction failed"));
+    transaction.onabort = () => reject(transaction.error ?? request.error ?? new Error("IndexedDB delete transaction aborted"));
+  });
 }
 
 // Clear Database store
 export async function clearAllDB(): Promise<void> {
-  try {
-    const db = await openDatabase();
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(STORE_NAME, "readwrite");
-      const store = transaction.objectStore(STORE_NAME);
-      const request = store.clear();
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE_NAME, "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.clear();
 
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
-  } catch (err) {
-    console.error("IndexedDB Clear Failed:", err);
-  }
+    transaction.oncomplete = () => resolve();
+    request.onerror = () => reject(request.error ?? new Error("IndexedDB clear failed"));
+    transaction.onerror = () => reject(transaction.error ?? request.error ?? new Error("IndexedDB clear transaction failed"));
+    transaction.onabort = () => reject(transaction.error ?? request.error ?? new Error("IndexedDB clear transaction aborted"));
+  });
 }

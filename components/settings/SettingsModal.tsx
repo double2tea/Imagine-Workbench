@@ -1,11 +1,17 @@
-import { Info, Settings, X } from "lucide-react";
-import { useState } from "react";
+import { Settings, X } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import type { StorageItem } from "@/lib/db";
 import type { AiProvider, ModelOption } from "@/lib/providers/model-catalog";
 import { ConnectionSettingsWorkspace } from "@/components/settings/ConnectionSettingsWorkspace";
+import DataManagementWorkspace from "@/components/settings/DataManagementWorkspace";
 import type { ProviderTestState } from "@/components/settings/provider-settings-types";
 import type { ProviderCredentials } from "@/lib/providers/types";
+import {
+  getWorkspaceDataSummary,
+  type LocalStorageCleanupKind,
+  type WorkspaceCleanupKind,
+  type WorkspaceDataSummary,
+} from "@/lib/data-management";
 
 export type { ProviderTestState };
 
@@ -19,8 +25,6 @@ type ModelCategory = "chat" | "image" | "video";
 type FetchedModelOptions = Record<AiProvider, Record<ModelCategory, ModelOption[]>>;
 
 interface SettingsModalProps {
-  assetFailedCount: number;
-  assetStatusCounts: Record<StorageItem["type"], number>;
   chatModelGroups: ModelGroup[];
   fetchedModelOptions: FetchedModelOptions;
   imageModelGroups: ModelGroup[];
@@ -32,9 +36,18 @@ interface SettingsModalProps {
   selectedChatModel: string;
   selectedProvider: AiProvider;
   videoModelGroups: ModelGroup[];
+  hasCurrentBoard?: boolean;
+  onCleanupAssets: (kind: WorkspaceCleanupKind) => Promise<void>;
   onClearCredentials: (provider: AiProvider) => void;
+  onClearLocalStorage: (kind: LocalStorageCleanupKind) => Promise<void>;
   onClose: () => void;
-  onResetData: () => void;
+  onClearAssets: () => Promise<void>;
+  onDuplicateCurrentBoard?: () => Promise<void>;
+  onExportCurrentBoard?: (includeCredentials: boolean) => Promise<void>;
+  onExportWorkspace: (includeCredentials: boolean) => Promise<void>;
+  onImportLocalAssets: (files: File[]) => Promise<void>;
+  onImportWorkspace: (file: File, includeCredentials: boolean) => Promise<void>;
+  onResetBoards: () => Promise<void>;
   onAddFetchedModels: (category: ModelCategory, values: string[]) => void;
   onAddManualModels: (category: ModelCategory, value: string) => void;
   onSaveCredential: (provider: AiProvider, field: keyof ProviderCredentials, value: string) => void;
@@ -44,16 +57,14 @@ interface SettingsModalProps {
   testProviderConnection: (provider: AiProvider) => void;
 }
 
-type SettingsTab = "connections" | "system";
+type SettingsTab = "connections" | "data";
 
 const TABS: { key: SettingsTab; label: string }[] = [
   { key: "connections", label: "连接" },
-  { key: "system", label: "系统" },
+  { key: "data", label: "数据" },
 ];
 
 export default function SettingsModal({
-  assetFailedCount,
-  assetStatusCounts,
   chatModelGroups,
   fetchedModelOptions,
   imageModelGroups,
@@ -65,9 +76,18 @@ export default function SettingsModal({
   selectedChatModel,
   selectedProvider,
   videoModelGroups,
+  hasCurrentBoard = false,
+  onCleanupAssets,
   onClearCredentials,
+  onClearLocalStorage,
+  onClearAssets,
   onClose,
-  onResetData,
+  onDuplicateCurrentBoard,
+  onExportCurrentBoard,
+  onExportWorkspace,
+  onImportLocalAssets,
+  onImportWorkspace,
+  onResetBoards,
   onAddFetchedModels,
   onAddManualModels,
   onSaveCredential,
@@ -77,6 +97,19 @@ export default function SettingsModal({
   testProviderConnection,
 }: SettingsModalProps) {
   const [tab, setTab] = useState<SettingsTab>("connections");
+  const [dataSummary, setDataSummary] = useState<WorkspaceDataSummary | null>(null);
+
+  const refreshDataSummary = useCallback(async () => {
+    setDataSummary(await getWorkspaceDataSummary());
+  }, []);
+
+  useEffect(() => {
+    if (!open || tab !== "data") return;
+    const refreshTimer = window.setTimeout(() => {
+      void refreshDataSummary();
+    }, 0);
+    return () => window.clearTimeout(refreshTimer);
+  }, [open, refreshDataSummary, tab]);
 
   return (
     <AnimatePresence>
@@ -141,45 +174,21 @@ export default function SettingsModal({
                 />
               )}
 
-              {tab === "system" && (
-                <div className="flex max-w-xl flex-col gap-4">
-                  <div>
-                    <label className="imagine-settings-label">Web 异步任务轮询</label>
-                    <p className="font-mono text-[10px] text-[var(--iw-muted)]">
-                      自动侦测间隔 4 秒，指数退避保护
-                    </p>
-                  </div>
-
-                  <div className="imagine-settings-info-panel">
-                    <div className="flex items-center justify-between">
-                      <span className="imagine-settings-info-title">
-                        <Info className="h-3.5 w-3.5 text-[var(--iw-faint)]" />
-                        本地项目库概要
-                      </span>
-                      <button
-                        type="button"
-                        onClick={onResetData}
-                        className="text-[10px] text-red-400 underline transition hover:text-red-300"
-                      >
-                        安全复位数据
-                      </button>
-                    </div>
-                    <ul className="imagine-settings-info-list">
-                      <li>类型: 浏览器本地离线存储</li>
-                      <li>合成图片数量: {assetStatusCounts.image} 张</li>
-                      <li>合成视频: {assetStatusCounts.video} 个</li>
-                      <li>失败任务数量: {assetFailedCount} 个</li>
-                      <li>
-                        失败任务会保留重试快照，可能包含上传参考图；重试成功、删除失败项或复位数据后清除。
-                      </li>
-                    </ul>
-                  </div>
-
-                  <p className="text-[10px] leading-relaxed text-[var(--iw-faint)]">
-                    Imagine Workbench 通过统一 provider adapter 接入服务商。图片、视频与 Agent
-                    对话共用密钥与 Base URL 规则；新增服务商只需在 registry.ts 添加配置。
-                  </p>
-                </div>
+              {tab === "data" && (
+                <DataManagementWorkspace
+                  hasCurrentBoard={hasCurrentBoard}
+                  summary={dataSummary}
+                  onCleanupAssets={onCleanupAssets}
+                  onClearAssets={onClearAssets}
+                  onClearLocalStorage={onClearLocalStorage}
+                  onDuplicateCurrentBoard={onDuplicateCurrentBoard}
+                  onExportCurrentBoard={onExportCurrentBoard}
+                  onExportWorkspace={onExportWorkspace}
+                  onImportLocalAssets={onImportLocalAssets}
+                  onImportWorkspace={onImportWorkspace}
+                  onRefreshSummary={refreshDataSummary}
+                  onResetBoards={onResetBoards}
+                />
               )}
             </div>
 

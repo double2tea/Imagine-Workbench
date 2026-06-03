@@ -55,7 +55,8 @@ export interface ProviderModelCapability {
 export const DEFAULT_IMAGE_MODEL = "12ai:gemini-3.1-flash-image-preview";
 export const DEFAULT_VIDEO_MODEL = "12ai:veo_3_1-fast";
 export const DEFAULT_CHAT_MODEL = "12ai:gemini-3.1-flash-lite-preview";
-export const DEFAULT_VISION_CHAT_MODEL = "12ai:gemini-3.1-flash-lite-preview";
+/** @deprecated Agent no longer auto-switches models; alias kept for existing imports/tests. */
+export const DEFAULT_VISION_CHAT_MODEL = DEFAULT_CHAT_MODEL;
 
 const GEMINI_25_RATIOS: ParameterOption[] = [
   { value: "1:1", label: "1:1 Square" },

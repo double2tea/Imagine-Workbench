@@ -1224,6 +1224,11 @@ details.group[open] > .imagine-agent-thought-summary {
   }
 }
 
+.imagine-agent-model-select-wrap {
+  position: relative;
+  z-index: 2;
+}
+
 .imagine-agent-model-select {
   height: 28px;
   max-width: 100%;

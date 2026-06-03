@@ -163,7 +163,9 @@ export function AgentPendingActionEditor({
             value={activeModel}
             disabled={disabled}
             onChange={event => handleModelChange(event.target.value)}
-            className="imagine-agent-model-select w-full"
+            onPointerDown={event => event.stopPropagation()}
+            onClick={event => event.stopPropagation()}
+            className="imagine-agent-model-select pointer-events-auto w-full"
           >
             {!activeModel ? <option value="">选择模型</option> : null}
             {modelMissingFromList ? (

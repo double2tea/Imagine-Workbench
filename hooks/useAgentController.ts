@@ -10,7 +10,7 @@ import type { AgentBoardContext, AgentSurface } from "@/lib/agent-context";
 import type { CreationMode } from "@/components/creation/CreationModeTabs";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import type { StorageItem } from "@/lib/db";
-import { DEFAULT_VISION_CHAT_MODEL } from "@/lib/providers/model-catalog";
+import { getSendableAgentImageReferences } from "@/lib/agent-chat-model";
 
 type NoticeType = "error" | "info" | "success";
 
@@ -352,9 +352,12 @@ export function useAgentController({
           : agentReferenceId && agentReferenceUrl
             ? [{ id: agentReferenceId, url: agentReferenceUrl }]
             : []);
-      const hasAgentImageReference = activeAgentReferences.some(reference => reference.url.trim().length > 0);
-      const agentModel = hasAgentImageReference ? DEFAULT_VISION_CHAT_MODEL : selectedChatModel;
-      const headers = buildProviderHeaders(agentModel);
+      const sendableAgentReferences = getSendableAgentImageReferences(
+        activeAgentReferences,
+        agentReferenceId,
+        agentReferenceUrl,
+      );
+      const headers = buildProviderHeaders(selectedChatModel);
 
       const requestHistory = agentMessages
         .concat(userMessage)
@@ -372,9 +375,9 @@ export function useAgentController({
           surface,
           boardContext: getBoardContext?.(),
           gallerySummary,
-          agentReferences: activeAgentReferences.map(reference => ({ id: reference.id, url: reference.url })),
-          agentReferenceId: activeAgentReferences[0]?.id || agentReferenceId || undefined,
-          model: agentModel,
+          agentReferences: sendableAgentReferences.map(reference => ({ id: reference.id, url: reference.url })),
+          agentReferenceId: sendableAgentReferences[0]?.id || undefined,
+          model: selectedChatModel,
         }),
       });
 

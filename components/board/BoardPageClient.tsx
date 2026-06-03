@@ -66,6 +66,18 @@ import {
   getBoardTextDraft,
 } from "@/lib/board/text-flush-registry";
 import { createVideoFrameStorageItem, getVideoFrameCaptureLabel, type CapturedVideoFrame } from "@/lib/video-frame";
+import {
+  cleanupWorkspaceAssets,
+  clearLocalStorageGroup,
+  createLocalUploadAsset,
+  exportBoardWorkspaceBackup,
+  exportCompleteWorkspaceBackup,
+  importWorkspaceBackup,
+  previewWorkspaceBackup,
+  resetBoardsToDefault,
+  type LocalStorageCleanupKind,
+  type WorkspaceCleanupKind,
+} from "@/lib/data-management";
 
 type NoticeType = "error" | "info" | "success";
 type MaskDestination = "creative" | "agent";
@@ -1437,11 +1449,146 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
   const handleClearProject = async () => {
     if (!confirm("确认清空本地项目库资产吗？画板节点不会自动清空。")) return;
-    await clearAllDB();
-    knownItemIdsRef.current = new Set();
-    handledBoardItemIdsRef.current = new Set();
-    setItems([]);
+    try {
+      await clearAllDB();
+      knownItemIdsRef.current = new Set();
+      handledBoardItemIdsRef.current = new Set();
+      setItems([]);
+      pushWorkspaceNotice("success", "本地资产库已清空");
+    } catch (error) {
+      pushWorkspaceNotice("error", toErrorMessage(error, "本地资产库清空失败"));
+    }
   };
+
+  const reloadBoardAssetsFromDB = useCallback(async () => {
+    const allItems = await getAllFromDB();
+    knownItemIdsRef.current = new Set(allItems.map(item => item.id));
+    setItems(allItems);
+  }, []);
+
+  const handleDataExportWorkspace = useCallback(async (includeCredentials: boolean) => {
+    try {
+      const result = await exportCompleteWorkspaceBackup(includeCredentials);
+      pushWorkspaceNotice("success", `已导出备份：${result.fileName}`);
+    } catch (error) {
+      pushWorkspaceNotice("error", toErrorMessage(error, "完整备份导出失败"));
+    }
+  }, [pushWorkspaceNotice]);
+
+  const handleDataExportCurrentBoard = useCallback(async (includeCredentials: boolean) => {
+    try {
+      flushSync(() => flushAllBoardText());
+      await boardController.saveNow();
+      const result = await exportBoardWorkspaceBackup(boardController.board, includeCredentials);
+      pushWorkspaceNotice("success", `已导出当前画板：${result.fileName}`);
+    } catch (error) {
+      pushWorkspaceNotice("error", toErrorMessage(error, "当前画板导出失败"));
+    }
+  }, [boardController, pushWorkspaceNotice]);
+
+  const handleDataImportWorkspace = useCallback(async (file: File, includeCredentials: boolean) => {
+    try {
+      const preview = await previewWorkspaceBackup(file);
+      const credentialNote = preview.includesCredentials && !includeCredentials
+        ? "\n备份包含 provider 密钥；当前未勾选，将不会导入密钥。"
+        : "";
+      if (!window.confirm(
+        `确认覆盖恢复此工作区？\n资产 ${preview.assetCount} 项，画板 ${preview.boardCount} 个，设置 ${preview.settingsKeyCount} 项。${credentialNote}`,
+      )) {
+        return;
+      }
+      const result = await importWorkspaceBackup(file, includeCredentials);
+      pushWorkspaceNotice("success", `已恢复 ${result.assetCount} 项资产与 ${result.boardCount} 个画板`);
+      window.setTimeout(() => window.location.reload(), 300);
+    } catch (error) {
+      pushWorkspaceNotice("error", toErrorMessage(error, "工作区恢复失败"));
+    }
+  }, [pushWorkspaceNotice]);
+
+  const handleDataImportLocalAssets = useCallback(async (files: File[]) => {
+    const importedItems: StorageItem[] = [];
+    for (let index = 0; index < files.length; index += 1) {
+      const file = files[index];
+      try {
+        const item = await createLocalUploadAsset(
+          file,
+          makeClientId(file.type.startsWith("video/") ? `local_video_${index}` : `local_image_${index}`),
+        );
+        if (!await saveItemOrWarn(item, pushWorkspaceNotice)) continue;
+        importedItems.push(item);
+      } catch (error) {
+        pushWorkspaceNotice("error", toErrorMessage(error, `${file.name || "媒体"} 导入失败`));
+      }
+    }
+    if (importedItems.length === 0) return;
+    setItems(prev => [
+      ...importedItems,
+      ...prev.filter(item => !importedItems.some(importedItem => importedItem.id === item.id)),
+    ]);
+    pushWorkspaceNotice("success", `已导入 ${importedItems.length} 个本地媒体`);
+  }, [pushWorkspaceNotice]);
+
+  const handleDataCleanupAssets = useCallback(async (kind: WorkspaceCleanupKind) => {
+    const labelByKind: Record<WorkspaceCleanupKind, string> = {
+      failed: "失败任务",
+      "stale-processing": "超过 2 小时的处理中/排队任务",
+      "broken-complete": "无媒体 URL 的完成记录",
+      orphaned: "未被任何画板引用的完成资产",
+    };
+    if (!window.confirm(`确认清理${labelByKind[kind]}吗？`)) return;
+    try {
+      const result = await cleanupWorkspaceAssets(kind);
+      await reloadBoardAssetsFromDB();
+      pushWorkspaceNotice("success", `已清理 ${result.deletedIds.length} 项`);
+    } catch (error) {
+      pushWorkspaceNotice("error", toErrorMessage(error, "资产清理失败"));
+    }
+  }, [pushWorkspaceNotice, reloadBoardAssetsFromDB]);
+
+  const handleDataClearLocalStorage = useCallback(async (kind: LocalStorageCleanupKind) => {
+    const labelByKind: Record<LocalStorageCleanupKind, string> = {
+      agent: "Agent 会话",
+      "model-cache": "模型缓存",
+      "provider-credentials": "provider 密钥",
+      "ui-preferences": "UI 偏好",
+    };
+    if (!window.confirm(`确认清理${labelByKind[kind]}吗？`)) return;
+    const count = clearLocalStorageGroup(kind);
+    pushWorkspaceNotice("success", `已清理 ${count} 个本地键，刷新后完全生效`);
+  }, [pushWorkspaceNotice]);
+
+  const handleDataResetBoards = useCallback(async () => {
+    if (!window.confirm("确认重置所有画板为一个空白默认画板吗？")) return;
+    try {
+      await resetBoardsToDefault();
+      pushWorkspaceNotice("success", "画板已重置");
+      window.setTimeout(() => window.location.assign("/board"), 300);
+    } catch (error) {
+      pushWorkspaceNotice("error", toErrorMessage(error, "画板重置失败"));
+    }
+  }, [pushWorkspaceNotice]);
+
+  const duplicateCurrentBoard = useCallback(async () => {
+    try {
+      flushSync(() => flushAllBoardText());
+      await boardController.saveNow();
+      const now = new Date().toISOString();
+      const nextBoard: BoardDocument = {
+        ...boardController.board,
+        id: makeClientId("board"),
+        title: `${boardController.board.title} 副本`,
+        createdAt: now,
+        updatedAt: now,
+      };
+      await saveBoardToDB(nextBoard);
+      setBoardSummaries(prev => [boardSummaryFromDocument(nextBoard), ...prev]);
+      setResolvedBoardId(nextBoard.id);
+      router.push(boardRoute(nextBoard.id));
+      pushWorkspaceNotice("success", "已复制当前画板");
+    } catch (error) {
+      pushWorkspaceNotice("error", toErrorMessage(error, "画板复制失败"));
+    }
+  }, [boardController, pushWorkspaceNotice, router]);
 
   const createBoardPage = useCallback(async () => {
     flushSync(() => flushAllBoardText());
@@ -1636,6 +1783,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         <AgentDock
           activeCountdownId={activeCountdownId}
           agentReferenceId={agentReferenceId}
+          agentReferences={agentReferences}
           agentReferenceUrl={agentReferenceUrl}
           atDropdownNode={atDropdown.visible && atDropdown.type === "agent-prompt" ? renderAgentAtDropdown() : null}
           autoExecute={autoExecute}
@@ -1649,10 +1797,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           messages={agentMessages}
           selectedChatModel={selectedChatModel}
           themeMode={themeMode}
-          usesVisionModel={Boolean(
-            agentReferenceUrl ||
-              agentReferences.some(reference => reference.url.trim().length > 0),
-          )}
+
           onSelectChatModel={handleSelectChatModel}
           onCancelCountdown={clearActiveCountdown}
           onChangeInput={(value) => handleTextareaChange(value, "agent-prompt")}
@@ -1679,8 +1824,6 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       )}
 
       <SettingsModal
-        assetFailedCount={assetStats.statusCounts.failed}
-        assetStatusCounts={assetStats.typeCounts}
         chatModelGroups={chatModelGroups}
         fetchedModelOptions={fetchedModelOptions}
         imageModelGroups={imageModelGroups}
@@ -1692,11 +1835,20 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         selectedChatModel={selectedChatModel}
         selectedProvider={selectedProvider}
         videoModelGroups={videoModelGroups}
+        hasCurrentBoard
         onAddFetchedModels={addFetchedModels}
         onAddManualModels={addManualModels}
+        onCleanupAssets={handleDataCleanupAssets}
+        onClearAssets={handleClearProject}
         onClearCredentials={clearProviderCredentials}
+        onClearLocalStorage={handleDataClearLocalStorage}
         onClose={() => setShowSettings(false)}
-        onResetData={handleClearProject}
+        onDuplicateCurrentBoard={duplicateCurrentBoard}
+        onExportCurrentBoard={handleDataExportCurrentBoard}
+        onExportWorkspace={handleDataExportWorkspace}
+        onImportLocalAssets={handleDataImportLocalAssets}
+        onImportWorkspace={handleDataImportWorkspace}
+        onResetBoards={handleDataResetBoards}
         onSaveCredential={handleSaveCredential}
         onSelectChatModel={handleSelectChatModel}
         onSelectProvider={handleSelectProvider}

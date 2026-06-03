@@ -19,7 +19,14 @@ export {
   createEmptyBoard,
 } from "@/lib/board/defaults";
 export { BOARD_UNDO_LIMIT, cloneBoardHistory, type BoardHistorySnapshot } from "@/lib/board/history";
-export { deleteBoardFromDB, getBoardFromDB, listBoardSummariesFromDB, saveBoardToDB } from "@/lib/board/persistence";
+export {
+  clearBoardsFromDB,
+  deleteBoardFromDB,
+  getBoardFromDB,
+  listBoardsFromDB,
+  listBoardSummariesFromDB,
+  saveBoardToDB,
+} from "@/lib/board/persistence";
 export {
   BOARD_PORT_IDS,
   boardNodeSupportsReferenceInput,

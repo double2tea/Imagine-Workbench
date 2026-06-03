@@ -2,9 +2,9 @@ import { z } from "zod";
 import { NextRequest, NextResponse } from "next/server";
 import type { AgentSurface } from "@/lib/agent-context";
 import { createChatCompletionText, createChatCompletionWithTools, parseJsonObjectText } from "@/lib/providers/chat";
+import { getSendableAgentImageReferences } from "@/lib/agent-chat-model";
 import {
   DEFAULT_CHAT_MODEL,
-  DEFAULT_VISION_CHAT_MODEL,
   MODEL_CAPABILITIES,
   parseProviderModel,
 } from "@/lib/providers/model-catalog";
@@ -175,15 +175,12 @@ export async function POST(req: NextRequest) {
     const latestUserMsg =
       typeof latestUserMessage?.content === "string" ? latestUserMessage.content : "";
 
-    const normalizedAgentRefs = [...agentReferences];
-    if (normalizedAgentRefs.length === 0 && agentReferenceId) {
-      normalizedAgentRefs.push({ id: agentReferenceId, url: "" });
-    }
-
-    const hasImageReference = normalizedAgentRefs.some(item => item.url.length > 0);
-    const modelValue = hasImageReference
-      ? DEFAULT_VISION_CHAT_MODEL
-      : body.model ?? req.headers.get("x-ai-chat-model") ?? DEFAULT_CHAT_MODEL;
+    const sendableAgentRefs = getSendableAgentImageReferences(
+      agentReferences,
+      agentReferenceId,
+      undefined,
+    );
+    const modelValue = body.model ?? req.headers.get("x-ai-chat-model") ?? DEFAULT_CHAT_MODEL;
     const parsed = parseProviderModel(modelValue, "12ai");
     const config = resolveProviderConfig(req, parsed.provider);
 
@@ -206,8 +203,8 @@ export async function POST(req: NextRequest) {
             .join("\n")
         : "No generated assets yet.";
     const referenceMsg =
-      normalizedAgentRefs.length > 0
-        ? `\n[USER REFERENCES]\n${normalizedAgentRefs
+      sendableAgentRefs.length > 0
+        ? `\n[USER REFERENCES]\n${sendableAgentRefs
             .map((item, idx) => `- Ref [${idx + 1}]: ID "${item.id}"`)
             .join("\n")}\n`
         : "";
@@ -249,7 +246,7 @@ export async function POST(req: NextRequest) {
       config,
       parsed.model,
       systemInstruction,
-      buildAgentMessages(messages, normalizedAgentRefs),
+      buildAgentMessages(messages, sendableAgentRefs),
       tools,
       toolCtx,
     );

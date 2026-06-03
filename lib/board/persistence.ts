@@ -64,8 +64,13 @@ export async function saveBoardToDB(board: BoardDocument): Promise<void> {
   await writeStore("readwrite", (store) => store.put(board));
 }
 
-export async function listBoardSummariesFromDB(): Promise<BoardSummary[]> {
+export async function listBoardsFromDB(): Promise<BoardDocument[]> {
   const boards = await readStore<BoardDocument[]>("readonly", (store) => store.getAll());
+  return boards.sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime());
+}
+
+export async function listBoardSummariesFromDB(): Promise<BoardSummary[]> {
+  const boards = await listBoardsFromDB();
   return boards
     .map(board => ({
       id: board.id,
@@ -79,4 +84,8 @@ export async function listBoardSummariesFromDB(): Promise<BoardSummary[]> {
 
 export async function deleteBoardFromDB(id: string): Promise<void> {
   await writeStore("readwrite", (store) => store.delete(id));
+}
+
+export async function clearBoardsFromDB(): Promise<void> {
+  await writeStore("readwrite", (store) => store.clear());
 }

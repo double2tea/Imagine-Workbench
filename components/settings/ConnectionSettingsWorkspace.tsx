@@ -6,7 +6,7 @@ import { ProviderCredentialCard } from "@/components/settings/ProviderCredential
 import type { ProviderTestState } from "@/components/settings/provider-settings-types";
 import { providerClearLabel, providerEndpointInfo } from "@/components/settings/provider-settings-utils";
 import type { AiProvider, ModelOption } from "@/lib/providers/model-catalog";
-import { DEFAULT_VISION_CHAT_MODEL } from "@/lib/providers/model-catalog";
+
 import { PROVIDER_KEYS, getProviderMeta } from "@/lib/providers/registry";
 import type { ProviderCredentials } from "@/lib/providers/types";
 
@@ -274,8 +274,7 @@ export function ConnectionSettingsWorkspace({
                   </div>
                   {section === "chat" ? (
                     <p className="mt-1 text-[10px] leading-relaxed text-[var(--iw-faint)]">
-                      用于 Agent 对话与提示词优化。附带图片参考时将自动切换为{" "}
-                      <span className="font-mono text-[var(--iw-muted)]">{DEFAULT_VISION_CHAT_MODEL}</span>
+                      用于 Agent 对话与提示词优化。附带参考图时仍使用所选模型；是否支持图片输入参考 OpenRouter 模型目录标记，不匹配或失败时由上游返回错误。
                     </p>
                   ) : null}
                 </div>

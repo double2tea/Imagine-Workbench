@@ -13,6 +13,7 @@ interface AgentModelSelectProps {
   disabled?: boolean;
   disabledHint?: string;
   groups: AgentModelGroup[];
+  hint?: string;
   value: string;
   onChange: (value: string) => void;
   className?: string;
@@ -23,6 +24,7 @@ export function AgentModelSelect({
   disabled = false,
   disabledHint,
   groups,
+  hint,
   value,
   onChange,
   className = "",
@@ -42,14 +44,19 @@ export function AgentModelSelect({
   if (groups.length === 0 && !missingCurrent && !value) return null;
 
   return (
+    <div
+      className={`imagine-agent-model-select-wrap pointer-events-auto min-w-0 ${hint ? "flex flex-col gap-1" : ""}`.trim()}
+      onPointerDown={event => event.stopPropagation()}
+      onClick={event => event.stopPropagation()}
+    >
     <select
       id={id}
       value={value}
       disabled={disabled}
       onChange={event => onChange(event.target.value)}
-      className={`imagine-agent-model-select ${disabled ? "imagine-agent-model-select--disabled" : ""} ${className}`.trim()}
+      className={`imagine-agent-model-select pointer-events-auto ${disabled ? "imagine-agent-model-select--disabled" : ""} ${className}`.trim()}
       aria-label="Agent 对话模型"
-      title={disabled ? disabledHint : undefined}
+      title={disabled ? disabledHint : hint}
     >
       {missingCurrent ? (
         <option value={value}>{value}（未在列表）</option>
@@ -64,5 +71,9 @@ export function AgentModelSelect({
         </optgroup>
       ))}
     </select>
+    {hint ? (
+      <span className="text-[10px] leading-snug text-indigo-300/90">{hint}</span>
+    ) : null}
+    </div>
   );
 }
