@@ -13,5 +13,6 @@ const SIZE_BY_VARIANT: Record<AgentIdentityMarkProps["variant"], ImagineMarkSize
 };
 
 export default function AgentIdentityMark({ variant }: AgentIdentityMarkProps) {
-  return <ImagineMark size={SIZE_BY_VARIANT[variant]} />;
+  const trackPointer = variant !== "inline";
+  return <ImagineMark size={SIZE_BY_VARIANT[variant]} trackPointer={trackPointer} />;
 }

@@ -1,20 +1,27 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
   <defs>
-    <linearGradient id="iw-shell" x1="7" y1="5" x2="25" y2="27" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#1a2332"/>
+    <linearGradient id="iw-shell" x1="6" y1="4" x2="26" y2="28" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2a3344"/>
+      <stop offset="0.55" stop-color="#1a2230"/>
       <stop offset="1" stop-color="#121820"/>
     </linearGradient>
-    <linearGradient id="iw-arc" x1="10" y1="8" x2="22" y2="24" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#c7e2f5"/>
-      <stop offset="1" stop-color="#6eb0e8"/>
+    <linearGradient id="iw-ring" x1="8" y1="7" x2="24" y2="25" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#b8d9f2"/>
+      <stop offset="1" stop-color="#5b9fd4"/>
     </linearGradient>
+    <radialGradient id="iw-glow" cx="0.35" cy="0.32" r="0.72">
+      <stop stop-color="#e8f4ff"/>
+      <stop offset="0.55" stop-color="#7ec8f8" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#3b82c4" stop-opacity="0"/>
+    </radialGradient>
   </defs>
-  <rect x="2" y="2" width="28" height="28" rx="9" fill="url(#iw-shell)"/>
-  <rect x="2.5" y="2.5" width="27" height="27" rx="8.5" stroke="rgba(148,163,184,0.28)" stroke-width="0.75"/>
-  <g stroke="url(#iw-arc)" stroke-width="2.35" stroke-linecap="round" fill="none">
-    <path d="M16 7.2 A9.2 9.2 0 0 1 24.1 19.4"/>
-    <path d="M16 7.2 A9.2 9.2 0 0 1 24.1 19.4" transform="rotate(120 16 16)"/>
-    <path d="M16 7.2 A9.2 9.2 0 0 1 24.1 19.4" transform="rotate(240 16 16)"/>
+  <rect x="2" y="2" width="28" height="28" rx="10" fill="url(#iw-shell)"/>
+  <rect x="2.5" y="2.5" width="27" height="27" rx="9.5" stroke="rgba(148,163,184,0.24)" stroke-width="0.7"/>
+  <circle cx="16" cy="16" r="10.5" stroke="rgba(148,163,184,0.18)" stroke-width="0.65" opacity="0.55"/>
+  <path d="M16 5.8c4.9 0 8.9 3.6 9.8 8.2 1 5.2-2.4 10.2-7.4 11.6" stroke="url(#iw-ring)" stroke-width="2.15" stroke-linecap="round"/>
+  <path d="M16 26.2c-4.4 0-8-3.1-8.9-7.2-.8-3.7 1.2-7.4 4.6-9" stroke="#5b9fd4" stroke-width="1.35" stroke-linecap="round" opacity="0.72"/>
+  <g transform="translate(16 16)">
+    <circle r="5.2" fill="url(#iw-glow)" opacity="0.92"/>
+    <circle r="1.35" fill="#f0f9ff"/>
   </g>
-  <circle cx="16" cy="16" r="2.15" fill="#0b1219"/>
 </svg>

@@ -3669,17 +3669,24 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 }
 
 .imagine-mark {
-  --imagine-mark-bg-1: #1f2a3a;
-  --imagine-mark-bg-2: #121820;
-  --imagine-mark-border: rgba(148, 163, 184, 0.22);
-  --imagine-mark-arc-1: #c7e2f5;
-  --imagine-mark-arc-2: #6eb0e8;
-  --imagine-mark-core: #0b1219;
+  --imagine-mark-glow-x: 0px;
+  --imagine-mark-glow-y: 0px;
+  --imagine-mark-bg-1: #2a3344;
+  --imagine-mark-bg-2: #1a2230;
+  --imagine-mark-bg-3: #121820;
+  --imagine-mark-border: rgba(148, 163, 184, 0.2);
+  --imagine-mark-ring-faint: rgba(148, 163, 184, 0.28);
+  --imagine-mark-ring-1: #b8d9f2;
+  --imagine-mark-ring-2: #5b9fd4;
+  --imagine-mark-glow-core: #e8f4ff;
+  --imagine-mark-glow-mid: rgba(126, 200, 248, 0.85);
+  --imagine-mark-glow-edge: rgba(59, 130, 196, 0);
+  --imagine-mark-glow-hot: #f0f9ff;
   position: relative;
   z-index: 1;
   display: block;
   flex-shrink: 0;
-  filter: drop-shadow(0 3px 10px rgba(15, 23, 42, 0.45));
+  filter: drop-shadow(0 4px 14px rgba(15, 23, 42, 0.42));
   transition:
     transform 180ms var(--iw-ease-out),
     filter 180ms var(--iw-ease-out);
@@ -3691,8 +3698,17 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
   height: 100%;
 }
 
+.imagine-mark-glow {
+  transition: transform 60ms linear;
+  transform: translate(var(--imagine-mark-glow-x), var(--imagine-mark-glow-y));
+}
+
 .imagine-mark-xs {
   filter: drop-shadow(0 2px 5px rgba(15, 23, 42, 0.28));
+}
+
+.imagine-mark-tracks-pointer:hover {
+  filter: drop-shadow(0 6px 18px rgba(91, 159, 212, 0.32));
 }
 
 .imagine-agent-orb-button:hover .imagine-mark {
@@ -3712,13 +3728,17 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 html[data-imagine-theme="light"] .imagine-mark,
 .imagine-workbench-shell.imagine-theme-light .imagine-mark,
 .imagine-agent-dock.imagine-theme-light .imagine-mark {
-  --imagine-mark-bg-1: #eef4fa;
-  --imagine-mark-bg-2: #d7e6f4;
-  --imagine-mark-border: rgba(255, 255, 255, 0.82);
-  --imagine-mark-arc-1: #5b9fd4;
-  --imagine-mark-arc-2: #2f7fbf;
-  --imagine-mark-core: #f8fafc;
-  filter: drop-shadow(0 3px 10px rgba(15, 23, 42, 0.12));
+  --imagine-mark-bg-1: #f4f8fc;
+  --imagine-mark-bg-2: #e3edf7;
+  --imagine-mark-bg-3: #cddded;
+  --imagine-mark-border: rgba(255, 255, 255, 0.9);
+  --imagine-mark-ring-faint: rgba(91, 159, 212, 0.22);
+  --imagine-mark-ring-1: #3d85b8;
+  --imagine-mark-ring-2: #2563a8;
+  --imagine-mark-glow-core: #ffffff;
+  --imagine-mark-glow-mid: rgba(126, 200, 248, 0.75);
+  --imagine-mark-glow-hot: #dbeafe;
+  filter: drop-shadow(0 3px 12px rgba(37, 99, 160, 0.16));
 }
 
 html[data-imagine-theme="light"] .imagine-mark-xs,
