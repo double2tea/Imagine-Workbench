@@ -534,11 +534,6 @@ export default function BoardWorkspace({
     }
   }, [onConnectionError, restoreNodeWithEdges, trashedNodes]);
 
-  const selectedNodeIdSet = useMemo(() => {
-    const boardNodeIds = new Set(board.nodes.map(node => node.id));
-    return new Set(selectedNodeIds.filter(id => boardNodeIds.has(id)));
-  }, [board.nodes, selectedNodeIds]);
-
   const flowNodeDataById = useMemo(() => {
     const dataById = new Map<string, BoardFlowNode["data"]>();
     for (const node of board.nodes) {
@@ -637,9 +632,6 @@ export default function BoardWorkspace({
           id: node.id,
           type: "board",
           position: node.position,
-          width: node.size.width,
-          height: node.size.height,
-          selected: selectedNodeIdSet.has(node.id),
           data: {
             ...cachedData,
             node,
@@ -650,7 +642,7 @@ export default function BoardWorkspace({
           },
         };
       }),
-    [board.nodes, flowNodeDataById, generateTaskByNodeId, selectedNodeIdSet],
+    [board.nodes, flowNodeDataById, generateTaskByNodeId],
   );
   const [visualNodes, setVisualNodes] = useState<BoardFlowNode[] | null>(null);
   const displayedNodes = visualNodes ?? flowNodes;
