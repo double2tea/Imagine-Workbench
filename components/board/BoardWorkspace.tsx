@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import {
   applyNodeChanges,
   BaseEdge,
@@ -644,8 +644,11 @@ export default function BoardWorkspace({
       }),
     [board.nodes, flowNodeDataById, generateTaskByNodeId],
   );
-  const [visualNodes, setVisualNodes] = useState<BoardFlowNode[] | null>(null);
-  const displayedNodes = visualNodes ?? flowNodes;
+  const [reactFlowNodes, setReactFlowNodes] = useState<BoardFlowNode[]>(flowNodes);
+  useLayoutEffect(() => {
+    if (isNodeDragActiveRef.current) return;
+    setReactFlowNodes(flowNodes);
+  }, [flowNodes]);
   const flowEdges = useMemo<BoardFlowEdge[]>(
     () =>
       board.edges.map(edge => ({
@@ -751,8 +754,7 @@ export default function BoardWorkspace({
   const handleNodeDragStart = useCallback<OnNodeDrag<BoardFlowNode>>(() => {
     isNodeDragActiveRef.current = true;
     pendingDragPositionByIdRef.current.clear();
-    setVisualNodes(flowNodes);
-  }, [flowNodes]);
+  }, []);
 
   const handleNodeDragStop = useCallback<OnNodeDrag<BoardFlowNode>>((_event, node, nodes) => {
     isNodeDragActiveRef.current = false;
@@ -765,16 +767,10 @@ export default function BoardWorkspace({
     beginUndoGesture();
     updateNodesPositions(Array.from(positionById, ([nodeId, position]) => ({ nodeId, position })));
     endUndoGesture();
-    setVisualNodes(null);
   }, [beginUndoGesture, endUndoGesture, updateNodesPositions]);
 
   const handleNodesChange = useCallback<OnNodesChange<BoardFlowNode>>((changes) => {
-    if (isNodeDragActiveRef.current) {
-      const visualChanges = changes.filter(change => change.type !== "dimensions" && change.type !== "select");
-      if (visualChanges.length > 0) {
-        setVisualNodes(currentNodes => (currentNodes ? applyNodeChanges(visualChanges, currentNodes) : currentNodes));
-      }
-    }
+    setReactFlowNodes(currentNodes => applyNodeChanges(changes, currentNodes));
     const settledPositions: Array<{ nodeId: string; position: BoardPoint }> = [];
     for (const change of changes) {
       if (change.type !== "position" || !change.position || change.dragging === true) continue;
@@ -1268,7 +1264,7 @@ export default function BoardWorkspace({
           className="board-canvas relative min-h-0 bg-[var(--iw-board-canvas-bg)]"
         >
           <ReactFlow
-            nodes={displayedNodes}
+            nodes={reactFlowNodes}
             edges={flowEdges}
             edgeTypes={edgeTypes}
             nodeTypes={nodeTypes}
