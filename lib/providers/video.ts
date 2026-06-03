@@ -127,14 +127,15 @@ export async function getVideoStatus(config: ProviderConfig, taskId: string, mod
   const task = parseVideoTaskId(config, taskId, model);
   const baseUrl = getVideoBaseUrl(config, task.isTwelveAiOmni);
   const response = await getJson<VideoStatusResponse>(`${baseUrl}/v1/videos/${encodeURIComponent(task.id)}`, config);
-  const status = response.status?.toLowerCase() ?? "processing";
+  const statusResponse = readVideoStatusResponse(response);
+  const status = statusResponse.status?.toLowerCase() ?? "processing";
   if (VIDEO_FAILED_STATUSES.has(status)) {
     return {
       done: true,
       mediaType: "video",
       progress: 100,
       status: "failed",
-      errorMessage: response.error?.message ?? "Video task failed",
+      errorMessage: statusResponse.error?.message ?? "Video task failed",
     };
   }
 
@@ -151,7 +152,7 @@ export async function getVideoStatus(config: ProviderConfig, taskId: string, mod
   return {
     done: false,
     mediaType: "video",
-    progress: response.progress ?? (status === "queued" ? 5 : 50),
+    progress: statusResponse.progress ?? (status === "queued" ? 5 : 50),
     status,
   };
 }
@@ -258,6 +259,29 @@ function readVideoUrl(value: VideoStatusResponse): string | undefined {
   return readVideoUrlCandidate(value);
 }
 
+function readVideoStatusResponse(value: VideoStatusResponse): VideoStatusResponse {
+  return readVideoStatusCandidate(value) ?? value;
+}
+
+function readVideoStatusCandidate(value: unknown): VideoStatusResponse | undefined {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const nested = readVideoStatusCandidate(item);
+      if (nested) return nested;
+    }
+    return undefined;
+  }
+  if (isRecord(value)) {
+    if (typeof value.status === "string") return value;
+
+    for (const key of ["data", "output", "result"]) {
+      const nested = readVideoStatusCandidate(value[key]);
+      if (nested) return nested;
+    }
+  }
+  return undefined;
+}
+
 function readVideoUrlCandidate(value: unknown): string | undefined {
   if (Array.isArray(value)) {
     for (const item of value) {
@@ -267,7 +291,7 @@ function readVideoUrlCandidate(value: unknown): string | undefined {
     return undefined;
   }
   if (isRecord(value)) {
-    const candidates = [value.url, value.video_url, value.content_url];
+    const candidates = [value.url, value.video_url, value.content_url, value.output];
     const direct = candidates.find(candidate => typeof candidate === "string" && candidate.trim().length > 0);
     if (typeof direct === "string") return direct.trim();
 
