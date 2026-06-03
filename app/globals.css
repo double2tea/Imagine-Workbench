@@ -3641,28 +3641,21 @@ html[data-imagine-theme="dark"] .imagine-root-body {
   animation: imagine-agent-orb-breathe 4s ease-in-out infinite;
 }
 
-.imagine-agent-mark {
-  --agent-mark-size: 32px;
-  --agent-mark-pupil-x: 0px;
-  --agent-mark-pupil-y: 0px;
-  --agent-mark-bg-1: #4338ca;
-  --agent-mark-bg-2: #6366f1;
-  --agent-mark-bg-3: #1e1b4b;
-  --agent-mark-shine: rgba(255, 255, 255, 0.5);
-  --agent-mark-depth: rgba(15, 23, 42, 0.24);
-  --agent-mark-border: rgba(255, 255, 255, 0.32);
-  --agent-mark-iris: rgba(255, 255, 255, 0.28);
-  --agent-mark-iris-fill: rgba(255, 255, 255, 0.1);
-  --agent-mark-glint: rgba(255, 255, 255, 0.4);
-  --agent-mark-pupil-bg: #c7d2fe;
-  --agent-mark-pupil-mid: #818cf8;
-  --agent-mark-pupil-core: #eef2ff;
-  --agent-mark-pupil-halo: rgba(255, 255, 255, 0.88);
+.imagine-mark {
+  --imagine-mark-core-x: 0px;
+  --imagine-mark-core-y: 0px;
+  --imagine-mark-bg-1: #4338ca;
+  --imagine-mark-bg-2: #6366f1;
+  --imagine-mark-bg-3: #1e1b4b;
+  --imagine-mark-border: rgba(255, 255, 255, 0.32);
+  --imagine-mark-glint: rgba(255, 255, 255, 0.4);
+  --imagine-mark-ring: rgba(255, 255, 255, 0.28);
+  --imagine-mark-ring-fill: rgba(255, 255, 255, 0.1);
+  --imagine-mark-core: #eef2ff;
+  --imagine-mark-core-shine: rgba(255, 255, 255, 0.82);
   position: relative;
   z-index: 1;
   display: block;
-  width: var(--agent-mark-size);
-  height: var(--agent-mark-size);
   flex-shrink: 0;
   filter: drop-shadow(0 8px 18px rgba(67, 56, 202, 0.32));
   transition:
@@ -3670,71 +3663,23 @@ html[data-imagine-theme="dark"] .imagine-root-body {
     filter 180ms var(--iw-ease-out);
 }
 
-.imagine-agent-mark-svg {
+.imagine-mark-svg {
   display: block;
   width: 100%;
   height: 100%;
 }
 
-.imagine-agent-mark-orb {
-  --agent-mark-size: 56px;
+.imagine-mark-core {
+  transition: transform 55ms linear;
 }
 
-.imagine-agent-mark-header {
-  --agent-mark-size: 32px;
-}
-
-.imagine-agent-mark-inline {
-  --agent-mark-size: 14px;
+.imagine-mark-xs {
   filter: drop-shadow(0 2px 6px rgba(67, 56, 202, 0.24));
 }
 
-.imagine-agent-orb-button:hover .imagine-agent-mark {
+.imagine-agent-orb-button:hover .imagine-mark {
   transform: translateY(-2px) scale(1.03);
   filter: drop-shadow(0 14px 28px rgba(99, 102, 241, 0.38));
-}
-
-.imagine-agent-mark-pupil {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  z-index: 2;
-  width: 30%;
-  height: 30%;
-  border-radius: 999px;
-  background: radial-gradient(
-    circle at 38% 32%,
-    var(--agent-mark-pupil-core, #eef2ff) 0%,
-    var(--agent-mark-pupil-bg, #c7d2fe) 38%,
-    var(--agent-mark-pupil-mid, #818cf8) 100%
-  );
-  box-shadow:
-    0 0 0 1.5px var(--agent-mark-pupil-halo, rgba(255, 255, 255, 0.88)),
-    0 3px 8px rgba(30, 27, 75, 0.35);
-  transform: translate(calc(-50% + var(--agent-mark-pupil-x)), calc(-50% + var(--agent-mark-pupil-y)));
-  transition: transform 55ms linear;
-  pointer-events: none;
-}
-
-.imagine-agent-mark-pupil-shine {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  z-index: 3;
-  width: 10%;
-  height: 10%;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.82);
-  transform: translate(
-    calc(-72% + var(--agent-mark-pupil-x) * 0.55),
-    calc(-88% + var(--agent-mark-pupil-y) * 0.55)
-  );
-  transition: transform 55ms linear;
-  pointer-events: none;
-}
-
-.imagine-agent-mark-inline .imagine-agent-mark-pupil-shine {
-  display: none;
 }
 
 .imagine-agent-orb-reminder {
@@ -3746,43 +3691,36 @@ html[data-imagine-theme="dark"] .imagine-root-body {
   pointer-events: none;
 }
 
-.imagine-workbench-shell.imagine-theme-light .imagine-agent-mark {
-  --agent-mark-bg-1: #6366f1;
-  --agent-mark-bg-2: #818cf8;
-  --agent-mark-bg-3: #4338ca;
-  --agent-mark-shine: rgba(255, 255, 255, 0.68);
-  --agent-mark-depth: rgba(49, 46, 129, 0.16);
-  --agent-mark-border: rgba(255, 255, 255, 0.46);
-  --agent-mark-iris: rgba(255, 255, 255, 0.34);
-  --agent-mark-iris-fill: rgba(255, 255, 255, 0.14);
-  --agent-mark-glint: rgba(255, 255, 255, 0.52);
-  --agent-mark-pupil-bg: #e0e7ff;
-  --agent-mark-pupil-mid: #6366f1;
-  --agent-mark-pupil-core: #ffffff;
+.imagine-workbench-shell.imagine-theme-light .imagine-mark {
+  --imagine-mark-bg-1: #6366f1;
+  --imagine-mark-bg-2: #818cf8;
+  --imagine-mark-bg-3: #4338ca;
+  --imagine-mark-border: rgba(255, 255, 255, 0.46);
+  --imagine-mark-glint: rgba(255, 255, 255, 0.52);
+  --imagine-mark-ring: rgba(255, 255, 255, 0.34);
+  --imagine-mark-ring-fill: rgba(255, 255, 255, 0.14);
+  --imagine-mark-core: #ffffff;
+  --imagine-mark-core-shine: rgba(255, 255, 255, 0.9);
   filter: drop-shadow(0 8px 20px rgba(79, 70, 229, 0.22));
 }
 
-.imagine-workbench-shell.imagine-theme-light .imagine-agent-mark-inline {
+.imagine-workbench-shell.imagine-theme-light .imagine-mark-xs {
   filter: drop-shadow(0 3px 8px rgba(79, 70, 229, 0.18));
 }
 
-.imagine-workbench-shell.imagine-theme-dark .imagine-agent-mark {
-  --agent-mark-bg-1: #3730a3;
-  --agent-mark-bg-2: #5b21b6;
-  --agent-mark-bg-3: #0f172a;
-  --agent-mark-shine: rgba(255, 255, 255, 0.38);
-  --agent-mark-depth: rgba(2, 6, 23, 0.42);
-  --agent-mark-border: rgba(255, 255, 255, 0.24);
-  --agent-mark-iris: rgba(255, 255, 255, 0.22);
-  --agent-mark-iris-fill: rgba(255, 255, 255, 0.06);
-  --agent-mark-glint: rgba(255, 255, 255, 0.34);
-  --agent-mark-pupil-bg: #a5b4fc;
-  --agent-mark-pupil-mid: #4f46e5;
-  --agent-mark-pupil-core: #eef2ff;
-  --agent-mark-pupil-halo: rgba(255, 255, 255, 0.78);
+.imagine-workbench-shell.imagine-theme-dark .imagine-mark {
+  --imagine-mark-bg-1: #3730a3;
+  --imagine-mark-bg-2: #5b21b6;
+  --imagine-mark-bg-3: #0f172a;
+  --imagine-mark-border: rgba(255, 255, 255, 0.24);
+  --imagine-mark-glint: rgba(255, 255, 255, 0.34);
+  --imagine-mark-ring: rgba(255, 255, 255, 0.22);
+  --imagine-mark-ring-fill: rgba(255, 255, 255, 0.06);
+  --imagine-mark-core: #eef2ff;
+  --imagine-mark-core-shine: rgba(255, 255, 255, 0.78);
 }
 
-.imagine-agent-dock.imagine-theme-light .imagine-agent-mark {
+.imagine-agent-dock.imagine-theme-light .imagine-mark {
   filter: drop-shadow(0 8px 20px rgba(79, 70, 229, 0.22));
 }
 
@@ -3798,11 +3736,11 @@ html[data-imagine-theme="dark"] .imagine-root-body {
     radial-gradient(circle at 68% 36%, rgba(244, 114, 182, 0.06), transparent 42%);
 }
 
-.imagine-agent-dock-idle-orb.imagine-theme-dark .imagine-agent-mark {
+.imagine-agent-dock-idle-orb.imagine-theme-dark .imagine-mark {
   filter: drop-shadow(0 12px 26px rgba(67, 56, 202, 0.45));
 }
 
-.imagine-agent-mark[data-track-pointer="true"]:hover {
+.imagine-mark[data-track-pointer="true"]:hover {
   filter: drop-shadow(0 10px 22px rgba(99, 102, 241, 0.38));
 }
 

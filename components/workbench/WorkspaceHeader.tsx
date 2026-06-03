@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Grid2X2, Moon, Settings, Sparkles, Sun, Trash2 } from "lucide-react";
+import { Grid2X2, Moon, Settings, Sun, Trash2 } from "lucide-react";
+import ImagineMark from "@/components/brand/ImagineMark";
 
 import type { ThemeMode } from "@/lib/theme-mode";
 
@@ -21,8 +22,8 @@ export default function WorkspaceHeader({
   return (
     <header className="imagine-app-header sticky top-0 z-40 flex min-w-0 items-center justify-between gap-2 overflow-hidden border-b border-[var(--iw-border)] bg-[var(--iw-header)] px-4 py-3 backdrop-blur-xl sm:gap-3 sm:px-6 select-none">
       <div className="z-10 flex min-w-0 flex-1 items-center gap-3">
-        <div className="imagine-brand-mark relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-blue-400/20 bg-blue-500/12 shadow-sm">
-          <Sparkles className="h-4.5 w-4.5 text-blue-200" />
+        <div className="imagine-brand-mark relative flex h-9 w-9 shrink-0 items-center justify-center">
+          <ImagineMark size="md" />
         </div>
         <div className="min-w-0">
           <h1 className="flex min-w-0 items-center gap-2 text-sm font-semibold tracking-tight text-[var(--iw-text)]">

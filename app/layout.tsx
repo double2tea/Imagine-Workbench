@@ -18,6 +18,10 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: 'Imagine Workbench — 灵感创作工作台',
   description: 'A professional and elegant AI-powered Image and Video Generation studio workspace featuring advanced prompt optimization, precise canvas masking, batch operation downloading, and an interactive chat-driven Agent Mode.',
+  icons: {
+    icon: [{ url: '/icon.svg', type: 'image/svg+xml' }],
+    apple: [{ url: '/icon.svg', type: 'image/svg+xml' }],
+  },
 };
 
 const themeBootstrapScript = `(function(){try{var t=localStorage.getItem("imagine_theme_mode");if(t==="dark"||t==="light"){document.documentElement.setAttribute("data-imagine-theme",t);}}catch(e){}})();`;
