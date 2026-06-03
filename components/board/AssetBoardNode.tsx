@@ -1,4 +1,5 @@
-import { Bot, Clock3, Download, ImageDown, ImageIcon, Paintbrush, Send, SlidersHorizontal, type LucideIcon, SkipBack, SkipForward, VideoIcon } from "lucide-react";
+import { Clock3, Download, ImageDown, ImageIcon, Paintbrush, Send, SlidersHorizontal, type LucideIcon, SkipBack, SkipForward, VideoIcon } from "lucide-react";
+import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
 import { useRef, useState } from "react";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
 import PreviewImage from "@/components/PreviewImage";
@@ -87,7 +88,7 @@ export default function AssetBoardNode({
                 className="imagine-board-asset-action nodrag text-purple-200 hover:border-purple-500/40 hover:bg-purple-600 hover:text-white"
                 title="发送给 Agent"
               >
-                <Bot className="h-3.5 w-3.5" />
+                <AgentIdentityMark variant="inline" />
               </button>
               <button
                 type="button"

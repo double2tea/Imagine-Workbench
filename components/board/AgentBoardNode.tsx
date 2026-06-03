@@ -1,4 +1,5 @@
-import { Bot, Send } from "lucide-react";
+import { Send } from "lucide-react";
+import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
 import DebouncedBoardTextarea from "@/components/board/DebouncedBoardTextarea";
 import type { BoardAgentNode } from "@/lib/board";
 
@@ -23,7 +24,7 @@ export default function AgentBoardNode({ node, onSend, onUpdate }: AgentBoardNod
         onClick={onSend}
         className="nodrag flex h-8 items-center justify-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-500/15 text-xs font-semibold text-purple-100 transition hover:bg-purple-500/25"
       >
-        <Bot className="h-3.5 w-3.5" />
+        <AgentIdentityMark variant="inline" />
         <Send className="h-3.5 w-3.5" />
       </button>
     </div>

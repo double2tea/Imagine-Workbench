@@ -3,6 +3,7 @@ import { forwardRef, useEffect, useRef } from "react";
 import { Check, ChevronRight, ImagePlus, Paintbrush, RefreshCw, Send, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import PreviewImage from "@/components/PreviewImage";
+import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
 import { AgentModelSelect } from "@/components/agent/AgentModelSelect";
 import { AgentActionSummary } from "@/components/agent/AgentActionSummary";
 import { AgentPendingActionEditor } from "@/components/agent/AgentPendingActionEditor";
@@ -191,16 +192,6 @@ function renderAgentContent(content: string): ReactNode {
         );
       })}
     </div>
-  );
-}
-
-function AgentIdentityMark({ variant }: { variant: "orb" | "header" }) {
-  return (
-    <span className={`imagine-agent-mark imagine-agent-mark-${variant}`}>
-      <span className="imagine-agent-mark-glyph">
-        <span className="imagine-agent-mark-node" />
-      </span>
-    </span>
   );
 }
 
@@ -458,14 +449,14 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
       const distance = Math.hypot(deltaX, deltaY);
 
       if (distance === 0) {
-        orbButton.style.setProperty("--agent-mark-x", "0px");
-        orbButton.style.setProperty("--agent-mark-y", "0px");
+        orbButton.style.setProperty("--agent-mark-pupil-x", "0px");
+        orbButton.style.setProperty("--agent-mark-pupil-y", "0px");
         return;
       }
 
       const gazeStrength = Math.min(distance / 180, 1);
-      orbButton.style.setProperty("--agent-mark-x", `${(deltaX / distance) * 4 * gazeStrength}px`);
-      orbButton.style.setProperty("--agent-mark-y", `${(deltaY / distance) * 3 * gazeStrength}px`);
+      orbButton.style.setProperty("--agent-mark-pupil-x", `${(deltaX / distance) * 5 * gazeStrength}px`);
+      orbButton.style.setProperty("--agent-mark-pupil-y", `${(deltaY / distance) * 4 * gazeStrength}px`);
     };
 
     window.addEventListener("pointermove", updateMarkOffset, { passive: true });

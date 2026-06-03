@@ -2,7 +2,8 @@
 
 import { memo } from "react";
 import { Handle, Position, useConnection, type Node, type NodeProps } from "@xyflow/react";
-import { Bot, ImagePlus, Layers, Trash2, Video } from "lucide-react";
+import { ImagePlus, Layers, Trash2, Video } from "lucide-react";
+import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
 import type {
   BoardAgentNode,
   BoardGenerateNodeUpdate,
@@ -65,7 +66,7 @@ interface BoardHandleProps {
 function nodeIcon(node: BoardNodeModel) {
   if (node.kind === "image-generate") return <ImagePlus className="h-3.5 w-3.5 text-blue-300" />;
   if (node.kind === "video-generate") return <Video className="h-3.5 w-3.5 text-violet-300" />;
-  if (node.kind === "agent") return <Bot className="h-3.5 w-3.5 text-purple-300" />;
+  if (node.kind === "agent") return <AgentIdentityMark variant="inline" />;
   if (node.kind === "reference-group") return <Layers className="h-3.5 w-3.5 text-cyan-300" />;
   return null;
 }

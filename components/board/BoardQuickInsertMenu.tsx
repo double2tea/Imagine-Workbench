@@ -1,6 +1,7 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
+import BoardInsertIcon from "@/components/board/BoardInsertIcon";
 import { BOARD_QUICK_INSERT_MENU_SIZE, clampFloatingMenuPosition } from "@/lib/board/interaction";
 import type { BoardPoint } from "@/lib/board";
 
@@ -34,9 +35,7 @@ export default function BoardQuickInsertMenu({ clientX, clientY, items, position
       style={{ left: anchor.left, top: anchor.top }}
       onContextMenu={(event) => event.preventDefault()}
     >
-      {items.map(item => {
-        const Icon = item.icon;
-        return (
+      {items.map(item => (
           <button
             key={item.kind}
             type="button"
@@ -45,12 +44,11 @@ export default function BoardQuickInsertMenu({ clientX, clientY, items, position
             data-accent="amber"
           >
             <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border ${item.iconSurfaceClassName}`}>
-              <Icon className={`h-3.5 w-3.5 ${item.iconClassName}`} />
+              <BoardInsertIcon kind={item.kind} icon={item.icon} iconClassName={item.iconClassName} />
             </span>
             <span>{item.label}</span>
           </button>
-        );
-      })}
+        ))}
     </div>
   );
 }

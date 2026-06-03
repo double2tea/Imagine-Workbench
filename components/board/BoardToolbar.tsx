@@ -26,6 +26,7 @@ import {
 import type { BoardSaveStatus } from "@/hooks/useBoardState";
 import type { ThemeMode } from "@/components/workbench/WorkspaceHeader";
 import type { BoardSummary } from "@/lib/board";
+import BoardInsertIcon from "@/components/board/BoardInsertIcon";
 
 interface BoardToolbarProps {
   boardId: string;
@@ -149,7 +150,7 @@ export default function BoardToolbar({
   const saveMeta = saveStatusMeta(saveStatus, saveError);
   const lastInsertItem =
     BOARD_INSERT_CATALOG.find(item => item.kind === lastInsertKind) ?? BOARD_INSERT_CATALOG[0];
-  const LastInsertIcon = lastInsertItem.icon;
+
 
   const visibleBoardSummaries = boardSummaries.some(board => board.id === boardId)
     ? boardSummaries
@@ -351,7 +352,11 @@ export default function BoardToolbar({
               data-accent="amber"
               title={`插入${lastInsertItem.label}节点`}
             >
-              <LastInsertIcon className={`h-3.5 w-3.5 ${lastInsertItem.iconClassName}`} />
+              <BoardInsertIcon
+                kind={lastInsertItem.kind}
+                icon={lastInsertItem.icon}
+                iconClassName={lastInsertItem.iconClassName}
+              />
               <span className="hidden sm:inline">插入{lastInsertItem.label}</span>
               <span className="sm:hidden">插入</span>
             </button>
@@ -380,9 +385,7 @@ export default function BoardToolbar({
             insertMenuPanelRef,
             insertMenuPosition,
             "imagine-board-header-menu fixed z-[60] w-44 p-1.5",
-            BOARD_INSERT_CATALOG.map(item => {
-              const Icon = item.icon;
-              return (
+            BOARD_INSERT_CATALOG.map(item => (
                 <button
                   key={item.kind}
                   type="button"
@@ -392,12 +395,11 @@ export default function BoardToolbar({
                   <span
                     className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border ${item.iconSurfaceClassName}`}
                   >
-                    <Icon className={`h-3.5 w-3.5 ${item.iconClassName}`} />
+                    <BoardInsertIcon kind={item.kind} icon={item.icon} iconClassName={item.iconClassName} />
                   </span>
                   <span className="text-xs font-semibold">{item.label}</span>
                 </button>
-              );
-            }),
+              )),
           )}
         </div>
 
