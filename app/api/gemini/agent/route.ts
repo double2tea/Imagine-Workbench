@@ -171,10 +171,6 @@ export async function POST(req: NextRequest) {
     const agentReferenceId = body.agentReferenceId;
     const surface: AgentSurface = body.surface;
 
-    const latestUserMessage = [...messages].reverse().find(m => m.role === "user");
-    const latestUserMsg =
-      typeof latestUserMessage?.content === "string" ? latestUserMessage.content : "";
-
     const sendableAgentRefs = getSendableAgentImageReferences(
       agentReferences,
       agentReferenceId,

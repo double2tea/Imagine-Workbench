@@ -2,15 +2,21 @@
   "name": "ai-studio-applet",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.27.0",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint .",
-    "pages:build": "npx @cloudflare/next-on-pages@1",
-    "pages:preview": "npm run pages:build && npx wrangler pages dev .vercel/output/static",
-    "pages:deploy": "npm run pages:build && npx wrangler pages deploy .vercel/output/static --project-name=imagine-workbench --commit-dirty=true",
-    "test:providers": "tsc -p tests/tsconfig.json && node --test .tmp/provider-tests/tests/*.test.js",
+    "lint": "oxlint .",
+    "lint:fix": "oxlint . --fix",
+    "lint:eslint": "eslint .",
+    "typecheck": "vp exec tsc --noEmit",
+    "check": "vp run lint && vp run typecheck",
+    "pages:build": "vp run build && vp dlx @cloudflare/next-on-pages@1 --skip-build",
+    "pages:preview": "vp run pages:build && vp dlx wrangler pages dev .vercel/output/static",
+    "pages:deploy": "vp run pages:build && vp dlx wrangler pages deploy .vercel/output/static --project-name=imagine-workbench --commit-dirty=true",
+    "test:providers": "vp exec tsc -p tests/tsconfig.json && node --test .tmp/provider-tests/tests/*.test.js",
+    "trellis": "trellis",
     "clean": "next clean"
   },
   "dependencies": {
@@ -30,6 +36,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@mindfoldhq/trellis": "^0.5.19",
     "@tailwindcss/postcss": "4.1.11",
     "@tailwindcss/typography": "^0.5.19",
     "@types/jszip": "^3.4.0",
@@ -40,8 +47,18 @@
     "eslint": "9.39.1",
     "eslint-config-next": "16.0.8",
     "firebase-tools": "^15.0.0",
+    "oxlint": "^1.68.0",
     "tailwindcss": "4.1.11",
     "tw-animate-css": "^1.4.0",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vite-plus": "^0.1.24"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@tailwindcss/oxide",
+      "protobufjs",
+      "sharp",
+      "unrs-resolver"
+    ]
   }
 }

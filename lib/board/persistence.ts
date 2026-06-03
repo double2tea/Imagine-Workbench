@@ -100,21 +100,6 @@ function writeBoardAndSummary(board: BoardDocument): Promise<void> {
   );
 }
 
-function writeStore<T>(mode: IDBTransactionMode, action: (store: IDBObjectStore) => IDBRequest<T>): Promise<void> {
-  return openBoardDatabase().then(
-    (db) =>
-      new Promise<void>((resolve, reject) => {
-        const transaction = db.transaction(STORE_NAME, mode);
-        const request = action(transaction.objectStore(STORE_NAME));
-
-        transaction.oncomplete = () => resolve();
-        request.onerror = () => reject(request.error ?? new Error("IndexedDB request failed"));
-        transaction.onerror = () => reject(transaction.error ?? request.error ?? new Error("IndexedDB transaction failed"));
-        transaction.onabort = () => reject(transaction.error ?? request.error ?? new Error("IndexedDB transaction aborted"));
-      }),
-  );
-}
-
 export async function getBoardFromDB(id: string): Promise<BoardDocument | null> {
   const result = await readStore<BoardDocument | undefined>("readonly", (store) => store.get(id));
   return result ?? null;

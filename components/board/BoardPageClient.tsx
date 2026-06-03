@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { flushSync } from "react-dom";
-import { Maximize2, Paintbrush, Send, Settings, Video } from "lucide-react";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
 import AgentDock, { type AgentToolAction } from "@/components/agent/AgentDock";
 import { isCustomImageResolutionValue } from "@/lib/agent-tool-action";
@@ -14,7 +13,6 @@ import BoardInspector from "@/components/board/BoardInspector";
 import BoardSidePanel from "@/components/board/BoardSidePanel";
 import BoardSideAssetList from "@/components/board/BoardSideAssetList";
 import BoardWorkspace from "@/components/board/BoardWorkspace";
-import PreviewImage from "@/components/PreviewImage";
 import SettingsModal from "@/components/settings/SettingsModal";
 import WorkspaceNotices, { type WorkspaceNotice } from "@/components/workbench/WorkspaceNotices";
 import type { AgentBoardContext, AgentBoardNodeSummary } from "@/lib/agent-context";
@@ -35,9 +33,6 @@ import {
   buildStorageItem,
   clearAllDB,
   deleteFromDB,
-  hydrateAssets,
-  listAllAssetMetas,
-  metaToPlaceholderItem,
   saveToDB,
   type StorageItem,
 } from "@/lib/db";
@@ -441,7 +436,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const [videoDuration, setVideoDuration] = useState("10");
   const [videoPreset, setVideoPreset] = useState("normal");
   const [videoResolution, setVideoResolution] = useState("720p");
-  const [customImageSize, setCustomImageSize] = useState("2560x1440");
+  const [customImageSize] = useState("2560x1440");
   const [agentInput, setAgentInput] = useState("");
   const [isAgentDockOpen, setIsAgentDockOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -572,7 +567,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     setReferenceImages,
   });
 
-  const { assetStats, searchableReferenceImages } = useAssetWorkspaceState(items);
+  const { searchableReferenceImages } = useAssetWorkspaceState(items);
   const resolveBoardReferenceUrl = useCallback<BoardReferenceUrlResolver>((assetId, fallbackUrl) => {
     const item = items.find(entry => entry.id === assetId);
     return item?.type === "image" && item.status === "complete" && item.url.trim() ? item.url : fallbackUrl;

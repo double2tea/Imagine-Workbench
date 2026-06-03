@@ -2,7 +2,6 @@
 
 import React, { useCallback, useState, useEffect, useRef, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { RefreshCw, Sparkles, Video } from "lucide-react";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
 import AgentDock from "@/components/agent/AgentDock";
 import CanvasMaskEditor from "@/components/CanvasMaskEditor";
@@ -14,7 +13,7 @@ import ImageGenerationPanel from "@/components/creation/ImageGenerationPanel";
 import VideoGenerationPanel from "@/components/creation/VideoGenerationPanel";
 import AtReferenceDropdown from "@/components/reference/AtReferenceDropdown";
 import PromptReferenceDropdown from "@/components/reference/PromptReferenceDropdown";
-import ReferenceImagePicker, { type ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
+import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import SettingsModal from "@/components/settings/SettingsModal";
 import AssetGalleryWorkspace from "@/components/workbench/AssetGalleryWorkspace";
 import MobileWorkbenchTabs, { type MobileWorkbenchPanel } from "@/components/workbench/MobileWorkbenchTabs";
@@ -282,8 +281,6 @@ export default function Home() {
     : null;
   const activeImageAspectRatio = customImageAspectRatio ?? aspectRatio;
   const imageResolutionOptions = getImageResolutionOptions(selectedModel, activeImageAspectRatio);
-  const presetImageResolutionOptions = imageResolutionOptions.filter(option => option.value !== "custom");
-  const supportsCustomImageSize = imageResolutionOptions.some(option => option.value === "custom");
   const videoCapabilities = getVideoModelCapabilities(selectedVideoModel);
   const isSubmittingImage = imageSubmitCount > 0;
   const isSubmittingVideo = videoSubmitCount > 0;
@@ -687,7 +684,7 @@ export default function Home() {
     setIsMaskOpen(true);
   };
 
-  const saveMaskOutput = async (mergedImageBase64: string, maskBase64: string) => {
+  const saveMaskOutput = async (mergedImageBase64: string) => {
     let compressedMergedImage: string;
     try {
       compressedMergedImage = await compressReferenceImageDataUrl(mergedImageBase64);

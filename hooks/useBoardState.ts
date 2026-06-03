@@ -19,7 +19,6 @@ import {
   type BoardConfig,
   type BoardDocument,
   type BoardEdge,
-  type BoardEdgeKind,
   type BoardGenerateNodeUpdate,
   type BoardGenerateVariantCount,
   type BoardGenerationStatus,

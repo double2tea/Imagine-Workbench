@@ -14,7 +14,6 @@ import {
   MiniMap,
   ReactFlow,
   getSmoothStepPath,
-  type Connection,
   type Edge,
   type EdgeMouseHandler,
   type EdgeProps,

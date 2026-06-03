@@ -475,7 +475,7 @@ async function generateOpenAiCompatibleImage(
   const response =
     input.referenceImages.length > 0
       ? await editOpenAiCompatibleImage(config, input, provider)
-      : await createOpenAiCompatibleImage(config, input, provider);
+      : await createOpenAiCompatibleImage(config, input);
 
   const imageUrl = readOpenAiImageUrl(response);
   if (imageUrl) return { imageUrl, source: input.model };
@@ -491,7 +491,6 @@ function readOpenAiImageUrl(response: OpenAiImageResponse): string | undefined {
 async function createOpenAiCompatibleImage(
   config: ProviderConfig,
   input: GenerateImageInput,
-  provider: AiProvider,
 ): Promise<OpenAiImageResponse> {
   const body: Record<string, string | number> = {
     model: input.model,

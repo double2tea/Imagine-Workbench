@@ -12,8 +12,6 @@ import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePic
 import type { StorageItem } from "@/lib/db";
 import { getSendableAgentImageReferences } from "@/lib/agent-chat-model";
 
-type NoticeType = "error" | "info" | "success";
-
 interface UseAgentControllerParams {
   agentInput: string;
   agentReferenceId: string | null;

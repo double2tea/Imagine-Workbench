@@ -11,6 +11,9 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
+  experimental: {
+    serverMinification: false,
+  },
   // Allow access to remote image placeholder.
   images: {
     remotePatterns: [
