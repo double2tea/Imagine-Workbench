@@ -27,6 +27,12 @@ export {
   listBoardSummariesFromDB,
   saveBoardToDB,
 } from "@/lib/board/persistence";
+export {
+  collectBoardAssetIdsFromNodes,
+  collectBoardNodeIdsFromNodes,
+  mergeBoardScopedMetas,
+  repairLegacyBoardAssetScope,
+} from "@/lib/assets/board-scope";
 export { BOARD_SNAP_GRID, snapBoardPoint } from "@/lib/board/snap-grid";
 export {
   BOARD_PORT_IDS,

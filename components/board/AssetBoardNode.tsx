@@ -4,10 +4,11 @@ import { useRef, useState } from "react";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
 import PreviewImage from "@/components/PreviewImage";
 import type { BoardAssetNode } from "@/lib/board";
-import type { StorageItem } from "@/lib/db";
+import { buildStorageItem, type StorageItem } from "@/lib/db";
 import { getVideoFrameCaptureLabel, type CapturedVideoFrame, type VideoFrameCaptureMode } from "@/lib/video-frame";
 
 interface AssetBoardNodeProps {
+  boardId: string;
   compareReferenceUrl?: string | null;
   node: BoardAssetNode;
   onCaptureVideoFrame?: (nodeId: string, item: StorageItem, frame: CapturedVideoFrame) => void | Promise<void>;
@@ -17,18 +18,21 @@ interface AssetBoardNodeProps {
   onSetAsReference?: (nodeId: string) => void;
 }
 
-function boardAssetToStorageItem(node: BoardAssetNode): StorageItem {
-  return {
-    id: node.asset.assetId,
-    type: node.asset.type,
-    url: node.asset.url,
-    prompt: node.asset.prompt,
-    model: node.asset.model,
-    aspectRatio: "auto",
-    createdAt: node.createdAt,
-    status: "complete",
-    progress: 100,
-  };
+function boardAssetToStorageItem(node: BoardAssetNode, boardId: string): StorageItem {
+  return buildStorageItem(
+    {
+      id: node.asset.assetId,
+      type: node.asset.type,
+      url: node.asset.url,
+      prompt: node.asset.prompt,
+      model: node.asset.model,
+      aspectRatio: "auto",
+      createdAt: node.createdAt,
+      status: "complete",
+      progress: 100,
+    },
+    { boardId },
+  );
 }
 
 const frameCaptureActions: Array<{
@@ -41,6 +45,7 @@ const frameCaptureActions: Array<{
 ];
 
 export default function AssetBoardNode({
+  boardId,
   compareReferenceUrl,
   node,
   onCaptureVideoFrame,
@@ -49,7 +54,7 @@ export default function AssetBoardNode({
   onSendToAgent,
   onSetAsReference,
 }: AssetBoardNodeProps) {
-  const item = boardAssetToStorageItem(node);
+  const item = boardAssetToStorageItem(node, boardId);
   const [isFrameMenuOpen, setIsFrameMenuOpen] = useState(false);
   const captureVideoFrameRef = useRef<VideoFrameCaptureRequest | null>(null);
 

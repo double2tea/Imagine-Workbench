@@ -40,13 +40,13 @@ function digestParts(parts: string[]): string {
 }
 
 function serializeReferenceGroupItem(item: BoardReferenceGroupItem): string {
-  return `${item.assetId}:${item.role}:${fingerprintLargeText(item.url)}`;
+  return `${item.assetId}:${item.role}`;
 }
 
 function serializeNodeContent(node: BoardNode): string {
   switch (node.kind) {
     case "asset":
-      return `asset|${node.id}|${node.title}|${node.size.width}x${node.size.height}|${node.asset.assetId}|${node.asset.type}|${fingerprintLargeText(node.asset.url)}`;
+      return `asset|${node.id}|${node.title}|${node.size.width}x${node.size.height}|${node.asset.assetId}|${node.asset.type}`;
     case "prompt":
       return `prompt|${node.id}|${node.title}|${fingerprintLargeText(node.prompt)}`;
     case "reference-group":

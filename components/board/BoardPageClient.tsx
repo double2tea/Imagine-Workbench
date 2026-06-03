@@ -21,6 +21,7 @@ import type { AgentBoardContext, AgentBoardNodeSummary } from "@/lib/agent-conte
 
 import { useAgentController } from "@/hooks/useAgentController";
 import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
+import { useBoardAssetStore } from "@/hooks/useBoardAssetStore";
 import { useBoardState } from "@/hooks/useBoardState";
 import { useClipboardImageImport } from "@/hooks/useClipboardImageImport";
 import { useGenerationActions } from "@/hooks/useGenerationActions";
@@ -30,7 +31,16 @@ import {
   useReferenceState,
 } from "@/hooks/useReferenceState";
 import { useProviderSettings } from "@/hooks/useProviderSettings";
-import { clearAllDB, deleteFromDB, getAllFromDB, saveToDB, type StorageItem } from "@/lib/db";
+import {
+  buildStorageItem,
+  clearAllDB,
+  deleteFromDB,
+  hydrateAssets,
+  listAllAssetMetas,
+  metaToPlaceholderItem,
+  saveToDB,
+  type StorageItem,
+} from "@/lib/db";
 import {
   DEFAULT_IMAGE_MODEL,
   DEFAULT_VIDEO_MODEL,
@@ -146,26 +156,32 @@ function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
-async function createBoardUploadItem(file: File, id: string): Promise<StorageItem> {
+async function createBoardUploadItem(
+  file: File,
+  id: string,
+  boardId: string,
+): Promise<StorageItem> {
   const isImage = file.type.startsWith("image/");
   const isVideo = file.type.startsWith("video/");
   if (!isImage && !isVideo) {
     throw new Error("画板只支持导入图片或视频文件");
   }
   const url = isImage ? await compressReferenceImageFile(file) : await readFileAsDataUrl(file);
-  const createdAt = new Date().toISOString();
-  return {
-    id,
-    type: isImage ? "image" : "video",
-    url,
-    prompt: file.name || "Board upload",
-    model: "local-upload",
-    aspectRatio: "auto",
-    createdAt,
-    status: "complete",
-    progress: 100,
-    operationName: "board-upload",
-  };
+  return buildStorageItem(
+    {
+      id,
+      type: isImage ? "image" : "video",
+      url,
+      prompt: file.name || "Board upload",
+      model: "local-upload",
+      aspectRatio: "auto",
+      createdAt: new Date().toISOString(),
+      status: "complete",
+      progress: 100,
+      operationName: "board-upload",
+    },
+    { boardId },
+  );
 }
 
 function getProviderLabel(provider: AiProvider): string {
@@ -407,7 +423,12 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     return () => window.cancelAnimationFrame(frame);
   }, [boardId, resolvedBoardId]);
   const boardController = useBoardState(resolvedBoardId);
-  const [items, setItems] = useState<StorageItem[]>([]);
+  const {
+    items,
+    loading: boardAssetsLoading,
+    reload: reloadBoardAssets,
+    setItems,
+  } = useBoardAssetStore(resolvedBoardId, boardController.board.nodes);
   const [boardSummaries, setBoardSummaries] = useState<BoardSummary[]>([]);
   const [, setMode] = useState<BoardMode>("image");
   const [prompt, setPrompt] = useState("");
@@ -435,9 +456,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const [maskDestination, setMaskDestination] = useState<MaskDestination>("creative");
   const [fullscreenItem, setFullscreenItem] = useState<StorageItem | null>(null);
   const [cancelingBoardItemIds, setCancelingBoardItemIds] = useState<string[]>([]);
-  const knownItemIdsRef = useRef<Set<string>>(new Set());
   const handledBoardItemIdsRef = useRef<Set<string>>(new Set());
-  const loadedItemsRef = useRef(false);
   const pollingFailuresRef = useRef<Record<string, number>>({});
   const generationAbortControllersRef = useRef<Record<string, AbortController>>({});
   const locallyCanceledItemIdsRef = useRef<Set<string>>(new Set());
@@ -576,6 +595,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       createdAt: "",
       status: "complete",
       progress: 100,
+      scope: "board",
+      boardId: resolvedBoardId,
+      hasBlob: reference.url.startsWith("data:"),
     }));
     const agentReferenceIdSet = new Set(agentReferences.map(reference => reference.id));
     const agentAtItems = [
@@ -590,7 +612,15 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onSelect={(item) => handleSelectAtItem(item.url, item.id, "agent-prompt")}
       />
     );
-  }, [agentReferences, atDropdown.search, handleSelectAtItem, searchableReferenceImages]);
+  }, [agentReferences, atDropdown.search, handleSelectAtItem, resolvedBoardId, searchableReferenceImages]);
+
+  useEffect(() => {
+    handledBoardItemIdsRef.current.clear();
+  }, [resolvedBoardId]);
+
+  useEffect(() => {
+    void reloadBoardAssets();
+  }, [reloadBoardAssets, resolvedBoardId]);
 
   useMediaPolling({
     buildProviderHeaders,
@@ -602,6 +632,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   });
 
   const { generateManualImage, generateManualVideo } = useGenerationActions({
+    boardId: resolvedBoardId,
     activeImageAspectRatio,
     activeImageModel,
     activeImageQuality,
@@ -851,6 +882,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
       boardController.updateGenerateNode(generateNodeId, { errorMessage: undefined, status: "processing" });
       const didStart = await generateManualImage({
+        boardId: resolvedBoardId,
         boardNodeId: generateNodeId,
         imageQuality: defaults.imageQuality,
         imageResolution: defaults.imageResolution,
@@ -931,6 +963,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
     boardController.updateGenerateNode(generateNodeId, { errorMessage: undefined, status: "processing" });
     const didStart = await generateManualVideo({
+      boardId: resolvedBoardId,
       boardNodeId: generateNodeId,
       model,
       prompt: promptFromAgent,
@@ -954,6 +987,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     generateManualVideo,
     items,
     pushWorkspaceNotice,
+    resolvedBoardId,
   ]);
 
   const {
@@ -1112,6 +1146,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         const item = await createBoardUploadItem(
           file,
           makeClientId(file.type.startsWith("video/") ? `board_video_${index}` : `board_image_${index}`),
+          resolvedBoardId,
         );
         if (!await saveItemOrWarn(item, pushWorkspaceNotice)) continue;
         importedItems.push(item);
@@ -1127,7 +1162,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       ...prev.filter(item => !importedItems.some(importedItem => importedItem.id === item.id)),
     ]);
     pushWorkspaceNotice("success", `已导入 ${importedItems.length} 个文件到画板`);
-  }, [addAssetToBoard, pushWorkspaceNotice]);
+  }, [addAssetToBoard, pushWorkspaceNotice, resolvedBoardId]);
 
   const useSelectedBoardAssetAsReference = () => {
     const references = activeBoardReference(boardController.board.nodes, boardController.selectedNodeId, resolveBoardReferenceUrl);
@@ -1251,6 +1286,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         let didStartAny = false;
         for (let remaining = node.variantCount; remaining > 0; remaining -= 1) {
           const didStart = await generateManualImage({
+            boardId: resolvedBoardId,
             boardNodeId: nodeId,
             imageQuality: node.imageQuality,
             imageResolution: nodeImageResolution,
@@ -1275,6 +1311,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         let didStartAny = false;
         for (let remaining = node.variantCount; remaining > 0; remaining -= 1) {
           const didStart = await generateManualVideo({
+            boardId: resolvedBoardId,
             boardNodeId: nodeId,
             model: node.model,
             prompt: nextPrompt,
@@ -1304,6 +1341,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     generateManualVideo,
     pushWorkspaceNotice,
     resolveGenerateNodeInputs,
+    resolvedBoardId,
   ]);
 
   const handleSendAgentNode = useCallback((nodeId: string) => {
@@ -1359,25 +1397,13 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   };
 
   useEffect(() => {
-    async function loadItems(): Promise<void> {
-      const allItems = await getAllFromDB();
-      knownItemIdsRef.current = new Set(allItems.map(item => item.id));
-      loadedItemsRef.current = true;
-      setItems(allItems);
-    }
-    loadItems().catch(error => pushWorkspaceNotice("error", `本地项目库读取失败：${toErrorMessage(error, "IndexedDB 读取失败")}`));
-  }, [pushWorkspaceNotice]);
-
-  useEffect(() => {
-    if (!loadedItemsRef.current) return;
     if (boardController.saveStatus === "loading") return;
-    const known = knownItemIdsRef.current;
+    if (boardAssetsLoading) return;
     const handledBoardItems = handledBoardItemIdsRef.current;
     for (const item of items) {
       const sourceBoardNodeId = item.sourceBoardNodeId;
       if (sourceBoardNodeId) {
         if (item.status === "pending" || item.status === "processing") {
-          known.add(item.id);
           const sourceNode = findGenerateNodeById(boardController.board.nodes, sourceBoardNodeId);
           if (sourceNode && (sourceNode.status !== "processing" || sourceNode.errorMessage)) {
             boardController.updateGenerateNode(sourceBoardNodeId, {
@@ -1394,7 +1420,6 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       if (sourceBoardNodeId && item.status === "complete") {
         const sourceNode = findGenerateNodeById(boardController.board.nodes, sourceBoardNodeId);
         if (!sourceNode) continue;
-        known.add(item.id);
         handledBoardItems.add(item.id);
         const nextStatus = nextSourceNodeStatus(items, sourceBoardNodeId, item.status);
         const existingAssetNode = findBoardAssetNodeByAssetId(boardController.board.nodes, item.id);
@@ -1429,7 +1454,6 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       if (sourceBoardNodeId && item.status === "failed") {
         const sourceNode = findGenerateNodeById(boardController.board.nodes, sourceBoardNodeId);
         if (!sourceNode) continue;
-        known.add(item.id);
         handledBoardItems.add(item.id);
         const nextStatus = nextSourceNodeStatus(items, sourceBoardNodeId, item.status);
         boardController.updateGenerateNode(sourceBoardNodeId, {
@@ -1438,14 +1462,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         });
         continue;
       }
-
-      if (known.has(item.id)) continue;
-      known.add(item.id);
-      if (item.status === "complete" && !findBoardAssetNodeByAssetId(boardController.board.nodes, item.id)) {
-        addAssetToBoard(item);
-      }
     }
-  }, [addAssetToBoard, boardController, items]);
+  }, [addAssetToBoard, boardAssetsLoading, boardController, items]);
 
   const handleClearProject = async () => {
     if (!(await confirmAction({
@@ -1455,7 +1473,6 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     }))) return;
     try {
       await clearAllDB();
-      knownItemIdsRef.current = new Set();
       handledBoardItemIdsRef.current = new Set();
       setItems([]);
       pushWorkspaceNotice("success", "本地资产库已清空");
@@ -1465,10 +1482,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   };
 
   const reloadBoardAssetsFromDB = useCallback(async () => {
-    const allItems = await getAllFromDB();
-    knownItemIdsRef.current = new Set(allItems.map(item => item.id));
-    setItems(allItems);
-  }, []);
+    await reloadBoardAssets();
+  }, [reloadBoardAssets]);
 
   const handleDataExportWorkspace = useCallback(async (includeCredentials: boolean) => {
     try {
@@ -1519,6 +1534,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         const item = await createLocalUploadAsset(
           file,
           makeClientId(file.type.startsWith("video/") ? `local_video_${index}` : `local_image_${index}`),
+          { boardId: resolvedBoardId },
         );
         if (!await saveItemOrWarn(item, pushWorkspaceNotice)) continue;
         importedItems.push(item);
@@ -1532,7 +1548,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       ...prev.filter(item => !importedItems.some(importedItem => importedItem.id === item.id)),
     ]);
     pushWorkspaceNotice("success", `已导入 ${importedItems.length} 个本地媒体`);
-  }, [pushWorkspaceNotice]);
+  }, [pushWorkspaceNotice, resolvedBoardId]);
 
   const handleDataCleanupAssets = useCallback(async (kind: WorkspaceCleanupKind) => {
     const labelByKind: Record<WorkspaceCleanupKind, string> = {
@@ -1760,6 +1776,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             <BoardSideAssetList
               key={resolvedBoardId}
               items={items}
+              loading={boardAssetsLoading}
               onAddToBoard={addAssetToBoard}
             />
           )}

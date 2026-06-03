@@ -1,6 +1,6 @@
 import { useEffect, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import { readFetchError } from "@/lib/client-fetch-error";
-import { saveToDB, type StorageItem } from "@/lib/db";
+import { mergeStorageItems, saveToDB, type StorageItem } from "@/lib/db";
 
 type NoticeType = "error" | "info" | "success";
 const PROCESSING_TIMEOUT_MS = 2 * 60 * 60 * 1000;
@@ -118,15 +118,15 @@ export function useMediaPolling({
                 const reader = new FileReader();
                 reader.onloadend = async () => {
                   const base64data = reader.result as string;
-                  updatedList[index] = {
+                  const completedItem: StorageItem = {
                     ...item,
                     url: base64data,
                     status: "complete",
                     progress: 100,
                     errorMessage: undefined,
                   };
-                  await saveItemOrWarn(updatedList[index], pushWorkspaceNotice);
-                  setItems([...updatedList]);
+                  await saveItemOrWarn(completedItem, pushWorkspaceNotice);
+                  setItems(current => mergeStorageItems(current, [completedItem]));
                 };
                 reader.readAsDataURL(blob);
                 changed = true;
@@ -185,7 +185,17 @@ export function useMediaPolling({
       }
 
       if (changed) {
-        setItems(updatedList);
+        setItems(current => {
+          const merged = new Map(current.map(entry => [entry.id, entry]));
+          for (const entry of updatedList) {
+            if (entry.status === "processing" || merged.has(entry.id)) {
+              merged.set(entry.id, entry);
+            }
+          }
+          return Array.from(merged.values()).sort(
+            (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+          );
+        });
       }
     }, 4000);
 

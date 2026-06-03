@@ -40,6 +40,7 @@ import type { BoardGenerateInputSummary, BoardGenerateTaskSummary } from "@/comp
 import BoardEmptyHint from "@/components/board/BoardEmptyHint";
 import BoardToolbar from "@/components/board/BoardToolbar";
 import BoardAssetCompareOverlay from "@/components/board/BoardAssetCompareOverlay";
+import { ensureHydratedStorageItem } from "@/lib/assets/ensure-hydrated";
 import type { StorageItem } from "@/lib/db";
 import {
   buildGalleryReferenceFingerprint,
@@ -667,6 +668,7 @@ export default function BoardWorkspace({
     const dataById = new Map<string, BoardFlowNode["data"]>();
     for (const node of board.nodes) {
       dataById.set(node.id, {
+        boardId: board.id,
         generateInputSummary: generateInputSummaryForNode(node, board.nodes, board.edges),
         hasResultConnection: hasResultConnection(node.id, board.edges),
         node,
@@ -953,10 +955,11 @@ export default function BoardWorkspace({
   const flowPositionFromClient = useCallback((clientX: number, clientY: number): BoardPoint => {
     const instance = flowInstanceRef.current;
     if (instance) {
-      return instance.screenToFlowPosition(
+      const point = instance.screenToFlowPosition(
         { x: clientX, y: clientY },
-        { snapToGrid, snapGrid: BOARD_SNAP_GRID },
+        { snapToGrid },
       );
+      return snapBoardPoint(point, snapToGrid);
     }
     const rect = flowHostRef.current?.getBoundingClientRect();
     const point = {
@@ -1264,12 +1267,14 @@ export default function BoardWorkspace({
       const item = galleryItems.find(entry => entry.id === assetId);
       if (item && item.status === "complete") {
         event.preventDefault();
-        addAssetNode({
-          position: centeredNodePosition(point, DEFAULT_ASSET_NODE_SIZE),
-          asset: storageItemToBoardAsset(item),
-          title: item.prompt,
+        void ensureHydratedStorageItem(item).then(hydrated => {
+          addAssetNode({
+            position: centeredNodePosition(point, DEFAULT_ASSET_NODE_SIZE),
+            asset: storageItemToBoardAsset(hydrated),
+            title: hydrated.prompt,
+          });
+          closeOverlayMenus();
         });
-        closeOverlayMenus();
       }
       return;
     }

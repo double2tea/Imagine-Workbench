@@ -16,7 +16,18 @@ import type {
   BoardSize,
   BoardViewport,
 } from "@/lib/board/types";
-import { clearAllDB, deleteFromDB, getAllFromDB, saveToDB, type GenerationRequestSnapshot, type StorageItem } from "@/lib/db";
+import { collectBoardAssetIdsFromNodes } from "@/lib/assets/board-scope";
+import {
+  buildStorageItem,
+  clearAllDB,
+  deleteFromDB,
+  getAllFromDB,
+  hydrateAssets,
+  listBoardScopedAssetMetas,
+  saveToDB,
+  type GenerationRequestSnapshot,
+  type StorageItem,
+} from "@/lib/db";
 import { compressReferenceImageFile, dataUriByteSize } from "@/lib/reference-images";
 
 export const WORKSPACE_BACKUP_SCHEMA_VERSION = 1;
@@ -245,8 +256,9 @@ export async function exportBoardWorkspaceBackup(
   board: BoardDocument,
   includeCredentials: boolean,
 ): Promise<WorkspaceExportResult> {
-  const assetIds = collectBoardAssetIds([board]);
-  const assets = (await getAllFromDB()).filter(item => assetIds.has(item.id));
+  const referencedIds = Array.from(collectBoardAssetIdsFromNodes(board.nodes));
+  const metas = await listBoardScopedAssetMetas(board.id, referencedIds, board.nodes.map(node => node.id));
+  const assets = await hydrateAssets(metas);
   return exportWorkspaceBackup({
     assets,
     boards: [board],
@@ -343,25 +355,32 @@ export function clearLocalStorageGroup(kind: LocalStorageCleanupKind): number {
   return keys.length;
 }
 
-export async function createLocalUploadAsset(file: File, id: string): Promise<StorageItem> {
+export async function createLocalUploadAsset(
+  file: File,
+  id: string,
+  options?: { boardId?: string },
+): Promise<StorageItem> {
   const isImage = file.type.startsWith("image/");
   const isVideo = file.type.startsWith("video/");
   if (!isImage && !isVideo) {
     throw new Error("只支持导入图片或视频文件");
   }
 
-  return {
-    id,
-    type: isImage ? "image" : "video",
-    url: isImage ? await compressReferenceImageFile(file) : await readFileAsDataUrl(file),
-    prompt: file.name || "Local upload",
-    model: "local-upload",
-    aspectRatio: "auto",
-    createdAt: new Date().toISOString(),
-    status: "complete",
-    progress: 100,
-    operationName: "local-upload",
-  };
+  return buildStorageItem(
+    {
+      id,
+      type: isImage ? "image" : "video",
+      url: isImage ? await compressReferenceImageFile(file) : await readFileAsDataUrl(file),
+      prompt: file.name || "Local upload",
+      model: "local-upload",
+      aspectRatio: "auto",
+      createdAt: new Date().toISOString(),
+      status: "complete",
+      progress: 100,
+      operationName: "local-upload",
+    },
+    { boardId: options?.boardId },
+  );
 }
 
 export function findOrphanAssetIds(items: StorageItem[], boardAssetIds: ReadonlySet<string>): string[] {
@@ -521,7 +540,7 @@ async function restoreAssetRecord(zip: JSZip, record: WorkspaceBackupAssetRecord
   const { mediaFile, mediaMimeType, ...storageFields } = record;
   if (!mediaFile) {
     if (!record.url) throw new Error(`资产 ${record.id} 缺少媒体内容`);
-    return { ...storageFields, url: record.url };
+    return buildStorageItem({ ...storageFields, url: record.url });
   }
   if (!record.mediaMimeType) throw new Error(`资产 ${record.id} 缺少媒体 MIME`);
   const zipMediaFile = zip.file(mediaFile);
@@ -530,7 +549,7 @@ async function restoreAssetRecord(zip: JSZip, record: WorkspaceBackupAssetRecord
   const url = `data:${record.mediaMimeType};base64,${base64}`;
   validateAssetMediaType(record.id, record.type, record.mediaMimeType);
   void mediaMimeType;
-  return { ...storageFields, url };
+  return buildStorageItem({ ...storageFields, url }, { boardId: storageFields.boardId });
 }
 
 function validateAssetMediaType(id: string, type: StorageItem["type"], mimeType: string): void {
@@ -594,6 +613,12 @@ function parseAssetRecord(value: unknown, index: number): WorkspaceBackupAssetRe
     generationRequest: parseGenerationRequest(value.generationRequest),
     maskOriginalId: readOptionalString(value, "maskOriginalId"),
     sourceBoardNodeId: readOptionalString(value, "sourceBoardNodeId"),
+    scope: value.scope === "board" ? "board" : "workspace",
+    boardId: typeof value.boardId === "string" ? value.boardId : "",
+    hasBlob:
+      typeof value.hasBlob === "boolean"
+        ? value.hasBlob
+        : Boolean(value.mediaFile || readOptionalString(value, "url")?.startsWith("data:")),
     mediaFile: readOptionalSafePath(value, "mediaFile"),
     mediaMimeType: readOptionalString(value, "mediaMimeType"),
   };

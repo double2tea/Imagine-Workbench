@@ -1,4 +1,4 @@
-import type { StorageItem } from "@/lib/db";
+import { buildStorageItem, type StorageItem } from "@/lib/db";
 
 export type VideoFrameCaptureMode = "first" | "current" | "last";
 
@@ -22,17 +22,21 @@ export function createVideoFrameStorageItem(
   id: string,
 ): StorageItem {
   const label = getVideoFrameCaptureLabel(frame.mode);
-  return {
-    id,
-    type: "image",
-    url: frame.dataUrl,
-    prompt: `${source.prompt} (${label})`,
-    model: source.model,
-    aspectRatio: `${frame.width}x${frame.height}`,
-    createdAt: new Date().toISOString(),
-    status: "complete",
-    progress: 100,
-  };
+  return buildStorageItem(
+    {
+      id,
+      type: "image",
+      url: frame.dataUrl,
+      prompt: `${source.prompt} (${label})`,
+      model: source.model,
+      aspectRatio: `${frame.width}x${frame.height}`,
+      createdAt: new Date().toISOString(),
+      status: "complete",
+      progress: 100,
+      sourceBoardNodeId: source.sourceBoardNodeId,
+    },
+    { boardId: source.boardId || undefined },
+  );
 }
 
 export async function captureVideoFrame(

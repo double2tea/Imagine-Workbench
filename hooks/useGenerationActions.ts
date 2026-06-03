@@ -2,7 +2,7 @@ import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import { readFetchError } from "@/lib/client-fetch-error";
 import { readImageGenerationPayload } from "@/lib/client-image-response";
-import { saveToDB, type GenerationRequestSnapshot, type StorageItem } from "@/lib/db";
+import { buildStorageItem, saveToDB, type GenerationRequestSnapshot, type StorageItem } from "@/lib/db";
 import { buildPromptWithReferenceMap } from "@/hooks/useReferenceState";
 import { getVideoModelCapabilities, type VideoReferenceMode } from "@/lib/providers/model-catalog";
 import { getReferenceImagePayloadError, prepareReferenceImageUrlForRequest } from "@/lib/reference-images";
@@ -10,6 +10,7 @@ import { getReferenceImagePayloadError, prepareReferenceImageUrlForRequest } fro
 type NoticeType = "error" | "info" | "success";
 
 interface UseGenerationActionsParams {
+  boardId?: string;
   activeImageAspectRatio: string;
   activeImageModel: string;
   activeImageQuality: string | undefined;
@@ -37,6 +38,7 @@ interface UseGenerationActionsParams {
 }
 
 interface GenerationOverrides {
+  boardId?: string;
   boardNodeId?: string;
   imageQuality?: string;
   imageResolution?: string;
@@ -149,6 +151,7 @@ function greatestCommonDivisor(a: number, b: number): number {
 }
 
 export function useGenerationActions({
+  boardId,
   activeImageAspectRatio,
   activeImageModel,
   activeImageQuality,
@@ -172,6 +175,9 @@ export function useGenerationActions({
   setItems,
   setVideoSubmitCount,
 }: UseGenerationActionsParams) {
+  const resolveScopeBoardId = (overrides: GenerationOverrides): string | undefined =>
+    overrides.boardId ?? boardId;
+
   const generateManualImage = async (overrides: GenerationOverrides = {}) => {
     const activePrompt = overrides.prompt ?? prompt;
     const activeReferenceImage = overrides.referenceImage ?? referenceImage;
@@ -224,19 +230,22 @@ export function useGenerationActions({
     const displayedImageSize = /^\d+x\d+$/.test(requestImageResolution) ? requestImageResolution : requestAspectRatio;
 
     const tempId = makeClientId("temp_img");
-    const newItem: StorageItem = {
-      id: tempId,
-      type: "image",
-      url: "https://picsum.photos/800/800",
-      prompt: activePrompt,
-      model: requestModel,
-      aspectRatio: displayedImageSize,
-      createdAt: new Date().toISOString(),
-      status: "pending",
-      progress: 30,
-      generationRequest,
-      sourceBoardNodeId: overrides.boardNodeId,
-    };
+    const newItem = buildStorageItem(
+      {
+        id: tempId,
+        type: "image",
+        url: "https://picsum.photos/800/800",
+        prompt: activePrompt,
+        model: requestModel,
+        aspectRatio: displayedImageSize,
+        createdAt: new Date().toISOString(),
+        status: "pending",
+        progress: 30,
+        generationRequest,
+        sourceBoardNodeId: overrides.boardNodeId,
+      },
+      { boardId: resolveScopeBoardId(overrides) },
+    );
 
     setItems(prev => [newItem, ...prev]);
 
@@ -259,13 +268,16 @@ export function useGenerationActions({
       if (res.ok) {
         const { operationName, imageUrl } = await readImageGenerationPayload(res);
         if (operationName) {
-          const compilingItem: StorageItem = {
-            ...newItem,
-            id: makeClientId("img"),
-            operationName,
-            status: "processing",
-            progress: 15,
-          };
+          const compilingItem = buildStorageItem(
+            {
+              ...newItem,
+              id: makeClientId("img"),
+              operationName,
+              status: "processing",
+              progress: 15,
+            },
+            { boardId: resolveScopeBoardId(overrides) },
+          );
           if (!await saveItemOrWarn(compilingItem, pushWorkspaceNotice)) {
             setItems(prev => [compilingItem, ...prev.filter(item => item.id !== tempId)]);
             return true;
@@ -274,13 +286,16 @@ export function useGenerationActions({
           return true;
         }
 
-        const completedItem: StorageItem = {
-          ...newItem,
-          id: makeClientId("img"),
-          url: imageUrl ?? "",
-          status: "complete",
-          progress: 100,
-        };
+        const completedItem = buildStorageItem(
+          {
+            ...newItem,
+            id: makeClientId("img"),
+            url: imageUrl ?? "",
+            status: "complete",
+            progress: 100,
+          },
+          { boardId: resolveScopeBoardId(overrides) },
+        );
         if (!imageUrl) {
           throw new Error("图片接口返回缺少 imageUrl 或 operationName");
         }
@@ -300,12 +315,15 @@ export function useGenerationActions({
       }
       console.error(error);
       const message = toErrorMessage(error, "图片生成失败");
-      const failedItem: StorageItem = {
-        ...newItem,
-        status: "failed",
-        progress: 100,
-        errorMessage: message,
-      };
+      const failedItem = buildStorageItem(
+        {
+          ...newItem,
+          status: "failed",
+          progress: 100,
+          errorMessage: message,
+        },
+        { boardId: resolveScopeBoardId(overrides) },
+      );
       await saveItemOrWarn(failedItem, pushWorkspaceNotice);
       setItems(prev => [failedItem, ...prev.filter(item => item.id !== tempId)]);
       pushWorkspaceNotice("error", message);
@@ -360,19 +378,22 @@ export function useGenerationActions({
     };
 
     const tempId = makeClientId("temp_vid");
-    const newItem: StorageItem = {
-      id: tempId,
-      type: "video",
-      url: "",
-      prompt: activePrompt,
-      model: requestModel,
-      aspectRatio: requestSize,
-      createdAt: new Date().toISOString(),
-      status: "processing",
-      progress: 12,
-      generationRequest,
-      sourceBoardNodeId: overrides.boardNodeId,
-    };
+    const newItem = buildStorageItem(
+      {
+        id: tempId,
+        type: "video",
+        url: "",
+        prompt: activePrompt,
+        model: requestModel,
+        aspectRatio: requestSize,
+        createdAt: new Date().toISOString(),
+        status: "processing",
+        progress: 12,
+        generationRequest,
+        sourceBoardNodeId: overrides.boardNodeId,
+      },
+      { boardId: resolveScopeBoardId(overrides) },
+    );
 
     setItems(prev => [newItem, ...prev]);
 
@@ -403,12 +424,15 @@ export function useGenerationActions({
           throw new Error("视频接口返回缺少 operationName");
         }
 
-        const compilingItem: StorageItem = {
-          ...newItem,
-          id: makeClientId("vid"),
-          operationName: activeOperationName,
-          status: "processing",
-        };
+        const compilingItem = buildStorageItem(
+          {
+            ...newItem,
+            id: makeClientId("vid"),
+            operationName: activeOperationName,
+            status: "processing",
+          },
+          { boardId: resolveScopeBoardId(overrides) },
+        );
 
         if (!await saveItemOrWarn(compilingItem, pushWorkspaceNotice)) {
           setItems(prev => [compilingItem, ...prev.filter(item => item.id !== tempId)]);
@@ -425,12 +449,15 @@ export function useGenerationActions({
       }
       console.error(error);
       const message = toErrorMessage(error, "视频生成失败");
-      const failedItem: StorageItem = {
-        ...newItem,
-        status: "failed",
-        progress: 100,
-        errorMessage: message,
-      };
+      const failedItem = buildStorageItem(
+        {
+          ...newItem,
+          status: "failed",
+          progress: 100,
+          errorMessage: message,
+        },
+        { boardId: resolveScopeBoardId(overrides) },
+      );
       await saveItemOrWarn(failedItem, pushWorkspaceNotice);
       setItems(prev => [failedItem, ...prev.filter(item => item.id !== tempId)]);
       pushWorkspaceNotice("error", message);

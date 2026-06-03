@@ -22,7 +22,15 @@ import MobileWorkbenchTabs, { type MobileWorkbenchPanel } from "@/components/wor
 import WorkspaceHeader from "@/components/workbench/WorkspaceHeader";
 
 import WorkspaceNotices, { type WorkspaceNotice } from "@/components/workbench/WorkspaceNotices";
-import { clearAllDB, getAllFromDB, saveToDB, type StorageItem } from "@/lib/db";
+import {
+  clearAllDB,
+  hydrateAssets,
+  listAllAssetMetas,
+  mergeStorageItems,
+  metaToPlaceholderItem,
+  saveToDB,
+  type StorageItem,
+} from "@/lib/db";
 import { useAgentController } from "@/hooks/useAgentController";
 import { useAssetActions } from "@/hooks/useAssetActions";
 import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
@@ -615,8 +623,21 @@ export default function Home() {
   useEffect(() => {
     async function loadWorkspace() {
       try {
-        const allItems = await getAllFromDB();
-        setItems(allItems);
+        const metas = await listAllAssetMetas();
+        setItems(metas.map(metaToPlaceholderItem));
+        const firstBatch = metas.slice(0, 40);
+        if (firstBatch.length > 0) {
+          const hydrated = await hydrateAssets(firstBatch);
+          setItems(current => mergeStorageItems(current, hydrated));
+          const rest = metas.slice(40, 120);
+          if (rest.length > 0) {
+            window.setTimeout(() => {
+              void hydrateAssets(rest).then(more =>
+                setItems(current => mergeStorageItems(current, more)),
+              );
+            }, 0);
+          }
+        }
       } catch (error) {
         console.error("IndexedDB Read Failed:", error);
         pushWorkspaceNotice("error", `本地项目库读取失败：${toErrorMessage(error, "IndexedDB 读取失败")}`);
@@ -727,6 +748,9 @@ export default function Home() {
       createdAt: "",
       status: "complete",
       progress: 100,
+      scope: "workspace",
+      boardId: "",
+      hasBlob: reference.url.startsWith("data:"),
     }));
     const agentReferenceIdSet = new Set(agentReferences.map(reference => reference.id));
     const agentAtItems = [
@@ -801,7 +825,11 @@ export default function Home() {
   };
 
   const reloadAssetsFromDB = useCallback(async () => {
-    setItems(await getAllFromDB());
+    const metas = await listAllAssetMetas();
+    setItems(metas.map(metaToPlaceholderItem));
+    void hydrateAssets(metas.slice(0, 80)).then(hydrated =>
+      setItems(current => mergeStorageItems(current, hydrated)),
+    );
   }, []);
 
   const handleDataExportWorkspace = useCallback(async (includeCredentials: boolean) => {

@@ -23,6 +23,7 @@ import { BOARD_PORT_IDS, getBoardNodePortDefinitions } from "@/lib/board/ports";
 import type { CapturedVideoFrame } from "@/lib/video-frame";
 
 export interface BoardFlowNodeData extends Record<string, unknown> {
+  boardId: string;
   compareReferenceUrl?: string | null;
   generateInputSummary?: BoardGenerateInputSummary;
   generateReferences: ReferenceImageRef[];
@@ -166,6 +167,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
       <div className={`h-[calc(100%-2.25rem)] min-h-0 rounded-b-lg ${nodeBodyOverflowClass(node.kind)}`}>
         {node.kind === "asset" && (
           <AssetBoardNode
+            boardId={data.boardId}
             node={node}
             compareReferenceUrl={data.compareReferenceUrl}
             onCaptureVideoFrame={data.onCaptureVideoFrame}
