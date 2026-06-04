@@ -2,6 +2,7 @@
 
 import { Maximize2, Pause, Play, Volume2, VolumeX } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useAlert } from "@/components/confirm/ConfirmProvider";
 import type { StorageItem } from "@/lib/db";
 import {
   captureVideoFrame,
@@ -42,6 +43,7 @@ export default function VideoAssetPlayer({
   onCaptureFrameRequestReady,
   preload = "metadata",
 }: VideoAssetPlayerProps) {
+  const showAlert = useAlert();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
@@ -60,9 +62,9 @@ export default function VideoAssetPlayer({
       const frame = await captureVideoFrame(video, mode);
       await onCaptureFrame(item, frame);
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : "视频截帧失败");
+      await showAlert({ message: error instanceof Error ? error.message : "视频截帧失败" });
     }
-  }, [item, onCaptureFrame]);
+  }, [item, onCaptureFrame, showAlert]);
 
   useEffect(() => {
     if (!onCaptureFrame || !onCaptureFrameRequestReady) return undefined;

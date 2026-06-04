@@ -1,5 +1,5 @@
 import type { BoardNode } from "@/lib/board/types";
-import { metaToPlaceholderItem, saveToDB, type StorageItemMeta } from "@/lib/db";
+import type { StorageItemMeta } from "@/lib/db";
 
 export function collectBoardNodeIdsFromNodes(nodes: BoardNode[]): Set<string> {
   return new Set(nodes.map(node => node.id));
@@ -30,28 +30,4 @@ export function mergeBoardScopedMetas(
   return Array.from(merged.values()).sort(
     (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
   );
-}
-
-export async function repairLegacyBoardAssetScope(
-  boardId: string,
-  metas: StorageItemMeta[],
-  boardNodeIds: Set<string>,
-): Promise<StorageItemMeta[]> {
-  const repairs: StorageItemMeta[] = [];
-  const next = metas.map(meta => {
-    if (
-      !meta.sourceBoardNodeId ||
-      !boardNodeIds.has(meta.sourceBoardNodeId) ||
-      (meta.scope === "board" && meta.boardId === boardId)
-    ) {
-      return meta;
-    }
-    const repaired: StorageItemMeta = { ...meta, scope: "board", boardId };
-    repairs.push(repaired);
-    return repaired;
-  });
-  if (repairs.length > 0) {
-    await Promise.all(repairs.map(meta => saveToDB(metaToPlaceholderItem(meta))));
-  }
-  return next;
 }

@@ -440,6 +440,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const [agentInput, setAgentInput] = useState("");
   const [isAgentDockOpen, setIsAgentDockOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [renameDialogDraft, setRenameDialogDraft] = useState<string | null>(null);
 
   const [, setIsOptimizing] = useState(false);
   const [imageSubmitCount, setImageSubmitCount] = useState(0);
@@ -1645,14 +1646,22 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   }, [boardController, router]);
 
   const renameBoardPage = useCallback(() => {
-    const nextTitle = window.prompt("重命名画板", boardController.board.title);
-    if (nextTitle === null) return;
+    setRenameDialogDraft(boardController.board.title);
+  }, [boardController.board.title]);
+
+  const closeRenameDialog = useCallback(() => {
+    setRenameDialogDraft(null);
+  }, []);
+
+  const submitRenameDialog = useCallback(() => {
+    if (renameDialogDraft === null) return;
     try {
-      boardController.updateBoardTitle(nextTitle);
+      boardController.updateBoardTitle(renameDialogDraft);
+      setRenameDialogDraft(null);
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, "画板重命名失败"));
     }
-  }, [boardController, pushWorkspaceNotice]);
+  }, [boardController, pushWorkspaceNotice, renameDialogDraft]);
 
   const deleteBoardPage = useCallback(async () => {
     if (boardSummaries.length <= 1) {
@@ -1727,6 +1736,47 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   return (
     <div className="imagine-workbench-shell imagine-theme-dark">
       <WorkspaceNotices notices={workspaceNotices} onDismiss={dismissWorkspaceNotice} />
+      {renameDialogDraft !== null && (
+        <div
+          role="presentation"
+          className="imagine-confirm-overlay fixed inset-0 z-[120] flex items-center justify-center p-4 backdrop-blur-sm"
+          onClick={closeRenameDialog}
+        >
+          <form
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="board-rename-title"
+            className="imagine-confirm-dialog w-full max-w-sm rounded-xl border p-4"
+            onClick={event => event.stopPropagation()}
+            onSubmit={event => {
+              event.preventDefault();
+              submitRenameDialog();
+            }}
+          >
+            <h2 id="board-rename-title" className="text-sm font-semibold text-[var(--iw-text)]">
+              重命名画板
+            </h2>
+            <input
+              autoFocus
+              value={renameDialogDraft}
+              onChange={event => setRenameDialogDraft(event.target.value)}
+              className="mt-3 h-10 w-full rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)] px-3 text-sm text-[var(--iw-text)] outline-none focus:border-[var(--iw-accent)]"
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                className="imagine-secondary-action h-9 rounded-lg border border-[var(--iw-border)] px-3 text-[11px] font-semibold text-[var(--iw-text)]"
+                onClick={closeRenameDialog}
+              >
+                取消
+              </button>
+              <button type="submit" className="imagine-primary-action h-9 rounded-lg px-3 text-[11px] font-semibold">
+                保存
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
       <BoardWorkspace
         boardSummaries={boardSummariesForToolbar}
         controller={boardController}

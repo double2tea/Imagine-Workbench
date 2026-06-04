@@ -297,7 +297,7 @@ export async function importWorkspaceBackup(
   const parsed = await parseWorkspaceBackup(file);
   await clearAllDB();
   await clearBoardsFromDB();
-  clearManagedLocalStorage();
+  clearManagedLocalStorage(includeCredentials);
 
   for (const asset of parsed.assets) {
     await saveToDB(asset);
@@ -854,9 +854,9 @@ function readManagedLocalStorage(includeCredentials: boolean): Record<string, st
   return entries;
 }
 
-function clearManagedLocalStorage(): void {
+function clearManagedLocalStorage(includeCredentials: boolean): void {
   if (typeof window === "undefined") return;
-  Object.keys(readManagedLocalStorage(true)).forEach(key => window.localStorage.removeItem(key));
+  Object.keys(readManagedLocalStorage(includeCredentials)).forEach(key => window.localStorage.removeItem(key));
 }
 
 function writeManagedLocalStorage(entries: Record<string, string>, includeCredentials: boolean): void {

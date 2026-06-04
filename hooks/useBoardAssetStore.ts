@@ -5,7 +5,6 @@ import {
   collectBoardAssetIdsFromNodes,
   collectBoardNodeIdsFromNodes,
   mergeBoardScopedMetas,
-  repairLegacyBoardAssetScope,
 } from "@/lib/assets/board-scope";
 import type { BoardNode } from "@/lib/board/types";
 import {
@@ -38,8 +37,7 @@ export function useBoardAssetStore(boardId: string, nodes: BoardNode[]): UseBoar
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      let scopedMetas = await listBoardScopedAssetMetas(boardId, referencedAssetIds, boardNodeIds);
-      scopedMetas = await repairLegacyBoardAssetScope(boardId, scopedMetas, boardNodeIds);
+      const scopedMetas = await listBoardScopedAssetMetas(boardId, referencedAssetIds, boardNodeIds);
       setMetas(scopedMetas);
       const placeholders = scopedMetas.map(metaToPlaceholderItem);
       setItems(placeholders);

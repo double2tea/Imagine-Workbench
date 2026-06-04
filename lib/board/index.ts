@@ -31,7 +31,6 @@ export {
   collectBoardAssetIdsFromNodes,
   collectBoardNodeIdsFromNodes,
   mergeBoardScopedMetas,
-  repairLegacyBoardAssetScope,
 } from "@/lib/assets/board-scope";
 export { BOARD_SNAP_GRID, snapBoardPoint } from "@/lib/board/snap-grid";
 export {
