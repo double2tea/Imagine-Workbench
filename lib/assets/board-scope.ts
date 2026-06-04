@@ -15,6 +15,9 @@ export function collectBoardAssetIdsFromNodes(nodes: BoardNode[]): Set<string> {
     if ((node.kind === "image-generate" || node.kind === "video-generate") && node.resultAssetId) {
       ids.add(node.resultAssetId);
     }
+    if (node.kind === "image-generate" || node.kind === "video-generate") {
+      for (const assetId of node.resultAssetIds ?? []) ids.add(assetId);
+    }
   }
   return ids;
 }

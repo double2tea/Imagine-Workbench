@@ -90,6 +90,8 @@ export interface BoardImageGenerateNode extends BoardNodeBase {
   variantCount: BoardGenerateVariantCount;
   status: BoardGenerationStatus;
   resultAssetId?: string;
+  resultAssetIds?: string[];
+  resultStackKey?: string;
   errorMessage?: string;
 }
 
@@ -105,6 +107,8 @@ export interface BoardVideoGenerateNode extends BoardNodeBase {
   variantCount: BoardGenerateVariantCount;
   status: BoardGenerationStatus;
   resultAssetId?: string;
+  resultAssetIds?: string[];
+  resultStackKey?: string;
   errorMessage?: string;
 }
 
@@ -138,6 +142,8 @@ export type BoardGenerateNodeUpdate = Partial<{
   model: string;
   prompt: string;
   resultAssetId: string;
+  resultAssetIds: string[];
+  resultStackKey: string;
   status: BoardGenerationStatus;
   thinkingLevel: string;
   variantCount: BoardGenerateVariantCount;

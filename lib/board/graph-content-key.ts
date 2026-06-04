@@ -63,11 +63,13 @@ function serializeNodeContent(node: BoardNode): string {
         node.aspectRatio,
         node.imageResolution,
         node.customImageResolution,
-        node.imageQuality ?? "",
-        node.thinkingLevel ?? "",
-        node.variantCount,
-        node.resultAssetId ?? "",
-        fingerprintLargeText(node.errorMessage ?? ""),
+          node.imageQuality ?? "",
+          node.thinkingLevel ?? "",
+          node.variantCount,
+          node.resultAssetId ?? "",
+          node.resultAssetIds?.join(",") ?? "",
+          node.resultStackKey ?? "",
+          fingerprintLargeText(node.errorMessage ?? ""),
       ].join("|");
     case "video-generate":
       return [
@@ -80,12 +82,14 @@ function serializeNodeContent(node: BoardNode): string {
         fingerprintLargeText(node.prompt),
         node.aspectRatio,
         node.videoDuration ?? "",
-        node.videoPreset ?? "",
-        node.videoReferenceMode ?? "",
-        node.videoResolution ?? "",
-        node.variantCount,
-        node.resultAssetId ?? "",
-        fingerprintLargeText(node.errorMessage ?? ""),
+          node.videoPreset ?? "",
+          node.videoReferenceMode ?? "",
+          node.videoResolution ?? "",
+          node.variantCount,
+          node.resultAssetId ?? "",
+          node.resultAssetIds?.join(",") ?? "",
+          node.resultStackKey ?? "",
+          fingerprintLargeText(node.errorMessage ?? ""),
       ].join("|");
     case "agent":
       return `agent|${node.id}|${node.title}|${fingerprintLargeText(node.instruction)}`;

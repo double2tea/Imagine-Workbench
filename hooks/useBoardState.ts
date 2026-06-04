@@ -334,6 +334,11 @@ function readOptionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim().length > 0 ? value : undefined;
 }
 
+function readOptionalStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.filter((item): item is string => typeof item === "string" && item.length > 0);
+}
+
 function readVideoReferenceMode(value: unknown): BoardVideoReferenceMode | undefined {
   return value === "reference" || value === "firstLast" ? value : undefined;
 }
@@ -443,12 +448,14 @@ function normalizeBoardNode(node: unknown, index: number): BoardNode | null {
       kind: "image-generate",
       model,
       prompt: typeof node.prompt === "string" ? node.prompt : "",
-      aspectRatio: aspectRatio || defaults.aspectRatio,
-      customImageResolution: readOptionalString(node.customImageResolution) || defaults.customImageResolution,
-      imageQuality: readOptionalString(node.imageQuality) ?? defaults.imageQuality,
-      imageResolution: readOptionalString(node.imageResolution) || defaults.imageResolution,
-      resultAssetId: typeof node.resultAssetId === "string" ? node.resultAssetId : undefined,
-      status: normalizeGenerationStatus(node.status),
+        aspectRatio: aspectRatio || defaults.aspectRatio,
+        customImageResolution: readOptionalString(node.customImageResolution) || defaults.customImageResolution,
+        imageQuality: readOptionalString(node.imageQuality) ?? defaults.imageQuality,
+        imageResolution: readOptionalString(node.imageResolution) || defaults.imageResolution,
+        resultAssetId: typeof node.resultAssetId === "string" ? node.resultAssetId : undefined,
+        resultAssetIds: readOptionalStringArray(node.resultAssetIds),
+        resultStackKey: readOptionalString(node.resultStackKey),
+        status: normalizeGenerationStatus(node.status),
       thinkingLevel: readOptionalString(node.thinkingLevel) ?? defaults.thinkingLevel,
       variantCount: normalizeVariantCount(node.variantCount),
       errorMessage: typeof node.errorMessage === "string" ? node.errorMessage : undefined,
@@ -460,12 +467,14 @@ function normalizeBoardNode(node: unknown, index: number): BoardNode | null {
     const defaults = defaultVideoParams(model, aspectRatio);
     return {
       ...shell,
-      kind: "video-generate",
-      model,
-      prompt: typeof node.prompt === "string" ? node.prompt : "",
-      aspectRatio: aspectRatio || defaults.aspectRatio,
-      resultAssetId: typeof node.resultAssetId === "string" ? node.resultAssetId : undefined,
-      status: normalizeGenerationStatus(node.status),
+        kind: "video-generate",
+        model,
+        prompt: typeof node.prompt === "string" ? node.prompt : "",
+        aspectRatio: aspectRatio || defaults.aspectRatio,
+        resultAssetId: typeof node.resultAssetId === "string" ? node.resultAssetId : undefined,
+        resultAssetIds: readOptionalStringArray(node.resultAssetIds),
+        resultStackKey: readOptionalString(node.resultStackKey),
+        status: normalizeGenerationStatus(node.status),
       videoDuration: readOptionalString(node.videoDuration) ?? defaults.videoDuration,
       videoPreset: readOptionalString(node.videoPreset) ?? defaults.videoPreset,
       videoReferenceMode: readVideoReferenceMode(node.videoReferenceMode) ?? defaults.videoReferenceMode,
@@ -683,12 +692,18 @@ function findMatchingEdge(edges: BoardEdge[], from: BoardPortRef, to: BoardPortR
   );
 }
 
+function sameStringList(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
 function sameGenerateUpdate(node: BoardImageGenerateNode | BoardVideoGenerateNode, input: BoardGenerateNodeUpdate): boolean {
   if ("aspectRatio" in input && node.aspectRatio !== input.aspectRatio) return false;
   if ("errorMessage" in input && node.errorMessage !== input.errorMessage) return false;
   if ("model" in input && node.model !== input.model) return false;
   if ("prompt" in input && node.prompt !== input.prompt) return false;
   if ("resultAssetId" in input && node.resultAssetId !== input.resultAssetId) return false;
+  if ("resultAssetIds" in input && !sameStringList(node.resultAssetIds ?? [], input.resultAssetIds ?? [])) return false;
+  if ("resultStackKey" in input && node.resultStackKey !== input.resultStackKey) return false;
   if ("status" in input && node.status !== input.status) return false;
   if ("variantCount" in input && node.variantCount !== input.variantCount) return false;
 

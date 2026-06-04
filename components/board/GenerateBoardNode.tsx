@@ -4,8 +4,10 @@ import BoardPromptTextarea, { type BoardPromptTextareaHandle } from "@/component
 import PreviewImage from "@/components/PreviewImage";
 import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
+import type { StorageItem } from "@/lib/db";
 import { getMediaReferenceType } from "@/lib/media-references";
 import type { BoardGenerateNodeUpdate, BoardGenerateVariantCount, BoardImageGenerateNode, BoardVideoGenerateNode } from "@/lib/board";
+import type { BoardPromptReference } from "@/lib/board/prompt-references";
 import {
   applyPromptTemplateText,
   insertPromptTemplateText,
@@ -44,8 +46,12 @@ interface GenerateBoardNodeProps {
   taskSummary?: BoardGenerateTaskSummary;
   onCancel?: () => void;
   onExecute: () => void;
+  onOpenResult?: (item: StorageItem) => void;
+  onSelectResult: (assetId: string) => void;
+  onSelectReference?: (reference: BoardPromptReference, index: number) => void;
   onUpdate: (input: BoardGenerateNodeUpdate) => void;
-  references: ReferenceImageRef[];
+  references: BoardPromptReference[];
+  resultItems: StorageItem[];
 }
 
 type GenerateContextTone = "failed" | "neutral" | "ok" | "processing" | "prompt" | "reference" | "result";
@@ -95,7 +101,20 @@ function runContext(node: GenerateNode, taskSummary: BoardGenerateTaskSummary | 
   return { title: "待运行", tone: "neutral" };
 }
 
-export default function GenerateBoardNode({ hasResultConnection = false, inputSummary, node, onCancel, onExecute, onUpdate, references, taskSummary }: GenerateBoardNodeProps) {
+export default function GenerateBoardNode({
+  hasResultConnection = false,
+  inputSummary,
+  node,
+  onCancel,
+  onExecute,
+  onOpenResult,
+  onSelectReference,
+  onSelectResult,
+  onUpdate,
+  references,
+  resultItems,
+  taskSummary,
+}: GenerateBoardNodeProps) {
   const promptTextareaRef = useRef<BoardPromptTextareaHandle | null>(null);
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
   const slashCommandRef = useRef<PromptTemplateSlashCommand | null>(null);
@@ -178,7 +197,9 @@ export default function GenerateBoardNode({ hasResultConnection = false, inputSu
           commitId={promptPreview === null ? node.id : undefined}
           value={promptPreview ?? node.prompt}
           onChange={(prompt) => onUpdate({ prompt })}
+          onSelectReference={onSelectReference}
           onSlashCommand={handleSlashCommand}
+          overlayClassName="p-2 pr-20 text-xs leading-5"
           references={references}
           readOnly={promptPreview !== null}
           headerRight={promptPreview === null ? <PromptTemplatePicker ref={templatePickerRef} compact onApply={handleApplyPromptTemplate} /> : undefined}
@@ -224,6 +245,43 @@ export default function GenerateBoardNode({ hasResultConnection = false, inputSu
               </span>
             )}
           </div>
+        </div>
+      )}
+      {resultItems.length > 0 && (
+        <div className="nodrag flex min-h-10 min-w-0 items-center gap-1 overflow-x-auto rounded-md border border-emerald-400/20 bg-emerald-500/5 p-1">
+          {resultItems.map((item, index) => {
+            const isActive = item.id === node.resultAssetId;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onSelectResult(item.id);
+                }}
+                onDoubleClick={(event) => {
+                  event.stopPropagation();
+                  onOpenResult?.(item);
+                }}
+                onPointerDown={stopBoardControlPointer}
+                className={`relative h-8 w-8 shrink-0 overflow-hidden rounded border transition ${
+                  isActive ? "border-emerald-300 ring-2 ring-emerald-400/25" : "border-[var(--iw-border)] opacity-75 hover:opacity-100"
+                }`}
+                title={`结果 ${index + 1}`}
+              >
+                {item.type === "image" ? (
+                  <PreviewImage src={item.url} alt="" className="h-full w-full object-cover" />
+                ) : item.type === "video" ? (
+                  <Video className="m-auto h-full w-4 text-violet-200" />
+                ) : (
+                  <Music className="m-auto h-full w-4 text-emerald-200" />
+                )}
+                <span className="absolute bottom-0 right-0 rounded-tl bg-black/60 px-1 text-[8px] font-semibold text-white">
+                  {index + 1}
+                </span>
+              </button>
+            );
+          })}
         </div>
       )}
       <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2">

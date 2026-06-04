@@ -48,6 +48,7 @@ interface UseGenerationActionsParams {
 interface GenerationOverrides {
   boardId?: string;
   boardNodeId?: string;
+  boardResultStackKey?: string;
   imageQuality?: string;
   imageResolution?: string;
   isCustomImageResolution?: boolean;
@@ -277,12 +278,13 @@ export function useGenerationActions({
         prompt: activePrompt,
         model: requestModel,
         aspectRatio: displayedImageSize,
-        createdAt: new Date().toISOString(),
-        status: "pending",
-        progress: 30,
-        generationRequest,
-        sourceBoardNodeId: overrides.boardNodeId,
-      },
+          createdAt: new Date().toISOString(),
+          status: "pending",
+          progress: 30,
+          generationRequest,
+          sourceBoardNodeId: overrides.boardNodeId,
+          sourceBoardResultStackKey: overrides.boardResultStackKey,
+        },
       { boardId: resolveScopeBoardId(overrides) },
     );
 
@@ -433,12 +435,13 @@ export function useGenerationActions({
         prompt: activePrompt,
         model: requestModel,
         aspectRatio: requestSize,
-        createdAt: new Date().toISOString(),
-        status: "processing",
-        progress: 12,
-        generationRequest,
-        sourceBoardNodeId: overrides.boardNodeId,
-      },
+          createdAt: new Date().toISOString(),
+          status: "processing",
+          progress: 12,
+          generationRequest,
+          sourceBoardNodeId: overrides.boardNodeId,
+          sourceBoardResultStackKey: overrides.boardResultStackKey,
+        },
       { boardId: resolveScopeBoardId(overrides) },
     );
 

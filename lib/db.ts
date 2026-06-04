@@ -53,6 +53,7 @@ export interface StorageItemMeta {
   generationRequest?: GenerationRequestSnapshot;
   maskOriginalId?: string;
   sourceBoardNodeId?: string;
+  sourceBoardResultStackKey?: string;
   /** Remote http(s) URL only when hasBlob is false. */
   url?: string;
   hasBlob: boolean;
@@ -94,6 +95,7 @@ interface LegacyStorageItem {
   generationRequest?: GenerationRequestSnapshot;
   maskOriginalId?: string;
   sourceBoardNodeId?: string;
+  sourceBoardResultStackKey?: string;
   scope?: AssetScope;
   boardId?: string;
 }
@@ -157,6 +159,7 @@ function splitIncomingItem(item: StorageItem): { meta: StorageItemMeta; blob: st
     generationRequest: item.generationRequest,
     maskOriginalId: item.maskOriginalId,
     sourceBoardNodeId: item.sourceBoardNodeId,
+    sourceBoardResultStackKey: item.sourceBoardResultStackKey,
     url: blob ? undefined : url || undefined,
     hasBlob: Boolean(blob),
   });
@@ -183,6 +186,7 @@ function legacyToMeta(raw: LegacyStorageItem): { meta: StorageItemMeta; blob: st
     generationRequest: raw.generationRequest,
     maskOriginalId: raw.maskOriginalId,
     sourceBoardNodeId: raw.sourceBoardNodeId,
+    sourceBoardResultStackKey: raw.sourceBoardResultStackKey,
     url: blob ? undefined : raw.url || undefined,
     hasBlob: Boolean(blob),
   });

@@ -235,15 +235,22 @@ type BoardReferenceUrlResolver = (assetId: string, fallbackUrl: string) => strin
 function activeBoardReference(
   nodes: ReturnType<typeof useBoardState>["board"]["nodes"],
   selectedNodeId: string | null,
+  items: StorageItem[],
   resolveUrl: BoardReferenceUrlResolver,
 ): ReferenceImageRef[] {
   const node = nodes.find(item => item.id === selectedNodeId);
-  if (!node || node.kind !== "asset") return [];
+  if (!node) return [];
+  if (node.kind === "image-generate" || node.kind === "video-generate") {
+    const item = items.find(current => current.id === node.resultAssetId && current.status === "complete");
+    return item ? [{ id: item.id, type: item.type, url: resolveUrl(item.id, item.url), role: "general" }] : [];
+  }
+  if (node.kind !== "asset") return [];
   return [{ id: node.asset.assetId, type: node.asset.type, url: resolveUrl(node.asset.assetId, node.asset.url), role: "general" }];
 }
 
 function boardNodeReferences(
   node: BoardDocument["nodes"][number] | undefined,
+  items: StorageItem[],
   resolveUrl: BoardReferenceUrlResolver,
 ): ReferenceImageRef[] {
   if (node?.kind === "asset") {
@@ -256,6 +263,10 @@ function boardNodeReferences(
       type: reference.type,
       url: resolveUrl(reference.assetId, reference.url),
     }));
+  }
+  if (node?.kind === "image-generate" || node?.kind === "video-generate") {
+    const item = items.find(current => current.id === node.resultAssetId && current.status === "complete");
+    return item ? [{ id: item.id, type: item.type, url: resolveUrl(item.id, item.url), role: "general" }] : [];
   }
   return [];
 }
@@ -520,6 +531,7 @@ function resolveBoardPatchRunInputs(
   generatedNodeId: string,
   tempToRealIds: Map<string, string>,
   currentNodes: BoardNode[],
+  items: StorageItem[],
   resolveUrl: BoardReferenceUrlResolver,
 ): { prompt: string; references: ReferenceImageRef[] } {
   let prompt = generateOperation.prompt?.trim() ?? "";
@@ -548,7 +560,7 @@ function resolveBoardPatchRunInputs(
     if (operation.to.portId === BOARD_PORT_IDS.referenceIn) {
       const sourceNodeId = resolvePatchNodeId(operation.from.nodeId, tempToRealIds);
       const sourceNode = currentNodes.find(node => node.id === sourceNodeId);
-      references.push(...boardNodeReferences(sourceNode, resolveUrl));
+      references.push(...boardNodeReferences(sourceNode, items, resolveUrl));
     }
   });
   return { prompt, references };
@@ -618,28 +630,17 @@ function findGenerateNodeById(nodes: BoardDocument["nodes"], nodeId: string): Ge
   return isGenerateBoardNode(node) ? node : undefined;
 }
 
-function completedSourceItemIndex(items: StorageItem[], sourceBoardNodeId: string, itemId: string): number {
-  const sourceItems = items
-    .filter(item => item.sourceBoardNodeId === sourceBoardNodeId && item.status === "complete")
-    .sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime());
-  const index = sourceItems.findIndex(item => item.id === itemId);
-  return index < 0 ? 0 : index;
+function isSourceStackItem(item: StorageItem, sourceNode: GenerateBoardNode): boolean {
+  return item.sourceBoardNodeId === sourceNode.id && (!sourceNode.resultStackKey || item.sourceBoardResultStackKey === sourceNode.resultStackKey);
 }
 
-function resultAssetPosition(sourceNode: GenerateBoardNode, resultIndex: number): BoardPoint {
-  return {
-    x: sourceNode.position.x + sourceNode.size.width + 140,
-    y: sourceNode.position.y + resultIndex * 320,
-  };
+function hasActiveSourceItems(items: StorageItem[], sourceNode: GenerateBoardNode): boolean {
+  return items.some(item => isSourceStackItem(item, sourceNode) && (item.status === "pending" || item.status === "processing"));
 }
 
-function hasActiveSourceItems(items: StorageItem[], sourceBoardNodeId: string): boolean {
-  return items.some(item => item.sourceBoardNodeId === sourceBoardNodeId && (item.status === "pending" || item.status === "processing"));
-}
-
-function nextSourceNodeStatus(items: StorageItem[], sourceBoardNodeId: string, itemStatus: StorageItem["status"]): BoardGenerationStatus {
-  if (hasActiveSourceItems(items, sourceBoardNodeId)) return "processing";
-  if (items.some(item => item.sourceBoardNodeId === sourceBoardNodeId && item.status === "complete")) return "complete";
+function nextSourceNodeStatus(items: StorageItem[], sourceNode: GenerateBoardNode, itemStatus: StorageItem["status"]): BoardGenerationStatus {
+  if (hasActiveSourceItems(items, sourceNode)) return "processing";
+  if (items.some(item => isSourceStackItem(item, sourceNode) && item.status === "complete")) return "complete";
   return itemStatus === "failed" ? "failed" : "complete";
 }
 
@@ -647,6 +648,84 @@ function activeSourceItemForNode(items: StorageItem[], sourceBoardNodeId: string
   return items
     .filter(item => item.sourceBoardNodeId === sourceBoardNodeId && (item.status === "pending" || item.status === "processing"))
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0];
+}
+
+function resultStackKeyForConfig({
+  edges,
+  kind,
+  model,
+  nodeId,
+  sizeKey,
+}: {
+  edges: BoardDocument["edges"];
+  kind: GenerateBoardNode["kind"];
+  model: string;
+  nodeId: string;
+  sizeKey: string;
+}): string {
+  const wiringKey = edges
+    .filter(edge => edge.to.nodeId === nodeId && (edge.to.portId === BOARD_PORT_IDS.promptIn || edge.to.portId === BOARD_PORT_IDS.referenceIn))
+    .map(edge => `${edge.kind}:${edge.from.nodeId}:${edge.from.portId}>${edge.to.nodeId}:${edge.to.portId}`)
+    .sort()
+    .join(",");
+  return `${kind}|${model}|${sizeKey}|${wiringKey}`;
+}
+
+function resultStackKeyForNode(node: GenerateBoardNode, edges: BoardDocument["edges"]): string {
+  const sizeKey = node.kind === "image-generate"
+    ? `${node.aspectRatio}|${node.imageResolution}|${node.customImageResolution}`
+    : `${node.aspectRatio}|${node.videoResolution ?? ""}`;
+  return resultStackKeyForConfig({
+    edges,
+    kind: node.kind,
+    model: node.model,
+    nodeId: node.id,
+    sizeKey,
+  });
+}
+
+function patchInputEdgesForNode(
+  patch: AgentBoardPatch,
+  generatedNodeId: string,
+  tempToRealIds: Map<string, string>,
+): BoardDocument["edges"] {
+  return patch.operations
+    .filter((operation): operation is AgentBoardPatchOperation & { op: "connect_ports" } => operation.op === "connect_ports")
+    .filter(operation => {
+      const targetNodeId = resolvePatchNodeId(operation.to.nodeId, tempToRealIds);
+      return targetNodeId === generatedNodeId && (operation.to.portId === BOARD_PORT_IDS.promptIn || operation.to.portId === BOARD_PORT_IDS.referenceIn);
+    })
+    .map((operation, index) => {
+      const toPortId = operation.to.portId;
+      return {
+        id: `patch-edge-${index}`,
+        kind: toPortId === BOARD_PORT_IDS.promptIn ? "prompt" : "reference",
+        from: resolvePatchPortRef(operation.from, tempToRealIds),
+        to: resolvePatchPortRef(operation.to, tempToRealIds),
+        createdAt: "",
+      };
+    });
+}
+
+function patchGenerateNodeForStackKey(operation: AgentBoardPatchCreateNodeOperation, generatedNodeId: string): GenerateBoardNode {
+  const previewNode = createPreviewBoardNode(operation, 0);
+  if (!isGenerateBoardNode(previewNode)) {
+    throw new Error("画板补丁运行目标不是生成节点");
+  }
+  return { ...previewNode, id: generatedNodeId };
+}
+
+function appendResultAssetId(node: GenerateBoardNode, assetId: string): string[] {
+  const current = node.resultAssetIds ?? (node.resultAssetId ? [node.resultAssetId] : []);
+  return current.includes(assetId) ? current : [...current, assetId];
+}
+
+function sourceStackResultAssetIds(items: StorageItem[], sourceNode: GenerateBoardNode, activeAssetId: string): string[] {
+  const completedIds = items
+    .filter(item => isSourceStackItem(item, sourceNode) && item.status === "complete")
+    .sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime())
+    .map(item => item.id);
+  return completedIds.includes(activeAssetId) ? completedIds : appendResultAssetId(sourceNode, activeAssetId);
 }
 
 function boardRoute(id: string): string {
@@ -1170,6 +1249,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           item.id,
           tempToRealIds,
           boardController.board.nodes,
+          items,
           resolveBoardReferenceUrl,
         );
         const promptValue = runInputs.prompt;
@@ -1186,10 +1266,20 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         }
         if (operation.kind === "image-generate") {
           const defaults = imageActionDefaults(model, operation.aspectRatio);
-          boardController.updateGenerateNode(item.id, { status: "processing", errorMessage: undefined, prompt: promptValue });
+          const resultStackKey = resultStackKeyForNode(
+            patchGenerateNodeForStackKey(operation, item.id),
+            patchInputEdgesForNode(patch, item.id, tempToRealIds),
+          );
+          boardController.updateGenerateNode(item.id, {
+            status: "processing",
+            errorMessage: undefined,
+            prompt: promptValue,
+            resultStackKey,
+          });
           const didStart = await generateManualImage({
             boardId: resolvedBoardId,
             boardNodeId: item.id,
+            boardResultStackKey: resultStackKey,
             imageQuality: operation.imageQuality ?? defaults.imageQuality,
             imageResolution: operation.imageResolution ?? defaults.imageResolution,
             isCustomImageResolution: isCustomImageResolutionValue(operation.imageResolution ?? defaults.imageResolution),
@@ -1215,10 +1305,20 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             });
             continue;
           }
-          boardController.updateGenerateNode(item.id, { status: "processing", errorMessage: undefined, prompt: promptValue });
+          const resultStackKey = resultStackKeyForNode(
+            patchGenerateNodeForStackKey(operation, item.id),
+            patchInputEdgesForNode(patch, item.id, tempToRealIds),
+          );
+          boardController.updateGenerateNode(item.id, {
+            status: "processing",
+            errorMessage: undefined,
+            prompt: promptValue,
+            resultStackKey,
+          });
           const didStart = await generateManualVideo({
             boardId: resolvedBoardId,
             boardNodeId: item.id,
+            boardResultStackKey: resultStackKey,
             model,
             prompt: promptValue,
             referenceImage: runInputs.references[0]?.url ?? null,
@@ -1344,11 +1444,25 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         boardController.endUndoGesture();
       }
       if (action.params?.run === true) {
-        boardController.updateGenerateNode(videoNodeId, { status: "processing", errorMessage: undefined });
+        const resultStackKey = resultStackKeyForConfig({
+          edges: [{
+            id: "image-to-video-reference-edge",
+            kind: "reference",
+            from: { nodeId: assetNodeId, portId: BOARD_PORT_IDS.assetOut, portKind: "asset" },
+            to: { nodeId: videoNodeId, portId: BOARD_PORT_IDS.referenceIn, portKind: "asset" },
+            createdAt: "",
+          }],
+          kind: "video-generate",
+          model,
+          nodeId: videoNodeId,
+          sizeKey: `${action.params.aspectRatio ?? defaults.aspectRatio}|${action.params.videoResolution ?? defaults.videoResolution ?? ""}`,
+        });
+        boardController.updateGenerateNode(videoNodeId, { status: "processing", errorMessage: undefined, resultStackKey });
         const reference = { id: sourceReference.assetId, url: sourceReference.url, role: "general" as const };
         const didStart = await generateManualVideo({
           boardId: resolvedBoardId,
           boardNodeId: videoNodeId,
+          boardResultStackKey: resultStackKey,
           model,
           prompt: promptValue,
           referenceImage: reference.url,
@@ -1531,6 +1645,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         return handledBoardAction(false);
       }
 
+      const referenceNodeIds: string[] = [];
       references.forEach((reference, index) => {
         const matchedItem = items.find(item => item.id === reference.id);
         const referenceType = getMediaReferenceType(reference);
@@ -1545,6 +1660,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           position: { x: 120 + index * 140, y: generatePosition.y + 280 },
           title: matchedItem?.prompt || "Agent reference",
         });
+        referenceNodeIds.push(assetNodeId);
         boardController.connectPorts(
           { nodeId: assetNodeId, portId: "asset-out", portKind: "asset" },
           { nodeId: generateNodeId, portId: "reference-in", portKind: "asset" },
@@ -1556,10 +1672,33 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         return handledBoardAction(true);
       }
 
-      boardController.updateGenerateNode(generateNodeId, { errorMessage: undefined, status: "processing" });
+      const resultStackKey = resultStackKeyForConfig({
+        edges: [
+          {
+            id: "agent-prompt-edge",
+            kind: "prompt",
+            from: { nodeId: promptNodeId, portId: BOARD_PORT_IDS.promptOut, portKind: "prompt" },
+            to: { nodeId: generateNodeId, portId: BOARD_PORT_IDS.promptIn, portKind: "prompt" },
+            createdAt: "",
+          },
+          ...referenceNodeIds.map((assetNodeId, index) => ({
+            id: `agent-reference-edge-${index}`,
+            kind: "reference" as const,
+            from: { nodeId: assetNodeId, portId: BOARD_PORT_IDS.assetOut, portKind: "asset" as const },
+            to: { nodeId: generateNodeId, portId: BOARD_PORT_IDS.referenceIn, portKind: "asset" as const },
+            createdAt: "",
+          })),
+        ],
+        kind: "image-generate",
+        model,
+        nodeId: generateNodeId,
+        sizeKey: `${defaults.aspectRatio}|${defaults.imageResolution}|${defaults.customImageResolution}`,
+      });
+      boardController.updateGenerateNode(generateNodeId, { errorMessage: undefined, resultStackKey, status: "processing" });
       const didStart = await generateManualImage({
         boardId: resolvedBoardId,
         boardNodeId: generateNodeId,
+        boardResultStackKey: resultStackKey,
         imageQuality: defaults.imageQuality,
         imageResolution: defaults.imageResolution,
         isCustomImageResolution: isCustomImageResolutionValue(defaults.imageResolution),
@@ -1622,6 +1761,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       return handledBoardAction(false);
     }
 
+    const referenceNodeIds: string[] = [];
     references.forEach((reference, index) => {
       const matchedItem = items.find(item => item.id === reference.id);
       const referenceType = getMediaReferenceType(reference);
@@ -1636,6 +1776,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         position: { x: 120 + index * 140, y: generatePosition.y + 280 },
         title: matchedItem?.prompt || "Agent reference",
       });
+      referenceNodeIds.push(assetNodeId);
       boardController.connectPorts(
         { nodeId: assetNodeId, portId: "asset-out", portKind: "asset" },
         { nodeId: generateNodeId, portId: "reference-in", portKind: "asset" },
@@ -1647,10 +1788,33 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       return handledBoardAction(true);
     }
 
-    boardController.updateGenerateNode(generateNodeId, { errorMessage: undefined, status: "processing" });
+    const resultStackKey = resultStackKeyForConfig({
+      edges: [
+        {
+          id: "agent-prompt-edge",
+          kind: "prompt",
+          from: { nodeId: promptNodeId, portId: BOARD_PORT_IDS.promptOut, portKind: "prompt" },
+          to: { nodeId: generateNodeId, portId: BOARD_PORT_IDS.promptIn, portKind: "prompt" },
+          createdAt: "",
+        },
+        ...referenceNodeIds.map((assetNodeId, index) => ({
+          id: `agent-reference-edge-${index}`,
+          kind: "reference" as const,
+          from: { nodeId: assetNodeId, portId: BOARD_PORT_IDS.assetOut, portKind: "asset" as const },
+          to: { nodeId: generateNodeId, portId: BOARD_PORT_IDS.referenceIn, portKind: "asset" as const },
+          createdAt: "",
+        })),
+      ],
+      kind: "video-generate",
+      model,
+      nodeId: generateNodeId,
+      sizeKey: `${defaults.aspectRatio}|${defaults.videoResolution ?? ""}`,
+    });
+    boardController.updateGenerateNode(generateNodeId, { errorMessage: undefined, resultStackKey, status: "processing" });
     const didStart = await generateManualVideo({
       boardId: resolvedBoardId,
       boardNodeId: generateNodeId,
+      boardResultStackKey: resultStackKey,
       model,
       prompt: promptFromAgent,
       referenceImage: references[0]?.url ?? null,
@@ -1855,7 +2019,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   }, [addAssetToBoard, pushWorkspaceNotice, resolvedBoardId]);
 
   const useSelectedBoardAssetAsReference = () => {
-    const references = activeBoardReference(boardController.board.nodes, boardController.selectedNodeId, resolveBoardReferenceUrl);
+    const references = activeBoardReference(boardController.board.nodes, boardController.selectedNodeId, items, resolveBoardReferenceUrl);
     if (references.length === 0) {
       pushWorkspaceNotice("info", "请选择一个图片资产节点");
       return;
@@ -1866,7 +2030,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   };
 
   const useBoardAssetAsReference = useCallback((nodeId: string) => {
-    const references = activeBoardReference(boardController.board.nodes, nodeId, resolveBoardReferenceUrl);
+    const references = activeBoardReference(boardController.board.nodes, nodeId, items, resolveBoardReferenceUrl);
     if (references.length === 0) {
       pushWorkspaceNotice("info", "请选择一个图片资产节点");
       return;
@@ -1874,10 +2038,10 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     setReferenceImage(references[0].url);
     setReferenceImages(references);
     pushWorkspaceNotice("success", "已将节点作为生成参考图");
-  }, [boardController.board.nodes, pushWorkspaceNotice, resolveBoardReferenceUrl, setReferenceImage, setReferenceImages]);
+  }, [boardController.board.nodes, items, pushWorkspaceNotice, resolveBoardReferenceUrl, setReferenceImage, setReferenceImages]);
 
   const useSelectedBoardAssetForAgent = () => {
-    const references = activeBoardReference(boardController.board.nodes, boardController.selectedNodeId, resolveBoardReferenceUrl);
+    const references = activeBoardReference(boardController.board.nodes, boardController.selectedNodeId, items, resolveBoardReferenceUrl);
     if (references.length === 0) {
       pushWorkspaceNotice("info", "请选择一个图片资产节点");
       return;
@@ -1889,7 +2053,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   };
 
   const useBoardAssetForAgent = useCallback((nodeId: string) => {
-    const references = activeBoardReference(boardController.board.nodes, nodeId, resolveBoardReferenceUrl);
+    const references = activeBoardReference(boardController.board.nodes, nodeId, items, resolveBoardReferenceUrl);
     if (references.length === 0) {
       pushWorkspaceNotice("info", "请选择一个图片资产节点");
       return;
@@ -1900,6 +2064,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     setIsAgentDockOpen(true);
   }, [
     boardController.board.nodes,
+    items,
     pushWorkspaceNotice,
     resolveBoardReferenceUrl,
     setAgentReferenceId,
@@ -1932,10 +2097,10 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     const references: ReferenceImageRef[] = boardController.board.edges
       .filter(edge => edge.to.nodeId === nodeId && edge.to.portId === "reference-in")
       .map(edge => boardController.board.nodes.find(item => item.id === edge.from.nodeId))
-      .flatMap(item => boardNodeReferences(item, resolveBoardReferenceUrl));
+      .flatMap(item => boardNodeReferences(item, items, resolveBoardReferenceUrl));
 
     return { node, prompt: resolvedPrompt, references };
-  }, [boardController.board.edges, boardController.board.nodes, resolveBoardReferenceUrl]);
+  }, [boardController.board.edges, boardController.board.nodes, items, resolveBoardReferenceUrl]);
 
   const handleExecuteGenerateNode = useCallback(async (nodeId: string) => {
     try {
@@ -1981,53 +2146,64 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         }
       }
 
-      boardController.updateGenerateNode(nodeId, { status: "processing", errorMessage: undefined, prompt: nextPrompt });
+        const resultStackKey = resultStackKeyForNode(node, boardController.board.edges);
+        const shouldStartNewStack = node.resultStackKey !== resultStackKey;
+        boardController.updateGenerateNode(nodeId, {
+          errorMessage: undefined,
+          prompt: nextPrompt,
+          resultAssetId: shouldStartNewStack ? undefined : node.resultAssetId,
+          resultAssetIds: shouldStartNewStack ? [] : node.resultAssetIds,
+          resultStackKey,
+          status: "processing",
+        });
 
-      if (node.kind === "image-generate") {
-        const nodeImageResolution = node.imageResolution === "custom" ? node.customImageResolution.trim() : node.imageResolution;
-        let didStartAny = false;
-        for (let remaining = node.variantCount; remaining > 0; remaining -= 1) {
-          const didStart = await generateManualImage({
-            boardId: resolvedBoardId,
-            boardNodeId: nodeId,
-            imageQuality: node.imageQuality,
-            imageResolution: nodeImageResolution,
-            isCustomImageResolution: node.imageResolution === "custom",
-            model: node.model,
-            prompt: nextPrompt,
-            referenceImage: references[0]?.url ?? null,
-            referenceImages: references,
-            size: node.aspectRatio,
-            thinkingLevel: node.thinkingLevel,
-          });
-          if (!didStart) break;
-          didStartAny = true;
-        }
-        if (!didStartAny) {
-          boardController.updateGenerateNode(nodeId, {
-            errorMessage: "图片生成请求未启动，请检查节点参数",
-            status: "failed",
-          });
-        }
-      } else {
-        let didStartAny = false;
-        for (let remaining = node.variantCount; remaining > 0; remaining -= 1) {
-          const didStart = await generateManualVideo({
-            boardId: resolvedBoardId,
-            boardNodeId: nodeId,
-            model: node.model,
-            prompt: nextPrompt,
-            referenceImage: references[0]?.url ?? null,
-            referenceImages: references,
-            size: node.aspectRatio,
-            videoDuration: node.videoDuration,
-            videoPreset: node.videoPreset,
-            videoReferenceMode: node.videoReferenceMode ?? getVideoModelCapabilities(node.model).referenceMode,
-            videoResolution: node.videoResolution,
-          });
-          if (!didStart) break;
-          didStartAny = true;
-        }
+        if (node.kind === "image-generate") {
+          const nodeImageResolution = node.imageResolution === "custom" ? node.customImageResolution.trim() : node.imageResolution;
+          let didStartAny = false;
+          for (let remaining = node.variantCount; remaining > 0; remaining -= 1) {
+            const didStart = await generateManualImage({
+              boardId: resolvedBoardId,
+              boardNodeId: nodeId,
+              boardResultStackKey: resultStackKey,
+              imageQuality: node.imageQuality,
+              imageResolution: nodeImageResolution,
+              isCustomImageResolution: node.imageResolution === "custom",
+              model: node.model,
+              prompt: nextPrompt,
+              referenceImage: references[0]?.url ?? null,
+              referenceImages: references,
+              size: node.aspectRatio,
+              thinkingLevel: node.thinkingLevel,
+            });
+            if (!didStart) break;
+            didStartAny = true;
+          }
+          if (!didStartAny) {
+            boardController.updateGenerateNode(nodeId, {
+              errorMessage: "图片生成请求未启动，请检查节点参数",
+              status: "failed",
+            });
+          }
+        } else {
+          let didStartAny = false;
+          for (let remaining = node.variantCount; remaining > 0; remaining -= 1) {
+            const didStart = await generateManualVideo({
+              boardId: resolvedBoardId,
+              boardNodeId: nodeId,
+              boardResultStackKey: resultStackKey,
+              model: node.model,
+              prompt: nextPrompt,
+              referenceImage: references[0]?.url ?? null,
+              referenceImages: references,
+              size: node.aspectRatio,
+              videoDuration: node.videoDuration,
+              videoPreset: node.videoPreset,
+              videoReferenceMode: node.videoReferenceMode ?? getVideoModelCapabilities(node.model).referenceMode,
+              videoResolution: node.videoResolution,
+            });
+            if (!didStart) break;
+            didStartAny = true;
+          }
         if (!didStartAny) {
           boardController.updateGenerateNode(nodeId, {
             errorMessage: "视频生成请求未启动，请检查节点参数",
@@ -2060,7 +2236,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     const references = boardController.board.edges
       .filter(edge => edge.to.nodeId === nodeId && edge.to.portId === "agent-context-in")
       .map(edge => boardController.board.nodes.find(item => item.id === edge.from.nodeId))
-      .flatMap(item => boardNodeReferences(item, resolveBoardReferenceUrl))
+      .flatMap(item => boardNodeReferences(item, items, resolveBoardReferenceUrl))
       .slice(0, IMAGE_REFERENCE_LIMIT);
 
     setAgentReferences(references);
@@ -2072,6 +2248,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   }, [
     boardController.board.edges,
     boardController.board.nodes,
+    items,
     pushWorkspaceNotice,
     resolveBoardReferenceUrl,
     setAgentReferenceId,
@@ -2108,6 +2285,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       if (sourceBoardNodeId) {
         if (item.status === "pending" || item.status === "processing") {
           const sourceNode = findGenerateNodeById(boardController.board.nodes, sourceBoardNodeId);
+          if (sourceNode && !isSourceStackItem(item, sourceNode)) continue;
           if (sourceNode && (sourceNode.status !== "processing" || sourceNode.errorMessage)) {
             boardController.updateGenerateNode(sourceBoardNodeId, {
               errorMessage: undefined,
@@ -2123,42 +2301,25 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       if (sourceBoardNodeId && item.status === "complete") {
         const sourceNode = findGenerateNodeById(boardController.board.nodes, sourceBoardNodeId);
         if (!sourceNode) continue;
+        if (!isSourceStackItem(item, sourceNode)) continue;
         handledBoardItems.add(item.id);
-        const nextStatus = nextSourceNodeStatus(items, sourceBoardNodeId, item.status);
-        const existingAssetNode = findBoardAssetNodeByAssetId(boardController.board.nodes, item.id);
-        if (existingAssetNode) {
-          boardController.updateGenerateNode(sourceBoardNodeId, {
-            resultAssetId: item.id,
-            status: nextStatus,
-          });
-          boardController.connectPorts(
-            { nodeId: sourceBoardNodeId, portId: "result-out", portKind: "result" },
-            { nodeId: existingAssetNode.id, portId: "asset-in", portKind: "asset" },
-          );
-          continue;
-        }
-        if (sourceNode?.resultAssetId === item.id) continue;
-        const resultIndex = completedSourceItemIndex(items, sourceBoardNodeId, item.id);
-        const assetNodeId = addAssetToBoard(
-          item,
-          resultAssetPosition(sourceNode, resultIndex),
-        );
+        const nextStatus = nextSourceNodeStatus(items, sourceNode, item.status);
+        const resultAssetIds = sourceStackResultAssetIds(items, sourceNode, item.id);
+        const activeResultAssetId = resultAssetIds[resultAssetIds.length - 1] ?? item.id;
         boardController.updateGenerateNode(sourceBoardNodeId, {
-          resultAssetId: item.id,
+          resultAssetId: activeResultAssetId,
+          resultAssetIds,
           status: nextStatus,
         });
-        boardController.connectPorts(
-          { nodeId: sourceBoardNodeId, portId: "result-out", portKind: "result" },
-          { nodeId: assetNodeId, portId: "asset-in", portKind: "asset" },
-        );
         continue;
       }
 
       if (sourceBoardNodeId && item.status === "failed") {
         const sourceNode = findGenerateNodeById(boardController.board.nodes, sourceBoardNodeId);
         if (!sourceNode) continue;
+        if (!isSourceStackItem(item, sourceNode)) continue;
         handledBoardItems.add(item.id);
-        const nextStatus = nextSourceNodeStatus(items, sourceBoardNodeId, item.status);
+        const nextStatus = nextSourceNodeStatus(items, sourceNode, item.status);
         boardController.updateGenerateNode(sourceBoardNodeId, {
           errorMessage: nextStatus === "failed" ? item.errorMessage ?? "生成失败" : undefined,
           status: nextStatus,
@@ -2166,7 +2327,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         continue;
       }
     }
-  }, [addAssetToBoard, boardAssetsLoading, boardController, items]);
+  }, [boardAssetsLoading, boardController, items]);
 
   const handleClearProject = async () => {
     if (!(await confirmAction({
@@ -2514,6 +2675,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onEditAssetImage={editBoardAssetImage}
         onExecuteGenerateNode={handleExecuteGenerateNode}
         onImportBoardFiles={handleImportBoardFiles}
+        onOpenFullscreen={setFullscreenItem}
         onOpenSettings={handleOpenSettings}
         onRenameBoard={renameBoardPage}
         onSelectBoard={handleSelectBoard}
@@ -2646,10 +2808,12 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
       <FullscreenPreview
         item={fullscreenItem}
+        items={items.filter(item => item.status === "complete")}
         onCaptureVideoFrame={(item, frame) =>
           handleCaptureVideoFrame(boardController.selectedNodeId ?? "", item, frame)
         }
         onClose={() => setFullscreenItem(null)}
+        onSelectItem={setFullscreenItem}
       />
       {isMaskOpen && (
         <CanvasMaskEditor

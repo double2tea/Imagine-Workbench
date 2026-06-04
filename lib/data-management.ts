@@ -393,12 +393,15 @@ export function collectBoardAssetIds(boards: BoardDocument[]): Set<string> {
   for (const board of boards) {
     for (const node of board.nodes) {
       if (node.kind === "asset") ids.add(node.asset.assetId);
-      if (node.kind === "reference-group") {
-        for (const reference of node.references) ids.add(reference.assetId);
-      }
-      if ((node.kind === "image-generate" || node.kind === "video-generate") && node.resultAssetId) {
-        ids.add(node.resultAssetId);
-      }
+        if (node.kind === "reference-group") {
+          for (const reference of node.references) ids.add(reference.assetId);
+        }
+        if ((node.kind === "image-generate" || node.kind === "video-generate") && node.resultAssetId) {
+          ids.add(node.resultAssetId);
+        }
+        if (node.kind === "image-generate" || node.kind === "video-generate") {
+          for (const assetId of node.resultAssetIds ?? []) ids.add(assetId);
+        }
     }
   }
   return ids;
@@ -613,6 +616,7 @@ function parseAssetRecord(value: unknown, index: number): WorkspaceBackupAssetRe
     generationRequest: parseGenerationRequest(value.generationRequest),
     maskOriginalId: readOptionalString(value, "maskOriginalId"),
     sourceBoardNodeId: readOptionalString(value, "sourceBoardNodeId"),
+    sourceBoardResultStackKey: readOptionalString(value, "sourceBoardResultStackKey"),
     scope: value.scope === "board" ? "board" : "workspace",
     boardId: typeof value.boardId === "string" ? value.boardId : "",
     hasBlob:
@@ -750,13 +754,15 @@ function parseBoardNode(value: unknown): BoardNode {
       model: readString(value, "model"),
       aspectRatio: readString(value, "aspectRatio"),
       customImageResolution: readString(value, "customImageResolution"),
-      imageQuality: readOptionalString(value, "imageQuality"),
-      imageResolution: readString(value, "imageResolution"),
-      thinkingLevel: readOptionalString(value, "thinkingLevel"),
-      variantCount: readVariantCount(value, "variantCount"),
-      status: readGenerationStatus(value, "status"),
-      resultAssetId: readOptionalString(value, "resultAssetId"),
-      errorMessage: readOptionalString(value, "errorMessage"),
+        imageQuality: readOptionalString(value, "imageQuality"),
+        imageResolution: readString(value, "imageResolution"),
+        thinkingLevel: readOptionalString(value, "thinkingLevel"),
+        variantCount: readVariantCount(value, "variantCount"),
+        status: readGenerationStatus(value, "status"),
+        resultAssetId: readOptionalString(value, "resultAssetId"),
+        resultAssetIds: readOptionalStringArray(value, "resultAssetIds"),
+        resultStackKey: readOptionalString(value, "resultStackKey"),
+        errorMessage: readOptionalString(value, "errorMessage"),
     };
   }
   if (kind === "video-generate") {
@@ -767,13 +773,15 @@ function parseBoardNode(value: unknown): BoardNode {
       model: readString(value, "model"),
       aspectRatio: readString(value, "aspectRatio"),
       videoDuration: readOptionalString(value, "videoDuration"),
-      videoPreset: readOptionalString(value, "videoPreset"),
-      videoReferenceMode: readVideoReferenceMode(value.videoReferenceMode),
-      videoResolution: readOptionalString(value, "videoResolution"),
-      variantCount: readVariantCount(value, "variantCount"),
-      status: readGenerationStatus(value, "status"),
-      resultAssetId: readOptionalString(value, "resultAssetId"),
-      errorMessage: readOptionalString(value, "errorMessage"),
+        videoPreset: readOptionalString(value, "videoPreset"),
+        videoReferenceMode: readVideoReferenceMode(value.videoReferenceMode),
+        videoResolution: readOptionalString(value, "videoResolution"),
+        variantCount: readVariantCount(value, "variantCount"),
+        status: readGenerationStatus(value, "status"),
+        resultAssetId: readOptionalString(value, "resultAssetId"),
+        resultAssetIds: readOptionalStringArray(value, "resultAssetIds"),
+        resultStackKey: readOptionalString(value, "resultStackKey"),
+        errorMessage: readOptionalString(value, "errorMessage"),
     };
   }
   if (kind === "agent") return { ...base, kind, instruction: readText(value, "instruction") };
@@ -841,10 +849,15 @@ function validateBoardAssetReferences(boards: BoardDocument[], assetIds: Readonl
           }
         }
       }
-      if ((node.kind === "image-generate" || node.kind === "video-generate") && node.resultAssetId && !assetIds.has(node.resultAssetId)) {
-        throw new Error(`画板 ${board.title} 生成节点引用缺失结果资产 ${node.resultAssetId}`);
+        if ((node.kind === "image-generate" || node.kind === "video-generate") && node.resultAssetId && !assetIds.has(node.resultAssetId)) {
+          throw new Error(`画板 ${board.title} 生成节点引用缺失结果资产 ${node.resultAssetId}`);
+        }
+        if (node.kind === "image-generate" || node.kind === "video-generate") {
+          for (const assetId of node.resultAssetIds ?? []) {
+            if (!assetIds.has(assetId)) throw new Error(`画板 ${board.title} 生成节点引用缺失结果资产 ${assetId}`);
+          }
+        }
       }
-    }
   }
 }
 

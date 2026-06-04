@@ -2,8 +2,9 @@
 
 import { memo } from "react";
 import { Handle, Position, useConnection, type Node, type NodeProps } from "@xyflow/react";
-import { ImagePlus, Layers, Trash2, Video } from "lucide-react";
+import { ImagePlus, Layers, Music, Trash2, Video } from "lucide-react";
 import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
+import PreviewImage from "@/components/PreviewImage";
 import type {
   BoardAgentNode,
   BoardGenerateNodeUpdate,
@@ -17,8 +18,9 @@ import GenerateBoardNode, { type BoardGenerateInputSummary, type BoardGenerateTa
 import NoteBoardNode from "@/components/board/NoteBoardNode";
 import PromptBoardNode from "@/components/board/PromptBoardNode";
 import ReferenceGroupBoardNode from "@/components/board/ReferenceGroupBoardNode";
-import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import type { StorageItem } from "@/lib/db";
+import { getMediaReferenceType } from "@/lib/media-references";
+import type { BoardPromptReference } from "@/lib/board/prompt-references";
 import { BOARD_PORT_IDS, getBoardNodePortDefinitions } from "@/lib/board/ports";
 import type { CapturedVideoFrame } from "@/lib/video-frame";
 
@@ -26,14 +28,15 @@ export interface BoardFlowNodeData extends Record<string, unknown> {
   boardId: string;
   compareReferenceUrl?: string | null;
   generateInputSummary?: BoardGenerateInputSummary;
-  generateReferences: ReferenceImageRef[];
+  generateReferences: BoardPromptReference[];
   generateTaskSummary?: BoardGenerateTaskSummary;
   hasResultConnection?: boolean;
   node: BoardNodeModel;
   onDelete: (nodeId: string) => void;
   onCancelGenerate: (nodeId: string) => void;
   onOpenAssetCompare?: (nodeId: string) => void;
-  promptReferences: ReferenceImageRef[];
+  onOpenFullscreen: (item: StorageItem) => void;
+  promptReferences: BoardPromptReference[];
   onCaptureVideoFrame: (nodeId: string, item: StorageItem, frame: CapturedVideoFrame) => void | Promise<void>;
   onEditAssetImage: (nodeId: string) => void;
   onExecuteGenerate: (nodeId: string) => void;
@@ -41,12 +44,15 @@ export interface BoardFlowNodeData extends Record<string, unknown> {
   onRemoveReferenceGroupItem: (nodeId: string, assetId: string) => void;
   onSendAgent: (nodeId: string) => void;
   onSendAssetToAgent: (nodeId: string) => void;
+  onSelectPromptReference: (nodeId: string, reference: BoardPromptReference) => void;
+  onSelectGenerateResult: (nodeId: string, assetId: string) => void;
   onSetAssetAsReference: (nodeId: string) => void;
   onUpdateReferenceGroupItemRole: (nodeId: string, assetId: string, role: BoardReferenceRole) => void;
   onUpdateAgent: (nodeId: string, instruction: string) => void;
   onUpdateGenerate: (nodeId: string, input: BoardGenerateNodeUpdate) => void;
   onUpdateNote: (nodeId: string, body: string) => void;
   onUpdatePrompt: (nodeId: string, prompt: string) => void;
+  resultItems: StorageItem[];
 }
 
 export type BoardFlowNode = Node<BoardFlowNodeData, "board">;
@@ -111,6 +117,48 @@ function nodeBodyOverflowClass(kind: BoardNodeModel["kind"]): string {
   return "overflow-hidden";
 }
 
+function GenerateReferenceShelf({
+  references,
+}: {
+  references: BoardGenerateInputSummary["referencePreviews"];
+}) {
+  if (references.length === 0) return null;
+  return (
+    <div className="nodrag pointer-events-none absolute -top-12 left-0 z-40 flex max-w-full gap-1 overflow-hidden rounded-lg border border-blue-400/20 bg-slate-950/88 p-1 shadow-xl backdrop-blur">
+      {references.slice(0, 6).map((reference, index) => {
+        const type = getMediaReferenceType(reference);
+        return (
+          <div
+            key={`${reference.id}:${reference.url}:${index}`}
+            className="relative h-9 w-9 shrink-0 overflow-hidden rounded-md border border-white/15 bg-slate-900"
+            title={reference.role ? `参考 ${index + 1} · ${reference.role}` : `参考 ${index + 1}`}
+          >
+            {type === "image" ? (
+              <PreviewImage src={reference.url} alt="" className="h-full w-full object-cover" />
+            ) : type === "video" ? (
+              <div className="flex h-full w-full items-center justify-center">
+                <Video className="h-4 w-4 text-violet-200" />
+              </div>
+            ) : (
+              <div className="flex h-full w-full items-center justify-center">
+                <Music className="h-4 w-4 text-cyan-200" />
+              </div>
+            )}
+            <span className="absolute bottom-0 right-0 rounded-tl bg-black/65 px-1 text-[8px] font-semibold text-white">
+              {index + 1}
+            </span>
+          </div>
+        );
+      })}
+      {references.length > 6 ? (
+        <span className="flex h-9 items-center rounded-md border border-white/10 px-2 text-[10px] font-semibold text-blue-100">
+          +{references.length - 6}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
   const { node } = data;
   const connectionInProgress = useConnection(connection => connection.inProgress);
@@ -146,6 +194,9 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
       style={{ height: node.size.height, width: node.size.width }}
     >
       {ports.map(handleForPort)}
+      {selected && (node.kind === "image-generate" || node.kind === "video-generate") ? (
+        <GenerateReferenceShelf references={data.generateInputSummary?.referencePreviews ?? []} />
+      ) : null}
 
       <div className="flex h-9 items-center justify-between gap-2 rounded-t-lg imagine-board-node-header px-3">
         <h2 className="flex min-w-0 items-center gap-2 truncate text-xs font-semibold">
@@ -173,6 +224,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             onCaptureVideoFrame={data.onCaptureVideoFrame}
             onCompare={data.onOpenAssetCompare ? () => data.onOpenAssetCompare?.(node.id) : undefined}
             onEditImage={data.onEditAssetImage}
+            onOpenFullscreen={data.onOpenFullscreen}
             onSendToAgent={data.onSendAssetToAgent}
             onSetAsReference={data.onSetAssetAsReference}
           />
@@ -182,6 +234,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             node={node}
             references={data.promptReferences}
             onChange={prompt => data.onUpdatePrompt(node.id, prompt)}
+            onSelectReference={reference => data.onSelectPromptReference(node.id, reference)}
           />
         )}
         {node.kind === "reference-group" && (
@@ -193,16 +246,20 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
           />
         )}
         {(node.kind === "image-generate" || node.kind === "video-generate") && (
-          <GenerateBoardNode
-            hasResultConnection={data.hasResultConnection}
-            inputSummary={data.generateInputSummary}
+            <GenerateBoardNode
+              hasResultConnection={data.hasResultConnection}
+              inputSummary={data.generateInputSummary}
             node={node}
             references={data.generateReferences}
+            resultItems={data.resultItems}
             taskSummary={data.generateTaskSummary}
             onCancel={() => data.onCancelGenerate(node.id)}
             onExecute={() => data.onExecuteGenerate(node.id)}
+            onOpenResult={data.onOpenFullscreen}
+            onSelectResult={assetId => data.onSelectGenerateResult(node.id, assetId)}
+            onSelectReference={reference => data.onSelectPromptReference(node.id, reference)}
             onUpdate={input => data.onUpdateGenerate(node.id, input)}
-          />
+            />
         )}
         {node.kind === "agent" && (
           <AgentBoardNode
