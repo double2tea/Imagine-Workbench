@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useRef, useState, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight, PanelRight } from "lucide-react";
 
 const BOARD_SIDE_COLLAPSED_KEY = "imagine_board_side_collapsed";
-const BOARD_SIDE_INSPECTOR_HEIGHT_KEY = "imagine_board_inspector_height";
-const DEFAULT_INSPECTOR_HEIGHT = 320;
-const MIN_PANEL_SECTION_HEIGHT = 180;
+const BOARD_SIDE_TAB_KEY = "imagine_board_side_tab";
+
+export type BoardSidePanelTab = "inspector" | "assets";
 
 interface BoardSidePanelProps {
   assetCount: number;
@@ -20,23 +20,27 @@ function readCollapsedPreference(): boolean {
   return window.localStorage.getItem(BOARD_SIDE_COLLAPSED_KEY) === "1";
 }
 
-function readInspectorHeightPreference(): number {
-  if (typeof window === "undefined") return DEFAULT_INSPECTOR_HEIGHT;
-  const stored = Number(window.localStorage.getItem(BOARD_SIDE_INSPECTOR_HEIGHT_KEY));
-  return Number.isFinite(stored) && stored >= MIN_PANEL_SECTION_HEIGHT ? stored : DEFAULT_INSPECTOR_HEIGHT;
-}
-
-function clampInspectorHeight(value: number, panelHeight: number): number {
-  const maxHeight = Math.max(MIN_PANEL_SECTION_HEIGHT, panelHeight - MIN_PANEL_SECTION_HEIGHT);
-  return Math.min(Math.max(value, MIN_PANEL_SECTION_HEIGHT), maxHeight);
+function readTabPreference(): BoardSidePanelTab {
+  if (typeof window === "undefined") return "inspector";
+  const stored = window.localStorage.getItem(BOARD_SIDE_TAB_KEY);
+  return stored === "assets" ? "assets" : "inspector";
 }
 
 export default function BoardSidePanel({ assetCount, assetsPanel, inspectorPanel, revealKey }: BoardSidePanelProps) {
-  const panelBodyRef = useRef<HTMLDivElement | null>(null);
   const [collapsedPreference, setCollapsedPreference] = useState(readCollapsedPreference);
-  const [inspectorHeight, setInspectorHeight] = useState(readInspectorHeightPreference);
+  const [activeTab, setActiveTab] = useState<BoardSidePanelTab>(readTabPreference);
   const [mobileOpen, setMobileOpen] = useState(false);
   const collapsed = collapsedPreference && !revealKey;
+
+  useEffect(() => {
+    if (!revealKey) return;
+    setActiveTab("inspector");
+  }, [revealKey]);
+
+  const selectTab = (tab: BoardSidePanelTab) => {
+    setActiveTab(tab);
+    window.localStorage.setItem(BOARD_SIDE_TAB_KEY, tab);
+  };
 
   const toggleCollapsed = () => {
     setCollapsedPreference(() => {
@@ -46,52 +50,34 @@ export default function BoardSidePanel({ assetCount, assetsPanel, inspectorPanel
     });
   };
 
-  const handleDividerPointerDown = useCallback((event: PointerEvent<HTMLButtonElement>) => {
-    const panelBody = panelBodyRef.current;
-    if (!panelBody) return;
-    event.preventDefault();
-    const panelHeight = panelBody.getBoundingClientRect().height;
-    const startY = event.clientY;
-    const startHeight = inspectorHeight;
-
-    const handlePointerMove = (moveEvent: globalThis.PointerEvent): void => {
-      const nextHeight = clampInspectorHeight(startHeight + moveEvent.clientY - startY, panelHeight);
-      setInspectorHeight(nextHeight);
-    };
-    const handlePointerUp = (upEvent: globalThis.PointerEvent): void => {
-      const nextHeight = clampInspectorHeight(startHeight + upEvent.clientY - startY, panelHeight);
-      setInspectorHeight(nextHeight);
-      window.localStorage.setItem(BOARD_SIDE_INSPECTOR_HEIGHT_KEY, String(Math.round(nextHeight)));
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", handlePointerUp);
-    };
-
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", handlePointerUp, { once: true });
-  }, [inspectorHeight]);
-
-  const panelBody = (
-    <div ref={panelBodyRef} className="imagine-board-side-panel-body flex min-h-0 min-w-0 flex-1 flex-col">
-      <section className="min-h-[180px] shrink-0 overflow-y-auto" style={{ flexBasis: inspectorHeight }}>
-        {inspectorPanel}
-      </section>
+  const tabBar = (
+    <div className="imagine-board-side-tabs shrink-0 grid grid-cols-2 gap-1 p-2">
       <button
         type="button"
-        className="h-2 shrink-0 cursor-row-resize border-y border-[var(--iw-border)] bg-[var(--iw-panel-soft)] transition hover:bg-[var(--iw-panel)]"
-        title="调整检查器和本地资产高度"
-        aria-label="调整检查器和本地资产高度"
-        onPointerDown={handleDividerPointerDown}
-      />
-      <section className="flex min-h-0 flex-1 flex-col">
-        <div className="shrink-0 px-3 py-2">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--iw-faint)]">
-            本地资产 <span className="font-mono normal-case tracking-normal text-[var(--iw-muted)]">{assetCount}</span>
-          </p>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {assetsPanel}
-        </div>
-      </section>
+        data-active={activeTab === "inspector"}
+        className="imagine-board-side-tab px-2"
+        onClick={() => selectTab("inspector")}
+      >
+        检查器
+      </button>
+      <button
+        type="button"
+        data-active={activeTab === "assets"}
+        className="imagine-board-side-tab px-2"
+        onClick={() => selectTab("assets")}
+      >
+        本地资产
+        <span className="ml-1 font-mono text-[10px] font-normal text-[var(--iw-muted)]">{assetCount}</span>
+      </button>
+    </div>
+  );
+
+  const panelBody = (
+    <div className="imagine-board-side-panel-body flex min-h-0 min-w-0 flex-1 flex-col">
+      {tabBar}
+      <div className="imagine-board-side-panel-scroll min-h-0 flex-1 overflow-y-auto">
+        {activeTab === "inspector" ? inspectorPanel : assetsPanel}
+      </div>
     </div>
   );
 
@@ -127,7 +113,7 @@ export default function BoardSidePanel({ assetCount, assetsPanel, inspectorPanel
           type="button"
           onClick={toggleCollapsed}
           className="imagine-board-side-collapse-btn hidden lg:flex"
-          title={collapsed ? "展开检查器" : "收起检查器"}
+          title={collapsed ? "展开侧栏" : "收起侧栏"}
           aria-expanded={!collapsed}
         >
           {collapsed ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}

@@ -96,6 +96,11 @@ interface BoardWorkspaceProps {
   onSendAssetToAgent: (nodeId: string) => void;
   onSendAgentNode: (nodeId: string) => void;
   onSetAssetAsReference: (nodeId: string) => void;
+  assetCompareRequest?: { originalUrl: string; resultUrl: string } | null;
+  focusNodeRequest?: { nodeId: string; seq: number } | null;
+  onAssetCompareRequestHandled?: () => void;
+  onFocusNodeRequestHandled?: () => void;
+  onSelectedNodeIdsChange?: (nodeIds: string[]) => void;
 }
 
 type BoardFlowEdge = Edge<{ kind: BoardEdgeKind; processing?: boolean }, "smoothstep">;
@@ -551,6 +556,11 @@ export default function BoardWorkspace({
   onSendAssetToAgent,
   onSendAgentNode,
   onSetAssetAsReference,
+  assetCompareRequest = null,
+  focusNodeRequest = null,
+  onAssetCompareRequestHandled,
+  onFocusNodeRequestHandled,
+  onSelectedNodeIdsChange,
 }: BoardWorkspaceProps) {
   const themeMode = useThemeModeSnapshot();
   const flowInstanceRef = useRef<ReactFlowInstance<BoardFlowNode, BoardFlowEdge> | null>(null);
@@ -564,9 +574,14 @@ export default function BoardWorkspace({
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
   const [trashedNodes, setTrashedNodes] = useState<BoardTrashEntry[]>([]);
   const [assetCompare, setAssetCompare] = useState<{ originalUrl: string; resultUrl: string } | null>(null);
+  const [flowReady, setFlowReady] = useState(false);
   const updateSelectedNodeIds = useCallback((nextIds: string[]): void => {
-    setSelectedNodeIds(currentIds => (sameStringList(currentIds, nextIds) ? currentIds : nextIds));
-  }, []);
+    setSelectedNodeIds(currentIds => {
+      if (sameStringList(currentIds, nextIds)) return currentIds;
+      onSelectedNodeIdsChange?.(nextIds);
+      return nextIds;
+    });
+  }, [onSelectedNodeIdsChange]);
   const galleryReferenceFingerprint = useMemo(
     () => buildGalleryReferenceFingerprint(galleryItems),
     [galleryItems],
@@ -638,6 +653,28 @@ export default function BoardWorkspace({
     setQuickInsertMenu(null);
     setNodeContextMenu(null);
   }, []);
+
+  useEffect(() => {
+    if (!focusNodeRequest) return;
+    const instance = flowInstanceRef.current;
+    if (!flowReady || !instance) return;
+    const node = board.nodes.find(entry => entry.id === focusNodeRequest.nodeId);
+    if (node) {
+      const centerX = node.position.x + node.size.width / 2;
+      const centerY = node.position.y + node.size.height / 2;
+      void instance.setCenter(centerX, centerY, {
+        zoom: Math.max(instance.getZoom(), 0.85),
+        duration: 240,
+      });
+    }
+    onFocusNodeRequestHandled?.();
+  }, [board.nodes, flowReady, focusNodeRequest, onFocusNodeRequestHandled]);
+
+  useEffect(() => {
+    if (!assetCompareRequest) return;
+    setAssetCompare(assetCompareRequest);
+    onAssetCompareRequestHandled?.();
+  }, [assetCompareRequest, onAssetCompareRequestHandled]);
 
   const trashAndDeleteNode = useCallback((nodeId: string) => {
     const node = board.nodes.find(item => item.id === nodeId);
@@ -931,19 +968,8 @@ export default function BoardWorkspace({
   };
 
   const deleteBoardEdge = useCallback((edgeId: string): void => {
-    const edge = board.edges.find(item => item.id === edgeId);
-    if (!edge) {
-      deleteEdge(edgeId);
-      return;
-    }
-    const targetNode = board.nodes.find(node => node.id === edge.to.nodeId);
-    const sourceNode = board.nodes.find(node => node.id === edge.from.nodeId);
-    if (targetNode?.kind === "reference-group" && sourceNode?.kind === "asset") {
-      removeReferenceGroupItem(targetNode.id, sourceNode.asset.assetId);
-      return;
-    }
     deleteEdge(edgeId);
-  }, [board.edges, board.nodes, deleteEdge, removeReferenceGroupItem]);
+  }, [deleteEdge]);
 
   const handleEdgesDelete: OnEdgesDelete<BoardFlowEdge> = edges => {
     for (const edge of edges) deleteBoardEdge(edge.id);
@@ -1457,6 +1483,7 @@ export default function BoardWorkspace({
             onEdgesDelete={handleEdgesDelete}
             onInit={(instance) => {
               flowInstanceRef.current = instance;
+              setFlowReady(true);
             }}
             onMoveEnd={handleMoveEnd}
             onNodeClick={handleNodeClick}

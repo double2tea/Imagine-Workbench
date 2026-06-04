@@ -1,7 +1,17 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Loader2, Maximize2, Paintbrush, Play, Send, Settings } from "lucide-react";
+import {
+  Crosshair,
+  Loader2,
+  Maximize2,
+  Paintbrush,
+  Play,
+  Send,
+  Settings,
+  SlidersHorizontal,
+  Trash2,
+} from "lucide-react";
 import type { StorageItem } from "@/lib/db";
 import {
   getImageAspectRatioFromResolution,
@@ -12,12 +22,15 @@ import {
   type AiProvider,
   type ModelOption,
 } from "@/lib/providers/model-catalog";
+import { getBoardNodePortDefinition } from "@/lib/board/ports";
 import type {
+  BoardEdge,
   BoardGenerateNode,
   BoardGenerateNodeUpdate,
   BoardGenerateVariantCount,
   BoardImageGenerateNode,
   BoardNode,
+  BoardPortRef,
   BoardVideoGenerateNode,
 } from "@/lib/board";
 
@@ -28,15 +41,21 @@ interface ProviderModelGroup {
 }
 
 interface BoardInspectorProps {
+  edge: BoardEdge | undefined;
   imageModelGroups: ProviderModelGroup[];
   incomingCount: number;
   items: StorageItem[];
   node: BoardNode | undefined;
+  nodes: BoardNode[];
   outgoingCount: number;
+  selectedNodeCount: number;
   videoModelGroups: ProviderModelGroup[];
+  onCompareAsset?: () => void;
+  onDeleteEdge: (edgeId: string) => void;
+  onEditAssetImage?: () => void;
   onExecuteGenerate: (nodeId: string) => void;
+  onFocusNode: (nodeId: string) => void;
   onOpenFullscreen: (item: StorageItem | null) => void;
-  onOpenMask: (imageUrl: string, assetId: string) => void;
   onOpenSettings: () => void;
   onSendAssetToAgent: () => void;
   onSyncAssetReference: () => void;
@@ -50,8 +69,47 @@ const monoInputClass = `${inputClass} font-mono`;
 const secondaryButtonClass = "imagine-secondary-action flex h-8 items-center justify-center !rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)] transition hover:bg-[var(--iw-panel)] hover:text-[var(--iw-text)]";
 const infoChipClass = "imagine-meta-chip rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5 text-[10px] font-mono text-[var(--iw-muted)]";
 
+const edgeKindLabels: Record<BoardEdge["kind"], string> = {
+  "agent-context": "Agent 上下文",
+  prompt: "提示",
+  reference: "参考",
+  result: "结果",
+};
+
+const nodeKindLabels: Record<BoardNode["kind"], string> = {
+  agent: "Agent",
+  asset: "资产",
+  "image-generate": "图片生成",
+  note: "备注",
+  prompt: "Prompt",
+  "reference-group": "参考组",
+  "video-generate": "视频生成",
+};
+
 function isGenerateNode(node: BoardNode | undefined): node is BoardGenerateNode {
   return node?.kind === "image-generate" || node?.kind === "video-generate";
+}
+
+function truncateText(value: string, maxLength: number): string {
+  const trimmed = value.trim();
+  if (trimmed.length <= maxLength) return trimmed;
+  return `${trimmed.slice(0, maxLength)}…`;
+}
+
+function describePortEndpoint(nodes: BoardNode[], ref: BoardPortRef): string {
+  const boardNode = nodes.find(entry => entry.id === ref.nodeId);
+  const port = boardNode ? getBoardNodePortDefinition(boardNode, ref.portId) : undefined;
+  const nodeLabel = boardNode?.title ?? ref.nodeId.slice(0, 8);
+  const portLabel = port?.label ?? ref.portId;
+  return `${nodeLabel} · ${portLabel}`;
+}
+
+function generateParamSummary(node: BoardGenerateNode): string {
+  if (node.kind === "image-generate") {
+    const resolution = node.imageResolution === "custom" ? node.customImageResolution : node.imageResolution;
+    return `${node.model} / ${resolution} / x${node.variantCount}`;
+  }
+  return `${node.model} / ${node.aspectRatio}${node.videoDuration ? ` / ${node.videoDuration}s` : ""} / x${node.variantCount}`;
 }
 
 function modelSupportsReferences(node: BoardGenerateNode): boolean {
@@ -170,15 +228,108 @@ function VariantCountSelect({
   );
 }
 
+function InspectorFocusButton({ nodeId, onFocusNode }: { nodeId: string; onFocusNode: (nodeId: string) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onFocusNode(nodeId)}
+      className={`${secondaryButtonClass} w-full gap-2 text-xs font-semibold`}
+    >
+      <Crosshair className="h-3.5 w-3.5" />
+      定位到画布
+    </button>
+  );
+}
+
+function EdgeInspector({
+  edge,
+  nodes,
+  onDeleteEdge,
+}: {
+  edge: BoardEdge;
+  nodes: BoardNode[];
+  onDeleteEdge: (edgeId: string) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <p className={infoChipClass}>类型 · {edgeKindLabels[edge.kind]}</p>
+      <div className="space-y-2 text-[11px] leading-5 text-[var(--iw-muted)]">
+        <p>
+          <span className="font-semibold text-[var(--iw-faint)]">从 </span>
+          {describePortEndpoint(nodes, edge.from)}
+        </p>
+        <p>
+          <span className="font-semibold text-[var(--iw-faint)]">到 </span>
+          {describePortEndpoint(nodes, edge.to)}
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={() => onDeleteEdge(edge.id)}
+        className="imagine-danger-action flex h-9 w-full items-center justify-center gap-2 !rounded-lg border border-red-400/30 bg-red-500/10 text-xs font-semibold text-red-200 transition hover:bg-red-500/15"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+        删除连线
+      </button>
+    </div>
+  );
+}
+
+function PromptNodeSummary({ node, onFocusNode }: { node: BoardNode & { kind: "prompt" }; onFocusNode: (nodeId: string) => void }) {
+  return (
+    <div className="space-y-2">
+      <p className="rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2.5 py-2 text-[11px] leading-5 text-[var(--iw-muted)]">
+        {truncateText(node.prompt, 240) || "（空提示词）"}
+      </p>
+      <p className="text-[10px] leading-5 text-[var(--iw-faint)]">在画布节点内编辑；支持 @ 引用与 / 模板。</p>
+      <InspectorFocusButton nodeId={node.id} onFocusNode={onFocusNode} />
+    </div>
+  );
+}
+
+function AgentNodeSummary({ node, onFocusNode }: { node: BoardNode & { kind: "agent" }; onFocusNode: (nodeId: string) => void }) {
+  return (
+    <div className="space-y-2">
+      <p className="rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2.5 py-2 text-[11px] leading-5 text-[var(--iw-muted)]">
+        {truncateText(node.instruction, 240) || "（空任务）"}
+      </p>
+      <p className="text-[10px] leading-5 text-[var(--iw-faint)]">在画布节点内编辑并发送；可连接图片作为上下文。</p>
+      <InspectorFocusButton nodeId={node.id} onFocusNode={onFocusNode} />
+    </div>
+  );
+}
+
+function NoteNodeSummary({ node, onFocusNode }: { node: BoardNode & { kind: "note" }; onFocusNode: (nodeId: string) => void }) {
+  return (
+    <div className="space-y-2">
+      <p className="rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2.5 py-2 text-[11px] leading-5 text-[var(--iw-muted)]">
+        {truncateText(node.body, 320) || "（空备注）"}
+      </p>
+      <InspectorFocusButton nodeId={node.id} onFocusNode={onFocusNode} />
+    </div>
+  );
+}
+
+function ReferenceGroupSummary({ node, onFocusNode }: { node: BoardNode & { kind: "reference-group" }; onFocusNode: (nodeId: string) => void }) {
+  return (
+    <div className="space-y-2">
+      <p className={infoChipClass}>{node.references.length} 张参考 · 在画布内调整顺序与角色</p>
+      <InspectorFocusButton nodeId={node.id} onFocusNode={onFocusNode} />
+    </div>
+  );
+}
+
 function ImageGenerateInspector({
   imageModelGroups,
   node,
   onExecuteGenerate,
+  onFocusNode,
   onUpdateGenerate,
 }: {
   imageModelGroups: ProviderModelGroup[];
   node: BoardImageGenerateNode;
   onExecuteGenerate: (nodeId: string) => void;
+  onFocusNode: (nodeId: string) => void;
   onUpdateGenerate: (nodeId: string, input: BoardGenerateNodeUpdate) => void;
 }) {
   const capabilities = getImageModelCapabilities(node.model);
@@ -192,8 +343,8 @@ function ImageGenerateInspector({
   const supportsReferences = modelSupportsReferences(node);
   const isProcessing = node.status === "processing";
 
-  return (
-    <div className="space-y-3">
+  const advancedFields = (
+    <div className="imagine-panel-disclosure-body">
       <InspectorField title="模型">
         <ModelSelect groups={imageModelGroups} value={node.model} onChange={model => onUpdateGenerate(node.id, imageModelPatch(model, node))} />
       </InspectorField>
@@ -212,9 +363,7 @@ function ImageGenerateInspector({
             value={node.imageResolution === "custom" ? "custom" : node.aspectRatio}
             onChange={event => onUpdateGenerate(node.id, imageAspectPatch(node.model, event.target.value, node))}
             disabled={node.imageResolution === "custom"}
-            className={`${inputClass} ${
-              node.imageResolution === "custom" ? "cursor-not-allowed opacity-70" : ""
-            }`}
+            className={`${inputClass} ${node.imageResolution === "custom" ? "cursor-not-allowed opacity-70" : ""}`}
           >
             {node.imageResolution === "custom" && <option value="custom">自定义尺寸决定比例</option>}
             {capabilities.aspectRatios.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
@@ -266,9 +415,19 @@ function ImageGenerateInspector({
       <InspectorField title="变体">
         <VariantCountSelect value={node.variantCount} onChange={variantCount => onUpdateGenerate(node.id, { variantCount })} />
       </InspectorField>
-      <p className={infoChipClass}>
-        参考图：{supportsReferences ? "支持" : "不支持"}
-      </p>
+      <p className={infoChipClass}>参考图：{supportsReferences ? "支持" : "不支持"}</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-3">
+      <p className={infoChipClass}>{generateParamSummary(node)}</p>
+      <p className="text-[10px] leading-5 text-[var(--iw-faint)]">主执行在画布节点；此处可细调模型参数。</p>
+      <InspectorFocusButton nodeId={node.id} onFocusNode={onFocusNode} />
+      <details className="imagine-panel-disclosure">
+        <summary className="imagine-panel-disclosure-summary">高级参数</summary>
+        {advancedFields}
+      </details>
       <button type="button" onClick={() => onExecuteGenerate(node.id)} disabled={isProcessing} className={`imagine-primary-action flex !h-9 min-h-0 w-full items-center justify-center gap-2 !rounded-lg text-xs font-semibold transition ${isProcessing ? "bg-[var(--iw-panel-soft)] text-[var(--iw-faint)]" : "bg-blue-600 text-white hover:bg-blue-500"}`}>
         {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
         执行图片节点
@@ -280,11 +439,13 @@ function ImageGenerateInspector({
 function VideoGenerateInspector({
   node,
   onExecuteGenerate,
+  onFocusNode,
   onUpdateGenerate,
   videoModelGroups,
 }: {
   node: BoardVideoGenerateNode;
   onExecuteGenerate: (nodeId: string) => void;
+  onFocusNode: (nodeId: string) => void;
   onUpdateGenerate: (nodeId: string, input: BoardGenerateNodeUpdate) => void;
   videoModelGroups: ProviderModelGroup[];
 }) {
@@ -292,8 +453,8 @@ function VideoGenerateInspector({
   const supportsReferences = modelSupportsReferences(node);
   const isProcessing = node.status === "processing";
 
-  return (
-    <div className="space-y-3">
+  const advancedFields = (
+    <div className="imagine-panel-disclosure-body">
       <InspectorField title="模型">
         <ModelSelect groups={videoModelGroups} value={node.model} onChange={model => onUpdateGenerate(node.id, videoModelPatch(model, node))} />
       </InspectorField>
@@ -312,7 +473,7 @@ function VideoGenerateInspector({
         </select>
       </InspectorField>
       {(capabilities.durations.length > 0 || capabilities.resolutions.length > 0 || capabilities.presets.length > 0) && (
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {capabilities.durations.length > 0 && (
             <InspectorField title="时长">
               <select value={node.videoDuration ?? ""} onChange={event => onUpdateGenerate(node.id, { videoDuration: event.target.value })} className={inputClass}>
@@ -342,6 +503,18 @@ function VideoGenerateInspector({
       <p className={infoChipClass}>
         参考图：{supportsReferences ? `${capabilities.referenceMode} / ${capabilities.maxReferenceImages}` : "不支持"}
       </p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-3">
+      <p className={infoChipClass}>{generateParamSummary(node)}</p>
+      <p className="text-[10px] leading-5 text-[var(--iw-faint)]">主执行在画布节点；此处可细调模型参数。</p>
+      <InspectorFocusButton nodeId={node.id} onFocusNode={onFocusNode} />
+      <details className="imagine-panel-disclosure">
+        <summary className="imagine-panel-disclosure-summary">高级参数</summary>
+        {advancedFields}
+      </details>
       <button type="button" onClick={() => onExecuteGenerate(node.id)} disabled={isProcessing} className={`imagine-primary-action flex !h-9 min-h-0 w-full items-center justify-center gap-2 !rounded-lg text-xs font-semibold transition ${isProcessing ? "bg-[var(--iw-panel-soft)] text-[var(--iw-faint)]" : "bg-blue-600 text-white hover:bg-blue-500"}`}>
         {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
         执行视频节点
@@ -351,43 +524,61 @@ function VideoGenerateInspector({
 }
 
 export default function BoardInspector({
+  edge,
   imageModelGroups,
   incomingCount,
   items,
   node,
+  nodes,
   outgoingCount,
+  selectedNodeCount,
   videoModelGroups,
+  onCompareAsset,
+  onDeleteEdge,
+  onEditAssetImage,
   onExecuteGenerate,
+  onFocusNode,
   onOpenFullscreen,
-  onOpenMask,
   onOpenSettings,
   onSendAssetToAgent,
   onSyncAssetReference,
   onUpdateGenerate,
 }: BoardInspectorProps) {
+  const headerTitle = edge ? "连线" : node?.title ?? "检查器";
+
   return (
     <div className="imagine-inspector-shell imagine-control-surface !p-3">
       <div className="mb-3 flex items-start justify-between gap-2">
-        {node ? (
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-[var(--iw-text)]">{node.title}</p>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-[var(--iw-text)]">{headerTitle}</p>
+          {edge ? (
+            <p className="imagine-status-chip mt-1 inline-block font-mono text-[10px]" data-status="complete">
+              {edgeKindLabels[edge.kind]}
+            </p>
+          ) : node ? (
             <p className="imagine-status-chip mt-1 inline-block font-mono text-[10px]" data-status={isGenerateNode(node) ? node.status : "complete"}>
-              {node.kind}
+              {nodeKindLabels[node.kind]}
             </p>
-          </div>
-        ) : (
-          <div className="min-w-0">
-            <p className="text-xs font-semibold text-[var(--iw-text)]">检查器</p>
+          ) : (
             <p className="mt-1 text-[11px] leading-5 text-[var(--iw-muted)]">
-              选中节点或连线后编辑参数；生成与 Agent 动作在节点内执行。
+              选中节点或连线查看详情；Prompt 与 Agent 在画布节点内编辑。
             </p>
-          </div>
-        )}
+          )}
+        </div>
         <button type="button" onClick={onOpenSettings} className="imagine-icon-button flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[var(--iw-border)] text-[var(--iw-faint)] transition" title="设置">
           <Settings className="h-3.5 w-3.5" />
         </button>
       </div>
-      {node ? (
+
+      {selectedNodeCount > 1 && !edge ? (
+        <p className="mb-3 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5 text-[10px] font-mono text-[var(--iw-muted)]">
+          已选 {selectedNodeCount} 个节点 · 检查器显示主选中项
+        </p>
+      ) : null}
+
+      {edge ? (
+        <EdgeInspector edge={edge} nodes={nodes} onDeleteEdge={onDeleteEdge} />
+      ) : node ? (
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-[var(--iw-muted)]">
             <div className="imagine-meta-chip rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5">输入 {incomingCount}</div>
@@ -396,33 +587,50 @@ export default function BoardInspector({
           {node.kind === "asset" && (
             <div className="space-y-2">
               <div className="grid grid-cols-3 gap-2">
-                <button type="button" onClick={() => onOpenFullscreen(items.find(item => item.id === node.asset.assetId) ?? null)} className={secondaryButtonClass}>
+                <button type="button" onClick={() => onOpenFullscreen(items.find(item => item.id === node.asset.assetId) ?? null)} className={secondaryButtonClass} title="全屏">
                   <Maximize2 className="h-3.5 w-3.5" />
                 </button>
-                <button type="button" onClick={() => onOpenMask(node.asset.url, node.asset.assetId)} className={secondaryButtonClass}>
-                  <Paintbrush className="h-3.5 w-3.5" />
-                </button>
-                <button type="button" onClick={onSendAssetToAgent} className={secondaryButtonClass}>
+                {node.asset.type === "image" && onEditAssetImage ? (
+                  <button type="button" onClick={onEditAssetImage} className={secondaryButtonClass} title="编辑图片">
+                    <Paintbrush className="h-3.5 w-3.5" />
+                  </button>
+                ) : (
+                  <span className={`${secondaryButtonClass} cursor-not-allowed opacity-40`} title="仅图片可编辑">
+                    <Paintbrush className="h-3.5 w-3.5" />
+                  </span>
+                )}
+                <button type="button" onClick={onSendAssetToAgent} className={secondaryButtonClass} title="发送到 Agent">
                   <Send className="h-3.5 w-3.5" />
                 </button>
               </div>
+              {node.asset.type === "image" && onCompareAsset ? (
+                <button type="button" onClick={onCompareAsset} className={`${secondaryButtonClass} w-full gap-2 text-xs font-semibold`}>
+                  <SlidersHorizontal className="h-3.5 w-3.5" />
+                  对比参考
+                </button>
+              ) : null}
               <button type="button" onClick={onSyncAssetReference} className={`${secondaryButtonClass} w-full text-xs font-semibold`}>
                 同步到传统参考槽
               </button>
+              <InspectorFocusButton nodeId={node.id} onFocusNode={onFocusNode} />
             </div>
           )}
+          {node.kind === "prompt" && <PromptNodeSummary node={node} onFocusNode={onFocusNode} />}
+          {node.kind === "agent" && <AgentNodeSummary node={node} onFocusNode={onFocusNode} />}
+          {node.kind === "note" && <NoteNodeSummary node={node} onFocusNode={onFocusNode} />}
+          {node.kind === "reference-group" && <ReferenceGroupSummary node={node} onFocusNode={onFocusNode} />}
           {node.kind === "image-generate" && (
-            <ImageGenerateInspector imageModelGroups={imageModelGroups} node={node} onExecuteGenerate={onExecuteGenerate} onUpdateGenerate={onUpdateGenerate} />
+            <ImageGenerateInspector imageModelGroups={imageModelGroups} node={node} onExecuteGenerate={onExecuteGenerate} onFocusNode={onFocusNode} onUpdateGenerate={onUpdateGenerate} />
           )}
           {node.kind === "video-generate" && (
-            <VideoGenerateInspector node={node} onExecuteGenerate={onExecuteGenerate} onUpdateGenerate={onUpdateGenerate} videoModelGroups={videoModelGroups} />
+            <VideoGenerateInspector node={node} onExecuteGenerate={onExecuteGenerate} onFocusNode={onFocusNode} onUpdateGenerate={onUpdateGenerate} videoModelGroups={videoModelGroups} />
           )}
           {isGenerateNode(node) && node.status === "failed" && node.errorMessage && (
             <p className="rounded-md border border-red-400/30 bg-red-500/10 px-2 py-1.5 text-[10px] text-red-200">{node.errorMessage}</p>
           )}
         </div>
       ) : (
-        <p className="text-xs leading-5 text-[var(--iw-faint)]">点击画布节点查看连线与参数；双击空白处可快速插入。</p>
+        <p className="text-xs leading-5 text-[var(--iw-faint)]">点击画布节点或连线；双击空白处可快速插入。切换到「本地资产」可拖入画布。</p>
       )}
     </div>
   );

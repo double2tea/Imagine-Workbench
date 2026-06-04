@@ -20,6 +20,7 @@ import type { AgentBoardContext, AgentBoardNodeSummary } from "@/lib/agent-conte
 import { useAgentController } from "@/hooks/useAgentController";
 import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
 import { useBoardAssetStore } from "@/hooks/useBoardAssetStore";
+import { collectBoardAssetIdsFromNodes } from "@/lib/assets/board-scope";
 import { useBoardState } from "@/hooks/useBoardState";
 import { useClipboardImageImport } from "@/hooks/useClipboardImageImport";
 import { useGenerationActions } from "@/hooks/useGenerationActions";
@@ -63,6 +64,7 @@ import {
   type BoardPoint,
   type BoardSummary,
   type BoardVideoGenerateNode,
+  assetCompareReferenceUrl,
 } from "@/lib/board";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import {
@@ -451,6 +453,14 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const [maskTargetId, setMaskTargetId] = useState("");
   const [maskDestination, setMaskDestination] = useState<MaskDestination>("creative");
   const [fullscreenItem, setFullscreenItem] = useState<StorageItem | null>(null);
+  const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
+  const focusNodeSeqRef = useRef(0);
+  const [focusNodeRequest, setFocusNodeRequest] = useState<{ nodeId: string; seq: number } | null>(null);
+  const requestFocusNode = useCallback((nodeId: string) => {
+    focusNodeSeqRef.current += 1;
+    setFocusNodeRequest({ nodeId, seq: focusNodeSeqRef.current });
+  }, []);
+  const [assetCompareRequest, setAssetCompareRequest] = useState<{ originalUrl: string; resultUrl: string } | null>(null);
   const [cancelingBoardItemIds, setCancelingBoardItemIds] = useState<string[]>([]);
   const handledBoardItemIdsRef = useRef<Set<string>>(new Set());
   const pollingFailuresRef = useRef<Record<string, number>>({});
@@ -1717,12 +1727,21 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   }, [pushWorkspaceNotice, selectBoardPage]);
 
   const selectedBoardNode = boardController.board.nodes.find(node => node.id === boardController.selectedNodeId);
+  const selectedBoardEdge = boardController.board.edges.find(edge => edge.id === boardController.selectedEdgeId);
   const selectedIncomingEdges = selectedBoardNode
     ? boardController.board.edges.filter(edge => edge.to.nodeId === selectedBoardNode.id)
     : [];
   const selectedOutgoingEdges = selectedBoardNode
     ? boardController.board.edges.filter(edge => edge.from.nodeId === selectedBoardNode.id)
     : [];
+  const canvasAssetIds = useMemo(
+    () => collectBoardAssetIdsFromNodes(boardController.board.nodes),
+    [boardController.board.nodes],
+  );
+  const highlightAssetId = selectedBoardNode?.kind === "asset" ? selectedBoardNode.asset.assetId : undefined;
+  const selectedAssetCompareUrl = selectedBoardNode?.kind === "asset" && selectedBoardNode.asset.type === "image"
+    ? assetCompareReferenceUrl(selectedBoardNode.id, boardController.board.nodes, boardController.board.edges)
+    : null;
   const imageModelGroups = getProviderModelGroups(imageModelOptions);
   const videoModelGroups = getProviderModelGroups(videoModelOptions);
   const chatModelGroups = getProviderModelGroups(chatModelOptions);
@@ -1781,6 +1800,11 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         boardSummaries={boardSummariesForToolbar}
         controller={boardController}
         galleryItems={items}
+        assetCompareRequest={assetCompareRequest}
+        focusNodeRequest={focusNodeRequest}
+        onAssetCompareRequestHandled={() => setAssetCompareRequest(null)}
+        onFocusNodeRequestHandled={() => setFocusNodeRequest(null)}
+        onSelectedNodeIdsChange={setSelectedNodeIds}
         onBack={handleBackToWorkbench}
         onCancelGenerateNode={handleCancelGenerateNode}
         onCaptureVideoFrame={handleCaptureVideoFrame}
@@ -1802,15 +1826,28 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           revealKey={boardController.selectedNodeId ?? boardController.selectedEdgeId}
           inspectorPanel={(
             <BoardInspector
+              edge={selectedBoardEdge}
               imageModelGroups={imageModelGroups}
               incomingCount={selectedIncomingEdges.length}
               items={items}
               node={selectedBoardNode}
+              nodes={boardController.board.nodes}
               outgoingCount={selectedOutgoingEdges.length}
+              selectedNodeCount={selectedNodeIds.length}
               videoModelGroups={videoModelGroups}
+              onCompareAsset={selectedAssetCompareUrl && selectedBoardNode?.kind === "asset"
+                ? () => setAssetCompareRequest({
+                  originalUrl: selectedAssetCompareUrl,
+                  resultUrl: selectedBoardNode.asset.url,
+                })
+                : undefined}
+              onDeleteEdge={boardController.deleteEdge}
+              onEditAssetImage={selectedBoardNode?.kind === "asset"
+                ? () => editBoardAssetImage(selectedBoardNode.id)
+                : undefined}
               onExecuteGenerate={(nodeId) => void handleExecuteGenerateNode(nodeId)}
+              onFocusNode={requestFocusNode}
               onOpenFullscreen={setFullscreenItem}
-              onOpenMask={(imageUrl, assetId) => launchMaskEditor(imageUrl, assetId)}
               onOpenSettings={() => setShowSettings(true)}
               onSendAssetToAgent={useSelectedBoardAssetForAgent}
               onSyncAssetReference={useSelectedBoardAssetAsReference}
@@ -1820,6 +1857,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           assetsPanel={(
             <BoardSideAssetList
               key={resolvedBoardId}
+              canvasAssetIds={canvasAssetIds}
+              highlightAssetId={highlightAssetId}
               items={items}
               loading={boardAssetsLoading}
               onAddToBoard={addAssetToBoard}

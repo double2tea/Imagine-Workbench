@@ -1076,7 +1076,35 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
   }, [mutateBoard]);
 
   const deleteEdge = useCallback((edgeId: string) => {
-    mutateBoard(currentBoard => touchBoard(currentBoard, currentBoard.nodes, currentBoard.edges.filter(edge => edge.id !== edgeId)));
+    mutateBoard(currentBoard => {
+      const edge = currentBoard.edges.find(item => item.id === edgeId);
+      if (!edge) return currentBoard;
+      const targetNode = currentBoard.nodes.find(node => node.id === edge.to.nodeId);
+      const sourceNode = currentBoard.nodes.find(node => node.id === edge.from.nodeId);
+      if (targetNode?.kind === "reference-group" && sourceNode?.kind === "asset") {
+        const assetId = sourceNode.asset.assetId;
+        const assetNodeIds = currentBoard.nodes
+          .filter(node => node.kind === "asset" && node.asset.assetId === assetId)
+          .map(node => node.id);
+        const updatedAt = nowIso();
+        return touchBoard(
+          currentBoard,
+          currentBoard.nodes.map(node =>
+            node.id === targetNode.id && node.kind === "reference-group"
+              ? { ...node, references: node.references.filter(item => item.assetId !== assetId), updatedAt }
+              : node,
+          ),
+          currentBoard.edges.filter(boardEdge =>
+            !(
+              boardEdge.to.nodeId === targetNode.id &&
+              boardEdge.to.portId === BOARD_PORT_IDS.assetIn &&
+              assetNodeIds.includes(boardEdge.from.nodeId)
+            ),
+          ),
+        );
+      }
+      return touchBoard(currentBoard, currentBoard.nodes, currentBoard.edges.filter(boardEdge => boardEdge.id !== edgeId));
+    });
     setSelectedEdgeId(currentId => (currentId === edgeId ? null : currentId));
   }, [mutateBoard]);
 

@@ -70,7 +70,7 @@ const UI_PREFERENCE_KEYS = [
   "imagine_board_last_insert",
   "imagine_board_handles_hint_seen",
   "imagine_board_side_collapsed",
-  "imagine_board_inspector_height",
+  "imagine_board_side_tab",
 ] as const;
 
 const MANAGED_EXACT_KEYS = [
