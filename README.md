@@ -35,12 +35,14 @@ The current app focuses on a browser-first creative loop:
 
 ## Run Locally
 
-Prerequisite: Node.js.
+Prerequisite: Node.js 24 and pnpm 10.27.0. If pnpm is not installed, enable it with Corepack.
 
 ```bash
-npm install
+corepack enable
+corepack prepare pnpm@10.27.0 --activate
+pnpm install --frozen-lockfile
 cp .env.example .env.local
-npm run dev
+pnpm run dev
 ```
 
 Open the local URL printed by Next.js, normally `http://localhost:3000`.
@@ -275,12 +277,16 @@ Board generation resolves connected image references against the latest asset st
 ## Development Commands
 
 ```bash
-npm run dev
-npm run lint
-npm run build
-npm run start
-npm run test:providers
+pnpm run dev
+pnpm run dev:no-hmr
+pnpm run lint
+pnpm run build
+pnpm run pages:build
+pnpm run start
+pnpm run test:providers
 ```
+
+`pnpm run dev` keeps Fast Refresh/HMR enabled for normal local work. `pnpm run dev:no-hmr` is only for non-interactive agent sessions that intentionally disable file watching while rewriting files rapidly. `pnpm run pages:build` clears prior Next/Vercel output and enables Vercel Corepack support so the Cloudflare adapter uses the `packageManager` version declared in `package.json`.
 
 `next.config.ts` enables standalone output, React strict mode, and strict TypeScript build checking. ESLint is ignored during builds but should still be run during development. For production standalone output, build first and run the generated standalone server when needed.
 
