@@ -2,6 +2,7 @@ import { useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } fr
 import { RefreshCw, Sparkles } from "lucide-react";
 import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
 import ReferenceImagePicker, { type ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
+import PromptReferenceInlineOverlay, { resolvePromptReferenceThumbnails } from "@/components/reference/PromptReferenceThumbnailStrip";
 import { type DraggedReferenceAsset, hasDraggedReferenceAsset } from "@/components/reference/referenceDrag";
 import {
   applyPromptTemplateText,
@@ -108,6 +109,7 @@ export default function ImageGenerationPanel({
   const imageReferenceCountLabel = imageReferenceLimit > 0
     ? `${Math.min(referenceImages.length, imageReferenceLimit)}/${imageReferenceLimit}`
     : String(referenceImages.length);
+  const promptReferenceThumbnails = resolvePromptReferenceThumbnails(prompt, referenceImages, capabilities.referenceMediaTypes);
 
   const handleApplyPromptTemplate = (template: PromptTemplate, mode: PromptTemplateApplyMode): void => {
     if (slashCommand && mode === "insert") {
@@ -161,17 +163,27 @@ export default function ImageGenerationPanel({
 
         <div className="imagine-field-shell relative p-3">
           {atDropdownNode}
-          <textarea
-            value={prompt}
-            onChange={(event) => handlePromptChange(event.target.value, event.target.selectionStart)}
-            onDragOver={(event) => {
-              if (!hasDraggedReferenceAsset(event.dataTransfer)) return;
-              event.dataTransfer.dropEffect = "copy";
-            }}
-            onDrop={onPromptDropAsset}
-            placeholder="写下你想创造的图片奇思妙想... 输入 @ 可引用作品"
-            className="imagine-field-textarea h-24 text-sm leading-6"
-          />
+          <div className="relative">
+            <textarea
+              value={prompt}
+              onChange={(event) => handlePromptChange(event.target.value, event.target.selectionStart)}
+              onDragOver={(event) => {
+                if (!hasDraggedReferenceAsset(event.dataTransfer)) return;
+                event.dataTransfer.dropEffect = "copy";
+              }}
+              onDrop={onPromptDropAsset}
+              placeholder="写下你想创造的图片奇思妙想... 输入 @ 可引用作品"
+              className={`imagine-field-textarea relative z-10 h-24 text-sm leading-6 caret-[var(--iw-text)] ${
+                promptReferenceThumbnails.length > 0 ? "!text-transparent" : ""
+              }`}
+            />
+            <PromptReferenceInlineOverlay
+              acceptedMediaTypes={capabilities.referenceMediaTypes}
+              prompt={prompt}
+              references={referenceImages}
+              className="text-sm leading-6"
+            />
+          </div>
           <div className="imagine-field-shell-footer mt-2 flex items-center justify-between pt-2">
             <span className="hidden sm:inline">拖入资产到此处插入 @图片N | 拖入下方只作为参考图</span>
             <span className="sm:hidden">@ 可引用作品</span>

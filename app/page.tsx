@@ -746,8 +746,12 @@ export default function Home() {
 
   const renderAtDropdown = (type: AtDropdownTarget) => {
     if (type !== "agent-prompt") {
+      const acceptedMediaTypes = type === "image-prompt"
+        ? imageCapabilities.referenceMediaTypes
+        : videoCapabilities.referenceMediaTypes;
       return (
         <PromptReferenceDropdown
+          acceptedMediaTypes={acceptedMediaTypes}
           references={referenceImages}
           search={atDropdown.search}
           onSelect={(index) => handleSelectPromptReference(index, type)}
@@ -1298,7 +1302,13 @@ export default function Home() {
         testProviderConnection={testProviderConnection}
       />
 
-      <FullscreenPreview item={fullscreenItem} onCaptureVideoFrame={handleCaptureVideoFrame} onClose={() => setFullscreenItem(null)} />
+      <FullscreenPreview
+        item={fullscreenItem}
+        items={filteredItems.filter(item => item.status === "complete")}
+        onCaptureVideoFrame={handleCaptureVideoFrame}
+        onClose={() => setFullscreenItem(null)}
+        onSelectItem={setFullscreenItem}
+      />
 
       {/* Inpainting Mask Drawer overlay loader */}
       {isMaskOpen && (

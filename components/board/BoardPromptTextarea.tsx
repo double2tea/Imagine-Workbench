@@ -3,8 +3,9 @@
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import PromptReferenceDropdown from "@/components/reference/PromptReferenceDropdown";
+import PromptReferenceInlineOverlay, { resolvePromptReferenceThumbnails } from "@/components/reference/PromptReferenceThumbnailStrip";
 import { useDebouncedTextCommit } from "@/hooks/useDebouncedTextCommit";
-import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
+import type { BoardPromptReference } from "@/lib/board/prompt-references";
 import { getReferencePromptToken } from "@/hooks/useReferenceState";
 import { registerBoardTextCommit, unregisterBoardTextCommit } from "@/lib/board/text-flush-registry";
 import { detectPromptTemplateSlashCommand, type PromptTemplateSlashCommand } from "@/lib/prompt-templates";
@@ -28,10 +29,12 @@ interface BoardPromptTextareaProps {
   commitId?: string;
   headerRight?: ReactNode;
   onChange: (value: string) => void;
+  onSelectReference?: (reference: BoardPromptReference, index: number) => void;
   onSlashCommand?: (command: PromptTemplateSlashCommand | null) => void;
+  overlayClassName?: string;
   placeholder?: string;
   readOnly?: boolean;
-  references: ReferenceImageRef[];
+  references: BoardPromptReference[];
   value: string;
 }
 
@@ -41,7 +44,9 @@ const BoardPromptTextarea = forwardRef<BoardPromptTextareaHandle, BoardPromptTex
     commitId,
     headerRight,
     onChange,
+    onSelectReference,
     onSlashCommand,
+    overlayClassName = "p-3 pr-20 text-xs leading-5",
     placeholder = "写提示词，输入 @ 引用连线 / 画板 / 库",
     readOnly = false,
     references,
@@ -55,6 +60,7 @@ const BoardPromptTextarea = forwardRef<BoardPromptTextareaHandle, BoardPromptTex
   const [dropdownAnchor, setDropdownAnchor] = useState<{ left: number; top: number; width: number } | null>(null);
   const { flush, getValue, setValue, value: draftValue } = useDebouncedTextCommit(value, onChange);
   const displayValue = readOnly ? value : draftValue;
+  const promptReferenceThumbnails = resolvePromptReferenceThumbnails(displayValue, references);
 
   useEffect(() => {
     if (!commitId || readOnly) return;
@@ -113,9 +119,12 @@ const BoardPromptTextarea = forwardRef<BoardPromptTextareaHandle, BoardPromptTex
     const searchLength = atSearch?.length ?? 0;
     const start = Math.max(0, caret - searchLength - 1);
     const token = getReferencePromptToken(index);
+    const reference = references[index];
+    if (!reference) throw new Error("选择的参考媒体不存在");
     const nextPrompt = `${displayValue.slice(0, start)}${token} ${displayValue.slice(caret)}`;
     const nextCaret = start + `${token} `.length;
     flush(nextPrompt);
+    onSelectReference?.(reference, index);
     setAtSearch(null);
     window.requestAnimationFrame(() => {
       textarea?.focus();
@@ -160,8 +169,13 @@ const BoardPromptTextarea = forwardRef<BoardPromptTextareaHandle, BoardPromptTex
               onSlashCommand?.(null);
             }, 120);
           }}
-          className={className}
+          className={`${className} relative z-10 caret-[var(--iw-text)] ${promptReferenceThumbnails.length > 0 ? "!text-transparent" : ""}`}
           placeholder={placeholder}
+        />
+        <PromptReferenceInlineOverlay
+          prompt={displayValue}
+          references={references}
+          className={overlayClassName}
         />
       </div>
     </div>

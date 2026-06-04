@@ -1,5 +1,7 @@
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import type { BoardEdge, BoardNode } from "@/lib/board/types";
+import type { MediaReferenceType } from "@/lib/media-references";
+import { getVideoModelCapabilities } from "@/lib/providers/model-catalog";
 
 export type BoardPromptReferenceSource = "连线" | "画板" | "库";
 
@@ -32,6 +34,19 @@ export interface BoardGalleryReferenceItem {
 }
 
 const GALLERY_REFERENCE_LIMIT = 24;
+
+function generateNodeReferenceTypes(node: BoardNode | undefined): ReadonlySet<MediaReferenceType> | null {
+  if (node?.kind === "image-generate") return new Set<MediaReferenceType>(["image"]);
+  if (node?.kind === "video-generate") return new Set(getVideoModelCapabilities(node.model).referenceMediaTypes);
+  return null;
+}
+
+function referenceMatchesTypes(
+  reference: Pick<ReferenceImageRef, "type">,
+  acceptedTypes: ReadonlySet<MediaReferenceType> | null,
+): boolean {
+  return !acceptedTypes || acceptedTypes.has(reference.type ?? "image");
+}
 
 function boardNodeReferences(node: BoardNode | undefined): ReferenceImageRef[] {
   if (node?.kind === "asset") {
@@ -78,9 +93,13 @@ function promptReferenceCandidates(nodes: BoardNode[], edges: BoardEdge[], promp
   return uniqueReferences(nodes.flatMap(node => boardNodeReferences(node)));
 }
 
-function boardMediaAssetReferences(nodes: BoardNode[]): BoardPromptReference[] {
+function boardMediaAssetReferences(
+  nodes: BoardNode[],
+  acceptedTypes: ReadonlySet<MediaReferenceType> | null,
+): BoardPromptReference[] {
   return nodes
     .filter((node): node is Extract<BoardNode, { kind: "asset" }> => node.kind === "asset")
+    .filter(node => referenceMatchesTypes(node.asset, acceptedTypes))
     .map(node => ({
       id: node.asset.assetId,
       role: "general" as const,
@@ -90,10 +109,14 @@ function boardMediaAssetReferences(nodes: BoardNode[]): BoardPromptReference[] {
     }));
 }
 
-function galleryReferences(items: BoardGalleryReferenceItem[] | undefined): BoardPromptReference[] {
+function galleryReferences(
+  items: BoardGalleryReferenceItem[] | undefined,
+  acceptedTypes: ReadonlySet<MediaReferenceType> | null,
+): BoardPromptReference[] {
   if (!items?.length) return [];
   return items
     .filter(item => (item.type === "image" || item.type === "video" || item.type === "audio") && item.status === "complete" && item.url.trim().length > 0)
+    .filter(item => referenceMatchesTypes({ type: item.type as MediaReferenceType }, acceptedTypes))
     .slice(0, GALLERY_REFERENCE_LIMIT)
     .map(item => ({
       id: item.id,
@@ -102,6 +125,23 @@ function galleryReferences(items: BoardGalleryReferenceItem[] | undefined): Boar
       url: item.url,
       sourceLabel: "库",
     }));
+}
+
+function acceptedTypesForFocus(
+  nodes: BoardNode[],
+  edges: BoardEdge[],
+  focus: { kind: "prompt"; nodeId: string } | { kind: "generate"; nodeId: string },
+): ReadonlySet<MediaReferenceType> | null {
+  if (focus.kind === "generate") {
+    return generateNodeReferenceTypes(nodes.find(node => node.id === focus.nodeId));
+  }
+  const targetGenerateIds = Array.from(new Set(
+    edges
+      .filter(edge => edge.from.nodeId === focus.nodeId && edge.to.portId === "prompt-in")
+      .map(edge => edge.to.nodeId),
+  ));
+  if (targetGenerateIds.length !== 1) return null;
+  return generateNodeReferenceTypes(nodes.find(node => node.id === targetGenerateIds[0]));
 }
 
 export function buildBoardPromptReferences(input: {
@@ -113,18 +153,21 @@ export function buildBoardPromptReferences(input: {
   const wiredRaw = input.focus.kind === "prompt"
     ? promptReferenceCandidates(input.nodes, input.edges, input.focus.nodeId)
     : generateReferenceCandidates(input.nodes, input.edges, input.focus.nodeId);
+  const acceptedTypes = acceptedTypesForFocus(input.nodes, input.edges, input.focus);
 
-  const wired: BoardPromptReference[] = wiredRaw.map(reference => ({ ...reference, sourceLabel: "连线" }));
+  const wired: BoardPromptReference[] = wiredRaw
+    .filter(reference => referenceMatchesTypes(reference, acceptedTypes))
+    .map(reference => ({ ...reference, sourceLabel: "连线" }));
   const seen = new Set(wired.map(reference => `${reference.id}:${reference.url}`));
 
-  const board = boardMediaAssetReferences(input.nodes).filter(reference => {
+  const board = boardMediaAssetReferences(input.nodes, acceptedTypes).filter(reference => {
     const key = `${reference.id}:${reference.url}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
 
-  const library = galleryReferences(input.galleryItems).filter(reference => {
+  const library = galleryReferences(input.galleryItems, acceptedTypes).filter(reference => {
     const key = `${reference.id}:${reference.url}`;
     if (seen.has(key)) return false;
     seen.add(key);

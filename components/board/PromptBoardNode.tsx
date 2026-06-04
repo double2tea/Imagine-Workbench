@@ -1,8 +1,8 @@
 import { useRef } from "react";
 import BoardPromptTextarea, { type BoardPromptTextareaHandle } from "@/components/board/BoardPromptTextarea";
 import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
-import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import type { BoardPromptNode } from "@/lib/board";
+import type { BoardPromptReference } from "@/lib/board/prompt-references";
 import {
   applyPromptTemplateText,
   insertPromptTemplateText,
@@ -14,10 +14,11 @@ import {
 interface PromptBoardNodeProps {
   node: BoardPromptNode;
   onChange: (prompt: string) => void;
-  references: ReferenceImageRef[];
+  onSelectReference?: (reference: BoardPromptReference, index: number) => void;
+  references: BoardPromptReference[];
 }
 
-export default function PromptBoardNode({ node, onChange, references }: PromptBoardNodeProps) {
+export default function PromptBoardNode({ node, onChange, onSelectReference, references }: PromptBoardNodeProps) {
   const textareaRef = useRef<BoardPromptTextareaHandle | null>(null);
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
   const slashCommandRef = useRef<PromptTemplateSlashCommand | null>(null);
@@ -55,6 +56,7 @@ export default function PromptBoardNode({ node, onChange, references }: PromptBo
       commitId={node.id}
       value={node.prompt}
       onChange={onChange}
+      onSelectReference={onSelectReference}
       onSlashCommand={handleSlashCommand}
       references={references}
       headerRight={<PromptTemplatePicker ref={templatePickerRef} accent="teal" compact onApply={handleApplyPromptTemplate} />}

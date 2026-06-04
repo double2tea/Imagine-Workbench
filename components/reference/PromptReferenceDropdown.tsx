@@ -2,7 +2,12 @@ import { Music } from "lucide-react";
 import PreviewImage from "@/components/PreviewImage";
 import AtDropdownShell, { AtDropdownHeader } from "@/components/reference/AtDropdownShell";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
-import { getMediaReferencePromptToken, getMediaReferenceType, mediaReferenceLabel } from "@/lib/media-references";
+import {
+  getMediaReferencePromptToken,
+  getMediaReferenceType,
+  mediaReferenceLabel,
+  type MediaReferenceType,
+} from "@/lib/media-references";
 import {
   BOARD_PROMPT_REFERENCE_GROUP_ORDER,
   type BoardPromptReference,
@@ -11,6 +16,7 @@ import {
 } from "@/lib/board/prompt-references";
 
 interface PromptReferenceDropdownProps {
+  acceptedMediaTypes?: ReadonlyArray<MediaReferenceType>;
   references: Array<ReferenceImageRef | BoardPromptReference>;
   search: string;
   onSelect: (index: number) => void;
@@ -25,10 +31,13 @@ interface FilteredReferenceItem {
 function filterReferences(
   references: Array<ReferenceImageRef | BoardPromptReference>,
   search: string,
+  acceptedMediaTypes?: ReadonlyArray<MediaReferenceType>,
 ): FilteredReferenceItem[] {
   const query = search.trim().toLowerCase();
+  const acceptedTypeSet = acceptedMediaTypes ? new Set(acceptedMediaTypes) : null;
   return references
     .map((reference, index) => ({ reference, index, token: getMediaReferencePromptToken(index) }))
+    .filter(item => !acceptedTypeSet || acceptedTypeSet.has(getMediaReferenceType(item.reference)))
     .filter(
       item =>
         query.length === 0 ||
@@ -127,8 +136,8 @@ function ReferenceList({
   );
 }
 
-export default function PromptReferenceDropdown({ references, search, onSelect }: PromptReferenceDropdownProps) {
-  const filtered = filterReferences(references, search);
+export default function PromptReferenceDropdown({ acceptedMediaTypes, references, search, onSelect }: PromptReferenceDropdownProps) {
+  const filtered = filterReferences(references, search, acceptedMediaTypes);
 
   if (references.length === 0) {
     return (

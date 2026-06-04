@@ -1,4 +1,4 @@
-import { Check, Clock3, Copy, ImageDown, Music, type LucideIcon, SkipBack, SkipForward, X } from "lucide-react";
+import { Check, Clock3, Copy, Film, ImageDown, Music, type LucideIcon, SkipBack, SkipForward, X } from "lucide-react";
 import { AnimatePresence } from "motion/react";
 import { useRef, useState } from "react";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
@@ -9,8 +9,10 @@ import { getVideoFrameCaptureLabel, type CapturedVideoFrame, type VideoFrameCapt
 
 interface FullscreenPreviewProps {
   item: StorageItem | null;
+  items?: StorageItem[];
   onCaptureVideoFrame: (item: StorageItem, frame: CapturedVideoFrame) => void | Promise<unknown>;
   onClose: () => void;
+  onSelectItem?: (item: StorageItem) => void;
 }
 
 type CopyStatus = "idle" | "copied" | "failed";
@@ -25,10 +27,12 @@ const frameCaptureActions: Array<{
   { icon: SkipForward, mode: "last" },
 ];
 
-export default function FullscreenPreview({ item, onCaptureVideoFrame, onClose }: FullscreenPreviewProps) {
+export default function FullscreenPreview({ item, items = [], onCaptureVideoFrame, onClose, onSelectItem }: FullscreenPreviewProps) {
   const [copyResult, setCopyResult] = useState<CopyResult>(null);
   const [isFrameMenuOpen, setIsFrameMenuOpen] = useState(false);
   const captureVideoFrameRef = useRef<VideoFrameCaptureRequest | null>(null);
+  const previewItems = items.length > 0 ? items : item ? [item] : [];
+  const showPreviewStrip = previewItems.length > 1 && Boolean(onSelectItem);
 
   const copyStatus: CopyStatus =
     copyResult !== null && copyResult.itemId === item?.id ? copyResult.status : "idle";
@@ -118,6 +122,36 @@ export default function FullscreenPreview({ item, onCaptureVideoFrame, onClose }
                 </div>
               )}
             </div>
+            {showPreviewStrip && (
+              <div className="no-scrollbar flex w-full max-w-6xl shrink-0 gap-2 overflow-x-auto rounded-lg border border-slate-800 bg-slate-950/78 px-3 py-2 shadow-xl backdrop-blur">
+                {previewItems.map(previewItem => {
+                  const isActive = previewItem.id === item.id;
+                  return (
+                    <button
+                      key={previewItem.id}
+                      type="button"
+                      onClick={() => onSelectItem?.(previewItem)}
+                      className={`relative h-14 w-20 shrink-0 overflow-hidden rounded-md border bg-slate-900 transition ${
+                        isActive ? "border-cyan-300 ring-2 ring-cyan-400/35" : "border-slate-700 hover:border-slate-500"
+                      }`}
+                      aria-label={`切换到 ${previewItem.prompt || previewItem.id}`}
+                    >
+                      {previewItem.type === "image" ? (
+                        <PreviewImage src={previewItem.url} alt={previewItem.prompt} className="h-full w-full object-cover" />
+                      ) : previewItem.type === "video" ? (
+                        <div className="flex h-full w-full items-center justify-center bg-slate-900">
+                          <Film className="h-5 w-5 text-slate-300" />
+                        </div>
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-slate-900">
+                          <Music className="h-5 w-5 text-slate-300" />
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             <div className="flex w-full max-w-6xl shrink-0 flex-col gap-2 rounded-lg border border-slate-800 bg-slate-950/88 px-3 py-2 text-slate-300 shadow-xl backdrop-blur sm:flex-row sm:items-center sm:justify-between">
               <p className="line-clamp-2 min-w-0 flex-1 text-xs italic leading-5 text-slate-200">
                 &ldquo;{item.prompt}&rdquo;

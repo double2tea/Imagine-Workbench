@@ -1,4 +1,4 @@
-import { Clock3, Download, ImageDown, ImageIcon, Music, Paintbrush, Send, SlidersHorizontal, type LucideIcon, SkipBack, SkipForward, VideoIcon } from "lucide-react";
+import { Clock3, Download, ImageDown, ImageIcon, Maximize2, Music, Paintbrush, Send, SlidersHorizontal, type LucideIcon, SkipBack, SkipForward, VideoIcon } from "lucide-react";
 import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
 import { useRef, useState } from "react";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
@@ -15,6 +15,7 @@ interface AssetBoardNodeProps {
   onCaptureVideoFrame?: (nodeId: string, item: StorageItem, frame: CapturedVideoFrame) => void | Promise<void>;
   onCompare?: () => void;
   onEditImage?: (nodeId: string) => void;
+  onOpenFullscreen?: (item: StorageItem) => void;
   onSendToAgent?: (nodeId: string) => void;
   onSetAsReference?: (nodeId: string) => void;
 }
@@ -62,6 +63,7 @@ export default function AssetBoardNode({
   onCaptureVideoFrame,
   onCompare,
   onEditImage,
+  onOpenFullscreen,
   onSendToAgent,
   onSetAsReference,
 }: AssetBoardNodeProps) {
@@ -116,6 +118,14 @@ export default function AssetBoardNode({
               </button>
             </>
           )}
+          <button
+            type="button"
+            onClick={() => onOpenFullscreen?.(item)}
+            className="imagine-board-asset-action nodrag hover:bg-slate-700 hover:text-white"
+            title="全屏预览"
+          >
+            <Maximize2 className="h-3.5 w-3.5" />
+          </button>
           <a
             href={node.asset.url}
             download={`${node.asset.assetId}.${boardAssetExtension(node.asset)}`}
