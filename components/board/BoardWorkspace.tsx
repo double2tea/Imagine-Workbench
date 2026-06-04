@@ -1257,6 +1257,7 @@ export default function BoardWorkspace({
         variantCount: node.variantCount,
         videoDuration: node.videoDuration,
         videoPreset: node.videoPreset,
+        videoReferenceMode: node.videoReferenceMode,
         videoResolution: node.videoResolution,
       });
       rememberPastedPosition();

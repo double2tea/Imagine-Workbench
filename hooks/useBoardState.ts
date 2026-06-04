@@ -29,6 +29,7 @@ import {
   type BoardReferenceGroupItem,
   type BoardReferenceGroupNode,
   type BoardReferenceRole,
+  type BoardVideoReferenceMode,
   type BoardPromptNode,
   type BoardSize,
   type BoardVideoGenerateNode,
@@ -194,6 +195,7 @@ function cloneBoardNodeForDuplicate(source: BoardNode, stackIndex: number): Boar
         variantCount: source.variantCount,
         videoDuration: source.videoDuration,
         videoPreset: source.videoPreset,
+        videoReferenceMode: source.videoReferenceMode,
         videoResolution: source.videoResolution,
       };
     case "agent":
@@ -332,6 +334,10 @@ function readOptionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim().length > 0 ? value : undefined;
 }
 
+function readVideoReferenceMode(value: unknown): BoardVideoReferenceMode | undefined {
+  return value === "reference" || value === "firstLast" ? value : undefined;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -373,6 +379,7 @@ function defaultVideoParams(model: string, aspectRatio?: string): {
   aspectRatio: string;
   videoDuration?: string;
   videoPreset?: string;
+  videoReferenceMode?: BoardVideoReferenceMode;
   videoResolution?: string;
 } {
   const capabilities = getVideoModelCapabilities(model);
@@ -382,6 +389,7 @@ function defaultVideoParams(model: string, aspectRatio?: string): {
       : firstOptionValue(capabilities.sizes, "auto"),
     videoDuration: capabilities.durations[0]?.value,
     videoPreset: capabilities.presets[0]?.value,
+    videoReferenceMode: capabilities.referenceMode === "none" ? undefined : capabilities.referenceMode,
     videoResolution: capabilities.resolutions[0]?.value,
   };
 }
@@ -460,6 +468,7 @@ function normalizeBoardNode(node: unknown, index: number): BoardNode | null {
       status: normalizeGenerationStatus(node.status),
       videoDuration: readOptionalString(node.videoDuration) ?? defaults.videoDuration,
       videoPreset: readOptionalString(node.videoPreset) ?? defaults.videoPreset,
+      videoReferenceMode: readVideoReferenceMode(node.videoReferenceMode) ?? defaults.videoReferenceMode,
       videoResolution: readOptionalString(node.videoResolution) ?? defaults.videoResolution,
       variantCount: normalizeVariantCount(node.variantCount),
       errorMessage: typeof node.errorMessage === "string" ? node.errorMessage : undefined,
@@ -630,6 +639,7 @@ function createGenerateBoardNode(input: CreateGenerateNodeInput, nodes: BoardNod
     aspectRatio: input.aspectRatio || videoDefaults.aspectRatio,
     videoDuration: input.videoDuration ?? videoDefaults.videoDuration,
     videoPreset: input.videoPreset ?? videoDefaults.videoPreset,
+    videoReferenceMode: input.videoReferenceMode ?? videoDefaults.videoReferenceMode,
     videoResolution: input.videoResolution ?? videoDefaults.videoResolution,
   };
 }
@@ -692,6 +702,7 @@ function sameGenerateUpdate(node: BoardImageGenerateNode | BoardVideoGenerateNod
   if (node.kind === "video-generate") {
     if ("videoDuration" in input && node.videoDuration !== input.videoDuration) return false;
     if ("videoPreset" in input && node.videoPreset !== input.videoPreset) return false;
+    if ("videoReferenceMode" in input && node.videoReferenceMode !== input.videoReferenceMode) return false;
     if ("videoResolution" in input && node.videoResolution !== input.videoResolution) return false;
   }
 

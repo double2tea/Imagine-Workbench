@@ -1,6 +1,6 @@
 import { formatProviderModel, isAgentCompatibleModelId, type AiProvider, type ModelOption } from "./model-catalog";
 import { getProviderMeta } from "./registry";
-import { RUNNINGHUB_STANDARD_MODELS } from "./runninghub";
+import { RUNNINGHUB_DEFAULT_LLM_MODEL, RUNNINGHUB_STANDARD_MODELS, runningHubLlmBaseUrl } from "./runninghub";
 import type { ProviderConfig } from "./types";
 import { getJson, isRecord } from "./utils";
 
@@ -53,9 +53,27 @@ async function listModelScopeModels(config: ProviderConfig, kind: ModelKindFilte
 
 async function listRunningHubModels(config: ProviderConfig, kind: ModelKindFilter): Promise<ModelOption[]> {
   if (kind === "chat") {
-    throw new Error("RunningHub does not expose chat models");
+    return listRunningHubChatModels(config);
+  }
+  if (kind === "all") {
+    return dedupeOptions([
+      ...(await listRunningHubChatModels(config)),
+      ...staticProviderModels(config.provider, kind),
+    ]);
   }
   return staticProviderModels(config.provider, kind);
+}
+
+async function listRunningHubChatModels(config: ProviderConfig): Promise<ModelOption[]> {
+  const response = await getJson<OpenAiModelsResponse>(`${runningHubLlmBaseUrl(config.baseUrl)}/v1/models`, config);
+  if (!Array.isArray(response.data)) {
+    throw new Error("RunningHub LLM model list response did not include a data array");
+  }
+  const options = response.data.flatMap(item => readModelId(item, config.provider, "chat"));
+  if (options.length === 0) {
+    throw new Error("No RunningHub LLM chat models were found in provider model list");
+  }
+  return dedupeOptions(options);
 }
 
 function staticProviderModels(provider: AiProvider, kind: ModelKindFilter): ModelOption[] {
@@ -74,7 +92,14 @@ function staticProviderModels(provider: AiProvider, kind: ModelKindFilter): Mode
 }
 
 function runningHubStaticModels(kind: ModelKindFilter): ModelOption[] {
-  if (kind === "chat") return [];
+  const chatModels = [
+    {
+      value: formatProviderModel("runninghub", RUNNINGHUB_DEFAULT_LLM_MODEL),
+      label: "RunningHub Qwen 3.7 Max",
+      kind: "chat",
+    },
+  ];
+  if (kind === "chat") return chatModels.map(model => ({ value: model.value, label: model.label }));
   const standardModels = RUNNINGHUB_STANDARD_MODELS
     .filter(model => model.listed !== false)
     .filter(model => kind === "all" || model.kind === kind)
@@ -89,6 +114,7 @@ function runningHubStaticModels(kind: ModelKindFilter): ModelOption[] {
     { value: "runninghub:workflow-video:<workflowId>", label: "RunningHub Workflow Video", kind: "video" },
   ].filter(model => kind === "all" || model.kind === kind);
   return [
+    ...(kind === "all" ? chatModels.map(model => ({ value: model.value, label: model.label })) : []),
     ...standardModels,
     ...virtualModels.map(model => ({ value: model.value, label: model.label })),
   ];

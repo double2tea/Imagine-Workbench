@@ -80,6 +80,7 @@ export type {
   BoardSize,
   BoardSummary,
   BoardVideoGenerateNode,
+  BoardVideoReferenceMode,
   CreateAgentNodeInput,
   BoardViewport,
   CreateAssetNodeInput,

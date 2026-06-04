@@ -56,6 +56,7 @@ import {
   supportsAsyncImageGeneration,
   type AiProvider,
   type ModelOption,
+  type VideoReferenceMode,
 } from "@/lib/providers/model-catalog";
 import { PROVIDER_KEYS, getProviderMeta } from "@/lib/providers/registry";
 import { getMediaReferenceType } from "@/lib/media-references";
@@ -166,6 +167,7 @@ export default function Home() {
   const [imageBackgroundGeneration, setImageBackgroundGeneration] = useState(false);
   const [videoDuration, setVideoDuration] = useState("10");
   const [videoPreset, setVideoPreset] = useState("normal");
+  const [selectedVideoReferenceMode, setSelectedVideoReferenceMode] = useState<VideoReferenceMode>("reference");
   const [videoResolution, setVideoResolution] = useState("720p");
   const [customImageSize, setCustomImageSize] = useState("2560x1440");
   const [traditionalSubTab, setTraditionalSubTab] = useState<CreationMode>("image");
@@ -300,9 +302,11 @@ export default function Home() {
   const activeVideoPreset = videoCapabilities.presets.some(option => option.value === videoPreset)
     ? videoPreset
     : undefined;
-  const videoReferenceMode = videoCapabilities.referenceMode;
+  const activeVideoReferenceMode = videoCapabilities.referenceModes.includes(selectedVideoReferenceMode)
+    ? selectedVideoReferenceMode
+    : videoCapabilities.referenceMode;
   const videoReferenceLimit = videoCapabilities.maxReferenceImages;
-  const isFirstLastVideoMode = videoReferenceMode === "firstLast";
+  const isFirstLastVideoMode = activeVideoReferenceMode === "firstLast";
   const videoReferenceLabel = isFirstLastVideoMode ? "首帧 / 尾帧" : "视频参考图";
   const videoPromptPlaceholder = isFirstLastVideoMode
     ? "描述首帧到尾帧之间的运动、转场与镜头变化... 输入 @ 可引用作品"
@@ -340,7 +344,7 @@ export default function Home() {
     prompt,
     videoReferenceLimit,
     videoReferenceMediaTypes: videoCapabilities.referenceMediaTypes,
-    videoReferenceMode,
+    videoReferenceMode: activeVideoReferenceMode,
     pushWorkspaceNotice,
     setAgentInput,
     setPrompt,
@@ -411,6 +415,7 @@ export default function Home() {
     activeImageResolution,
     activeVideoDuration,
     activeVideoPreset,
+    activeVideoReferenceMode,
     activeVideoResolution,
     activeVideoSize,
     buildProviderHeaders,
@@ -428,7 +433,7 @@ export default function Home() {
     setItems,
     setVideoSubmitCount,
     videoReferenceLimit,
-    videoReferenceMode,
+    videoReferenceMode: activeVideoReferenceMode,
   });
   const {
     cancelProcessingItem,
@@ -514,6 +519,9 @@ export default function Home() {
     if (capabilities.presets.length > 0 && !capabilities.presets.some(option => option.value === videoPreset)) {
       setVideoPreset(capabilities.presets[0].value);
     }
+    if (!capabilities.referenceModes.includes(selectedVideoReferenceMode)) {
+      setSelectedVideoReferenceMode(capabilities.referenceMode);
+    }
   };
 
   const reuseTaskInComposer = (item: StorageItem) => {
@@ -524,7 +532,7 @@ export default function Home() {
     const request = item.generationRequest;
     const model = request?.model ?? item.model;
     const references: ReferenceImageRef[] = getGenerationReferenceMedia(request).map((reference, index) => {
-      const videoMode = item.type === "video" ? getVideoModelCapabilities(model).referenceMode : "reference";
+      const videoMode = item.type === "video" ? request?.videoReferenceMode ?? getVideoModelCapabilities(model).referenceMode : "reference";
       const role: ReferenceImageRef["role"] = reference.role ?? (videoMode === "firstLast"
         ? index === 0
           ? "start"
@@ -565,6 +573,7 @@ export default function Home() {
       setAspectRatio(request?.aspectRatio ?? item.aspectRatio);
       if (request?.videoDurationSeconds) setVideoDuration(request.videoDurationSeconds);
       if (request?.videoPreset) setVideoPreset(request.videoPreset);
+      if (request?.videoReferenceMode) setSelectedVideoReferenceMode(request.videoReferenceMode);
       if (request?.videoResolution) setVideoResolution(request.videoResolution);
       setTraditionalSubTab("video");
     }
@@ -1085,11 +1094,13 @@ export default function Home() {
         referenceImages={referenceImages}
         referenceLabel={videoReferenceLabel}
         referenceLimit={videoReferenceLimit}
-        referenceMode={videoReferenceMode}
+        referenceMode={activeVideoReferenceMode}
+        referenceModeOptions={videoCapabilities.referenceModes}
         resolutionOptions={videoCapabilities.resolutions}
         selectedDuration={videoDuration}
         selectedModel={selectedVideoModel}
         selectedPreset={videoPreset}
+        selectedReferenceMode={activeVideoReferenceMode}
         selectedResolution={videoResolution}
         selectedSize={aspectRatio}
         submitCount={videoSubmitCount}
@@ -1108,6 +1119,7 @@ export default function Home() {
         onReferenceRoleChange={(id, role) => toggleReferenceRole(id, role ?? "general")}
         onReferenceUpload={event => handleReferenceUpload(event, "video-prompt")}
         onSelectDuration={setVideoDuration}
+        onSelectReferenceMode={setSelectedVideoReferenceMode}
         onSelectResolution={setVideoResolution}
         onSelectModel={handleSelectVideoModel}
         onSelectPreset={setVideoPreset}

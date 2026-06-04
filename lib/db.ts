@@ -29,6 +29,7 @@ export interface GenerationRequestSnapshot {
   thinkingLevel?: string;
   videoDurationSeconds?: string;
   videoPreset?: string;
+  videoReferenceMode?: "reference" | "firstLast";
   videoResolution?: string;
   referenceMedia?: GenerationReferenceMediaSnapshot[];
   /** @deprecated Use referenceMedia. Kept only for reading pre-migration assets. */

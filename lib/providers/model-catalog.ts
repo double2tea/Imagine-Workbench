@@ -1,7 +1,7 @@
 export type { AiProvider } from "./registry";
 import type { AiProvider } from "./registry";
 import { PROVIDER_KEYS, isKnownProvider } from "./registry";
-import { RUNNINGHUB_STANDARD_MODELS } from "./runninghub";
+import { RUNNINGHUB_DEFAULT_LLM_MODEL, RUNNINGHUB_STANDARD_MODELS, type RunningHubStandardModel } from "./runninghub";
 import type { MediaReferenceType } from "@/lib/media-references";
 
 export interface ModelOption {
@@ -30,6 +30,7 @@ export interface VideoModelCapabilities {
   durations: ParameterOption[];
   presets: ParameterOption[];
   referenceMode: VideoReferenceMode;
+  referenceModes: VideoReferenceMode[];
   maxReferenceImages: number;
   minReferenceImages: number;
   referenceMediaTypes: MediaReferenceType[];
@@ -54,6 +55,7 @@ export interface ProviderModelCapability {
   durations: ParameterOption[];
   presets: ParameterOption[];
   videoReferenceMode: VideoReferenceMode;
+  videoReferenceModes: VideoReferenceMode[];
   maxReferenceImages: number;
   minReferenceImages: number;
   referenceMediaTypes: MediaReferenceType[];
@@ -224,18 +226,73 @@ const GROK_VIDEO_PRESETS: ParameterOption[] = [
   { value: "custom", label: "Custom" },
 ];
 
-const TWELVE_AI_VIDEO_SIZES: ParameterOption[] = [
+const VEO_31_VIDEO_SIZES: ParameterOption[] = [
   { value: "auto", label: "Auto (source/default)" },
-  { value: "1280x720", label: "1280x720 720p" },
-  { value: "720x1280", label: "720x1280 Vertical" },
-  { value: "1920x1080", label: "1920x1080 1080p" },
-  { value: "1080x1920", label: "1080x1920 Vertical" },
+  { value: "16:9", label: "16:9 Landscape" },
+  { value: "9:16", label: "9:16 Vertical" },
+];
+
+const VEO_31_VIDEO_RESOLUTIONS: ParameterOption[] = [
+  { value: "720p", label: "720p" },
+  { value: "1080p", label: "1080p" },
+];
+
+const VEO_31_VIDEO_DURATIONS: ParameterOption[] = [
+  { value: "4", label: "4s" },
+  { value: "6", label: "6s" },
+  { value: "8", label: "8s" },
+];
+
+const SEEDANCE_VIDEO_SIZES: ParameterOption[] = [
+  { value: "auto", label: "Auto (adaptive)" },
+  { value: "16:9", label: "16:9 Landscape" },
+  { value: "9:16", label: "9:16 Vertical" },
+  { value: "1:1", label: "1:1 Square" },
+  { value: "4:3", label: "4:3 Landscape" },
+  { value: "3:4", label: "3:4 Portrait" },
+  { value: "21:9", label: "21:9 Wide" },
+];
+
+const SEEDANCE_VIDEO_RESOLUTIONS: ParameterOption[] = [
+  { value: "480p", label: "480p" },
+  { value: "720p", label: "720p" },
+  { value: "1080p", label: "1080p" },
+];
+
+const RUNNINGHUB_SEEDANCE_VIDEO_RESOLUTIONS: ParameterOption[] = [
+  ...SEEDANCE_VIDEO_RESOLUTIONS,
+  { value: "4k", label: "4K" },
+];
+
+const HAILUO_VIDEO_SIZES: ParameterOption[] = [
+  { value: "auto", label: "Auto" },
 ];
 
 const TWELVE_AI_OMNI_VIDEO_SIZES: ParameterOption[] = [
   { value: "auto", label: "Auto (source/default)" },
-  { value: "1280x720", label: "1280x720 720p" },
-  { value: "720x1280", label: "720x1280 Vertical" },
+  { value: "16:9", label: "16:9 Landscape" },
+  { value: "9:16", label: "9:16 Vertical" },
+];
+
+const OMNI_FLASH_VIDEO_RESOLUTIONS: ParameterOption[] = [
+  { value: "720p", label: "720p" },
+  { value: "1080p", label: "1080p" },
+  { value: "4k", label: "4K" },
+];
+
+const OMNI_FLASH_VIDEO_DURATIONS: ParameterOption[] = [
+  { value: "4", label: "4s" },
+  { value: "6", label: "6s" },
+  { value: "8", label: "8s" },
+  { value: "10", label: "10s" },
+];
+
+const AUTO_ASPECT_RATIO: ParameterOption[] = [
+  { value: "auto", label: "Auto" },
+];
+
+const AUTO_IMAGE_SIZES: ParameterOption[] = [
+  imageResolutionOption("auto"),
 ];
 
 const MODELSCOPE_IMAGE_SIZES: ParameterOption[] = [
@@ -268,6 +325,18 @@ const RUNNINGHUB_VIDEO_SIZES: ParameterOption[] = [
 const RUNNINGHUB_IMAGE_SIZES: ParameterOption[] = RUNNINGHUB_VIDEO_SIZES.map(option =>
   imageResolutionOption(option.value),
 );
+
+const OPEN_DIMENSION_IMAGE_SIZES: ParameterOption[] = [
+  imageResolutionOption("auto"),
+  imageResolutionOption("1024x1024"),
+  imageResolutionOption("1280x720"),
+  imageResolutionOption("720x1280"),
+  imageResolutionOption("1536x1024"),
+  imageResolutionOption("1024x1536"),
+  imageResolutionOption("1536x1536"),
+  imageResolutionOption("2048x2048"),
+  imageResolutionOption("custom"),
+];
 
 const AGNES_IMAGE_SIZES: ParameterOption[] = [
   imageResolutionOption("1024x1024"),
@@ -424,7 +493,9 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     provider: "12ai",
     model: "veo_3_1-fast",
     supportsReferences: true,
-    sizes: TWELVE_AI_VIDEO_SIZES,
+    sizes: VEO_31_VIDEO_SIZES,
+    resolutions: VEO_31_VIDEO_RESOLUTIONS,
+    durations: VEO_31_VIDEO_DURATIONS,
     videoReferenceMode: "reference",
     maxReferenceImages: 3,
     minReferenceImages: 0,
@@ -436,7 +507,9 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     provider: "12ai",
     model: "veo_3_1-fast-fl",
     supportsReferences: true,
-    sizes: TWELVE_AI_VIDEO_SIZES,
+    sizes: VEO_31_VIDEO_SIZES,
+    resolutions: VEO_31_VIDEO_RESOLUTIONS,
+    durations: VEO_31_VIDEO_DURATIONS,
     videoReferenceMode: "firstLast",
     maxReferenceImages: 2,
     minReferenceImages: 1,
@@ -449,6 +522,8 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     model: "omni_flash-10s",
     supportsReferences: true,
     sizes: TWELVE_AI_OMNI_VIDEO_SIZES,
+    resolutions: OMNI_FLASH_VIDEO_RESOLUTIONS,
+    durations: OMNI_FLASH_VIDEO_DURATIONS,
     videoReferenceMode: "reference",
     maxReferenceImages: 7,
     minReferenceImages: 0,
@@ -474,6 +549,12 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     label: "12AI Gemini 3.1 Flash Lite Vision",
     provider: "12ai",
     model: "gemini-3.1-flash-lite-preview",
+  }),
+  chatCapability({
+    value: formatProviderModel("runninghub", RUNNINGHUB_DEFAULT_LLM_MODEL),
+    label: "RunningHub Qwen 3.7 Max",
+    provider: "runninghub",
+    model: RUNNINGHUB_DEFAULT_LLM_MODEL,
   }),
   chatCapability({
     value: "grok2api:grok-4.20-auto",
@@ -731,34 +812,37 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     supportsReferences: true,
     sizes: MODELSCOPE_IMAGE_SIZES,
   }),
-  ...RUNNINGHUB_STANDARD_MODELS.filter(model => model.listed !== false).map(model =>
-    model.kind === "image"
-      ? imageCapability({
-          value: formatProviderModel("runninghub", model.model),
-          label: model.label,
-          provider: "runninghub",
-          model: model.model,
-          supportsAsync: false,
-          supportsReferences: model.supportsReferences,
-          sizes: RUNNINGHUB_IMAGE_SIZES,
-          maxReferenceImages: model.maxReferenceImages,
-          minReferenceImages: model.minReferenceImages,
-        })
-      : videoCapability({
-          value: formatProviderModel("runninghub", model.model),
-          label: model.label,
-          provider: "runninghub",
-          model: model.model,
-          supportsReferences: model.supportsReferences,
-          sizes: RUNNINGHUB_VIDEO_SIZES,
-          resolutions: model.resolutionOptions?.map(value => ({ value, label: value })),
-          durations: model.durationOptions?.map(value => ({ value, label: `${value}s` })),
-          videoReferenceMode: model.videoReferenceMode ?? (model.supportsReferences ? "reference" : "none"),
-          maxReferenceImages: model.maxReferenceImages,
-          minReferenceImages: model.minReferenceImages,
-          referenceMediaTypes: model.referenceMediaTypes ? [...model.referenceMediaTypes] : undefined,
-        }),
-  ),
+  ...RUNNINGHUB_STANDARD_MODELS.filter(model => model.listed !== false).map(model => {
+    if (model.kind === "image") {
+      const profile = runningHubImageParameterProfile(model);
+      return imageCapability({
+        value: formatProviderModel("runninghub", model.model),
+        label: model.label,
+        provider: "runninghub",
+        model: model.model,
+        supportsAsync: false,
+        supportsReferences: model.supportsReferences,
+        ...profile,
+        maxReferenceImages: model.maxReferenceImages,
+        minReferenceImages: model.minReferenceImages,
+      });
+    }
+
+    const profile = runningHubVideoParameterProfile(model);
+    return videoCapability({
+      value: formatProviderModel("runninghub", model.model),
+      label: model.label,
+      provider: "runninghub",
+      model: model.model,
+      supportsReferences: model.supportsReferences,
+      ...profile,
+      videoReferenceMode: model.videoReferenceMode ?? (model.supportsReferences ? "reference" : "none"),
+      videoReferenceModes: model.videoReferenceModes ? [...model.videoReferenceModes] : undefined,
+      maxReferenceImages: model.maxReferenceImages,
+      minReferenceImages: model.minReferenceImages,
+      referenceMediaTypes: model.referenceMediaTypes ? [...model.referenceMediaTypes] : undefined,
+    });
+  }),
   imageCapability({
     value: "runninghub:ai-app-image:<webappId>",
     label: "RunningHub AI App Image",
@@ -919,11 +1003,12 @@ export function getImageAspectRatioFromResolution(resolution: string): string | 
 export function getVideoModelCapabilities(value: string): VideoModelCapabilities {
   const capability = getKnownCapability(value, "video");
   return {
-    sizes: capability?.sizes ?? TWELVE_AI_VIDEO_SIZES,
+    sizes: capability?.sizes ?? VEO_31_VIDEO_SIZES,
     resolutions: capability?.resolutions ?? [],
     durations: capability?.durations ?? [],
     presets: capability?.presets ?? [],
     referenceMode: capability?.videoReferenceMode ?? "none",
+    referenceModes: capability?.videoReferenceModes ?? [],
     maxReferenceImages: capability?.maxReferenceImages ?? 0,
     minReferenceImages: capability?.minReferenceImages ?? 0,
     referenceMediaTypes: capability?.referenceMediaTypes ?? [],
@@ -979,6 +1064,7 @@ interface VideoCapabilityInput extends CapabilityInput {
   durations?: ParameterOption[];
   presets?: ParameterOption[];
   videoReferenceMode: VideoReferenceMode;
+  videoReferenceModes?: VideoReferenceMode[];
   maxReferenceImages: number;
   minReferenceImages: number;
   referenceMediaTypes?: MediaReferenceType[];
@@ -1001,6 +1087,7 @@ function imageCapability(input: ImageCapabilityInput): ProviderModelCapability {
     durations: [],
     presets: [],
     videoReferenceMode: "none",
+    videoReferenceModes: [],
     maxReferenceImages: input.maxReferenceImages ?? 0,
     minReferenceImages: input.minReferenceImages ?? 0,
     referenceMediaTypes: input.supportsReferences ? input.referenceMediaTypes ?? ["image"] : [],
@@ -1024,6 +1111,7 @@ function videoCapability(input: VideoCapabilityInput): ProviderModelCapability {
     durations: input.durations ?? [],
     presets: input.presets ?? [],
     videoReferenceMode: input.videoReferenceMode,
+    videoReferenceModes: input.videoReferenceModes ?? (input.videoReferenceMode === "none" ? [] : [input.videoReferenceMode]),
     maxReferenceImages: input.maxReferenceImages,
     minReferenceImages: input.minReferenceImages,
     referenceMediaTypes: input.supportsReferences ? input.referenceMediaTypes ?? ["image"] : [],
@@ -1047,6 +1135,7 @@ function chatCapability(input: CapabilityInput): ProviderModelCapability {
     durations: [],
     presets: [],
     videoReferenceMode: "none",
+    videoReferenceModes: [],
     maxReferenceImages: 0,
     minReferenceImages: 0,
     referenceMediaTypes: [],
@@ -1091,6 +1180,72 @@ function modelScopeVirtualImageCapability(model: string): ProviderModelCapabilit
     supportsReferences: model.toLowerCase().includes("edit"),
     sizes: MODELSCOPE_IMAGE_SIZES,
   });
+}
+
+function runningHubImageParameterProfile(
+  model: RunningHubStandardModel,
+): Pick<ImageCapabilityInput, "aspectRatios" | "qualityLevels" | "sizes"> {
+  const lower = model.model.toLowerCase();
+  if (lower.includes("rhart-image-g-2")) {
+    return {
+      aspectRatios: GPT_IMAGE_RATIOS,
+      qualityLevels: GPT_QUALITY_OPTIONS,
+      sizes: GPT_IMAGE_SIZES,
+    };
+  }
+  if (
+    lower.includes("seedream") ||
+    lower.includes("jimeng") ||
+    lower.includes("z-image") ||
+    lower.includes("f-2-dev")
+  ) {
+    return { sizes: OPEN_DIMENSION_IMAGE_SIZES };
+  }
+  if (lower.includes("rhart-image-g/")) {
+    return { aspectRatios: GROK_IMAGE_RATIOS, sizes: GROK_IMAGE_SIZES };
+  }
+  return { aspectRatios: AUTO_ASPECT_RATIO, sizes: AUTO_IMAGE_SIZES };
+}
+
+function runningHubVideoParameterProfile(
+  model: RunningHubStandardModel,
+): Pick<VideoCapabilityInput, "durations" | "resolutions" | "sizes"> {
+  const lower = model.model.toLowerCase();
+  if (lower.includes("hailuo")) {
+    return {
+      durations: optionList(model.durationOptions),
+      sizes: HAILUO_VIDEO_SIZES,
+    };
+  }
+  if (lower.includes("seedance")) {
+    return {
+      durations: optionList(model.durationOptions),
+      resolutions: RUNNINGHUB_SEEDANCE_VIDEO_RESOLUTIONS,
+      sizes: SEEDANCE_VIDEO_SIZES,
+    };
+  }
+  if (lower.includes("gemini-omni-flash")) {
+    return {
+      durations: optionList(model.durationOptions),
+      resolutions: optionList(model.resolutionOptions) ?? OMNI_FLASH_VIDEO_RESOLUTIONS,
+      sizes: TWELVE_AI_OMNI_VIDEO_SIZES,
+    };
+  }
+  if (lower.includes("rhart-video-v3.1")) {
+    return {
+      durations: optionList(model.durationOptions),
+      resolutions: optionList(model.resolutionOptions) ?? VEO_31_VIDEO_RESOLUTIONS,
+      sizes: VEO_31_VIDEO_SIZES,
+    };
+  }
+  return { sizes: RUNNINGHUB_VIDEO_SIZES };
+}
+
+function optionList(values: readonly string[] | undefined): ParameterOption[] | undefined {
+  return values?.map(value => ({
+    value,
+    label: /^\d+$/.test(value) ? `${value}s` : value === "4k" ? "4K" : value,
+  }));
 }
 
 function aspectRatiosFromSizes(sizes: ParameterOption[]): ParameterOption[] {

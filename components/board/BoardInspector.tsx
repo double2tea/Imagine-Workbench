@@ -31,6 +31,7 @@ import type {
   BoardImageGenerateNode,
   BoardNode,
   BoardPortRef,
+  BoardVideoReferenceMode,
   BoardVideoGenerateNode,
 } from "@/lib/board";
 
@@ -84,6 +85,11 @@ const nodeKindLabels: Record<BoardNode["kind"], string> = {
   prompt: "Prompt",
   "reference-group": "参考组",
   "video-generate": "视频生成",
+};
+
+const videoReferenceModeLabels: Record<BoardVideoReferenceMode, string> = {
+  reference: "全能参考",
+  firstLast: "首尾帧 / 关键帧",
 };
 
 function isGenerateNode(node: BoardNode | undefined): node is BoardGenerateNode {
@@ -159,6 +165,7 @@ function imageAspectPatch(model: string, aspectRatio: string, current: BoardImag
 
 function videoModelPatch(model: string, current: BoardVideoGenerateNode): BoardGenerateNodeUpdate {
   const capabilities = getVideoModelCapabilities(model);
+  const currentReferenceMode = current.videoReferenceMode;
   return {
     aspectRatio: capabilities.sizes.some(option => option.value === current.aspectRatio)
       ? current.aspectRatio
@@ -170,6 +177,11 @@ function videoModelPatch(model: string, current: BoardVideoGenerateNode): BoardG
     videoPreset: capabilities.presets.some(option => option.value === current.videoPreset)
       ? current.videoPreset
       : capabilities.presets[0]?.value,
+    videoReferenceMode: currentReferenceMode && capabilities.referenceModes.includes(currentReferenceMode)
+      ? currentReferenceMode
+      : capabilities.referenceMode === "none"
+        ? undefined
+        : capabilities.referenceMode,
     videoResolution: capabilities.resolutions.some(option => option.value === current.videoResolution)
       ? current.videoResolution
       : capabilities.resolutions[0]?.value,
@@ -212,6 +224,10 @@ function parseVariantCount(value: string): BoardGenerateVariantCount {
   if (value === "2") return 2;
   if (value === "4") return 4;
   throw new Error(`Unsupported variant count: ${value}`);
+}
+
+function isBoardVideoReferenceMode(value: string): value is BoardVideoReferenceMode {
+  return value === "reference" || value === "firstLast";
 }
 
 function VariantCountSelect({
@@ -452,6 +468,12 @@ function VideoGenerateInspector({
   const capabilities = getVideoModelCapabilities(node.model);
   const supportsReferences = modelSupportsReferences(node);
   const isProcessing = node.status === "processing";
+  const defaultReferenceMode: BoardVideoReferenceMode | undefined =
+    capabilities.referenceMode === "reference" || capabilities.referenceMode === "firstLast"
+      ? capabilities.referenceMode
+      : undefined;
+  const activeReferenceMode = node.videoReferenceMode ?? defaultReferenceMode;
+  const referenceModeOptions = capabilities.referenceModes.filter(isBoardVideoReferenceMode);
 
   const advancedFields = (
     <div className="imagine-panel-disclosure-body">
@@ -472,7 +494,7 @@ function VideoGenerateInspector({
           {capabilities.sizes.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
         </select>
       </InspectorField>
-      {(capabilities.durations.length > 0 || capabilities.resolutions.length > 0 || capabilities.presets.length > 0) && (
+      {(capabilities.durations.length > 0 || capabilities.resolutions.length > 0 || capabilities.presets.length > 0 || referenceModeOptions.length > 1) && (
         <div className="grid grid-cols-2 gap-2">
           {capabilities.durations.length > 0 && (
             <InspectorField title="时长">
@@ -495,13 +517,26 @@ function VideoGenerateInspector({
               </select>
             </InspectorField>
           )}
+          {referenceModeOptions.length > 1 && activeReferenceMode && (
+            <InspectorField title="参考模式">
+              <select
+                value={activeReferenceMode}
+                onChange={event => onUpdateGenerate(node.id, { videoReferenceMode: event.target.value as BoardVideoReferenceMode })}
+                className={inputClass}
+              >
+                {referenceModeOptions.map(option => (
+                  <option key={option} value={option}>{videoReferenceModeLabels[option]}</option>
+                ))}
+              </select>
+            </InspectorField>
+          )}
         </div>
       )}
       <InspectorField title="变体">
         <VariantCountSelect value={node.variantCount} onChange={variantCount => onUpdateGenerate(node.id, { variantCount })} />
       </InspectorField>
       <p className={infoChipClass}>
-        参考图：{supportsReferences ? `${capabilities.referenceMode} / ${capabilities.maxReferenceImages}` : "不支持"}
+        参考图：{supportsReferences && activeReferenceMode ? `${videoReferenceModeLabels[activeReferenceMode]} / ${capabilities.maxReferenceImages}` : "不支持"}
       </p>
     </div>
   );

@@ -440,6 +440,24 @@ export function AgentPendingActionEditor({
           </select>
         </label>
       )}
+
+      {isVideo && videoCapabilities && videoCapabilities.referenceModes.length > 1 && (
+        <label className="imagine-agent-action-field">
+          <span className="imagine-agent-action-field-label">参考模式</span>
+          <select
+            value={params.videoReferenceMode ?? videoCapabilities.referenceMode}
+            disabled={disabled}
+            onChange={event => updateParams({ videoReferenceMode: event.target.value as AgentGenerationParams["videoReferenceMode"] })}
+            className="imagine-agent-model-select w-full"
+          >
+            {videoCapabilities.referenceModes.map(option => (
+              <option key={option} value={option}>
+                {option === "firstLast" ? "首尾帧 / 关键帧" : "全能参考"}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
     </div>
   );
 }

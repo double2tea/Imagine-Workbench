@@ -27,6 +27,7 @@ interface RetryRequestBody {
   imageQuality?: string;
   imageResolution?: string;
   preset?: string;
+  referenceMode?: "reference" | "firstLast";
   thinkingLevel?: string;
   resolutionName?: string;
   referenceImage?: string;
@@ -111,6 +112,7 @@ function buildRetryRequestBody(item: StorageItem): RetryRequestBody {
   } else {
     body.durationSeconds = request?.videoDurationSeconds;
     body.preset = request?.videoPreset;
+    body.referenceMode = request?.videoReferenceMode;
     body.resolutionName = request?.videoResolution;
     body.referenceMedia = referenceMedia.map(reference => ({
       dataUri: reference.url,

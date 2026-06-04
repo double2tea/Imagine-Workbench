@@ -58,6 +58,7 @@ import {
   supportsAsyncImageGeneration,
   type AiProvider,
   type ModelOption,
+  type VideoReferenceMode,
 } from "@/lib/providers/model-catalog";
 import { getProviderMeta, PROVIDER_KEYS } from "@/lib/providers/registry";
 import { compressReferenceImageDataUrl, compressReferenceImageFile } from "@/lib/reference-images";
@@ -82,6 +83,7 @@ import {
   type BoardPortRef,
   type BoardSummary,
   type BoardVideoGenerateNode,
+  type BoardVideoReferenceMode,
   assetCompareReferenceUrl,
 } from "@/lib/board";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
@@ -292,6 +294,7 @@ function videoActionDefaults(model: string, aspectRatio: string | undefined): {
   aspectRatio: string;
   videoDuration?: string;
   videoPreset?: string;
+  videoReferenceMode?: BoardVideoReferenceMode;
   videoResolution?: string;
 } {
   const capabilities = getVideoModelCapabilities(model);
@@ -301,6 +304,9 @@ function videoActionDefaults(model: string, aspectRatio: string | undefined): {
       : firstOptionValue(capabilities.sizes, "auto"),
     videoDuration: capabilities.durations[0]?.value,
     videoPreset: capabilities.presets[0]?.value,
+    videoReferenceMode: capabilities.referenceMode === "reference" || capabilities.referenceMode === "firstLast"
+      ? capabilities.referenceMode
+      : undefined,
     videoResolution: capabilities.resolutions[0]?.value,
   };
 }
@@ -370,6 +376,7 @@ function buildGenerateNodeUpdate(
     if (params?.videoResolution?.trim()) update.videoResolution = params.videoResolution;
     if (params?.videoDuration?.trim()) update.videoDuration = params.videoDuration;
     if (params?.videoPreset?.trim()) update.videoPreset = params.videoPreset;
+    if (params?.videoReferenceMode) update.videoReferenceMode = params.videoReferenceMode;
   }
   return update;
 }
@@ -432,6 +439,7 @@ function createPreviewBoardNode(operation: AgentBoardPatchCreateNodeOperation, i
     ...(operation.videoResolution ? { videoResolution: operation.videoResolution } : {}),
     ...(operation.videoDuration ? { videoDuration: operation.videoDuration } : {}),
     ...(operation.videoPreset ? { videoPreset: operation.videoPreset } : {}),
+    ...(operation.videoReferenceMode ? { videoReferenceMode: operation.videoReferenceMode } : {}),
   };
 }
 
@@ -683,6 +691,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const [imageThinkingLevel, setImageThinkingLevel] = useState("minimal");
   const [videoDuration, setVideoDuration] = useState("10");
   const [videoPreset, setVideoPreset] = useState("normal");
+  const [selectedVideoReferenceMode, setSelectedVideoReferenceMode] = useState<VideoReferenceMode>("reference");
   const [videoResolution, setVideoResolution] = useState("720p");
   const [customImageSize] = useState("2560x1440");
   const [agentInput, setAgentInput] = useState("");
@@ -774,6 +783,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const activeVideoResolution = videoCapabilities.resolutions.some(option => option.value === videoResolution) ? videoResolution : undefined;
   const activeVideoDuration = videoCapabilities.durations.some(option => option.value === videoDuration) ? videoDuration : undefined;
   const activeVideoPreset = videoCapabilities.presets.some(option => option.value === videoPreset) ? videoPreset : undefined;
+  const activeVideoReferenceMode = videoCapabilities.referenceModes.includes(selectedVideoReferenceMode)
+    ? selectedVideoReferenceMode
+    : videoCapabilities.referenceMode;
 
   const {
     agentReferenceId,
@@ -802,7 +814,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     prompt,
     videoReferenceLimit: videoCapabilities.maxReferenceImages,
     videoReferenceMediaTypes: videoCapabilities.referenceMediaTypes,
-    videoReferenceMode: videoCapabilities.referenceMode,
+    videoReferenceMode: activeVideoReferenceMode,
     pushWorkspaceNotice,
     setAgentInput,
     setPrompt,
@@ -895,6 +907,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     activeImageResolution,
     activeVideoDuration,
     activeVideoPreset,
+    activeVideoReferenceMode,
     activeVideoResolution,
     activeVideoSize,
     buildProviderHeaders,
@@ -912,7 +925,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     setItems,
     setVideoSubmitCount,
     videoReferenceLimit: videoCapabilities.maxReferenceImages,
-    videoReferenceMode: videoCapabilities.referenceMode,
+    videoReferenceMode: activeVideoReferenceMode,
   });
 
   const handleSelectImageModel = useCallback((model: string) => {
@@ -952,7 +965,10 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     if (capabilities.presets.length > 0 && !capabilities.presets.some(option => option.value === videoPreset)) {
       setVideoPreset(capabilities.presets[0].value);
     }
-  }, [aspectRatio, videoDuration, videoPreset, videoResolution]);
+    if (!capabilities.referenceModes.includes(selectedVideoReferenceMode)) {
+      setSelectedVideoReferenceMode(capabilities.referenceMode);
+    }
+  }, [aspectRatio, selectedVideoReferenceMode, videoDuration, videoPreset, videoResolution]);
 
   const optimizeActivePrompt = async (promptOverride?: string) => {
     const promptToOptimize = promptOverride ?? prompt;
@@ -1112,6 +1128,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
                 ...(operation.videoResolution ? { videoResolution: operation.videoResolution } : {}),
                 ...(operation.videoDuration ? { videoDuration: operation.videoDuration } : {}),
                 ...(operation.videoPreset ? { videoPreset: operation.videoPreset } : {}),
+                ...(operation.videoReferenceMode ? { videoReferenceMode: operation.videoReferenceMode } : {}),
               });
             }
             tempToRealIds.set(operation.tempId, nodeId);
@@ -1209,6 +1226,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             size: operation.aspectRatio ?? defaults.aspectRatio,
             videoDuration: operation.videoDuration ?? defaults.videoDuration,
             videoPreset: operation.videoPreset ?? defaults.videoPreset,
+            videoReferenceMode: operation.videoReferenceMode ?? defaults.videoReferenceMode,
             videoResolution: operation.videoResolution ?? defaults.videoResolution,
           });
           if (!didStart) {
@@ -1314,6 +1332,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           ...(action.params?.videoResolution ? { videoResolution: action.params.videoResolution } : {}),
           ...(action.params?.videoDuration ? { videoDuration: action.params.videoDuration } : {}),
           ...(action.params?.videoPreset ? { videoPreset: action.params.videoPreset } : {}),
+          ...(action.params?.videoReferenceMode ? { videoReferenceMode: action.params.videoReferenceMode } : {}),
         });
         boardController.connectPorts(
           { nodeId: assetNodeId, portId: BOARD_PORT_IDS.assetOut, portKind: "asset" },
@@ -1337,6 +1356,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           size: action.params.aspectRatio ?? defaults.aspectRatio,
           videoDuration: action.params.videoDuration ?? defaults.videoDuration,
           videoPreset: action.params.videoPreset ?? defaults.videoPreset,
+          videoReferenceMode: action.params.videoReferenceMode ?? defaults.videoReferenceMode,
           videoResolution: action.params.videoResolution ?? defaults.videoResolution,
         });
         if (!didStart) {
@@ -1566,6 +1586,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       ...(action.params?.videoResolution ? { videoResolution: action.params.videoResolution } : {}),
       ...(action.params?.videoDuration ? { videoDuration: action.params.videoDuration } : {}),
       ...(action.params?.videoPreset ? { videoPreset: action.params.videoPreset } : {}),
+      ...(action.params?.videoReferenceMode ? { videoReferenceMode: action.params.videoReferenceMode } : {}),
     };
     const generateNodeId = boardController.addGenerateNode({
       kind,
@@ -1637,6 +1658,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       size: defaults.aspectRatio,
       videoDuration: defaults.videoDuration,
       videoPreset: defaults.videoPreset,
+      videoReferenceMode: defaults.videoReferenceMode,
       videoResolution: defaults.videoResolution,
     });
     if (!didStart) {
@@ -2000,6 +2022,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             size: node.aspectRatio,
             videoDuration: node.videoDuration,
             videoPreset: node.videoPreset,
+            videoReferenceMode: node.videoReferenceMode ?? getVideoModelCapabilities(node.model).referenceMode,
             videoResolution: node.videoResolution,
           });
           if (!didStart) break;
@@ -2104,14 +2127,14 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         const nextStatus = nextSourceNodeStatus(items, sourceBoardNodeId, item.status);
         const existingAssetNode = findBoardAssetNodeByAssetId(boardController.board.nodes, item.id);
         if (existingAssetNode) {
-          boardController.updateGenerateNode(sourceBoardNodeId, {
-            resultAssetId: item.id,
-            status: nextStatus,
-          });
           boardController.connectPorts(
             { nodeId: sourceBoardNodeId, portId: "result-out", portKind: "result" },
             { nodeId: existingAssetNode.id, portId: "asset-in", portKind: "asset" },
           );
+          boardController.updateGenerateNode(sourceBoardNodeId, {
+            resultAssetId: item.id,
+            status: nextStatus,
+          });
           continue;
         }
         if (sourceNode?.resultAssetId === item.id) continue;
@@ -2120,14 +2143,14 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           item,
           resultAssetPosition(sourceNode, resultIndex),
         );
-        boardController.updateGenerateNode(sourceBoardNodeId, {
-          resultAssetId: item.id,
-          status: nextStatus,
-        });
         boardController.connectPorts(
           { nodeId: sourceBoardNodeId, portId: "result-out", portKind: "result" },
           { nodeId: assetNodeId, portId: "asset-in", portKind: "asset" },
         );
+        boardController.updateGenerateNode(sourceBoardNodeId, {
+          resultAssetId: item.id,
+          status: nextStatus,
+        });
         continue;
       }
 

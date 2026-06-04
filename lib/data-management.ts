@@ -636,10 +636,15 @@ function parseGenerationRequest(value: unknown): GenerationRequestSnapshot | und
     thinkingLevel: readOptionalString(value, "thinkingLevel"),
     videoDurationSeconds: readOptionalString(value, "videoDurationSeconds"),
     videoPreset: readOptionalString(value, "videoPreset"),
+    videoReferenceMode: readVideoReferenceMode(value.videoReferenceMode),
     videoResolution: readOptionalString(value, "videoResolution"),
     referenceMedia: parseGenerationReferenceMedia(value.referenceMedia),
     referenceImages: readOptionalStringArray(value, "referenceImages"),
   };
+}
+
+function readVideoReferenceMode(value: unknown): "reference" | "firstLast" | undefined {
+  return value === "reference" || value === "firstLast" ? value : undefined;
 }
 
 function parseGenerationReferenceMedia(value: unknown): GenerationReferenceMediaSnapshot[] | undefined {
@@ -763,6 +768,7 @@ function parseBoardNode(value: unknown): BoardNode {
       aspectRatio: readString(value, "aspectRatio"),
       videoDuration: readOptionalString(value, "videoDuration"),
       videoPreset: readOptionalString(value, "videoPreset"),
+      videoReferenceMode: readVideoReferenceMode(value.videoReferenceMode),
       videoResolution: readOptionalString(value, "videoResolution"),
       variantCount: readVariantCount(value, "variantCount"),
       status: readGenerationStatus(value, "status"),

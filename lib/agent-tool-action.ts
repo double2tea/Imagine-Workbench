@@ -68,8 +68,13 @@ export function resolveVideoActionParams(
   const videoPreset = current.videoPreset && capabilities.presets.some(option => option.value === current.videoPreset)
     ? current.videoPreset
     : capabilities.presets[0]?.value;
+  const videoReferenceMode = current.videoReferenceMode && capabilities.referenceModes.includes(current.videoReferenceMode)
+    ? current.videoReferenceMode
+    : capabilities.referenceMode === "none"
+      ? undefined
+      : capabilities.referenceMode;
 
-  return { ...current, model, aspectRatio, videoResolution, videoDuration, videoPreset };
+  return { ...current, model, aspectRatio, videoResolution, videoDuration, videoPreset, videoReferenceMode };
 }
 
 function isImageActionType(type: AgentToolAction["type"]): boolean {
@@ -108,6 +113,7 @@ export function prepareAgentActionDraft(action: AgentToolAction): AgentToolActio
         videoResolution: params.videoResolution,
         videoDuration: params.videoDuration,
         videoPreset: params.videoPreset,
+        videoReferenceMode: params.videoReferenceMode,
       },
     };
   }
@@ -130,6 +136,7 @@ export function prepareAgentActionDraft(action: AgentToolAction): AgentToolActio
         videoResolution: params.videoResolution,
         videoDuration: params.videoDuration,
         videoPreset: params.videoPreset,
+        videoReferenceMode: params.videoReferenceMode,
         run: params.run,
       },
     };
@@ -212,7 +219,8 @@ export function validateAgentToolAction(
       params.thinkingLevel?.trim() ||
       params.videoResolution?.trim() ||
       params.videoDuration?.trim() ||
-      params.videoPreset?.trim()
+      params.videoPreset?.trim() ||
+      params.videoReferenceMode
       ? null
       : "请先填写要更新的节点内容";
   }

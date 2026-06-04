@@ -35,10 +35,12 @@ interface VideoGenerationPanelProps {
   referenceLabel: string;
   referenceLimit: number;
   referenceMode: VideoReferenceMode;
+  referenceModeOptions: VideoReferenceMode[];
   resolutionOptions: ParameterOption[];
   selectedDuration: string;
   selectedModel: string;
   selectedPreset: string;
+  selectedReferenceMode: VideoReferenceMode;
   selectedResolution: string;
   selectedSize: string;
   submitCount: number;
@@ -53,6 +55,7 @@ interface VideoGenerationPanelProps {
   onReferenceRoleChange: (id: string, role: ReferenceImageRef["role"]) => void;
   onReferenceUpload: (event: ChangeEvent<HTMLInputElement>) => void;
   onSelectDuration: (value: string) => void;
+  onSelectReferenceMode: (value: VideoReferenceMode) => void;
   onSelectResolution: (value: string) => void;
   onSelectModel: (value: string) => void;
   onSelectPreset: (value: string) => void;
@@ -76,10 +79,12 @@ export default function VideoGenerationPanel({
   referenceLabel,
   referenceLimit,
   referenceMode,
+  referenceModeOptions,
   resolutionOptions,
   selectedDuration,
   selectedModel,
   selectedPreset,
+  selectedReferenceMode,
   selectedResolution,
   selectedSize,
   submitCount,
@@ -94,6 +99,7 @@ export default function VideoGenerationPanel({
   onReferenceRoleChange,
   onReferenceUpload,
   onSelectDuration,
+  onSelectReferenceMode,
   onSelectResolution,
   onSelectModel,
   onSelectPreset,
@@ -117,6 +123,11 @@ export default function VideoGenerationPanel({
         : extraControlCount === 1
           ? "sm:grid-cols-3"
           : "sm:grid-cols-2";
+  const referenceModeLabels: Record<VideoReferenceMode, string> = {
+    none: "不使用参考",
+    reference: "全能参考",
+    firstLast: "首尾帧 / 关键帧",
+  };
 
   const handleApplyPromptTemplate = (template: PromptTemplate, mode: PromptTemplateApplyMode): void => {
     if (slashCommand && mode === "insert") {
@@ -219,6 +230,21 @@ export default function VideoGenerationPanel({
         </div>
 
       </div>
+
+      {referenceModeOptions.length > 1 && (
+        <div>
+          <label className="imagine-section-label mb-1.5 block">参考模式</label>
+          <select
+            value={selectedReferenceMode}
+            onChange={(event) => onSelectReferenceMode(event.target.value as VideoReferenceMode)}
+            className="imagine-select py-2.5"
+          >
+            {referenceModeOptions.map(option => (
+              <option key={option} value={option}>{referenceModeLabels[option]}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {(resolutionOptions.length > 0 || durationOptions.length > 0 || presetOptions.length > 0) && (
         <details className="imagine-inline-disclosure">

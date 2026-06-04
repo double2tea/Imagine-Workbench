@@ -3,7 +3,7 @@ import {
   buildRunningHubStandardBody,
   getRunningHubStandardEndpoint,
   getRunningHubStandardModel,
-  resolveRunningHubStandardModelForReferences,
+  resolveRunningHubStandardModelForReferenceMedia,
   validateRunningHubStandardReferenceCount,
 } from "./runninghub";
 import type { GenerateImageInput, GenerateImageResult, MediaStatusResult, ProviderConfig, ReferenceMedia } from "./types";
@@ -60,15 +60,15 @@ interface ModelScopeImageStatusResponse extends ModelScopeImageCreateResponse {
 interface RunningHubCreateResponse {
   code?: number;
   msg?: string;
-  data?: {
-    id?: string;
-    taskId?: string;
-    task_id?: string;
-    taskStatus?: string;
-  } | string;
-  id?: string;
-  taskId?: string;
-  task_id?: string;
+  message?: string;
+  result?: unknown;
+  data?: unknown;
+  id?: string | number;
+  task?: unknown;
+  taskId?: string | number;
+  task_id?: string | number;
+  taskID?: string | number;
+  taskid?: string | number;
 }
 
 interface RunningHubQueryResponse {
@@ -126,8 +126,10 @@ interface RunningHubMediaInput {
   model: string;
   aspectRatio?: string;
   imageResolution?: string;
+  imageQuality?: string;
   resolutionName?: string;
   durationSeconds?: string;
+  referenceMode?: "reference" | "firstLast";
   referenceImages: GenerateImageInput["referenceImages"];
   referenceMedia?: ReferenceMedia[];
 }
@@ -312,7 +314,10 @@ export async function generateRunningHubMedia(
   assertRunningHubOk(response, "RunningHub task creation failed");
   const taskId = readRunningHubCreatedTaskId(response);
   if (!taskId) {
-    throw new Error(response.msg ?? "RunningHub response did not include a taskId");
+    const message = response.msg ?? response.message;
+    throw new Error(
+      `RunningHub response did not include a taskId${message ? ` (${message})` : ""}: ${summarizeRunningHubCreateResponse(response)}`,
+    );
   }
   return {
     operationName: mediaOperationName("runninghub", mediaType, runningHubOperationTaskId(request.statusMode, taskId)),
@@ -321,11 +326,41 @@ export async function generateRunningHubMedia(
 }
 
 function readRunningHubCreatedTaskId(response: RunningHubCreateResponse): string | undefined {
-  if (typeof response.data === "string" && response.data.trim()) return response.data;
-  if (typeof response.data === "object" && response.data !== null) {
-    return response.data.taskId ?? response.data.task_id ?? response.data.id;
+  return readRunningHubTaskIdValue(response);
+}
+
+function readRunningHubTaskIdValue(value: unknown): string | undefined {
+  if (typeof value === "string") return value.trim() || undefined;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const taskId = readRunningHubTaskIdValue(item);
+      if (taskId) return taskId;
+    }
+    return undefined;
   }
-  return response.taskId ?? response.task_id ?? response.id;
+  if (!isRecord(value)) return undefined;
+
+  const directKeys = ["taskId", "task_id", "taskID", "taskid", "id"];
+  for (const key of directKeys) {
+    const taskId = readRunningHubTaskIdValue(value[key]);
+    if (taskId) return taskId;
+  }
+
+  const nestedKeys = ["data", "task", "result", "results"];
+  for (const key of nestedKeys) {
+    const taskId = readRunningHubTaskIdValue(value[key]);
+    if (taskId) return taskId;
+  }
+  return undefined;
+}
+
+function summarizeRunningHubCreateResponse(response: RunningHubCreateResponse): string {
+  try {
+    return JSON.stringify(response).slice(0, 600);
+  } catch {
+    return "[unserializable response]";
+  }
 }
 
 export async function getRunningHubMediaStatus(
@@ -451,7 +486,7 @@ async function buildRunningHubRequest(
     const references = input.referenceMedia ?? input.referenceImages.map(reference => ({ ...reference, type: "image" as const }));
     validateRunningHubStandardReferenceCount(standardModel, references.length);
     validateRunningHubStandardReferenceMediaTypes(standardModel, references);
-    const routedModel = resolveRunningHubStandardModelForReferences(standardModel, references.length);
+    const routedModel = resolveRunningHubStandardModelForReferenceMedia(standardModel, references, input.referenceMode);
     validateRunningHubStandardReferenceCount(routedModel, references.length);
     validateRunningHubStandardReferenceMediaTypes(routedModel, references);
     const referenceMediaUrls = routedModel.supportsReferences
@@ -464,6 +499,7 @@ async function buildRunningHubRequest(
         prompt: input.prompt,
         aspectRatio: input.aspectRatio,
         imageResolution: input.imageResolution,
+        imageQuality: input.imageQuality,
         resolutionName: input.resolutionName,
         durationSeconds: input.durationSeconds,
         referenceImages: input.referenceImages,

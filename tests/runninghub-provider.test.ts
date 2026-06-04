@@ -5,8 +5,10 @@ import {
   buildRunningHubStandardBody,
   getRunningHubStandardEndpoint,
   getRunningHubStandardModel,
+  resolveRunningHubStandardModelForReferenceMedia,
   resolveRunningHubStandardModelForReferences,
 } from "../lib/providers/runninghub";
+import { createChatCompletionText } from "../lib/providers/chat";
 import { generateRunningHubMedia, getRunningHubMediaStatus } from "../lib/providers/image";
 import { listProviderModels } from "../lib/providers/models";
 import type { ProviderConfig } from "../lib/providers/types";
@@ -176,6 +178,7 @@ test("runninghub seedance 1.5 text video uses documented aspectRatio field", () 
 });
 
 test("runninghub seedance 2.0 image and multimodal videos map uploaded image urls", () => {
+  const fastAuto = getRunningHubStandardModel("api:/openapi/v2/bytedance/seedance-2.0-global-fast/text-to-video", "video");
   const i2v = getRunningHubStandardModel("api:/openapi/v2/bytedance/seedance-2.0-global-fast/image-to-video", "video");
   const fastMultimodal = getRunningHubStandardModel(
     "api:/openapi/v2/bytedance/seedance-2.0-global-fast/multimodal-video",
@@ -185,9 +188,14 @@ test("runninghub seedance 2.0 image and multimodal videos map uploaded image url
     "api:/openapi/v2/bytedance/seedance-2.0-global/multimodal-video",
     "video",
   );
+  assert.ok(fastAuto);
   assert.ok(i2v);
   assert.ok(fastMultimodal);
   assert.ok(multimodal);
+  assert.equal(resolveRunningHubStandardModelForReferences(fastAuto, 1).model, i2v.model);
+  assert.equal(resolveRunningHubStandardModelForReferenceMedia(fastAuto, [{ type: "image" }], "reference").model, fastMultimodal.model);
+  assert.equal(resolveRunningHubStandardModelForReferenceMedia(fastAuto, [{ type: "image" }], "firstLast").model, i2v.model);
+  assert.equal(resolveRunningHubStandardModelForReferenceMedia(fastAuto, [{ type: "audio" }]).model, fastMultimodal.model);
 
   assert.deepEqual(
     buildRunningHubStandardBody(i2v, {
@@ -360,14 +368,16 @@ test("runninghub veo 3.1 and gpt image 2 variants map documented fields", () => 
     buildRunningHubStandardBody(resolveRunningHubStandardModelForReferences(gptImage, 1), {
       prompt: "edit product photo",
       aspectRatio: "16:9",
+      imageResolution: "3840x2160",
+      imageQuality: "high",
       referenceImages: [{ dataUri: "data:image/png;base64,input" }],
       referenceUrls: ["https://runninghub.example/product.png"],
     }),
     {
       prompt: "edit product photo",
       aspectRatio: "16:9",
-      resolution: "2k",
-      quality: "medium",
+      resolution: "4k",
+      quality: "high",
       imageUrls: ["https://runninghub.example/product.png"],
     },
   );
@@ -457,6 +467,23 @@ test("runninghub veo 3.1 auto routes non-text variants", () => {
       lastImageUrl: "https://runninghub.example/end.png",
     },
   );
+});
+
+test("runninghub advertised first-last modes route to first-last request shapes", () => {
+  const seedance = getRunningHubStandardModel("api:/openapi/v2/bytedance/seedance-2.0-global-fast/text-to-video", "video");
+  const veoLite = getRunningHubStandardModel("api:/openapi/v2/rhart-video-v3.1-lite-official/text-to-video", "video");
+  const veoOfficial = getRunningHubStandardModel("api:/openapi/v2/rhart-video-v3.1-fast-official/text-to-video", "video");
+  const omniFlash = getRunningHubStandardModel("api:/openapi/v2/gemini-omni-flash/text-to-video", "video");
+  assert.ok(seedance);
+  assert.ok(veoLite);
+  assert.ok(veoOfficial);
+  assert.ok(omniFlash);
+
+  assert.deepEqual(veoOfficial.videoReferenceModes, undefined);
+  assert.deepEqual(omniFlash.videoReferenceModes, undefined);
+
+  assert.equal(resolveRunningHubStandardModelForReferenceMedia(seedance, [{ type: "image" }, { type: "image" }], "firstLast").model, "api:/openapi/v2/bytedance/seedance-2.0-global-fast/image-to-video");
+  assert.equal(resolveRunningHubStandardModelForReferenceMedia(veoLite, [{ type: "image" }, { type: "image" }], "firstLast").model, "api:/openapi/v2/rhart-video-v3.1-lite-official/start-end-to-video");
 });
 
 test("runninghub youchuan image models map version-specific defaults", () => {
@@ -559,6 +586,8 @@ test("runninghub task creation reads documented and aliased task id fields", asy
     { response: { taskId: "root_task" }, expected: "root_task" },
     { response: { code: 0, data: { task_id: "data_task" } }, expected: "data_task" },
     { response: { code: 0, data: "string_task" }, expected: "string_task" },
+    { response: { code: 0, data: { task: { id: 998877 } } }, expected: "998877" },
+    { response: { code: 0, result: { taskID: "result_task" } }, expected: "result_task" },
   ];
 
   try {
@@ -631,6 +660,31 @@ test("runninghub polling selects output url by requested media type", async () =
   }
 });
 
+test("runninghub task creation error includes response summary when id is absent", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (): Promise<Response> => Response.json({ code: 0, data: { status: "created" } });
+
+  try {
+    await assert.rejects(
+      () =>
+        generateRunningHubMedia(
+          runningHubConfig,
+          {
+            prompt: "missing task id",
+            model: "api:/openapi/v2/seedream-v5-lite/text-to-image",
+            aspectRatio: "1:1",
+            imageResolution: "1024x1024",
+            referenceImages: [],
+          },
+          "image",
+        ),
+      /RunningHub response did not include a taskId: .*"status":"created"/,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("runninghub standard tasks keep v2 query polling endpoint", async () => {
   const originalFetch = globalThis.fetch;
   const calls: Array<{ url: string; body: unknown }> = [];
@@ -666,21 +720,84 @@ test("runninghub standard tasks keep v2 query polling endpoint", async () => {
 });
 
 test("runninghub model listing filters standard models by metadata kind", async () => {
-  const imageModels = await listProviderModels(runningHubConfig, "image");
-  const videoModels = await listProviderModels(runningHubConfig, "video");
+  const originalFetch = globalThis.fetch;
+  const calls: string[] = [];
+  globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
+    calls.push(input.toString());
+    return Response.json({
+      data: [
+        { id: "qwen/qwen3.7-max" },
+        { id: "deepseek/deepseek-v4-flash" },
+      ],
+    });
+  };
 
-  assert.equal(
-    imageModels.some(option => option.value === "runninghub:api:/openapi/v2/bytedance/seedance-2.0-global-fast/image-to-video"),
-    false,
-  );
-  assert.equal(
-    videoModels.some(option => option.value === "runninghub:api:/openapi/v2/bytedance/seedance-2.0-global-fast/image-to-video"),
-    true,
-  );
-  assert.equal(
-    videoModels.some(option => option.value === "runninghub:api:/openapi/v2/rhart-image-g-2/image-to-image"),
-    false,
-  );
+  try {
+    const chatModels = await listProviderModels(runningHubConfig, "chat");
+    const allModels = await listProviderModels(runningHubConfig, "all");
+    const imageModels = await listProviderModels(runningHubConfig, "image");
+    const videoModels = await listProviderModels(runningHubConfig, "video");
+
+    assert.equal(calls[0], "https://llm.runninghub.cn/v1/models");
+    assert.equal(chatModels.some(option => option.value === "runninghub:qwen/qwen3.7-max"), true);
+    assert.equal(allModels.some(option => option.value === "runninghub:qwen/qwen3.7-max"), true);
+    assert.equal(
+      imageModels.some(option => option.value === "runninghub:api:/openapi/v2/bytedance/seedance-2.0-global-fast/image-to-video"),
+      false,
+    );
+    assert.equal(
+      imageModels.some(option => option.value === "runninghub:api:/openapi/v2/seedream-v5-lite/image-to-image"),
+      false,
+    );
+    assert.equal(
+      videoModels.some(option => option.value === "runninghub:api:/openapi/v2/bytedance/seedance-2.0-global-fast/image-to-video"),
+      false,
+    );
+    assert.equal(
+      videoModels.some(option => option.value === "runninghub:api:/openapi/v2/bytedance/seedance-2.0-global-fast/multimodal-video"),
+      false,
+    );
+    assert.equal(
+      videoModels.some(option => option.value === "runninghub:api:/openapi/v2/gemini-omni-flash/image-to-video"),
+      false,
+    );
+    assert.equal(
+      videoModels.some(option => option.value === "runninghub:api:/openapi/v2/rhart-image-g-2/image-to-image"),
+      false,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("runninghub chat completions use llm endpoint", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: Array<{ url: string; body: unknown }> = [];
+  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    calls.push({ url: input.toString(), body: init?.body ? JSON.parse(String(init.body)) : undefined });
+    return Response.json({ choices: [{ message: { content: "hello" } }] });
+  };
+
+  try {
+    const text = await createChatCompletionText(
+      runningHubConfig,
+      "qwen/qwen3.7-max",
+      [{ role: "user", content: "Hi there!" }],
+      1,
+    );
+
+    assert.equal(text, "hello");
+    assert.equal(calls[0]?.url, "https://llm.runninghub.cn/v1/chat/completions");
+    assert.deepEqual(calls[0]?.body, {
+      model: "qwen/qwen3.7-max",
+      messages: [{ role: "user", content: "Hi there!" }],
+      temperature: 1,
+      stream: false,
+      reasoning_effort: "none",
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("runninghub v2 query business errors fail fast", async () => {

@@ -33,6 +33,7 @@ export function AgentActionSummary({ action }: { action: AgentToolAction }) {
     pushLine(lines, "质量", params.imageQuality);
     pushLine(lines, "时长", params.videoDuration);
     pushLine(lines, "预设", params.videoPreset);
+    pushLine(lines, "参考模式", params.videoReferenceMode);
   } else if (action.type === "continue_image_to_video") {
     pushLine(lines, "来源节点", params.nodeId || "当前选中节点");
     pushLine(lines, "视频提示词", params.prompt);
@@ -41,6 +42,7 @@ export function AgentActionSummary({ action }: { action: AgentToolAction }) {
     pushLine(lines, "分辨率", params.videoResolution);
     pushLine(lines, "时长", params.videoDuration);
     pushLine(lines, "预设", params.videoPreset);
+    pushLine(lines, "参考模式", params.videoReferenceMode);
     lines.push(`自动运行: ${params.run ? "是" : "否"}`);
   } else {
     if (params.prompt) lines.push(`提示词: ${truncateText(params.prompt, 96)}`);
@@ -50,6 +52,7 @@ export function AgentActionSummary({ action }: { action: AgentToolAction }) {
     pushLine(lines, "质量", params.imageQuality);
     pushLine(lines, "时长", params.videoDuration);
     pushLine(lines, "预设", params.videoPreset);
+    pushLine(lines, "参考模式", params.videoReferenceMode);
   }
 
   if (lines.length === 0) {

@@ -6,6 +6,7 @@ export type BoardPortDirection = "input" | "output";
 export type BoardGenerationStatus = "idle" | "processing" | "complete" | "failed";
 export type BoardGenerateVariantCount = 1 | 2 | 4;
 export type BoardReferenceRole = "general" | "start" | "end";
+export type BoardVideoReferenceMode = "reference" | "firstLast";
 
 export interface BoardPoint {
   x: number;
@@ -99,6 +100,7 @@ export interface BoardVideoGenerateNode extends BoardNodeBase {
   aspectRatio: string;
   videoDuration?: string;
   videoPreset?: string;
+  videoReferenceMode?: BoardVideoReferenceMode;
   videoResolution?: string;
   variantCount: BoardGenerateVariantCount;
   status: BoardGenerationStatus;
@@ -141,6 +143,7 @@ export type BoardGenerateNodeUpdate = Partial<{
   variantCount: BoardGenerateVariantCount;
   videoDuration: string;
   videoPreset: string;
+  videoReferenceMode: BoardVideoReferenceMode;
   videoResolution: string;
 }>;
 
@@ -209,6 +212,7 @@ export interface CreateGenerateNodeInput {
   variantCount?: BoardGenerateVariantCount;
   videoDuration?: string;
   videoPreset?: string;
+  videoReferenceMode?: BoardVideoReferenceMode;
   videoResolution?: string;
   position?: BoardPoint;
   size?: BoardSize;

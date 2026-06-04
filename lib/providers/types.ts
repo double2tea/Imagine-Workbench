@@ -1,4 +1,4 @@
-import type { AiProvider } from "./model-catalog";
+import type { AiProvider, VideoReferenceMode } from "./model-catalog";
 import type { MediaReferenceType } from "@/lib/media-references";
 
 export interface ProviderCredentials {
@@ -44,6 +44,7 @@ export interface GenerateVideoInput {
   aspectRatio: string;
   durationSeconds?: string;
   preset?: string;
+  referenceMode?: VideoReferenceMode;
   resolutionName?: string;
   referenceMedia: ReferenceMedia[];
 }

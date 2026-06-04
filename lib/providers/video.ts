@@ -52,6 +52,7 @@ export async function generateVideo(config: ProviderConfig, input: GenerateVideo
       imageResolution: input.aspectRatio,
       resolutionName: input.resolutionName,
       durationSeconds: input.durationSeconds,
+      referenceMode: input.referenceMode === "none" ? undefined : input.referenceMode,
       referenceImages: input.referenceMedia.filter(reference => reference.type === "image"),
       referenceMedia: input.referenceMedia,
     }, "video");

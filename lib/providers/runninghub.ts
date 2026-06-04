@@ -1,5 +1,9 @@
 import type { MediaReferenceType } from "@/lib/media-references";
 
+export const RUNNINGHUB_LLM_BASE_URL = "https://llm.runninghub.cn";
+export const RUNNINGHUB_DEFAULT_LLM_MODEL = "qwen/qwen3.7-max";
+const RUNNINGHUB_STANDARD_BASE_URLS = new Set(["https://www.runninghub.cn", "https://www.runninghub.ai"]);
+
 export type RunningHubStandardModelKind = "image" | "video";
 
 export interface RunningHubStandardModel {
@@ -11,6 +15,7 @@ export interface RunningHubStandardModel {
   minReferenceImages: number;
   maxReferenceImages: number;
   videoReferenceMode?: "reference" | "firstLast";
+  videoReferenceModes?: readonly ("reference" | "firstLast")[];
   referenceMediaTypes?: readonly MediaReferenceType[];
   durationOptions?: readonly string[];
   resolutionOptions?: readonly string[];
@@ -27,6 +32,7 @@ export interface RunningHubStandardRequestInput {
   prompt: string;
   aspectRatio?: string;
   imageResolution?: string;
+  imageQuality?: string;
   resolutionName?: string;
   durationSeconds?: string;
   referenceImages: Array<{ dataUri: string }>;
@@ -38,6 +44,8 @@ export interface RunningHubStandardRequestInput {
     audioUrls: string[];
   };
 }
+
+export type RunningHubReferenceMode = "reference" | "firstLast";
 
 type RunningHubStandardRequest =
   | {
@@ -109,11 +117,14 @@ type RunningHubStandardRequest =
 export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
   {
     model: "api:/openapi/v2/seedream-v5-lite/text-to-image",
-    label: "RunningHub Seedream V5 Lite Text-to-Image",
+    label: "RunningHub Seedream V5 Lite Auto",
     kind: "image",
-    supportsReferences: false,
+    supportsReferences: true,
     minReferenceImages: 0,
-    maxReferenceImages: 0,
+    maxReferenceImages: 10,
+    referenceRoutes: {
+      imageToImage: "api:/openapi/v2/seedream-v5-lite/image-to-image",
+    },
     request: {
       type: "prompt-dimensions",
       endpoint: "/openapi/v2/seedream-v5-lite/text-to-image",
@@ -127,9 +138,10 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     model: "api:/openapi/v2/seedream-v5-lite/image-to-image",
     label: "RunningHub Seedream V5 Lite Image-to-Image",
     kind: "image",
+    listed: false,
     supportsReferences: true,
     minReferenceImages: 1,
-    maxReferenceImages: 14,
+    maxReferenceImages: 10,
     request: {
       type: "prompt-dimensions",
       endpoint: "/openapi/v2/seedream-v5-lite/image-to-image",
@@ -142,11 +154,14 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
   },
   {
     model: "api:/openapi/v2/bytedance/jimeng-4.6/text-to-image",
-    label: "RunningHub Jimeng 4.6 Text-to-Image",
+    label: "RunningHub Jimeng 4.6 Auto",
     kind: "image",
-    supportsReferences: false,
+    supportsReferences: true,
     minReferenceImages: 0,
-    maxReferenceImages: 0,
+    maxReferenceImages: 16,
+    referenceRoutes: {
+      imageToImage: "api:/openapi/v2/bytedance/jimeng-4.6/image-to-image",
+    },
     request: {
       type: "prompt-dimensions",
       endpoint: "/openapi/v2/bytedance/jimeng-4.6/text-to-image",
@@ -162,6 +177,7 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     model: "api:/openapi/v2/bytedance/jimeng-4.6/image-to-image",
     label: "RunningHub Jimeng 4.6 Image-to-Image",
     kind: "image",
+    listed: false,
     supportsReferences: true,
     minReferenceImages: 1,
     maxReferenceImages: 14,
@@ -179,11 +195,14 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
   },
   {
     model: "api:/openapi/v2/rhart-image-g/text-to-image",
-    label: "RunningHub Grok Image 4.2 Text-to-Image",
+    label: "RunningHub Grok Image 4.2 Auto",
     kind: "image",
-    supportsReferences: false,
+    supportsReferences: true,
     minReferenceImages: 0,
-    maxReferenceImages: 0,
+    maxReferenceImages: 1,
+    referenceRoutes: {
+      imageToImage: "api:/openapi/v2/rhart-image-g/image-to-image",
+    },
     request: {
       type: "grok-image",
       endpoint: "/openapi/v2/rhart-image-g/text-to-image",
@@ -194,6 +213,7 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     model: "api:/openapi/v2/rhart-image-g/image-to-image",
     label: "RunningHub Grok Image 4.2 Image-to-Image",
     kind: "image",
+    listed: false,
     supportsReferences: true,
     minReferenceImages: 1,
     maxReferenceImages: 1,
@@ -242,12 +262,17 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
   },
   {
     model: "api:/openapi/v2/minimax/hailuo-02/standard",
-    label: "RunningHub Hailuo 02 Standard Video",
+    label: "RunningHub Hailuo 02 Standard Auto",
     kind: "video",
-    supportsReferences: false,
+    supportsReferences: true,
     minReferenceImages: 0,
-    maxReferenceImages: 0,
+    maxReferenceImages: 2,
+    videoReferenceMode: "firstLast",
     durationOptions: ["6", "10"],
+    referenceRoutes: {
+      firstLast: "api:/openapi/v2/minimax/hailuo-02/i2v-standard",
+      imageToVideo: "api:/openapi/v2/minimax/hailuo-02/i2v-standard",
+    },
     request: {
       type: "hailuo-video",
       endpoint: "/openapi/v2/minimax/hailuo-02/standard",
@@ -257,6 +282,7 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     model: "api:/openapi/v2/minimax/hailuo-02/t2v-standard",
     label: "RunningHub Hailuo 02 T2V Standard",
     kind: "video",
+    listed: false,
     supportsReferences: false,
     minReferenceImages: 0,
     maxReferenceImages: 0,
@@ -283,6 +309,7 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     model: "api:/openapi/v2/minimax/hailuo-02/i2v-standard",
     label: "RunningHub Hailuo 02 I2V Standard",
     kind: "video",
+    listed: false,
     supportsReferences: true,
     minReferenceImages: 1,
     maxReferenceImages: 2,
@@ -334,12 +361,20 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
   },
   {
     model: "api:/openapi/v2/bytedance/seedance-2.0-global-fast/text-to-video",
-    label: "RunningHub Seedance 2.0 Global Fast Text-to-Video",
+    label: "RunningHub Seedance 2.0 Global Fast Auto",
     kind: "video",
-    supportsReferences: false,
+    supportsReferences: true,
     minReferenceImages: 0,
-    maxReferenceImages: 0,
+    maxReferenceImages: 9,
+    videoReferenceMode: "reference",
+    videoReferenceModes: ["reference", "firstLast"],
+    referenceMediaTypes: ["image", "video", "audio"],
     durationOptions: ["5", "8", "10", "12", "15"],
+    referenceRoutes: {
+      imageToVideo: "api:/openapi/v2/bytedance/seedance-2.0-global-fast/image-to-video",
+      firstLast: "api:/openapi/v2/bytedance/seedance-2.0-global-fast/image-to-video",
+      reference: "api:/openapi/v2/bytedance/seedance-2.0-global-fast/multimodal-video",
+    },
     request: {
       type: "seedance-video",
       endpoint: "/openapi/v2/bytedance/seedance-2.0-global-fast/text-to-video",
@@ -356,6 +391,7 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     model: "api:/openapi/v2/bytedance/seedance-2.0-global-fast/image-to-video",
     label: "RunningHub Seedance 2.0 Global Fast Image-to-Video",
     kind: "video",
+    listed: false,
     supportsReferences: true,
     minReferenceImages: 1,
     maxReferenceImages: 2,
@@ -381,6 +417,7 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     model: "api:/openapi/v2/bytedance/seedance-2.0-global-fast/multimodal-video",
     label: "RunningHub Seedance 2.0 Global Fast Multimodal Video",
     kind: "video",
+    listed: false,
     supportsReferences: true,
     minReferenceImages: 1,
     maxReferenceImages: 9,
@@ -405,12 +442,20 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
   },
   {
     model: "api:/openapi/v2/bytedance/seedance-2.0-global/text-to-video",
-    label: "RunningHub Seedance 2.0 Global Text-to-Video",
+    label: "RunningHub Seedance 2.0 Global Auto",
     kind: "video",
-    supportsReferences: false,
+    supportsReferences: true,
     minReferenceImages: 0,
-    maxReferenceImages: 0,
+    maxReferenceImages: 9,
+    videoReferenceMode: "reference",
+    videoReferenceModes: ["reference", "firstLast"],
+    referenceMediaTypes: ["image", "video", "audio"],
     durationOptions: ["5", "8", "10", "12", "15"],
+    referenceRoutes: {
+      imageToVideo: "api:/openapi/v2/bytedance/seedance-2.0-global/image-to-video",
+      firstLast: "api:/openapi/v2/bytedance/seedance-2.0-global/image-to-video",
+      reference: "api:/openapi/v2/bytedance/seedance-2.0-global/multimodal-video",
+    },
     request: {
       type: "seedance-video",
       endpoint: "/openapi/v2/bytedance/seedance-2.0-global/text-to-video",
@@ -427,6 +472,7 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     model: "api:/openapi/v2/bytedance/seedance-2.0-global/image-to-video",
     label: "RunningHub Seedance 2.0 Global Image-to-Video",
     kind: "video",
+    listed: false,
     supportsReferences: true,
     minReferenceImages: 1,
     maxReferenceImages: 2,
@@ -452,6 +498,7 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     model: "api:/openapi/v2/bytedance/seedance-2.0-global/multimodal-video",
     label: "RunningHub Seedance 2.0 Global Multimodal Video",
     kind: "video",
+    listed: false,
     supportsReferences: true,
     minReferenceImages: 1,
     maxReferenceImages: 9,
@@ -476,13 +523,19 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
   },
   {
     model: "api:/openapi/v2/gemini-omni-flash/text-to-video",
-    label: "RunningHub Gemini Omni Flash Text-to-Video",
+    label: "RunningHub Gemini Omni Flash Auto",
     kind: "video",
-    supportsReferences: false,
+    supportsReferences: true,
     minReferenceImages: 0,
-    maxReferenceImages: 0,
+    maxReferenceImages: 8,
+    videoReferenceMode: "reference",
+    referenceMediaTypes: ["image", "video"],
     durationOptions: ["4", "6", "8", "10"],
     resolutionOptions: ["720p", "1080p", "4k"],
+    referenceRoutes: {
+      imageToVideo: "api:/openapi/v2/gemini-omni-flash/image-to-video",
+      reference: "api:/openapi/v2/gemini-omni-flash/video-edit",
+    },
     request: {
       type: "aspect-resolution-video",
       endpoint: "/openapi/v2/gemini-omni-flash/text-to-video",
@@ -494,6 +547,7 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     model: "api:/openapi/v2/gemini-omni-flash/image-to-video",
     label: "RunningHub Gemini Omni Flash Image-to-Video",
     kind: "video",
+    listed: false,
     supportsReferences: true,
     minReferenceImages: 1,
     maxReferenceImages: 3,
@@ -511,6 +565,7 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     model: "api:/openapi/v2/gemini-omni-flash/video-edit",
     label: "RunningHub Gemini Omni Flash Video Edit",
     kind: "video",
+    listed: false,
     supportsReferences: true,
     minReferenceImages: 1,
     maxReferenceImages: 8,
@@ -588,6 +643,7 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     supportsReferences: true,
     minReferenceImages: 0,
     maxReferenceImages: 3,
+    videoReferenceMode: "reference",
     durationOptions: ["4", "6", "8"],
     referenceRoutes: {
       imageToVideo: "api:/openapi/v2/rhart-video-v3.1-fast-official/image-to-video",
@@ -704,6 +760,7 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     supportsReferences: true,
     minReferenceImages: 0,
     maxReferenceImages: 3,
+    videoReferenceMode: "reference",
     durationOptions: ["4", "6", "8"],
     referenceRoutes: {
       imageToVideo: "api:/openapi/v2/rhart-video-v3.1-pro-official/image-to-video",
@@ -815,7 +872,7 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     kind: "image",
     supportsReferences: true,
     minReferenceImages: 0,
-    maxReferenceImages: 14,
+    maxReferenceImages: 16,
     referenceRoutes: {
       imageToImage: "api:/openapi/v2/rhart-image-g-2/image-to-image",
     },
@@ -831,7 +888,7 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     kind: "image",
     supportsReferences: true,
     minReferenceImages: 0,
-    maxReferenceImages: 14,
+    maxReferenceImages: 16,
     referenceRoutes: {
       imageToImage: "api:/openapi/v2/rhart-image-g-2-official/image-to-image",
     },
@@ -849,7 +906,7 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     listed: false,
     supportsReferences: true,
     minReferenceImages: 1,
-    maxReferenceImages: 14,
+    maxReferenceImages: 16,
     request: {
       type: "aspect-resolution-image",
       endpoint: "/openapi/v2/rhart-image-g-2/image-to-image",
@@ -864,7 +921,7 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     listed: false,
     supportsReferences: true,
     minReferenceImages: 1,
-    maxReferenceImages: 14,
+    maxReferenceImages: 16,
     request: {
       type: "aspect-resolution-image",
       endpoint: "/openapi/v2/rhart-image-g-2-official/image-to-image",
@@ -921,6 +978,10 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
   },
 ];
 
+export function runningHubLlmBaseUrl(baseUrl: string): string {
+  return RUNNINGHUB_STANDARD_BASE_URLS.has(baseUrl) ? RUNNINGHUB_LLM_BASE_URL : baseUrl;
+}
+
 export function getRunningHubStandardModel(
   model: string,
   kind: RunningHubStandardModelKind,
@@ -932,6 +993,28 @@ export function resolveRunningHubStandardModelForReferences(
   model: RunningHubStandardModel,
   referenceCount: number,
 ): RunningHubStandardModel {
+  return resolveRunningHubStandardModel(model, referenceCount, false);
+}
+
+export function resolveRunningHubStandardModelForReferenceMedia(
+  model: RunningHubStandardModel,
+  references: readonly { type: MediaReferenceType }[],
+  referenceMode?: RunningHubReferenceMode,
+): RunningHubStandardModel {
+  return resolveRunningHubStandardModel(
+    model,
+    references.length,
+    references.some(reference => reference.type !== "image"),
+    referenceMode,
+  );
+}
+
+function resolveRunningHubStandardModel(
+  model: RunningHubStandardModel,
+  referenceCount: number,
+  hasNonImageReference: boolean,
+  referenceMode?: RunningHubReferenceMode,
+): RunningHubStandardModel {
   const routes = model.referenceRoutes;
   if (!routes || referenceCount === 0) return model;
 
@@ -942,7 +1025,15 @@ export function resolveRunningHubStandardModelForReferences(
   }
 
   const routedModel =
-    referenceCount === 1
+    hasNonImageReference
+      ? routes.reference
+      : referenceMode === "reference"
+        ? routes.reference ?? routes.imageToVideo
+        : referenceMode === "firstLast"
+          ? referenceCount === 2
+            ? routes.firstLast ?? routes.imageToVideo
+            : routes.imageToVideo ?? routes.reference
+      : referenceCount === 1
       ? routes.imageToVideo ?? routes.reference
       : referenceCount === 2
         ? routes.firstLast ?? routes.reference
@@ -1065,8 +1156,8 @@ export function buildRunningHubStandardBody(
       return {
         prompt: input.prompt,
         aspectRatio: input.aspectRatio === "auto" || input.aspectRatio === undefined ? "1:1" : input.aspectRatio,
-        resolution: model.request.resolution,
-        ...(model.request.quality ? { quality: model.request.quality } : {}),
+        resolution: readImageResolutionTier(input.imageResolution, model.request.resolution),
+        ...readImageQuality(input.imageQuality, model.request.quality),
         ...(model.request.referenceField ? { [model.request.referenceField]: referenceMediaUrls.imageUrls } : {}),
         ...model.request.extra,
       };
@@ -1088,6 +1179,24 @@ function readDimensions(value: string | undefined): { width: number; height: num
     width: Number(match[1]),
     height: Number(match[2]),
   };
+}
+
+function readImageResolutionTier(value: string | undefined, fallback: string): string {
+  if (!value || value === "auto") return fallback;
+  const normalized = value.toLowerCase();
+  if (normalized === "1k" || normalized === "2k" || normalized === "4k") return normalized;
+
+  const dimensions = readDimensions(value);
+  if (!dimensions) return fallback;
+  const longSide = Math.max(dimensions.width, dimensions.height);
+  if (longSide >= 3200) return "4k";
+  if (longSide >= 1900) return "2k";
+  return "1k";
+}
+
+function readImageQuality(value: string | undefined, fallback: string | undefined): Record<string, string> {
+  if (value && value !== "auto") return { quality: value };
+  return fallback ? { quality: fallback } : {};
 }
 
 function readHailuoDuration(value: string | undefined): string {

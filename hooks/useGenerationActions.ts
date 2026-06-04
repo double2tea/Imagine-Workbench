@@ -24,6 +24,7 @@ interface UseGenerationActionsParams {
   activeImageResolution: string;
   activeVideoDuration: string | undefined;
   activeVideoPreset: string | undefined;
+  activeVideoReferenceMode: VideoReferenceMode;
   activeVideoResolution: string | undefined;
   activeVideoSize: string;
   buildProviderHeaders: (target?: string) => Record<string, string>;
@@ -58,6 +59,7 @@ interface GenerationOverrides {
   thinkingLevel?: string;
   videoDuration?: string;
   videoPreset?: string;
+  videoReferenceMode?: VideoReferenceMode;
   videoResolution?: string;
 }
 
@@ -180,6 +182,7 @@ export function useGenerationActions({
   activeImageResolution,
   activeVideoDuration,
   activeVideoPreset,
+  activeVideoReferenceMode,
   activeVideoResolution,
   activeVideoSize,
   buildProviderHeaders,
@@ -379,6 +382,7 @@ export function useGenerationActions({
     const requestSize = overrides.size ?? activeVideoSize;
     const requestVideoDuration = overrides.videoDuration ?? activeVideoDuration;
     const requestVideoPreset = overrides.videoPreset ?? activeVideoPreset;
+    const requestVideoReferenceMode = overrides.videoReferenceMode ?? activeVideoReferenceMode;
     const requestVideoResolution = overrides.videoResolution ?? activeVideoResolution;
     const requestVideoCapabilities = getVideoModelCapabilities(requestModel);
 
@@ -386,7 +390,7 @@ export function useGenerationActions({
     const videoReferences = buildVideoReferences(
       activeReferenceImages,
       activeReferenceImage,
-      requestVideoCapabilities.referenceMode,
+      requestVideoReferenceMode,
       requestVideoCapabilities.maxReferenceImages,
     );
     const unsupportedReference = videoReferences.find(reference => !requestVideoCapabilities.referenceMediaTypes.includes(getMediaReferenceType(reference)));
@@ -415,6 +419,7 @@ export function useGenerationActions({
       aspectRatio: requestSize,
       videoDurationSeconds: requestVideoDuration,
       videoPreset: requestVideoPreset,
+      videoReferenceMode: requestVideoReferenceMode === "none" ? undefined : requestVideoReferenceMode,
       videoResolution: requestVideoResolution,
       referenceMedia: buildReferenceMediaSnapshot(videoReferences, videoReferencePayloads),
     };
@@ -454,6 +459,7 @@ export function useGenerationActions({
           aspectRatio: generationRequest.aspectRatio,
           durationSeconds: generationRequest.videoDurationSeconds,
           preset: generationRequest.videoPreset,
+          referenceMode: generationRequest.videoReferenceMode,
           resolutionName: generationRequest.videoResolution,
           model: generationRequest.model,
         }),

@@ -81,6 +81,7 @@ function serializeNodeContent(node: BoardNode): string {
         node.aspectRatio,
         node.videoDuration ?? "",
         node.videoPreset ?? "",
+        node.videoReferenceMode ?? "",
         node.videoResolution ?? "",
         node.variantCount,
         node.resultAssetId ?? "",

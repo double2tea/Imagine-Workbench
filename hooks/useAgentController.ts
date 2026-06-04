@@ -72,6 +72,7 @@ interface GenerationOverrides {
   thinkingLevel?: string;
   videoDuration?: string;
   videoPreset?: string;
+  videoReferenceMode?: "reference" | "firstLast";
   videoResolution?: string;
 }
 
@@ -300,6 +301,7 @@ export function useAgentController({
           videoResolution: params.videoResolution,
           videoDuration: params.videoDuration,
           videoPreset: params.videoPreset,
+          videoReferenceMode: params.videoReferenceMode,
         });
       }, 500);
     } else if (type === "edit_image") {

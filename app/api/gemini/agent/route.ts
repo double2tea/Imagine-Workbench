@@ -98,6 +98,7 @@ const agentActionSchema = z.object({
       videoResolution: z.string().optional(),
       videoDuration: z.string().optional(),
       videoPreset: z.string().optional(),
+      videoReferenceMode: z.enum(["reference", "firstLast"]).optional(),
     })
     .optional(),
 });
@@ -130,6 +131,7 @@ const agentBoardPatchCreateNodeSchema = z.object({
   videoResolution: z.string().optional(),
   videoDuration: z.string().optional(),
   videoPreset: z.string().optional(),
+  videoReferenceMode: z.enum(["reference", "firstLast"]).optional(),
   run: z.boolean().optional(),
 });
 
@@ -147,6 +149,7 @@ const agentBoardPatchUpdateNodeSchema = z.object({
   videoResolution: z.string().optional(),
   videoDuration: z.string().optional(),
   videoPreset: z.string().optional(),
+  videoReferenceMode: z.enum(["reference", "firstLast"]).optional(),
 });
 
 const agentBoardPatchConnectPortsSchema = z.object({
@@ -189,6 +192,7 @@ const agentBoardActionSchema = z.object({
       videoResolution: z.string().optional(),
       videoDuration: z.string().optional(),
       videoPreset: z.string().optional(),
+      videoReferenceMode: z.enum(["reference", "firstLast"]).optional(),
       title: z.string().optional(),
       body: z.string().optional(),
       instruction: z.string().optional(),
@@ -313,7 +317,7 @@ export async function POST(req: NextRequest) {
       `${galleryText}\n\n` +
       "## Output\n" +
       "Return ONLY valid JSON:\n" +
-      '{"thought":"...","text":"Chinese user-facing reply","activeSkills":["..."],"recommendedAction":{"type":"none|optimize_prompt|generate_image|edit_image|generate_video","params":{"prompt":"...","model":"...","aspectRatio":"...","referenceImageId":"...","imageResolution":"...","imageQuality":"...","thinkingLevel":"...","videoResolution":"...","videoDuration":"...","videoPreset":"..."}},"boardAction":{"type":"none|create_board_image_flow|create_board_video_flow|create_board_note|update_board_node|apply_board_patch|continue_image_to_video","params":{"nodeId":"...","prompt":"...","model":"...","aspectRatio":"...","referenceImageId":"...","imageResolution":"...","imageQuality":"...","thinkingLevel":"...","videoResolution":"...","videoDuration":"...","videoPreset":"...","title":"...","body":"...","instruction":"...","boardPatch":{"title":"...","run":false,"shots":[{"id":"S1","scene":"...","shot":"...","beat":"...","imagePrompt":"...","videoPrompt":"...","run":false}],"operations":[{"op":"create_node","tempId":"shot1_prompt","kind":"prompt","title":"S1 Prompt","prompt":"...","position":{"x":120,"y":160}},{"op":"create_node","tempId":"shot1_image","kind":"image-generate","title":"S1 Image","prompt":"...","model":"...","aspectRatio":"16:9","run":false,"position":{"x":520,"y":160}},{"op":"connect_ports","from":{"nodeId":"shot1_prompt","portId":"prompt-out","portKind":"prompt"},"to":{"nodeId":"shot1_image","portId":"prompt-in","portKind":"prompt"}}]},"run":true}},"suggestedFollowUps":["...","..."]}\n\n' +
+      '{"thought":"...","text":"Chinese user-facing reply","activeSkills":["..."],"recommendedAction":{"type":"none|optimize_prompt|generate_image|edit_image|generate_video","params":{"prompt":"...","model":"...","aspectRatio":"...","referenceImageId":"...","imageResolution":"...","imageQuality":"...","thinkingLevel":"...","videoResolution":"...","videoDuration":"...","videoPreset":"...","videoReferenceMode":"reference|firstLast"}},"boardAction":{"type":"none|create_board_image_flow|create_board_video_flow|create_board_note|update_board_node|apply_board_patch|continue_image_to_video","params":{"nodeId":"...","prompt":"...","model":"...","aspectRatio":"...","referenceImageId":"...","imageResolution":"...","imageQuality":"...","thinkingLevel":"...","videoResolution":"...","videoDuration":"...","videoPreset":"...","videoReferenceMode":"reference|firstLast","title":"...","body":"...","instruction":"...","boardPatch":{"title":"...","run":false,"shots":[{"id":"S1","scene":"...","shot":"...","beat":"...","imagePrompt":"...","videoPrompt":"...","run":false}],"operations":[{"op":"create_node","tempId":"shot1_prompt","kind":"prompt","title":"S1 Prompt","prompt":"...","position":{"x":120,"y":160}},{"op":"create_node","tempId":"shot1_image","kind":"image-generate","title":"S1 Image","prompt":"...","model":"...","aspectRatio":"16:9","run":false,"position":{"x":520,"y":160}},{"op":"connect_ports","from":{"nodeId":"shot1_prompt","portId":"prompt-out","portKind":"prompt"},"to":{"nodeId":"shot1_image","portId":"prompt-in","portKind":"prompt"}}]},"run":true}},"suggestedFollowUps":["...","..."]}\n\n' +
       referenceMsg;
 
     const tools = getAgentTools();

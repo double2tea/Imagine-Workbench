@@ -97,7 +97,7 @@ export const PROVIDER_REGISTRY = [
     hasEditableBaseUrl: true,
     supportsImage: true,
     supportsVideo: true,
-    supportsChat: false,
+    supportsChat: true,
   },
 ] as const;
 

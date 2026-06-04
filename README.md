@@ -68,6 +68,7 @@ MODELSCOPE_BASE_URL="https://api-inference.modelscope.cn"
 
 RUNNINGHUB_API_KEY="your_runninghub_api_key"
 RUNNINGHUB_BASE_URL="https://www.runninghub.cn"
+# RunningHub LLM chat uses https://llm.runninghub.cn automatically when the base URL is the official Standard Model host.
 ```
 
 The app can also accept provider credentials from the in-app settings panel. Request headers from the UI are resolved by `lib/providers/utils.ts`.
@@ -145,6 +146,7 @@ Current adapters:
 - 星途 (xstx): OpenAI-compatible chat, image, and model listing
 - Agnes AI: OpenAI-compatible chat, image, video, and model listing
 - ModelScope image: API-Inference `/v1/images/generations` with async polling via `/v1/tasks/{task_id}`
+- RunningHub LLM chat/model list: OpenAI-compatible `/v1/chat/completions` and `/v1/models` via `https://llm.runninghub.cn`
 - RunningHub image/video: configured Standard Model API endpoints (`api:/openapi/v2/...`) are polled through `/openapi/v2/query`; AI App / Workflow virtual models are polled through `/task/openapi/outputs`
 
 ModelScope public REST video generation is not enabled by default because the public official docs verified for this implementation do not expose one stable unified REST video endpoint. Use a deployed OpenAI-compatible service or RunningHub for video.

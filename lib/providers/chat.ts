@@ -1,4 +1,5 @@
 import type { ChatCompletionWithToolsResponse, ChatMessageInput, ProviderConfig, ToolDefinition } from "./types";
+import { runningHubLlmBaseUrl } from "./runninghub";
 import { postJson, requireText } from "./utils";
 
 interface ChatCompletionResponse {
@@ -15,11 +16,12 @@ export async function createChatCompletionText(
   messages: ChatMessageInput[],
   temperature: number,
 ): Promise<string> {
-  const response = await postJson<ChatCompletionResponse>(`${config.baseUrl}/v1/chat/completions`, config, {
+  const response = await postJson<ChatCompletionResponse>(chatCompletionsUrl(config), config, {
     model,
     messages,
     temperature,
     stream: false,
+    ...runningHubChatDefaults(config),
   });
 
   const content = response.choices?.[0]?.message?.content;
@@ -44,14 +46,24 @@ export async function createChatCompletionWithTools(
   tools: ToolDefinition[],
   temperature: number,
 ): Promise<ChatCompletionWithToolsResponse> {
-  return postJson<ChatCompletionWithToolsResponse>(`${config.baseUrl}/v1/chat/completions`, config, {
+  return postJson<ChatCompletionWithToolsResponse>(chatCompletionsUrl(config), config, {
     model,
     messages,
     tools,
     tool_choice: "auto",
     temperature,
     stream: false,
+    ...runningHubChatDefaults(config),
   });
+}
+
+function chatCompletionsUrl(config: ProviderConfig): string {
+  const baseUrl = config.provider === "runninghub" ? runningHubLlmBaseUrl(config.baseUrl) : config.baseUrl;
+  return `${baseUrl}/v1/chat/completions`;
+}
+
+function runningHubChatDefaults(config: ProviderConfig): Record<string, unknown> {
+  return config.provider === "runninghub" ? { reasoning_effort: "none" } : {};
 }
 
 export function parseJsonObjectText(text: string): unknown {

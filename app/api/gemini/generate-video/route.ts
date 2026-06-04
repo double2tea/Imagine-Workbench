@@ -14,6 +14,7 @@ interface GenerateVideoBody {
   aspectRatio?: unknown;
   durationSeconds?: unknown;
   preset?: unknown;
+  referenceMode?: unknown;
   resolutionName?: unknown;
   image?: unknown;
   lastFrame?: unknown;
@@ -44,6 +45,7 @@ export async function POST(req: NextRequest) {
       aspectRatio: optionalText(body.aspectRatio) ?? "16:9",
       durationSeconds: optionalText(body.durationSeconds),
       preset: optionalText(body.preset),
+      referenceMode: readReferenceMode(body.referenceMode),
       resolutionName: optionalText(body.resolutionName),
       referenceMedia,
     });
@@ -54,6 +56,10 @@ export async function POST(req: NextRequest) {
     console.error("Generate video endpoint failed:", err);
     return NextResponse.json({ error: message }, { status: videoErrorStatus(message) });
   }
+}
+
+function readReferenceMode(value: unknown): "reference" | "firstLast" | undefined {
+  return value === "reference" || value === "firstLast" ? value : undefined;
 }
 
 function videoErrorStatus(message: string): number {

@@ -24,6 +24,7 @@ export type AgentToolActionType = AgentWorkbenchActionType | AgentBoardActionTyp
 
 export type AgentBoardPatchNodeKind = "prompt" | "note" | "image-generate" | "video-generate" | "agent";
 export type AgentBoardPatchPortKind = "asset" | "prompt" | "result" | "agent";
+export type AgentVideoReferenceMode = "reference" | "firstLast";
 
 export interface AgentBoardPatchPoint {
   x: number;
@@ -63,6 +64,7 @@ export interface AgentBoardPatchCreateNodeOperation {
   videoResolution?: string;
   videoDuration?: string;
   videoPreset?: string;
+  videoReferenceMode?: AgentVideoReferenceMode;
   run?: boolean;
 }
 
@@ -80,6 +82,7 @@ export interface AgentBoardPatchUpdateNodeOperation {
   videoResolution?: string;
   videoDuration?: string;
   videoPreset?: string;
+  videoReferenceMode?: AgentVideoReferenceMode;
 }
 
 export interface AgentBoardPatchConnectPortsOperation {
@@ -111,6 +114,7 @@ export interface AgentGenerationParams {
   videoResolution?: string;
   videoDuration?: string;
   videoPreset?: string;
+  videoReferenceMode?: AgentVideoReferenceMode;
   title?: string;
   body?: string;
   instruction?: string;
