@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { Upload } from "lucide-react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import {
-  applyNodeChanges,
   BaseEdge,
   Background,
   BackgroundVariant,
@@ -28,17 +28,26 @@ import {
   type OnReconnect,
   type OnSelectionChangeFunc,
   type ReactFlowInstance,
+  useNodesState,
   useReactFlow,
 } from "@xyflow/react";
-import BoardQuickInsertMenu from "@/components/board/BoardQuickInsertMenu";
+import BoardQuickInsertMenu, { type BoardQuickInsertMenuItem } from "@/components/board/BoardQuickInsertMenu";
 import BoardNodeContextMenu, { buildBoardNodeContextMenuActions } from "@/components/board/BoardNodeContextMenu";
-import { BOARD_TRASH_LIMIT, IMAGINE_BOARD_ASSET_DRAG_TYPE, isTextEntryTarget } from "@/lib/board/interaction";
+import { BoardMediaImportProvider } from "@/components/board/BoardMediaImportContext";
+import {
+  BOARD_MEDIA_FILE_ACCEPT,
+  BOARD_QUICK_INSERT_IMPORT_KIND,
+  BOARD_TRASH_LIMIT,
+  IMAGINE_BOARD_ASSET_DRAG_TYPE,
+  isTextEntryTarget,
+} from "@/lib/board/interaction";
 import type { BoardStateController } from "@/hooks/useBoardState";
 import BoardNode, { type BoardFlowNode } from "@/components/board/BoardNode";
 import type { BoardGenerateInputSummary, BoardGenerateTaskSummary } from "@/components/board/GenerateBoardNode";
 import BoardEmptyHint from "@/components/board/BoardEmptyHint";
 import BoardToolbar from "@/components/board/BoardToolbar";
 import BoardAssetCompareOverlay from "@/components/board/BoardAssetCompareOverlay";
+import type { WorkspaceNoticeType } from "@/components/workbench/WorkspaceNotices";
 import { ensureHydratedStorageItem } from "@/lib/assets/ensure-hydrated";
 import type { StorageItem } from "@/lib/db";
 import {
@@ -84,6 +93,7 @@ interface BoardWorkspaceProps {
   onBack: () => void;
   onCaptureVideoFrame: (nodeId: string, item: StorageItem, frame: CapturedVideoFrame) => void | Promise<void>;
   onConnectionError: (message: string) => void;
+  onWorkspaceNotice: (type: WorkspaceNoticeType, message: string) => void;
   onCancelGenerateNode: (nodeId: string) => void;
   onEditAssetImage: (nodeId: string) => void;
   onExecuteGenerateNode: (nodeId: string) => void;
@@ -145,10 +155,6 @@ function sameStringList(left: string[], right: string[]): boolean {
   return left.every((value, index) => value === right[index]);
 }
 
-function sameOptionalNumber(left: number | undefined, right: number | undefined): boolean {
-  return left === right;
-}
-
 function sameBoardViewportModel(left: BoardViewport, right: BoardViewport): boolean {
   return (
     Math.abs(left.x - right.x) < BOARD_VIEWPORT_POSITION_EPSILON &&
@@ -161,25 +167,87 @@ function sameBoardSelectionSnapshot(left: BoardSelectionSnapshot, right: BoardSe
   return left.edgeId === right.edgeId && left.nodeId === right.nodeId && sameStringList(left.nodeIds, right.nodeIds);
 }
 
-function sameFlowNodeState(left: BoardFlowNode, right: BoardFlowNode): boolean {
+function sameBoardNodeRenderModel(left: BoardNodeModel, right: BoardNodeModel): boolean {
   return (
-    left.id === right.id &&
-    left.type === right.type &&
-    left.data === right.data &&
-    left.position.x === right.position.x &&
-    left.position.y === right.position.y &&
-    left.selected === right.selected &&
-    left.dragging === right.dragging &&
-    sameOptionalNumber(left.measured?.width, right.measured?.width) &&
-    sameOptionalNumber(left.measured?.height, right.measured?.height) &&
-    sameOptionalNumber(left.width, right.width) &&
-    sameOptionalNumber(left.height, right.height)
+    left === right ||
+    (
+      left.id === right.id &&
+      left.kind === right.kind &&
+      left.title === right.title &&
+      left.updatedAt === right.updatedAt &&
+      left.size.width === right.size.width &&
+      left.size.height === right.size.height
+    )
   );
 }
 
-function sameFlowNodeList(left: BoardFlowNode[], right: BoardFlowNode[]): boolean {
+function sameReferenceList(
+  left: BoardFlowNode["data"]["generateReferences"],
+  right: BoardFlowNode["data"]["generateReferences"],
+): boolean {
   if (left.length !== right.length) return false;
-  return left.every((node, index) => sameFlowNodeState(node, right[index]));
+  return left.every((reference, index) => {
+    const other = right[index];
+    return reference.id === other.id && reference.url === other.url && reference.role === other.role;
+  });
+}
+
+function sameGenerateInputSummary(
+  left: BoardGenerateInputSummary | undefined,
+  right: BoardGenerateInputSummary | undefined,
+): boolean {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  if (
+    left.promptPreview !== right.promptPreview ||
+    left.promptSourceTitle !== right.promptSourceTitle ||
+    left.referenceCount !== right.referenceCount ||
+    left.referencePreviews.length !== right.referencePreviews.length
+  ) return false;
+  return left.referencePreviews.every((reference, index) => {
+    const other = right.referencePreviews[index];
+    return reference.id === other.id && reference.url === other.url && reference.role === other.role;
+  });
+}
+
+function sameGenerateTaskSummary(
+  left: BoardGenerateTaskSummary | undefined,
+  right: BoardGenerateTaskSummary | undefined,
+): boolean {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  return left.id === right.id && left.progress === right.progress && left.status === right.status;
+}
+
+function sameFlowNodeDataModel(left: BoardFlowNode["data"], right: BoardFlowNode["data"]): boolean {
+  return (
+    sameBoardNodeRenderModel(left.node, right.node) &&
+    left.hasResultConnection === right.hasResultConnection &&
+    left.compareReferenceUrl === right.compareReferenceUrl &&
+    sameGenerateInputSummary(left.generateInputSummary, right.generateInputSummary) &&
+    sameGenerateTaskSummary(left.generateTaskSummary, right.generateTaskSummary) &&
+    sameReferenceList(left.generateReferences, right.generateReferences) &&
+    sameReferenceList(left.promptReferences, right.promptReferences)
+  );
+}
+
+function sameFlowNodeModel(left: BoardFlowNode, right: BoardFlowNode): boolean {
+  return (
+    left.id === right.id &&
+    left.type === right.type &&
+    sameFlowNodeDataModel(left.data, right.data) &&
+    left.position.x === right.position.x &&
+    left.position.y === right.position.y
+  );
+}
+
+function sameFlowNodeModelList(left: BoardFlowNode[], right: BoardFlowNode[]): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((node, index) => sameFlowNodeModel(node, right[index]));
+}
+
+function sameFlowNodeListByReference(left: BoardFlowNode[], right: BoardFlowNode[]): boolean {
+  return left.length === right.length && left.every((node, index) => node === right[index]);
 }
 
 function boardSelectedNodeIdSet(selectedNodeId: string | null, selectedNodeIds: string[]): Set<string> {
@@ -188,16 +256,75 @@ function boardSelectedNodeIdSet(selectedNodeId: string | null, selectedNodeIds: 
   return ids;
 }
 
-function boardFlowNodesWithSelection(
+function patchFlowNodeSelection(
   nodes: BoardFlowNode[],
   selectedNodeId: string | null,
   selectedNodeIds: string[],
 ): BoardFlowNode[] {
   const selectedIdSet = boardSelectedNodeIdSet(selectedNodeId, selectedNodeIds);
-  return nodes.map(node => ({
-    ...node,
-    selected: selectedIdSet.has(node.id),
-  }));
+  let changed = false;
+  const next = nodes.map(node => {
+    const selected = selectedIdSet.has(node.id);
+    if (node.selected === selected) return node;
+    changed = true;
+    return { ...node, selected };
+  });
+  return changed ? next : nodes;
+}
+
+function mergeFlowNodesFromBoard(
+  current: BoardFlowNode[],
+  flowNodes: BoardFlowNode[],
+  selectedNodeId: string | null,
+  selectedNodeIds: string[],
+): BoardFlowNode[] {
+  const selectedIdSet = boardSelectedNodeIdSet(selectedNodeId, selectedNodeIds);
+  const previousById = new Map(current.map(node => [node.id, node]));
+  return flowNodes.map(flowNode => {
+    const selected = selectedIdSet.has(flowNode.id);
+    const previous = previousById.get(flowNode.id);
+    if (previous && sameFlowNodeModel(previous, flowNode)) {
+      if (previous.selected === selected) return previous;
+      return { ...previous, selected };
+    }
+    if (!previous) return { ...flowNode, selected };
+    return {
+      ...flowNode,
+      selected,
+      measured: previous.measured,
+      dragging: previous.dragging,
+      width: previous.width,
+      height: previous.height,
+    };
+  });
+}
+
+function syncReactFlowNodesFromBoard(
+  current: BoardFlowNode[],
+  flowNodes: BoardFlowNode[],
+  selectedNodeId: string | null,
+  selectedNodeIds: string[],
+): BoardFlowNode[] {
+  const next = sameFlowNodeModelList(current, flowNodes)
+    ? patchFlowNodeSelection(current, selectedNodeId, selectedNodeIds)
+    : mergeFlowNodesFromBoard(current, flowNodes, selectedNodeId, selectedNodeIds);
+  return sameFlowNodeListByReference(current, next) ? current : next;
+}
+
+function boardIntendedSelectionSnapshot(
+  selectedEdgeId: string | null,
+  selectedNodeId: string | null,
+  selectedNodeIds: string[],
+): BoardSelectionSnapshot {
+  if (selectedEdgeId) {
+    return { edgeId: selectedEdgeId, nodeId: null, nodeIds: [] };
+  }
+  const nodeIds = selectedNodeIds.length > 0
+    ? selectedNodeIds
+    : selectedNodeId
+      ? [selectedNodeId]
+      : [];
+  return { edgeId: null, nodeId: nodeIds[0] ?? null, nodeIds };
 }
 
 function BoardEdgeComponent({
@@ -274,6 +401,14 @@ const reactFlowDefaultEdgeOptions = { type: "smoothstep" };
 const reactFlowDeleteKeyCode = ["Backspace", "Delete"];
 const reactFlowPanOnDrag = [1, 2];
 const reactFlowProOptions = { hideAttribution: true };
+
+const BOARD_QUICK_INSERT_IMPORT_ITEM: BoardQuickInsertMenuItem = {
+  kind: BOARD_QUICK_INSERT_IMPORT_KIND,
+  label: "导入媒体",
+  icon: Upload,
+  iconClassName: "text-emerald-300",
+  iconSurfaceClassName: "bg-emerald-500/10 border-emerald-400/20",
+};
 
 function portKindFromHandle(handleId: string | null | undefined): BoardPortKind | null {
   if (!handleId) return null;
@@ -399,9 +534,9 @@ async function imageUrlToFile(url: string, index: number): Promise<File> {
   return new File([blob], `board-drag-image-${index}.${extensionFromImageType(blob.type)}`, { type: blob.type });
 }
 
-function pasteImageFiles(dataTransfer: DataTransfer): File[] {
+function pasteMediaFiles(dataTransfer: DataTransfer): File[] {
   return Array.from(dataTransfer.items)
-    .filter(item => item.kind === "file" && item.type.startsWith("image/"))
+    .filter(item => item.kind === "file" && (item.type.startsWith("image/") || item.type.startsWith("video/")))
     .map(item => item.getAsFile())
     .filter((file): file is File => file !== null);
 }
@@ -485,6 +620,7 @@ export default function BoardWorkspace({
   onCancelGenerateNode,
   onCaptureVideoFrame,
   onConnectionError,
+  onWorkspaceNotice,
   onEditAssetImage,
   onExecuteGenerateNode,
   onImportBoardFiles,
@@ -505,10 +641,13 @@ export default function BoardWorkspace({
   const themeMode = useThemeModeSnapshot();
   const flowInstanceRef = useRef<ReactFlowInstance<BoardFlowNode, BoardFlowEdge> | null>(null);
   const flowHostRef = useRef<HTMLElement | null>(null);
+  const mediaImportInputRef = useRef<HTMLInputElement>(null);
+  const pendingImportPointRef = useRef<BoardPoint | null>(null);
   const copiedNodeRef = useRef<CopiedBoardNode | null>(null);
   const isNodeDragActiveRef = useRef(false);
   const pendingDragPositionByIdRef = useRef<Map<string, BoardPoint>>(new Map());
   const selectionRef = useRef<BoardSelectionSnapshot>({ edgeId: null, nodeId: null, nodeIds: [] });
+  const isSyncingFlowNodesRef = useRef(false);
   const [quickInsertMenu, setQuickInsertMenu] = useState<QuickInsertMenu | null>(null);
   const [nodeContextMenu, setNodeContextMenu] = useState<BoardNodeContextMenuState | null>(null);
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
@@ -587,6 +726,10 @@ export default function BoardWorkspace({
   const boardGraphContentKey = useMemo(
     () => buildBoardGraphContentKey(board.nodes, board.edges),
     [board.nodes, board.edges],
+  );
+  const boardNodePositionsKey = useMemo(
+    () => board.nodes.map(node => `${node.id}:${node.position.x},${node.position.y}`).join("|"),
+    [board.nodes],
   );
 
   const closeOverlayMenus = useCallback(() => {
@@ -749,19 +892,23 @@ export default function BoardWorkspace({
           },
         };
       }),
-    [board.nodes, flowNodeDataById, generateTaskByNodeId],
+    // board.nodes read inside; graph + position keys gate rebuilds
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [boardGraphContentKey, boardNodePositionsKey, flowNodeDataById, generateTaskByNodeId],
   );
-  const [reactFlowNodes, setReactFlowNodes] = useState<BoardFlowNode[]>(() =>
-    boardFlowNodesWithSelection(flowNodes, selectedNodeId, selectedNodeIds),
-  );
+  const [reactFlowNodes, setReactFlowNodes, onNodesChange] = useNodesState<BoardFlowNode>([]);
   const reactFlowNodesRef = useRef<BoardFlowNode[]>(reactFlowNodes);
   useLayoutEffect(() => {
+    reactFlowNodesRef.current = reactFlowNodes;
+  }, [reactFlowNodes]);
+  useLayoutEffect(() => {
     if (isNodeDragActiveRef.current) return;
-    const nextNodes = boardFlowNodesWithSelection(flowNodes, selectedNodeId, selectedNodeIds);
-    if (sameFlowNodeList(reactFlowNodesRef.current, nextNodes)) return;
-    reactFlowNodesRef.current = nextNodes;
-    setReactFlowNodes(nextNodes);
-  }, [flowNodes, selectedNodeId, selectedNodeIds]);
+    isSyncingFlowNodesRef.current = true;
+    setReactFlowNodes(current => syncReactFlowNodesFromBoard(current, flowNodes, selectedNodeId, selectedNodeIds));
+    queueMicrotask(() => {
+      isSyncingFlowNodesRef.current = false;
+    });
+  }, [flowNodes, selectedNodeId, selectedNodeIds, setReactFlowNodes]);
   const flowEdges = useMemo<BoardFlowEdge[]>(
     () =>
       board.edges.map(edge => ({
@@ -771,7 +918,6 @@ export default function BoardWorkspace({
         sourceHandle: edge.from.portId,
         targetHandle: edge.to.portId,
         type: "smoothstep",
-        selected: selectedEdgeId === edge.id,
         animated: edge.kind === "result" || isGenerateEdgeProcessing(edge, board.nodes),
         data: { kind: edge.kind, processing: isGenerateEdgeProcessing(edge, board.nodes) },
         className: `imagine-board-edge imagine-board-edge-${edge.kind}`,
@@ -805,6 +951,7 @@ export default function BoardWorkspace({
   };
 
   const handleSelectionChange = useCallback<OnSelectionChangeFunc<BoardFlowNode, BoardFlowEdge>>(({ nodes, edges }) => {
+    if (isSyncingFlowNodesRef.current) return;
     const ids = nodes.map(node => node.id);
     const edgeId = edges[0]?.id ?? null;
     const nodeId = ids[0] ?? null;
@@ -819,12 +966,14 @@ export default function BoardWorkspace({
     const nextSelection = edgeId
       ? { edgeId, nodeId: null, nodeIds: ids }
       : { edgeId: null, nodeId, nodeIds: ids };
+    const intendedSelection = boardIntendedSelectionSnapshot(selectedEdgeId, selectedNodeId, selectedNodeIds);
+    if (sameBoardSelectionSnapshot(intendedSelection, nextSelection)) return;
     if (sameBoardSelectionSnapshot(selectionRef.current, nextSelection)) return;
     selectionRef.current = nextSelection;
     updateSelectedNodeIds(ids);
     selectEdge(nextSelection.edgeId);
     selectNode(nextSelection.nodeId);
-  }, [board.nodes, selectEdge, selectedNodeId, selectNode, updateSelectedNodeIds]);
+  }, [board.nodes, selectEdge, selectedEdgeId, selectedNodeId, selectedNodeIds, selectNode, updateSelectedNodeIds]);
 
   const handleNodeClick: NodeMouseHandler<BoardFlowNode> = () => {
     closeOverlayMenus();
@@ -888,12 +1037,8 @@ export default function BoardWorkspace({
   }, [beginUndoGesture, endUndoGesture, updateNodesPositions]);
 
   const handleNodesChange = useCallback<OnNodesChange<BoardFlowNode>>((changes) => {
-    setReactFlowNodes(currentNodes => {
-      const nextNodes = applyNodeChanges(changes, currentNodes);
-      const resolvedNodes = sameFlowNodeList(currentNodes, nextNodes) ? currentNodes : nextNodes;
-      reactFlowNodesRef.current = resolvedNodes;
-      return resolvedNodes;
-    });
+    onNodesChange(changes);
+
     const settledPositions: Array<{ nodeId: string; position: BoardPoint }> = [];
     for (const change of changes) {
       if (change.type !== "position" || !change.position || change.dragging === true) continue;
@@ -905,7 +1050,7 @@ export default function BoardWorkspace({
     }
     if (settledPositions.length === 0) return;
     updateNodesPositions(settledPositions);
-  }, [updateNodesPositions]);
+  }, [onNodesChange, updateNodesPositions]);
 
   const handleMoveEnd = useCallback((_event: MouseEvent | TouchEvent | null, viewport: BoardViewport): void => {
     if (sameBoardViewportModel(viewportRef.current, viewport)) return;
@@ -1023,7 +1168,7 @@ export default function BoardWorkspace({
 
   const quickInsertMenuItems = useMemo(() => {
     const from = quickInsertMenu?.connectionFrom;
-    if (!from) return BOARD_INSERT_CATALOG;
+    if (!from) return [BOARD_QUICK_INSERT_IMPORT_ITEM, ...BOARD_INSERT_CATALOG];
     const sourceNode = board.nodes.find(node => node.id === from.nodeId);
     if (from.portKind === "prompt") {
       return BOARD_INSERT_CATALOG.filter(item => item.kind === "image-generate" || item.kind === "video-generate");
@@ -1229,6 +1374,26 @@ export default function BoardWorkspace({
     setQuickInsertMenu(null);
   }, [centeredNodePosition, onImportBoardFiles]);
 
+  const openMediaImportPicker = useCallback((point?: BoardPoint): void => {
+    flowHostRef.current?.focus();
+    const resolved = point ?? visibleCenterPosition(DEFAULT_ASSET_NODE_SIZE);
+    if (!resolved) {
+      onWorkspaceNotice("info", "无法确定导入位置，请先点击画布再试");
+      return;
+    }
+    pendingImportPointRef.current = resolved;
+    mediaImportInputRef.current?.click();
+  }, [onWorkspaceNotice, visibleCenterPosition]);
+
+  const handleMediaImportInputChange = useCallback((event: ChangeEvent<HTMLInputElement>): void => {
+    const files = event.target.files ? Array.from(event.target.files) : [];
+    event.target.value = "";
+    const point = pendingImportPointRef.current;
+    pendingImportPointRef.current = null;
+    if (!point || files.length === 0) return;
+    importFilesAtPoint(files, point);
+  }, [importFilesAtPoint]);
+
   const importImageUrlsAtPoint = useCallback((urls: string[], point: BoardPoint): void => {
     if (urls.length === 0) return;
     void Promise.all(urls.map((url, index) => imageUrlToFile(url, index)))
@@ -1286,7 +1451,7 @@ export default function BoardWorkspace({
       if (event.defaultPrevented || isTextEntryTarget(event.target)) return;
       const clipboardData = event.clipboardData;
       if (!clipboardData) return;
-      const files = pasteImageFiles(clipboardData);
+      const files = pasteMediaFiles(clipboardData);
       if (files.length === 0) return;
       const position = visibleCenterPosition(DEFAULT_ASSET_NODE_SIZE);
       if (!position) return;
@@ -1359,7 +1524,16 @@ export default function BoardWorkspace({
   ]);
 
   return (
+    <BoardMediaImportProvider openImport={openMediaImportPicker}>
     <main className="imagine-workbench-shell imagine-theme-dark flex h-screen min-h-0 flex-col bg-[var(--iw-bg)] text-[var(--iw-text)]">
+      <input
+        ref={mediaImportInputRef}
+        type="file"
+        accept={BOARD_MEDIA_FILE_ACCEPT}
+        multiple
+        className="hidden"
+        onChange={handleMediaImportInputChange}
+      />
       <BoardToolbar
         boardId={board.id}
         boardSummaries={boardSummaries}
@@ -1387,6 +1561,7 @@ export default function BoardWorkspace({
         onToggleGrid={() => updateBoardConfig({ showGrid: !board.config.showGrid })}
         onToggleMiniMap={() => updateBoardConfig({ showMiniMap: !board.config.showMiniMap })}
         onToggleSnapToGrid={() => updateBoardConfig({ snapToGrid: !board.config.snapToGrid })}
+        onImportMedia={() => openMediaImportPicker()}
       />
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto]">
         <section
@@ -1476,6 +1651,11 @@ export default function BoardWorkspace({
               items={quickInsertMenuItems}
               position={quickInsertMenu.position}
               onPick={(kind, position) => {
+                if (kind === BOARD_QUICK_INSERT_IMPORT_KIND) {
+                  openMediaImportPicker(position);
+                  setQuickInsertMenu(null);
+                  return;
+                }
                 const quickKind = kind as BoardInsertKind;
                 if (quickInsertMenu.connectionFrom) {
                   addConnectedQuickNodeAtPoint(quickKind, position, quickInsertMenu.connectionFrom);
@@ -1553,5 +1733,6 @@ export default function BoardWorkspace({
         />
       )}
     </main>
+    </BoardMediaImportProvider>
   );
 }

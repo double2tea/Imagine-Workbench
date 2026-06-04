@@ -1809,6 +1809,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onCancelGenerateNode={handleCancelGenerateNode}
         onCaptureVideoFrame={handleCaptureVideoFrame}
         onConnectionError={handleBoardConnectionError}
+        onWorkspaceNotice={pushWorkspaceNotice}
         onCreateBoard={handleCreateBoard}
         onDeleteBoard={handleDeleteBoard}
         onEditAssetImage={editBoardAssetImage}

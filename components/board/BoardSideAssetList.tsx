@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Video } from "lucide-react";
+import { Upload, Video } from "lucide-react";
+import { useBoardMediaImport } from "@/components/board/BoardMediaImportContext";
 import PreviewImage from "@/components/PreviewImage";
 import { useResolvedAssetUrl } from "@/hooks/useResolvedAssetUrl";
 import { ensureHydratedStorageItem } from "@/lib/assets/ensure-hydrated";
@@ -80,6 +81,21 @@ function BoardSideAssetRow({
   );
 }
 
+function ImportMediaButton({ className = "" }: { className?: string }) {
+  const openImport = useBoardMediaImport();
+  if (!openImport) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => openImport()}
+      className={`imagine-secondary-action flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-[var(--iw-border)] text-[11px] font-semibold text-[var(--iw-text)] ${className}`}
+    >
+      <Upload className="h-3.5 w-3.5 text-emerald-300" />
+      从本机导入图片/视频
+    </button>
+  );
+}
+
 export default function BoardSideAssetList({
   canvasAssetIds,
   highlightAssetId,
@@ -111,6 +127,7 @@ export default function BoardSideAssetList({
   if (loading) {
     return (
       <div className="flex flex-col gap-2 px-3 pb-3 pt-1">
+        <ImportMediaButton />
         <p className="rounded-lg border border-dashed border-[var(--iw-border)] px-3 py-6 text-center text-xs text-[var(--iw-muted)]">
           正在加载本画板资产…
         </p>
@@ -121,8 +138,9 @@ export default function BoardSideAssetList({
   if (items.length === 0) {
     return (
       <div className="flex flex-col gap-2 px-3 pb-3 pt-1">
+        <ImportMediaButton />
         <p className="rounded-lg border border-dashed border-[var(--iw-border)] px-3 py-6 text-center text-xs text-[var(--iw-muted)]">
-          本画板暂无关联资产。在此画板生成，或从画布引用已有节点。
+          本画板暂无关联资产。使用上方导入，或在此画板生成后出现在列表中。
         </p>
       </div>
     );
@@ -130,6 +148,7 @@ export default function BoardSideAssetList({
 
   return (
     <div className="flex flex-col gap-2 px-3 pb-3 pt-1">
+      <ImportMediaButton />
       <div className="flex flex-wrap gap-1.5">
         {filterChips.map(chip => (
           <button

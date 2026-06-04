@@ -2,7 +2,13 @@ export const BOARD_TRASH_LIMIT = 20;
 
 export const IMAGINE_BOARD_ASSET_DRAG_TYPE = "application/x-imagine-board-asset-id";
 
-export const BOARD_QUICK_INSERT_MENU_SIZE = { width: 176, height: 280 } as const;
+/** File picker accept for board-local image/video import. */
+export const BOARD_MEDIA_FILE_ACCEPT = "image/*,video/*";
+
+/** Quick-insert menu item kind (not a board node type). */
+export const BOARD_QUICK_INSERT_IMPORT_KIND = "import-media";
+
+export const BOARD_QUICK_INSERT_MENU_SIZE = { width: 176, height: 312 } as const;
 export const BOARD_NODE_CONTEXT_MENU_SIZE = { width: 200, height: 240 } as const;
 
 export function isTextEntryTarget(target: EventTarget | null): boolean {

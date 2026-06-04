@@ -18,6 +18,7 @@ import {
   Settings,
   Sun,
   Trash2,
+  Upload,
 } from "lucide-react";
 import { useAlert } from "@/components/confirm/ConfirmProvider";
 import { BOARD_CONNECTION_HELP } from "@/lib/workspace-messages";
@@ -50,6 +51,7 @@ interface BoardToolbarProps {
   onCreateBoard: () => void;
   onDeleteBoard: () => void;
   onInsert: (kind: BoardInsertKind) => void;
+  onImportMedia: () => void;
   onOpenSettings: () => void;
   onRenameBoard: () => void;
   onRedo: () => void;
@@ -126,6 +128,7 @@ export default function BoardToolbar({
   onCreateBoard,
   onDeleteBoard,
   onInsert,
+  onImportMedia,
   onOpenSettings,
   onRenameBoard,
   onRedo,
@@ -409,6 +412,16 @@ export default function BoardToolbar({
           )}
         </div>
 
+        <button
+          type="button"
+          onClick={onImportMedia}
+          className={`${headerBtn} shrink-0`}
+          title="导入图片或视频到画布"
+        >
+          <Upload className="h-3.5 w-3.5 text-emerald-300" />
+          <span className="hidden md:inline">导入媒体</span>
+        </button>
+
         <div className="flex items-center gap-1">
           <button
             type="button"
@@ -470,6 +483,17 @@ export default function BoardToolbar({
             overflowMenuPosition,
             "imagine-board-header-menu fixed z-[60] w-[13.5rem] p-1.5",
             <>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsOverflowOpen(false);
+                  onImportMedia();
+                }}
+                className="imagine-board-header-menu-action"
+              >
+                <Upload className="h-3.5 w-3.5" />
+                导入媒体
+              </button>
               <button
                 type="button"
                 onClick={() => {
