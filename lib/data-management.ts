@@ -391,18 +391,7 @@ export function findOrphanAssetIds(items: StorageItem[], boardAssetIds: Readonly
 export function collectBoardAssetIds(boards: BoardDocument[]): Set<string> {
   const ids = new Set<string>();
   for (const board of boards) {
-    for (const node of board.nodes) {
-      if (node.kind === "asset") ids.add(node.asset.assetId);
-        if (node.kind === "reference-group") {
-          for (const reference of node.references) ids.add(reference.assetId);
-        }
-        if ((node.kind === "image-generate" || node.kind === "video-generate") && node.resultAssetId) {
-          ids.add(node.resultAssetId);
-        }
-        if (node.kind === "image-generate" || node.kind === "video-generate") {
-          for (const assetId of node.resultAssetIds ?? []) ids.add(assetId);
-        }
-    }
+    for (const assetId of collectBoardAssetIdsFromNodes(board.nodes)) ids.add(assetId);
   }
   return ids;
 }

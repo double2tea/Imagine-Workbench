@@ -43,6 +43,7 @@ import {
 } from "@/lib/board";
 import { getImageModelCapabilities, getImageResolutionOptions, getVideoModelCapabilities } from "@/lib/providers/model-catalog";
 import { BOARD_PORT_IDS, filterValidBoardEdges, resolveBoardConnectionKind } from "@/lib/board/ports";
+import { isBoardResultStackNode, removeResultAssetFromBoardNodeResultStack } from "@/lib/assets/board-scope";
 
 export type BoardSaveStatus = "idle" | "loading" | "saving" | "saved" | "error";
 
@@ -1077,12 +1078,24 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
           .filter(edge => edge.from.nodeId === nodeId && edge.to.portId === "asset-in")
           .map(edge => ({ assetId: deletedNode.asset.assetId, groupNodeId: edge.to.nodeId }))
         : [];
+      const resultSourceNodeIds = deletedNode?.kind === "asset"
+        ? new Set(currentBoard.edges
+          .filter(edge => edge.to.nodeId === nodeId && edge.from.portId === BOARD_PORT_IDS.resultOut)
+          .map(edge => edge.from.nodeId))
+        : new Set<string>();
       const remainingNodes = currentBoard.nodes.filter(node => node.id !== nodeId);
       const remainingEdges = currentBoard.edges.filter(edge => edge.from.nodeId !== nodeId && edge.to.nodeId !== nodeId);
       return touchBoard(
         currentBoard,
         remainingNodes
           .map(node => {
+            if (
+              deletedNode?.kind === "asset" &&
+              resultSourceNodeIds.has(node.id) &&
+              isBoardResultStackNode(node)
+            ) {
+              return removeResultAssetFromBoardNodeResultStack(node, deletedNode.asset.assetId, updatedAt);
+            }
             if (node.kind !== "reference-group") return node;
             const removedAssetIds = removedGroupReferences
               .filter(reference => reference.groupNodeId === node.id)

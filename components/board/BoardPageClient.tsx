@@ -29,7 +29,7 @@ import type { AgentBoardContext, AgentBoardNodeSummary } from "@/lib/agent-conte
 import { useAgentController } from "@/hooks/useAgentController";
 import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
 import { useBoardAssetStore } from "@/hooks/useBoardAssetStore";
-import { collectBoardAssetIdsFromNodes } from "@/lib/assets/board-scope";
+import { collectPlacedBoardAssetIdsFromNodes } from "@/lib/assets/board-scope";
 import { useBoardState } from "@/hooks/useBoardState";
 import { useClipboardImageImport } from "@/hooks/useClipboardImageImport";
 import { useGenerationActions } from "@/hooks/useGenerationActions";
@@ -2627,7 +2627,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     ? boardController.board.edges.filter(edge => edge.from.nodeId === selectedBoardNode.id)
     : [];
   const canvasAssetIds = useMemo(
-    () => collectBoardAssetIdsFromNodes(boardController.board.nodes),
+    () => collectPlacedBoardAssetIdsFromNodes(boardController.board.nodes),
     [boardController.board.nodes],
   );
   const highlightAssetId = selectedBoardNode?.kind === "asset" ? selectedBoardNode.asset.assetId : undefined;

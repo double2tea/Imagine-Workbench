@@ -12,6 +12,7 @@
   "include": [
     "./canvas-editor.test.ts",
     "./agent-chat-model.test.ts",
+    "./board-asset-scope.test.ts",
     "./board-model-options.test.ts",
     "./openrouter-capabilities.test.ts",
     "./board-edge-dedupe.test.ts",
@@ -22,6 +23,7 @@
     "./reference-images.test.ts",
     "../lib/canvas-editor.ts",
     "../lib/agent-chat-model.ts",
+    "../lib/assets/board-scope.ts",
     "../lib/openrouter/capabilities.ts",
     "../lib/providers/model-catalog.ts",
     "../lib/providers/runninghub.ts",
