@@ -720,6 +720,25 @@ function appendResultAssetId(node: GenerateBoardNode, assetId: string): string[]
   return current.includes(assetId) ? current : [...current, assetId];
 }
 
+function sameStringList(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function pruneUnavailableGenerateResultAssets(
+  node: GenerateBoardNode,
+  availableAssetIds: ReadonlySet<string>,
+): BoardGenerateNodeUpdate | null {
+  const currentIds = node.resultAssetIds ?? (node.resultAssetId ? [node.resultAssetId] : []);
+  const nextIds = currentIds.filter(id => availableAssetIds.has(id));
+  const nextActiveId = node.resultAssetId && nextIds.includes(node.resultAssetId)
+    ? node.resultAssetId
+    : nextIds[nextIds.length - 1];
+  const update: BoardGenerateNodeUpdate = {};
+  if (!sameStringList(currentIds, nextIds)) update.resultAssetIds = nextIds;
+  if (node.resultAssetId !== nextActiveId) update.resultAssetId = nextActiveId;
+  return hasGenerateNodeUpdate(update) ? update : null;
+}
+
 function sourceStackResultAssetIds(items: StorageItem[], sourceNode: GenerateBoardNode, activeAssetId: string): string[] {
   const completedIds = items
     .filter(item => isSourceStackItem(item, sourceNode) && item.status === "complete")
@@ -755,6 +774,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const boardController = useBoardState(resolvedBoardId);
   const {
     items,
+    isCurrentScopeLoaded: isBoardAssetScopeLoaded,
     loading: boardAssetsLoading,
     reload: reloadBoardAssets,
     setItems,
@@ -968,6 +988,18 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   useEffect(() => {
     void reloadBoardAssets();
   }, [reloadBoardAssets, resolvedBoardId]);
+
+  useEffect(() => {
+    if (boardController.saveStatus === "loading") return;
+    if (boardAssetsLoading) return;
+    if (!isBoardAssetScopeLoaded) return;
+    const availableAssetIds = new Set(items.map(item => item.id));
+    for (const node of boardController.board.nodes) {
+      if (!isGenerateBoardNode(node)) continue;
+      const update = pruneUnavailableGenerateResultAssets(node, availableAssetIds);
+      if (update) boardController.updateGenerateNode(node.id, update);
+    }
+  }, [boardAssetsLoading, boardController, isBoardAssetScopeLoaded, items]);
 
   useMediaPolling({
     buildProviderHeaders,
