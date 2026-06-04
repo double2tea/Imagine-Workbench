@@ -21,8 +21,8 @@ import { useRef, useState, type DragEvent } from "react";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
 import PreviewImage from "@/components/PreviewImage";
 import { makeReferenceDropToken, REFERENCE_ASSET_MIME } from "@/components/reference/referenceDrag";
-import type { StorageItem } from "@/lib/db";
-import { mediaReferenceLabel, mediaReferenceTypeFromDataUri, type MediaReferenceType } from "@/lib/media-references";
+import { getGenerationReferenceMedia, type StorageItem } from "@/lib/db";
+import { mediaReferenceLabel } from "@/lib/media-references";
 import { formatDisplayedAspectRatio } from "@/lib/media-display";
 import { parseProviderModel, type AiProvider } from "@/lib/providers/model-catalog";
 import { getProviderMeta } from "@/lib/providers/registry";
@@ -92,10 +92,6 @@ function processingTitle(type: StorageItem["type"]): string {
   return "图像生成中";
 }
 
-function referencePreviewType(url: string): MediaReferenceType {
-  return mediaReferenceTypeFromDataUri(url) ?? "image";
-}
-
 export default function AssetCard({
   canceling,
   inCompare,
@@ -123,7 +119,7 @@ export default function AssetCard({
   const provider = parseProviderModel(item.model, selectedProvider).provider;
   const isDraggableReference = item.status === "complete";
   const failedTitle = isContentSafetyError(item.errorMessage) ? "内容安全拦截" : "生成失败 / 链接中断";
-  const referenceUrls = item.generationRequest?.referenceImages ?? [];
+  const referenceMedia = getGenerationReferenceMedia(item.generationRequest);
 
   const handleDragStart = (event: DragEvent<HTMLDivElement>) => {
     if (!isDraggableReference) {
@@ -459,12 +455,12 @@ export default function AssetCard({
           <p className="min-w-0 flex-1 truncate font-sans text-[11px] font-medium text-slate-300" title={item.prompt}>
             {item.prompt}
           </p>
-          {referenceUrls.length > 0 && (
+          {referenceMedia.length > 0 && (
             <div className="flex shrink-0 items-center gap-1">
               <span className="font-mono text-[10px] text-[var(--iw-faint)]">参考</span>
               <div className="no-scrollbar flex max-w-[96px] gap-1 overflow-x-auto">
-                {referenceUrls.map((url, index) => {
-                  const mediaType = referencePreviewType(url);
+                {referenceMedia.map((reference, index) => {
+                  const mediaType = reference.type;
                   return (
                     <button
                       type="button"
@@ -474,9 +470,9 @@ export default function AssetCard({
                       title={`点击放大参考${mediaReferenceLabel(mediaType)} ${index + 1}`}
                     >
                       {mediaType === "image" ? (
-                        <PreviewImage src={url} alt={`参考图 ${index + 1}`} className="h-full w-full object-cover" />
+                        <PreviewImage src={reference.url} alt={`参考图 ${index + 1}`} className="h-full w-full object-cover" />
                       ) : mediaType === "video" ? (
-                        <video src={url} muted preload="metadata" className="h-full w-full object-cover" />
+                        <video src={reference.url} muted preload="metadata" className="h-full w-full object-cover" />
                       ) : (
                         <Music className="m-auto h-full w-3.5 text-slate-400" />
                       )}

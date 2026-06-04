@@ -2,10 +2,16 @@ import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import { readFetchError } from "@/lib/client-fetch-error";
 import { readImageGenerationPayload } from "@/lib/client-image-response";
-import { buildStorageItem, saveToDB, type GenerationRequestSnapshot, type StorageItem } from "@/lib/db";
+import {
+  buildStorageItem,
+  saveToDB,
+  type GenerationReferenceMediaSnapshot,
+  type GenerationRequestSnapshot,
+  type StorageItem,
+} from "@/lib/db";
 import { buildPromptWithReferenceMap } from "@/hooks/useReferenceState";
 import { getMediaReferenceType, mediaReferenceLabel } from "@/lib/media-references";
-import { getVideoModelCapabilities, type VideoReferenceMode } from "@/lib/providers/model-catalog";
+import { getImageModelCapabilities, getVideoModelCapabilities, type VideoReferenceMode } from "@/lib/providers/model-catalog";
 import { getReferenceImagePayloadError, getReferenceMediaPayloadError, prepareReferenceImageUrlForRequest, prepareReferenceMediaUrlForRequest } from "@/lib/reference-images";
 
 type NoticeType = "error" | "info" | "success";
@@ -127,6 +133,20 @@ function validateCustomImageSize(size: string): string | null {
   return null;
 }
 
+function buildReferenceMediaSnapshot(
+  references: ReferenceImageRef[],
+  payloads: string[],
+): GenerationReferenceMediaSnapshot[] {
+  return payloads.map((url, index) => {
+    const reference = references[index];
+    return {
+      url,
+      type: reference ? getMediaReferenceType(reference) : "image",
+      ...(reference?.role ? { role: reference.role } : {}),
+    };
+  });
+}
+
 function customImageSizeAspectRatio(size: string): string | null {
   const match = size.match(/^(\d+)x(\d+)$/);
   if (!match) return null;
@@ -189,6 +209,7 @@ export function useGenerationActions({
     const requestImageQuality = overrides.imageQuality ?? activeImageQuality;
     const requestIsCustomImageResolution = overrides.isCustomImageResolution ?? isCustomImageResolution;
     const requestThinkingLevel = overrides.thinkingLevel ?? imageThinkingLevel;
+    const requestImageCapabilities = getImageModelCapabilities(requestModel);
     const requestAspectRatio =
       requestIsCustomImageResolution
         ? customImageSizeAspectRatio(requestImageResolution) ?? (overrides.size ?? activeImageAspectRatio)
@@ -211,6 +232,14 @@ export function useGenerationActions({
     if (imageReferenceUrls.length === 0 && activeReferenceImage) {
       imageReferenceUrls.push(activeReferenceImage);
     }
+    if (imageReferenceUrls.length < requestImageCapabilities.minReferenceImages) {
+      pushWorkspaceNotice("error", `当前图片模型需要至少 ${requestImageCapabilities.minReferenceImages} 张参考图`);
+      return false;
+    }
+    if (imageReferenceUrls.length > requestImageCapabilities.maxReferenceImages) {
+      pushWorkspaceNotice("error", `当前图片模型最多支持 ${requestImageCapabilities.maxReferenceImages} 张参考图`);
+      return false;
+    }
     let imageReferencePayloads: string[];
     try {
       imageReferencePayloads = await Promise.all(imageReferenceUrls.map(prepareReferenceImageUrlForRequest));
@@ -232,7 +261,7 @@ export function useGenerationActions({
       imageResolution: requestImageResolution,
       imageQuality: requestImageQuality,
       thinkingLevel: requestThinkingLevel,
-      referenceImages: imageReferencePayloads,
+      referenceMedia: buildReferenceMediaSnapshot(activeReferenceImages, imageReferencePayloads),
     };
     const displayedImageSize = /^\d+x\d+$/.test(requestImageResolution) ? requestImageResolution : requestAspectRatio;
 
@@ -387,7 +416,7 @@ export function useGenerationActions({
       videoDurationSeconds: requestVideoDuration,
       videoPreset: requestVideoPreset,
       videoResolution: requestVideoResolution,
-      referenceImages: videoReferencePayloads,
+      referenceMedia: buildReferenceMediaSnapshot(videoReferences, videoReferencePayloads),
     };
 
     const tempId = makeClientId("temp_vid");

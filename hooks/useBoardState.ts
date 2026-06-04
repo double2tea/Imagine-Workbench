@@ -527,10 +527,22 @@ function normalizeReferenceGroupItems(items: unknown[]): BoardReferenceGroupItem
       model: readNonEmptyString(item.model, "unknown"),
       prompt: readNonEmptyString(item.prompt, "Reference"),
       role: item.role === "start" || item.role === "end" ? item.role : "general",
+      type: item.type === "video" || item.type === "audio" ? item.type : "image",
       url: readNonEmptyString(item.url, ""),
     });
   }
   return normalizedItems;
+}
+
+function referenceGroupItemFromAssetNode(assetNode: BoardNode & { kind: "asset" }): BoardReferenceGroupItem {
+  return {
+    assetId: assetNode.asset.assetId,
+    model: assetNode.asset.model,
+    prompt: assetNode.asset.prompt,
+    role: "general",
+    type: assetNode.asset.type,
+    url: assetNode.asset.url,
+  };
 }
 
 function normalizeGenerationStatus(status: unknown): BoardGenerationStatus {
@@ -928,16 +940,10 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     const edgeId = createBoardId("edge");
     mutateBoard(currentBoard => {
       const assetNode = currentBoard.nodes.find(currentNode => currentNode.id === assetNodeId);
-      if (assetNode?.kind !== "asset" || assetNode.asset.type !== "image") {
-        throw new Error("参考组只支持图片资产");
+      if (assetNode?.kind !== "asset") {
+        throw new Error("参考组只支持媒体资产");
       }
-      const reference: BoardReferenceGroupItem = {
-        assetId: assetNode.asset.assetId,
-        model: assetNode.asset.model,
-        prompt: assetNode.asset.prompt,
-        role: "general",
-        url: assetNode.asset.url,
-      };
+      const reference = referenceGroupItemFromAssetNode(assetNode);
       const nextNode: BoardReferenceGroupNode = { ...node, references: [reference, ...node.references] };
       const nextNodes = [...currentBoard.nodes, nextNode];
       const edge: BoardEdge = {
@@ -1129,23 +1135,11 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       );
       const oldSourceNode = currentBoard.nodes.find(node => node.id === oldEdge.from.nodeId);
       const nextSourceNode = currentBoard.nodes.find(node => node.id === from.nodeId);
-      const oldReference: BoardReferenceGroupItem | null = oldSourceNode?.kind === "asset" && oldSourceNode.asset.type === "image"
-        ? {
-          assetId: oldSourceNode.asset.assetId,
-          model: oldSourceNode.asset.model,
-          prompt: oldSourceNode.asset.prompt,
-          role: "general",
-          url: oldSourceNode.asset.url,
-        }
+      const oldReference: BoardReferenceGroupItem | null = oldSourceNode?.kind === "asset"
+        ? referenceGroupItemFromAssetNode(oldSourceNode)
         : null;
-      const nextReference: BoardReferenceGroupItem | null = nextSourceNode?.kind === "asset" && nextSourceNode.asset.type === "image"
-        ? {
-          assetId: nextSourceNode.asset.assetId,
-          model: nextSourceNode.asset.model,
-          prompt: nextSourceNode.asset.prompt,
-          role: "general",
-          url: nextSourceNode.asset.url,
-        }
+      const nextReference: BoardReferenceGroupItem | null = nextSourceNode?.kind === "asset"
+        ? referenceGroupItemFromAssetNode(nextSourceNode)
         : null;
       if (!oldReference && !nextReference) return touchBoard(currentBoard, currentBoard.nodes, nextEdges);
 
@@ -1228,16 +1222,10 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     const updatedAt = nowIso();
     mutateBoard(currentBoard => {
       const assetNode = currentBoard.nodes.find(node => node.id === assetNodeId);
-      if (assetNode?.kind !== "asset" || assetNode.asset.type !== "image") {
-        throw new Error("参考组只支持图片资产");
+      if (assetNode?.kind !== "asset") {
+        throw new Error("参考组只支持媒体资产");
       }
-      const reference: BoardReferenceGroupItem = {
-        assetId: assetNode.asset.assetId,
-        model: assetNode.asset.model,
-        prompt: assetNode.asset.prompt,
-        role: "general",
-        url: assetNode.asset.url,
-      };
+      const reference = referenceGroupItemFromAssetNode(assetNode);
       return touchBoard(
         currentBoard,
         currentBoard.nodes.map(node => {

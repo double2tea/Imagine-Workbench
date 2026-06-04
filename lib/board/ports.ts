@@ -1,6 +1,6 @@
-import type { BoardEdge, BoardEdgeKind, BoardNode, BoardPortDefinition, BoardPortRef } from "@/lib/board/types";
-import { dedupeBoardEdgesByEndpoints } from "@/lib/board/edge-dedupe";
-import { getModelCapability, getVideoModelCapabilities } from "@/lib/providers/model-catalog";
+import type { BoardEdge, BoardEdgeKind, BoardNode, BoardPortDefinition, BoardPortRef } from "./types";
+import { dedupeBoardEdgesByEndpoints } from "./edge-dedupe";
+import { getModelCapability, getVideoModelCapabilities } from "../providers/model-catalog";
 
 export const BOARD_PORT_IDS = {
   agentContextIn: "agent-context-in",
@@ -40,7 +40,7 @@ export function getBoardNodePortDefinitions(
   }
   if (node.kind === "reference-group") {
     return [
-      { id: BOARD_PORT_IDS.assetIn, label: "图片输入", kind: "asset", direction: "input" },
+      { id: BOARD_PORT_IDS.assetIn, label: "媒体输入", kind: "asset", direction: "input" },
       { id: BOARD_PORT_IDS.assetOut, label: "参考组输出", kind: "asset", direction: "output" },
     ];
   }
@@ -84,13 +84,17 @@ function findPort(nodes: BoardNode[], ref: BoardPortRef): { node: BoardNode; por
   return { node, port };
 }
 
-function isImageReferenceSource(node: BoardNode): boolean {
-  return (node.kind === "asset" && node.asset.type === "image") || node.kind === "reference-group";
+function isReferenceSource(node: BoardNode): boolean {
+  return node.kind === "asset" || node.kind === "reference-group";
 }
 
 function isAcceptedGenerateReferenceSource(source: BoardNode, target: BoardNode): boolean {
   if (!isGenerateNode(target)) return false;
-  if (source.kind === "reference-group") return target.kind === "image-generate" || getVideoModelCapabilities(target.model).referenceMediaTypes.includes("image");
+  if (source.kind === "reference-group") {
+    if (target.kind === "image-generate") return source.references.every(reference => reference.type === "image");
+    const acceptedTypes = getVideoModelCapabilities(target.model).referenceMediaTypes;
+    return source.references.every(reference => acceptedTypes.includes(reference.type));
+  }
   if (source.kind !== "asset") return false;
   if (target.kind === "image-generate") return source.asset.type === "image";
   return getVideoModelCapabilities(target.model).referenceMediaTypes.includes(source.asset.type);
@@ -124,7 +128,6 @@ export function resolveBoardConnectionKind(nodes: BoardNode[], from: BoardPortRe
 
   if (
     source.node.kind === "asset" &&
-    source.node.asset.type === "image" &&
     target.node.kind === "reference-group" &&
     source.port.id === BOARD_PORT_IDS.assetOut &&
     target.port.id === BOARD_PORT_IDS.assetIn
@@ -142,7 +145,7 @@ export function resolveBoardConnectionKind(nodes: BoardNode[], from: BoardPortRe
   }
 
   if (
-    isImageReferenceSource(source.node) &&
+    isReferenceSource(source.node) &&
     target.node.kind === "agent" &&
     source.port.id === BOARD_PORT_IDS.assetOut &&
     target.port.id === BOARD_PORT_IDS.agentContextIn
@@ -150,7 +153,7 @@ export function resolveBoardConnectionKind(nodes: BoardNode[], from: BoardPortRe
     return "agent-context";
   }
 
-  throw new Error("端口类型不兼容：媒体可连支持该类型的生成参考，图片可连参考组/Agent，Prompt 可连生成，生成结果可连资产。");
+  throw new Error("端口类型不兼容：媒体可连参考组、Agent 或支持该类型的生成参考，Prompt 可连生成，生成结果可连资产。");
 }
 
 export function isValidBoardConnection(nodes: BoardNode[], from: BoardPortRef, to: BoardPortRef): boolean {

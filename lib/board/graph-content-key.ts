@@ -40,7 +40,7 @@ function digestParts(parts: string[]): string {
 }
 
 function serializeReferenceGroupItem(item: BoardReferenceGroupItem): string {
-  return `${item.assetId}:${item.role}`;
+  return `${item.assetId}:${item.type}:${item.role}`;
 }
 
 function serializeNodeContent(node: BoardNode): string {

@@ -145,11 +145,11 @@ Current adapters:
 - 星途 (xstx): OpenAI-compatible chat, image, and model listing
 - Agnes AI: OpenAI-compatible chat, image, video, and model listing
 - ModelScope image: API-Inference `/v1/images/generations` with async polling via `/v1/tasks/{task_id}`
-- RunningHub image/video: configured Standard Model API endpoints (`api:/openapi/v2/...`) or AI App / Workflow virtual models, polled through `/openapi/v2/query`
+- RunningHub image/video: configured Standard Model API endpoints (`api:/openapi/v2/...`) are polled through `/openapi/v2/query`; AI App / Workflow virtual models are polled through `/task/openapi/outputs`
 
 ModelScope public REST video generation is not enabled by default because the public official docs verified for this implementation do not expose one stable unified REST video endpoint. Use a deployed OpenAI-compatible service or RunningHub for video.
 
-RunningHub support intentionally treats AI Apps and workflows as provider-backed virtual models. It does not add ComfyUI editing, local ComfyUI backends, or workflow JSON graph editing to Imagine Workbench.
+RunningHub support intentionally treats AI Apps and workflows as provider-backed virtual models. It does not add ComfyUI editing, local ComfyUI backends, workflow JSON graph editing, encrypted `accessPassword` handling, or user-authored `nodeInfoList` configuration to Imagine Workbench.
 
 ## Model Defaults
 
@@ -170,12 +170,13 @@ Model-specific parameters are defined in the catalog so the UI can adapt control
 
 - Gemini image models expose aspect ratio, output size, and thinking-level controls when supported.
 - GPT Image models expose explicit pixel sizes and quality.
-- GPT Image 2 resolution labels are normalized in the UI as `1K`, `2K`, `4K`, etc. while request payloads still use provider-valid dimensions.
+- GPT Image 2 resolution labels are normalized in the UI as `1K`, `2K`, `4K`, etc. while request payloads still use provider-valid dimensions; RunningHub GPT Image 2 channel/official choices auto-route text-only vs image-edit requests by reference presence.
 - Video models expose `auto` size first, so image-to-video can preserve the source image size when the upstream service supports it.
 - `12ai:veo_3_1-fast` supports text-to-video and reference-image mode with 0-3 images.
 - `12ai:veo_3_1-fast-fl` is the only built-in 12AI first/last-frame mode and requires 1-2 images.
+- RunningHub Veo 3.1 models expose channel/official/quality choices while the adapter auto-routes text-only, image-to-video, first/last-frame, and reference-to-video requests by reference count.
 - `grok2api:grok-imagine-video` supports optional reference images with the grok2api video parameters.
-- Video reference image API/provider payloads accept `data:image/*` base64 data URIs only. Generated remote image results are downloaded by the image route before client storage so later image-to-video references avoid browser CORS fetches.
+- Video reference media API/provider payloads accept `data:image/*`, `data:video/*`, and `data:audio/*` base64 data URIs when the selected model capability allows them. Generated remote image results are downloaded by the image route before client storage so later image-to-video references avoid browser CORS fetches.
 
 ## Prompt Templates
 

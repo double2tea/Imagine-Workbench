@@ -1,5 +1,6 @@
 import { formatProviderModel, isAgentCompatibleModelId, type AiProvider, type ModelOption } from "./model-catalog";
 import { getProviderMeta } from "./registry";
+import { RUNNINGHUB_STANDARD_MODELS } from "./runninghub";
 import type { ProviderConfig } from "./types";
 import { getJson, isRecord } from "./utils";
 
@@ -58,6 +59,8 @@ async function listRunningHubModels(config: ProviderConfig, kind: ModelKindFilte
 }
 
 function staticProviderModels(provider: AiProvider, kind: ModelKindFilter): ModelOption[] {
+  if (provider === "runninghub") return runningHubStaticModels(kind);
+
   const options = [
     { value: "modelscope:Qwen/Qwen-Image", label: "ModelScope Qwen Image" },
     { value: "agnes:agnes-2.0-flash", label: "Agnes AI Agnes 2.0 Flash" },
@@ -65,13 +68,30 @@ function staticProviderModels(provider: AiProvider, kind: ModelKindFilter): Mode
     { value: "agnes:agnes-image-2.1-flash", label: "Agnes AI Image 2.1 Flash" },
     { value: "agnes:agnes-video-v2.0", label: "Agnes AI Video V2.0" },
     { value: "modelscope:Qwen/Qwen-Image-Edit", label: "ModelScope Qwen Image Edit" },
-    { value: "runninghub:ai-app-image:<webappId>", label: "RunningHub AI App Image" },
-    { value: "runninghub:ai-app-video:<webappId>", label: "RunningHub AI App Video" },
-    { value: "runninghub:workflow-image:<workflowId>", label: "RunningHub Workflow Image" },
-    { value: "runninghub:workflow-video:<workflowId>", label: "RunningHub Workflow Video" },
   ].filter(option => parseOptionProvider(option.value) === provider);
 
   return options.filter(option => matchesKind(option.value, kind));
+}
+
+function runningHubStaticModels(kind: ModelKindFilter): ModelOption[] {
+  if (kind === "chat") return [];
+  const standardModels = RUNNINGHUB_STANDARD_MODELS
+    .filter(model => model.listed !== false)
+    .filter(model => kind === "all" || model.kind === kind)
+    .map(model => ({
+      value: formatProviderModel("runninghub", model.model),
+      label: model.label,
+    }));
+  const virtualModels = [
+    { value: "runninghub:ai-app-image:<webappId>", label: "RunningHub AI App Image", kind: "image" },
+    { value: "runninghub:ai-app-video:<webappId>", label: "RunningHub AI App Video", kind: "video" },
+    { value: "runninghub:workflow-image:<workflowId>", label: "RunningHub Workflow Image", kind: "image" },
+    { value: "runninghub:workflow-video:<workflowId>", label: "RunningHub Workflow Video", kind: "video" },
+  ].filter(model => kind === "all" || model.kind === kind);
+  return [
+    ...standardModels,
+    ...virtualModels.map(model => ({ value: model.value, label: model.label })),
+  ];
 }
 
 function parseOptionProvider(value: string): AiProvider | null {

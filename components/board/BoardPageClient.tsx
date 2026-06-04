@@ -251,7 +251,7 @@ function boardNodeReferences(
     return node.references.map(reference => ({
       id: reference.assetId,
       role: reference.role,
-      type: "image",
+      type: reference.type,
       url: resolveUrl(reference.assetId, reference.url),
     }));
   }
@@ -797,6 +797,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     toggleReferenceRole,
   } = useReferenceState({
     agentInput,
+    imageReferenceLimit: imageCapabilities.maxReferenceImages,
+    imageReferenceMediaTypes: imageCapabilities.referenceMediaTypes,
     prompt,
     videoReferenceLimit: videoCapabilities.maxReferenceImages,
     videoReferenceMediaTypes: videoCapabilities.referenceMediaTypes,
@@ -816,6 +818,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
   useClipboardImageImport({
     agentReferenceCount: agentReferences.length,
+    imageReferenceLimit: imageCapabilities.maxReferenceImages,
     pushWorkspaceNotice,
     referenceImageCount: referenceImages.length,
     setAgentReferenceId,
@@ -840,7 +843,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const renderAgentAtDropdown = useCallback(() => {
     const agentReferenceItems: StorageItem[] = agentReferences.map((reference, index) => ({
       id: reference.id,
-      type: "image",
+      type: getMediaReferenceType(reference),
       url: reference.url,
       prompt: `Agent 引用图 ${index + 1}`,
       model: "agent-reference",

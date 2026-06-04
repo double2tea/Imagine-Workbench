@@ -53,6 +53,7 @@ export default function VideoAssetPlayer({
   const rangeMax = Number.isFinite(duration) && duration > 0 ? duration : Math.max(currentTime, 0);
   const rangeValue = Math.min(currentTime, rangeMax);
   const progressPercent = rangeMax > 0 ? (rangeValue / rangeMax) * 100 : 0;
+  const videoUrl = item.url.trim();
 
   const captureFrame = useCallback<VideoFrameCaptureRequest>(async (mode) => {
     const video = videoRef.current;
@@ -103,11 +104,15 @@ export default function VideoAssetPlayer({
     video.currentTime = Number(value);
   };
 
+  if (!videoUrl) {
+    return <div ref={containerRef} className="relative flex h-full w-full items-center justify-center bg-slate-950" />;
+  }
+
   return (
     <div ref={containerRef} className="group/video relative flex h-full w-full items-center justify-center bg-slate-950">
       <video
         ref={videoRef}
-        src={item.url}
+        src={videoUrl}
         loop={loop}
         autoPlay={autoPlay}
         muted={isMuted}

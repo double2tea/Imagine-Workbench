@@ -1,8 +1,9 @@
 "use client";
 
-import { ArrowDown, ArrowUp, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Music, Video, X } from "lucide-react";
 import PreviewImage from "@/components/PreviewImage";
 import type { BoardReferenceGroupNode, BoardReferenceRole } from "@/lib/board";
+import { mediaReferenceLabel } from "@/lib/media-references";
 
 interface ReferenceGroupBoardNodeProps {
   node: BoardReferenceGroupNode;
@@ -33,7 +34,7 @@ export default function ReferenceGroupBoardNode({
   if (node.references.length === 0) {
     return (
       <div className="flex h-full items-center justify-center px-4 text-center text-xs leading-5 text-[var(--iw-muted)]">
-        连接图片资产组成参考组
+        连接媒体资产组成参考组
       </div>
     );
   }
@@ -47,12 +48,21 @@ export default function ReferenceGroupBoardNode({
             className="grid grid-cols-[52px_1fr_auto] items-center gap-2 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-1.5"
           >
             <div className="h-12 w-12 overflow-hidden rounded-md bg-[var(--iw-panel)]">
-              <PreviewImage src={reference.url} alt="" className="h-full w-full object-cover" />
+              {reference.type === "image" ? (
+                <PreviewImage src={reference.url} alt="" className="h-full w-full object-cover" />
+              ) : reference.type === "video" ? (
+                <Video className="m-auto h-full w-5 text-[var(--iw-faint)]" />
+              ) : (
+                <Music className="m-auto h-full w-5 text-[var(--iw-faint)]" />
+              )}
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
                 <span className="rounded border border-[var(--iw-border)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--iw-muted)]">
                   @图片{index + 1}
+                </span>
+                <span className="rounded border border-[var(--iw-border)] px-1.5 py-0.5 text-[10px] text-[var(--iw-muted)]">
+                  {mediaReferenceLabel(reference.type)}
                 </span>
                 <button
                   type="button"

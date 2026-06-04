@@ -313,7 +313,7 @@ function NoteNodeSummary({ node, onFocusNode }: { node: BoardNode & { kind: "not
 function ReferenceGroupSummary({ node, onFocusNode }: { node: BoardNode & { kind: "reference-group" }; onFocusNode: (nodeId: string) => void }) {
   return (
     <div className="space-y-2">
-      <p className={infoChipClass}>{node.references.length} 张参考 · 在画布内调整顺序与角色</p>
+      <p className={infoChipClass}>{node.references.length} 个参考媒体 · 在画布内调整顺序与角色</p>
       <InspectorFocusButton nodeId={node.id} onFocusNode={onFocusNode} />
     </div>
   );

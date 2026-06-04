@@ -15,6 +15,9 @@ import {
   parseProviderModel,
   supportsAsyncImageGeneration,
 } from "../lib/providers/model-catalog";
+import { getGenerationReferenceMedia } from "../lib/db";
+import { BOARD_PORT_IDS, resolveBoardConnectionKind } from "../lib/board/ports";
+import type { BoardNode } from "../lib/board/types";
 
 test("parseProviderModel reads provider prefixes", () => {
   assert.deepEqual(parseProviderModel("12ai-async:gemini-3.1-flash-image-preview", "12ai"), {
@@ -62,6 +65,68 @@ test("unknown model capability fails fast", () => {
   assert.throws(
     () => getModelCapability("12ai:not-a-real-model", "image"),
     /Unknown provider model capability: 12ai:not-a-real-model/,
+  );
+});
+
+test("generation request reference media migrates legacy reference images", () => {
+  assert.deepEqual(
+    getGenerationReferenceMedia({
+      prompt: "legacy",
+      model: "m",
+      aspectRatio: "1:1",
+      referenceImages: ["data:video/mp4;base64,dmVv", "https://example.test/ref.png"],
+    }),
+    [
+      { url: "data:video/mp4;base64,dmVv", type: "video" },
+      { url: "https://example.test/ref.png", type: "image" },
+    ],
+  );
+  assert.deepEqual(
+    getGenerationReferenceMedia({
+      prompt: "typed",
+      model: "m",
+      aspectRatio: "16:9",
+      referenceMedia: [{ url: "data:audio/mpeg;base64,YQ==", type: "audio", role: "general" }],
+    }),
+    [{ url: "data:audio/mpeg;base64,YQ==", type: "audio", role: "general" }],
+  );
+});
+
+test("board reference groups preserve media types for generate connections", () => {
+  const groupNode: BoardNode = {
+    id: "group_1",
+    kind: "reference-group",
+    title: "Media refs",
+    position: { x: 0, y: 0 },
+    size: { width: 280, height: 180 },
+    createdAt: "2026-06-04T00:00:00.000Z",
+    updatedAt: "2026-06-04T00:00:00.000Z",
+    references: [
+      { assetId: "a1", model: "m", prompt: "audio", role: "general", type: "audio", url: "data:audio/mpeg;base64,YQ==" },
+    ],
+  };
+  const videoNode: BoardNode = {
+    id: "video_1",
+    kind: "video-generate",
+    title: "Video",
+    position: { x: 320, y: 0 },
+    size: { width: 320, height: 240 },
+    createdAt: "2026-06-04T00:00:00.000Z",
+    updatedAt: "2026-06-04T00:00:00.000Z",
+    prompt: "",
+    model: "runninghub:api:/openapi/v2/bytedance/seedance-2.0-global/multimodal-video",
+    aspectRatio: "16:9",
+    variantCount: 1,
+    status: "idle",
+  };
+
+  assert.equal(
+    resolveBoardConnectionKind(
+      [groupNode, videoNode],
+      { nodeId: groupNode.id, portId: BOARD_PORT_IDS.assetOut, portKind: "asset" },
+      { nodeId: videoNode.id, portId: BOARD_PORT_IDS.referenceIn, portKind: "asset" },
+    ),
+    "reference",
   );
 });
 
@@ -155,6 +220,77 @@ test("modelscope qwen image exposes documented aspect ratio sizes", () => {
   ]);
 });
 
+test("runninghub exposes concrete standard model capabilities", () => {
+  assert.equal(IMAGE_MODEL_OPTIONS["runninghub"][0]?.value, "runninghub:api:/openapi/v2/seedream-v5-lite/text-to-image");
+  assert.equal(VIDEO_MODEL_OPTIONS["runninghub"][0]?.value, "runninghub:api:/openapi/v2/minimax/hailuo-02/standard");
+  assert.equal(
+    IMAGE_MODEL_OPTIONS["runninghub"].some(
+      option => option.value === "runninghub:api:/openapi/v2/seedream-v5-lite/text-to-image",
+    ),
+    true,
+  );
+  assert.equal(
+    VIDEO_MODEL_OPTIONS["runninghub"].some(
+      option => option.value === "runninghub:api:/openapi/v2/minimax/hailuo-02/standard",
+    ),
+    true,
+  );
+
+  const image = getModelCapability("runninghub:api:/openapi/v2/rhart-image/f-2-dev/text-to-image", "image");
+  const video = getModelCapability("runninghub:api:/openapi/v2/minimax/hailuo-02/standard", "video");
+  const imageToImage = getModelCapability("runninghub:api:/openapi/v2/seedream-v5-lite/image-to-image", "image");
+  const i2v = getModelCapability("runninghub:api:/openapi/v2/minimax/hailuo-02/i2v-standard", "video");
+  const seedance = getModelCapability("runninghub:api:/openapi/v2/bytedance/seedance-2.0-global-fast/text-to-video", "video");
+  const seedanceI2v = getModelCapability(
+    "runninghub:api:/openapi/v2/bytedance/seedance-2.0-global-fast/image-to-video",
+    "video",
+  );
+  const seedanceFastMultimodal = getModelCapability(
+    "runninghub:api:/openapi/v2/bytedance/seedance-2.0-global-fast/multimodal-video",
+    "video",
+  );
+  const seedanceMultimodal = getModelCapability(
+    "runninghub:api:/openapi/v2/bytedance/seedance-2.0-global/multimodal-video",
+    "video",
+  );
+  const omniFlash = getModelCapability("runninghub:api:/openapi/v2/gemini-omni-flash/image-to-video", "video");
+  const omniFlashVideoEdit = getModelCapability("runninghub:api:/openapi/v2/gemini-omni-flash/video-edit", "video");
+  const veo = getModelCapability("runninghub:api:/openapi/v2/rhart-video-v3.1-fast-official/text-to-video", "video");
+  const veoStartEndHidden = "runninghub:api:/openapi/v2/rhart-video-v3.1-fast/start-end-to-video";
+  const gptImage = getModelCapability("runninghub:api:/openapi/v2/rhart-image-g-2-official/text-to-image", "image");
+  const gptImageEditHidden = "runninghub:api:/openapi/v2/rhart-image-g-2-official/image-to-image";
+  const youchuan = getModelCapability("runninghub:api:/openapi/v2/youchuan/text-to-image-v81", "image");
+  assert.equal(image.supportsReferences, false);
+  assert.equal(imageToImage.supportsReferences, true);
+  assert.equal(imageToImage.maxReferenceImages, 14);
+  assert.equal(getImageModelCapabilities("runninghub:api:/openapi/v2/seedream-v5-lite/image-to-image").maxReferenceImages, 14);
+  assert.deepEqual(
+    getImageModelCapabilities("runninghub:api:/openapi/v2/seedream-v5-lite/image-to-image").referenceMediaTypes,
+    ["image"],
+  );
+  assert.equal(video.videoReferenceMode, "none");
+  assert.deepEqual(video.durations.map(option => option.value), ["6", "10"]);
+  assert.equal(i2v.videoReferenceMode, "firstLast");
+  assert.equal(i2v.minReferenceImages, 1);
+  assert.equal(i2v.maxReferenceImages, 2);
+  assert.deepEqual(seedance.durations.map(option => option.value), ["5", "8", "10", "12", "15"]);
+  assert.equal(seedanceI2v.videoReferenceMode, "firstLast");
+  assert.equal(seedanceI2v.maxReferenceImages, 2);
+  assert.deepEqual(seedanceFastMultimodal.referenceMediaTypes, ["image", "video", "audio"]);
+  assert.deepEqual(seedanceMultimodal.referenceMediaTypes, ["image", "video", "audio"]);
+  assert.equal(omniFlash.maxReferenceImages, 3);
+  assert.deepEqual(omniFlash.resolutions.map(option => option.value), ["720p", "1080p", "4k"]);
+  assert.deepEqual(omniFlashVideoEdit.referenceMediaTypes, ["image", "video"]);
+  assert.equal(veo.videoReferenceMode, "reference");
+  assert.equal(veo.maxReferenceImages, 3);
+  assert.deepEqual(veo.durations.map(option => option.value), ["4", "6", "8"]);
+  assert.equal(VIDEO_MODEL_OPTIONS["runninghub"].some(option => option.value === veoStartEndHidden), false);
+  assert.equal(gptImage.maxReferenceImages, 14);
+  assert.equal(gptImage.supportsReferences, true);
+  assert.equal(IMAGE_MODEL_OPTIONS["runninghub"].some(option => option.value === gptImageEditHidden), false);
+  assert.equal(youchuan.supportsReferences, false);
+});
+
 test("agent chat defaults use 12AI Gemini 3.1 Flash Lite", () => {
   assert.equal(DEFAULT_CHAT_MODEL, "12ai:gemini-3.1-flash-lite-preview");
   assert.equal(DEFAULT_VISION_CHAT_MODEL, "12ai:gemini-3.1-flash-lite-preview");
@@ -224,4 +360,11 @@ test("video model selector exposes auto size", () => {
   assert.equal(grokVideo.videoReferenceMode, "reference");
   assert.equal(grokVideo.maxReferenceImages, 7);
   assert.equal(getVideoModelCapabilities("12ai:veo_3_1-fast-fl").referenceMode, "firstLast");
+});
+
+test("unknown video model capabilities do not invent reference support", () => {
+  const video = getVideoModelCapabilities("12ai:manual-video-model");
+  assert.equal(video.referenceMode, "none");
+  assert.equal(video.maxReferenceImages, 0);
+  assert.deepEqual(video.referenceMediaTypes, []);
 });

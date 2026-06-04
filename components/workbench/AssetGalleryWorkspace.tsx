@@ -1,11 +1,11 @@
-import { ChevronDown, ChevronLeft, ChevronRight, Image as ImageIcon, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Image as ImageIcon, Music, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import AssetCard from "@/components/assets/AssetCard";
 import AssetSelectionBar from "@/components/assets/AssetSelectionBar";
 import AssetToolbar, { type AssetDatePreset, type AssetStatusFilter, type AssetTypeFilter } from "@/components/assets/AssetToolbar";
 import ComparePanel, { type CompareViewType } from "@/components/assets/ComparePanel";
 import PreviewImage from "@/components/PreviewImage";
-import type { StorageItem } from "@/lib/db";
+import { getGenerationReferenceMedia, type StorageItem } from "@/lib/db";
 import type { AiProvider } from "@/lib/providers/model-catalog";
 import type { CapturedVideoFrame } from "@/lib/video-frame";
 
@@ -145,23 +145,23 @@ export default function AssetGalleryWorkspace({
     () => filteredItems.find(item => item.id === referencePreview?.itemId),
     [filteredItems, referencePreview?.itemId],
   );
-  const referencePreviewUrls = referencePreviewItem?.generationRequest?.referenceImages ?? [];
+  const referencePreviewMedia = getGenerationReferenceMedia(referencePreviewItem?.generationRequest);
   const referencePreviewIndex =
-    referencePreview && referencePreviewUrls.length > 0
-      ? Math.min(referencePreview.index, referencePreviewUrls.length - 1)
+    referencePreview && referencePreviewMedia.length > 0
+      ? Math.min(referencePreview.index, referencePreviewMedia.length - 1)
       : 0;
-  const referencePreviewUrl = referencePreviewUrls[referencePreviewIndex];
-  const hasMultipleReferencePreviews = referencePreviewUrls.length > 1;
+  const selectedReferencePreview = referencePreviewMedia[referencePreviewIndex];
+  const hasMultipleReferencePreviews = referencePreviewMedia.length > 1;
   const showPreviousReference = () => {
     setReferencePreview(current => {
-      if (!current || referencePreviewUrls.length === 0) return current;
-      return { ...current, index: (referencePreviewIndex - 1 + referencePreviewUrls.length) % referencePreviewUrls.length };
+      if (!current || referencePreviewMedia.length === 0) return current;
+      return { ...current, index: (referencePreviewIndex - 1 + referencePreviewMedia.length) % referencePreviewMedia.length };
     });
   };
   const showNextReference = () => {
     setReferencePreview(current => {
-      if (!current || referencePreviewUrls.length === 0) return current;
-      return { ...current, index: (referencePreviewIndex + 1) % referencePreviewUrls.length };
+      if (!current || referencePreviewMedia.length === 0) return current;
+      return { ...current, index: (referencePreviewIndex + 1) % referencePreviewMedia.length };
     });
   };
 
@@ -359,7 +359,7 @@ export default function AssetGalleryWorkspace({
         )}
       </div>
 
-      {referencePreviewUrl && (
+      {selectedReferencePreview && (
         <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
           <button
             type="button"
@@ -370,7 +370,7 @@ export default function AssetGalleryWorkspace({
           <div className="relative flex max-h-[92vh] w-[min(1200px,calc(100vw-32px))] flex-col overflow-hidden rounded-xl border border-white/10 bg-slate-950 shadow-2xl">
             <div className="flex h-12 items-center justify-between border-b border-white/10 px-4">
               <span className="font-mono text-[10px] text-[var(--iw-muted)]">
-                {referencePreviewIndex + 1} / {referencePreviewUrls.length}
+                {referencePreviewIndex + 1} / {referencePreviewMedia.length}
               </span>
               <button
                 type="button"
@@ -393,11 +393,20 @@ export default function AssetGalleryWorkspace({
                   <ChevronLeft className="h-5 w-5" />
                 </button>
               )}
-              <PreviewImage
-                src={referencePreviewUrl}
-                alt={`参考图 ${referencePreviewIndex + 1}`}
-                className="max-h-[72vh] w-full object-contain"
-              />
+              {selectedReferencePreview.type === "image" ? (
+                <PreviewImage
+                  src={selectedReferencePreview.url}
+                  alt={`参考图 ${referencePreviewIndex + 1}`}
+                  className="max-h-[72vh] w-full object-contain"
+                />
+              ) : selectedReferencePreview.type === "video" ? (
+                <video src={selectedReferencePreview.url} controls className="max-h-[72vh] w-full object-contain" />
+              ) : (
+                <div className="flex min-h-60 w-full flex-col items-center justify-center gap-3 text-slate-300">
+                  <Music className="h-9 w-9" />
+                  <audio src={selectedReferencePreview.url} controls className="w-full max-w-lg" />
+                </div>
+              )}
               {hasMultipleReferencePreviews && (
                 <button
                   type="button"
@@ -411,7 +420,7 @@ export default function AssetGalleryWorkspace({
             </div>
 
             <div className="no-scrollbar flex gap-2 overflow-x-auto border-t border-white/10 bg-slate-950 p-3">
-              {referencePreviewUrls.map((url, index) => (
+              {referencePreviewMedia.map((reference, index) => (
                 <button
                   key={`${referencePreviewItem?.id ?? "reference"}_${index}`}
                   type="button"
@@ -423,7 +432,13 @@ export default function AssetGalleryWorkspace({
                   }`}
                   aria-label={`查看参考图 ${index + 1}`}
                 >
-                  <PreviewImage src={url} alt={`参考图 ${index + 1}`} className="h-full w-full object-cover" />
+                  {reference.type === "image" ? (
+                    <PreviewImage src={reference.url} alt={`参考图 ${index + 1}`} className="h-full w-full object-cover" />
+                  ) : reference.type === "video" ? (
+                    <video src={reference.url} muted preload="metadata" className="h-full w-full object-cover" />
+                  ) : (
+                    <Music className="m-auto h-full w-4 text-slate-400" />
+                  )}
                 </button>
               ))}
             </div>

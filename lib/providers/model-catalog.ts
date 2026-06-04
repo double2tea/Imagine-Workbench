@@ -1,6 +1,7 @@
 export type { AiProvider } from "./registry";
 import type { AiProvider } from "./registry";
 import { PROVIDER_KEYS, isKnownProvider } from "./registry";
+import { RUNNINGHUB_STANDARD_MODELS } from "./runninghub";
 import type { MediaReferenceType } from "@/lib/media-references";
 
 export interface ModelOption {
@@ -18,6 +19,9 @@ export interface ImageModelCapabilities {
   resolutions: ParameterOption[];
   qualities: ParameterOption[];
   thinkingLevels: ParameterOption[];
+  maxReferenceImages: number;
+  minReferenceImages: number;
+  referenceMediaTypes: MediaReferenceType[];
 }
 
 export interface VideoModelCapabilities {
@@ -727,6 +731,34 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     supportsReferences: true,
     sizes: MODELSCOPE_IMAGE_SIZES,
   }),
+  ...RUNNINGHUB_STANDARD_MODELS.filter(model => model.listed !== false).map(model =>
+    model.kind === "image"
+      ? imageCapability({
+          value: formatProviderModel("runninghub", model.model),
+          label: model.label,
+          provider: "runninghub",
+          model: model.model,
+          supportsAsync: false,
+          supportsReferences: model.supportsReferences,
+          sizes: RUNNINGHUB_IMAGE_SIZES,
+          maxReferenceImages: model.maxReferenceImages,
+          minReferenceImages: model.minReferenceImages,
+        })
+      : videoCapability({
+          value: formatProviderModel("runninghub", model.model),
+          label: model.label,
+          provider: "runninghub",
+          model: model.model,
+          supportsReferences: model.supportsReferences,
+          sizes: RUNNINGHUB_VIDEO_SIZES,
+          resolutions: model.resolutionOptions?.map(value => ({ value, label: value })),
+          durations: model.durationOptions?.map(value => ({ value, label: `${value}s` })),
+          videoReferenceMode: model.videoReferenceMode ?? (model.supportsReferences ? "reference" : "none"),
+          maxReferenceImages: model.maxReferenceImages,
+          minReferenceImages: model.minReferenceImages,
+          referenceMediaTypes: model.referenceMediaTypes ? [...model.referenceMediaTypes] : undefined,
+        }),
+  ),
   imageCapability({
     value: "runninghub:ai-app-image:<webappId>",
     label: "RunningHub AI App Image",
@@ -753,8 +785,9 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     supportsReferences: true,
     sizes: RUNNINGHUB_VIDEO_SIZES,
     videoReferenceMode: "reference",
-    maxReferenceImages: 4,
+    maxReferenceImages: 9,
     minReferenceImages: 0,
+    referenceMediaTypes: ["image", "video", "audio"],
   }),
   videoCapability({
     value: "runninghub:workflow-video:<workflowId>",
@@ -764,8 +797,9 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     supportsReferences: true,
     sizes: RUNNINGHUB_VIDEO_SIZES,
     videoReferenceMode: "reference",
-    maxReferenceImages: 4,
+    maxReferenceImages: 9,
     minReferenceImages: 0,
+    referenceMediaTypes: ["image", "video", "audio"],
   }),
 ];
 
@@ -851,6 +885,9 @@ export function getImageModelCapabilities(value: string): ImageModelCapabilities
       resolutions: capability.sizes,
       qualities: capability.qualityLevels,
       thinkingLevels: capability.thinkingLevels,
+      maxReferenceImages: capability.maxReferenceImages,
+      minReferenceImages: capability.minReferenceImages,
+      referenceMediaTypes: capability.referenceMediaTypes,
     };
   }
   return {
@@ -858,6 +895,9 @@ export function getImageModelCapabilities(value: string): ImageModelCapabilities
     resolutions: [],
     qualities: [],
     thinkingLevels: [],
+    maxReferenceImages: 0,
+    minReferenceImages: 0,
+    referenceMediaTypes: [],
   };
 }
 
@@ -883,10 +923,10 @@ export function getVideoModelCapabilities(value: string): VideoModelCapabilities
     resolutions: capability?.resolutions ?? [],
     durations: capability?.durations ?? [],
     presets: capability?.presets ?? [],
-    referenceMode: capability?.videoReferenceMode ?? "reference",
-    maxReferenceImages: capability?.maxReferenceImages ?? 3,
+    referenceMode: capability?.videoReferenceMode ?? "none",
+    maxReferenceImages: capability?.maxReferenceImages ?? 0,
     minReferenceImages: capability?.minReferenceImages ?? 0,
-    referenceMediaTypes: capability?.referenceMediaTypes ?? ["image"],
+    referenceMediaTypes: capability?.referenceMediaTypes ?? [],
   };
 }
 
@@ -927,6 +967,9 @@ interface ImageCapabilityInput extends CapabilityInput {
   sizes?: ParameterOption[];
   thinkingLevels?: ParameterOption[];
   qualityLevels?: ParameterOption[];
+  maxReferenceImages?: number;
+  minReferenceImages?: number;
+  referenceMediaTypes?: MediaReferenceType[];
 }
 
 interface VideoCapabilityInput extends CapabilityInput {
@@ -958,9 +1001,9 @@ function imageCapability(input: ImageCapabilityInput): ProviderModelCapability {
     durations: [],
     presets: [],
     videoReferenceMode: "none",
-    maxReferenceImages: 0,
-    minReferenceImages: 0,
-    referenceMediaTypes: [],
+    maxReferenceImages: input.maxReferenceImages ?? 0,
+    minReferenceImages: input.minReferenceImages ?? 0,
+    referenceMediaTypes: input.supportsReferences ? input.referenceMediaTypes ?? ["image"] : [],
   };
 }
 

@@ -550,5 +550,6 @@ function formatCapabilities(c: ProviderModelCapability): Record<string, unknown>
     videoReferenceMode: c.videoReferenceMode,
     maxReferenceImages: c.maxReferenceImages,
     minReferenceImages: c.minReferenceImages,
+    referenceMediaTypes: c.referenceMediaTypes,
   };
 }

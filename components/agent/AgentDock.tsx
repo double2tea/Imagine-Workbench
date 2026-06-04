@@ -503,6 +503,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
     agentReferenceUrl,
   );
   const hasSendableAgentImages = sendableAgentReferences.length > 0;
+  const hasVisibleAgentReference = hasSendableAgentImages && agentReferenceUrl;
   const [visionLookup, setVisionLookup] = useState<{
     model: string;
     supportsVision: boolean | null;
@@ -776,11 +777,11 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
       </div>
 
       <div className={`${isOpen ? "imagine-agent-dock-input-divider pt-3 mt-2" : ""} flex flex-col gap-3`}>
-        {hasSendableAgentImages && (
+        {hasVisibleAgentReference && (
           <div className="imagine-agent-reference-strip flex items-center justify-between gap-3 p-2 animate-fade-in mb-1">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="imagine-agent-ref-thumb relative h-10 w-10 shrink-0 overflow-hidden rounded-lg">
-                <PreviewImage src={agentReferenceUrl || ""} alt="agent ref" className="h-full w-full object-cover" />
+                <PreviewImage src={agentReferenceUrl} alt="agent ref" className="h-full w-full object-cover" />
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="text-[10px] font-bold text-indigo-300">局部编辑参考图</span>

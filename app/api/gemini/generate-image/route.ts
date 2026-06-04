@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
     const referenceImages = readReferenceImages(body.referenceImages, body.referenceImage);
     const payloadError = getReferenceImagePayloadError(referenceImages);
     if (payloadError) return NextResponse.json({ error: payloadError }, { status: 413 });
+    validateReferenceCount(modelValue, referenceImages.length);
 
     const result = await generateImage(config, {
       prompt: requireText(body.prompt, "Prompt"),
@@ -110,6 +111,16 @@ function resolveImageQuality(modelValue: string, imageQuality: string | undefine
   const capabilities = getImageModelCapabilities(modelValue);
   if (capabilities.qualities.some(option => option.value === imageQuality)) return imageQuality;
   throw new ImageRequestValidationError(`Unsupported imageQuality "${imageQuality}" for this image model`);
+}
+
+function validateReferenceCount(modelValue: string, count: number): void {
+  const capabilities = getImageModelCapabilities(modelValue);
+  if (count < capabilities.minReferenceImages) {
+    throw new ImageRequestValidationError(`Selected image model requires at least ${capabilities.minReferenceImages} reference image(s)`);
+  }
+  if (count > capabilities.maxReferenceImages) {
+    throw new ImageRequestValidationError(`Selected image model supports at most ${capabilities.maxReferenceImages} reference image(s)`);
+  }
 }
 
 function isValidCustomImageResolution(value: string, aspectRatio: string): boolean {

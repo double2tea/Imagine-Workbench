@@ -1,5 +1,13 @@
 import type { AiProvider } from "./model-catalog";
-import type { GenerateImageInput, GenerateImageResult, MediaStatusResult, ProviderConfig } from "./types";
+import {
+  buildRunningHubStandardBody,
+  getRunningHubStandardEndpoint,
+  getRunningHubStandardModel,
+  resolveRunningHubStandardModelForReferences,
+  validateRunningHubStandardReferenceCount,
+} from "./runninghub";
+import type { GenerateImageInput, GenerateImageResult, MediaStatusResult, ProviderConfig, ReferenceMedia } from "./types";
+import { mediaReferenceFileExtension, mediaReferenceLabel, mediaReferenceTypeFromMime } from "../media-references";
 import {
   dataUriToBlob,
   getJson,
@@ -53,10 +61,14 @@ interface RunningHubCreateResponse {
   code?: number;
   msg?: string;
   data?: {
+    id?: string;
     taskId?: string;
+    task_id?: string;
     taskStatus?: string;
-  };
+  } | string;
+  id?: string;
   taskId?: string;
+  task_id?: string;
 }
 
 interface RunningHubQueryResponse {
@@ -65,11 +77,35 @@ interface RunningHubQueryResponse {
   data?: {
     status?: string;
     errorMessage?: string;
-    results?: Array<{ url?: string; fileUrl?: string; fileType?: string }>;
+    results?: RunningHubMediaOutput[];
   };
   status?: string;
   errorMessage?: string;
-  results?: Array<{ url?: string; fileUrl?: string; fileType?: string }>;
+  results?: RunningHubMediaOutput[];
+}
+
+interface RunningHubTaskOutputsResponse {
+  code?: number;
+  msg?: string;
+  data?: RunningHubMediaOutput[] | { failedReason?: unknown } | null;
+}
+
+interface RunningHubUploadResponse {
+  code?: number;
+  msg?: string;
+  message?: string;
+  data?: {
+    download_url?: string;
+    downloadUrl?: string;
+    url?: string;
+    fileUrl?: string;
+    file_url?: string;
+  };
+  download_url?: string;
+  downloadUrl?: string;
+  url?: string;
+  fileUrl?: string;
+  file_url?: string;
 }
 
 interface GeminiGenerateContentResponse {
@@ -90,9 +126,34 @@ interface RunningHubMediaInput {
   model: string;
   aspectRatio?: string;
   imageResolution?: string;
+  resolutionName?: string;
+  durationSeconds?: string;
   referenceImages: GenerateImageInput["referenceImages"];
+  referenceMedia?: ReferenceMedia[];
 }
 
+type RunningHubStatusMode = "standard" | "task-output";
+
+interface RunningHubRequest {
+  endpoint: string;
+  body: Record<string, unknown>;
+  statusMode: RunningHubStatusMode;
+}
+
+interface RunningHubMediaOutput {
+  url?: string;
+  fileUrl?: string;
+  fileType?: string;
+  outputType?: string;
+}
+
+interface RunningHubNodeInfo {
+  nodeId: string;
+  fieldName: string;
+  fieldValue: string;
+}
+
+const RUNNINGHUB_TASK_OUTPUT_PREFIX = "task-output:";
 const ASYNC_IMAGE_SUCCESS_STATUSES = new Set(["complete", "completed", "partial_complete", "succeeded", "success"]);
 const ASYNC_IMAGE_FAILED_STATUSES = new Set(["failed", "failure", "canceled", "cancelled", "expired"]);
 
@@ -246,16 +307,25 @@ export async function generateRunningHubMedia(
   input: RunningHubMediaInput,
   mediaType: "image" | "video",
 ): Promise<GenerateImageResult> {
-  const request = buildRunningHubRequest(config, input, mediaType);
+  const request = await buildRunningHubRequest(config, input, mediaType);
   const response = await postJson<RunningHubCreateResponse>(`${config.baseUrl}${request.endpoint}`, config, request.body);
-  const taskId = response.data?.taskId ?? response.taskId;
+  assertRunningHubOk(response, "RunningHub task creation failed");
+  const taskId = readRunningHubCreatedTaskId(response);
   if (!taskId) {
     throw new Error(response.msg ?? "RunningHub response did not include a taskId");
   }
   return {
-    operationName: mediaOperationName("runninghub", mediaType, taskId),
+    operationName: mediaOperationName("runninghub", mediaType, runningHubOperationTaskId(request.statusMode, taskId)),
     source: input.model,
   };
+}
+
+function readRunningHubCreatedTaskId(response: RunningHubCreateResponse): string | undefined {
+  if (typeof response.data === "string" && response.data.trim()) return response.data;
+  if (typeof response.data === "object" && response.data !== null) {
+    return response.data.taskId ?? response.data.task_id ?? response.data.id;
+  }
+  return response.taskId ?? response.task_id ?? response.id;
 }
 
 export async function getRunningHubMediaStatus(
@@ -263,11 +333,17 @@ export async function getRunningHubMediaStatus(
   mediaType: "image" | "video",
   taskId: string,
 ): Promise<MediaStatusResult> {
+  const operationTask = parseRunningHubOperationTaskId(taskId);
+  if (operationTask.statusMode === "task-output") {
+    return getRunningHubTaskOutputStatus(config, mediaType, operationTask.taskId);
+  }
+
   const response = await postJson<RunningHubQueryResponse>(`${config.baseUrl}/openapi/v2/query`, config, { taskId });
+  assertRunningHubOk(response, "RunningHub task query failed");
   const data = response.data ?? response;
   const status = data.status?.toLowerCase() ?? "running";
   if (status === "succeeded" || status === "success" || status === "completed") {
-    const url = data.results?.find(result => result.url || result.fileUrl)?.url ?? data.results?.find(result => result.fileUrl)?.fileUrl;
+    const url = readRunningHubOutputUrl(data.results ?? [], mediaType);
     if (!url) throw new Error("RunningHub task completed without a result URL");
     return { done: true, mediaType, progress: 100, status, url };
   }
@@ -281,6 +357,69 @@ export async function getRunningHubMediaStatus(
     };
   }
   return { done: false, mediaType, progress: status === "queued" ? 5 : 50, status };
+}
+
+async function getRunningHubTaskOutputStatus(
+  config: ProviderConfig,
+  mediaType: "image" | "video",
+  taskId: string,
+): Promise<MediaStatusResult> {
+  const response = await postJson<RunningHubTaskOutputsResponse>(`${config.baseUrl}/task/openapi/outputs`, config, {
+    apiKey: config.apiKey,
+    taskId,
+  });
+  if (response.code === 804 || response.code === 813) {
+    return { done: false, mediaType, progress: response.code === 813 ? 5 : 50, status: response.msg ?? "running" };
+  }
+  if (response.code === 805) {
+    return {
+      done: true,
+      mediaType,
+      progress: 100,
+      status: "failed",
+      errorMessage: response.msg ?? "RunningHub task failed",
+    };
+  }
+  if (response.code !== undefined && response.code !== 0) {
+    throw new Error(response.msg ?? `RunningHub task output query failed with code ${response.code}`);
+  }
+
+  if (isRunningHubFailedOutput(response.data)) {
+    return {
+      done: true,
+      mediaType,
+      progress: 100,
+      status: "failed",
+      errorMessage: readFailedReason(response.data.failedReason),
+    };
+  }
+
+  const results = Array.isArray(response.data) ? response.data : [];
+  if (results.length === 0) {
+    return { done: false, mediaType, progress: 50, status: response.msg ?? "running" };
+  }
+  const url = readRunningHubOutputUrl(results, mediaType);
+  if (!url) throw new Error("RunningHub task completed without a result URL");
+  return { done: true, mediaType, progress: 100, status: "success", url };
+}
+
+function isRunningHubFailedOutput(value: RunningHubTaskOutputsResponse["data"]): value is { failedReason?: unknown } {
+  return typeof value === "object" && value !== null && !Array.isArray(value) && "failedReason" in value;
+}
+
+function readFailedReason(reason: unknown): string {
+  return typeof reason === "string" && reason.trim() ? reason : "RunningHub task failed";
+}
+
+function readRunningHubOutputUrl(results: RunningHubMediaOutput[], mediaType: "image" | "video"): string | undefined {
+  return results.find(result => isRunningHubOutputMediaType(result, mediaType))?.url
+    ?? results.find(result => isRunningHubOutputMediaType(result, mediaType))?.fileUrl;
+}
+
+function isRunningHubOutputMediaType(result: RunningHubMediaOutput, mediaType: "image" | "video"): boolean {
+  const marker = (result.fileType ?? result.outputType ?? result.url ?? result.fileUrl ?? "").toLowerCase();
+  if (mediaType === "image") return /\.(png|jpe?g|webp|gif)(\?|$)/.test(marker) || /^(png|jpe?g|webp|gif|image)\b/.test(marker);
+  return /\.(mp4|mov|webm|m4v)(\?|$)/.test(marker) || /^(mp4|mov|webm|m4v|video)\b/.test(marker);
 }
 
 function readModelScopeReferenceImages(input: GenerateImageInput): string | string[] | undefined {
@@ -301,22 +440,52 @@ function readModelScopeImageUrl(response: ModelScopeImageCreateResponse): string
   return response.output?.output_images?.[0];
 }
 
-function buildRunningHubRequest(
+async function buildRunningHubRequest(
   config: ProviderConfig,
   input: RunningHubMediaInput,
   mediaType: "image" | "video",
-): { endpoint: string; body: Record<string, unknown> } {
+): Promise<RunningHubRequest> {
   const size = mediaType === "image" ? input.imageResolution : input.aspectRatio;
+  const standardModel = getRunningHubStandardModel(input.model, mediaType);
+  if (standardModel) {
+    const references = input.referenceMedia ?? input.referenceImages.map(reference => ({ ...reference, type: "image" as const }));
+    validateRunningHubStandardReferenceCount(standardModel, references.length);
+    validateRunningHubStandardReferenceMediaTypes(standardModel, references);
+    const routedModel = resolveRunningHubStandardModelForReferences(standardModel, references.length);
+    validateRunningHubStandardReferenceCount(routedModel, references.length);
+    validateRunningHubStandardReferenceMediaTypes(routedModel, references);
+    const referenceMediaUrls = routedModel.supportsReferences
+      ? await uploadRunningHubStandardReferences(config, references)
+      : undefined;
+    return {
+      endpoint: getRunningHubStandardEndpoint(routedModel),
+      statusMode: "standard",
+      body: buildRunningHubStandardBody(routedModel, {
+        prompt: input.prompt,
+        aspectRatio: input.aspectRatio,
+        imageResolution: input.imageResolution,
+        resolutionName: input.resolutionName,
+        durationSeconds: input.durationSeconds,
+        referenceImages: input.referenceImages,
+        ...(referenceMediaUrls ? { referenceMediaUrls } : {}),
+      }),
+    };
+  }
+
   if (input.model.startsWith("api:")) {
     const endpoint = input.model.slice("api:".length);
     if (endpoint.startsWith("/openapi/v2/")) {
+      const references = input.referenceMedia ?? input.referenceImages.map(reference => ({ ...reference, type: "image" as const }));
+      const referenceMediaUrls = references.length > 0 ? await uploadRunningHubStandardReferences(config, references) : undefined;
+      const imageUrls = referenceMediaUrls?.imageUrls ?? input.referenceImages.map(reference => reference.dataUri);
       return {
         endpoint,
+        statusMode: "standard",
         body: {
           prompt: input.prompt,
           size: size === "auto" ? undefined : size,
-          image_url: input.referenceImages[0]?.dataUri,
-          image_urls: input.referenceImages.map(reference => reference.dataUri),
+          image_url: imageUrls[0],
+          image_urls: imageUrls,
         },
       };
     }
@@ -328,17 +497,11 @@ function buildRunningHubRequest(
     if (webappId === "<webappId>") throw new Error(`RunningHub ${mediaType} AI App model is missing webappId`);
     return {
       endpoint: "/task/openapi/ai-app/run",
+      statusMode: "task-output",
       body: {
         apiKey: config.apiKey,
         webappId,
-        nodeInfoList: [
-          { nodeId: "prompt", fieldName: "prompt", fieldValue: input.prompt },
-          ...input.referenceImages.map((reference, index) => ({
-            nodeId: `image_${index + 1}`,
-            fieldName: "image",
-            fieldValue: reference.dataUri,
-          })),
-        ],
+        nodeInfoList: buildRunningHubTaskNodeInfoList(input),
       },
     };
   }
@@ -349,23 +512,99 @@ function buildRunningHubRequest(
     if (workflowId === "<workflowId>") throw new Error(`RunningHub ${mediaType} workflow model is missing workflowId`);
     return {
       endpoint: "/task/openapi/create",
+      statusMode: "task-output",
       body: {
         apiKey: config.apiKey,
         workflowId,
-        nodeInfoList: [
-          { nodeId: "prompt", fieldName: "prompt", fieldValue: input.prompt },
-          ...input.referenceImages.map((reference, index) => ({
-            nodeId: `image_${index + 1}`,
-            fieldName: "image",
-            fieldValue: reference.dataUri,
-          })),
-        ],
+        nodeInfoList: buildRunningHubTaskNodeInfoList(input),
       },
     };
   }
   throw new Error(
     `RunningHub ${mediaType} model must be api:/openapi/v2/..., ${expectedPrefix}<webappId>, or ${workflowPrefix}<workflowId>`,
   );
+}
+
+function buildRunningHubTaskNodeInfoList(input: RunningHubMediaInput): RunningHubNodeInfo[] {
+  const references = input.referenceMedia ?? input.referenceImages.map(reference => ({ ...reference, type: "image" as const }));
+  const counts = { image: 0, video: 0, audio: 0 };
+  return [
+    { nodeId: "prompt", fieldName: "prompt", fieldValue: input.prompt },
+    ...references.map(reference => {
+      counts[reference.type] += 1;
+      return {
+        nodeId: `${reference.type}_${counts[reference.type]}`,
+        fieldName: reference.type,
+        fieldValue: reference.dataUri,
+      };
+    }),
+  ];
+}
+
+function runningHubOperationTaskId(statusMode: RunningHubStatusMode, taskId: string): string {
+  return statusMode === "task-output" ? `${RUNNINGHUB_TASK_OUTPUT_PREFIX}${taskId}` : taskId;
+}
+
+function parseRunningHubOperationTaskId(taskId: string): { statusMode: RunningHubStatusMode; taskId: string } {
+  if (taskId.startsWith(RUNNINGHUB_TASK_OUTPUT_PREFIX)) {
+    return { statusMode: "task-output", taskId: taskId.slice(RUNNINGHUB_TASK_OUTPUT_PREFIX.length) };
+  }
+  return { statusMode: "standard", taskId };
+}
+
+function validateRunningHubStandardReferenceMediaTypes(
+  model: NonNullable<ReturnType<typeof getRunningHubStandardModel>>,
+  references: ReferenceMedia[],
+): void {
+  const acceptedTypes = model.referenceMediaTypes ?? ["image"];
+  const unsupported = references.find(reference => !acceptedTypes.includes(reference.type));
+  if (unsupported) {
+    throw new Error(`${model.label} does not support ${mediaReferenceLabel(unsupported.type)} references`);
+  }
+}
+
+async function uploadRunningHubStandardReferences(
+  config: ProviderConfig,
+  references: ReferenceMedia[],
+): Promise<{ imageUrls: string[]; videoUrls: string[]; audioUrls: string[] }> {
+  const urls = {
+    imageUrls: [] as string[],
+    videoUrls: [] as string[],
+    audioUrls: [] as string[],
+  };
+  for (const [index, reference] of references.entries()) {
+    const form = new FormData();
+    const blob = dataUriToBlob(reference.dataUri);
+    const mediaType = mediaReferenceTypeFromMime(blob.type) ?? reference.type;
+    form.append("file", blob, `reference-${index + 1}.${mediaReferenceFileExtension(blob.type, mediaType)}`);
+    const response = await postForm<RunningHubUploadResponse>(`${config.baseUrl}/openapi/v2/media/upload/binary`, config, form);
+    assertRunningHubOk(response, "RunningHub media upload failed");
+    if (mediaType === "image") urls.imageUrls.push(readRunningHubUploadUrl(response));
+    if (mediaType === "video") urls.videoUrls.push(readRunningHubUploadUrl(response));
+    if (mediaType === "audio") urls.audioUrls.push(readRunningHubUploadUrl(response));
+  }
+  return urls;
+}
+
+function readRunningHubUploadUrl(response: RunningHubUploadResponse): string {
+  const url =
+    response.data?.download_url ??
+    response.data?.downloadUrl ??
+    response.data?.url ??
+    response.data?.fileUrl ??
+    response.data?.file_url ??
+    response.download_url ??
+    response.downloadUrl ??
+    response.url ??
+    response.fileUrl ??
+    response.file_url;
+  if (!url) throw new Error("RunningHub upload response did not include download_url");
+  return url;
+}
+
+function assertRunningHubOk(response: { code?: number; msg?: string; message?: string }, fallback: string): void {
+  if (response.code === undefined || response.code === 0 || response.code === 200) return;
+  throw new Error(response.msg ?? response.message ?? `${fallback} with code ${response.code}`);
 }
 
 async function generate12AiGeminiImage(config: ProviderConfig, input: GenerateImageInput): Promise<GenerateImageResult> {

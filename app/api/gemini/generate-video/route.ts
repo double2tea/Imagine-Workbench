@@ -4,6 +4,7 @@ import { generateVideo } from "@/lib/providers/video";
 import { optionalText, requireText, resolveProviderConfig } from "@/lib/providers/utils";
 import { mediaReferenceLabel, mediaReferenceTypeFromBase64DataUri, type MediaReferenceType } from "@/lib/media-references";
 import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, getReferenceMediaPayloadError } from "@/lib/reference-images";
+import type { ReferenceMedia } from "@/lib/providers/types";
 
 export const runtime = "edge";
 
@@ -17,6 +18,7 @@ interface GenerateVideoBody {
   image?: unknown;
   lastFrame?: unknown;
   images?: unknown;
+  referenceMedia?: unknown;
 }
 
 export async function POST(req: NextRequest) {
@@ -29,12 +31,12 @@ export async function POST(req: NextRequest) {
     const parsed = parseProviderModel(modelValue, "12ai");
     const config = resolveProviderConfig(req, parsed.provider);
     const capability = getVideoModelCapabilities(modelValue);
-    const referenceImages = readReferenceImages(body.images, body.image, body.lastFrame);
-    const formatError = getReferenceMediaFormatError(referenceImages, capability.referenceMediaTypes);
+    const referenceMedia = readReferenceMedia(body.referenceMedia, body.images, body.image, body.lastFrame);
+    const formatError = getReferenceMediaFormatError(referenceMedia, capability.referenceMediaTypes);
     if (formatError) return NextResponse.json({ error: formatError }, { status: 400 });
-    const payloadError = getReferenceMediaPayloadError(referenceImages);
+    const payloadError = getReferenceMediaPayloadError(referenceMedia.map(reference => reference.dataUri));
     if (payloadError) return NextResponse.json({ error: payloadError }, { status: 413 });
-    validateReferenceCount(referenceImages.length, capability.minReferenceImages, capability.maxReferenceImages);
+    validateReferenceCount(referenceMedia.length, capability.minReferenceImages, capability.maxReferenceImages);
 
     const result = await generateVideo(config, {
       prompt: requireText(body.prompt, "Prompt"),
@@ -43,7 +45,7 @@ export async function POST(req: NextRequest) {
       durationSeconds: optionalText(body.durationSeconds),
       preset: optionalText(body.preset),
       resolutionName: optionalText(body.resolutionName),
-      referenceImages: referenceImages.map(dataUri => ({ dataUri })),
+      referenceMedia,
     });
 
     return NextResponse.json(result);
@@ -68,22 +70,42 @@ function getRequestBodySizeError(req: NextRequest): string | null {
   return "参考媒体请求体过大，请压缩或减少参考媒体后重试";
 }
 
-function readReferenceImages(images: unknown, image: unknown, lastFrame: unknown): string[] {
+function readReferenceMedia(referenceMedia: unknown, images: unknown, image: unknown, lastFrame: unknown): ReferenceMedia[] {
+  if (Array.isArray(referenceMedia) && referenceMedia.length > 0) {
+    return referenceMedia.map(readReferenceMediaValue).filter((reference): reference is ReferenceMedia => reference !== null);
+  }
+
   if (Array.isArray(images) && images.length > 0) {
-    return images.filter((value): value is string => typeof value === "string" && value.length > 0);
+    return images
+      .filter((value): value is string => typeof value === "string" && value.length > 0)
+      .map(readReferenceMediaItem);
   }
 
   const refs: string[] = [];
   if (typeof image === "string" && image.length > 0) refs.push(image);
   if (typeof lastFrame === "string" && lastFrame.length > 0) refs.push(lastFrame);
-  return refs;
+  return refs.map(readReferenceMediaItem);
 }
 
-function getReferenceMediaFormatError(referenceImages: string[], acceptedTypes: MediaReferenceType[]): string | null {
-  for (const reference of referenceImages) {
-    const type = mediaReferenceTypeFromBase64DataUri(reference);
-    if (!type) return "Video reference media must be data:image/*, data:video/* or data:audio/* base64 data URIs";
-    if (!acceptedTypes.includes(type)) return `当前视频模型不支持${mediaReferenceLabel(type)}输入`;
+function readReferenceMediaValue(value: unknown): ReferenceMedia | null {
+  if (typeof value === "string" && value.length > 0) return readReferenceMediaItem(value);
+  if (typeof value !== "object" || value === null || !("dataUri" in value)) return null;
+  const dataUri = value.dataUri;
+  if (typeof dataUri !== "string" || dataUri.length === 0) return null;
+  return readReferenceMediaItem(dataUri);
+}
+
+function readReferenceMediaItem(dataUri: string): ReferenceMedia {
+  const type = mediaReferenceTypeFromBase64DataUri(dataUri);
+  if (!type) return { dataUri, type: "image" };
+  return { dataUri, type };
+}
+
+function getReferenceMediaFormatError(referenceMedia: ReferenceMedia[], acceptedTypes: MediaReferenceType[]): string | null {
+  for (const reference of referenceMedia) {
+    const actualType = mediaReferenceTypeFromBase64DataUri(reference.dataUri);
+    if (!actualType) return "Video reference media must be data:image/*, data:video/* or data:audio/* base64 data URIs";
+    if (!acceptedTypes.includes(actualType)) return `当前视频模型不支持${mediaReferenceLabel(actualType)}输入`;
   }
   return null;
 }

@@ -25,10 +25,11 @@ import {
   hydrateAssets,
   listBoardScopedAssetMetas,
   saveToDB,
+  type GenerationReferenceMediaSnapshot,
   type GenerationRequestSnapshot,
   type StorageItem,
 } from "@/lib/db";
-import { mediaReferenceTypeFromMime } from "@/lib/media-references";
+import { isMediaReferenceType, mediaReferenceTypeFromDataUri, mediaReferenceTypeFromMime } from "@/lib/media-references";
 import { compressReferenceImageFile, dataUriByteSize } from "@/lib/reference-images";
 
 export const WORKSPACE_BACKUP_SCHEMA_VERSION = 1;
@@ -636,8 +637,26 @@ function parseGenerationRequest(value: unknown): GenerationRequestSnapshot | und
     videoDurationSeconds: readOptionalString(value, "videoDurationSeconds"),
     videoPreset: readOptionalString(value, "videoPreset"),
     videoResolution: readOptionalString(value, "videoResolution"),
+    referenceMedia: parseGenerationReferenceMedia(value.referenceMedia),
     referenceImages: readOptionalStringArray(value, "referenceImages"),
   };
+}
+
+function parseGenerationReferenceMedia(value: unknown): GenerationReferenceMediaSnapshot[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) throw new Error("referenceMedia 格式无效");
+  return value.map(item => {
+    if (!isRecord(item)) throw new Error("referenceMedia 条目格式无效");
+    const url = readString(item, "url");
+    const typeValue = item.type;
+    const type = isMediaReferenceType(typeValue) ? typeValue : mediaReferenceTypeFromDataUri(url) ?? "image";
+    const roleValue = item.role;
+    return {
+      url,
+      type,
+      ...(roleValue === "start" || roleValue === "end" || roleValue === "general" ? { role: roleValue } : {}),
+    };
+  });
 }
 
 function parseBoardDocuments(text: string): BoardDocument[] {
@@ -762,6 +781,7 @@ function parseReferenceGroupItem(value: unknown): BoardReferenceGroupItem {
     model: readString(value, "model"),
     prompt: readString(value, "prompt"),
     role: readReferenceRole(value, "role"),
+    type: isMediaReferenceType(value.type) ? value.type : mediaReferenceTypeFromDataUri(readString(value, "url")) ?? "image",
     url: readString(value, "url"),
   };
 }

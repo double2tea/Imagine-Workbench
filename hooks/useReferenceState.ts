@@ -7,7 +7,7 @@ import {
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import { getMediaReferencePromptToken, getMediaReferenceType, mediaReferenceLabel, mediaReferenceTypeFromMime, type MediaReferenceType } from "@/lib/media-references";
 import type { VideoReferenceMode } from "@/lib/providers/model-catalog";
-import { compressReferenceImageFile } from "@/lib/reference-images";
+import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, compressReferenceImageFile } from "@/lib/reference-images";
 
 export type AtDropdownTarget = "image-prompt" | "video-prompt" | "agent-prompt";
 type PromptReferenceTarget = Exclude<AtDropdownTarget, "agent-prompt">;
@@ -23,6 +23,8 @@ interface AtDropdownState {
 
 interface UseReferenceStateParams {
   agentInput: string;
+  imageReferenceLimit: number;
+  imageReferenceMediaTypes: MediaReferenceType[];
   prompt: string;
   videoReferenceLimit: number;
   videoReferenceMediaTypes: MediaReferenceType[];
@@ -53,6 +55,13 @@ function readFileAsDataUrl(file: File): Promise<string> {
     reader.onerror = () => reject(reader.error ?? new Error("文件读取失败"));
     reader.readAsDataURL(file);
   });
+}
+
+function getRawMediaFileSizeError(file: File, type: MediaReferenceType): string | null {
+  if (type === "image") return null;
+  const maxRawBytes = Math.floor(REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES * 0.75);
+  if (file.size <= maxRawBytes) return null;
+  return `${mediaReferenceLabel(type)}参考文件过大，请压缩到 ${Math.floor(maxRawBytes / 1024 / 1024)}MB 以内后重试`;
 }
 
 export function getReferencePromptToken(index: number): string {
@@ -103,6 +112,8 @@ export function removePromptReferenceTokens(prompt: string): string {
 
 export function useReferenceState({
   agentInput,
+  imageReferenceLimit,
+  imageReferenceMediaTypes,
   prompt,
   videoReferenceLimit,
   videoReferenceMediaTypes,
@@ -123,10 +134,10 @@ export function useReferenceState({
   });
 
   const getReferenceLimitForTarget = (target: PromptReferenceTarget): number =>
-    target === "video-prompt" ? videoReferenceLimit : IMAGE_REFERENCE_LIMIT;
+    target === "video-prompt" ? videoReferenceLimit : imageReferenceLimit;
 
   const getAcceptedMediaTypesForTarget = (target: PromptReferenceTarget): MediaReferenceType[] =>
-    target === "video-prompt" ? videoReferenceMediaTypes : ["image"];
+    target === "video-prompt" ? videoReferenceMediaTypes : imageReferenceMediaTypes;
 
   const isAcceptedReferenceType = (type: MediaReferenceType, target: PromptReferenceTarget): boolean =>
     getAcceptedMediaTypesForTarget(target).includes(type);
@@ -183,6 +194,11 @@ export function useReferenceState({
     const limit = getReferenceLimitForTarget(target);
     if (referenceImages.length >= limit) {
       pushWorkspaceNotice("error", `参考图已达上限：最多 ${limit} 张`);
+      return;
+    }
+    const fileSizeError = getRawMediaFileSizeError(file, type);
+    if (fileSizeError) {
+      pushWorkspaceNotice("error", fileSizeError);
       return;
     }
 

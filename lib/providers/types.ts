@@ -1,4 +1,5 @@
 import type { AiProvider } from "./model-catalog";
+import type { MediaReferenceType } from "@/lib/media-references";
 
 export interface ProviderCredentials {
   apiKey: string;
@@ -14,6 +15,10 @@ export interface ProviderConfig {
 
 export interface ReferenceImage {
   dataUri: string;
+}
+
+export interface ReferenceMedia extends ReferenceImage {
+  type: MediaReferenceType;
 }
 
 export interface GenerateImageInput {
@@ -40,7 +45,7 @@ export interface GenerateVideoInput {
   durationSeconds?: string;
   preset?: string;
   resolutionName?: string;
-  referenceImages: ReferenceImage[];
+  referenceMedia: ReferenceMedia[];
 }
 
 export interface GenerateVideoResult {

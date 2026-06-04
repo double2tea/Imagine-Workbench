@@ -38,7 +38,7 @@ function boardNodeReferences(node: BoardNode | undefined): ReferenceImageRef[] {
     return [{ id: node.asset.assetId, role: "general", type: node.asset.type, url: node.asset.url }];
   }
   if (node?.kind === "reference-group") {
-    return node.references.map(reference => ({ id: reference.assetId, role: reference.role, type: "image", url: reference.url }));
+    return node.references.map(reference => ({ id: reference.assetId, role: reference.role, type: reference.type, url: reference.url }));
   }
   return [];
 }

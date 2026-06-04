@@ -1189,7 +1189,7 @@ export default function BoardWorkspace({
       return BOARD_INSERT_CATALOG.filter(item =>
         item.kind === "image-generate" ||
         item.kind === "video-generate" ||
-        (sourceNode.asset.type === "image" && item.kind === "reference-group"),
+        item.kind === "reference-group",
       );
     }
     if (sourceNode?.kind === "reference-group") {
@@ -1299,10 +1299,6 @@ export default function BoardWorkspace({
     if (sourceKind === "asset") {
       const sourceNode = board.nodes.find(node => node.id === sourceNodeId);
       if (sourceNode?.kind === "asset") {
-        if (sourceNode.asset.type !== "image") {
-          onConnectionError("参考组只支持图片资产。");
-          return;
-        }
         if (sourceHandleId === "asset-out") {
           setQuickInsertMenu({
             clientX: clientPoint.x,

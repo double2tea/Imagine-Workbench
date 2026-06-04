@@ -101,6 +101,13 @@ export default function ImageGenerationPanel({
   const presetResolutionOptions = imageResolutionOptions.filter(option => option.value !== "custom");
   const supportsCustomImageSize = imageResolutionOptions.some(option => option.value === "custom");
   const isCustomImageResolution = imageResolution === "custom";
+  const imageReferenceLimit = capabilities.maxReferenceImages;
+  const imageReferenceHelp = imageReferenceLimit > 0
+    ? `支持 JPG / PNG / WEBP | 最多 ${imageReferenceLimit} 张 | 可拖入右侧资产或粘贴剪贴板`
+    : "当前模型不支持参考图";
+  const imageReferenceCountLabel = imageReferenceLimit > 0
+    ? `${Math.min(referenceImages.length, imageReferenceLimit)}/${imageReferenceLimit}`
+    : String(referenceImages.length);
 
   const handleApplyPromptTemplate = (template: PromptTemplate, mode: PromptTemplateApplyMode): void => {
     if (slashCommand && mode === "insert") {
@@ -338,12 +345,13 @@ export default function ImageGenerationPanel({
         addLabel="多图垫"
         browseClassName="font-medium text-blue-300 underline-offset-4 hover:text-blue-200 hover:underline cursor-pointer"
         clearLabel="清空所有垫图"
-        emptyHelp="支持 JPG / PNG / WEBP | 可拖入右侧资产或粘贴剪贴板"
-        emptyLabel="添加图片"
-        label={`创意参考图 / 多图垫图 ${referenceImages.length > 0 ? `(${referenceImages.length})` : ""}`}
-        maxCount={4}
+        emptyHelp={imageReferenceHelp}
+        emptyLabel={imageReferenceLimit > 0 ? "添加图片" : "当前模型不支持参考图"}
+        label={`创意参考图 / 多图垫图 ${referenceImages.length > 0 ? `(${imageReferenceCountLabel})` : ""}`}
+        maxCount={imageReferenceLimit}
         references={referenceImages}
-        uploadLabel="浏览上传"
+        uploadLabel={imageReferenceLimit > 0 ? "浏览上传" : "不可上传"}
+        acceptedMediaTypes={capabilities.referenceMediaTypes}
         onClear={onClearReferences}
         onDropAsset={onReferenceDropAsset}
         onDropFiles={onReferenceDropFiles}

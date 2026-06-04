@@ -89,7 +89,8 @@ export default function ReferenceImagePicker({
   onUpload,
   acceptedMediaTypes = ["image"],
 }: ReferenceImagePickerProps) {
-  const visibleReferences = references.slice(0, maxCount);
+  const canAdd = maxCount > 0 && references.length < maxCount;
+  const visibleReferences = maxCount > 0 ? references.slice(0, maxCount) : references;
   const accept = acceptedMediaTypes.map(type => `${type}/*`).join(",");
 
   const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
@@ -194,7 +195,7 @@ export default function ReferenceImagePicker({
             );
           })}
 
-          {references.length < maxCount && (
+          {canAdd && (
             <label className="imagine-reference-add-tile">
               <span className="font-bold text-lg leading-none">+</span>
               <span className="mt-0.5 text-[8px] font-semibold">{addLabel}</span>
@@ -207,10 +208,14 @@ export default function ReferenceImagePicker({
           <CloudUpload className="mb-1.5 h-5 w-5 text-[var(--iw-faint)]" />
           <span className="text-xs text-[var(--iw-muted)]">
             {emptyLabel}，或{" "}
-            <label className={browseClassName}>
-              {uploadLabel}
-              <input type="file" accept={accept} onChange={onUpload} className="hidden" />
-            </label>
+              {maxCount > 0 ? (
+                <label className={browseClassName}>
+                  {uploadLabel}
+                  <input type="file" accept={accept} onChange={onUpload} className="hidden" />
+                </label>
+              ) : (
+                <span>{uploadLabel}</span>
+              )}
           </span>
           <span className="mt-1 hidden text-[9px] text-[var(--iw-faint)] sm:inline">{emptyHelp}</span>
         </div>

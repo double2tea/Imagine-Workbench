@@ -1,4 +1,9 @@
 // IndexedDB: asset metadata (light) + blob payloads (heavy data URLs)
+import {
+  mediaReferenceTypeFromDataUri,
+  type MediaReferenceRole,
+  type MediaReferenceType,
+} from "./media-references";
 
 const DB_NAME = "ImagineWorkbenchDB";
 const DB_VERSION = 2;
@@ -8,6 +13,12 @@ const LEGACY_STORE = "assets";
 
 export type AssetScope = "workspace" | "board";
 export type StorageItemType = "image" | "video" | "audio";
+
+export interface GenerationReferenceMediaSnapshot {
+  url: string;
+  type: MediaReferenceType;
+  role?: MediaReferenceRole;
+}
 
 export interface GenerationRequestSnapshot {
   prompt: string;
@@ -19,6 +30,8 @@ export interface GenerationRequestSnapshot {
   videoDurationSeconds?: string;
   videoPreset?: string;
   videoResolution?: string;
+  referenceMedia?: GenerationReferenceMediaSnapshot[];
+  /** @deprecated Use referenceMedia. Kept only for reading pre-migration assets. */
   referenceImages?: string[];
 }
 
@@ -47,6 +60,17 @@ export interface StorageItemMeta {
 /** Hydrated asset record used across UI and generation flows. */
 export interface StorageItem extends StorageItemMeta {
   url: string;
+}
+
+export function getGenerationReferenceMedia(
+  request: GenerationRequestSnapshot | undefined,
+): GenerationReferenceMediaSnapshot[] {
+  if (!request) return [];
+  if (request.referenceMedia) return request.referenceMedia;
+  return (request.referenceImages ?? []).map(url => ({
+    url,
+    type: mediaReferenceTypeFromDataUri(url) ?? "image",
+  }));
 }
 
 interface AssetBlobRecord {

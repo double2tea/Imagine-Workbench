@@ -49,7 +49,11 @@ export async function generateVideo(config: ProviderConfig, input: GenerateVideo
       prompt: input.prompt,
       model: input.model,
       aspectRatio: input.aspectRatio,
-      referenceImages: input.referenceImages,
+      imageResolution: input.aspectRatio,
+      resolutionName: input.resolutionName,
+      durationSeconds: input.durationSeconds,
+      referenceImages: input.referenceMedia.filter(reference => reference.type === "image"),
+      referenceMedia: input.referenceMedia,
     }, "video");
     if (!result.operationName) throw new Error("RunningHub video response did not include an operation name");
     return {
@@ -77,7 +81,7 @@ export async function generateVideo(config: ProviderConfig, input: GenerateVideo
     if (input.preset) form.set("preset", input.preset);
   }
 
-  for (const [index, reference] of input.referenceImages.entries()) {
+  for (const [index, reference] of input.referenceMedia.entries()) {
     const blob = await referenceToBlob(reference);
     form.append("input_reference[]", blob, referenceFileName(index, blob.type));
   }
@@ -103,7 +107,7 @@ export async function generateVideo(config: ProviderConfig, input: GenerateVideo
 async function generateAgnesVideo(config: ProviderConfig, input: GenerateVideoInput): Promise<GenerateVideoResult> {
   const size = aspectRatioToVideoSize(input.aspectRatio, config.provider);
   const dimensions = size ? parseVideoDimensions(size) : undefined;
-  const referenceUrls = input.referenceImages.map(reference => reference.dataUri);
+  const referenceUrls = input.referenceMedia.map(reference => reference.dataUri);
   const response = await postJson<VideoCreateResponse>(`${config.baseUrl}/v1/videos`, config, {
     model: input.model,
     prompt: input.prompt,
@@ -244,7 +248,7 @@ function referenceFileName(index: number, mimeType: string): string {
   return `reference_${index + 1}.png`;
 }
 
-async function referenceToBlob(reference: GenerateVideoInput["referenceImages"][number]): Promise<Blob> {
+async function referenceToBlob(reference: GenerateVideoInput["referenceMedia"][number]): Promise<Blob> {
   const source = reference.dataUri;
   if (!isImageDataUri(source) && !isVideoDataUri(source) && !isAudioDataUri(source)) {
     throw new Error("Video reference media must be data:image/*, data:video/* or data:audio/* base64 data URIs");

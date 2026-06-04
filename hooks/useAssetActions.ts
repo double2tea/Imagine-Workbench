@@ -4,7 +4,14 @@ import { useConfirm } from "@/components/confirm/ConfirmProvider";
 import type { CompareViewType } from "@/components/assets/ComparePanel";
 import { readFetchError } from "@/lib/client-fetch-error";
 import { readImageGenerationPayload } from "@/lib/client-image-response";
-import { clearAllDB, deleteFromDB, saveToDB, type StorageItem } from "@/lib/db";
+import {
+  clearAllDB,
+  deleteFromDB,
+  getGenerationReferenceMedia,
+  saveToDB,
+  type StorageItem,
+} from "@/lib/db";
+import type { MediaReferenceRole, MediaReferenceType } from "@/lib/media-references";
 import { mediaReferenceFileExtension, mediaReferenceMimeFromDataUri } from "@/lib/media-references";
 import { parseProviderModel, type AiProvider } from "@/lib/providers/model-catalog";
 import { getReferenceImagePayloadError, getReferenceMediaPayloadError, prepareReferenceImageUrlForRequest, prepareReferenceMediaUrlForRequest } from "@/lib/reference-images";
@@ -24,6 +31,7 @@ interface RetryRequestBody {
   resolutionName?: string;
   referenceImage?: string;
   referenceImages?: string[];
+  referenceMedia?: Array<{ dataUri: string; type: MediaReferenceType; role?: MediaReferenceRole }>;
   images?: string[];
 }
 
@@ -86,7 +94,8 @@ function readVideoGenerationPayload(data: unknown): { imageUrl: string | null; o
 
 function buildRetryRequestBody(item: StorageItem): RetryRequestBody {
   const request = item.generationRequest;
-  const referenceImages = request?.referenceImages;
+  const referenceMedia = getGenerationReferenceMedia(request);
+  const referenceUrls = referenceMedia.map(reference => reference.url);
   const body: RetryRequestBody = {
     prompt: request?.prompt ?? item.prompt,
     model: request?.model ?? item.model,
@@ -97,13 +106,17 @@ function buildRetryRequestBody(item: StorageItem): RetryRequestBody {
     body.imageQuality = request?.imageQuality;
     body.imageResolution = request?.imageResolution ?? request?.aspectRatio ?? item.aspectRatio;
     body.thinkingLevel = request?.thinkingLevel;
-    body.referenceImage = referenceImages?.[0];
-    body.referenceImages = referenceImages;
+    body.referenceImage = referenceUrls[0];
+    body.referenceImages = referenceUrls;
   } else {
     body.durationSeconds = request?.videoDurationSeconds;
     body.preset = request?.videoPreset;
     body.resolutionName = request?.videoResolution;
-    body.images = referenceImages;
+    body.referenceMedia = referenceMedia.map(reference => ({
+      dataUri: reference.url,
+      type: reference.type,
+      ...(reference.role ? { role: reference.role } : {}),
+    }));
   }
 
   return body;
@@ -117,6 +130,13 @@ async function prepareRetryReferenceImages(body: RetryRequestBody): Promise<void
   }
   if (body.images) {
     body.images = await Promise.all(body.images.map(prepareReferenceMediaUrlForRequest));
+  }
+  if (body.referenceMedia) {
+    const prepared = await Promise.all(body.referenceMedia.map(async reference => ({
+      ...reference,
+      dataUri: await prepareReferenceMediaUrlForRequest(reference.dataUri),
+    })));
+    body.referenceMedia = prepared;
   }
 }
 
@@ -330,8 +350,8 @@ export function useAssetActions({
     try {
       const retryRequestBody = buildRetryRequestBody(item);
       await prepareRetryReferenceImages(retryRequestBody);
-      const retryPayloadError = retryRequestBody.images
-        ? getReferenceMediaPayloadError(retryRequestBody.images)
+      const retryPayloadError = retryRequestBody.referenceMedia
+        ? getReferenceMediaPayloadError(retryRequestBody.referenceMedia.map(reference => reference.dataUri))
         : getReferenceImagePayloadError(retryRequestBody.referenceImages ?? []);
       if (retryPayloadError) throw new Error(retryPayloadError);
 

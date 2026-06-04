@@ -7,6 +7,7 @@ type NoticeType = "error" | "info" | "success";
 
 interface UseClipboardImageImportParams {
   agentReferenceCount: number;
+  imageReferenceLimit: number;
   pushWorkspaceNotice: (type: NoticeType, message: string) => void;
   referenceImageCount: number;
   setAgentReferenceId: Dispatch<SetStateAction<string | null>>;
@@ -33,6 +34,7 @@ function toErrorMessage(error: unknown, fallback: string): string {
 
 export function useClipboardImageImport({
   agentReferenceCount,
+  imageReferenceLimit,
   pushWorkspaceNotice,
   referenceImageCount,
   setAgentReferenceId,
@@ -42,11 +44,16 @@ export function useClipboardImageImport({
   setReferenceImages,
 }: UseClipboardImageImportParams) {
   const agentReferenceCountRef = useRef(agentReferenceCount);
+  const imageReferenceLimitRef = useRef(imageReferenceLimit);
   const referenceImageCountRef = useRef(referenceImageCount);
 
   useEffect(() => {
     agentReferenceCountRef.current = agentReferenceCount;
   }, [agentReferenceCount]);
+
+  useEffect(() => {
+    imageReferenceLimitRef.current = imageReferenceLimit;
+  }, [imageReferenceLimit]);
 
   useEffect(() => {
     referenceImageCountRef.current = referenceImageCount;
@@ -64,17 +71,22 @@ export function useClipboardImageImport({
       event.preventDefault();
       const isAgentPaste = event.target instanceof Element && event.target.closest(".imagine-agent-dock") !== null;
       const currentReferenceCount = isAgentPaste ? agentReferenceCountRef.current : referenceImageCountRef.current;
+      const referenceLimit = isAgentPaste ? IMAGE_REFERENCE_LIMIT : imageReferenceLimitRef.current;
 
-      if (currentReferenceCount >= IMAGE_REFERENCE_LIMIT) {
-        pushWorkspaceNotice("error", `参考图已达上限：最多 ${IMAGE_REFERENCE_LIMIT} 张，先移除一张再粘贴`);
+      if (referenceLimit === 0) {
+        pushWorkspaceNotice("error", "当前图片模型不支持参考图");
+        return;
+      }
+      if (currentReferenceCount >= referenceLimit) {
+        pushWorkspaceNotice("error", `参考图已达上限：最多 ${referenceLimit} 张，先移除一张再粘贴`);
         return;
       }
 
       try {
         const compressedDataUrl = await compressReferenceImageFile(file);
         const latestReferenceCount = isAgentPaste ? agentReferenceCountRef.current : referenceImageCountRef.current;
-        if (latestReferenceCount >= IMAGE_REFERENCE_LIMIT) {
-          pushWorkspaceNotice("error", `参考图已达上限：最多 ${IMAGE_REFERENCE_LIMIT} 张，先移除一张再粘贴`);
+        if (latestReferenceCount >= referenceLimit) {
+          pushWorkspaceNotice("error", `参考图已达上限：最多 ${referenceLimit} 张，先移除一张再粘贴`);
           return;
         }
 
@@ -89,7 +101,7 @@ export function useClipboardImageImport({
             if (prev.some(reference => reference.id === newReferenceId)) return prev;
             return [...prev, { id: newReferenceId, url: compressedDataUrl }];
           });
-          pushWorkspaceNotice("success", `已从剪贴板导入 Agent 参考图（${nextReferenceCount}/${IMAGE_REFERENCE_LIMIT}）`);
+          pushWorkspaceNotice("success", `已从剪贴板导入 Agent 参考图（${nextReferenceCount}/${referenceLimit}）`);
           return;
         }
 
@@ -99,7 +111,7 @@ export function useClipboardImageImport({
           if (prev.some(reference => reference.id === newReferenceId)) return prev;
           return [...prev, { id: newReferenceId, url: compressedDataUrl, role: "general" }];
         });
-        pushWorkspaceNotice("success", `已从剪贴板导入参考图（${nextReferenceCount}/${IMAGE_REFERENCE_LIMIT}）`);
+        pushWorkspaceNotice("success", `已从剪贴板导入参考图（${nextReferenceCount}/${referenceLimit}）`);
       } catch (error) {
         console.error(error);
         pushWorkspaceNotice("error", toErrorMessage(error, "剪贴板图片压缩失败，请重新复制图片后再试"));
@@ -109,6 +121,7 @@ export function useClipboardImageImport({
     return () => window.removeEventListener("paste", handlePaste);
   }, [
     agentReferenceCount,
+    imageReferenceLimit,
     pushWorkspaceNotice,
     setAgentReferenceId,
     setAgentReferenceUrl,

@@ -68,6 +68,7 @@ export interface BoardReferenceGroupItem {
   model: string;
   prompt: string;
   role: BoardReferenceRole;
+  type: BoardAssetType;
   url: string;
 }
 

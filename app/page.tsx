@@ -23,6 +23,7 @@ import WorkspaceHeader from "@/components/workbench/WorkspaceHeader";
 import WorkspaceNotices, { type WorkspaceNotice } from "@/components/workbench/WorkspaceNotices";
 import {
   clearAllDB,
+  getGenerationReferenceMedia,
   hydrateAssets,
   listAllAssetMetas,
   mergeStorageItems,
@@ -57,7 +58,7 @@ import {
   type ModelOption,
 } from "@/lib/providers/model-catalog";
 import { PROVIDER_KEYS, getProviderMeta } from "@/lib/providers/registry";
-import { mediaReferenceTypeFromDataUri } from "@/lib/media-references";
+import { getMediaReferenceType } from "@/lib/media-references";
 import { compressReferenceImageDataUrl, compressReferenceImageFile } from "@/lib/reference-images";
 import {
   cleanupWorkspaceAssets,
@@ -334,6 +335,8 @@ export default function Home() {
     toggleReferenceRole,
   } = useReferenceState({
     agentInput,
+    imageReferenceLimit: imageCapabilities.maxReferenceImages,
+    imageReferenceMediaTypes: imageCapabilities.referenceMediaTypes,
     prompt,
     videoReferenceLimit,
     videoReferenceMediaTypes: videoCapabilities.referenceMediaTypes,
@@ -354,6 +357,7 @@ export default function Home() {
 
   useClipboardImageImport({
     agentReferenceCount: agentReferences.length,
+    imageReferenceLimit: imageCapabilities.maxReferenceImages,
     pushWorkspaceNotice,
     referenceImageCount: referenceImages.length,
     setAgentReferenceId,
@@ -519,16 +523,16 @@ export default function Home() {
     }
     const request = item.generationRequest;
     const model = request?.model ?? item.model;
-    const references: ReferenceImageRef[] = (request?.referenceImages ?? []).map((url, index) => {
+    const references: ReferenceImageRef[] = getGenerationReferenceMedia(request).map((reference, index) => {
       const videoMode = item.type === "video" ? getVideoModelCapabilities(model).referenceMode : "reference";
-      const role: ReferenceImageRef["role"] = videoMode === "firstLast"
+      const role: ReferenceImageRef["role"] = reference.role ?? (videoMode === "firstLast"
         ? index === 0
           ? "start"
           : index === 1
             ? "end"
             : "general"
-        : "general";
-      return { id: `${item.id}_reference_${index + 1}`, type: mediaReferenceTypeFromDataUri(url) ?? "image", url, role };
+        : "general");
+      return { id: `${item.id}_reference_${index + 1}`, type: reference.type, url: reference.url, role };
     });
 
     setPrompt(item.prompt);
@@ -744,7 +748,7 @@ export default function Home() {
 
     const agentReferenceItems: StorageItem[] = agentReferences.map((reference, index) => ({
       id: reference.id,
-      type: "image",
+      type: getMediaReferenceType(reference),
       url: reference.url,
       prompt: `Agent 引用图 ${index + 1}`,
       model: "agent-reference",

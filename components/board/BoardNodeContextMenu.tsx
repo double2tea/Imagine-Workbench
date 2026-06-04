@@ -36,6 +36,8 @@ export function buildBoardNodeContextMenuActions(input: {
   if (input.node.kind === "asset" && input.node.asset.type === "image") {
     if (input.onCompare) actions.push({ id: "compare", label: "对比参考", onSelect: input.onCompare });
     if (input.onEditImage) actions.push({ id: "edit", label: "编辑图片", onSelect: input.onEditImage });
+  }
+  if (input.node.kind === "asset") {
     if (input.onSetReference) actions.push({ id: "reference", label: "设为参考", onSelect: input.onSetReference });
     if (input.onSendAgent) actions.push({ id: "agent", label: "发送到 Agent", onSelect: input.onSendAgent });
   }

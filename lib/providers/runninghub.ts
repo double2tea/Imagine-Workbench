@@ -1,0 +1,1142 @@
+import type { MediaReferenceType } from "@/lib/media-references";
+
+export type RunningHubStandardModelKind = "image" | "video";
+
+export interface RunningHubStandardModel {
+  model: string;
+  label: string;
+  kind: RunningHubStandardModelKind;
+  listed?: boolean;
+  supportsReferences: boolean;
+  minReferenceImages: number;
+  maxReferenceImages: number;
+  videoReferenceMode?: "reference" | "firstLast";
+  referenceMediaTypes?: readonly MediaReferenceType[];
+  durationOptions?: readonly string[];
+  resolutionOptions?: readonly string[];
+  referenceRoutes?: {
+    imageToImage?: string;
+    imageToVideo?: string;
+    firstLast?: string;
+    reference?: string;
+  };
+  request: RunningHubStandardRequest;
+}
+
+export interface RunningHubStandardRequestInput {
+  prompt: string;
+  aspectRatio?: string;
+  imageResolution?: string;
+  resolutionName?: string;
+  durationSeconds?: string;
+  referenceImages: Array<{ dataUri: string }>;
+  referenceMedia?: Array<{ dataUri: string; type: MediaReferenceType }>;
+  referenceUrls?: string[];
+  referenceMediaUrls?: {
+    imageUrls: string[];
+    videoUrls: string[];
+    audioUrls: string[];
+  };
+}
+
+type RunningHubStandardRequest =
+  | {
+      type: "prompt-dimensions";
+      endpoint: string;
+      extra?: Record<string, unknown>;
+      referenceField?: "imageUrls";
+    }
+  | {
+      type: "grok-image";
+      endpoint: string;
+      model: string;
+      referenceField?: "imageUrl";
+    }
+  | {
+      type: "node-dimensions";
+      endpoint: string;
+      promptField: string;
+      widthField?: string;
+      heightField?: string;
+      extra: Record<string, unknown>;
+    }
+  | {
+      type: "hailuo-video";
+      endpoint: string;
+      requiresReference?: boolean;
+    }
+  | {
+      type: "seedance-video";
+      endpoint: string;
+      durations: readonly string[];
+      aspectField: "aspectRatio" | "ratio";
+      extra: Record<string, unknown>;
+    }
+  | {
+      type: "aspect-resolution-video";
+      endpoint: string;
+      durations: readonly string[];
+      aspectField: "aspectRatio" | "ratio";
+      durationValueType?: "string" | "number";
+      extra?: Record<string, unknown>;
+    }
+  | {
+      type: "image-reference-video";
+      endpoint: string;
+      durations?: readonly string[];
+      referenceField: "imageUrls" | "imageUrl" | "firstFrameUrl" | "firstImageUrl";
+      lastReferenceField?: "lastFrameUrl" | "lastImageUrl";
+      videoField?: "videoUrls" | "videoUrl";
+      audioField?: "audioUrls";
+      aspectField?: "aspectRatio" | "ratio";
+      durationValueType?: "string" | "number";
+      extra?: Record<string, unknown>;
+    }
+  | {
+      type: "aspect-resolution-image";
+      endpoint: string;
+      resolution: string;
+      quality?: string;
+      referenceField?: "imageUrls";
+      extra?: Record<string, unknown>;
+    }
+  | {
+      type: "youchuan-image";
+      endpoint: string;
+      extra: Record<string, unknown>;
+    };
+
+export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
+  {
+    model: "api:/openapi/v2/seedream-v5-lite/text-to-image",
+    label: "RunningHub Seedream V5 Lite Text-to-Image",
+    kind: "image",
+    supportsReferences: false,
+    minReferenceImages: 0,
+    maxReferenceImages: 0,
+    request: {
+      type: "prompt-dimensions",
+      endpoint: "/openapi/v2/seedream-v5-lite/text-to-image",
+      extra: {
+        sequentialImageGeneration: "disabled",
+        maxImages: 1,
+      },
+    },
+  },
+  {
+    model: "api:/openapi/v2/seedream-v5-lite/image-to-image",
+    label: "RunningHub Seedream V5 Lite Image-to-Image",
+    kind: "image",
+    supportsReferences: true,
+    minReferenceImages: 1,
+    maxReferenceImages: 14,
+    request: {
+      type: "prompt-dimensions",
+      endpoint: "/openapi/v2/seedream-v5-lite/image-to-image",
+      referenceField: "imageUrls",
+      extra: {
+        sequentialImageGeneration: "disabled",
+        maxImages: 1,
+      },
+    },
+  },
+  {
+    model: "api:/openapi/v2/bytedance/jimeng-4.6/text-to-image",
+    label: "RunningHub Jimeng 4.6 Text-to-Image",
+    kind: "image",
+    supportsReferences: false,
+    minReferenceImages: 0,
+    maxReferenceImages: 0,
+    request: {
+      type: "prompt-dimensions",
+      endpoint: "/openapi/v2/bytedance/jimeng-4.6/text-to-image",
+      extra: {
+        scale: 50,
+        forceSingle: false,
+        minRatio: 0.333333,
+        maxRatio: 3,
+      },
+    },
+  },
+  {
+    model: "api:/openapi/v2/bytedance/jimeng-4.6/image-to-image",
+    label: "RunningHub Jimeng 4.6 Image-to-Image",
+    kind: "image",
+    supportsReferences: true,
+    minReferenceImages: 1,
+    maxReferenceImages: 14,
+    request: {
+      type: "prompt-dimensions",
+      endpoint: "/openapi/v2/bytedance/jimeng-4.6/image-to-image",
+      referenceField: "imageUrls",
+      extra: {
+        scale: 50,
+        forceSingle: false,
+        minRatio: 0.333333,
+        maxRatio: 3,
+      },
+    },
+  },
+  {
+    model: "api:/openapi/v2/rhart-image-g/text-to-image",
+    label: "RunningHub Grok Image 4.2 Text-to-Image",
+    kind: "image",
+    supportsReferences: false,
+    minReferenceImages: 0,
+    maxReferenceImages: 0,
+    request: {
+      type: "grok-image",
+      endpoint: "/openapi/v2/rhart-image-g/text-to-image",
+      model: "g-4.2",
+    },
+  },
+  {
+    model: "api:/openapi/v2/rhart-image-g/image-to-image",
+    label: "RunningHub Grok Image 4.2 Image-to-Image",
+    kind: "image",
+    supportsReferences: true,
+    minReferenceImages: 1,
+    maxReferenceImages: 1,
+    request: {
+      type: "grok-image",
+      endpoint: "/openapi/v2/rhart-image-g/image-to-image",
+      model: "g-4.2",
+      referenceField: "imageUrl",
+    },
+  },
+  {
+    model: "api:/openapi/v2/rhart-image/z-image/turbo",
+    label: "RunningHub Z-Image Turbo",
+    kind: "image",
+    supportsReferences: false,
+    minReferenceImages: 0,
+    maxReferenceImages: 0,
+    request: {
+      type: "node-dimensions",
+      endpoint: "/openapi/v2/rhart-image/z-image/turbo",
+      promptField: "10##text",
+      extra: {
+        "28##select": "8",
+        "29##file_type": "PNG",
+      },
+    },
+  },
+  {
+    model: "api:/openapi/v2/rhart-image/f-2-dev/text-to-image",
+    label: "RunningHub Flux 2 Dev Text-to-Image",
+    kind: "image",
+    supportsReferences: false,
+    minReferenceImages: 0,
+    maxReferenceImages: 0,
+    request: {
+      type: "node-dimensions",
+      endpoint: "/openapi/v2/rhart-image/f-2-dev/text-to-image",
+      promptField: "12##text",
+      widthField: "30##value",
+      heightField: "29##value",
+      extra: {
+        "41##select": "1",
+        "43##file_type": "PNG",
+      },
+    },
+  },
+  {
+    model: "api:/openapi/v2/minimax/hailuo-02/standard",
+    label: "RunningHub Hailuo 02 Standard Video",
+    kind: "video",
+    supportsReferences: false,
+    minReferenceImages: 0,
+    maxReferenceImages: 0,
+    durationOptions: ["6", "10"],
+    request: {
+      type: "hailuo-video",
+      endpoint: "/openapi/v2/minimax/hailuo-02/standard",
+    },
+  },
+  {
+    model: "api:/openapi/v2/minimax/hailuo-02/t2v-standard",
+    label: "RunningHub Hailuo 02 T2V Standard",
+    kind: "video",
+    supportsReferences: false,
+    minReferenceImages: 0,
+    maxReferenceImages: 0,
+    durationOptions: ["6", "10"],
+    request: {
+      type: "hailuo-video",
+      endpoint: "/openapi/v2/minimax/hailuo-02/t2v-standard",
+    },
+  },
+  {
+    model: "api:/openapi/v2/minimax/hailuo-02/pro",
+    label: "RunningHub Hailuo 02 Pro Video",
+    kind: "video",
+    supportsReferences: false,
+    minReferenceImages: 0,
+    maxReferenceImages: 0,
+    durationOptions: ["6", "10"],
+    request: {
+      type: "hailuo-video",
+      endpoint: "/openapi/v2/minimax/hailuo-02/pro",
+    },
+  },
+  {
+    model: "api:/openapi/v2/minimax/hailuo-02/i2v-standard",
+    label: "RunningHub Hailuo 02 I2V Standard",
+    kind: "video",
+    supportsReferences: true,
+    minReferenceImages: 1,
+    maxReferenceImages: 2,
+    videoReferenceMode: "firstLast",
+    durationOptions: ["6", "10"],
+    request: {
+      type: "hailuo-video",
+      endpoint: "/openapi/v2/minimax/hailuo-02/i2v-standard",
+      requiresReference: true,
+    },
+  },
+  {
+    model: "api:/openapi/v2/seedance-v1.5-pro/text-to-video",
+    label: "RunningHub Seedance 1.5 Pro Text-to-Video",
+    kind: "video",
+    supportsReferences: false,
+    minReferenceImages: 0,
+    maxReferenceImages: 0,
+    durationOptions: ["5", "8", "10", "12"],
+    request: {
+      type: "seedance-video",
+      endpoint: "/openapi/v2/seedance-v1.5-pro/text-to-video",
+      durations: ["5", "8", "10", "12"],
+      aspectField: "aspectRatio",
+      extra: {
+        generateAudio: "true",
+        cameraFixed: "false",
+      },
+    },
+  },
+  {
+    model: "api:/openapi/v2/seedance-v1.5-pro/text-to-video-fast",
+    label: "RunningHub Seedance 1.5 Pro Fast Text-to-Video",
+    kind: "video",
+    supportsReferences: false,
+    minReferenceImages: 0,
+    maxReferenceImages: 0,
+    durationOptions: ["5", "8", "10", "12"],
+    request: {
+      type: "seedance-video",
+      endpoint: "/openapi/v2/seedance-v1.5-pro/text-to-video-fast",
+      durations: ["5", "8", "10", "12"],
+      aspectField: "aspectRatio",
+      extra: {
+        generateAudio: "true",
+        cameraFixed: "false",
+      },
+    },
+  },
+  {
+    model: "api:/openapi/v2/bytedance/seedance-2.0-global-fast/text-to-video",
+    label: "RunningHub Seedance 2.0 Global Fast Text-to-Video",
+    kind: "video",
+    supportsReferences: false,
+    minReferenceImages: 0,
+    maxReferenceImages: 0,
+    durationOptions: ["5", "8", "10", "12", "15"],
+    request: {
+      type: "seedance-video",
+      endpoint: "/openapi/v2/bytedance/seedance-2.0-global-fast/text-to-video",
+      durations: ["5", "8", "10", "12", "15"],
+      aspectField: "ratio",
+      extra: {
+        generateAudio: true,
+        returnLastFrame: false,
+        seed: -1,
+      },
+    },
+  },
+  {
+    model: "api:/openapi/v2/bytedance/seedance-2.0-global-fast/image-to-video",
+    label: "RunningHub Seedance 2.0 Global Fast Image-to-Video",
+    kind: "video",
+    supportsReferences: true,
+    minReferenceImages: 1,
+    maxReferenceImages: 2,
+    videoReferenceMode: "firstLast",
+    durationOptions: ["5", "8", "10", "12", "15"],
+    request: {
+      type: "image-reference-video",
+      endpoint: "/openapi/v2/bytedance/seedance-2.0-global-fast/image-to-video",
+      durations: ["5", "8", "10", "12", "15"],
+      referenceField: "firstFrameUrl",
+      lastReferenceField: "lastFrameUrl",
+      aspectField: "ratio",
+      extra: {
+        generateAudio: true,
+        realPersonMode: true,
+        conversionSlots: ["all"],
+        returnLastFrame: false,
+        seed: -1,
+      },
+    },
+  },
+  {
+    model: "api:/openapi/v2/bytedance/seedance-2.0-global-fast/multimodal-video",
+    label: "RunningHub Seedance 2.0 Global Fast Multimodal Video",
+    kind: "video",
+    supportsReferences: true,
+    minReferenceImages: 1,
+    maxReferenceImages: 9,
+    referenceMediaTypes: ["image", "video", "audio"],
+    durationOptions: ["5", "8", "10", "12", "15"],
+    request: {
+      type: "image-reference-video",
+      endpoint: "/openapi/v2/bytedance/seedance-2.0-global-fast/multimodal-video",
+      durations: ["5", "8", "10", "12", "15"],
+      referenceField: "imageUrls",
+      videoField: "videoUrls",
+      audioField: "audioUrls",
+      aspectField: "ratio",
+      extra: {
+        generateAudio: true,
+        realPersonMode: true,
+        conversionSlots: ["all"],
+        returnLastFrame: false,
+        seed: -1,
+      },
+    },
+  },
+  {
+    model: "api:/openapi/v2/bytedance/seedance-2.0-global/text-to-video",
+    label: "RunningHub Seedance 2.0 Global Text-to-Video",
+    kind: "video",
+    supportsReferences: false,
+    minReferenceImages: 0,
+    maxReferenceImages: 0,
+    durationOptions: ["5", "8", "10", "12", "15"],
+    request: {
+      type: "seedance-video",
+      endpoint: "/openapi/v2/bytedance/seedance-2.0-global/text-to-video",
+      durations: ["5", "8", "10", "12", "15"],
+      aspectField: "ratio",
+      extra: {
+        generateAudio: true,
+        returnLastFrame: false,
+        seed: -1,
+      },
+    },
+  },
+  {
+    model: "api:/openapi/v2/bytedance/seedance-2.0-global/image-to-video",
+    label: "RunningHub Seedance 2.0 Global Image-to-Video",
+    kind: "video",
+    supportsReferences: true,
+    minReferenceImages: 1,
+    maxReferenceImages: 2,
+    videoReferenceMode: "firstLast",
+    durationOptions: ["5", "8", "10", "12", "15"],
+    request: {
+      type: "image-reference-video",
+      endpoint: "/openapi/v2/bytedance/seedance-2.0-global/image-to-video",
+      durations: ["5", "8", "10", "12", "15"],
+      referenceField: "firstFrameUrl",
+      lastReferenceField: "lastFrameUrl",
+      aspectField: "ratio",
+      extra: {
+        generateAudio: true,
+        realPersonMode: true,
+        conversionSlots: ["all"],
+        returnLastFrame: false,
+        seed: -1,
+      },
+    },
+  },
+  {
+    model: "api:/openapi/v2/bytedance/seedance-2.0-global/multimodal-video",
+    label: "RunningHub Seedance 2.0 Global Multimodal Video",
+    kind: "video",
+    supportsReferences: true,
+    minReferenceImages: 1,
+    maxReferenceImages: 9,
+    referenceMediaTypes: ["image", "video", "audio"],
+    durationOptions: ["5", "8", "10", "12", "15"],
+    request: {
+      type: "image-reference-video",
+      endpoint: "/openapi/v2/bytedance/seedance-2.0-global/multimodal-video",
+      durations: ["5", "8", "10", "12", "15"],
+      referenceField: "imageUrls",
+      videoField: "videoUrls",
+      audioField: "audioUrls",
+      aspectField: "ratio",
+      extra: {
+        generateAudio: true,
+        realPersonMode: true,
+        conversionSlots: ["all"],
+        returnLastFrame: false,
+        seed: -1,
+      },
+    },
+  },
+  {
+    model: "api:/openapi/v2/gemini-omni-flash/text-to-video",
+    label: "RunningHub Gemini Omni Flash Text-to-Video",
+    kind: "video",
+    supportsReferences: false,
+    minReferenceImages: 0,
+    maxReferenceImages: 0,
+    durationOptions: ["4", "6", "8", "10"],
+    resolutionOptions: ["720p", "1080p", "4k"],
+    request: {
+      type: "aspect-resolution-video",
+      endpoint: "/openapi/v2/gemini-omni-flash/text-to-video",
+      durations: ["4", "6", "8", "10"],
+      aspectField: "aspectRatio",
+    },
+  },
+  {
+    model: "api:/openapi/v2/gemini-omni-flash/image-to-video",
+    label: "RunningHub Gemini Omni Flash Image-to-Video",
+    kind: "video",
+    supportsReferences: true,
+    minReferenceImages: 1,
+    maxReferenceImages: 3,
+    durationOptions: ["4", "6", "8", "10"],
+    resolutionOptions: ["720p", "1080p", "4k"],
+    request: {
+      type: "image-reference-video",
+      endpoint: "/openapi/v2/gemini-omni-flash/image-to-video",
+      durations: ["4", "6", "8", "10"],
+      referenceField: "imageUrls",
+      aspectField: "aspectRatio",
+    },
+  },
+  {
+    model: "api:/openapi/v2/gemini-omni-flash/video-edit",
+    label: "RunningHub Gemini Omni Flash Video Edit",
+    kind: "video",
+    supportsReferences: true,
+    minReferenceImages: 1,
+    maxReferenceImages: 8,
+    referenceMediaTypes: ["image", "video"],
+    durationOptions: ["4", "6", "8", "10"],
+    resolutionOptions: ["720p", "1080p", "4k"],
+    request: {
+      type: "image-reference-video",
+      endpoint: "/openapi/v2/gemini-omni-flash/video-edit",
+      durations: ["4", "6", "8", "10"],
+      referenceField: "imageUrls",
+      videoField: "videoUrl",
+      aspectField: "aspectRatio",
+    },
+  },
+  {
+    model: "api:/openapi/v2/rhart-video-v3.1-fast/text-to-video",
+    label: "RunningHub Veo 3.1 Fast Channel Auto",
+    kind: "video",
+    supportsReferences: true,
+    minReferenceImages: 0,
+    maxReferenceImages: 2,
+    videoReferenceMode: "firstLast",
+    durationOptions: ["4", "6", "8"],
+    referenceRoutes: {
+      imageToVideo: "api:/openapi/v2/rhart-video-v3.1-fast/image-to-video",
+      firstLast: "api:/openapi/v2/rhart-video-v3.1-fast/start-end-to-video",
+    },
+    request: {
+      type: "aspect-resolution-video",
+      endpoint: "/openapi/v2/rhart-video-v3.1-fast/text-to-video",
+      durations: ["4", "6", "8"],
+      aspectField: "aspectRatio",
+    },
+  },
+  {
+    model: "api:/openapi/v2/rhart-video-v3.1-fast/image-to-video",
+    label: "RunningHub Veo 3.1 Fast I2V Channel Low Price",
+    kind: "video",
+    listed: false,
+    supportsReferences: true,
+    minReferenceImages: 1,
+    maxReferenceImages: 1,
+    durationOptions: ["4", "6", "8"],
+    request: {
+      type: "image-reference-video",
+      endpoint: "/openapi/v2/rhart-video-v3.1-fast/image-to-video",
+      durations: ["4", "6", "8"],
+      referenceField: "imageUrls",
+      aspectField: "aspectRatio",
+    },
+  },
+  {
+    model: "api:/openapi/v2/rhart-video-v3.1-fast/start-end-to-video",
+    label: "RunningHub Veo 3.1 Fast Start-End Channel Low Price",
+    kind: "video",
+    listed: false,
+    supportsReferences: true,
+    minReferenceImages: 2,
+    maxReferenceImages: 2,
+    durationOptions: ["4", "6", "8"],
+    request: {
+      type: "image-reference-video",
+      endpoint: "/openapi/v2/rhart-video-v3.1-fast/start-end-to-video",
+      durations: ["4", "6", "8"],
+      referenceField: "firstFrameUrl",
+      lastReferenceField: "lastFrameUrl",
+      aspectField: "aspectRatio",
+    },
+  },
+  {
+    model: "api:/openapi/v2/rhart-video-v3.1-fast-official/text-to-video",
+    label: "RunningHub Veo 3.1 Fast Official Auto",
+    kind: "video",
+    supportsReferences: true,
+    minReferenceImages: 0,
+    maxReferenceImages: 3,
+    durationOptions: ["4", "6", "8"],
+    referenceRoutes: {
+      imageToVideo: "api:/openapi/v2/rhart-video-v3.1-fast-official/image-to-video",
+      reference: "api:/openapi/v2/rhart-video-v3.1-fast-official/reference-to-video",
+    },
+    request: {
+      type: "aspect-resolution-video",
+      endpoint: "/openapi/v2/rhart-video-v3.1-fast-official/text-to-video",
+      durations: ["4", "6", "8"],
+      aspectField: "aspectRatio",
+      extra: {
+        generateAudio: true,
+      },
+    },
+  },
+  {
+    model: "api:/openapi/v2/rhart-video-v3.1-fast-official/image-to-video",
+    label: "RunningHub Veo 3.1 Fast I2V Official Stable",
+    kind: "video",
+    listed: false,
+    supportsReferences: true,
+    minReferenceImages: 1,
+    maxReferenceImages: 1,
+    durationOptions: ["4", "6", "8"],
+    request: {
+      type: "image-reference-video",
+      endpoint: "/openapi/v2/rhart-video-v3.1-fast-official/image-to-video",
+      durations: ["4", "6", "8"],
+      referenceField: "imageUrl",
+      aspectField: "aspectRatio",
+      extra: {
+        generateAudio: true,
+      },
+    },
+  },
+  {
+    model: "api:/openapi/v2/rhart-video-v3.1-fast-official/reference-to-video",
+    label: "RunningHub Veo 3.1 Fast Reference Official Stable",
+    kind: "video",
+    listed: false,
+    supportsReferences: true,
+    minReferenceImages: 1,
+    maxReferenceImages: 3,
+    resolutionOptions: ["720p", "1080p"],
+    request: {
+      type: "image-reference-video",
+      endpoint: "/openapi/v2/rhart-video-v3.1-fast-official/reference-to-video",
+      referenceField: "imageUrls",
+      aspectField: "aspectRatio",
+      extra: {
+        generateAudio: false,
+      },
+    },
+  },
+  {
+    model: "api:/openapi/v2/rhart-video-v3.1-pro/text-to-video",
+    label: "RunningHub Veo 3.1 Pro Channel Auto",
+    kind: "video",
+    supportsReferences: true,
+    minReferenceImages: 0,
+    maxReferenceImages: 2,
+    videoReferenceMode: "firstLast",
+    durationOptions: ["4", "6", "8"],
+    referenceRoutes: {
+      imageToVideo: "api:/openapi/v2/rhart-video-v3.1-pro/image-to-video",
+      firstLast: "api:/openapi/v2/rhart-video-v3.1-pro/start-end-to-video",
+    },
+    request: {
+      type: "aspect-resolution-video",
+      endpoint: "/openapi/v2/rhart-video-v3.1-pro/text-to-video",
+      durations: ["4", "6", "8"],
+      aspectField: "aspectRatio",
+    },
+  },
+  {
+    model: "api:/openapi/v2/rhart-video-v3.1-pro/image-to-video",
+    label: "RunningHub Veo 3.1 Pro I2V Channel Low Price",
+    kind: "video",
+    listed: false,
+    supportsReferences: true,
+    minReferenceImages: 1,
+    maxReferenceImages: 1,
+    durationOptions: ["4", "6", "8"],
+    request: {
+      type: "image-reference-video",
+      endpoint: "/openapi/v2/rhart-video-v3.1-pro/image-to-video",
+      durations: ["4", "6", "8"],
+      referenceField: "imageUrl",
+      aspectField: "aspectRatio",
+    },
+  },
+  {
+    model: "api:/openapi/v2/rhart-video-v3.1-pro/start-end-to-video",
+    label: "RunningHub Veo 3.1 Pro Start-End Channel Low Price",
+    kind: "video",
+    listed: false,
+    supportsReferences: true,
+    minReferenceImages: 2,
+    maxReferenceImages: 2,
+    durationOptions: ["4", "6", "8"],
+    request: {
+      type: "image-reference-video",
+      endpoint: "/openapi/v2/rhart-video-v3.1-pro/start-end-to-video",
+      durations: ["4", "6", "8"],
+      referenceField: "firstFrameUrl",
+      lastReferenceField: "lastFrameUrl",
+      aspectField: "aspectRatio",
+    },
+  },
+  {
+    model: "api:/openapi/v2/rhart-video-v3.1-pro-official/text-to-video",
+    label: "RunningHub Veo 3.1 Pro Official Auto",
+    kind: "video",
+    supportsReferences: true,
+    minReferenceImages: 0,
+    maxReferenceImages: 3,
+    durationOptions: ["4", "6", "8"],
+    referenceRoutes: {
+      imageToVideo: "api:/openapi/v2/rhart-video-v3.1-pro-official/image-to-video",
+      reference: "api:/openapi/v2/rhart-video-v3.1-pro-official/reference-to-video",
+    },
+    request: {
+      type: "aspect-resolution-video",
+      endpoint: "/openapi/v2/rhart-video-v3.1-pro-official/text-to-video",
+      durations: ["4", "6", "8"],
+      aspectField: "aspectRatio",
+    },
+  },
+  {
+    model: "api:/openapi/v2/rhart-video-v3.1-pro-official/image-to-video",
+    label: "RunningHub Veo 3.1 Pro I2V Official Stable",
+    kind: "video",
+    listed: false,
+    supportsReferences: true,
+    minReferenceImages: 1,
+    maxReferenceImages: 1,
+    durationOptions: ["4", "6", "8"],
+    request: {
+      type: "image-reference-video",
+      endpoint: "/openapi/v2/rhart-video-v3.1-pro-official/image-to-video",
+      durations: ["4", "6", "8"],
+      referenceField: "imageUrl",
+      aspectField: "aspectRatio",
+    },
+  },
+  {
+    model: "api:/openapi/v2/rhart-video-v3.1-pro-official/reference-to-video",
+    label: "RunningHub Veo 3.1 Pro Reference Official Stable",
+    kind: "video",
+    listed: false,
+    supportsReferences: true,
+    minReferenceImages: 1,
+    maxReferenceImages: 3,
+    resolutionOptions: ["720p", "1080p"],
+    request: {
+      type: "image-reference-video",
+      endpoint: "/openapi/v2/rhart-video-v3.1-pro-official/reference-to-video",
+      referenceField: "imageUrls",
+      extra: {
+        generateAudio: false,
+      },
+    },
+  },
+  {
+    model: "api:/openapi/v2/rhart-video-v3.1-lite-official/text-to-video",
+    label: "RunningHub Veo 3.1 Lite Official Auto",
+    kind: "video",
+    supportsReferences: true,
+    minReferenceImages: 0,
+    maxReferenceImages: 2,
+    videoReferenceMode: "firstLast",
+    durationOptions: ["4", "6", "8"],
+    resolutionOptions: ["720p", "1080p"],
+    referenceRoutes: {
+      imageToVideo: "api:/openapi/v2/rhart-video-v3.1-lite-official/image-to-video",
+      firstLast: "api:/openapi/v2/rhart-video-v3.1-lite-official/start-end-to-video",
+    },
+    request: {
+      type: "aspect-resolution-video",
+      endpoint: "/openapi/v2/rhart-video-v3.1-lite-official/text-to-video",
+      durations: ["4", "6", "8"],
+      aspectField: "aspectRatio",
+    },
+  },
+  {
+    model: "api:/openapi/v2/rhart-video-v3.1-lite-official/image-to-video",
+    label: "RunningHub Veo 3.1 Lite I2V Official Stable",
+    kind: "video",
+    listed: false,
+    supportsReferences: true,
+    minReferenceImages: 1,
+    maxReferenceImages: 1,
+    durationOptions: ["4", "6", "8"],
+    resolutionOptions: ["720p", "1080p"],
+    request: {
+      type: "image-reference-video",
+      endpoint: "/openapi/v2/rhart-video-v3.1-lite-official/image-to-video",
+      durations: ["4", "6", "8"],
+      referenceField: "imageUrl",
+      aspectField: "aspectRatio",
+    },
+  },
+  {
+    model: "api:/openapi/v2/rhart-video-v3.1-lite-official/start-end-to-video",
+    label: "RunningHub Veo 3.1 Lite Start-End Official Stable",
+    kind: "video",
+    listed: false,
+    supportsReferences: true,
+    minReferenceImages: 2,
+    maxReferenceImages: 2,
+    durationOptions: ["4", "6", "8"],
+    resolutionOptions: ["720p", "1080p"],
+    request: {
+      type: "image-reference-video",
+      endpoint: "/openapi/v2/rhart-video-v3.1-lite-official/start-end-to-video",
+      durations: ["4", "6", "8"],
+      referenceField: "firstImageUrl",
+      lastReferenceField: "lastImageUrl",
+      aspectField: "aspectRatio",
+    },
+  },
+  {
+    model: "api:/openapi/v2/rhart-image-g-2/text-to-image",
+    label: "RunningHub GPT Image 2 Channel Auto",
+    kind: "image",
+    supportsReferences: true,
+    minReferenceImages: 0,
+    maxReferenceImages: 14,
+    referenceRoutes: {
+      imageToImage: "api:/openapi/v2/rhart-image-g-2/image-to-image",
+    },
+    request: {
+      type: "aspect-resolution-image",
+      endpoint: "/openapi/v2/rhart-image-g-2/text-to-image",
+      resolution: "1k",
+    },
+  },
+  {
+    model: "api:/openapi/v2/rhart-image-g-2-official/text-to-image",
+    label: "RunningHub GPT Image 2 Official Auto",
+    kind: "image",
+    supportsReferences: true,
+    minReferenceImages: 0,
+    maxReferenceImages: 14,
+    referenceRoutes: {
+      imageToImage: "api:/openapi/v2/rhart-image-g-2-official/image-to-image",
+    },
+    request: {
+      type: "aspect-resolution-image",
+      endpoint: "/openapi/v2/rhart-image-g-2-official/text-to-image",
+      resolution: "2k",
+      quality: "medium",
+    },
+  },
+  {
+    model: "api:/openapi/v2/rhart-image-g-2/image-to-image",
+    label: "RunningHub GPT Image 2 Edit Channel Low Price",
+    kind: "image",
+    listed: false,
+    supportsReferences: true,
+    minReferenceImages: 1,
+    maxReferenceImages: 14,
+    request: {
+      type: "aspect-resolution-image",
+      endpoint: "/openapi/v2/rhart-image-g-2/image-to-image",
+      resolution: "1k",
+      referenceField: "imageUrls",
+    },
+  },
+  {
+    model: "api:/openapi/v2/rhart-image-g-2-official/image-to-image",
+    label: "RunningHub GPT Image 2 Edit Official Stable",
+    kind: "image",
+    listed: false,
+    supportsReferences: true,
+    minReferenceImages: 1,
+    maxReferenceImages: 14,
+    request: {
+      type: "aspect-resolution-image",
+      endpoint: "/openapi/v2/rhart-image-g-2-official/image-to-image",
+      resolution: "2k",
+      quality: "medium",
+      referenceField: "imageUrls",
+    },
+  },
+  {
+    model: "api:/openapi/v2/youchuan/text-to-image-v7",
+    label: "RunningHub Youchuan V7 Text-to-Image",
+    kind: "image",
+    supportsReferences: false,
+    minReferenceImages: 0,
+    maxReferenceImages: 0,
+    request: {
+      type: "youchuan-image",
+      endpoint: "/openapi/v2/youchuan/text-to-image-v7",
+      extra: {
+        chaos: 0,
+        quality: "1",
+        stylize: 0,
+        weird: 0,
+        raw: false,
+        iw: 1,
+        sw: 100,
+        sv: 4,
+        ow: 100,
+        tile: false,
+      },
+    },
+  },
+  {
+    model: "api:/openapi/v2/youchuan/text-to-image-v81",
+    label: "RunningHub Youchuan V8.1 Text-to-Image",
+    kind: "image",
+    supportsReferences: false,
+    minReferenceImages: 0,
+    maxReferenceImages: 0,
+    request: {
+      type: "youchuan-image",
+      endpoint: "/openapi/v2/youchuan/text-to-image-v81",
+      extra: {
+        chaos: 0,
+        quality: "1",
+        stylize: 0,
+        raw: false,
+        iw: 1,
+        sw: 100,
+        sv: 6,
+        hd: false,
+      },
+    },
+  },
+];
+
+export function getRunningHubStandardModel(
+  model: string,
+  kind: RunningHubStandardModelKind,
+): RunningHubStandardModel | undefined {
+  return RUNNINGHUB_STANDARD_MODELS.find(item => item.kind === kind && item.model === model);
+}
+
+export function resolveRunningHubStandardModelForReferences(
+  model: RunningHubStandardModel,
+  referenceCount: number,
+): RunningHubStandardModel {
+  const routes = model.referenceRoutes;
+  if (!routes || referenceCount === 0) return model;
+
+  if (model.kind === "image" && routes.imageToImage) {
+    const resolved = getRunningHubStandardModel(routes.imageToImage, model.kind);
+    if (!resolved) throw new Error(`${model.label} route target is not configured: ${routes.imageToImage}`);
+    return resolved;
+  }
+
+  const routedModel =
+    referenceCount === 1
+      ? routes.imageToVideo ?? routes.reference
+      : referenceCount === 2
+        ? routes.firstLast ?? routes.reference
+        : routes.reference;
+  if (!routedModel) return model;
+
+  const resolved = getRunningHubStandardModel(routedModel, model.kind);
+  if (!resolved) throw new Error(`${model.label} route target is not configured: ${routedModel}`);
+  return resolved;
+}
+
+export function getRunningHubStandardEndpoint(model: RunningHubStandardModel): string {
+  return model.request.endpoint;
+}
+
+export function validateRunningHubStandardReferenceCount(model: RunningHubStandardModel, referenceCount: number): void {
+  if (!model.supportsReferences && referenceCount > 0) {
+    throw new Error(`${model.label} does not support reference media`);
+  }
+  if (referenceCount < model.minReferenceImages) {
+    throw new Error(`${model.label} requires at least ${model.minReferenceImages} reference media item`);
+  }
+  if (referenceCount > model.maxReferenceImages) {
+    throw new Error(`${model.label} supports at most ${model.maxReferenceImages} reference media items`);
+  }
+}
+
+export function buildRunningHubStandardBody(
+  model: RunningHubStandardModel,
+  input: RunningHubStandardRequestInput,
+): Record<string, unknown> {
+  const referenceMediaUrls = input.referenceMediaUrls ?? {
+    imageUrls: input.referenceUrls ?? input.referenceImages.map(ref => ref.dataUri),
+    videoUrls: [],
+    audioUrls: [],
+  };
+  const referenceCount =
+    referenceMediaUrls.imageUrls.length + referenceMediaUrls.videoUrls.length + referenceMediaUrls.audioUrls.length;
+  validateRunningHubStandardReferenceCount(model, referenceCount);
+
+  switch (model.request.type) {
+    case "prompt-dimensions": {
+      return {
+        prompt: input.prompt,
+        ...readDimensions(input.imageResolution),
+        ...model.request.extra,
+        ...(model.request.referenceField ? { [model.request.referenceField]: referenceMediaUrls.imageUrls } : {}),
+      };
+    }
+    case "grok-image": {
+      return {
+        model: model.request.model,
+        prompt: input.prompt,
+        ...(model.request.referenceField ? { [model.request.referenceField]: referenceMediaUrls.imageUrls[0] } : {}),
+      };
+    }
+    case "node-dimensions": {
+      const dimensions = readDimensions(input.imageResolution) ?? { width: 1024, height: 1024 };
+      return {
+        [model.request.promptField]: input.prompt,
+        ...(model.request.widthField ? { [model.request.widthField]: dimensions.width } : {}),
+        ...(model.request.heightField ? { [model.request.heightField]: dimensions.height } : {}),
+        ...model.request.extra,
+      };
+    }
+    case "hailuo-video": {
+      return {
+        prompt: input.prompt,
+        enablePromptExpansion: true,
+        duration: readHailuoDuration(input.durationSeconds),
+        ...(model.request.requiresReference
+          ? { firstImageUrl: referenceMediaUrls.imageUrls[0], lastImageUrl: referenceMediaUrls.imageUrls[1] }
+          : {}),
+      };
+    }
+    case "seedance-video": {
+      return {
+        prompt: input.prompt,
+        resolution: input.resolutionName ?? "720p",
+        duration: readDuration(input.durationSeconds, model.request.durations, model.label),
+        [model.request.aspectField]:
+          input.aspectRatio === "auto" || input.aspectRatio === undefined ? "adaptive" : input.aspectRatio,
+        ...model.request.extra,
+      };
+    }
+    case "aspect-resolution-video": {
+      return {
+        prompt: input.prompt,
+        resolution: input.resolutionName ?? "720p",
+        duration: readDurationValue(input.durationSeconds, model.request.durations, model.label, model.request.durationValueType),
+        [model.request.aspectField]:
+          input.aspectRatio === "auto" || input.aspectRatio === undefined ? "adaptive" : input.aspectRatio,
+        ...model.request.extra,
+      };
+    }
+    case "image-reference-video": {
+      return {
+        prompt: input.prompt,
+        resolution: input.resolutionName ?? "720p",
+        ...(model.request.durations
+          ? { duration: readDurationValue(input.durationSeconds, model.request.durations, model.label, model.request.durationValueType) }
+          : {}),
+        ...(model.request.aspectField
+          ? {
+              [model.request.aspectField]:
+                input.aspectRatio === "auto" || input.aspectRatio === undefined ? "adaptive" : input.aspectRatio,
+            }
+          : {}),
+        ...readVideoReferenceFields(
+          model.request.referenceField,
+          model.request.lastReferenceField,
+          model.request.videoField,
+          model.request.audioField,
+          referenceMediaUrls,
+        ),
+        ...model.request.extra,
+      };
+    }
+    case "aspect-resolution-image": {
+      return {
+        prompt: input.prompt,
+        aspectRatio: input.aspectRatio === "auto" || input.aspectRatio === undefined ? "1:1" : input.aspectRatio,
+        resolution: model.request.resolution,
+        ...(model.request.quality ? { quality: model.request.quality } : {}),
+        ...(model.request.referenceField ? { [model.request.referenceField]: referenceMediaUrls.imageUrls } : {}),
+        ...model.request.extra,
+      };
+    }
+    case "youchuan-image": {
+      return {
+        prompt: input.prompt,
+        ...model.request.extra,
+      };
+    }
+  }
+}
+
+function readDimensions(value: string | undefined): { width: number; height: number } | undefined {
+  if (!value || value === "auto") return undefined;
+  const match = value.match(/^(\d+)x(\d+)$/);
+  if (!match) return undefined;
+  return {
+    width: Number(match[1]),
+    height: Number(match[2]),
+  };
+}
+
+function readHailuoDuration(value: string | undefined): string {
+  if (value === undefined) return "6";
+  if (value === "6" || value === "10") return value;
+  throw new Error("RunningHub Hailuo 02 Standard duration must be 6 or 10 seconds");
+}
+
+function readDuration(value: string | undefined, allowedValues: readonly string[], label: string): string {
+  if (value === undefined) return allowedValues[0] ?? "5";
+  if (allowedValues.includes(value)) return value;
+  throw new Error(`${label} duration must be ${allowedValues.join(", ")} seconds`);
+}
+
+function readDurationValue(
+  value: string | undefined,
+  allowedValues: readonly string[],
+  label: string,
+  valueType: "string" | "number" = "string",
+): string | number {
+  const duration = readDuration(value, allowedValues, label);
+  return valueType === "number" ? Number(duration) : duration;
+}
+
+function readVideoReferenceFields(
+  referenceField: "imageUrls" | "imageUrl" | "firstFrameUrl" | "firstImageUrl",
+  lastReferenceField: "lastFrameUrl" | "lastImageUrl" | undefined,
+  videoField: "videoUrls" | "videoUrl" | undefined,
+  audioField: "audioUrls" | undefined,
+  referenceMediaUrls: { imageUrls: string[]; videoUrls: string[]; audioUrls: string[] },
+): Record<string, unknown> {
+  const imageFields =
+    referenceField === "imageUrls"
+      ? { imageUrls: referenceMediaUrls.imageUrls }
+      : {
+          [referenceField]: referenceMediaUrls.imageUrls[0],
+          ...(lastReferenceField && referenceMediaUrls.imageUrls[1]
+            ? { [lastReferenceField]: referenceMediaUrls.imageUrls[1] }
+            : {}),
+        };
+  const videoFields =
+    videoField && referenceMediaUrls.videoUrls.length > 0
+      ? { [videoField]: videoField === "videoUrls" ? referenceMediaUrls.videoUrls : referenceMediaUrls.videoUrls[0] }
+      : {};
+  const audioFields =
+    audioField && referenceMediaUrls.audioUrls.length > 0 ? { [audioField]: referenceMediaUrls.audioUrls } : {};
+  return {
+    ...imageFields,
+    ...videoFields,
+    ...audioFields,
+  };
+}
