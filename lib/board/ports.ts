@@ -76,9 +76,13 @@ function findNode(nodes: BoardNode[], nodeId: string): BoardNode {
   return node;
 }
 
-function findPort(nodes: BoardNode[], ref: BoardPortRef): { node: BoardNode; port: BoardPortDefinition } {
+function findPort(
+  nodes: BoardNode[],
+  ref: BoardPortRef,
+  options?: BoardNodePortOptions,
+): { node: BoardNode; port: BoardPortDefinition } {
   const node = findNode(nodes, ref.nodeId);
-  const port = getBoardNodePortDefinition(node, ref.portId);
+  const port = getBoardNodePortDefinition(node, ref.portId, options);
   if (!port) throw new Error("连接端点不存在或当前模型不支持该端口");
   if (port.kind !== ref.portKind) throw new Error("连接端口类型不一致");
   return { node, port };
@@ -91,6 +95,7 @@ function isReferenceSource(node: BoardNode): boolean {
 function isAcceptedGenerateReferenceSource(source: BoardNode, target: BoardNode): boolean {
   if (!isGenerateNode(target)) return false;
   if (source.kind === "reference-group") {
+    if (source.references.length === 0) return false;
     if (target.kind === "image-generate") return source.references.every(reference => reference.type === "image");
     const acceptedTypes = getVideoModelCapabilities(target.model).referenceMediaTypes;
     return source.references.every(reference => acceptedTypes.includes(reference.type));
@@ -101,8 +106,12 @@ function isAcceptedGenerateReferenceSource(source: BoardNode, target: BoardNode)
 }
 
 export function resolveBoardConnectionKind(nodes: BoardNode[], from: BoardPortRef, to: BoardPortRef): BoardEdgeKind {
-  const source = findPort(nodes, from);
-  const target = findPort(nodes, to);
+  const sourceOptions: BoardNodePortOptions = {};
+  const targetOptions: BoardNodePortOptions = {};
+  if (from.portId === BOARD_PORT_IDS.resultOut) sourceOptions.hasResultConnection = true;
+  if (to.portId === BOARD_PORT_IDS.resultOut) targetOptions.hasResultConnection = true;
+  const source = findPort(nodes, from, sourceOptions);
+  const target = findPort(nodes, to, targetOptions);
   if (source.port.direction !== "output" || target.port.direction !== "input") {
     throw new Error("连接方向不正确");
   }
