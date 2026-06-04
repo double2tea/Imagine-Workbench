@@ -54,16 +54,15 @@ function readThemeChangeEvent(event: Event): ThemeMode | null {
   return detail === "light" || detail === "dark" ? detail : null;
 }
 
-/** Subscribes to theme changes without lifting state to page/board roots. */
-function readInitialThemeMode(): ThemeMode {
-  if (typeof window === "undefined") return DEFAULT_THEME;
-  return resolveThemeMode();
-}
-
 export function useThemeMode(): { themeMode: ThemeMode; toggleThemeMode: () => void } {
-  const [themeMode, setThemeMode] = useState<ThemeMode>(readInitialThemeMode);
+  const [themeMode, setThemeMode] = useState<ThemeMode>(DEFAULT_THEME);
 
   useLayoutEffect(() => {
+    setThemeMode(current => {
+      const next = resolveThemeMode();
+      return current === next ? current : next;
+    });
+
     const onThemeChange = (event: Event): void => {
       const next = readThemeChangeEvent(event) ?? resolveThemeMode();
       setThemeMode(current => (current === next ? current : next));
@@ -83,9 +82,14 @@ export function useThemeMode(): { themeMode: ThemeMode; toggleThemeMode: () => v
 
 /** For React Flow colorMode and other surfaces that need React state on theme change. */
 export function useThemeModeSnapshot(): ThemeMode {
-  const [themeMode, setThemeMode] = useState<ThemeMode>(readInitialThemeMode);
+  const [themeMode, setThemeMode] = useState<ThemeMode>(DEFAULT_THEME);
 
   useLayoutEffect(() => {
+    setThemeMode(current => {
+      const next = resolveThemeMode();
+      return current === next ? current : next;
+    });
+
     const onThemeChange = (event: Event): void => {
       const next = readThemeChangeEvent(event) ?? resolveThemeMode();
       setThemeMode(current => (current === next ? current : next));
