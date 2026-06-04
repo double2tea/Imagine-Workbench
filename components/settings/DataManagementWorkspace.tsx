@@ -1,6 +1,7 @@
 import { Download, FileArchive, FileInput, HardDrive, RefreshCw, Shield, Trash2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { formatBytes, type LocalStorageCleanupKind, type WorkspaceCleanupKind, type WorkspaceDataSummary } from "@/lib/data-management";
+import { getShowPriceSetting, setShowPriceSetting } from "@/lib/providers/pricing";
 
 interface DataManagementWorkspaceProps {
   hasCurrentBoard: boolean;
@@ -53,6 +54,7 @@ export default function DataManagementWorkspace({
   const localAssetInputRef = useRef<HTMLInputElement | null>(null);
   const [busyLabel, setBusyLabel] = useState<string | null>(null);
   const [includeCredentials, setIncludeCredentials] = useState(false);
+  const [showPrice, setShowPrice] = useState(() => getShowPriceSetting());
 
   const runAction = async (label: string, action: () => Promise<void>) => {
     setBusyLabel(label);
@@ -194,6 +196,32 @@ export default function DataManagementWorkspace({
           </div>
         </div>
       </section>
+      <section className="rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="flex items-center gap-2 text-xs font-semibold text-[var(--iw-text)]">
+              <FileArchive className="h-3.5 w-3.5 text-amber-300" />
+              费用显示
+            </p>
+            <p className="mt-1 text-[11px] text-[var(--iw-muted)]">
+              在生成按钮旁显示模型价格
+            </p>
+          </div>
+          <label className="relative inline-flex cursor-pointer items-center">
+            <input
+              type="checkbox"
+              className="peer sr-only"
+              checked={showPrice}
+              onChange={e => {
+                setShowPrice(e.target.checked);
+                setShowPriceSetting(e.target.checked);
+              }}
+            />
+            <div className="h-5 w-9 rounded-full bg-[var(--iw-border)] after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all peer-checked:bg-amber-500 peer-checked:after:translate-x-full" />
+          </label>
+        </div>
+      </section>
+
 
       <section className="rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-3">
         <p className="flex items-center gap-2 text-xs font-semibold text-[var(--iw-text)]">

@@ -1,6 +1,7 @@
 import { useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from "react";
 import { RefreshCw, Sparkles, Video as VideoIcon } from "lucide-react";
 import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
+import ModelPriceBadge from "@/components/creation/ModelPriceBadge";
 import ReferenceImagePicker, { type ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import PromptReferenceInlineOverlay, { resolvePromptReferenceThumbnails } from "@/components/reference/PromptReferenceThumbnailStrip";
 import { type DraggedReferenceAsset, hasDraggedReferenceAsset } from "@/components/reference/referenceDrag";
@@ -345,11 +346,12 @@ export default function VideoGenerationPanel({
           }`}
         >
           {isSubmitting ? (
-            <RefreshCw className="h-4 w-4 animate-spin text-white" />
+            <RefreshCw className="h-4 w-4 shrink-0 animate-spin text-white" />
           ) : (
-            <VideoIcon className="h-4 w-4 text-white" />
+            <VideoIcon className="h-4 w-4 shrink-0 text-white" />
           )}
-          {isSubmitting ? `提交中 (${submitCount})，可继续排队` : "生成视频"}
+          <span className="truncate">{isSubmitting ? `提交中 (${submitCount})，可继续排队` : "生成视频"}</span>
+          {!isSubmitting && <ModelPriceBadge provider={selectedModel.split(":")[0]} modelId={selectedModel} />}
         </button>
       )}
     </div>
