@@ -666,10 +666,12 @@ export default function BoardWorkspace({
   const updateSelectedNodeIds = useCallback((nextIds: string[]): void => {
     setSelectedNodeIds(currentIds => {
       if (sameStringList(currentIds, nextIds)) return currentIds;
-      onSelectedNodeIdsChange?.(nextIds);
       return nextIds;
     });
-  }, [onSelectedNodeIdsChange]);
+  }, []);
+  useEffect(() => {
+    onSelectedNodeIdsChange?.(selectedNodeIds);
+  }, [onSelectedNodeIdsChange, selectedNodeIds]);
   const galleryReferenceFingerprint = useMemo(
     () => buildGalleryReferenceFingerprint(galleryItems),
     [galleryItems],
