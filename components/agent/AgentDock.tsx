@@ -1,5 +1,5 @@
-import type { ChangeEvent, FormEvent, ReactNode, Ref } from "react";
-import { forwardRef, useEffect, useState } from "react";
+import type { ChangeEvent, CSSProperties, FormEvent, PointerEvent as ReactPointerEvent, ReactNode, Ref } from "react";
+import { forwardRef, useEffect, useRef, useState } from "react";
 import { Check, ChevronRight, ImagePlus, Paintbrush, RefreshCw, Send, X } from "lucide-react";
 import { motion } from "motion/react";
 import PreviewImage from "@/components/PreviewImage";
@@ -78,6 +78,66 @@ interface AgentContentLine {
   text: string;
 }
 
+interface AgentOrbPosition {
+  x: number;
+  y: number;
+}
+
+interface AgentOrbDragState {
+  current: AgentOrbPosition;
+  moved: boolean;
+  origin: AgentOrbPosition;
+  pointerId: number;
+  startX: number;
+  startY: number;
+}
+
+function clampAgentOrbPosition(position: AgentOrbPosition): AgentOrbPosition {
+  const maxX = Math.max(AGENT_ORB_MARGIN, window.innerWidth - AGENT_ORB_SIZE - AGENT_ORB_MARGIN);
+  const maxY = Math.max(AGENT_ORB_MARGIN, window.innerHeight - AGENT_ORB_SIZE - AGENT_ORB_MARGIN);
+  return {
+    x: Math.min(Math.max(position.x, AGENT_ORB_MARGIN), maxX),
+    y: Math.min(Math.max(position.y, AGENT_ORB_MARGIN), maxY),
+  };
+}
+
+function getDefaultAgentOrbPosition(): AgentOrbPosition {
+  return clampAgentOrbPosition({
+    x: window.innerWidth - AGENT_ORB_SIZE - 48,
+    y: window.innerHeight - AGENT_ORB_SIZE - 56,
+  });
+}
+
+function parseStoredAgentOrbPosition(value: string | null): AgentOrbPosition | null {
+  if (!value) return null;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      "x" in parsed &&
+      "y" in parsed &&
+      typeof parsed.x === "number" &&
+      typeof parsed.y === "number"
+    ) {
+      return { x: parsed.x, y: parsed.y };
+    }
+  } catch {
+    localStorage.removeItem(AGENT_ORB_POSITION_STORAGE_KEY);
+  }
+  return null;
+}
+
+function persistAgentOrbPosition(position: AgentOrbPosition) {
+  localStorage.setItem(AGENT_ORB_POSITION_STORAGE_KEY, JSON.stringify(position));
+}
+
+function getInitialAgentOrbPosition(): AgentOrbPosition | null {
+  if (typeof window === "undefined") return null;
+  const storedPosition = parseStoredAgentOrbPosition(localStorage.getItem(AGENT_ORB_POSITION_STORAGE_KEY));
+  return storedPosition ? clampAgentOrbPosition(storedPosition) : getDefaultAgentOrbPosition();
+}
+
 const TOOL_LABELS: Record<string, string> = {
   query_models: "查询模型",
   get_skill_info: "查询技能",
@@ -109,8 +169,10 @@ const SKILL_LABELS: Record<string, { label: string; className: string }> = {
   ExportManager: { label: "批量导出", className: "bg-red-500/12 text-red-300 border-red-500/20" },
 };
 
-const AGENT_DOCK_SHELL_CLASS =
-  "pointer-events-none fixed inset-x-4 bottom-12 z-40 mx-auto flex w-[calc(100vw-32px)] max-w-5xl justify-end sm:bottom-16 sm:w-[min(1040px,calc(100vw-40px))]";
+const AGENT_ORB_POSITION_STORAGE_KEY = "imagine_agent_orb_position";
+const AGENT_ORB_SIZE = 72;
+const AGENT_ORB_MARGIN = 12;
+const AGENT_ORB_DRAG_THRESHOLD = 4;
 
 const ACTION_LABELS: Record<AgentToolAction["type"], string> = {
   none: "无操作",
@@ -444,6 +506,10 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
     model: string;
     supportsVision: boolean | null;
   } | null>(null);
+  const [orbPosition, setOrbPosition] = useState<AgentOrbPosition | null>(getInitialAgentOrbPosition);
+  const [isOrbDragging, setIsOrbDragging] = useState(false);
+  const orbDragRef = useRef<AgentOrbDragState | null>(null);
+  const suppressOrbClickRef = useRef(false);
 
   useEffect(() => {
     if (!hasSendableAgentImages || !selectedChatModel.trim()) {
@@ -478,6 +544,23 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
     return () => controller.abort();
   }, [hasSendableAgentImages, selectedChatModel]);
 
+  useEffect(() => {
+    setOrbPosition(getInitialAgentOrbPosition());
+  }, []);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setOrbPosition(previousPosition => {
+        const nextPosition = clampAgentOrbPosition(previousPosition ?? getDefaultAgentOrbPosition());
+        persistAgentOrbPosition(nextPosition);
+        return nextPosition;
+      });
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   const openRouterVisionSupport =
     hasSendableAgentImages && visionLookup?.model === selectedChatModel
       ? visionLookup.supportsVision
@@ -485,27 +568,127 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
 
   const agentReferenceHint = formatAgentReferenceHint(sendableAgentReferences, openRouterVisionSupport);
   const isIdleOrb = !isOpen && !isLoading && input.trim().length === 0 && !hasSendableAgentImages;
+  const idleOrbStyle = isIdleOrb && orbPosition
+    ? {
+      bottom: "auto",
+      left: orbPosition.x,
+      right: "auto",
+      top: orbPosition.y,
+    } satisfies CSSProperties
+    : undefined;
 
   const dockShellClass = isIdleOrb
-    ? `imagine-agent-dock imagine-agent-dock-idle-orb imagine-theme-dark ${AGENT_DOCK_SHELL_CLASS}`
+    ? "imagine-agent-dock imagine-agent-dock-idle-orb imagine-theme-dark pointer-events-none fixed bottom-12 right-4 z-40 flex h-[72px] w-[72px] sm:bottom-16 sm:right-10"
     : "imagine-agent-dock imagine-agent-dock-panel imagine-theme-dark pointer-events-auto fixed inset-x-4 bottom-12 z-50 mx-auto w-[calc(100vw-32px)] max-w-5xl rounded-lg p-3 sm:bottom-16 sm:w-[min(1040px,calc(100vw-40px))]";
+  const dockStateClass = [
+    !isIdleOrb && isOverContent ? "imagine-agent-dock-over-content" : "",
+    isIdleOrb && isOrbDragging ? "is-dragging" : "",
+  ].filter(Boolean).join(" ");
+
+  const updateOrbDragPosition = (clientX: number, clientY: number, pointerId: number) => {
+    const drag = orbDragRef.current;
+    if (!drag || drag.pointerId !== pointerId) return;
+
+    const deltaX = clientX - drag.startX;
+    const deltaY = clientY - drag.startY;
+    if (
+      !drag.moved &&
+      Math.abs(deltaX) < AGENT_ORB_DRAG_THRESHOLD &&
+      Math.abs(deltaY) < AGENT_ORB_DRAG_THRESHOLD
+    ) {
+      return;
+    }
+
+    drag.moved = true;
+    const nextPosition = clampAgentOrbPosition({
+      x: drag.origin.x + deltaX,
+      y: drag.origin.y + deltaY,
+    });
+    drag.current = nextPosition;
+    setOrbPosition(nextPosition);
+  };
+
+  const finishOrbDrag = (pointerId: number) => {
+    const drag = orbDragRef.current;
+    if (!drag || drag.pointerId !== pointerId) return;
+
+    orbDragRef.current = null;
+    setIsOrbDragging(false);
+
+    if (drag.moved) {
+      suppressOrbClickRef.current = true;
+      persistAgentOrbPosition(drag.current);
+    }
+  };
+
+  useEffect(() => {
+    if (!isOrbDragging) return;
+
+    const handlePointerMove = (event: PointerEvent) => {
+      updateOrbDragPosition(event.clientX, event.clientY, event.pointerId);
+    };
+    const handlePointerEnd = (event: PointerEvent) => {
+      finishOrbDrag(event.pointerId);
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerEnd);
+    window.addEventListener("pointercancel", handlePointerEnd);
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerEnd);
+      window.removeEventListener("pointercancel", handlePointerEnd);
+    };
+  }, [isOrbDragging]);
+
+  const handleOrbPointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (event.button !== 0) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const origin = clampAgentOrbPosition({ x: rect.left, y: rect.top });
+    orbDragRef.current = {
+      current: origin,
+      moved: false,
+      origin,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+    };
+    event.preventDefault();
+    setIsOrbDragging(true);
+  };
+
+  const handleOrbClick = () => {
+    if (suppressOrbClickRef.current) {
+      suppressOrbClickRef.current = false;
+      return;
+    }
+    onToggleOpen();
+  };
 
   return (
     <section
       ref={ref}
-      className={`${dockShellClass}${!isIdleOrb && isOverContent ? " imagine-agent-dock-over-content" : ""}`}
-      style={!isIdleOrb && isOverContent ? { opacity: 0.84 } : undefined}
+      className={`${dockShellClass}${dockStateClass ? ` ${dockStateClass}` : ""}`}
+      style={isIdleOrb ? idleOrbStyle : !isIdleOrb && isOverContent ? { opacity: 0.84 } : undefined}
     >
       {isIdleOrb ? (
         <button
           type="button"
-          onClick={onToggleOpen}
-          className="imagine-agent-orb-button pointer-events-auto group relative flex h-16 w-16 items-center justify-center rounded-full"
+          onClick={handleOrbClick}
+          onPointerDown={handleOrbPointerDown}
+          className="imagine-agent-orb-button pointer-events-auto group relative flex h-[72px] w-[72px] items-center justify-center rounded-full"
           title="展开 Agent 对话"
           aria-label="展开 Agent 对话"
         >
           <span className="imagine-agent-orb-aura" />
-          <AgentIdentityMark variant="orb" />
+          <span className="imagine-agent-orb-fluff" aria-hidden />
+          <span className="imagine-agent-orb-face" aria-hidden>
+            <span className="imagine-agent-orb-eye" />
+            <span className="imagine-agent-orb-eye" />
+            <span className="imagine-agent-orb-mouth" />
+            <span className="imagine-agent-orb-cheek imagine-agent-orb-cheek-left" />
+            <span className="imagine-agent-orb-cheek imagine-agent-orb-cheek-right" />
+          </span>
           <span className="imagine-agent-orb-reminder absolute right-14 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-full border px-2.5 py-1 text-[10px] font-semibold shadow-lg backdrop-blur">
             Agent
           </span>

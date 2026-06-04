@@ -3526,9 +3526,10 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
   border: 0 !important;
   border-radius: 999px !important;
   box-shadow: none !important;
+  height: 72px !important;
   max-width: none !important;
   padding: 0 !important;
-  width: auto !important;
+  width: 72px !important;
 }
 
 .imagine-agent-dock-panel {
@@ -3627,29 +3628,59 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 }
 
 .imagine-agent-orb-button {
-  background: transparent;
-  border: 0;
-  box-shadow: none;
+  background:
+    radial-gradient(circle at 45% 34%, rgba(255, 255, 246, 0.98) 0 18%, rgba(255, 235, 210, 0.96) 42%, rgba(244, 186, 170, 0.9) 74%),
+    radial-gradient(circle at 72% 72%, rgba(137, 213, 225, 0.44), transparent 48%);
+  border: 1px solid rgba(255, 244, 228, 0.82);
+  box-shadow:
+    0 18px 38px rgba(246, 166, 142, 0.22),
+    0 0 0 8px rgba(255, 238, 218, 0.1),
+    inset 0 2px 0 rgba(255, 255, 255, 0.7),
+    inset 0 -12px 18px rgba(196, 122, 113, 0.14);
+  cursor: grab;
   overflow: visible;
-  transition: transform 180ms ease;
+  touch-action: none;
+  transition:
+    box-shadow 180ms ease,
+    filter 180ms ease,
+    transform 180ms ease;
   will-change: transform;
 }
 
 .imagine-agent-orb-button::before {
   position: absolute;
-  inset: 3px;
+  inset: -5px;
   content: "";
   border-radius: inherit;
-  border: 1px solid color-mix(in srgb, var(--iw-accent) 12%, var(--iw-border));
-  box-shadow: 0 0 0 6px color-mix(in srgb, var(--iw-accent) 4%, transparent);
-  opacity: 0.82;
+  border: 1px solid rgba(255, 238, 222, 0.5);
+  background:
+    radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.55), transparent 26%),
+    radial-gradient(circle at 75% 74%, rgba(111, 185, 204, 0.14), transparent 42%);
+  box-shadow:
+    0 -5px 10px rgba(255, 247, 232, 0.18),
+    -7px 2px 12px rgba(255, 218, 198, 0.16),
+    7px 3px 12px rgba(160, 215, 225, 0.12);
+  opacity: 0.95;
 }
 
 .imagine-agent-orb-button::after {
-  content: none;
+  position: absolute;
+  inset: 5px;
+  content: "";
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 35% 25%, rgba(255, 255, 255, 0.58), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 58%);
+  pointer-events: none;
 }
 
 .imagine-agent-orb-button:hover {
+  box-shadow:
+    0 20px 42px rgba(246, 166, 142, 0.3),
+    0 0 0 9px rgba(255, 238, 218, 0.12),
+    inset 0 2px 0 rgba(255, 255, 255, 0.82),
+    inset 0 -12px 18px rgba(196, 122, 113, 0.12);
+  filter: saturate(1.03);
   transform: translateY(-3px) scale(1.035);
 }
 
@@ -3657,15 +3688,93 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
   transform: translateY(0) scale(0.96);
 }
 
+.imagine-agent-dock-idle-orb.is-dragging .imagine-agent-orb-button {
+  cursor: grabbing;
+  filter: saturate(1.06);
+  transform: scale(1.04);
+}
+
 .imagine-agent-orb-aura {
   position: absolute;
-  inset: -16px;
+  inset: -18px;
   border-radius: inherit;
   background:
-    radial-gradient(circle, color-mix(in srgb, var(--iw-accent) 15%, transparent), transparent 58%),
-    radial-gradient(circle at 68% 36%, rgba(14, 165, 233, 0.08), transparent 42%);
-  opacity: 0.62;
+    radial-gradient(circle, rgba(255, 214, 192, 0.34), transparent 58%),
+    radial-gradient(circle at 70% 36%, rgba(122, 203, 218, 0.18), transparent 42%);
+  opacity: 0.64;
   animation: imagine-agent-orb-breathe 4s ease-in-out infinite;
+}
+
+.imagine-agent-orb-fluff {
+  position: absolute;
+  z-index: 1;
+  inset: -3px;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 18% 34%, rgba(255, 244, 226, 0.64) 0 8%, transparent 16%),
+    radial-gradient(circle at 78% 31%, rgba(255, 244, 226, 0.58) 0 7%, transparent 15%),
+    radial-gradient(circle at 28% 82%, rgba(245, 191, 176, 0.42) 0 7%, transparent 16%),
+    radial-gradient(circle at 74% 79%, rgba(141, 209, 221, 0.28) 0 6%, transparent 15%);
+  filter: blur(0.3px);
+  pointer-events: none;
+}
+
+.imagine-agent-orb-face {
+  position: absolute;
+  z-index: 3;
+  width: 42px;
+  height: 32px;
+  transform: translateY(4px);
+  pointer-events: none;
+}
+
+.imagine-agent-orb-eye {
+  position: absolute;
+  top: 7px;
+  width: 5px;
+  height: 9px;
+  border-radius: 999px;
+  background: rgba(42, 37, 46, 0.88);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.28),
+    0 0 0 1px rgba(42, 37, 46, 0.04);
+}
+
+.imagine-agent-orb-eye:first-child {
+  left: 12px;
+}
+
+.imagine-agent-orb-eye:nth-child(2) {
+  right: 12px;
+}
+
+.imagine-agent-orb-mouth {
+  position: absolute;
+  left: 50%;
+  top: 19px;
+  width: 12px;
+  height: 6px;
+  border-bottom: 2px solid rgba(42, 37, 46, 0.72);
+  border-radius: 0 0 999px 999px;
+  transform: translateX(-50%);
+}
+
+.imagine-agent-orb-cheek {
+  position: absolute;
+  top: 18px;
+  width: 7px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(244, 129, 139, 0.28);
+  filter: blur(0.2px);
+}
+
+.imagine-agent-orb-cheek-left {
+  left: 4px;
+}
+
+.imagine-agent-orb-cheek-right {
+  right: 4px;
 }
 
 .imagine-mark {
@@ -3712,8 +3821,8 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 }
 
 .imagine-agent-orb-button:hover .imagine-mark {
-  transform: translateY(-2px) scale(1.03);
-  filter: drop-shadow(0 10px 22px rgba(2, 6, 23, 0.5));
+  transform: translateY(-2px) scale(1.04);
+  filter: drop-shadow(0 10px 20px rgba(196, 122, 113, 0.22));
 }
 
 .imagine-agent-orb-reminder {
@@ -3755,24 +3864,24 @@ html[data-imagine-theme="light"] .imagine-mark-xs,
 
 .imagine-agent-dock-idle-orb.imagine-theme-light .imagine-agent-orb-aura {
   background:
-    radial-gradient(circle, color-mix(in srgb, var(--iw-accent) 10%, transparent), transparent 58%),
-    radial-gradient(circle at 68% 36%, rgba(14, 165, 233, 0.06), transparent 42%);
+    radial-gradient(circle, rgba(255, 214, 192, 0.26), transparent 58%),
+    radial-gradient(circle at 68% 36%, rgba(122, 203, 218, 0.13), transparent 42%);
 }
 
 .imagine-agent-dock-idle-orb.imagine-theme-dark .imagine-mark {
-  filter: drop-shadow(0 6px 16px rgba(15, 23, 42, 0.55));
+  filter: drop-shadow(0 6px 14px rgba(196, 122, 113, 0.18));
 }
 
 .imagine-agent-dock-idle-orb.imagine-theme-dark .imagine-agent-orb-button::before {
-  border-color: color-mix(in srgb, var(--iw-accent) 24%, var(--iw-border));
-  box-shadow: 0 0 0 6px color-mix(in srgb, var(--iw-accent) 10%, transparent);
+  border-color: rgba(255, 255, 255, 0.58);
+  box-shadow: none;
 }
 
 .imagine-agent-dock-idle-orb.imagine-theme-dark .imagine-agent-orb-aura {
   background:
-    radial-gradient(circle, color-mix(in srgb, var(--iw-accent) 22%, transparent), transparent 58%),
-    radial-gradient(circle at 68% 36%, rgba(14, 165, 233, 0.12), transparent 42%);
-  opacity: 0.82;
+    radial-gradient(circle, rgba(255, 214, 192, 0.38), transparent 58%),
+    radial-gradient(circle at 68% 36%, rgba(122, 203, 218, 0.2), transparent 42%);
+  opacity: 0.72;
 }
 
 .imagine-agent-dock-idle-orb.imagine-theme-dark .imagine-agent-orb-reminder {
@@ -4497,7 +4606,7 @@ html[data-imagine-theme="light"] .imagine-mark-xs,
     font-size: 9px !important;
   }
 
-  .imagine-agent-dock {
+  .imagine-agent-dock:not(.imagine-agent-dock-idle-orb) {
     bottom: 0 !important;
     inset-inline: 0 !important;
     width: 100vw !important;
@@ -4508,15 +4617,15 @@ html[data-imagine-theme="light"] .imagine-mark-xs,
     padding: 10px 12px calc(10px + env(safe-area-inset-bottom)) !important;
   }
 
-  .imagine-agent-dock > div:first-child {
+  .imagine-agent-dock:not(.imagine-agent-dock-idle-orb) > div:first-child {
     margin-bottom: 6px !important;
   }
 
-  .imagine-agent-dock [class*="max-h-[min(46vh,440px)]"] {
+  .imagine-agent-dock:not(.imagine-agent-dock-idle-orb) [class*="max-h-[min(46vh,440px)]"] {
     max-height: min(54dvh, 440px) !important;
   }
 
-  .imagine-agent-dock input[type="text"] {
+  .imagine-agent-dock:not(.imagine-agent-dock-idle-orb) input[type="text"] {
     height: 40px;
     font-size: 16px !important;
   }
@@ -4526,34 +4635,32 @@ html[data-imagine-theme="light"] .imagine-mark-xs,
     align-items: center;
   }
 
-  .imagine-agent-dock label[for="auto_trigger"] {
+  .imagine-agent-dock:not(.imagine-agent-dock-idle-orb) label[for="auto_trigger"] {
     height: 40px !important;
     min-width: 58px;
     padding-inline: 9px !important;
   }
 
-  .imagine-agent-dock [class*="self-end ml-10"] {
+  .imagine-agent-dock:not(.imagine-agent-dock-idle-orb) [class*="self-end ml-10"] {
     margin-left: 26px !important;
   }
 
-  .imagine-agent-dock [class*="self-start mr-10"] {
+  .imagine-agent-dock:not(.imagine-agent-dock-idle-orb) [class*="self-start mr-10"] {
     margin-right: 26px !important;
   }
 
-  .imagine-agent-dock form {
+  .imagine-agent-dock:not(.imagine-agent-dock-idle-orb) form {
     min-width: 0;
   }
 }
 
 @media (max-width: 860px) {
   .imagine-agent-dock.imagine-agent-dock-idle-orb {
-    bottom: calc(16px + env(safe-area-inset-bottom)) !important;
-    inset-inline: 16px !important;
-    width: calc(100vw - 32px) !important;
+    width: 72px !important;
+    height: 72px !important;
     max-width: none !important;
-    justify-content: flex-end !important;
     border: 0 !important;
-    border-radius: 0 !important;
+    border-radius: 999px !important;
     padding: 0 !important;
   }
 }
