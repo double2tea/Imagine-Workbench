@@ -118,7 +118,7 @@ export function buildGalleryReferenceFingerprint(
   items: Array<{ id: string; status: string; type: string; url: string }>,
 ): string {
   const lines = items
-    .filter(item => item.type === "image")
+    .filter(item => item.type === "image" || item.type === "video" || item.type === "audio")
     .map(item => `${item.id}\t${item.status}\t${fingerprintLargeText(item.url)}`)
     .sort();
   return `n${lines.length}:h${digestParts(lines)}`;

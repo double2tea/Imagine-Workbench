@@ -2,8 +2,8 @@ export const BOARD_TRASH_LIMIT = 20;
 
 export const IMAGINE_BOARD_ASSET_DRAG_TYPE = "application/x-imagine-board-asset-id";
 
-/** File picker accept for board-local image/video import. */
-export const BOARD_MEDIA_FILE_ACCEPT = "image/*,video/*";
+/** File picker accept for board-local image/video/audio import. */
+export const BOARD_MEDIA_FILE_ACCEPT = "image/*,video/*,audio/*";
 
 /** Quick-insert menu item kind (not a board node type). */
 export const BOARD_QUICK_INSERT_IMPORT_KIND = "import-media";

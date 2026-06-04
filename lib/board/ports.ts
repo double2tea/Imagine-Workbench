@@ -1,6 +1,6 @@
 import type { BoardEdge, BoardEdgeKind, BoardNode, BoardPortDefinition, BoardPortRef } from "@/lib/board/types";
 import { dedupeBoardEdgesByEndpoints } from "@/lib/board/edge-dedupe";
-import { getModelCapability } from "@/lib/providers/model-catalog";
+import { getModelCapability, getVideoModelCapabilities } from "@/lib/providers/model-catalog";
 
 export const BOARD_PORT_IDS = {
   agentContextIn: "agent-context-in",
@@ -30,13 +30,10 @@ export function getBoardNodePortDefinitions(
   options: BoardNodePortOptions = {},
 ): BoardPortDefinition[] {
   if (node.kind === "asset") {
-    const ports: BoardPortDefinition[] = [
+    return [
       { id: BOARD_PORT_IDS.assetIn, label: "资产输入", kind: "asset", direction: "input" },
+      { id: BOARD_PORT_IDS.assetOut, label: "资产输出", kind: "asset", direction: "output" },
     ];
-    if (node.asset.type === "image") {
-      ports.push({ id: BOARD_PORT_IDS.assetOut, label: "资产输出", kind: "asset", direction: "output" });
-    }
-    return ports;
   }
   if (node.kind === "prompt") {
     return [{ id: BOARD_PORT_IDS.promptOut, label: "提示输出", kind: "prompt", direction: "output" }];
@@ -91,6 +88,14 @@ function isImageReferenceSource(node: BoardNode): boolean {
   return (node.kind === "asset" && node.asset.type === "image") || node.kind === "reference-group";
 }
 
+function isAcceptedGenerateReferenceSource(source: BoardNode, target: BoardNode): boolean {
+  if (!isGenerateNode(target)) return false;
+  if (source.kind === "reference-group") return target.kind === "image-generate" || getVideoModelCapabilities(target.model).referenceMediaTypes.includes("image");
+  if (source.kind !== "asset") return false;
+  if (target.kind === "image-generate") return source.asset.type === "image";
+  return getVideoModelCapabilities(target.model).referenceMediaTypes.includes(source.asset.type);
+}
+
 export function resolveBoardConnectionKind(nodes: BoardNode[], from: BoardPortRef, to: BoardPortRef): BoardEdgeKind {
   const source = findPort(nodes, from);
   const target = findPort(nodes, to);
@@ -109,7 +114,7 @@ export function resolveBoardConnectionKind(nodes: BoardNode[], from: BoardPortRe
   }
 
   if (
-    isImageReferenceSource(source.node) &&
+    isAcceptedGenerateReferenceSource(source.node, target.node) &&
     isGenerateNode(target.node) &&
     source.port.id === BOARD_PORT_IDS.assetOut &&
     target.port.id === BOARD_PORT_IDS.referenceIn
@@ -145,7 +150,7 @@ export function resolveBoardConnectionKind(nodes: BoardNode[], from: BoardPortRe
     return "agent-context";
   }
 
-  throw new Error("端口类型不兼容：图片可连参考/Agent，Prompt 可连生成，生成结果可连资产。");
+  throw new Error("端口类型不兼容：媒体可连支持该类型的生成参考，图片可连参考组/Agent，Prompt 可连生成，生成结果可连资产。");
 }
 
 export function isValidBoardConnection(nodes: BoardNode[], from: BoardPortRef, to: BoardPortRef): boolean {

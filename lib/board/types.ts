@@ -1,5 +1,5 @@
 export type BoardNodeKind = "asset" | "prompt" | "reference-group" | "image-generate" | "video-generate" | "agent" | "note";
-export type BoardAssetType = "image" | "video";
+export type BoardAssetType = "image" | "video" | "audio";
 export type BoardEdgeKind = "reference" | "prompt" | "result" | "agent-context";
 export type BoardPortKind = "asset" | "prompt" | "result" | "agent";
 export type BoardPortDirection = "input" | "output";

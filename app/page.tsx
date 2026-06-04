@@ -57,6 +57,7 @@ import {
   type ModelOption,
 } from "@/lib/providers/model-catalog";
 import { PROVIDER_KEYS, getProviderMeta } from "@/lib/providers/registry";
+import { mediaReferenceTypeFromDataUri } from "@/lib/media-references";
 import { compressReferenceImageDataUrl, compressReferenceImageFile } from "@/lib/reference-images";
 import {
   cleanupWorkspaceAssets,
@@ -316,6 +317,7 @@ export default function Home() {
     atDropdown,
     handleImageUpload,
     handlePromptDropAsset,
+    handleReferenceUpload,
     handleReferenceDropAsset,
     handleReferenceDropFiles,
     handleSelectAtItem,
@@ -334,6 +336,7 @@ export default function Home() {
     agentInput,
     prompt,
     videoReferenceLimit,
+    videoReferenceMediaTypes: videoCapabilities.referenceMediaTypes,
     videoReferenceMode,
     pushWorkspaceNotice,
     setAgentInput,
@@ -510,6 +513,10 @@ export default function Home() {
   };
 
   const reuseTaskInComposer = (item: StorageItem) => {
+    if (item.type === "audio") {
+      pushWorkspaceNotice("error", "音频资产没有可复用的生成参数");
+      return;
+    }
     const request = item.generationRequest;
     const model = request?.model ?? item.model;
     const references: ReferenceImageRef[] = (request?.referenceImages ?? []).map((url, index) => {
@@ -521,7 +528,7 @@ export default function Home() {
             ? "end"
             : "general"
         : "general";
-      return { id: `${item.id}_reference_${index + 1}`, url, role };
+      return { id: `${item.id}_reference_${index + 1}`, type: mediaReferenceTypeFromDataUri(url) ?? "image", url, role };
     });
 
     setPrompt(item.prompt);
@@ -759,7 +766,7 @@ export default function Home() {
       <AtReferenceDropdown
         items={agentAtItems}
         search={atDropdown.search}
-        onSelect={(item) => handleSelectAtItem(item.url, item.id, type)}
+        onSelect={(item) => handleSelectAtItem(item.url, item.id, type, item.type)}
       />
     );
   };
@@ -1095,7 +1102,7 @@ export default function Home() {
         onReferenceDropFiles={files => handleReferenceDropFiles(files, "video-prompt")}
         onReferenceRemove={removeReferenceImage}
         onReferenceRoleChange={(id, role) => toggleReferenceRole(id, role ?? "general")}
-        onReferenceUpload={handleImageUpload}
+        onReferenceUpload={event => handleReferenceUpload(event, "video-prompt")}
         onSelectDuration={setVideoDuration}
         onSelectResolution={setVideoResolution}
         onSelectModel={handleSelectVideoModel}

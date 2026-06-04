@@ -5,6 +5,7 @@ import {
   readDraggedReferenceAsset,
 } from "@/components/reference/referenceDrag";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
+import { getMediaReferencePromptToken, getMediaReferenceType, mediaReferenceLabel, mediaReferenceTypeFromMime, type MediaReferenceType } from "@/lib/media-references";
 import type { VideoReferenceMode } from "@/lib/providers/model-catalog";
 import { compressReferenceImageFile } from "@/lib/reference-images";
 
@@ -24,6 +25,7 @@ interface UseReferenceStateParams {
   agentInput: string;
   prompt: string;
   videoReferenceLimit: number;
+  videoReferenceMediaTypes: MediaReferenceType[];
   videoReferenceMode: VideoReferenceMode;
   pushWorkspaceNotice: (type: NoticeType, message: string) => void;
   setAgentInput: Dispatch<SetStateAction<string>>;
@@ -38,8 +40,23 @@ function toErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message.trim() ? error.message : fallback;
 }
 
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== "string") {
+        reject(new Error("文件读取结果不是 Data URL"));
+        return;
+      }
+      resolve(reader.result);
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("文件读取失败"));
+    reader.readAsDataURL(file);
+  });
+}
+
 export function getReferencePromptToken(index: number): string {
-  return `@图片${index + 1}`;
+  return getMediaReferencePromptToken(index);
 }
 
 function escapeRegExp(value: string): string {
@@ -58,7 +75,7 @@ export function buildPromptWithReferenceMap(
     }))
     .filter(reference => reference.sentIndex !== -1)
     .filter(reference => new RegExp(`${escapeRegExp(reference.token)}(?!\\d)`).test(prompt))
-    .map(reference => `- ${reference.token} = reference image ${reference.sentIndex + 1}`);
+    .map(reference => `- ${reference.token} = reference media ${reference.sentIndex + 1}`);
 
   if (lines.length === 0) return prompt;
   return `Reference mapping:\n${lines.join("\n")}\n\nUser prompt:\n${prompt}`;
@@ -88,6 +105,7 @@ export function useReferenceState({
   agentInput,
   prompt,
   videoReferenceLimit,
+  videoReferenceMediaTypes,
   videoReferenceMode,
   pushWorkspaceNotice,
   setAgentInput,
@@ -107,6 +125,12 @@ export function useReferenceState({
   const getReferenceLimitForTarget = (target: PromptReferenceTarget): number =>
     target === "video-prompt" ? videoReferenceLimit : IMAGE_REFERENCE_LIMIT;
 
+  const getAcceptedMediaTypesForTarget = (target: PromptReferenceTarget): MediaReferenceType[] =>
+    target === "video-prompt" ? videoReferenceMediaTypes : ["image"];
+
+  const isAcceptedReferenceType = (type: MediaReferenceType, target: PromptReferenceTarget): boolean =>
+    getAcceptedMediaTypesForTarget(target).includes(type);
+
   const getDroppedReferenceRole = (target: PromptReferenceTarget, index: number): ReferenceImageRef["role"] => {
     if (target !== "video-prompt" || videoReferenceMode !== "firstLast") return "general";
     if (index === 0) return "start";
@@ -115,6 +139,11 @@ export function useReferenceState({
   };
 
   const addDroppedReferenceAsset = (asset: DraggedReferenceAsset, target: PromptReferenceTarget): number | null => {
+    const type = getMediaReferenceType(asset);
+    if (!isAcceptedReferenceType(type, target)) {
+      pushWorkspaceNotice("error", `当前输入不支持${mediaReferenceLabel(type)}参考`);
+      return null;
+    }
     const existingIndex = referenceImages.findIndex(reference => reference.id === asset.id);
     if (existingIndex !== -1) return existingIndex;
 
@@ -127,6 +156,7 @@ export function useReferenceState({
     const nextIndex = referenceImages.length;
     const nextReference: ReferenceImageRef = {
       id: asset.id,
+      type,
       url: asset.url,
       role: getDroppedReferenceRole(target, nextIndex),
     };
@@ -144,7 +174,12 @@ export function useReferenceState({
     addDroppedReferenceAsset(asset, target);
   };
 
-  const addReferenceImageFile = async (file: File, target: PromptReferenceTarget, id: string) => {
+  const addReferenceMediaFile = async (file: File, target: PromptReferenceTarget, id: string) => {
+    const type = mediaReferenceTypeFromMime(file.type);
+    if (!type || !isAcceptedReferenceType(type, target)) {
+      pushWorkspaceNotice("error", `当前输入不支持${type ? mediaReferenceLabel(type) : "该媒体"}参考`);
+      return;
+    }
     const limit = getReferenceLimitForTarget(target);
     if (referenceImages.length >= limit) {
       pushWorkspaceNotice("error", `参考图已达上限：最多 ${limit} 张`);
@@ -152,24 +187,25 @@ export function useReferenceState({
     }
 
     try {
-      const compressedDataUrl = await compressReferenceImageFile(file);
+      const dataUrl = type === "image" ? await compressReferenceImageFile(file) : await readFileAsDataUrl(file);
       setReferenceImages(prev => {
         if (prev.some(reference => reference.id === id)) return prev;
         if (prev.length >= limit) return prev;
 
         const nextReference: ReferenceImageRef = {
           id,
-          url: compressedDataUrl,
+          type,
+          url: dataUrl,
           role: getDroppedReferenceRole(target, prev.length),
         };
         if (prev.length === 0) {
-          setReferenceImage(compressedDataUrl);
+          setReferenceImage(dataUrl);
         }
         return [...prev, nextReference];
       });
     } catch (error) {
       console.error(error);
-      pushWorkspaceNotice("error", toErrorMessage(error, "参考图压缩失败，请换一张图片"));
+      pushWorkspaceNotice("error", toErrorMessage(error, `${mediaReferenceLabel(type)}参考读取失败`));
     }
   };
 
@@ -182,7 +218,7 @@ export function useReferenceState({
     }
 
     files.slice(0, availableSlots).forEach((file, index) => {
-      void addReferenceImageFile(file, target, `${makeClientId("drop")}_${index}`);
+      void addReferenceMediaFile(file, target, `${makeClientId("drop")}_${index}`);
     });
   };
 
@@ -213,12 +249,16 @@ export function useReferenceState({
     }, 0);
   };
 
-  const handleImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleReferenceUpload = (event: ChangeEvent<HTMLInputElement>, target: PromptReferenceTarget) => {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
 
-    void addReferenceImageFile(file, "image-prompt", makeClientId("upload"));
+    void addReferenceMediaFile(file, target, makeClientId("upload"));
+  };
+
+  const handleImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
+    handleReferenceUpload(event, "image-prompt");
   };
 
   const removeReferenceImage = (id: string) => {
@@ -274,8 +314,12 @@ export function useReferenceState({
     setAtDropdown({ visible: false, type, search: "" });
   };
 
-  const handleSelectAtItem = (itemUrl: string, itemId: string, type: AtDropdownTarget) => {
-    if (type === "agent-prompt") {
+  const handleSelectAtItem = (itemUrl: string, itemId: string, target: AtDropdownTarget, itemType: MediaReferenceType = "image") => {
+    if (target === "agent-prompt") {
+      if (itemType !== "image") {
+        pushWorkspaceNotice("error", `Agent 暂不支持${mediaReferenceLabel(itemType)}引用`);
+        return;
+      }
       const lastAtIndex = agentInput.lastIndexOf("@");
       const base = lastAtIndex !== -1 ? agentInput.substring(0, lastAtIndex) : agentInput;
       setAgentInput(`${base}[Ref: ${itemId}] `);
@@ -283,9 +327,13 @@ export function useReferenceState({
       setAgentReferenceUrl(itemUrl);
       setAgentReferences(prev => {
         if (prev.some(reference => reference.id === itemId)) return prev;
-        return [...prev, { id: itemId, url: itemUrl }];
+        return [...prev, { id: itemId, type: itemType, url: itemUrl }];
       });
     } else {
+      if (!isAcceptedReferenceType(itemType, target)) {
+        pushWorkspaceNotice("error", `当前输入不支持${mediaReferenceLabel(itemType)}参考`);
+        return;
+      }
       const lastAtIndex = prompt.lastIndexOf("@");
       const base = lastAtIndex !== -1 ? prompt.substring(0, lastAtIndex) : prompt;
       setPrompt(`${base}[Ref: ${itemId}] `);
@@ -293,17 +341,17 @@ export function useReferenceState({
       setReferenceImages(prev => {
         if (prev.some(reference => reference.id === itemId)) return prev;
         const role =
-          type === "video-prompt" && videoReferenceMode === "firstLast"
+          target === "video-prompt" && videoReferenceMode === "firstLast"
             ? prev.length === 1
               ? "end"
               : prev.length === 0
                 ? "start"
                 : "general"
             : "general";
-        return [...prev, { id: itemId, url: itemUrl, role }];
+        return [...prev, { id: itemId, type: itemType, url: itemUrl, role }];
       });
     }
-    setAtDropdown({ visible: false, type, search: "" });
+    setAtDropdown({ visible: false, type: target, search: "" });
   };
 
   return {
@@ -312,6 +360,7 @@ export function useReferenceState({
     agentReferenceUrl,
     atDropdown,
     handleImageUpload,
+    handleReferenceUpload,
     handlePromptDropAsset,
     handleReferenceDropAsset,
     handleReferenceDropFiles,

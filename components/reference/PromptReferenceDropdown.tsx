@@ -1,6 +1,8 @@
+import { Music } from "lucide-react";
 import PreviewImage from "@/components/PreviewImage";
 import AtDropdownShell, { AtDropdownHeader } from "@/components/reference/AtDropdownShell";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
+import { getMediaReferencePromptToken, getMediaReferenceType, mediaReferenceLabel } from "@/lib/media-references";
 import {
   BOARD_PROMPT_REFERENCE_GROUP_ORDER,
   type BoardPromptReference,
@@ -26,7 +28,7 @@ function filterReferences(
 ): FilteredReferenceItem[] {
   const query = search.trim().toLowerCase();
   return references
-    .map((reference, index) => ({ reference, index, token: `图片${index + 1}` }))
+    .map((reference, index) => ({ reference, index, token: getMediaReferencePromptToken(index) }))
     .filter(
       item =>
         query.length === 0 ||
@@ -50,6 +52,7 @@ function groupFilteredReferences(items: FilteredReferenceItem[]): Map<BoardPromp
 
 function ReferenceRow({ item, onSelect }: { item: FilteredReferenceItem; onSelect: (index: number) => void }) {
   const group = resolveBoardPromptReferenceGroup(item.reference);
+  const mediaType = getMediaReferenceType(item.reference);
   return (
     <button
       type="button"
@@ -58,12 +61,18 @@ function ReferenceRow({ item, onSelect }: { item: FilteredReferenceItem; onSelec
       className="imagine-at-dropdown-item nodrag"
     >
       <div className="imagine-at-dropdown-thumb">
-        <PreviewImage src={item.reference.url} alt={item.token} className="h-full w-full object-cover" />
+        {mediaType === "image" ? (
+          <PreviewImage src={item.reference.url} alt={item.token} className="h-full w-full object-cover" />
+        ) : mediaType === "video" ? (
+          <video src={item.reference.url} muted className="h-full w-full object-cover" />
+        ) : (
+          <Music className="h-4 w-4 text-[var(--iw-faint)]" />
+        )}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate font-mono text-[10px] font-bold text-[var(--iw-accent-strong)]">@{item.token}</p>
+        <p className="truncate font-mono text-[10px] font-bold text-[var(--iw-accent-strong)]">{item.token}</p>
         <p className="truncate text-[9px] text-[var(--iw-faint)]">
-          {group ? item.reference.id : ("sourceLabel" in item.reference && item.reference.sourceLabel) || item.reference.id}
+          {mediaReferenceLabel(mediaType)} · {group ? item.reference.id : ("sourceLabel" in item.reference && item.reference.sourceLabel) || item.reference.id}
         </p>
       </div>
     </button>
@@ -108,7 +117,7 @@ function ReferenceList({
       })}
       {ungrouped.length > 0 ? (
         <section className="imagine-at-dropdown-group">
-          <p className="imagine-at-dropdown-group-label">参考图</p>
+          <p className="imagine-at-dropdown-group-label">参考媒体</p>
           {ungrouped.map(item => (
             <ReferenceRow key={`other:${item.reference.id}:${item.index}`} item={item} onSelect={onSelect} />
           ))}
@@ -124,13 +133,13 @@ export default function PromptReferenceDropdown({ references, search, onSelect }
   if (references.length === 0) {
     return (
       <AtDropdownShell empty>
-        连接参考图、拖入画板资产，或从库中选取作品后，用 @图片N 指定引用
+        连接参考媒体、拖入画板资产，或从库中选取作品后，用 @图片N 指定引用
       </AtDropdownShell>
     );
   }
 
   if (filtered.length === 0) {
-    return <AtDropdownShell empty>未找到匹配的已导入参考图</AtDropdownShell>;
+    return <AtDropdownShell empty>未找到匹配的已导入参考媒体</AtDropdownShell>;
   }
 
   return (

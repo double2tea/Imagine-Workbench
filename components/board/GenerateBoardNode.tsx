@@ -1,9 +1,10 @@
 import { useRef, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { ImagePlus, Loader2, Play, Video, X } from "lucide-react";
+import { ImagePlus, Loader2, Music, Play, Video, X } from "lucide-react";
 import BoardPromptTextarea, { type BoardPromptTextareaHandle } from "@/components/board/BoardPromptTextarea";
 import PreviewImage from "@/components/PreviewImage";
 import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
+import { getMediaReferenceType } from "@/lib/media-references";
 import type { BoardGenerateNodeUpdate, BoardGenerateVariantCount, BoardImageGenerateNode, BoardVideoGenerateNode } from "@/lib/board";
 import {
   applyPromptTemplateText,
@@ -19,6 +20,7 @@ const variantCountOptions: BoardGenerateVariantCount[] = [1, 2, 4];
 export interface BoardGenerateReferencePreview {
   id: string;
   role?: string;
+  type?: ReferenceImageRef["type"];
   url: string;
 }
 
@@ -205,9 +207,15 @@ export default function GenerateBoardNode({ hasResultConnection = false, inputSu
               <div
                 key={`${reference.id}:${reference.url}`}
                 className="h-6 w-6 overflow-hidden rounded border border-blue-400/30 bg-[var(--iw-panel-soft)]"
-                title={reference.role ? `参考图 · ${reference.role}` : "参考图"}
+                title={reference.role ? `参考媒体 · ${reference.role}` : "参考媒体"}
               >
-                <PreviewImage src={reference.url} alt="" className="h-full w-full object-cover" />
+                {getMediaReferenceType(reference) === "image" ? (
+                  <PreviewImage src={reference.url} alt="" className="h-full w-full object-cover" />
+                ) : getMediaReferenceType(reference) === "video" ? (
+                  <Video className="m-auto h-full w-3.5 text-[var(--iw-faint)]" />
+                ) : (
+                  <Music className="m-auto h-full w-3.5 text-[var(--iw-faint)]" />
+                )}
               </div>
             ))}
             {referencePreviews.length > 4 && (

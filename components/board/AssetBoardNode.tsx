@@ -1,4 +1,4 @@
-import { Clock3, Download, ImageDown, ImageIcon, Paintbrush, Send, SlidersHorizontal, type LucideIcon, SkipBack, SkipForward, VideoIcon } from "lucide-react";
+import { Clock3, Download, ImageDown, ImageIcon, Music, Paintbrush, Send, SlidersHorizontal, type LucideIcon, SkipBack, SkipForward, VideoIcon } from "lucide-react";
 import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
 import { useRef, useState } from "react";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
@@ -43,6 +43,18 @@ const frameCaptureActions: Array<{
   { icon: Clock3, mode: "current" },
   { icon: SkipForward, mode: "last" },
 ];
+
+function boardAssetExtension(type: BoardAssetNode["asset"]["type"]): string {
+  if (type === "image") return "png";
+  if (type === "audio") return "mp3";
+  return "mp4";
+}
+
+function boardAssetIcon(type: BoardAssetNode["asset"]["type"]) {
+  if (type === "image") return <ImageIcon className="h-3.5 w-3.5" />;
+  if (type === "audio") return <Music className="h-3.5 w-3.5" />;
+  return <VideoIcon className="h-3.5 w-3.5" />;
+}
 
 export default function AssetBoardNode({
   boardId,
@@ -107,7 +119,7 @@ export default function AssetBoardNode({
           )}
           <a
             href={node.asset.url}
-            download={`${node.asset.assetId}.${node.asset.type === "image" ? "png" : "mp4"}`}
+            download={`${node.asset.assetId}.${boardAssetExtension(node.asset.type)}`}
             className="imagine-board-asset-action nodrag hover:bg-slate-700 hover:text-white"
             title="下载"
           >
@@ -116,6 +128,10 @@ export default function AssetBoardNode({
         </div>
         {node.asset.type === "image" ? (
           <PreviewImage src={node.asset.url} alt={node.asset.prompt} className="h-full w-full object-contain" />
+        ) : node.asset.type === "audio" ? (
+          <div className="flex h-full w-full items-center justify-center px-4">
+            <audio src={node.asset.url} controls className="w-full" />
+          </div>
         ) : (
           <div className="relative h-full w-full">
             <VideoAssetPlayer
@@ -164,7 +180,7 @@ export default function AssetBoardNode({
         )}
       </div>
       <div className="flex h-9 shrink-0 items-center gap-2 border-t border-[var(--iw-border)] px-3 text-[10px] text-[var(--iw-faint)]">
-        {node.asset.type === "image" ? <ImageIcon className="h-3.5 w-3.5" /> : <VideoIcon className="h-3.5 w-3.5" />}
+        {boardAssetIcon(node.asset.type)}
         <span className="truncate">{node.asset.prompt}</span>
       </div>
     </div>

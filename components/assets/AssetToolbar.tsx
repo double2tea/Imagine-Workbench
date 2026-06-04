@@ -2,7 +2,7 @@ import { Search } from "lucide-react";
 import type { StorageItem } from "@/lib/db";
 import type { AiProvider } from "@/lib/providers/model-catalog";
 
-export type AssetTypeFilter = "all" | "images" | "videos";
+export type AssetTypeFilter = "all" | "images" | "videos" | "audios";
 export type AssetStatusFilter = "all" | StorageItem["status"];
 export type AssetDatePreset = "all" | "today" | "7d" | "30d" | "custom";
 
@@ -38,6 +38,7 @@ const TYPE_FILTER_OPTIONS = [
   { value: "all", label: "全部" },
   { value: "images", label: "图片" },
   { value: "videos", label: "视频" },
+  { value: "audios", label: "音频" },
 ] as const;
 
 const STATUS_FILTER_OPTIONS = [
@@ -108,6 +109,7 @@ export default function AssetToolbar({
   const getTypeCount = (value: AssetTypeFilter): number => {
     if (value === "images") return typeCounts.image;
     if (value === "videos") return typeCounts.video;
+    if (value === "audios") return typeCounts.audio;
     return itemsCount;
   };
 

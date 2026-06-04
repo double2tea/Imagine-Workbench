@@ -1,6 +1,7 @@
 export type { AiProvider } from "./registry";
 import type { AiProvider } from "./registry";
 import { PROVIDER_KEYS, isKnownProvider } from "./registry";
+import type { MediaReferenceType } from "@/lib/media-references";
 
 export interface ModelOption {
   value: string;
@@ -27,6 +28,7 @@ export interface VideoModelCapabilities {
   referenceMode: VideoReferenceMode;
   maxReferenceImages: number;
   minReferenceImages: number;
+  referenceMediaTypes: MediaReferenceType[];
 }
 
 export type ModelKind = "chat" | "image" | "video";
@@ -50,6 +52,7 @@ export interface ProviderModelCapability {
   videoReferenceMode: VideoReferenceMode;
   maxReferenceImages: number;
   minReferenceImages: number;
+  referenceMediaTypes: MediaReferenceType[];
 }
 
 export const DEFAULT_IMAGE_MODEL = "12ai:gemini-3.1-flash-image-preview";
@@ -421,6 +424,7 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     videoReferenceMode: "reference",
     maxReferenceImages: 3,
     minReferenceImages: 0,
+    referenceMediaTypes: ["image", "video"],
   }),
   videoCapability({
     value: "12ai:veo_3_1-fast-fl",
@@ -432,6 +436,7 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     videoReferenceMode: "firstLast",
     maxReferenceImages: 2,
     minReferenceImages: 1,
+    referenceMediaTypes: ["image", "video"],
   }),
   videoCapability({
     value: "12ai:omni_flash-10s",
@@ -443,6 +448,7 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     videoReferenceMode: "reference",
     maxReferenceImages: 7,
     minReferenceImages: 0,
+    referenceMediaTypes: ["image", "video"],
   }),
   videoCapability({
     value: "grok2api:grok-imagine-video",
@@ -457,6 +463,7 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     videoReferenceMode: "reference",
     maxReferenceImages: 7,
     minReferenceImages: 0,
+    referenceMediaTypes: ["image", "video"],
   }),
   chatCapability({
     value: "12ai:gemini-3.1-flash-lite-preview",
@@ -879,6 +886,7 @@ export function getVideoModelCapabilities(value: string): VideoModelCapabilities
     referenceMode: capability?.videoReferenceMode ?? "reference",
     maxReferenceImages: capability?.maxReferenceImages ?? 3,
     minReferenceImages: capability?.minReferenceImages ?? 0,
+    referenceMediaTypes: capability?.referenceMediaTypes ?? ["image"],
   };
 }
 
@@ -930,6 +938,7 @@ interface VideoCapabilityInput extends CapabilityInput {
   videoReferenceMode: VideoReferenceMode;
   maxReferenceImages: number;
   minReferenceImages: number;
+  referenceMediaTypes?: MediaReferenceType[];
 }
 
 function imageCapability(input: ImageCapabilityInput): ProviderModelCapability {
@@ -951,6 +960,7 @@ function imageCapability(input: ImageCapabilityInput): ProviderModelCapability {
     videoReferenceMode: "none",
     maxReferenceImages: 0,
     minReferenceImages: 0,
+    referenceMediaTypes: [],
   };
 }
 
@@ -973,6 +983,7 @@ function videoCapability(input: VideoCapabilityInput): ProviderModelCapability {
     videoReferenceMode: input.videoReferenceMode,
     maxReferenceImages: input.maxReferenceImages,
     minReferenceImages: input.minReferenceImages,
+    referenceMediaTypes: input.supportsReferences ? input.referenceMediaTypes ?? ["image"] : [],
   };
 }
 
@@ -995,6 +1006,7 @@ function chatCapability(input: CapabilityInput): ProviderModelCapability {
     videoReferenceMode: "none",
     maxReferenceImages: 0,
     minReferenceImages: 0,
+    referenceMediaTypes: [],
   };
 }
 

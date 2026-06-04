@@ -4,8 +4,9 @@ import { readFetchError } from "@/lib/client-fetch-error";
 import { readImageGenerationPayload } from "@/lib/client-image-response";
 import { buildStorageItem, saveToDB, type GenerationRequestSnapshot, type StorageItem } from "@/lib/db";
 import { buildPromptWithReferenceMap } from "@/hooks/useReferenceState";
+import { getMediaReferenceType, mediaReferenceLabel } from "@/lib/media-references";
 import { getVideoModelCapabilities, type VideoReferenceMode } from "@/lib/providers/model-catalog";
-import { getReferenceImagePayloadError, prepareReferenceImageUrlForRequest } from "@/lib/reference-images";
+import { getReferenceImagePayloadError, getReferenceMediaPayloadError, prepareReferenceImageUrlForRequest, prepareReferenceMediaUrlForRequest } from "@/lib/reference-images";
 
 type NoticeType = "error" | "info" | "success";
 
@@ -88,25 +89,26 @@ async function saveItemOrWarn(
   }
 }
 
-function buildVideoReferenceUrls(
+function buildVideoReferences(
   references: ReferenceImageRef[],
   fallbackReference: string | null,
   mode: VideoReferenceMode,
   maxCount: number,
-): string[] {
+): ReferenceImageRef[] {
   if (maxCount === 0 || mode === "none") return [];
 
   if (mode === "firstLast") {
-    const start = references.find(reference => reference.role === "start")?.url ?? references[0]?.url ?? fallbackReference;
+    const fallback = fallbackReference ? { id: "fallback-reference", type: "image" as const, url: fallbackReference, role: "general" as const } : undefined;
+    const start = references.find(reference => reference.role === "start") ?? references[0] ?? fallback;
     const end =
-      references.find(reference => reference.role === "end")?.url ??
-      references.find(reference => reference.url !== start)?.url;
-    return [start, end].filter((url): url is string => typeof url === "string" && url.length > 0).slice(0, maxCount);
+      references.find(reference => reference.role === "end") ??
+      references.find(reference => reference.url !== start?.url);
+    return [start, end].filter((reference): reference is ReferenceImageRef => reference !== undefined && reference.url.length > 0).slice(0, maxCount);
   }
 
-  const urls = references.map(reference => reference.url);
-  if (urls.length === 0 && fallbackReference) urls.push(fallbackReference);
-  return urls.filter(url => url.length > 0).slice(0, maxCount);
+  const refs = references.filter(reference => reference.url.length > 0);
+  if (refs.length === 0 && fallbackReference) refs.push({ id: "fallback-reference", type: "image", url: fallbackReference, role: "general" });
+  return refs.slice(0, maxCount);
 }
 
 function validateCustomImageSize(size: string): string | null {
@@ -199,6 +201,11 @@ export function useGenerationActions({
         pushWorkspaceNotice("error", `自定义图片尺寸无效：${sizeError}`);
         return false;
       }
+    }
+    const unsupportedImageReference = activeReferenceImages.find(reference => getMediaReferenceType(reference) !== "image");
+    if (unsupportedImageReference) {
+      pushWorkspaceNotice("error", `图片生成不支持${mediaReferenceLabel(getMediaReferenceType(unsupportedImageReference))}参考`);
+      return false;
     }
     const imageReferenceUrls = activeReferenceImages.map(reference => reference.url);
     if (imageReferenceUrls.length === 0 && activeReferenceImage) {
@@ -347,20 +354,26 @@ export function useGenerationActions({
     const requestVideoCapabilities = getVideoModelCapabilities(requestModel);
 
     if (!activePrompt.trim()) return false;
-    const videoReferenceUrls = buildVideoReferenceUrls(
+    const videoReferences = buildVideoReferences(
       activeReferenceImages,
       activeReferenceImage,
       requestVideoCapabilities.referenceMode,
       requestVideoCapabilities.maxReferenceImages,
     );
-    let videoReferencePayloads: string[];
-    try {
-      videoReferencePayloads = await Promise.all(videoReferenceUrls.map(prepareReferenceImageUrlForRequest));
-    } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "参考图读取失败"));
+    const unsupportedReference = videoReferences.find(reference => !requestVideoCapabilities.referenceMediaTypes.includes(getMediaReferenceType(reference)));
+    if (unsupportedReference) {
+      pushWorkspaceNotice("error", `当前视频模型不支持${mediaReferenceLabel(getMediaReferenceType(unsupportedReference))}输入`);
       return false;
     }
-    const videoPayloadError = getReferenceImagePayloadError(videoReferencePayloads);
+    const videoReferenceUrls = videoReferences.map(reference => reference.url);
+    let videoReferencePayloads: string[];
+    try {
+      videoReferencePayloads = await Promise.all(videoReferenceUrls.map(prepareReferenceMediaUrlForRequest));
+    } catch (error) {
+      pushWorkspaceNotice("error", toErrorMessage(error, "参考媒体读取失败"));
+      return false;
+    }
+    const videoPayloadError = getReferenceMediaPayloadError(videoReferencePayloads);
     if (videoPayloadError) {
       pushWorkspaceNotice("error", videoPayloadError);
       return false;

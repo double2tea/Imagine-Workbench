@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Upload, Video } from "lucide-react";
+import { Music, Upload, Video } from "lucide-react";
 import { useBoardMediaImport } from "@/components/board/BoardMediaImportContext";
 import PreviewImage from "@/components/PreviewImage";
 import { useResolvedAssetUrl } from "@/hooks/useResolvedAssetUrl";
@@ -11,7 +11,7 @@ import type { StorageItem } from "@/lib/db";
 
 const PAGE_SIZE = 36;
 
-type AssetFilter = "all" | "image" | "video" | "active";
+type AssetFilter = "all" | "image" | "video" | "audio" | "active";
 
 interface BoardSideAssetListProps {
   canvasAssetIds: ReadonlySet<string>;
@@ -50,9 +50,9 @@ function BoardSideAssetRow({
     <button
       type="button"
       disabled={adding || alreadyOnCanvas}
-      draggable={item.type === "image" && item.status === "complete" && !adding && !alreadyOnCanvas}
+      draggable={item.status === "complete" && !adding && !alreadyOnCanvas}
       onDragStart={event => {
-        if (item.type !== "image" || item.status !== "complete" || adding || alreadyOnCanvas) return;
+        if (item.status !== "complete" || adding || alreadyOnCanvas) return;
         event.dataTransfer.setData(IMAGINE_BOARD_ASSET_DRAG_TYPE, item.id);
         event.dataTransfer.effectAllowed = "copy";
       }}
@@ -67,6 +67,8 @@ function BoardSideAssetRow({
       <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg bg-[var(--iw-panel)]">
         {item.type === "image" && item.status === "complete" ? (
           <PreviewImage src={previewUrl} alt="" className="h-full w-full object-cover" />
+        ) : item.type === "audio" ? (
+          <Music className="h-4 w-4 text-[var(--iw-faint)]" />
         ) : (
           <Video className="h-4 w-4 text-[var(--iw-faint)]" />
         )}
@@ -91,7 +93,7 @@ function ImportMediaButton({ className = "" }: { className?: string }) {
       className={`imagine-secondary-action flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-[var(--iw-border)] text-[11px] font-semibold text-[var(--iw-text)] ${className}`}
     >
       <Upload className="h-3.5 w-3.5 text-emerald-300" />
-      从本机导入图片/视频
+      从本机导入图片/视频/音频
     </button>
   );
 }
@@ -109,6 +111,7 @@ export default function BoardSideAssetList({
   const filteredItems = useMemo(() => {
     if (filter === "image") return items.filter(item => item.type === "image");
     if (filter === "video") return items.filter(item => item.type === "video");
+    if (filter === "audio") return items.filter(item => item.type === "audio");
     if (filter === "active") {
       return items.filter(item => item.status === "pending" || item.status === "processing");
     }
@@ -121,6 +124,7 @@ export default function BoardSideAssetList({
     { id: "all", label: "全部" },
     { id: "image", label: "图片" },
     { id: "video", label: "视频" },
+    { id: "audio", label: "音频" },
     { id: "active", label: "进行中" },
   ];
 

@@ -6,7 +6,7 @@ import { readFetchError } from "@/lib/client-fetch-error";
 import { readImageGenerationPayload } from "@/lib/client-image-response";
 import { clearAllDB, deleteFromDB, saveToDB, type StorageItem } from "@/lib/db";
 import { parseProviderModel, type AiProvider } from "@/lib/providers/model-catalog";
-import { getReferenceImagePayloadError, prepareReferenceImageUrlForRequest } from "@/lib/reference-images";
+import { getReferenceImagePayloadError, getReferenceMediaPayloadError, prepareReferenceImageUrlForRequest, prepareReferenceMediaUrlForRequest } from "@/lib/reference-images";
 import { createVideoFrameStorageItem, getVideoFrameCaptureLabel, type CapturedVideoFrame } from "@/lib/video-frame";
 
 type NoticeType = "error" | "info" | "success";
@@ -62,6 +62,18 @@ function toErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message.trim() ? error.message : fallback;
 }
 
+function assetDownloadExtension(type: StorageItem["type"]): string {
+  if (type === "image") return "png";
+  if (type === "audio") return "mp3";
+  return "mp4";
+}
+
+function assetDownloadMimeType(type: StorageItem["type"]): string {
+  if (type === "image") return "image/png";
+  if (type === "audio") return "audio/mpeg";
+  return "video/mp4";
+}
+
 function readVideoGenerationPayload(data: unknown): { imageUrl: string | null; operationName: string | null } {
   return {
     imageUrl: getStringField(data, "imageUrl"),
@@ -101,7 +113,7 @@ async function prepareRetryReferenceImages(body: RetryRequestBody): Promise<void
     body.referenceImage = referenceImages[0];
   }
   if (body.images) {
-    body.images = await Promise.all(body.images.map(prepareReferenceImageUrlForRequest));
+    body.images = await Promise.all(body.images.map(prepareReferenceMediaUrlForRequest));
   }
 }
 
@@ -298,6 +310,10 @@ export function useAssetActions({
 
   const retryFailedItem = async (item: StorageItem) => {
     if (item.status !== "failed") return;
+    if (item.type === "audio") {
+      pushWorkspaceNotice("error", "音频资产不支持生成重试");
+      return;
+    }
     const retryingItem: StorageItem = {
       ...item,
       status: item.type === "image" ? "pending" : "processing",
@@ -311,9 +327,9 @@ export function useAssetActions({
     try {
       const retryRequestBody = buildRetryRequestBody(item);
       await prepareRetryReferenceImages(retryRequestBody);
-      const retryPayloadError = getReferenceImagePayloadError(
-        retryRequestBody.referenceImages ?? retryRequestBody.images ?? [],
-      );
+      const retryPayloadError = retryRequestBody.images
+        ? getReferenceMediaPayloadError(retryRequestBody.images)
+        : getReferenceImagePayloadError(retryRequestBody.referenceImages ?? []);
       if (retryPayloadError) throw new Error(retryPayloadError);
 
       const headers = buildProviderHeaders(retryRequestBody.model);
@@ -378,7 +394,7 @@ export function useAssetActions({
   };
 
   const handleDownloadItem = async (item: StorageItem) => {
-    const extension = item.type === "image" ? "png" : "mp4";
+    const extension = assetDownloadExtension(item.type);
     const fileName = `imagine_${item.id}.${extension}`;
 
     try {
@@ -391,7 +407,7 @@ export function useAssetActions({
           for (let index = 0; index < byteChars.length; index += 1) {
             bytes[index] = byteChars.charCodeAt(index);
           }
-          blob = new Blob([bytes], { type: item.type === "image" ? "image/png" : "video/mp4" });
+          blob = new Blob([bytes], { type: assetDownloadMimeType(item.type) });
         } else {
           throw new Error("Invalid data URI");
         }
@@ -443,7 +459,7 @@ export function useAssetActions({
     }> = [];
 
     await Promise.all(itemsToExport.map(async (item) => {
-      const extension = item.type === "image" ? "png" : "mp4";
+      const extension = assetDownloadExtension(item.type);
       const fileName = `creation_${item.id}.${extension}`;
 
       metadataList.push({

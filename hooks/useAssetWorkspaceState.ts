@@ -99,6 +99,7 @@ export function useAssetWorkspaceState(items: StorageItem[]) {
     return items.filter(item => {
       if (filterType === "images" && item.type !== "image") return false;
       if (filterType === "videos" && item.type !== "video") return false;
+      if (filterType === "audios" && item.type !== "audio") return false;
       if (assetStatusFilter !== "all" && item.status !== assetStatusFilter) return false;
       if (assetModelFilter !== "all" && item.model !== assetModelFilter) return false;
       const dateKey = getAssetDateKey(item.createdAt);
@@ -112,7 +113,7 @@ export function useAssetWorkspaceState(items: StorageItem[]) {
   }, [assetDateEnd, assetDatePreset, assetDateStart, assetModelFilter, assetStatusFilter, deferredSearchQuery, filterType, items]);
 
   const searchableReferenceImages = useMemo(
-    () => items.filter(item => item.type === "image" && item.status === "complete"),
+    () => items.filter(item => item.status === "complete"),
     [items],
   );
 

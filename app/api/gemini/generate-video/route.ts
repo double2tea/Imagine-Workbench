@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getVideoModelCapabilities, parseProviderModel } from "@/lib/providers/model-catalog";
 import { generateVideo } from "@/lib/providers/video";
 import { optionalText, requireText, resolveProviderConfig } from "@/lib/providers/utils";
-import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, getReferenceImagePayloadError, isImageDataUri } from "@/lib/reference-images";
+import { mediaReferenceLabel, mediaReferenceTypeFromDataUri, type MediaReferenceType } from "@/lib/media-references";
+import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, getReferenceMediaPayloadError } from "@/lib/reference-images";
 
 export const runtime = "edge";
 
@@ -29,9 +30,9 @@ export async function POST(req: NextRequest) {
     const config = resolveProviderConfig(req, parsed.provider);
     const capability = getVideoModelCapabilities(modelValue);
     const referenceImages = readReferenceImages(body.images, body.image, body.lastFrame);
-    const formatError = getReferenceImageFormatError(referenceImages);
+    const formatError = getReferenceMediaFormatError(referenceImages, capability.referenceMediaTypes);
     if (formatError) return NextResponse.json({ error: formatError }, { status: 400 });
-    const payloadError = getReferenceImagePayloadError(referenceImages);
+    const payloadError = getReferenceMediaPayloadError(referenceImages);
     if (payloadError) return NextResponse.json({ error: payloadError }, { status: 413 });
     validateReferenceCount(referenceImages.length, capability.minReferenceImages, capability.maxReferenceImages);
 
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
 }
 
 function videoErrorStatus(message: string): number {
-  if (message.includes("Video reference images must be data:image/* base64 data URIs")) return 400;
+  if (message.includes("Video reference media must be data:image/*, data:video/* or data:audio/* base64 data URIs")) return 400;
   return message.includes("No available channel") ? 503 : 500;
 }
 
@@ -64,7 +65,7 @@ function getRequestBodySizeError(req: NextRequest): string | null {
 
   const bytes = Number(contentLength);
   if (!Number.isFinite(bytes) || bytes <= REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES) return null;
-  return "参考图请求体过大，请压缩或减少参考图后重试";
+  return "参考媒体请求体过大，请压缩或减少参考媒体后重试";
 }
 
 function readReferenceImages(images: unknown, image: unknown, lastFrame: unknown): string[] {
@@ -78,10 +79,13 @@ function readReferenceImages(images: unknown, image: unknown, lastFrame: unknown
   return refs;
 }
 
-function getReferenceImageFormatError(referenceImages: string[]): string | null {
-  return referenceImages.some(reference => !isImageDataUri(reference))
-    ? "Video reference images must be data:image/* base64 data URIs"
-    : null;
+function getReferenceMediaFormatError(referenceImages: string[], acceptedTypes: MediaReferenceType[]): string | null {
+  for (const reference of referenceImages) {
+    const type = mediaReferenceTypeFromDataUri(reference);
+    if (!type) return "Video reference media must be data:image/*, data:video/* or data:audio/* base64 data URIs";
+    if (!acceptedTypes.includes(type)) return `当前视频模型不支持${mediaReferenceLabel(type)}输入`;
+  }
+  return null;
 }
 
 function validateReferenceCount(count: number, min: number, max: number): void {

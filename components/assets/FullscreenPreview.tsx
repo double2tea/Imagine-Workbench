@@ -1,4 +1,4 @@
-import { Check, Clock3, Copy, ImageDown, type LucideIcon, SkipBack, SkipForward, X } from "lucide-react";
+import { Check, Clock3, Copy, ImageDown, Music, type LucideIcon, SkipBack, SkipForward, X } from "lucide-react";
 import { AnimatePresence } from "motion/react";
 import { useRef, useState } from "react";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
@@ -70,7 +70,7 @@ export default function FullscreenPreview({ item, onCaptureVideoFrame, onClose }
                   alt={item.prompt}
                   className="h-full w-full object-contain"
                 />
-              ) : (
+              ) : item.type === "video" ? (
                 <div className="group/fullscreen-video relative h-full w-full">
                   <VideoAssetPlayer
                     item={item}
@@ -110,6 +110,11 @@ export default function FullscreenPreview({ item, onCaptureVideoFrame, onClose }
                       </div>
                     )}
                   </div>
+                </div>
+              ) : (
+                <div className="flex h-full w-full flex-col items-center justify-center gap-4 px-6">
+                  <Music className="h-12 w-12 text-slate-500" />
+                  <audio src={item.url} controls className="w-full max-w-2xl" />
                 </div>
               )}
             </div>

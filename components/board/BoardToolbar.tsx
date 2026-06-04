@@ -416,7 +416,7 @@ export default function BoardToolbar({
           type="button"
           onClick={onImportMedia}
           className={`${headerBtn} shrink-0`}
-          title="导入图片或视频到画布"
+          title="导入图片、视频或音频到画布"
         >
           <Upload className="h-3.5 w-3.5 text-emerald-300" />
           <span className="hidden md:inline">导入媒体</span>

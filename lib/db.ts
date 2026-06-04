@@ -7,6 +7,7 @@ const BLOB_STORE = "assets_blob";
 const LEGACY_STORE = "assets";
 
 export type AssetScope = "workspace" | "board";
+export type StorageItemType = "image" | "video" | "audio";
 
 export interface GenerationRequestSnapshot {
   prompt: string;
@@ -23,7 +24,7 @@ export interface GenerationRequestSnapshot {
 
 export interface StorageItemMeta {
   id: string;
-  type: "image" | "video";
+  type: StorageItemType;
   prompt: string;
   model: string;
   aspectRatio: string;
@@ -55,7 +56,7 @@ interface AssetBlobRecord {
 
 interface LegacyStorageItem {
   id: string;
-  type: "image" | "video";
+  type: StorageItemType;
   url: string;
   prompt: string;
   model: string;

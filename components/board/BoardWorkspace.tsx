@@ -463,20 +463,28 @@ function connectionPortRefs(connection: {
   return null;
 }
 
+function isBoardImportableMediaFile(file: File): boolean {
+  return file.type.startsWith("image/") || file.type.startsWith("video/") || file.type.startsWith("audio/");
+}
+
+function isBoardImportableMediaType(type: string): boolean {
+  return type === "" || type.startsWith("image/") || type.startsWith("video/") || type.startsWith("audio/");
+}
+
 function importableFiles(dataTransfer: DataTransfer): File[] {
-  const transferFiles = Array.from(dataTransfer.files).filter(file => file.type.startsWith("image/") || file.type.startsWith("video/"));
+  const transferFiles = Array.from(dataTransfer.files).filter(isBoardImportableMediaFile);
   if (transferFiles.length > 0) return transferFiles;
   return Array.from(dataTransfer.items)
     .filter(item => item.kind === "file")
     .map(item => item.getAsFile())
-    .filter((file): file is File => file !== null && (file.type.startsWith("image/") || file.type.startsWith("video/")));
+    .filter((file): file is File => file !== null && isBoardImportableMediaFile(file));
 }
 
 function hasImportableFile(dataTransfer: DataTransfer): boolean {
   return (
-    Array.from(dataTransfer.files).some(file => file.type.startsWith("image/") || file.type.startsWith("video/")) ||
+    Array.from(dataTransfer.files).some(isBoardImportableMediaFile) ||
     Array.from(dataTransfer.items).some(item =>
-      item.kind === "file" && (item.type === "" || item.type.startsWith("image/") || item.type.startsWith("video/")),
+      item.kind === "file" && isBoardImportableMediaType(item.type),
     )
   );
 }
@@ -536,15 +544,15 @@ async function imageUrlToFile(url: string, index: number): Promise<File> {
 
 function pasteMediaFiles(dataTransfer: DataTransfer): File[] {
   return Array.from(dataTransfer.items)
-    .filter(item => item.kind === "file" && (item.type.startsWith("image/") || item.type.startsWith("video/")))
+    .filter(item => item.kind === "file" && isBoardImportableMediaType(item.type))
     .map(item => item.getAsFile())
-    .filter((file): file is File => file !== null);
+    .filter((file): file is File => file !== null && isBoardImportableMediaFile(file));
 }
 
 function storageItemToBoardAsset(item: StorageItem): CreateAssetNodeInput["asset"] {
   return {
     assetId: item.id,
-    type: item.type === "video" ? "video" : "image",
+    type: item.type,
     url: item.url,
     model: item.model,
     prompt: item.prompt,
@@ -579,6 +587,7 @@ function generateInputSummaryForNode(node: BoardNodeModel, nodes: BoardNodeModel
     referencePreviews: references.map(reference => ({
       id: reference.id,
       role: reference.role,
+      type: reference.type,
       url: reference.url,
     })),
   };
@@ -1160,11 +1169,13 @@ export default function BoardWorkspace({
       return;
     }
     if (kind === "reference-group") {
+      const sourceNode = board.nodes.find(node => node.id === from.nodeId);
+      if (sourceNode?.kind !== "asset" || sourceNode.asset.type !== "image") return;
       addReferenceGroupNodeWithAsset({ position: centeredNodePosition(point, DEFAULT_REFERENCE_GROUP_NODE_SIZE) }, from.nodeId);
       setQuickInsertMenu(null);
       return;
     }
-  }, [addGenerateNodeWithConnection, addReferenceGroupNodeWithAsset, centeredNodePosition]);
+  }, [addGenerateNodeWithConnection, addReferenceGroupNodeWithAsset, board.nodes, centeredNodePosition]);
 
   const quickInsertMenuItems = useMemo(() => {
     const from = quickInsertMenu?.connectionFrom;
@@ -1175,7 +1186,11 @@ export default function BoardWorkspace({
     }
     if (from.portKind !== "asset") return [];
     if (sourceNode?.kind === "asset") {
-      return BOARD_INSERT_CATALOG.filter(item => item.kind === "image-generate" || item.kind === "video-generate" || item.kind === "reference-group");
+      return BOARD_INSERT_CATALOG.filter(item =>
+        item.kind === "image-generate" ||
+        item.kind === "video-generate" ||
+        (sourceNode.asset.type === "image" && item.kind === "reference-group"),
+      );
     }
     if (sourceNode?.kind === "reference-group") {
       return BOARD_INSERT_CATALOG.filter(item => item.kind === "image-generate" || item.kind === "video-generate");

@@ -1,16 +1,13 @@
 import type { ChangeEvent, DragEvent } from "react";
-import { CloudUpload, Layers, X } from "lucide-react";
+import { CloudUpload, Layers, Music, X } from "lucide-react";
 import {
   type DraggedReferenceAsset,
   hasDraggedReferenceAsset,
   readDraggedReferenceAsset,
 } from "@/components/reference/referenceDrag";
+import { getMediaReferencePromptToken, getMediaReferenceType, mediaReferenceLabel, mediaReferenceTypeFromMime, type MediaReference, type MediaReferenceType } from "@/lib/media-references";
 
-export interface ReferenceImageRef {
-  id: string;
-  url: string;
-  role?: "start" | "end" | "general";
-}
+export interface ReferenceImageRef extends MediaReference {}
 
 interface ReferenceImagePickerProps {
   addLabel: string;
@@ -29,6 +26,7 @@ interface ReferenceImagePickerProps {
   onRemove: (id: string) => void;
   onRoleChange?: (id: string, role: ReferenceImageRef["role"]) => void;
   onUpload: (event: ChangeEvent<HTMLInputElement>) => void;
+  acceptedMediaTypes?: MediaReferenceType[];
 }
 
 function getNextRole(reference: ReferenceImageRef): ReferenceImageRef["role"] {
@@ -37,21 +35,39 @@ function getNextRole(reference: ReferenceImageRef): ReferenceImageRef["role"] {
   return "start";
 }
 
-function hasDraggedImageFile(dataTransfer: DataTransfer): boolean {
+function allowsMediaType(type: MediaReferenceType, acceptedMediaTypes: MediaReferenceType[]): boolean {
+  return acceptedMediaTypes.includes(type);
+}
+
+function hasDraggedMediaFile(dataTransfer: DataTransfer, acceptedMediaTypes: MediaReferenceType[]): boolean {
   return (
-    Array.from(dataTransfer.items).some(item => item.kind === "file" && (item.type === "" || item.type.startsWith("image/"))) ||
-    Array.from(dataTransfer.files).some(file => file.type.startsWith("image/"))
+    Array.from(dataTransfer.items).some(item => {
+      if (item.kind !== "file") return false;
+      if (item.type === "") return true;
+      const type = mediaReferenceTypeFromMime(item.type);
+      return type ? allowsMediaType(type, acceptedMediaTypes) : false;
+    }) ||
+    Array.from(dataTransfer.files).some(file => {
+      const type = mediaReferenceTypeFromMime(file.type);
+      return type ? allowsMediaType(type, acceptedMediaTypes) : false;
+    })
   );
 }
 
-function readDraggedImageFiles(dataTransfer: DataTransfer): File[] {
+function readDraggedMediaFiles(dataTransfer: DataTransfer, acceptedMediaTypes: MediaReferenceType[]): File[] {
   const itemFiles = Array.from(dataTransfer.items)
     .filter(item => item.kind === "file")
     .map(item => item.getAsFile())
-    .filter((file): file is File => file !== null && file.type.startsWith("image/"));
+    .filter((file): file is File => {
+      const type = file ? mediaReferenceTypeFromMime(file.type) : null;
+      return file !== null && type !== null && allowsMediaType(type, acceptedMediaTypes);
+    });
 
   if (itemFiles.length > 0) return itemFiles;
-  return Array.from(dataTransfer.files).filter(file => file.type.startsWith("image/"));
+  return Array.from(dataTransfer.files).filter(file => {
+    const type = mediaReferenceTypeFromMime(file.type);
+    return type ? allowsMediaType(type, acceptedMediaTypes) : false;
+  });
 }
 
 export default function ReferenceImagePicker({
@@ -71,13 +87,18 @@ export default function ReferenceImagePicker({
   onRemove,
   onRoleChange,
   onUpload,
+  acceptedMediaTypes = ["image"],
 }: ReferenceImagePickerProps) {
   const visibleReferences = references.slice(0, maxCount);
+  const accept = acceptedMediaTypes.map(type => `${type}/*`).join(",");
 
   const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
-    const hasReferenceAsset = onDropAsset !== undefined && hasDraggedReferenceAsset(event.dataTransfer);
-    const hasImageFile = onDropFiles !== undefined && hasDraggedImageFile(event.dataTransfer);
-    if (!hasReferenceAsset && !hasImageFile) return;
+    const asset = onDropAsset && hasDraggedReferenceAsset(event.dataTransfer)
+      ? readDraggedReferenceAsset(event.dataTransfer)
+      : null;
+    const hasReferenceAsset = asset ? allowsMediaType(getMediaReferenceType(asset), acceptedMediaTypes) : false;
+    const hasMediaFile = onDropFiles !== undefined && hasDraggedMediaFile(event.dataTransfer, acceptedMediaTypes);
+    if (!hasReferenceAsset && !hasMediaFile) return;
 
     event.preventDefault();
     event.dataTransfer.dropEffect = "copy";
@@ -86,13 +107,13 @@ export default function ReferenceImagePicker({
   const handleDrop = (event: DragEvent<HTMLDivElement>) => {
     const handleDropAsset = onDropAsset;
     const asset = handleDropAsset ? readDraggedReferenceAsset(event.dataTransfer) : null;
-    if (asset && handleDropAsset) {
+    if (asset && handleDropAsset && allowsMediaType(getMediaReferenceType(asset), acceptedMediaTypes)) {
       event.preventDefault();
       handleDropAsset(asset);
       return;
     }
 
-    const files = onDropFiles ? readDraggedImageFiles(event.dataTransfer) : [];
+    const files = onDropFiles ? readDraggedMediaFiles(event.dataTransfer, acceptedMediaTypes) : [];
     if (files.length === 0) return;
 
     event.preventDefault();
@@ -122,6 +143,8 @@ export default function ReferenceImagePicker({
           {visibleReferences.map((reference, index) => {
             const isStart = roleMode && reference.role === "start";
             const isEnd = roleMode && reference.role === "end";
+            const mediaType = getMediaReferenceType(reference);
+            const token = getMediaReferencePromptToken(index);
 
             return (
               <div
@@ -133,8 +156,14 @@ export default function ReferenceImagePicker({
                     ? "border-amber-500/50 shadow-[0_0_10px_rgba(245,158,11,0.25)]"
                     : "border-white/10"
                 }`}
-                style={{ backgroundImage: `url(${reference.url})` }}
+                style={mediaType === "image" ? { backgroundImage: `url(${reference.url})` } : undefined}
               >
+                {mediaType === "video" && <video src={reference.url} muted className="h-full w-full object-cover" />}
+                {mediaType === "audio" && (
+                  <div className="flex h-full w-full items-center justify-center bg-black/30">
+                    <Music className="h-5 w-5 text-violet-100" />
+                  </div>
+                )}
                 {/* intentional image-overlay for contrast on arbitrary generated thumbs; black + white + role colors (emerald/amber/red) ensure legibility independent of theme vars (see design + pr1 review) */}
                 <button
                   type="button"
@@ -154,11 +183,11 @@ export default function ReferenceImagePicker({
                     }`}
                     title="点击切换：首帧 / 尾帧 / 普通参考"
                   >
-                    {isStart ? `🎬 首帧 @图片${index + 1}` : isEnd ? `🏁 尾帧 @图片${index + 1}` : `📎 @图片${index + 1}`}
+                    {isStart ? `首帧 ${token}` : isEnd ? `尾帧 ${token}` : `${mediaReferenceLabel(mediaType)} ${token}`}
                   </button>
                 ) : (
                   <div className="absolute bottom-0 inset-x-0 bg-black/65 text-[8px] font-mono text-slate-300 truncate px-1 py-0.5 text-center">
-                    @图片{index + 1}
+                    {token}
                   </div>
                 )}
               </div>
@@ -169,7 +198,7 @@ export default function ReferenceImagePicker({
             <label className="imagine-reference-add-tile">
               <span className="font-bold text-lg leading-none">+</span>
               <span className="mt-0.5 text-[8px] font-semibold">{addLabel}</span>
-              <input type="file" accept="image/*" onChange={onUpload} className="hidden" />
+              <input type="file" accept={accept} onChange={onUpload} className="hidden" />
             </label>
           )}
         </div>
@@ -180,7 +209,7 @@ export default function ReferenceImagePicker({
             {emptyLabel}，或{" "}
             <label className={browseClassName}>
               {uploadLabel}
-              <input type="file" accept="image/*" onChange={onUpload} className="hidden" />
+              <input type="file" accept={accept} onChange={onUpload} className="hidden" />
             </label>
           </span>
           <span className="mt-1 hidden text-[9px] text-[var(--iw-faint)] sm:inline">{emptyHelp}</span>

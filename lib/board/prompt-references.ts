@@ -34,11 +34,11 @@ export interface BoardGalleryReferenceItem {
 const GALLERY_REFERENCE_LIMIT = 24;
 
 function boardNodeReferences(node: BoardNode | undefined): ReferenceImageRef[] {
-  if (node?.kind === "asset" && node.asset.type === "image") {
-    return [{ id: node.asset.assetId, role: "general", url: node.asset.url }];
+  if (node?.kind === "asset") {
+    return [{ id: node.asset.assetId, role: "general", type: node.asset.type, url: node.asset.url }];
   }
   if (node?.kind === "reference-group") {
-    return node.references.map(reference => ({ id: reference.assetId, role: reference.role, url: reference.url }));
+    return node.references.map(reference => ({ id: reference.assetId, role: reference.role, type: "image", url: reference.url }));
   }
   return [];
 }
@@ -78,12 +78,13 @@ function promptReferenceCandidates(nodes: BoardNode[], edges: BoardEdge[], promp
   return uniqueReferences(nodes.flatMap(node => boardNodeReferences(node)));
 }
 
-function boardImageAssetReferences(nodes: BoardNode[]): BoardPromptReference[] {
+function boardMediaAssetReferences(nodes: BoardNode[]): BoardPromptReference[] {
   return nodes
-    .filter((node): node is Extract<BoardNode, { kind: "asset" }> => node.kind === "asset" && node.asset.type === "image")
+    .filter((node): node is Extract<BoardNode, { kind: "asset" }> => node.kind === "asset")
     .map(node => ({
       id: node.asset.assetId,
       role: "general" as const,
+      type: node.asset.type,
       url: node.asset.url,
       sourceLabel: "画板",
     }));
@@ -92,11 +93,12 @@ function boardImageAssetReferences(nodes: BoardNode[]): BoardPromptReference[] {
 function galleryReferences(items: BoardGalleryReferenceItem[] | undefined): BoardPromptReference[] {
   if (!items?.length) return [];
   return items
-    .filter(item => item.type === "image" && item.status === "complete" && item.url.trim().length > 0)
+    .filter(item => (item.type === "image" || item.type === "video" || item.type === "audio") && item.status === "complete" && item.url.trim().length > 0)
     .slice(0, GALLERY_REFERENCE_LIMIT)
     .map(item => ({
       id: item.id,
       role: "general" as const,
+      type: item.type === "video" || item.type === "audio" ? item.type : "image",
       url: item.url,
       sourceLabel: "库",
     }));
@@ -115,7 +117,7 @@ export function buildBoardPromptReferences(input: {
   const wired: BoardPromptReference[] = wiredRaw.map(reference => ({ ...reference, sourceLabel: "连线" }));
   const seen = new Set(wired.map(reference => `${reference.id}:${reference.url}`));
 
-  const board = boardImageAssetReferences(input.nodes).filter(reference => {
+  const board = boardMediaAssetReferences(input.nodes).filter(reference => {
     const key = `${reference.id}:${reference.url}`;
     if (seen.has(key)) return false;
     seen.add(key);

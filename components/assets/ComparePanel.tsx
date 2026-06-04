@@ -1,4 +1,4 @@
-import { Sliders } from "lucide-react";
+import { Music, Sliders } from "lucide-react";
 import PreviewImage from "@/components/PreviewImage";
 import type { StorageItem } from "@/lib/db";
 
@@ -41,8 +41,13 @@ function CompareFrame({ item, tone }: { item: StorageItem; tone: "blue" | "amber
         <div className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)]">
           {item.type === "image" ? (
             <PreviewImage src={item.url} alt={isBlue ? "对比 A" : "对比 B"} className="h-full w-full object-cover" />
-          ) : (
+          ) : item.type === "video" ? (
             <video src={item.url} controls loop preload="metadata" className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex w-full flex-col items-center justify-center gap-3 px-3">
+              <Music className="h-5 w-5 text-[var(--iw-faint)]" />
+              <audio src={item.url} controls className="w-full" />
+            </div>
           )}
         </div>
       </div>

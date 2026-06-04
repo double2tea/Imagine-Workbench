@@ -4,17 +4,19 @@ import test from "node:test";
 import {
   REFERENCE_IMAGE_MAX_BYTES,
   REFERENCE_IMAGE_MAX_EDGE,
+  REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES,
   REFERENCE_IMAGES_MAX_TOTAL_BYTES,
   dataUriByteSize,
   getReferenceImagePayloadError,
+  getReferenceMediaPayloadError,
   scaleImageDimensions,
 } from "../lib/reference-images";
 
-function makeDataUri(byteCount: number): string {
+function makeDataUri(byteCount: number, mimeType = "image/webp"): string {
   const triples = Math.floor(byteCount / 3);
   const remainder = byteCount % 3;
   const suffix = remainder === 1 ? "AA==" : remainder === 2 ? "AAA=" : "";
-  return `data:image/webp;base64,${"A".repeat(triples * 4)}${suffix}`;
+  return `data:${mimeType};base64,${"A".repeat(triples * 4)}${suffix}`;
 }
 
 test("scaleImageDimensions keeps smaller images unchanged", () => {
@@ -47,4 +49,20 @@ test("getReferenceImagePayloadError rejects oversized data URI totals", () => {
 
 test("getReferenceImagePayloadError ignores remote references", () => {
   assert.equal(getReferenceImagePayloadError(["https://example.com/reference.png"]), null);
+});
+
+test("getReferenceMediaPayloadError allows large video within request total", () => {
+  const error = getReferenceMediaPayloadError([makeDataUri(REFERENCE_IMAGE_MAX_BYTES + 1, "video/mp4")]);
+
+  assert.equal(error, null);
+});
+
+test("getReferenceMediaPayloadError rejects oversized media totals", () => {
+  const halfTotal = Math.floor(REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES / 2) + 1;
+  const error = getReferenceMediaPayloadError([
+    makeDataUri(halfTotal, "video/mp4"),
+    makeDataUri(halfTotal, "audio/mpeg"),
+  ]);
+
+  assert.match(error ?? "", /参考媒体总大小/);
 });

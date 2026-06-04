@@ -9,6 +9,14 @@ export function isImageDataUri(value: string): boolean {
   return /^data:image\/[a-z0-9.+-]+;base64,/i.test(value);
 }
 
+export function isVideoDataUri(value: string): boolean {
+  return /^data:video\/[a-z0-9.+-]+;base64,/i.test(value);
+}
+
+export function isAudioDataUri(value: string): boolean {
+  return /^data:audio\/[a-z0-9.+-]+;base64,/i.test(value);
+}
+
 export function scaleImageDimensions(
   width: number,
   height: number,
@@ -53,6 +61,25 @@ export function getReferenceImagePayloadError(referenceUrls: string[]): string |
   return null;
 }
 
+export function getReferenceMediaPayloadError(referenceUrls: string[]): string | null {
+  let totalBytes = 0;
+
+  for (const url of referenceUrls) {
+    const bytes = dataUriByteSize(url);
+    if (bytes === null) continue;
+    if (isImageDataUri(url) && bytes > REFERENCE_IMAGE_MAX_BYTES) {
+      return `单张参考图压缩后仍超过 ${formatBytes(REFERENCE_IMAGE_MAX_BYTES)}，请换一张更小的图`;
+    }
+    totalBytes += bytes;
+  }
+
+  if (totalBytes > REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES) {
+    return `参考媒体总大小超过 ${formatBytes(REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES)}，请减少参考媒体或压缩后重试`;
+  }
+
+  return null;
+}
+
 export async function compressReferenceImageFile(file: File): Promise<string> {
   if (!file.type.startsWith("image/")) {
     throw new Error("参考图必须是图片文件");
@@ -83,6 +110,22 @@ export async function prepareReferenceImageUrlForRequest(url: string): Promise<s
   return compressReferenceImageBlob(blob);
 }
 
+export async function prepareReferenceMediaUrlForRequest(url: string): Promise<string> {
+  if (isImageDataUri(url)) return url;
+  if (isVideoDataUri(url) || isAudioDataUri(url)) return url;
+  if (url.startsWith("data:")) throw new Error("参考媒体必须是图片、视频或音频 Data URL");
+
+  const response = await fetchReferenceMediaUrl(url);
+  if (!response.ok) {
+    throw new Error(await readReferenceImageFetchError(response));
+  }
+
+  const blob = await response.blob();
+  if (blob.type.startsWith("image/")) return compressReferenceImageBlob(blob);
+  if (blob.type.startsWith("video/") || blob.type.startsWith("audio/")) return readBlobAsDataUrl(blob);
+  throw new Error("参考媒体必须是图片、视频或音频文件");
+}
+
 async function fetchReferenceImageUrl(url: string): Promise<Response> {
   if (url.startsWith("blob:")) return fetch(url);
   if (url.startsWith("http://") || url.startsWith("https://")) {
@@ -93,6 +136,12 @@ async function fetchReferenceImageUrl(url: string): Promise<Response> {
     });
   }
   throw new Error("参考图必须是 data:image/*、blob: 或受支持的图片结果地址");
+}
+
+async function fetchReferenceMediaUrl(url: string): Promise<Response> {
+  if (url.startsWith("blob:")) return fetch(url);
+  if (url.startsWith("http://") || url.startsWith("https://")) return fetch(url);
+  throw new Error("参考媒体必须是 data:*、blob: 或受支持的媒体结果地址");
 }
 
 async function readReferenceImageFetchError(response: Response): Promise<string> {

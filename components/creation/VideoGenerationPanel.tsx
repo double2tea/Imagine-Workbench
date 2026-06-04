@@ -271,10 +271,11 @@ export default function VideoGenerationPanel({
       )}
 
       <ReferenceImagePicker
+        acceptedMediaTypes={capabilities.referenceMediaTypes}
         addLabel="添加参考"
         browseClassName="font-medium text-violet-300 underline-offset-4 hover:text-violet-200 hover:underline cursor-pointer"
         clearLabel={clearReferenceLabel}
-        emptyHelp={`支持 JPG / PNG / WEBP | 最多 ${referenceLimit} 张 | ${referenceHelp}`}
+        emptyHelp={`支持 ${capabilities.referenceMediaTypes.includes("video") ? "图片 / 视频" : "JPG / PNG / WEBP"} | 最多 ${referenceLimit} 个 | ${referenceHelp}`}
         emptyLabel={`添加${referenceLabel}`}
         label={`${referenceLabel} ${referenceImages.length > 0 ? `(${Math.min(referenceImages.length, referenceLimit)}/${referenceLimit})` : ""}`}
         maxCount={referenceLimit}

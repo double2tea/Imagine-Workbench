@@ -6,6 +6,7 @@ import {
   type LucideIcon,
   Maximize2,
   MoreHorizontal,
+  Music,
   Paintbrush,
   RefreshCw,
   SlidersHorizontal,
@@ -21,6 +22,7 @@ import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/as
 import PreviewImage from "@/components/PreviewImage";
 import { makeReferenceDropToken, REFERENCE_ASSET_MIME } from "@/components/reference/referenceDrag";
 import type { StorageItem } from "@/lib/db";
+import { mediaReferenceLabel, mediaReferenceTypeFromDataUri, type MediaReferenceType } from "@/lib/media-references";
 import { formatDisplayedAspectRatio } from "@/lib/media-display";
 import { parseProviderModel, type AiProvider } from "@/lib/providers/model-catalog";
 import { getProviderMeta } from "@/lib/providers/registry";
@@ -84,6 +86,16 @@ const frameCaptureActions: Array<{
 
 type FrameMenuPlacement = "hover" | "meta";
 
+function processingTitle(type: StorageItem["type"]): string {
+  if (type === "video") return "视频合成中";
+  if (type === "audio") return "音频处理中";
+  return "图像生成中";
+}
+
+function referencePreviewType(url: string): MediaReferenceType {
+  return mediaReferenceTypeFromDataUri(url) ?? "image";
+}
+
 export default function AssetCard({
   canceling,
   inCompare,
@@ -109,7 +121,7 @@ export default function AssetCard({
   const [frameMenuPlacement, setFrameMenuPlacement] = useState<FrameMenuPlacement | null>(null);
   const captureVideoFrameRef = useRef<VideoFrameCaptureRequest | null>(null);
   const provider = parseProviderModel(item.model, selectedProvider).provider;
-  const isDraggableReference = item.type === "image" && item.status === "complete";
+  const isDraggableReference = item.status === "complete";
   const failedTitle = isContentSafetyError(item.errorMessage) ? "内容安全拦截" : "生成失败 / 链接中断";
   const referenceUrls = item.generationRequest?.referenceImages ?? [];
 
@@ -120,7 +132,7 @@ export default function AssetCard({
     }
 
     event.dataTransfer.effectAllowed = "copy";
-    event.dataTransfer.setData(REFERENCE_ASSET_MIME, JSON.stringify({ id: item.id, url: item.url }));
+    event.dataTransfer.setData(REFERENCE_ASSET_MIME, JSON.stringify({ id: item.id, type: item.type, url: item.url }));
     event.dataTransfer.setData("text/plain", makeReferenceDropToken(item.id));
   };
 
@@ -153,7 +165,7 @@ export default function AssetCard({
               <RefreshCw className="h-4 w-4 text-indigo-300 animate-spin" />
             </div>
             <p className="imagine-generation-stage-title">
-              {item.status === "pending" ? "任务已排队" : item.type === "video" ? "视频合成中" : "图像生成中"}
+              {item.status === "pending" ? "任务已排队" : processingTitle(item.type)}
             </p>
             <span className="imagine-generation-stage-meta">模型 {formatModelName(item.model)}</span>
             <div className="imagine-generation-progress" role="progressbar" aria-valuenow={item.progress} aria-valuemin={0} aria-valuemax={100}>
@@ -210,7 +222,7 @@ export default function AssetCard({
                 loading={priority ? "eager" : "lazy"}
                 onClick={() => onOpenFullscreen(item)}
               />
-            ) : (
+            ) : item.type === "video" ? (
               <VideoAssetPlayer
                 item={item}
                 onCaptureFrame={onCaptureVideoFrame}
@@ -218,6 +230,10 @@ export default function AssetCard({
                   captureVideoFrameRef.current = request;
                 }}
               />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center px-4">
+                <audio src={item.url} controls className="w-full" />
+              </div>
             )}
 
             <div className="absolute top-3 right-3 z-10 flex gap-1.5">
@@ -226,10 +242,15 @@ export default function AssetCard({
                   <ImageIcon className="h-3 w-3" />
                   IMAGE
                 </span>
-              ) : (
+              ) : item.type === "video" ? (
                 <span className="imagine-asset-type-badge flex items-center gap-1.5 px-2 py-1 text-[9px] font-bold tracking-wider uppercase rounded bg-purple-500/80 backdrop-blur-md text-white border border-purple-400/25">
                   <span className="h-1.5 w-1.5 rounded-full bg-red-400 animate-ping" />
                   VIDEO
+                </span>
+              ) : (
+                <span className="imagine-asset-type-badge flex items-center gap-1.5 px-2 py-1 text-[9px] font-bold tracking-wider uppercase rounded bg-emerald-500/80 backdrop-blur-md text-white border border-emerald-400/25">
+                  <Music className="h-3 w-3" />
+                  AUDIO
                 </span>
               )}
             </div>
@@ -442,17 +463,26 @@ export default function AssetCard({
             <div className="flex shrink-0 items-center gap-1">
               <span className="font-mono text-[10px] text-[var(--iw-faint)]">参考</span>
               <div className="no-scrollbar flex max-w-[96px] gap-1 overflow-x-auto">
-                {referenceUrls.map((url, index) => (
-                  <button
-                    type="button"
-                    key={`${item.id}_reference_${index}`}
-                    onClick={() => onOpenReferencePreview(item, index)}
-                    className="relative h-7 w-7 overflow-hidden rounded-md border border-white/10 bg-slate-950 transition hover:border-cyan-300/70 focus:outline-none focus:ring-2 focus:ring-cyan-400/40"
-                    title={`点击放大参考图 ${index + 1}`}
-                  >
-                    <PreviewImage src={url} alt={`参考图 ${index + 1}`} className="h-full w-full object-cover" />
-                  </button>
-                ))}
+                {referenceUrls.map((url, index) => {
+                  const mediaType = referencePreviewType(url);
+                  return (
+                    <button
+                      type="button"
+                      key={`${item.id}_reference_${index}`}
+                      onClick={() => onOpenReferencePreview(item, index)}
+                      className="relative h-7 w-7 overflow-hidden rounded-md border border-white/10 bg-slate-950 transition hover:border-cyan-300/70 focus:outline-none focus:ring-2 focus:ring-cyan-400/40"
+                      title={`点击放大参考${mediaReferenceLabel(mediaType)} ${index + 1}`}
+                    >
+                      {mediaType === "image" ? (
+                        <PreviewImage src={url} alt={`参考图 ${index + 1}`} className="h-full w-full object-cover" />
+                      ) : mediaType === "video" ? (
+                        <video src={url} muted preload="metadata" className="h-full w-full object-cover" />
+                      ) : (
+                        <Music className="m-auto h-full w-3.5 text-slate-400" />
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}

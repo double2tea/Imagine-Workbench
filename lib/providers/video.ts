@@ -1,5 +1,5 @@
 import type { GenerateVideoInput, GenerateVideoResult, MediaStatusResult, ProviderConfig } from "./types";
-import { isImageDataUri } from "@/lib/reference-images";
+import { isAudioDataUri, isImageDataUri, isVideoDataUri } from "@/lib/reference-images";
 import { generateRunningHubMedia, getRunningHubMediaStatus } from "./image";
 import {
   aspectRatioToVideoSize,
@@ -232,20 +232,27 @@ function isTwelveAiOmniModel(model: string | undefined): boolean {
 
 function referenceFileName(index: number, mimeType: string): string {
   if (mimeType === "video/mp4") return `reference_${index + 1}.mp4`;
+  if (mimeType === "video/webm") return `reference_${index + 1}.webm`;
+  if (mimeType === "video/quicktime") return `reference_${index + 1}.mov`;
+  if (mimeType === "audio/mpeg") return `reference_${index + 1}.mp3`;
+  if (mimeType === "audio/wav") return `reference_${index + 1}.wav`;
+  if (mimeType === "audio/ogg") return `reference_${index + 1}.ogg`;
   if (mimeType === "image/jpeg") return `reference_${index + 1}.jpg`;
   if (mimeType === "image/webp") return `reference_${index + 1}.webp`;
+  if (mimeType.startsWith("video/")) return `reference_${index + 1}.video`;
+  if (mimeType.startsWith("audio/")) return `reference_${index + 1}.audio`;
   return `reference_${index + 1}.png`;
 }
 
 async function referenceToBlob(reference: GenerateVideoInput["referenceImages"][number]): Promise<Blob> {
   const source = reference.dataUri;
-  if (!isImageDataUri(source)) {
-    throw new Error("Video reference images must be data:image/* base64 data URIs");
+  if (!isImageDataUri(source) && !isVideoDataUri(source) && !isAudioDataUri(source)) {
+    throw new Error("Video reference media must be data:image/*, data:video/* or data:audio/* base64 data URIs");
   }
 
   const blob = dataUriToBlob(source);
-  if (!blob.type.startsWith("image/")) {
-    throw new Error("Video reference must be an image file");
+  if (!blob.type.startsWith("image/") && !blob.type.startsWith("video/") && !blob.type.startsWith("audio/")) {
+    throw new Error("Video reference must be an image, video or audio file");
   }
   return blob;
 }

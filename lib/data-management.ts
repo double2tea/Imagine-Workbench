@@ -28,6 +28,7 @@ import {
   type GenerationRequestSnapshot,
   type StorageItem,
 } from "@/lib/db";
+import { mediaReferenceTypeFromMime } from "@/lib/media-references";
 import { compressReferenceImageFile, dataUriByteSize } from "@/lib/reference-images";
 
 export const WORKSPACE_BACKUP_SCHEMA_VERSION = 1;
@@ -360,17 +361,14 @@ export async function createLocalUploadAsset(
   id: string,
   options?: { boardId?: string },
 ): Promise<StorageItem> {
-  const isImage = file.type.startsWith("image/");
-  const isVideo = file.type.startsWith("video/");
-  if (!isImage && !isVideo) {
-    throw new Error("只支持导入图片或视频文件");
-  }
+  const mediaType = mediaReferenceTypeFromMime(file.type);
+  if (!mediaType) throw new Error("只支持导入图片、视频或音频文件");
 
   return buildStorageItem(
     {
       id,
-      type: isImage ? "image" : "video",
-      url: isImage ? await compressReferenceImageFile(file) : await readFileAsDataUrl(file),
+      type: mediaType,
+      url: mediaType === "image" ? await compressReferenceImageFile(file) : await readFileAsDataUrl(file),
       prompt: file.name || "Local upload",
       model: "local-upload",
       aspectRatio: "auto",
@@ -555,6 +553,7 @@ async function restoreAssetRecord(zip: JSZip, record: WorkspaceBackupAssetRecord
 function validateAssetMediaType(id: string, type: StorageItem["type"], mimeType: string): void {
   if (type === "image" && !mimeType.startsWith("image/")) throw new Error(`资产 ${id} 的媒体类型不是图片`);
   if (type === "video" && !mimeType.startsWith("video/")) throw new Error(`资产 ${id} 的媒体类型不是视频`);
+  if (type === "audio" && !mimeType.startsWith("audio/")) throw new Error(`资产 ${id} 的媒体类型不是音频`);
 }
 
 function parseManifest(text: string): WorkspaceBackupManifest {
@@ -921,7 +920,12 @@ function mediaExtension(mimeType: string, type: StorageItem["type"]): string {
   if (mimeType === "image/png") return "png";
   if (mimeType === "video/webm") return "webm";
   if (mimeType === "video/quicktime") return "mov";
-  return type === "image" ? "png" : "mp4";
+  if (mimeType === "audio/mpeg") return "mp3";
+  if (mimeType === "audio/wav") return "wav";
+  if (mimeType === "audio/ogg") return "ogg";
+  if (type === "image") return "png";
+  if (type === "audio") return "mp3";
+  return "mp4";
 }
 
 function estimateAssetBytes(item: StorageItem): number {
@@ -1045,13 +1049,13 @@ function readOptionalLiteral<T extends string>(record: Record<string, unknown>, 
 
 function readAssetType(record: Record<string, unknown>, field: string): StorageItem["type"] {
   const value = record[field];
-  if (value !== "image" && value !== "video") throw new Error(`${field} 类型无效`);
+  if (value !== "image" && value !== "video" && value !== "audio") throw new Error(`${field} 类型无效`);
   return value;
 }
 
-function readBoardAssetType(record: Record<string, unknown>, field: string): "image" | "video" {
+function readBoardAssetType(record: Record<string, unknown>, field: string): "image" | "video" | "audio" {
   const value = record[field];
-  if (value !== "image" && value !== "video") throw new Error(`${field} 类型无效`);
+  if (value !== "image" && value !== "video" && value !== "audio") throw new Error(`${field} 类型无效`);
   return value;
 }
 

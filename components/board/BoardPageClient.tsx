@@ -85,6 +85,7 @@ import {
   assetCompareReferenceUrl,
 } from "@/lib/board";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
+import { getMediaReferenceType, mediaReferenceLabel, mediaReferenceTypeFromMime, type MediaReferenceType } from "@/lib/media-references";
 import {
   flushAllBoardText,
   flushBoardText,
@@ -181,16 +182,15 @@ async function createBoardUploadItem(
   id: string,
   boardId: string,
 ): Promise<StorageItem> {
-  const isImage = file.type.startsWith("image/");
-  const isVideo = file.type.startsWith("video/");
-  if (!isImage && !isVideo) {
-    throw new Error("画板只支持导入图片或视频文件");
+  const mediaType = mediaReferenceTypeFromMime(file.type);
+  if (!mediaType) {
+    throw new Error("画板只支持导入图片、视频或音频文件");
   }
-  const url = isImage ? await compressReferenceImageFile(file) : await readFileAsDataUrl(file);
+  const url = mediaType === "image" ? await compressReferenceImageFile(file) : await readFileAsDataUrl(file);
   return buildStorageItem(
     {
       id,
-      type: isImage ? "image" : "video",
+      type: mediaType,
       url,
       prompt: file.name || "Board upload",
       model: "local-upload",
@@ -202,6 +202,12 @@ async function createBoardUploadItem(
     },
     { boardId },
   );
+}
+
+function boardUploadIdPrefix(type: MediaReferenceType, index: number): string {
+  if (type === "video") return `board_video_${index}`;
+  if (type === "audio") return `board_audio_${index}`;
+  return `board_image_${index}`;
 }
 
 function getProviderLabel(provider: AiProvider): string {
@@ -230,21 +236,22 @@ function activeBoardReference(
   resolveUrl: BoardReferenceUrlResolver,
 ): ReferenceImageRef[] {
   const node = nodes.find(item => item.id === selectedNodeId);
-  if (!node || node.kind !== "asset" || node.asset.type !== "image") return [];
-  return [{ id: node.asset.assetId, url: resolveUrl(node.asset.assetId, node.asset.url), role: "general" }];
+  if (!node || node.kind !== "asset") return [];
+  return [{ id: node.asset.assetId, type: node.asset.type, url: resolveUrl(node.asset.assetId, node.asset.url), role: "general" }];
 }
 
 function boardNodeReferences(
   node: BoardDocument["nodes"][number] | undefined,
   resolveUrl: BoardReferenceUrlResolver,
 ): ReferenceImageRef[] {
-  if (node?.kind === "asset" && node.asset.type === "image") {
-    return [{ id: node.asset.assetId, url: resolveUrl(node.asset.assetId, node.asset.url), role: "general" }];
+  if (node?.kind === "asset") {
+    return [{ id: node.asset.assetId, type: node.asset.type, url: resolveUrl(node.asset.assetId, node.asset.url), role: "general" }];
   }
   if (node?.kind === "reference-group") {
     return node.references.map(reference => ({
       id: reference.assetId,
       role: reference.role,
+      type: "image",
       url: resolveUrl(reference.assetId, reference.url),
     }));
   }
@@ -792,6 +799,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     agentInput,
     prompt,
     videoReferenceLimit: videoCapabilities.maxReferenceImages,
+    videoReferenceMediaTypes: videoCapabilities.referenceMediaTypes,
     videoReferenceMode: videoCapabilities.referenceMode,
     pushWorkspaceNotice,
     setAgentInput,
@@ -820,7 +828,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const { searchableReferenceImages } = useAssetWorkspaceState(items);
   const resolveBoardReferenceUrl = useCallback<BoardReferenceUrlResolver>((assetId, fallbackUrl) => {
     const item = items.find(entry => entry.id === assetId);
-    return item?.type === "image" && item.status === "complete" && item.url.trim() ? item.url : fallbackUrl;
+    return item && item.status === "complete" && item.url.trim() ? item.url : fallbackUrl;
   }, [items]);
   void handleImageUpload;
   void handleReferenceDropAsset;
@@ -854,7 +862,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       <AtReferenceDropdown
         items={agentAtItems}
         search={atDropdown.search}
-        onSelect={(item) => handleSelectAtItem(item.url, item.id, "agent-prompt")}
+        onSelect={(item) => handleSelectAtItem(item.url, item.id, "agent-prompt", item.type)}
       />
     );
   }, [agentReferences, atDropdown.search, handleSelectAtItem, resolvedBoardId, searchableReferenceImages]);
@@ -1487,7 +1495,14 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
       const capability = getModelCapability(model, "image");
       if (references.length > 0 && !capability.supportsReferences) {
-        const message = "Agent 选中的图片模型不支持参考图输入";
+        const message = "Agent 选中的图片模型不支持参考媒体输入";
+        boardController.updateGenerateNode(generateNodeId, { errorMessage: message, status: "failed" });
+        pushWorkspaceNotice("error", message);
+        return handledBoardAction(false);
+      }
+      const unsupportedImageReference = references.find(reference => getMediaReferenceType(reference) !== "image");
+      if (unsupportedImageReference) {
+        const message = `图片生成不支持${mediaReferenceLabel(getMediaReferenceType(unsupportedImageReference))}参考`;
         boardController.updateGenerateNode(generateNodeId, { errorMessage: message, status: "failed" });
         pushWorkspaceNotice("error", message);
         return handledBoardAction(false);
@@ -1495,12 +1510,13 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
       references.forEach((reference, index) => {
         const matchedItem = items.find(item => item.id === reference.id);
+        const referenceType = getMediaReferenceType(reference);
         const assetNodeId = boardController.addAssetNode({
           asset: {
             assetId: reference.id,
             model: matchedItem?.model ?? "agent-reference",
             prompt: matchedItem?.prompt ?? "Agent reference",
-            type: "image",
+            type: referenceType,
             url: reference.url,
           },
           position: { x: 120 + index * 140, y: generatePosition.y + 280 },
@@ -1562,14 +1578,21 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
     const capability = getModelCapability(model, "video");
     if (references.length > 0 && !capability.supportsReferences) {
-      const message = "Agent 选中的视频模型不支持参考图输入";
+      const message = "Agent 选中的视频模型不支持参考媒体输入";
       boardController.updateGenerateNode(generateNodeId, { errorMessage: message, status: "failed" });
       pushWorkspaceNotice("error", message);
       return handledBoardAction(false);
     }
     const videoCapability = getVideoModelCapabilities(model);
+    const unsupportedVideoReference = references.find(reference => !videoCapability.referenceMediaTypes.includes(getMediaReferenceType(reference)));
+    if (unsupportedVideoReference) {
+      const message = `当前视频模型不支持${mediaReferenceLabel(getMediaReferenceType(unsupportedVideoReference))}输入`;
+      boardController.updateGenerateNode(generateNodeId, { errorMessage: message, status: "failed" });
+      pushWorkspaceNotice("error", message);
+      return handledBoardAction(false);
+    }
     if (references.length < videoCapability.minReferenceImages || references.length > videoCapability.maxReferenceImages) {
-      const message = `当前视频模型需要 ${videoCapability.minReferenceImages}-${videoCapability.maxReferenceImages} 张参考图`;
+      const message = `当前视频模型需要 ${videoCapability.minReferenceImages}-${videoCapability.maxReferenceImages} 个参考媒体`;
       boardController.updateGenerateNode(generateNodeId, { errorMessage: message, status: "failed" });
       pushWorkspaceNotice("error", message);
       return handledBoardAction(false);
@@ -1577,12 +1600,13 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
     references.forEach((reference, index) => {
       const matchedItem = items.find(item => item.id === reference.id);
+      const referenceType = getMediaReferenceType(reference);
       const assetNodeId = boardController.addAssetNode({
         asset: {
           assetId: reference.id,
           model: matchedItem?.model ?? "agent-reference",
           prompt: matchedItem?.prompt ?? "Agent reference",
-          type: "image",
+          type: referenceType,
           url: reference.url,
         },
         position: { x: 120 + index * 140, y: generatePosition.y + 280 },
@@ -1772,9 +1796,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   }, [addAssetToBoard, boardController.board.nodes, pushWorkspaceNotice]);
 
   const handleImportBoardFiles = useCallback(async (files: File[], position: BoardPoint): Promise<void> => {
-    const boardFiles = files.filter(file => file.type.startsWith("image/") || file.type.startsWith("video/"));
+    const boardFiles = files.filter(file => mediaReferenceTypeFromMime(file.type) !== null);
     if (boardFiles.length === 0) {
-      pushWorkspaceNotice("info", "画板只支持导入图片或视频文件");
+      pushWorkspaceNotice("info", "画板只支持导入图片、视频或音频文件");
       return;
     }
 
@@ -1782,9 +1806,11 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     for (let index = 0; index < boardFiles.length; index += 1) {
       const file = boardFiles[index];
       try {
+        const mediaType = mediaReferenceTypeFromMime(file.type);
+        if (!mediaType) throw new Error("不支持的媒体类型");
         const item = await createBoardUploadItem(
           file,
-          makeClientId(file.type.startsWith("video/") ? `board_video_${index}` : `board_image_${index}`),
+          makeClientId(boardUploadIdPrefix(mediaType, index)),
           resolvedBoardId,
         );
         if (!await saveItemOrWarn(item, pushWorkspaceNotice)) continue;
@@ -1904,8 +1930,20 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       }
       const capability = getModelCapability(node.model, node.kind === "image-generate" ? "image" : "video");
       if (references.length > 0 && !capability.supportsReferences) {
-        boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: "当前模型不支持参考图输入" });
-        pushWorkspaceNotice("error", "当前模型不支持参考图输入");
+        boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: "当前模型不支持参考媒体输入" });
+        pushWorkspaceNotice("error", "当前模型不支持参考媒体输入");
+        return;
+      }
+      const unsupportedReference = references.find(reference => {
+        const type = getMediaReferenceType(reference);
+        return node.kind === "image-generate"
+          ? type !== "image"
+          : !getVideoModelCapabilities(node.model).referenceMediaTypes.includes(type);
+      });
+      if (unsupportedReference) {
+        const message = `当前模型不支持${mediaReferenceLabel(getMediaReferenceType(unsupportedReference))}输入`;
+        boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: message });
+        pushWorkspaceNotice("error", message);
         return;
       }
       if (node.kind === "video-generate") {
@@ -2170,9 +2208,11 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     for (let index = 0; index < files.length; index += 1) {
       const file = files[index];
       try {
+        const mediaType = mediaReferenceTypeFromMime(file.type);
+        if (!mediaType) throw new Error("不支持的媒体类型");
         const item = await createLocalUploadAsset(
           file,
-          makeClientId(file.type.startsWith("video/") ? `local_video_${index}` : `local_image_${index}`),
+          makeClientId(boardUploadIdPrefix(mediaType, index).replace("board_", "local_")),
           { boardId: resolvedBoardId },
         );
         if (!await saveItemOrWarn(item, pushWorkspaceNotice)) continue;
