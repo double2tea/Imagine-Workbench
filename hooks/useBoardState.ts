@@ -399,7 +399,7 @@ function normalizeBoardNode(node: unknown, index: number): BoardNode | null {
 
   if (node.kind === "asset") {
     const asset = isRecord(node.asset) ? node.asset : null;
-    if (!asset || (asset.type !== "image" && asset.type !== "video")) return null;
+    if (!asset || (asset.type !== "image" && asset.type !== "video" && asset.type !== "audio")) return null;
     return {
       ...shell,
       kind: "asset",
@@ -739,8 +739,8 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
   const beginUndoGesture = useCallback(() => {
     if (!hasLoaded || dragUndoCapturedRef.current) return;
     dragUndoCapturedRef.current = true;
-    pushUndoSnapshot(board);
-  }, [board, hasLoaded, pushUndoSnapshot]);
+    pushUndoSnapshot(boardRef.current);
+  }, [hasLoaded, pushUndoSnapshot]);
 
   const endUndoGesture = useCallback(() => {
     dragUndoCapturedRef.current = false;

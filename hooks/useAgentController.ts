@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import { getExecutableAction, getPendingAgentAction, type AgentToolAction, type ChatMessage } from "@/components/agent/AgentDock";
+import { getExecutableAction, getPendingAgentAction, type ChatMessage } from "@/components/agent/AgentDock";
+import type { AgentGenerationParams, AgentToolAction } from "@/lib/agent-actions";
 import {
   isCustomImageResolutionValue,
   prepareAgentActionDraft,
   validateAgentToolAction,
-  type AgentGenerationParams,
 } from "@/lib/agent-tool-action";
 import type { AgentBoardContext, AgentSurface } from "@/lib/agent-context";
 import type { CreationMode } from "@/components/creation/CreationModeTabs";
@@ -19,7 +19,7 @@ interface UseAgentControllerParams {
   agentReferenceUrl: string | null;
   buildProviderHeaders: (target?: string) => Record<string, string>;
   chatStorageKey?: string;
-  executeToolActionOverride?: (input: ExecuteToolActionOverrideInput) => Promise<boolean> | boolean;
+  executeToolActionOverride?: (input: ExecuteToolActionOverrideInput) => Promise<ExecuteToolActionOverrideReturn> | ExecuteToolActionOverrideReturn;
   getBoardContext?: () => AgentBoardContext;
   generateManualImage: (overrides?: GenerationOverrides) => Promise<boolean>;
   generateManualVideo: (overrides?: GenerationOverrides) => Promise<boolean>;
@@ -79,6 +79,13 @@ interface ExecuteToolActionOverrideInput {
   action: AgentToolAction;
   references: ReferenceImageRef[];
 }
+
+interface ExecuteToolActionOverrideResult {
+  handled: boolean;
+  success: boolean;
+}
+
+type ExecuteToolActionOverrideReturn = boolean | ExecuteToolActionOverrideResult;
 
 interface AgentResponsePayload {
   activeSkills?: string[];
@@ -240,13 +247,18 @@ export function useAgentController({
     }
 
     clearActiveCountdown();
-    setAgentMessages(prev => prev.map(message => message.id === messageId ? { ...message, interactiveState: "completed" } : message));
+    setAgentMessages(prev => prev.map(message => message.id === messageId ? { ...message, interactiveState: "executing" } : message));
     const actionReferenceOverride: GenerationOverrides | undefined = actionReferences.length > 0
       ? { referenceImage: actionReferences[0]?.url ?? null, referenceImages: actionReferences }
       : undefined;
     if (executeToolActionOverride) {
-      const wasHandled = await executeToolActionOverride({ action, references: actionReferences });
-      if (wasHandled) return;
+      const result = await executeToolActionOverride({ action, references: actionReferences });
+      const wasHandled = typeof result === "boolean" ? result : result.handled;
+      const didSucceed = typeof result === "boolean" ? result : result.success;
+      if (wasHandled) {
+        setAgentMessages(prev => prev.map(message => message.id === messageId ? { ...message, interactiveState: didSucceed ? "completed" : "idle" } : message));
+        return;
+      }
     }
 
     if (type === "optimize_prompt") {
@@ -299,6 +311,7 @@ export function useAgentController({
         launchMaskEditor(editReference.url, editReference.id);
       }
     }
+    setAgentMessages(prev => prev.map(message => message.id === messageId ? { ...message, interactiveState: "completed" } : message));
   };
 
   const startAutoCountdown = (messageId: string, action: AgentToolAction) => {

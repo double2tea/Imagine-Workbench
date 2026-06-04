@@ -8,6 +8,66 @@ export interface Skill {
 
 export const SKILL_REGISTRY: Skill[] = [
   {
+    name: "Screenwriter",
+    category: "planning",
+    description:
+      "剧本写作助手。负责把故事设定、广告创意或短片想法写成可继续拆分的剧本文本，包括标题、logline、场景、动作、对白/旁白和情绪节奏。",
+    whenToUse:
+      "用户要求写剧本、改剧本、扩写短片故事、广告脚本、分场文本，或希望先有一版可拍摄文本再进入分镜时。",
+    examples: [
+      "用户: '帮我写一个30秒赛博朋克饮料广告剧本' -> 输出短剧本和镜头节奏",
+      "用户: '把这段故事改得更适合拍短片' -> 重写动作、对白和场景推进",
+    ],
+  },
+  {
+    name: "ScriptAnalyzer",
+    category: "planning",
+    description:
+      "剧本分析助手。负责阅读剧本文本，提炼角色、场景、冲突、情绪转折、视觉母题、必须保持一致的美术锚点和可拆分镜头节点。",
+    whenToUse:
+      "用户给出剧本并要求分析、拆解、提炼角色/场景/节奏，或准备进入分镜规划前。",
+    examples: [
+      "用户: '分析这个剧本能拆成哪些画面' -> 输出场景、角色、情绪和关键镜头",
+      "用户: '找出这个短片里的视觉连续性要求' -> 提炼角色、服装、环境和色彩锚点",
+    ],
+  },
+  {
+    name: "ShotBreakdownPlanner",
+    category: "planning",
+    description:
+      "分镜拆解规划师。负责把剧本或故事 beat 拆为镜头列表，包含镜号、景别、机位、运动、动作、对白/旁白、图像提示词和可选视频提示词。",
+    whenToUse:
+      "用户要求拆分镜头、生成 shot list、为每个分镜写 prompt、把剧本变成画板节点计划时。",
+    examples: [
+      "用户: '把这段剧本拆成8个分镜' -> 输出编号镜头和每镜 prompt",
+      "用户: '每个镜头都要有图像和视频提示词' -> 为每个镜头生成 image prompt / video prompt",
+    ],
+  },
+  {
+    name: "StoryboardBoardComposer",
+    category: "board",
+    description:
+      "分镜画板编排助手。负责把分镜计划落到画板原生节点中，优先创建或更新 Prompt、Note、图片生成、视频生成节点，并保持节点之间的 prompt/reference/result 关系可读。",
+    whenToUse:
+      "当前 surface 为 board，且用户要求把剧本/分镜/shot list 放到画板上、修改已有分镜节点、或继续连接图像/视频节点时。",
+    examples: [
+      "用户: '把这5个分镜放到画板上' -> 创建分镜笔记或 prompt/image 节点组",
+      "用户: '把当前分镜节点改得更电影感' -> 返回 update_board_node",
+    ],
+  },
+  {
+    name: "BatchGenerationPlanner",
+    category: "planning",
+    description:
+      "批量生成规划师。负责把多镜头、多变体或多节点生成拆成可审阅批次，默认先创建节点，只有用户明确要求时才建议运行批量生成。",
+    whenToUse:
+      "用户要求批量生成多张分镜图、批量创建视频节点、或一次性推进多个镜头时。",
+    examples: [
+      "用户: '把这组分镜都生成图片' -> 先给出可审阅批次和运行范围",
+      "用户: '先只建节点不要跑' -> 创建流程但 run=false",
+    ],
+  },
+  {
     name: "PromptEngineer",
     category: "prompt",
     description:

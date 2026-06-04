@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { NextRequest, NextResponse } from "next/server";
 import type { AgentSurface } from "@/lib/agent-context";
+import { AGENT_BOARD_ACTION_TYPES, AGENT_WORKBENCH_ACTION_TYPES } from "@/lib/agent-actions";
 import { createChatCompletionText, createChatCompletionWithTools, parseJsonObjectText } from "@/lib/providers/chat";
 import { getSendableAgentImageReferences } from "@/lib/agent-chat-model";
 import {
@@ -84,7 +85,7 @@ const agentBodySchema = z.object({
 });
 
 const agentActionSchema = z.object({
-  type: z.enum(["none", "optimize_prompt", "generate_image", "edit_image", "generate_video"]),
+  type: z.enum(AGENT_WORKBENCH_ACTION_TYPES),
   params: z
     .object({
       prompt: z.string().optional(),
@@ -101,10 +102,83 @@ const agentActionSchema = z.object({
     .optional(),
 });
 
+const agentBoardPatchPointSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+});
+
+const agentBoardPatchPortRefSchema = z.object({
+  nodeId: z.string(),
+  portId: z.string(),
+  portKind: z.enum(["asset", "prompt", "result", "agent"]),
+});
+
+const agentBoardPatchCreateNodeSchema = z.object({
+  op: z.literal("create_node"),
+  tempId: z.string(),
+  kind: z.enum(["prompt", "note", "image-generate", "video-generate", "agent"]),
+  title: z.string().optional(),
+  position: agentBoardPatchPointSchema.optional(),
+  prompt: z.string().optional(),
+  body: z.string().optional(),
+  instruction: z.string().optional(),
+  model: z.string().optional(),
+  aspectRatio: z.string().optional(),
+  imageResolution: z.string().optional(),
+  imageQuality: z.string().optional(),
+  thinkingLevel: z.string().optional(),
+  videoResolution: z.string().optional(),
+  videoDuration: z.string().optional(),
+  videoPreset: z.string().optional(),
+  run: z.boolean().optional(),
+});
+
+const agentBoardPatchUpdateNodeSchema = z.object({
+  op: z.literal("update_node"),
+  nodeId: z.string(),
+  prompt: z.string().optional(),
+  body: z.string().optional(),
+  instruction: z.string().optional(),
+  model: z.string().optional(),
+  aspectRatio: z.string().optional(),
+  imageResolution: z.string().optional(),
+  imageQuality: z.string().optional(),
+  thinkingLevel: z.string().optional(),
+  videoResolution: z.string().optional(),
+  videoDuration: z.string().optional(),
+  videoPreset: z.string().optional(),
+});
+
+const agentBoardPatchConnectPortsSchema = z.object({
+  op: z.literal("connect_ports"),
+  from: agentBoardPatchPortRefSchema,
+  to: agentBoardPatchPortRefSchema,
+});
+
+const agentBoardPatchSchema = z.object({
+  title: z.string().optional(),
+  run: z.boolean().optional(),
+  shots: z.array(z.object({
+    id: z.string().optional(),
+    scene: z.string().optional(),
+    shot: z.string().optional(),
+    beat: z.string().optional(),
+    imagePrompt: z.string().optional(),
+    videoPrompt: z.string().optional(),
+    run: z.boolean().optional(),
+  })).optional(),
+  operations: z.array(z.discriminatedUnion("op", [
+    agentBoardPatchCreateNodeSchema,
+    agentBoardPatchUpdateNodeSchema,
+    agentBoardPatchConnectPortsSchema,
+  ])),
+});
+
 const agentBoardActionSchema = z.object({
-  type: z.enum(["none", "create_board_image_flow", "create_board_video_flow", "create_board_note"]),
+  type: z.enum(AGENT_BOARD_ACTION_TYPES),
   params: z
     .object({
+      nodeId: z.string().optional(),
       prompt: z.string().optional(),
       model: z.string().optional(),
       aspectRatio: z.string().optional(),
@@ -117,6 +191,8 @@ const agentBoardActionSchema = z.object({
       videoPreset: z.string().optional(),
       title: z.string().optional(),
       body: z.string().optional(),
+      instruction: z.string().optional(),
+      boardPatch: agentBoardPatchSchema.optional(),
       run: z.boolean().optional(),
     })
     .optional(),
@@ -208,8 +284,11 @@ export async function POST(req: NextRequest) {
       ? "\n## Board Surface\n" +
         "The user is operating a spatial board. Use get_board_context / get_connected_context before recommending board changes.\n" +
         "For board mutations, prefer boardAction over recommendedAction. Do not invent a general DAG or ComfyUI workflow.\n" +
-        "Allowed boardAction.type values: none, create_board_image_flow, create_board_video_flow, create_board_note.\n" +
-        "create_board_image_flow/create_board_video_flow should include params.prompt and may include params.model, params.aspectRatio, params.referenceImageId, params.run.\n"
+        "Allowed boardAction.type values: none, create_board_image_flow, create_board_video_flow, create_board_note, update_board_node, apply_board_patch, continue_image_to_video.\n" +
+        "create_board_image_flow/create_board_video_flow should include params.prompt and may include params.model, params.aspectRatio, params.referenceImageId, params.run.\n" +
+        "Use update_board_node when the user asks to revise the selected/current board node or a specific node. Include params.nodeId when known; otherwise omit it to target the current selection. Use params.prompt for Prompt and generation nodes, params.body for Note nodes, and params.instruction for Agent nodes. If no target can be resolved, return boardAction.type none and ask the user to select a node.\n" +
+        "Use apply_board_patch for multi-shot storyboard plans. Put the plan in params.boardPatch.operations. Allowed operations are create_node, update_node, connect_ports. Use tempId for created nodes and refer to it from later connect_ports operations. Keep patches to 36 operations or fewer; split larger scripts into follow-ups. Default params.boardPatch.run to false unless the user explicitly asks to run generation.\n" +
+        "Use continue_image_to_video only when the target is an existing image asset or completed image generation result. Include params.nodeId when known, plus params.prompt and a video params.model.\n"
       : "\n## Workbench Surface\nUse recommendedAction for normal workstation actions. Keep boardAction.type as none.\n";
 
     const systemInstruction =
@@ -221,6 +300,7 @@ export async function POST(req: NextRequest) {
       "- Call query_models before recommending a generation model.\n" +
       "- Call get_gallery_assets when the user references previous assets.\n\n" +
       "- On board surface, call get_board_context or get_connected_context before returning boardAction.\n" +
+      "- Call get_prompt_blueprint with screenplay-draft, script-analysis, shot-breakdown, or storyboard-board-patch when the user asks for script/storyboard workflow planning.\n" +
       "- Call get_prompt_templates when the user asks for reusable prompt templates.\n\n" +
       "## Skill Registry\n" +
       `${skillsText}\n\n` +
@@ -233,7 +313,7 @@ export async function POST(req: NextRequest) {
       `${galleryText}\n\n` +
       "## Output\n" +
       "Return ONLY valid JSON:\n" +
-      '{"thought":"...","text":"Chinese user-facing reply","activeSkills":["..."],"recommendedAction":{"type":"none|optimize_prompt|generate_image|edit_image|generate_video","params":{"prompt":"...","model":"...","aspectRatio":"...","referenceImageId":"...","imageResolution":"...","imageQuality":"...","thinkingLevel":"...","videoResolution":"...","videoDuration":"...","videoPreset":"..."}},"boardAction":{"type":"none|create_board_image_flow|create_board_video_flow|create_board_note","params":{"prompt":"...","model":"...","aspectRatio":"...","referenceImageId":"...","imageResolution":"...","imageQuality":"...","thinkingLevel":"...","videoResolution":"...","videoDuration":"...","videoPreset":"...","title":"...","body":"...","run":true}},"suggestedFollowUps":["...","..."]}\n\n' +
+      '{"thought":"...","text":"Chinese user-facing reply","activeSkills":["..."],"recommendedAction":{"type":"none|optimize_prompt|generate_image|edit_image|generate_video","params":{"prompt":"...","model":"...","aspectRatio":"...","referenceImageId":"...","imageResolution":"...","imageQuality":"...","thinkingLevel":"...","videoResolution":"...","videoDuration":"...","videoPreset":"..."}},"boardAction":{"type":"none|create_board_image_flow|create_board_video_flow|create_board_note|update_board_node|apply_board_patch|continue_image_to_video","params":{"nodeId":"...","prompt":"...","model":"...","aspectRatio":"...","referenceImageId":"...","imageResolution":"...","imageQuality":"...","thinkingLevel":"...","videoResolution":"...","videoDuration":"...","videoPreset":"...","title":"...","body":"...","instruction":"...","boardPatch":{"title":"...","run":false,"shots":[{"id":"S1","scene":"...","shot":"...","beat":"...","imagePrompt":"...","videoPrompt":"...","run":false}],"operations":[{"op":"create_node","tempId":"shot1_prompt","kind":"prompt","title":"S1 Prompt","prompt":"...","position":{"x":120,"y":160}},{"op":"create_node","tempId":"shot1_image","kind":"image-generate","title":"S1 Image","prompt":"...","model":"...","aspectRatio":"16:9","run":false,"position":{"x":520,"y":160}},{"op":"connect_ports","from":{"nodeId":"shot1_prompt","portId":"prompt-out","portKind":"prompt"},"to":{"nodeId":"shot1_image","portId":"prompt-in","portKind":"prompt"}}]},"run":true}},"suggestedFollowUps":["...","..."]}\n\n' +
       referenceMsg;
 
     const tools = getAgentTools();

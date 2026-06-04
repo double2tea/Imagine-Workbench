@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import type { AgentToolAction } from "@/components/agent/AgentDock";
+import type { AgentBoardPatchOperation, AgentGenerationParams, AgentToolAction } from "@/lib/agent-actions";
 import {
   patchAgentToolAction,
   resolveImageActionParams,
@@ -34,11 +34,30 @@ function isImageActionType(type: AgentToolAction["type"]): boolean {
 }
 
 function isVideoActionType(type: AgentToolAction["type"]): boolean {
-  return type === "generate_video" || type === "create_board_video_flow";
+  return type === "generate_video" || type === "create_board_video_flow" || type === "continue_image_to_video";
 }
 
 function firstOptionValue(options: Array<{ value: string }>, fallback: string): string {
   return options[0]?.value ?? fallback;
+}
+
+function describePatchOperation(operation: AgentBoardPatchOperation): string {
+  if (operation.op === "create_node") return `创建 ${operation.kind}: ${operation.title ?? operation.tempId}`;
+  if (operation.op === "update_node") return `更新节点: ${operation.nodeId}`;
+  return `连接: ${operation.from.nodeId}.${operation.from.portId} -> ${operation.to.nodeId}.${operation.to.portId}`;
+}
+
+function editablePatchField(operation: AgentBoardPatchOperation): { field: "prompt" | "body" | "instruction"; value: string } | null {
+  if (operation.op === "connect_ports") return null;
+  if ("body" in operation && typeof operation.body === "string") return { field: "body", value: operation.body };
+  if ("instruction" in operation && typeof operation.instruction === "string") return { field: "instruction", value: operation.instruction };
+  if ("prompt" in operation && typeof operation.prompt === "string") return { field: "prompt", value: operation.prompt };
+  if (operation.op === "create_node") {
+    if (operation.kind === "note") return { field: "body", value: "" };
+    if (operation.kind === "agent") return { field: "instruction", value: "" };
+    return { field: "prompt", value: "" };
+  }
+  return null;
 }
 
 export function AgentPendingActionEditor({
@@ -53,7 +72,9 @@ export function AgentPendingActionEditor({
   const isImage = isImageActionType(action.type) && !isEditImage;
   const isVideo = isVideoActionType(action.type);
   const isNote = action.type === "create_board_note";
-  const showPrompt = action.type !== "none" && !isNote;
+  const isBoardNodeUpdate = action.type === "update_board_node";
+  const isBoardPatch = action.type === "apply_board_patch";
+  const showPrompt = action.type !== "none" && !isNote && !isBoardNodeUpdate && !isBoardPatch;
   const showNoteFields = isNote;
 
   const imageModel = params.model ?? "";
@@ -88,6 +109,19 @@ export function AgentPendingActionEditor({
 
   const updateParams = (patch: NonNullable<AgentToolAction["params"]>) => {
     onChange(patchAgentToolAction(action, patch));
+  };
+
+  const updateBoardPatchParams = (patch: Partial<NonNullable<AgentGenerationParams["boardPatch"]>>) => {
+    if (!params.boardPatch) return;
+    updateParams({ boardPatch: { ...params.boardPatch, ...patch } });
+  };
+
+  const updatePatchOperation = (index: number, patch: Partial<AgentBoardPatchOperation>) => {
+    if (!params.boardPatch) return;
+    const operations = params.boardPatch.operations.map((operation, operationIndex) => (
+      operationIndex === index ? { ...operation, ...patch } as AgentBoardPatchOperation : operation
+    ));
+    updateBoardPatchParams({ operations });
   };
 
   const handleModelChange = (model: string) => {
@@ -154,6 +188,85 @@ export function AgentPendingActionEditor({
             />
           </label>
         </>
+      )}
+
+      {isBoardNodeUpdate && (
+        <>
+          <label className="imagine-agent-action-field">
+            <span className="imagine-agent-action-field-label">目标节点 ID</span>
+            <input
+              type="text"
+              value={params.nodeId ?? ""}
+              disabled={disabled}
+              onChange={event => updateParams({ nodeId: event.target.value })}
+              className="imagine-agent-action-input"
+              placeholder="留空则使用当前选中节点"
+            />
+          </label>
+          <label className="imagine-agent-action-field">
+            <span className="imagine-agent-action-field-label">提示词 / Agent 指令 / 笔记内容</span>
+            <textarea
+              value={params.prompt ?? params.instruction ?? params.body ?? ""}
+              disabled={disabled}
+              rows={3}
+              onChange={event => updateParams({ prompt: event.target.value, instruction: event.target.value, body: event.target.value })}
+              className="imagine-agent-action-textarea"
+              placeholder="执行前可修改要写入节点的内容"
+            />
+          </label>
+        </>
+      )}
+
+      {isBoardPatch && params.boardPatch && (
+        <div className="imagine-agent-action-field">
+          <span className="imagine-agent-action-field-label">画板补丁</span>
+          <input
+            type="text"
+            value={params.boardPatch.title ?? ""}
+            disabled={disabled}
+            onChange={event => updateBoardPatchParams({ title: event.target.value })}
+            className="imagine-agent-action-input"
+            placeholder="补丁标题"
+          />
+          <label className="mt-2 flex items-center gap-2 text-[11px] text-[var(--iw-muted)]">
+            <input
+              type="checkbox"
+              checked={params.boardPatch.run === true}
+              disabled={disabled}
+              onChange={event => updateBoardPatchParams({ run: event.target.checked })}
+            />
+            执行后立即运行生成节点
+          </label>
+          {params.boardPatch.shots?.length ? (
+            <div className="mt-2 space-y-1 text-[11px] text-[var(--iw-muted)]">
+              {params.boardPatch.shots.slice(0, 6).map((shot, index) => (
+                <p key={`${shot.id ?? "shot"}-${index}`}>
+                  {shot.scene ?? "Scene"} / {shot.shot ?? `Shot ${index + 1}`}: {shot.beat ?? shot.imagePrompt ?? "未填写 beat"}
+                </p>
+              ))}
+            </div>
+          ) : null}
+          <div className="mt-2 space-y-2">
+            {params.boardPatch.operations.map((operation, index) => {
+              const editable = editablePatchField(operation);
+              return (
+                <div key={`${operation.op}-${index}`} className="rounded-md border border-white/10 p-2">
+                  <p className="text-[11px] font-medium text-[var(--iw-text)]">{index + 1}. {describePatchOperation(operation)}</p>
+                  {editable ? (
+                    <textarea
+                      value={editable.value}
+                      disabled={disabled}
+                      rows={2}
+                      onChange={event => updatePatchOperation(index, { [editable.field]: event.target.value } as Partial<AgentBoardPatchOperation>)}
+                      className="imagine-agent-action-textarea mt-2"
+                      placeholder="执行前可修改文本内容"
+                    />
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
 
       {(isImage || isVideo) && modelGroups.length > 0 && (

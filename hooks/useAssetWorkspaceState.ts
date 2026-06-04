@@ -63,7 +63,7 @@ export function useAssetWorkspaceState(items: StorageItem[]) {
   const assetStats = useMemo<AssetStats>(() => {
     const dateCounts = new Map<string, number>();
     const models = new Set<string>();
-    const typeCounts: Record<StorageItem["type"], number> = { image: 0, video: 0 };
+    const typeCounts: Record<StorageItem["type"], number> = { audio: 0, image: 0, video: 0 };
     const statusCounts: Record<StorageItem["status"], number> = {
       complete: 0,
       failed: 0,

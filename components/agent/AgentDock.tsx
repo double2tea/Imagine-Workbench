@@ -12,7 +12,7 @@ import {
 import { AgentModelSelect } from "@/components/agent/AgentModelSelect";
 import { AgentActionSummary } from "@/components/agent/AgentActionSummary";
 import { AgentPendingActionEditor } from "@/components/agent/AgentPendingActionEditor";
-import type { AgentGenerationParams } from "@/lib/agent-tool-action";
+import type { AgentBoardAction, AgentToolAction, AgentWorkbenchAction } from "@/lib/agent-actions";
 import type { AiProvider, ModelOption } from "@/lib/providers/model-catalog";
 
 export interface ChatMessage {
@@ -20,14 +20,8 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   thought?: string;
-  recommendedAction?: {
-    type: "none" | "optimize_prompt" | "generate_image" | "edit_image" | "generate_video";
-    params?: AgentGenerationParams;
-  };
-  boardAction?: {
-    type: "none" | "create_board_image_flow" | "create_board_video_flow" | "create_board_note";
-    params?: AgentGenerationParams;
-  };
+  recommendedAction?: AgentWorkbenchAction;
+  boardAction?: AgentBoardAction;
   actionDraft?: AgentToolAction;
   suggestedFollowUps?: string[];
   interactiveState?: "idle" | "executing" | "completed" | "declined";
@@ -35,9 +29,7 @@ export interface ChatMessage {
   toolCalls?: Array<{ name: string; args: Record<string, unknown> }>;
 }
 
-export type AgentWorkbenchAction = NonNullable<ChatMessage["recommendedAction"]>;
-export type AgentBoardAction = NonNullable<ChatMessage["boardAction"]>;
-export type AgentToolAction = AgentWorkbenchAction | AgentBoardAction;
+export type { AgentBoardAction, AgentToolAction, AgentWorkbenchAction };
 
 interface AgentModelGroup {
   provider: AiProvider;
@@ -97,6 +89,11 @@ const TOOL_LABELS: Record<string, string> = {
 };
 
 const SKILL_LABELS: Record<string, { label: string; className: string }> = {
+  Screenwriter: { label: "剧本写作", className: "bg-orange-500/12 text-orange-300 border-orange-500/20" },
+  ScriptAnalyzer: { label: "剧本分析", className: "bg-cyan-500/12 text-cyan-300 border-cyan-500/20" },
+  ShotBreakdownPlanner: { label: "分镜拆解", className: "bg-purple-500/12 text-purple-300 border-purple-500/20" },
+  StoryboardBoardComposer: { label: "分镜画板", className: "bg-fuchsia-500/12 text-fuchsia-300 border-fuchsia-500/20" },
+  BatchGenerationPlanner: { label: "批量规划", className: "bg-emerald-500/12 text-emerald-300 border-emerald-500/20" },
   PromptEngineer: { label: "提示词工程", className: "bg-teal-500/12 text-teal-300 border-teal-500/20" },
   PromptTemplateLibrarian: { label: "模板库", className: "bg-lime-500/12 text-lime-300 border-lime-500/20" },
   BoardContextRetriever: { label: "画板上下文", className: "bg-blue-500/12 text-blue-300 border-blue-500/20" },
@@ -124,6 +121,9 @@ const ACTION_LABELS: Record<AgentToolAction["type"], string> = {
   create_board_image_flow: "创建图片节点流程",
   create_board_video_flow: "创建视频节点流程",
   create_board_note: "创建画板笔记",
+  update_board_node: "更新画板节点",
+  apply_board_patch: "应用画板补丁",
+  continue_image_to_video: "从图片续接视频",
 };
 
 export function getExecutableAction(message: ChatMessage): AgentToolAction | null {

@@ -4,7 +4,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { flushSync } from "react-dom";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
-import AgentDock, { type AgentToolAction } from "@/components/agent/AgentDock";
+import AgentDock from "@/components/agent/AgentDock";
+import {
+  AGENT_BOARD_PATCH_MAX_OPERATIONS,
+  type AgentBoardPatch,
+  type AgentBoardPatchCreateNodeOperation,
+  type AgentBoardPatchOperation,
+  type AgentBoardPatchPortRef,
+  type AgentGenerationParams,
+  type AgentToolAction,
+} from "@/lib/agent-actions";
 import { isCustomImageResolutionValue } from "@/lib/agent-tool-action";
 import AtReferenceDropdown from "@/components/reference/AtReferenceDropdown";
 import CanvasMaskEditor from "@/components/CanvasMaskEditor";
@@ -54,14 +63,23 @@ import { getProviderMeta, PROVIDER_KEYS } from "@/lib/providers/registry";
 import { compressReferenceImageDataUrl, compressReferenceImageFile } from "@/lib/reference-images";
 import {
   DEFAULT_BOARD_ID,
+  DEFAULT_AGENT_NODE_SIZE,
+  DEFAULT_GENERATE_NODE_SIZE,
+  DEFAULT_NOTE_NODE_SIZE,
+  DEFAULT_PROMPT_NODE_SIZE,
+  BOARD_PORT_IDS,
   createEmptyBoard,
   deleteBoardFromDB,
   listBoardSummariesFromDB,
+  resolveBoardConnectionKind,
   saveBoardToDB,
   type BoardDocument,
+  type BoardGenerateNodeUpdate,
   type BoardGenerationStatus,
   type BoardImageGenerateNode,
+  type BoardNode,
   type BoardPoint,
+  type BoardPortRef,
   type BoardSummary,
   type BoardVideoGenerateNode,
   assetCompareReferenceUrl,
@@ -69,6 +87,7 @@ import {
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import {
   flushAllBoardText,
+  flushBoardText,
   flushBoardTextForAgentNode,
   flushBoardTextForGenerateNode,
   getBoardTextDraft,
@@ -96,6 +115,10 @@ type GenerateBoardNode = BoardImageGenerateNode | BoardVideoGenerateNode;
 type AgentGenerateAction = AgentToolAction & { type: "generate_image" | "generate_video" };
 type AgentBoardFlowAction = AgentToolAction & { type: "create_board_image_flow" | "create_board_video_flow" };
 type AgentBoardNoteAction = AgentToolAction & { type: "create_board_note" };
+type AgentBoardUpdateAction = AgentToolAction & { type: "update_board_node" };
+type AgentBoardPatchAction = AgentToolAction & { type: "apply_board_patch" };
+type AgentImageToVideoAction = AgentToolAction & { type: "continue_image_to_video" };
+type BoardAgentActionResult = boolean | { handled: true; success: boolean };
 
 interface BoardPageProps {
   boardId?: string;
@@ -287,6 +310,22 @@ function isAgentBoardNoteAction(action: AgentToolAction): action is AgentBoardNo
   return action.type === "create_board_note";
 }
 
+function isAgentBoardUpdateAction(action: AgentToolAction): action is AgentBoardUpdateAction {
+  return action.type === "update_board_node";
+}
+
+function isAgentBoardPatchAction(action: AgentToolAction): action is AgentBoardPatchAction {
+  return action.type === "apply_board_patch";
+}
+
+function isAgentImageToVideoAction(action: AgentToolAction): action is AgentImageToVideoAction {
+  return action.type === "continue_image_to_video";
+}
+
+function handledBoardAction(success: boolean): BoardAgentActionResult {
+  return { handled: true, success };
+}
+
 function shouldRunAgentBoardFlow(action: AgentGenerateAction | AgentBoardFlowAction): boolean {
   if (isAgentBoardFlowAction(action)) return action.params?.run !== false;
   return true;
@@ -300,7 +339,207 @@ function sliceAgentText(value: string): string {
   return value.trim().slice(0, 240);
 }
 
-function summarizeBoardNodeForAgent(node: BoardDocument["nodes"][number]): AgentBoardNodeSummary {
+function firstTextParam(params: AgentGenerationParams | undefined): string {
+  return params?.prompt?.trim() || params?.body?.trim() || params?.instruction?.trim() || "";
+}
+
+function buildGenerateNodeUpdate(
+  node: GenerateBoardNode,
+  params: AgentGenerationParams | undefined,
+): BoardGenerateNodeUpdate {
+  const update: BoardGenerateNodeUpdate = {};
+  const prompt = params?.prompt?.trim();
+  if (prompt) update.prompt = prompt;
+  if (params?.model?.trim()) {
+    getModelCapability(params.model, node.kind === "image-generate" ? "image" : "video");
+    update.model = params.model;
+  }
+  if (params?.aspectRatio?.trim()) update.aspectRatio = params.aspectRatio;
+  if (node.kind === "image-generate") {
+    if (params?.imageResolution?.trim()) update.imageResolution = params.imageResolution;
+    if (params?.imageQuality?.trim()) update.imageQuality = params.imageQuality;
+    if (params?.thinkingLevel?.trim()) update.thinkingLevel = params.thinkingLevel;
+  } else {
+    if (params?.videoResolution?.trim()) update.videoResolution = params.videoResolution;
+    if (params?.videoDuration?.trim()) update.videoDuration = params.videoDuration;
+    if (params?.videoPreset?.trim()) update.videoPreset = params.videoPreset;
+  }
+  return update;
+}
+
+function hasGenerateNodeUpdate(update: BoardGenerateNodeUpdate): boolean {
+  return Object.keys(update).length > 0;
+}
+
+function createPreviewBoardNode(operation: AgentBoardPatchCreateNodeOperation, index: number): BoardNode {
+  const createdAt = new Date().toISOString();
+  const position = operation.position ?? { x: 120 + index * 32, y: 160 + index * 24 };
+  const base = {
+    id: operation.tempId,
+    title: operation.title ?? operation.tempId,
+    position,
+    createdAt,
+    updatedAt: createdAt,
+  };
+  if (operation.kind === "prompt") {
+    return { ...base, kind: "prompt", size: DEFAULT_PROMPT_NODE_SIZE, prompt: operation.prompt ?? "" };
+  }
+  if (operation.kind === "note") {
+    return { ...base, kind: "note", size: DEFAULT_NOTE_NODE_SIZE, body: operation.body ?? operation.prompt ?? "" };
+  }
+  if (operation.kind === "agent") {
+    return { ...base, kind: "agent", size: DEFAULT_AGENT_NODE_SIZE, instruction: operation.instruction ?? operation.prompt ?? "" };
+  }
+  if (operation.kind === "image-generate") {
+    const model = operation.model ?? DEFAULT_IMAGE_MODEL;
+    const defaults = imageActionDefaults(model, operation.aspectRatio);
+    getModelCapability(model, "image");
+    return {
+      ...base,
+      ...defaults,
+      kind: "image-generate",
+      size: DEFAULT_GENERATE_NODE_SIZE,
+      model,
+      prompt: operation.prompt ?? "",
+      status: "idle",
+      variantCount: 1,
+      ...(operation.aspectRatio ? { aspectRatio: operation.aspectRatio } : {}),
+      ...(operation.imageResolution ? { imageResolution: operation.imageResolution } : {}),
+      ...(operation.imageQuality ? { imageQuality: operation.imageQuality } : {}),
+      ...(operation.thinkingLevel ? { thinkingLevel: operation.thinkingLevel } : {}),
+    };
+  }
+  const model = operation.model ?? DEFAULT_VIDEO_MODEL;
+  const defaults = videoActionDefaults(model, operation.aspectRatio);
+  getModelCapability(model, "video");
+  return {
+    ...base,
+    ...defaults,
+    kind: "video-generate",
+    size: DEFAULT_GENERATE_NODE_SIZE,
+    model,
+    prompt: operation.prompt ?? "",
+    status: "idle",
+    variantCount: 1,
+    ...(operation.aspectRatio ? { aspectRatio: operation.aspectRatio } : {}),
+    ...(operation.videoResolution ? { videoResolution: operation.videoResolution } : {}),
+    ...(operation.videoDuration ? { videoDuration: operation.videoDuration } : {}),
+    ...(operation.videoPreset ? { videoPreset: operation.videoPreset } : {}),
+  };
+}
+
+function resolvePatchNodeId(nodeId: string, tempToRealIds: Map<string, string>): string {
+  return tempToRealIds.get(nodeId) ?? nodeId;
+}
+
+function resolvePatchPortRef(ref: AgentBoardPatchPortRef, tempToRealIds: Map<string, string>): BoardPortRef {
+  return {
+    nodeId: resolvePatchNodeId(ref.nodeId, tempToRealIds),
+    portId: ref.portId,
+    portKind: ref.portKind,
+  };
+}
+
+function updatePreviewNode(node: BoardNode, operation: AgentBoardPatchOperation): BoardNode {
+  if (operation.op !== "update_node") return node;
+  const updatedAt = new Date().toISOString();
+  if (node.kind === "prompt") {
+    if (!operation.prompt?.trim()) throw new Error("Prompt 节点更新缺少 prompt");
+    return { ...node, prompt: operation.prompt, updatedAt };
+  }
+  if (node.kind === "note") {
+    const body = operation.body ?? operation.prompt;
+    if (!body?.trim()) throw new Error("Note 节点更新缺少 body");
+    return { ...node, body, updatedAt };
+  }
+  if (node.kind === "agent") {
+    const instruction = operation.instruction ?? operation.prompt;
+    if (!instruction?.trim()) throw new Error("Agent 节点更新缺少 instruction");
+    return { ...node, instruction, updatedAt };
+  }
+  if (node.kind === "image-generate" || node.kind === "video-generate") {
+    if (node.status === "processing") throw new Error("生成中的节点不可直接更新");
+    const update = buildGenerateNodeUpdate(node, operation);
+    if (!hasGenerateNodeUpdate(update)) throw new Error("生成节点更新缺少参数");
+    return { ...node, ...update, updatedAt };
+  }
+  throw new Error("画板补丁不支持更新该类型节点");
+}
+
+function validateBoardPatch(patch: AgentBoardPatch, currentNodes: BoardNode[]): void {
+  if (patch.operations.length === 0) throw new Error("画板补丁没有操作");
+  if (patch.operations.length > AGENT_BOARD_PATCH_MAX_OPERATIONS) {
+    throw new Error(`画板补丁最多支持 ${AGENT_BOARD_PATCH_MAX_OPERATIONS} 个操作`);
+  }
+
+  const previewNodes = [...currentNodes];
+  const tempIds = new Set<string>();
+  patch.operations.forEach((operation, index) => {
+    if (operation.op === "create_node") {
+      if (!operation.tempId.trim()) throw new Error("创建节点缺少 tempId");
+      if (tempIds.has(operation.tempId) || currentNodes.some(node => node.id === operation.tempId)) {
+        throw new Error(`重复的临时节点 ID: ${operation.tempId}`);
+      }
+      tempIds.add(operation.tempId);
+      previewNodes.push(createPreviewBoardNode(operation, index));
+      return;
+    }
+    if (operation.op === "update_node") {
+      if (tempIds.has(operation.nodeId)) {
+        throw new Error("同一补丁内不能更新临时节点；请在 create_node 中填完整字段");
+      }
+      const indexToUpdate = previewNodes.findIndex(node => node.id === operation.nodeId);
+      if (indexToUpdate < 0) throw new Error(`未找到要更新的节点: ${operation.nodeId}`);
+      previewNodes[indexToUpdate] = updatePreviewNode(previewNodes[indexToUpdate], operation);
+      return;
+    }
+    const from = resolvePatchPortRef(operation.from, new Map());
+    const to = resolvePatchPortRef(operation.to, new Map());
+    resolveBoardConnectionKind(previewNodes, from, to);
+  });
+}
+
+function resolveBoardPatchRunInputs(
+  patch: AgentBoardPatch,
+  generateOperation: AgentBoardPatchCreateNodeOperation,
+  generatedNodeId: string,
+  tempToRealIds: Map<string, string>,
+  currentNodes: BoardNode[],
+  resolveUrl: BoardReferenceUrlResolver,
+): { prompt: string; references: ReferenceImageRef[] } {
+  let prompt = generateOperation.prompt?.trim() ?? "";
+  const references: ReferenceImageRef[] = [];
+  patch.operations.forEach(operation => {
+    if (operation.op !== "connect_ports") return;
+    const targetNodeId = resolvePatchNodeId(operation.to.nodeId, tempToRealIds);
+    if (targetNodeId !== generatedNodeId) return;
+    if (operation.to.portId === BOARD_PORT_IDS.promptIn) {
+      const sourceTempOperation = patch.operations.find(item =>
+        item.op === "create_node" &&
+        item.tempId === operation.from.nodeId &&
+        item.kind === "prompt"
+      );
+      if (sourceTempOperation?.op === "create_node" && sourceTempOperation.kind === "prompt") {
+        prompt = sourceTempOperation.prompt?.trim() ?? prompt;
+        return;
+      }
+      const sourceNodeId = resolvePatchNodeId(operation.from.nodeId, tempToRealIds);
+      const sourceNode = currentNodes.find(node => node.id === sourceNodeId);
+      if (sourceNode?.kind === "prompt") {
+        prompt = (getBoardTextDraft(sourceNode.id) ?? sourceNode.prompt).trim();
+      }
+      return;
+    }
+    if (operation.to.portId === BOARD_PORT_IDS.referenceIn) {
+      const sourceNodeId = resolvePatchNodeId(operation.from.nodeId, tempToRealIds);
+      const sourceNode = currentNodes.find(node => node.id === sourceNodeId);
+      references.push(...boardNodeReferences(sourceNode, resolveUrl));
+    }
+  });
+  return { prompt, references };
+}
+
+function summarizeBoardNodeForAgent(node: BoardDocument["nodes"][number], draftText?: string): AgentBoardNodeSummary {
   switch (node.kind) {
     case "asset":
       return {
@@ -317,7 +556,7 @@ function summarizeBoardNodeForAgent(node: BoardDocument["nodes"][number]): Agent
         id: node.id,
         kind: node.kind,
         title: node.title,
-        prompt: sliceAgentText(node.prompt),
+        prompt: sliceAgentText(draftText ?? node.prompt),
       };
     case "reference-group":
       return {
@@ -332,7 +571,7 @@ function summarizeBoardNodeForAgent(node: BoardDocument["nodes"][number]): Agent
         id: node.id,
         kind: node.kind,
         title: node.title,
-        prompt: sliceAgentText(node.prompt),
+        prompt: sliceAgentText(draftText ?? node.prompt),
         model: node.model,
         aspectRatio: node.aspectRatio,
         status: node.status,
@@ -343,14 +582,14 @@ function summarizeBoardNodeForAgent(node: BoardDocument["nodes"][number]): Agent
         id: node.id,
         kind: node.kind,
         title: node.title,
-        instruction: sliceAgentText(node.instruction),
+        instruction: sliceAgentText(draftText ?? node.instruction),
       };
     case "note":
       return {
         id: node.id,
         kind: node.kind,
         title: node.title,
-        body: sliceAgentText(node.body),
+        body: sliceAgentText(draftText ?? node.body),
       };
   }
 }
@@ -765,19 +1004,22 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     );
   };
 
-  const buildAgentBoardContext = useCallback((): AgentBoardContext => ({
-    boardId: boardController.board.id,
-    title: boardController.board.title,
-    selectedNodeId: boardController.selectedNodeId,
-    selectedEdgeId: boardController.selectedEdgeId,
-    nodes: boardController.board.nodes.slice(0, 60).map(summarizeBoardNodeForAgent),
-    edges: boardController.board.edges.slice(0, 100).map(edge => ({
-      id: edge.id,
-      kind: edge.kind,
-      from: edge.from,
-      to: edge.to,
-    })),
-  }), [
+  const buildAgentBoardContext = useCallback((): AgentBoardContext => {
+    flushAllBoardText();
+    return {
+      boardId: boardController.board.id,
+      title: boardController.board.title,
+      selectedNodeId: boardController.selectedNodeId,
+      selectedEdgeId: boardController.selectedEdgeId,
+      nodes: boardController.board.nodes.slice(0, 60).map(node => summarizeBoardNodeForAgent(node, getBoardTextDraft(node.id))),
+      edges: boardController.board.edges.slice(0, 100).map(edge => ({
+        id: edge.id,
+        kind: edge.kind,
+        from: edge.from,
+        to: edge.to,
+      })),
+    };
+  }, [
     boardController.board.edges,
     boardController.board.id,
     boardController.board.nodes,
@@ -792,12 +1034,401 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   }: {
     action: AgentToolAction;
     references: ReferenceImageRef[];
-  }): Promise<boolean> => {
+  }): Promise<BoardAgentActionResult> => {
+    if (isAgentBoardPatchAction(action)) {
+      const patch = action.params?.boardPatch;
+      if (!patch) {
+        pushWorkspaceNotice("error", "Agent 画板补丁缺少操作");
+        return handledBoardAction(false);
+      }
+      flushAllBoardText();
+      try {
+        validateBoardPatch(patch, boardController.board.nodes);
+      } catch (error) {
+        pushWorkspaceNotice("error", toErrorMessage(error, "Agent 画板补丁无效"));
+        return handledBoardAction(false);
+      }
+
+      const tempToRealIds = new Map<string, string>();
+      const runQueue: Array<{ id: string; operation: AgentBoardPatchCreateNodeOperation }> = [];
+      boardController.beginUndoGesture();
+      try {
+        patch.operations.forEach(operation => {
+          if (operation.op === "create_node") {
+            let nodeId: string;
+            if (operation.kind === "prompt") {
+              nodeId = boardController.addPromptNode({
+                title: operation.title,
+                prompt: operation.prompt,
+                position: operation.position,
+              });
+            } else if (operation.kind === "note") {
+              nodeId = boardController.addNoteNode({
+                title: operation.title,
+                body: operation.body ?? operation.prompt,
+                position: operation.position,
+              });
+            } else if (operation.kind === "agent") {
+              nodeId = boardController.addAgentNode({
+                title: operation.title,
+                instruction: operation.instruction ?? operation.prompt,
+                position: operation.position,
+              });
+            } else if (operation.kind === "image-generate") {
+              const model = operation.model ?? DEFAULT_IMAGE_MODEL;
+              nodeId = boardController.addGenerateNode({
+                kind: operation.kind,
+                title: operation.title,
+                position: operation.position,
+                prompt: operation.prompt,
+                model,
+                ...imageActionDefaults(model, operation.aspectRatio),
+                ...(operation.aspectRatio ? { aspectRatio: operation.aspectRatio } : {}),
+                ...(operation.imageResolution ? { imageResolution: operation.imageResolution } : {}),
+                ...(operation.imageQuality ? { imageQuality: operation.imageQuality } : {}),
+                ...(operation.thinkingLevel ? { thinkingLevel: operation.thinkingLevel } : {}),
+              });
+            } else {
+              const model = operation.model ?? DEFAULT_VIDEO_MODEL;
+              nodeId = boardController.addGenerateNode({
+                kind: operation.kind,
+                title: operation.title,
+                position: operation.position,
+                prompt: operation.prompt,
+                model,
+                ...videoActionDefaults(model, operation.aspectRatio),
+                ...(operation.aspectRatio ? { aspectRatio: operation.aspectRatio } : {}),
+                ...(operation.videoResolution ? { videoResolution: operation.videoResolution } : {}),
+                ...(operation.videoDuration ? { videoDuration: operation.videoDuration } : {}),
+                ...(operation.videoPreset ? { videoPreset: operation.videoPreset } : {}),
+              });
+            }
+            tempToRealIds.set(operation.tempId, nodeId);
+            if ((patch.run || operation.run) && (operation.kind === "image-generate" || operation.kind === "video-generate")) {
+              runQueue.push({ id: nodeId, operation });
+            }
+            return;
+          }
+          if (operation.op === "update_node") {
+            const nodeId = resolvePatchNodeId(operation.nodeId, tempToRealIds);
+            const node = boardController.board.nodes.find(item => item.id === nodeId);
+            if (node?.kind === "prompt") {
+              boardController.updatePromptNode(nodeId, operation.prompt ?? "");
+            } else if (node?.kind === "note") {
+              boardController.updateNoteBody(nodeId, operation.body ?? operation.prompt ?? "");
+            } else if (node?.kind === "agent") {
+              boardController.updateAgentInstruction(nodeId, operation.instruction ?? operation.prompt ?? "");
+            } else if (node?.kind === "image-generate" || node?.kind === "video-generate") {
+              boardController.updateGenerateNode(nodeId, buildGenerateNodeUpdate(node, operation));
+            }
+            return;
+          }
+          boardController.connectPorts(
+            resolvePatchPortRef(operation.from, tempToRealIds),
+            resolvePatchPortRef(operation.to, tempToRealIds),
+          );
+        });
+      } finally {
+        boardController.endUndoGesture();
+      }
+
+      let runFailureCount = 0;
+      for (const item of runQueue) {
+        const operation = item.operation;
+        const model = operation.model ?? (operation.kind === "image-generate" ? DEFAULT_IMAGE_MODEL : DEFAULT_VIDEO_MODEL);
+        const runInputs = resolveBoardPatchRunInputs(
+          patch,
+          operation,
+          item.id,
+          tempToRealIds,
+          boardController.board.nodes,
+          resolveBoardReferenceUrl,
+        );
+        const promptValue = runInputs.prompt;
+        if (!promptValue) {
+          boardController.updateGenerateNode(item.id, { status: "failed", errorMessage: "批量生成节点缺少提示词" });
+          runFailureCount += 1;
+          continue;
+        }
+        const capability = getModelCapability(model, operation.kind === "image-generate" ? "image" : "video");
+        if (runInputs.references.length > 0 && !capability.supportsReferences) {
+          boardController.updateGenerateNode(item.id, { status: "failed", errorMessage: "当前模型不支持参考图输入" });
+          runFailureCount += 1;
+          continue;
+        }
+        if (operation.kind === "image-generate") {
+          const defaults = imageActionDefaults(model, operation.aspectRatio);
+          boardController.updateGenerateNode(item.id, { status: "processing", errorMessage: undefined, prompt: promptValue });
+          const didStart = await generateManualImage({
+            boardId: resolvedBoardId,
+            boardNodeId: item.id,
+            imageQuality: operation.imageQuality ?? defaults.imageQuality,
+            imageResolution: operation.imageResolution ?? defaults.imageResolution,
+            isCustomImageResolution: isCustomImageResolutionValue(operation.imageResolution ?? defaults.imageResolution),
+            model,
+            prompt: promptValue,
+            referenceImage: runInputs.references[0]?.url ?? null,
+            referenceImages: runInputs.references,
+            size: operation.aspectRatio ?? defaults.aspectRatio,
+            thinkingLevel: operation.thinkingLevel ?? defaults.thinkingLevel,
+          });
+          if (!didStart) {
+            runFailureCount += 1;
+            boardController.updateGenerateNode(item.id, { status: "failed", errorMessage: "图片生成请求未启动" });
+          }
+        } else {
+          const defaults = videoActionDefaults(model, operation.aspectRatio);
+          const videoCapability = getVideoModelCapabilities(model);
+          if (runInputs.references.length < videoCapability.minReferenceImages || runInputs.references.length > videoCapability.maxReferenceImages) {
+            runFailureCount += 1;
+            boardController.updateGenerateNode(item.id, {
+              status: "failed",
+              errorMessage: `当前视频模型需要 ${videoCapability.minReferenceImages}-${videoCapability.maxReferenceImages} 张参考图`,
+            });
+            continue;
+          }
+          boardController.updateGenerateNode(item.id, { status: "processing", errorMessage: undefined, prompt: promptValue });
+          const didStart = await generateManualVideo({
+            boardId: resolvedBoardId,
+            boardNodeId: item.id,
+            model,
+            prompt: promptValue,
+            referenceImage: runInputs.references[0]?.url ?? null,
+            referenceImages: runInputs.references,
+            size: operation.aspectRatio ?? defaults.aspectRatio,
+            videoDuration: operation.videoDuration ?? defaults.videoDuration,
+            videoPreset: operation.videoPreset ?? defaults.videoPreset,
+            videoResolution: operation.videoResolution ?? defaults.videoResolution,
+          });
+          if (!didStart) {
+            runFailureCount += 1;
+            boardController.updateGenerateNode(item.id, { status: "failed", errorMessage: "视频生成请求未启动" });
+          }
+        }
+      }
+
+      if (runFailureCount > 0) {
+        pushWorkspaceNotice("error", `已应用画板补丁，但 ${runFailureCount} 个生成节点未启动`);
+        return handledBoardAction(false);
+      }
+      pushWorkspaceNotice("success", `已应用画板补丁：${patch.operations.length} 个操作`);
+      return handledBoardAction(true);
+    }
+
+    if (isAgentImageToVideoAction(action)) {
+      const targetNodeId = action.params?.nodeId?.trim() || boardController.selectedNodeId;
+      const promptValue = action.params?.prompt?.trim();
+      const model = action.params?.model?.trim();
+      if (!targetNodeId) {
+        pushWorkspaceNotice("error", "请先选中要续接视频的图片节点");
+        return handledBoardAction(false);
+      }
+      if (!promptValue || !model) {
+        pushWorkspaceNotice("error", "图生视频续接缺少视频提示词或模型");
+        return handledBoardAction(false);
+      }
+      const sourceNode = boardController.board.nodes.find(node => node.id === targetNodeId);
+      if (!sourceNode) {
+        pushWorkspaceNotice("error", "未找到要续接视频的来源节点");
+        return handledBoardAction(false);
+      }
+      const sourceReference = sourceNode.kind === "asset" && sourceNode.asset.type === "image"
+        ? {
+          assetId: sourceNode.asset.assetId,
+          model: sourceNode.asset.model,
+          prompt: sourceNode.asset.prompt,
+          url: resolveBoardReferenceUrl(sourceNode.asset.assetId, sourceNode.asset.url),
+        }
+        : sourceNode.kind === "image-generate" && sourceNode.resultAssetId
+          ? (() => {
+            const item = items.find(current => current.id === sourceNode.resultAssetId && current.type === "image" && current.status === "complete");
+            return item
+              ? { assetId: item.id, model: item.model, prompt: item.prompt, url: resolveBoardReferenceUrl(item.id, item.url) }
+              : null;
+          })()
+          : null;
+      if (!sourceReference) {
+        pushWorkspaceNotice("error", "来源节点没有可用的完成图片资产");
+        return handledBoardAction(false);
+      }
+      const defaults = videoActionDefaults(model, action.params?.aspectRatio);
+      const capability = getModelCapability(model, "video");
+      if (!capability.supportsReferences) {
+        pushWorkspaceNotice("error", "当前视频模型不支持参考图续接");
+        return handledBoardAction(false);
+      }
+      const videoCapability = getVideoModelCapabilities(model);
+      if (videoCapability.minReferenceImages > 1 || videoCapability.maxReferenceImages < 1) {
+        pushWorkspaceNotice("error", `当前视频模型需要 ${videoCapability.minReferenceImages}-${videoCapability.maxReferenceImages} 张参考图`);
+        return handledBoardAction(false);
+      }
+
+      const sourcePosition = sourceNode.position;
+      boardController.beginUndoGesture();
+      let assetNodeId = sourceNode.kind === "asset"
+        ? sourceNode.id
+        : findBoardAssetNodeByAssetId(boardController.board.nodes, sourceReference.assetId)?.id ?? "";
+      let videoNodeId = "";
+      try {
+        if (!assetNodeId) {
+          assetNodeId = boardController.addAssetNode({
+            title: sourceReference.prompt || "Video reference",
+            asset: {
+              assetId: sourceReference.assetId,
+              type: "image",
+              model: sourceReference.model,
+              prompt: sourceReference.prompt,
+              url: sourceReference.url,
+            },
+            position: { x: sourcePosition.x + 360, y: sourcePosition.y + 220 },
+          });
+          boardController.connectPorts(
+            { nodeId: sourceNode.id, portId: BOARD_PORT_IDS.resultOut, portKind: "result" },
+            { nodeId: assetNodeId, portId: BOARD_PORT_IDS.assetIn, portKind: "asset" },
+          );
+        } else if (sourceNode.kind === "image-generate") {
+          boardController.connectPorts(
+            { nodeId: sourceNode.id, portId: BOARD_PORT_IDS.resultOut, portKind: "result" },
+            { nodeId: assetNodeId, portId: BOARD_PORT_IDS.assetIn, portKind: "asset" },
+          );
+        }
+        videoNodeId = boardController.addGenerateNode({
+          kind: "video-generate",
+          title: action.params?.title ?? "Image to Video",
+          prompt: promptValue,
+          model,
+          position: { x: sourcePosition.x + 720, y: sourcePosition.y },
+          ...defaults,
+          ...(action.params?.aspectRatio ? { aspectRatio: action.params.aspectRatio } : {}),
+          ...(action.params?.videoResolution ? { videoResolution: action.params.videoResolution } : {}),
+          ...(action.params?.videoDuration ? { videoDuration: action.params.videoDuration } : {}),
+          ...(action.params?.videoPreset ? { videoPreset: action.params.videoPreset } : {}),
+        });
+        boardController.connectPorts(
+          { nodeId: assetNodeId, portId: BOARD_PORT_IDS.assetOut, portKind: "asset" },
+          { nodeId: videoNodeId, portId: BOARD_PORT_IDS.referenceIn, portKind: "asset" },
+        );
+        boardController.selectNode(videoNodeId);
+        boardController.selectEdge(null);
+      } finally {
+        boardController.endUndoGesture();
+      }
+      if (action.params?.run === true) {
+        boardController.updateGenerateNode(videoNodeId, { status: "processing", errorMessage: undefined });
+        const reference = { id: sourceReference.assetId, url: sourceReference.url, role: "general" as const };
+        const didStart = await generateManualVideo({
+          boardId: resolvedBoardId,
+          boardNodeId: videoNodeId,
+          model,
+          prompt: promptValue,
+          referenceImage: reference.url,
+          referenceImages: [reference],
+          size: action.params.aspectRatio ?? defaults.aspectRatio,
+          videoDuration: action.params.videoDuration ?? defaults.videoDuration,
+          videoPreset: action.params.videoPreset ?? defaults.videoPreset,
+          videoResolution: action.params.videoResolution ?? defaults.videoResolution,
+        });
+        if (!didStart) {
+          boardController.updateGenerateNode(videoNodeId, { status: "failed", errorMessage: "视频生成请求未启动" });
+          pushWorkspaceNotice("error", "已创建图生视频节点，但视频生成请求未启动");
+          return handledBoardAction(false);
+        }
+      }
+      pushWorkspaceNotice("success", action.params?.run === true ? "已创建并启动图生视频节点" : "已创建图生视频节点");
+      return handledBoardAction(true);
+    }
+
+    if (isAgentBoardUpdateAction(action)) {
+      const targetNodeId = action.params?.nodeId?.trim() || boardController.selectedNodeId;
+      if (!targetNodeId) {
+        pushWorkspaceNotice("error", "请先选中要更新的画板节点");
+        return handledBoardAction(false);
+      }
+      const node = boardController.board.nodes.find(item => item.id === targetNodeId);
+      if (!node) {
+        pushWorkspaceNotice("error", "未找到 Agent 要更新的画板节点");
+        return handledBoardAction(false);
+      }
+      if ((node.kind === "image-generate" || node.kind === "video-generate") && node.status === "processing") {
+        pushWorkspaceNotice("error", "生成中的节点不可直接改参数，请等待完成或取消任务");
+        return handledBoardAction(false);
+      }
+
+      if (node.kind === "image-generate" || node.kind === "video-generate") {
+        flushBoardTextForGenerateNode(boardController.board.nodes, boardController.board.edges, node.id);
+      } else {
+        flushBoardText([node.id]);
+      }
+
+      if (node.kind === "prompt") {
+        const prompt = firstTextParam(action.params);
+        if (!prompt) {
+          pushWorkspaceNotice("error", "Agent 节点更新缺少提示词内容");
+          return handledBoardAction(false);
+        }
+        boardController.beginUndoGesture();
+        try {
+          boardController.updatePromptNode(node.id, prompt);
+        } finally {
+          boardController.endUndoGesture();
+        }
+      } else if (node.kind === "note") {
+        const body = firstTextParam(action.params);
+        if (!body) {
+          pushWorkspaceNotice("error", "Agent 节点更新缺少笔记内容");
+          return handledBoardAction(false);
+        }
+        boardController.beginUndoGesture();
+        try {
+          boardController.updateNoteBody(node.id, body);
+        } finally {
+          boardController.endUndoGesture();
+        }
+      } else if (node.kind === "agent") {
+        const instruction = firstTextParam(action.params);
+        if (!instruction) {
+          pushWorkspaceNotice("error", "Agent 节点更新缺少指令内容");
+          return handledBoardAction(false);
+        }
+        boardController.beginUndoGesture();
+        try {
+          boardController.updateAgentInstruction(node.id, instruction);
+        } finally {
+          boardController.endUndoGesture();
+        }
+      } else if (node.kind === "image-generate" || node.kind === "video-generate") {
+        let update: BoardGenerateNodeUpdate;
+        try {
+          update = buildGenerateNodeUpdate(node, action.params);
+        } catch (error) {
+          pushWorkspaceNotice("error", toErrorMessage(error, "Agent 生成节点参数无效"));
+          return handledBoardAction(false);
+        }
+        if (!hasGenerateNodeUpdate(update)) {
+          pushWorkspaceNotice("error", "Agent 节点更新缺少生成参数");
+          return handledBoardAction(false);
+        }
+        boardController.beginUndoGesture();
+        try {
+          boardController.updateGenerateNode(node.id, update);
+        } finally {
+          boardController.endUndoGesture();
+        }
+      } else {
+        pushWorkspaceNotice("error", "Agent 暂不支持更新该类型节点");
+        return handledBoardAction(false);
+      }
+      boardController.selectNode(node.id);
+      boardController.selectEdge(null);
+      pushWorkspaceNotice("success", "已更新画板节点");
+      return handledBoardAction(true);
+    }
+
     if (isAgentBoardNoteAction(action)) {
       const body = action.params?.body?.trim() || action.params?.prompt?.trim();
       if (!body) {
         pushWorkspaceNotice("error", "Agent 画板笔记缺少内容");
-        return true;
+        return handledBoardAction(false);
       }
       boardController.addNoteNode({
         body,
@@ -808,7 +1439,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         },
       });
       pushWorkspaceNotice("success", "已创建 Agent 画板笔记");
-      return true;
+      return handledBoardAction(true);
     }
 
     if (!isAgentGenerateAction(action) && !isAgentBoardFlowAction(action)) return false;
@@ -816,14 +1447,14 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     const promptFromAgent = action.params?.prompt?.trim() ?? "";
     if (!promptFromAgent) {
       pushWorkspaceNotice("error", "Agent 生成动作缺少提示词");
-      return true;
+      return handledBoardAction(false);
     }
 
     const kind = action.type === "generate_image" || action.type === "create_board_image_flow" ? "image-generate" : "video-generate";
     const model = action.params?.model || (kind === "image-generate" ? DEFAULT_IMAGE_MODEL : DEFAULT_VIDEO_MODEL);
     if (isPlaceholderRunningHubModel(model)) {
       pushWorkspaceNotice("error", "请先填写真实的 RunningHub webappId 或 workflowId");
-      return true;
+      return handledBoardAction(false);
     }
     const shouldRun = shouldRunAgentBoardFlow(action);
     const baseIndex = boardController.board.nodes.length;
@@ -859,7 +1490,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         const message = "Agent 选中的图片模型不支持参考图输入";
         boardController.updateGenerateNode(generateNodeId, { errorMessage: message, status: "failed" });
         pushWorkspaceNotice("error", message);
-        return true;
+        return handledBoardAction(false);
       }
 
       references.forEach((reference, index) => {
@@ -883,7 +1514,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
       if (!shouldRun) {
         pushWorkspaceNotice("success", "已创建 Agent 图片生成节点流程");
-        return true;
+        return handledBoardAction(true);
       }
 
       boardController.updateGenerateNode(generateNodeId, { errorMessage: undefined, status: "processing" });
@@ -905,8 +1536,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           errorMessage: "图片生成请求未启动，请检查节点参数",
           status: "failed",
         });
+        return handledBoardAction(false);
       }
-      return true;
+      return handledBoardAction(true);
     }
 
     const defaults = {
@@ -933,14 +1565,14 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       const message = "Agent 选中的视频模型不支持参考图输入";
       boardController.updateGenerateNode(generateNodeId, { errorMessage: message, status: "failed" });
       pushWorkspaceNotice("error", message);
-      return true;
+      return handledBoardAction(false);
     }
     const videoCapability = getVideoModelCapabilities(model);
     if (references.length < videoCapability.minReferenceImages || references.length > videoCapability.maxReferenceImages) {
       const message = `当前视频模型需要 ${videoCapability.minReferenceImages}-${videoCapability.maxReferenceImages} 张参考图`;
       boardController.updateGenerateNode(generateNodeId, { errorMessage: message, status: "failed" });
       pushWorkspaceNotice("error", message);
-      return true;
+      return handledBoardAction(false);
     }
 
     references.forEach((reference, index) => {
@@ -964,7 +1596,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
     if (!shouldRun) {
       pushWorkspaceNotice("success", "已创建 Agent 视频生成节点流程");
-      return true;
+      return handledBoardAction(true);
     }
 
     boardController.updateGenerateNode(generateNodeId, { errorMessage: undefined, status: "processing" });
@@ -985,8 +1617,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         errorMessage: "视频生成请求未启动，请检查节点参数",
         status: "failed",
       });
+      return handledBoardAction(false);
     }
-    return true;
+    return handledBoardAction(true);
   }, [
     boardController,
     generateManualImage,

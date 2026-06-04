@@ -1,25 +1,11 @@
-import type { AgentToolAction } from "@/components/agent/AgentDock";
+import { AGENT_BOARD_PATCH_MAX_OPERATIONS, type AgentGenerationParams, type AgentToolAction } from "@/lib/agent-actions";
 import {
   getImageModelCapabilities,
   getImageResolutionOptions,
   getVideoModelCapabilities,
 } from "@/lib/providers/model-catalog";
 
-export interface AgentGenerationParams {
-  prompt?: string;
-  model?: string;
-  aspectRatio?: string;
-  referenceImageId?: string;
-  imageResolution?: string;
-  imageQuality?: string;
-  thinkingLevel?: string;
-  videoResolution?: string;
-  videoDuration?: string;
-  videoPreset?: string;
-  title?: string;
-  body?: string;
-  run?: boolean;
-}
+export type { AgentGenerationParams };
 
 export function cloneAgentToolAction(action: AgentToolAction): AgentToolAction {
   return {
@@ -106,6 +92,48 @@ export function prepareAgentActionDraft(action: AgentToolAction): AgentToolActio
       },
     };
   }
+  if (draft.type === "update_board_node") {
+    return {
+      type: draft.type,
+      params: {
+        nodeId: params.nodeId,
+        prompt: params.prompt,
+        body: params.body,
+        instruction: params.instruction,
+        model: params.model,
+        aspectRatio: params.aspectRatio,
+        imageResolution: params.imageResolution,
+        imageQuality: params.imageQuality,
+        thinkingLevel: params.thinkingLevel,
+        videoResolution: params.videoResolution,
+        videoDuration: params.videoDuration,
+        videoPreset: params.videoPreset,
+      },
+    };
+  }
+  if (draft.type === "apply_board_patch") {
+    return {
+      type: draft.type,
+      params: {
+        boardPatch: params.boardPatch,
+      },
+    };
+  }
+  if (draft.type === "continue_image_to_video") {
+    return {
+      type: draft.type,
+      params: {
+        nodeId: params.nodeId,
+        prompt: params.prompt,
+        model: params.model,
+        aspectRatio: params.aspectRatio,
+        videoResolution: params.videoResolution,
+        videoDuration: params.videoDuration,
+        videoPreset: params.videoPreset,
+        run: params.run,
+      },
+    };
+  }
   if (isImageActionType(draft.type) && params.model) {
     return patchAgentToolAction(draft, resolveImageActionParams(params.model, params));
   }
@@ -156,6 +184,37 @@ export function validateAgentToolAction(
 
   if (action.type === "create_board_note") {
     return params.body?.trim() || params.prompt?.trim() ? null : "请先填写笔记内容";
+  }
+
+  if (action.type === "apply_board_patch") {
+    const operationCount = params.boardPatch?.operations.length ?? 0;
+    if (operationCount === 0) return "请先提供画板补丁操作";
+    if (operationCount > AGENT_BOARD_PATCH_MAX_OPERATIONS) {
+      return `画板补丁最多支持 ${AGENT_BOARD_PATCH_MAX_OPERATIONS} 个操作`;
+    }
+    return null;
+  }
+
+  if (action.type === "continue_image_to_video") {
+    if (!params.prompt?.trim()) return "请先填写视频提示词";
+    if (!params.model?.trim()) return "请先选择视频模型";
+    return null;
+  }
+
+  if (action.type === "update_board_node") {
+    return params.prompt?.trim() ||
+      params.body?.trim() ||
+      params.instruction?.trim() ||
+      params.model?.trim() ||
+      params.aspectRatio?.trim() ||
+      params.imageResolution?.trim() ||
+      params.imageQuality?.trim() ||
+      params.thinkingLevel?.trim() ||
+      params.videoResolution?.trim() ||
+      params.videoDuration?.trim() ||
+      params.videoPreset?.trim()
+      ? null
+      : "请先填写要更新的节点内容";
   }
 
   return null;

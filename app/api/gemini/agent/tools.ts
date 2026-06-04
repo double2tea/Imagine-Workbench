@@ -32,6 +32,10 @@ const getPromptBlueprintSchema = z.object({
     "game-asset",
     "poster-flyer",
     "app-web-design",
+    "screenplay-draft",
+    "script-analysis",
+    "shot-breakdown",
+    "storyboard-board-patch",
   ]),
 });
 
@@ -136,6 +140,10 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
               "game-asset",
               "poster-flyer",
               "app-web-design",
+              "screenplay-draft",
+              "script-analysis",
+              "shot-breakdown",
+              "storyboard-board-patch",
             ],
             description: "目标使用场景类别",
           },
@@ -345,6 +353,60 @@ interface PromptBlueprint {
 }
 
 const PROMPT_BLUEPRINTS: Record<string, PromptBlueprint> = {
+  "screenplay-draft": {
+    category: "剧本草稿",
+    recommendedStyles: ["短片剧本", "广告脚本", "分场剧本", "旁白驱动", "无对白视觉叙事"],
+    structuredFields: [
+      "title（片名或项目名）",
+      "logline（一句话故事/广告承诺）",
+      "characters（角色：姓名、外观、动机、视觉锚点）",
+      "scenes（场景：地点、时间、动作、对白/旁白、情绪节奏）",
+      "continuity（连续性：服装、道具、色彩、镜头母题）",
+    ],
+    compositionTips: "先写可拍摄动作，再写对白。每个场景保留明确地点、时间、角色状态和视觉锚点，方便继续拆分镜。",
+  },
+  "script-analysis": {
+    category: "剧本分析",
+    recommendedStyles: ["角色分析", "场景拆解", "视觉连续性", "节奏诊断", "制作清单"],
+    structuredFields: [
+      "premise（故事前提/广告目标）",
+      "beats（关键情节点和情绪转折）",
+      "characters（角色一致性要求）",
+      "locations（场景和美术需求）",
+      "shotCandidates（可拆分镜头候选）",
+      "risks（叙事或视觉连续性风险）",
+    ],
+    compositionTips: "把抽象情绪转成可观察动作和画面。标出必须跨镜头保持一致的角色、服装、道具、色彩和光线。",
+  },
+  "shot-breakdown": {
+    category: "分镜拆解",
+    recommendedStyles: ["电影分镜", "广告 shot list", "图像提示词", "视频提示词", "批量生成计划"],
+    structuredFields: [
+      "scene（场景编号/名称）",
+      "shot（镜号）",
+      "beat（剧情 beat）",
+      "framing（景别：wide / medium / close-up）",
+      "camera（机位、镜头、运动）",
+      "action（画面动作）",
+      "dialogueOrVoiceover（对白/旁白）",
+      "imagePrompt（静帧生成提示词）",
+      "videoPrompt（可选视频运动提示词）",
+    ],
+    compositionTips: "每个镜头只表达一个清晰动作。imagePrompt 写静帧构图和视觉锚点；videoPrompt 写运动、节奏和镜头变化。",
+  },
+  "storyboard-board-patch": {
+    category: "分镜画板补丁",
+    recommendedStyles: ["Prompt 节点", "Image Generate 节点", "Video Generate 节点", "Note 节点", "批量 create-only"],
+    structuredFields: [
+      "boardPatch.title（计划标题）",
+      "boardPatch.run（默认 false，用户明确要求才 true）",
+      "shots（每个镜头的 scene/shot/beat/imagePrompt/videoPrompt）",
+      "operations.create_node（创建 prompt / note / image-generate / video-generate / agent）",
+      "operations.connect_ports（用 tempId 连接 prompt-out 到 prompt-in）",
+      "operations.update_node（仅更新已有节点允许字段）",
+    ],
+    compositionTips: "每个 shot 优先生成一组 Prompt -> Image Generate。横向排列：Prompt x=120，Image x=520，Video x=920；不同 shot 按 y 间距 220 排列。大于 12 个 shot 时拆成后续批次。",
+  },
   "portrait-avatar": {
     category: "肖像/头像",
     recommendedStyles: ["摄影写实", "电影级/定帧", "3D渲染", "插画", "Q版/Chibi", "油画"],
