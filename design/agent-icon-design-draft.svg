@@ -1,0 +1,93 @@
+<svg width="1200" height="760" viewBox="0 0 1200 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bodyWarm" cx="0" cy="0" r="1" gradientTransform="matrix(178 210 -226 192 444 214)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff9e8"/>
+      <stop offset="0.48" stop-color="#ffd48a"/>
+      <stop offset="1" stop-color="#f08c65"/>
+    </radialGradient>
+    <linearGradient id="bodyShade" x1="326" y1="148" x2="568" y2="512" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity="0.72"/>
+      <stop offset="0.42" stop-color="#fff4cf" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#b6475f" stop-opacity="0.3"/>
+    </linearGradient>
+    <radialGradient id="blush" cx="0" cy="0" r="1" gradientTransform="matrix(70 0 0 42 448 401)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ff8ca8" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#ff8ca8" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="softGlow" cx="0" cy="0" r="1" gradientTransform="matrix(238 0 0 210 454 346)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffcf8d" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#ffcf8d" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="softShadow" x="238" y="70" width="550" height="570" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="22" stdDeviation="30" flood-color="#7a2f49" flood-opacity="0.2"/>
+    </filter>
+    <filter id="tinyShadow" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#7a2f49" flood-opacity="0.2"/>
+    </filter>
+    <style>
+      .bg { fill: #111722; }
+      .label { fill: #e8edf4; font: 600 22px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 0; }
+      .note { fill: #9aa8b8; font: 500 15px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 0; }
+      .eye { fill: #282338; }
+      .glint { fill: #ffffff; }
+      .smile { stroke: #282338; stroke-width: 12; stroke-linecap: round; }
+      .line { stroke: rgba(255,255,255,0.54); stroke-width: 6; stroke-linecap: round; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1200" height="760" rx="0"/>
+  <circle cx="454" cy="346" r="262" fill="url(#softGlow)"/>
+
+  <text x="76" y="56" class="label">Agent icon draft - warm plush sprite</text>
+  <text x="76" y="86" class="note">No blue, no outer ball shell, no inner logo. Single mascot mark for app logo and draggable agent.</text>
+
+  <g filter="url(#softShadow)">
+    <path
+      d="M429 120c28-34 88-20 101 22 46-4 84 29 87 75 39 14 64 51 59 94-6 51-49 89-99 93-15 47-61 80-114 80-39 0-75-18-98-45-46 18-100-1-121-44-46-5-80-43-80-89 0-42 29-78 69-88-4-10-6-21-6-32 0-54 45-98 99-98 22 0 43 7 59 19 8-8 17-14 30-17Z"
+      fill="url(#bodyWarm)"
+    />
+    <path
+      d="M429 120c28-34 88-20 101 22 46-4 84 29 87 75 39 14 64 51 59 94-6 51-49 89-99 93-15 47-61 80-114 80-39 0-75-18-98-45-46 18-100-1-121-44-46-5-80-43-80-89 0-42 29-78 69-88-4-10-6-21-6-32 0-54 45-98 99-98 22 0 43 7 59 19 8-8 17-14 30-17Z"
+      fill="url(#bodyShade)"
+    />
+    <path d="M268 232c28-38 75-54 119-40 30-39 93-43 129-8" class="line" opacity="0.62"/>
+    <ellipse cx="316" cy="344" rx="34" ry="47" class="eye"/>
+    <ellipse cx="472" cy="344" rx="34" ry="47" class="eye"/>
+    <circle cx="305" cy="328" r="11" class="glint"/>
+    <circle cx="461" cy="328" r="11" class="glint"/>
+    <ellipse cx="286" cy="417" rx="60" ry="34" fill="url(#blush)"/>
+    <ellipse cx="508" cy="417" rx="60" ry="34" fill="url(#blush)"/>
+    <path d="M350 409c20 29 43 42 68 42s48-13 68-42" class="smile" fill="none"/>
+    <circle cx="512" cy="240" r="14" fill="#fff4d5" opacity="0.95"/>
+  </g>
+
+  <g transform="translate(810 160)" filter="url(#tinyShadow)">
+    <text x="0" y="-42" class="label">Small-size check</text>
+    <g transform="translate(0 0) scale(0.48)">
+      <path d="M160 14c22-27 70-16 80 18 37-3 67 23 70 60 31 11 51 41 47 76-5 41-39 71-79 74-12 38-49 64-91 64-31 0-60-14-79-36-37 14-80-1-97-35-37-4-64-34-64-72 0-34 23-62 55-70-3-8-5-17-5-26 0-43 36-78 79-78 18 0 34 6 47 15 6-6 14-11 24-14Z" fill="url(#bodyWarm)"/>
+      <path d="M89 88c23-30 60-43 96-32 24-31 74-34 103-6" class="line" opacity="0.5"/>
+      <ellipse cx="89" cy="157" rx="24" ry="34" class="eye"/>
+      <ellipse cx="207" cy="157" rx="24" ry="34" class="eye"/>
+      <circle cx="81" cy="146" r="8" class="glint"/>
+      <circle cx="199" cy="146" r="8" class="glint"/>
+      <path d="M123 214c16 23 35 34 54 34s38-11 54-34" stroke="#282338" stroke-width="9" stroke-linecap="round" fill="none"/>
+    </g>
+    <g transform="translate(210 0) scale(0.24)">
+      <path d="M160 14c22-27 70-16 80 18 37-3 67 23 70 60 31 11 51 41 47 76-5 41-39 71-79 74-12 38-49 64-91 64-31 0-60-14-79-36-37 14-80-1-97-35-37-4-64-34-64-72 0-34 23-62 55-70-3-8-5-17-5-26 0-43 36-78 79-78 18 0 34 6 47 15 6-6 14-11 24-14Z" fill="url(#bodyWarm)"/>
+      <ellipse cx="89" cy="157" rx="24" ry="34" class="eye"/>
+      <ellipse cx="207" cy="157" rx="24" ry="34" class="eye"/>
+      <circle cx="81" cy="146" r="8" class="glint"/>
+      <circle cx="199" cy="146" r="8" class="glint"/>
+      <path d="M123 214c16 23 35 34 54 34s38-11 54-34" stroke="#282338" stroke-width="9" stroke-linecap="round" fill="none"/>
+    </g>
+    <text x="0" y="236" class="note">Readable at dock size and favicon scale.</text>
+  </g>
+
+  <g transform="translate(810 464)">
+    <text x="0" y="-42" class="label">Interaction notes</text>
+    <text x="0" y="0" class="note">Hover: tiny lift + eye tracking, no shell animation.</text>
+    <text x="0" y="30" class="note">Drag: body squashes 4%, aura follows softly.</text>
+    <text x="0" y="60" class="note">Theme: mark stays stable; only shadow/aura changes.</text>
+    <text x="0" y="90" class="note">Avoid: blue, green, glass rings, nested app icon.</text>
+  </g>
+</svg>

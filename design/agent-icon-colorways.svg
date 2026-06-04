@@ -1,0 +1,218 @@
+<svg width="1280" height="940" viewBox="0 0 1280 940" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .page { fill: #111722; }
+      .title { fill: #edf2f7; font: 700 28px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 0; }
+      .note { fill: #9aa8b8; font: 500 15px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 0; }
+      .label { fill: #e8edf4; font: 700 18px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 0; }
+      .tiny { fill: #a7b3c2; font: 600 12px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 0; }
+      .card { fill: #151c28; stroke: rgba(255,255,255,0.08); }
+      .light-bg { fill: #eef3f8; }
+      .dark-bg { fill: #07080b; }
+      .eye { fill: #282338; }
+      .eye-soft { fill: #242b38; }
+      .glint { fill: #ffffff; }
+      .line { stroke: rgba(255,255,255,0.58); stroke-width: 6; stroke-linecap: round; }
+    </style>
+
+    <radialGradient id="champagneBody" cx="0" cy="0" r="1" gradientTransform="matrix(178 210 -226 192 336 202)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff8e8"/>
+      <stop offset="0.5" stop-color="#ffd58d"/>
+      <stop offset="1" stop-color="#ef896c"/>
+    </radialGradient>
+    <linearGradient id="champagneShade" x1="218" y1="136" x2="460" y2="500" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity="0.72"/>
+      <stop offset="0.45" stop-color="#fff2c8" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#a83f63" stop-opacity="0.28"/>
+    </linearGradient>
+    <radialGradient id="champagneGlow" cx="0" cy="0" r="1" gradientTransform="matrix(220 0 0 196 346 346)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffcf8d" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#ffcf8d" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="roseBody" cx="0" cy="0" r="1" gradientTransform="matrix(178 210 -226 192 336 202)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff3f5"/>
+      <stop offset="0.52" stop-color="#ffb8bd"/>
+      <stop offset="1" stop-color="#c9607f"/>
+    </radialGradient>
+    <linearGradient id="roseShade" x1="218" y1="136" x2="460" y2="500" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity="0.7"/>
+      <stop offset="0.45" stop-color="#ffe1e6" stop-opacity="0.14"/>
+      <stop offset="1" stop-color="#6f365f" stop-opacity="0.28"/>
+    </linearGradient>
+    <radialGradient id="roseGlow" cx="0" cy="0" r="1" gradientTransform="matrix(220 0 0 196 346 346)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ff9db0" stop-opacity="0.26"/>
+      <stop offset="1" stop-color="#ff9db0" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="violetBody" cx="0" cy="0" r="1" gradientTransform="matrix(178 210 -226 192 336 202)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff7ea"/>
+      <stop offset="0.5" stop-color="#e5c4ff"/>
+      <stop offset="1" stop-color="#a889f2"/>
+    </radialGradient>
+    <linearGradient id="violetShade" x1="218" y1="136" x2="460" y2="500" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity="0.72"/>
+      <stop offset="0.46" stop-color="#f1ddff" stop-opacity="0.14"/>
+      <stop offset="1" stop-color="#4b3d7f" stop-opacity="0.3"/>
+    </linearGradient>
+    <radialGradient id="violetGlow" cx="0" cy="0" r="1" gradientTransform="matrix(220 0 0 196 346 346)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#d7b8ff" stop-opacity="0.24"/>
+      <stop offset="1" stop-color="#d7b8ff" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="pearlBody" cx="0" cy="0" r="1" gradientTransform="matrix(178 210 -226 192 336 202)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fffdf4"/>
+      <stop offset="0.5" stop-color="#e8d6b6"/>
+      <stop offset="1" stop-color="#9fb2b6"/>
+    </radialGradient>
+    <linearGradient id="pearlShade" x1="218" y1="136" x2="460" y2="500" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity="0.72"/>
+      <stop offset="0.45" stop-color="#f6ead3" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#2f5260" stop-opacity="0.24"/>
+    </linearGradient>
+    <radialGradient id="pearlGlow" cx="0" cy="0" r="1" gradientTransform="matrix(220 0 0 196 346 346)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#e7d6b8" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#e7d6b8" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="blushWarm" cx="0" cy="0" r="1" gradientTransform="matrix(78 0 0 46 340 414)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ff8ca8" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#ff8ca8" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="softShadow" x="80" y="56" width="590" height="600" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="20" stdDeviation="28" flood-color="#0f172a" flood-opacity="0.22"/>
+    </filter>
+
+    <symbol id="agentChampagne" viewBox="0 0 760 760">
+      <circle cx="346" cy="346" r="274" fill="url(#champagneGlow)"/>
+      <g filter="url(#softShadow)">
+        <path d="M321 108c28-34 88-20 101 22 46-4 84 29 87 75 39 14 64 51 59 94-6 51-49 89-99 93-15 47-61 80-114 80-39 0-75-18-98-45-46 18-100-1-121-44-46-5-80-43-80-89 0-42 29-78 69-88-4-10-6-21-6-32 0-54 45-98 99-98 22 0 43 7 59 19 8-8 17-14 30-17Z" fill="url(#champagneBody)"/>
+        <path d="M321 108c28-34 88-20 101 22 46-4 84 29 87 75 39 14 64 51 59 94-6 51-49 89-99 93-15 47-61 80-114 80-39 0-75-18-98-45-46 18-100-1-121-44-46-5-80-43-80-89 0-42 29-78 69-88-4-10-6-21-6-32 0-54 45-98 99-98 22 0 43 7 59 19 8-8 17-14 30-17Z" fill="url(#champagneShade)"/>
+        <path d="M160 220c28-38 75-54 119-40 30-39 93-43 129-8" class="line" opacity="0.58"/>
+        <ellipse cx="214" cy="345" rx="34" ry="47" class="eye"/>
+        <ellipse cx="370" cy="345" rx="34" ry="47" class="eye"/>
+        <circle cx="203" cy="328" r="11" class="glint"/>
+        <circle cx="359" cy="328" r="11" class="glint"/>
+        <circle cx="226" cy="364" r="5" fill="#ffffff" opacity="0.42"/>
+        <circle cx="382" cy="364" r="5" fill="#ffffff" opacity="0.42"/>
+        <ellipse cx="184" cy="420" rx="62" ry="36" fill="url(#blushWarm)"/>
+        <ellipse cx="410" cy="420" rx="62" ry="36" fill="url(#blushWarm)"/>
+        <circle cx="404" cy="228" r="14" fill="#fff4d5" opacity="0.92"/>
+      </g>
+    </symbol>
+    <symbol id="agentRose" viewBox="0 0 760 760">
+      <circle cx="346" cy="346" r="274" fill="url(#roseGlow)"/>
+      <g filter="url(#softShadow)">
+        <path d="M321 108c28-34 88-20 101 22 46-4 84 29 87 75 39 14 64 51 59 94-6 51-49 89-99 93-15 47-61 80-114 80-39 0-75-18-98-45-46 18-100-1-121-44-46-5-80-43-80-89 0-42 29-78 69-88-4-10-6-21-6-32 0-54 45-98 99-98 22 0 43 7 59 19 8-8 17-14 30-17Z" fill="url(#roseBody)"/>
+        <path d="M321 108c28-34 88-20 101 22 46-4 84 29 87 75 39 14 64 51 59 94-6 51-49 89-99 93-15 47-61 80-114 80-39 0-75-18-98-45-46 18-100-1-121-44-46-5-80-43-80-89 0-42 29-78 69-88-4-10-6-21-6-32 0-54 45-98 99-98 22 0 43 7 59 19 8-8 17-14 30-17Z" fill="url(#roseShade)"/>
+        <path d="M160 220c28-38 75-54 119-40 30-39 93-43 129-8" class="line" opacity="0.58"/>
+        <ellipse cx="214" cy="345" rx="34" ry="47" class="eye"/>
+        <ellipse cx="370" cy="345" rx="34" ry="47" class="eye"/>
+        <circle cx="203" cy="328" r="11" class="glint"/>
+        <circle cx="359" cy="328" r="11" class="glint"/>
+        <circle cx="226" cy="364" r="5" fill="#ffffff" opacity="0.42"/>
+        <circle cx="382" cy="364" r="5" fill="#ffffff" opacity="0.42"/>
+        <ellipse cx="184" cy="420" rx="62" ry="36" fill="url(#blushWarm)"/>
+        <ellipse cx="410" cy="420" rx="62" ry="36" fill="url(#blushWarm)"/>
+        <circle cx="404" cy="228" r="14" fill="#fff4d5" opacity="0.92"/>
+      </g>
+    </symbol>
+    <symbol id="agentViolet" viewBox="0 0 760 760">
+      <circle cx="346" cy="346" r="274" fill="url(#violetGlow)"/>
+      <g filter="url(#softShadow)">
+        <path d="M321 108c28-34 88-20 101 22 46-4 84 29 87 75 39 14 64 51 59 94-6 51-49 89-99 93-15 47-61 80-114 80-39 0-75-18-98-45-46 18-100-1-121-44-46-5-80-43-80-89 0-42 29-78 69-88-4-10-6-21-6-32 0-54 45-98 99-98 22 0 43 7 59 19 8-8 17-14 30-17Z" fill="url(#violetBody)"/>
+        <path d="M321 108c28-34 88-20 101 22 46-4 84 29 87 75 39 14 64 51 59 94-6 51-49 89-99 93-15 47-61 80-114 80-39 0-75-18-98-45-46 18-100-1-121-44-46-5-80-43-80-89 0-42 29-78 69-88-4-10-6-21-6-32 0-54 45-98 99-98 22 0 43 7 59 19 8-8 17-14 30-17Z" fill="url(#violetShade)"/>
+        <path d="M160 220c28-38 75-54 119-40 30-39 93-43 129-8" class="line" opacity="0.58"/>
+        <ellipse cx="214" cy="345" rx="34" ry="47" class="eye"/>
+        <ellipse cx="370" cy="345" rx="34" ry="47" class="eye"/>
+        <circle cx="203" cy="328" r="11" class="glint"/>
+        <circle cx="359" cy="328" r="11" class="glint"/>
+        <circle cx="226" cy="364" r="5" fill="#ffffff" opacity="0.42"/>
+        <circle cx="382" cy="364" r="5" fill="#ffffff" opacity="0.42"/>
+        <ellipse cx="184" cy="420" rx="62" ry="36" fill="url(#blushWarm)"/>
+        <ellipse cx="410" cy="420" rx="62" ry="36" fill="url(#blushWarm)"/>
+        <circle cx="404" cy="228" r="14" fill="#fff4d5" opacity="0.92"/>
+      </g>
+    </symbol>
+    <symbol id="agentPearl" viewBox="0 0 760 760">
+      <circle cx="346" cy="346" r="274" fill="url(#pearlGlow)"/>
+      <g filter="url(#softShadow)">
+        <path d="M321 108c28-34 88-20 101 22 46-4 84 29 87 75 39 14 64 51 59 94-6 51-49 89-99 93-15 47-61 80-114 80-39 0-75-18-98-45-46 18-100-1-121-44-46-5-80-43-80-89 0-42 29-78 69-88-4-10-6-21-6-32 0-54 45-98 99-98 22 0 43 7 59 19 8-8 17-14 30-17Z" fill="url(#pearlBody)"/>
+        <path d="M321 108c28-34 88-20 101 22 46-4 84 29 87 75 39 14 64 51 59 94-6 51-49 89-99 93-15 47-61 80-114 80-39 0-75-18-98-45-46 18-100-1-121-44-46-5-80-43-80-89 0-42 29-78 69-88-4-10-6-21-6-32 0-54 45-98 99-98 22 0 43 7 59 19 8-8 17-14 30-17Z" fill="url(#pearlShade)"/>
+        <path d="M160 220c28-38 75-54 119-40 30-39 93-43 129-8" class="line" opacity="0.58"/>
+        <ellipse cx="214" cy="345" rx="34" ry="47" class="eye-soft"/>
+        <ellipse cx="370" cy="345" rx="34" ry="47" class="eye-soft"/>
+        <circle cx="203" cy="328" r="11" class="glint"/>
+        <circle cx="359" cy="328" r="11" class="glint"/>
+        <circle cx="226" cy="364" r="5" fill="#ffffff" opacity="0.42"/>
+        <circle cx="382" cy="364" r="5" fill="#ffffff" opacity="0.42"/>
+        <ellipse cx="184" cy="420" rx="62" ry="36" fill="url(#blushWarm)"/>
+        <ellipse cx="410" cy="420" rx="62" ry="36" fill="url(#blushWarm)"/>
+        <circle cx="404" cy="228" r="14" fill="#fff4d5" opacity="0.92"/>
+      </g>
+    </symbol>
+  </defs>
+
+  <rect class="page" width="1280" height="940"/>
+  <text x="64" y="58" class="title">Agent icon colorways - no mouth mascot</text>
+  <text x="64" y="88" class="note">Each route is tested on current app light/dark theme backgrounds. Body color stays stable; aura/shadow can adapt by theme.</text>
+
+  <g transform="translate(64 126)">
+    <rect class="card" width="270" height="350" rx="18"/>
+    <text x="20" y="34" class="label">A. Champagne Coral</text>
+    <text x="20" y="58" class="tiny">recommended / warm neutral</text>
+    <rect class="dark-bg" x="20" y="82" width="110" height="110" rx="18"/>
+    <rect class="light-bg" x="140" y="82" width="110" height="110" rx="18"/>
+    <use href="#agentChampagne" x="8" y="68" width="155" height="155"/>
+    <use href="#agentChampagne" x="128" y="68" width="155" height="155"/>
+    <text x="20" y="230" class="note">Cream, amber, soft coral.</text>
+    <text x="20" y="256" class="note">Friendly without feeling blue/green.</text>
+    <text x="20" y="300" class="tiny">#FFF8E8  #FFD58D  #EF896C</text>
+  </g>
+
+  <g transform="translate(366 126)">
+    <rect class="card" width="270" height="350" rx="18"/>
+    <text x="20" y="34" class="label">B. Rose Ember</text>
+    <text x="20" y="58" class="tiny">soft, emotional, visible</text>
+    <rect class="dark-bg" x="20" y="82" width="110" height="110" rx="18"/>
+    <rect class="light-bg" x="140" y="82" width="110" height="110" rx="18"/>
+    <use href="#agentRose" x="8" y="68" width="155" height="155"/>
+    <use href="#agentRose" x="128" y="68" width="155" height="155"/>
+    <text x="20" y="230" class="note">Warm pink with muted depth.</text>
+    <text x="20" y="256" class="note">Cute, slightly more expressive.</text>
+    <text x="20" y="300" class="tiny">#FFF3F5  #FFB8BD  #C9607F</text>
+  </g>
+
+  <g transform="translate(668 126)">
+    <rect class="card" width="270" height="350" rx="18"/>
+    <text x="20" y="34" class="label">C. Moon Apricot</text>
+    <text x="20" y="58" class="tiny">cooler, still not blue</text>
+    <rect class="dark-bg" x="20" y="82" width="110" height="110" rx="18"/>
+    <rect class="light-bg" x="140" y="82" width="110" height="110" rx="18"/>
+    <use href="#agentViolet" x="8" y="68" width="155" height="155"/>
+    <use href="#agentViolet" x="128" y="68" width="155" height="155"/>
+    <text x="20" y="230" class="note">Tiny violet cast, apricot top.</text>
+    <text x="20" y="256" class="note">Feels more magical/agentic.</text>
+    <text x="20" y="300" class="tiny">#FFF7EA  #E5C4FF  #A889F2</text>
+  </g>
+
+  <g transform="translate(970 126)">
+    <rect class="card" width="270" height="350" rx="18"/>
+    <text x="20" y="34" class="label">D. Pearl Taupe</text>
+    <text x="20" y="58" class="tiny">quiet, most brand-safe</text>
+    <rect class="dark-bg" x="20" y="82" width="110" height="110" rx="18"/>
+    <rect class="light-bg" x="140" y="82" width="110" height="110" rx="18"/>
+    <use href="#agentPearl" x="8" y="68" width="155" height="155"/>
+    <use href="#agentPearl" x="128" y="68" width="155" height="155"/>
+    <text x="20" y="230" class="note">Pearl, sand, muted stone.</text>
+    <text x="20" y="256" class="note">Least playful, cleanest in UI.</text>
+    <text x="20" y="300" class="tiny">#FFFDF4  #E8D6B6  #9FB2B6</text>
+  </g>
+
+  <g transform="translate(64 560)">
+    <text x="0" y="0" class="label">Recommendation</text>
+    <text x="0" y="34" class="note">Pick A if the Agent should feel friendly and warm while staying readable in both themes.</text>
+    <text x="0" y="62" class="note">Pick D if you want the least cartoonish direction; it will blend into the workstation more quietly.</text>
+    <text x="0" y="90" class="note">I would avoid C unless you want a more magical personality; it risks drifting into a familiar purple AI look.</text>
+  </g>
+</svg>

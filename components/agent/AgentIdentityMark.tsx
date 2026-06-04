@@ -7,12 +7,11 @@ interface AgentIdentityMarkProps {
 }
 
 const SIZE_BY_VARIANT: Record<AgentIdentityMarkProps["variant"], ImagineMarkSize> = {
-  orb: "lg",
+  orb: "xl",
   header: "md",
   inline: "xs",
 };
 
 export default function AgentIdentityMark({ variant }: AgentIdentityMarkProps) {
-  const trackPointer = variant !== "inline";
-  return <ImagineMark size={SIZE_BY_VARIANT[variant]} trackPointer={trackPointer} />;
+  return <ImagineMark size={SIZE_BY_VARIANT[variant]} trackPointer />;
 }

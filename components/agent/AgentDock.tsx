@@ -1,5 +1,5 @@
 import type { ChangeEvent, CSSProperties, FormEvent, PointerEvent as ReactPointerEvent, ReactNode, Ref } from "react";
-import { forwardRef, useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Check, ChevronRight, ImagePlus, Paintbrush, RefreshCw, Send, X } from "lucide-react";
 import { motion } from "motion/react";
 import PreviewImage from "@/components/PreviewImage";
@@ -14,6 +14,7 @@ import { AgentActionSummary } from "@/components/agent/AgentActionSummary";
 import { AgentPendingActionEditor } from "@/components/agent/AgentPendingActionEditor";
 import type { AgentBoardAction, AgentToolAction, AgentWorkbenchAction } from "@/lib/agent-actions";
 import type { AiProvider, ModelOption } from "@/lib/providers/model-catalog";
+import { applyThemeClassesToDom, resolveThemeMode } from "@/lib/theme-mode";
 
 export interface ChatMessage {
   id: string;
@@ -170,7 +171,7 @@ const SKILL_LABELS: Record<string, { label: string; className: string }> = {
 };
 
 const AGENT_ORB_POSITION_STORAGE_KEY = "imagine_agent_orb_position";
-const AGENT_ORB_SIZE = 72;
+const AGENT_ORB_SIZE = 108;
 const AGENT_ORB_MARGIN = 12;
 const AGENT_ORB_DRAG_THRESHOLD = 4;
 
@@ -568,6 +569,11 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
 
   const agentReferenceHint = formatAgentReferenceHint(sendableAgentReferences, openRouterVisionSupport);
   const isIdleOrb = !isOpen && !isLoading && input.trim().length === 0 && !hasSendableAgentImages;
+
+  useLayoutEffect(() => {
+    applyThemeClassesToDom(resolveThemeMode());
+  }, [isIdleOrb]);
+
   const idleOrbStyle = isIdleOrb && orbPosition
     ? {
       bottom: "auto",
@@ -578,7 +584,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
     : undefined;
 
   const dockShellClass = isIdleOrb
-    ? "imagine-agent-dock imagine-agent-dock-idle-orb imagine-theme-dark pointer-events-none fixed bottom-12 right-4 z-40 flex h-[72px] w-[72px] sm:bottom-16 sm:right-10"
+    ? "imagine-agent-dock imagine-agent-dock-idle-orb imagine-theme-dark pointer-events-none fixed bottom-12 right-4 z-40 flex h-[108px] w-[108px] sm:bottom-16 sm:right-10"
     : "imagine-agent-dock imagine-agent-dock-panel imagine-theme-dark pointer-events-auto fixed inset-x-4 bottom-12 z-50 mx-auto w-[calc(100vw-32px)] max-w-5xl rounded-lg p-3 sm:bottom-16 sm:w-[min(1040px,calc(100vw-40px))]";
   const dockStateClass = [
     !isIdleOrb && isOverContent ? "imagine-agent-dock-over-content" : "",
@@ -658,6 +664,8 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
   };
 
   const handleOrbClick = () => {
+    orbDragRef.current = null;
+    setIsOrbDragging(false);
     if (suppressOrbClickRef.current) {
       suppressOrbClickRef.current = false;
       return;
@@ -676,22 +684,12 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
           type="button"
           onClick={handleOrbClick}
           onPointerDown={handleOrbPointerDown}
-          className="imagine-agent-orb-button pointer-events-auto group relative flex h-[72px] w-[72px] items-center justify-center rounded-full"
+          className="imagine-agent-orb-button pointer-events-auto group relative flex h-[108px] w-[108px] items-center justify-center rounded-full"
           title="展开 Agent 对话"
           aria-label="展开 Agent 对话"
         >
           <span className="imagine-agent-orb-aura" />
-          <span className="imagine-agent-orb-fluff" aria-hidden />
-          <span className="imagine-agent-orb-face" aria-hidden>
-            <span className="imagine-agent-orb-eye" />
-            <span className="imagine-agent-orb-eye" />
-            <span className="imagine-agent-orb-mouth" />
-            <span className="imagine-agent-orb-cheek imagine-agent-orb-cheek-left" />
-            <span className="imagine-agent-orb-cheek imagine-agent-orb-cheek-right" />
-          </span>
-          <span className="imagine-agent-orb-reminder absolute right-14 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-full border px-2.5 py-1 text-[10px] font-semibold shadow-lg backdrop-blur">
-            Agent
-          </span>
+          <AgentIdentityMark variant="orb" />
         </button>
       ) : (
         <>

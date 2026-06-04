@@ -1,26 +1,30 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-4 -4 32 32" fill="none">
   <defs>
-    <linearGradient id="iw-shell" x1="6" y1="4" x2="26" y2="28" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#1e293b"/>
-      <stop offset="0.55" stop-color="#111827"/>
-      <stop offset="1" stop-color="#070b12"/>
+    <radialGradient id="iw-body" cx="0" cy="0" r="1" gradientTransform="matrix(7.5 8.85 -9.52 8.1 14.15 8.5)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff7ef"/>
+      <stop offset="0.5" stop-color="#f0c9b2"/>
+      <stop offset="1" stop-color="#d09a82"/>
+    </radialGradient>
+    <linearGradient id="iw-shade" x1="9.2" y1="5.75" x2="19.4" y2="21.05" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity="0.72"/>
+      <stop offset="0.45" stop-color="#fff7e5" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#895948" stop-opacity="0.14"/>
     </linearGradient>
-    <linearGradient id="iw-face" x1="8" y1="7" x2="24" y2="25" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#eef5ff"/>
-      <stop offset="1" stop-color="#9fb4cc"/>
-    </linearGradient>
-    <linearGradient id="iw-accent" x1="10" y1="22" x2="23" y2="9" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#38bdf8"/>
-      <stop offset="1" stop-color="#3b82f6"/>
-    </linearGradient>
+    <radialGradient id="iw-blush" cx="0" cy="0" r="1" gradientTransform="matrix(3.28 0 0 1.94 14.32 17.43)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#d98496" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="transparent"/>
+    </radialGradient>
   </defs>
-  <rect x="2" y="2" width="28" height="28" rx="8" fill="url(#iw-shell)"/>
-  <rect x="2.5" y="2.5" width="27" height="27" rx="7.5" stroke="rgba(226,232,240,0.16)" stroke-width="0.7"/>
-  <path d="M8.2 9.5h15.2v4.15H12.55v2.2h8.35v3.85h-8.35v2.8H8.2V9.5Z" fill="url(#iw-face)"/>
-  <path d="M21.4 9.5h4.4l-6.15 13h-4.3l-2.7-5.8h4.35l1.55 3.08 2.85-6.1V9.5Z" fill="url(#iw-accent)"/>
-  <path d="M8.2 9.5h15.2M12.55 15.85h8.35M8.2 22.5h4.35" stroke="rgba(15,23,42,0.4)" stroke-width="0.55" stroke-linecap="round" opacity="0.55"/>
-  <g transform="translate(23.7 8.3)">
-    <circle r="1.55" fill="#dbeafe"/>
-    <circle r="0.58" fill="#fff"/>
-  </g>
+  <path d="M13.52 4.55c1.18-1.43 3.71-.84 4.25.93 1.94-.17 3.54 1.22 3.66 3.16 1.64.59 2.69 2.15 2.48 3.96-.25 2.15-2.06 3.75-4.17 3.92-.63 1.98-2.57 3.37-4.8 3.37-1.64 0-3.16-.76-4.13-1.9-1.94.76-4.21-.04-5.1-1.86-1.94-.21-3.37-1.81-3.37-3.75 0-1.77 1.22-3.29 2.91-3.71-.17-.42-.25-.88-.25-1.35 0-2.27 1.9-4.13 4.17-4.13.93 0 1.81.29 2.48.8.34-.34.72-.59 1.27-.72Z" fill="url(#iw-body)"/>
+  <path d="M13.52 4.55c1.18-1.43 3.71-.84 4.25.93 1.94-.17 3.54 1.22 3.66 3.16 1.64.59 2.69 2.15 2.48 3.96-.25 2.15-2.06 3.75-4.17 3.92-.63 1.98-2.57 3.37-4.8 3.37-1.64 0-3.16-.76-4.13-1.9-1.94.76-4.21-.04-5.1-1.86-1.94-.21-3.37-1.81-3.37-3.75 0-1.77 1.22-3.29 2.91-3.71-.17-.42-.25-.88-.25-1.35 0-2.27 1.9-4.13 4.17-4.13.93 0 1.81.29 2.48.8.34-.34.72-.59 1.27-.72Z" fill="url(#iw-shade)"/>
+  <path d="M6.74 9.26c1.18-1.6 3.16-2.27 5.01-1.69 1.26-1.64 3.92-1.81 5.43-.34" stroke="rgba(255,255,255,0.58)" stroke-width="0.26" stroke-linecap="round"/>
+  <ellipse cx="9.01" cy="14.53" rx="1.43" ry="1.98" fill="#242b38"/>
+  <ellipse cx="15.58" cy="14.53" rx="1.43" ry="1.98" fill="#242b38"/>
+  <circle cx="8.55" cy="13.81" r="0.46" fill="#ffffff"/>
+  <circle cx="15.12" cy="13.81" r="0.46" fill="#ffffff"/>
+  <circle cx="9.51" cy="15.33" r="0.21" fill="#ffffff" opacity="0.4"/>
+  <circle cx="16.08" cy="15.33" r="0.21" fill="#ffffff" opacity="0.4"/>
+  <ellipse cx="7.75" cy="17.68" rx="2.61" ry="1.52" fill="url(#iw-blush)" opacity="0.86"/>
+  <ellipse cx="17.26" cy="17.68" rx="2.61" ry="1.52" fill="url(#iw-blush)" opacity="0.78"/>
+  <circle cx="17.01" cy="9.6" r="0.59" fill="#ffe8c6" opacity="0.92"/>
 </svg>

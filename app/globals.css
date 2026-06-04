@@ -3526,10 +3526,10 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
   border: 0 !important;
   border-radius: 999px !important;
   box-shadow: none !important;
-  height: 72px !important;
+  height: 108px !important;
   max-width: none !important;
   padding: 0 !important;
-  width: 72px !important;
+  width: 108px !important;
 }
 
 .imagine-agent-dock-panel {
@@ -3628,15 +3628,9 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 }
 
 .imagine-agent-orb-button {
-  background:
-    radial-gradient(circle at 45% 34%, rgba(255, 255, 246, 0.98) 0 18%, rgba(255, 235, 210, 0.96) 42%, rgba(244, 186, 170, 0.9) 74%),
-    radial-gradient(circle at 72% 72%, rgba(137, 213, 225, 0.44), transparent 48%);
-  border: 1px solid rgba(255, 244, 228, 0.82);
-  box-shadow:
-    0 18px 38px rgba(246, 166, 142, 0.22),
-    0 0 0 8px rgba(255, 238, 218, 0.1),
-    inset 0 2px 0 rgba(255, 255, 255, 0.7),
-    inset 0 -12px 18px rgba(196, 122, 113, 0.14);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
   cursor: grab;
   overflow: visible;
   touch-action: none;
@@ -3647,41 +3641,9 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
   will-change: transform;
 }
 
-.imagine-agent-orb-button::before {
-  position: absolute;
-  inset: -5px;
-  content: "";
-  border-radius: inherit;
-  border: 1px solid rgba(255, 238, 222, 0.5);
-  background:
-    radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.55), transparent 26%),
-    radial-gradient(circle at 75% 74%, rgba(111, 185, 204, 0.14), transparent 42%);
-  box-shadow:
-    0 -5px 10px rgba(255, 247, 232, 0.18),
-    -7px 2px 12px rgba(255, 218, 198, 0.16),
-    7px 3px 12px rgba(160, 215, 225, 0.12);
-  opacity: 0.95;
-}
-
-.imagine-agent-orb-button::after {
-  position: absolute;
-  inset: 5px;
-  content: "";
-  border-radius: inherit;
-  background:
-    radial-gradient(circle at 35% 25%, rgba(255, 255, 255, 0.58), transparent 28%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 58%);
-  pointer-events: none;
-}
-
 .imagine-agent-orb-button:hover {
-  box-shadow:
-    0 20px 42px rgba(246, 166, 142, 0.3),
-    0 0 0 9px rgba(255, 238, 218, 0.12),
-    inset 0 2px 0 rgba(255, 255, 255, 0.82),
-    inset 0 -12px 18px rgba(196, 122, 113, 0.12);
-  filter: saturate(1.03);
-  transform: translateY(-3px) scale(1.035);
+  filter: saturate(1.05);
+  transform: translateY(-4px) scale(1.045);
 }
 
 .imagine-agent-orb-button:active {
@@ -3690,112 +3652,44 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 
 .imagine-agent-dock-idle-orb.is-dragging .imagine-agent-orb-button {
   cursor: grabbing;
-  filter: saturate(1.06);
-  transform: scale(1.04);
+  filter: saturate(1.08);
+  transform: scale(1.045);
 }
 
 .imagine-agent-orb-aura {
   position: absolute;
-  inset: -18px;
-  border-radius: inherit;
+  inset: -18px -22px -16px;
+  border-radius: 46% 54% 52% 48% / 48% 44% 56% 52%;
   background:
-    radial-gradient(circle, rgba(255, 214, 192, 0.34), transparent 58%),
-    radial-gradient(circle at 70% 36%, rgba(122, 203, 218, 0.18), transparent 42%);
-  opacity: 0.64;
+    radial-gradient(ellipse at 46% 48%, rgba(240, 201, 178, 0.2), transparent 58%),
+    radial-gradient(ellipse at 70% 38%, rgba(208, 154, 130, 0.14), transparent 44%);
+  filter: blur(10px);
+  opacity: 0.72;
   animation: imagine-agent-orb-breathe 4s ease-in-out infinite;
 }
 
-.imagine-agent-orb-fluff {
-  position: absolute;
-  z-index: 1;
-  inset: -3px;
-  border-radius: inherit;
-  background:
-    radial-gradient(circle at 18% 34%, rgba(255, 244, 226, 0.64) 0 8%, transparent 16%),
-    radial-gradient(circle at 78% 31%, rgba(255, 244, 226, 0.58) 0 7%, transparent 15%),
-    radial-gradient(circle at 28% 82%, rgba(245, 191, 176, 0.42) 0 7%, transparent 16%),
-    radial-gradient(circle at 74% 79%, rgba(141, 209, 221, 0.28) 0 6%, transparent 15%);
-  filter: blur(0.3px);
-  pointer-events: none;
-}
-
-.imagine-agent-orb-face {
-  position: absolute;
-  z-index: 3;
-  width: 42px;
-  height: 32px;
-  transform: translateY(4px);
-  pointer-events: none;
-}
-
-.imagine-agent-orb-eye {
-  position: absolute;
-  top: 7px;
-  width: 5px;
-  height: 9px;
-  border-radius: 999px;
-  background: rgba(42, 37, 46, 0.88);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.28),
-    0 0 0 1px rgba(42, 37, 46, 0.04);
-}
-
-.imagine-agent-orb-eye:first-child {
-  left: 12px;
-}
-
-.imagine-agent-orb-eye:nth-child(2) {
-  right: 12px;
-}
-
-.imagine-agent-orb-mouth {
-  position: absolute;
-  left: 50%;
-  top: 19px;
-  width: 12px;
-  height: 6px;
-  border-bottom: 2px solid rgba(42, 37, 46, 0.72);
-  border-radius: 0 0 999px 999px;
-  transform: translateX(-50%);
-}
-
-.imagine-agent-orb-cheek {
-  position: absolute;
-  top: 18px;
-  width: 7px;
-  height: 4px;
-  border-radius: 999px;
-  background: rgba(244, 129, 139, 0.28);
-  filter: blur(0.2px);
-}
-
-.imagine-agent-orb-cheek-left {
-  left: 4px;
-}
-
-.imagine-agent-orb-cheek-right {
-  right: 4px;
-}
-
 .imagine-mark {
-  --imagine-mark-glow-x: 0px;
-  --imagine-mark-glow-y: 0px;
-  --imagine-mark-bg-1: #1e293b;
-  --imagine-mark-bg-2: #111827;
-  --imagine-mark-bg-3: #070b12;
-  --imagine-mark-border: rgba(226, 232, 240, 0.16);
-  --imagine-mark-face-1: #eef5ff;
-  --imagine-mark-face-2: #9fb4cc;
-  --imagine-mark-accent-1: #38bdf8;
-  --imagine-mark-accent-2: #3b82f6;
-  --imagine-mark-line: rgba(15, 23, 42, 0.4);
-  --imagine-mark-node: #dbeafe;
-  --imagine-mark-node-core: #ffffff;
+  --imagine-mark-body-x: 0px;
+  --imagine-mark-body-y: 0px;
+  --imagine-mark-eye-x: 0px;
+  --imagine-mark-eye-y: 0px;
+  --imagine-mark-body-light: #fff7ef;
+  --imagine-mark-body-mid: #f0c9b2;
+  --imagine-mark-body-deep: #d09a82;
+  --imagine-mark-shine: rgba(255, 255, 255, 0.72);
+  --imagine-mark-shine-soft: rgba(255, 238, 224, 0.1);
+  --imagine-mark-shadow-soft: rgba(137, 89, 72, 0.14);
+  --imagine-mark-highlight: rgba(255, 255, 255, 0.7);
+  --imagine-mark-eye: #242b38;
+  --imagine-mark-eye-glint: #ffffff;
+  --imagine-mark-blush: rgba(217, 132, 150, 0.22);
+  --imagine-mark-spark: #ffe8c6;
   position: relative;
   z-index: 1;
   display: block;
   flex-shrink: 0;
-  filter: drop-shadow(0 4px 12px rgba(2, 6, 23, 0.34));
+  overflow: visible;
+  filter: drop-shadow(0 5px 14px rgba(15, 23, 42, 0.24));
   transition:
     transform 180ms var(--iw-ease-out),
     filter 180ms var(--iw-ease-out);
@@ -3805,50 +3699,54 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
   display: block;
   width: 100%;
   height: 100%;
+  overflow: visible;
+  transform-origin: center;
 }
 
-.imagine-mark-glow {
-  transition: transform 60ms linear;
-  transform: translate(var(--imagine-mark-glow-x), var(--imagine-mark-glow-y));
+.imagine-mark-body {
+  transition: transform 120ms var(--iw-ease-out);
+  transform: translate(var(--imagine-mark-body-x), var(--imagine-mark-body-y));
+  will-change: transform;
+}
+
+.imagine-mark-eyes {
+  transition: transform 90ms linear;
+  transform: translate(var(--imagine-mark-eye-x), var(--imagine-mark-eye-y));
+  will-change: transform;
 }
 
 .imagine-mark-xs {
-  filter: drop-shadow(0 2px 5px rgba(15, 23, 42, 0.28));
+  filter: drop-shadow(0 2px 5px rgba(15, 23, 42, 0.2));
 }
 
 .imagine-mark-tracks-pointer:hover {
-  filter: drop-shadow(0 6px 16px rgba(37, 99, 235, 0.28));
+  transform: translateY(-2px) scale(1.045);
+  filter: drop-shadow(0 8px 18px rgba(67, 87, 92, 0.28));
 }
 
 .imagine-agent-orb-button:hover .imagine-mark {
-  transform: translateY(-2px) scale(1.04);
-  filter: drop-shadow(0 10px 20px rgba(196, 122, 113, 0.22));
+  transform: translateY(-3px) scale(1.08);
+  filter: drop-shadow(0 12px 24px rgba(67, 87, 92, 0.32));
 }
 
-.imagine-agent-orb-reminder {
-  animation: imagine-agent-orb-reminder 16s ease-in-out infinite;
-  background: rgba(17, 24, 39, 0.78) !important;
-  border-color: color-mix(in srgb, var(--iw-accent) 20%, var(--iw-border)) !important;
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
-  color: color-mix(in srgb, var(--iw-accent) 28%, #ffffff) !important;
-  pointer-events: none;
+.imagine-agent-orb-button:hover .imagine-mark-svg {
+  animation: imagine-agent-mark-hover 2.4s ease-in-out infinite;
 }
 
 html[data-imagine-theme="light"] .imagine-mark,
 .imagine-workbench-shell.imagine-theme-light .imagine-mark,
 .imagine-agent-dock.imagine-theme-light .imagine-mark {
-  --imagine-mark-bg-1: #ffffff;
-  --imagine-mark-bg-2: #eaf1f8;
-  --imagine-mark-bg-3: #cbd8e5;
-  --imagine-mark-border: rgba(15, 23, 42, 0.1);
-  --imagine-mark-face-1: #182235;
-  --imagine-mark-face-2: #334155;
-  --imagine-mark-accent-1: #0ea5e9;
-  --imagine-mark-accent-2: #2563eb;
-  --imagine-mark-line: rgba(255, 255, 255, 0.36);
-  --imagine-mark-node: #2563eb;
-  --imagine-mark-node-core: #ffffff;
-  filter: drop-shadow(0 3px 12px rgba(37, 99, 160, 0.16));
+  --imagine-mark-body-light: #fff7ef;
+  --imagine-mark-body-mid: #f0c9b2;
+  --imagine-mark-body-deep: #d09a82;
+  --imagine-mark-shine: rgba(255, 255, 255, 0.74);
+  --imagine-mark-shine-soft: rgba(255, 238, 224, 0.1);
+  --imagine-mark-shadow-soft: rgba(137, 89, 72, 0.12);
+  --imagine-mark-highlight: rgba(255, 255, 255, 0.72);
+  --imagine-mark-eye: #25303a;
+  --imagine-mark-blush: rgba(217, 132, 150, 0.18);
+  --imagine-mark-spark: #ffe8c6;
+  filter: drop-shadow(0 4px 12px rgba(137, 89, 72, 0.1));
 }
 
 html[data-imagine-theme="light"] .imagine-mark-xs,
@@ -3856,38 +3754,30 @@ html[data-imagine-theme="light"] .imagine-mark-xs,
   filter: drop-shadow(0 2px 6px rgba(15, 23, 42, 0.1));
 }
 
-.imagine-agent-dock-idle-orb.imagine-theme-light .imagine-agent-orb-reminder {
-  background: rgba(255, 255, 255, 0.9) !important;
-  border-color: color-mix(in srgb, var(--iw-accent) 16%, var(--iw-border)) !important;
-  color: var(--iw-accent-strong) !important;
-}
-
 .imagine-agent-dock-idle-orb.imagine-theme-light .imagine-agent-orb-aura {
   background:
-    radial-gradient(circle, rgba(255, 214, 192, 0.26), transparent 58%),
-    radial-gradient(circle at 68% 36%, rgba(122, 203, 218, 0.13), transparent 42%);
+    radial-gradient(ellipse at 46% 48%, rgba(240, 201, 178, 0.16), transparent 58%),
+    radial-gradient(ellipse at 68% 36%, rgba(208, 154, 130, 0.1), transparent 42%);
 }
 
 .imagine-agent-dock-idle-orb.imagine-theme-dark .imagine-mark {
-  filter: drop-shadow(0 6px 14px rgba(196, 122, 113, 0.18));
-}
-
-.imagine-agent-dock-idle-orb.imagine-theme-dark .imagine-agent-orb-button::before {
-  border-color: rgba(255, 255, 255, 0.58);
-  box-shadow: none;
+  --imagine-mark-body-light: #e7cbc0;
+  --imagine-mark-body-mid: #b98475;
+  --imagine-mark-body-deep: #78584f;
+  --imagine-mark-shine: rgba(255, 245, 238, 0.42);
+  --imagine-mark-shine-soft: rgba(220, 151, 128, 0.08);
+  --imagine-mark-shadow-soft: rgba(70, 40, 34, 0.2);
+  --imagine-mark-eye: #1d2530;
+  --imagine-mark-blush: rgba(211, 116, 132, 0.12);
+  --imagine-mark-spark: #e7bfa5;
+  filter: drop-shadow(0 8px 18px rgba(185, 132, 117, 0.12));
 }
 
 .imagine-agent-dock-idle-orb.imagine-theme-dark .imagine-agent-orb-aura {
   background:
-    radial-gradient(circle, rgba(255, 214, 192, 0.38), transparent 58%),
-    radial-gradient(circle at 68% 36%, rgba(122, 203, 218, 0.2), transparent 42%);
-  opacity: 0.72;
-}
-
-.imagine-agent-dock-idle-orb.imagine-theme-dark .imagine-agent-orb-reminder {
-  background: rgba(17, 24, 39, 0.88) !important;
-  border-color: color-mix(in srgb, var(--iw-accent) 28%, var(--iw-border)) !important;
-  color: color-mix(in srgb, var(--iw-accent) 26%, #ffffff) !important;
+    radial-gradient(ellipse at 46% 48%, rgba(185, 132, 117, 0.12), transparent 58%),
+    radial-gradient(ellipse at 68% 36%, rgba(120, 88, 79, 0.08), transparent 42%);
+  opacity: 0.5;
 }
 
 @keyframes imagine-agent-orb-breathe {
@@ -3903,18 +3793,18 @@ html[data-imagine-theme="light"] .imagine-mark-xs,
   }
 }
 
-@keyframes imagine-agent-orb-reminder {
+@keyframes imagine-agent-mark-hover {
   0%,
-  68%,
   100% {
-    opacity: 0;
-    transform: translateY(-50%) translateX(6px) scale(0.96);
+    transform: translateY(0) rotate(0deg) scale(1);
   }
 
-  74%,
-  88% {
-    opacity: 1;
-    transform: translateY(-50%) translateX(0) scale(1);
+  42% {
+    transform: translateY(-1.5px) rotate(-1.2deg) scale(1.018);
+  }
+
+  70% {
+    transform: translateY(0.4px) rotate(0.8deg) scale(0.996);
   }
 }
 
@@ -4656,8 +4546,8 @@ html[data-imagine-theme="light"] .imagine-mark-xs,
 
 @media (max-width: 860px) {
   .imagine-agent-dock.imagine-agent-dock-idle-orb {
-    width: 72px !important;
-    height: 72px !important;
+    width: 108px !important;
+    height: 108px !important;
     max-width: none !important;
     border: 0 !important;
     border-radius: 999px !important;

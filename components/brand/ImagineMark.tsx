@@ -2,20 +2,22 @@
 
 import { useId, useLayoutEffect, useRef, type CSSProperties } from "react";
 
-export type ImagineMarkSize = "xs" | "sm" | "md" | "lg";
+export type ImagineMarkSize = "xs" | "sm" | "md" | "lg" | "xl";
 
 const SIZE_PX: Record<ImagineMarkSize, number> = {
   xs: 16,
   sm: 20,
   md: 28,
   lg: 40,
+  xl: 108,
 };
 
-const GLOW_RANGE: Record<ImagineMarkSize, { x: number; y: number; reach: number }> = {
-  xs: { x: 0, y: 0, reach: 0 },
-  sm: { x: 1.8, y: 1.8, reach: 40 },
-  md: { x: 2.6, y: 2.6, reach: 56 },
-  lg: { x: 3.4, y: 3.4, reach: 80 },
+const POINTER_REACH: Record<ImagineMarkSize, number> = {
+  xs: 0,
+  sm: 40,
+  md: 56,
+  lg: 80,
+  xl: 160,
 };
 
 interface ImagineMarkProps {
@@ -30,46 +32,50 @@ export default function ImagineMark({
   className = "",
 }: ImagineMarkProps) {
   const uid = useId().replace(/:/g, "");
-  const shellGradientId = `imagine-mark-shell-${uid}`;
-  const faceGradientId = `imagine-mark-face-${uid}`;
-  const accentGradientId = `imagine-mark-accent-${uid}`;
+  const bodyGradientId = `imagine-mark-body-${uid}`;
+  const shadeGradientId = `imagine-mark-shade-${uid}`;
+  const blushGradientId = `imagine-mark-blush-${uid}`;
   const rootRef = useRef<HTMLSpanElement>(null);
   const px = SIZE_PX[size];
-  const glow = GLOW_RANGE[size];
-  const shouldTrack = trackPointer && glow.reach > 0;
+  const pointerReach = POINTER_REACH[size];
+  const shouldTrack = trackPointer && pointerReach > 0;
 
   useLayoutEffect(() => {
     const root = rootRef.current;
     if (!root || !shouldTrack) return;
 
-    const resetGlow = () => {
-      root.style.setProperty("--imagine-mark-glow-x", "0px");
-      root.style.setProperty("--imagine-mark-glow-y", "0px");
+    const resetMotion = () => {
+      root.style.setProperty("--imagine-mark-body-x", "0px");
+      root.style.setProperty("--imagine-mark-body-y", "0px");
+      root.style.setProperty("--imagine-mark-eye-x", "0px");
+      root.style.setProperty("--imagine-mark-eye-y", "0px");
     };
 
-    const updateGlow = (clientX: number, clientY: number) => {
+    const updateMotion = (clientX: number, clientY: number) => {
       const rect = root.getBoundingClientRect();
       const centerX = rect.left + rect.width / 2;
       const centerY = rect.top + rect.height / 2;
       const dx = clientX - centerX;
       const dy = clientY - centerY;
       const distance = Math.hypot(dx, dy) || 1;
-      const reach = Math.min(distance, glow.reach);
+      const reach = Math.min(distance, pointerReach);
       const nx = (dx / distance) * reach;
       const ny = (dy / distance) * reach;
-      root.style.setProperty("--imagine-mark-glow-x", `${(nx / glow.reach) * glow.x}px`);
-      root.style.setProperty("--imagine-mark-glow-y", `${(ny / glow.reach) * glow.y}px`);
+      root.style.setProperty("--imagine-mark-body-x", `${(nx / pointerReach) * 0.46}px`);
+      root.style.setProperty("--imagine-mark-body-y", `${(ny / pointerReach) * 0.36}px`);
+      root.style.setProperty("--imagine-mark-eye-x", `${(nx / pointerReach) * 1.15}px`);
+      root.style.setProperty("--imagine-mark-eye-y", `${(ny / pointerReach) * 0.95}px`);
     };
 
-    const onPointerMove = (event: PointerEvent) => updateGlow(event.clientX, event.clientY);
+    const onPointerMove = (event: PointerEvent) => updateMotion(event.clientX, event.clientY);
 
-    resetGlow();
+    resetMotion();
     window.addEventListener("pointermove", onPointerMove, { passive: true });
     return () => {
       window.removeEventListener("pointermove", onPointerMove);
-      resetGlow();
+      resetMotion();
     };
-  }, [glow.reach, glow.x, glow.y, shouldTrack]);
+  }, [pointerReach, shouldTrack]);
 
   const rootClass = [
     "imagine-mark",
@@ -90,55 +96,59 @@ export default function ImagineMark({
     >
       <svg
         className="imagine-mark-svg"
-        viewBox="0 0 32 32"
+        viewBox="-4 -4 32 32"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
       >
         <defs>
-          <linearGradient id={shellGradientId} x1="6" y1="4" x2="26" y2="28" gradientUnits="userSpaceOnUse">
-            <stop stopColor="var(--imagine-mark-bg-1)" />
-            <stop offset="0.55" stopColor="var(--imagine-mark-bg-2)" />
-            <stop offset="1" stopColor="var(--imagine-mark-bg-3)" />
+          <radialGradient id={bodyGradientId} cx="0" cy="0" r="1" gradientTransform="matrix(7.5 8.85 -9.52 8.1 14.15 8.5)" gradientUnits="userSpaceOnUse">
+            <stop stopColor="var(--imagine-mark-body-light)" />
+            <stop offset="0.5" stopColor="var(--imagine-mark-body-mid)" />
+            <stop offset="1" stopColor="var(--imagine-mark-body-deep)" />
+          </radialGradient>
+          <linearGradient id={shadeGradientId} x1="9.2" y1="5.75" x2="19.4" y2="21.05" gradientUnits="userSpaceOnUse">
+            <stop stopColor="var(--imagine-mark-shine)" />
+            <stop offset="0.45" stopColor="var(--imagine-mark-shine-soft)" />
+            <stop offset="1" stopColor="var(--imagine-mark-shadow-soft)" />
           </linearGradient>
-          <linearGradient id={faceGradientId} x1="8" y1="7" x2="24" y2="25" gradientUnits="userSpaceOnUse">
-            <stop stopColor="var(--imagine-mark-face-1)" />
-            <stop offset="1" stopColor="var(--imagine-mark-face-2)" />
-          </linearGradient>
-          <linearGradient id={accentGradientId} x1="10" y1="22" x2="23" y2="9" gradientUnits="userSpaceOnUse">
-            <stop stopColor="var(--imagine-mark-accent-1)" />
-            <stop offset="1" stopColor="var(--imagine-mark-accent-2)" />
-          </linearGradient>
+          <radialGradient id={blushGradientId} cx="0" cy="0" r="1" gradientTransform="matrix(3.28 0 0 1.94 14.32 17.43)" gradientUnits="userSpaceOnUse">
+            <stop stopColor="var(--imagine-mark-blush)" />
+            <stop offset="1" stopColor="transparent" />
+          </radialGradient>
         </defs>
-        <rect x="2" y="2" width="28" height="28" rx="8" fill={`url(#${shellGradientId})`} />
-        <rect
-          x="2.5"
-          y="2.5"
-          width="27"
-          height="27"
-          rx="7.5"
-          stroke="var(--imagine-mark-border)"
-          strokeWidth="0.7"
-        />
-        <path
-          d="M8.2 9.5h15.2v4.15H12.55v2.2h8.35v3.85h-8.35v2.8H8.2V9.5Z"
-          fill={`url(#${faceGradientId})`}
-        />
-        <path
-          d="M21.4 9.5h4.4l-6.15 13h-4.3l-2.7-5.8h4.35l1.55 3.08 2.85-6.1V9.5Z"
-          fill={`url(#${accentGradientId})`}
-        />
-        <path
-          d="M8.2 9.5h15.2M12.55 15.85h8.35M8.2 22.5h4.35"
-          stroke="var(--imagine-mark-line)"
-          strokeWidth="0.55"
-          strokeLinecap="round"
-          fill="none"
-          opacity="0.55"
-        />
-        <g className="imagine-mark-glow" transform="translate(23.7 8.3)">
-          <circle r="1.55" fill="var(--imagine-mark-node)" />
-          <circle r="0.58" fill="var(--imagine-mark-node-core)" />
+        <g className="imagine-mark-body">
+          <path
+            d="M13.52 4.55c1.18-1.43 3.71-.84 4.25.93 1.94-.17 3.54 1.22 3.66 3.16 1.64.59 2.69 2.15 2.48 3.96-.25 2.15-2.06 3.75-4.17 3.92-.63 1.98-2.57 3.37-4.8 3.37-1.64 0-3.16-.76-4.13-1.9-1.94.76-4.21-.04-5.1-1.86-1.94-.21-3.37-1.81-3.37-3.75 0-1.77 1.22-3.29 2.91-3.71-.17-.42-.25-.88-.25-1.35 0-2.27 1.9-4.13 4.17-4.13.93 0 1.81.29 2.48.8.34-.34.72-.59 1.27-.72Z"
+            fill={`url(#${bodyGradientId})`}
+          />
+          <path
+            d="M13.52 4.55c1.18-1.43 3.71-.84 4.25.93 1.94-.17 3.54 1.22 3.66 3.16 1.64.59 2.69 2.15 2.48 3.96-.25 2.15-2.06 3.75-4.17 3.92-.63 1.98-2.57 3.37-4.8 3.37-1.64 0-3.16-.76-4.13-1.9-1.94.76-4.21-.04-5.1-1.86-1.94-.21-3.37-1.81-3.37-3.75 0-1.77 1.22-3.29 2.91-3.71-.17-.42-.25-.88-.25-1.35 0-2.27 1.9-4.13 4.17-4.13.93 0 1.81.29 2.48.8.34-.34.72-.59 1.27-.72Z"
+            fill={`url(#${shadeGradientId})`}
+            opacity="0.95"
+          />
         </g>
+        <path
+          d="M6.74 9.26c1.18-1.6 3.16-2.27 5.01-1.69 1.26-1.64 3.92-1.81 5.43-.34"
+          stroke="var(--imagine-mark-highlight)"
+          strokeWidth="0.26"
+          strokeLinecap="round"
+          opacity="0.58"
+        />
+        <g className="imagine-mark-eyes">
+          <g transform="translate(9.01 14.53)">
+            <ellipse rx="1.43" ry="1.98" fill="var(--imagine-mark-eye)" />
+            <circle cx="-0.46" cy="-0.72" r="0.46" fill="var(--imagine-mark-eye-glint)" />
+            <circle cx="0.5" cy="0.8" r="0.21" fill="var(--imagine-mark-eye-glint)" opacity="0.4" />
+          </g>
+          <g transform="translate(15.58 14.53)">
+            <ellipse rx="1.43" ry="1.98" fill="var(--imagine-mark-eye)" />
+            <circle cx="-0.46" cy="-0.72" r="0.46" fill="var(--imagine-mark-eye-glint)" />
+            <circle cx="0.5" cy="0.8" r="0.21" fill="var(--imagine-mark-eye-glint)" opacity="0.4" />
+          </g>
+        </g>
+        <ellipse cx="7.75" cy="17.68" rx="2.61" ry="1.52" fill={`url(#${blushGradientId})`} opacity="0.86" />
+        <ellipse cx="17.26" cy="17.68" rx="2.61" ry="1.52" fill={`url(#${blushGradientId})`} opacity="0.78" />
+        <circle cx="17.01" cy="9.6" r="0.59" fill="var(--imagine-mark-spark)" opacity="0.92" />
       </svg>
     </span>
   );

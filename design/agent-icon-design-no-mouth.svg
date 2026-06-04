@@ -1,0 +1,55 @@
+<svg width="760" height="760" viewBox="0 0 760 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bodyWarm" cx="0" cy="0" r="1" gradientTransform="matrix(178 210 -226 192 336 202)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff7e7"/>
+      <stop offset="0.5" stop-color="#ffd18a"/>
+      <stop offset="1" stop-color="#ed866a"/>
+    </radialGradient>
+    <linearGradient id="bodyShade" x1="218" y1="136" x2="460" y2="500" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity="0.72"/>
+      <stop offset="0.42" stop-color="#fff3cc" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#ad4560" stop-opacity="0.28"/>
+    </linearGradient>
+    <radialGradient id="blush" cx="0" cy="0" r="1" gradientTransform="matrix(78 0 0 46 340 414)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ff8ca8" stop-opacity="0.48"/>
+      <stop offset="1" stop-color="#ff8ca8" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="softGlow" cx="0" cy="0" r="1" gradientTransform="matrix(248 0 0 220 346 346)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffcf8d" stop-opacity="0.26"/>
+      <stop offset="1" stop-color="#ffcf8d" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="softShadow" x="92" y="64" width="570" height="580" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="24" stdDeviation="32" flood-color="#7a2f49" flood-opacity="0.22"/>
+    </filter>
+    <style>
+      .bg { fill: #111722; }
+      .eye { fill: #282338; }
+      .glint { fill: #ffffff; }
+      .line { stroke: rgba(255,255,255,0.54); stroke-width: 6; stroke-linecap: round; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="760" height="760"/>
+  <circle cx="346" cy="346" r="274" fill="url(#softGlow)"/>
+
+  <g filter="url(#softShadow)">
+    <path
+      d="M321 108c28-34 88-20 101 22 46-4 84 29 87 75 39 14 64 51 59 94-6 51-49 89-99 93-15 47-61 80-114 80-39 0-75-18-98-45-46 18-100-1-121-44-46-5-80-43-80-89 0-42 29-78 69-88-4-10-6-21-6-32 0-54 45-98 99-98 22 0 43 7 59 19 8-8 17-14 30-17Z"
+      fill="url(#bodyWarm)"
+    />
+    <path
+      d="M321 108c28-34 88-20 101 22 46-4 84 29 87 75 39 14 64 51 59 94-6 51-49 89-99 93-15 47-61 80-114 80-39 0-75-18-98-45-46 18-100-1-121-44-46-5-80-43-80-89 0-42 29-78 69-88-4-10-6-21-6-32 0-54 45-98 99-98 22 0 43 7 59 19 8-8 17-14 30-17Z"
+      fill="url(#bodyShade)"
+    />
+    <path d="M160 220c28-38 75-54 119-40 30-39 93-43 129-8" class="line" opacity="0.62"/>
+    <ellipse cx="214" cy="345" rx="34" ry="47" class="eye"/>
+    <ellipse cx="370" cy="345" rx="34" ry="47" class="eye"/>
+    <circle cx="203" cy="328" r="11" class="glint"/>
+    <circle cx="359" cy="328" r="11" class="glint"/>
+    <circle cx="226" cy="364" r="5" fill="#ffffff" opacity="0.42"/>
+    <circle cx="382" cy="364" r="5" fill="#ffffff" opacity="0.42"/>
+    <ellipse cx="184" cy="420" rx="62" ry="36" fill="url(#blush)"/>
+    <ellipse cx="410" cy="420" rx="62" ry="36" fill="url(#blush)"/>
+    <circle cx="404" cy="228" r="14" fill="#fff4d5" opacity="0.95"/>
+  </g>
+</svg>
