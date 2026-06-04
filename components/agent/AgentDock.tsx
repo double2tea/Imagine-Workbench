@@ -508,7 +508,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
     model: string;
     supportsVision: boolean | null;
   } | null>(null);
-  const [orbPosition, setOrbPosition] = useState<AgentOrbPosition | null>(getInitialAgentOrbPosition);
+  const [orbPosition, setOrbPosition] = useState<AgentOrbPosition | null>(null);
   const [isOrbDragging, setIsOrbDragging] = useState(false);
   const orbDragRef = useRef<AgentOrbDragState | null>(null);
   const suppressOrbClickRef = useRef(false);
@@ -546,7 +546,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
     return () => controller.abort();
   }, [hasSendableAgentImages, selectedChatModel]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setOrbPosition(getInitialAgentOrbPosition());
   }, []);
 
