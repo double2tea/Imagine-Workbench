@@ -161,20 +161,6 @@ function sameBoardSelectionSnapshot(left: BoardSelectionSnapshot, right: BoardSe
   return left.edgeId === right.edgeId && left.nodeId === right.nodeId && sameStringList(left.nodeIds, right.nodeIds);
 }
 
-function sameBoardNodeRenderModel(left: BoardNodeModel, right: BoardNodeModel): boolean {
-  return (
-    left === right ||
-    (
-      left.id === right.id &&
-      left.kind === right.kind &&
-      left.title === right.title &&
-      left.updatedAt === right.updatedAt &&
-      left.size.width === right.size.width &&
-      left.size.height === right.size.height
-    )
-  );
-}
-
 function sameFlowNodeState(left: BoardFlowNode, right: BoardFlowNode): boolean {
   return (
     left.id === right.id &&
@@ -196,68 +182,22 @@ function sameFlowNodeList(left: BoardFlowNode[], right: BoardFlowNode[]): boolea
   return left.every((node, index) => sameFlowNodeState(node, right[index]));
 }
 
-function sameReferenceList(
-  left: BoardFlowNode["data"]["generateReferences"],
-  right: BoardFlowNode["data"]["generateReferences"],
-): boolean {
-  if (left.length !== right.length) return false;
-  return left.every((reference, index) => {
-    const other = right[index];
-    return reference.id === other.id && reference.url === other.url && reference.role === other.role;
-  });
+function boardSelectedNodeIdSet(selectedNodeId: string | null, selectedNodeIds: string[]): Set<string> {
+  const ids = new Set(selectedNodeIds);
+  if (selectedNodeId) ids.add(selectedNodeId);
+  return ids;
 }
 
-function sameGenerateInputSummary(
-  left: BoardGenerateInputSummary | undefined,
-  right: BoardGenerateInputSummary | undefined,
-): boolean {
-  if (left === right) return true;
-  if (!left || !right) return false;
-  if (
-    left.promptPreview !== right.promptPreview ||
-    left.promptSourceTitle !== right.promptSourceTitle ||
-    left.referenceCount !== right.referenceCount ||
-    left.referencePreviews.length !== right.referencePreviews.length
-  ) return false;
-  return left.referencePreviews.every((reference, index) => {
-    const other = right.referencePreviews[index];
-    return reference.id === other.id && reference.url === other.url && reference.role === other.role;
-  });
-}
-
-function sameGenerateTaskSummary(
-  left: BoardGenerateTaskSummary | undefined,
-  right: BoardGenerateTaskSummary | undefined,
-): boolean {
-  if (left === right) return true;
-  if (!left || !right) return false;
-  return left.id === right.id && left.progress === right.progress && left.status === right.status;
-}
-
-function sameFlowNodeDataModel(left: BoardFlowNode["data"], right: BoardFlowNode["data"]): boolean {
-  return (
-    sameBoardNodeRenderModel(left.node, right.node) &&
-    left.hasResultConnection === right.hasResultConnection &&
-    left.compareReferenceUrl === right.compareReferenceUrl &&
-    sameGenerateInputSummary(left.generateInputSummary, right.generateInputSummary) &&
-    sameGenerateTaskSummary(left.generateTaskSummary, right.generateTaskSummary) &&
-    sameReferenceList(left.generateReferences, right.generateReferences) &&
-    sameReferenceList(left.promptReferences, right.promptReferences)
-  );
-}
-
-function sameFlowNodeModelList(left: BoardFlowNode[], right: BoardFlowNode[]): boolean {
-  if (left.length !== right.length) return false;
-  return left.every((node, index) => {
-    const other = right[index];
-    return (
-      node.id === other.id &&
-      node.type === other.type &&
-      sameFlowNodeDataModel(node.data, other.data) &&
-      node.position.x === other.position.x &&
-      node.position.y === other.position.y
-    );
-  });
+function boardFlowNodesWithSelection(
+  nodes: BoardFlowNode[],
+  selectedNodeId: string | null,
+  selectedNodeIds: string[],
+): BoardFlowNode[] {
+  const selectedIdSet = boardSelectedNodeIdSet(selectedNodeId, selectedNodeIds);
+  return nodes.map(node => ({
+    ...node,
+    selected: selectedIdSet.has(node.id),
+  }));
 }
 
 function BoardEdgeComponent({
@@ -811,14 +751,17 @@ export default function BoardWorkspace({
       }),
     [board.nodes, flowNodeDataById, generateTaskByNodeId],
   );
-  const [reactFlowNodes, setReactFlowNodes] = useState<BoardFlowNode[]>(flowNodes);
-  const reactFlowNodesRef = useRef<BoardFlowNode[]>(flowNodes);
+  const [reactFlowNodes, setReactFlowNodes] = useState<BoardFlowNode[]>(() =>
+    boardFlowNodesWithSelection(flowNodes, selectedNodeId, selectedNodeIds),
+  );
+  const reactFlowNodesRef = useRef<BoardFlowNode[]>(reactFlowNodes);
   useLayoutEffect(() => {
     if (isNodeDragActiveRef.current) return;
-    if (sameFlowNodeModelList(reactFlowNodesRef.current, flowNodes)) return;
-    reactFlowNodesRef.current = flowNodes;
-    setReactFlowNodes(flowNodes);
-  }, [flowNodes]);
+    const nextNodes = boardFlowNodesWithSelection(flowNodes, selectedNodeId, selectedNodeIds);
+    if (sameFlowNodeList(reactFlowNodesRef.current, nextNodes)) return;
+    reactFlowNodesRef.current = nextNodes;
+    setReactFlowNodes(nextNodes);
+  }, [flowNodes, selectedNodeId, selectedNodeIds]);
   const flowEdges = useMemo<BoardFlowEdge[]>(
     () =>
       board.edges.map(edge => ({
@@ -828,6 +771,7 @@ export default function BoardWorkspace({
         sourceHandle: edge.from.portId,
         targetHandle: edge.to.portId,
         type: "smoothstep",
+        selected: selectedEdgeId === edge.id,
         animated: edge.kind === "result" || isGenerateEdgeProcessing(edge, board.nodes),
         data: { kind: edge.kind, processing: isGenerateEdgeProcessing(edge, board.nodes) },
         className: `imagine-board-edge imagine-board-edge-${edge.kind}`,
@@ -864,6 +808,14 @@ export default function BoardWorkspace({
     const ids = nodes.map(node => node.id);
     const edgeId = edges[0]?.id ?? null;
     const nodeId = ids[0] ?? null;
+    if (
+      ids.length === 0 &&
+      !edgeId &&
+      selectedNodeId &&
+      board.nodes.some(node => node.id === selectedNodeId)
+    ) {
+      return;
+    }
     const nextSelection = edgeId
       ? { edgeId, nodeId: null, nodeIds: ids }
       : { edgeId: null, nodeId, nodeIds: ids };
@@ -872,7 +824,7 @@ export default function BoardWorkspace({
     updateSelectedNodeIds(ids);
     selectEdge(nextSelection.edgeId);
     selectNode(nextSelection.nodeId);
-  }, [selectEdge, selectNode, updateSelectedNodeIds]);
+  }, [board.nodes, selectEdge, selectedNodeId, selectNode, updateSelectedNodeIds]);
 
   const handleNodeClick: NodeMouseHandler<BoardFlowNode> = () => {
     closeOverlayMenus();
