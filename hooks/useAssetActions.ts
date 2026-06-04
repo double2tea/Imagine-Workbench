@@ -5,6 +5,7 @@ import type { CompareViewType } from "@/components/assets/ComparePanel";
 import { readFetchError } from "@/lib/client-fetch-error";
 import { readImageGenerationPayload } from "@/lib/client-image-response";
 import { clearAllDB, deleteFromDB, saveToDB, type StorageItem } from "@/lib/db";
+import { mediaReferenceFileExtension, mediaReferenceMimeFromDataUri } from "@/lib/media-references";
 import { parseProviderModel, type AiProvider } from "@/lib/providers/model-catalog";
 import { getReferenceImagePayloadError, getReferenceMediaPayloadError, prepareReferenceImageUrlForRequest, prepareReferenceMediaUrlForRequest } from "@/lib/reference-images";
 import { createVideoFrameStorageItem, getVideoFrameCaptureLabel, type CapturedVideoFrame } from "@/lib/video-frame";
@@ -62,16 +63,18 @@ function toErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message.trim() ? error.message : fallback;
 }
 
-function assetDownloadExtension(type: StorageItem["type"]): string {
-  if (type === "image") return "png";
-  if (type === "audio") return "mp3";
-  return "mp4";
+function defaultDownloadMimeType(type: StorageItem["type"]): string {
+  if (type === "image") return "image/png";
+  if (type === "video") return "video/mp4";
+  return "audio/mpeg";
 }
 
-function assetDownloadMimeType(type: StorageItem["type"]): string {
-  if (type === "image") return "image/png";
-  if (type === "audio") return "audio/mpeg";
-  return "video/mp4";
+function assetDownloadExtension(item: StorageItem): string {
+  return mediaReferenceFileExtension(mediaReferenceMimeFromDataUri(item.url), item.type);
+}
+
+function assetDownloadMimeType(item: StorageItem): string {
+  return mediaReferenceMimeFromDataUri(item.url) ?? defaultDownloadMimeType(item.type);
 }
 
 function readVideoGenerationPayload(data: unknown): { imageUrl: string | null; operationName: string | null } {
@@ -394,7 +397,7 @@ export function useAssetActions({
   };
 
   const handleDownloadItem = async (item: StorageItem) => {
-    const extension = assetDownloadExtension(item.type);
+    const extension = assetDownloadExtension(item);
     const fileName = `imagine_${item.id}.${extension}`;
 
     try {
@@ -407,7 +410,7 @@ export function useAssetActions({
           for (let index = 0; index < byteChars.length; index += 1) {
             bytes[index] = byteChars.charCodeAt(index);
           }
-          blob = new Blob([bytes], { type: assetDownloadMimeType(item.type) });
+          blob = new Blob([bytes], { type: assetDownloadMimeType(item) });
         } else {
           throw new Error("Invalid data URI");
         }
@@ -459,7 +462,7 @@ export function useAssetActions({
     }> = [];
 
     await Promise.all(itemsToExport.map(async (item) => {
-      const extension = assetDownloadExtension(item.type);
+      const extension = assetDownloadExtension(item);
       const fileName = `creation_${item.id}.${extension}`;
 
       metadataList.push({

@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  mediaReferenceFileExtension,
+  mediaReferenceTypeFromBase64DataUri,
+} from "../lib/media-references";
+import {
   REFERENCE_IMAGE_MAX_BYTES,
   REFERENCE_IMAGE_MAX_EDGE,
   REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES,
@@ -65,4 +69,14 @@ test("getReferenceMediaPayloadError rejects oversized media totals", () => {
   ]);
 
   assert.match(error ?? "", /参考媒体总大小/);
+});
+
+test("media base64 data URI type detection rejects non-base64 data URI", () => {
+  assert.equal(mediaReferenceTypeFromBase64DataUri("data:video/mp4,not-base64"), null);
+  assert.equal(mediaReferenceTypeFromBase64DataUri(makeDataUri(5, "audio/ogg")), "audio");
+});
+
+test("mediaReferenceFileExtension preserves imported audio formats", () => {
+  assert.equal(mediaReferenceFileExtension("audio/wav", "audio"), "wav");
+  assert.equal(mediaReferenceFileExtension("audio/ogg", "audio"), "ogg");
 });

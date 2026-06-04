@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getVideoModelCapabilities, parseProviderModel } from "@/lib/providers/model-catalog";
 import { generateVideo } from "@/lib/providers/video";
 import { optionalText, requireText, resolveProviderConfig } from "@/lib/providers/utils";
-import { mediaReferenceLabel, mediaReferenceTypeFromDataUri, type MediaReferenceType } from "@/lib/media-references";
+import { mediaReferenceLabel, mediaReferenceTypeFromBase64DataUri, type MediaReferenceType } from "@/lib/media-references";
 import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, getReferenceMediaPayloadError } from "@/lib/reference-images";
 
 export const runtime = "edge";
@@ -81,7 +81,7 @@ function readReferenceImages(images: unknown, image: unknown, lastFrame: unknown
 
 function getReferenceMediaFormatError(referenceImages: string[], acceptedTypes: MediaReferenceType[]): string | null {
   for (const reference of referenceImages) {
-    const type = mediaReferenceTypeFromDataUri(reference);
+    const type = mediaReferenceTypeFromBase64DataUri(reference);
     if (!type) return "Video reference media must be data:image/*, data:video/* or data:audio/* base64 data URIs";
     if (!acceptedTypes.includes(type)) return `当前视频模型不支持${mediaReferenceLabel(type)}输入`;
   }

@@ -5,6 +5,7 @@ import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/as
 import PreviewImage from "@/components/PreviewImage";
 import type { BoardAssetNode } from "@/lib/board";
 import { buildStorageItem, type StorageItem } from "@/lib/db";
+import { mediaReferenceFileExtension, mediaReferenceMimeFromDataUri } from "@/lib/media-references";
 import { getVideoFrameCaptureLabel, type CapturedVideoFrame, type VideoFrameCaptureMode } from "@/lib/video-frame";
 
 interface AssetBoardNodeProps {
@@ -44,10 +45,8 @@ const frameCaptureActions: Array<{
   { icon: SkipForward, mode: "last" },
 ];
 
-function boardAssetExtension(type: BoardAssetNode["asset"]["type"]): string {
-  if (type === "image") return "png";
-  if (type === "audio") return "mp3";
-  return "mp4";
+function boardAssetExtension(asset: BoardAssetNode["asset"]): string {
+  return mediaReferenceFileExtension(mediaReferenceMimeFromDataUri(asset.url), asset.type);
 }
 
 function boardAssetIcon(type: BoardAssetNode["asset"]["type"]) {
@@ -119,7 +118,7 @@ export default function AssetBoardNode({
           )}
           <a
             href={node.asset.url}
-            download={`${node.asset.assetId}.${boardAssetExtension(node.asset.type)}`}
+            download={`${node.asset.assetId}.${boardAssetExtension(node.asset)}`}
             className="imagine-board-asset-action nodrag hover:bg-slate-700 hover:text-white"
             title="下载"
           >
