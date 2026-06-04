@@ -31,8 +31,8 @@ export default function ImagineMark({
 }: ImagineMarkProps) {
   const uid = useId().replace(/:/g, "");
   const shellGradientId = `imagine-mark-shell-${uid}`;
-  const ringGradientId = `imagine-mark-ring-${uid}`;
-  const glowGradientId = `imagine-mark-glow-${uid}`;
+  const faceGradientId = `imagine-mark-face-${uid}`;
+  const accentGradientId = `imagine-mark-accent-${uid}`;
   const rootRef = useRef<HTMLSpanElement>(null);
   const px = SIZE_PX[size];
   const glow = GLOW_RANGE[size];
@@ -100,47 +100,44 @@ export default function ImagineMark({
             <stop offset="0.55" stopColor="var(--imagine-mark-bg-2)" />
             <stop offset="1" stopColor="var(--imagine-mark-bg-3)" />
           </linearGradient>
-          <linearGradient id={ringGradientId} x1="8" y1="7" x2="24" y2="25" gradientUnits="userSpaceOnUse">
-            <stop stopColor="var(--imagine-mark-ring-1)" />
-            <stop offset="1" stopColor="var(--imagine-mark-ring-2)" />
+          <linearGradient id={faceGradientId} x1="8" y1="7" x2="24" y2="25" gradientUnits="userSpaceOnUse">
+            <stop stopColor="var(--imagine-mark-face-1)" />
+            <stop offset="1" stopColor="var(--imagine-mark-face-2)" />
           </linearGradient>
-          <radialGradient id={glowGradientId} cx="0.35" cy="0.32" r="0.72">
-            <stop stopColor="var(--imagine-mark-glow-core)" />
-            <stop offset="0.55" stopColor="var(--imagine-mark-glow-mid)" />
-            <stop offset="1" stopColor="var(--imagine-mark-glow-edge)" stopOpacity="0" />
-          </radialGradient>
+          <linearGradient id={accentGradientId} x1="10" y1="22" x2="23" y2="9" gradientUnits="userSpaceOnUse">
+            <stop stopColor="var(--imagine-mark-accent-1)" />
+            <stop offset="1" stopColor="var(--imagine-mark-accent-2)" />
+          </linearGradient>
         </defs>
-        <rect x="2" y="2" width="28" height="28" rx="10" fill={`url(#${shellGradientId})`} />
+        <rect x="2" y="2" width="28" height="28" rx="8" fill={`url(#${shellGradientId})`} />
         <rect
           x="2.5"
           y="2.5"
           width="27"
           height="27"
-          rx="9.5"
+          rx="7.5"
           stroke="var(--imagine-mark-border)"
           strokeWidth="0.7"
         />
-        <circle cx="16" cy="16" r="10.5" stroke="var(--imagine-mark-ring-faint)" strokeWidth="0.65" opacity="0.55" />
         <path
-          d="M16 5.8c4.9 0 8.9 3.6 9.8 8.2 1 5.2-2.4 10.2-7.4 11.6"
-          stroke={`url(#${ringGradientId})`}
-          strokeWidth="2.15"
-          strokeLinecap="round"
-          fill="none"
+          d="M8.2 9.5h15.2v4.15H12.55v2.2h8.35v3.85h-8.35v2.8H8.2V9.5Z"
+          fill={`url(#${faceGradientId})`}
         />
         <path
-          d="M16 26.2c-4.4 0-8-3.1-8.9-7.2-.8-3.7 1.2-7.4 4.6-9"
-          stroke="var(--imagine-mark-ring-2)"
-          strokeWidth="1.35"
+          d="M21.4 9.5h4.4l-6.15 13h-4.3l-2.7-5.8h4.35l1.55 3.08 2.85-6.1V9.5Z"
+          fill={`url(#${accentGradientId})`}
+        />
+        <path
+          d="M8.2 9.5h15.2M12.55 15.85h8.35M8.2 22.5h4.35"
+          stroke="var(--imagine-mark-line)"
+          strokeWidth="0.55"
           strokeLinecap="round"
           fill="none"
-          opacity="0.72"
+          opacity="0.55"
         />
-        <g transform="translate(16 16)">
-          <g className="imagine-mark-glow">
-            <circle r="5.2" fill={`url(#${glowGradientId})`} opacity="0.92" />
-            <circle r="1.35" fill="var(--imagine-mark-glow-hot)" />
-          </g>
+        <g className="imagine-mark-glow" transform="translate(23.7 8.3)">
+          <circle r="1.55" fill="var(--imagine-mark-node)" />
+          <circle r="0.58" fill="var(--imagine-mark-node-core)" />
         </g>
       </svg>
     </span>
