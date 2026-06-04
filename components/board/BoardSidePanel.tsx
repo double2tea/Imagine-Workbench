@@ -27,10 +27,15 @@ function readTabPreference(): BoardSidePanelTab {
 }
 
 export default function BoardSidePanel({ assetCount, assetsPanel, inspectorPanel, revealKey }: BoardSidePanelProps) {
-  const [collapsedPreference, setCollapsedPreference] = useState(readCollapsedPreference);
-  const [activeTab, setActiveTab] = useState<BoardSidePanelTab>(readTabPreference);
+  const [collapsedPreference, setCollapsedPreference] = useState(false);
+  const [activeTab, setActiveTab] = useState<BoardSidePanelTab>("inspector");
   const [mobileOpen, setMobileOpen] = useState(false);
   const collapsed = collapsedPreference && !revealKey;
+
+  useEffect(() => {
+    setCollapsedPreference(readCollapsedPreference());
+    setActiveTab(readTabPreference());
+  }, []);
 
   useEffect(() => {
     if (!revealKey) return;
