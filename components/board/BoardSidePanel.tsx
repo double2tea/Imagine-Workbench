@@ -121,7 +121,9 @@ export default function BoardSidePanel({ assetCount, assetsPanel, inspectorPanel
           title={collapsed ? "展开侧栏" : "收起侧栏"}
           aria-expanded={!collapsed}
         >
-          {collapsed ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          <PanelRight className="h-4 w-4" />
+          <span className="imagine-board-side-collapse-label">{collapsed ? "面板" : "收起"}</span>
+          {collapsed ? <ChevronLeft className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
         </button>
         {mobileOpen ? (
           <button

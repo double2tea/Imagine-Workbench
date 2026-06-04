@@ -434,7 +434,7 @@ function ImageGenerateInspector({
       <p className={infoChipClass}>{generateParamSummary(node)}</p>
       <p className="text-[10px] leading-5 text-[var(--iw-faint)]">主执行在画布节点；此处可细调模型参数。</p>
       <InspectorFocusButton nodeId={node.id} onFocusNode={onFocusNode} />
-      <details className="imagine-panel-disclosure">
+      <details className="imagine-panel-disclosure" open>
         <summary className="imagine-panel-disclosure-summary">高级参数</summary>
         {advancedFields}
       </details>
@@ -540,7 +540,7 @@ function VideoGenerateInspector({
       <p className={infoChipClass}>{generateParamSummary(node)}</p>
       <p className="text-[10px] leading-5 text-[var(--iw-faint)]">主执行在画布节点；此处可细调模型参数。</p>
       <InspectorFocusButton nodeId={node.id} onFocusNode={onFocusNode} />
-      <details className="imagine-panel-disclosure">
+      <details className="imagine-panel-disclosure" open>
         <summary className="imagine-panel-disclosure-summary">高级参数</summary>
         {advancedFields}
       </details>

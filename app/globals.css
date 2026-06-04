@@ -2910,6 +2910,45 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
   color: #172033 !important;
 }
 
+html[data-imagine-theme="light"] .imagine-generate-context-chip,
+.imagine-workbench-shell.imagine-theme-light .imagine-generate-context-chip {
+  background: #f8fafc !important;
+  border-color: rgba(15, 23, 42, 0.12) !important;
+  color: #334155 !important;
+}
+
+html[data-imagine-theme="light"] .imagine-generate-context-chip[data-tone="prompt"],
+html[data-imagine-theme="light"] .imagine-generate-context-chip[data-tone="reference"],
+.imagine-workbench-shell.imagine-theme-light .imagine-generate-context-chip[data-tone="prompt"],
+.imagine-workbench-shell.imagine-theme-light .imagine-generate-context-chip[data-tone="reference"] {
+  background: #eff6ff !important;
+  border-color: rgba(37, 99, 235, 0.22) !important;
+  color: #1d4ed8 !important;
+}
+
+html[data-imagine-theme="light"] .imagine-generate-context-chip[data-tone="result"],
+html[data-imagine-theme="light"] .imagine-generate-context-chip[data-tone="ok"],
+.imagine-workbench-shell.imagine-theme-light .imagine-generate-context-chip[data-tone="result"],
+.imagine-workbench-shell.imagine-theme-light .imagine-generate-context-chip[data-tone="ok"] {
+  background: #ecfdf3 !important;
+  border-color: rgba(2, 122, 72, 0.24) !important;
+  color: #027a48 !important;
+}
+
+html[data-imagine-theme="light"] .imagine-generate-context-chip[data-tone="processing"],
+.imagine-workbench-shell.imagine-theme-light .imagine-generate-context-chip[data-tone="processing"] {
+  background: #eff8ff !important;
+  border-color: rgba(23, 92, 211, 0.24) !important;
+  color: #175cd3 !important;
+}
+
+html[data-imagine-theme="light"] .imagine-generate-context-chip[data-tone="failed"],
+.imagine-workbench-shell.imagine-theme-light .imagine-generate-context-chip[data-tone="failed"] {
+  background: #fef3f2 !important;
+  border-color: rgba(180, 35, 24, 0.24) !important;
+  color: #b42318 !important;
+}
+
 .imagine-workbench-shell.imagine-theme-light .imagine-board-controls,
 .imagine-workbench-shell.imagine-theme-light .imagine-board-minimap {
   background: rgba(255, 255, 255, 0.95) !important;
@@ -3153,6 +3192,7 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
   width: 100%;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   border-bottom: 1px solid var(--iw-border);
   color: var(--iw-muted);
   transition: color 160ms var(--iw-ease-out), background-color 160ms var(--iw-ease-out);
@@ -3162,6 +3202,22 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 .imagine-board-side-collapse-btn:hover {
   background: var(--iw-panel-soft);
   color: var(--iw-text);
+}
+
+.imagine-board-side-collapse-label {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.imagine-board-side-panel[data-collapsed="true"] .imagine-board-side-collapse-btn {
+  min-height: 96px;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.imagine-board-side-panel[data-collapsed="true"] .imagine-board-side-collapse-label {
+  writing-mode: vertical-rl;
+  letter-spacing: 0.08em;
 }
 
 .imagine-theme-light .imagine-field-shell,

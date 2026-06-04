@@ -213,7 +213,8 @@ export default function GenerateBoardNode({
         {contextItems.map(item => (
           <div
             key={item.key}
-            className={`min-w-0 rounded-md border px-1.5 py-1 ${contextToneClass(item.tone)}`}
+            data-tone={item.tone}
+            className={`imagine-generate-context-chip min-w-0 rounded-md border px-1.5 py-1 ${contextToneClass(item.tone)}`}
             title={item.tooltip}
           >
             <span className="block truncate text-[8px] font-semibold uppercase opacity-70">{item.label}</span>
