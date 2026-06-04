@@ -19,9 +19,8 @@ import {
   getImageResolutionOptions,
   getModelCapability,
   getVideoModelCapabilities,
-  type AiProvider,
-  type ModelOption,
 } from "@/lib/providers/model-catalog";
+import { includeCurrentModelOption, type BoardModelOptionGroup } from "@/lib/board/model-options";
 import { getBoardNodePortDefinition } from "@/lib/board/ports";
 import type {
   BoardEdge,
@@ -35,22 +34,16 @@ import type {
   BoardVideoGenerateNode,
 } from "@/lib/board";
 
-interface ProviderModelGroup {
-  provider: AiProvider;
-  label: string;
-  options: ModelOption[];
-}
-
 interface BoardInspectorProps {
   edge: BoardEdge | undefined;
-  imageModelGroups: ProviderModelGroup[];
+  imageModelGroups: BoardModelOptionGroup[];
   incomingCount: number;
   items: StorageItem[];
   node: BoardNode | undefined;
   nodes: BoardNode[];
   outgoingCount: number;
   selectedNodeCount: number;
-  videoModelGroups: ProviderModelGroup[];
+  videoModelGroups: BoardModelOptionGroup[];
   onCompareAsset?: () => void;
   onDeleteEdge: (edgeId: string) => void;
   onEditAssetImage?: () => void;
@@ -193,13 +186,14 @@ function ModelSelect({
   value,
   onChange,
 }: {
-  groups: ProviderModelGroup[];
+  groups: BoardModelOptionGroup[];
   value: string;
   onChange: (value: string) => void;
 }) {
+  const modelGroups = includeCurrentModelOption(groups, value);
   return (
     <select value={value} onChange={event => onChange(event.target.value)} className={inputClass}>
-      {groups.map(group => (
+      {modelGroups.map(group => (
         <optgroup key={group.provider} label={group.label}>
           {group.options.map(option => (
             <option key={option.value} value={option.value}>{option.label}</option>
@@ -342,7 +336,7 @@ function ImageGenerateInspector({
   onFocusNode,
   onUpdateGenerate,
 }: {
-  imageModelGroups: ProviderModelGroup[];
+  imageModelGroups: BoardModelOptionGroup[];
   node: BoardImageGenerateNode;
   onExecuteGenerate: (nodeId: string) => void;
   onFocusNode: (nodeId: string) => void;
@@ -463,7 +457,7 @@ function VideoGenerateInspector({
   onExecuteGenerate: (nodeId: string) => void;
   onFocusNode: (nodeId: string) => void;
   onUpdateGenerate: (nodeId: string, input: BoardGenerateNodeUpdate) => void;
-  videoModelGroups: ProviderModelGroup[];
+  videoModelGroups: BoardModelOptionGroup[];
 }) {
   const capabilities = getVideoModelCapabilities(node.model);
   const supportsReferences = modelSupportsReferences(node);

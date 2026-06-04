@@ -3351,10 +3351,6 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
   line-height: 1.35;
 }
 
-.imagine-status-chip {
-  text-transform: lowercase;
-}
-
 .imagine-theme-light .imagine-asset-card {
   background: #ffffff !important;
   border-color: rgba(15, 23, 42, 0.11) !important;
