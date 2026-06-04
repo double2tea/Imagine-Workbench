@@ -383,6 +383,43 @@ test("runninghub veo 3.1 and gpt image 2 variants map documented fields", () => 
   );
 });
 
+test("runninghub gemini 3 flash and pro image models map documented fields", () => {
+  const flashOfficial = getRunningHubStandardModel("api:/openapi/v2/rhart-image-n-g31-flash-official/text-to-image", "image");
+  const proUltra = getRunningHubStandardModel("api:/openapi/v2/rhart-image-n-pro-official/text-to-image-ultra", "image");
+  assert.ok(flashOfficial);
+  assert.ok(proUltra);
+
+  assert.deepEqual(
+    buildRunningHubStandardBody(resolveRunningHubStandardModelForReferences(flashOfficial, 1), {
+      prompt: "turn sketch into neon manga",
+      aspectRatio: "1:8",
+      imageResolution: "4k",
+      referenceImages: [{ dataUri: "data:image/png;base64,input" }],
+      referenceUrls: ["https://runninghub.example/sketch.png"],
+    }),
+    {
+      prompt: "turn sketch into neon manga",
+      aspectRatio: "1:8",
+      resolution: "4k",
+      imageUrls: ["https://runninghub.example/sketch.png"],
+    },
+  );
+
+  assert.deepEqual(
+    buildRunningHubStandardBody(resolveRunningHubStandardModelForReferences(proUltra, 0), {
+      prompt: "ultra detailed product photo",
+      aspectRatio: "3:4",
+      imageResolution: "8k",
+      referenceImages: [],
+    }),
+    {
+      prompt: "ultra detailed product photo",
+      aspectRatio: "3:4",
+      resolution: "8k",
+    },
+  );
+});
+
 test("runninghub veo 3.1 auto routes non-text variants", () => {
   const fastChannel = getRunningHubStandardModel("api:/openapi/v2/rhart-video-v3.1-fast/text-to-video", "video");
   const fastOfficial = getRunningHubStandardModel("api:/openapi/v2/rhart-video-v3.1-fast-official/text-to-video", "video");
@@ -397,10 +434,10 @@ test("runninghub veo 3.1 auto routes non-text variants", () => {
   );
   assert.deepEqual(
     buildRunningHubStandardBody(resolveRunningHubStandardModelForReferences(fastChannel, 2), {
-      prompt: "start to end",
-      aspectRatio: "16:9",
-      resolutionName: "720p",
-      durationSeconds: "4",
+        prompt: "start to end",
+        aspectRatio: "16:9",
+        resolutionName: "720p",
+        durationSeconds: "8",
       referenceImages: [],
       referenceMediaUrls: {
         imageUrls: ["https://runninghub.example/start.png", "https://runninghub.example/end.png"],
@@ -409,9 +446,9 @@ test("runninghub veo 3.1 auto routes non-text variants", () => {
       },
     }),
     {
-      prompt: "start to end",
-      resolution: "720p",
-      duration: "4",
+        prompt: "start to end",
+        resolution: "720p",
+        duration: "8",
       aspectRatio: "16:9",
       firstFrameUrl: "https://runninghub.example/start.png",
       lastFrameUrl: "https://runninghub.example/end.png",
@@ -458,12 +495,11 @@ test("runninghub veo 3.1 auto routes non-text variants", () => {
         audioUrls: [],
       },
     }),
-    {
-      prompt: "lite start end",
-      resolution: "720p",
-      duration: "4",
-      aspectRatio: "16:9",
-      firstImageUrl: "https://runninghub.example/start.png",
+      {
+        prompt: "lite start end",
+        resolution: "720p",
+        aspectRatio: "16:9",
+        firstImageUrl: "https://runninghub.example/start.png",
       lastImageUrl: "https://runninghub.example/end.png",
     },
   );
@@ -479,11 +515,12 @@ test("runninghub advertised first-last modes route to first-last request shapes"
   assert.ok(veoOfficial);
   assert.ok(omniFlash);
 
-  assert.deepEqual(veoOfficial.videoReferenceModes, undefined);
+  assert.deepEqual(veoOfficial.videoReferenceModes, ["reference", "firstLast"]);
   assert.deepEqual(omniFlash.videoReferenceModes, undefined);
 
   assert.equal(resolveRunningHubStandardModelForReferenceMedia(seedance, [{ type: "image" }, { type: "image" }], "firstLast").model, "api:/openapi/v2/bytedance/seedance-2.0-global-fast/image-to-video");
   assert.equal(resolveRunningHubStandardModelForReferenceMedia(veoLite, [{ type: "image" }, { type: "image" }], "firstLast").model, "api:/openapi/v2/rhart-video-v3.1-lite-official/start-end-to-video");
+  assert.equal(resolveRunningHubStandardModelForReferenceMedia(veoOfficial, [{ type: "image" }, { type: "image" }], "firstLast").model, "api:/openapi/v2/rhart-video-v3.1-fast-official/image-to-video");
 });
 
 test("runninghub youchuan image models map version-specific defaults", () => {

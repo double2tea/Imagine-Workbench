@@ -243,6 +243,8 @@ test("runninghub exposes concrete standard model capabilities", () => {
   const veoStartEndHidden = "runninghub:api:/openapi/v2/rhart-video-v3.1-fast/start-end-to-video";
   const gptImage = getModelCapability("runninghub:api:/openapi/v2/rhart-image-g-2-official/text-to-image", "image");
   const gptImageEditHidden = "runninghub:api:/openapi/v2/rhart-image-g-2-official/image-to-image";
+  const geminiFlash = getModelCapability("runninghub:api:/openapi/v2/rhart-image-n-g31-flash-official/text-to-image", "image");
+  const geminiProUltra = getModelCapability("runninghub:api:/openapi/v2/rhart-image-n-pro-official/text-to-image-ultra", "image");
   const youchuan = getModelCapability("runninghub:api:/openapi/v2/youchuan/text-to-image-v81", "image");
   assert.equal(image.supportsReferences, false);
   assert.equal(image.sizes.some(option => option.value === "custom"), true);
@@ -259,8 +261,22 @@ test("runninghub exposes concrete standard model capabilities", () => {
   assert.equal(video.maxReferenceImages, 2);
   assert.deepEqual(video.durations.map(option => option.value), ["6", "10"]);
   assert.deepEqual(seedance.sizes.map(option => option.value), ["auto", "16:9", "9:16", "1:1", "4:3", "3:4", "21:9"]);
-  assert.deepEqual(seedance.resolutions.map(option => option.value), ["480p", "720p", "1080p", "4k"]);
-  assert.deepEqual(seedance.durations.map(option => option.value), ["5", "8", "10", "12", "15"]);
+  assert.deepEqual(seedance.resolutions.map(option => option.value), ["480p", "720p", "1080p", "2k", "4k"]);
+  assert.deepEqual(seedance.durations.map(option => option.value), [
+    "-1",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+  ]);
   assert.equal(seedance.videoReferenceMode, "reference");
   assert.deepEqual(seedance.videoReferenceModes, ["reference", "firstLast"]);
   assert.deepEqual(seedance.referenceMediaTypes, ["image", "video", "audio"]);
@@ -271,17 +287,71 @@ test("runninghub exposes concrete standard model capabilities", () => {
   assert.deepEqual(omniFlash.resolutions.map(option => option.value), ["720p", "1080p", "4k"]);
   assert.deepEqual(omniFlash.referenceMediaTypes, ["image", "video"]);
   assert.equal(veo.videoReferenceMode, "reference");
-  assert.deepEqual(veo.videoReferenceModes, ["reference"]);
+  assert.deepEqual(veo.videoReferenceModes, ["reference", "firstLast"]);
   assert.deepEqual(veo.sizes.map(option => option.value), ["auto", "16:9", "9:16"]);
-  assert.deepEqual(veo.resolutions.map(option => option.value), ["720p", "1080p"]);
+  assert.deepEqual(veo.resolutions.map(option => option.value), ["720p", "1080p", "4k"]);
   assert.equal(veo.maxReferenceImages, 3);
   assert.deepEqual(veo.durations.map(option => option.value), ["4", "6", "8"]);
   assert.equal(VIDEO_MODEL_OPTIONS["runninghub"].some(option => option.value === veoStartEndHidden), false);
-  assert.equal(gptImage.maxReferenceImages, 16);
+  assert.equal(gptImage.maxReferenceImages, 10);
   assert.equal(gptImage.supportsReferences, true);
-  assert.deepEqual(gptImage.qualityLevels.map(option => option.value), ["auto", "low", "medium", "high"]);
-  assert.equal(gptImage.sizes.some(option => option.value === "3840x2160"), true);
+  assert.deepEqual(gptImage.aspectRatios.map(option => option.value), [
+    "1:1",
+    "1:2",
+    "2:1",
+    "1:3",
+    "3:1",
+    "2:3",
+    "3:2",
+    "3:4",
+    "4:3",
+    "4:5",
+    "5:4",
+    "9:16",
+    "21:9",
+    "9:21",
+    "16:9",
+  ]);
+  assert.deepEqual(gptImage.qualityLevels.map(option => option.value), ["low", "medium", "high"]);
+  assert.deepEqual(gptImage.sizes.map(option => option.value), ["1k", "2k", "4k"]);
+  assert.equal(geminiFlash.maxReferenceImages, 14);
+  assert.deepEqual(geminiFlash.aspectRatios.map(option => option.value), [
+    "1:1",
+    "16:9",
+    "9:16",
+    "4:3",
+    "3:4",
+    "3:2",
+    "2:3",
+    "5:4",
+    "4:5",
+    "21:9",
+    "1:4",
+    "4:1",
+    "1:8",
+    "8:1",
+  ]);
+  assert.deepEqual(geminiFlash.sizes.map(option => option.value), ["1k", "2k", "4k"]);
+  assert.deepEqual(geminiProUltra.sizes.map(option => option.value), ["4k", "8k"]);
   assert.equal(IMAGE_MODEL_OPTIONS["runninghub"].some(option => option.value === gptImageEditHidden), false);
+  assert.equal(
+    IMAGE_MODEL_OPTIONS["runninghub"].some(
+      option => option.value === "runninghub:api:/openapi/v2/rhart-image-n-g31-flash-official/text-to-image",
+    ),
+    true,
+  );
+  assert.equal(
+    IMAGE_MODEL_OPTIONS["runninghub"].some(
+      option => option.value === "runninghub:api:/openapi/v2/rhart-image-n-g31-flash-official/image-to-image",
+    ),
+    false,
+  );
+  assert.equal(
+    IMAGE_MODEL_OPTIONS["runninghub"].some(
+      option => option.value === "runninghub:api:/openapi/v2/rhart-image-n-pro-official/text-to-image-ultra",
+    ),
+    true,
+  );
   assert.equal(IMAGE_MODEL_OPTIONS["runninghub"].some(option => option.value === "runninghub:api:/openapi/v2/seedream-v5-lite/image-to-image"), false);
   assert.equal(VIDEO_MODEL_OPTIONS["runninghub"].some(option => option.value === "runninghub:api:/openapi/v2/gemini-omni-flash/image-to-video"), false);
   assert.equal(youchuan.supportsReferences, false);

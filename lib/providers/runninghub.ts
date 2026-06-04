@@ -3,6 +3,16 @@ import type { MediaReferenceType } from "@/lib/media-references";
 export const RUNNINGHUB_LLM_BASE_URL = "https://llm.runninghub.cn";
 export const RUNNINGHUB_DEFAULT_LLM_MODEL = "qwen/qwen3.7-max";
 const RUNNINGHUB_STANDARD_BASE_URLS = new Set(["https://www.runninghub.cn", "https://www.runninghub.ai"]);
+const SEEDANCE_15_DURATIONS = ["4", "5", "6", "7", "8", "9", "10", "11", "12"] as const;
+const SEEDANCE_20_DURATIONS = ["-1", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"] as const;
+const SEEDANCE_15_RESOLUTIONS = ["480p", "720p", "1080p"] as const;
+const SEEDANCE_15_FAST_RESOLUTIONS = ["720p", "1080p"] as const;
+const SEEDANCE_20_FAST_RESOLUTIONS = ["480p", "720p", "1080p", "2k", "4k"] as const;
+const SEEDANCE_20_GLOBAL_RESOLUTIONS = ["480p", "720p", "native1080p", "1080p", "2k", "4k"] as const;
+const VEO_31_DURATIONS = ["4", "6", "8"] as const;
+const VEO_31_CHANNEL_DURATIONS = ["8"] as const;
+const VEO_31_4K_RESOLUTIONS = ["720p", "1080p", "4k"] as const;
+const VEO_31_HD_RESOLUTIONS = ["720p", "1080p"] as const;
 
 export type RunningHubStandardModelKind = "image" | "video";
 
@@ -93,17 +103,20 @@ type RunningHubStandardRequest =
       endpoint: string;
       durations?: readonly string[];
       referenceField: "imageUrls" | "imageUrl" | "firstFrameUrl" | "firstImageUrl";
+      referenceValue?: "single" | "array";
       lastReferenceField?: "lastFrameUrl" | "lastImageUrl";
       videoField?: "videoUrls" | "videoUrl";
       audioField?: "audioUrls";
       aspectField?: "aspectRatio" | "ratio";
       durationValueType?: "string" | "number";
+      omitResolution?: boolean;
       extra?: Record<string, unknown>;
     }
   | {
       type: "aspect-resolution-image";
       endpoint: string;
       resolution: string;
+      aspectRatioFallback?: string;
       quality?: string;
       referenceField?: "imageUrls";
       extra?: Record<string, unknown>;
@@ -328,11 +341,12 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     supportsReferences: false,
     minReferenceImages: 0,
     maxReferenceImages: 0,
-    durationOptions: ["5", "8", "10", "12"],
+      durationOptions: SEEDANCE_15_DURATIONS,
+      resolutionOptions: SEEDANCE_15_RESOLUTIONS,
     request: {
       type: "seedance-video",
       endpoint: "/openapi/v2/seedance-v1.5-pro/text-to-video",
-      durations: ["5", "8", "10", "12"],
+        durations: SEEDANCE_15_DURATIONS,
       aspectField: "aspectRatio",
       extra: {
         generateAudio: "true",
@@ -347,11 +361,12 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     supportsReferences: false,
     minReferenceImages: 0,
     maxReferenceImages: 0,
-    durationOptions: ["5", "8", "10", "12"],
+      durationOptions: SEEDANCE_15_DURATIONS,
+      resolutionOptions: SEEDANCE_15_FAST_RESOLUTIONS,
     request: {
       type: "seedance-video",
       endpoint: "/openapi/v2/seedance-v1.5-pro/text-to-video-fast",
-      durations: ["5", "8", "10", "12"],
+        durations: SEEDANCE_15_DURATIONS,
       aspectField: "aspectRatio",
       extra: {
         generateAudio: "true",
@@ -369,7 +384,8 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     videoReferenceMode: "reference",
     videoReferenceModes: ["reference", "firstLast"],
     referenceMediaTypes: ["image", "video", "audio"],
-    durationOptions: ["5", "8", "10", "12", "15"],
+      durationOptions: SEEDANCE_20_DURATIONS,
+      resolutionOptions: SEEDANCE_20_FAST_RESOLUTIONS,
     referenceRoutes: {
       imageToVideo: "api:/openapi/v2/bytedance/seedance-2.0-global-fast/image-to-video",
       firstLast: "api:/openapi/v2/bytedance/seedance-2.0-global-fast/image-to-video",
@@ -378,7 +394,7 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     request: {
       type: "seedance-video",
       endpoint: "/openapi/v2/bytedance/seedance-2.0-global-fast/text-to-video",
-      durations: ["5", "8", "10", "12", "15"],
+        durations: SEEDANCE_20_DURATIONS,
       aspectField: "ratio",
       extra: {
         generateAudio: true,
@@ -396,11 +412,12 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     minReferenceImages: 1,
     maxReferenceImages: 2,
     videoReferenceMode: "firstLast",
-    durationOptions: ["5", "8", "10", "12", "15"],
+      durationOptions: SEEDANCE_20_DURATIONS,
+      resolutionOptions: SEEDANCE_20_FAST_RESOLUTIONS,
     request: {
       type: "image-reference-video",
       endpoint: "/openapi/v2/bytedance/seedance-2.0-global-fast/image-to-video",
-      durations: ["5", "8", "10", "12", "15"],
+        durations: SEEDANCE_20_DURATIONS,
       referenceField: "firstFrameUrl",
       lastReferenceField: "lastFrameUrl",
       aspectField: "ratio",
@@ -422,11 +439,12 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     minReferenceImages: 1,
     maxReferenceImages: 9,
     referenceMediaTypes: ["image", "video", "audio"],
-    durationOptions: ["5", "8", "10", "12", "15"],
+      durationOptions: SEEDANCE_20_DURATIONS,
+      resolutionOptions: SEEDANCE_20_FAST_RESOLUTIONS,
     request: {
       type: "image-reference-video",
       endpoint: "/openapi/v2/bytedance/seedance-2.0-global-fast/multimodal-video",
-      durations: ["5", "8", "10", "12", "15"],
+        durations: SEEDANCE_20_DURATIONS,
       referenceField: "imageUrls",
       videoField: "videoUrls",
       audioField: "audioUrls",
@@ -450,7 +468,8 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     videoReferenceMode: "reference",
     videoReferenceModes: ["reference", "firstLast"],
     referenceMediaTypes: ["image", "video", "audio"],
-    durationOptions: ["5", "8", "10", "12", "15"],
+      durationOptions: SEEDANCE_20_DURATIONS,
+      resolutionOptions: SEEDANCE_20_GLOBAL_RESOLUTIONS,
     referenceRoutes: {
       imageToVideo: "api:/openapi/v2/bytedance/seedance-2.0-global/image-to-video",
       firstLast: "api:/openapi/v2/bytedance/seedance-2.0-global/image-to-video",
@@ -459,7 +478,7 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     request: {
       type: "seedance-video",
       endpoint: "/openapi/v2/bytedance/seedance-2.0-global/text-to-video",
-      durations: ["5", "8", "10", "12", "15"],
+        durations: SEEDANCE_20_DURATIONS,
       aspectField: "ratio",
       extra: {
         generateAudio: true,
@@ -477,11 +496,12 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     minReferenceImages: 1,
     maxReferenceImages: 2,
     videoReferenceMode: "firstLast",
-    durationOptions: ["5", "8", "10", "12", "15"],
+      durationOptions: SEEDANCE_20_DURATIONS,
+      resolutionOptions: SEEDANCE_20_GLOBAL_RESOLUTIONS,
     request: {
       type: "image-reference-video",
       endpoint: "/openapi/v2/bytedance/seedance-2.0-global/image-to-video",
-      durations: ["5", "8", "10", "12", "15"],
+        durations: SEEDANCE_20_DURATIONS,
       referenceField: "firstFrameUrl",
       lastReferenceField: "lastFrameUrl",
       aspectField: "ratio",
@@ -503,11 +523,12 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     minReferenceImages: 1,
     maxReferenceImages: 9,
     referenceMediaTypes: ["image", "video", "audio"],
-    durationOptions: ["5", "8", "10", "12", "15"],
+      durationOptions: SEEDANCE_20_DURATIONS,
+      resolutionOptions: SEEDANCE_20_GLOBAL_RESOLUTIONS,
     request: {
       type: "image-reference-video",
       endpoint: "/openapi/v2/bytedance/seedance-2.0-global/multimodal-video",
-      durations: ["5", "8", "10", "12", "15"],
+        durations: SEEDANCE_20_DURATIONS,
       referenceField: "imageUrls",
       videoField: "videoUrls",
       audioField: "audioUrls",
@@ -561,9 +582,9 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
       aspectField: "aspectRatio",
     },
   },
-  {
-    model: "api:/openapi/v2/gemini-omni-flash/video-edit",
-    label: "RunningHub Gemini Omni Flash Video Edit",
+    {
+      model: "api:/openapi/v2/gemini-omni-flash/video-edit",
+      label: "RunningHub Gemini Omni Flash Video Edit",
     kind: "video",
     listed: false,
     supportsReferences: true,
@@ -578,18 +599,185 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
       durations: ["4", "6", "8", "10"],
       referenceField: "imageUrls",
       videoField: "videoUrl",
-      aspectField: "aspectRatio",
+        aspectField: "aspectRatio",
+      },
     },
-  },
-  {
-    model: "api:/openapi/v2/rhart-video-v3.1-fast/text-to-video",
-    label: "RunningHub Veo 3.1 Fast Channel Auto",
+    {
+      model: "api:/openapi/v2/rhart-image-n-g31-flash/text-to-image",
+      label: "RunningHub Gemini 3 Flash Image Channel Auto",
+      kind: "image",
+      supportsReferences: true,
+      minReferenceImages: 0,
+      maxReferenceImages: 10,
+      referenceRoutes: {
+        imageToImage: "api:/openapi/v2/rhart-image-n-g31-flash/image-to-image",
+      },
+      request: {
+        type: "aspect-resolution-image",
+        endpoint: "/openapi/v2/rhart-image-n-g31-flash/text-to-image",
+        resolution: "1k",
+        aspectRatioFallback: "9:16",
+      },
+    },
+    {
+      model: "api:/openapi/v2/rhart-image-n-g31-flash/image-to-image",
+      label: "RunningHub Gemini 3 Flash Image Edit Channel Low Price",
+      kind: "image",
+      listed: false,
+      supportsReferences: true,
+      minReferenceImages: 1,
+      maxReferenceImages: 10,
+      request: {
+        type: "aspect-resolution-image",
+        endpoint: "/openapi/v2/rhart-image-n-g31-flash/image-to-image",
+        resolution: "1k",
+        aspectRatioFallback: "9:16",
+        referenceField: "imageUrls",
+      },
+    },
+    {
+      model: "api:/openapi/v2/rhart-image-n-g31-flash-official/text-to-image",
+      label: "RunningHub Gemini 3 Flash Image Official Auto",
+      kind: "image",
+      supportsReferences: true,
+      minReferenceImages: 0,
+      maxReferenceImages: 14,
+      referenceRoutes: {
+        imageToImage: "api:/openapi/v2/rhart-image-n-g31-flash-official/image-to-image",
+      },
+      request: {
+        type: "aspect-resolution-image",
+        endpoint: "/openapi/v2/rhart-image-n-g31-flash-official/text-to-image",
+        resolution: "1k",
+        aspectRatioFallback: "21:9",
+      },
+    },
+    {
+      model: "api:/openapi/v2/rhart-image-n-g31-flash-official/image-to-image",
+      label: "RunningHub Gemini 3 Flash Image Edit Official Stable",
+      kind: "image",
+      listed: false,
+      supportsReferences: true,
+      minReferenceImages: 1,
+      maxReferenceImages: 14,
+      request: {
+        type: "aspect-resolution-image",
+        endpoint: "/openapi/v2/rhart-image-n-g31-flash-official/image-to-image",
+        resolution: "1k",
+        aspectRatioFallback: "9:16",
+        referenceField: "imageUrls",
+      },
+    },
+    {
+      model: "api:/openapi/v2/rhart-image-n-pro/text-to-image",
+      label: "RunningHub Gemini Pro Image Channel Auto",
+      kind: "image",
+      supportsReferences: true,
+      minReferenceImages: 0,
+      maxReferenceImages: 10,
+      referenceRoutes: {
+        imageToImage: "api:/openapi/v2/rhart-image-n-pro/edit",
+      },
+      request: {
+        type: "aspect-resolution-image",
+        endpoint: "/openapi/v2/rhart-image-n-pro/text-to-image",
+        resolution: "1k",
+        aspectRatioFallback: "9:16",
+      },
+    },
+    {
+      model: "api:/openapi/v2/rhart-image-n-pro/edit",
+      label: "RunningHub Gemini Pro Image Edit Channel Low Price",
+      kind: "image",
+      listed: false,
+      supportsReferences: true,
+      minReferenceImages: 1,
+      maxReferenceImages: 10,
+      request: {
+        type: "aspect-resolution-image",
+        endpoint: "/openapi/v2/rhart-image-n-pro/edit",
+        resolution: "1k",
+        aspectRatioFallback: "3:4",
+        referenceField: "imageUrls",
+      },
+    },
+    {
+      model: "api:/openapi/v2/rhart-image-n-pro-official/text-to-image",
+      label: "RunningHub Gemini Pro Image Official Auto",
+      kind: "image",
+      supportsReferences: true,
+      minReferenceImages: 0,
+      maxReferenceImages: 10,
+      referenceRoutes: {
+        imageToImage: "api:/openapi/v2/rhart-image-n-pro-official/edit",
+      },
+      request: {
+        type: "aspect-resolution-image",
+        endpoint: "/openapi/v2/rhart-image-n-pro-official/text-to-image",
+        resolution: "1k",
+        aspectRatioFallback: "3:4",
+      },
+    },
+    {
+      model: "api:/openapi/v2/rhart-image-n-pro-official/edit",
+      label: "RunningHub Gemini Pro Image Edit Official Stable",
+      kind: "image",
+      listed: false,
+      supportsReferences: true,
+      minReferenceImages: 1,
+      maxReferenceImages: 10,
+      request: {
+        type: "aspect-resolution-image",
+        endpoint: "/openapi/v2/rhart-image-n-pro-official/edit",
+        resolution: "1k",
+        aspectRatioFallback: "3:4",
+        referenceField: "imageUrls",
+      },
+    },
+    {
+      model: "api:/openapi/v2/rhart-image-n-pro-official/text-to-image-ultra",
+      label: "RunningHub Gemini Pro Image Ultra Official Auto",
+      kind: "image",
+      supportsReferences: true,
+      minReferenceImages: 0,
+      maxReferenceImages: 10,
+      referenceRoutes: {
+        imageToImage: "api:/openapi/v2/rhart-image-n-pro-official/edit-ultra",
+      },
+      request: {
+        type: "aspect-resolution-image",
+        endpoint: "/openapi/v2/rhart-image-n-pro-official/text-to-image-ultra",
+        resolution: "8k",
+        aspectRatioFallback: "3:4",
+      },
+    },
+    {
+      model: "api:/openapi/v2/rhart-image-n-pro-official/edit-ultra",
+      label: "RunningHub Gemini Pro Image Edit Ultra Official Stable",
+      kind: "image",
+      listed: false,
+      supportsReferences: true,
+      minReferenceImages: 1,
+      maxReferenceImages: 10,
+      request: {
+        type: "aspect-resolution-image",
+        endpoint: "/openapi/v2/rhart-image-n-pro-official/edit-ultra",
+        resolution: "8k",
+        aspectRatioFallback: "3:4",
+        referenceField: "imageUrls",
+      },
+    },
+    {
+      model: "api:/openapi/v2/rhart-video-v3.1-fast/text-to-video",
+      label: "RunningHub Veo 3.1 Fast Channel Auto",
     kind: "video",
     supportsReferences: true,
     minReferenceImages: 0,
-    maxReferenceImages: 2,
-    videoReferenceMode: "firstLast",
-    durationOptions: ["4", "6", "8"],
+      maxReferenceImages: 3,
+      videoReferenceMode: "reference",
+      videoReferenceModes: ["reference", "firstLast"],
+      durationOptions: VEO_31_CHANNEL_DURATIONS,
+      resolutionOptions: VEO_31_4K_RESOLUTIONS,
     referenceRoutes: {
       imageToVideo: "api:/openapi/v2/rhart-video-v3.1-fast/image-to-video",
       firstLast: "api:/openapi/v2/rhart-video-v3.1-fast/start-end-to-video",
@@ -597,7 +785,7 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     request: {
       type: "aspect-resolution-video",
       endpoint: "/openapi/v2/rhart-video-v3.1-fast/text-to-video",
-      durations: ["4", "6", "8"],
+        durations: VEO_31_CHANNEL_DURATIONS,
       aspectField: "aspectRatio",
     },
   },
@@ -608,12 +796,13 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     listed: false,
     supportsReferences: true,
     minReferenceImages: 1,
-    maxReferenceImages: 1,
-    durationOptions: ["4", "6", "8"],
+      maxReferenceImages: 3,
+      durationOptions: VEO_31_CHANNEL_DURATIONS,
+      resolutionOptions: VEO_31_4K_RESOLUTIONS,
     request: {
       type: "image-reference-video",
       endpoint: "/openapi/v2/rhart-video-v3.1-fast/image-to-video",
-      durations: ["4", "6", "8"],
+        durations: VEO_31_CHANNEL_DURATIONS,
       referenceField: "imageUrls",
       aspectField: "aspectRatio",
     },
@@ -626,11 +815,12 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     supportsReferences: true,
     minReferenceImages: 2,
     maxReferenceImages: 2,
-    durationOptions: ["4", "6", "8"],
+      durationOptions: VEO_31_CHANNEL_DURATIONS,
+      resolutionOptions: VEO_31_4K_RESOLUTIONS,
     request: {
       type: "image-reference-video",
       endpoint: "/openapi/v2/rhart-video-v3.1-fast/start-end-to-video",
-      durations: ["4", "6", "8"],
+        durations: VEO_31_CHANNEL_DURATIONS,
       referenceField: "firstFrameUrl",
       lastReferenceField: "lastFrameUrl",
       aspectField: "aspectRatio",
@@ -642,17 +832,20 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     kind: "video",
     supportsReferences: true,
     minReferenceImages: 0,
-    maxReferenceImages: 3,
-    videoReferenceMode: "reference",
-    durationOptions: ["4", "6", "8"],
-    referenceRoutes: {
-      imageToVideo: "api:/openapi/v2/rhart-video-v3.1-fast-official/image-to-video",
-      reference: "api:/openapi/v2/rhart-video-v3.1-fast-official/reference-to-video",
+      maxReferenceImages: 3,
+      videoReferenceMode: "reference",
+      videoReferenceModes: ["reference", "firstLast"],
+      durationOptions: VEO_31_DURATIONS,
+      resolutionOptions: VEO_31_4K_RESOLUTIONS,
+      referenceRoutes: {
+        imageToVideo: "api:/openapi/v2/rhart-video-v3.1-fast-official/image-to-video",
+        firstLast: "api:/openapi/v2/rhart-video-v3.1-fast-official/image-to-video",
+        reference: "api:/openapi/v2/rhart-video-v3.1-fast-official/reference-to-video",
     },
     request: {
       type: "aspect-resolution-video",
       endpoint: "/openapi/v2/rhart-video-v3.1-fast-official/text-to-video",
-      durations: ["4", "6", "8"],
+        durations: VEO_31_DURATIONS,
       aspectField: "aspectRatio",
       extra: {
         generateAudio: true,
@@ -666,13 +859,15 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     listed: false,
     supportsReferences: true,
     minReferenceImages: 1,
-    maxReferenceImages: 1,
-    durationOptions: ["4", "6", "8"],
+      maxReferenceImages: 2,
+      durationOptions: VEO_31_DURATIONS,
+      resolutionOptions: VEO_31_4K_RESOLUTIONS,
     request: {
       type: "image-reference-video",
       endpoint: "/openapi/v2/rhart-video-v3.1-fast-official/image-to-video",
-      durations: ["4", "6", "8"],
-      referenceField: "imageUrl",
+        durations: VEO_31_DURATIONS,
+        referenceField: "imageUrl",
+        lastReferenceField: "lastImageUrl",
       aspectField: "aspectRatio",
       extra: {
         generateAudio: true,
@@ -687,7 +882,7 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     supportsReferences: true,
     minReferenceImages: 1,
     maxReferenceImages: 3,
-    resolutionOptions: ["720p", "1080p"],
+      resolutionOptions: VEO_31_HD_RESOLUTIONS,
     request: {
       type: "image-reference-video",
       endpoint: "/openapi/v2/rhart-video-v3.1-fast-official/reference-to-video",
@@ -704,9 +899,11 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     kind: "video",
     supportsReferences: true,
     minReferenceImages: 0,
-    maxReferenceImages: 2,
-    videoReferenceMode: "firstLast",
-    durationOptions: ["4", "6", "8"],
+      maxReferenceImages: 3,
+      videoReferenceMode: "reference",
+      videoReferenceModes: ["reference", "firstLast"],
+      durationOptions: VEO_31_CHANNEL_DURATIONS,
+      resolutionOptions: VEO_31_4K_RESOLUTIONS,
     referenceRoutes: {
       imageToVideo: "api:/openapi/v2/rhart-video-v3.1-pro/image-to-video",
       firstLast: "api:/openapi/v2/rhart-video-v3.1-pro/start-end-to-video",
@@ -714,7 +911,7 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     request: {
       type: "aspect-resolution-video",
       endpoint: "/openapi/v2/rhart-video-v3.1-pro/text-to-video",
-      durations: ["4", "6", "8"],
+        durations: VEO_31_CHANNEL_DURATIONS,
       aspectField: "aspectRatio",
     },
   },
@@ -725,13 +922,15 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     listed: false,
     supportsReferences: true,
     minReferenceImages: 1,
-    maxReferenceImages: 1,
-    durationOptions: ["4", "6", "8"],
+      maxReferenceImages: 3,
+      durationOptions: VEO_31_CHANNEL_DURATIONS,
     request: {
       type: "image-reference-video",
       endpoint: "/openapi/v2/rhart-video-v3.1-pro/image-to-video",
-      durations: ["4", "6", "8"],
-      referenceField: "imageUrl",
+        durations: VEO_31_CHANNEL_DURATIONS,
+        referenceField: "imageUrl",
+        referenceValue: "array",
+        omitResolution: true,
       aspectField: "aspectRatio",
     },
   },
@@ -743,11 +942,12 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     supportsReferences: true,
     minReferenceImages: 2,
     maxReferenceImages: 2,
-    durationOptions: ["4", "6", "8"],
+      durationOptions: VEO_31_CHANNEL_DURATIONS,
+      resolutionOptions: VEO_31_4K_RESOLUTIONS,
     request: {
       type: "image-reference-video",
       endpoint: "/openapi/v2/rhart-video-v3.1-pro/start-end-to-video",
-      durations: ["4", "6", "8"],
+        durations: VEO_31_CHANNEL_DURATIONS,
       referenceField: "firstFrameUrl",
       lastReferenceField: "lastFrameUrl",
       aspectField: "aspectRatio",
@@ -759,17 +959,20 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     kind: "video",
     supportsReferences: true,
     minReferenceImages: 0,
-    maxReferenceImages: 3,
-    videoReferenceMode: "reference",
-    durationOptions: ["4", "6", "8"],
-    referenceRoutes: {
-      imageToVideo: "api:/openapi/v2/rhart-video-v3.1-pro-official/image-to-video",
-      reference: "api:/openapi/v2/rhart-video-v3.1-pro-official/reference-to-video",
+      maxReferenceImages: 3,
+      videoReferenceMode: "reference",
+      videoReferenceModes: ["reference", "firstLast"],
+      durationOptions: VEO_31_DURATIONS,
+      resolutionOptions: VEO_31_4K_RESOLUTIONS,
+      referenceRoutes: {
+        imageToVideo: "api:/openapi/v2/rhart-video-v3.1-pro-official/image-to-video",
+        firstLast: "api:/openapi/v2/rhart-video-v3.1-pro-official/image-to-video",
+        reference: "api:/openapi/v2/rhart-video-v3.1-pro-official/reference-to-video",
     },
     request: {
       type: "aspect-resolution-video",
       endpoint: "/openapi/v2/rhart-video-v3.1-pro-official/text-to-video",
-      durations: ["4", "6", "8"],
+        durations: VEO_31_DURATIONS,
       aspectField: "aspectRatio",
     },
   },
@@ -780,13 +983,15 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     listed: false,
     supportsReferences: true,
     minReferenceImages: 1,
-    maxReferenceImages: 1,
-    durationOptions: ["4", "6", "8"],
+      maxReferenceImages: 2,
+      durationOptions: VEO_31_DURATIONS,
+      resolutionOptions: VEO_31_4K_RESOLUTIONS,
     request: {
       type: "image-reference-video",
       endpoint: "/openapi/v2/rhart-video-v3.1-pro-official/image-to-video",
-      durations: ["4", "6", "8"],
-      referenceField: "imageUrl",
+        durations: VEO_31_DURATIONS,
+        referenceField: "imageUrl",
+        lastReferenceField: "lastImageUrl",
       aspectField: "aspectRatio",
     },
   },
@@ -798,7 +1003,7 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     supportsReferences: true,
     minReferenceImages: 1,
     maxReferenceImages: 3,
-    resolutionOptions: ["720p", "1080p"],
+      resolutionOptions: VEO_31_4K_RESOLUTIONS,
     request: {
       type: "image-reference-video",
       endpoint: "/openapi/v2/rhart-video-v3.1-pro-official/reference-to-video",
@@ -816,8 +1021,8 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     minReferenceImages: 0,
     maxReferenceImages: 2,
     videoReferenceMode: "firstLast",
-    durationOptions: ["4", "6", "8"],
-    resolutionOptions: ["720p", "1080p"],
+      durationOptions: VEO_31_DURATIONS,
+      resolutionOptions: VEO_31_HD_RESOLUTIONS,
     referenceRoutes: {
       imageToVideo: "api:/openapi/v2/rhart-video-v3.1-lite-official/image-to-video",
       firstLast: "api:/openapi/v2/rhart-video-v3.1-lite-official/start-end-to-video",
@@ -825,7 +1030,7 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     request: {
       type: "aspect-resolution-video",
       endpoint: "/openapi/v2/rhart-video-v3.1-lite-official/text-to-video",
-      durations: ["4", "6", "8"],
+        durations: VEO_31_DURATIONS,
       aspectField: "aspectRatio",
     },
   },
@@ -837,12 +1042,12 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     supportsReferences: true,
     minReferenceImages: 1,
     maxReferenceImages: 1,
-    durationOptions: ["4", "6", "8"],
-    resolutionOptions: ["720p", "1080p"],
+      durationOptions: VEO_31_DURATIONS,
+      resolutionOptions: VEO_31_HD_RESOLUTIONS,
     request: {
       type: "image-reference-video",
       endpoint: "/openapi/v2/rhart-video-v3.1-lite-official/image-to-video",
-      durations: ["4", "6", "8"],
+        durations: VEO_31_DURATIONS,
       referenceField: "imageUrl",
       aspectField: "aspectRatio",
     },
@@ -855,13 +1060,11 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     supportsReferences: true,
     minReferenceImages: 2,
     maxReferenceImages: 2,
-    durationOptions: ["4", "6", "8"],
-    resolutionOptions: ["720p", "1080p"],
+      resolutionOptions: VEO_31_HD_RESOLUTIONS,
     request: {
       type: "image-reference-video",
       endpoint: "/openapi/v2/rhart-video-v3.1-lite-official/start-end-to-video",
-      durations: ["4", "6", "8"],
-      referenceField: "firstImageUrl",
+        referenceField: "firstImageUrl",
       lastReferenceField: "lastImageUrl",
       aspectField: "aspectRatio",
     },
@@ -872,61 +1075,65 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     kind: "image",
     supportsReferences: true,
     minReferenceImages: 0,
-    maxReferenceImages: 16,
+    maxReferenceImages: 10,
     referenceRoutes: {
       imageToImage: "api:/openapi/v2/rhart-image-g-2/image-to-image",
     },
     request: {
-      type: "aspect-resolution-image",
-      endpoint: "/openapi/v2/rhart-image-g-2/text-to-image",
-      resolution: "1k",
+        type: "aspect-resolution-image",
+        endpoint: "/openapi/v2/rhart-image-g-2/text-to-image",
+        resolution: "1k",
+        aspectRatioFallback: "empty",
+      },
     },
-  },
   {
     model: "api:/openapi/v2/rhart-image-g-2-official/text-to-image",
     label: "RunningHub GPT Image 2 Official Auto",
-    kind: "image",
-    supportsReferences: true,
-    minReferenceImages: 0,
-    maxReferenceImages: 16,
+      kind: "image",
+      supportsReferences: true,
+      minReferenceImages: 0,
+      maxReferenceImages: 10,
     referenceRoutes: {
       imageToImage: "api:/openapi/v2/rhart-image-g-2-official/image-to-image",
     },
     request: {
       type: "aspect-resolution-image",
-      endpoint: "/openapi/v2/rhart-image-g-2-official/text-to-image",
-      resolution: "2k",
-      quality: "medium",
-    },
+        endpoint: "/openapi/v2/rhart-image-g-2-official/text-to-image",
+        resolution: "2k",
+        aspectRatioFallback: "16:9",
+        quality: "medium",
+      },
   },
   {
     model: "api:/openapi/v2/rhart-image-g-2/image-to-image",
     label: "RunningHub GPT Image 2 Edit Channel Low Price",
     kind: "image",
     listed: false,
-    supportsReferences: true,
-    minReferenceImages: 1,
-    maxReferenceImages: 16,
+      supportsReferences: true,
+      minReferenceImages: 1,
+      maxReferenceImages: 10,
     request: {
       type: "aspect-resolution-image",
-      endpoint: "/openapi/v2/rhart-image-g-2/image-to-image",
-      resolution: "1k",
-      referenceField: "imageUrls",
-    },
+        endpoint: "/openapi/v2/rhart-image-g-2/image-to-image",
+        resolution: "1k",
+        aspectRatioFallback: "empty",
+        referenceField: "imageUrls",
+      },
   },
   {
     model: "api:/openapi/v2/rhart-image-g-2-official/image-to-image",
     label: "RunningHub GPT Image 2 Edit Official Stable",
     kind: "image",
     listed: false,
-    supportsReferences: true,
-    minReferenceImages: 1,
-    maxReferenceImages: 16,
+      supportsReferences: true,
+      minReferenceImages: 1,
+      maxReferenceImages: 10,
     request: {
       type: "aspect-resolution-image",
-      endpoint: "/openapi/v2/rhart-image-g-2-official/image-to-image",
-      resolution: "2k",
-      quality: "medium",
+        endpoint: "/openapi/v2/rhart-image-g-2-official/image-to-image",
+        resolution: "2k",
+        aspectRatioFallback: "16:9",
+        quality: "medium",
       referenceField: "imageUrls",
     },
   },
@@ -1129,34 +1336,38 @@ export function buildRunningHubStandardBody(
         ...model.request.extra,
       };
     }
-    case "image-reference-video": {
-      return {
-        prompt: input.prompt,
-        resolution: input.resolutionName ?? "720p",
-        ...(model.request.durations
-          ? { duration: readDurationValue(input.durationSeconds, model.request.durations, model.label, model.request.durationValueType) }
-          : {}),
+      case "image-reference-video": {
+        return {
+          prompt: input.prompt,
+          ...(model.request.omitResolution ? {} : { resolution: input.resolutionName ?? "720p" }),
+          ...(model.request.durations
+            ? { duration: readDurationValue(input.durationSeconds, model.request.durations, model.label, model.request.durationValueType) }
+            : {}),
         ...(model.request.aspectField
           ? {
               [model.request.aspectField]:
                 input.aspectRatio === "auto" || input.aspectRatio === undefined ? "adaptive" : input.aspectRatio,
             }
           : {}),
-        ...readVideoReferenceFields(
-          model.request.referenceField,
-          model.request.lastReferenceField,
-          model.request.videoField,
-          model.request.audioField,
+          ...readVideoReferenceFields(
+            model.request.referenceField,
+            model.request.referenceValue,
+            model.request.lastReferenceField,
+            model.request.videoField,
+            model.request.audioField,
           referenceMediaUrls,
         ),
         ...model.request.extra,
       };
     }
-    case "aspect-resolution-image": {
-      return {
-        prompt: input.prompt,
-        aspectRatio: input.aspectRatio === "auto" || input.aspectRatio === undefined ? "1:1" : input.aspectRatio,
-        resolution: readImageResolutionTier(input.imageResolution, model.request.resolution),
+      case "aspect-resolution-image": {
+        return {
+          prompt: input.prompt,
+          aspectRatio:
+            input.aspectRatio === "auto" || input.aspectRatio === undefined
+              ? model.request.aspectRatioFallback ?? "1:1"
+              : input.aspectRatio,
+          resolution: readImageResolutionTier(input.imageResolution, model.request.resolution),
         ...readImageQuality(input.imageQuality, model.request.quality),
         ...(model.request.referenceField ? { [model.request.referenceField]: referenceMediaUrls.imageUrls } : {}),
         ...model.request.extra,
@@ -1184,7 +1395,7 @@ function readDimensions(value: string | undefined): { width: number; height: num
 function readImageResolutionTier(value: string | undefined, fallback: string): string {
   if (!value || value === "auto") return fallback;
   const normalized = value.toLowerCase();
-  if (normalized === "1k" || normalized === "2k" || normalized === "4k") return normalized;
+  if (normalized === "1k" || normalized === "2k" || normalized === "4k" || normalized === "8k") return normalized;
 
   const dimensions = readDimensions(value);
   if (!dimensions) return fallback;
@@ -1223,14 +1434,15 @@ function readDurationValue(
 
 function readVideoReferenceFields(
   referenceField: "imageUrls" | "imageUrl" | "firstFrameUrl" | "firstImageUrl",
+  referenceValue: "single" | "array" | undefined,
   lastReferenceField: "lastFrameUrl" | "lastImageUrl" | undefined,
   videoField: "videoUrls" | "videoUrl" | undefined,
   audioField: "audioUrls" | undefined,
   referenceMediaUrls: { imageUrls: string[]; videoUrls: string[]; audioUrls: string[] },
 ): Record<string, unknown> {
   const imageFields =
-    referenceField === "imageUrls"
-      ? { imageUrls: referenceMediaUrls.imageUrls }
+    referenceField === "imageUrls" || referenceValue === "array"
+      ? { [referenceField]: referenceMediaUrls.imageUrls }
       : {
           [referenceField]: referenceMediaUrls.imageUrls[0],
           ...(lastReferenceField && referenceMediaUrls.imageUrls[1]
