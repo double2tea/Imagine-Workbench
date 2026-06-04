@@ -2104,14 +2104,14 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         const nextStatus = nextSourceNodeStatus(items, sourceBoardNodeId, item.status);
         const existingAssetNode = findBoardAssetNodeByAssetId(boardController.board.nodes, item.id);
         if (existingAssetNode) {
-          boardController.connectPorts(
-            { nodeId: sourceBoardNodeId, portId: "result-out", portKind: "result" },
-            { nodeId: existingAssetNode.id, portId: "asset-in", portKind: "asset" },
-          );
           boardController.updateGenerateNode(sourceBoardNodeId, {
             resultAssetId: item.id,
             status: nextStatus,
           });
+          boardController.connectPorts(
+            { nodeId: sourceBoardNodeId, portId: "result-out", portKind: "result" },
+            { nodeId: existingAssetNode.id, portId: "asset-in", portKind: "asset" },
+          );
           continue;
         }
         if (sourceNode?.resultAssetId === item.id) continue;
@@ -2120,14 +2120,14 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           item,
           resultAssetPosition(sourceNode, resultIndex),
         );
-        boardController.connectPorts(
-          { nodeId: sourceBoardNodeId, portId: "result-out", portKind: "result" },
-          { nodeId: assetNodeId, portId: "asset-in", portKind: "asset" },
-        );
         boardController.updateGenerateNode(sourceBoardNodeId, {
           resultAssetId: item.id,
           status: nextStatus,
         });
+        boardController.connectPorts(
+          { nodeId: sourceBoardNodeId, portId: "result-out", portKind: "result" },
+          { nodeId: assetNodeId, portId: "asset-in", portKind: "asset" },
+        );
         continue;
       }
 
