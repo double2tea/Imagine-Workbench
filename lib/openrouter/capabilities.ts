@@ -88,19 +88,7 @@ function registerInputSupportKey(
   const existing = index.get(key);
   if (!existing) {
     index.set(key, { inputSupport, supportsVision, openRouterId });
-    return;
   }
-
-  const mergedSupport = {
-    audio: existing.inputSupport.audio || inputSupport.audio,
-    image: existing.inputSupport.image || inputSupport.image,
-    video: existing.inputSupport.video || inputSupport.video,
-  };
-  index.set(key, {
-    inputSupport: mergedSupport,
-    supportsVision: mergedSupport.image,
-    openRouterId: supportsVision ? openRouterId : existing.openRouterId,
-  });
 }
 
 export function buildOpenRouterInputSupportIndex(

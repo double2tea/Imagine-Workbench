@@ -1,6 +1,6 @@
 import type { ChangeEvent, CSSProperties, FormEvent, PointerEvent as ReactPointerEvent, ReactNode, Ref } from "react";
 import { forwardRef, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Check, ChevronRight, ImagePlus, Paintbrush, RefreshCw, Send, X } from "lucide-react";
+import { Check, ChevronRight, FileAudio, ImagePlus, Paintbrush, RefreshCw, Send, X } from "lucide-react";
 import { motion } from "motion/react";
 import PreviewImage from "@/components/PreviewImage";
 import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
@@ -15,6 +15,7 @@ import { AgentActionSummary } from "@/components/agent/AgentActionSummary";
 import { AgentPendingActionEditor } from "@/components/agent/AgentPendingActionEditor";
 import type { AgentBoardAction, AgentToolAction, AgentWorkbenchAction } from "@/lib/agent-actions";
 import type { AiProvider, ModelOption } from "@/lib/providers/model-catalog";
+import { getMediaReferenceType, mediaReferenceLabel, type MediaReferenceType } from "@/lib/media-references";
 import { applyThemeClassesToDom, resolveThemeMode } from "@/lib/theme-mode";
 
 export interface ChatMessage {
@@ -235,6 +236,20 @@ function renderInlineEmphasis(text: string): ReactNode[] {
       }
       return part;
     });
+}
+
+function renderAgentReferencePreview(type: MediaReferenceType, url: string): ReactNode {
+  if (type === "image") {
+    return <PreviewImage src={url} alt="agent ref" className="h-full w-full object-cover" />;
+  }
+  if (type === "video") {
+    return <video src={url} className="h-full w-full object-cover" muted playsInline preload="metadata" />;
+  }
+  return (
+    <div className="flex h-full w-full items-center justify-center bg-[var(--iw-panel-soft)] text-indigo-200">
+      <FileAudio className="h-5 w-5" />
+    </div>
+  );
 }
 
 function renderAgentContent(content: string): ReactNode {
@@ -504,7 +519,13 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
     agentReferenceUrl,
   );
   const hasSendableAgentReferences = sendableAgentReferences.length > 0;
-  const hasVisibleAgentReference = hasSendableAgentReferences && agentReferenceUrl;
+  const visibleAgentReference = agentReferenceUrl
+    ? sendableAgentReferences.find(reference => reference.id === agentReferenceId) ??
+      sendableAgentReferences.find(reference => reference.url === agentReferenceUrl) ??
+      null
+    : null;
+  const visibleAgentReferenceType = visibleAgentReference ? getMediaReferenceType(visibleAgentReference) : null;
+  const hasVisibleAgentReference = visibleAgentReference !== null && visibleAgentReferenceType !== null;
   const [inputSupportLookup, setInputSupportLookup] = useState<{
     inputSupport: AgentReferenceInputSupport | null;
     model: string;
@@ -794,26 +815,30 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
           <div className="imagine-agent-reference-strip flex items-center justify-between gap-3 p-2 animate-fade-in mb-1">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="imagine-agent-ref-thumb relative h-10 w-10 shrink-0 overflow-hidden rounded-lg">
-                <PreviewImage src={agentReferenceUrl} alt="agent ref" className="h-full w-full object-cover" />
+                {renderAgentReferencePreview(visibleAgentReferenceType, visibleAgentReference.url)}
               </div>
               <div className="flex flex-col min-w-0">
-                <span className="text-[10px] font-bold text-indigo-300">局部编辑参考图</span>
+                <span className="text-[10px] font-bold text-indigo-300">
+                  {mediaReferenceLabel(visibleAgentReferenceType)}引用
+                </span>
                 <span className="max-w-[150px] truncate font-mono text-[9px] text-[var(--iw-faint)]">
-                  ID: {agentReferenceId ? agentReferenceId.substring(0, 16) : "Pasted Custom File"}
+                  ID: {visibleAgentReference.id.substring(0, 16)}
                 </span>
               </div>
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                type="button"
-                onClick={onMaskReference}
-                className="px-2 py-1 bg-blue-600/30 hover:bg-blue-600 border border-blue-500/30 text-blue-200 hover:text-white rounded-lg text-[10px] font-bold transition flex items-center gap-1 cursor-pointer"
-                title="使用画笔抹除或标记局部涂层"
-              >
-                <Paintbrush className="h-3 w-3" />
-                画笔涂抹
-              </button>
+              {visibleAgentReferenceType === "image" ? (
+                <button
+                  type="button"
+                  onClick={onMaskReference}
+                  className="px-2 py-1 bg-blue-600/30 hover:bg-blue-600 border border-blue-500/30 text-blue-200 hover:text-white rounded-lg text-[10px] font-bold transition flex items-center gap-1 cursor-pointer"
+                  title="使用画笔抹除或标记局部涂层"
+                >
+                  <Paintbrush className="h-3 w-3" />
+                  画笔涂抹
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={onClearReference}

@@ -64,6 +64,25 @@ test("lookupOpenRouterInputSupport matches provider-prefixed model ids without c
   assert.equal(match?.openRouterId, "google/gemini-2.5-pro");
 });
 
+test("buildOpenRouterInputSupportIndex does not merge duplicate keys into a capability superset", () => {
+  const index = buildOpenRouterInputSupportIndex([
+    {
+      id: "provider-a/shared-model",
+      canonical_slug: "provider-a/shared-model",
+      architecture: { input_modalities: ["text", "image"] },
+    },
+    {
+      id: "provider-b/shared-model",
+      canonical_slug: "provider-b/shared-model",
+      architecture: { input_modalities: ["text", "audio", "video"] },
+    },
+  ]);
+
+  const match = lookupOpenRouterInputSupport(index, "12ai:shared-model");
+  assert.deepEqual(match?.inputSupport, { audio: false, image: true, video: false });
+  assert.equal(match?.openRouterId, "provider-a/shared-model");
+});
+
 test("lookupOpenRouterVisionSupport matches provider-prefixed model ids", () => {
   resetOpenRouterVisionCacheForTests();
   const index = buildOpenRouterVisionIndex([
