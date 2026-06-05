@@ -19,7 +19,12 @@ import {
   tryParseProviderModel,
 } from "../lib/providers/model-catalog";
 import { getGenerationReferenceMedia } from "../lib/db";
-import { BOARD_PORT_IDS, resolveBoardConnectionKind, resolveBoardConnectionNodesWithCompatibleModel } from "../lib/board/ports";
+import {
+  BOARD_PORT_IDS,
+  boardNodeSupportsReferenceInput,
+  resolveBoardConnectionKind,
+  resolveBoardConnectionNodesWithCompatibleModel,
+} from "../lib/board/ports";
 import type { BoardNode } from "../lib/board/types";
 import { getProviderMeta } from "../lib/providers/registry";
 
@@ -183,6 +188,55 @@ test("board video reference connections auto-switch to an audio-compatible model
 
   assert.equal(patchedVideoNode?.kind, "video-generate");
   if (patchedVideoNode?.kind !== "video-generate") throw new Error("Expected video node");
+  const patchedCapabilities = getVideoModelCapabilities(patchedVideoNode.model);
+  assert.notEqual(patchedVideoNode.model, videoNode.model);
+  assert.equal(patchedCapabilities.referenceMediaTypes.includes("audio"), true);
+  assert.equal(patchedCapabilities.sizes.some(option => option.value === patchedVideoNode.aspectRatio), true);
+  if (patchedVideoNode.videoDuration) {
+    assert.equal(patchedCapabilities.durations.some(option => option.value === patchedVideoNode.videoDuration), true);
+  }
+  assert.equal(resolveBoardConnectionKind(nodes, from, to), "reference");
+});
+
+test("board video reference connections recover from unknown current models", () => {
+  const audioNode: BoardNode = {
+    id: "asset_audio",
+    kind: "asset",
+    title: "Audio",
+    position: { x: 0, y: 0 },
+    size: { width: 280, height: 180 },
+    createdAt: "2026-06-06T00:00:00.000Z",
+    updatedAt: "2026-06-06T00:00:00.000Z",
+    asset: {
+      assetId: "audio_1",
+      type: "audio",
+      url: "data:audio/mpeg;base64,YQ==",
+      prompt: "audio",
+      model: "local",
+    },
+  };
+  const videoNode: BoardNode = {
+    id: "video_unknown",
+    kind: "video-generate",
+    title: "Video",
+    position: { x: 320, y: 0 },
+    size: { width: 320, height: 240 },
+    createdAt: "2026-06-06T00:00:00.000Z",
+    updatedAt: "2026-06-06T00:00:00.000Z",
+    prompt: "",
+    model: "12ai:not-a-real-video-model",
+    aspectRatio: "auto",
+    variantCount: 1,
+    status: "idle",
+  };
+  const from = { nodeId: audioNode.id, portId: BOARD_PORT_IDS.assetOut, portKind: "asset" as const };
+  const to = { nodeId: videoNode.id, portId: BOARD_PORT_IDS.referenceIn, portKind: "asset" as const };
+  const nodes = resolveBoardConnectionNodesWithCompatibleModel([audioNode, videoNode], from, to);
+  const patchedVideoNode = nodes.find(node => node.id === videoNode.id);
+
+  assert.equal(boardNodeSupportsReferenceInput(videoNode), true);
+  assert.equal(patchedVideoNode?.kind, "video-generate");
+  if (patchedVideoNode?.kind !== "video-generate") throw new Error("Expected video node");
   assert.notEqual(patchedVideoNode.model, videoNode.model);
   assert.equal(getVideoModelCapabilities(patchedVideoNode.model).referenceMediaTypes.includes("audio"), true);
   assert.equal(resolveBoardConnectionKind(nodes, from, to), "reference");
@@ -229,8 +283,11 @@ test("board image reference connections auto-switch to an image-reference model"
 
   assert.equal(patchedGenerateNode?.kind, "image-generate");
   if (patchedGenerateNode?.kind !== "image-generate") throw new Error("Expected image generate node");
+  const patchedCapability = getModelCapability(patchedGenerateNode.model, "image");
   assert.notEqual(patchedGenerateNode.model, originalModel);
-  assert.equal(getImageModelCapabilities(patchedGenerateNode.model).referenceMediaTypes.includes("image"), true);
+  assert.equal(patchedCapability.supportsAsync, false);
+  assert.equal(patchedCapability.referenceMediaTypes.includes("image"), true);
+  assert.equal(getImageModelCapabilities(patchedGenerateNode.model).aspectRatios.some(option => option.value === patchedGenerateNode.aspectRatio), true);
   assert.equal(resolveBoardConnectionKind(nodes, from, to), "reference");
 });
 

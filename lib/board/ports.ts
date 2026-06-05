@@ -1,7 +1,13 @@
 import type { BoardEdge, BoardEdgeKind, BoardNode, BoardPortDefinition, BoardPortRef } from "./types";
 import { dedupeBoardEdgesByEndpoints } from "./edge-dedupe";
 import type { MediaReferenceType } from "@/lib/media-references";
-import { getModelCapabilities, getModelCapability, getVideoModelCapabilities } from "../providers/model-catalog";
+import {
+  getImageModelCapabilities,
+  getImageResolutionOptions,
+  getModelCapabilities,
+  getModelCapability,
+  getVideoModelCapabilities,
+} from "../providers/model-catalog";
 
 export const BOARD_PORT_IDS = {
   agentContextIn: "agent-context-in",
@@ -12,6 +18,8 @@ export const BOARD_PORT_IDS = {
   referenceIn: "reference-in",
   resultOut: "result-out",
 } as const;
+
+const DEFAULT_CUSTOM_IMAGE_RESOLUTION = "2560x1440";
 
 interface BoardNodePortOptions {
   hasResultConnection?: boolean;
@@ -28,7 +36,14 @@ function isExecutableNode(node: BoardNode): boolean {
 export function boardNodeSupportsReferenceInput(node: BoardNode): boolean {
   if (node.kind === "runninghub-app") return true;
   if (!isGenerateNode(node)) return false;
-  return getModelCapability(node.model, node.kind === "image-generate" ? "image" : "video").supportsReferences;
+  try {
+    if (getModelCapability(node.model, node.kind === "image-generate" ? "image" : "video").supportsReferences) {
+      return true;
+    }
+  } catch {
+    return hasCompatibleReferenceModel(node.kind);
+  }
+  return hasCompatibleReferenceModel(node.kind);
 }
 
 export function getBoardNodePortDefinitions(
@@ -113,13 +128,26 @@ function getGenerateAcceptedReferenceTypes(node: BoardNode & { kind: "image-gene
   return getModelCapability(node.model, "image").referenceMediaTypes;
 }
 
+function isAutoSelectableCapability(item: ReturnType<typeof getModelCapabilities>[number]): boolean {
+  return item.supportsReferences && !item.supportsAsync && !item.value.includes("<");
+}
+
+function hasCompatibleReferenceModel(kind: "image-generate" | "video-generate"): boolean {
+  const modelKind = kind === "image-generate" ? "image" : "video";
+  return getModelCapabilities(modelKind).some(isAutoSelectableCapability);
+}
+
 function acceptsReferenceTypes(
   node: BoardNode & { kind: "image-generate" | "video-generate"; model: string },
   referenceTypes: MediaReferenceType[],
 ): boolean {
   if (referenceTypes.length === 0) return false;
-  const acceptedTypes = getGenerateAcceptedReferenceTypes(node);
-  return referenceTypes.every(type => acceptedTypes.includes(type));
+  try {
+    const acceptedTypes = getGenerateAcceptedReferenceTypes(node);
+    return referenceTypes.every(type => acceptedTypes.includes(type));
+  } catch {
+    return false;
+  }
 }
 
 function findCompatibleGenerateModel(
@@ -129,11 +157,66 @@ function findCompatibleGenerateModel(
   if (referenceTypes.length === 0) return null;
   const modelKind = kind === "image-generate" ? "image" : "video";
   const capability = getModelCapabilities(modelKind).find(item =>
-    item.supportsReferences &&
-    !item.value.includes("<") &&
+    isAutoSelectableCapability(item) &&
     referenceTypes.every(type => item.referenceMediaTypes.includes(type))
   );
   return capability?.value ?? null;
+}
+
+function firstOptionValue(options: Array<{ value: string }>, fallback: string): string {
+  return options[0]?.value ?? fallback;
+}
+
+function patchGenerateNodeForModel(
+  node: BoardNode & { kind: "image-generate" | "video-generate"; model: string },
+  model: string,
+): BoardNode {
+  if (node.kind === "image-generate") {
+    const capabilities = getImageModelCapabilities(model);
+    const aspectRatio = capabilities.aspectRatios.some(option => option.value === node.aspectRatio)
+      ? node.aspectRatio
+      : firstOptionValue(capabilities.aspectRatios, "1:1");
+    const resolutionOptions = getImageResolutionOptions(model, aspectRatio);
+    const resolutionSource = resolutionOptions.length > 0 ? resolutionOptions : capabilities.resolutions;
+    return {
+      ...node,
+      aspectRatio,
+      customImageResolution: node.customImageResolution || DEFAULT_CUSTOM_IMAGE_RESOLUTION,
+      imageQuality: capabilities.qualities.some(option => option.value === node.imageQuality)
+        ? node.imageQuality
+        : capabilities.qualities[0]?.value,
+      imageResolution: resolutionSource.some(option => option.value === node.imageResolution)
+        ? node.imageResolution
+        : firstOptionValue(resolutionSource, "1K"),
+      model,
+      thinkingLevel: capabilities.thinkingLevels.some(option => option.value === node.thinkingLevel)
+        ? node.thinkingLevel
+        : capabilities.thinkingLevels[0]?.value,
+    };
+  }
+
+  const capabilities = getVideoModelCapabilities(model);
+  return {
+    ...node,
+    aspectRatio: capabilities.sizes.some(option => option.value === node.aspectRatio)
+      ? node.aspectRatio
+      : firstOptionValue(capabilities.sizes, "auto"),
+    model,
+    videoDuration: capabilities.durations.some(option => option.value === node.videoDuration)
+      ? node.videoDuration
+      : capabilities.durations[0]?.value,
+    videoPreset: capabilities.presets.some(option => option.value === node.videoPreset)
+      ? node.videoPreset
+      : capabilities.presets[0]?.value,
+    videoReferenceMode: node.videoReferenceMode && capabilities.referenceModes.includes(node.videoReferenceMode)
+      ? node.videoReferenceMode
+      : capabilities.referenceMode === "none"
+        ? undefined
+        : capabilities.referenceMode,
+    videoResolution: capabilities.resolutions.some(option => option.value === node.videoResolution)
+      ? node.videoResolution
+      : capabilities.resolutions[0]?.value,
+  };
 }
 
 export function resolveBoardConnectionNodesWithCompatibleModel(
@@ -162,7 +245,7 @@ export function resolveBoardConnectionNodesWithCompatibleModel(
 
   return nodes.map(node =>
     node.id === target.id && isGenerateNode(node)
-      ? { ...node, model: compatibleModel }
+      ? patchGenerateNodeForModel(node, compatibleModel)
       : node,
   );
 }
