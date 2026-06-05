@@ -1,6 +1,6 @@
 import { useEffect, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import { readFetchError } from "@/lib/client-fetch-error";
-import { mergeStorageItems, saveToDB, type StorageItem } from "@/lib/db";
+import { saveToDB, type StorageItem } from "@/lib/db";
 
 type NoticeType = "error" | "info" | "success";
 const PROCESSING_TIMEOUT_MS = 2 * 60 * 60 * 1000;
@@ -43,6 +43,21 @@ async function saveItemOrWarn(
     pushWorkspaceNotice("error", `本地存储失败，刷新后可能丢失：${message}`);
     return false;
   }
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("结果文件读取失败"));
+    reader.onloadend = () => {
+      if (typeof reader.result !== "string") {
+        reject(new Error("结果文件读取失败"));
+        return;
+      }
+      resolve(reader.result);
+    };
+    reader.readAsDataURL(blob);
+  });
 }
 
 export function useMediaPolling({
@@ -121,20 +136,16 @@ export function useMediaPolling({
 
               if (dlRes.ok) {
                 const blob = await dlRes.blob();
-                const reader = new FileReader();
-                reader.onloadend = async () => {
-                  const base64data = reader.result as string;
-                  const completedItem: StorageItem = {
-                    ...item,
-                    url: base64data,
-                    status: "complete",
-                    progress: 100,
-                    errorMessage: undefined,
-                  };
-                  await saveItemOrWarn(completedItem, pushWorkspaceNotice);
-                  setItems(current => mergeStorageItems(current, [completedItem]));
+                const completedItem: StorageItem = {
+                  ...item,
+                  url: await blobToDataUrl(blob),
+                  status: "complete",
+                  progress: 100,
+                  errorMessage: undefined,
                 };
-                reader.readAsDataURL(blob);
+                updatedList[index] = completedItem;
+                delete pollingFailuresRef.current[item.id];
+                await saveItemOrWarn(completedItem, pushWorkspaceNotice);
                 changed = true;
               } else {
                 throw new Error(await readFetchError(dlRes, "结果下载失败"));

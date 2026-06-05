@@ -196,11 +196,18 @@ export function useAgentController({
     }
   }, [agentMessages, chatStorageKey]);
 
-  const clearActiveCountdown = () => {
+  const clearAutoCountdownInterval = () => {
     if (autoCountdownInterval.current) clearInterval(autoCountdownInterval.current);
+    autoCountdownInterval.current = null;
+  };
+
+  const clearActiveCountdown = () => {
+    clearAutoCountdownInterval();
     setActiveCountdownId(null);
     setCountdownSeconds(3);
   };
+
+  useEffect(() => clearAutoCountdownInterval, []);
 
   const handleToggleAutoExecute = (value: boolean) => {
     setAutoExecute(value);
@@ -326,7 +333,7 @@ export function useAgentController({
       secondsLeft -= 1;
       setCountdownSeconds(secondsLeft);
       if (secondsLeft <= 0) {
-        if (autoCountdownInterval.current) clearInterval(autoCountdownInterval.current);
+        clearAutoCountdownInterval();
         const message = agentMessagesRef.current.find(entry => entry.id === messageId);
         const pendingAction = message ? getPendingAgentAction(message) : action;
         if (pendingAction) executeAgentToolAction(messageId, pendingAction);

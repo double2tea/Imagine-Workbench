@@ -229,11 +229,50 @@ export async function downloadRunningHubMedia(
 
   return new Response(res.body, {
     headers: {
-      "Content-Type": res.headers.get("Content-Type") ?? defaultRunningHubContentType(mediaType),
-      "Content-Disposition": `inline; filename="${mediaType}_${Date.now()}.${defaultRunningHubExtension(mediaType)}"`,
+      "Content-Type": runningHubDownloadContentType(res, mediaType),
+      "Content-Disposition": `inline; filename="${mediaType}_${Date.now()}.${runningHubDownloadExtension(res, status.url, mediaType)}"`,
       "Cache-Control": "public, max-age=31536000",
     },
   });
+}
+
+function runningHubDownloadContentType(res: Response, mediaType: ProviderMediaType): string {
+  return res.headers.get("Content-Type") ?? defaultRunningHubContentType(mediaType);
+}
+
+function runningHubDownloadExtension(res: Response, url: string, mediaType: ProviderMediaType): string {
+  const contentType = res.headers.get("Content-Type");
+  const contentTypeExtension = contentType ? extensionFromContentType(contentType) : null;
+  if (contentTypeExtension) return contentTypeExtension;
+  return extensionFromUrl(url, mediaType) ?? defaultRunningHubExtension(mediaType);
+}
+
+function extensionFromContentType(contentType: string): string | null {
+  const mimeType = contentType.split(";")[0]?.trim().toLowerCase();
+  if (mimeType === "image/jpeg") return "jpg";
+  if (mimeType === "image/webp") return "webp";
+  if (mimeType === "image/png") return "png";
+  if (mimeType === "video/webm") return "webm";
+  if (mimeType === "video/quicktime") return "mov";
+  if (mimeType === "video/mp4") return "mp4";
+  if (mimeType === "audio/mpeg") return "mp3";
+  if (mimeType === "audio/wav" || mimeType === "audio/x-wav") return "wav";
+  if (mimeType === "audio/ogg") return "ogg";
+  if (mimeType === "audio/aac") return "aac";
+  if (mimeType === "audio/flac") return "flac";
+  if (mimeType === "audio/mp4" || mimeType === "audio/x-m4a") return "m4a";
+  return null;
+}
+
+function extensionFromUrl(url: string, mediaType: ProviderMediaType): string | null {
+  const pathname = new URL(url).pathname.toLowerCase();
+  const match = pathname.match(/\.([a-z0-9]+)$/);
+  const extension = match?.[1];
+  if (!extension) return null;
+  if (mediaType === "image" && (extension === "png" || extension === "jpg" || extension === "jpeg" || extension === "webp")) return extension;
+  if (mediaType === "video" && (extension === "mp4" || extension === "webm" || extension === "mov")) return extension;
+  if (mediaType === "audio" && (extension === "mp3" || extension === "wav" || extension === "m4a" || extension === "aac" || extension === "ogg" || extension === "flac")) return extension;
+  return null;
 }
 
 function defaultRunningHubContentType(mediaType: ProviderMediaType): string {

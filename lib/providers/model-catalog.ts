@@ -1141,6 +1141,13 @@ export function getAudioModelCapabilities(value: string): AudioModelCapabilities
   };
 }
 
+export class ProviderModelParseError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ProviderModelParseError";
+  }
+}
+
 export function parseProviderModel(value: string, fallbackProvider: AiProvider): {
   provider: AiProvider;
   model: string;
@@ -1161,7 +1168,19 @@ export function parseProviderModel(value: string, fallbackProvider: AiProvider):
     return { provider, model, async: false };
   }
 
-  return { provider: fallbackProvider, model: value, async: false };
+  throw new ProviderModelParseError(`Unknown provider prefix "${provider}" in model "${value}"`);
+}
+
+export function tryParseProviderModel(
+  value: string,
+  fallbackProvider: AiProvider,
+): ReturnType<typeof parseProviderModel> | null {
+  try {
+    return parseProviderModel(value, fallbackProvider);
+  } catch (error) {
+    if (error instanceof ProviderModelParseError) return null;
+    throw error;
+  }
 }
 
 interface CapabilityInput {

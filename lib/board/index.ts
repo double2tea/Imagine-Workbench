@@ -48,7 +48,6 @@ export {
   assetCompareReferenceUrl,
   buildBoardPromptReferences,
   generateReferenceCandidates,
-  isGenerateEdgeProcessing,
   type BoardGalleryReferenceItem,
   type BoardPromptReference,
 } from "@/lib/board/prompt-references";

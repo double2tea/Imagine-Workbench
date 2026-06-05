@@ -24,7 +24,7 @@ import { makeReferenceDropToken, REFERENCE_ASSET_MIME } from "@/components/refer
 import { getGenerationReferenceMedia, type StorageItem } from "@/lib/db";
 import { mediaReferenceLabel } from "@/lib/media-references";
 import { formatDisplayedAspectRatio } from "@/lib/media-display";
-import { parseProviderModel, type AiProvider } from "@/lib/providers/model-catalog";
+import { tryParseProviderModel, type AiProvider } from "@/lib/providers/model-catalog";
 import { getProviderMeta } from "@/lib/providers/registry";
 import { getVideoFrameCaptureLabel, type CapturedVideoFrame, type VideoFrameCaptureMode } from "@/lib/video-frame";
 
@@ -116,7 +116,7 @@ export default function AssetCard({
   const [isMobileActionsOpen, setIsMobileActionsOpen] = useState(false);
   const [frameMenuPlacement, setFrameMenuPlacement] = useState<FrameMenuPlacement | null>(null);
   const captureVideoFrameRef = useRef<VideoFrameCaptureRequest | null>(null);
-  const provider = parseProviderModel(item.model, selectedProvider).provider;
+  const provider = tryParseProviderModel(item.model, selectedProvider)?.provider ?? selectedProvider;
   const isDraggableReference = item.status === "complete";
   const failedTitle = isContentSafetyError(item.errorMessage) ? "内容安全拦截" : "生成失败 / 链接中断";
   const referenceMedia = getGenerationReferenceMedia(item.generationRequest);

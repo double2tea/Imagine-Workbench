@@ -66,8 +66,6 @@ export type BoardFlowNode = Node<BoardFlowNodeData, "board">;
 
 type BoardHandleZone = "edge" | "segment";
 
-let referenceShelfDragImage: HTMLCanvasElement | null = null;
-
 interface BoardHandleProps {
   id: string;
   kind: BoardPortKind;
@@ -130,12 +128,10 @@ function nodeBodyOverflowClass(kind: BoardNodeModel["kind"]): string {
 }
 
 function getReferenceShelfDragImage(): HTMLCanvasElement {
-  if (!referenceShelfDragImage) {
-    referenceShelfDragImage = document.createElement("canvas");
-    referenceShelfDragImage.width = 1;
-    referenceShelfDragImage.height = 1;
-  }
-  return referenceShelfDragImage;
+  const dragImage = document.createElement("canvas");
+  dragImage.width = 1;
+  dragImage.height = 1;
+  return dragImage;
 }
 
 function GenerateReferenceShelf({

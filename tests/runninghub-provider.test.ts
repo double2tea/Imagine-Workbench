@@ -11,7 +11,7 @@ import {
 import { parseRunningHubBindingsFromJsonText } from "../lib/board/runninghub-bindings";
 import { createChatCompletionText } from "../lib/providers/chat";
 import { generateAudio, getAudioStatus } from "../lib/providers/audio";
-import { generateRunningHubMedia, getRunningHubMediaStatus } from "../lib/providers/image";
+import { downloadRunningHubMedia, generateRunningHubMedia, getRunningHubMediaStatus } from "../lib/providers/image";
 import { listProviderModels } from "../lib/providers/models";
 import { fetchRunningHubAiAppSchema } from "../lib/providers/runninghub-app";
 import type { ProviderConfig } from "../lib/providers/types";
@@ -902,6 +902,32 @@ test("runninghub polling selects audio output url by requested media type", asyn
       status: "success",
       url: "https://runninghub.example/output.wav",
     });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("runninghub audio download preserves upstream audio extension", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
+    const url = input.toString();
+    if (url.endsWith("/task/openapi/outputs")) {
+      return Response.json({
+        code: 0,
+        msg: "success",
+        data: [{ fileUrl: "https://runninghub.example/output.wav", fileType: "wav" }],
+      });
+    }
+    if (url === "https://runninghub.example/output.wav") {
+      return new Response("audio-data", { headers: { "Content-Type": "audio/wav" } });
+    }
+    return Response.json({ code: 999, msg: "unexpected endpoint" }, { status: 500 });
+  };
+
+  try {
+    const response = await downloadRunningHubMedia(runningHubConfig, "audio", "task-output:audio_123");
+    assert.equal(response.headers.get("Content-Type"), "audio/wav");
+    assert.match(response.headers.get("Content-Disposition") ?? "", /^inline; filename="audio_\d+\.wav"$/);
   } finally {
     globalThis.fetch = originalFetch;
   }

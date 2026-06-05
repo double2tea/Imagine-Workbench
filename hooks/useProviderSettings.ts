@@ -7,7 +7,7 @@ import {
   IMAGE_MODEL_OPTIONS,
   VIDEO_MODEL_OPTIONS,
   formatProviderModel,
-  parseProviderModel,
+  tryParseProviderModel,
   type AiProvider,
   type ModelOption,
 } from "@/lib/providers/model-catalog";
@@ -76,7 +76,7 @@ function mergeProviderModelOptions(
   for (const provider of PROVIDER_KEYS) {
     result[provider] = mergeModelOptions(
       base[provider],
-      incoming.filter(option => parseProviderModel(option.value, "12ai").provider === provider),
+      incoming.filter(option => tryParseProviderModel(option.value, "12ai")?.provider === provider),
     );
   }
   return result;
@@ -102,7 +102,8 @@ function mergeRecordModelOptions(
 }
 
 function classifyModelOption(option: ModelOption): ModelCategory {
-  const parsed = parseProviderModel(option.value, "12ai");
+  const parsed = tryParseProviderModel(option.value, "12ai");
+  if (!parsed) return "chat";
   const model = parsed.model.toLowerCase();
   if (model.includes("audio") || model.includes("tts") || model.includes("voice") || model.includes("speech")) return "audio";
   if (model.includes("video") || model.includes("veo") || model.includes("omni_flash")) return "video";
@@ -111,11 +112,12 @@ function classifyModelOption(option: ModelOption): ModelCategory {
 }
 
 function isSelectableImageModel(option: ModelOption): boolean {
-  return !parseProviderModel(option.value, "12ai").async;
+  return tryParseProviderModel(option.value, "12ai")?.async === false;
 }
 
 function isSelectableChatModel(option: ModelOption): boolean {
-  const parsed = parseProviderModel(option.value, "12ai");
+  const parsed = tryParseProviderModel(option.value, "12ai");
+  if (!parsed) return false;
   if (parsed.provider !== "12ai") return true;
   return parsed.model !== "gemini-3.1-flash" && !parsed.model.toLowerCase().includes("deepseek");
 }
@@ -150,7 +152,7 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
       target && isKnownProvider(target)
         ? target
         : target
-          ? parseProviderModel(target, selectedProvider).provider
+          ? tryParseProviderModel(target, selectedProvider)?.provider ?? selectedProvider
           : selectedProvider;
     const chatModelHeader = target && !isKnownProvider(target) ? target : selectedChatModel;
     const headers: Record<string, string> = {
@@ -187,7 +189,8 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
   const handleSelectChatModel = (model: string) => {
     setSelectedChatModel(model);
     localStorage.setItem("imagine_chat_model", model);
-    const parsed = parseProviderModel(model, selectedProvider);
+    const parsed = tryParseProviderModel(model, selectedProvider);
+    if (!parsed) return;
     if (parsed.provider !== selectedProvider) {
       setSelectedProvider(parsed.provider);
       localStorage.setItem("imagine_ai_provider", parsed.provider);

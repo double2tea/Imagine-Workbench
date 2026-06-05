@@ -1,16 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getVideoModelCapabilities, parseProviderModel } from "@/lib/providers/model-catalog";
+import { getVideoModelCapabilities, parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
 import { generateVideo } from "@/lib/providers/video";
+import { readRunningHubNodeInfoList } from "@/lib/providers/runninghub-node-info";
 import { optionalText, requireText, resolveProviderConfig } from "@/lib/providers/utils";
 import { mediaReferenceLabel, mediaReferenceTypeFromBase64DataUri, type MediaReferenceType } from "@/lib/media-references";
 import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, getReferenceMediaPayloadError } from "@/lib/reference-images";
-import type {
-  ReferenceMedia,
-  RunningHubTaskBindingDelivery,
-  RunningHubTaskBindingSource,
-  RunningHubTaskBindingValueType,
-  RunningHubTaskNodeBinding,
-} from "@/lib/providers/types";
+import type { ReferenceMedia } from "@/lib/providers/types";
 
 export const runtime = "edge";
 
@@ -65,7 +60,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to generate video";
     console.error("Generate video endpoint failed:", err);
-    return NextResponse.json({ error: message }, { status: videoErrorStatus(message) });
+    return NextResponse.json({ error: message }, { status: videoErrorStatus(err, message) });
   }
 }
 
@@ -73,7 +68,8 @@ function readReferenceMode(value: unknown): "reference" | "firstLast" | undefine
   return value === "reference" || value === "firstLast" ? value : undefined;
 }
 
-function videoErrorStatus(message: string): number {
+function videoErrorStatus(err: unknown, message: string): number {
+  if (err instanceof ProviderModelParseError) return 400;
   if (message.includes("Video reference media must be data:image/*, data:video/* or data:audio/* base64 data URIs")) return 400;
   return message.includes("No available channel") ? 503 : 500;
 }
@@ -134,60 +130,4 @@ function validateReferenceCount(count: number, min: number, max: number): void {
   if (count > max) {
     throw new Error(`Selected video model supports at most ${max} reference image(s)`);
   }
-}
-
-function readRunningHubNodeInfoList(value: unknown): RunningHubTaskNodeBinding[] | undefined {
-  if (!Array.isArray(value)) return undefined;
-  return value.map(readRunningHubNodeInfoBinding).filter((binding): binding is RunningHubTaskNodeBinding => binding !== null);
-}
-
-function readRunningHubNodeInfoBinding(value: unknown): RunningHubTaskNodeBinding | null {
-  if (typeof value !== "object" || value === null) return null;
-  const record = value as Record<string, unknown>;
-  const nodeId = optionalText(record.nodeId);
-  const fieldName = optionalText(record.fieldName);
-  if (!nodeId || !fieldName) return null;
-  return {
-    nodeId,
-    fieldName,
-    label: optionalText(record.label),
-    source: readBindingSource(record.source),
-    value: optionalText(record.value),
-    valueType: readBindingValueType(record.valueType),
-    enabled: typeof record.enabled === "boolean" ? record.enabled : undefined,
-    required: typeof record.required === "boolean" ? record.required : undefined,
-    referenceIndex: readReferenceIndex(record.referenceIndex),
-    referenceType: record.referenceType === "video" || record.referenceType === "audio" ? record.referenceType : "image",
-    deliveryMode: readBindingDelivery(record.deliveryMode),
-  };
-}
-
-function readBindingSource(value: unknown): RunningHubTaskBindingSource {
-  if (value === "prompt" || value === "reference" || value === "randomSeed") return value;
-  return "literal";
-}
-
-function readBindingValueType(value: unknown): RunningHubTaskBindingValueType | undefined {
-  if (
-    value === "text" ||
-    value === "number" ||
-    value === "boolean" ||
-    value === "image" ||
-    value === "video" ||
-    value === "audio" ||
-    value === "raw"
-  ) {
-    return value;
-  }
-  return undefined;
-}
-
-function readBindingDelivery(value: unknown): RunningHubTaskBindingDelivery {
-  if (value === "url" || value === "fileName") return value;
-  return "raw";
-}
-
-function readReferenceIndex(value: unknown): number | undefined {
-  if (typeof value !== "number" || !Number.isInteger(value) || value < 0) return undefined;
-  return value;
 }

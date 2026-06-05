@@ -2,15 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { mediaReferenceLabel, mediaReferenceTypeFromBase64DataUri, type MediaReferenceType } from "@/lib/media-references";
 import { getReferenceMediaPayloadError, REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES } from "@/lib/reference-images";
 import { generateAudio } from "@/lib/providers/audio";
-import { parseProviderModel } from "@/lib/providers/model-catalog";
-import type {
-  ReferenceMedia,
-  RunningHubTaskBindingDelivery,
-  RunningHubTaskBindingSource,
-  RunningHubTaskBindingValueType,
-  RunningHubTaskNodeBinding,
-} from "@/lib/providers/types";
-import { optionalText, resolveProviderConfig } from "@/lib/providers/utils";
+import { parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
+import { readRunningHubNodeInfoList } from "@/lib/providers/runninghub-node-info";
+import type { ReferenceMedia } from "@/lib/providers/types";
+import { optionalText, requireText, resolveProviderConfig } from "@/lib/providers/utils";
 
 export const runtime = "edge";
 
@@ -39,19 +34,23 @@ export async function POST(req: NextRequest) {
     if (formatError) return NextResponse.json({ error: formatError }, { status: 400 });
     const payloadError = getReferenceMediaPayloadError(referenceMedia.map(reference => reference.dataUri));
     if (payloadError) return NextResponse.json({ error: payloadError }, { status: 413 });
+    const runningHubNodeInfoList = readRunningHubNodeInfoList(body.runningHubNodeInfoList);
 
     const config = resolveProviderConfig(req, parsed.provider);
     const result = await generateAudio(config, {
-      prompt: optionalText(body.prompt) ?? "",
+      prompt: runningHubNodeInfoList ? optionalText(body.prompt) ?? "" : requireText(body.prompt, "Prompt"),
       model: parsed.model,
       referenceMedia,
       runningHubAccessPassword: optionalText(body.runningHubAccessPassword),
-      runningHubNodeInfoList: readRunningHubNodeInfoList(body.runningHubNodeInfoList),
+      runningHubNodeInfoList,
     });
 
     return NextResponse.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to generate RunningHub audio";
+    if (err instanceof ProviderModelParseError) {
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
     console.error("RunningHub audio generation route error:", err);
     return NextResponse.json({ error: message }, { status: 500 });
   }
@@ -93,60 +92,4 @@ function getReferenceMediaFormatError(referenceMedia: ReferenceMedia[]): string 
     if (!acceptedTypes.includes(actualType)) return `RunningHub 音频应用不支持${mediaReferenceLabel(actualType)}输入`;
   }
   return null;
-}
-
-function readRunningHubNodeInfoList(value: unknown): RunningHubTaskNodeBinding[] | undefined {
-  if (!Array.isArray(value)) return undefined;
-  return value.map(readRunningHubNodeInfoBinding).filter((binding): binding is RunningHubTaskNodeBinding => binding !== null);
-}
-
-function readRunningHubNodeInfoBinding(value: unknown): RunningHubTaskNodeBinding | null {
-  if (typeof value !== "object" || value === null) return null;
-  const record = value as Record<string, unknown>;
-  const nodeId = optionalText(record.nodeId);
-  const fieldName = optionalText(record.fieldName);
-  if (!nodeId || !fieldName) return null;
-  return {
-    nodeId,
-    fieldName,
-    label: optionalText(record.label),
-    source: readBindingSource(record.source),
-    value: optionalText(record.value),
-    valueType: readBindingValueType(record.valueType),
-    enabled: typeof record.enabled === "boolean" ? record.enabled : undefined,
-    required: typeof record.required === "boolean" ? record.required : undefined,
-    referenceIndex: readReferenceIndex(record.referenceIndex),
-    referenceType: record.referenceType === "video" || record.referenceType === "audio" ? record.referenceType : "image",
-    deliveryMode: readBindingDelivery(record.deliveryMode),
-  };
-}
-
-function readBindingSource(value: unknown): RunningHubTaskBindingSource {
-  if (value === "prompt" || value === "reference" || value === "randomSeed") return value;
-  return "literal";
-}
-
-function readBindingValueType(value: unknown): RunningHubTaskBindingValueType | undefined {
-  if (
-    value === "text" ||
-    value === "number" ||
-    value === "boolean" ||
-    value === "image" ||
-    value === "video" ||
-    value === "audio" ||
-    value === "raw"
-  ) {
-    return value;
-  }
-  return undefined;
-}
-
-function readBindingDelivery(value: unknown): RunningHubTaskBindingDelivery {
-  if (value === "url" || value === "fileName") return value;
-  return "raw";
-}
-
-function readReferenceIndex(value: unknown): number | undefined {
-  if (typeof value !== "number" || !Number.isInteger(value) || value < 0) return undefined;
-  return value;
 }

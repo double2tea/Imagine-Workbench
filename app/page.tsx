@@ -52,8 +52,8 @@ import {
   getImageModelCapabilities,
   getImageResolutionOptions,
   getVideoModelCapabilities,
-  parseProviderModel,
   supportsAsyncImageGeneration,
+  tryParseProviderModel,
   type AiProvider,
   type ModelOption,
   type VideoReferenceMode,
@@ -137,12 +137,14 @@ function getProviderModelGroups(optionsByProvider: Record<AiProvider, ModelOptio
 }
 
 function formatStoredModelLabel(value: string, fallbackProvider: AiProvider): string {
-  const parsed = parseProviderModel(value, fallbackProvider);
+  const parsed = tryParseProviderModel(value, fallbackProvider);
+  if (!parsed) return value;
   return `${getProviderLabel(parsed.provider)} ${parsed.model}`;
 }
 
 function getSelectableStoredImageModel(value: string, fallbackProvider: AiProvider): string {
-  const parsed = parseProviderModel(value, fallbackProvider);
+  const parsed = tryParseProviderModel(value, fallbackProvider);
+  if (!parsed) return value;
   return parsed.async ? formatProviderModel(parsed.provider, parsed.model) : value;
 }
 
@@ -293,7 +295,11 @@ export default function Home() {
   const canUseAsyncImageGeneration = supportsAsyncImageGeneration(selectedModel);
   const activeImageResolution = imageResolution === "custom" ? customImageSize.trim() : imageResolution;
   const activeImageQuality = imageCapabilities.qualities.some(option => option.value === imageQuality) ? imageQuality : undefined;
-  const selectedImageProviderModel = parseProviderModel(selectedModel, selectedProvider);
+  const selectedImageProviderModel = tryParseProviderModel(selectedModel, selectedProvider) ?? {
+    provider: selectedProvider,
+    model: selectedModel,
+    async: false,
+  };
   const activeVideoSize = videoCapabilities.sizes.some(option => option.value === aspectRatio) ? aspectRatio : "auto";
   const activeVideoResolution = videoCapabilities.resolutions.some(option => option.value === videoResolution)
     ? videoResolution

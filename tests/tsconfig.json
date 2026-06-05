@@ -39,7 +39,7 @@
     "../lib/board/model-options.ts",
     "../lib/board/types.ts",
     "../lib/client-fetch-error.ts",
-    "../lib/providers/model-catalog.ts",
+    "../lib/providers/runninghub-node-info.ts",
     "../lib/providers/utils.ts",
     "../lib/reference-images.ts"
   ]

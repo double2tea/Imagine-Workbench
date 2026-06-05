@@ -6,6 +6,7 @@ import {
   BaseEdge,
   Background,
   BackgroundVariant,
+  type Connection,
   ConnectionLineType,
   ConnectionMode,
   Controls,
@@ -1246,9 +1247,14 @@ export default function BoardWorkspace({
     return refs ? isValidBoardPortConnection(board.nodes, refs.from, refs.to) : false;
   }, [board.nodes]);
 
-  const handleConnect: OnConnect = (connection) => {
+  const readValidConnectionRefs = useCallback((connection: Connection) => {
     const refs = connectionPortRefs(connection);
-    if (!refs || !isValidBoardPortConnection(board.nodes, refs.from, refs.to)) {
+    return refs && isValidBoardPortConnection(board.nodes, refs.from, refs.to) ? refs : null;
+  }, [board.nodes]);
+
+  const handleConnect: OnConnect = (connection) => {
+    const refs = readValidConnectionRefs(connection);
+    if (!refs) {
       onConnectionError("端口类型不兼容：图片可连参考/Agent，Prompt 可连生成，生成结果可连资产。");
       return;
     }
@@ -1312,8 +1318,8 @@ export default function BoardWorkspace({
   };
 
   const handleReconnect = useCallback<OnReconnect<BoardFlowEdge>>((oldEdge, newConnection) => {
-    const refs = connectionPortRefs(newConnection);
-    if (!refs || !isValidBoardPortConnection(board.nodes, refs.from, refs.to)) {
+    const refs = readValidConnectionRefs(newConnection);
+    if (!refs) {
       onConnectionError("端口类型不兼容：图片可连参考/Agent，Prompt 可连生成，生成结果可连资产。");
       return;
     }
@@ -1326,7 +1332,7 @@ export default function BoardWorkspace({
     } catch (error) {
       onConnectionError(error instanceof Error ? error.message : "重连失败");
     }
-  }, [addAssetToReferenceGroup, board.nodes, onConnectionError, reconnectEdge]);
+  }, [addAssetToReferenceGroup, onConnectionError, readValidConnectionRefs, reconnectEdge]);
 
   const handleEdgeClick: EdgeMouseHandler<BoardFlowEdge> = (_event, edge) => {
     closeOverlayMenus();
@@ -1879,7 +1885,6 @@ export default function BoardWorkspace({
     canRedo,
     canUndo,
     closeOverlayMenus,
-    duplicateNode,
     duplicateNodes,
     pasteCopiedNode,
     redo,

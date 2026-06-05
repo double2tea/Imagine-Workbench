@@ -13,7 +13,7 @@ import {
 } from "@/lib/db";
 import type { MediaReferenceRole, MediaReferenceType } from "@/lib/media-references";
 import { mediaReferenceFileExtension, mediaReferenceMimeFromDataUri } from "@/lib/media-references";
-import { parseProviderModel, type AiProvider } from "@/lib/providers/model-catalog";
+import { tryParseProviderModel, type AiProvider } from "@/lib/providers/model-catalog";
 import type { RunningHubTaskNodeBinding } from "@/lib/providers/types";
 import { getReferenceImagePayloadError, getReferenceMediaPayloadError, prepareReferenceImageUrlForRequest, prepareReferenceMediaUrlForRequest } from "@/lib/reference-images";
 import { createVideoFrameStorageItem, getVideoFrameCaptureLabel, type CapturedVideoFrame } from "@/lib/video-frame";
@@ -319,7 +319,7 @@ export function useAssetActions({
       type: item.type,
       prompt: item.prompt,
       model: item.model,
-      provider: parseProviderModel(item.model, selectedProvider).provider,
+      provider: tryParseProviderModel(item.model, selectedProvider)?.provider ?? selectedProvider,
       aspectRatio: item.aspectRatio,
       status: item.status,
       progress: item.progress,

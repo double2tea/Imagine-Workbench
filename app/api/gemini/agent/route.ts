@@ -8,6 +8,7 @@ import {
   DEFAULT_CHAT_MODEL,
   MODEL_CAPABILITIES,
   parseProviderModel,
+  ProviderModelParseError,
 } from "@/lib/providers/model-catalog";
 import type { ChatMessageInput } from "@/lib/providers/types";
 import { resolveProviderConfig } from "@/lib/providers/utils";
@@ -355,6 +356,10 @@ export async function POST(req: NextRequest) {
     if (err instanceof z.ZodError) {
       console.error("Zod validation error:", JSON.stringify(err.issues, null, 2));
       return NextResponse.json({ error: "Invalid agent request", details: err.issues }, { status: 400 });
+    }
+
+    if (err instanceof ProviderModelParseError) {
+      return NextResponse.json({ error: message }, { status: 400 });
     }
 
     return NextResponse.json({

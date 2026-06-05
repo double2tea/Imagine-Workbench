@@ -16,6 +16,7 @@ import {
   getVideoModelCapabilities,
   parseProviderModel,
   supportsAsyncImageGeneration,
+  tryParseProviderModel,
 } from "../lib/providers/model-catalog";
 import { getGenerationReferenceMedia } from "../lib/db";
 import { BOARD_PORT_IDS, resolveBoardConnectionKind } from "../lib/board/ports";
@@ -33,6 +34,17 @@ test("parseProviderModel reads provider prefixes", () => {
     model: "grok-4.20-fast",
     async: false,
   });
+});
+
+test("parseProviderModel rejects unknown provider prefixes", () => {
+  assert.throws(
+    () => parseProviderModel("unknown-provider:model-id", "12ai"),
+    /Unknown provider prefix "unknown-provider" in model "unknown-provider:model-id"/,
+  );
+});
+
+test("tryParseProviderModel returns null for unknown provider prefixes", () => {
+  assert.equal(tryParseProviderModel("unknown-provider:model-id", "12ai"), null);
 });
 
 test("getModelCapability exposes explicit provider capability schema", () => {

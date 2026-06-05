@@ -75,3 +75,15 @@ test("token overlap matches same family across provider-specific ids", () => {
     ) >= 0.5,
   );
 });
+
+test("lookupOpenRouterVisionSupport tolerates unknown provider prefixes", () => {
+  const index = buildOpenRouterVisionIndex([
+    {
+      id: "google/gemini-2.5-flash-preview-05-20",
+      canonical_slug: "google/gemini-2.5-flash-preview-05-20",
+      architecture: { input_modalities: ["text", "image"] },
+    },
+  ]);
+
+  assert.equal(lookupOpenRouterVisionSupport(index, "unknown:gemini-2.5-flash-preview-05-20")?.supportsVision, true);
+});

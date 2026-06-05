@@ -55,8 +55,8 @@ import {
   getImageResolutionOptions,
   getModelCapability,
   getVideoModelCapabilities,
-  parseProviderModel,
   supportsAsyncImageGeneration,
+  tryParseProviderModel,
   type AiProvider,
   type ModelOption,
   type VideoReferenceMode,
@@ -1001,7 +1001,11 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
   const imageCapabilities = getImageModelCapabilities(selectedModel);
   const videoCapabilities = getVideoModelCapabilities(selectedVideoModel);
-  const selectedImageProviderModel = parseProviderModel(selectedModel, selectedProvider);
+  const selectedImageProviderModel = tryParseProviderModel(selectedModel, selectedProvider) ?? {
+    provider: selectedProvider,
+    model: selectedModel,
+    async: false,
+  };
   const canUseAsyncImageGeneration = supportsAsyncImageGeneration(selectedModel);
   const activeImageResolution = imageResolution === "custom" ? customImageSize.trim() : imageResolution;
   const customImageAspectRatio = imageResolution === "custom"

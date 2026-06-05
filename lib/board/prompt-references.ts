@@ -238,13 +238,3 @@ export function assetCompareReferenceUrl(
   const references = generateReferenceCandidatesFromIndex(index, sourceNode.id);
   return references[0]?.url ?? null;
 }
-
-export function isGenerateEdgeProcessing(
-  edge: BoardEdge,
-  nodes: BoardNode[],
-  index = buildBoardPromptReferenceGraphIndex(nodes, []),
-): boolean {
-  const source = index.nodeById.get(edge.from.nodeId);
-  if (source?.kind !== "image-generate" && source?.kind !== "video-generate" && source?.kind !== "runninghub-app") return false;
-  return source.status === "processing";
-}

@@ -1,4 +1,4 @@
-import { parseProviderModel, type AiProvider } from "../providers/model-catalog";
+import { tryParseProviderModel, type AiProvider } from "../providers/model-catalog";
 
 const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
@@ -122,8 +122,9 @@ export function lookupOpenRouterVisionSupport(
   modelValue: string,
   fallbackProvider: AiProvider = "12ai",
 ): { supportsVision: boolean; openRouterId: string } | null {
-  const parsed = parseProviderModel(modelValue, fallbackProvider);
-  const normalized = normalizeOpenRouterModelKey(parsed.model);
+  const parsed = tryParseProviderModel(modelValue, fallbackProvider);
+  const fallbackModel = modelValue.includes(":") ? modelValue.slice(modelValue.indexOf(":") + 1) : modelValue;
+  const normalized = normalizeOpenRouterModelKey(parsed?.model ?? fallbackModel);
   if (!normalized) return null;
 
   const direct = index.get(normalized);

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createChatCompletionText } from "@/lib/providers/chat";
-import { DEFAULT_CHAT_MODEL, parseProviderModel } from "@/lib/providers/model-catalog";
+import { DEFAULT_CHAT_MODEL, parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
 import { optionalText, requireText, resolveProviderConfig } from "@/lib/providers/utils";
 
 export const runtime = "edge";
@@ -35,6 +35,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ optimized });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to optimize prompt";
+    if (err instanceof ProviderModelParseError) {
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
     console.error("Error in prompt optimization:", err);
     return NextResponse.json({ error: message }, { status: 500 });
   }
