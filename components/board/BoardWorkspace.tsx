@@ -435,6 +435,22 @@ const reactFlowDefaultEdgeOptions = { type: "smoothstep" };
 const reactFlowDeleteKeyCode = ["Backspace", "Delete"];
 const reactFlowPanOnDrag = [1, 2];
 const reactFlowProOptions = { hideAttribution: true };
+const COARSE_POINTER_QUERY = "(pointer: coarse)";
+
+function useCoarsePointer(): boolean {
+  const [isCoarsePointer, setIsCoarsePointer] = useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(COARSE_POINTER_QUERY);
+    const updateCoarsePointer = (): void => setIsCoarsePointer(mediaQuery.matches);
+
+    updateCoarsePointer();
+    mediaQuery.addEventListener("change", updateCoarsePointer);
+    return () => mediaQuery.removeEventListener("change", updateCoarsePointer);
+  }, []);
+
+  return isCoarsePointer;
+}
 
 const BOARD_QUICK_INSERT_IMPORT_ITEM: BoardQuickInsertMenuItem = {
   kind: BOARD_QUICK_INSERT_IMPORT_KIND,
@@ -701,6 +717,7 @@ export default function BoardWorkspace({
   onSelectedNodeIdsChange,
 }: BoardWorkspaceProps) {
   const themeMode = useThemeModeSnapshot();
+  const isCoarsePointer = useCoarsePointer();
   const flowInstanceRef = useRef<ReactFlowInstance<BoardFlowNode, BoardFlowEdge> | null>(null);
   const flowHostRef = useRef<HTMLElement | null>(null);
   const mediaImportInputRef = useRef<HTMLInputElement>(null);
@@ -1739,10 +1756,10 @@ export default function BoardWorkspace({
             multiSelectionKeyCode="Shift"
             onReconnect={handleReconnect}
             onSelectionChange={handleSelectionChange}
-            panOnDrag={reactFlowPanOnDrag}
+            panOnDrag={isCoarsePointer ? true : reactFlowPanOnDrag}
             panOnScroll
             panOnScrollMode={PanOnScrollMode.Free}
-            selectionOnDrag
+            selectionOnDrag={!isCoarsePointer}
             onConnect={handleConnect}
             onConnectEnd={handleConnectEnd}
             onEdgeClick={handleEdgeClick}
