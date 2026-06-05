@@ -223,7 +223,7 @@ export default function GenerateBoardNode({
           references={references}
           readOnly={promptPreview !== null}
           headerRight={promptPreview === null ? <PromptTemplatePicker ref={templatePickerRef} compact onApply={handleApplyPromptTemplate} /> : undefined}
-          className={`nodrag nowheel h-full w-full resize-none rounded-md imagine-board-input p-2 pr-20 text-xs leading-5 outline-none placeholder:text-[var(--iw-faint)] focus:border-[var(--iw-border)] ${
+          className={`nodrag nowheel h-full w-full resize-none rounded-md imagine-board-input !p-2 !pr-20 text-xs leading-5 outline-none placeholder:text-[var(--iw-faint)] focus:border-[var(--iw-border)] ${
             promptPreview !== null ? "cursor-default opacity-85" : ""
           }`}
           placeholder={promptPreview !== null ? "已连接 Prompt 节点，请在提示节点编辑" : "可直接写提示词，输入 @ 引用参考图"}

@@ -484,7 +484,7 @@ export default function RunningHubAppBoardNode({
             references={references}
             readOnly={promptPreview !== null}
             overlayClassName="p-2 text-xs leading-5"
-            className={`nodrag nowheel min-h-[146px] flex-1 resize-none rounded-md imagine-board-input p-2 text-xs leading-5 outline-none ${
+            className={`nodrag nowheel min-h-[146px] flex-1 resize-none rounded-md imagine-board-input !p-2 text-xs leading-5 outline-none ${
               promptPreview !== null ? "cursor-default opacity-85" : ""
             }`}
             placeholder={promptPreview !== null ? "已连接 Prompt 节点" : "输入 Prompt，字段可绑定到这里"}

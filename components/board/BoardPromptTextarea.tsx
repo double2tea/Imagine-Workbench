@@ -40,7 +40,7 @@ interface BoardPromptTextareaProps {
 
 const BoardPromptTextarea = forwardRef<BoardPromptTextareaHandle, BoardPromptTextareaProps>(function BoardPromptTextarea(
   {
-    className = "nodrag nowheel h-full w-full resize-none imagine-board-input p-3 pr-20 text-xs leading-5 outline-none placeholder:text-[var(--iw-faint)]",
+    className = "nodrag nowheel h-full w-full resize-none imagine-board-input !p-3 !pr-20 text-xs leading-5 outline-none placeholder:text-[var(--iw-faint)]",
     commitId,
     headerRight,
     onChange,
@@ -156,27 +156,29 @@ const BoardPromptTextarea = forwardRef<BoardPromptTextareaHandle, BoardPromptTex
       {headerRight ? <div className="pointer-events-none absolute right-2 top-2 z-20 [&>*]:pointer-events-auto">{headerRight}</div> : null}
       <div className="relative flex h-full min-h-0 flex-col p-2 pt-2">
         {atDropdownPortal}
-        <textarea
-          ref={textareaRef}
-          value={displayValue}
-          readOnly={readOnly}
-          onChange={(event) => handleChange(event.target.value, event.target.selectionStart)}
-          onBlur={() => {
-            if (readOnly) return;
-            flush();
-            window.setTimeout(() => {
-              setAtSearch(null);
-              onSlashCommand?.(null);
-            }, 120);
-          }}
-          className={`${className} relative z-10 caret-[var(--iw-text)] ${promptReferenceThumbnails.length > 0 ? "!text-transparent" : ""}`}
-          placeholder={placeholder}
-        />
-        <PromptReferenceInlineOverlay
-          prompt={displayValue}
-          references={references}
-          className={overlayClassName}
-        />
+        <div className="relative flex min-h-0 flex-1">
+          <textarea
+            ref={textareaRef}
+            value={displayValue}
+            readOnly={readOnly}
+            onChange={(event) => handleChange(event.target.value, event.target.selectionStart)}
+            onBlur={() => {
+              if (readOnly) return;
+              flush();
+              window.setTimeout(() => {
+                setAtSearch(null);
+                onSlashCommand?.(null);
+              }, 120);
+            }}
+            className={`${className} relative z-10 caret-[var(--iw-text)] ${promptReferenceThumbnails.length > 0 ? "!text-transparent" : ""}`}
+            placeholder={placeholder}
+          />
+          <PromptReferenceInlineOverlay
+            prompt={displayValue}
+            references={references}
+            className={overlayClassName}
+          />
+        </div>
       </div>
     </div>
   );

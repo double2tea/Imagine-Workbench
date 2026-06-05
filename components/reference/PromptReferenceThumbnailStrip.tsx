@@ -43,18 +43,21 @@ function renderReferenceChip(thumbnail: PromptReferenceThumbnail): ReactNode {
   return (
     <span
       key={`${token}:${reference.id}:${reference.url}:${index}`}
-      className="relative mx-0.5 inline-flex h-8 w-8 translate-y-1 items-center justify-center overflow-hidden rounded-md border border-white/15 bg-slate-950 align-baseline shadow-sm"
+      className="relative inline text-transparent"
       title={`${token} · ${mediaReferenceLabel(type)} · ${reference.id}`}
     >
-      {type === "image" ? (
-        <PreviewImage src={reference.url} alt={token} className="h-full w-full object-cover" />
-      ) : type === "video" ? (
-        <Film className="h-4 w-4 text-violet-200" />
-      ) : (
-        <Music className="h-4 w-4 text-cyan-200" />
-      )}
-      <span className="absolute bottom-0 right-0 rounded-tl bg-black/65 px-1 text-[8px] font-semibold leading-3 text-white">
-        {index + 1}
+      {token}
+      <span className="absolute left-1/2 top-1/2 inline-flex h-8 w-8 -translate-x-1/2 -translate-y-[42%] items-center justify-center overflow-hidden rounded-md border border-white/15 bg-slate-950 align-baseline shadow-sm">
+        {type === "image" ? (
+          <PreviewImage src={reference.url} alt={token} className="h-full w-full object-cover" />
+        ) : type === "video" ? (
+          <Film className="h-4 w-4 text-violet-200" />
+        ) : (
+          <Music className="h-4 w-4 text-cyan-200" />
+        )}
+        <span className="absolute bottom-0 right-0 rounded-tl bg-black/65 px-1 text-[8px] font-semibold leading-3 text-white">
+          {index + 1}
+        </span>
       </span>
     </span>
   );
