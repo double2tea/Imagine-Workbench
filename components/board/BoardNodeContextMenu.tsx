@@ -26,13 +26,11 @@ export function buildBoardNodeContextMenuActions(input: {
   onEditImage?: () => void;
   onExecute?: () => void;
   onConnectSelected?: () => void;
-  onGroupSelected?: () => void;
   onSendAgent?: () => void;
 }): BoardNodeContextMenuAction[] {
   const actions: BoardNodeContextMenuAction[] = [
     { id: "duplicate", label: "复制节点", onSelect: input.onDuplicate },
   ];
-  if (input.onGroupSelected) actions.push({ id: "group-selected", label: "所选资产打组", onSelect: input.onGroupSelected });
   if (input.onConnectSelected) actions.push({ id: "connect-selected", label: "所选节点连到此节点", onSelect: input.onConnectSelected });
   if (input.onCopyImage) actions.push({ id: "copy-image", label: "复制图片", onSelect: input.onCopyImage });
   if ((input.node.kind === "image-generate" || input.node.kind === "video-generate" || input.node.kind === "runninghub-app") && input.onExecute) {

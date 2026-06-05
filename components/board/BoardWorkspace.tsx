@@ -929,7 +929,6 @@ export default function BoardWorkspace({
     addPromptNode,
     addReferenceGroupNode,
     addReferenceGroupNodeWithAsset,
-    addReferenceGroupNodeWithAssets,
     addResultNodeWithConnection,
     addRunningHubAppNode,
     clearBoard,
@@ -1688,40 +1687,6 @@ export default function BoardWorkspace({
     return [];
   }, [board.nodes, quickInsertMenu?.connectionFrom]);
 
-  const groupSelectedAssetNodes = useCallback((): void => {
-    const assetNodes = selectedNodeIds
-      .map(nodeId => board.nodes.find(node => node.id === nodeId))
-      .filter((node): node is BoardNodeModel & { kind: "asset" } => node?.kind === "asset");
-    if (assetNodes.length < 2) {
-      onConnectionError("请选择至少两个媒体资产再打组");
-      return;
-    }
-    const bounds = assetNodes.reduce(
-      (current, node) => ({
-        maxX: Math.max(current.maxX, node.position.x + node.size.width),
-        maxY: Math.max(current.maxY, node.position.y + node.size.height),
-        minX: Math.min(current.minX, node.position.x),
-        minY: Math.min(current.minY, node.position.y),
-      }),
-      { maxX: -Infinity, maxY: -Infinity, minX: Infinity, minY: Infinity },
-    );
-    const groupId = addReferenceGroupNodeWithAssets(
-      {
-        position: centeredNodePosition(
-          {
-            x: (bounds.minX + bounds.maxX) / 2,
-            y: (bounds.minY + bounds.maxY) / 2,
-          },
-          DEFAULT_REFERENCE_GROUP_NODE_SIZE,
-        ),
-        title: `参考组 (${assetNodes.length})`,
-      },
-      assetNodes.map(node => node.id),
-    );
-    updateSelectedNodeIds([groupId]);
-    closeOverlayMenus();
-  }, [addReferenceGroupNodeWithAssets, board.nodes, centeredNodePosition, closeOverlayMenus, onConnectionError, selectedNodeIds, updateSelectedNodeIds]);
-
   const connectSelectedNodesToTarget = useCallback((targetNodeId: string): void => {
     const targetNode = board.nodes.find(node => node.id === targetNodeId);
     if (!targetNode) return;
@@ -2259,10 +2224,6 @@ export default function BoardWorkspace({
             const copyableImageUrl = (node.kind === "asset" || node.kind === "result") && node.asset.type === "image"
               ? node.asset.url
               : null;
-            const selectedAssetCount = selectedNodeIds.filter(nodeId => {
-              const selectedNode = board.nodes.find(item => item.id === nodeId);
-              return selectedNode?.kind === "asset";
-            }).length;
             const selectedBatchConnectionCount = selectedNodeIds.filter(nodeId => {
               const selectedNode = board.nodes.find(item => item.id === nodeId);
               return selectedNode ? batchConnectionToTarget(board.nodes, selectedNode, node) !== null : false;
@@ -2299,9 +2260,6 @@ export default function BoardWorkspace({
                 onEditAssetImage(node.id);
                 closeOverlayMenus();
               } : undefined,
-              onGroupSelected: selectedAssetCount > 1
-                ? groupSelectedAssetNodes
-                : undefined,
               onExecute: node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app"
                 ? () => {
                   onExecuteGenerateNode(node.id);

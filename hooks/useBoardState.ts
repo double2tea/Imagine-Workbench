@@ -125,7 +125,6 @@ export interface BoardStateController {
   addPromptNode: (input?: CreatePromptNodeInput) => string;
   addReferenceGroupNode: (input?: CreateReferenceGroupNodeInput) => string;
   addReferenceGroupNodeWithAsset: (input: CreateReferenceGroupNodeInput, assetNodeId: string) => string;
-  addReferenceGroupNodeWithAssets: (input: CreateReferenceGroupNodeInput, assetNodeIds: string[]) => string;
   addRunningHubAppNode: (input?: CreateRunningHubAppNodeInput) => string;
   addAssetToReferenceGroup: (assetNodeId: string, groupNodeId: string) => void;
   clearBoard: () => void;
@@ -1278,40 +1277,6 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     return node.id;
   }, [board.nodes, mutateBoard]);
 
-  const addReferenceGroupNodeWithAssets = useCallback((input: CreateReferenceGroupNodeInput, assetNodeIds: string[]): string => {
-    if (assetNodeIds.length === 0) throw new Error("请选择要打组的媒体资产");
-    const node = createReferenceGroupBoardNode(input, board.nodes);
-    mutateBoard(currentBoard => {
-      const assetNodes = assetNodeIds.map(assetNodeId => {
-        const assetNode = currentBoard.nodes.find(currentNode => currentNode.id === assetNodeId);
-        if (assetNode?.kind !== "asset") throw new Error("参考组只支持媒体资产");
-        return assetNode;
-      });
-      const references = assetNodes.reduce<BoardReferenceGroupItem[]>((items, assetNode) => {
-        const reference = referenceGroupItemFromAssetNode(assetNode);
-        return items.some(item => item.assetId === reference.assetId) ? items : [...items, reference];
-      }, node.references);
-      const nextNode: BoardReferenceGroupNode = { ...node, references };
-      const nextNodes = [...currentBoard.nodes, nextNode];
-      const nextEdges = assetNodes.reduce<BoardEdge[]>((edges, assetNode) => {
-        const from: BoardPortRef = { nodeId: assetNode.id, portId: BOARD_PORT_IDS.assetOut, portKind: "asset" };
-        const to: BoardPortRef = { nodeId: node.id, portId: BOARD_PORT_IDS.assetIn, portKind: "asset" };
-        if (findMatchingEdge(edges, from, to)) return edges;
-        return connectEdge(nextNodes, edges, {
-          id: createBoardId("edge"),
-          kind: resolveBoardConnectionKind(nextNodes, from, to),
-          from,
-          to,
-          createdAt: nowIso(),
-        });
-      }, currentBoard.edges);
-      return touchBoard(currentBoard, nextNodes, nextEdges);
-    });
-    setSelectedNodeId(node.id);
-    setSelectedEdgeId(null);
-    return node.id;
-  }, [board.nodes, mutateBoard]);
-
   const addGenerateNode = useCallback((input: CreateGenerateNodeInput): string => {
     const node = createGenerateBoardNode(input, board.nodes);
     mutateBoard(currentBoard => touchBoard(currentBoard, [...currentBoard.nodes, node]));
@@ -1966,7 +1931,6 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       addPromptNode,
       addReferenceGroupNode,
       addReferenceGroupNodeWithAsset,
-      addReferenceGroupNodeWithAssets,
       addRunningHubAppNode,
       addAssetToReferenceGroup,
       clearBoard,
@@ -2006,7 +1970,6 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       addPromptNode,
       addReferenceGroupNode,
       addReferenceGroupNodeWithAsset,
-      addReferenceGroupNodeWithAssets,
       addRunningHubAppNode,
       addAssetToReferenceGroup,
       beginUndoGesture,
