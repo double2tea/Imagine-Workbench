@@ -128,8 +128,8 @@ type BoardFlowEdge = Edge<{ kind: BoardEdgeKind; processing?: boolean }, "smooth
 const MEDIA_NODE_MIN_HEIGHT = 220;
 const MEDIA_NODE_MAX_HEIGHT = 330;
 const MEDIA_NODE_MIN_WIDTH = 300;
-const MEDIA_NODE_MAX_WIDTH = 500;
-const MEDIA_NODE_TARGET_AREA = 115000;
+const MEDIA_NODE_MAX_WIDTH = 540;
+const MEDIA_NODE_TARGET_AREA = 130000;
 type BoardHandleDirection = "input" | "output";
 
 function mediaNodeSizeForAspectRatio(aspectRatio: number): BoardSize {
