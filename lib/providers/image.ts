@@ -54,6 +54,8 @@ interface ModelScopeImageStatusResponse extends ModelScopeImageCreateResponse {
   task_status?: string;
   status?: string;
   message?: string;
+  detail?: string;
+  error_info?: string;
   error?: { message?: string };
 }
 
@@ -177,6 +179,8 @@ interface RunningHubTaskReferenceUpload {
 const RUNNINGHUB_TASK_OUTPUT_PREFIX = "task-output:";
 const ASYNC_IMAGE_SUCCESS_STATUSES = new Set(["complete", "completed", "partial_complete", "succeeded", "success"]);
 const ASYNC_IMAGE_FAILED_STATUSES = new Set(["failed", "failure", "canceled", "cancelled", "expired"]);
+const MODELSCOPE_IMAGE_SUCCESS_STATUSES = new Set(["succeed", "success", "succeeded", "completed"]);
+const MODELSCOPE_IMAGE_FAILED_STATUSES = new Set(["failed", "fail", "error", "canceled", "cancelled", "timeout", "revoked"]);
 
 export async function generateImage(config: ProviderConfig, input: GenerateImageInput): Promise<GenerateImageResult> {
   if (config.provider === "modelscope") {
@@ -339,12 +343,7 @@ async function generateModelScopeImage(config: ProviderConfig, input: GenerateIm
       "Authorization": `Bearer ${config.apiKey}`,
       "X-ModelScope-Async-Mode": "true",
     },
-    body: JSON.stringify({
-      model: input.model,
-      prompt: input.prompt,
-      size: input.imageResolution,
-      image_url: readModelScopeReferenceImages(input),
-    }),
+    body: JSON.stringify(buildModelScopeImageBody(input)),
   });
   const json = parseProviderResponseBody(await response.text()) as ModelScopeImageCreateResponse;
   if (!response.ok) {
@@ -377,18 +376,18 @@ async function getModelScopeImageStatus(config: ProviderConfig, taskId: string):
   }
 
   const status = (json.task_status ?? json.status ?? "PENDING").toLowerCase();
-  if (status === "succeed" || status === "success" || status === "completed") {
+  if (MODELSCOPE_IMAGE_SUCCESS_STATUSES.has(status)) {
     const url = readModelScopeImageUrl(json);
     if (!url) throw new Error("ModelScope image task completed without an image URL");
     return { done: true, mediaType: "image", progress: 100, status, url };
   }
-  if (status === "failed" || status === "fail" || status === "canceled") {
+  if (MODELSCOPE_IMAGE_FAILED_STATUSES.has(status)) {
     return {
       done: true,
       mediaType: "image",
       progress: 100,
       status: "failed",
-      errorMessage: json.error?.message ?? json.message ?? "ModelScope image task failed",
+      errorMessage: readProviderError(json) ?? "ModelScope image task failed",
     };
   }
   return { done: false, mediaType: "image", progress: 50, status };
@@ -552,6 +551,23 @@ function readModelScopeReferenceImages(input: GenerateImageInput): string | stri
   if (input.referenceImages.length === 0) return undefined;
   const urls = input.referenceImages.map(reference => reference.dataUri);
   return urls.length === 1 ? urls[0] : urls;
+}
+
+function buildModelScopeImageBody(input: GenerateImageInput): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    model: input.model,
+    prompt: input.prompt,
+  };
+  const size = input.imageResolution;
+  const match = size.match(/^(\d+)x(\d+)$/);
+  if (match) {
+    body.size = size;
+    body.width = Number(match[1]);
+    body.height = Number(match[2]);
+  }
+  const imageUrl = readModelScopeReferenceImages(input);
+  if (imageUrl) body.image_url = imageUrl;
+  return body;
 }
 
 function readModelScopeImageUrl(response: ModelScopeImageCreateResponse): string | undefined {
@@ -1033,5 +1049,8 @@ function readProviderError(value: unknown): string | undefined {
   const error = value.error;
   if (typeof error === "string") return error;
   if (isRecord(error) && typeof error.message === "string") return error.message;
+  if (typeof value.error_info === "string") return value.error_info;
+  if (typeof value.message === "string") return value.message;
+  if (typeof value.detail === "string") return value.detail;
   return undefined;
 }

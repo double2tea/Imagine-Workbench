@@ -212,10 +212,10 @@ test("image resolution labels hide pixel dimensions while keeping request values
 
 test("modelscope qwen image exposes documented aspect ratio sizes", () => {
   assert.deepEqual(getImageResolutionOptions("modelscope:Qwen/Qwen-Image", "4:3"), [
-    { value: "1472x1140", label: "1K" },
+    { value: "1472x1104", label: "1K" },
   ]);
   assert.deepEqual(getImageResolutionOptions("modelscope:Qwen/Qwen-Image", "3:4"), [
-    { value: "1140x1472", label: "1K" },
+    { value: "1104x1472", label: "1K" },
   ]);
   assert.deepEqual(getImageResolutionOptions("modelscope:Qwen/Qwen-Image", "3:2"), [
     { value: "1584x1056", label: "1K" },
@@ -223,6 +223,34 @@ test("modelscope qwen image exposes documented aspect ratio sizes", () => {
   assert.deepEqual(getImageResolutionOptions("modelscope:Qwen/Qwen-Image", "2:3"), [
     { value: "1056x1584", label: "1K" },
   ]);
+});
+
+test("modelscope exposes current chat and image presets", () => {
+  assert.equal(getProviderMeta("modelscope").supportsChat, true);
+  assert.equal(
+    CHAT_MODEL_OPTIONS["modelscope"].some(option => option.value === "modelscope:Qwen/Qwen3-235B-A22B"),
+    true,
+  );
+  assert.equal(
+    CHAT_MODEL_OPTIONS["modelscope"].some(option => option.value === "modelscope:MiniMax/MiniMax-M2.7:MiniMax"),
+    true,
+  );
+  assert.equal(
+    getModelCapabilities("image", "modelscope").some(
+      capability => capability.value === "modelscope:Tongyi-MAI/Z-Image-Turbo",
+    ),
+    true,
+  );
+  assert.equal(
+    getModelCapabilities("image", "modelscope").some(
+      capability => capability.value === "modelscope:Qwen/Qwen-Image-Edit-2511",
+    ),
+    true,
+  );
+  assert.equal(
+    getModelCapability("modelscope:Qwen/Qwen-Image-Edit-2511", "image").supportsReferences,
+    true,
+  );
 });
 
 test("runninghub exposes concrete standard model capabilities", () => {

@@ -1,4 +1,4 @@
-import { formatProviderModel, isAgentCompatibleModelId, type AiProvider, type ModelOption } from "./model-catalog";
+import { formatProviderModel, getModelCapabilities, isAgentCompatibleModelId, type AiProvider, type ModelOption } from "./model-catalog";
 import { getProviderMeta } from "./registry";
 import { RUNNINGHUB_DEFAULT_LLM_MODEL, RUNNINGHUB_STANDARD_MODELS, runningHubLlmBaseUrl } from "./runninghub";
 import type { ProviderConfig } from "./types";
@@ -78,17 +78,23 @@ async function listRunningHubChatModels(config: ProviderConfig): Promise<ModelOp
 
 function staticProviderModels(provider: AiProvider, kind: ModelKindFilter): ModelOption[] {
   if (provider === "runninghub") return runningHubStaticModels(kind);
+  if (provider === "modelscope") return modelScopeStaticModels(kind);
 
   const options = [
-    { value: "modelscope:Qwen/Qwen-Image", label: "ModelScope Qwen Image" },
     { value: "agnes:agnes-2.0-flash", label: "Agnes AI Agnes 2.0 Flash" },
     { value: "agnes:agnes-1.5-flash", label: "Agnes AI Agnes 1.5 Flash" },
     { value: "agnes:agnes-image-2.1-flash", label: "Agnes AI Image 2.1 Flash" },
     { value: "agnes:agnes-video-v2.0", label: "Agnes AI Video V2.0" },
-    { value: "modelscope:Qwen/Qwen-Image-Edit", label: "ModelScope Qwen Image Edit" },
   ].filter(option => parseOptionProvider(option.value) === provider);
 
   return options.filter(option => matchesKind(option.value, kind));
+}
+
+function modelScopeStaticModels(kind: ModelKindFilter): ModelOption[] {
+  return getModelCapabilities(kind === "all" ? undefined : kind, "modelscope").map(capability => ({
+    value: capability.value,
+    label: capability.label,
+  }));
 }
 
 function runningHubStaticModels(kind: ModelKindFilter): ModelOption[] {

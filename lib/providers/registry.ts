@@ -89,7 +89,7 @@ export const PROVIDER_REGISTRY = [
     supportsImage: true,
     supportsVideo: false,
     supportsAudio: false,
-    supportsChat: false,
+    supportsChat: true,
   },
   {
     key: "runninghub",

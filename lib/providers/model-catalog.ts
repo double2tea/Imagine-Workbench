@@ -394,17 +394,75 @@ const MODELSCOPE_IMAGE_SIZES: ParameterOption[] = [
   imageResolutionOption("1328x1328"),
   imageResolutionOption("1664x928"),
   imageResolutionOption("928x1664"),
-  imageResolutionOption("1472x1140"),
-  imageResolutionOption("1140x1472"),
+  imageResolutionOption("1472x1104"),
+  imageResolutionOption("1104x1472"),
   imageResolutionOption("1584x1056"),
   imageResolutionOption("1056x1584"),
 ];
 
+const MODELSCOPE_CHAT_MODELS = [
+  {
+    model: "Qwen/Qwen3-235B-A22B",
+    label: "ModelScope Qwen3 235B A22B",
+  },
+  {
+    model: "Qwen/Qwen3-VL-235B-A22B-Instruct",
+    label: "ModelScope Qwen3 VL 235B A22B Instruct",
+  },
+  {
+    model: "MiniMax/MiniMax-M2.7:MiniMax",
+    label: "ModelScope MiniMax M2.7",
+  },
+] as const;
+
+type ModelScopeImageModel = {
+  model: string;
+  label: string;
+  supportsReferences: boolean;
+  maxReferenceImages?: number;
+};
+
+const MODELSCOPE_IMAGE_MODELS: readonly ModelScopeImageModel[] = [
+  {
+    model: "Tongyi-MAI/Z-Image-Turbo",
+    label: "ModelScope Z-Image Turbo",
+    supportsReferences: false,
+  },
+  {
+    model: "Qwen/Qwen-Image-2512",
+    label: "ModelScope Qwen Image 2512",
+    supportsReferences: false,
+  },
+  {
+    model: "Qwen/Qwen-Image-Edit-2511",
+    label: "ModelScope Qwen Image Edit 2511",
+    supportsReferences: true,
+    maxReferenceImages: 4,
+  },
+  {
+    model: "black-forest-labs/FLUX.2-klein-9B",
+    label: "ModelScope FLUX.2 Klein 9B",
+    supportsReferences: true,
+    maxReferenceImages: 4,
+  },
+  {
+    model: "Qwen/Qwen-Image",
+    label: "ModelScope Qwen Image",
+    supportsReferences: false,
+  },
+  {
+    model: "Qwen/Qwen-Image-Edit",
+    label: "ModelScope Qwen Image Edit",
+    supportsReferences: true,
+    maxReferenceImages: 4,
+  },
+] as const;
+
 const DOCUMENTED_IMAGE_SIZE_RATIOS: Record<string, string> = {
   "1664x928": "16:9",
   "928x1664": "9:16",
-  "1472x1140": "4:3",
-  "1140x1472": "3:4",
+  "1472x1104": "4:3",
+  "1104x1472": "3:4",
   "1584x1056": "3:2",
   "1056x1584": "2:3",
 };
@@ -644,6 +702,14 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     provider: "12ai",
     model: "gemini-3.1-flash-lite-preview",
   }),
+  ...MODELSCOPE_CHAT_MODELS.map(model =>
+    chatCapability({
+      value: formatProviderModel("modelscope", model.model),
+      label: model.label,
+      provider: "modelscope",
+      model: model.model,
+    }),
+  ),
   chatCapability({
     value: formatProviderModel("runninghub", RUNNINGHUB_DEFAULT_LLM_MODEL),
     label: "RunningHub Qwen 3.7 Max",
@@ -888,24 +954,18 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     aspectRatios: GPT_IMAGE_RATIOS,
     sizes: GPT_IMAGE_SIZES,
   }),
-  imageCapability({
-    value: "modelscope:Qwen/Qwen-Image",
-    label: "ModelScope Qwen Image",
-    provider: "modelscope",
-    model: "Qwen/Qwen-Image",
-    supportsAsync: true,
-    supportsReferences: false,
-    sizes: MODELSCOPE_IMAGE_SIZES,
-  }),
-  imageCapability({
-    value: "modelscope:Qwen/Qwen-Image-Edit",
-    label: "ModelScope Qwen Image Edit",
-    provider: "modelscope",
-    model: "Qwen/Qwen-Image-Edit",
-    supportsAsync: true,
-    supportsReferences: true,
-    sizes: MODELSCOPE_IMAGE_SIZES,
-  }),
+  ...MODELSCOPE_IMAGE_MODELS.map(model =>
+    imageCapability({
+      value: formatProviderModel("modelscope", model.model),
+      label: model.label,
+      provider: "modelscope",
+      model: model.model,
+      supportsAsync: true,
+      supportsReferences: model.supportsReferences,
+      maxReferenceImages: model.maxReferenceImages,
+      sizes: MODELSCOPE_IMAGE_SIZES,
+    }),
+  ),
   ...RUNNINGHUB_STANDARD_MODELS.filter(model => model.listed !== false).map(model => {
     if (model.kind === "image") {
       const profile = runningHubImageParameterProfile(model);
@@ -1349,13 +1409,15 @@ function getKnownCapability(value: string, kind: ModelKind): ProviderModelCapabi
 }
 
 function modelScopeVirtualImageCapability(model: string): ProviderModelCapability {
+  const supportsReferences = model.toLowerCase().includes("edit") || model.toLowerCase().includes("klein");
   return imageCapability({
     value: formatProviderModel("modelscope", model),
     label: `ModelScope ${model}`,
     provider: "modelscope",
     model,
     supportsAsync: true,
-    supportsReferences: model.toLowerCase().includes("edit"),
+    supportsReferences,
+    maxReferenceImages: supportsReferences ? 4 : undefined,
     sizes: MODELSCOPE_IMAGE_SIZES,
   });
 }
