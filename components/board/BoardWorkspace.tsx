@@ -12,6 +12,7 @@ import {
   EdgeLabelRenderer,
   MarkerType,
   MiniMap,
+  PanOnScrollMode,
   ReactFlow,
   getSmoothStepPath,
   type Edge,
@@ -1739,6 +1740,8 @@ export default function BoardWorkspace({
             onReconnect={handleReconnect}
             onSelectionChange={handleSelectionChange}
             panOnDrag={reactFlowPanOnDrag}
+            panOnScroll
+            panOnScrollMode={PanOnScrollMode.Free}
             selectionOnDrag
             onConnect={handleConnect}
             onConnectEnd={handleConnectEnd}
@@ -1766,6 +1769,7 @@ export default function BoardWorkspace({
             }}
             onPaneContextMenu={openQuickInsertMenu}
             proOptions={reactFlowProOptions}
+            zoomOnScroll={false}
             zoomOnDoubleClick={false}
           >
             {board.config.showGrid && <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="var(--iw-board-handle)" />}
