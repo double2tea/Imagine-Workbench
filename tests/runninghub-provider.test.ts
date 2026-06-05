@@ -954,6 +954,37 @@ test("runninghub task creation error includes response summary when id is absent
   }
 });
 
+test("runninghub task creation surfaces standard model access errors before task id parsing", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (): Promise<Response> => Response.json({
+    taskId: "",
+    status: "",
+    errorCode: "1014",
+    errorMessage: "Access Denied: Standard Model API is restricted to Enterprise-Shared API Keys only.|访问被拒绝：标准模型API仅限企业级-共享API Key调用。",
+    results: null,
+  });
+
+  try {
+    await assert.rejects(
+      () =>
+        generateRunningHubMedia(
+          runningHubConfig,
+          {
+            prompt: "enterprise only",
+            model: "api:/openapi/v2/seedream-v5-lite/text-to-image",
+            aspectRatio: "1:1",
+            imageResolution: "1024x1024",
+            referenceImages: [],
+          },
+          "image",
+        ),
+      /Access Denied: Standard Model API is restricted to Enterprise-Shared API Keys only.*errorCode 1014/,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("runninghub standard tasks keep v2 query polling endpoint", async () => {
   const originalFetch = globalThis.fetch;
   const calls: Array<{ url: string; body: unknown }> = [];

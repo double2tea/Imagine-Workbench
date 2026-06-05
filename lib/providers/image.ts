@@ -61,6 +61,8 @@ interface RunningHubCreateResponse {
   code?: number;
   msg?: string;
   message?: string;
+  errorCode?: string;
+  errorMessage?: string;
   result?: unknown;
   data?: unknown;
   id?: string | number;
@@ -74,9 +76,11 @@ interface RunningHubCreateResponse {
 interface RunningHubQueryResponse {
   code?: number;
   msg?: string;
+  errorCode?: string;
   data?: {
     status?: string;
     errorMessage?: string;
+    errorCode?: string;
     results?: RunningHubMediaOutput[];
   };
   status?: string;
@@ -94,6 +98,8 @@ interface RunningHubUploadResponse {
   code?: number;
   msg?: string;
   message?: string;
+  errorCode?: string;
+  errorMessage?: string;
   data?: {
     download_url?: string;
     downloadUrl?: string;
@@ -779,7 +785,16 @@ function readRunningHubUploadFileName(response: RunningHubUploadResponse): strin
   );
 }
 
-function assertRunningHubOk(response: { code?: number; msg?: string; message?: string }, fallback: string): void {
+function assertRunningHubOk(
+  response: { code?: number; msg?: string; message?: string; errorCode?: string; errorMessage?: string },
+  fallback: string,
+): void {
+  const errorCode = response.errorCode?.trim();
+  const errorMessage = response.errorMessage?.trim();
+  if (errorCode && errorCode !== "0") {
+    throw new Error(errorMessage ? `${errorMessage} (errorCode ${errorCode})` : `${fallback} with errorCode ${errorCode}`);
+  }
+  if (errorMessage) throw new Error(errorMessage);
   if (response.code === undefined || response.code === 0 || response.code === 200) return;
   throw new Error(response.msg ?? response.message ?? `${fallback} with code ${response.code}`);
 }
