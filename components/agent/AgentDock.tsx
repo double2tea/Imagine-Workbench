@@ -6,8 +6,9 @@ import PreviewImage from "@/components/PreviewImage";
 import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import {
+  type AgentReferenceInputSupport,
   formatAgentReferenceHint,
-  getSendableAgentImageReferences,
+  getSendableAgentMediaReferences,
 } from "@/lib/agent-chat-model";
 import { AgentModelSelect } from "@/components/agent/AgentModelSelect";
 import { AgentActionSummary } from "@/components/agent/AgentActionSummary";
@@ -497,16 +498,16 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
     event.preventDefault();
     onSubmit();
   };
-  const sendableAgentReferences = getSendableAgentImageReferences(
+  const sendableAgentReferences = getSendableAgentMediaReferences(
     agentReferences,
     agentReferenceId,
     agentReferenceUrl,
   );
-  const hasSendableAgentImages = sendableAgentReferences.length > 0;
-  const hasVisibleAgentReference = hasSendableAgentImages && agentReferenceUrl;
-  const [visionLookup, setVisionLookup] = useState<{
+  const hasSendableAgentReferences = sendableAgentReferences.length > 0;
+  const hasVisibleAgentReference = hasSendableAgentReferences && agentReferenceUrl;
+  const [inputSupportLookup, setInputSupportLookup] = useState<{
+    inputSupport: AgentReferenceInputSupport | null;
     model: string;
-    supportsVision: boolean | null;
   } | null>(null);
   const [orbPosition, setOrbPosition] = useState<AgentOrbPosition | null>(null);
   const [isOrbDragging, setIsOrbDragging] = useState(false);
@@ -514,7 +515,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
   const suppressOrbClickRef = useRef(false);
 
   useEffect(() => {
-    if (!hasSendableAgentImages || !selectedChatModel.trim()) {
+    if (!hasSendableAgentReferences || !selectedChatModel.trim()) {
       return;
     }
 
@@ -526,25 +527,37 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
       .then(async response => {
         if (!response.ok) return null;
         const payload: unknown = await response.json();
-        if (typeof payload !== "object" || payload === null || !("supportsVision" in payload)) {
+        if (typeof payload !== "object" || payload === null) {
           return null;
         }
-        const value = payload.supportsVision;
-        return typeof value === "boolean" ? value : null;
+        const inputSupport = "inputSupport" in payload ? payload.inputSupport : null;
+        if (typeof inputSupport === "object" && inputSupport !== null) {
+          return {
+            audio: "audio" in inputSupport && typeof inputSupport.audio === "boolean" ? inputSupport.audio : null,
+            image: "image" in inputSupport && typeof inputSupport.image === "boolean" ? inputSupport.image : null,
+            video: "video" in inputSupport && typeof inputSupport.video === "boolean" ? inputSupport.video : null,
+          } satisfies AgentReferenceInputSupport;
+        }
+        const supportsVision = "supportsVision" in payload ? payload.supportsVision : null;
+        return {
+          audio: null,
+          image: typeof supportsVision === "boolean" ? supportsVision : null,
+          video: null,
+        } satisfies AgentReferenceInputSupport;
       })
-      .then(supportsVision => {
+      .then(inputSupport => {
         if (!controller.signal.aborted) {
-          setVisionLookup({ model, supportsVision });
+          setInputSupportLookup({ inputSupport, model });
         }
       })
       .catch(() => {
         if (!controller.signal.aborted) {
-          setVisionLookup({ model, supportsVision: null });
+          setInputSupportLookup({ inputSupport: null, model });
         }
       });
 
     return () => controller.abort();
-  }, [hasSendableAgentImages, selectedChatModel]);
+  }, [hasSendableAgentReferences, selectedChatModel]);
 
   useLayoutEffect(() => {
     setOrbPosition(getInitialAgentOrbPosition());
@@ -563,13 +576,13 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const openRouterVisionSupport =
-    hasSendableAgentImages && visionLookup?.model === selectedChatModel
-      ? visionLookup.supportsVision
+  const openRouterInputSupport =
+    hasSendableAgentReferences && inputSupportLookup?.model === selectedChatModel
+      ? inputSupportLookup.inputSupport
       : null;
 
-  const agentReferenceHint = formatAgentReferenceHint(sendableAgentReferences, openRouterVisionSupport);
-  const isIdleOrb = !isOpen && !isLoading && input.trim().length === 0 && !hasSendableAgentImages;
+  const agentReferenceHint = formatAgentReferenceHint(sendableAgentReferences, openRouterInputSupport);
+  const isIdleOrb = !isOpen && !isLoading && input.trim().length === 0 && !hasSendableAgentReferences;
 
   useLayoutEffect(() => {
     applyThemeClassesToDom(resolveThemeMode());
@@ -721,7 +734,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
         <span className="ml-auto flex shrink-0 items-center gap-2">
           <span className="imagine-agent-dock-status hidden items-center gap-1.5 lg:flex">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400/70" />
-            {hasSendableAgentImages ? "引用中" : "画廊"}
+            {hasSendableAgentReferences ? "引用中" : "画廊"}
           </span>
           {messages.length > 1 && (
             <button

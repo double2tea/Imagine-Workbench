@@ -3,14 +3,19 @@ import { NextRequest, NextResponse } from "next/server";
 import type { AgentSurface } from "@/lib/agent-context";
 import { AGENT_BOARD_ACTION_TYPES, AGENT_WORKBENCH_ACTION_TYPES } from "@/lib/agent-actions";
 import { createChatCompletionText, createChatCompletionWithTools, parseJsonObjectText } from "@/lib/providers/chat";
-import { getSendableAgentImageReferences } from "@/lib/agent-chat-model";
+import {
+  getSendableAgentMediaReferences,
+  parseAgentAudioDataUrl,
+  type AgentReferenceInput,
+} from "@/lib/agent-chat-model";
+import { getMediaReferenceType, mediaReferenceLabel } from "@/lib/media-references";
 import {
   DEFAULT_CHAT_MODEL,
   MODEL_CAPABILITIES,
   parseProviderModel,
   ProviderModelParseError,
 } from "@/lib/providers/model-catalog";
-import type { ChatMessageInput } from "@/lib/providers/types";
+import type { ChatContentPart, ChatMessageInput } from "@/lib/providers/types";
 import { resolveProviderConfig } from "@/lib/providers/utils";
 import { SKILL_REGISTRY } from "./skills";
 import { executeToolCall, getAgentTools, type ToolContext } from "./tools";
@@ -76,6 +81,7 @@ const agentBodySchema = z.object({
     .array(
       z.object({
         id: z.string(),
+        type: z.enum(["image", "video", "audio"]).optional(),
         url: z.string(),
       }),
     )
@@ -252,7 +258,7 @@ export async function POST(req: NextRequest) {
     const agentReferenceId = body.agentReferenceId;
     const surface: AgentSurface = body.surface;
 
-    const sendableAgentRefs = getSendableAgentImageReferences(
+    const sendableAgentRefs = getSendableAgentMediaReferences(
       agentReferences,
       agentReferenceId,
       undefined,
@@ -282,7 +288,7 @@ export async function POST(req: NextRequest) {
     const referenceMsg =
       sendableAgentRefs.length > 0
         ? `\n[USER REFERENCES]\n${sendableAgentRefs
-            .map((item, idx) => `- Ref [${idx + 1}]: ID "${item.id}"`)
+            .map((item, idx) => `- Ref [${idx + 1}]: ${mediaReferenceLabel(getMediaReferenceType(item))} ID "${item.id}"`)
             .join("\n")}\n`
         : "";
     const boardMsg = surface === "board"
@@ -419,12 +425,13 @@ function readContent(value: string | null): string {
 
 function buildAgentMessages(
   messages: ChatMessageInput[],
-  references: Array<{ id: string; url: string }>,
+  references: AgentReferenceInput[],
 ): ChatMessageInput[] {
-  const imageParts = references
+  const mediaParts = references
     .filter(ref => ref.url.length > 0)
-    .map(ref => ({ type: "image_url" as const, image_url: { url: ref.url } }));
-  if (imageParts.length === 0) return messages;
+    .map(createAgentMediaContentPart)
+    .filter((part): part is ChatContentPart => part !== null);
+  if (mediaParts.length === 0) return messages;
 
   return messages.map((message, index) => {
     if (index !== messages.length - 1 || message.role !== "user" || typeof message.content !== "string") {
@@ -432,7 +439,20 @@ function buildAgentMessages(
     }
     return {
       role: message.role,
-      content: [{ type: "text", text: message.content }, ...imageParts],
+      content: [{ type: "text", text: message.content }, ...mediaParts],
     };
   });
+}
+
+function createAgentMediaContentPart(reference: AgentReferenceInput): ChatContentPart | null {
+  const type = getMediaReferenceType(reference);
+  if (type === "image") {
+    return { type: "image_url", image_url: { url: reference.url } };
+  }
+  if (type === "video") {
+    return { type: "video_url", video_url: { url: reference.url } };
+  }
+
+  const audio = parseAgentAudioDataUrl(reference.url);
+  return audio ? { type: "input_audio", input_audio: audio } : null;
 }

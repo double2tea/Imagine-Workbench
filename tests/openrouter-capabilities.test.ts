@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildOpenRouterInputSupportIndex,
   buildOpenRouterVisionIndex,
+  lookupOpenRouterInputSupport,
   lookupOpenRouterVisionSupport,
   normalizeOpenRouterModelKey,
+  openRouterModelInputSupport,
   openRouterModelSupportsImageInput,
   resetOpenRouterVisionCacheForTests,
   scoreOpenRouterModelTokenOverlap,
@@ -26,6 +29,39 @@ test("openRouterModelSupportsImageInput reads architecture.input_modalities", ()
     }),
     false,
   );
+});
+
+test("openRouterModelInputSupport reads image video and audio modalities", () => {
+  assert.deepEqual(
+    openRouterModelInputSupport({
+      id: "google/gemini-2.5-pro",
+      canonical_slug: "google/gemini-2.5-pro",
+      architecture: { input_modalities: ["text", "image", "video", "audio"] },
+    }),
+    { audio: true, image: true, video: true },
+  );
+  assert.deepEqual(
+    openRouterModelInputSupport({
+      id: "deepseek/deepseek-r1",
+      canonical_slug: "deepseek/deepseek-r1",
+      architecture: { input_modalities: ["text"] },
+    }),
+    { audio: false, image: false, video: false },
+  );
+});
+
+test("lookupOpenRouterInputSupport matches provider-prefixed model ids without changing provider", () => {
+  const index = buildOpenRouterInputSupportIndex([
+    {
+      id: "google/gemini-2.5-pro",
+      canonical_slug: "google/gemini-2.5-pro",
+      architecture: { input_modalities: ["text", "image", "video", "audio"] },
+    },
+  ]);
+
+  const match = lookupOpenRouterInputSupport(index, "12ai:gemini-2.5-pro");
+  assert.deepEqual(match?.inputSupport, { audio: true, image: true, video: true });
+  assert.equal(match?.openRouterId, "google/gemini-2.5-pro");
 });
 
 test("lookupOpenRouterVisionSupport matches provider-prefixed model ids", () => {

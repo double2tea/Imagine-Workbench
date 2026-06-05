@@ -19,12 +19,19 @@ interface OpenRouterModelsResponse {
   data?: unknown[];
 }
 
-interface VisionIndexEntry {
+export interface OpenRouterInputSupport {
+  audio: boolean;
+  image: boolean;
+  video: boolean;
+}
+
+interface OpenRouterInputSupportIndexEntry {
+  inputSupport: OpenRouterInputSupport;
   supportsVision: boolean;
   openRouterId: string;
 }
 
-let cachedIndex: Map<string, VisionIndexEntry> | null = null;
+let cachedIndex: Map<string, OpenRouterInputSupportIndexEntry> | null = null;
 let cachedAt = 0;
 
 export function normalizeOpenRouterModelKey(value: string): string {
@@ -56,42 +63,67 @@ function readOpenRouterModel(value: unknown): OpenRouterModelRecord | null {
 }
 
 export function openRouterModelSupportsImageInput(model: OpenRouterModelRecord): boolean {
-  return model.architecture?.input_modalities?.includes("image") ?? false;
+  return openRouterModelInputSupport(model).image;
 }
 
-function registerVisionKey(
-  index: Map<string, VisionIndexEntry>,
+export function openRouterModelInputSupport(model: OpenRouterModelRecord): OpenRouterInputSupport {
+  const modalities = new Set(model.architecture?.input_modalities ?? []);
+  return {
+    audio: modalities.has("audio"),
+    image: modalities.has("image"),
+    video: modalities.has("video"),
+  };
+}
+
+function registerInputSupportKey(
+  index: Map<string, OpenRouterInputSupportIndexEntry>,
   rawKey: string,
-  supportsVision: boolean,
+  inputSupport: OpenRouterInputSupport,
   openRouterId: string,
 ): void {
   const key = normalizeOpenRouterModelKey(rawKey);
   if (!key) return;
 
+  const supportsVision = inputSupport.image;
   const existing = index.get(key);
   if (!existing) {
-    index.set(key, { supportsVision, openRouterId });
+    index.set(key, { inputSupport, supportsVision, openRouterId });
     return;
   }
 
-  if (supportsVision) {
-    index.set(key, { supportsVision: true, openRouterId });
-  }
+  const mergedSupport = {
+    audio: existing.inputSupport.audio || inputSupport.audio,
+    image: existing.inputSupport.image || inputSupport.image,
+    video: existing.inputSupport.video || inputSupport.video,
+  };
+  index.set(key, {
+    inputSupport: mergedSupport,
+    supportsVision: mergedSupport.image,
+    openRouterId: supportsVision ? openRouterId : existing.openRouterId,
+  });
 }
 
-export function buildOpenRouterVisionIndex(models: OpenRouterModelRecord[]): Map<string, VisionIndexEntry> {
-  const index = new Map<string, VisionIndexEntry>();
+export function buildOpenRouterInputSupportIndex(
+  models: OpenRouterModelRecord[],
+): Map<string, OpenRouterInputSupportIndexEntry> {
+  const index = new Map<string, OpenRouterInputSupportIndexEntry>();
 
   for (const model of models) {
-    const supportsVision = openRouterModelSupportsImageInput(model);
+    const inputSupport = openRouterModelInputSupport(model);
     const slugTail = model.id.includes("/") ? model.id.split("/").pop() ?? model.id : model.id;
 
-    registerVisionKey(index, model.id, supportsVision, model.id);
-    registerVisionKey(index, model.canonical_slug, supportsVision, model.id);
-    registerVisionKey(index, slugTail, supportsVision, model.id);
+    registerInputSupportKey(index, model.id, inputSupport, model.id);
+    registerInputSupportKey(index, model.canonical_slug, inputSupport, model.id);
+    registerInputSupportKey(index, slugTail, inputSupport, model.id);
   }
 
   return index;
+}
+
+export function buildOpenRouterVisionIndex(
+  models: OpenRouterModelRecord[],
+): Map<string, OpenRouterInputSupportIndexEntry> {
+  return buildOpenRouterInputSupportIndex(models);
 }
 
 function tokenizeModelKey(key: string): Set<string> {
@@ -117,11 +149,11 @@ export function scoreOpenRouterModelTokenOverlap(left: string, right: string): n
   return shared / Math.max(leftTokens.size, rightTokens.size);
 }
 
-export function lookupOpenRouterVisionSupport(
-  index: Map<string, VisionIndexEntry>,
+export function lookupOpenRouterInputSupport(
+  index: Map<string, OpenRouterInputSupportIndexEntry>,
   modelValue: string,
   fallbackProvider: AiProvider = "12ai",
-): { supportsVision: boolean; openRouterId: string } | null {
+): OpenRouterInputSupportIndexEntry | null {
   const parsed = tryParseProviderModel(modelValue, fallbackProvider);
   const fallbackModel = modelValue.includes(":") ? modelValue.slice(modelValue.indexOf(":") + 1) : modelValue;
   const normalized = normalizeOpenRouterModelKey(parsed?.model ?? fallbackModel);
@@ -130,8 +162,8 @@ export function lookupOpenRouterVisionSupport(
   const direct = index.get(normalized);
   if (direct) return direct;
 
-  let bestSubstring: { entry: VisionIndexEntry; score: number } | null = null;
-  let bestTokenOverlap: { entry: VisionIndexEntry; score: number } | null = null;
+  let bestSubstring: { entry: OpenRouterInputSupportIndexEntry; score: number } | null = null;
+  let bestTokenOverlap: { entry: OpenRouterInputSupportIndexEntry; score: number } | null = null;
 
   for (const [key, entry] of index) {
     if (key.length >= MIN_SUBSTRING_KEY_LENGTH || normalized.length >= MIN_SUBSTRING_KEY_LENGTH) {
@@ -150,6 +182,15 @@ export function lookupOpenRouterVisionSupport(
   }
 
   return bestSubstring?.entry ?? bestTokenOverlap?.entry ?? null;
+}
+
+export function lookupOpenRouterVisionSupport(
+  index: Map<string, OpenRouterInputSupportIndexEntry>,
+  modelValue: string,
+  fallbackProvider: AiProvider = "12ai",
+): { supportsVision: boolean; openRouterId: string } | null {
+  const match = lookupOpenRouterInputSupport(index, modelValue, fallbackProvider);
+  return match ? { supportsVision: match.supportsVision, openRouterId: match.openRouterId } : null;
 }
 
 async function fetchOpenRouterModelCatalog(): Promise<OpenRouterModelRecord[]> {
@@ -178,7 +219,7 @@ async function fetchOpenRouterModelCatalog(): Promise<OpenRouterModelRecord[]> {
     .filter((model): model is OpenRouterModelRecord => model !== null);
 }
 
-async function getOpenRouterVisionIndex(): Promise<Map<string, VisionIndexEntry> | null> {
+async function getOpenRouterInputSupportIndex(): Promise<Map<string, OpenRouterInputSupportIndexEntry> | null> {
   const now = Date.now();
   if (cachedIndex && now - cachedAt < CACHE_TTL_MS) {
     return cachedIndex;
@@ -186,22 +227,28 @@ async function getOpenRouterVisionIndex(): Promise<Map<string, VisionIndexEntry>
 
   try {
     const models = await fetchOpenRouterModelCatalog();
-    cachedIndex = buildOpenRouterVisionIndex(models);
+    cachedIndex = buildOpenRouterInputSupportIndex(models);
     cachedAt = now;
     return cachedIndex;
   } catch (error) {
-    console.warn("OpenRouter vision index refresh failed:", error);
+    console.warn("OpenRouter input support index refresh failed:", error);
     return cachedIndex;
   }
 }
 
 /** Returns null when OpenRouter catalog is unavailable or model cannot be matched. */
-export async function getOpenRouterVisionSupport(modelValue: string): Promise<boolean | null> {
-  const index = await getOpenRouterVisionIndex();
+export async function getOpenRouterInputSupport(modelValue: string): Promise<OpenRouterInputSupport | null> {
+  const index = await getOpenRouterInputSupportIndex();
   if (!index) return null;
 
-  const match = lookupOpenRouterVisionSupport(index, modelValue);
-  return match?.supportsVision ?? null;
+  const match = lookupOpenRouterInputSupport(index, modelValue);
+  return match?.inputSupport ?? null;
+}
+
+/** Returns null when OpenRouter catalog is unavailable or model cannot be matched. */
+export async function getOpenRouterVisionSupport(modelValue: string): Promise<boolean | null> {
+  const inputSupport = await getOpenRouterInputSupport(modelValue);
+  return inputSupport?.image ?? null;
 }
 
 export function resetOpenRouterVisionCacheForTests(): void {

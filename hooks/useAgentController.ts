@@ -10,7 +10,7 @@ import type { AgentBoardContext, AgentSurface } from "@/lib/agent-context";
 import type { CreationMode } from "@/components/creation/CreationModeTabs";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import type { StorageItem } from "@/lib/db";
-import { getSendableAgentImageReferences } from "@/lib/agent-chat-model";
+import { getSendableAgentMediaReferences } from "@/lib/agent-chat-model";
 
 interface UseAgentControllerParams {
   agentInput: string;
@@ -380,7 +380,7 @@ export function useAgentController({
           : agentReferenceId && agentReferenceUrl
             ? [{ id: agentReferenceId, url: agentReferenceUrl }]
             : []);
-      const sendableAgentReferences = getSendableAgentImageReferences(
+      const sendableAgentReferences = getSendableAgentMediaReferences(
         activeAgentReferences,
         agentReferenceId,
         agentReferenceUrl,
@@ -403,7 +403,11 @@ export function useAgentController({
           surface,
           boardContext: getBoardContext?.(),
           gallerySummary,
-          agentReferences: sendableAgentReferences.map(reference => ({ id: reference.id, url: reference.url })),
+          agentReferences: sendableAgentReferences.map(reference => ({
+            id: reference.id,
+            type: reference.type,
+            url: reference.url,
+          })),
           agentReferenceId: sendableAgentReferences[0]?.id || undefined,
           model: selectedChatModel,
         }),
