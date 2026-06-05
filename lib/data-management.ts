@@ -735,6 +735,9 @@ function parseBoardNode(value: unknown): BoardNode {
         prompt: readString(asset, "prompt"),
         model: readString(asset, "model"),
       },
+      resultSourceNodeId: readOptionalString(value, "resultSourceNodeId"),
+      resultStackKey: readOptionalString(value, "resultStackKey"),
+      resultAssetIds: readOptionalStringArray(value, "resultAssetIds"),
     };
   }
   if (kind === "prompt") return { ...base, kind, prompt: readText(value, "prompt") };
@@ -797,6 +800,24 @@ function parseBoardNode(value: unknown): BoardNode {
     };
   }
   if (kind === "agent") return { ...base, kind, instruction: readText(value, "instruction") };
+  if (kind === "result") {
+    const asset = readRecord(value, "asset");
+    return {
+      ...base,
+      kind,
+      sourceNodeId: readString(value, "sourceNodeId"),
+      resultStackKey: readString(value, "resultStackKey"),
+      activeAssetId: readString(value, "activeAssetId"),
+      resultAssetIds: readOptionalStringArray(value, "resultAssetIds") ?? [],
+      asset: {
+        assetId: readString(asset, "assetId"),
+        type: readBoardAssetType(asset, "type"),
+        url: readString(asset, "url"),
+        prompt: readString(asset, "prompt"),
+        model: readString(asset, "model"),
+      },
+    };
+  }
   return { ...base, kind, body: readText(value, "body") };
 }
 
@@ -874,23 +895,19 @@ function validateBoardAssetReferences(boards: BoardDocument[], assetIds: Readonl
       if (node.kind === "asset" && !assetIds.has(node.asset.assetId)) {
         throw new Error(`画板 ${board.title} 引用缺失资产 ${node.asset.assetId}`);
       }
+      if (node.kind === "result") {
+        if (!assetIds.has(node.asset.assetId)) {
+          throw new Error(`画板 ${board.title} 引用缺失资产 ${node.asset.assetId}`);
+        }
+        for (const assetId of node.resultAssetIds) {
+          if (!assetIds.has(assetId)) throw new Error(`画板 ${board.title} 结果节点引用缺失结果资产 ${assetId}`);
+        }
+      }
       if (node.kind === "reference-group") {
         for (const reference of node.references) {
           if (!assetIds.has(reference.assetId)) {
             throw new Error(`画板 ${board.title} 参考组引用缺失资产 ${reference.assetId}`);
           }
-        }
-      }
-      if (
-        (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app") &&
-        node.resultAssetId &&
-        !assetIds.has(node.resultAssetId)
-      ) {
-        throw new Error(`画板 ${board.title} 生成节点引用缺失结果资产 ${node.resultAssetId}`);
-      }
-      if (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app") {
-        for (const assetId of node.resultAssetIds ?? []) {
-          if (!assetIds.has(assetId)) throw new Error(`画板 ${board.title} 生成节点引用缺失结果资产 ${assetId}`);
         }
       }
     }
@@ -1160,7 +1177,8 @@ function readBoardNodeKind(record: Record<string, unknown>, field: string): Boar
     value !== "video-generate" &&
     value !== "runninghub-app" &&
     value !== "agent" &&
-    value !== "note"
+    value !== "note" &&
+    value !== "result"
   ) {
     throw new Error(`${field} 节点类型无效`);
   }

@@ -51,6 +51,7 @@ interface RunningHubAppBoardNodeProps {
   onUpdate: (input: BoardRunningHubAppNodeUpdate) => void;
   references: BoardPromptReference[];
   resultItems: StorageItem[];
+  activeResultAssetId?: string;
 }
 
 interface RunningHubSavedTarget {
@@ -231,10 +232,10 @@ function statusLabel(status: BoardRunningHubAppNode["status"]): string {
   return "待运行";
 }
 
-function resultStatusLabel(node: BoardRunningHubAppNode, hasResultConnection: boolean, resultCount: number): string {
+function resultStatusLabel(hasResultConnection: boolean, resultCount: number): string {
   if (resultCount > 1) return `${resultCount} 个结果`;
-  if (node.resultAssetId && hasResultConnection) return "结果已连接";
-  if (node.resultAssetId) return "已生成";
+  if (resultCount > 0 && hasResultConnection) return "结果已连接";
+  if (resultCount > 0) return "已生成";
   return "未生成";
 }
 
@@ -251,6 +252,7 @@ export default function RunningHubAppBoardNode({
   onUpdate,
   references,
   resultItems,
+  activeResultAssetId,
 }: RunningHubAppBoardNodeProps) {
   const [importText, setImportText] = useState("");
   const [importError, setImportError] = useState<string | null>(null);
@@ -514,13 +516,13 @@ export default function RunningHubAppBoardNode({
               {isReady ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
               {!hasTarget ? "缺少目标" : isReady ? "可运行" : `${readiness.missingCount} 缺少`}
             </span>
-            <span className={`${chipClass} ${node.resultAssetId ? "text-emerald-200" : ""}`}>
-              {resultStatusLabel(node, hasResultConnection, resultItems.length)}
+            <span className={`${chipClass} ${resultItems.length > 0 ? "text-emerald-200" : ""}`}>
+              {resultStatusLabel(hasResultConnection, resultItems.length)}
             </span>
           </div>
 
           <BoardResultStack
-            activeAssetId={node.resultAssetId}
+            activeAssetId={activeResultAssetId}
             onMaterializeResult={onMaterializeResult}
             onOpenResult={onOpenResult}
             onSelectResult={onSelectResult}

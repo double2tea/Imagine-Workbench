@@ -1,4 +1,5 @@
 import type { BoardDocument, BoardSummary } from "@/lib/board/types";
+import type { BoardNode } from "@/lib/board/types";
 
 const DB_NAME = "ImagineWorkbenchBoardDB";
 const STORE_NAME = "boards";
@@ -100,9 +101,50 @@ function writeBoardAndSummary(board: BoardDocument): Promise<void> {
   );
 }
 
+function migrateBoardDocument(doc: BoardDocument): BoardDocument {
+  const hasLegacyAsset = doc.nodes.some(
+    node => node.kind === "asset" && "resultSourceNodeId" in node && (node as unknown as Record<string, unknown>).resultSourceNodeId,
+  );
+  const hasLegacyGenerate = doc.nodes.some(
+    node =>
+      (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app") &&
+      ("resultAssetId" in node || "resultAssetIds" in node),
+  );
+  if (!hasLegacyAsset && !hasLegacyGenerate) return doc;
+
+  const migratedNodes: BoardNode[] = [];
+  for (const node of doc.nodes) {
+    if (node.kind === "asset") {
+      const legacyNode = node as typeof node & { resultSourceNodeId?: string; resultStackKey?: string; resultAssetIds?: string[] };
+      if (legacyNode.resultSourceNodeId) {
+        // Convert the asset node into a result node — same ID, same position, same edges
+        const { resultSourceNodeId: _, resultStackKey: __, resultAssetIds: ___, ...baseNode } = legacyNode;
+        migratedNodes.push({
+          ...baseNode,
+          kind: "result",
+          sourceNodeId: legacyNode.resultSourceNodeId,
+          resultStackKey: legacyNode.resultStackKey ?? "",
+          activeAssetId: baseNode.asset.assetId,
+          resultAssetIds: legacyNode.resultAssetIds ?? [baseNode.asset.assetId],
+        });
+        continue;
+      }
+    }
+    if (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app") {
+      const { resultAssetId: _ra, resultAssetIds: _ras, ...rest } = node as typeof node & { resultAssetId?: unknown; resultAssetIds?: unknown };
+      migratedNodes.push(rest as typeof node);
+      continue;
+    }
+    migratedNodes.push(node);
+  }
+
+  // Edges remain unchanged — the converted result node keeps the same ID
+  return { ...doc, nodes: migratedNodes, updatedAt: new Date().toISOString() };
+}
+
 export async function getBoardFromDB(id: string): Promise<BoardDocument | null> {
   const result = await readStore<BoardDocument | undefined>("readonly", (store) => store.get(id));
-  return result ?? null;
+  return result ? migrateBoardDocument(result) : null;
 }
 
 export async function saveBoardToDB(board: BoardDocument): Promise<void> {

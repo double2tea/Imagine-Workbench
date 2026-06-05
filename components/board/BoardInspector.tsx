@@ -60,6 +60,7 @@ interface BoardInspectorProps {
   onSendAssetToAgent: () => void;
   onSyncAssetReference: () => void;
   onUpdateGenerate: (nodeId: string, input: BoardGenerateNodeUpdate) => void;
+  onUpdateNodeTitle: (nodeId: string, title: string) => void;
   onUpdateRunningHubApp: (nodeId: string, input: BoardRunningHubAppNodeUpdate) => void;
 }
 
@@ -84,6 +85,7 @@ const nodeKindLabels: Record<BoardNode["kind"], string> = {
   note: "备注",
   prompt: "Prompt",
   "reference-group": "参考组",
+  result: "生成结果",
   "runninghub-app": "RunningHub 应用",
   "video-generate": "视频生成",
 };
@@ -670,6 +672,7 @@ export default function BoardInspector({
   onSendAssetToAgent,
   onSyncAssetReference,
   onUpdateGenerate,
+  onUpdateNodeTitle,
   onUpdateRunningHubApp,
 }: BoardInspectorProps) {
   const headerTitle = edge ? "连线" : node?.title ?? "检查器";
@@ -708,6 +711,13 @@ export default function BoardInspector({
         <EdgeInspector edge={edge} nodes={nodes} onDeleteEdge={onDeleteEdge} />
       ) : node ? (
         <div className="space-y-3">
+          <InspectorField title="节点名称">
+            <input
+              value={node.title}
+              onChange={event => onUpdateNodeTitle(node.id, event.target.value)}
+              className={inputClass}
+            />
+          </InspectorField>
           <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-[var(--iw-muted)]">
             <div className="imagine-meta-chip rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5">输入 {incomingCount}</div>
             <div className="imagine-meta-chip rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5">输出 {outgoingCount}</div>

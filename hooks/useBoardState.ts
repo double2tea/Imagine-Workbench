@@ -20,6 +20,7 @@ import {
   type BoardConfig,
   type BoardDocument,
   type BoardEdge,
+  type BoardAssetReference,
   type BoardGenerateNodeUpdate,
   type BoardGenerateVariantCount,
   type BoardGenerationStatus,
@@ -30,6 +31,7 @@ import {
   type BoardReferenceGroupItem,
   type BoardReferenceGroupNode,
   type BoardReferenceRole,
+  type BoardResultNode,
   type BoardRunningHubAppNode,
   type BoardRunningHubAppNodeUpdate,
   type BoardRunningHubBindingDelivery,
@@ -49,13 +51,21 @@ import {
   type CreateNoteNodeInput,
   type CreatePromptNodeInput,
   type CreateReferenceGroupNodeInput,
+  type CreateResultNodeInput,
   type CreateRunningHubAppNodeInput,
 } from "@/lib/board";
 import { getImageModelCapabilities, getImageResolutionOptions, getVideoModelCapabilities } from "@/lib/providers/model-catalog";
 import { BOARD_PORT_IDS, filterValidBoardEdges, resolveBoardConnectionKind } from "@/lib/board/ports";
-import { isBoardResultStackNode, removeResultAssetFromBoardNodeResultStack } from "@/lib/assets/board-scope";
+import { findResultNodeForSource, isResultSourceNode, resultNodeDefaultPosition } from "@/lib/board/utils";
 
 export type BoardSaveStatus = "idle" | "loading" | "saving" | "saved" | "error";
+
+interface CompleteGenerationResultUpdate {
+  asset: BoardAssetReference;
+  resultAssetId: string;
+  resultAssetIds: string[];
+  status: BoardGenerationStatus;
+}
 
 const DEFAULT_CUSTOM_IMAGE_RESOLUTION = "2560x1440";
 const DEFAULT_VARIANT_COUNT: BoardGenerateVariantCount = 1;
@@ -70,6 +80,7 @@ const BOARD_NODE_KINDS = new Set<BoardNode["kind"]>([
   "note",
   "prompt",
   "reference-group",
+  "result",
   "runninghub-app",
   "video-generate",
 ]);
@@ -94,6 +105,10 @@ export interface BoardStateController {
   addAgentNode: (input?: CreateAgentNodeInput) => string;
   addAssetNode: (input: CreateAssetNodeInput) => string;
   addAssetNodeWithConnection: (input: CreateAssetNodeInput, from: BoardPortRef) => string;
+  addResultNodeWithConnection: (input: CreateResultNodeInput, from: BoardPortRef) => string;
+  completeGenerationResult: (sourceNodeId: string, update: CompleteGenerationResultUpdate) => void;
+  updateAssetNodeAsset: (nodeId: string, asset: BoardAssetReference, resultAssetIds?: string[]) => void;
+  updateResultNodeAsset: (nodeId: string, assetId: string) => void;
   addGenerateNode: (input: CreateGenerateNodeInput) => string;
   addGenerateNodeWithConnection: (
     input: CreateGenerateNodeInput,
@@ -121,6 +136,7 @@ export interface BoardStateController {
   updateReferenceGroupItemRole: (groupNodeId: string, assetId: string, role: BoardReferenceRole) => void;
   updateAgentInstruction: (nodeId: string, instruction: string) => void;
   updateGenerateNode: (nodeId: string, input: BoardGenerateNodeUpdate) => void;
+  updateNodeTitle: (nodeId: string, title: string) => void;
   updateNodePosition: (nodeId: string, position: BoardPoint) => void;
   updateNodesPositions: (updates: Array<{ nodeId: string; position: BoardPoint }>) => void;
   updateNodeSize: (nodeId: string, size: BoardSize) => void;
@@ -160,6 +176,7 @@ function duplicateNodeIdPrefix(kind: BoardNode["kind"]): string {
   if (kind === "video-generate") return "video_gen";
   if (kind === "runninghub-app") return "rh_app";
   if (kind === "agent") return "agent";
+  if (kind === "result") return "result";
   return "note";
 }
 
@@ -228,6 +245,16 @@ function cloneBoardNodeForDuplicate(source: BoardNode, stackIndex: number): Boar
       };
     case "agent":
       return { ...shell, kind: "agent", instruction: source.instruction };
+    case "result":
+      return {
+        ...shell,
+        kind: "result",
+        sourceNodeId: source.sourceNodeId,
+        resultStackKey: source.resultStackKey,
+        activeAssetId: source.activeAssetId,
+        resultAssetIds: source.resultAssetIds,
+        asset: source.asset,
+      };
     case "note":
       return { ...shell, kind: "note", body: source.body };
     default: {
@@ -461,6 +488,25 @@ function normalizeBoardNode(node: unknown, index: number): BoardNode | null {
       },
     };
   }
+  if (node.kind === "result") {
+    const asset = isRecord(node.asset) ? node.asset : null;
+    if (!asset || (asset.type !== "image" && asset.type !== "video" && asset.type !== "audio")) return null;
+    return {
+      ...shell,
+      kind: "result",
+      sourceNodeId: readNonEmptyString(node.sourceNodeId, ""),
+      resultStackKey: readNonEmptyString(node.resultStackKey, ""),
+      activeAssetId: readNonEmptyString(node.activeAssetId, readNonEmptyString(asset.assetId, shell.id)),
+      resultAssetIds: readOptionalStringArray(node.resultAssetIds) ?? [],
+      asset: {
+        assetId: readNonEmptyString(asset.assetId, shell.id),
+        model: readNonEmptyString(asset.model, "unknown"),
+        prompt: readNonEmptyString(asset.prompt, shell.title),
+        type: asset.type,
+        url: readNonEmptyString(asset.url, ""),
+      },
+    };
+  }
   if (node.kind === "prompt") {
     return {
       ...shell,
@@ -488,8 +534,6 @@ function normalizeBoardNode(node: unknown, index: number): BoardNode | null {
         customImageResolution: readOptionalString(node.customImageResolution) || defaults.customImageResolution,
         imageQuality: readOptionalString(node.imageQuality) ?? defaults.imageQuality,
         imageResolution: readOptionalString(node.imageResolution) || defaults.imageResolution,
-        resultAssetId: typeof node.resultAssetId === "string" ? node.resultAssetId : undefined,
-        resultAssetIds: readOptionalStringArray(node.resultAssetIds),
         resultStackKey: readOptionalString(node.resultStackKey),
         status: normalizeGenerationStatus(node.status),
       thinkingLevel: readOptionalString(node.thinkingLevel) ?? defaults.thinkingLevel,
@@ -507,8 +551,6 @@ function normalizeBoardNode(node: unknown, index: number): BoardNode | null {
         model,
         prompt: typeof node.prompt === "string" ? node.prompt : "",
         aspectRatio: aspectRatio || defaults.aspectRatio,
-        resultAssetId: typeof node.resultAssetId === "string" ? node.resultAssetId : undefined,
-        resultAssetIds: readOptionalStringArray(node.resultAssetIds),
         resultStackKey: readOptionalString(node.resultStackKey),
         status: normalizeGenerationStatus(node.status),
       videoDuration: readOptionalString(node.videoDuration) ?? defaults.videoDuration,
@@ -527,8 +569,6 @@ function normalizeBoardNode(node: unknown, index: number): BoardNode | null {
       bindings: Array.isArray(node.bindings) ? normalizeRunningHubBindings(node.bindings) : defaultRunningHubBindings(),
       outputType: readRunningHubOutputType(node.outputType),
       prompt: typeof node.prompt === "string" ? node.prompt : "",
-      resultAssetId: typeof node.resultAssetId === "string" ? node.resultAssetId : undefined,
-      resultAssetIds: readOptionalStringArray(node.resultAssetIds),
       resultStackKey: readOptionalString(node.resultStackKey),
       status: normalizeGenerationStatus(node.status),
       targetId: readOptionalString(node.targetId) ?? "",
@@ -569,6 +609,12 @@ function defaultNodeTitle(kind: BoardNode["kind"]): string {
   if (kind === "runninghub-app") return "RunningHub App";
   if (kind === "agent") return "Agent";
   return "Note";
+}
+
+function defaultAssetNodeTitle(type: BoardAssetReference["type"]): string {
+  if (type === "image") return "图片资产";
+  if (type === "video") return "视频资产";
+  return "音频资产";
 }
 
 function defaultRunningHubBindings(): BoardRunningHubNodeInfoBinding[] {
@@ -701,7 +747,25 @@ function createAssetBoardNode(input: CreateAssetNodeInput, nodes: BoardNode[]): 
   return {
     id: createBoardId("asset"),
     kind: "asset",
-    title: input.title ?? input.asset.prompt,
+    title: input.title ?? defaultAssetNodeTitle(input.asset.type),
+    asset: input.asset,
+    position: input.position ?? moveDefaultPosition(nodes),
+    size: input.size ?? DEFAULT_ASSET_NODE_SIZE,
+    createdAt,
+    updatedAt: createdAt,
+  };
+}
+
+function createResultBoardNode(input: CreateResultNodeInput, nodes: BoardNode[]): BoardResultNode {
+  const createdAt = nowIso();
+  return {
+    id: createBoardId("result"),
+    kind: "result",
+    title: input.title ?? defaultAssetNodeTitle(input.asset.type),
+    sourceNodeId: input.sourceNodeId,
+    resultStackKey: input.resultStackKey,
+    activeAssetId: input.activeAssetId,
+    resultAssetIds: input.resultAssetIds,
     asset: input.asset,
     position: input.position ?? moveDefaultPosition(nodes),
     size: input.size ?? DEFAULT_ASSET_NODE_SIZE,
@@ -827,17 +891,11 @@ function findMatchingEdge(edges: BoardEdge[], from: BoardPortRef, to: BoardPortR
   );
 }
 
-function sameStringList(left: string[], right: string[]): boolean {
-  return left.length === right.length && left.every((value, index) => value === right[index]);
-}
-
 function sameGenerateUpdate(node: BoardImageGenerateNode | BoardVideoGenerateNode, input: BoardGenerateNodeUpdate): boolean {
   if ("aspectRatio" in input && node.aspectRatio !== input.aspectRatio) return false;
   if ("errorMessage" in input && node.errorMessage !== input.errorMessage) return false;
   if ("model" in input && node.model !== input.model) return false;
   if ("prompt" in input && node.prompt !== input.prompt) return false;
-  if ("resultAssetId" in input && node.resultAssetId !== input.resultAssetId) return false;
-  if ("resultAssetIds" in input && !sameStringList(node.resultAssetIds ?? [], input.resultAssetIds ?? [])) return false;
   if ("resultStackKey" in input && node.resultStackKey !== input.resultStackKey) return false;
   if ("status" in input && node.status !== input.status) return false;
   if ("variantCount" in input && node.variantCount !== input.variantCount) return false;
@@ -865,8 +923,6 @@ function sameRunningHubAppUpdate(node: BoardRunningHubAppNode, input: BoardRunni
   if ("errorMessage" in input && node.errorMessage !== input.errorMessage) return false;
   if ("outputType" in input && node.outputType !== input.outputType) return false;
   if ("prompt" in input && node.prompt !== input.prompt) return false;
-  if ("resultAssetId" in input && node.resultAssetId !== input.resultAssetId) return false;
-  if ("resultAssetIds" in input && !sameStringList(node.resultAssetIds ?? [], input.resultAssetIds ?? [])) return false;
   if ("resultStackKey" in input && node.resultStackKey !== input.resultStackKey) return false;
   if ("status" in input && node.status !== input.status) return false;
   if ("targetId" in input && node.targetId !== input.targetId) return false;
@@ -1081,6 +1137,79 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     return node.id;
   }, [board.nodes, mutateBoard]);
 
+  const addResultNodeWithConnection = useCallback((input: CreateResultNodeInput, from: BoardPortRef): string => {
+    const node = createResultBoardNode(input, board.nodes);
+    const to: BoardPortRef = { nodeId: node.id, portId: BOARD_PORT_IDS.assetIn, portKind: "asset" };
+    const edgeId = createBoardId("edge");
+    mutateBoard(currentBoard => {
+      const nextNodes = [...currentBoard.nodes, node];
+      const edge: BoardEdge = {
+        id: edgeId,
+        kind: resolveBoardConnectionKind(nextNodes, from, to),
+        from,
+        to,
+        createdAt: nowIso(),
+      };
+      return touchBoard(currentBoard, nextNodes, connectEdge(nextNodes, currentBoard.edges, edge));
+    });
+    setSelectedNodeId(null);
+    setSelectedEdgeId(edgeId);
+    return node.id;
+  }, [board.nodes, mutateBoard]);
+
+  const completeGenerationResult = useCallback((
+    sourceNodeId: string,
+    input: CompleteGenerationResultUpdate,
+  ) => {
+    mutateBoard(currentBoard => {
+      const sourceNode = currentBoard.nodes.find(node => node.id === sourceNodeId);
+      if (!isResultSourceNode(sourceNode)) return currentBoard;
+      const updatedAt = nowIso();
+      const resultStackKey = sourceNode.resultStackKey ?? "";
+      let nextNodes = currentBoard.nodes.map(node =>
+        node.id === sourceNodeId ? { ...node, ...input, updatedAt } : node,
+      );
+      let nextEdges = currentBoard.edges;
+
+      const from: BoardPortRef = { nodeId: sourceNodeId, portId: BOARD_PORT_IDS.resultOut, portKind: "result" };
+      const existingResultNode = findResultNodeForSource(nextNodes, sourceNodeId);
+      const resultNode: BoardResultNode = existingResultNode
+        ? {
+          ...existingResultNode,
+          asset: input.asset,
+          activeAssetId: input.resultAssetId,
+          resultAssetIds: input.resultAssetIds,
+          updatedAt,
+        }
+        : createResultBoardNode(
+          {
+            sourceNodeId,
+            resultStackKey,
+            activeAssetId: input.resultAssetId,
+            resultAssetIds: input.resultAssetIds,
+            asset: input.asset,
+            position: resultNodeDefaultPosition(sourceNode),
+          },
+          nextNodes,
+        );
+      if (existingResultNode) {
+        nextNodes = nextNodes.map(node => (node.id === resultNode.id ? resultNode : node));
+      } else {
+        nextNodes = [...nextNodes, resultNode];
+      }
+      const to: BoardPortRef = { nodeId: resultNode.id, portId: BOARD_PORT_IDS.assetIn, portKind: "asset" };
+      if (!findMatchingEdge(nextEdges, from, to)) {
+        const edge: BoardEdge = {
+          ...createBoardEdge(nextNodes, from, to),
+          id: createBoardId("edge"),
+        };
+        nextEdges = connectEdge(nextNodes, nextEdges, edge);
+      }
+
+      return touchBoard(currentBoard, nextNodes, nextEdges);
+    });
+  }, [mutateBoard]);
+
   const addPromptNode = useCallback((input: CreatePromptNodeInput = {}): string => {
     const createdAt = nowIso();
     const nodeId = createBoardId("prompt");
@@ -1235,24 +1364,24 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
           .filter(edge => edge.from.nodeId === nodeId && edge.to.portId === "asset-in")
           .map(edge => ({ assetId: deletedNode.asset.assetId, groupNodeId: edge.to.nodeId }))
         : [];
-      const resultSourceNodeIds = deletedNode?.kind === "asset"
-        ? new Set(currentBoard.edges
-          .filter(edge => edge.to.nodeId === nodeId && edge.from.portId === BOARD_PORT_IDS.resultOut)
-          .map(edge => edge.from.nodeId))
-        : new Set<string>();
-      const remainingNodes = currentBoard.nodes.filter(node => node.id !== nodeId);
-      const remainingEdges = currentBoard.edges.filter(edge => edge.from.nodeId !== nodeId && edge.to.nodeId !== nodeId);
+      // Cascade-delete connected result nodes when deleting a generate node
+      const resultNodeIdsToDelete = isResultSourceNode(deletedNode)
+        ? currentBoard.edges
+          .filter(edge => edge.from.nodeId === nodeId && edge.from.portId === BOARD_PORT_IDS.resultOut)
+          .map(edge => edge.to.nodeId)
+        : [];
+      const remainingNodes = currentBoard.nodes
+        .filter(node => node.id !== nodeId && !resultNodeIdsToDelete.includes(node.id));
+      const remainingEdges = currentBoard.edges.filter(edge =>
+        edge.from.nodeId !== nodeId &&
+        edge.to.nodeId !== nodeId &&
+        !resultNodeIdsToDelete.includes(edge.from.nodeId) &&
+        !resultNodeIdsToDelete.includes(edge.to.nodeId)
+      );
       return touchBoard(
         currentBoard,
         remainingNodes
           .map(node => {
-            if (
-              deletedNode?.kind === "asset" &&
-              resultSourceNodeIds.has(node.id) &&
-              isBoardResultStackNode(node)
-            ) {
-              return removeResultAssetFromBoardNodeResultStack(node, deletedNode.asset.assetId, updatedAt);
-            }
             if (node.kind !== "reference-group") return node;
             const removedAssetIds = removedGroupReferences
               .filter(reference => reference.groupNodeId === node.id)
@@ -1561,6 +1690,20 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     }), { skipUndo: true });
   }, [mutateBoard]);
 
+  const updateNodeTitle = useCallback((nodeId: string, title: string) => {
+    const updatedAt = nowIso();
+    mutateBoard(currentBoard => {
+      let didChange = false;
+      const nextNodes = currentBoard.nodes.map(node => {
+        if (node.id !== nodeId) return node;
+        if (node.title === title) return node;
+        didChange = true;
+        return { ...node, title, updatedAt };
+      });
+      return didChange ? touchBoard(currentBoard, nextNodes) : currentBoard;
+    });
+  }, [mutateBoard]);
+
   const updateNodesPositions = useCallback((updates: Array<{ nodeId: string; position: BoardPoint }>) => {
     if (updates.length === 0) return;
     const positionById = new Map(updates.map(update => [update.nodeId, update.position]));
@@ -1592,6 +1735,40 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
         currentBoard,
         currentBoard.nodes.map(node => (node.id === nodeId ? { ...node, size, updatedAt } : node)),
       ),
+      { skipUndo: true },
+    );
+  }, [mutateBoard]);
+
+  const updateAssetNodeAsset = useCallback((nodeId: string, asset: BoardAssetReference) => {
+    const updatedAt = nowIso();
+    mutateBoard(
+      currentBoard => {
+        let didChange = false;
+        const nextNodes = currentBoard.nodes.map(node => {
+          if (node.id !== nodeId || node.kind !== "asset") return node;
+          if (node.asset.assetId === asset.assetId) return node;
+          didChange = true;
+          return { ...node, asset, updatedAt };
+        });
+        return didChange ? touchBoard(currentBoard, nextNodes) : currentBoard;
+      },
+      { skipUndo: true },
+    );
+  }, [mutateBoard]);
+
+  const updateResultNodeAsset = useCallback((nodeId: string, assetId: string) => {
+    const updatedAt = nowIso();
+    mutateBoard(
+      currentBoard => {
+        let didChange = false;
+        const nextNodes = currentBoard.nodes.map(node => {
+          if (node.id !== nodeId || node.kind !== "result") return node;
+          if (node.activeAssetId === assetId) return node;
+          didChange = true;
+          return { ...node, activeAssetId: assetId, updatedAt };
+        });
+        return didChange ? touchBoard(currentBoard, nextNodes) : currentBoard;
+      },
       { skipUndo: true },
     );
   }, [mutateBoard]);
@@ -1694,6 +1871,8 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       addAgentNode,
       addAssetNode,
       addAssetNodeWithConnection,
+      addResultNodeWithConnection,
+      completeGenerationResult,
       addGenerateNode,
       addGenerateNodeWithConnection,
       addNoteNode,
@@ -1715,8 +1894,11 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       updateBoardConfig,
       updateBoardTitle,
       updateReferenceGroupItemRole,
+      updateAssetNodeAsset,
+      updateResultNodeAsset,
       updateAgentInstruction,
       updateGenerateNode,
+      updateNodeTitle,
       updateNodePosition,
       updateNodesPositions,
       updateNodeSize,
@@ -1728,6 +1910,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       addAgentNode,
       addAssetNode,
       addAssetNodeWithConnection,
+      addResultNodeWithConnection,
       addGenerateNode,
       addGenerateNodeWithConnection,
       addNoteNode,
@@ -1742,6 +1925,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       canRedo,
       canUndo,
       clearBoard,
+      completeGenerationResult,
       connectPorts,
       deleteEdge,
       deleteNode,
@@ -1764,8 +1948,11 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       updateBoardConfig,
       updateBoardTitle,
       updateReferenceGroupItemRole,
+      updateAssetNodeAsset,
+      updateResultNodeAsset,
       updateAgentInstruction,
       updateGenerateNode,
+      updateNodeTitle,
       updateNodePosition,
       updateNodesPositions,
       updateNodeSize,

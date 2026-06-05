@@ -20,6 +20,7 @@ import GenerateBoardNode, { type BoardGenerateInputSummary, type BoardGenerateTa
 import NoteBoardNode from "@/components/board/NoteBoardNode";
 import PromptBoardNode from "@/components/board/PromptBoardNode";
 import ReferenceGroupBoardNode from "@/components/board/ReferenceGroupBoardNode";
+import ResultBoardNode from "@/components/board/ResultBoardNode";
 import RunningHubAppBoardNode from "@/components/board/RunningHubAppBoardNode";
 import type { StorageItem } from "@/lib/db";
 import { getMediaReferenceType } from "@/lib/media-references";
@@ -51,14 +52,19 @@ export interface BoardFlowNodeData extends Record<string, unknown> {
   onSendAgent: (nodeId: string) => void;
   onSendAssetToAgent: (nodeId: string) => void;
   onSelectPromptReference: (nodeId: string, reference: BoardPromptReference) => void;
+  onSelectAssetStackResult: (nodeId: string, assetId: string) => void;
   onSelectGenerateResult: (nodeId: string, assetId: string) => void;
   onSetAssetAsReference: (nodeId: string) => void;
   onUpdateReferenceGroupItemRole: (nodeId: string, assetId: string, role: BoardReferenceRole) => void;
   onUpdateAgent: (nodeId: string, instruction: string) => void;
   onUpdateGenerate: (nodeId: string, input: BoardGenerateNodeUpdate) => void;
+  onMeasureAssetAspectRatio: (nodeId: string, aspectRatio: number) => void;
+  onUpdateNodeTitle: (nodeId: string, title: string) => void;
   onUpdateRunningHubApp: (nodeId: string, input: BoardRunningHubAppNodeUpdate) => void;
   onUpdateNote: (nodeId: string, body: string) => void;
   onUpdatePrompt: (nodeId: string, prompt: string) => void;
+  activeResultAssetId?: string;
+  assetStackItems: StorageItem[];
   resultItems: StorageItem[];
 }
 
@@ -213,6 +219,7 @@ function GenerateReferenceShelf({
 
 function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
   const { node } = data;
+  const isMediaNode = node.kind === "asset" || node.kind === "result";
   const ports = getBoardNodePortDefinitions(node, { hasResultConnection: data.hasResultConnection });
   const handleForPort = (port: (typeof ports)[number]) => {
     if (port.id === BOARD_PORT_IDS.promptIn) {
@@ -252,7 +259,14 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
         />
       ) : null}
 
-      <div className="flex h-9 items-center justify-between gap-2 rounded-t-lg imagine-board-node-header px-3">
+      <div
+        className={[
+          "flex h-9 items-center justify-between gap-2 px-3",
+          isMediaNode
+            ? "pointer-events-none absolute inset-x-0 -top-10 z-30 opacity-0 transition-opacity duration-200 board-asset-node-chrome"
+            : "rounded-t-lg imagine-board-node-header",
+        ].join(" ")}
+      >
         <h2 className="flex min-w-0 items-center gap-2 truncate text-xs font-semibold">
           {nodeIcon(node)}
           <span className="truncate">{node.title}</span>
@@ -263,24 +277,45 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             event.stopPropagation();
             data.onDelete(node.id);
           }}
-          className="nodrag flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[var(--iw-muted)] transition hover:bg-red-500/10 hover:text-red-300"
+          className="nodrag pointer-events-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[var(--iw-muted)] transition hover:bg-red-500/10 hover:text-red-300"
           title="删除节点"
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       </div>
-      <div className={`h-[calc(100%-2.25rem)] min-h-0 rounded-b-lg ${nodeBodyOverflowClass(node.kind)}`}>
+      <div
+        className={[
+          isMediaNode ? "h-full rounded-lg" : "h-[calc(100%-2.25rem)] rounded-b-lg",
+          "min-h-0",
+          nodeBodyOverflowClass(node.kind),
+        ].join(" ")}
+      >
         {node.kind === "asset" && (
           <AssetBoardNode
             boardId={data.boardId}
             node={node}
+            activeStackAssetId={node.asset.assetId}
+            stackItems={data.assetStackItems}
             compareReferenceUrl={data.compareReferenceUrl}
             onCaptureVideoFrame={data.onCaptureVideoFrame}
             onCompare={data.onOpenAssetCompare ? () => data.onOpenAssetCompare?.(node.id) : undefined}
             onEditImage={data.onEditAssetImage}
+            onMeasureAspectRatio={data.onMeasureAssetAspectRatio}
             onOpenFullscreen={data.onOpenFullscreen}
+            onSelectStackAsset={assetId => data.onSelectAssetStackResult(node.id, assetId)}
             onSendToAgent={data.onSendAssetToAgent}
             onSetAsReference={data.onSetAssetAsReference}
+          />
+        )}
+        {node.kind === "result" && (
+          <ResultBoardNode
+            boardId={data.boardId}
+            node={node}
+            stackItems={data.assetStackItems}
+            onCaptureVideoFrame={data.onCaptureVideoFrame}
+            onMeasureAspectRatio={data.onMeasureAssetAspectRatio}
+            onOpenFullscreen={data.onOpenFullscreen}
+            onSelectStackAsset={assetId => data.onSelectAssetStackResult(node.id, assetId)}
           />
         )}
         {node.kind === "prompt" && (
@@ -306,6 +341,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             node={node}
             references={data.generateReferences}
             resultItems={data.resultItems}
+            activeResultAssetId={data.activeResultAssetId}
             showReferencePreviews={false}
             taskSummary={data.generateTaskSummary}
             onCancel={() => data.onCancelGenerate(node.id)}
@@ -331,6 +367,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             onSelectReference={reference => data.onSelectPromptReference(node.id, reference)}
             onUpdate={input => data.onUpdateRunningHubApp(node.id, input)}
             resultItems={data.resultItems}
+            activeResultAssetId={data.activeResultAssetId}
           />
         )}
         {node.kind === "agent" && (

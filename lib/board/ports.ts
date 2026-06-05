@@ -34,7 +34,7 @@ export function getBoardNodePortDefinitions(
   node: BoardNode,
   options: BoardNodePortOptions = {},
 ): BoardPortDefinition[] {
-  if (node.kind === "asset") {
+  if (node.kind === "asset" || node.kind === "result") {
     return [
       { id: BOARD_PORT_IDS.assetIn, label: "资产输入", kind: "asset", direction: "input" },
       { id: BOARD_PORT_IDS.assetOut, label: "资产输出", kind: "asset", direction: "output" },
@@ -56,7 +56,7 @@ export function getBoardNodePortDefinitions(
     if (boardNodeSupportsReferenceInput(node)) {
       ports.push({ id: BOARD_PORT_IDS.referenceIn, label: "参考输入", kind: "asset", direction: "input" });
     }
-    if (node.status === "complete" || Boolean(node.resultAssetId) || options.hasResultConnection) {
+    if (node.status === "complete" || options.hasResultConnection) {
       ports.push({ id: BOARD_PORT_IDS.resultOut, label: "结果输出", kind: "result", direction: "output" });
     }
     return ports;
@@ -94,13 +94,13 @@ function findPort(
 }
 
 function isReferenceSource(node: BoardNode): boolean {
-  return node.kind === "asset" || node.kind === "reference-group";
+  return node.kind === "asset" || node.kind === "reference-group" || node.kind === "result";
 }
 
 function isAcceptedGenerateReferenceSource(source: BoardNode, target: BoardNode): boolean {
   if (target.kind === "runninghub-app") {
     if (source.kind === "reference-group") return source.references.length > 0;
-    return source.kind === "asset";
+    return source.kind === "asset" || source.kind === "result";
   }
   if (!isGenerateNode(target)) return false;
   if (source.kind === "reference-group") {
@@ -109,7 +109,7 @@ function isAcceptedGenerateReferenceSource(source: BoardNode, target: BoardNode)
     const acceptedTypes = getVideoModelCapabilities(target.model).referenceMediaTypes;
     return source.references.every(reference => acceptedTypes.includes(reference.type));
   }
-  if (source.kind !== "asset") return false;
+  if (source.kind !== "asset" && source.kind !== "result") return false;
   if (target.kind === "image-generate") return source.asset.type === "image";
   return getVideoModelCapabilities(target.model).referenceMediaTypes.includes(source.asset.type);
 }
@@ -155,7 +155,7 @@ export function resolveBoardConnectionKind(nodes: BoardNode[], from: BoardPortRe
 
   if (
     isExecutableNode(source.node) &&
-    target.node.kind === "asset" &&
+    (target.node.kind === "asset" || target.node.kind === "result") &&
     source.port.id === BOARD_PORT_IDS.resultOut &&
     target.port.id === BOARD_PORT_IDS.assetIn
   ) {

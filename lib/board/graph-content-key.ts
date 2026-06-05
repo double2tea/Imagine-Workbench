@@ -46,7 +46,18 @@ function serializeReferenceGroupItem(item: BoardReferenceGroupItem): string {
 function serializeNodeContent(node: BoardNode): string {
   switch (node.kind) {
     case "asset":
-      return `asset|${node.id}|${node.title}|${node.size.width}x${node.size.height}|${node.asset.assetId}|${node.asset.type}|${fingerprintLargeText(node.asset.url)}`;
+      return [
+        "asset",
+        node.id,
+        node.title,
+        `${node.size.width}x${node.size.height}`,
+        node.asset.assetId,
+        node.asset.type,
+        fingerprintLargeText(node.asset.url),
+        node.resultSourceNodeId ?? "",
+        node.resultStackKey ?? "",
+        node.resultAssetIds?.join(",") ?? "",
+      ].join("|");
     case "prompt":
       return `prompt|${node.id}|${node.title}|${fingerprintLargeText(node.prompt)}`;
     case "reference-group":
@@ -126,6 +137,20 @@ function serializeNodeContent(node: BoardNode): string {
       return `agent|${node.id}|${node.title}|${fingerprintLargeText(node.instruction)}`;
     case "note":
       return `note|${node.id}|${node.title}|${fingerprintLargeText(node.body)}`;
+    case "result":
+      return [
+        "result",
+        node.id,
+        node.title,
+        `${node.size.width}x${node.size.height}`,
+        node.sourceNodeId,
+        node.resultStackKey,
+        node.activeAssetId,
+        node.resultAssetIds.join(","),
+        node.asset.assetId,
+        node.asset.type,
+        fingerprintLargeText(node.asset.url),
+      ].join("|");
     default: {
       const exhaustive: never = node;
       return exhaustive;

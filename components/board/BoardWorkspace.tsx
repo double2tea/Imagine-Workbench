@@ -89,6 +89,7 @@ import {
 } from "@/lib/board";
 import { BOARD_PORT_IDS, isValidBoardConnection as isValidBoardPortConnection } from "@/lib/board/ports";
 import { BOARD_INSERT_CATALOG, type BoardInsertKind } from "@/lib/board/insert-catalog";
+import { findResultNodeForSource, resultNodeDefaultPosition } from "@/lib/board/utils";
 import { DEFAULT_VIDEO_MODEL } from "@/lib/providers/model-catalog";
 
 interface BoardWorkspaceProps {
@@ -269,6 +270,7 @@ function sameFlowNodeDataModel(left: BoardFlowNode["data"], right: BoardFlowNode
   return (
     sameBoardNodeRenderModel(left.node, right.node) &&
     left.hasResultConnection === right.hasResultConnection &&
+    left.activeResultAssetId === right.activeResultAssetId &&
     left.compareReferenceUrl === right.compareReferenceUrl &&
     sameGenerateInputSummary(left.generateInputSummary, right.generateInputSummary) &&
     sameGenerateTaskSummary(left.generateTaskSummary, right.generateTaskSummary) &&
@@ -709,57 +711,8 @@ function isCurrentGenerateStackItem(item: StorageItem, node: BoardNodeModel): bo
   );
 }
 
-function resultItemsForGenerateNode(
-  node: BoardNodeModel,
-  itemById: ReadonlyMap<string, StorageItem>,
-): StorageItem[] {
-  if (node.kind !== "image-generate" && node.kind !== "video-generate" && node.kind !== "runninghub-app") return [];
-  const ids = node.resultAssetIds ?? (node.resultAssetId ? [node.resultAssetId] : []);
-  return ids
-    .map(id => itemById.get(id))
-    .filter((item): item is StorageItem => item !== undefined && item.status === "complete");
-}
-
-function materializedResultKey(sourceNodeId: string, assetId: string): string {
-  return `${sourceNodeId}:${assetId}`;
-}
-
 function isResultSourceNode(node: BoardNodeModel | undefined): node is Extract<BoardNodeModel, { kind: "image-generate" | "video-generate" | "runninghub-app" }> {
   return node?.kind === "image-generate" || node?.kind === "video-generate" || node?.kind === "runninghub-app";
-}
-
-function resultAssetNodePosition(sourceNode: Extract<BoardNodeModel, { kind: "image-generate" | "video-generate" | "runninghub-app" }>): BoardPoint {
-  return {
-    x: sourceNode.position.x + sourceNode.size.width + 48,
-    y: sourceNode.position.y,
-  };
-}
-
-function findMaterializedResultAssetNode(
-  nodes: BoardNodeModel[],
-  edges: BoardEdge[],
-  sourceNodeId: string,
-  assetId: string,
-): Extract<BoardNodeModel, { kind: "asset" }> | undefined {
-  return nodes.find((node): node is Extract<BoardNodeModel, { kind: "asset" }> => (
-    node.kind === "asset" &&
-    node.asset.assetId === assetId &&
-    edges.some(edge => (
-      edge.from.nodeId === sourceNodeId &&
-      edge.from.portId === BOARD_PORT_IDS.resultOut &&
-      edge.to.nodeId === node.id &&
-      edge.to.portId === BOARD_PORT_IDS.assetIn
-    ))
-  ));
-}
-
-function hasActiveResultConnection(
-  node: BoardNodeModel,
-  resultSourceNodeIdsWithConnection: ReadonlySet<string>,
-  materializedResultAssetNodeByKey: ReadonlyMap<string, Extract<BoardNodeModel, { kind: "asset" }>>,
-): boolean {
-  if (!isResultSourceNode(node) || !node.resultAssetId) return resultSourceNodeIdsWithConnection.has(node.id);
-  return materializedResultAssetNodeByKey.has(materializedResultKey(node.id, node.resultAssetId));
 }
 
 function pastedNodePosition(node: BoardNodeModel): BoardPoint {
@@ -856,7 +809,6 @@ export default function BoardWorkspace({
     restoreNodeWithEdges,
     addAgentNode,
     addAssetNode,
-    addAssetNodeWithConnection,
     addAssetToReferenceGroup,
     addGenerateNode,
     addGenerateNodeWithConnection,
@@ -864,6 +816,7 @@ export default function BoardWorkspace({
     addPromptNode,
     addReferenceGroupNode,
     addReferenceGroupNodeWithAsset,
+    addResultNodeWithConnection,
     addRunningHubAppNode,
     clearBoard,
     connectPorts,
@@ -877,9 +830,13 @@ export default function BoardWorkspace({
     setViewport,
     updateBoardConfig,
     updateReferenceGroupItemRole,
+    updateAssetNodeAsset,
+    updateResultNodeAsset,
     updateAgentInstruction,
     updateGenerateNode,
     updateRunningHubAppNode,
+    updateNodeSize,
+    updateNodeTitle,
     updateNodesPositions,
     updateNoteBody,
     updatePromptNode,
@@ -909,25 +866,26 @@ export default function BoardWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reference fingerprint gates complete/url changes used by result stacks
     [galleryReferenceFingerprint],
   );
+
+  const measureAssetAspectRatio = useCallback((nodeId: string, aspectRatio: number): void => {
+    if (!Number.isFinite(aspectRatio) || aspectRatio <= 0) return;
+    const node = boardPromptReferenceGraphIndex.nodeById.get(nodeId);
+    if (node?.kind !== "asset" && node?.kind !== "result") return;
+    const height = Math.round(node.size.width / aspectRatio);
+    if (Math.abs(node.size.height - height) <= 1) return;
+    updateNodeSize(nodeId, { width: node.size.width, height });
+  }, [boardPromptReferenceGraphIndex, updateNodeSize]);
+
   const boardResultConnectionIndex = useMemo(() => {
     const resultSourceNodeIdsWithConnection = new Set<string>();
-    const materializedResultAssetNodeByKey = new Map<string, Extract<BoardNodeModel, { kind: "asset" }>>();
 
     for (const edge of board.edges) {
       if (edge.from.portId !== BOARD_PORT_IDS.resultOut) continue;
       resultSourceNodeIdsWithConnection.add(edge.from.nodeId);
-      if (edge.to.portId !== BOARD_PORT_IDS.assetIn) continue;
-      const targetNode = boardPromptReferenceGraphIndex.nodeById.get(edge.to.nodeId);
-      if (targetNode?.kind !== "asset") continue;
-      materializedResultAssetNodeByKey.set(
-        materializedResultKey(edge.from.nodeId, targetNode.asset.assetId),
-        targetNode,
-      );
     }
 
-    return { materializedResultAssetNodeByKey, resultSourceNodeIdsWithConnection };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- graph key gates edge/node content; index supplies node lookup
-  }, [boardGraphContentKey, boardPromptReferenceGraphIndex]);
+    return { resultSourceNodeIdsWithConnection };
+  }, [boardGraphContentKey]);
 
   const closeOverlayMenus = useCallback(() => {
     setQuickInsertMenu(null);
@@ -1004,15 +962,16 @@ export default function BoardWorkspace({
   const materializeGenerateResult = useCallback((nodeId: string, assetId: string): void => {
     const sourceNode = board.nodes.find(node => node.id === nodeId);
     if (!isResultSourceNode(sourceNode)) return;
-    const connectedAssetNode = findMaterializedResultAssetNode(board.nodes, board.edges, sourceNode.id, assetId);
-    if (connectedAssetNode) {
-      selectNode(connectedAssetNode.id);
-      selectEdge(null);
-      return;
-    }
     const item = galleryItems.find(entry => entry.id === assetId);
     if (!item || item.status !== "complete") {
       onConnectionError("找不到生成结果资产");
+      return;
+    }
+    const resultNode = findResultNodeForSource(board.nodes, sourceNode.id);
+    if (resultNode) {
+      updateResultNodeAsset(resultNode.id, assetId);
+      selectNode(resultNode.id);
+      selectEdge(null);
       return;
     }
     const from: BoardPortRef = {
@@ -1020,42 +979,45 @@ export default function BoardWorkspace({
       portId: BOARD_PORT_IDS.resultOut,
       portKind: "result",
     };
-    const existingAssetNode = board.nodes.find(node => node.kind === "asset" && node.asset.assetId === assetId);
-    if (existingAssetNode) {
-      connectPorts(from, {
-        nodeId: existingAssetNode.id,
-        portId: BOARD_PORT_IDS.assetIn,
-        portKind: "asset",
-      });
-      selectNode(existingAssetNode.id);
-      selectEdge(null);
-      return;
-    }
-    const assetNodeId = addAssetNodeWithConnection(
+    const resultNodeId = addResultNodeWithConnection(
       {
+        sourceNodeId: sourceNode.id,
+        resultStackKey: sourceNode.resultStackKey ?? "",
+        activeAssetId: assetId,
+        resultAssetIds: [assetId],
         asset: storageItemToBoardAsset(item),
-        position: resultAssetNodePosition(sourceNode),
-        title: item.prompt || item.model,
+        position: resultNodeDefaultPosition(sourceNode),
       },
       from,
     );
-    selectNode(assetNodeId);
+    selectNode(resultNodeId);
     selectEdge(null);
-  }, [addAssetNodeWithConnection, board.edges, board.nodes, connectPorts, galleryItems, onConnectionError, selectEdge, selectNode]);
+  }, [addResultNodeWithConnection, board.nodes, galleryItems, onConnectionError, selectEdge, selectNode, updateResultNodeAsset]);
 
   const flowNodeDataById = useMemo(() => {
     const dataById = new Map<string, BoardFlowNode["data"]>();
+    // Build result node index for generate nodes to look up
+    const resultNodeBySourceId = new Map<string, BoardNodeModel & { kind: "result" }>();
     for (const node of board.nodes) {
+      if (node.kind === "result") resultNodeBySourceId.set(node.sourceNodeId, node);
+    }
+    for (const node of board.nodes) {
+      const connectedResultNode = node.kind === "result" ? node : resultNodeBySourceId.get(node.id);
+      const resultAssetIds = node.kind === "result"
+        ? node.resultAssetIds
+        : connectedResultNode?.resultAssetIds;
       dataById.set(node.id, {
         boardId: board.id,
         generateInputSummary: generateInputSummaryForNode(node, boardPromptReferenceGraphIndex),
-          hasResultConnection: hasActiveResultConnection(
-            node,
-            boardResultConnectionIndex.resultSourceNodeIdsWithConnection,
-            boardResultConnectionIndex.materializedResultAssetNodeByKey,
-          ),
-          node,
-          resultItems: resultItemsForGenerateNode(node, galleryItemById),
+        hasResultConnection: connectedResultNode !== undefined,
+        activeResultAssetId: connectedResultNode?.activeAssetId,
+        assetStackItems: resultAssetIds
+          ? resultAssetIds.map(id => galleryItemById.get(id)).filter((item): item is StorageItem => item !== undefined && item.status === "complete")
+          : [],
+        node,
+        resultItems: connectedResultNode
+          ? connectedResultNode.resultAssetIds.map(id => galleryItemById.get(id)).filter((item): item is StorageItem => item !== undefined && item.status === "complete")
+          : [],
         generateReferences:
           node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app"
             ? buildBoardPromptReferences({
@@ -1098,21 +1060,30 @@ export default function BoardWorkspace({
         onMoveGenerateReferenceEdge: moveGenerateReferenceEdge,
         onMoveReferenceGroupItem: moveReferenceGroupItem,
         onRemoveReferenceGroupItem: removeReferenceGroupItem,
-          onSendAgent: onSendAgentNode,
-          onSendAssetToAgent,
-          onSelectGenerateResult: (nodeId: string, assetId: string) => {
-            const sourceNode = board.nodes.find(node => node.id === nodeId);
-            if (sourceNode?.kind === "runninghub-app") {
-              updateRunningHubAppNode(nodeId, { resultAssetId: assetId });
-              return;
-            }
-            updateGenerateNode(nodeId, { resultAssetId: assetId });
-          },
-          onSelectPromptReference: connectSelectedBoardPromptReference,
+        onSendAgent: onSendAgentNode,
+        onSendAssetToAgent,
+        onSelectAssetStackResult: (nodeId: string, assetId: string) => {
+          const item = galleryItemById.get(assetId);
+          if (!item || item.status !== "complete") {
+            onConnectionError("找不到生成结果资产");
+            return;
+          }
+          updateResultNodeAsset(nodeId, assetId);
+        },
+        onSelectGenerateResult: (nodeId: string, assetId: string) => {
+          const item = galleryItemById.get(assetId);
+          const connectedResultNode = findResultNodeForSource(board.nodes, nodeId);
+          if (item?.status === "complete" && connectedResultNode) {
+            updateResultNodeAsset(connectedResultNode.id, assetId);
+          }
+        },
+        onSelectPromptReference: connectSelectedBoardPromptReference,
         onSetAssetAsReference,
         onUpdateReferenceGroupItemRole: updateReferenceGroupItemRole,
         onUpdateAgent: updateAgentInstruction,
         onUpdateGenerate: updateGenerateNode,
+        onMeasureAssetAspectRatio: measureAssetAspectRatio,
+        onUpdateNodeTitle: updateNodeTitle,
         onUpdateRunningHubApp: updateRunningHubAppNode,
         onUpdateNote: updateNoteBody,
         onUpdatePrompt: updatePromptNode,
@@ -1133,6 +1104,7 @@ export default function BoardWorkspace({
     onEditAssetImage,
     onExecuteGenerateNode,
     onFetchRunningHubAppSchema,
+    onConnectionError,
     onOpenFullscreen,
     materializeGenerateResult,
     moveReferenceGroupItem,
@@ -1142,10 +1114,13 @@ export default function BoardWorkspace({
     onSendAgentNode,
     connectSelectedBoardPromptReference,
     onSetAssetAsReference,
+    measureAssetAspectRatio,
     trashAndDeleteNode,
     updateReferenceGroupItemRole,
+    updateAssetNodeAsset,
     updateAgentInstruction,
     updateGenerateNode,
+    updateNodeTitle,
     updateNoteBody,
     updatePromptNode,
     updateRunningHubAppNode,
@@ -1610,9 +1585,26 @@ export default function BoardWorkspace({
       rememberPastedPosition();
       return;
     }
+    if (node.kind === "result") {
+      addResultNodeWithConnection(
+        {
+          sourceNodeId: node.sourceNodeId,
+          resultStackKey: node.resultStackKey,
+          activeAssetId: node.activeAssetId,
+          resultAssetIds: node.resultAssetIds,
+          asset: node.asset,
+          position,
+          size: node.size,
+          title: node.title,
+        },
+        { nodeId: node.sourceNodeId, portId: BOARD_PORT_IDS.resultOut, portKind: "result" },
+      );
+      rememberPastedPosition();
+      return;
+    }
     addNoteNode({ body: node.body, position, size: node.size, title: node.title });
     rememberPastedPosition();
-  }, [addAgentNode, addAssetNode, addGenerateNode, addNoteNode, addPromptNode, addReferenceGroupNode, addRunningHubAppNode]);
+  }, [addAgentNode, addAssetNode, addGenerateNode, addNoteNode, addPromptNode, addReferenceGroupNode, addResultNodeWithConnection, addRunningHubAppNode]);
 
   const handleConnectEnd = useCallback<OnConnectEnd>((event, connectionState) => {
     if (connectionState.isValid || !connectionState.fromNode || !connectionState.fromHandle) return;
@@ -1664,43 +1656,33 @@ export default function BoardWorkspace({
     }
     if (sourceKind === "result") {
       const sourceNode = board.nodes.find(node => node.id === sourceNodeId);
-      if (!isResultSourceNode(sourceNode)) return;
-      if (!sourceNode.resultAssetId) {
+      if (!isResultSourceNode(sourceNode) || sourceNode.status !== "complete") {
         onConnectionError("生成结果尚未就绪");
         return;
       }
-      const connectedAssetNode = findMaterializedResultAssetNode(board.nodes, board.edges, sourceNode.id, sourceNode.resultAssetId);
-      if (connectedAssetNode) {
-        selectNode(connectedAssetNode.id);
+      const connectedResultNode = findResultNodeForSource(board.nodes, sourceNode.id);
+      if (connectedResultNode) {
+        selectNode(connectedResultNode.id);
         selectEdge(null);
-        return;
-      }
-      const item = galleryItems.find(entry => entry.id === sourceNode.resultAssetId);
-      if (!item || item.status !== "complete") {
-        onConnectionError("找不到生成结果资产");
         return;
       }
       const from: BoardPortRef = { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "result" };
-      const existingAssetNode = board.nodes.find(node => node.kind === "asset" && node.asset.assetId === item.id);
-      if (existingAssetNode) {
-        connectPorts(from, { nodeId: existingAssetNode.id, portId: BOARD_PORT_IDS.assetIn, portKind: "asset" });
-        selectNode(existingAssetNode.id);
-        selectEdge(null);
-        return;
-      }
-      const assetNodeId = addAssetNodeWithConnection(
+      const resultNodeId = addResultNodeWithConnection(
         {
+          sourceNodeId: sourceNode.id,
+          resultStackKey: sourceNode.resultStackKey ?? "",
+          activeAssetId: "",
+          resultAssetIds: [],
+          asset: { assetId: "", type: "image", url: "", prompt: "", model: "" },
           position: centeredNodePosition(flowPoint, DEFAULT_ASSET_NODE_SIZE),
-          asset: storageItemToBoardAsset(item),
-          title: item.prompt,
         },
         from,
       );
-      selectNode(assetNodeId);
+      selectNode(resultNodeId);
       selectEdge(null);
       return;
     }
-  }, [addAssetNodeWithConnection, board.edges, board.nodes, centeredNodePosition, connectPorts, flowPositionFromClient, galleryItems, onConnectionError, selectEdge, selectNode]);
+  }, [addResultNodeWithConnection, board.nodes, centeredNodePosition, connectPorts, flowPositionFromClient, onConnectionError, selectEdge, selectNode]);
 
   const openQuickInsertMenu = useCallback((event: ReactMouseEvent | MouseEvent): void => {
     event.preventDefault();
@@ -1783,7 +1765,6 @@ export default function BoardWorkspace({
           addAssetNode({
             position: centeredNodePosition(point, DEFAULT_ASSET_NODE_SIZE),
             asset: storageItemToBoardAsset(hydrated),
-            title: hydrated.prompt,
           });
           closeOverlayMenus();
         });

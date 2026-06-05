@@ -138,6 +138,12 @@ html[data-imagine-theme="light"],
   letter-spacing: 0;
 }
 
+.board-node-shell:is([data-kind="asset"], [data-kind="result"]):is(:hover, :focus-within) .board-asset-node-chrome,
+.board-node-shell:is([data-kind="asset"], [data-kind="result"])[data-selected="true"] .board-asset-node-chrome {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .imagine-board-node-selected,
 .imagine-board-node[data-selected="true"] {
   border-color: var(--iw-board-accent-amber);

@@ -1,4 +1,4 @@
-export type BoardNodeKind = "asset" | "prompt" | "reference-group" | "image-generate" | "video-generate" | "runninghub-app" | "agent" | "note";
+export type BoardNodeKind = "asset" | "prompt" | "reference-group" | "image-generate" | "video-generate" | "runninghub-app" | "agent" | "note" | "result";
 export type BoardAssetType = "image" | "video" | "audio";
 export type BoardEdgeKind = "reference" | "prompt" | "result" | "agent-context";
 export type BoardPortKind = "asset" | "prompt" | "result" | "agent";
@@ -68,6 +68,9 @@ export interface BoardNodeBase {
 export interface BoardAssetNode extends BoardNodeBase {
   kind: "asset";
   asset: BoardAssetReference;
+  resultSourceNodeId?: string;
+  resultStackKey?: string;
+  resultAssetIds?: string[];
 }
 
 export interface BoardPromptNode extends BoardNodeBase {
@@ -174,6 +177,15 @@ export interface BoardNoteNode extends BoardNodeBase {
   body: string;
 }
 
+export interface BoardResultNode extends BoardNodeBase {
+  kind: "result";
+  sourceNodeId: string;
+  resultStackKey: string;
+  activeAssetId: string;
+  resultAssetIds: string[];
+  asset: BoardAssetReference;
+}
+
 export type BoardNode =
   | BoardAssetNode
   | BoardPromptNode
@@ -182,10 +194,12 @@ export type BoardNode =
   | BoardVideoGenerateNode
   | BoardRunningHubAppNode
   | BoardAgentNode
-  | BoardNoteNode;
+  | BoardNoteNode
+  | BoardResultNode;
 
 export type BoardGenerateNode = BoardImageGenerateNode | BoardVideoGenerateNode;
 export type BoardExecutableNode = BoardGenerateNode | BoardRunningHubAppNode;
+export type BoardResultSourceNode = BoardImageGenerateNode | BoardVideoGenerateNode | BoardRunningHubAppNode;
 
 export type BoardGenerateNodeUpdate = Partial<{
   aspectRatio: string;
@@ -247,6 +261,20 @@ export interface BoardDocument {
 }
 
 export interface CreateAssetNodeInput {
+  asset: BoardAssetReference;
+  position?: BoardPoint;
+  resultSourceNodeId?: string;
+  resultStackKey?: string;
+  resultAssetIds?: string[];
+  size?: BoardSize;
+  title?: string;
+}
+
+export interface CreateResultNodeInput {
+  sourceNodeId: string;
+  resultStackKey: string;
+  activeAssetId: string;
+  resultAssetIds: string[];
   asset: BoardAssetReference;
   position?: BoardPoint;
   size?: BoardSize;

@@ -1,30 +1,23 @@
-import { Clock3, Download, ImageDown, Maximize2, Paintbrush, Send, SlidersHorizontal, type LucideIcon, SkipBack, SkipForward } from "lucide-react";
-import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
+import { Download, ImageDown, Maximize2, type LucideIcon, SkipBack, SkipForward, Clock3 } from "lucide-react";
 import { useRef, useState } from "react";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
 import PreviewImage from "@/components/PreviewImage";
-import type { BoardAssetNode } from "@/lib/board";
+import type { BoardResultNode } from "@/lib/board";
 import { buildStorageItem, type StorageItem } from "@/lib/db";
 import { mediaReferenceFileExtension, mediaReferenceMimeFromDataUri } from "@/lib/media-references";
 import { getVideoFrameCaptureLabel, type CapturedVideoFrame, type VideoFrameCaptureMode } from "@/lib/video-frame";
 
-interface AssetBoardNodeProps {
-  activeStackAssetId?: string;
+interface ResultBoardNodeProps {
   boardId: string;
-  compareReferenceUrl?: string | null;
-  node: BoardAssetNode;
+  node: BoardResultNode;
+  stackItems: StorageItem[];
   onCaptureVideoFrame?: (nodeId: string, item: StorageItem, frame: CapturedVideoFrame) => void | Promise<void>;
-  onCompare?: () => void;
-  onEditImage?: (nodeId: string) => void;
   onMeasureAspectRatio?: (nodeId: string, aspectRatio: number) => void;
   onOpenFullscreen?: (item: StorageItem) => void;
   onSelectStackAsset?: (assetId: string) => void;
-  onSendToAgent?: (nodeId: string) => void;
-  onSetAsReference?: (nodeId: string) => void;
-  stackItems?: StorageItem[];
 }
 
-function boardAssetToStorageItem(node: BoardAssetNode, boardId: string): StorageItem {
+function resultNodeToStorageItem(node: BoardResultNode, boardId: string): StorageItem {
   return buildStorageItem(
     {
       id: node.asset.assetId,
@@ -50,28 +43,21 @@ const frameCaptureActions: Array<{
   { icon: SkipForward, mode: "last" },
 ];
 
-function boardAssetExtension(asset: BoardAssetNode["asset"]): string {
+function boardAssetExtension(asset: BoardResultNode["asset"]): string {
   return mediaReferenceFileExtension(mediaReferenceMimeFromDataUri(asset.url), asset.type);
 }
 
-export default function AssetBoardNode({
-  activeStackAssetId,
+export default function ResultBoardNode({
   boardId,
-  compareReferenceUrl,
   node,
+  stackItems,
   onCaptureVideoFrame,
-  onCompare,
-  onEditImage,
   onMeasureAspectRatio,
   onOpenFullscreen,
   onSelectStackAsset,
-  onSendToAgent,
-  onSetAsReference,
-  stackItems = [],
-}: AssetBoardNodeProps) {
-  const item = boardAssetToStorageItem(node, boardId);
-  const stackCount = stackItems.length;
-  const hasStackSwitcher = stackCount > 1;
+}: ResultBoardNodeProps) {
+  const item = resultNodeToStorageItem(node, boardId);
+  const hasStackSwitcher = stackItems.length > 1;
   const [isFrameMenuOpen, setIsFrameMenuOpen] = useState(false);
   const captureVideoFrameRef = useRef<VideoFrameCaptureRequest | null>(null);
 
@@ -83,44 +69,6 @@ export default function AssetBoardNode({
   return (
     <div className="group/board-video relative flex h-full min-h-0 items-center justify-center overflow-hidden bg-[var(--iw-panel-soft)]">
       <div className="absolute left-2 top-2 z-30 flex gap-1 opacity-0 transition-opacity duration-200 hover:opacity-100 group-hover/board-video:opacity-100">
-        {node.asset.type === "image" && (
-          <>
-            {compareReferenceUrl && onCompare && (
-              <button
-                type="button"
-                onClick={onCompare}
-                className="imagine-board-asset-action nodrag text-blue-200 hover:border-blue-500/40 hover:bg-blue-600 hover:text-white"
-                title="对比参考图"
-              >
-                <SlidersHorizontal className="h-3.5 w-3.5" />
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => onSetAsReference?.(node.id)}
-              className="imagine-board-asset-action nodrag text-cyan-200 hover:border-cyan-500/40 hover:bg-cyan-600 hover:text-white"
-              title="设为参考图"
-            >
-              <Send className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => onSendToAgent?.(node.id)}
-              className="imagine-board-asset-action nodrag text-purple-200 hover:border-purple-500/40 hover:bg-purple-600 hover:text-white"
-              title="发送给 Agent"
-            >
-              <AgentIdentityMark variant="inline" />
-            </button>
-            <button
-              type="button"
-              onClick={() => onEditImage?.(node.id)}
-              className="imagine-board-asset-action nodrag text-amber-200 hover:border-amber-500/40 hover:bg-amber-600 hover:text-white"
-              title="局部编辑"
-            >
-              <Paintbrush className="h-3.5 w-3.5" />
-            </button>
-          </>
-        )}
         <button
           type="button"
           onClick={() => onOpenFullscreen?.(item)}
@@ -140,7 +88,7 @@ export default function AssetBoardNode({
       </div>
       {hasStackSwitcher && (
         <div className="pointer-events-none absolute right-2 top-2 z-30 rounded-md bg-slate-950/80 px-2 py-1 text-xs font-semibold text-white opacity-0 shadow-lg backdrop-blur transition-opacity duration-200 group-hover/board-video:opacity-100">
-          {stackCount}
+          {stackItems.length}
         </div>
       )}
       {node.asset.type === "image" ? (
@@ -210,7 +158,7 @@ export default function AssetBoardNode({
       {hasStackSwitcher && (
         <div className="absolute bottom-3 left-1/2 z-30 flex -translate-x-1/2 gap-2 opacity-0 transition-opacity duration-200 group-hover/board-video:opacity-100">
           {stackItems.map((stackItem, index) => {
-            const isActive = stackItem.id === (activeStackAssetId ?? node.asset.assetId);
+            const isActive = stackItem.id === node.activeAssetId;
             return (
               <button
                 key={stackItem.id}

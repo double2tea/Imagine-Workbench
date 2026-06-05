@@ -58,6 +58,7 @@ interface GenerateBoardNodeProps {
   onUpdate: (input: BoardGenerateNodeUpdate) => void;
   references: BoardPromptReference[];
   resultItems: StorageItem[];
+  activeResultAssetId?: string;
 }
 
 type GenerateContextTone = "failed" | "neutral" | "ok" | "processing" | "prompt" | "reference" | "result";
@@ -163,12 +164,10 @@ function contextToneClass(tone: GenerateContextTone): string {
   return "border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)]";
 }
 
-function resultContext(node: GenerateNode, hasResultConnection: boolean, resultCount: number): { title: string; tone: GenerateContextTone } {
+function resultContext(hasResultConnection: boolean, resultCount: number): { title: string; tone: GenerateContextTone } {
   if (resultCount > 1) return { title: `${resultCount} 个结果`, tone: hasResultConnection ? "result" : "ok" };
-  if (node.resultAssetId && hasResultConnection) return { title: "已连接", tone: "result" };
-  if (node.resultAssetId) return { title: "已生成", tone: "ok" };
-  if (node.status === "processing") return { title: "等待", tone: "processing" };
-  if (node.status === "failed") return { title: "未输出", tone: "failed" };
+  if (resultCount > 0 && hasResultConnection) return { title: "已连接", tone: "result" };
+  if (resultCount > 0) return { title: "已生成", tone: "ok" };
   return { title: "未生成", tone: "neutral" };
 }
 
@@ -194,6 +193,7 @@ export default function GenerateBoardNode({
   onUpdate,
   references,
   resultItems,
+  activeResultAssetId,
   showReferencePreviews = true,
   taskSummary,
 }: GenerateBoardNodeProps) {
@@ -229,7 +229,7 @@ export default function GenerateBoardNode({
     [activeVideoReferenceMode, node.kind, referencePreviews, videoCapabilities],
   );
   const steps = statusSteps(node.status);
-  const result = resultContext(node, hasResultConnection, resultItems.length);
+  const result = resultContext(hasResultConnection, resultItems.length);
   const run = runContext(node, taskSummary);
   const promptContext = promptPreview !== null
     ? { title: promptSourceTitle ?? "已连接", tone: "prompt" as const }
@@ -354,7 +354,7 @@ export default function GenerateBoardNode({
         </div>
       )}
       <BoardResultStack
-        activeAssetId={node.resultAssetId}
+        activeAssetId={activeResultAssetId}
         onMaterializeResult={onMaterializeResult}
         onOpenResult={onOpenResult}
         onSelectResult={onSelectResult}

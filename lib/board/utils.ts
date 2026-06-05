@@ -1,0 +1,28 @@
+import type { BoardNode, BoardPoint, BoardSize } from "@/lib/board/types";
+
+export function isResultSourceNode(
+  node: BoardNode | undefined,
+): node is Extract<BoardNode, { kind: "image-generate" | "video-generate" | "runninghub-app" }> {
+  return node?.kind === "image-generate" || node?.kind === "video-generate" || node?.kind === "runninghub-app";
+}
+
+export function findResultNodeForSource(
+  nodes: readonly BoardNode[],
+  sourceNodeId: string,
+): Extract<BoardNode, { kind: "result" }> | undefined {
+  return nodes.find(
+    (node): node is Extract<BoardNode, { kind: "result" }> =>
+      node.kind === "result" && node.sourceNodeId === sourceNodeId,
+  );
+}
+
+export function resultNodeDefaultPosition(sourceNode: { position: BoardPoint; size: BoardSize }): BoardPoint {
+  return {
+    x: sourceNode.position.x + sourceNode.size.width + 48,
+    y: sourceNode.position.y,
+  };
+}
+
+export function sameStringList(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}

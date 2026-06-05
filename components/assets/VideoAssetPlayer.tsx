@@ -15,8 +15,10 @@ export type VideoFrameCaptureRequest = (mode: VideoFrameCaptureMode) => Promise<
 interface VideoAssetPlayerProps {
   autoPlay?: boolean;
   className?: string;
+  controlsVisibility?: "always" | "hover";
   item: StorageItem;
   loop?: boolean;
+  onAspectRatio?: (aspectRatio: number) => void;
   onCaptureFrame?: (item: StorageItem, frame: CapturedVideoFrame) => void | Promise<unknown>;
   onCaptureFrameRequestReady?: (request: VideoFrameCaptureRequest | null) => void;
   preload?: "none" | "metadata" | "auto";
@@ -37,8 +39,10 @@ function isPlayInterruptedError(error: unknown): boolean {
 export default function VideoAssetPlayer({
   autoPlay = false,
   className = "h-full w-full object-contain",
+  controlsVisibility = "always",
   item,
   loop = true,
+  onAspectRatio,
   onCaptureFrame,
   onCaptureFrameRequestReady,
   preload = "metadata",
@@ -121,9 +125,13 @@ export default function VideoAssetPlayer({
         className={className}
         onClick={togglePlay}
         onLoadedMetadata={event => {
-          setDuration(event.currentTarget.duration);
-          setCurrentTime(event.currentTarget.currentTime);
-          setIsMuted(event.currentTarget.muted);
+          const video = event.currentTarget;
+          setDuration(video.duration);
+          setCurrentTime(video.currentTime);
+          setIsMuted(video.muted);
+          if (video.videoWidth > 0 && video.videoHeight > 0) {
+            onAspectRatio?.(video.videoWidth / video.videoHeight);
+          }
         }}
         onPause={() => setIsPaused(true)}
         onPlay={() => setIsPaused(false)}
@@ -132,7 +140,10 @@ export default function VideoAssetPlayer({
       />
 
       <div
-        className="absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/86 via-black/50 to-transparent px-4 pb-2.5 pt-6 text-white"
+        className={[
+          "absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/86 via-black/50 to-transparent px-4 pb-2.5 pt-6 text-white transition-opacity duration-200",
+          controlsVisibility === "hover" ? "pointer-events-none opacity-0 group-hover/video:pointer-events-auto group-hover/video:opacity-100" : "opacity-100",
+        ].join(" ")}
         onClick={event => event.stopPropagation()}
       >
         <div className="flex h-6 items-center gap-2.5">
