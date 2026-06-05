@@ -92,23 +92,47 @@ test("calculateModelPrice routes RunningHub video references to the billed model
 test("calculateModelPrice applies provisional Gemini Omni Flash 4k price", () => {
   assert.deepEqual(
     calculateModelPrice("runninghub", "runninghub:api:/openapi/v2/gemini-omni-flash/text-to-video", {
+      duration: "10",
       videoResolution: "1080p",
     }),
     { price: 1.95, unit: "次", totalPrice: 1.95, isCalculated: false },
   );
   assert.deepEqual(
     calculateModelPrice("runninghub", "runninghub:api:/openapi/v2/gemini-omni-flash/text-to-video", {
+      duration: "4",
       videoResolution: "4k",
     }),
     { price: 3.15, unit: "次", totalPrice: 3.15, isCalculated: false },
   );
   assert.deepEqual(
     calculateModelPrice("runninghub", "runninghub:api:/openapi/v2/gemini-omni-flash/text-to-video", {
+      duration: "6",
+      videoResolution: "4k",
+    }),
+    { price: 3.57, unit: "次", totalPrice: 3.57, isCalculated: false },
+  );
+  assert.deepEqual(
+    calculateModelPrice("runninghub", "runninghub:api:/openapi/v2/gemini-omni-flash/text-to-video", {
+      duration: "8",
+      videoResolution: "4k",
+    }),
+    { price: 3.78, unit: "次", totalPrice: 3.78, isCalculated: false },
+  );
+  assert.deepEqual(
+    calculateModelPrice("runninghub", "runninghub:api:/openapi/v2/gemini-omni-flash/text-to-video", {
+      duration: "10",
+      videoResolution: "4k",
+    }),
+    { price: 4.20, unit: "次", totalPrice: 4.20, isCalculated: false },
+  );
+  assert.deepEqual(
+    calculateModelPrice("runninghub", "runninghub:api:/openapi/v2/gemini-omni-flash/text-to-video", {
+      duration: "10",
       referenceTypes: ["video"],
       videoReferenceMode: "reference",
       videoResolution: "4K",
     }),
-    { price: 3.15, unit: "次", totalPrice: 3.15, isCalculated: false },
+    { price: 4.20, unit: "次", totalPrice: 4.20, isCalculated: false },
   );
 });
 

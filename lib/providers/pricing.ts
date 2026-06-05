@@ -189,7 +189,16 @@ function resolveOptionPriceOverride(
   options: ModelPriceOptions | undefined,
 ): ModelPrice {
   if (provider === "runninghub" && modelId.includes("gemini-omni-flash") && options?.videoResolution?.toLowerCase() === "4k") {
-    return { ...base, price: 3.15 };
+    const durationPrice = resolveGeminiOmniFlash4kPrice(options.duration);
+    return durationPrice === null ? base : { ...base, price: durationPrice };
   }
   return base;
+}
+
+function resolveGeminiOmniFlash4kPrice(duration: string | undefined): number | null {
+  if (duration === "4") return 3.15;
+  if (duration === "6") return 3.57;
+  if (duration === "8") return 3.78;
+  if (duration === "10") return 4.20;
+  return null;
 }
