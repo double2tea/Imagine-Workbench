@@ -46,6 +46,11 @@ export function collectPlacedBoardAssetIdsFromNodes(nodes: BoardNode[]): Set<str
   return ids;
 }
 
+export function boardResultStackContainsAsset(node: BoardResultStackNode, assetId: string): boolean {
+  const resultAssetIds = node.resultAssetIds ?? (node.resultAssetId ? [node.resultAssetId] : []);
+  return resultAssetIds.includes(assetId);
+}
+
 export function removeResultAssetFromBoardNodeResultStack(
   node: BoardResultStackNode,
   assetId: string,

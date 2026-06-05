@@ -29,7 +29,7 @@ import type { AgentBoardContext, AgentBoardNodeSummary } from "@/lib/agent-conte
 import { useAgentController } from "@/hooks/useAgentController";
 import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
 import { useBoardAssetStore } from "@/hooks/useBoardAssetStore";
-import { collectPlacedBoardAssetIdsFromNodes } from "@/lib/assets/board-scope";
+import { boardResultStackContainsAsset, collectPlacedBoardAssetIdsFromNodes } from "@/lib/assets/board-scope";
 import { useBoardState } from "@/hooks/useBoardState";
 import { useClipboardImageImport } from "@/hooks/useClipboardImageImport";
 import { useGenerationActions } from "@/hooks/useGenerationActions";
@@ -623,6 +623,15 @@ function summarizeBoardNodeForAgent(node: BoardDocument["nodes"][number], draftT
 
 function findBoardAssetNodeByAssetId(nodes: BoardDocument["nodes"], assetId: string) {
   return nodes.find(node => node.kind === "asset" && node.asset.assetId === assetId);
+}
+
+function hasResultAssetConnection(edges: BoardDocument["edges"], sourceNodeId: string, assetNodeId: string): boolean {
+  return edges.some(edge => (
+    edge.from.nodeId === sourceNodeId &&
+    edge.from.portId === BOARD_PORT_IDS.resultOut &&
+    edge.to.nodeId === assetNodeId &&
+    edge.to.portId === BOARD_PORT_IDS.assetIn
+  ));
 }
 
 function findGenerateNodeById(nodes: BoardDocument["nodes"], nodeId: string): GenerateBoardNode | undefined {
@@ -1982,7 +1991,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   ]);
 
   const addAssetToBoard = useCallback((asset: StorageItem, position?: BoardPoint): string => {
-    return boardController.addAssetNode({
+    const assetNodeId = boardController.addAssetNode({
       asset: {
         assetId: asset.id,
         type: asset.type,
@@ -1993,6 +2002,22 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       position,
       title: asset.prompt || asset.model,
     });
+
+    if (asset.sourceBoardNodeId) {
+      const sourceNode = findGenerateNodeById(boardController.board.nodes, asset.sourceBoardNodeId);
+      if (
+        sourceNode &&
+        boardResultStackContainsAsset(sourceNode, asset.id) &&
+        !hasResultAssetConnection(boardController.board.edges, sourceNode.id, assetNodeId)
+      ) {
+        boardController.connectPorts(
+          { nodeId: sourceNode.id, portId: BOARD_PORT_IDS.resultOut, portKind: "result" },
+          { nodeId: assetNodeId, portId: BOARD_PORT_IDS.assetIn, portKind: "asset" },
+        );
+      }
+    }
+
+    return assetNodeId;
   }, [boardController]);
 
   const handleCaptureVideoFrame = useCallback(async (

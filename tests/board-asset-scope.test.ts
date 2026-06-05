@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  boardResultStackContainsAsset,
   collectBoardAssetIdsFromNodes,
   collectPlacedBoardAssetIdsFromNodes,
   removeResultAssetFromBoardNodeResultStack,
@@ -84,4 +85,12 @@ test("removeResultAssetFromBoardNodeResultStack removes a materialized result wi
   assert.deepEqual(updated.resultAssetIds, ["asset_a"]);
   assert.equal(updated.resultAssetId, "asset_a");
   assert.equal(updated.updatedAt, "2026-06-05T00:01:00.000Z");
+});
+
+test("boardResultStackContainsAsset checks the current result stack", () => {
+  const node = nodes[0];
+  if (node.kind !== "image-generate") throw new Error("Expected image generate fixture");
+
+  assert.equal(boardResultStackContainsAsset(node, "asset_a"), true);
+  assert.equal(boardResultStackContainsAsset(node, "asset_c"), false);
 });
