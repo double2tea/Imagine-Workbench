@@ -30,6 +30,7 @@ import { useAgentController } from "@/hooks/useAgentController";
 import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
 import { useBoardAssetStore } from "@/hooks/useBoardAssetStore";
 import { boardResultStackContainsAsset, collectPlacedBoardAssetIdsFromNodes } from "@/lib/assets/board-scope";
+import { generateReferenceCandidates } from "@/lib/board/prompt-references";
 import { useBoardState } from "@/hooks/useBoardState";
 import { useClipboardImageImport } from "@/hooks/useClipboardImageImport";
 import { useGenerationActions } from "@/hooks/useGenerationActions";
@@ -2887,6 +2888,20 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const selectedOutgoingEdges = selectedBoardNode
     ? boardController.board.edges.filter(edge => edge.from.nodeId === selectedBoardNode.id)
     : [];
+  const selectedGenerateInputSummary = useMemo(() => {
+    if (selectedBoardNode?.kind !== "image-generate" && selectedBoardNode?.kind !== "video-generate") return undefined;
+    const references = generateReferenceCandidates(boardController.board.nodes, boardController.board.edges, selectedBoardNode.id);
+    return {
+      promptPreview: null,
+      referenceCount: references.length,
+      referencePreviews: references.map(reference => ({
+        id: reference.id,
+        role: reference.role,
+        type: reference.type,
+        url: reference.url,
+      })),
+    };
+  }, [boardController.board.edges, boardController.board.nodes, selectedBoardNode]);
   const canvasAssetIds = useMemo(
     () => collectPlacedBoardAssetIdsFromNodes(boardController.board.nodes),
     [boardController.board.nodes],
@@ -2983,6 +2998,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           inspectorPanel={(
             <BoardInspector
               edge={selectedBoardEdge}
+              generateInputSummary={selectedGenerateInputSummary}
               imageModelGroups={imageModelGroups}
               incomingCount={selectedIncomingEdges.length}
               items={items}

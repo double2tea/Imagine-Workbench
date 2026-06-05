@@ -1,30 +1,55 @@
 "use client";
 
-import { calculateModelPrice, getShowPriceSetting } from "@/lib/providers/pricing";
+import { usePriceDisplaySetting } from "@/hooks/usePriceDisplaySetting";
+import { calculateModelPrice, formatPriceValue } from "@/lib/providers/pricing";
 
 interface ModelPriceBadgeProps {
   provider: string;
   modelId: string;
   duration?: string;
   resolution?: string;
+  imageQuality?: string;
+  referenceTypes?: Array<"image" | "video" | "audio">;
+  thinkingLevel?: string;
+  videoReferenceMode?: "reference" | "firstLast" | "none";
+  videoResolution?: string;
 }
 
-export default function ModelPriceBadge({ provider, modelId, duration, resolution }: ModelPriceBadgeProps) {
-  if (!getShowPriceSetting()) return null;
+export default function ModelPriceBadge({
+  provider,
+  modelId,
+  duration,
+  resolution,
+  imageQuality,
+  referenceTypes,
+  thinkingLevel,
+  videoReferenceMode,
+  videoResolution,
+}: ModelPriceBadgeProps) {
+  const [showPrice] = usePriceDisplaySetting();
+  if (!showPrice) return null;
 
-  const price = calculateModelPrice(provider, modelId, { duration, resolution });
+  const price = calculateModelPrice(provider, modelId, {
+    duration,
+    imageQuality,
+    referenceTypes,
+    resolution,
+    thinkingLevel,
+    videoReferenceMode,
+    videoResolution,
+  });
   if (!price) return null;
 
-  const formatUnitPrice = (val: number) =>
-    val < 1 ? val.toFixed(2) : val.toFixed(2).replace(/\.?0+$/, "");
-
   const formatted = price.isCalculated
-    ? `≈¥${price.totalPrice.toFixed(2)}`
-    : `≈¥${formatUnitPrice(price.price)}/${price.unit}`;
+    ? `约 ¥${formatPriceValue(price.totalPrice)}`
+    : `¥${formatPriceValue(price.price)} / ${price.unit}`;
 
   return (
-    <span className="text-[10px] font-medium text-[var(--iw-muted)]">
-      · {formatted}
+    <span
+      className="inline-flex shrink-0 items-center rounded-full border border-white/25 bg-white/15 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-white shadow-sm shadow-black/10"
+      title={price.detail ?? formatted}
+    >
+      {formatted}
     </span>
   );
 }

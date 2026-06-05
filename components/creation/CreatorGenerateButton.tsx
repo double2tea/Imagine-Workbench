@@ -11,6 +11,11 @@ interface CreatorGenerateButtonProps {
   priceModelId?: string;
   priceDuration?: string;
   priceResolution?: string;
+  priceImageQuality?: string;
+  priceReferenceTypes?: Array<"image" | "video" | "audio">;
+  priceThinkingLevel?: string;
+  priceVideoReferenceMode?: "reference" | "firstLast" | "none";
+  priceVideoResolution?: string;
   submitCount: number;
   onGenerate: () => void;
 }
@@ -23,6 +28,11 @@ export default function CreatorGenerateButton({
   priceModelId,
   priceDuration,
   priceResolution,
+  priceImageQuality,
+  priceReferenceTypes,
+  priceThinkingLevel,
+  priceVideoReferenceMode,
+  priceVideoResolution,
   submitCount,
   onGenerate,
 }: CreatorGenerateButtonProps) {
@@ -59,6 +69,11 @@ export default function CreatorGenerateButton({
           modelId={priceModelId!}
           duration={priceDuration}
           resolution={priceResolution}
+          imageQuality={priceImageQuality}
+          referenceTypes={priceReferenceTypes}
+          thinkingLevel={priceThinkingLevel}
+          videoReferenceMode={priceVideoReferenceMode}
+          videoResolution={priceVideoResolution}
         />
       )}
     </button>

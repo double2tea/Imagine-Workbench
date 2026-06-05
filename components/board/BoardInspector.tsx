@@ -1,5 +1,6 @@
 "use client";
 import ModelPriceBadge from "@/components/creation/ModelPriceBadge";
+import type { BoardGenerateInputSummary } from "@/components/board/GenerateBoardNode";
 
 import type { ReactNode } from "react";
 import {
@@ -36,12 +37,14 @@ import type {
   BoardVideoReferenceMode,
   BoardVideoGenerateNode,
 } from "@/lib/board";
+import { selectVideoReferenceTypesForMode } from "@/lib/video-reference-selection";
 
 interface BoardInspectorProps {
   edge: BoardEdge | undefined;
   imageModelGroups: BoardModelOptionGroup[];
   incomingCount: number;
   items: StorageItem[];
+  generateInputSummary?: BoardGenerateInputSummary;
   node: BoardNode | undefined;
   nodes: BoardNode[];
   outgoingCount: number;
@@ -450,13 +453,22 @@ function ImageGenerateInspector({
       <button type="button" onClick={() => onExecuteGenerate(node.id)} disabled={isProcessing} className={`imagine-primary-action flex !h-9 min-h-0 w-full items-center justify-center gap-2 !rounded-lg text-xs font-semibold transition ${isProcessing ? "bg-[var(--iw-panel-soft)] text-[var(--iw-faint)]" : "bg-blue-600 text-white hover:bg-blue-500"}`}>
         {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
         执行图片节点
-          {!isProcessing && <ModelPriceBadge provider={node.model.split(":")[0]} modelId={node.model} resolution={node.imageResolution === "custom" ? node.customImageResolution : node.imageResolution} />}
+        {!isProcessing && (
+          <ModelPriceBadge
+            provider={node.model.split(":")[0]}
+            modelId={node.model}
+            resolution={node.imageResolution === "custom" ? node.customImageResolution : node.imageResolution}
+            imageQuality={node.imageQuality}
+            thinkingLevel={node.thinkingLevel}
+          />
+        )}
       </button>
     </div>
   );
 }
 
 function VideoGenerateInspector({
+  inputSummary,
   node,
   onExecuteGenerate,
   onFocusNode,
@@ -464,6 +476,7 @@ function VideoGenerateInspector({
   videoModelGroups,
 }: {
   node: BoardVideoGenerateNode;
+  inputSummary?: BoardGenerateInputSummary;
   onExecuteGenerate: (nodeId: string) => void;
   onFocusNode: (nodeId: string) => void;
   onUpdateGenerate: (nodeId: string, input: BoardGenerateNodeUpdate) => void;
@@ -478,6 +491,17 @@ function VideoGenerateInspector({
       : undefined;
   const activeReferenceMode = node.videoReferenceMode ?? defaultReferenceMode;
   const referenceModeOptions = capabilities.referenceModes.filter(isBoardVideoReferenceMode);
+  const priceReferenceTypes = selectVideoReferenceTypesForMode(
+    inputSummary?.referencePreviews.map(reference => ({
+      id: reference.id,
+      role: reference.role === "start" || reference.role === "end" || reference.role === "general" ? reference.role : undefined,
+      type: reference.type,
+      url: reference.url,
+    })) ?? [],
+    inputSummary?.referencePreviews[0]?.url ?? null,
+    activeReferenceMode ?? "none",
+    capabilities.maxReferenceImages,
+  );
 
   const advancedFields = (
     <div className="imagine-panel-disclosure-body">
@@ -557,7 +581,16 @@ function VideoGenerateInspector({
       <button type="button" onClick={() => onExecuteGenerate(node.id)} disabled={isProcessing} className={`imagine-primary-action flex !h-9 min-h-0 w-full items-center justify-center gap-2 !rounded-lg text-xs font-semibold transition ${isProcessing ? "bg-[var(--iw-panel-soft)] text-[var(--iw-faint)]" : "bg-blue-600 text-white hover:bg-blue-500"}`}>
         {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
         执行视频节点
-          {!isProcessing && <ModelPriceBadge provider={node.model.split(":")[0]} modelId={node.model} duration={node.videoDuration} />}
+        {!isProcessing && (
+          <ModelPriceBadge
+            provider={node.model.split(":")[0]}
+            modelId={node.model}
+            duration={node.videoDuration}
+            referenceTypes={priceReferenceTypes}
+            videoReferenceMode={activeReferenceMode}
+            videoResolution={node.videoResolution}
+          />
+        )}
       </button>
     </div>
   );
@@ -619,6 +652,7 @@ export default function BoardInspector({
   imageModelGroups,
   incomingCount,
   items,
+  generateInputSummary,
   node,
   nodes,
   outgoingCount,
@@ -715,7 +749,7 @@ export default function BoardInspector({
             <ImageGenerateInspector imageModelGroups={imageModelGroups} node={node} onExecuteGenerate={onExecuteGenerate} onFocusNode={onFocusNode} onUpdateGenerate={onUpdateGenerate} />
           )}
           {node.kind === "video-generate" && (
-            <VideoGenerateInspector node={node} onExecuteGenerate={onExecuteGenerate} onFocusNode={onFocusNode} onUpdateGenerate={onUpdateGenerate} videoModelGroups={videoModelGroups} />
+            <VideoGenerateInspector inputSummary={generateInputSummary} node={node} onExecuteGenerate={onExecuteGenerate} onFocusNode={onFocusNode} onUpdateGenerate={onUpdateGenerate} videoModelGroups={videoModelGroups} />
           )}
           {node.kind === "runninghub-app" && (
             <RunningHubAppInspector node={node} onExecuteGenerate={onExecuteGenerate} onFocusNode={onFocusNode} onUpdateRunningHubApp={onUpdateRunningHubApp} />

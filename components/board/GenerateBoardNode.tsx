@@ -16,6 +16,8 @@ import {
   type PromptTemplateApplyMode,
   type PromptTemplateSlashCommand,
 } from "@/lib/prompt-templates";
+import { getVideoModelCapabilities } from "@/lib/providers/model-catalog";
+import { selectVideoReferenceTypesForMode } from "@/lib/video-reference-selection";
 
 type GenerateNode = BoardImageGenerateNode | BoardVideoGenerateNode;
 const variantCountOptions: BoardGenerateVariantCount[] = [1, 2, 4];
@@ -124,6 +126,23 @@ export default function GenerateBoardNode({
   const promptSourceTitle = inputSummary?.promptSourceTitle;
   const referenceCount = inputSummary?.referenceCount ?? 0;
   const referencePreviews = inputSummary?.referencePreviews ?? [];
+  const videoCapabilities = node.kind === "video-generate" ? getVideoModelCapabilities(node.model) : null;
+  const activeVideoReferenceMode = node.kind === "video-generate"
+    ? node.videoReferenceMode ?? videoCapabilities?.referenceMode ?? "none"
+    : "none";
+  const videoPriceReferenceTypes = node.kind === "video-generate" && videoCapabilities
+    ? selectVideoReferenceTypesForMode(
+      referencePreviews.map(reference => ({
+        id: reference.id,
+        role: reference.role === "start" || reference.role === "end" || reference.role === "general" ? reference.role : undefined,
+        type: reference.type,
+        url: reference.url,
+      })),
+      referencePreviews[0]?.url ?? null,
+      activeVideoReferenceMode,
+      videoCapabilities.maxReferenceImages,
+    )
+    : [];
   const steps = statusSteps(node.status);
   const result = resultContext(node, hasResultConnection);
   const run = runContext(node, taskSummary);
@@ -327,7 +346,19 @@ export default function GenerateBoardNode({
           >
             {node.kind === "image-generate" ? <ImagePlus className="h-3.5 w-3.5" /> : <Video className="h-3.5 w-3.5" />}
             <Play className="h-3 w-3" />
-            {!isProcessing && <ModelPriceBadge provider={node.model.split(":")[0]} modelId={node.model} duration={node.kind === "video-generate" ? node.videoDuration : undefined} resolution={node.kind === "image-generate" ? (node.imageResolution === "custom" ? node.customImageResolution : node.imageResolution) : undefined} />}
+            {!isProcessing && (
+              <ModelPriceBadge
+                provider={node.model.split(":")[0]}
+                modelId={node.model}
+                duration={node.kind === "video-generate" ? node.videoDuration : undefined}
+                resolution={node.kind === "image-generate" ? (node.imageResolution === "custom" ? node.customImageResolution : node.imageResolution) : undefined}
+                imageQuality={node.kind === "image-generate" ? node.imageQuality : undefined}
+                referenceTypes={node.kind === "video-generate" ? videoPriceReferenceTypes : undefined}
+                thinkingLevel={node.kind === "image-generate" ? node.thinkingLevel : undefined}
+                videoReferenceMode={node.kind === "video-generate" ? activeVideoReferenceMode : undefined}
+                videoResolution={node.kind === "video-generate" ? node.videoResolution : undefined}
+              />
+            )}
           </button>
         )}
       </div>

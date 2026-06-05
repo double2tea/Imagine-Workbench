@@ -1,7 +1,7 @@
 import { Download, FileArchive, FileInput, HardDrive, RefreshCw, Shield, Trash2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
+import { usePriceDisplaySetting } from "@/hooks/usePriceDisplaySetting";
 import { formatBytes, type LocalStorageCleanupKind, type WorkspaceCleanupKind, type WorkspaceDataSummary } from "@/lib/data-management";
-import { getShowPriceSetting, setShowPriceSetting } from "@/lib/providers/pricing";
 
 interface DataManagementWorkspaceProps {
   hasCurrentBoard: boolean;
@@ -54,7 +54,7 @@ export default function DataManagementWorkspace({
   const localAssetInputRef = useRef<HTMLInputElement | null>(null);
   const [busyLabel, setBusyLabel] = useState<string | null>(null);
   const [includeCredentials, setIncludeCredentials] = useState(false);
-  const [showPrice, setShowPrice] = useState(() => getShowPriceSetting());
+  const [showPrice, setShowPrice] = usePriceDisplaySetting();
 
   const runAction = async (label: string, action: () => Promise<void>) => {
     setBusyLabel(label);
@@ -212,10 +212,7 @@ export default function DataManagementWorkspace({
               type="checkbox"
               className="peer sr-only"
               checked={showPrice}
-              onChange={e => {
-                setShowPrice(e.target.checked);
-                setShowPriceSetting(e.target.checked);
-              }}
+              onChange={e => setShowPrice(e.target.checked)}
             />
             <div className="h-5 w-9 rounded-full bg-[var(--iw-border)] after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all peer-checked:bg-amber-500 peer-checked:after:translate-x-full" />
           </label>

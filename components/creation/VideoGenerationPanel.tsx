@@ -14,6 +14,7 @@ import {
   type PromptTemplateSlashCommand,
 } from "@/lib/prompt-templates";
 import type { ModelOption, ParameterOption, VideoModelCapabilities, VideoReferenceMode } from "@/lib/providers/model-catalog";
+import { selectVideoReferenceTypesForMode } from "@/lib/video-reference-selection";
 
 interface ModelOptionGroup {
   provider: string;
@@ -131,6 +132,12 @@ export default function VideoGenerationPanel({
     firstLast: "首尾帧 / 关键帧",
   };
   const promptReferenceThumbnails = resolvePromptReferenceThumbnails(prompt, referenceImages, capabilities.referenceMediaTypes);
+  const priceReferenceTypes = selectVideoReferenceTypesForMode(
+    referenceImages,
+    null,
+    selectedReferenceMode,
+    capabilities.maxReferenceImages,
+  );
 
   const handleApplyPromptTemplate = (template: PromptTemplate, mode: PromptTemplateApplyMode): void => {
     if (slashCommand && mode === "insert") {
@@ -351,7 +358,16 @@ export default function VideoGenerationPanel({
             <VideoIcon className="h-4 w-4 shrink-0 text-white" />
           )}
           <span className="truncate">{isSubmitting ? `提交中 (${submitCount})，可继续排队` : "生成视频"}</span>
-          {!isSubmitting && <ModelPriceBadge provider={selectedModel.split(":")[0]} modelId={selectedModel} duration={selectedDuration} />}
+          {!isSubmitting && (
+            <ModelPriceBadge
+              provider={selectedModel.split(":")[0]}
+              modelId={selectedModel}
+              duration={selectedDuration}
+              referenceTypes={priceReferenceTypes}
+              videoReferenceMode={selectedReferenceMode}
+              videoResolution={selectedResolution}
+            />
+          )}
         </button>
       )}
     </div>

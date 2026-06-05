@@ -14,6 +14,7 @@ import { buildPromptWithReferenceMap } from "@/hooks/useReferenceState";
 import { getMediaReferenceType, mediaReferenceLabel } from "@/lib/media-references";
 import { getImageModelCapabilities, getVideoModelCapabilities, type VideoReferenceMode } from "@/lib/providers/model-catalog";
 import { getReferenceImagePayloadError, getReferenceMediaPayloadError, prepareReferenceImageUrlForRequest, prepareReferenceMediaUrlForRequest } from "@/lib/reference-images";
+import { selectVideoReferencesForMode } from "@/lib/video-reference-selection";
 
 type NoticeType = "error" | "info" | "success";
 
@@ -100,28 +101,6 @@ async function saveItemOrWarn(
     pushWorkspaceNotice("error", `本地存储失败，刷新后可能丢失：${message}`);
     return false;
   }
-}
-
-function buildVideoReferences(
-  references: ReferenceImageRef[],
-  fallbackReference: string | null,
-  mode: VideoReferenceMode,
-  maxCount: number,
-): ReferenceImageRef[] {
-  if (maxCount === 0 || mode === "none") return [];
-
-  if (mode === "firstLast") {
-    const fallback = fallbackReference ? { id: "fallback-reference", type: "image" as const, url: fallbackReference, role: "general" as const } : undefined;
-    const start = references.find(reference => reference.role === "start") ?? references[0] ?? fallback;
-    const end =
-      references.find(reference => reference.role === "end") ??
-      references.find(reference => reference.url !== start?.url);
-    return [start, end].filter((reference): reference is ReferenceImageRef => reference !== undefined && reference.url.length > 0).slice(0, maxCount);
-  }
-
-  const refs = references.filter(reference => reference.url.length > 0);
-  if (refs.length === 0 && fallbackReference) refs.push({ id: "fallback-reference", type: "image", url: fallbackReference, role: "general" });
-  return refs.slice(0, maxCount);
 }
 
 function validateCustomImageSize(size: string): string | null {
@@ -395,7 +374,7 @@ export function useGenerationActions({
     const requestVideoCapabilities = getVideoModelCapabilities(requestModel);
 
     if (!activePrompt.trim() && overrides.allowEmptyPrompt !== true) return false;
-    const videoReferences = buildVideoReferences(
+    const videoReferences = selectVideoReferencesForMode(
       activeReferenceImages,
       activeReferenceImage,
       requestVideoReferenceMode,
