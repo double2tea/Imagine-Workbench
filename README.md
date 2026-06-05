@@ -153,7 +153,7 @@ Current adapters:
 
 ModelScope public REST video generation is not enabled by default because the public official docs verified for this implementation do not expose one stable unified REST video endpoint. Use a deployed OpenAI-compatible service or RunningHub for video.
 
-RunningHub support intentionally treats AI Apps and workflows as provider-backed virtual models. It does not add ComfyUI editing, local ComfyUI backends, workflow JSON graph editing, encrypted `accessPassword` handling, or user-authored `nodeInfoList` configuration to Imagine Workbench.
+RunningHub support intentionally treats Standard Model API endpoints, AI Apps, and workflows as provider-backed execution targets. AI App board nodes can read the official RunningHub API-call demo for a `webappId` and turn its `nodeInfoList` into editable prompt/reference/literal bindings. Workflow nodes accept imported API-format JSON. This does not add ComfyUI graph editing, local ComfyUI backends, or local workflow execution to Imagine Workbench.
 
 ## Model Defaults
 

@@ -13,6 +13,12 @@ import type {
   BoardPortRef,
   BoardReferenceGroupItem,
   BoardReferenceRole,
+  BoardRunningHubBindingDelivery,
+  BoardRunningHubBindingSource,
+  BoardRunningHubBindingValueType,
+  BoardRunningHubNodeInfoBinding,
+  BoardRunningHubOutputType,
+  BoardRunningHubTargetType,
   BoardSize,
   BoardViewport,
 } from "@/lib/board/types";
@@ -391,18 +397,7 @@ export function findOrphanAssetIds(items: StorageItem[], boardAssetIds: Readonly
 export function collectBoardAssetIds(boards: BoardDocument[]): Set<string> {
   const ids = new Set<string>();
   for (const board of boards) {
-    for (const node of board.nodes) {
-      if (node.kind === "asset") ids.add(node.asset.assetId);
-        if (node.kind === "reference-group") {
-          for (const reference of node.references) ids.add(reference.assetId);
-        }
-        if ((node.kind === "image-generate" || node.kind === "video-generate") && node.resultAssetId) {
-          ids.add(node.resultAssetId);
-        }
-        if (node.kind === "image-generate" || node.kind === "video-generate") {
-          for (const assetId of node.resultAssetIds ?? []) ids.add(assetId);
-        }
-    }
+    for (const assetId of collectBoardAssetIdsFromNodes(board.nodes)) ids.add(assetId);
   }
   return ids;
 }
@@ -784,6 +779,23 @@ function parseBoardNode(value: unknown): BoardNode {
         errorMessage: readOptionalString(value, "errorMessage"),
     };
   }
+  if (kind === "runninghub-app") {
+    return {
+      ...base,
+      kind,
+      targetType: readRunningHubTargetType(value, "targetType"),
+      outputType: readRunningHubOutputType(value, "outputType"),
+      targetId: readString(value, "targetId"),
+      accessPassword: readOptionalString(value, "accessPassword"),
+      prompt: readText(value, "prompt"),
+      bindings: readArray(value, "bindings").map(parseRunningHubBinding),
+      status: readGenerationStatus(value, "status"),
+      resultAssetId: readOptionalString(value, "resultAssetId"),
+      resultAssetIds: readOptionalStringArray(value, "resultAssetIds"),
+      resultStackKey: readOptionalString(value, "resultStackKey"),
+      errorMessage: readOptionalString(value, "errorMessage"),
+    };
+  }
   if (kind === "agent") return { ...base, kind, instruction: readText(value, "instruction") };
   return { ...base, kind, body: readText(value, "body") };
 }
@@ -797,6 +809,26 @@ function parseReferenceGroupItem(value: unknown): BoardReferenceGroupItem {
     role: readReferenceRole(value, "role"),
     type: isMediaReferenceType(value.type) ? value.type : mediaReferenceTypeFromDataUri(readString(value, "url")) ?? "image",
     url: readString(value, "url"),
+  };
+}
+
+function parseRunningHubBinding(value: unknown): BoardRunningHubNodeInfoBinding {
+  if (!isRecord(value)) throw new Error("RunningHub 参数绑定格式无效");
+  return {
+    id: readString(value, "id"),
+    nodeId: readString(value, "nodeId"),
+    fieldName: readString(value, "fieldName"),
+    label: readOptionalString(value, "label"),
+    source: readRunningHubBindingSource(value, "source"),
+    value: readOptionalString(value, "value") ?? "",
+    valueType: readRunningHubBindingValueType(value.valueType),
+    enabled: typeof value.enabled === "boolean" ? value.enabled : true,
+    required: typeof value.required === "boolean" ? value.required : undefined,
+    referenceIndex: typeof value.referenceIndex === "number" && Number.isInteger(value.referenceIndex) && value.referenceIndex >= 0
+      ? value.referenceIndex
+      : undefined,
+    referenceType: isMediaReferenceType(value.referenceType) ? value.referenceType : "image",
+    deliveryMode: readRunningHubBindingDelivery(value, "deliveryMode"),
   };
 }
 
@@ -849,15 +881,19 @@ function validateBoardAssetReferences(boards: BoardDocument[], assetIds: Readonl
           }
         }
       }
-        if ((node.kind === "image-generate" || node.kind === "video-generate") && node.resultAssetId && !assetIds.has(node.resultAssetId)) {
-          throw new Error(`画板 ${board.title} 生成节点引用缺失结果资产 ${node.resultAssetId}`);
-        }
-        if (node.kind === "image-generate" || node.kind === "video-generate") {
-          for (const assetId of node.resultAssetIds ?? []) {
-            if (!assetIds.has(assetId)) throw new Error(`画板 ${board.title} 生成节点引用缺失结果资产 ${assetId}`);
-          }
+      if (
+        (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app") &&
+        node.resultAssetId &&
+        !assetIds.has(node.resultAssetId)
+      ) {
+        throw new Error(`画板 ${board.title} 生成节点引用缺失结果资产 ${node.resultAssetId}`);
+      }
+      if (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app") {
+        for (const assetId of node.resultAssetIds ?? []) {
+          if (!assetIds.has(assetId)) throw new Error(`画板 ${board.title} 生成节点引用缺失结果资产 ${assetId}`);
         }
       }
+    }
   }
 }
 
@@ -1122,11 +1158,53 @@ function readBoardNodeKind(record: Record<string, unknown>, field: string): Boar
     value !== "reference-group" &&
     value !== "image-generate" &&
     value !== "video-generate" &&
+    value !== "runninghub-app" &&
     value !== "agent" &&
     value !== "note"
   ) {
     throw new Error(`${field} 节点类型无效`);
   }
+  return value;
+}
+
+function readRunningHubTargetType(record: Record<string, unknown>, field: string): BoardRunningHubTargetType {
+  const value = record[field];
+  if (value !== "ai-app" && value !== "workflow") throw new Error(`${field} RunningHub 目标类型无效`);
+  return value;
+}
+
+function readRunningHubOutputType(record: Record<string, unknown>, field: string): BoardRunningHubOutputType {
+  const value = record[field];
+  if (value !== "image" && value !== "video") throw new Error(`${field} RunningHub 输出类型无效`);
+  return value;
+}
+
+function readRunningHubBindingSource(record: Record<string, unknown>, field: string): BoardRunningHubBindingSource {
+  const value = record[field];
+  if (value !== "literal" && value !== "prompt" && value !== "reference" && value !== "randomSeed") {
+    throw new Error(`${field} RunningHub 参数来源无效`);
+  }
+  return value;
+}
+
+function readRunningHubBindingValueType(value: unknown): BoardRunningHubBindingValueType | undefined {
+  if (
+    value === "text" ||
+    value === "number" ||
+    value === "boolean" ||
+    value === "image" ||
+    value === "video" ||
+    value === "audio" ||
+    value === "raw"
+  ) {
+    return value;
+  }
+  return undefined;
+}
+
+function readRunningHubBindingDelivery(record: Record<string, unknown>, field: string): BoardRunningHubBindingDelivery {
+  const value = record[field];
+  if (value !== "raw" && value !== "url" && value !== "fileName") throw new Error(`${field} RunningHub 参数交付模式无效`);
   return value;
 }
 

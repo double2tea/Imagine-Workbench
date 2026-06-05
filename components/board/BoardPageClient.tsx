@@ -29,7 +29,8 @@ import type { AgentBoardContext, AgentBoardNodeSummary } from "@/lib/agent-conte
 import { useAgentController } from "@/hooks/useAgentController";
 import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
 import { useBoardAssetStore } from "@/hooks/useBoardAssetStore";
-import { collectBoardAssetIdsFromNodes } from "@/lib/assets/board-scope";
+import { boardResultStackContainsAsset, collectPlacedBoardAssetIdsFromNodes } from "@/lib/assets/board-scope";
+import { generateReferenceCandidates } from "@/lib/board/prompt-references";
 import { useBoardState } from "@/hooks/useBoardState";
 import { useClipboardImageImport } from "@/hooks/useClipboardImageImport";
 import { useGenerationActions } from "@/hooks/useGenerationActions";
@@ -61,6 +62,7 @@ import {
   type VideoReferenceMode,
 } from "@/lib/providers/model-catalog";
 import { getProviderMeta, PROVIDER_KEYS } from "@/lib/providers/registry";
+import type { RunningHubTaskNodeBinding } from "@/lib/providers/types";
 import { compressReferenceImageDataUrl, compressReferenceImageFile } from "@/lib/reference-images";
 import {
   DEFAULT_BOARD_ID,
@@ -81,10 +83,16 @@ import {
   type BoardNode,
   type BoardPoint,
   type BoardPortRef,
+  type BoardRunningHubAppNode,
+  type BoardRunningHubAppNodeUpdate,
+  type BoardRunningHubNodeInfoBinding,
   type BoardSummary,
   type BoardVideoGenerateNode,
   type BoardVideoReferenceMode,
   assetCompareReferenceUrl,
+  analyzeRunningHubBindings,
+  hasRunningHubBindingIdentity,
+  parseRunningHubBindingsFromJsonText,
 } from "@/lib/board";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import { getMediaReferenceType, mediaReferenceLabel, mediaReferenceTypeFromMime, type MediaReferenceType } from "@/lib/media-references";
@@ -115,6 +123,7 @@ type NoticeType = "error" | "info" | "success";
 type MaskDestination = "creative" | "agent";
 type BoardMode = "image" | "video";
 type GenerateBoardNode = BoardImageGenerateNode | BoardVideoGenerateNode;
+type ExecutableBoardNode = GenerateBoardNode | BoardRunningHubAppNode;
 type AgentGenerateAction = AgentToolAction & { type: "generate_image" | "generate_video" };
 type AgentBoardFlowAction = AgentToolAction & { type: "create_board_image_flow" | "create_board_video_flow" };
 type AgentBoardNoteAction = AgentToolAction & { type: "create_board_note" };
@@ -138,6 +147,10 @@ function getStringField(value: unknown, field: string): string | null {
   return typeof fieldValue === "string" && fieldValue.trim() ? fieldValue : null;
 }
 
+function isUnknownRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 function toErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message.trim() ? error.message : fallback;
 }
@@ -149,6 +162,13 @@ async function readFetchError(response: Response, fallback: string): Promise<str
   } catch {
     return `${fallback} (HTTP ${response.status})`;
   }
+}
+
+function readRunningHubSchemaNodeInfoList(value: unknown): unknown[] {
+  if (!isUnknownRecord(value) || !Array.isArray(value.nodeInfoList)) {
+    throw new Error("RunningHub 字段响应缺少 nodeInfoList");
+  }
+  return value.nodeInfoList;
 }
 
 async function saveItemOrWarn(
@@ -240,7 +260,7 @@ function activeBoardReference(
 ): ReferenceImageRef[] {
   const node = nodes.find(item => item.id === selectedNodeId);
   if (!node) return [];
-  if (node.kind === "image-generate" || node.kind === "video-generate") {
+  if (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app") {
     const item = items.find(current => current.id === node.resultAssetId && current.status === "complete");
     return item ? [{ id: item.id, type: item.type, url: resolveUrl(item.id, item.url), role: "general" }] : [];
   }
@@ -264,7 +284,7 @@ function boardNodeReferences(
       url: resolveUrl(reference.assetId, reference.url),
     }));
   }
-  if (node?.kind === "image-generate" || node?.kind === "video-generate") {
+  if (node?.kind === "image-generate" || node?.kind === "video-generate" || node?.kind === "runninghub-app") {
     const item = items.find(current => current.id === node.resultAssetId && current.status === "complete");
     return item ? [{ id: item.id, type: item.type, url: resolveUrl(item.id, item.url), role: "general" }] : [];
   }
@@ -273,6 +293,42 @@ function boardNodeReferences(
 
 function isGenerateBoardNode(node: BoardDocument["nodes"][number] | undefined): node is GenerateBoardNode {
   return node?.kind === "image-generate" || node?.kind === "video-generate";
+}
+
+function isExecutableBoardNode(node: BoardDocument["nodes"][number] | undefined): node is ExecutableBoardNode {
+  return isGenerateBoardNode(node) || node?.kind === "runninghub-app";
+}
+
+function runningHubAppModelValue(node: BoardRunningHubAppNode): string {
+  const target = node.targetType === "workflow" ? "workflow" : "ai-app";
+  return `runninghub:${target}-${node.outputType}:${node.targetId.trim()}`;
+}
+
+function runningHubNodeInfoBindings(node: BoardRunningHubAppNode): RunningHubTaskNodeBinding[] {
+  return node.bindings
+    .filter(binding => binding.enabled !== false && hasRunningHubBindingIdentity(binding))
+    .map(binding => ({
+      nodeId: binding.nodeId.trim(),
+      fieldName: binding.fieldName.trim(),
+      label: binding.label,
+      source: binding.source,
+      value: binding.value,
+      valueType: binding.valueType,
+      enabled: binding.enabled,
+      required: binding.required,
+      referenceIndex: binding.referenceIndex,
+      referenceType: binding.referenceType,
+      deliveryMode: binding.deliveryMode,
+    }));
+}
+
+function runningHubAppNodeError(node: BoardRunningHubAppNode, prompt: string, referenceCount: number): string | null {
+  if (!node.targetId.trim() || node.targetId.includes("<")) {
+    return node.targetType === "workflow" ? "请填写真实的 workflowId" : "请填写真实的 webappId";
+  }
+  const readiness = analyzeRunningHubBindings(node.bindings, prompt, referenceCount);
+  if (readiness.missingCount > 0) return `RunningHub 应用还有 ${readiness.missingCount} 个必填字段缺少输入`;
+  return null;
 }
 
 function firstOptionValue(options: Array<{ value: string }>, fallback: string): string {
@@ -604,6 +660,16 @@ function summarizeBoardNodeForAgent(node: BoardDocument["nodes"][number], draftT
         status: node.status,
         resultAssetId: node.resultAssetId,
       };
+    case "runninghub-app":
+      return {
+        id: node.id,
+        kind: node.kind,
+        title: node.title,
+        prompt: sliceAgentText(draftText ?? node.prompt),
+        model: runningHubAppModelValue(node),
+        status: node.status,
+        resultAssetId: node.resultAssetId,
+      };
     case "agent":
       return {
         id: node.id,
@@ -625,20 +691,29 @@ function findBoardAssetNodeByAssetId(nodes: BoardDocument["nodes"], assetId: str
   return nodes.find(node => node.kind === "asset" && node.asset.assetId === assetId);
 }
 
-function findGenerateNodeById(nodes: BoardDocument["nodes"], nodeId: string): GenerateBoardNode | undefined {
-  const node = nodes.find(item => item.id === nodeId);
-  return isGenerateBoardNode(node) ? node : undefined;
+function hasResultAssetConnection(edges: BoardDocument["edges"], sourceNodeId: string, assetNodeId: string): boolean {
+  return edges.some(edge => (
+    edge.from.nodeId === sourceNodeId &&
+    edge.from.portId === BOARD_PORT_IDS.resultOut &&
+    edge.to.nodeId === assetNodeId &&
+    edge.to.portId === BOARD_PORT_IDS.assetIn
+  ));
 }
 
-function isSourceStackItem(item: StorageItem, sourceNode: GenerateBoardNode): boolean {
+function findExecutableNodeById(nodes: BoardDocument["nodes"], nodeId: string): ExecutableBoardNode | undefined {
+  const node = nodes.find(item => item.id === nodeId);
+  return isExecutableBoardNode(node) ? node : undefined;
+}
+
+function isSourceStackItem(item: StorageItem, sourceNode: ExecutableBoardNode): boolean {
   return item.sourceBoardNodeId === sourceNode.id && (!sourceNode.resultStackKey || item.sourceBoardResultStackKey === sourceNode.resultStackKey);
 }
 
-function hasActiveSourceItems(items: StorageItem[], sourceNode: GenerateBoardNode): boolean {
+function hasActiveSourceItems(items: StorageItem[], sourceNode: ExecutableBoardNode): boolean {
   return items.some(item => isSourceStackItem(item, sourceNode) && (item.status === "pending" || item.status === "processing"));
 }
 
-function nextSourceNodeStatus(items: StorageItem[], sourceNode: GenerateBoardNode, itemStatus: StorageItem["status"]): BoardGenerationStatus {
+function nextSourceNodeStatus(items: StorageItem[], sourceNode: ExecutableBoardNode, itemStatus: StorageItem["status"]): BoardGenerationStatus {
   if (hasActiveSourceItems(items, sourceNode)) return "processing";
   if (items.some(item => isSourceStackItem(item, sourceNode) && item.status === "complete")) return "complete";
   return itemStatus === "failed" ? "failed" : "complete";
@@ -658,7 +733,7 @@ function resultStackKeyForConfig({
   sizeKey,
 }: {
   edges: BoardDocument["edges"];
-  kind: GenerateBoardNode["kind"];
+  kind: ExecutableBoardNode["kind"];
   model: string;
   nodeId: string;
   sizeKey: string;
@@ -671,14 +746,27 @@ function resultStackKeyForConfig({
   return `${kind}|${model}|${sizeKey}|${wiringKey}`;
 }
 
-function resultStackKeyForNode(node: GenerateBoardNode, edges: BoardDocument["edges"]): string {
+function resultStackKeyForNode(node: ExecutableBoardNode, edges: BoardDocument["edges"]): string {
   const sizeKey = node.kind === "image-generate"
     ? `${node.aspectRatio}|${node.imageResolution}|${node.customImageResolution}`
-    : `${node.aspectRatio}|${node.videoResolution ?? ""}`;
+      : node.kind === "video-generate"
+        ? `${node.aspectRatio}|${node.videoResolution ?? ""}`
+      : `${node.targetType}|${node.outputType}|${node.targetId}|${node.bindings.map(binding => [
+        binding.nodeId,
+        binding.fieldName,
+        binding.source,
+        binding.deliveryMode,
+        binding.valueType ?? "",
+        binding.enabled === false ? "off" : "on",
+        binding.required === true ? "required" : "",
+        binding.referenceIndex ?? "",
+        binding.referenceType ?? "",
+        binding.value,
+      ].join(":")).join(",")}`;
   return resultStackKeyForConfig({
     edges,
     kind: node.kind,
-    model: node.model,
+    model: node.kind === "runninghub-app" ? runningHubAppModelValue(node) : node.model,
     nodeId: node.id,
     sizeKey,
   });
@@ -715,7 +803,7 @@ function patchGenerateNodeForStackKey(operation: AgentBoardPatchCreateNodeOperat
   return { ...previewNode, id: generatedNodeId };
 }
 
-function appendResultAssetId(node: GenerateBoardNode, assetId: string): string[] {
+function appendResultAssetId(node: ExecutableBoardNode, assetId: string): string[] {
   const current = node.resultAssetIds ?? (node.resultAssetId ? [node.resultAssetId] : []);
   return current.includes(assetId) ? current : [...current, assetId];
 }
@@ -739,7 +827,22 @@ function pruneUnavailableGenerateResultAssets(
   return hasGenerateNodeUpdate(update) ? update : null;
 }
 
-function sourceStackResultAssetIds(items: StorageItem[], sourceNode: GenerateBoardNode, activeAssetId: string): string[] {
+function pruneUnavailableRunningHubResultAssets(
+  node: BoardRunningHubAppNode,
+  availableAssetIds: ReadonlySet<string>,
+): BoardRunningHubAppNodeUpdate | null {
+  const currentIds = node.resultAssetIds ?? (node.resultAssetId ? [node.resultAssetId] : []);
+  const nextIds = currentIds.filter(id => availableAssetIds.has(id));
+  const nextActiveId = node.resultAssetId && nextIds.includes(node.resultAssetId)
+    ? node.resultAssetId
+    : nextIds[nextIds.length - 1];
+  const update: BoardRunningHubAppNodeUpdate = {};
+  if (!sameStringList(currentIds, nextIds)) update.resultAssetIds = nextIds;
+  if (node.resultAssetId !== nextActiveId) update.resultAssetId = nextActiveId;
+  return Object.keys(update).length > 0 ? update : null;
+}
+
+function sourceStackResultAssetIds(items: StorageItem[], sourceNode: ExecutableBoardNode, activeAssetId: string): string[] {
   const completedIds = items
     .filter(item => isSourceStackItem(item, sourceNode) && item.status === "complete")
     .sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime())
@@ -886,6 +989,21 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     ? selectedVideoReferenceMode
     : videoCapabilities.referenceMode;
 
+  const fetchRunningHubAppSchema = useCallback(async (webappId: string): Promise<BoardRunningHubNodeInfoBinding[]> => {
+    const response = await fetch("/api/runninghub/ai-app-schema", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...buildProviderHeaders("runninghub"),
+      },
+      body: JSON.stringify({ webappId }),
+    });
+    if (!response.ok) throw new Error(await readFetchError(response, "RunningHub 应用字段读取失败"));
+    const data = await response.json() as unknown;
+    const nodeInfoList = readRunningHubSchemaNodeInfoList(data);
+    return parseRunningHubBindingsFromJsonText(JSON.stringify({ nodeInfoList }));
+  }, [buildProviderHeaders]);
+
   const {
     agentReferenceId,
     agentReferences,
@@ -995,9 +1113,14 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     if (!isBoardAssetScopeLoaded) return;
     const availableAssetIds = new Set(items.map(item => item.id));
     for (const node of boardController.board.nodes) {
-      if (!isGenerateBoardNode(node)) continue;
-      const update = pruneUnavailableGenerateResultAssets(node, availableAssetIds);
-      if (update) boardController.updateGenerateNode(node.id, update);
+      if (isGenerateBoardNode(node)) {
+        const update = pruneUnavailableGenerateResultAssets(node, availableAssetIds);
+        if (update) boardController.updateGenerateNode(node.id, update);
+      }
+      if (node.kind === "runninghub-app") {
+        const update = pruneUnavailableRunningHubResultAssets(node, availableAssetIds);
+        if (update) boardController.updateRunningHubAppNode(node.id, update);
+      }
     }
   }, [boardAssetsLoading, boardController, isBoardAssetScopeLoaded, items]);
 
@@ -1982,7 +2105,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   ]);
 
   const addAssetToBoard = useCallback((asset: StorageItem, position?: BoardPoint): string => {
-    return boardController.addAssetNode({
+    const assetNodeId = boardController.addAssetNode({
       asset: {
         assetId: asset.id,
         type: asset.type,
@@ -1993,6 +2116,22 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       position,
       title: asset.prompt || asset.model,
     });
+
+    if (asset.sourceBoardNodeId) {
+      const sourceNode = findExecutableNodeById(boardController.board.nodes, asset.sourceBoardNodeId);
+      if (
+        sourceNode &&
+        boardResultStackContainsAsset(sourceNode, asset.id) &&
+        !hasResultAssetConnection(boardController.board.edges, sourceNode.id, assetNodeId)
+      ) {
+        boardController.connectPorts(
+          { nodeId: sourceNode.id, portId: BOARD_PORT_IDS.resultOut, portKind: "result" },
+          { nodeId: assetNodeId, portId: BOARD_PORT_IDS.assetIn, portKind: "asset" },
+        );
+      }
+    }
+
+    return assetNodeId;
   }, [boardController]);
 
   const handleCaptureVideoFrame = useCallback(async (
@@ -2134,8 +2273,90 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     return { node, prompt: resolvedPrompt, references };
   }, [boardController.board.edges, boardController.board.nodes, items, resolveBoardReferenceUrl]);
 
+  const resolveRunningHubAppNodeInputs = useCallback((nodeId: string) => {
+    const node = boardController.board.nodes.find(item => item.id === nodeId);
+    if (node?.kind !== "runninghub-app") {
+      throw new Error("请选择 RunningHub 应用节点");
+    }
+
+    const promptEdge = boardController.board.edges.find(edge => edge.to.nodeId === nodeId && edge.to.portId === "prompt-in");
+    const promptNode = promptEdge
+      ? boardController.board.nodes.find(item => item.id === promptEdge.from.nodeId)
+      : undefined;
+    const resolvedPrompt = promptNode?.kind === "prompt"
+      ? (getBoardTextDraft(promptNode.id) ?? promptNode.prompt)
+      : (getBoardTextDraft(node.id) ?? node.prompt);
+    const references: ReferenceImageRef[] = boardController.board.edges
+      .filter(edge => edge.to.nodeId === nodeId && edge.to.portId === "reference-in")
+      .map(edge => boardController.board.nodes.find(item => item.id === edge.from.nodeId))
+      .flatMap(item => boardNodeReferences(item, items, resolveBoardReferenceUrl));
+
+    return { node, prompt: resolvedPrompt, references };
+  }, [boardController.board.edges, boardController.board.nodes, items, resolveBoardReferenceUrl]);
+
   const handleExecuteGenerateNode = useCallback(async (nodeId: string) => {
     try {
+      const candidateNode = boardController.board.nodes.find(item => item.id === nodeId);
+      if (candidateNode?.kind === "runninghub-app") {
+        const { node, prompt: nodePrompt, references } = resolveRunningHubAppNodeInputs(nodeId);
+        flushBoardTextForGenerateNode(boardController.board.nodes, boardController.board.edges, nodeId);
+        const errorMessage = runningHubAppNodeError(node, nodePrompt, references.length);
+        if (errorMessage) {
+          boardController.updateRunningHubAppNode(nodeId, { status: "failed", errorMessage });
+          pushWorkspaceNotice("error", errorMessage);
+          return;
+        }
+
+        const resultStackKey = resultStackKeyForNode(node, boardController.board.edges);
+        const shouldStartNewStack = node.resultStackKey !== resultStackKey;
+        boardController.updateRunningHubAppNode(nodeId, {
+          errorMessage: undefined,
+          prompt: nodePrompt,
+          resultAssetId: shouldStartNewStack ? undefined : node.resultAssetId,
+          resultAssetIds: shouldStartNewStack ? [] : node.resultAssetIds,
+          resultStackKey,
+          status: "processing",
+        });
+
+        const model = runningHubAppModelValue(node);
+        const didStart = node.outputType === "image"
+          ? await generateManualImage({
+            allowEmptyPrompt: true,
+            boardId: resolvedBoardId,
+            boardNodeId: nodeId,
+            boardResultStackKey: resultStackKey,
+            imageResolution: "auto",
+            isCustomImageResolution: false,
+            model,
+            prompt: nodePrompt,
+            referenceImage: references[0]?.url ?? null,
+            referenceImages: references,
+            runningHubAccessPassword: node.accessPassword,
+            runningHubNodeInfoList: runningHubNodeInfoBindings(node),
+            size: "auto",
+          })
+          : await generateManualVideo({
+            allowEmptyPrompt: true,
+            boardId: resolvedBoardId,
+            boardNodeId: nodeId,
+            boardResultStackKey: resultStackKey,
+            model,
+            prompt: nodePrompt,
+            referenceImage: references[0]?.url ?? null,
+            referenceImages: references,
+            runningHubAccessPassword: node.accessPassword,
+            runningHubNodeInfoList: runningHubNodeInfoBindings(node),
+            size: "auto",
+          });
+        if (!didStart) {
+          boardController.updateRunningHubAppNode(nodeId, {
+            errorMessage: "RunningHub 应用请求未启动，请检查节点参数",
+            status: "failed",
+          });
+        }
+        return;
+      }
+
       const { node, prompt: nodePrompt, references } = resolveGenerateNodeInputs(nodeId);
       flushBoardTextForGenerateNode(boardController.board.nodes, boardController.board.edges, nodeId);
       const nextPrompt = nodePrompt.trim();
@@ -2252,6 +2473,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     generateManualVideo,
     pushWorkspaceNotice,
     resolveGenerateNodeInputs,
+    resolveRunningHubAppNodeInputs,
     resolvedBoardId,
   ]);
 
@@ -2316,13 +2538,18 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       const sourceBoardNodeId = item.sourceBoardNodeId;
       if (sourceBoardNodeId) {
         if (item.status === "pending" || item.status === "processing") {
-          const sourceNode = findGenerateNodeById(boardController.board.nodes, sourceBoardNodeId);
+          const sourceNode = findExecutableNodeById(boardController.board.nodes, sourceBoardNodeId);
           if (sourceNode && !isSourceStackItem(item, sourceNode)) continue;
           if (sourceNode && (sourceNode.status !== "processing" || sourceNode.errorMessage)) {
-            boardController.updateGenerateNode(sourceBoardNodeId, {
+            const update = {
               errorMessage: undefined,
               status: "processing",
-            });
+            } as const;
+            if (sourceNode.kind === "runninghub-app") {
+              boardController.updateRunningHubAppNode(sourceBoardNodeId, update);
+            } else {
+              boardController.updateGenerateNode(sourceBoardNodeId, update);
+            }
           }
           continue;
         }
@@ -2331,31 +2558,66 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       }
 
       if (sourceBoardNodeId && item.status === "complete") {
-        const sourceNode = findGenerateNodeById(boardController.board.nodes, sourceBoardNodeId);
+        const sourceNode = findExecutableNodeById(boardController.board.nodes, sourceBoardNodeId);
         if (!sourceNode) continue;
         if (!isSourceStackItem(item, sourceNode)) continue;
         handledBoardItems.add(item.id);
         const nextStatus = nextSourceNodeStatus(items, sourceNode, item.status);
         const resultAssetIds = sourceStackResultAssetIds(items, sourceNode, item.id);
         const activeResultAssetId = resultAssetIds[resultAssetIds.length - 1] ?? item.id;
-        boardController.updateGenerateNode(sourceBoardNodeId, {
+        const update = {
           resultAssetId: activeResultAssetId,
           resultAssetIds,
           status: nextStatus,
-        });
+        };
+        if (sourceNode.kind === "runninghub-app") {
+          boardController.updateRunningHubAppNode(sourceBoardNodeId, update);
+          const existingAssetNode = findBoardAssetNodeByAssetId(boardController.board.nodes, item.id);
+          if (existingAssetNode) {
+            if (!hasResultAssetConnection(boardController.board.edges, sourceNode.id, existingAssetNode.id)) {
+              boardController.connectPorts(
+                { nodeId: sourceNode.id, portId: BOARD_PORT_IDS.resultOut, portKind: "result" },
+                { nodeId: existingAssetNode.id, portId: BOARD_PORT_IDS.assetIn, portKind: "asset" },
+              );
+            }
+          } else {
+            const assetNodeId = boardController.addAssetNode({
+              asset: {
+                assetId: item.id,
+                model: item.model,
+                prompt: item.prompt,
+                type: item.type,
+                url: item.url,
+              },
+              position: { x: sourceNode.position.x + sourceNode.size.width + 48, y: sourceNode.position.y },
+              title: item.prompt || item.model,
+            });
+            boardController.connectPorts(
+              { nodeId: sourceNode.id, portId: BOARD_PORT_IDS.resultOut, portKind: "result" },
+              { nodeId: assetNodeId, portId: BOARD_PORT_IDS.assetIn, portKind: "asset" },
+            );
+          }
+        } else {
+          boardController.updateGenerateNode(sourceBoardNodeId, update);
+        }
         continue;
       }
 
       if (sourceBoardNodeId && item.status === "failed") {
-        const sourceNode = findGenerateNodeById(boardController.board.nodes, sourceBoardNodeId);
+        const sourceNode = findExecutableNodeById(boardController.board.nodes, sourceBoardNodeId);
         if (!sourceNode) continue;
         if (!isSourceStackItem(item, sourceNode)) continue;
         handledBoardItems.add(item.id);
         const nextStatus = nextSourceNodeStatus(items, sourceNode, item.status);
-        boardController.updateGenerateNode(sourceBoardNodeId, {
+        const update = {
           errorMessage: nextStatus === "failed" ? item.errorMessage ?? "生成失败" : undefined,
           status: nextStatus,
-        });
+        };
+        if (sourceNode.kind === "runninghub-app") {
+          boardController.updateRunningHubAppNode(sourceBoardNodeId, update);
+        } else {
+          boardController.updateGenerateNode(sourceBoardNodeId, update);
+        }
         continue;
       }
     }
@@ -2626,8 +2888,22 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const selectedOutgoingEdges = selectedBoardNode
     ? boardController.board.edges.filter(edge => edge.from.nodeId === selectedBoardNode.id)
     : [];
+  const selectedGenerateInputSummary = useMemo(() => {
+    if (selectedBoardNode?.kind !== "image-generate" && selectedBoardNode?.kind !== "video-generate") return undefined;
+    const references = generateReferenceCandidates(boardController.board.nodes, boardController.board.edges, selectedBoardNode.id);
+    return {
+      promptPreview: null,
+      referenceCount: references.length,
+      referencePreviews: references.map(reference => ({
+        id: reference.id,
+        role: reference.role,
+        type: reference.type,
+        url: reference.url,
+      })),
+    };
+  }, [boardController.board.edges, boardController.board.nodes, selectedBoardNode]);
   const canvasAssetIds = useMemo(
-    () => collectBoardAssetIdsFromNodes(boardController.board.nodes),
+    () => collectPlacedBoardAssetIdsFromNodes(boardController.board.nodes),
     [boardController.board.nodes],
   );
   const highlightAssetId = selectedBoardNode?.kind === "asset" ? selectedBoardNode.asset.assetId : undefined;
@@ -2706,6 +2982,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onDeleteBoard={handleDeleteBoard}
         onEditAssetImage={editBoardAssetImage}
         onExecuteGenerateNode={handleExecuteGenerateNode}
+        onFetchRunningHubAppSchema={fetchRunningHubAppSchema}
         onImportBoardFiles={handleImportBoardFiles}
         onOpenFullscreen={setFullscreenItem}
         onOpenSettings={handleOpenSettings}
@@ -2721,6 +2998,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           inspectorPanel={(
             <BoardInspector
               edge={selectedBoardEdge}
+              generateInputSummary={selectedGenerateInputSummary}
               imageModelGroups={imageModelGroups}
               incomingCount={selectedIncomingEdges.length}
               items={items}
@@ -2746,6 +3024,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
               onSendAssetToAgent={useSelectedBoardAssetForAgent}
               onSyncAssetReference={useSelectedBoardAssetAsReference}
               onUpdateGenerate={boardController.updateGenerateNode}
+              onUpdateRunningHubApp={boardController.updateRunningHubAppNode}
             />
           )}
           assetsPanel={(

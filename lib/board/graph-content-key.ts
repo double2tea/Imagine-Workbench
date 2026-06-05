@@ -91,6 +91,37 @@ function serializeNodeContent(node: BoardNode): string {
           node.resultStackKey ?? "",
           fingerprintLargeText(node.errorMessage ?? ""),
       ].join("|");
+    case "runninghub-app":
+      return [
+        "runninghub-app",
+        node.id,
+        node.title,
+        `${node.size.width}x${node.size.height}`,
+        node.targetType,
+        node.outputType,
+        node.targetId,
+        node.status,
+        fingerprintLargeText(node.prompt),
+        fingerprintLargeText(node.accessPassword ?? ""),
+        node.bindings.map(binding => [
+          binding.id,
+          binding.nodeId,
+          binding.fieldName,
+          binding.label ?? "",
+          binding.source,
+          binding.deliveryMode,
+          binding.valueType ?? "",
+          binding.enabled === false ? "off" : "on",
+          binding.required === true ? "required" : "",
+          binding.referenceIndex ?? "",
+          binding.referenceType ?? "",
+          fingerprintLargeText(binding.value),
+        ].join(":")).join(","),
+        node.resultAssetId ?? "",
+        node.resultAssetIds?.join(",") ?? "",
+        node.resultStackKey ?? "",
+        fingerprintLargeText(node.errorMessage ?? ""),
+      ].join("|");
     case "agent":
       return `agent|${node.id}|${node.title}|${fingerprintLargeText(node.instruction)}`;
     case "note":

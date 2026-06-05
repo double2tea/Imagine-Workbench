@@ -6,7 +6,7 @@ import {
   resolveRunningHubStandardModelForReferenceMedia,
   validateRunningHubStandardReferenceCount,
 } from "./runninghub";
-import type { GenerateImageInput, GenerateImageResult, MediaStatusResult, ProviderConfig, ReferenceMedia } from "./types";
+import type { GenerateImageInput, GenerateImageResult, MediaStatusResult, ProviderConfig, ReferenceMedia, RunningHubTaskNodeBinding } from "./types";
 import { mediaReferenceFileExtension, mediaReferenceLabel, mediaReferenceTypeFromMime } from "../media-references";
 import {
   dataUriToBlob,
@@ -100,12 +100,16 @@ interface RunningHubUploadResponse {
     url?: string;
     fileUrl?: string;
     file_url?: string;
+    filename?: string;
+    fileName?: string;
   };
   download_url?: string;
   downloadUrl?: string;
   url?: string;
   fileUrl?: string;
   file_url?: string;
+  filename?: string;
+  fileName?: string;
 }
 
 interface GeminiGenerateContentResponse {
@@ -132,6 +136,8 @@ interface RunningHubMediaInput {
   referenceMode?: "reference" | "firstLast";
   referenceImages: GenerateImageInput["referenceImages"];
   referenceMedia?: ReferenceMedia[];
+  runningHubAccessPassword?: string;
+  runningHubNodeInfoList?: RunningHubTaskNodeBinding[];
 }
 
 type RunningHubStatusMode = "standard" | "task-output";
@@ -152,7 +158,14 @@ interface RunningHubMediaOutput {
 interface RunningHubNodeInfo {
   nodeId: string;
   fieldName: string;
-  fieldValue: string;
+  fieldValue: unknown;
+}
+
+interface RunningHubTaskReferenceUpload {
+  fileName?: string;
+  raw: string;
+  type: ReferenceMedia["type"];
+  url: string;
 }
 
 const RUNNINGHUB_TASK_OUTPUT_PREFIX = "task-output:";
@@ -531,13 +544,15 @@ async function buildRunningHubRequest(
     const webappId = input.model.slice(expectedPrefix.length).trim();
     if (!webappId) throw new Error(`RunningHub ${mediaType} AI App model is missing webappId`);
     if (webappId === "<webappId>") throw new Error(`RunningHub ${mediaType} AI App model is missing webappId`);
+    const nodeInfoList = await buildRunningHubTaskNodeInfoList(config, input);
     return {
       endpoint: "/task/openapi/ai-app/run",
       statusMode: "task-output",
       body: {
         apiKey: config.apiKey,
         webappId,
-        nodeInfoList: buildRunningHubTaskNodeInfoList(input),
+        ...(nodeInfoList.length > 0 ? { nodeInfoList } : {}),
+        ...(input.runningHubAccessPassword ? { accessPassword: input.runningHubAccessPassword } : {}),
       },
     };
   }
@@ -546,13 +561,15 @@ async function buildRunningHubRequest(
     const workflowId = input.model.slice(workflowPrefix.length).trim();
     if (!workflowId) throw new Error(`RunningHub ${mediaType} workflow model is missing workflowId`);
     if (workflowId === "<workflowId>") throw new Error(`RunningHub ${mediaType} workflow model is missing workflowId`);
+    const nodeInfoList = await buildRunningHubTaskNodeInfoList(config, input);
     return {
       endpoint: "/task/openapi/create",
       statusMode: "task-output",
       body: {
         apiKey: config.apiKey,
         workflowId,
-        nodeInfoList: buildRunningHubTaskNodeInfoList(input),
+        ...(nodeInfoList.length > 0 ? { nodeInfoList } : {}),
+        ...(input.runningHubAccessPassword ? { accessPassword: input.runningHubAccessPassword } : {}),
       },
     };
   }
@@ -561,20 +578,102 @@ async function buildRunningHubRequest(
   );
 }
 
-function buildRunningHubTaskNodeInfoList(input: RunningHubMediaInput): RunningHubNodeInfo[] {
+async function buildRunningHubTaskNodeInfoList(config: ProviderConfig, input: RunningHubMediaInput): Promise<RunningHubNodeInfo[]> {
+  const bindings = input.runningHubNodeInfoList ?? [];
+  if (bindings.length === 0) return [];
   const references = input.referenceMedia ?? input.referenceImages.map(reference => ({ ...reference, type: "image" as const }));
-  const counts = { image: 0, video: 0, audio: 0 };
-  return [
-    { nodeId: "prompt", fieldName: "prompt", fieldValue: input.prompt },
-    ...references.map(reference => {
-      counts[reference.type] += 1;
-      return {
-        nodeId: `${reference.type}_${counts[reference.type]}`,
-        fieldName: reference.type,
-        fieldValue: reference.dataUri,
-      };
-    }),
-  ];
+  const uploadedReferences = await uploadRunningHubTaskReferences(config, references);
+  return bindings
+    .filter(binding => binding.enabled !== false)
+    .filter(binding => shouldSubmitRunningHubTaskBinding(binding, uploadedReferences))
+    .map(binding => ({
+      nodeId: binding.nodeId,
+      fieldName: binding.fieldName,
+      fieldValue: resolveRunningHubTaskBindingValue(input.prompt, binding, uploadedReferences),
+    }));
+}
+
+function shouldSubmitRunningHubTaskBinding(
+  binding: RunningHubTaskNodeBinding,
+  references: RunningHubTaskReferenceUpload[],
+): boolean {
+  if (binding.source !== "reference" || binding.required === true) return true;
+  const candidates = binding.referenceType
+    ? references.filter(reference => reference.type === binding.referenceType)
+    : references;
+  return candidates[binding.referenceIndex ?? 0] !== undefined;
+}
+
+async function uploadRunningHubTaskReferences(
+  config: ProviderConfig,
+  references: ReferenceMedia[],
+): Promise<RunningHubTaskReferenceUpload[]> {
+  const uploads: RunningHubTaskReferenceUpload[] = [];
+  for (const [index, reference] of references.entries()) {
+    const form = new FormData();
+    const blob = dataUriToBlob(reference.dataUri);
+    const mediaType = mediaReferenceTypeFromMime(blob.type) ?? reference.type;
+    form.append("file", blob, `reference-${index + 1}.${mediaReferenceFileExtension(blob.type, mediaType)}`);
+    const response = await postForm<RunningHubUploadResponse>(`${config.baseUrl}/openapi/v2/media/upload/binary`, config, form);
+    assertRunningHubOk(response, "RunningHub media upload failed");
+    uploads.push({
+      fileName: readRunningHubUploadFileName(response),
+      raw: reference.dataUri,
+      type: mediaType,
+      url: readRunningHubUploadUrl(response),
+    });
+  }
+  return uploads;
+}
+
+function resolveRunningHubTaskBindingValue(
+  prompt: string,
+  binding: RunningHubTaskNodeBinding,
+  references: RunningHubTaskReferenceUpload[],
+): unknown {
+  if (binding.source === "prompt") return coerceRunningHubTaskBindingValue(prompt, binding);
+  if (binding.source === "literal") return coerceRunningHubTaskBindingValue(binding.value ?? "", binding);
+  if (binding.source === "randomSeed") return randomRunningHubSeed();
+
+  const candidates = binding.referenceType
+    ? references.filter(reference => reference.type === binding.referenceType)
+    : references;
+  const reference = candidates[binding.referenceIndex ?? 0];
+  if (!reference) {
+    throw new Error(`RunningHub nodeInfoList binding ${binding.nodeId}.${binding.fieldName} reference is missing`);
+  }
+  if (binding.deliveryMode === "fileName") {
+    if (!reference.fileName) {
+      throw new Error(`RunningHub upload for ${binding.nodeId}.${binding.fieldName} did not include filename`);
+    }
+    return reference.fileName;
+  }
+  if (binding.deliveryMode === "url") return reference.url;
+  return reference.raw;
+}
+
+function coerceRunningHubTaskBindingValue(value: string, binding: RunningHubTaskNodeBinding): unknown {
+  if (binding.required === true && value.trim() === "") {
+    throw new Error(`RunningHub nodeInfoList binding ${binding.nodeId}.${binding.fieldName} is required`);
+  }
+  if (binding.valueType === "number") {
+    if (value.trim() === "") return "";
+    const numberValue = Number(value);
+    if (!Number.isFinite(numberValue)) {
+      throw new Error(`RunningHub nodeInfoList binding ${binding.nodeId}.${binding.fieldName} must be a number`);
+    }
+    return numberValue;
+  }
+  if (binding.valueType === "boolean") {
+    if (value === "true") return true;
+    if (value === "false") return false;
+    throw new Error(`RunningHub nodeInfoList binding ${binding.nodeId}.${binding.fieldName} must be true or false`);
+  }
+  return value;
+}
+
+function randomRunningHubSeed(): number {
+  return Math.floor(Math.random() * 1_000_000_000_000_000);
 }
 
 function runningHubOperationTaskId(statusMode: RunningHubStatusMode, taskId: string): string {
@@ -636,6 +735,15 @@ function readRunningHubUploadUrl(response: RunningHubUploadResponse): string {
     response.file_url;
   if (!url) throw new Error("RunningHub upload response did not include download_url");
   return url;
+}
+
+function readRunningHubUploadFileName(response: RunningHubUploadResponse): string | undefined {
+  return (
+    response.data?.filename ??
+    response.data?.fileName ??
+    response.filename ??
+    response.fileName
+  );
 }
 
 function assertRunningHubOk(response: { code?: number; msg?: string; message?: string }, fallback: string): void {

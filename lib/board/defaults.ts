@@ -39,6 +39,11 @@ export const DEFAULT_GENERATE_NODE_SIZE: BoardSize = {
   height: 260,
 };
 
+export const DEFAULT_RUNNINGHUB_APP_NODE_SIZE: BoardSize = {
+  width: 680,
+  height: 520,
+};
+
 export const DEFAULT_AGENT_NODE_SIZE: BoardSize = {
   width: 320,
   height: 220,

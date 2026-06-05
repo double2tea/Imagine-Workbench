@@ -8,9 +8,11 @@ import {
   resolveRunningHubStandardModelForReferenceMedia,
   resolveRunningHubStandardModelForReferences,
 } from "../lib/providers/runninghub";
+import { parseRunningHubBindingsFromJsonText } from "../lib/board/runninghub-bindings";
 import { createChatCompletionText } from "../lib/providers/chat";
 import { generateRunningHubMedia, getRunningHubMediaStatus } from "../lib/providers/image";
 import { listProviderModels } from "../lib/providers/models";
+import { fetchRunningHubAiAppSchema } from "../lib/providers/runninghub-app";
 import type { ProviderConfig } from "../lib/providers/types";
 
 const runningHubConfig: ProviderConfig = {
@@ -383,6 +385,43 @@ test("runninghub veo 3.1 and gpt image 2 variants map documented fields", () => 
   );
 });
 
+test("runninghub gemini 3 flash and pro image models map documented fields", () => {
+  const flashOfficial = getRunningHubStandardModel("api:/openapi/v2/rhart-image-n-g31-flash-official/text-to-image", "image");
+  const proUltra = getRunningHubStandardModel("api:/openapi/v2/rhart-image-n-pro-official/text-to-image-ultra", "image");
+  assert.ok(flashOfficial);
+  assert.ok(proUltra);
+
+  assert.deepEqual(
+    buildRunningHubStandardBody(resolveRunningHubStandardModelForReferences(flashOfficial, 1), {
+      prompt: "turn sketch into neon manga",
+      aspectRatio: "1:8",
+      imageResolution: "4k",
+      referenceImages: [{ dataUri: "data:image/png;base64,input" }],
+      referenceUrls: ["https://runninghub.example/sketch.png"],
+    }),
+    {
+      prompt: "turn sketch into neon manga",
+      aspectRatio: "1:8",
+      resolution: "4k",
+      imageUrls: ["https://runninghub.example/sketch.png"],
+    },
+  );
+
+  assert.deepEqual(
+    buildRunningHubStandardBody(resolveRunningHubStandardModelForReferences(proUltra, 0), {
+      prompt: "ultra detailed product photo",
+      aspectRatio: "3:4",
+      imageResolution: "8k",
+      referenceImages: [],
+    }),
+    {
+      prompt: "ultra detailed product photo",
+      aspectRatio: "3:4",
+      resolution: "8k",
+    },
+  );
+});
+
 test("runninghub veo 3.1 auto routes non-text variants", () => {
   const fastChannel = getRunningHubStandardModel("api:/openapi/v2/rhart-video-v3.1-fast/text-to-video", "video");
   const fastOfficial = getRunningHubStandardModel("api:/openapi/v2/rhart-video-v3.1-fast-official/text-to-video", "video");
@@ -397,10 +436,10 @@ test("runninghub veo 3.1 auto routes non-text variants", () => {
   );
   assert.deepEqual(
     buildRunningHubStandardBody(resolveRunningHubStandardModelForReferences(fastChannel, 2), {
-      prompt: "start to end",
-      aspectRatio: "16:9",
-      resolutionName: "720p",
-      durationSeconds: "4",
+        prompt: "start to end",
+        aspectRatio: "16:9",
+        resolutionName: "720p",
+        durationSeconds: "8",
       referenceImages: [],
       referenceMediaUrls: {
         imageUrls: ["https://runninghub.example/start.png", "https://runninghub.example/end.png"],
@@ -409,9 +448,9 @@ test("runninghub veo 3.1 auto routes non-text variants", () => {
       },
     }),
     {
-      prompt: "start to end",
-      resolution: "720p",
-      duration: "4",
+        prompt: "start to end",
+        resolution: "720p",
+        duration: "8",
       aspectRatio: "16:9",
       firstFrameUrl: "https://runninghub.example/start.png",
       lastFrameUrl: "https://runninghub.example/end.png",
@@ -458,12 +497,11 @@ test("runninghub veo 3.1 auto routes non-text variants", () => {
         audioUrls: [],
       },
     }),
-    {
-      prompt: "lite start end",
-      resolution: "720p",
-      duration: "4",
-      aspectRatio: "16:9",
-      firstImageUrl: "https://runninghub.example/start.png",
+      {
+        prompt: "lite start end",
+        resolution: "720p",
+        aspectRatio: "16:9",
+        firstImageUrl: "https://runninghub.example/start.png",
       lastImageUrl: "https://runninghub.example/end.png",
     },
   );
@@ -479,11 +517,12 @@ test("runninghub advertised first-last modes route to first-last request shapes"
   assert.ok(veoOfficial);
   assert.ok(omniFlash);
 
-  assert.deepEqual(veoOfficial.videoReferenceModes, undefined);
+  assert.deepEqual(veoOfficial.videoReferenceModes, ["reference", "firstLast"]);
   assert.deepEqual(omniFlash.videoReferenceModes, undefined);
 
   assert.equal(resolveRunningHubStandardModelForReferenceMedia(seedance, [{ type: "image" }, { type: "image" }], "firstLast").model, "api:/openapi/v2/bytedance/seedance-2.0-global-fast/image-to-video");
   assert.equal(resolveRunningHubStandardModelForReferenceMedia(veoLite, [{ type: "image" }, { type: "image" }], "firstLast").model, "api:/openapi/v2/rhart-video-v3.1-lite-official/start-end-to-video");
+  assert.equal(resolveRunningHubStandardModelForReferenceMedia(veoOfficial, [{ type: "image" }, { type: "image" }], "firstLast").model, "api:/openapi/v2/rhart-video-v3.1-fast-official/image-to-video");
 });
 
 test("runninghub youchuan image models map version-specific defaults", () => {
@@ -573,8 +612,133 @@ test("runninghub ai app tasks use task output polling endpoint", async () => {
       url: "https://runninghub.example/output.png",
     });
     assert.equal(calls[0]?.url, "https://www.runninghub.cn/task/openapi/ai-app/run");
+    assert.deepEqual(calls[0]?.body, {
+      apiKey: "rh_test_key",
+      webappId: "1877265245566922753",
+    });
     assert.equal(calls[1]?.url, "https://www.runninghub.cn/task/openapi/outputs");
     assert.deepEqual(calls[1]?.body, { apiKey: "rh_test_key", taskId: "task_123" });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("runninghub ai app tasks map custom nodeInfoList bindings", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: Array<{ url: string; body: unknown }> = [];
+  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const url = input.toString();
+    if (url.endsWith("/openapi/v2/media/upload/binary")) {
+      calls.push({ url, body: init?.body instanceof FormData ? "form-data" : init?.body });
+      return Response.json({
+        code: 200,
+        message: "success",
+        data: {
+          download_url: "https://runninghub.example/uploaded.png",
+          filename: "api/uploaded.png",
+        },
+      });
+    }
+    calls.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+    if (url.endsWith("/task/openapi/ai-app/run")) {
+      return Response.json({ code: 0, msg: "success", data: { taskId: "task_custom", taskStatus: "RUNNING" } });
+    }
+    return Response.json({ code: 999, msg: "unexpected endpoint" }, { status: 500 });
+  };
+
+  try {
+    const created = await generateRunningHubMedia(
+      runningHubConfig,
+      {
+        prompt: "node prompt",
+        model: "ai-app-image:1877265245566922753",
+        aspectRatio: "auto",
+        imageResolution: "auto",
+        referenceImages: [{ dataUri: "data:image/png;base64,AA==" }],
+        runningHubAccessPassword: "secret",
+        runningHubNodeInfoList: [
+          { nodeId: "122", fieldName: "prompt", source: "prompt", deliveryMode: "raw" },
+          { nodeId: "14", fieldName: "image", source: "reference", referenceIndex: 0, referenceType: "image", deliveryMode: "url" },
+          { nodeId: "15", fieldName: "optionalImage", source: "reference", referenceIndex: 4, referenceType: "image", deliveryMode: "url" },
+          { nodeId: "16", fieldName: "disabled", source: "literal", value: "skip", enabled: false, deliveryMode: "raw" },
+          { nodeId: "3", fieldName: "seed", source: "literal", value: "12345", valueType: "number", deliveryMode: "raw" },
+          { nodeId: "4", fieldName: "randomSeed", source: "randomSeed", valueType: "number", deliveryMode: "raw" },
+        ],
+      },
+      "image",
+    );
+
+    assert.equal(created.operationName, "runninghub:image:task-output:task_custom");
+    assert.equal(calls[0]?.url, "https://www.runninghub.cn/openapi/v2/media/upload/binary");
+    assert.equal(calls[1]?.url, "https://www.runninghub.cn/task/openapi/ai-app/run");
+    const body = calls[1]?.body;
+    assert.equal(typeof body, "object");
+    assert.notEqual(body, null);
+    const nodeInfoList = body && typeof body === "object" && "nodeInfoList" in body && Array.isArray(body.nodeInfoList)
+      ? body.nodeInfoList as Array<{ fieldValue: unknown }>
+      : [];
+    assert.equal(typeof nodeInfoList[3]?.fieldValue, "number");
+    assert.deepEqual(calls[1]?.body, {
+      apiKey: "rh_test_key",
+      webappId: "1877265245566922753",
+      accessPassword: "secret",
+      nodeInfoList: [
+        { nodeId: "122", fieldName: "prompt", fieldValue: "node prompt" },
+        { nodeId: "14", fieldName: "image", fieldValue: "https://runninghub.example/uploaded.png" },
+        { nodeId: "3", fieldName: "seed", fieldValue: 12345 },
+        { nodeId: "4", fieldName: "randomSeed", fieldValue: nodeInfoList[3]?.fieldValue },
+      ],
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("runninghub ai app schema reads official apiCallDemo curl nodeInfoList", async () => {
+  const originalFetch = globalThis.fetch;
+  const demoCurl = `curl --location 'https://www.runninghub.cn/task/openapi/ai-app/run' \\
+--header 'Content-Type: application/json' \\
+--data '{
+  "webappId": "2013570680079523842",
+  "nodeInfoList": [
+    {
+      "nodeId": "173",
+      "nodeName": "上传手稿",
+      "fieldName": "image",
+      "fieldValue": "api/example.png",
+      "fieldType": "IMAGE",
+      "description": "手稿图片"
+    },
+    {
+      "nodeId": "221",
+      "nodeName": "模型参数",
+      "fieldName": "ratio",
+      "fieldValue": "3:4",
+      "fieldType": "LIST",
+      "fieldData": "[{\\"index\\":\\"1:1\\",\\"name\\":\\"1:1\\"},{\\"index\\":\\"3:4\\",\\"name\\":\\"3:4\\"}]",
+      "description": "输出比例"
+    }
+  ]
+}'`;
+  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const url = input.toString();
+    assert.equal(url, "https://www.runninghub.cn/api/webapp/apiCallDemo?apiKey=rh_test_key&webappId=2013570680079523842");
+    assert.equal(init?.headers && typeof init.headers === "object" && "Authorization" in init.headers, true);
+    return Response.json({ code: 0, data: { curl: demoCurl } });
+  };
+
+  try {
+    const schema = await fetchRunningHubAiAppSchema(runningHubConfig, "2013570680079523842");
+    assert.equal(schema.webappId, "2013570680079523842");
+    assert.equal(schema.nodeInfoList.length, 2);
+    assert.equal(schema.nodeInfoList[0]?.fieldType, "IMAGE");
+
+    const bindings = parseRunningHubBindingsFromJsonText(JSON.stringify({ nodeInfoList: schema.nodeInfoList }));
+    assert.equal(bindings[0]?.source, "reference");
+    assert.equal(bindings[0]?.deliveryMode, "fileName");
+    assert.equal(bindings[0]?.required, true);
+    assert.equal(bindings[1]?.source, "literal");
+    assert.deepEqual(bindings[1]?.options?.map(option => option.value), ["1:1", "3:4"]);
   } finally {
     globalThis.fetch = originalFetch;
   }

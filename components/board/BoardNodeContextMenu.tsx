@@ -30,7 +30,7 @@ export function buildBoardNodeContextMenuActions(input: {
   const actions: BoardNodeContextMenuAction[] = [
     { id: "duplicate", label: "复制节点", onSelect: input.onDuplicate },
   ];
-  if ((input.node.kind === "image-generate" || input.node.kind === "video-generate") && input.onExecute) {
+  if ((input.node.kind === "image-generate" || input.node.kind === "video-generate" || input.node.kind === "runninghub-app") && input.onExecute) {
     actions.push({ id: "execute", label: "执行生成", onSelect: input.onExecute });
   }
   if (input.node.kind === "asset" && input.node.asset.type === "image") {

@@ -61,6 +61,7 @@ import {
 import { PROVIDER_KEYS, getProviderMeta } from "@/lib/providers/registry";
 import { getMediaReferenceType } from "@/lib/media-references";
 import { compressReferenceImageDataUrl, compressReferenceImageFile } from "@/lib/reference-images";
+import { selectVideoReferenceTypesForMode } from "@/lib/video-reference-selection";
 import {
   cleanupWorkspaceAssets,
   clearLocalStorageGroup,
@@ -358,6 +359,12 @@ export default function Home() {
   const activeImageModel = shouldUseAsyncImageGeneration && selectedImageProviderModel.provider === "12ai"
     ? `12ai-async:${selectedImageProviderModel.model}`
     : selectedModel;
+  const videoPriceReferenceTypes = selectVideoReferenceTypesForMode(
+    referenceImages,
+    referenceImage,
+    activeVideoReferenceMode,
+    videoCapabilities.maxReferenceImages,
+  );
 
   useClipboardImageImport({
     agentReferenceCount: agentReferences.length,
@@ -1209,6 +1216,15 @@ export default function Home() {
                 disabled={!prompt.trim()}
                 isSubmitting={traditionalSubTab === "image" ? isSubmittingImage : isSubmittingVideo}
                 submitCount={traditionalSubTab === "image" ? imageSubmitCount : videoSubmitCount}
+                priceProvider={traditionalSubTab === "image" ? selectedModel.split(":")[0] : selectedVideoModel.split(":")[0]}
+                priceModelId={traditionalSubTab === "image" ? selectedModel : selectedVideoModel}
+                priceDuration={traditionalSubTab === "video" ? activeVideoDuration ?? videoDuration : undefined}
+                priceResolution={traditionalSubTab === "image" ? activeImageResolution : undefined}
+                priceImageQuality={traditionalSubTab === "image" ? imageQuality : undefined}
+                priceReferenceTypes={traditionalSubTab === "video" ? videoPriceReferenceTypes : undefined}
+                priceThinkingLevel={traditionalSubTab === "image" ? imageThinkingLevel : undefined}
+                priceVideoReferenceMode={traditionalSubTab === "video" ? activeVideoReferenceMode : undefined}
+                priceVideoResolution={traditionalSubTab === "video" ? videoResolution : undefined}
                 onGenerate={traditionalSubTab === "image" ? generateManualImage : generateManualVideo}
               />
             </div>

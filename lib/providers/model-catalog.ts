@@ -192,6 +192,91 @@ const GPT_QUALITY_OPTIONS: ParameterOption[] = [
   { value: "high", label: "High" },
 ];
 
+const RUNNINGHUB_GPT_IMAGE_CHANNEL_RATIOS: ParameterOption[] = [
+  { value: "empty", label: "Auto" },
+  { value: "3:2", label: "3:2 Landscape" },
+  { value: "1:1", label: "1:1 Square" },
+  { value: "2:3", label: "2:3 Portrait" },
+  { value: "5:4", label: "5:4 Landscape" },
+  { value: "4:5", label: "4:5 Portrait" },
+  { value: "16:9", label: "16:9 Cinema" },
+  { value: "9:16", label: "9:16 Vertical" },
+  { value: "21:9", label: "21:9 Wide" },
+  { value: "3:4", label: "3:4 Portrait" },
+  { value: "4:3", label: "4:3 Landscape" },
+];
+
+const RUNNINGHUB_GPT_IMAGE_OFFICIAL_RATIOS: ParameterOption[] = [
+  { value: "1:1", label: "1:1 Square" },
+  { value: "1:2", label: "1:2 Portrait" },
+  { value: "2:1", label: "2:1 Landscape" },
+  { value: "1:3", label: "1:3 Portrait" },
+  { value: "3:1", label: "3:1 Landscape" },
+  { value: "2:3", label: "2:3 Portrait" },
+  { value: "3:2", label: "3:2 Landscape" },
+  { value: "3:4", label: "3:4 Portrait" },
+  { value: "4:3", label: "4:3 Landscape" },
+  { value: "4:5", label: "4:5 Portrait" },
+  { value: "5:4", label: "5:4 Landscape" },
+  { value: "9:16", label: "9:16 Vertical" },
+  { value: "21:9", label: "21:9 Wide" },
+  { value: "9:21", label: "9:21 Portrait" },
+  { value: "16:9", label: "16:9 Cinema" },
+];
+
+const RUNNINGHUB_GPT_IMAGE_RESOLUTIONS: ParameterOption[] = [
+  { value: "1k", label: "1K" },
+  { value: "2k", label: "2K" },
+  { value: "4k", label: "4K" },
+];
+
+const RUNNINGHUB_GPT_QUALITY_OPTIONS: ParameterOption[] = [
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" },
+];
+
+const RUNNINGHUB_GEMINI_FLASH_IMAGE_RATIOS: ParameterOption[] = [
+  { value: "1:1", label: "1:1 Square" },
+  { value: "16:9", label: "16:9 Cinema" },
+  { value: "9:16", label: "9:16 Vertical" },
+  { value: "4:3", label: "4:3 Landscape" },
+  { value: "3:4", label: "3:4 Portrait" },
+  { value: "3:2", label: "3:2 Landscape" },
+  { value: "2:3", label: "2:3 Portrait" },
+  { value: "5:4", label: "5:4 Landscape" },
+  { value: "4:5", label: "4:5 Portrait" },
+  { value: "21:9", label: "21:9 Wide" },
+  { value: "1:4", label: "1:4 Portrait" },
+  { value: "4:1", label: "4:1 Landscape" },
+  { value: "1:8", label: "1:8 Portrait" },
+  { value: "8:1", label: "8:1 Landscape" },
+];
+
+const RUNNINGHUB_GEMINI_PRO_IMAGE_RATIOS: ParameterOption[] = [
+  { value: "1:1", label: "1:1 Square" },
+  { value: "16:9", label: "16:9 Cinema" },
+  { value: "9:16", label: "9:16 Vertical" },
+  { value: "4:3", label: "4:3 Landscape" },
+  { value: "3:4", label: "3:4 Portrait" },
+  { value: "3:2", label: "3:2 Landscape" },
+  { value: "2:3", label: "2:3 Portrait" },
+  { value: "5:4", label: "5:4 Landscape" },
+  { value: "4:5", label: "4:5 Portrait" },
+  { value: "21:9", label: "21:9 Wide" },
+];
+
+const RUNNINGHUB_GEMINI_IMAGE_RESOLUTIONS: ParameterOption[] = [
+  { value: "1k", label: "1K" },
+  { value: "2k", label: "2K" },
+  { value: "4k", label: "4K" },
+];
+
+const RUNNINGHUB_GEMINI_ULTRA_IMAGE_RESOLUTIONS: ParameterOption[] = [
+  { value: "4k", label: "4K" },
+  { value: "8k", label: "8K" },
+];
+
 const THINKING_LEVELS: ParameterOption[] = [
   { value: "minimal", label: "Minimal" },
   { value: "high", label: "High" },
@@ -261,6 +346,7 @@ const SEEDANCE_VIDEO_RESOLUTIONS: ParameterOption[] = [
 
 const RUNNINGHUB_SEEDANCE_VIDEO_RESOLUTIONS: ParameterOption[] = [
   ...SEEDANCE_VIDEO_RESOLUTIONS,
+  { value: "2k", label: "2K" },
   { value: "4k", label: "4K" },
 ];
 
@@ -1187,10 +1273,23 @@ function runningHubImageParameterProfile(
 ): Pick<ImageCapabilityInput, "aspectRatios" | "qualityLevels" | "sizes"> {
   const lower = model.model.toLowerCase();
   if (lower.includes("rhart-image-g-2")) {
+    const isOfficial = lower.includes("official");
     return {
-      aspectRatios: GPT_IMAGE_RATIOS,
-      qualityLevels: GPT_QUALITY_OPTIONS,
-      sizes: GPT_IMAGE_SIZES,
+      aspectRatios: isOfficial ? RUNNINGHUB_GPT_IMAGE_OFFICIAL_RATIOS : RUNNINGHUB_GPT_IMAGE_CHANNEL_RATIOS,
+      qualityLevels: isOfficial ? RUNNINGHUB_GPT_QUALITY_OPTIONS : undefined,
+      sizes: RUNNINGHUB_GPT_IMAGE_RESOLUTIONS,
+    };
+  }
+  if (lower.includes("rhart-image-n-g31-flash")) {
+    return {
+      aspectRatios: RUNNINGHUB_GEMINI_FLASH_IMAGE_RATIOS,
+      sizes: RUNNINGHUB_GEMINI_IMAGE_RESOLUTIONS,
+    };
+  }
+  if (lower.includes("rhart-image-n-pro")) {
+    return {
+      aspectRatios: RUNNINGHUB_GEMINI_PRO_IMAGE_RATIOS,
+      sizes: lower.includes("ultra") ? RUNNINGHUB_GEMINI_ULTRA_IMAGE_RESOLUTIONS : RUNNINGHUB_GEMINI_IMAGE_RESOLUTIONS,
     };
   }
   if (
@@ -1220,7 +1319,7 @@ function runningHubVideoParameterProfile(
   if (lower.includes("seedance")) {
     return {
       durations: optionList(model.durationOptions),
-      resolutions: RUNNINGHUB_SEEDANCE_VIDEO_RESOLUTIONS,
+      resolutions: optionList(model.resolutionOptions) ?? RUNNINGHUB_SEEDANCE_VIDEO_RESOLUTIONS,
       sizes: SEEDANCE_VIDEO_SIZES,
     };
   }
@@ -1301,8 +1400,9 @@ function runningHubVirtualCapability(model: string, kind?: ModelKind): ProviderM
       supportsReferences: true,
       sizes: RUNNINGHUB_VIDEO_SIZES,
       videoReferenceMode: "reference",
-      maxReferenceImages: 4,
+      maxReferenceImages: 9,
       minReferenceImages: 0,
+      referenceMediaTypes: ["image", "video", "audio"],
     });
   }
   if (resolvedKind === "image") {
@@ -1313,6 +1413,7 @@ function runningHubVirtualCapability(model: string, kind?: ModelKind): ProviderM
       model,
       supportsAsync: false,
       supportsReferences: true,
+      maxReferenceImages: 9,
       sizes: RUNNINGHUB_IMAGE_SIZES,
     });
   }

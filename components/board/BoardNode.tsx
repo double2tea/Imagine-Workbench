@@ -2,7 +2,7 @@
 
 import { memo } from "react";
 import { Handle, Position, useConnection, type Node, type NodeProps } from "@xyflow/react";
-import { ImagePlus, Layers, Music, Trash2, Video } from "lucide-react";
+import { ImagePlus, Layers, Music, Trash2, Video, Workflow } from "lucide-react";
 import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
 import PreviewImage from "@/components/PreviewImage";
 import type {
@@ -11,6 +11,8 @@ import type {
   BoardNode as BoardNodeModel,
   BoardPortKind,
   BoardReferenceRole,
+  BoardRunningHubNodeInfoBinding,
+  BoardRunningHubAppNodeUpdate,
 } from "@/lib/board";
 import AgentBoardNode from "@/components/board/AgentBoardNode";
 import AssetBoardNode from "@/components/board/AssetBoardNode";
@@ -18,6 +20,7 @@ import GenerateBoardNode, { type BoardGenerateInputSummary, type BoardGenerateTa
 import NoteBoardNode from "@/components/board/NoteBoardNode";
 import PromptBoardNode from "@/components/board/PromptBoardNode";
 import ReferenceGroupBoardNode from "@/components/board/ReferenceGroupBoardNode";
+import RunningHubAppBoardNode from "@/components/board/RunningHubAppBoardNode";
 import type { StorageItem } from "@/lib/db";
 import { getMediaReferenceType } from "@/lib/media-references";
 import type { BoardPromptReference } from "@/lib/board/prompt-references";
@@ -40,6 +43,7 @@ export interface BoardFlowNodeData extends Record<string, unknown> {
   onCaptureVideoFrame: (nodeId: string, item: StorageItem, frame: CapturedVideoFrame) => void | Promise<void>;
   onEditAssetImage: (nodeId: string) => void;
   onExecuteGenerate: (nodeId: string) => void;
+  onFetchRunningHubAppSchema: (webappId: string) => Promise<BoardRunningHubNodeInfoBinding[]>;
   onMoveReferenceGroupItem: (nodeId: string, assetId: string, direction: "up" | "down") => void;
   onRemoveReferenceGroupItem: (nodeId: string, assetId: string) => void;
   onSendAgent: (nodeId: string) => void;
@@ -50,6 +54,7 @@ export interface BoardFlowNodeData extends Record<string, unknown> {
   onUpdateReferenceGroupItemRole: (nodeId: string, assetId: string, role: BoardReferenceRole) => void;
   onUpdateAgent: (nodeId: string, instruction: string) => void;
   onUpdateGenerate: (nodeId: string, input: BoardGenerateNodeUpdate) => void;
+  onUpdateRunningHubApp: (nodeId: string, input: BoardRunningHubAppNodeUpdate) => void;
   onUpdateNote: (nodeId: string, body: string) => void;
   onUpdatePrompt: (nodeId: string, prompt: string) => void;
   resultItems: StorageItem[];
@@ -73,6 +78,7 @@ interface BoardHandleProps {
 function nodeIcon(node: BoardNodeModel) {
   if (node.kind === "image-generate") return <ImagePlus className="h-3.5 w-3.5 text-blue-300" />;
   if (node.kind === "video-generate") return <Video className="h-3.5 w-3.5 text-violet-300" />;
+  if (node.kind === "runninghub-app") return <Workflow className="h-3.5 w-3.5 text-emerald-300" />;
   if (node.kind === "agent") return <AgentIdentityMark variant="inline" />;
   if (node.kind === "reference-group") return <Layers className="h-3.5 w-3.5 text-cyan-300" />;
   return null;
@@ -111,7 +117,7 @@ function BoardHandle({ id, kind, label, position, top, type, zone = "edge", zone
 }
 
 function nodeBodyOverflowClass(kind: BoardNodeModel["kind"]): string {
-  if (kind === "prompt" || kind === "image-generate" || kind === "video-generate") {
+  if (kind === "prompt" || kind === "image-generate" || kind === "video-generate" || kind === "runninghub-app") {
     return "overflow-visible";
   }
   return "overflow-hidden";
@@ -194,7 +200,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
       style={{ height: node.size.height, width: node.size.width }}
     >
       {ports.map(handleForPort)}
-      {selected && (node.kind === "image-generate" || node.kind === "video-generate") ? (
+      {selected && (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app") ? (
         <GenerateReferenceShelf references={data.generateInputSummary?.referencePreviews ?? []} />
       ) : null}
 
@@ -260,6 +266,17 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             onSelectReference={reference => data.onSelectPromptReference(node.id, reference)}
             onUpdate={input => data.onUpdateGenerate(node.id, input)}
             />
+        )}
+        {node.kind === "runninghub-app" && (
+          <RunningHubAppBoardNode
+            inputSummary={data.generateInputSummary}
+            node={node}
+            references={data.generateReferences}
+            onExecute={() => data.onExecuteGenerate(node.id)}
+            onFetchAppSchema={data.onFetchRunningHubAppSchema}
+            onSelectReference={reference => data.onSelectPromptReference(node.id, reference)}
+            onUpdate={input => data.onUpdateRunningHubApp(node.id, input)}
+          />
         )}
         {node.kind === "agent" && (
           <AgentBoardNode

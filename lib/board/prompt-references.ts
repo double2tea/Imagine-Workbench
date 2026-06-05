@@ -38,6 +38,7 @@ const GALLERY_REFERENCE_LIMIT = 24;
 function generateNodeReferenceTypes(node: BoardNode | undefined): ReadonlySet<MediaReferenceType> | null {
   if (node?.kind === "image-generate") return new Set<MediaReferenceType>(["image"]);
   if (node?.kind === "video-generate") return new Set(getVideoModelCapabilities(node.model).referenceMediaTypes);
+  if (node?.kind === "runninghub-app") return new Set<MediaReferenceType>(["image", "video", "audio"]);
   return null;
 }
 
@@ -185,13 +186,13 @@ export function assetCompareReferenceUrl(
   const resultEdge = edges.find(edge => edge.to.nodeId === assetNodeId && edge.from.portId === "result-out");
   if (!resultEdge) return null;
   const sourceNode = nodes.find(node => node.id === resultEdge.from.nodeId);
-  if (sourceNode?.kind !== "image-generate" && sourceNode?.kind !== "video-generate") return null;
+  if (sourceNode?.kind !== "image-generate" && sourceNode?.kind !== "video-generate" && sourceNode?.kind !== "runninghub-app") return null;
   const references = generateReferenceCandidates(nodes, edges, sourceNode.id);
   return references[0]?.url ?? null;
 }
 
 export function isGenerateEdgeProcessing(edge: BoardEdge, nodes: BoardNode[]): boolean {
   const source = nodes.find(node => node.id === edge.from.nodeId);
-  if (source?.kind !== "image-generate" && source?.kind !== "video-generate") return false;
+  if (source?.kind !== "image-generate" && source?.kind !== "video-generate" && source?.kind !== "runninghub-app") return false;
   return source.status === "processing";
 }

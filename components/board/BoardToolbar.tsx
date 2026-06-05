@@ -144,7 +144,7 @@ export default function BoardToolbar({
   const [isBoardMenuOpen, setIsBoardMenuOpen] = useState(false);
   const [isInsertMenuOpen, setIsInsertMenuOpen] = useState(false);
   const [isOverflowOpen, setIsOverflowOpen] = useState(false);
-  const [lastInsertKind, setLastInsertKind] = useState<BoardInsertKind>(() => readLastBoardInsertKind());
+  const [lastInsertKind, setLastInsertKind] = useState<BoardInsertKind>("prompt");
   const [boardMenuPosition, setBoardMenuPosition] = useState({ left: 16, top: 56 });
   const [insertMenuPosition, setInsertMenuPosition] = useState({ left: 16, top: 56 });
   const [overflowMenuPosition, setOverflowMenuPosition] = useState({ left: 16, top: 56 });
@@ -173,6 +173,10 @@ export default function BoardToolbar({
         },
         ...boardSummaries,
       ];
+
+  useEffect(() => {
+    setLastInsertKind(readLastBoardInsertKind());
+  }, []);
 
   useEffect(() => {
     if (!isBoardMenuOpen && !isInsertMenuOpen && !isOverflowOpen) return;

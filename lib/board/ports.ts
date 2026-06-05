@@ -20,7 +20,12 @@ function isGenerateNode(node: BoardNode): node is BoardNode & { kind: "image-gen
   return node.kind === "image-generate" || node.kind === "video-generate";
 }
 
+function isExecutableNode(node: BoardNode): boolean {
+  return isGenerateNode(node) || node.kind === "runninghub-app";
+}
+
 export function boardNodeSupportsReferenceInput(node: BoardNode): boolean {
+  if (node.kind === "runninghub-app") return true;
   if (!isGenerateNode(node)) return false;
   return getModelCapability(node.model, node.kind === "image-generate" ? "image" : "video").supportsReferences;
 }
@@ -44,7 +49,7 @@ export function getBoardNodePortDefinitions(
       { id: BOARD_PORT_IDS.assetOut, label: "参考组输出", kind: "asset", direction: "output" },
     ];
   }
-  if (isGenerateNode(node)) {
+  if (isGenerateNode(node) || node.kind === "runninghub-app") {
     const ports: BoardPortDefinition[] = [
       { id: BOARD_PORT_IDS.promptIn, label: "提示输入", kind: "prompt", direction: "input" },
     ];
@@ -93,6 +98,10 @@ function isReferenceSource(node: BoardNode): boolean {
 }
 
 function isAcceptedGenerateReferenceSource(source: BoardNode, target: BoardNode): boolean {
+  if (target.kind === "runninghub-app") {
+    if (source.kind === "reference-group") return source.references.length > 0;
+    return source.kind === "asset";
+  }
   if (!isGenerateNode(target)) return false;
   if (source.kind === "reference-group") {
     if (source.references.length === 0) return false;
@@ -119,7 +128,7 @@ export function resolveBoardConnectionKind(nodes: BoardNode[], from: BoardPortRe
 
   if (
     source.node.kind === "prompt" &&
-    isGenerateNode(target.node) &&
+    isExecutableNode(target.node) &&
     source.port.id === BOARD_PORT_IDS.promptOut &&
     target.port.id === BOARD_PORT_IDS.promptIn
   ) {
@@ -128,7 +137,7 @@ export function resolveBoardConnectionKind(nodes: BoardNode[], from: BoardPortRe
 
   if (
     isAcceptedGenerateReferenceSource(source.node, target.node) &&
-    isGenerateNode(target.node) &&
+    isExecutableNode(target.node) &&
     source.port.id === BOARD_PORT_IDS.assetOut &&
     target.port.id === BOARD_PORT_IDS.referenceIn
   ) {
@@ -145,7 +154,7 @@ export function resolveBoardConnectionKind(nodes: BoardNode[], from: BoardPortRe
   }
 
   if (
-    isGenerateNode(source.node) &&
+    isExecutableNode(source.node) &&
     target.node.kind === "asset" &&
     source.port.id === BOARD_PORT_IDS.resultOut &&
     target.port.id === BOARD_PORT_IDS.assetIn
