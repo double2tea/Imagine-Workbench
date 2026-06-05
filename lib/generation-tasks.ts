@@ -63,6 +63,12 @@ export interface ListGenerationTasksOptions {
   offset?: number;
 }
 
+export interface CreateGenerationTaskRetryInput {
+  id: string;
+  createdAt: string;
+  progress?: number;
+}
+
 export type GenerationTaskUpdate = Partial<Omit<GenerationTask, "id" | "createdAt">>;
 
 function clampProgress(progress: number): number {
@@ -200,4 +206,31 @@ export async function updateGenerationTask(id: string, update: GenerationTaskUpd
   };
   await saveGenerationTask(next);
   return next;
+}
+
+export async function cancelGenerationTask(id: string): Promise<GenerationTask> {
+  return updateGenerationTask(id, {
+    status: "canceled",
+    progress: 100,
+  });
+}
+
+export function createRetryGenerationTask(
+  task: GenerationTask,
+  input: CreateGenerationTaskRetryInput,
+): GenerationTask {
+  if (task.status !== "failed") {
+    throw new Error(`Only failed generation tasks can be retried: ${task.id}`);
+  }
+  return createGenerationTask({
+    id: input.id,
+    mediaType: task.mediaType,
+    prompt: task.prompt,
+    model: task.model,
+    status: "pending",
+    progress: input.progress ?? 0,
+    createdAt: input.createdAt,
+    source: task.source,
+    request: task.request,
+  });
 }

@@ -36,6 +36,7 @@ import { useAssetActions } from "@/hooks/useAssetActions";
 import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
 import { useClipboardImageImport } from "@/hooks/useClipboardImageImport";
 import { useGenerationActions } from "@/hooks/useGenerationActions";
+import { useGenerationTaskStore } from "@/hooks/useGenerationTaskStore";
 import { useMediaPolling } from "@/hooks/useMediaPolling";
 import {
   IMAGE_REFERENCE_LIMIT,
@@ -176,6 +177,7 @@ export default function Home() {
 
   // Database State
   const [items, setItems] = useState<StorageItem[]>([]);
+  const { generationTasks, setGenerationTasks } = useGenerationTaskStore();
 
   // Traditional Form States
   const [prompt, setPrompt] = useState("");
@@ -442,10 +444,11 @@ export default function Home() {
 
   useMediaPolling({
     buildProviderHeaders,
-    items,
+    generationTasks,
     locallyCanceledItemIdsRef,
     pollingFailuresRef,
     pushWorkspaceNotice,
+    setGenerationTasks,
     setItems,
   });
   const {
@@ -472,6 +475,7 @@ export default function Home() {
     referenceImages,
     selectedModel,
     selectedVideoModel,
+    setGenerationTasks,
     setImageSubmitCount,
     setItems,
     setVideoSubmitCount,

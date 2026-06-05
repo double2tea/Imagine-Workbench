@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   createGenerationTask,
+  createRetryGenerationTask,
   generationTaskRequestSnapshot,
   legacyStorageItemToGenerationTask,
   legacyStorageItemsToGenerationTasks,
@@ -114,4 +115,53 @@ test("legacyStorageItemsToGenerationTasks excludes completed assets and sorts ne
   ]);
 
   assert.deepEqual(tasks.map(task => task.legacyAssetId), ["newer", "older"]);
+});
+
+test("createRetryGenerationTask creates a new pending attempt from a failed task", () => {
+  const failedTask = createGenerationTask({
+    id: "task_failed",
+    mediaType: "image",
+    prompt: "prompt",
+    model: "model",
+    status: "failed",
+    progress: 100,
+    createdAt: timestamp,
+    source: { surface: "workspace" },
+    request: requestWithPassword,
+    resultAssetIds: ["asset_old"],
+    activeResultAssetId: "asset_old",
+  });
+
+  const retryTask = createRetryGenerationTask(failedTask, {
+    id: "task_retry",
+    createdAt: "2026-06-05T04:00:00.000Z",
+    progress: 12,
+  });
+
+  assert.equal(retryTask.id, "task_retry");
+  assert.equal(retryTask.status, "pending");
+  assert.equal(retryTask.progress, 12);
+  assert.deepEqual(retryTask.resultAssetIds, []);
+  assert.equal(retryTask.activeResultAssetId, undefined);
+  assert.equal(retryTask.prompt, failedTask.prompt);
+  assert.equal(retryTask.source.surface, "workspace");
+  assert.equal("runningHubAccessPassword" in (retryTask.request ?? {}), false);
+});
+
+test("createRetryGenerationTask rejects non-failed tasks", () => {
+  const processingTask = createGenerationTask({
+    id: "task_processing",
+    mediaType: "video",
+    prompt: "prompt",
+    model: "model",
+    status: "processing",
+    progress: 50,
+    createdAt: timestamp,
+    source: { surface: "workspace" },
+  });
+
+  assert.throws(
+    () => createRetryGenerationTask(processingTask, { id: "task_retry", createdAt: timestamp }),
+    /Only failed generation tasks can be retried/,
+  );
 });

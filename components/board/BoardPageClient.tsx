@@ -35,6 +35,7 @@ import { generateReferenceCandidates } from "@/lib/board/prompt-references";
 import { useBoardState } from "@/hooks/useBoardState";
 import { useClipboardImageImport } from "@/hooks/useClipboardImageImport";
 import { useGenerationActions } from "@/hooks/useGenerationActions";
+import { useGenerationTaskStore } from "@/hooks/useGenerationTaskStore";
 import { useMediaPolling } from "@/hooks/useMediaPolling";
 import {
   IMAGE_REFERENCE_LIMIT,
@@ -910,6 +911,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     reload: reloadBoardAssets,
     setItems,
   } = useBoardAssetStore(resolvedBoardId, boardController.board.nodes);
+  const { generationTasks, setGenerationTasks } = useGenerationTaskStore({ boardId: resolvedBoardId });
   const [boardSummaries, setBoardSummaries] = useState<BoardSummary[]>([]);
   const [, setMode] = useState<BoardMode>("image");
   const [prompt, setPrompt] = useState("");
@@ -1163,10 +1165,11 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
   useMediaPolling({
     buildProviderHeaders,
-    items,
+    generationTasks,
     locallyCanceledItemIdsRef,
     pollingFailuresRef,
     pushWorkspaceNotice,
+    setGenerationTasks,
     setItems,
   });
 
@@ -1192,6 +1195,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     referenceImages,
     selectedModel,
     selectedVideoModel,
+    setGenerationTasks,
     setImageSubmitCount,
     setItems,
     setVideoSubmitCount,

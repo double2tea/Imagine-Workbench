@@ -9,6 +9,15 @@ import {
   type GenerationRequestSnapshot,
   type StorageItem,
 } from "@/lib/db";
+import {
+  cancelGenerationTask,
+  createGenerationTask,
+  saveGenerationTask,
+  updateGenerationTask,
+  type GenerationTask,
+  type GenerationTaskSource,
+  type GenerationTaskUpdate,
+} from "@/lib/generation-tasks";
 import type { RunningHubTaskNodeBinding } from "@/lib/providers/types";
 import { buildPromptWithReferenceMap } from "@/hooks/useReferenceState";
 import { getMediaReferenceType, mediaReferenceLabel } from "@/lib/media-references";
@@ -40,6 +49,7 @@ interface UseGenerationActionsParams {
   referenceImages: ReferenceImageRef[];
   selectedModel: string;
   selectedVideoModel: string;
+  setGenerationTasks: Dispatch<SetStateAction<GenerationTask[]>>;
   setImageSubmitCount: Dispatch<SetStateAction<number>>;
   setItems: Dispatch<SetStateAction<StorageItem[]>>;
   setVideoSubmitCount: Dispatch<SetStateAction<number>>;
@@ -100,6 +110,58 @@ async function saveItemOrWarn(
     console.error("IndexedDB Save Failed:", error);
     pushWorkspaceNotice("error", `本地存储失败，刷新后可能丢失：${message}`);
     return false;
+  }
+}
+
+function upsertGenerationTask(tasks: GenerationTask[], task: GenerationTask): GenerationTask[] {
+  const merged = new Map(tasks.map(entry => [entry.id, entry]));
+  merged.set(task.id, task);
+  return Array.from(merged.values()).sort(
+    (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+  );
+}
+
+async function saveTaskOrWarn(
+  task: GenerationTask,
+  pushWorkspaceNotice: (type: NoticeType, message: string) => void,
+): Promise<boolean> {
+  try {
+    await saveGenerationTask(task);
+    return true;
+  } catch (error) {
+    const message = toErrorMessage(error, "任务写入失败");
+    console.error("Generation Task Save Failed:", error);
+    pushWorkspaceNotice("error", `任务存储失败，未启动远端生成：${message}`);
+    return false;
+  }
+}
+
+async function updateTaskOrWarn(
+  id: string,
+  update: GenerationTaskUpdate,
+  pushWorkspaceNotice: (type: NoticeType, message: string) => void,
+): Promise<GenerationTask | null> {
+  try {
+    return await updateGenerationTask(id, update);
+  } catch (error) {
+    const message = toErrorMessage(error, "任务更新失败");
+    console.error("Generation Task Update Failed:", error);
+    pushWorkspaceNotice("error", `任务状态更新失败：${message}`);
+    return null;
+  }
+}
+
+async function cancelTaskOrWarn(
+  id: string,
+  pushWorkspaceNotice: (type: NoticeType, message: string) => void,
+): Promise<GenerationTask | null> {
+  try {
+    return await cancelGenerationTask(id);
+  } catch (error) {
+    const message = toErrorMessage(error, "任务取消状态更新失败");
+    console.error("Generation Task Cancel Failed:", error);
+    pushWorkspaceNotice("error", `任务取消状态更新失败：${message}`);
+    return null;
   }
 }
 
@@ -180,12 +242,30 @@ export function useGenerationActions({
   referenceImages,
   selectedModel,
   selectedVideoModel,
+  setGenerationTasks,
   setImageSubmitCount,
   setItems,
   setVideoSubmitCount,
 }: UseGenerationActionsParams) {
   const resolveScopeBoardId = (overrides: GenerationOverrides): string | undefined =>
     overrides.boardId ?? boardId;
+
+  const resolveTaskSource = (overrides: GenerationOverrides): GenerationTaskSource => {
+    const scopedBoardId = resolveScopeBoardId(overrides);
+    if (scopedBoardId || overrides.boardNodeId || overrides.boardResultStackKey) {
+      return {
+        surface: "board",
+        ...(scopedBoardId ? { boardId: scopedBoardId } : {}),
+        ...(overrides.boardNodeId ? { boardNodeId: overrides.boardNodeId } : {}),
+        ...(overrides.boardResultStackKey ? { resultStackKey: overrides.boardResultStackKey } : {}),
+      };
+    }
+    return { surface: "workspace" };
+  };
+
+  const recordGenerationTask = (task: GenerationTask) => {
+    setGenerationTasks(prev => upsertGenerationTask(prev, task));
+  };
 
   const generateManualImage = async (overrides: GenerationOverrides = {}) => {
     const activePrompt = overrides.prompt ?? prompt;
@@ -254,29 +334,27 @@ export function useGenerationActions({
     };
     const displayedImageSize = /^\d+x\d+$/.test(requestImageResolution) ? requestImageResolution : requestAspectRatio;
 
-    const tempId = makeClientId("temp_img");
-    const newItem = buildStorageItem(
-      {
-        id: tempId,
-        type: "image",
-        url: "https://picsum.photos/800/800",
-        prompt: activePrompt,
-        model: requestModel,
-        aspectRatio: displayedImageSize,
-          createdAt: new Date().toISOString(),
-          status: "pending",
-          progress: 30,
-          generationRequest,
-          sourceBoardNodeId: overrides.boardNodeId,
-          sourceBoardResultStackKey: overrides.boardResultStackKey,
-        },
-      { boardId: resolveScopeBoardId(overrides) },
-    );
-
-    setItems(prev => [newItem, ...prev]);
+    const taskId = makeClientId("task_img");
+    const createdAt = new Date().toISOString();
+    const task = createGenerationTask({
+      id: taskId,
+      mediaType: "image",
+      prompt: activePrompt,
+      model: requestModel,
+      status: "pending",
+      progress: 30,
+      createdAt,
+      source: resolveTaskSource(overrides),
+      request: generationRequest,
+    });
+    if (!await saveTaskOrWarn(task, pushWorkspaceNotice)) {
+      setImageSubmitCount(prev => Math.max(0, prev - 1));
+      return true;
+    }
+    recordGenerationTask(task);
 
     const controller = new AbortController();
-    generationAbortControllersRef.current[tempId] = controller;
+    generationAbortControllersRef.current[taskId] = controller;
 
     try {
       const headers = buildProviderHeaders(overrides.model ?? selectedModel);
@@ -294,68 +372,77 @@ export function useGenerationActions({
       if (res.ok) {
         const { operationName, imageUrl } = await readImageGenerationPayload(res);
         if (operationName) {
-          const compilingItem = buildStorageItem(
-            {
-              ...newItem,
-              id: makeClientId("img"),
-              operationName,
-              status: "processing",
-              progress: 15,
-            },
-            { boardId: resolveScopeBoardId(overrides) },
-          );
-          if (!await saveItemOrWarn(compilingItem, pushWorkspaceNotice)) {
-            setItems(prev => [compilingItem, ...prev.filter(item => item.id !== tempId)]);
-            return true;
-          }
-          setItems(prev => [compilingItem, ...prev.filter(item => item.id !== tempId)]);
+          const processingTask = await updateTaskOrWarn(taskId, {
+            operationName,
+            status: "processing",
+            progress: 15,
+            canCancelRemote: operationName.startsWith("12ai:video:"),
+          }, pushWorkspaceNotice);
+          if (processingTask) recordGenerationTask(processingTask);
           return true;
         }
 
-        const completedItem = buildStorageItem(
-          {
-            ...newItem,
-            id: makeClientId("img"),
-            url: imageUrl ?? "",
-            status: "complete",
-            progress: 100,
-          },
-          { boardId: resolveScopeBoardId(overrides) },
-        );
         if (!imageUrl) {
           throw new Error("图片接口返回缺少 imageUrl 或 operationName");
         }
+        const completedAssetId = makeClientId("img");
+        const completedItem = buildStorageItem(
+          {
+            id: completedAssetId,
+            type: "image",
+            url: imageUrl,
+            prompt: activePrompt,
+            model: requestModel,
+            aspectRatio: displayedImageSize,
+            createdAt,
+            status: "complete",
+            progress: 100,
+            generationRequest,
+            sourceBoardNodeId: overrides.boardNodeId,
+            sourceBoardResultStackKey: overrides.boardResultStackKey,
+          },
+          { boardId: resolveScopeBoardId(overrides) },
+        );
 
         if (!await saveItemOrWarn(completedItem, pushWorkspaceNotice)) {
-          setItems(prev => [completedItem, ...prev.filter(item => item.id !== tempId)]);
+          const failedTask = await updateTaskOrWarn(taskId, {
+            status: "failed",
+            progress: 100,
+            errorMessage: "结果资产本地存储失败",
+          }, pushWorkspaceNotice);
+          if (failedTask) recordGenerationTask(failedTask);
           return true;
         }
-        setItems(prev => [completedItem, ...prev.filter(item => item.id !== tempId)]);
+        setItems(prev => [completedItem, ...prev]);
+        const completeTask = await updateTaskOrWarn(taskId, {
+          activeResultAssetId: completedAssetId,
+          resultAssetIds: [completedAssetId],
+          status: "complete",
+          progress: 100,
+        }, pushWorkspaceNotice);
+        if (completeTask) recordGenerationTask(completeTask);
       } else {
         throw new Error(await readFetchError(res, "图片生成请求失败"));
       }
     } catch (error) {
-      if (locallyCanceledItemIdsRef.current.has(tempId) || isAbortError(error)) {
-        locallyCanceledItemIdsRef.current.delete(tempId);
+      if (locallyCanceledItemIdsRef.current.has(taskId) || isAbortError(error)) {
+        locallyCanceledItemIdsRef.current.delete(taskId);
+        const canceledTask = await cancelTaskOrWarn(taskId, pushWorkspaceNotice);
+        if (canceledTask) recordGenerationTask(canceledTask);
         return true;
       }
       console.error(error);
       const message = toErrorMessage(error, "图片生成失败");
-      const failedItem = buildStorageItem(
-        {
-          ...newItem,
-          status: "failed",
-          progress: 100,
-          errorMessage: message,
-        },
-        { boardId: resolveScopeBoardId(overrides) },
-      );
-      await saveItemOrWarn(failedItem, pushWorkspaceNotice);
-      setItems(prev => [failedItem, ...prev.filter(item => item.id !== tempId)]);
+      const failedTask = await updateTaskOrWarn(taskId, {
+        status: "failed",
+        progress: 100,
+        errorMessage: message,
+      }, pushWorkspaceNotice);
+      if (failedTask) recordGenerationTask(failedTask);
       pushWorkspaceNotice("error", message);
       return true;
     } finally {
-      delete generationAbortControllersRef.current[tempId];
+      delete generationAbortControllersRef.current[taskId];
       setImageSubmitCount(prev => Math.max(0, prev - 1));
     }
     return true;
@@ -413,29 +500,26 @@ export function useGenerationActions({
       referenceMedia: buildReferenceMediaSnapshot(videoReferences, videoReferencePayloads),
     };
 
-    const tempId = makeClientId("temp_vid");
-    const newItem = buildStorageItem(
-      {
-        id: tempId,
-        type: "video",
-        url: "",
-        prompt: activePrompt,
-        model: requestModel,
-        aspectRatio: requestSize,
-          createdAt: new Date().toISOString(),
-          status: "processing",
-          progress: 12,
-          generationRequest,
-          sourceBoardNodeId: overrides.boardNodeId,
-          sourceBoardResultStackKey: overrides.boardResultStackKey,
-        },
-      { boardId: resolveScopeBoardId(overrides) },
-    );
-
-    setItems(prev => [newItem, ...prev]);
+    const taskId = makeClientId("task_vid");
+    const task = createGenerationTask({
+      id: taskId,
+      mediaType: "video",
+      prompt: activePrompt,
+      model: requestModel,
+      status: "pending",
+      progress: 12,
+      createdAt: new Date().toISOString(),
+      source: resolveTaskSource(overrides),
+      request: generationRequest,
+    });
+    if (!await saveTaskOrWarn(task, pushWorkspaceNotice)) {
+      setVideoSubmitCount(prev => Math.max(0, prev - 1));
+      return true;
+    }
+    recordGenerationTask(task);
 
     const controller = new AbortController();
-    generationAbortControllersRef.current[tempId] = controller;
+    generationAbortControllersRef.current[taskId] = controller;
 
     try {
       const headers = buildProviderHeaders(requestModel);
@@ -464,46 +548,35 @@ export function useGenerationActions({
           throw new Error("视频接口返回缺少 operationName");
         }
 
-        const compilingItem = buildStorageItem(
-          {
-            ...newItem,
-            id: makeClientId("vid"),
-            operationName: activeOperationName,
-            status: "processing",
-          },
-          { boardId: resolveScopeBoardId(overrides) },
-        );
-
-        if (!await saveItemOrWarn(compilingItem, pushWorkspaceNotice)) {
-          setItems(prev => [compilingItem, ...prev.filter(item => item.id !== tempId)]);
-          return true;
-        }
-        setItems(prev => [compilingItem, ...prev.filter(item => item.id !== tempId)]);
+        const processingTask = await updateTaskOrWarn(taskId, {
+          operationName: activeOperationName,
+          status: "processing",
+          progress: 15,
+          canCancelRemote: activeOperationName.startsWith("12ai:video:"),
+        }, pushWorkspaceNotice);
+        if (processingTask) recordGenerationTask(processingTask);
       } else {
         throw new Error(await readFetchError(res, "视频生成请求失败"));
       }
     } catch (error) {
-      if (locallyCanceledItemIdsRef.current.has(tempId) || isAbortError(error)) {
-        locallyCanceledItemIdsRef.current.delete(tempId);
+      if (locallyCanceledItemIdsRef.current.has(taskId) || isAbortError(error)) {
+        locallyCanceledItemIdsRef.current.delete(taskId);
+        const canceledTask = await cancelTaskOrWarn(taskId, pushWorkspaceNotice);
+        if (canceledTask) recordGenerationTask(canceledTask);
         return true;
       }
       console.error(error);
       const message = toErrorMessage(error, "视频生成失败");
-      const failedItem = buildStorageItem(
-        {
-          ...newItem,
-          status: "failed",
-          progress: 100,
-          errorMessage: message,
-        },
-        { boardId: resolveScopeBoardId(overrides) },
-      );
-      await saveItemOrWarn(failedItem, pushWorkspaceNotice);
-      setItems(prev => [failedItem, ...prev.filter(item => item.id !== tempId)]);
+      const failedTask = await updateTaskOrWarn(taskId, {
+        status: "failed",
+        progress: 100,
+        errorMessage: message,
+      }, pushWorkspaceNotice);
+      if (failedTask) recordGenerationTask(failedTask);
       pushWorkspaceNotice("error", message);
       return true;
     } finally {
-      delete generationAbortControllersRef.current[tempId];
+      delete generationAbortControllersRef.current[taskId];
       setVideoSubmitCount(prev => Math.max(0, prev - 1));
     }
     return true;
@@ -545,29 +618,26 @@ export function useGenerationActions({
       referenceMedia: buildReferenceMediaSnapshot(audioReferences, audioReferencePayloads),
     };
 
-    const tempId = makeClientId("temp_audio");
-    const newItem = buildStorageItem(
-      {
-        id: tempId,
-        type: "audio",
-        url: "",
-        prompt: activePrompt,
-        model: requestModel,
-        aspectRatio: "audio",
-        createdAt: new Date().toISOString(),
-        status: "processing",
-        progress: 12,
-        generationRequest,
-        sourceBoardNodeId: overrides.boardNodeId,
-        sourceBoardResultStackKey: overrides.boardResultStackKey,
-      },
-      { boardId: resolveScopeBoardId(overrides) },
-    );
-
-    setItems(prev => [newItem, ...prev]);
+    const taskId = makeClientId("task_aud");
+    const task = createGenerationTask({
+      id: taskId,
+      mediaType: "audio",
+      prompt: activePrompt,
+      model: requestModel,
+      status: "pending",
+      progress: 12,
+      createdAt: new Date().toISOString(),
+      source: resolveTaskSource(overrides),
+      request: generationRequest,
+    });
+    if (!await saveTaskOrWarn(task, pushWorkspaceNotice)) {
+      setVideoSubmitCount(prev => Math.max(0, prev - 1));
+      return true;
+    }
+    recordGenerationTask(task);
 
     const controller = new AbortController();
-    generationAbortControllersRef.current[tempId] = controller;
+    generationAbortControllersRef.current[taskId] = controller;
 
     try {
       const headers = buildProviderHeaders(requestModel);
@@ -594,46 +664,35 @@ export function useGenerationActions({
           throw new Error("音频接口返回缺少 operationName");
         }
 
-        const compilingItem = buildStorageItem(
-          {
-            ...newItem,
-            id: makeClientId("aud"),
-            operationName: activeOperationName,
-            status: "processing",
-          },
-          { boardId: resolveScopeBoardId(overrides) },
-        );
-
-        if (!await saveItemOrWarn(compilingItem, pushWorkspaceNotice)) {
-          setItems(prev => [compilingItem, ...prev.filter(item => item.id !== tempId)]);
-          return true;
-        }
-        setItems(prev => [compilingItem, ...prev.filter(item => item.id !== tempId)]);
+        const processingTask = await updateTaskOrWarn(taskId, {
+          operationName: activeOperationName,
+          status: "processing",
+          progress: 15,
+          canCancelRemote: activeOperationName.startsWith("12ai:video:"),
+        }, pushWorkspaceNotice);
+        if (processingTask) recordGenerationTask(processingTask);
       } else {
         throw new Error(await readFetchError(res, "音频生成请求失败"));
       }
     } catch (error) {
-      if (locallyCanceledItemIdsRef.current.has(tempId) || isAbortError(error)) {
-        locallyCanceledItemIdsRef.current.delete(tempId);
+      if (locallyCanceledItemIdsRef.current.has(taskId) || isAbortError(error)) {
+        locallyCanceledItemIdsRef.current.delete(taskId);
+        const canceledTask = await cancelTaskOrWarn(taskId, pushWorkspaceNotice);
+        if (canceledTask) recordGenerationTask(canceledTask);
         return true;
       }
       console.error(error);
       const message = toErrorMessage(error, "音频生成失败");
-      const failedItem = buildStorageItem(
-        {
-          ...newItem,
-          status: "failed",
-          progress: 100,
-          errorMessage: message,
-        },
-        { boardId: resolveScopeBoardId(overrides) },
-      );
-      await saveItemOrWarn(failedItem, pushWorkspaceNotice);
-      setItems(prev => [failedItem, ...prev.filter(item => item.id !== tempId)]);
+      const failedTask = await updateTaskOrWarn(taskId, {
+        status: "failed",
+        progress: 100,
+        errorMessage: message,
+      }, pushWorkspaceNotice);
+      if (failedTask) recordGenerationTask(failedTask);
       pushWorkspaceNotice("error", message);
       return true;
     } finally {
-      delete generationAbortControllersRef.current[tempId];
+      delete generationAbortControllersRef.current[taskId];
       setVideoSubmitCount(prev => Math.max(0, prev - 1));
     }
     return true;
