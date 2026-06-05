@@ -37,7 +37,7 @@ export function applyThemeClassesToDom(mode: ThemeMode): void {
 }
 
 export function persistThemeMode(mode: ThemeMode): void {
-  window.localStorage.setItem(STORAGE_KEY, mode);
+  try { window.localStorage.setItem(STORAGE_KEY, mode); } catch { /* storage unavailable */ }
   const root = window.document.documentElement;
   root.setAttribute("data-imagine-theme", mode);
   root.style.colorScheme = mode;

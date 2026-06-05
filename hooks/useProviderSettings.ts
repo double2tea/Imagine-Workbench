@@ -168,7 +168,7 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
   const handleSaveCredential = useCallback((provider: AiProvider, field: keyof ProviderCredentials, value: string) => {
     setProviderCredentials(prev => {
       const next = { ...prev, [provider]: { ...prev[provider], [field]: value } };
-      localStorage.setItem("imagine_provider_credentials", JSON.stringify(next));
+      try { localStorage.setItem("imagine_provider_credentials", JSON.stringify(next)); } catch { /* storage unavailable */ }
       return next;
     });
   }, [setProviderCredentials]);
@@ -176,24 +176,24 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
   const clearProviderCredentials = useCallback((provider: AiProvider) => {
     setProviderCredentials(prev => {
       const next = { ...prev, [provider]: { apiKey: "", baseUrl: "" } };
-      localStorage.setItem("imagine_provider_credentials", JSON.stringify(next));
+      try { localStorage.setItem("imagine_provider_credentials", JSON.stringify(next)); } catch { /* storage unavailable */ }
       return next;
     });
   }, [setProviderCredentials]);
 
   const handleSelectProvider = (provider: AiProvider) => {
     setSelectedProvider(provider);
-    localStorage.setItem("imagine_ai_provider", provider);
+    try { localStorage.setItem("imagine_ai_provider", provider); } catch { /* storage unavailable */ }
   };
 
   const handleSelectChatModel = (model: string) => {
     setSelectedChatModel(model);
-    localStorage.setItem("imagine_chat_model", model);
+    try { localStorage.setItem("imagine_chat_model", model); } catch { /* storage unavailable */ }
     const parsed = tryParseProviderModel(model, selectedProvider);
     if (!parsed) return;
     if (parsed.provider !== selectedProvider) {
       setSelectedProvider(parsed.provider);
-      localStorage.setItem("imagine_ai_provider", parsed.provider);
+      try { localStorage.setItem("imagine_ai_provider", parsed.provider); } catch { /* storage unavailable */ }
     }
   };
 
@@ -203,7 +203,7 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
     options: Record<AiProvider, ModelOption[]>,
   ) => {
     setter(options);
-    localStorage.setItem(modelOptionsStorageKey(category), JSON.stringify(options));
+    try { localStorage.setItem(modelOptionsStorageKey(category), JSON.stringify(options)); } catch { /* storage unavailable */ }
   };
 
   const addManualModels = (category: ModelCategory, rawInput: string) => {
@@ -354,7 +354,7 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
           localStorage.removeItem("imagine_grok2api_api_key");
           localStorage.removeItem("imagine_grok2api_base_url");
           localStorage.removeItem("imagine_custom_api_base_url");
-          localStorage.setItem("imagine_provider_credentials", JSON.stringify(migrated));
+          try { localStorage.setItem("imagine_provider_credentials", JSON.stringify(migrated)); } catch { /* storage unavailable */ }
         }
       }
 
@@ -389,7 +389,7 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
 
       const storedChatModel = localStorage.getItem("imagine_chat_model");
       if (storedChatModel === "12ai:gemini-3.1-flash" || (storedChatModel && !hasChatModel(storedChatModel, restoredChatOptions))) {
-        localStorage.setItem("imagine_chat_model", DEFAULT_CHAT_MODEL);
+        try { localStorage.setItem("imagine_chat_model", DEFAULT_CHAT_MODEL); } catch { /* storage unavailable */ }
       } else if (storedChatModel) {
         setSelectedChatModel(storedChatModel);
       }

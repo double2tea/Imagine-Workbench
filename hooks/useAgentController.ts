@@ -155,6 +155,7 @@ export function useAgentController({
   const [countdownSeconds, setCountdownSeconds] = useState(3);
   const chatBottomRef = useRef<HTMLDivElement | null>(null);
   const autoCountdownInterval = useRef<NodeJS.Timeout | null>(null);
+  const chatPersistTimer = useRef<NodeJS.Timeout | null>(null);
   const agentMessagesRef = useRef(agentMessages);
 
   useEffect(() => {
@@ -192,8 +193,15 @@ export function useAgentController({
 
   useEffect(() => {
     if (agentMessages.length > 1) {
-      localStorage.setItem(chatStorageKey, JSON.stringify(agentMessages));
+      if (chatPersistTimer.current) clearTimeout(chatPersistTimer.current);
+      const snapshot = agentMessages;
+      chatPersistTimer.current = setTimeout(() => {
+        try { localStorage.setItem(chatStorageKey, JSON.stringify(snapshot)); } catch { /* storage unavailable */ }
+      }, 500);
     }
+    return () => {
+      if (chatPersistTimer.current) clearTimeout(chatPersistTimer.current);
+    };
   }, [agentMessages, chatStorageKey]);
 
   const clearAutoCountdownInterval = () => {
@@ -211,7 +219,7 @@ export function useAgentController({
 
   const handleToggleAutoExecute = (value: boolean) => {
     setAutoExecute(value);
-    localStorage.setItem("imagine_auto_execute", String(value));
+    try { localStorage.setItem("imagine_auto_execute", String(value)); } catch { /* storage unavailable */ }
     if (!value) {
       clearActiveCountdown();
     }
@@ -458,7 +466,7 @@ export function useAgentController({
 
   const handleClearChat = () => {
     setAgentMessages([WELCOME_MESSAGE]);
-    localStorage.removeItem(chatStorageKey);
+    try { localStorage.removeItem(chatStorageKey); } catch { /* storage unavailable */ }
   };
 
   return {
