@@ -144,6 +144,21 @@ html[data-imagine-theme="light"],
   box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25), var(--iw-card-shadow);
 }
 
+.react-flow__node.dragging .imagine-board-node {
+  box-shadow: 0 0 0 1px var(--iw-board-border);
+}
+
+.react-flow__node.dragging {
+  will-change: transform;
+}
+
+.react-flow__node.dragging .board-node-handle {
+  box-shadow: none !important;
+  filter: none !important;
+  opacity: 0 !important;
+  transition: none !important;
+}
+
 .imagine-board-quick-insert {
   border-radius: 8px;
   border: 1px solid var(--iw-border);
@@ -2745,6 +2760,12 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
   filter: drop-shadow(0 0 6px rgba(248, 113, 113, 0.36));
 }
 
+.board-canvas.is-node-dragging .react-flow__edge-path,
+.board-canvas.is-node-dragging .react-flow__connection-path {
+  animation: none !important;
+  filter: none !important;
+}
+
 .board-quick-insert-menu {
   backdrop-filter: blur(18px);
   background:
@@ -2890,6 +2911,10 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 .imagine-workbench-shell.imagine-theme-light .imagine-board-node[data-selected="true"] {
   border-color: var(--iw-board-accent-amber) !important;
   box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.2), 0 4px 12px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.04) !important;
+}
+
+.imagine-workbench-shell.imagine-theme-light .react-flow__node.dragging .imagine-board-node {
+  box-shadow: 0 0 0 1px var(--iw-board-border) !important;
 }
 
 .imagine-workbench-shell.imagine-theme-light .imagine-board-quick-insert {

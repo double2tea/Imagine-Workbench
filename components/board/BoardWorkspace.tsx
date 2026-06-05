@@ -733,6 +733,7 @@ export default function BoardWorkspace({
   const [trashedNodes, setTrashedNodes] = useState<BoardTrashEntry[]>([]);
   const [assetCompare, setAssetCompare] = useState<{ originalUrl: string; resultUrl: string } | null>(null);
   const [flowReady, setFlowReady] = useState(false);
+  const [isNodeDragActive, setIsNodeDragActive] = useState(false);
   const updateSelectedNodeIds = useCallback((nextIds: string[]): void => {
     setSelectedNodeIds(currentIds => {
       if (sameStringList(currentIds, nextIds)) return currentIds;
@@ -1146,11 +1147,13 @@ export default function BoardWorkspace({
 
   const handleNodeDragStart = useCallback<OnNodeDrag<BoardFlowNode>>(() => {
     isNodeDragActiveRef.current = true;
+    setIsNodeDragActive(true);
     pendingDragPositionByIdRef.current.clear();
   }, []);
 
   const handleNodeDragStop = useCallback<OnNodeDrag<BoardFlowNode>>((_event, node, nodes) => {
     isNodeDragActiveRef.current = false;
+    setIsNodeDragActive(false);
     const positionById = new Map(pendingDragPositionByIdRef.current);
     const draggedNodes = nodes.length > 0 ? nodes : [node];
     for (const draggedNode of draggedNodes) {
@@ -1725,7 +1728,7 @@ export default function BoardWorkspace({
           onDoubleClick={handleFlowDoubleClick}
           onDragOver={handleBoardDragOver}
           onDrop={handleBoardDrop}
-          className="board-canvas relative min-h-0 bg-[var(--iw-board-canvas-bg)]"
+          className={`board-canvas relative min-h-0 bg-[var(--iw-board-canvas-bg)]${isNodeDragActive ? " is-node-dragging" : ""}`}
         >
           <ReactFlow
             nodes={reactFlowNodes}
