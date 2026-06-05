@@ -1437,27 +1437,35 @@ export default function BoardWorkspace({
 
   const addConnectedQuickNodeAtPoint = useCallback((kind: BoardInsertKind, point: BoardPoint, from: BoardPortRef): void => {
     if (kind === "image-generate") {
-      addGenerateNodeWithConnection(
-        {
-          kind: "image-generate",
-          model: from.portKind === "asset" ? DEFAULT_BOARD_REFERENCE_IMAGE_MODEL : DEFAULT_BOARD_IMAGE_MODEL,
-          aspectRatio: "1:1",
-          imageResolution: "1024x1024",
-          position: centeredNodePosition(point, DEFAULT_GENERATE_NODE_SIZE),
-        },
-        from,
-        from.portKind === "prompt" ? BOARD_PORT_IDS.promptIn : BOARD_PORT_IDS.referenceIn,
-      );
-      setQuickInsertMenu(null);
+      try {
+        addGenerateNodeWithConnection(
+          {
+            kind: "image-generate",
+            model: from.portKind === "asset" ? DEFAULT_BOARD_REFERENCE_IMAGE_MODEL : DEFAULT_BOARD_IMAGE_MODEL,
+            aspectRatio: "1:1",
+            imageResolution: "1024x1024",
+            position: centeredNodePosition(point, DEFAULT_GENERATE_NODE_SIZE),
+          },
+          from,
+          from.portKind === "prompt" ? BOARD_PORT_IDS.promptIn : BOARD_PORT_IDS.referenceIn,
+        );
+        setQuickInsertMenu(null);
+      } catch (error) {
+        onConnectionError(error instanceof Error ? error.message : "连接失败");
+      }
       return;
     }
     if (kind === "video-generate") {
-      addGenerateNodeWithConnection(
-        { kind: "video-generate", model: DEFAULT_VIDEO_MODEL, aspectRatio: "auto", position: centeredNodePosition(point, DEFAULT_GENERATE_NODE_SIZE) },
-        from,
-        from.portKind === "prompt" ? BOARD_PORT_IDS.promptIn : BOARD_PORT_IDS.referenceIn,
-      );
-      setQuickInsertMenu(null);
+      try {
+        addGenerateNodeWithConnection(
+          { kind: "video-generate", model: DEFAULT_VIDEO_MODEL, aspectRatio: "auto", position: centeredNodePosition(point, DEFAULT_GENERATE_NODE_SIZE) },
+          from,
+          from.portKind === "prompt" ? BOARD_PORT_IDS.promptIn : BOARD_PORT_IDS.referenceIn,
+        );
+        setQuickInsertMenu(null);
+      } catch (error) {
+        onConnectionError(error instanceof Error ? error.message : "连接失败");
+      }
       return;
     }
     if (kind === "reference-group") {
@@ -1476,7 +1484,7 @@ export default function BoardWorkspace({
       });
       setQuickInsertMenu(null);
     }
-  }, [addGenerateNodeWithConnection, addReferenceGroupNodeWithAsset, addRunningHubAppNode, board.nodes, centeredNodePosition, connectPorts]);
+  }, [addGenerateNodeWithConnection, addReferenceGroupNodeWithAsset, addRunningHubAppNode, board.nodes, centeredNodePosition, connectPorts, onConnectionError]);
 
   const quickInsertMenuItems = useMemo(() => {
     const from = quickInsertMenu?.connectionFrom;
