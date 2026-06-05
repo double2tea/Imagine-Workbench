@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import type { ProviderTestState } from "@/components/settings/provider-settings-types";
 import {
+  AUDIO_MODEL_OPTIONS,
   CHAT_MODEL_OPTIONS,
   DEFAULT_CHAT_MODEL,
   IMAGE_MODEL_OPTIONS,
@@ -13,7 +14,7 @@ import {
 import { getProviderMeta, isKnownProvider, PROVIDER_KEYS } from "@/lib/providers/registry";
 import type { ProviderCredentials } from "@/lib/providers/types";
 
-type ModelCategory = "chat" | "image" | "video";
+type ModelCategory = "chat" | "image" | "video" | "audio";
 type NoticeType = "error" | "info" | "success";
 type FetchedModelOptions = Record<AiProvider, Record<ModelCategory, ModelOption[]>>;
 
@@ -103,6 +104,7 @@ function mergeRecordModelOptions(
 function classifyModelOption(option: ModelOption): ModelCategory {
   const parsed = parseProviderModel(option.value, "12ai");
   const model = parsed.model.toLowerCase();
+  if (model.includes("audio") || model.includes("tts") || model.includes("voice") || model.includes("speech")) return "audio";
   if (model.includes("video") || model.includes("veo") || model.includes("omni_flash")) return "video";
   if (model.includes("image") || model.includes("imagen") || model.includes("imagine")) return "image";
   return "chat";
@@ -133,6 +135,7 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
   const [chatModelOptions, setChatModelOptions] = useState<Record<AiProvider, ModelOption[]>>(CHAT_MODEL_OPTIONS);
   const [imageModelOptions, setImageModelOptions] = useState<Record<AiProvider, ModelOption[]>>(IMAGE_MODEL_OPTIONS);
   const [videoModelOptions, setVideoModelOptions] = useState<Record<AiProvider, ModelOption[]>>(VIDEO_MODEL_OPTIONS);
+  const [audioModelOptions, setAudioModelOptions] = useState<Record<AiProvider, ModelOption[]>>(AUDIO_MODEL_OPTIONS);
   const [fetchedModelOptions, setFetchedModelOptions] = useState<FetchedModelOptions>(emptyFetchedModelOptions);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [modelListMessage, setModelListMessage] = useState("");
@@ -216,9 +219,12 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
     } else if (category === "image") {
       const next = mergeManualModelGroups(imageModelOptions, byProvider);
       saveModelOptions(category, setImageModelOptions, next);
-    } else {
+    } else if (category === "video") {
       const next = mergeManualModelGroups(videoModelOptions, byProvider);
       saveModelOptions(category, setVideoModelOptions, next);
+    } else {
+      const next = mergeManualModelGroups(audioModelOptions, byProvider);
+      saveModelOptions(category, setAudioModelOptions, next);
     }
 
     const message = `已添加 ${countManualModels(byProvider)} 个${modelCategoryLabel(category)}模型`;
@@ -242,9 +248,12 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
     } else if (category === "image") {
       const next = { ...imageModelOptions, [selectedProvider]: mergeModelOptions(imageModelOptions[selectedProvider], selectedModels) };
       saveModelOptions(category, setImageModelOptions, next);
-    } else {
+    } else if (category === "video") {
       const next = { ...videoModelOptions, [selectedProvider]: mergeModelOptions(videoModelOptions[selectedProvider], selectedModels) };
       saveModelOptions(category, setVideoModelOptions, next);
+    } else {
+      const next = { ...audioModelOptions, [selectedProvider]: mergeModelOptions(audioModelOptions[selectedProvider], selectedModels) };
+      saveModelOptions(category, setAudioModelOptions, next);
     }
 
     const message = `已添加 ${selectedModels.length} 个${modelCategoryLabel(category)}模型`;
@@ -273,6 +282,7 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
       const fetchedChat = fetched.filter(option => classifyModelOption(option) === "chat").filter(isSelectableChatModel);
       const fetchedImage = fetched.filter(option => classifyModelOption(option) === "image").filter(isSelectableImageModel);
       const fetchedVideo = fetched.filter(option => classifyModelOption(option) === "video");
+      const fetchedAudio = fetched.filter(option => classifyModelOption(option) === "audio");
 
       setFetchedModelOptions(prev => ({
         ...prev,
@@ -280,10 +290,11 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
           chat: fetchedChat,
           image: fetchedImage,
           video: fetchedVideo,
+          audio: fetchedAudio,
         },
       }));
 
-      setModelListMessage(`已获取 ${fetched.length} 个模型：Chat ${fetchedChat.length} / Image ${fetchedImage.length} / Video ${fetchedVideo.length}，请选择后添加`);
+      setModelListMessage(`已获取 ${fetched.length} 个模型：Chat ${fetchedChat.length} / Image ${fetchedImage.length} / Video ${fetchedVideo.length} / Audio ${fetchedAudio.length}，请选择后添加`);
     } catch (err) {
       const message = toErrorMessage(err, "模型列表获取失败");
       setModelListMessage(message);
@@ -371,6 +382,7 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
       const restoredChatOptions = restoreModelOptions("imagine_chat_model_options", setChatModelOptions, CHAT_MODEL_OPTIONS, isSelectableChatModel);
       restoreModelOptions("imagine_image_model_options", setImageModelOptions, IMAGE_MODEL_OPTIONS, isSelectableImageModel);
       restoreModelOptions("imagine_video_model_options", setVideoModelOptions, VIDEO_MODEL_OPTIONS);
+      restoreModelOptions("imagine_audio_model_options", setAudioModelOptions, AUDIO_MODEL_OPTIONS);
 
       const storedChatModel = localStorage.getItem("imagine_chat_model");
       if (storedChatModel === "12ai:gemini-3.1-flash" || (storedChatModel && !hasChatModel(storedChatModel, restoredChatOptions))) {
@@ -381,11 +393,12 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
     }, 0);
 
     return () => clearTimeout(restoreSettings);
-  }, [setChatModelOptions, setImageModelOptions, setProviderCredentials, setSelectedChatModel, setSelectedProvider, setVideoModelOptions]);
+  }, [setAudioModelOptions, setChatModelOptions, setImageModelOptions, setProviderCredentials, setSelectedChatModel, setSelectedProvider, setVideoModelOptions]);
 
   return {
     addFetchedModels,
     addManualModels,
+    audioModelOptions,
     buildProviderHeaders,
     chatModelOptions,
     clearProviderCredentials,
@@ -420,12 +433,14 @@ function restoreFlatModelOptions(
 function modelOptionsStorageKey(category: ModelCategory): string {
   if (category === "chat") return "imagine_chat_model_options";
   if (category === "image") return "imagine_image_model_options";
+  if (category === "audio") return "imagine_audio_model_options";
   return "imagine_video_model_options";
 }
 
 function modelCategoryLabel(category: ModelCategory): string {
   if (category === "chat") return "Chat";
   if (category === "image") return "Image";
+  if (category === "audio") return "Audio";
   return "Video";
 }
 
@@ -488,6 +503,7 @@ function emptyFetchedModelOptions(): FetchedModelOptions {
       chat: [],
       image: [],
       video: [],
+      audio: [],
     };
   }
   return record;

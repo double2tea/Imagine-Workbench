@@ -261,6 +261,7 @@ export default function Home() {
   const {
     addFetchedModels,
     addManualModels,
+    audioModelOptions,
     buildProviderHeaders,
     chatModelOptions,
     clearProviderCredentials,
@@ -477,6 +478,7 @@ export default function Home() {
   });
   const imageModelGroups = getProviderModelGroups(imageModelOptions);
   const videoModelGroups = getProviderModelGroups(videoModelOptions);
+  const audioModelGroups = getProviderModelGroups(audioModelOptions);
   const chatModelGroups = getProviderModelGroups(chatModelOptions);
   const handleSelectImageModel = (model: string) => {
     const capabilities = getImageModelCapabilities(model);
@@ -1288,6 +1290,7 @@ export default function Home() {
       </main>
 
       <SettingsModal
+        audioModelGroups={audioModelGroups}
         chatModelGroups={chatModelGroups}
         fetchedModelOptions={fetchedModelOptions}
         imageModelGroups={imageModelGroups}

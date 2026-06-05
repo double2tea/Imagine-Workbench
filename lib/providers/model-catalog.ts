@@ -36,7 +36,15 @@ export interface VideoModelCapabilities {
   referenceMediaTypes: MediaReferenceType[];
 }
 
-export type ModelKind = "chat" | "image" | "video";
+export interface AudioModelCapabilities {
+  formats: ParameterOption[];
+  durations: ParameterOption[];
+  maxReferenceMedia: number;
+  minReferenceMedia: number;
+  referenceMediaTypes: MediaReferenceType[];
+}
+
+export type ModelKind = "chat" | "image" | "video" | "audio";
 export type VideoReferenceMode = "none" | "reference" | "firstLast";
 
 export interface ProviderModelCapability {
@@ -971,10 +979,31 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     minReferenceImages: 0,
     referenceMediaTypes: ["image", "video", "audio"],
   }),
+  audioCapability({
+    value: "runninghub:ai-app-audio:<webappId>",
+    label: "RunningHub AI App Audio",
+    provider: "runninghub",
+    model: "ai-app-audio:<webappId>",
+    supportsReferences: true,
+    maxReferenceMedia: 9,
+    minReferenceMedia: 0,
+    referenceMediaTypes: ["image", "video", "audio"],
+  }),
+  audioCapability({
+    value: "runninghub:workflow-audio:<workflowId>",
+    label: "RunningHub Workflow Audio",
+    provider: "runninghub",
+    model: "workflow-audio:<workflowId>",
+    supportsReferences: true,
+    maxReferenceMedia: 9,
+    minReferenceMedia: 0,
+    referenceMediaTypes: ["image", "video", "audio"],
+  }),
 ];
 
 export const IMAGE_MODEL_OPTIONS = buildProviderOptionsRecord("image", false);
 export const VIDEO_MODEL_OPTIONS = buildProviderOptionsRecord("video", true);
+export const AUDIO_MODEL_OPTIONS = buildProviderOptionsRecord("audio", true);
 export const CHAT_MODEL_OPTIONS = buildProviderOptionsRecord("chat", true);
 
 export function getChatModelOptions(provider: AiProvider): ModelOption[] {
@@ -1101,6 +1130,17 @@ export function getVideoModelCapabilities(value: string): VideoModelCapabilities
   };
 }
 
+export function getAudioModelCapabilities(value: string): AudioModelCapabilities {
+  const capability = getKnownCapability(value, "audio");
+  return {
+    formats: capability?.presets ?? [],
+    durations: capability?.durations ?? [],
+    maxReferenceMedia: capability?.maxReferenceImages ?? 0,
+    minReferenceMedia: capability?.minReferenceImages ?? 0,
+    referenceMediaTypes: capability?.referenceMediaTypes ?? [],
+  };
+}
+
 export function parseProviderModel(value: string, fallbackProvider: AiProvider): {
   provider: AiProvider;
   model: string;
@@ -1156,6 +1196,15 @@ interface VideoCapabilityInput extends CapabilityInput {
   referenceMediaTypes?: MediaReferenceType[];
 }
 
+interface AudioCapabilityInput extends CapabilityInput {
+  supportsReferences: boolean;
+  formats?: ParameterOption[];
+  durations?: ParameterOption[];
+  maxReferenceMedia: number;
+  minReferenceMedia: number;
+  referenceMediaTypes?: MediaReferenceType[];
+}
+
 function imageCapability(input: ImageCapabilityInput): ProviderModelCapability {
   return {
     value: input.value,
@@ -1201,6 +1250,30 @@ function videoCapability(input: VideoCapabilityInput): ProviderModelCapability {
     maxReferenceImages: input.maxReferenceImages,
     minReferenceImages: input.minReferenceImages,
     referenceMediaTypes: input.supportsReferences ? input.referenceMediaTypes ?? ["image"] : [],
+  };
+}
+
+function audioCapability(input: AudioCapabilityInput): ProviderModelCapability {
+  return {
+    value: input.value,
+    label: input.label,
+    provider: input.provider,
+    model: input.model,
+    kind: "audio",
+    supportsAsync: false,
+    supportsReferences: input.supportsReferences,
+    aspectRatios: [],
+    sizes: [],
+    thinkingLevels: [],
+    qualityLevels: [],
+    resolutions: [],
+    durations: input.durations ?? [],
+    presets: input.formats ?? [],
+    videoReferenceMode: "none",
+    videoReferenceModes: [],
+    maxReferenceImages: input.maxReferenceMedia,
+    minReferenceImages: input.minReferenceMedia,
+    referenceMediaTypes: input.supportsReferences ? input.referenceMediaTypes ?? ["audio"] : [],
   };
 }
 
@@ -1389,8 +1462,21 @@ function greatestCommonDivisor(a: number, b: number): number {
 
 function runningHubVirtualCapability(model: string, kind?: ModelKind): ProviderModelCapability {
   const lower = model.toLowerCase();
+  const isAudio = lower.includes("audio");
   const isVideo = lower.includes("video");
-  const resolvedKind: ModelKind = kind ?? (isVideo ? "video" : "image");
+  const resolvedKind: ModelKind = kind ?? (isAudio ? "audio" : isVideo ? "video" : "image");
+  if (resolvedKind === "audio") {
+    return audioCapability({
+      value: formatProviderModel("runninghub", model),
+      label: `RunningHub ${model}`,
+      provider: "runninghub",
+      model,
+      supportsReferences: true,
+      maxReferenceMedia: 9,
+      minReferenceMedia: 0,
+      referenceMediaTypes: ["image", "video", "audio"],
+    });
+  }
   if (resolvedKind === "video") {
     return videoCapability({
       value: formatProviderModel("runninghub", model),

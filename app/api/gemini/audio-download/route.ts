@@ -12,8 +12,8 @@ export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as DownloadBody;
     const operation = parseMediaOperationName(requireText(body.operationName, "operationName"));
-    if (operation.provider !== "runninghub" || operation.mediaType !== "audio") {
-      return NextResponse.json({ error: "Only RunningHub audio operations can be downloaded" }, { status: 400 });
+    if (operation.mediaType !== "audio") {
+      return NextResponse.json({ error: "Only audio operations can be downloaded" }, { status: 400 });
     }
 
     const config = resolveProviderConfig(req, operation.provider);

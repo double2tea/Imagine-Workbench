@@ -10,7 +10,7 @@ export function providerEndpointInfo(provider: AiProvider): string[] | undefined
   ) {
     return [`Chat/Image: ${meta.defaultBaseUrl}`, `Video: ${meta.defaultVideoBaseUrl}`];
   }
-  if (!meta.supportsImage && !meta.supportsVideo && meta.supportsChat) {
+  if (!meta.supportsImage && !meta.supportsVideo && !meta.supportsAudio && meta.supportsChat) {
     return [`Chat: ${meta.defaultBaseUrl}/v1`];
   }
   return undefined;

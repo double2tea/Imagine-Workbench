@@ -956,6 +956,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const {
     addFetchedModels,
     addManualModels,
+    audioModelOptions,
     buildProviderHeaders,
     chatModelOptions,
     clearProviderCredentials,
@@ -2937,6 +2938,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     : null;
   const imageModelGroups = getProviderModelGroups(imageModelOptions);
   const videoModelGroups = getProviderModelGroups(videoModelOptions);
+  const audioModelGroups = getProviderModelGroups(audioModelOptions);
   const chatModelGroups = getProviderModelGroups(chatModelOptions);
   const boardSummariesForToolbar = useMemo(() => {
     if (boardController.saveStatus === "loading") return boardSummaries;
@@ -3109,6 +3111,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       )}
 
       <SettingsModal
+        audioModelGroups={audioModelGroups}
         chatModelGroups={chatModelGroups}
         fetchedModelOptions={fetchedModelOptions}
         imageModelGroups={imageModelGroups}

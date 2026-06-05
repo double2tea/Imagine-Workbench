@@ -11,6 +11,7 @@ export interface ProviderMeta {
   hasEditableBaseUrl: boolean;
   supportsImage: boolean;
   supportsVideo: boolean;
+  supportsAudio: boolean;
   supportsChat: boolean;
 }
 
@@ -28,6 +29,7 @@ export const PROVIDER_REGISTRY = [
     hasEditableBaseUrl: false,
     supportsImage: true,
     supportsVideo: true,
+    supportsAudio: false,
     supportsChat: true,
   },
   {
@@ -41,6 +43,7 @@ export const PROVIDER_REGISTRY = [
     hasEditableBaseUrl: true,
     supportsImage: true,
     supportsVideo: true,
+    supportsAudio: false,
     supportsChat: true,
   },
   {
@@ -55,6 +58,7 @@ export const PROVIDER_REGISTRY = [
     hasEditableBaseUrl: true,
     supportsImage: true,
     supportsVideo: false,
+    supportsAudio: false,
     supportsChat: true,
   },
   {
@@ -69,6 +73,7 @@ export const PROVIDER_REGISTRY = [
     hasEditableBaseUrl: true,
     supportsImage: true,
     supportsVideo: true,
+    supportsAudio: false,
     supportsChat: true,
   },
   {
@@ -83,6 +88,7 @@ export const PROVIDER_REGISTRY = [
     hasEditableBaseUrl: true,
     supportsImage: true,
     supportsVideo: false,
+    supportsAudio: false,
     supportsChat: false,
   },
   {
@@ -97,6 +103,7 @@ export const PROVIDER_REGISTRY = [
     hasEditableBaseUrl: true,
     supportsImage: true,
     supportsVideo: true,
+    supportsAudio: true,
     supportsChat: true,
   },
 ] as const;

@@ -4,7 +4,7 @@ import { RUNNINGHUB_DEFAULT_LLM_MODEL, RUNNINGHUB_STANDARD_MODELS, runningHubLlm
 import type { ProviderConfig } from "./types";
 import { getJson, isRecord } from "./utils";
 
-export type ModelKindFilter = "chat" | "image" | "video" | "all";
+export type ModelKindFilter = "chat" | "image" | "video" | "audio" | "all";
 
 interface OpenAiModelsResponse {
   data?: unknown[];
@@ -110,8 +110,10 @@ function runningHubStaticModels(kind: ModelKindFilter): ModelOption[] {
   const virtualModels = [
     { value: "runninghub:ai-app-image:<webappId>", label: "RunningHub AI App Image", kind: "image" },
     { value: "runninghub:ai-app-video:<webappId>", label: "RunningHub AI App Video", kind: "video" },
+    { value: "runninghub:ai-app-audio:<webappId>", label: "RunningHub AI App Audio", kind: "audio" },
     { value: "runninghub:workflow-image:<workflowId>", label: "RunningHub Workflow Image", kind: "image" },
     { value: "runninghub:workflow-video:<workflowId>", label: "RunningHub Workflow Video", kind: "video" },
+    { value: "runninghub:workflow-audio:<workflowId>", label: "RunningHub Workflow Audio", kind: "audio" },
   ].filter(model => kind === "all" || model.kind === kind);
   return [
     ...(kind === "all" ? chatModels.map(model => ({ value: model.value, label: model.label })) : []),
@@ -150,6 +152,9 @@ function matchesKind(model: string, kind: ModelKindFilter): boolean {
   const lower = model.toLowerCase();
   if (kind === "video") {
     return lower.includes("video") || lower.includes("veo") || lower.includes("-to-video") || lower.includes("omni_flash");
+  }
+  if (kind === "audio") {
+    return lower.includes("audio") || lower.includes("tts") || lower.includes("voice") || lower.includes("speech");
   }
   return lower.includes("image") || lower.includes("imagen") || lower.includes("imagine") || lower.includes("text-to-image");
 }

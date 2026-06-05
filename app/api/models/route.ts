@@ -28,6 +28,6 @@ function readProvider(req: NextRequest): AiProvider {
 
 function readKind(req: NextRequest): ModelKindFilter {
   const kind = req.nextUrl.searchParams.get("kind");
-  if (kind === "image" || kind === "video" || kind === "all") return kind;
+  if (kind === "image" || kind === "video" || kind === "audio" || kind === "all") return kind;
   return "chat";
 }

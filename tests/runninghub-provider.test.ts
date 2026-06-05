@@ -10,6 +10,7 @@ import {
 } from "../lib/providers/runninghub";
 import { parseRunningHubBindingsFromJsonText } from "../lib/board/runninghub-bindings";
 import { createChatCompletionText } from "../lib/providers/chat";
+import { generateAudio, getAudioStatus } from "../lib/providers/audio";
 import { generateRunningHubMedia, getRunningHubMediaStatus } from "../lib/providers/image";
 import { listProviderModels } from "../lib/providers/models";
 import { fetchRunningHubAiAppSchema } from "../lib/providers/runninghub-app";
@@ -657,6 +658,28 @@ test("runninghub ai app audio tasks use task output polling endpoint", async () 
   }
 });
 
+test("generic audio adapter routes runninghub ai app audio tasks", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
+    const url = input.toString();
+    if (url.endsWith("/task/openapi/ai-app/run")) {
+      return Response.json({ code: 0, msg: "success", data: { taskId: "generic_audio_123" } });
+    }
+    return Response.json({ code: 999, msg: "unexpected endpoint" }, { status: 500 });
+  };
+
+  try {
+    const created = await generateAudio(runningHubConfig, {
+      prompt: "generic audio",
+      model: "ai-app-audio:2061323800511344642",
+      referenceMedia: [],
+    });
+    assert.equal(created.operationName, "runninghub:audio:task-output:generic_audio_123");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("runninghub ai app tasks map custom nodeInfoList bindings", async () => {
   const originalFetch = globalThis.fetch;
   const calls: Array<{ url: string; body: unknown }> = [];
@@ -884,6 +907,28 @@ test("runninghub polling selects audio output url by requested media type", asyn
   }
 });
 
+test("generic audio status uses runninghub task output polling", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (): Promise<Response> => Response.json({
+    code: 0,
+    msg: "success",
+    data: [{ fileUrl: "https://runninghub.example/output.mp3", fileType: "mp3" }],
+  });
+
+  try {
+    const status = await getAudioStatus(runningHubConfig, "task-output:audio_456");
+    assert.deepEqual(status, {
+      done: true,
+      mediaType: "audio",
+      progress: 100,
+      status: "success",
+      url: "https://runninghub.example/output.mp3",
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("runninghub task creation error includes response summary when id is absent", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (): Promise<Response> => Response.json({ code: 0, data: { status: "created" } });
@@ -961,10 +1006,13 @@ test("runninghub model listing filters standard models by metadata kind", async 
     const allModels = await listProviderModels(runningHubConfig, "all");
     const imageModels = await listProviderModels(runningHubConfig, "image");
     const videoModels = await listProviderModels(runningHubConfig, "video");
+    const audioModels = await listProviderModels(runningHubConfig, "audio");
 
     assert.equal(calls[0], "https://llm.runninghub.cn/v1/models");
     assert.equal(chatModels.some(option => option.value === "runninghub:qwen/qwen3.7-max"), true);
     assert.equal(allModels.some(option => option.value === "runninghub:qwen/qwen3.7-max"), true);
+    assert.equal(allModels.some(option => option.value === "runninghub:ai-app-audio:<webappId>"), true);
+    assert.equal(audioModels.some(option => option.value === "runninghub:ai-app-audio:<webappId>"), true);
     assert.equal(
       imageModels.some(option => option.value === "runninghub:api:/openapi/v2/bytedance/seedance-2.0-global-fast/image-to-video"),
       false,

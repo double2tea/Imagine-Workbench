@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  AUDIO_MODEL_OPTIONS,
   CHAT_MODEL_OPTIONS,
   DEFAULT_CHAT_MODEL,
   DEFAULT_VISION_CHAT_MODEL,
@@ -9,6 +10,7 @@ import {
   VIDEO_MODEL_OPTIONS,
   getImageModelCapabilities,
   getImageResolutionOptions,
+  getAudioModelCapabilities,
   getModelCapabilities,
   getModelCapability,
   getVideoModelCapabilities,
@@ -213,9 +215,11 @@ test("modelscope qwen image exposes documented aspect ratio sizes", () => {
 
 test("runninghub exposes concrete standard model capabilities", () => {
   assert.equal(getProviderMeta("runninghub").supportsChat, true);
+  assert.equal(getProviderMeta("runninghub").supportsAudio, true);
   assert.equal(CHAT_MODEL_OPTIONS["runninghub"].some(option => option.value === "runninghub:qwen/qwen3.7-max"), true);
   assert.equal(IMAGE_MODEL_OPTIONS["runninghub"][0]?.value, "runninghub:api:/openapi/v2/seedream-v5-lite/text-to-image");
   assert.equal(VIDEO_MODEL_OPTIONS["runninghub"][0]?.value, "runninghub:api:/openapi/v2/minimax/hailuo-02/standard");
+  assert.equal(AUDIO_MODEL_OPTIONS["runninghub"][0]?.value, "runninghub:ai-app-audio:<webappId>");
   assert.equal(IMAGE_MODEL_OPTIONS["runninghub"][0]?.label, "RunningHub Seedream V5 Lite Auto");
   assert.equal(
     IMAGE_MODEL_OPTIONS["runninghub"].some(
@@ -246,6 +250,7 @@ test("runninghub exposes concrete standard model capabilities", () => {
   const geminiFlash = getModelCapability("runninghub:api:/openapi/v2/rhart-image-n-g31-flash-official/text-to-image", "image");
   const geminiProUltra = getModelCapability("runninghub:api:/openapi/v2/rhart-image-n-pro-official/text-to-image-ultra", "image");
   const youchuan = getModelCapability("runninghub:api:/openapi/v2/youchuan/text-to-image-v81", "image");
+  const audio = getModelCapability("runninghub:ai-app-audio:2061323800511344642", "audio");
   assert.equal(image.supportsReferences, false);
   assert.equal(image.sizes.some(option => option.value === "custom"), true);
   assert.equal(seedream.supportsReferences, true);
@@ -357,6 +362,12 @@ test("runninghub exposes concrete standard model capabilities", () => {
   assert.equal(youchuan.supportsReferences, false);
   assert.deepEqual(youchuan.aspectRatios.map(option => option.value), ["auto"]);
   assert.deepEqual(youchuan.sizes.map(option => option.value), ["auto"]);
+  assert.deepEqual(audio.referenceMediaTypes, ["image", "video", "audio"]);
+  assert.deepEqual(getAudioModelCapabilities("runninghub:ai-app-audio:2061323800511344642").referenceMediaTypes, [
+    "image",
+    "video",
+    "audio",
+  ]);
 });
 
 test("agent chat defaults use 12AI Gemini 3.1 Flash Lite", () => {

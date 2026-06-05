@@ -21,10 +21,11 @@ interface ModelGroup {
   options: ModelOption[];
 }
 
-type ModelCategory = "chat" | "image" | "video";
+type ModelCategory = "chat" | "image" | "video" | "audio";
 type FetchedModelOptions = Record<AiProvider, Record<ModelCategory, ModelOption[]>>;
 
 interface SettingsModalProps {
+  audioModelGroups: ModelGroup[];
   chatModelGroups: ModelGroup[];
   fetchedModelOptions: FetchedModelOptions;
   imageModelGroups: ModelGroup[];
@@ -66,6 +67,7 @@ const TABS: { key: SettingsTab; label: string }[] = [
 ];
 
 export default function SettingsModal({
+  audioModelGroups,
   chatModelGroups,
   fetchedModelOptions,
   imageModelGroups,
@@ -156,6 +158,7 @@ export default function SettingsModal({
               {tab === "connections" && (
                 <ConnectionSettingsWorkspace
                   chatModelGroups={chatModelGroups}
+                  audioModelGroups={audioModelGroups}
                   fetchedModelOptions={fetchedModelOptions}
                   imageModelGroups={imageModelGroups}
                   isLoadingModels={isLoadingModels}

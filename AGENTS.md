@@ -71,6 +71,7 @@ Never hardcode provider strings (`"12ai"`, `"grok2api"`, `"xstx"`) in enumeratio
 - Credential / base URL resolution: `lib/providers/utils.ts` (delegates to registry)
 - Image generation/editing: `lib/providers/image.ts`
 - Video generation/status/download: `lib/providers/video.ts`
+- Audio generation/status/download: `lib/providers/audio.ts`
 - Chat completions and JSON parsing: `lib/providers/chat.ts`
 - Model listing: `lib/providers/models.ts`
 

@@ -571,7 +571,7 @@ export function useGenerationActions({
 
     try {
       const headers = buildProviderHeaders(requestModel);
-      const res = await fetch("/api/runninghub/generate-audio", {
+      const res = await fetch("/api/gemini/generate-audio", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
         signal: controller.signal,

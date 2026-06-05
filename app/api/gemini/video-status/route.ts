@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAsyncImageStatus, getRunningHubMediaStatus } from "@/lib/providers/image";
+import { getAudioStatus } from "@/lib/providers/audio";
+import { getAsyncImageStatus } from "@/lib/providers/image";
 import { getVideoStatus } from "@/lib/providers/video";
 import { optionalText, parseMediaOperationName, requireText, resolveProviderConfig } from "@/lib/providers/utils";
 
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest) {
     const result = operation.mediaType === "image"
       ? await getAsyncImageStatus(config, operation.id)
       : operation.mediaType === "audio"
-        ? await getRunningHubMediaStatus(config, "audio", operation.id)
+        ? await getAudioStatus(config, operation.id)
         : await getVideoStatus(config, operation.id, optionalText(body.model));
 
     return NextResponse.json(result);

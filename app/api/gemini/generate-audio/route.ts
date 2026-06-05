@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { mediaReferenceLabel, mediaReferenceTypeFromBase64DataUri, type MediaReferenceType } from "@/lib/media-references";
-import { getReferenceMediaPayloadError, REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES } from "@/lib/reference-images";
 import { generateAudio } from "@/lib/providers/audio";
 import { parseProviderModel } from "@/lib/providers/model-catalog";
 import type {
@@ -11,6 +10,7 @@ import type {
   RunningHubTaskNodeBinding,
 } from "@/lib/providers/types";
 import { optionalText, resolveProviderConfig } from "@/lib/providers/utils";
+import { getReferenceMediaPayloadError, REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES } from "@/lib/reference-images";
 
 export const runtime = "edge";
 
@@ -30,10 +30,6 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as GenerateAudioBody;
     const modelValue = optionalText(body.model) ?? "";
     const parsed = parseProviderModel(modelValue, "runninghub");
-    if (parsed.provider !== "runninghub") {
-      return NextResponse.json({ error: "Audio AI App generation currently supports RunningHub targets only" }, { status: 400 });
-    }
-
     const referenceMedia = readReferenceMedia(body.referenceMedia);
     const formatError = getReferenceMediaFormatError(referenceMedia);
     if (formatError) return NextResponse.json({ error: formatError }, { status: 400 });
@@ -51,8 +47,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(result);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to generate RunningHub audio";
-    console.error("RunningHub audio generation route error:", err);
+    const message = err instanceof Error ? err.message : "Failed to generate audio";
+    console.error("Audio generation route error:", err);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
@@ -89,8 +85,8 @@ function getReferenceMediaFormatError(referenceMedia: ReferenceMedia[]): string 
   const acceptedTypes: MediaReferenceType[] = ["image", "video", "audio"];
   for (const reference of referenceMedia) {
     const actualType = mediaReferenceTypeFromBase64DataUri(reference.dataUri);
-    if (!actualType) return "RunningHub reference media must be data:image/*, data:video/* or data:audio/* base64 data URIs";
-    if (!acceptedTypes.includes(actualType)) return `RunningHub 音频应用不支持${mediaReferenceLabel(actualType)}输入`;
+    if (!actualType) return "Audio reference media must be data:image/*, data:video/* or data:audio/* base64 data URIs";
+    if (!acceptedTypes.includes(actualType)) return `音频生成不支持${mediaReferenceLabel(actualType)}输入`;
   }
   return null;
 }

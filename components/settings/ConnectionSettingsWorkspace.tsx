@@ -10,7 +10,7 @@ import type { AiProvider, ModelOption } from "@/lib/providers/model-catalog";
 import { PROVIDER_KEYS, getProviderMeta } from "@/lib/providers/registry";
 import type { ProviderCredentials } from "@/lib/providers/types";
 
-type ModelCategory = "chat" | "image" | "video";
+type ModelCategory = "chat" | "image" | "video" | "audio";
 type WorkspaceSection = "credentials" | ModelCategory;
 
 interface ModelGroup {
@@ -31,9 +31,11 @@ const WORKSPACE_SECTIONS: { key: WorkspaceSection; label: string }[] = [
   { key: "chat", label: "Agent" },
   { key: "image", label: "图像" },
   { key: "video", label: "视频" },
+  { key: "audio", label: "音频" },
 ];
 
 export interface ConnectionSettingsWorkspaceProps {
+  audioModelGroups: ModelGroup[];
   chatModelGroups: ModelGroup[];
   fetchedModelOptions: FetchedModelOptions;
   imageModelGroups: ModelGroup[];
@@ -55,6 +57,7 @@ export interface ConnectionSettingsWorkspaceProps {
 }
 
 export function ConnectionSettingsWorkspace({
+  audioModelGroups,
   chatModelGroups,
   fetchedModelOptions,
   imageModelGroups,
@@ -96,8 +99,9 @@ export function ConnectionSettingsWorkspace({
       chat: chatModelGroups,
       image: imageModelGroups,
       video: videoModelGroups,
+      audio: audioModelGroups,
     }),
-    [chatModelGroups, imageModelGroups, videoModelGroups],
+    [audioModelGroups, chatModelGroups, imageModelGroups, videoModelGroups],
   );
 
   const activeModelGroups =
@@ -126,6 +130,7 @@ export function ConnectionSettingsWorkspace({
   const selectedProviderCapabilities = [
     selectedProviderMeta.supportsImage ? "图像" : null,
     selectedProviderMeta.supportsVideo ? "视频" : null,
+    selectedProviderMeta.supportsAudio ? "音频" : null,
     selectedProviderMeta.supportsChat ? "对话" : null,
   ]
     .filter((value): value is string => Boolean(value))
@@ -224,7 +229,7 @@ export function ConnectionSettingsWorkspace({
       </aside>
 
       <div className="imagine-settings-workspace-main">
-        <div className="imagine-settings-workspace-segment imagine-settings-segment grid grid-cols-4">
+        <div className="imagine-settings-workspace-segment imagine-settings-segment grid grid-cols-5">
           {WORKSPACE_SECTIONS.map(option => (
             <button
               key={option.key}

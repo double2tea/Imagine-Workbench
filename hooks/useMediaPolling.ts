@@ -110,7 +110,7 @@ export function useMediaPolling({
                 mediaType === "image"
                   ? "/api/gemini/image-download"
                   : mediaType === "audio"
-                    ? "/api/runninghub/audio-download"
+                    ? "/api/gemini/audio-download"
                     : "/api/gemini/video-download";
 
               const dlRes = await fetch(downloadEndpoint, {

@@ -26,6 +26,7 @@
     "../lib/agent-chat-model.ts",
     "../lib/assets/board-scope.ts",
     "../lib/openrouter/capabilities.ts",
+    "../lib/providers/audio.ts",
     "../lib/providers/model-catalog.ts",
     "../lib/providers/pricing.ts",
     "../lib/providers/runninghub-app.ts",
