@@ -7,10 +7,11 @@ import {
 import type { RunningHubTaskNodeBinding } from "./providers/types";
 
 const DB_NAME = "ImagineWorkbenchDB";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const META_STORE = "assets_meta";
 const BLOB_STORE = "assets_blob";
 const LEGACY_STORE = "assets";
+export const GENERATION_TASK_STORE = "generation_tasks";
 
 export type AssetScope = "workspace" | "board";
 export type StorageItemType = "image" | "video" | "audio";
@@ -243,6 +244,13 @@ export function openDatabase(): Promise<IDBDatabase> {
 
       if (!db.objectStoreNames.contains(BLOB_STORE)) {
         db.createObjectStore(BLOB_STORE, { keyPath: "id" });
+      }
+
+      if (!db.objectStoreNames.contains(GENERATION_TASK_STORE)) {
+        const tasks = db.createObjectStore(GENERATION_TASK_STORE, { keyPath: "id" });
+        tasks.createIndex("by_boardId", "source.boardId", { unique: false });
+        tasks.createIndex("by_status", "status", { unique: false });
+        tasks.createIndex("by_createdAt", "createdAt", { unique: false });
       }
 
       if (event.oldVersion > 0 && event.oldVersion < DB_VERSION) {

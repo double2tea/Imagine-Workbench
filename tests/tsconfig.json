@@ -19,6 +19,7 @@
     "./board-graph-content-key.test.ts",
     "./board-edge-dedupe.test.ts",
     "./client-fetch-error.test.ts",
+    "./generation-tasks.test.ts",
     "./model-catalog.test.ts",
     "./modelscope-provider.test.ts",
     "./runninghub-provider.test.ts",
@@ -41,6 +42,7 @@
     "../lib/board/model-options.ts",
     "../lib/board/types.ts",
     "../lib/client-fetch-error.ts",
+    "../lib/generation-tasks.ts",
     "../lib/providers/runninghub-node-info.ts",
     "../lib/providers/utils.ts",
     "../lib/reference-images.ts"
