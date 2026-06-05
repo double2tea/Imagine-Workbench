@@ -1,12 +1,12 @@
 "use client";
 
-import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import PromptReferenceDropdown from "@/components/reference/PromptReferenceDropdown";
 import PromptReferenceInlineOverlay, { resolvePromptReferenceThumbnails } from "@/components/reference/PromptReferenceThumbnailStrip";
 import { useDebouncedTextCommit } from "@/hooks/useDebouncedTextCommit";
 import type { BoardPromptReference } from "@/lib/board/prompt-references";
-import { getReferencePromptToken } from "@/hooks/useReferenceState";
+import { getMediaReferencePromptToken, getMediaReferenceType } from "@/lib/media-references";
 import { registerBoardTextCommit, unregisterBoardTextCommit } from "@/lib/board/text-flush-registry";
 import { detectPromptTemplateSlashCommand, type PromptTemplateSlashCommand } from "@/lib/prompt-templates";
 
@@ -60,7 +60,11 @@ const BoardPromptTextarea = forwardRef<BoardPromptTextareaHandle, BoardPromptTex
   const [dropdownAnchor, setDropdownAnchor] = useState<{ left: number; top: number; width: number } | null>(null);
   const { flush, getValue, setValue, value: draftValue } = useDebouncedTextCommit(value, onChange);
   const displayValue = readOnly ? value : draftValue;
-  const promptReferenceThumbnails = resolvePromptReferenceThumbnails(displayValue, references);
+  const promptReferenceThumbnails = useMemo(
+    () => resolvePromptReferenceThumbnails(displayValue, references),
+    [displayValue, references],
+  );
+  const isAtSearchOpen = atSearch !== null;
 
   useEffect(() => {
     if (!commitId || readOnly) return;
@@ -91,7 +95,7 @@ const BoardPromptTextarea = forwardRef<BoardPromptTextareaHandle, BoardPromptTex
   );
 
   useLayoutEffect(() => {
-    if (atSearch === null) {
+    if (!isAtSearchOpen) {
       setDropdownAnchor(null);
       return;
     }
@@ -99,7 +103,7 @@ const BoardPromptTextarea = forwardRef<BoardPromptTextareaHandle, BoardPromptTex
     if (!shell) return;
     const rect = shell.getBoundingClientRect();
     setDropdownAnchor({ left: rect.left, top: rect.top, width: rect.width });
-  }, [atSearch, displayValue]);
+  }, [isAtSearchOpen]);
 
   const handleChange = (nextValue: string, caret: number | null): void => {
     if (readOnly) return;
@@ -118,9 +122,9 @@ const BoardPromptTextarea = forwardRef<BoardPromptTextareaHandle, BoardPromptTex
     const caret = textarea?.selectionStart ?? displayValue.length;
     const searchLength = atSearch?.length ?? 0;
     const start = Math.max(0, caret - searchLength - 1);
-    const token = getReferencePromptToken(index);
     const reference = references[index];
     if (!reference) throw new Error("选择的参考媒体不存在");
+    const token = getMediaReferencePromptToken(index, getMediaReferenceType(reference));
     const nextPrompt = `${displayValue.slice(0, start)}${token} ${displayValue.slice(caret)}`;
     const nextCaret = start + `${token} `.length;
     flush(nextPrompt);

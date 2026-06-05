@@ -2659,7 +2659,7 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 
 .board-node-shell:is(:hover, :focus-within) .board-node-handle,
 .board-node-shell[data-selected="true"] .board-node-handle,
-.board-node-shell[data-connecting="true"] .board-node-handle.connectionindicator,
+.board-node-handle[data-connecting="true"].connectionindicator,
 .board-node-handle.connectingfrom,
 .board-node-handle.connectingto {
   --board-handle-scale: 1;
@@ -2672,22 +2672,22 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 .board-node-shell[data-selected="true"] .board-connection-zone-edge,
 .board-node-shell:is(:hover, :focus-within) .board-connection-zone-segment,
 .board-node-shell[data-selected="true"] .board-connection-zone-segment,
-.board-node-shell[data-connecting="true"] .board-connection-zone-edge.connectionindicator,
-.board-node-shell[data-connecting="true"] .board-connection-zone-segment.connectionindicator {
+.board-node-handle[data-connecting="true"].board-connection-zone-edge.connectionindicator,
+.board-node-handle[data-connecting="true"].board-connection-zone-segment.connectionindicator {
   opacity: 0.24 !important;
   background: color-mix(in srgb, var(--iw-panel) 8%, transparent) !important;
   border-color: color-mix(in srgb, var(--iw-border) 28%, transparent) !important;
   box-shadow: none;
 }
 
-.board-node-shell[data-connecting="true"] .board-connection-zone-edge.connectionindicator,
-.board-node-shell[data-connecting="true"] .board-connection-zone-segment.connectionindicator {
+.board-node-handle[data-connecting="true"].board-connection-zone-edge.connectionindicator,
+.board-node-handle[data-connecting="true"].board-connection-zone-segment.connectionindicator {
   opacity: 0.32 !important;
 }
 
 .board-node-shell:is(:hover, :focus-within) .board-node-handle.connectionindicator,
 .board-node-shell[data-selected="true"] .board-node-handle.connectionindicator,
-.board-node-shell[data-connecting="true"] .board-node-handle.connectionindicator,
+.board-node-handle[data-connecting="true"].connectionindicator,
 .board-node-handle.connectingfrom {
   pointer-events: all !important;
 }
@@ -2723,14 +2723,14 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 }
 
 .board-node-handle.connectingfrom {
-  animation: imagine-board-handle-anchor 900ms ease-in-out infinite;
+  animation: none;
   box-shadow:
     0 0 0 4px rgba(96, 165, 250, 0.18),
     0 0 20px rgba(96, 165, 250, 0.4) !important;
 }
 
-.board-node-shell[data-connecting="true"] .board-node-handle.connectionindicator:not(.connectingfrom) {
-  animation: imagine-board-handle-candidate 1200ms ease-in-out infinite;
+.board-node-handle[data-connecting="true"].connectionindicator:not(.connectingfrom) {
+  animation: none;
 }
 
 .board-node-handle.connectingto.valid {
@@ -2746,18 +2746,18 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 }
 
 .board-canvas .react-flow__connection-path {
-  animation: imagine-board-connection-dash 700ms linear infinite;
-  filter: drop-shadow(0 0 5px rgba(96, 165, 250, 0.5));
+  animation: none;
+  filter: none;
 }
 
 .board-canvas .react-flow__connection.valid .react-flow__connection-path {
   stroke: var(--iw-board-edge-prompt) !important;
-  filter: drop-shadow(0 0 6px rgba(45, 212, 191, 0.52));
+  filter: none;
 }
 
 .board-canvas .react-flow__connection.invalid .react-flow__connection-path {
   stroke: #f87171 !important;
-  filter: drop-shadow(0 0 6px rgba(248, 113, 113, 0.36));
+  filter: none;
 }
 
 .board-canvas.is-node-dragging .react-flow__edge-path,

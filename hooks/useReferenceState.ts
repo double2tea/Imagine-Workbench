@@ -5,7 +5,14 @@ import {
   readDraggedReferenceAsset,
 } from "@/components/reference/referenceDrag";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
-import { getMediaReferencePromptToken, getMediaReferenceType, mediaReferenceLabel, mediaReferenceTypeFromMime, type MediaReferenceType } from "@/lib/media-references";
+import {
+  getMediaReferencePromptToken,
+  getMediaReferenceType,
+  mediaReferenceLabel,
+  mediaReferenceTypeFromLabel,
+  mediaReferenceTypeFromMime,
+  type MediaReferenceType,
+} from "@/lib/media-references";
 import type { VideoReferenceMode } from "@/lib/providers/model-catalog";
 import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, compressReferenceImageFile } from "@/lib/reference-images";
 
@@ -64,8 +71,14 @@ function getRawMediaFileSizeError(file: File, type: MediaReferenceType): string 
   return `${mediaReferenceLabel(type)}参考文件过大，请压缩到 ${Math.floor(maxRawBytes / 1024 / 1024)}MB 以内后重试`;
 }
 
-export function getReferencePromptToken(index: number): string {
-  return getMediaReferencePromptToken(index);
+export function getReferencePromptToken(index: number, type: MediaReferenceType = "image"): string {
+  return getMediaReferencePromptToken(index, type);
+}
+
+function getAcceptedReferencePromptTokens(index: number, type: MediaReferenceType): string[] {
+  const token = getReferencePromptToken(index, type);
+  const legacyToken = getReferencePromptToken(index);
+  return token === legacyToken ? [token] : [token, legacyToken];
 }
 
 function escapeRegExp(value: string): string {
@@ -78,10 +91,10 @@ export function buildPromptWithReferenceMap(
   sentReferenceUrls = references.map(reference => reference.url),
 ): string {
   const lines = references
-    .map((reference, index) => ({
-      sentIndex: sentReferenceUrls.findIndex(url => url === reference.url),
-      token: getReferencePromptToken(index),
-    }))
+    .flatMap((reference, index) => {
+      const sentIndex = sentReferenceUrls.findIndex(url => url === reference.url);
+      return getAcceptedReferencePromptTokens(index, getMediaReferenceType(reference)).map(token => ({ sentIndex, token }));
+    })
     .filter(reference => reference.sentIndex !== -1)
     .filter(reference => new RegExp(`${escapeRegExp(reference.token)}(?!\\d)`).test(prompt))
     .map(reference => `- ${reference.token} = reference media ${reference.sentIndex + 1}`);
@@ -95,19 +108,19 @@ function insertTextAtRange(value: string, start: number, end: number, text: stri
 }
 
 function remapPromptAfterReferenceRemoval(prompt: string, removedIndex: number): string {
-  return prompt.replace(/@图片(\d+)/g, (match, value) => {
+  return prompt.replace(/@(图片|视频|音频)(\d+)/g, (match, label, value) => {
     const parsed = Number(value);
     if (!Number.isInteger(parsed) || parsed < 1) return match;
 
     const index = parsed - 1;
     if (index === removedIndex) return "";
-    if (index > removedIndex) return getReferencePromptToken(index - 1);
+    if (index > removedIndex) return getReferencePromptToken(index - 1, mediaReferenceTypeFromLabel(label) ?? "image");
     return match;
   });
 }
 
 export function removePromptReferenceTokens(prompt: string): string {
-  return prompt.replace(/@图片\d+/g, "");
+  return prompt.replace(/@(图片|视频|音频)\d+/g, "");
 }
 
 export function useReferenceState({
@@ -255,7 +268,7 @@ export function useReferenceState({
         return;
       }
 
-      const referenceToken = getReferencePromptToken(referenceIndex);
+      const referenceToken = getReferencePromptToken(referenceIndex, getMediaReferenceType(asset));
       const nextPrompt = currentValue.includes(dropToken)
         ? currentValue.replace(dropToken, referenceToken)
         : insertTextAtRange(currentValue, selectionStart, selectionEnd, referenceToken);
@@ -326,7 +339,9 @@ export function useReferenceState({
     const searchLength = atDropdown.visible && atDropdown.type === type ? atDropdown.search.length : 0;
     const suffixStart = lastAtIndex === -1 ? prompt.length : lastAtIndex + 1 + searchLength;
     const suffix = prompt.substring(suffixStart);
-    setPrompt(`${base}${getReferencePromptToken(index)} ${suffix}`);
+    const reference = referenceImages[index];
+    if (!reference) throw new Error("选择的参考媒体不存在");
+    setPrompt(`${base}${getReferencePromptToken(index, getMediaReferenceType(reference))} ${suffix}`);
     setAtDropdown({ visible: false, type, search: "" });
   };
 

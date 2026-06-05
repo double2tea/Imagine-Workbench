@@ -45,6 +45,8 @@ export interface BoardFlowNodeData extends Record<string, unknown> {
   onExecuteGenerate: (nodeId: string) => void;
   onFetchRunningHubAppSchema: (webappId: string) => Promise<BoardRunningHubAppSchemaResult>;
   onMoveReferenceGroupItem: (nodeId: string, assetId: string, direction: "up" | "down") => void;
+  onMoveGenerateReferenceEdge: (nodeId: string, sourceEdgeId: string, targetEdgeId: string) => void;
+  onMaterializeGenerateResult: (nodeId: string, assetId: string) => void;
   onRemoveReferenceGroupItem: (nodeId: string, assetId: string) => void;
   onSendAgent: (nodeId: string) => void;
   onSendAssetToAgent: (nodeId: string) => void;
@@ -63,6 +65,8 @@ export interface BoardFlowNodeData extends Record<string, unknown> {
 export type BoardFlowNode = Node<BoardFlowNodeData, "board">;
 
 type BoardHandleZone = "edge" | "segment";
+
+let referenceShelfDragImage: HTMLCanvasElement | null = null;
 
 interface BoardHandleProps {
   id: string;
@@ -94,11 +98,13 @@ function handleClass(kind: BoardPortKind): string {
 function BoardHandle({ id, kind, label, position, top, type, zone = "edge", zoneHeight }: BoardHandleProps) {
   const isEdgeZone = zone === "edge";
   const segmentHeight = zoneHeight ?? 72;
+  const connectionInProgress = useConnection(connection => connection.inProgress);
   return (
     <Handle
       id={id}
       type={type}
       position={position}
+      data-connecting={connectionInProgress ? "true" : "false"}
       className={[
         "board-node-handle",
         `board-node-handle-${kind}`,
@@ -117,26 +123,70 @@ function BoardHandle({ id, kind, label, position, top, type, zone = "edge", zone
 }
 
 function nodeBodyOverflowClass(kind: BoardNodeModel["kind"]): string {
-  if (kind === "prompt" || kind === "image-generate" || kind === "video-generate" || kind === "runninghub-app") {
+  if (kind === "prompt" || kind === "runninghub-app") {
     return "overflow-visible";
   }
   return "overflow-hidden";
 }
 
+function getReferenceShelfDragImage(): HTMLCanvasElement {
+  if (!referenceShelfDragImage) {
+    referenceShelfDragImage = document.createElement("canvas");
+    referenceShelfDragImage.width = 1;
+    referenceShelfDragImage.height = 1;
+  }
+  return referenceShelfDragImage;
+}
+
 function GenerateReferenceShelf({
+  nodeId,
+  onMoveReference,
   references,
 }: {
+  nodeId: string;
+  onMoveReference: (nodeId: string, sourceEdgeId: string, targetEdgeId: string) => void;
   references: BoardGenerateInputSummary["referencePreviews"];
 }) {
   if (references.length === 0) return null;
   return (
-    <div className="nodrag pointer-events-none absolute -top-12 left-0 z-40 flex max-w-full gap-1 overflow-hidden rounded-lg border border-blue-400/20 bg-slate-950/88 p-1 shadow-xl backdrop-blur">
+    <div className="nodrag nopan absolute -top-12 left-0 z-40 flex max-w-full gap-1 overflow-hidden rounded-lg border border-blue-400/20 bg-slate-950/88 p-1 shadow-xl backdrop-blur">
       {references.slice(0, 6).map((reference, index) => {
         const type = getMediaReferenceType(reference);
+        const canReorder = typeof reference.sourceEdgeId === "string";
         return (
           <div
             key={`${reference.id}:${reference.url}:${index}`}
-            className="relative h-9 w-9 shrink-0 overflow-hidden rounded-md border border-white/15 bg-slate-900"
+            draggable={canReorder}
+            onPointerDown={(event) => {
+              event.stopPropagation();
+            }}
+            onDragStart={(event) => {
+              if (!reference.sourceEdgeId) return;
+              event.stopPropagation();
+              event.dataTransfer.effectAllowed = "move";
+              event.dataTransfer.setData("application/x-imagine-reference-edge-id", reference.sourceEdgeId);
+              event.dataTransfer.setDragImage(getReferenceShelfDragImage(), 0, 0);
+            }}
+            onDragOver={(event) => {
+              if (!canReorder) return;
+              event.preventDefault();
+              event.stopPropagation();
+              event.dataTransfer.dropEffect = "move";
+            }}
+            onDrop={(event) => {
+              if (!reference.sourceEdgeId) return;
+              event.preventDefault();
+              event.stopPropagation();
+              const sourceEdgeId = event.dataTransfer.getData("application/x-imagine-reference-edge-id");
+              if (!sourceEdgeId) return;
+              onMoveReference(nodeId, sourceEdgeId, reference.sourceEdgeId);
+            }}
+            onDragEnd={(event) => {
+              event.stopPropagation();
+            }}
+            className={`relative h-9 w-9 shrink-0 overflow-hidden rounded-md border border-white/15 bg-slate-900 ${
+              canReorder ? "cursor-grab active:cursor-grabbing" : ""
+            }`}
             title={reference.role ? `参考 ${index + 1} · ${reference.role}` : `参考 ${index + 1}`}
           >
             {type === "image" ? (
@@ -167,7 +217,6 @@ function GenerateReferenceShelf({
 
 function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
   const { node } = data;
-  const connectionInProgress = useConnection(connection => connection.inProgress);
   const ports = getBoardNodePortDefinitions(node, { hasResultConnection: data.hasResultConnection });
   const handleForPort = (port: (typeof ports)[number]) => {
     if (port.id === BOARD_PORT_IDS.promptIn) {
@@ -195,13 +244,16 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
     <article
       className={`board-node-shell imagine-board-node h-full !overflow-visible !rounded-lg ${selected ? "imagine-board-node-selected" : ""}`}
       data-kind={node.kind}
-      data-connecting={connectionInProgress ? "true" : "false"}
       data-selected={selected ? "true" : "false"}
       style={{ height: node.size.height, width: node.size.width }}
     >
       {ports.map(handleForPort)}
       {selected && (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app") ? (
-        <GenerateReferenceShelf references={data.generateInputSummary?.referencePreviews ?? []} />
+        <GenerateReferenceShelf
+          nodeId={node.id}
+          references={data.generateInputSummary?.referencePreviews ?? []}
+          onMoveReference={data.onMoveGenerateReferenceEdge}
+        />
       ) : null}
 
       <div className="flex h-9 items-center justify-between gap-2 rounded-t-lg imagine-board-node-header px-3">
@@ -252,30 +304,37 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
           />
         )}
         {(node.kind === "image-generate" || node.kind === "video-generate") && (
-            <GenerateBoardNode
-              hasResultConnection={data.hasResultConnection}
-              inputSummary={data.generateInputSummary}
+          <GenerateBoardNode
+            hasResultConnection={data.hasResultConnection}
+            inputSummary={data.generateInputSummary}
             node={node}
             references={data.generateReferences}
             resultItems={data.resultItems}
+            showReferencePreviews={false}
             taskSummary={data.generateTaskSummary}
             onCancel={() => data.onCancelGenerate(node.id)}
             onExecute={() => data.onExecuteGenerate(node.id)}
+            onMaterializeResult={assetId => data.onMaterializeGenerateResult(node.id, assetId)}
             onOpenResult={data.onOpenFullscreen}
             onSelectResult={assetId => data.onSelectGenerateResult(node.id, assetId)}
             onSelectReference={reference => data.onSelectPromptReference(node.id, reference)}
             onUpdate={input => data.onUpdateGenerate(node.id, input)}
-            />
+          />
         )}
         {node.kind === "runninghub-app" && (
           <RunningHubAppBoardNode
+            hasResultConnection={data.hasResultConnection}
             inputSummary={data.generateInputSummary}
             node={node}
             references={data.generateReferences}
             onExecute={() => data.onExecuteGenerate(node.id)}
             onFetchAppSchema={data.onFetchRunningHubAppSchema}
+            onMaterializeResult={assetId => data.onMaterializeGenerateResult(node.id, assetId)}
+            onOpenResult={data.onOpenFullscreen}
+            onSelectResult={assetId => data.onSelectGenerateResult(node.id, assetId)}
             onSelectReference={reference => data.onSelectPromptReference(node.id, reference)}
             onUpdate={input => data.onUpdateRunningHubApp(node.id, input)}
+            resultItems={data.resultItems}
           />
         )}
         {node.kind === "agent" && (

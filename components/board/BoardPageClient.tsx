@@ -83,6 +83,7 @@ import {
   type BoardNode,
   type BoardPoint,
   type BoardPortRef,
+  type BoardAssetReference,
   type BoardRunningHubAppNode,
   type BoardRunningHubAppNodeUpdate,
   type BoardRunningHubAppSchemaResult,
@@ -702,6 +703,28 @@ function hasResultAssetConnection(edges: BoardDocument["edges"], sourceNodeId: s
     edge.to.nodeId === assetNodeId &&
     edge.to.portId === BOARD_PORT_IDS.assetIn
   ));
+}
+
+function storageItemToBoardAssetReference(item: StorageItem): BoardAssetReference {
+  return {
+    assetId: item.id,
+    model: item.model,
+    prompt: item.prompt,
+    type: item.type,
+    url: item.url,
+  };
+}
+
+function resultAssetNodePosition(sourceNode: ExecutableBoardNode): BoardPoint {
+  return {
+    x: sourceNode.position.x + sourceNode.size.width + 48,
+    y: sourceNode.position.y,
+  };
+}
+
+function shouldAutoMaterializeCompletedResult(sourceNode: ExecutableBoardNode): boolean {
+  if (sourceNode.kind === "runninghub-app") return true;
+  return sourceNode.variantCount === 1;
 }
 
 function findExecutableNodeById(nodes: BoardDocument["nodes"], nodeId: string): ExecutableBoardNode | undefined {
@@ -2598,6 +2621,10 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         };
         if (sourceNode.kind === "runninghub-app") {
           boardController.updateRunningHubAppNode(sourceBoardNodeId, update);
+        } else {
+          boardController.updateGenerateNode(sourceBoardNodeId, update);
+        }
+        if (shouldAutoMaterializeCompletedResult(sourceNode)) {
           const existingAssetNode = findBoardAssetNodeByAssetId(boardController.board.nodes, item.id);
           if (existingAssetNode) {
             if (!hasResultAssetConnection(boardController.board.edges, sourceNode.id, existingAssetNode.id)) {
@@ -2608,14 +2635,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             }
           } else {
             const assetNodeId = boardController.addAssetNode({
-              asset: {
-                assetId: item.id,
-                model: item.model,
-                prompt: item.prompt,
-                type: item.type,
-                url: item.url,
-              },
-              position: { x: sourceNode.position.x + sourceNode.size.width + 48, y: sourceNode.position.y },
+              asset: storageItemToBoardAssetReference(item),
+              position: resultAssetNodePosition(sourceNode),
               title: item.prompt || item.model,
             });
             boardController.connectPorts(
@@ -2623,8 +2644,6 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
               { nodeId: assetNodeId, portId: BOARD_PORT_IDS.assetIn, portKind: "asset" },
             );
           }
-        } else {
-          boardController.updateGenerateNode(sourceBoardNodeId, update);
         }
         continue;
       }

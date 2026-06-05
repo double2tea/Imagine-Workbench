@@ -3,7 +3,7 @@
 import { ArrowDown, ArrowUp, Music, Video, X } from "lucide-react";
 import PreviewImage from "@/components/PreviewImage";
 import type { BoardReferenceGroupNode, BoardReferenceRole } from "@/lib/board";
-import { mediaReferenceLabel } from "@/lib/media-references";
+import { getMediaReferencePromptToken, mediaReferenceLabel } from "@/lib/media-references";
 
 interface ReferenceGroupBoardNodeProps {
   node: BoardReferenceGroupNode;
@@ -46,6 +46,7 @@ export default function ReferenceGroupBoardNode({
           <div
             key={reference.assetId}
             className="grid grid-cols-[52px_1fr_auto] items-center gap-2 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-1.5"
+            style={{ contentVisibility: "auto", containIntrinsicSize: "64px" }}
           >
             <div className="h-12 w-12 overflow-hidden rounded-md bg-[var(--iw-panel)]">
               {reference.type === "image" ? (
@@ -59,7 +60,7 @@ export default function ReferenceGroupBoardNode({
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
                 <span className="rounded border border-[var(--iw-border)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--iw-muted)]">
-                  @图片{index + 1}
+                  {getMediaReferencePromptToken(index, reference.type)}
                 </span>
                 <span className="rounded border border-[var(--iw-border)] px-1.5 py-0.5 text-[10px] text-[var(--iw-muted)]">
                   {mediaReferenceLabel(reference.type)}

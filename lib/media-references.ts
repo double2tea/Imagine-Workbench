@@ -49,6 +49,13 @@ export function mediaReferenceLabel(type: MediaReferenceType): string {
   return "音频";
 }
 
+export function mediaReferenceTypeFromLabel(label: string): MediaReferenceType | null {
+  if (label === "图片") return "image";
+  if (label === "视频") return "video";
+  if (label === "音频") return "audio";
+  return null;
+}
+
 export function mediaReferenceFileExtension(mimeType: string | null, fallbackType: MediaReferenceType): string {
   if (mimeType === "image/jpeg") return "jpg";
   if (mimeType === "image/png") return "png";
@@ -64,6 +71,6 @@ export function mediaReferenceFileExtension(mimeType: string | null, fallbackTyp
   return "mp3";
 }
 
-export function getMediaReferencePromptToken(index: number): string {
-  return `@图片${index + 1}`;
+export function getMediaReferencePromptToken(index: number, type: MediaReferenceType = "image"): string {
+  return `@${mediaReferenceLabel(type)}${index + 1}`;
 }

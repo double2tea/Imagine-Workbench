@@ -186,7 +186,7 @@ export default function ImageGenerationPanel({
             />
           </div>
           <div className="imagine-field-shell-footer mt-2 flex items-center justify-between pt-2">
-            <span className="hidden sm:inline">拖入资产到此处插入 @图片N | 拖入下方只作为参考图</span>
+            <span className="hidden sm:inline">拖入资产到此处插入 @媒体N | 拖入下方只作为参考图</span>
             <span className="sm:hidden">@ 可引用作品</span>
             <span>{prompt.length} 字符</span>
           </div>

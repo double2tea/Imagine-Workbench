@@ -40,13 +40,13 @@ function digestParts(parts: string[]): string {
 }
 
 function serializeReferenceGroupItem(item: BoardReferenceGroupItem): string {
-  return `${item.assetId}:${item.type}:${item.role}`;
+  return `${item.assetId}:${item.type}:${item.role}:${fingerprintLargeText(item.url)}`;
 }
 
 function serializeNodeContent(node: BoardNode): string {
   switch (node.kind) {
     case "asset":
-      return `asset|${node.id}|${node.title}|${node.size.width}x${node.size.height}|${node.asset.assetId}|${node.asset.type}`;
+      return `asset|${node.id}|${node.title}|${node.size.width}x${node.size.height}|${node.asset.assetId}|${node.asset.type}|${fingerprintLargeText(node.asset.url)}`;
     case "prompt":
       return `prompt|${node.id}|${node.title}|${fingerprintLargeText(node.prompt)}`;
     case "reference-group":
@@ -133,8 +133,8 @@ function serializeNodeContent(node: BoardNode): string {
   }
 }
 
-function serializeEdge(edge: BoardEdge): string {
-  return `${edge.id}|${edge.kind}|${edge.from.nodeId}|${edge.from.portId}|${edge.to.nodeId}|${edge.to.portId}`;
+function serializeEdge(edge: BoardEdge, order: number): string {
+  return `${edge.id}|${order}|${edge.kind}|${edge.from.nodeId}|${edge.from.portId}|${edge.to.nodeId}|${edge.to.portId}`;
 }
 
 /** Stable digest for graph-derived node data; ignores position, size, and viewport. */
@@ -142,9 +142,7 @@ export function buildBoardGraphContentKey(nodes: BoardNode[], edges: BoardEdge[]
   const nodeLines = [...nodes]
     .sort((left, right) => left.id.localeCompare(right.id))
     .map(serializeNodeContent);
-  const edgeLines = [...edges]
-    .sort((left, right) => left.id.localeCompare(right.id))
-    .map(serializeEdge);
+  const edgeLines = edges.map((edge, index) => serializeEdge(edge, index)).sort();
   const nodeDigest = digestParts(nodeLines);
   const edgeDigest = digestParts(edgeLines);
   return `n${nodes.length}:e${edges.length}:nh${nodeDigest}:eh${edgeDigest}`;

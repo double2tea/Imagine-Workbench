@@ -1,5 +1,5 @@
-import { useRef, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { ImagePlus, Loader2, Music, Play, Video, X } from "lucide-react";
+import { useMemo, useRef, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { ImagePlus, Loader2, Music, Play, Plus, Video, X } from "lucide-react";
 import ModelPriceBadge from "@/components/creation/ModelPriceBadge";
 import BoardPromptTextarea, { type BoardPromptTextareaHandle } from "@/components/board/BoardPromptTextarea";
 import PreviewImage from "@/components/PreviewImage";
@@ -25,6 +25,7 @@ const variantCountOptions: BoardGenerateVariantCount[] = [1, 2, 4];
 export interface BoardGenerateReferencePreview {
   id: string;
   role?: string;
+  sourceEdgeId?: string;
   type?: ReferenceImageRef["type"];
   url: string;
 }
@@ -46,9 +47,11 @@ interface GenerateBoardNodeProps {
   hasResultConnection?: boolean;
   inputSummary?: BoardGenerateInputSummary;
   node: GenerateNode;
+  showReferencePreviews?: boolean;
   taskSummary?: BoardGenerateTaskSummary;
   onCancel?: () => void;
   onExecute: () => void;
+  onMaterializeResult?: (assetId: string) => void;
   onOpenResult?: (item: StorageItem) => void;
   onSelectResult: (assetId: string) => void;
   onSelectReference?: (reference: BoardPromptReference, index: number) => void;
@@ -58,6 +61,79 @@ interface GenerateBoardNodeProps {
 }
 
 type GenerateContextTone = "failed" | "neutral" | "ok" | "processing" | "prompt" | "reference" | "result";
+
+interface BoardResultStackProps {
+  activeAssetId?: string;
+  onMaterializeResult?: (assetId: string) => void;
+  onOpenResult?: (item: StorageItem) => void;
+  onSelectResult: (assetId: string) => void;
+  resultItems: StorageItem[];
+}
+
+export function BoardResultStack({
+  activeAssetId,
+  onMaterializeResult,
+  onOpenResult,
+  onSelectResult,
+  resultItems,
+}: BoardResultStackProps) {
+  if (resultItems.length === 0) return null;
+  const stopPointer = (event: ReactPointerEvent<HTMLButtonElement>): void => {
+    event.stopPropagation();
+  };
+  return (
+    <div className="nodrag flex min-h-10 min-w-0 items-center gap-1 overflow-x-auto rounded-md border border-emerald-400/20 bg-emerald-500/5 p-1">
+      {resultItems.map((item, index) => {
+        const isActive = item.id === activeAssetId;
+        return (
+          <div key={item.id} className="relative h-8 w-8 shrink-0">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onSelectResult(item.id);
+              }}
+              onDoubleClick={(event) => {
+                event.stopPropagation();
+                onOpenResult?.(item);
+              }}
+              onPointerDown={stopPointer}
+              className={`h-full w-full overflow-hidden rounded border transition ${
+                isActive ? "border-emerald-300 ring-2 ring-emerald-400/25" : "border-[var(--iw-border)] opacity-75 hover:opacity-100"
+              }`}
+              title={`结果 ${index + 1}`}
+            >
+              {item.type === "image" ? (
+                <PreviewImage src={item.url} alt="" className="h-full w-full object-cover" />
+              ) : item.type === "video" ? (
+                <Video className="m-auto h-full w-4 text-violet-200" />
+              ) : (
+                <Music className="m-auto h-full w-4 text-emerald-200" />
+              )}
+              <span className="absolute bottom-0 right-0 rounded-tl bg-black/60 px-1 text-[8px] font-semibold text-white">
+                {index + 1}
+              </span>
+            </button>
+            {onMaterializeResult ? (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onMaterializeResult(item.id);
+                }}
+                onPointerDown={stopPointer}
+                className="absolute right-0 top-0 flex h-4 w-4 items-center justify-center rounded-bl rounded-tr border-b border-l border-emerald-200/60 bg-emerald-500 text-white shadow transition hover:bg-emerald-400"
+                title="放到画板"
+              >
+                <Plus className="h-2.5 w-2.5" />
+              </button>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 function statusText(node: GenerateNode): string {
   if (node.status === "processing") return "处理中";
@@ -87,7 +163,8 @@ function contextToneClass(tone: GenerateContextTone): string {
   return "border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)]";
 }
 
-function resultContext(node: GenerateNode, hasResultConnection: boolean): { title: string; tone: GenerateContextTone } {
+function resultContext(node: GenerateNode, hasResultConnection: boolean, resultCount: number): { title: string; tone: GenerateContextTone } {
+  if (resultCount > 1) return { title: `${resultCount} 个结果`, tone: hasResultConnection ? "result" : "ok" };
   if (node.resultAssetId && hasResultConnection) return { title: "已连接", tone: "result" };
   if (node.resultAssetId) return { title: "已生成", tone: "ok" };
   if (node.status === "processing") return { title: "等待", tone: "processing" };
@@ -110,12 +187,14 @@ export default function GenerateBoardNode({
   node,
   onCancel,
   onExecute,
+  onMaterializeResult,
   onOpenResult,
   onSelectReference,
   onSelectResult,
   onUpdate,
   references,
   resultItems,
+  showReferencePreviews = true,
   taskSummary,
 }: GenerateBoardNodeProps) {
   const promptTextareaRef = useRef<BoardPromptTextareaHandle | null>(null);
@@ -126,31 +205,37 @@ export default function GenerateBoardNode({
   const promptSourceTitle = inputSummary?.promptSourceTitle;
   const referenceCount = inputSummary?.referenceCount ?? 0;
   const referencePreviews = inputSummary?.referencePreviews ?? [];
-  const videoCapabilities = node.kind === "video-generate" ? getVideoModelCapabilities(node.model) : null;
+  const videoCapabilities = useMemo(
+    () => node.kind === "video-generate" ? getVideoModelCapabilities(node.model) : null,
+    [node.kind, node.model],
+  );
   const activeVideoReferenceMode = node.kind === "video-generate"
     ? node.videoReferenceMode ?? videoCapabilities?.referenceMode ?? "none"
     : "none";
-  const videoPriceReferenceTypes = node.kind === "video-generate" && videoCapabilities
-    ? selectVideoReferenceTypesForMode(
-      referencePreviews.map(reference => ({
-        id: reference.id,
-        role: reference.role === "start" || reference.role === "end" || reference.role === "general" ? reference.role : undefined,
-        type: reference.type,
-        url: reference.url,
-      })),
-      referencePreviews[0]?.url ?? null,
-      activeVideoReferenceMode,
-      videoCapabilities.maxReferenceImages,
-    )
-    : [];
+  const videoPriceReferenceTypes = useMemo(
+    () => node.kind === "video-generate" && videoCapabilities
+      ? selectVideoReferenceTypesForMode(
+        referencePreviews.map(reference => ({
+          id: reference.id,
+          role: reference.role === "start" || reference.role === "end" || reference.role === "general" ? reference.role : undefined,
+          type: reference.type,
+          url: reference.url,
+        })),
+        referencePreviews[0]?.url ?? null,
+        activeVideoReferenceMode,
+        videoCapabilities.maxReferenceImages,
+      )
+      : [],
+    [activeVideoReferenceMode, node.kind, referencePreviews, videoCapabilities],
+  );
   const steps = statusSteps(node.status);
-  const result = resultContext(node, hasResultConnection);
+  const result = resultContext(node, hasResultConnection, resultItems.length);
   const run = runContext(node, taskSummary);
   const promptContext = promptPreview !== null
     ? { title: promptSourceTitle ?? "已连接", tone: "prompt" as const }
     : { title: "节点内", tone: "neutral" as const };
   const referenceContext = referenceCount > 0
-    ? { title: `${referenceCount} 张`, tone: "reference" as const }
+    ? { title: `${referenceCount} 个`, tone: "reference" as const }
     : { title: "无", tone: "neutral" as const };
   const contextItems: Array<{ key: string; label: string; title: string; tone: GenerateContextTone; tooltip?: string }> = [
     {
@@ -210,8 +295,8 @@ export default function GenerateBoardNode({
     onUpdate({ variantCount: count });
   };
   return (
-    <div className="flex h-full min-h-0 flex-col gap-2 p-3">
-      <div className="relative min-h-0 flex-1 overflow-visible">
+    <div className="flex h-full min-h-0 flex-col gap-2 overflow-hidden p-3">
+      <div className="relative min-h-0 flex-1 overflow-hidden rounded-md">
         <BoardPromptTextarea
           ref={promptTextareaRef}
           commitId={promptPreview === null ? node.id : undefined}
@@ -242,7 +327,7 @@ export default function GenerateBoardNode({
           </div>
         ))}
       </div>
-      {referencePreviews.length > 0 && (
+      {showReferencePreviews && referencePreviews.length > 0 && (
         <div className="flex min-h-6 min-w-0 items-center gap-1.5">
           <div className="nodrag flex min-w-0 items-center gap-1">
             {referencePreviews.slice(0, 4).map(reference => (
@@ -268,43 +353,13 @@ export default function GenerateBoardNode({
           </div>
         </div>
       )}
-      {resultItems.length > 0 && (
-        <div className="nodrag flex min-h-10 min-w-0 items-center gap-1 overflow-x-auto rounded-md border border-emerald-400/20 bg-emerald-500/5 p-1">
-          {resultItems.map((item, index) => {
-            const isActive = item.id === node.resultAssetId;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onSelectResult(item.id);
-                }}
-                onDoubleClick={(event) => {
-                  event.stopPropagation();
-                  onOpenResult?.(item);
-                }}
-                onPointerDown={stopBoardControlPointer}
-                className={`relative h-8 w-8 shrink-0 overflow-hidden rounded border transition ${
-                  isActive ? "border-emerald-300 ring-2 ring-emerald-400/25" : "border-[var(--iw-border)] opacity-75 hover:opacity-100"
-                }`}
-                title={`结果 ${index + 1}`}
-              >
-                {item.type === "image" ? (
-                  <PreviewImage src={item.url} alt="" className="h-full w-full object-cover" />
-                ) : item.type === "video" ? (
-                  <Video className="m-auto h-full w-4 text-violet-200" />
-                ) : (
-                  <Music className="m-auto h-full w-4 text-emerald-200" />
-                )}
-                <span className="absolute bottom-0 right-0 rounded-tl bg-black/60 px-1 text-[8px] font-semibold text-white">
-                  {index + 1}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
+      <BoardResultStack
+        activeAssetId={node.resultAssetId}
+        onMaterializeResult={onMaterializeResult}
+        onOpenResult={onOpenResult}
+        onSelectResult={onSelectResult}
+        resultItems={resultItems}
+      />
       <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
         <span className={`imagine-status-chip truncate text-[10px] font-mono ${node.status === "failed" ? "text-red-300" : "text-[var(--iw-muted)]"}`} data-status={node.status}>
           {node.errorMessage ?? statusLabel}

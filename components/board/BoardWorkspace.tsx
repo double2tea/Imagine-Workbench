@@ -59,10 +59,10 @@ import {
 import { flushAllBoardText } from "@/lib/board/text-flush-registry";
 import {
   assetCompareReferenceUrl,
+  buildBoardPromptReferenceGraphIndex,
   buildBoardPromptReferences,
-  generateReferenceCandidates,
-  isGenerateEdgeProcessing,
   resolveBoardPromptReferenceGroup,
+  type BoardPromptReferenceGraphIndex,
   type BoardPromptReference,
 } from "@/lib/board/prompt-references";
 import { useThemeModeSnapshot } from "@/lib/theme-mode";
@@ -195,7 +195,13 @@ function sameReferenceList(
   if (left.length !== right.length) return false;
   return left.every((reference, index) => {
     const other = right[index];
-    return reference.id === other.id && reference.url === other.url && reference.role === other.role;
+    return (
+      reference.id === other.id &&
+      reference.role === other.role &&
+      reference.sourceLabel === other.sourceLabel &&
+      reference.type === other.type &&
+      reference.url === other.url
+    );
   });
 }
 
@@ -239,7 +245,13 @@ function sameGenerateInputSummary(
   ) return false;
   return left.referencePreviews.every((reference, index) => {
     const other = right.referencePreviews[index];
-    return reference.id === other.id && reference.url === other.url && reference.role === other.role;
+    return (
+      reference.id === other.id &&
+      reference.role === other.role &&
+      reference.sourceEdgeId === other.sourceEdgeId &&
+      reference.type === other.type &&
+      reference.url === other.url
+    );
   });
 }
 
@@ -386,6 +398,7 @@ function BoardEdgeComponent({
   });
   const kind = data?.kind ?? "reference";
   const processing = data?.processing === true;
+  const showLabel = processing || selected;
 
   return (
     <>
@@ -398,33 +411,35 @@ function BoardEdgeComponent({
         interactionWidth={18}
         className={`imagine-board-edge-path imagine-board-edge-path-${kind}`}
       />
-      <EdgeLabelRenderer>
-        <div
-          className="nodrag nopan flex items-center gap-1"
-          style={{
-            pointerEvents: "all",
-            position: "absolute",
-            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-          }}
-        >
-          {processing ? (
-            <span className="rounded-full border border-blue-400/30 bg-blue-500/15 px-2 py-0.5 text-[9px] font-semibold text-blue-200">
-              生成中
-            </span>
-          ) : null}
-          <button
-            type="button"
-            aria-label="删除连接"
-            title="删除连接"
-            onClick={() => void deleteElements({ edges: [{ id }] })}
-            className={`flex h-6 w-6 items-center justify-center rounded-full border border-[var(--iw-border)] bg-[var(--iw-panel)] text-[var(--iw-muted)] shadow-lg transition hover:border-red-400/40 hover:bg-red-500 hover:text-white ${
-              selected ? "opacity-100" : "opacity-70"
-            }`}
+      {showLabel ? (
+        <EdgeLabelRenderer>
+          <div
+            className="nodrag nopan flex items-center gap-1"
+            style={{
+              pointerEvents: "all",
+              position: "absolute",
+              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+            }}
           >
-            <span className="text-sm leading-none">×</span>
-          </button>
-        </div>
-      </EdgeLabelRenderer>
+            {processing ? (
+              <span className="rounded-full border border-blue-400/30 bg-blue-500/15 px-2 py-0.5 text-[9px] font-semibold text-blue-200">
+                生成中
+              </span>
+            ) : null}
+            {selected ? (
+              <button
+                type="button"
+                aria-label="删除连接"
+                title="删除连接"
+                onClick={() => void deleteElements({ edges: [{ id }] })}
+                className="flex h-6 w-6 items-center justify-center rounded-full border border-[var(--iw-border)] bg-[var(--iw-panel)] text-[var(--iw-muted)] shadow-lg transition hover:border-red-400/40 hover:bg-red-500 hover:text-white"
+              >
+                <span className="text-sm leading-none">×</span>
+              </button>
+            ) : null}
+          </div>
+        </EdgeLabelRenderer>
+      ) : null}
     </>
   );
 }
@@ -622,24 +637,62 @@ function edgeColor(kind: BoardEdge["kind"]): string {
   return getBoardVar(varNames[kind], fallbacks[kind]);
 }
 
-function generateInputSummaryForNode(node: BoardNodeModel, nodes: BoardNodeModel[], edges: BoardEdge[]): BoardGenerateInputSummary | undefined {
+function boardEdgeColors(): Record<BoardEdgeKind, string> {
+  return {
+    "agent-context": edgeColor("agent-context"),
+    prompt: edgeColor("prompt"),
+    reference: edgeColor("reference"),
+    result: edgeColor("result"),
+  };
+}
+
+function generateInputSummaryForNode(
+  node: BoardNodeModel,
+  index: BoardPromptReferenceGraphIndex,
+): BoardGenerateInputSummary | undefined {
   if (node.kind !== "image-generate" && node.kind !== "video-generate" && node.kind !== "runninghub-app") return undefined;
 
-  const promptEdge = edges.find(edge => edge.to.nodeId === node.id && edge.to.portId === "prompt-in");
-  const promptNode = promptEdge ? nodes.find(item => item.id === promptEdge.from.nodeId) : undefined;
+  const incomingEdges = index.incomingEdgesByTargetNode.get(node.id) ?? [];
+  const promptEdge = incomingEdges.find(edge => edge.to.portId === "prompt-in");
+  const promptNode = promptEdge ? index.nodeById.get(promptEdge.from.nodeId) : undefined;
   const promptPreview = promptNode?.kind === "prompt" ? promptNode.prompt : null;
-  const references = generateReferenceCandidates(nodes, edges, node.id);
+  const seenReferences = new Set<string>();
+  const referencePreviews = incomingEdges
+    .filter(edge => edge.to.portId === BOARD_PORT_IDS.referenceIn)
+    .flatMap(edge => {
+      const sourceNode = index.nodeById.get(edge.from.nodeId);
+      if (sourceNode?.kind === "asset") {
+        return [{
+          id: sourceNode.asset.assetId,
+          role: "general" as const,
+          sourceEdgeId: edge.id,
+          type: sourceNode.asset.type,
+          url: sourceNode.asset.url,
+        }];
+      }
+      if (sourceNode?.kind === "reference-group") {
+        return sourceNode.references.map(reference => ({
+          id: reference.assetId,
+          role: reference.role,
+          sourceEdgeId: edge.id,
+          type: reference.type,
+          url: reference.url,
+        }));
+      }
+      return [];
+    })
+    .filter(reference => {
+      const key = `${reference.id}:${reference.url}`;
+      if (seenReferences.has(key)) return false;
+      seenReferences.add(key);
+      return true;
+    });
 
   return {
     promptPreview,
     promptSourceTitle: promptNode?.kind === "prompt" ? promptNode.title : undefined,
-    referenceCount: references.length,
-    referencePreviews: references.map(reference => ({
-      id: reference.id,
-      role: reference.role,
-      type: reference.type,
-      url: reference.url,
-    })),
+    referenceCount: referencePreviews.length,
+    referencePreviews,
   };
 }
 
@@ -655,29 +708,57 @@ function isCurrentGenerateStackItem(item: StorageItem, node: BoardNodeModel): bo
   );
 }
 
-function activeGenerateTaskForNode(items: StorageItem[], node: BoardNodeModel): BoardGenerateTaskSummary | undefined {
-  const item = items
-    .filter((candidate): candidate is StorageItem & { status: "pending" | "processing" } => isCurrentGenerateStackItem(candidate, node) && isActiveGenerateTask(candidate))
-    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0];
-  if (!item) return undefined;
-  return {
-    id: item.id,
-    progress: Math.max(0, Math.min(100, item.progress)),
-    status: item.status,
-  };
-}
-
-function resultItemsForGenerateNode(node: BoardNodeModel, items: StorageItem[]): StorageItem[] {
+function resultItemsForGenerateNode(
+  node: BoardNodeModel,
+  itemById: ReadonlyMap<string, StorageItem>,
+): StorageItem[] {
   if (node.kind !== "image-generate" && node.kind !== "video-generate" && node.kind !== "runninghub-app") return [];
   const ids = node.resultAssetIds ?? (node.resultAssetId ? [node.resultAssetId] : []);
-  const byId = new Map(items.map(item => [item.id, item]));
   return ids
-    .map(id => byId.get(id))
+    .map(id => itemById.get(id))
     .filter((item): item is StorageItem => item !== undefined && item.status === "complete");
 }
 
-function hasResultConnection(nodeId: string, edges: BoardEdge[]): boolean {
-  return edges.some(edge => edge.from.nodeId === nodeId && edge.from.portId === "result-out");
+function materializedResultKey(sourceNodeId: string, assetId: string): string {
+  return `${sourceNodeId}:${assetId}`;
+}
+
+function isResultSourceNode(node: BoardNodeModel | undefined): node is Extract<BoardNodeModel, { kind: "image-generate" | "video-generate" | "runninghub-app" }> {
+  return node?.kind === "image-generate" || node?.kind === "video-generate" || node?.kind === "runninghub-app";
+}
+
+function resultAssetNodePosition(sourceNode: Extract<BoardNodeModel, { kind: "image-generate" | "video-generate" | "runninghub-app" }>): BoardPoint {
+  return {
+    x: sourceNode.position.x + sourceNode.size.width + 48,
+    y: sourceNode.position.y,
+  };
+}
+
+function findMaterializedResultAssetNode(
+  nodes: BoardNodeModel[],
+  edges: BoardEdge[],
+  sourceNodeId: string,
+  assetId: string,
+): Extract<BoardNodeModel, { kind: "asset" }> | undefined {
+  return nodes.find((node): node is Extract<BoardNodeModel, { kind: "asset" }> => (
+    node.kind === "asset" &&
+    node.asset.assetId === assetId &&
+    edges.some(edge => (
+      edge.from.nodeId === sourceNodeId &&
+      edge.from.portId === BOARD_PORT_IDS.resultOut &&
+      edge.to.nodeId === node.id &&
+      edge.to.portId === BOARD_PORT_IDS.assetIn
+    ))
+  ));
+}
+
+function hasActiveResultConnection(
+  node: BoardNodeModel,
+  resultSourceNodeIdsWithConnection: ReadonlySet<string>,
+  materializedResultAssetNodeByKey: ReadonlyMap<string, Extract<BoardNodeModel, { kind: "asset" }>>,
+): boolean {
+  if (!isResultSourceNode(node) || !node.resultAssetId) return resultSourceNodeIdsWithConnection.has(node.id);
+  return materializedResultAssetNodeByKey.has(materializedResultKey(node.id, node.resultAssetId));
 }
 
 function pastedNodePosition(node: BoardNodeModel): BoardPoint {
@@ -787,6 +868,7 @@ export default function BoardWorkspace({
     connectPorts,
     deleteEdge,
     deleteNode,
+    moveGenerateReferenceEdge,
     moveReferenceGroupItem,
     removeReferenceGroupItem,
     selectEdge,
@@ -811,10 +893,40 @@ export default function BoardWorkspace({
     () => buildBoardGraphContentKey(board.nodes, board.edges),
     [board.nodes, board.edges],
   );
+  const boardPromptReferenceGraphIndex = useMemo(
+    () => buildBoardPromptReferenceGraphIndex(board.nodes, board.edges),
+    // graph key includes node content and edge order; positions do not affect reference resolution
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [boardGraphContentKey],
+  );
   const boardNodePositionsKey = useMemo(
     () => board.nodes.map(node => `${node.id}:${node.position.x},${node.position.y}`).join("|"),
     [board.nodes],
   );
+  const galleryItemById = useMemo(
+    () => new Map(galleryItems.map(item => [item.id, item])),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reference fingerprint gates complete/url changes used by result stacks
+    [galleryReferenceFingerprint],
+  );
+  const boardResultConnectionIndex = useMemo(() => {
+    const resultSourceNodeIdsWithConnection = new Set<string>();
+    const materializedResultAssetNodeByKey = new Map<string, Extract<BoardNodeModel, { kind: "asset" }>>();
+
+    for (const edge of board.edges) {
+      if (edge.from.portId !== BOARD_PORT_IDS.resultOut) continue;
+      resultSourceNodeIdsWithConnection.add(edge.from.nodeId);
+      if (edge.to.portId !== BOARD_PORT_IDS.assetIn) continue;
+      const targetNode = boardPromptReferenceGraphIndex.nodeById.get(edge.to.nodeId);
+      if (targetNode?.kind !== "asset") continue;
+      materializedResultAssetNodeByKey.set(
+        materializedResultKey(edge.from.nodeId, targetNode.asset.assetId),
+        targetNode,
+      );
+    }
+
+    return { materializedResultAssetNodeByKey, resultSourceNodeIdsWithConnection };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- graph key gates edge/node content; index supplies node lookup
+  }, [boardGraphContentKey, boardPromptReferenceGraphIndex]);
 
   const closeOverlayMenus = useCallback(() => {
     setQuickInsertMenu(null);
@@ -888,15 +1000,61 @@ export default function BoardWorkspace({
     connectPorts(from, to);
   }, [board.edges, board.nodes, connectPorts]);
 
+  const materializeGenerateResult = useCallback((nodeId: string, assetId: string): void => {
+    const sourceNode = board.nodes.find(node => node.id === nodeId);
+    if (!isResultSourceNode(sourceNode)) return;
+    const connectedAssetNode = findMaterializedResultAssetNode(board.nodes, board.edges, sourceNode.id, assetId);
+    if (connectedAssetNode) {
+      selectNode(connectedAssetNode.id);
+      selectEdge(null);
+      return;
+    }
+    const item = galleryItems.find(entry => entry.id === assetId);
+    if (!item || item.status !== "complete") {
+      onConnectionError("找不到生成结果资产");
+      return;
+    }
+    const from: BoardPortRef = {
+      nodeId: sourceNode.id,
+      portId: BOARD_PORT_IDS.resultOut,
+      portKind: "result",
+    };
+    const existingAssetNode = board.nodes.find(node => node.kind === "asset" && node.asset.assetId === assetId);
+    if (existingAssetNode) {
+      connectPorts(from, {
+        nodeId: existingAssetNode.id,
+        portId: BOARD_PORT_IDS.assetIn,
+        portKind: "asset",
+      });
+      selectNode(existingAssetNode.id);
+      selectEdge(null);
+      return;
+    }
+    const assetNodeId = addAssetNodeWithConnection(
+      {
+        asset: storageItemToBoardAsset(item),
+        position: resultAssetNodePosition(sourceNode),
+        title: item.prompt || item.model,
+      },
+      from,
+    );
+    selectNode(assetNodeId);
+    selectEdge(null);
+  }, [addAssetNodeWithConnection, board.edges, board.nodes, connectPorts, galleryItems, onConnectionError, selectEdge, selectNode]);
+
   const flowNodeDataById = useMemo(() => {
     const dataById = new Map<string, BoardFlowNode["data"]>();
     for (const node of board.nodes) {
       dataById.set(node.id, {
         boardId: board.id,
-        generateInputSummary: generateInputSummaryForNode(node, board.nodes, board.edges),
-          hasResultConnection: hasResultConnection(node.id, board.edges),
+        generateInputSummary: generateInputSummaryForNode(node, boardPromptReferenceGraphIndex),
+          hasResultConnection: hasActiveResultConnection(
+            node,
+            boardResultConnectionIndex.resultSourceNodeIdsWithConnection,
+            boardResultConnectionIndex.materializedResultAssetNodeByKey,
+          ),
           node,
-          resultItems: resultItemsForGenerateNode(node, galleryItems),
+          resultItems: resultItemsForGenerateNode(node, galleryItemById),
         generateReferences:
           node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app"
             ? buildBoardPromptReferences({
@@ -904,6 +1062,7 @@ export default function BoardWorkspace({
               edges: board.edges,
               focus: { kind: "generate", nodeId: node.id },
               galleryItems: galleryReferenceItems,
+              index: boardPromptReferenceGraphIndex,
             })
             : [],
         promptReferences:
@@ -913,18 +1072,19 @@ export default function BoardWorkspace({
               edges: board.edges,
               focus: { kind: "prompt", nodeId: node.id },
               galleryItems: galleryReferenceItems,
+              index: boardPromptReferenceGraphIndex,
             })
             : [],
         compareReferenceUrl:
           node.kind === "asset" && node.asset.type === "image"
-            ? assetCompareReferenceUrl(node.id, board.nodes, board.edges)
+            ? assetCompareReferenceUrl(node.id, board.nodes, board.edges, boardPromptReferenceGraphIndex)
             : null,
         onCaptureVideoFrame,
         onCancelGenerate: onCancelGenerateNode,
         onOpenAssetCompare: (nodeId: string) => {
           const assetNode = board.nodes.find(item => item.id === nodeId);
           if (assetNode?.kind !== "asset" || assetNode.asset.type !== "image") return;
-          const originalUrl = assetCompareReferenceUrl(nodeId, board.nodes, board.edges);
+          const originalUrl = assetCompareReferenceUrl(nodeId, board.nodes, board.edges, boardPromptReferenceGraphIndex);
           if (!originalUrl) return;
           setAssetCompare({ originalUrl, resultUrl: assetNode.asset.url });
         },
@@ -933,6 +1093,8 @@ export default function BoardWorkspace({
         onExecuteGenerate: onExecuteGenerateNode,
         onFetchRunningHubAppSchema,
         onOpenFullscreen,
+        onMaterializeGenerateResult: materializeGenerateResult,
+        onMoveGenerateReferenceEdge: moveGenerateReferenceEdge,
         onMoveReferenceGroupItem: moveReferenceGroupItem,
         onRemoveReferenceGroupItem: removeReferenceGroupItem,
           onSendAgent: onSendAgentNode,
@@ -960,15 +1122,20 @@ export default function BoardWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
       boardGraphContentKey,
+      boardPromptReferenceGraphIndex,
+      boardResultConnectionIndex,
       galleryReferenceFingerprint,
       galleryReferenceItems,
+      galleryItemById,
     onCancelGenerateNode,
     onCaptureVideoFrame,
     onEditAssetImage,
     onExecuteGenerateNode,
     onFetchRunningHubAppSchema,
     onOpenFullscreen,
+    materializeGenerateResult,
     moveReferenceGroupItem,
+    moveGenerateReferenceEdge,
     removeReferenceGroupItem,
     onSendAssetToAgent,
     onSendAgentNode,
@@ -985,14 +1152,28 @@ export default function BoardWorkspace({
 
   const generateTaskByNodeId = useMemo(() => {
     const map = new Map<string, BoardGenerateTaskSummary>();
-    for (const node of board.nodes) {
-      if (node.kind !== "image-generate" && node.kind !== "video-generate" && node.kind !== "runninghub-app") continue;
-      const task = activeGenerateTaskForNode(galleryItems, node);
-      if (task) map.set(node.id, task);
+    const activeItemByNodeId = new Map<string, StorageItem & { status: "pending" | "processing" }>();
+
+    for (const item of galleryItems) {
+      if (!item.sourceBoardNodeId || !isActiveGenerateTask(item)) continue;
+      const sourceNode = boardPromptReferenceGraphIndex.nodeById.get(item.sourceBoardNodeId);
+      if (!sourceNode || !isCurrentGenerateStackItem(item, sourceNode)) continue;
+      const current = activeItemByNodeId.get(sourceNode.id);
+      if (!current || new Date(item.createdAt).getTime() > new Date(current.createdAt).getTime()) {
+        activeItemByNodeId.set(sourceNode.id, item);
+      }
+    }
+
+    for (const [nodeId, item] of activeItemByNodeId) {
+      map.set(nodeId, {
+        id: item.id,
+        progress: Math.max(0, Math.min(100, item.progress)),
+        status: item.status,
+      });
     }
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- task fingerprint gates progress-only polls
-  }, [boardGraphContentKey, galleryTaskFingerprint]);
+  }, [boardGraphContentKey, boardPromptReferenceGraphIndex, galleryTaskFingerprint]);
 
   const flowNodes = useMemo<BoardFlowNode[]>(
     () =>
@@ -1032,23 +1213,32 @@ export default function BoardWorkspace({
       isSyncingFlowNodesRef.current = false;
     });
   }, [flowNodes, selectedNodeId, selectedNodeIds, setReactFlowNodes]);
+  const flowEdgeColorByKind = useMemo(
+    () => boardEdgeColors(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- theme mode is the only supported edge-token invalidator
+    [themeMode],
+  );
   const flowEdges = useMemo<BoardFlowEdge[]>(
     () =>
-      board.edges.map(edge => ({
-        id: edge.id,
-        source: edge.from.nodeId,
-        target: edge.to.nodeId,
-        sourceHandle: edge.from.portId,
-        targetHandle: edge.to.portId,
-        type: "smoothstep",
-        animated: edge.kind === "result" || isGenerateEdgeProcessing(edge, board.nodes),
-        data: { kind: edge.kind, processing: isGenerateEdgeProcessing(edge, board.nodes) },
-        className: `imagine-board-edge imagine-board-edge-${edge.kind}`,
-        markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor(edge.kind), width: 18, height: 18 },
-        style: { strokeWidth: selectedEdgeId === edge.id ? 3 : 2 },
-      })),
+      board.edges.map(edge => {
+        const sourceNode = boardPromptReferenceGraphIndex.nodeById.get(edge.from.nodeId);
+        const processing = isResultSourceNode(sourceNode) && sourceNode.status === "processing";
+        return {
+          id: edge.id,
+          source: edge.from.nodeId,
+          target: edge.to.nodeId,
+          sourceHandle: edge.from.portId,
+          targetHandle: edge.to.portId,
+          type: "smoothstep",
+          animated: edge.kind === "result" || processing,
+          data: { kind: edge.kind, processing },
+          className: `imagine-board-edge imagine-board-edge-${edge.kind}`,
+          markerEnd: { type: MarkerType.ArrowClosed, color: flowEdgeColorByKind[edge.kind], width: 18, height: 18 },
+          style: { strokeWidth: selectedEdgeId === edge.id ? 3 : 2 },
+        };
+      }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- graph key gates processing animation without position churn
-    [boardGraphContentKey, selectedEdgeId, themeMode],
+    [boardGraphContentKey, boardPromptReferenceGraphIndex, flowEdgeColorByKind, selectedEdgeId],
   );
 
   const isValidBoardConnection = useCallback<IsValidConnection<BoardFlowEdge>>((connection) => {
@@ -1468,9 +1658,15 @@ export default function BoardWorkspace({
     }
     if (sourceKind === "result") {
       const sourceNode = board.nodes.find(node => node.id === sourceNodeId);
-      if (sourceNode?.kind !== "image-generate" && sourceNode?.kind !== "video-generate" && sourceNode?.kind !== "runninghub-app") return;
+      if (!isResultSourceNode(sourceNode)) return;
       if (!sourceNode.resultAssetId) {
         onConnectionError("生成结果尚未就绪");
+        return;
+      }
+      const connectedAssetNode = findMaterializedResultAssetNode(board.nodes, board.edges, sourceNode.id, sourceNode.resultAssetId);
+      if (connectedAssetNode) {
+        selectNode(connectedAssetNode.id);
+        selectEdge(null);
         return;
       }
       const item = galleryItems.find(entry => entry.id === sourceNode.resultAssetId);
@@ -1478,17 +1674,27 @@ export default function BoardWorkspace({
         onConnectionError("找不到生成结果资产");
         return;
       }
-      addAssetNodeWithConnection(
+      const from: BoardPortRef = { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "result" };
+      const existingAssetNode = board.nodes.find(node => node.kind === "asset" && node.asset.assetId === item.id);
+      if (existingAssetNode) {
+        connectPorts(from, { nodeId: existingAssetNode.id, portId: BOARD_PORT_IDS.assetIn, portKind: "asset" });
+        selectNode(existingAssetNode.id);
+        selectEdge(null);
+        return;
+      }
+      const assetNodeId = addAssetNodeWithConnection(
         {
           position: centeredNodePosition(flowPoint, DEFAULT_ASSET_NODE_SIZE),
           asset: storageItemToBoardAsset(item),
           title: item.prompt,
         },
-        { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "result" },
+        from,
       );
+      selectNode(assetNodeId);
+      selectEdge(null);
       return;
     }
-  }, [addAssetNodeWithConnection, board.nodes, centeredNodePosition, flowPositionFromClient, galleryItems, onConnectionError]);
+  }, [addAssetNodeWithConnection, board.edges, board.nodes, centeredNodePosition, connectPorts, flowPositionFromClient, galleryItems, onConnectionError, selectEdge, selectNode]);
 
   const openQuickInsertMenu = useCallback((event: ReactMouseEvent | MouseEvent): void => {
     event.preventDefault();

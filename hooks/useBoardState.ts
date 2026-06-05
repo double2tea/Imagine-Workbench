@@ -111,6 +111,7 @@ export interface BoardStateController {
   deleteEdge: (edgeId: string) => void;
   deleteNode: (nodeId: string) => void;
   moveReferenceGroupItem: (groupNodeId: string, assetId: string, direction: "up" | "down") => void;
+  moveGenerateReferenceEdge: (nodeId: string, sourceEdgeId: string, targetEdgeId: string) => void;
   removeReferenceGroupItem: (groupNodeId: string, assetId: string) => void;
   selectEdge: (edgeId: string | null) => void;
   selectNode: (nodeId: string | null) => void;
@@ -1476,6 +1477,34 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     );
   }, [mutateBoard]);
 
+  const moveGenerateReferenceEdge = useCallback((nodeId: string, sourceEdgeId: string, targetEdgeId: string) => {
+    if (sourceEdgeId === targetEdgeId) return;
+    mutateBoard(currentBoard => {
+      const referenceEdges = currentBoard.edges.filter(
+        edge => edge.to.nodeId === nodeId && edge.to.portId === BOARD_PORT_IDS.referenceIn,
+      );
+      const sourceIndex = referenceEdges.findIndex(edge => edge.id === sourceEdgeId);
+      const targetIndex = referenceEdges.findIndex(edge => edge.id === targetEdgeId);
+      if (sourceIndex < 0 || targetIndex < 0) return currentBoard;
+
+      const nextReferenceEdges = [...referenceEdges];
+      const sourceEdge = nextReferenceEdges[sourceIndex];
+      const targetEdge = nextReferenceEdges[targetIndex];
+      if (!sourceEdge || !targetEdge) return currentBoard;
+      nextReferenceEdges[sourceIndex] = targetEdge;
+      nextReferenceEdges[targetIndex] = sourceEdge;
+
+      let nextReferenceIndex = 0;
+      const nextEdges = currentBoard.edges.map(edge => {
+        if (edge.to.nodeId !== nodeId || edge.to.portId !== BOARD_PORT_IDS.referenceIn) return edge;
+        const nextEdge = nextReferenceEdges[nextReferenceIndex];
+        nextReferenceIndex += 1;
+        return nextEdge ?? edge;
+      });
+      return touchBoard(currentBoard, currentBoard.nodes, nextEdges);
+    });
+  }, [mutateBoard]);
+
   const updateReferenceGroupItemRole = useCallback((groupNodeId: string, assetId: string, role: BoardReferenceRole) => {
     const updatedAt = nowIso();
     mutateBoard(currentBoard =>
@@ -1678,6 +1707,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       deleteEdge,
       deleteNode,
       moveReferenceGroupItem,
+      moveGenerateReferenceEdge,
       removeReferenceGroupItem,
       selectEdge,
       selectNode,
@@ -1718,6 +1748,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       duplicateNode,
       duplicateNodes,
       moveReferenceGroupItem,
+      moveGenerateReferenceEdge,
       reconnectEdge,
       restoreNodeWithEdges,
       removeReferenceGroupItem,

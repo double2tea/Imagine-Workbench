@@ -68,8 +68,10 @@ export function useClipboardImageImport({
       const file = readPastedImageFile(clipboardData);
       if (!file) return;
 
-      event.preventDefault();
       const isAgentPaste = event.target instanceof Element && event.target.closest(".imagine-agent-dock") !== null;
+      if (!isAgentPaste && document.querySelector(".board-canvas")) return;
+
+      event.preventDefault();
       const currentReferenceCount = isAgentPaste ? agentReferenceCountRef.current : referenceImageCountRef.current;
       const referenceLimit = isAgentPaste ? IMAGE_REFERENCE_LIMIT : imageReferenceLimitRef.current;
 

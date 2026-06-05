@@ -145,7 +145,7 @@ export default function ReferenceImagePicker({
             const isStart = roleMode && reference.role === "start";
             const isEnd = roleMode && reference.role === "end";
             const mediaType = getMediaReferenceType(reference);
-            const token = getMediaReferencePromptToken(index);
+            const token = getMediaReferencePromptToken(index, mediaType);
 
             return (
               <div

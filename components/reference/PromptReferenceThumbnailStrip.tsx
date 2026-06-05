@@ -15,6 +15,8 @@ export interface PromptReferenceThumbnail {
   token: string;
 }
 
+const promptReferenceTokenPattern = /@(图片|视频|音频)(\d+)/g;
+
 export function resolvePromptReferenceThumbnails(
   prompt: string,
   references: ReadonlyArray<ReferenceImageRef>,
@@ -23,8 +25,8 @@ export function resolvePromptReferenceThumbnails(
   const seen = new Set<number>();
   const matches: PromptReferenceThumbnail[] = [];
   const acceptedTypeSet = acceptedMediaTypes ? new Set(acceptedMediaTypes) : null;
-  for (const match of prompt.matchAll(/@图片(\d+)/g)) {
-    const parsed = Number(match[1]);
+  for (const match of prompt.matchAll(promptReferenceTokenPattern)) {
+    const parsed = Number(match[2]);
     if (!Number.isInteger(parsed) || parsed < 1) continue;
     const index = parsed - 1;
     if (seen.has(index)) continue;
@@ -32,7 +34,11 @@ export function resolvePromptReferenceThumbnails(
     if (!reference) continue;
     if (acceptedTypeSet && !acceptedTypeSet.has(getMediaReferenceType(reference))) continue;
     seen.add(index);
-    matches.push({ index, reference, token: getMediaReferencePromptToken(index) });
+    matches.push({
+      index,
+      reference,
+      token: getMediaReferencePromptToken(index, getMediaReferenceType(reference)),
+    });
   }
   return matches;
 }
@@ -83,13 +89,13 @@ export default function PromptReferenceInlineOverlay({
 
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
-  for (const match of prompt.matchAll(/@图片(\d+)/g)) {
+  for (const match of prompt.matchAll(promptReferenceTokenPattern)) {
     const matchText = match[0];
     const matchIndex = match.index ?? 0;
     if (matchIndex > lastIndex) {
       parts.push(prompt.slice(lastIndex, matchIndex));
     }
-    const parsed = Number(match[1]);
+    const parsed = Number(match[2]);
     const thumbnail = Number.isInteger(parsed) ? thumbnailByIndex.get(parsed - 1) : undefined;
     parts.push(thumbnail ? renderReferenceChip(thumbnail) : matchText);
     lastIndex = matchIndex + matchText.length;

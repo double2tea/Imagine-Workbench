@@ -81,6 +81,11 @@ const headerBtn =
   "imagine-board-header-btn flex h-9 min-h-9 items-center gap-1.5 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2.5 text-xs font-semibold text-[var(--iw-text)] transition";
 const iconBtn =
   "imagine-board-header-icon flex h-9 w-9 min-w-9 items-center justify-center rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)] transition disabled:cursor-not-allowed disabled:opacity-40";
+const HEADER_MENU_GAP = 8;
+const HEADER_MENU_VIEWPORT_MARGIN = 12;
+const BOARD_MENU_ESTIMATED_HEIGHT = 380;
+const INSERT_MENU_ESTIMATED_HEIGHT = 360;
+const OVERFLOW_MENU_ESTIMATED_HEIGHT = 280;
 
 function resolveHeaderMenuPortalRoot(): HTMLElement {
   const boardMain = document.querySelector("main.imagine-workbench-shell");
@@ -101,7 +106,7 @@ function renderAnchoredHeaderMenu(
   return createPortal(
     <div
       ref={panelRef}
-      className={className}
+      className={`${className} max-h-[calc(100vh-1.5rem)] overflow-y-auto`}
       style={{ left: position.left, top: position.top }}
     >
       {children}
@@ -224,14 +229,23 @@ export default function BoardToolbar({
   function openAnchoredMenu(
     buttonRef: RefObject<HTMLButtonElement | null>,
     menuWidth: number,
+    menuHeight: number,
     setPosition: (value: { left: number; top: number }) => void,
     open: () => void,
   ): void {
     const rect = buttonRef.current?.getBoundingClientRect();
     if (rect) {
+      const maxTop = window.innerHeight - menuHeight - HEADER_MENU_VIEWPORT_MARGIN;
+      const belowTop = rect.bottom + HEADER_MENU_GAP;
+      const aboveTop = rect.top - menuHeight - HEADER_MENU_GAP;
       setPosition({
-        left: Math.max(12, Math.min(rect.left, window.innerWidth - menuWidth - 12)),
-        top: rect.bottom + 8,
+        left: Math.max(
+          HEADER_MENU_VIEWPORT_MARGIN,
+          Math.min(rect.left, window.innerWidth - menuWidth - HEADER_MENU_VIEWPORT_MARGIN),
+        ),
+        top: belowTop <= maxTop
+          ? belowTop
+          : Math.max(HEADER_MENU_VIEWPORT_MARGIN, Math.min(aboveTop, maxTop)),
       });
     }
     open();
@@ -262,7 +276,7 @@ export default function BoardToolbar({
               }
               setIsInsertMenuOpen(false);
               setIsOverflowOpen(false);
-              openAnchoredMenu(boardMenuButtonRef, 320, setBoardMenuPosition, () => setIsBoardMenuOpen(true));
+              openAnchoredMenu(boardMenuButtonRef, 320, BOARD_MENU_ESTIMATED_HEIGHT, setBoardMenuPosition, () => setIsBoardMenuOpen(true));
             }}
             className={`${headerBtn} min-w-0 max-w-[min(14rem,42vw)]`}
             title={boardTitle}
@@ -385,7 +399,7 @@ export default function BoardToolbar({
                 }
                 setIsBoardMenuOpen(false);
                 setIsOverflowOpen(false);
-                openAnchoredMenu(insertMenuButtonRef, 200, setInsertMenuPosition, () => setIsInsertMenuOpen(true));
+                openAnchoredMenu(insertMenuButtonRef, 200, INSERT_MENU_ESTIMATED_HEIGHT, setInsertMenuPosition, () => setIsInsertMenuOpen(true));
               }}
               className={`${iconBtn} !w-8 !min-w-8 !rounded-none !border-0 border-l border-l-[var(--iw-border)]`}
               data-accent="amber"
@@ -472,7 +486,7 @@ export default function BoardToolbar({
               }
               setIsBoardMenuOpen(false);
               setIsInsertMenuOpen(false);
-              openAnchoredMenu(overflowButtonRef, 220, setOverflowMenuPosition, () => setIsOverflowOpen(true));
+              openAnchoredMenu(overflowButtonRef, 220, OVERFLOW_MENU_ESTIMATED_HEIGHT, setOverflowMenuPosition, () => setIsOverflowOpen(true));
             }}
             className={iconBtn}
             aria-expanded={isOverflowOpen}

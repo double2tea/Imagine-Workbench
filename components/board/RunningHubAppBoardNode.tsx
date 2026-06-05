@@ -15,7 +15,8 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import BoardPromptTextarea from "@/components/board/BoardPromptTextarea";
-import type { BoardGenerateInputSummary } from "@/components/board/GenerateBoardNode";
+import { BoardResultStack, type BoardGenerateInputSummary } from "@/components/board/GenerateBoardNode";
+import type { StorageItem } from "@/lib/db";
 import type {
   BoardAssetType,
   BoardRunningHubAppNode,
@@ -38,13 +39,18 @@ import {
 import type { BoardPromptReference } from "@/lib/board/prompt-references";
 
 interface RunningHubAppBoardNodeProps {
+  hasResultConnection?: boolean;
   inputSummary?: BoardGenerateInputSummary;
   node: BoardRunningHubAppNode;
   onExecute: () => void;
   onFetchAppSchema: (webappId: string) => Promise<BoardRunningHubAppSchemaResult>;
+  onMaterializeResult?: (assetId: string) => void;
+  onOpenResult?: (item: StorageItem) => void;
+  onSelectResult: (assetId: string) => void;
   onSelectReference?: (reference: BoardPromptReference, index: number) => void;
   onUpdate: (input: BoardRunningHubAppNodeUpdate) => void;
   references: BoardPromptReference[];
+  resultItems: StorageItem[];
 }
 
 interface RunningHubSavedTarget {
@@ -225,14 +231,26 @@ function statusLabel(status: BoardRunningHubAppNode["status"]): string {
   return "待运行";
 }
 
+function resultStatusLabel(node: BoardRunningHubAppNode, hasResultConnection: boolean, resultCount: number): string {
+  if (resultCount > 1) return `${resultCount} 个结果`;
+  if (node.resultAssetId && hasResultConnection) return "结果已连接";
+  if (node.resultAssetId) return "已生成";
+  return "未生成";
+}
+
 export default function RunningHubAppBoardNode({
+  hasResultConnection = false,
   inputSummary,
   node,
   onExecute,
   onFetchAppSchema,
+  onMaterializeResult,
+  onOpenResult,
+  onSelectResult,
   onSelectReference,
   onUpdate,
   references,
+  resultItems,
 }: RunningHubAppBoardNodeProps) {
   const [importText, setImportText] = useState("");
   const [importError, setImportError] = useState<string | null>(null);
@@ -490,13 +508,24 @@ export default function RunningHubAppBoardNode({
             placeholder={promptPreview !== null ? "已连接 Prompt 节点" : "输入 Prompt，字段可绑定到这里"}
           />
 
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="grid grid-cols-3 gap-1.5">
             <span className={chipClass}>{statusLabel(node.status)}</span>
             <span className={`${chipClass} ${isReady ? "text-emerald-200" : "text-amber-200"}`}>
               {isReady ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
               {!hasTarget ? "缺少目标" : isReady ? "可运行" : `${readiness.missingCount} 缺少`}
             </span>
+            <span className={`${chipClass} ${node.resultAssetId ? "text-emerald-200" : ""}`}>
+              {resultStatusLabel(node, hasResultConnection, resultItems.length)}
+            </span>
           </div>
+
+          <BoardResultStack
+            activeAssetId={node.resultAssetId}
+            onMaterializeResult={onMaterializeResult}
+            onOpenResult={onOpenResult}
+            onSelectResult={onSelectResult}
+            resultItems={resultItems}
+          />
 
           {isImportOpen && (
             <div className={`${softPanelClass} nodrag w-full min-w-0 p-2`}>

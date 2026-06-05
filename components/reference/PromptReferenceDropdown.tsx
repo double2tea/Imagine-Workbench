@@ -36,7 +36,11 @@ function filterReferences(
   const query = search.trim().toLowerCase();
   const acceptedTypeSet = acceptedMediaTypes ? new Set(acceptedMediaTypes) : null;
   return references
-    .map((reference, index) => ({ reference, index, token: getMediaReferencePromptToken(index) }))
+    .map((reference, index) => ({
+      reference,
+      index,
+      token: getMediaReferencePromptToken(index, getMediaReferenceType(reference)),
+    }))
     .filter(item => !acceptedTypeSet || acceptedTypeSet.has(getMediaReferenceType(item.reference)))
     .filter(
       item =>
@@ -66,6 +70,10 @@ function ReferenceRow({ item, onSelect }: { item: FilteredReferenceItem; onSelec
     <button
       type="button"
       onMouseDown={(event) => event.preventDefault()}
+      onPointerDown={(event) => {
+        event.preventDefault();
+        if (event.pointerType !== "mouse") onSelect(item.index);
+      }}
       onClick={() => onSelect(item.index)}
       className="imagine-at-dropdown-item nodrag"
     >
@@ -142,7 +150,7 @@ export default function PromptReferenceDropdown({ acceptedMediaTypes, references
   if (references.length === 0) {
     return (
       <AtDropdownShell empty>
-        连接参考媒体、拖入画板资产，或从库中选取作品后，用 @图片N 指定引用
+        连接参考媒体、拖入画板资产，或从库中选取作品后，用 @图片N / @视频N / @音频N 指定引用
       </AtDropdownShell>
     );
   }
