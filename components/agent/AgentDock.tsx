@@ -853,16 +853,16 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
             <form onSubmit={submit} className="relative flex items-center w-full">
               <label
                 className="imagine-agent-attach-btn absolute left-2 flex h-7 w-7 cursor-pointer items-center justify-center rounded-md"
-                title="上传图片到 Agent 引用"
+                title="上传媒体到 Agent 引用"
               >
                 <ImagePlus className="h-3.5 w-3.5" />
-                <input type="file" accept="image/*" onChange={onUploadReference} className="hidden" />
+                <input type="file" accept="image/*,video/*,audio/*" onChange={onUploadReference} className="hidden" />
               </label>
               <input
                 type="text"
                 value={input}
                 onChange={(event) => onChangeInput(event.target.value)}
-                placeholder="问 Agent... 输入 @ 引用完成图"
+                placeholder="问 Agent... 输入 @ 引用媒体"
                 className="imagine-agent-input w-full py-2.5 pl-12 pr-11 text-xs text-[var(--iw-text)] placeholder:text-[var(--iw-faint)]"
               />
               <button

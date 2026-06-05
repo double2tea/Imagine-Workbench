@@ -63,7 +63,11 @@ import {
 } from "@/lib/providers/model-catalog";
 import { getProviderMeta, PROVIDER_KEYS } from "@/lib/providers/registry";
 import type { RunningHubTaskNodeBinding } from "@/lib/providers/types";
-import { compressReferenceImageDataUrl, compressReferenceImageFile } from "@/lib/reference-images";
+import {
+  REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES,
+  compressReferenceImageDataUrl,
+  compressReferenceImageFile,
+} from "@/lib/reference-images";
 import {
   DEFAULT_BOARD_ID,
   DEFAULT_AGENT_NODE_SIZE,
@@ -2569,17 +2573,27 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     event.target.value = "";
     if (!file) return;
     if (agentReferences.length >= IMAGE_REFERENCE_LIMIT) {
-      pushWorkspaceNotice("error", `Agent 参考图已达上限：最多 ${IMAGE_REFERENCE_LIMIT} 张`);
+      pushWorkspaceNotice("error", `Agent 引用已达上限：最多 ${IMAGE_REFERENCE_LIMIT} 个`);
+      return;
+    }
+    const mediaType = mediaReferenceTypeFromMime(file.type);
+    if (!mediaType) {
+      pushWorkspaceNotice("error", "Agent 只支持上传图片、视频或音频引用");
+      return;
+    }
+    if (mediaType !== "image" && file.size > Math.floor(REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES * 0.75)) {
+      pushWorkspaceNotice("error", `${mediaReferenceLabel(mediaType)}引用文件过大，请压缩后重试`);
       return;
     }
     try {
-      const compressedDataUrl = await compressReferenceImageFile(file);
+      const dataUrl = mediaType === "image" ? await compressReferenceImageFile(file) : await readFileAsDataUrl(file);
       const newReferenceId = makeClientId("agent_upload");
       setAgentReferenceId(newReferenceId);
-      setAgentReferenceUrl(compressedDataUrl);
-      setAgentReferences(prev => [...prev, { id: newReferenceId, url: compressedDataUrl }].slice(0, IMAGE_REFERENCE_LIMIT));
+      setAgentReferenceUrl(dataUrl);
+      setAgentReferences(prev => [...prev, { id: newReferenceId, type: mediaType, url: dataUrl }].slice(0, IMAGE_REFERENCE_LIMIT));
+      pushWorkspaceNotice("success", `已上传 Agent ${mediaReferenceLabel(mediaType)}引用`);
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "Agent 参考图压缩失败，请换一张图片"));
+      pushWorkspaceNotice("error", toErrorMessage(error, "Agent 引用读取失败，请换一个文件"));
     }
   };
 

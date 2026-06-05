@@ -59,8 +59,12 @@ import {
   type VideoReferenceMode,
 } from "@/lib/providers/model-catalog";
 import { PROVIDER_KEYS, getProviderMeta } from "@/lib/providers/registry";
-import { getMediaReferenceType } from "@/lib/media-references";
-import { compressReferenceImageDataUrl, compressReferenceImageFile } from "@/lib/reference-images";
+import { getMediaReferenceType, mediaReferenceLabel, mediaReferenceTypeFromMime } from "@/lib/media-references";
+import {
+  REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES,
+  compressReferenceImageDataUrl,
+  compressReferenceImageFile,
+} from "@/lib/reference-images";
 import { selectVideoReferenceTypesForMode } from "@/lib/video-reference-selection";
 import {
   cleanupWorkspaceAssets,
@@ -107,6 +111,21 @@ function getStringField(value: unknown, field: string): string | null {
 
 function toErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message.trim() ? error.message : fallback;
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== "string") {
+        reject(new Error("文件读取结果不是 Data URL"));
+        return;
+      }
+      resolve(reader.result);
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("文件读取失败"));
+    reader.readAsDataURL(file);
+  });
 }
 
 async function readFetchError(response: Response, fallback: string): Promise<string> {
@@ -391,23 +410,33 @@ export default function Home() {
     if (!file) return;
 
     if (agentReferences.length >= IMAGE_REFERENCE_LIMIT) {
-      pushWorkspaceNotice("error", `Agent 参考图已达上限：最多 ${IMAGE_REFERENCE_LIMIT} 张`);
+      pushWorkspaceNotice("error", `Agent 引用已达上限：最多 ${IMAGE_REFERENCE_LIMIT} 个`);
+      return;
+    }
+
+    const mediaType = mediaReferenceTypeFromMime(file.type);
+    if (!mediaType) {
+      pushWorkspaceNotice("error", "Agent 只支持上传图片、视频或音频引用");
+      return;
+    }
+    if (mediaType !== "image" && file.size > Math.floor(REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES * 0.75)) {
+      pushWorkspaceNotice("error", `${mediaReferenceLabel(mediaType)}引用文件过大，请压缩后重试`);
       return;
     }
 
     try {
-      const compressedDataUrl = await compressReferenceImageFile(file);
+      const dataUrl = mediaType === "image" ? await compressReferenceImageFile(file) : await readFileAsDataUrl(file);
       const newReferenceId = makeClientId("agent_upload");
       setAgentReferenceId(newReferenceId);
-      setAgentReferenceUrl(compressedDataUrl);
+      setAgentReferenceUrl(dataUrl);
       setAgentReferences(prev => {
         if (prev.length >= IMAGE_REFERENCE_LIMIT) return prev;
-        return [...prev, { id: newReferenceId, url: compressedDataUrl }];
+        return [...prev, { id: newReferenceId, type: mediaType, url: dataUrl }];
       });
-      pushWorkspaceNotice("success", `已上传 Agent 参考图（${agentReferences.length + 1}/${IMAGE_REFERENCE_LIMIT}）`);
+      pushWorkspaceNotice("success", `已上传 Agent ${mediaReferenceLabel(mediaType)}引用（${agentReferences.length + 1}/${IMAGE_REFERENCE_LIMIT}）`);
     } catch (error) {
       console.error(error);
-      pushWorkspaceNotice("error", toErrorMessage(error, "Agent 参考图压缩失败，请换一张图片"));
+      pushWorkspaceNotice("error", toErrorMessage(error, "Agent 引用读取失败，请换一个文件"));
     }
   };
 
