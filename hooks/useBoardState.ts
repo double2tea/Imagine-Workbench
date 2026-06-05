@@ -56,7 +56,12 @@ import {
   type CreateRunningHubAppNodeInput,
 } from "@/lib/board";
 import { getImageModelCapabilities, getImageResolutionOptions, getVideoModelCapabilities } from "@/lib/providers/model-catalog";
-import { BOARD_PORT_IDS, filterValidBoardEdges, resolveBoardConnectionKind } from "@/lib/board/ports";
+import {
+  BOARD_PORT_IDS,
+  filterValidBoardEdges,
+  resolveBoardConnectionKind,
+  resolveBoardConnectionNodesWithCompatibleModel,
+} from "@/lib/board/ports";
 import { findResultNodeForSource, isResultSourceNode, resultNodeDefaultPosition } from "@/lib/board/utils";
 
 export type BoardSaveStatus = "idle" | "loading" | "saving" | "saved" | "error";
@@ -1300,7 +1305,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     };
     const edgeId = createBoardId("edge");
     mutateBoard(currentBoard => {
-      const nextNodes = [...currentBoard.nodes, node];
+      const nextNodes = resolveBoardConnectionNodesWithCompatibleModel([...currentBoard.nodes, node], from, to);
       const edge: BoardEdge = {
         id: edgeId,
         kind: resolveBoardConnectionKind(nextNodes, from, to),
@@ -1451,7 +1456,8 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       if (!oldEdge) {
         throw new Error("连接不存在");
       }
-      const kind = resolveBoardConnectionKind(currentBoard.nodes, from, to);
+      const compatibleNodes = resolveBoardConnectionNodesWithCompatibleModel(currentBoard.nodes, from, to);
+      const kind = resolveBoardConnectionKind(compatibleNodes, from, to);
       const withoutDuplicate = currentBoard.edges.filter(currentEdge => {
         if (currentEdge.id === edgeId) return true;
         return !(
@@ -1465,17 +1471,17 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
         edge.id === edgeId ? { ...edge, kind, from, to } : edge,
       );
       const oldSourceNode = currentBoard.nodes.find(node => node.id === oldEdge.from.nodeId);
-      const nextSourceNode = currentBoard.nodes.find(node => node.id === from.nodeId);
+      const nextSourceNode = compatibleNodes.find(node => node.id === from.nodeId);
       const oldReference: BoardReferenceGroupItem | null = oldSourceNode?.kind === "asset"
         ? referenceGroupItemFromAssetNode(oldSourceNode)
         : null;
       const nextReference: BoardReferenceGroupItem | null = nextSourceNode?.kind === "asset"
         ? referenceGroupItemFromAssetNode(nextSourceNode)
         : null;
-      if (!oldReference && !nextReference) return touchBoard(currentBoard, currentBoard.nodes, nextEdges);
+      if (!oldReference && !nextReference) return touchBoard(currentBoard, compatibleNodes, nextEdges);
 
       const updatedAt = nowIso();
-      const nextNodes = currentBoard.nodes.map(node => {
+      const nextNodes = compatibleNodes.map(node => {
         if (node.kind !== "reference-group") return node;
         let references = node.references;
         if (node.id === oldEdge.to.nodeId && oldEdge.to.portId === BOARD_PORT_IDS.assetIn) {
@@ -1539,11 +1545,12 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     const edgeId = createBoardId("edge");
     mutateBoard(currentBoard => {
       if (findMatchingEdge(currentBoard.edges, from, to)) return currentBoard;
+      const nextNodes = resolveBoardConnectionNodesWithCompatibleModel(currentBoard.nodes, from, to);
       const edge: BoardEdge = {
-        ...createBoardEdge(currentBoard.nodes, from, to),
+        ...createBoardEdge(nextNodes, from, to),
         id: edgeId,
       };
-      return touchBoard(currentBoard, currentBoard.nodes, connectEdge(currentBoard.nodes, currentBoard.edges, edge));
+      return touchBoard(currentBoard, nextNodes, connectEdge(nextNodes, currentBoard.edges, edge));
     });
     setSelectedEdgeId(edgeId);
     setSelectedNodeId(null);

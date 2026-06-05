@@ -19,7 +19,7 @@ import {
   tryParseProviderModel,
 } from "../lib/providers/model-catalog";
 import { getGenerationReferenceMedia } from "../lib/db";
-import { BOARD_PORT_IDS, resolveBoardConnectionKind } from "../lib/board/ports";
+import { BOARD_PORT_IDS, resolveBoardConnectionKind, resolveBoardConnectionNodesWithCompatibleModel } from "../lib/board/ports";
 import type { BoardNode } from "../lib/board/types";
 import { getProviderMeta } from "../lib/providers/registry";
 
@@ -143,6 +143,95 @@ test("board reference groups preserve media types for generate connections", () 
     ),
     "reference",
   );
+});
+
+test("board video reference connections auto-switch to an audio-compatible model", () => {
+  const audioNode: BoardNode = {
+    id: "asset_audio",
+    kind: "asset",
+    title: "Audio",
+    position: { x: 0, y: 0 },
+    size: { width: 280, height: 180 },
+    createdAt: "2026-06-06T00:00:00.000Z",
+    updatedAt: "2026-06-06T00:00:00.000Z",
+    asset: {
+      assetId: "audio_1",
+      type: "audio",
+      url: "data:audio/mpeg;base64,YQ==",
+      prompt: "audio",
+      model: "local",
+    },
+  };
+  const videoNode: BoardNode = {
+    id: "video_1",
+    kind: "video-generate",
+    title: "Video",
+    position: { x: 320, y: 0 },
+    size: { width: 320, height: 240 },
+    createdAt: "2026-06-06T00:00:00.000Z",
+    updatedAt: "2026-06-06T00:00:00.000Z",
+    prompt: "",
+    model: "12ai:veo_3_1-fast",
+    aspectRatio: "16:9",
+    variantCount: 1,
+    status: "idle",
+  };
+  const from = { nodeId: audioNode.id, portId: BOARD_PORT_IDS.assetOut, portKind: "asset" as const };
+  const to = { nodeId: videoNode.id, portId: BOARD_PORT_IDS.referenceIn, portKind: "asset" as const };
+  const nodes = resolveBoardConnectionNodesWithCompatibleModel([audioNode, videoNode], from, to);
+  const patchedVideoNode = nodes.find(node => node.id === videoNode.id);
+
+  assert.equal(patchedVideoNode?.kind, "video-generate");
+  if (patchedVideoNode?.kind !== "video-generate") throw new Error("Expected video node");
+  assert.notEqual(patchedVideoNode.model, videoNode.model);
+  assert.equal(getVideoModelCapabilities(patchedVideoNode.model).referenceMediaTypes.includes("audio"), true);
+  assert.equal(resolveBoardConnectionKind(nodes, from, to), "reference");
+});
+
+test("board image reference connections auto-switch to an image-reference model", () => {
+  const originalModel = "grok2api:grok-imagine-image";
+  const imageNode: BoardNode = {
+    id: "asset_image",
+    kind: "asset",
+    title: "Image",
+    position: { x: 0, y: 0 },
+    size: { width: 280, height: 180 },
+    createdAt: "2026-06-06T00:00:00.000Z",
+    updatedAt: "2026-06-06T00:00:00.000Z",
+    asset: {
+      assetId: "image_1",
+      type: "image",
+      url: "data:image/png;base64,YQ==",
+      prompt: "image",
+      model: "local",
+    },
+  };
+  const generateNode: BoardNode = {
+    id: "image_generate_1",
+    kind: "image-generate",
+    title: "Image Generate",
+    position: { x: 320, y: 0 },
+    size: { width: 320, height: 240 },
+    createdAt: "2026-06-06T00:00:00.000Z",
+    updatedAt: "2026-06-06T00:00:00.000Z",
+    prompt: "",
+    model: originalModel,
+    aspectRatio: "1:1",
+    customImageResolution: "2560x1440",
+    imageResolution: "1024x1024",
+    variantCount: 1,
+    status: "idle",
+  };
+  const from = { nodeId: imageNode.id, portId: BOARD_PORT_IDS.assetOut, portKind: "asset" as const };
+  const to = { nodeId: generateNode.id, portId: BOARD_PORT_IDS.referenceIn, portKind: "asset" as const };
+  const nodes = resolveBoardConnectionNodesWithCompatibleModel([imageNode, generateNode], from, to);
+  const patchedGenerateNode = nodes.find(node => node.id === generateNode.id);
+
+  assert.equal(patchedGenerateNode?.kind, "image-generate");
+  if (patchedGenerateNode?.kind !== "image-generate") throw new Error("Expected image generate node");
+  assert.notEqual(patchedGenerateNode.model, originalModel);
+  assert.equal(getImageModelCapabilities(patchedGenerateNode.model).referenceMediaTypes.includes("image"), true);
+  assert.equal(resolveBoardConnectionKind(nodes, from, to), "reference");
 });
 
 test("image capability helper separates aspect ratios from requestable resolutions", () => {

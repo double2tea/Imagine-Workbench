@@ -1318,13 +1318,17 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         pushWorkspaceNotice("error", "未找到要编辑的图片资产节点");
         return;
       }
+      const editedTitle = `${sourceNode.title} 局部编辑`;
+      const editedPrompt = sourceNode.asset.prompt.trim()
+        ? `${sourceNode.asset.prompt}\n局部编辑：${sourceNode.title}`
+        : editedTitle;
       const editedItem = buildStorageItem(
         {
           id: makeClientId("img_edit"),
           type: "image",
           url: compressedMergedImage,
-          prompt: `${sourceNode.title} 局部编辑`,
-          model: "board-local-edit",
+          prompt: editedPrompt,
+          model: sourceNode.asset.model,
           aspectRatio: "auto",
           createdAt: new Date().toISOString(),
           status: "complete",
@@ -1337,6 +1341,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       setItems(prev => [editedItem, ...prev]);
       const editedNodeId = boardController.addAssetNode({
         asset: storageItemToBoardAssetReference(editedItem),
+        title: editedTitle,
         position: {
           x: sourceNode.position.x + sourceNode.size.width + 40,
           y: sourceNode.position.y,

@@ -23,6 +23,7 @@ import {
   getVideoModelCapabilities,
 } from "@/lib/providers/model-catalog";
 import { includeCurrentModelOption, type BoardModelOptionGroup } from "@/lib/board/model-options";
+import type { MediaReferenceType } from "@/lib/media-references";
 import { getBoardNodePortDefinition } from "@/lib/board/ports";
 import type {
   BoardEdge,
@@ -137,6 +138,45 @@ function firstOption(options: Array<{ value: string }>, fallback: string): strin
   return options[0]?.value ?? fallback;
 }
 
+function getInputReferenceTypes(inputSummary?: BoardGenerateInputSummary): MediaReferenceType[] {
+  const types: MediaReferenceType[] = [];
+  inputSummary?.referencePreviews.forEach(reference => {
+    if (reference.type && !types.includes(reference.type)) types.push(reference.type);
+  });
+  return types;
+}
+
+function getModelReferenceTypes(kind: "image" | "video", model: string): MediaReferenceType[] {
+  try {
+    return kind === "image"
+      ? getImageModelCapabilities(model).referenceMediaTypes
+      : getVideoModelCapabilities(model).referenceMediaTypes;
+  } catch {
+    return [];
+  }
+}
+
+function filterModelGroupsForReferenceTypes(
+  groups: BoardModelOptionGroup[],
+  kind: "image" | "video",
+  referenceTypes: MediaReferenceType[],
+): BoardModelOptionGroup[] {
+  if (referenceTypes.length === 0) return groups;
+  return groups
+    .map(group => ({
+      ...group,
+      options: group.options.filter(option => {
+        const acceptedTypes = getModelReferenceTypes(kind, option.value);
+        return referenceTypes.every(type => acceptedTypes.includes(type));
+      }),
+    }))
+    .filter(group => group.options.length > 0);
+}
+
+function hasModelOptionValue(groups: BoardModelOptionGroup[], value: string): boolean {
+  return groups.some(group => group.options.some(option => option.value === value));
+}
+
 function imageModelPatch(model: string, current: BoardImageGenerateNode): BoardGenerateNodeUpdate {
   const capabilities = getImageModelCapabilities(model);
   const aspectRatio = capabilities.aspectRatios.some(option => option.value === current.aspectRatio)
@@ -196,17 +236,29 @@ function videoModelPatch(model: string, current: BoardVideoGenerateNode): BoardG
 }
 
 function ModelSelect({
+  allowUnknownCurrent = true,
   groups,
+  placeholder = "选择可用模型",
   value,
   onChange,
 }: {
+  allowUnknownCurrent?: boolean;
   groups: BoardModelOptionGroup[];
+  placeholder?: string;
   value: string;
   onChange: (value: string) => void;
 }) {
-  const modelGroups = includeCurrentModelOption(groups, value);
+  const modelGroups = allowUnknownCurrent ? includeCurrentModelOption(groups, value) : groups;
+  const hasSelectedValue = hasModelOptionValue(modelGroups, value);
+  const isEmpty = modelGroups.length === 0;
   return (
-    <select value={value} onChange={event => onChange(event.target.value)} className={inputClass}>
+    <select
+      value={hasSelectedValue ? value : ""}
+      onChange={event => onChange(event.target.value)}
+      disabled={isEmpty}
+      className={`${inputClass} ${isEmpty ? "cursor-not-allowed opacity-70" : ""}`}
+    >
+      {!hasSelectedValue && <option value="" disabled>{placeholder}</option>}
       {modelGroups.map(group => (
         <optgroup key={group.provider} label={group.label}>
           {group.options.map(option => (
@@ -345,12 +397,14 @@ function ReferenceGroupSummary({ node, onFocusNode }: { node: BoardNode & { kind
 
 function ImageGenerateInspector({
   imageModelGroups,
+  inputSummary,
   node,
   onExecuteGenerate,
   onFocusNode,
   onUpdateGenerate,
 }: {
   imageModelGroups: BoardModelOptionGroup[];
+  inputSummary?: BoardGenerateInputSummary;
   node: BoardImageGenerateNode;
   onExecuteGenerate: (nodeId: string) => void;
   onFocusNode: (nodeId: string) => void;
@@ -365,12 +419,19 @@ function ImageGenerateInspector({
   const presetResolutionOptions = activeResolutionOptions.filter(option => option.value !== "custom");
   const supportsCustomImageSize = activeResolutionOptions.some(option => option.value === "custom");
   const supportsReferences = modelSupportsReferences(node);
+  const requiredReferenceTypes = getInputReferenceTypes(inputSummary);
+  const selectableImageModelGroups = filterModelGroupsForReferenceTypes(imageModelGroups, "image", requiredReferenceTypes);
   const isProcessing = node.status === "processing";
 
   const advancedFields = (
     <div className="imagine-panel-disclosure-body">
       <InspectorField title="模型">
-        <ModelSelect groups={imageModelGroups} value={node.model} onChange={model => onUpdateGenerate(node.id, imageModelPatch(model, node))} />
+        <ModelSelect
+          allowUnknownCurrent={requiredReferenceTypes.length === 0}
+          groups={selectableImageModelGroups}
+          value={node.model}
+          onChange={model => onUpdateGenerate(node.id, imageModelPatch(model, node))}
+        />
       </InspectorField>
       {node.model.startsWith("runninghub:") && (
         <InspectorField title="RunningHub 模型 ID">
@@ -486,6 +547,8 @@ function VideoGenerateInspector({
 }) {
   const capabilities = getVideoModelCapabilities(node.model);
   const supportsReferences = modelSupportsReferences(node);
+  const requiredReferenceTypes = getInputReferenceTypes(inputSummary);
+  const selectableVideoModelGroups = filterModelGroupsForReferenceTypes(videoModelGroups, "video", requiredReferenceTypes);
   const isProcessing = node.status === "processing";
   const defaultReferenceMode: BoardVideoReferenceMode | undefined =
     capabilities.referenceMode === "reference" || capabilities.referenceMode === "firstLast"
@@ -508,7 +571,12 @@ function VideoGenerateInspector({
   const advancedFields = (
     <div className="imagine-panel-disclosure-body">
       <InspectorField title="模型">
-        <ModelSelect groups={videoModelGroups} value={node.model} onChange={model => onUpdateGenerate(node.id, videoModelPatch(model, node))} />
+        <ModelSelect
+          allowUnknownCurrent={requiredReferenceTypes.length === 0}
+          groups={selectableVideoModelGroups}
+          value={node.model}
+          onChange={model => onUpdateGenerate(node.id, videoModelPatch(model, node))}
+        />
       </InspectorField>
       {node.model.startsWith("runninghub:") && (
         <InspectorField title="RunningHub 模型 ID">
@@ -758,7 +826,7 @@ export default function BoardInspector({
           {node.kind === "note" && <NoteNodeSummary node={node} onFocusNode={onFocusNode} />}
           {node.kind === "reference-group" && <ReferenceGroupSummary node={node} onFocusNode={onFocusNode} />}
           {node.kind === "image-generate" && (
-            <ImageGenerateInspector imageModelGroups={imageModelGroups} node={node} onExecuteGenerate={onExecuteGenerate} onFocusNode={onFocusNode} onUpdateGenerate={onUpdateGenerate} />
+            <ImageGenerateInspector imageModelGroups={imageModelGroups} inputSummary={generateInputSummary} node={node} onExecuteGenerate={onExecuteGenerate} onFocusNode={onFocusNode} onUpdateGenerate={onUpdateGenerate} />
           )}
           {node.kind === "video-generate" && (
             <VideoGenerateInspector inputSummary={generateInputSummary} node={node} onExecuteGenerate={onExecuteGenerate} onFocusNode={onFocusNode} onUpdateGenerate={onUpdateGenerate} videoModelGroups={videoModelGroups} />

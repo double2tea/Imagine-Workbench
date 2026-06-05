@@ -18,7 +18,7 @@
     "pages:deploy": "pnpm run pages:build && pnpm dlx wrangler pages deploy .vercel/output/static --project-name=imagine-workbench --commit-dirty=true",
     "test:providers": "tsc -p tests/tsconfig.json && node --test .tmp/provider-tests/tests/*.test.js",
     "trellis": "trellis",
-    "clean": "next clean",
+    "clean": "rm -rf .next/types",
     "local": "bash scripts/run-local.sh"
   },
   "dependencies": {

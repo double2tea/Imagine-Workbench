@@ -1,6 +1,7 @@
 import type { BoardEdge, BoardEdgeKind, BoardNode, BoardPortDefinition, BoardPortRef } from "./types";
 import { dedupeBoardEdgesByEndpoints } from "./edge-dedupe";
-import { getModelCapability, getVideoModelCapabilities } from "../providers/model-catalog";
+import type { MediaReferenceType } from "@/lib/media-references";
+import { getModelCapabilities, getModelCapability, getVideoModelCapabilities } from "../providers/model-catalog";
 
 export const BOARD_PORT_IDS = {
   agentContextIn: "agent-context-in",
@@ -97,6 +98,75 @@ function isReferenceSource(node: BoardNode): boolean {
   return node.kind === "asset" || node.kind === "reference-group" || node.kind === "result";
 }
 
+function dedupeReferenceTypes(types: MediaReferenceType[]): MediaReferenceType[] {
+  return types.filter((type, index) => types.indexOf(type) === index);
+}
+
+function getReferenceSourceMediaTypes(source: BoardNode): MediaReferenceType[] {
+  if (source.kind === "reference-group") return dedupeReferenceTypes(source.references.map(reference => reference.type));
+  if (source.kind === "asset" || source.kind === "result") return [source.asset.type];
+  return [];
+}
+
+function getGenerateAcceptedReferenceTypes(node: BoardNode & { kind: "image-generate" | "video-generate"; model: string }): MediaReferenceType[] {
+  if (node.kind === "video-generate") return getVideoModelCapabilities(node.model).referenceMediaTypes;
+  return getModelCapability(node.model, "image").referenceMediaTypes;
+}
+
+function acceptsReferenceTypes(
+  node: BoardNode & { kind: "image-generate" | "video-generate"; model: string },
+  referenceTypes: MediaReferenceType[],
+): boolean {
+  if (referenceTypes.length === 0) return false;
+  const acceptedTypes = getGenerateAcceptedReferenceTypes(node);
+  return referenceTypes.every(type => acceptedTypes.includes(type));
+}
+
+function findCompatibleGenerateModel(
+  kind: "image-generate" | "video-generate",
+  referenceTypes: MediaReferenceType[],
+): string | null {
+  if (referenceTypes.length === 0) return null;
+  const modelKind = kind === "image-generate" ? "image" : "video";
+  const capability = getModelCapabilities(modelKind).find(item =>
+    item.supportsReferences &&
+    !item.value.includes("<") &&
+    referenceTypes.every(type => item.referenceMediaTypes.includes(type))
+  );
+  return capability?.value ?? null;
+}
+
+export function resolveBoardConnectionNodesWithCompatibleModel(
+  nodes: BoardNode[],
+  from: BoardPortRef,
+  to: BoardPortRef,
+): BoardNode[] {
+  if (
+    from.portId !== BOARD_PORT_IDS.assetOut ||
+    from.portKind !== "asset" ||
+    to.portId !== BOARD_PORT_IDS.referenceIn ||
+    to.portKind !== "asset"
+  ) {
+    return nodes;
+  }
+
+  const source = findNode(nodes, from.nodeId);
+  const target = findNode(nodes, to.nodeId);
+  if (!isGenerateNode(target)) return nodes;
+
+  const referenceTypes = getReferenceSourceMediaTypes(source);
+  if (acceptsReferenceTypes(target, referenceTypes)) return nodes;
+
+  const compatibleModel = findCompatibleGenerateModel(target.kind, referenceTypes);
+  if (!compatibleModel) return nodes;
+
+  return nodes.map(node =>
+    node.id === target.id && isGenerateNode(node)
+      ? { ...node, model: compatibleModel }
+      : node,
+  );
+}
+
 function isAcceptedGenerateReferenceSource(source: BoardNode, target: BoardNode): boolean {
   if (target.kind === "runninghub-app") {
     if (source.kind === "reference-group") return source.references.length > 0;
@@ -176,7 +246,7 @@ export function resolveBoardConnectionKind(nodes: BoardNode[], from: BoardPortRe
 
 export function isValidBoardConnection(nodes: BoardNode[], from: BoardPortRef, to: BoardPortRef): boolean {
   try {
-    resolveBoardConnectionKind(nodes, from, to);
+    resolveBoardConnectionKind(resolveBoardConnectionNodesWithCompatibleModel(nodes, from, to), from, to);
     return true;
   } catch {
     return false;
