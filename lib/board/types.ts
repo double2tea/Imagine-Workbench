@@ -158,6 +158,12 @@ export interface BoardRunningHubAppNode extends BoardNodeBase {
   errorMessage?: string;
 }
 
+export interface BoardRunningHubAppSchemaResult {
+  webappId: string;
+  name?: string;
+  bindings: BoardRunningHubNodeInfoBinding[];
+}
+
 export interface BoardAgentNode extends BoardNodeBase {
   kind: "agent";
   instruction: string;

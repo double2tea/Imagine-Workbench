@@ -9,16 +9,19 @@ import {
   Loader2,
   Play,
   Plus,
+  Save,
   Settings2,
   Trash2,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import BoardPromptTextarea from "@/components/board/BoardPromptTextarea";
 import type { BoardGenerateInputSummary } from "@/components/board/GenerateBoardNode";
 import type {
   BoardAssetType,
   BoardRunningHubAppNode,
+  BoardRunningHubAppSchemaResult,
   BoardRunningHubAppNodeUpdate,
+  BoardRunningHubBindingOption,
   BoardRunningHubBindingDelivery,
   BoardRunningHubBindingSource,
   BoardRunningHubBindingValueType,
@@ -38,11 +41,24 @@ interface RunningHubAppBoardNodeProps {
   inputSummary?: BoardGenerateInputSummary;
   node: BoardRunningHubAppNode;
   onExecute: () => void;
-  onFetchAppSchema: (webappId: string) => Promise<BoardRunningHubNodeInfoBinding[]>;
+  onFetchAppSchema: (webappId: string) => Promise<BoardRunningHubAppSchemaResult>;
   onSelectReference?: (reference: BoardPromptReference, index: number) => void;
   onUpdate: (input: BoardRunningHubAppNodeUpdate) => void;
   references: BoardPromptReference[];
 }
+
+interface RunningHubSavedTarget {
+  accessPassword?: string;
+  bindings: BoardRunningHubNodeInfoBinding[];
+  id: string;
+  label: string;
+  outputType: BoardRunningHubOutputType;
+  targetId: string;
+  targetType: BoardRunningHubTargetType;
+  updatedAt: string;
+}
+
+const SAVED_TARGETS_STORAGE_KEY = "imagine_runninghub_saved_targets";
 
 const inputClass = "nodrag nowheel h-8 min-w-0 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)] px-2 text-[10px] text-[var(--iw-text)] outline-none focus:border-emerald-400/60";
 const labelClass = "text-[10px] font-medium text-[var(--iw-faint)]";
@@ -100,6 +116,99 @@ function readReferenceIndexInput(value: string): number | undefined {
   return Number.isInteger(index) && index >= 0 ? index : undefined;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function readOptionalString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function readOptionalBoolean(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined;
+}
+
+function readOptionalNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function readSavedBinding(value: unknown): BoardRunningHubNodeInfoBinding | null {
+  if (!isRecord(value)) return null;
+  const id = readOptionalString(value.id);
+  const nodeId = readOptionalString(value.nodeId);
+  const fieldName = readOptionalString(value.fieldName);
+  if (!id || !nodeId || !fieldName) return null;
+  const rawOptions = Array.isArray(value.options) ? value.options : [];
+  const options = rawOptions
+    .map((option): BoardRunningHubBindingOption | null => {
+      if (!isRecord(option)) return null;
+      const optionLabel = readOptionalString(option.label);
+      const optionValue = readOptionalString(option.value);
+      if (!optionLabel || optionValue === undefined) return null;
+      const description = readOptionalString(option.description);
+      return description ? { label: optionLabel, value: optionValue, description } : { label: optionLabel, value: optionValue };
+    })
+    .filter((option): option is BoardRunningHubBindingOption => option !== null);
+  return {
+    id,
+    nodeId,
+    fieldName,
+    fieldData: readOptionalString(value.fieldData),
+    description: readOptionalString(value.description),
+    descriptionEn: readOptionalString(value.descriptionEn),
+    label: readOptionalString(value.label),
+    source: readSource(readOptionalString(value.source) ?? "literal"),
+    value: readOptionalString(value.value) ?? "",
+    valueType: readOptionalString(value.valueType) ? readValueType(readOptionalString(value.valueType) ?? "text") : undefined,
+    options,
+    enabled: readOptionalBoolean(value.enabled),
+    required: readOptionalBoolean(value.required),
+    referenceIndex: readOptionalNumber(value.referenceIndex),
+    referenceType: readOptionalString(value.referenceType) ? readReferenceType(readOptionalString(value.referenceType) ?? "image") : undefined,
+    deliveryMode: readDelivery(readOptionalString(value.deliveryMode) ?? "raw"),
+  };
+}
+
+function readSavedTarget(value: unknown): RunningHubSavedTarget | null {
+  if (!isRecord(value)) return null;
+  const id = readOptionalString(value.id);
+  const label = readOptionalString(value.label);
+  const targetId = readOptionalString(value.targetId);
+  if (!id || !label || !targetId || !Array.isArray(value.bindings)) return null;
+  return {
+    accessPassword: readOptionalString(value.accessPassword),
+    bindings: value.bindings.map(readSavedBinding).filter((binding): binding is BoardRunningHubNodeInfoBinding => binding !== null),
+    id,
+    label,
+    outputType: readOutputType(readOptionalString(value.outputType) ?? "image"),
+    targetId,
+    targetType: readTargetType(readOptionalString(value.targetType) ?? "ai-app"),
+    updatedAt: readOptionalString(value.updatedAt) ?? new Date(0).toISOString(),
+  };
+}
+
+function readSavedTargets(): RunningHubSavedTarget[] {
+  if (typeof window === "undefined") return [];
+  const raw = window.localStorage.getItem(SAVED_TARGETS_STORAGE_KEY);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map(readSavedTarget).filter((target): target is RunningHubSavedTarget => target !== null);
+  } catch {
+    return [];
+  }
+}
+
+function writeSavedTargets(targets: RunningHubSavedTarget[]): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(SAVED_TARGETS_STORAGE_KEY, JSON.stringify(targets));
+}
+
+function savedTargetId(targetType: BoardRunningHubTargetType, targetId: string): string {
+  return `${targetType}:${targetId.trim()}`;
+}
+
 function bindingTitle(binding: BoardRunningHubNodeInfoBinding): string {
   return binding.label?.trim() || binding.description || binding.fieldName || "未命名参数";
 }
@@ -128,6 +237,7 @@ export default function RunningHubAppBoardNode({
   const [importError, setImportError] = useState<string | null>(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isFetchingSchema, setIsFetchingSchema] = useState(false);
+  const [savedTargets, setSavedTargets] = useState<RunningHubSavedTarget[]>([]);
   const promptPreview = inputSummary?.promptPreview ?? null;
   const referenceCount = inputSummary?.referenceCount ?? 0;
   const readiness = analyzeRunningHubBindings(node.bindings, promptPreview ?? node.prompt, referenceCount);
@@ -136,6 +246,11 @@ export default function RunningHubAppBoardNode({
   const bindingSummary = node.bindings.length > 0
     ? `${readiness.enabledCount}/${node.bindings.length} 字段`
     : "未读取字段";
+  const currentSavedTarget = savedTargets.find(target => target.id === savedTargetId(node.targetType, node.targetId));
+
+  useEffect(() => {
+    setSavedTargets(readSavedTargets());
+  }, []);
 
   const updateBinding = (bindingId: string, patch: Partial<BoardRunningHubNodeInfoBinding>): void => {
     onUpdate({
@@ -149,6 +264,56 @@ export default function RunningHubAppBoardNode({
 
   const addBinding = (): void => {
     onUpdate({ bindings: [...node.bindings, createDefaultRunningHubBinding()] });
+  };
+
+  const persistSavedTargets = (targets: RunningHubSavedTarget[]): void => {
+    const next = targets.slice(0, 50);
+    setSavedTargets(next);
+    writeSavedTargets(next);
+  };
+
+  const saveTargetSnapshot = (bindings: BoardRunningHubNodeInfoBinding[], name?: string, targetIdOverride?: string): void => {
+    const targetId = (targetIdOverride ?? node.targetId).trim();
+    if (!targetId) {
+      setImportError("请先填写 RunningHub 应用或 Workflow ID");
+      return;
+    }
+    const id = savedTargetId(node.targetType, targetId);
+    const label = name?.trim() || currentSavedTarget?.label || `${node.targetType === "workflow" ? "Workflow" : "AI App"} ${targetId}`;
+    const target: RunningHubSavedTarget = {
+      accessPassword: node.accessPassword?.trim() || undefined,
+      bindings,
+      id,
+      label,
+      outputType: node.outputType,
+      targetId,
+      targetType: node.targetType,
+      updatedAt: new Date().toISOString(),
+    };
+    persistSavedTargets([target, ...savedTargets.filter(item => item.id !== id)]);
+    setImportError(null);
+  };
+
+  const saveCurrentTarget = (): void => {
+    saveTargetSnapshot(node.bindings);
+  };
+
+  const applySavedTarget = (targetId: string): void => {
+    const target = savedTargets.find(item => item.id === targetId);
+    if (!target) return;
+    onUpdate({
+      accessPassword: target.accessPassword ?? "",
+      bindings: target.bindings,
+      outputType: target.outputType,
+      targetId: target.targetId,
+      targetType: target.targetType,
+    });
+    setImportError(null);
+  };
+
+  const deleteCurrentSavedTarget = (): void => {
+    if (!currentSavedTarget) return;
+    persistSavedTargets(savedTargets.filter(target => target.id !== currentSavedTarget.id));
   };
 
   const updateTargetText = (value: string): void => {
@@ -192,8 +357,9 @@ export default function RunningHubAppBoardNode({
     setIsFetchingSchema(true);
     setImportError(null);
     try {
-      const bindings = await onFetchAppSchema(webappId);
-      onUpdate({ targetId: webappId, bindings });
+      const schema = await onFetchAppSchema(webappId);
+      onUpdate({ targetId: schema.webappId, bindings: schema.bindings });
+      saveTargetSnapshot(schema.bindings, schema.name, schema.webappId);
     } catch (error) {
       setImportError(error instanceof Error ? error.message : "字段读取失败");
     } finally {
@@ -251,6 +417,43 @@ export default function RunningHubAppBoardNode({
           运行
         </button>
       </div>
+
+      {(savedTargets.length > 0 || hasTarget) && (
+        <div className="mb-2 grid grid-cols-[minmax(0,1fr)_auto_auto] gap-1.5">
+          <select
+            value={currentSavedTarget?.id ?? ""}
+            onChange={event => applySavedTarget(event.target.value)}
+            disabled={savedTargets.length === 0}
+            className={`${inputClass} w-full`}
+          >
+            <option value="">选择已保存应用</option>
+            {savedTargets.map(target => (
+              <option key={target.id} value={target.id}>
+                {target.label}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={saveCurrentTarget}
+            disabled={!hasTarget}
+            className="nodrag flex h-8 items-center gap-1.5 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)] px-2 text-[10px] font-semibold text-[var(--iw-text)] transition hover:border-emerald-400/50 disabled:text-[var(--iw-faint)]"
+            title="保存当前 RunningHub 目标"
+          >
+            <Save className="h-3.5 w-3.5" />
+            保存
+          </button>
+          <button
+            type="button"
+            onClick={deleteCurrentSavedTarget}
+            disabled={!currentSavedTarget}
+            className={iconButtonClass}
+            title="删除当前保存目标"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
 
       <div className="grid min-h-0 flex-1 grid-cols-[0.92fr_1.08fr] gap-2">
         <section className={`${softPanelClass} flex flex-col gap-2 p-2`}>

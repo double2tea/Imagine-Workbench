@@ -85,7 +85,7 @@ import {
   type BoardPortRef,
   type BoardRunningHubAppNode,
   type BoardRunningHubAppNodeUpdate,
-  type BoardRunningHubNodeInfoBinding,
+  type BoardRunningHubAppSchemaResult,
   type BoardSummary,
   type BoardVideoGenerateNode,
   type BoardVideoReferenceMode,
@@ -164,11 +164,15 @@ async function readFetchError(response: Response, fallback: string): Promise<str
   }
 }
 
-function readRunningHubSchemaNodeInfoList(value: unknown): unknown[] {
+function readRunningHubAppSchemaResult(value: unknown): { name?: string; nodeInfoList: unknown[]; webappId: string } {
   if (!isUnknownRecord(value) || !Array.isArray(value.nodeInfoList)) {
     throw new Error("RunningHub 字段响应缺少 nodeInfoList");
   }
-  return value.nodeInfoList;
+  return {
+    name: getStringField(value, "name") ?? undefined,
+    nodeInfoList: value.nodeInfoList,
+    webappId: getStringField(value, "webappId") ?? "",
+  };
 }
 
 async function saveItemOrWarn(
@@ -989,7 +993,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     ? selectedVideoReferenceMode
     : videoCapabilities.referenceMode;
 
-  const fetchRunningHubAppSchema = useCallback(async (webappId: string): Promise<BoardRunningHubNodeInfoBinding[]> => {
+  const fetchRunningHubAppSchema = useCallback(async (webappId: string): Promise<BoardRunningHubAppSchemaResult> => {
     const response = await fetch("/api/runninghub/ai-app-schema", {
       method: "POST",
       headers: {
@@ -1000,8 +1004,12 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     });
     if (!response.ok) throw new Error(await readFetchError(response, "RunningHub 应用字段读取失败"));
     const data = await response.json() as unknown;
-    const nodeInfoList = readRunningHubSchemaNodeInfoList(data);
-    return parseRunningHubBindingsFromJsonText(JSON.stringify({ nodeInfoList }));
+    const schema = readRunningHubAppSchemaResult(data);
+    return {
+      bindings: parseRunningHubBindingsFromJsonText(JSON.stringify({ nodeInfoList: schema.nodeInfoList })),
+      name: schema.name,
+      webappId: schema.webappId || webappId,
+    };
   }, [buildProviderHeaders]);
 
   const {

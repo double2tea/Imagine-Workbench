@@ -79,7 +79,7 @@ import {
   type BoardPoint,
   type BoardPortKind,
   type BoardPortRef,
-  type BoardRunningHubNodeInfoBinding,
+  type BoardRunningHubAppSchemaResult,
   type BoardSize,
   type BoardSummary,
   type BoardViewport,
@@ -101,7 +101,7 @@ interface BoardWorkspaceProps {
   onCancelGenerateNode: (nodeId: string) => void;
   onEditAssetImage: (nodeId: string) => void;
   onExecuteGenerateNode: (nodeId: string) => void;
-  onFetchRunningHubAppSchema: (webappId: string) => Promise<BoardRunningHubNodeInfoBinding[]>;
+  onFetchRunningHubAppSchema: (webappId: string) => Promise<BoardRunningHubAppSchemaResult>;
   onImportBoardFiles: (files: File[], position: BoardPoint) => void | Promise<void>;
   onCreateBoard: () => void;
   onDeleteBoard: () => void;

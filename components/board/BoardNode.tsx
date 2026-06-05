@@ -11,8 +11,8 @@ import type {
   BoardNode as BoardNodeModel,
   BoardPortKind,
   BoardReferenceRole,
-  BoardRunningHubNodeInfoBinding,
   BoardRunningHubAppNodeUpdate,
+  BoardRunningHubAppSchemaResult,
 } from "@/lib/board";
 import AgentBoardNode from "@/components/board/AgentBoardNode";
 import AssetBoardNode from "@/components/board/AssetBoardNode";
@@ -43,7 +43,7 @@ export interface BoardFlowNodeData extends Record<string, unknown> {
   onCaptureVideoFrame: (nodeId: string, item: StorageItem, frame: CapturedVideoFrame) => void | Promise<void>;
   onEditAssetImage: (nodeId: string) => void;
   onExecuteGenerate: (nodeId: string) => void;
-  onFetchRunningHubAppSchema: (webappId: string) => Promise<BoardRunningHubNodeInfoBinding[]>;
+  onFetchRunningHubAppSchema: (webappId: string) => Promise<BoardRunningHubAppSchemaResult>;
   onMoveReferenceGroupItem: (nodeId: string, assetId: string, direction: "up" | "down") => void;
   onRemoveReferenceGroupItem: (nodeId: string, assetId: string) => void;
   onSendAgent: (nodeId: string) => void;

@@ -14,6 +14,7 @@ export interface RunningHubAiAppNodeInfo {
 
 export interface RunningHubAiAppSchema {
   webappId: string;
+  name?: string;
   nodeInfoList: RunningHubAiAppNodeInfo[];
 }
 
@@ -40,7 +41,18 @@ export async function fetchRunningHubAiAppSchema(
   if (nodeInfoList.length === 0) {
     throw new Error("RunningHub AI App schema response did not include nodeInfoList");
   }
-  return { webappId, nodeInfoList };
+  return { webappId, name: readAppName(response.data), nodeInfoList };
+}
+
+function readAppName(value: unknown): string | undefined {
+  if (!isRecord(value)) return undefined;
+  const name = readString(value.webappName) ?? readString(value.appName) ?? readString(value.name) ?? readString(value.title);
+  if (name?.trim()) return name.trim();
+  const webapp = isRecord(value.webapp) ? readAppName(value.webapp) : undefined;
+  if (webapp) return webapp;
+  const app = isRecord(value.app) ? readAppName(value.app) : undefined;
+  if (app) return app;
+  return undefined;
 }
 
 function readNodeInfoList(value: unknown): RunningHubAiAppNodeInfo[] {
