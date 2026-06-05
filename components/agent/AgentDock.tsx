@@ -46,6 +46,7 @@ interface AgentDockProps {
   agentReferences: ReferenceImageRef[];
   agentReferenceUrl: string | null;
   atDropdownNode: ReactNode;
+  audioModelGroups: AgentModelGroup[];
   autoExecute: boolean;
   chatBottomRef: Ref<HTMLDivElement>;
   chatModelGroups: AgentModelGroup[];
@@ -143,6 +144,7 @@ function getInitialAgentOrbPosition(): AgentOrbPosition | null {
 
 const TOOL_LABELS: Record<string, string> = {
   query_models: "查询模型",
+  get_agent_capabilities: "查询能力",
   get_skill_info: "查询技能",
   get_gallery_assets: "搜索资产",
   get_prompt_blueprint: "获取模板",
@@ -183,6 +185,7 @@ const ACTION_LABELS: Record<AgentToolAction["type"], string> = {
   generate_image: "生成图片",
   edit_image: "编辑图片",
   generate_video: "生成视频",
+  generate_audio: "生成音频",
   create_board_image_flow: "创建图片节点流程",
   create_board_video_flow: "创建视频节点流程",
   create_board_note: "创建画板笔记",
@@ -284,6 +287,7 @@ function AgentMessage({
   countdownSeconds,
   message,
   onCancelCountdown,
+  audioModelGroups,
   imageModelGroups,
   videoModelGroups,
   onDeclineAction,
@@ -292,6 +296,7 @@ function AgentMessage({
   onSuggestedPrompt,
 }: {
   activeCountdownId: string | null;
+  audioModelGroups: AgentModelGroup[];
   countdownSeconds: number;
   imageModelGroups: AgentModelGroup[];
   videoModelGroups: AgentModelGroup[];
@@ -390,6 +395,7 @@ function AgentMessage({
           {canEditAction ? (
             <AgentPendingActionEditor
               action={pendingAction}
+              audioModelGroups={audioModelGroups}
               imageModelGroups={imageModelGroups}
               videoModelGroups={videoModelGroups}
               onChange={nextAction => onUpdateActionDraft(message.id, nextAction)}
@@ -479,6 +485,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
     agentReferences,
     agentReferenceUrl,
     atDropdownNode,
+    audioModelGroups,
     autoExecute,
     chatBottomRef,
     chatModelGroups,
@@ -785,6 +792,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
                   countdownSeconds={countdownSeconds}
                   message={message}
                   onCancelCountdown={onCancelCountdown}
+                  audioModelGroups={audioModelGroups}
                   imageModelGroups={imageModelGroups}
                   videoModelGroups={videoModelGroups}
                   onDeclineAction={onDeclineAction}

@@ -13,6 +13,7 @@ import {
 } from "@/lib/db";
 import type { MediaReferenceRole, MediaReferenceType } from "@/lib/media-references";
 import { mediaReferenceFileExtension, mediaReferenceMimeFromDataUri } from "@/lib/media-references";
+import { createPanoramaScreenshotStorageItem, type PanoramaScreenshot } from "@/lib/panorama/capture";
 import { tryParseProviderModel, type AiProvider } from "@/lib/providers/model-catalog";
 import type { RunningHubTaskNodeBinding } from "@/lib/providers/types";
 import { getReferenceImagePayloadError, getReferenceMediaPayloadError, prepareReferenceImageUrlForRequest, prepareReferenceMediaUrlForRequest } from "@/lib/reference-images";
@@ -473,6 +474,27 @@ export function useAssetActions({
     return frameItem;
   };
 
+  const handleSavePanoramaScreenshots = async (
+    item: StorageItem,
+    screenshots: PanoramaScreenshot[],
+  ): Promise<void> => {
+    if (item.type !== "image") {
+      throw new Error("只有图片资产可以进入全景查看");
+    }
+
+    const savedItems: StorageItem[] = [];
+    for (const [index, screenshot] of screenshots.entries()) {
+      const screenshotItem = createPanoramaScreenshotStorageItem(item, screenshot, makeClientId(`pano_${index}`));
+      if (await saveItemOrWarn(screenshotItem, pushWorkspaceNotice)) savedItems.push(screenshotItem);
+    }
+    if (savedItems.length === 0) return;
+    setItems(prev => [
+      ...savedItems,
+      ...prev.filter(prevItem => !savedItems.some(savedItem => savedItem.id === prevItem.id)),
+    ]);
+    pushWorkspaceNotice("success", `已保存 ${savedItems.length} 张全景截图`);
+  };
+
   const handleBatchDownloadZip = async () => {
     if (selectedItemIds.length === 0) return;
     const itemsToExport = items.filter(item => selectedItemIds.includes(item.id));
@@ -569,6 +591,7 @@ export function useAssetActions({
     handleDeleteItem,
     handleDownloadItem,
     handleResetLocalData,
+    handleSavePanoramaScreenshots,
     retryFailedItem,
     toggleCompare,
     toggleSelectItem,

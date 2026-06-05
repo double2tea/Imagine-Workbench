@@ -21,6 +21,7 @@ interface UseAgentControllerParams {
   chatStorageKey?: string;
   executeToolActionOverride?: (input: ExecuteToolActionOverrideInput) => Promise<ExecuteToolActionOverrideReturn> | ExecuteToolActionOverrideReturn;
   getBoardContext?: () => AgentBoardContext;
+  generateManualAudio: (overrides?: GenerationOverrides) => Promise<boolean>;
   generateManualImage: (overrides?: GenerationOverrides) => Promise<boolean>;
   generateManualVideo: (overrides?: GenerationOverrides) => Promise<boolean>;
   handleSelectImageModel: (model: string) => void;
@@ -102,7 +103,8 @@ function canAutoExecuteAgentAction(action: AgentToolAction): boolean {
   return action.type === "optimize_prompt" ||
     action.type === "generate_image" ||
     action.type === "edit_image" ||
-    action.type === "generate_video";
+    action.type === "generate_video" ||
+    action.type === "generate_audio";
 }
 
 function makeClientId(prefix: string): string {
@@ -130,6 +132,7 @@ export function useAgentController({
   chatStorageKey = "imagine_agent_chat",
   executeToolActionOverride,
   getBoardContext,
+  generateManualAudio,
   generateManualImage,
   generateManualVideo,
   handleSelectImageModel,
@@ -317,6 +320,17 @@ export function useAgentController({
           videoDuration: params.videoDuration,
           videoPreset: params.videoPreset,
           videoReferenceMode: params.videoReferenceMode,
+        });
+      }, 500);
+    } else if (type === "generate_audio") {
+      setPrompt(params.prompt || "");
+      bridgeActionReferences(actionReferences);
+      setTraditionalSubTab("video");
+      setTimeout(() => {
+        generateManualAudio({
+          ...actionReferenceOverride,
+          model: params.model,
+          prompt: params.prompt || "",
         });
       }, 500);
     } else if (type === "edit_image") {

@@ -1,4 +1,5 @@
 @import "@xyflow/react/dist/style.css";
+@import "pannellum/build/pannellum.css";
 @import "tailwindcss";
 
 @theme {
@@ -3429,6 +3430,18 @@ html[data-imagine-theme="light"] .imagine-generate-context-chip[data-tone="faile
   box-shadow: none !important;
 }
 
+.imagine-panorama-action {
+  background: rgba(8, 47, 73, 0.86) !important;
+  border-color: rgba(34, 211, 238, 0.34) !important;
+  color: #cffafe !important;
+}
+
+.imagine-panorama-action:hover {
+  background: #0891b2 !important;
+  border-color: rgba(103, 232, 249, 0.72) !important;
+  color: #ffffff !important;
+}
+
 .imagine-meta-chip {
   border-radius: 6px !important;
   line-height: 1.35;
@@ -3499,6 +3512,19 @@ html[data-imagine-theme="light"] .imagine-generate-context-chip[data-tone="faile
 
 .imagine-workbench-shell.imagine-theme-light .imagine-card-action :is(svg, span) {
   color: currentColor !important;
+}
+
+.imagine-workbench-shell.imagine-theme-light .imagine-panorama-action {
+  background: #ffffff !important;
+  border-color: rgba(8, 145, 178, 0.42) !important;
+  color: #0e7490 !important;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.14) !important;
+}
+
+.imagine-workbench-shell.imagine-theme-light .imagine-panorama-action:hover {
+  background: #ecfeff !important;
+  border-color: rgba(14, 116, 144, 0.58) !important;
+  color: #155e75 !important;
 }
 
 .imagine-workbench-shell.imagine-theme-light .imagine-settings-provider-button[data-active="true"] {

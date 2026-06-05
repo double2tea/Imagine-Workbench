@@ -4,6 +4,7 @@ export const AGENT_WORKBENCH_ACTION_TYPES = [
   "generate_image",
   "edit_image",
   "generate_video",
+  "generate_audio",
 ] as const;
 
 export const AGENT_BOARD_ACTION_TYPES = [

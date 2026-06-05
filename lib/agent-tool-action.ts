@@ -77,12 +77,23 @@ export function resolveVideoActionParams(
   return { ...current, model, aspectRatio, videoResolution, videoDuration, videoPreset, videoReferenceMode };
 }
 
+export function resolveAudioActionParams(
+  model: string,
+  current: AgentGenerationParams = {},
+): AgentGenerationParams {
+  return { ...current, model };
+}
+
 function isImageActionType(type: AgentToolAction["type"]): boolean {
   return type === "generate_image" || type === "create_board_image_flow";
 }
 
 function isVideoActionType(type: AgentToolAction["type"]): boolean {
   return type === "generate_video" || type === "create_board_video_flow";
+}
+
+function isAudioActionType(type: AgentToolAction["type"]): boolean {
+  return type === "generate_audio";
 }
 
 export function prepareAgentActionDraft(action: AgentToolAction): AgentToolAction {
@@ -147,6 +158,9 @@ export function prepareAgentActionDraft(action: AgentToolAction): AgentToolActio
   if (isVideoActionType(draft.type) && params.model) {
     return patchAgentToolAction(draft, resolveVideoActionParams(params.model, params));
   }
+  if (isAudioActionType(draft.type) && params.model) {
+    return patchAgentToolAction(draft, resolveAudioActionParams(params.model, params));
+  }
   return draft;
 }
 
@@ -181,6 +195,7 @@ export function validateAgentToolAction(
   if (
     action.type === "generate_image" ||
     action.type === "generate_video" ||
+    action.type === "generate_audio" ||
     action.type === "create_board_image_flow" ||
     action.type === "create_board_video_flow"
   ) {

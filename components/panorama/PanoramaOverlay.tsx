@@ -1,0 +1,335 @@
+"use client";
+
+import { Camera, Columns4, Grid3X3, Loader2, RotateCcw, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { StorageItem } from "@/lib/db";
+import {
+  PANORAMA_CAPTURE_SIZES,
+  PANORAMA_FOUR_VIEW_CAMERAS,
+  PANORAMA_TWELVE_VIEW_CAMERAS,
+  type PanoramaCaptureSize,
+  type PanoramaCaptureSizeId,
+  type PanoramaCamera,
+  type PanoramaScreenshot,
+} from "@/lib/panorama/capture";
+
+interface PanoramaOverlayProps {
+  item: StorageItem;
+  onClose: () => void;
+  onSaveScreenshots: (item: StorageItem, screenshots: PanoramaScreenshot[]) => Promise<void> | void;
+}
+
+type PanoramaSaveMode = "current" | "four" | "twelve";
+
+interface ExportablePanoramaRenderer {
+  render(
+    pitch: number,
+    yaw: number,
+    hfov: number,
+    params: { returnImage: true },
+  ): unknown;
+}
+
+const actionButtonClass = "flex h-9 items-center gap-1.5 rounded-md border border-white/12 bg-slate-950/86 px-2.5 text-xs font-semibold text-slate-100 shadow-lg backdrop-blur transition hover:bg-cyan-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-45";
+const iconButtonClass = "flex h-9 w-9 items-center justify-center rounded-md border border-white/12 bg-slate-950/86 text-slate-200 shadow-lg backdrop-blur transition hover:bg-white/10 hover:text-white";
+const sizeSelectClass = "h-9 rounded-md border border-white/12 bg-slate-950/86 px-2.5 text-xs font-semibold text-slate-100 shadow-lg outline-none backdrop-blur transition hover:border-cyan-300/55 focus:border-cyan-300/70";
+
+function degreesToRadians(value: number): number {
+  return value * Math.PI / 180;
+}
+
+function dataUrlToBlob(dataUrl: string): Promise<Blob> {
+  return fetch(dataUrl).then(response => response.blob());
+}
+
+async function imageSizeFromDataUrl(dataUrl: string): Promise<{ width: number; height: number }> {
+  const bitmap = await createImageBitmap(await dataUrlToBlob(dataUrl));
+  const size = { width: bitmap.width, height: bitmap.height };
+  bitmap.close();
+  return size;
+}
+
+function renderPanoramaImage(renderer: Pannellum.Renderer, camera: PanoramaCamera): string {
+  const exportRenderer = renderer as unknown as ExportablePanoramaRenderer;
+  const result = exportRenderer.render(
+    degreesToRadians(camera.pitch),
+    degreesToRadians(camera.yaw),
+    degreesToRadians(camera.hfov),
+    { returnImage: true },
+  );
+  if (typeof result !== "string" || !result.startsWith("data:image/")) {
+    throw new Error("全景截图渲染失败");
+  }
+  return result;
+}
+
+function getCaptureSize(id: PanoramaCaptureSizeId): PanoramaCaptureSize {
+  const size = PANORAMA_CAPTURE_SIZES.find(option => option.id === id);
+  if (!size) throw new Error("未知全景截图尺寸");
+  return size;
+}
+
+function readCaptureSizeId(value: string): PanoramaCaptureSizeId {
+  const size = PANORAMA_CAPTURE_SIZES.find(option => option.id === value);
+  if (!size) throw new Error("未知全景截图尺寸");
+  return size.id;
+}
+
+function readErrorMessage(error: unknown): string {
+  return error instanceof Error && error.message.trim() ? error.message : "全景查看器加载失败";
+}
+
+async function preparePanoramaUrl(sourceUrl: string): Promise<{ url: string; revoke: (() => void) | null }> {
+  if (!sourceUrl.startsWith("data:")) return { url: sourceUrl, revoke: null };
+  const objectUrl = URL.createObjectURL(await dataUrlToBlob(sourceUrl));
+  return {
+    url: objectUrl,
+    revoke: () => URL.revokeObjectURL(objectUrl),
+  };
+}
+
+function createPanoramaViewer(container: HTMLElement, panoramaUrl: string, camera?: PanoramaCamera): Pannellum.Viewer {
+  return window.pannellum.viewer(container, {
+    type: "equirectangular",
+    panorama: panoramaUrl,
+    autoLoad: true,
+    showControls: false,
+    showFullscreenCtrl: false,
+    showZoomCtrl: false,
+    keyboardZoom: true,
+    mouseZoom: true,
+    compass: false,
+    yaw: camera?.yaw ?? 0,
+    pitch: camera?.pitch ?? 0,
+    hfov: camera?.hfov ?? 90,
+    minHfov: 45,
+    maxHfov: 120,
+    strings: {
+      loadingLabel: "正在加载全景",
+      genericWebGLError: "当前浏览器无法加载 WebGL 全景视图",
+      textureSizeError: "全景图尺寸超过当前设备支持范围",
+    },
+  });
+}
+
+function waitForPanoramaLoad(viewer: Pannellum.Viewer): Promise<void> {
+  if (viewer.isLoaded()) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    viewer.on("load", () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    });
+    viewer.on("error", message => {
+      if (settled) return;
+      settled = true;
+      reject(new Error(message));
+    });
+  });
+}
+
+function waitForPaintFrame(): Promise<void> {
+  return new Promise(resolve => {
+    window.requestAnimationFrame(() => resolve());
+  });
+}
+
+async function renderSizedPanoramaImage(panoramaUrl: string, camera: PanoramaCamera, size: PanoramaCaptureSize): Promise<string> {
+  const captureContainer = document.createElement("div");
+  captureContainer.setAttribute("aria-hidden", "true");
+  captureContainer.style.position = "fixed";
+  captureContainer.style.left = "-10000px";
+  captureContainer.style.top = "0";
+  captureContainer.style.width = `${size.width}px`;
+  captureContainer.style.height = `${size.height}px`;
+  captureContainer.style.pointerEvents = "none";
+  captureContainer.style.opacity = "0";
+  document.body.appendChild(captureContainer);
+
+  const captureViewer = createPanoramaViewer(captureContainer, panoramaUrl, camera);
+  try {
+    await waitForPanoramaLoad(captureViewer);
+    captureViewer.lookAt(camera.pitch, camera.yaw, camera.hfov, false);
+    await waitForPaintFrame();
+    return renderPanoramaImage(captureViewer.getRenderer(), camera);
+  } finally {
+    captureViewer.destroy();
+    captureContainer.remove();
+  }
+}
+
+export default function PanoramaOverlay({ item, onClose, onSaveScreenshots }: PanoramaOverlayProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const viewerRef = useRef<Pannellum.Viewer | null>(null);
+  const panoramaUrlRef = useRef<string | null>(null);
+  const revokeUrlRef = useRef<(() => void) | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isReady, setIsReady] = useState(false);
+  const [savingMode, setSavingMode] = useState<PanoramaSaveMode | null>(null);
+  const [captureSizeId, setCaptureSizeId] = useState<PanoramaCaptureSizeId>(PANORAMA_CAPTURE_SIZES[0].id);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function buildViewer(): Promise<void> {
+      setErrorMessage(null);
+      setIsReady(false);
+      await import("pannellum/build/pannellum.js");
+      const container = containerRef.current;
+      if (!container || !isActive) return;
+      viewerRef.current?.destroy();
+      revokeUrlRef.current?.();
+      const prepared = await preparePanoramaUrl(item.url);
+      if (!isActive) {
+        prepared.revoke?.();
+        return;
+      }
+      revokeUrlRef.current = prepared.revoke;
+      panoramaUrlRef.current = prepared.url;
+      viewerRef.current = createPanoramaViewer(container, prepared.url);
+      viewerRef.current.on("load", () => {
+        if (isActive) setIsReady(true);
+      });
+      viewerRef.current.on("error", message => {
+        if (isActive) setErrorMessage(message);
+      });
+    }
+
+    void buildViewer().catch(error => {
+      if (isActive) setErrorMessage(readErrorMessage(error));
+    });
+
+    return () => {
+      isActive = false;
+      viewerRef.current?.destroy();
+      viewerRef.current = null;
+      panoramaUrlRef.current = null;
+      revokeUrlRef.current?.();
+      revokeUrlRef.current = null;
+    };
+  }, [item.url]);
+
+  const captureCamera = useCallback(async (camera: PanoramaCamera): Promise<PanoramaScreenshot> => {
+    const panoramaUrl = panoramaUrlRef.current;
+    if (!panoramaUrl) throw new Error("全景查看器尚未就绪");
+    const dataUrl = await renderSizedPanoramaImage(panoramaUrl, camera, getCaptureSize(captureSizeId));
+    const size = await imageSizeFromDataUrl(dataUrl);
+    return { camera, dataUrl, ...size };
+  }, [captureSizeId]);
+
+  const captureCurrent = useCallback(async (): Promise<PanoramaScreenshot> => {
+    const viewer = viewerRef.current;
+    if (!viewer) throw new Error("全景查看器尚未就绪");
+    return captureCamera({
+      label: "当前视角",
+      yaw: viewer.getYaw(),
+      pitch: viewer.getPitch(),
+      hfov: viewer.getHfov(),
+    });
+  }, [captureCamera]);
+
+  const saveScreenshots = useCallback(async (mode: PanoramaSaveMode) => {
+    if (savingMode !== null || !isReady) return;
+    setSavingMode(mode);
+    setErrorMessage(null);
+    try {
+      const screenshots: PanoramaScreenshot[] = [];
+      if (mode === "current") {
+        screenshots.push(await captureCurrent());
+      } else {
+        const cameras = mode === "four" ? PANORAMA_FOUR_VIEW_CAMERAS : PANORAMA_TWELVE_VIEW_CAMERAS;
+        for (const camera of cameras) {
+          screenshots.push(await captureCamera(camera));
+        }
+      }
+      await onSaveScreenshots(item, screenshots);
+    } catch (error) {
+      setErrorMessage(readErrorMessage(error));
+    } finally {
+      setSavingMode(null);
+    }
+  }, [captureCamera, captureCurrent, isReady, item, onSaveScreenshots, savingMode]);
+
+  const resetView = useCallback(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+    viewer.lookAt(0, 0, 90, 180);
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-[60] flex bg-slate-950/96 p-2 backdrop-blur-md sm:p-4">
+      <div className="relative flex h-full min-h-0 w-full overflow-hidden rounded-lg border border-white/10 bg-black shadow-2xl">
+        <div ref={containerRef} className="h-full min-h-0 w-full" />
+
+        {!isReady && !errorMessage && (
+          <div className="absolute inset-0 flex items-center justify-center bg-slate-950/70 text-sm font-semibold text-slate-200">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin text-cyan-200" />
+            正在加载全景
+          </div>
+        )}
+
+        {errorMessage && (
+          <div className="absolute left-1/2 top-1/2 w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-red-300/20 bg-red-950/86 px-4 py-3 text-sm text-red-100 shadow-xl">
+            {errorMessage}
+          </div>
+        )}
+
+        <div className="absolute left-3 top-3 flex max-w-[calc(100%-4.5rem)] flex-wrap gap-2 sm:left-4 sm:top-4">
+          <button
+            type="button"
+            onClick={() => void saveScreenshots("current")}
+            disabled={!isReady || savingMode !== null}
+            className={actionButtonClass}
+            title="保存当前视角截图"
+          >
+            {savingMode === "current" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+            <span>截图</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => void saveScreenshots("four")}
+            disabled={!isReady || savingMode !== null}
+            className={actionButtonClass}
+            title="保存 4 个方向截图"
+          >
+            {savingMode === "four" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Columns4 className="h-4 w-4" />}
+            <span>4视角</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => void saveScreenshots("twelve")}
+            disabled={!isReady || savingMode !== null}
+            className={actionButtonClass}
+            title="保存 12 个方向截图"
+          >
+            {savingMode === "twelve" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Grid3X3 className="h-4 w-4" />}
+            <span>12视角</span>
+          </button>
+          <button type="button" onClick={resetView} disabled={!isReady} className={iconButtonClass} title="重置视角">
+            <RotateCcw className="h-4 w-4" />
+          </button>
+          <label className="flex h-9 items-center gap-1.5 rounded-md border border-white/12 bg-slate-950/86 px-2 text-xs font-semibold text-slate-200 shadow-lg backdrop-blur">
+            <span>尺寸</span>
+            <select
+              value={captureSizeId}
+              onChange={event => setCaptureSizeId(readCaptureSizeId(event.target.value))}
+              className={sizeSelectClass}
+              title="全景截图尺寸"
+            >
+              {PANORAMA_CAPTURE_SIZES.map(size => (
+                <option key={size.id} value={size.id}>
+                  {size.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <button type="button" onClick={onClose} className={`absolute right-3 top-3 sm:right-4 sm:top-4 ${iconButtonClass}`} aria-label="退出全景查看">
+          <X className="h-4.5 w-4.5" />
+        </button>
+      </div>
+    </div>
+  );
+}

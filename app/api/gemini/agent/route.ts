@@ -42,7 +42,7 @@ const boardContextSchema = z.object({
   selectedEdgeId: z.string().nullable(),
   nodes: z.array(z.object({
     id: z.string(),
-    kind: z.enum(["asset", "prompt", "reference-group", "image-generate", "video-generate", "agent", "note"]),
+    kind: z.enum(["asset", "prompt", "reference-group", "image-generate", "video-generate", "runninghub-app", "agent", "note", "result"]),
     title: z.string(),
     prompt: z.string().optional(),
     model: z.string().optional(),
@@ -267,33 +267,16 @@ export async function POST(req: NextRequest) {
     const parsed = parseProviderModel(modelValue, "12ai");
     const config = resolveProviderConfig(req, parsed.provider);
 
-    const skillsText = SKILL_REGISTRY.map(
-      skill => `- ${skill.name} (${skill.category}): ${skill.whenToUse}`,
-    ).join("\n");
-    const modelsText = MODEL_CAPABILITIES.map(
-      model =>
-        `- ${model.value}: kind=${model.kind}, provider=${model.provider}, references=${model.supportsReferences}, async=${model.supportsAsync}, sizes=[${model.sizes
-          .map(option => option.value)
-          .join(", ")}], ratios=[${model.aspectRatios
-          .map(option => option.value)
-          .join(", ")}], videoReferenceMode=${model.videoReferenceMode}, maxReferenceImages=${model.maxReferenceImages}`,
-    ).join("\n");
-    const galleryText =
-      galleryItems.length > 0
-        ? galleryItems
-            .slice(0, 20)
-            .map(item => `- ${item.id}: type=${item.type}, aspectRatio=${item.aspectRatio}, prompt="${item.prompt.slice(0, 80)}"`)
-            .join("\n")
-        : "No generated assets yet.";
     const referenceMsg =
       sendableAgentRefs.length > 0
         ? `\n[USER REFERENCES]\n${sendableAgentRefs
             .map((item, idx) => `- Ref [${idx + 1}]: ${mediaReferenceLabel(getMediaReferenceType(item))} ID "${item.id}"`)
             .join("\n")}\n`
         : "";
+    const contextSummary = formatAgentRuntimeSummary(surface, body.boardContext, galleryItems, sendableAgentRefs);
     const boardMsg = surface === "board"
       ? "\n## Board Surface\n" +
-        "The user is operating a spatial board. Use get_board_context / get_connected_context before recommending board changes.\n" +
+        "The user is operating a spatial board. Read board details progressively: call get_board_context(summary) for broad board questions and get_connected_context for selected-node work.\n" +
         "For board mutations, prefer boardAction over recommendedAction. Do not invent a general DAG or ComfyUI workflow.\n" +
         "Allowed boardAction.type values: none, create_board_image_flow, create_board_video_flow, create_board_note, update_board_node, apply_board_patch, continue_image_to_video.\n" +
         "create_board_image_flow/create_board_video_flow should include params.prompt and may include params.model, params.aspectRatio, params.referenceImageId, params.run.\n" +
@@ -305,26 +288,27 @@ export async function POST(req: NextRequest) {
     const systemInstruction =
       "You are the senior Creative Agent of the Imagine Workbench.\n" +
       "Collaborate with the user on visual creative projects and recommend exactly one executable action when useful.\n\n" +
+      "## Context Policy\n" +
+      "Use progressive disclosure. Start from the user's latest message and the Runtime Summary. Do not assume full gallery, board, model, or skill details.\n" +
+      "When the user asks what you can do or which tools you have, call get_agent_capabilities and answer without recommending an executable action unless they explicitly ask you to do one.\n" +
+      "Before selecting a model or explaining model parameters, call query_models for the relevant kind. Use only returned model IDs.\n" +
+      "Only call get_gallery_assets when prior generated assets matter. Only call board context tools when the board structure matters.\n\n" +
       "## Tools\n" +
-      "Use tool calls to inspect skills, model capabilities, and gallery assets before recommending an action.\n" +
+      "Use tool calls to inspect Agent capabilities, skills, model capabilities, gallery assets, board context, and templates.\n" +
+      "- Call get_agent_capabilities for Agent/tool/capability questions.\n" +
       "- Call get_skill_info before activating a skill whose details matter.\n" +
       "- Call query_models before recommending a generation model.\n" +
       "- Call get_gallery_assets when the user references previous assets.\n\n" +
       "- On board surface, call get_board_context or get_connected_context before returning boardAction.\n" +
       "- Call get_prompt_blueprint with screenplay-draft, script-analysis, shot-breakdown, or storyboard-board-patch when the user asks for script/storyboard workflow planning.\n" +
       "- Call get_prompt_templates when the user asks for reusable prompt templates.\n\n" +
-      "## Skill Registry\n" +
-      `${skillsText}\n\n` +
       boardMsg +
       "\n" +
-      "## Model Catalog\n" +
-      "Use only these model IDs when recommending a workstation action. Do not guess model IDs.\n" +
-      `${modelsText}\n\n` +
-      "## Current Gallery Assets\n" +
-      `${galleryText}\n\n` +
+      "## Runtime Summary\n" +
+      `${contextSummary}\n\n` +
       "## Output\n" +
       "Return ONLY valid JSON:\n" +
-      '{"thought":"...","text":"Chinese user-facing reply","activeSkills":["..."],"recommendedAction":{"type":"none|optimize_prompt|generate_image|edit_image|generate_video","params":{"prompt":"...","model":"...","aspectRatio":"...","referenceImageId":"...","imageResolution":"...","imageQuality":"...","thinkingLevel":"...","videoResolution":"...","videoDuration":"...","videoPreset":"...","videoReferenceMode":"reference|firstLast"}},"boardAction":{"type":"none|create_board_image_flow|create_board_video_flow|create_board_note|update_board_node|apply_board_patch|continue_image_to_video","params":{"nodeId":"...","prompt":"...","model":"...","aspectRatio":"...","referenceImageId":"...","imageResolution":"...","imageQuality":"...","thinkingLevel":"...","videoResolution":"...","videoDuration":"...","videoPreset":"...","videoReferenceMode":"reference|firstLast","title":"...","body":"...","instruction":"...","boardPatch":{"title":"...","run":false,"shots":[{"id":"S1","scene":"...","shot":"...","beat":"...","imagePrompt":"...","videoPrompt":"...","run":false}],"operations":[{"op":"create_node","tempId":"shot1_prompt","kind":"prompt","title":"S1 Prompt","prompt":"...","position":{"x":120,"y":160}},{"op":"create_node","tempId":"shot1_image","kind":"image-generate","title":"S1 Image","prompt":"...","model":"...","aspectRatio":"16:9","run":false,"position":{"x":520,"y":160}},{"op":"connect_ports","from":{"nodeId":"shot1_prompt","portId":"prompt-out","portKind":"prompt"},"to":{"nodeId":"shot1_image","portId":"prompt-in","portKind":"prompt"}}]},"run":true}},"suggestedFollowUps":["...","..."]}\n\n' +
+      '{"thought":"...","text":"Chinese user-facing reply","activeSkills":["..."],"recommendedAction":{"type":"none|optimize_prompt|generate_image|edit_image|generate_video|generate_audio","params":{"prompt":"...","model":"...","aspectRatio":"...","referenceImageId":"...","imageResolution":"...","imageQuality":"...","thinkingLevel":"...","videoResolution":"...","videoDuration":"...","videoPreset":"...","videoReferenceMode":"reference|firstLast"}},"boardAction":{"type":"none|create_board_image_flow|create_board_video_flow|create_board_note|update_board_node|apply_board_patch|continue_image_to_video","params":{"nodeId":"...","prompt":"...","model":"...","aspectRatio":"...","referenceImageId":"...","imageResolution":"...","imageQuality":"...","thinkingLevel":"...","videoResolution":"...","videoDuration":"...","videoPreset":"...","videoReferenceMode":"reference|firstLast","title":"...","body":"...","instruction":"...","boardPatch":{"title":"...","run":false,"shots":[{"id":"S1","scene":"...","shot":"...","beat":"...","imagePrompt":"...","videoPrompt":"...","run":false}],"operations":[{"op":"create_node","tempId":"shot1_prompt","kind":"prompt","title":"S1 Prompt","prompt":"...","position":{"x":120,"y":160}},{"op":"create_node","tempId":"shot1_image","kind":"image-generate","title":"S1 Image","prompt":"...","model":"...","aspectRatio":"16:9","run":false,"position":{"x":520,"y":160}},{"op":"connect_ports","from":{"nodeId":"shot1_prompt","portId":"prompt-out","portKind":"prompt"},"to":{"nodeId":"shot1_image","portId":"prompt-in","portKind":"prompt"}}]},"run":true}},"suggestedFollowUps":["...","..."]}\n\n' +
       referenceMsg;
 
     const tools = getAgentTools();
@@ -348,7 +332,7 @@ export async function POST(req: NextRequest) {
     }
     parsedResponse.activeSkills = validateActiveSkills(parsedResponse.activeSkills);
 
-    if (parsedResponse.activeSkills.length === 0) {
+    if (parsedResponse.activeSkills.length === 0 && hasExecutableAgentAction(parsedResponse.recommendedAction, parsedResponse.boardAction)) {
       parsedResponse.activeSkills = surface === "board"
         ? ["BoardContextRetriever", "BoardComposer"]
         : ["PromptEngineer", "ImageGenerator"];
@@ -376,6 +360,54 @@ export async function POST(req: NextRequest) {
       suggestedFollowUps: ["检查 API Key 和 Base URL", "切换到传统创作模式"],
     });
   }
+}
+
+function hasExecutableAgentAction(
+  recommendedAction: z.infer<typeof agentActionSchema>,
+  boardAction: z.infer<typeof agentBoardActionSchema>,
+): boolean {
+  return recommendedAction.type !== "none" || boardAction.type !== "none";
+}
+
+function formatAgentRuntimeSummary(
+  surface: AgentSurface,
+  boardContext: z.infer<typeof boardContextSchema> | undefined,
+  galleryItems: Array<{ type: string }>,
+  references: AgentReferenceInput[],
+): string {
+  const galleryCounts = countValues(galleryItems.map(item => item.type));
+  const referenceCounts = countValues(references.map(reference => getMediaReferenceType(reference)));
+  const boardSummary = boardContext
+    ? {
+        boardId: boardContext.boardId,
+        edgeCount: boardContext.edges.length,
+        nodeCount: boardContext.nodes.length,
+        nodeKinds: countValues(boardContext.nodes.map(node => node.kind)),
+        selectedEdgeId: boardContext.selectedEdgeId,
+        selectedNodeId: boardContext.selectedNodeId,
+        title: boardContext.title,
+      }
+    : null;
+
+  return JSON.stringify({
+    surface,
+    board: boardSummary,
+    gallery: {
+      count: galleryItems.length,
+      types: galleryCounts,
+    },
+    userReferences: {
+      count: references.length,
+      types: referenceCounts,
+    },
+  });
+}
+
+function countValues(values: string[]): Record<string, number> {
+  return values.reduce<Record<string, number>>((acc, value) => {
+    acc[value] = (acc[value] ?? 0) + 1;
+    return acc;
+  }, {});
 }
 
 async function runAgentLoop(

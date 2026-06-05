@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import type { AgentBoardPatchOperation, AgentGenerationParams, AgentToolAction } from "@/lib/agent-actions";
 import {
   patchAgentToolAction,
+  resolveAudioActionParams,
   resolveImageActionParams,
   resolveVideoActionParams,
 } from "@/lib/agent-tool-action";
@@ -23,6 +24,7 @@ interface AgentModelGroup {
 
 interface AgentPendingActionEditorProps {
   action: AgentToolAction;
+  audioModelGroups: AgentModelGroup[];
   disabled?: boolean;
   imageModelGroups: AgentModelGroup[];
   videoModelGroups: AgentModelGroup[];
@@ -35,6 +37,10 @@ function isImageActionType(type: AgentToolAction["type"]): boolean {
 
 function isVideoActionType(type: AgentToolAction["type"]): boolean {
   return type === "generate_video" || type === "create_board_video_flow" || type === "continue_image_to_video";
+}
+
+function isAudioActionType(type: AgentToolAction["type"]): boolean {
+  return type === "generate_audio";
 }
 
 function firstOptionValue(options: Array<{ value: string }>, fallback: string): string {
@@ -62,6 +68,7 @@ function editablePatchField(operation: AgentBoardPatchOperation): { field: "prom
 
 export function AgentPendingActionEditor({
   action,
+  audioModelGroups,
   disabled = false,
   imageModelGroups,
   videoModelGroups,
@@ -71,6 +78,7 @@ export function AgentPendingActionEditor({
   const isEditImage = action.type === "edit_image";
   const isImage = isImageActionType(action.type) && !isEditImage;
   const isVideo = isVideoActionType(action.type);
+  const isAudio = isAudioActionType(action.type);
   const isNote = action.type === "create_board_note";
   const isBoardNodeUpdate = action.type === "update_board_node";
   const isBoardPatch = action.type === "apply_board_patch";
@@ -79,6 +87,7 @@ export function AgentPendingActionEditor({
 
   const imageModel = params.model ?? "";
   const videoModel = params.model ?? "";
+  const audioModel = params.model ?? "";
 
   const imageCapabilities = useMemo(
     () => (isImage && imageModel ? getImageModelCapabilities(imageModel) : null),
@@ -97,10 +106,10 @@ export function AgentPendingActionEditor({
   );
 
   const modelGroups = useMemo(
-    () => (isImage ? imageModelGroups : isVideo ? videoModelGroups : []),
-    [imageModelGroups, isImage, isVideo, videoModelGroups],
+    () => (isImage ? imageModelGroups : isVideo ? videoModelGroups : isAudio ? audioModelGroups : []),
+    [audioModelGroups, imageModelGroups, isAudio, isImage, isVideo, videoModelGroups],
   );
-  const activeModel = isImage ? imageModel : isVideo ? videoModel : "";
+  const activeModel = isImage ? imageModel : isVideo ? videoModel : isAudio ? audioModel : "";
   const flatModelOptions = useMemo(
     () => modelGroups.flatMap(group => group.options),
     [modelGroups],
@@ -131,6 +140,10 @@ export function AgentPendingActionEditor({
     }
     if (isVideo) {
       onChange(patchAgentToolAction(action, resolveVideoActionParams(model, params)));
+      return;
+    }
+    if (isAudio) {
+      onChange(patchAgentToolAction(action, resolveAudioActionParams(model, params)));
     }
   };
 
@@ -269,7 +282,7 @@ export function AgentPendingActionEditor({
         </div>
       )}
 
-      {(isImage || isVideo) && modelGroups.length > 0 && (
+      {(isImage || isVideo || isAudio) && modelGroups.length > 0 && (
         <label className="imagine-agent-action-field">
           <span className="imagine-agent-action-field-label">生成模型</span>
           <select
@@ -458,6 +471,7 @@ export function AgentPendingActionEditor({
           </select>
         </label>
       )}
+
     </div>
   );
 }

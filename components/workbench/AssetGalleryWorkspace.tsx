@@ -47,6 +47,7 @@ interface AssetGalleryWorkspaceProps {
   onExportMetadata: () => void;
   onLaunchMaskEditor: (imageUrl: string, id: string) => void;
   onOpenFullscreen: (item: StorageItem) => void;
+  onOpenPanorama: (item: StorageItem) => void;
   onResetCompare: () => void;
   onRetryItem: (item: StorageItem) => void;
   onReuseTask: (item: StorageItem) => void;
@@ -106,6 +107,7 @@ export default function AssetGalleryWorkspace({
   onExportMetadata,
   onLaunchMaskEditor,
   onOpenFullscreen,
+  onOpenPanorama,
   onResetCompare,
   onRetryItem,
   onReuseTask,
@@ -327,6 +329,7 @@ export default function AssetGalleryWorkspace({
                           onDownload={onDownloadItem}
                           onLaunchMaskEditor={onLaunchMaskEditor}
                           onOpenFullscreen={onOpenFullscreen}
+                          onOpenPanorama={onOpenPanorama}
                           onOpenReferencePreview={(previewItem, index) => setReferencePreview({ itemId: previewItem.id, index })}
                           onRetry={onRetryItem}
                           onReuseTask={onReuseTask}

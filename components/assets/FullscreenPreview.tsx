@@ -1,16 +1,19 @@
-import { Check, Clock3, Copy, Film, ImageDown, Music, type LucideIcon, SkipBack, SkipForward, X } from "lucide-react";
+import { Check, Clock3, Compass, Copy, Film, ImageDown, Music, type LucideIcon, SkipBack, SkipForward, X } from "lucide-react";
 import { AnimatePresence } from "motion/react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
+import PanoramaOverlay from "@/components/panorama/PanoramaOverlay";
 import PreviewImage from "@/components/PreviewImage";
 import type { StorageItem } from "@/lib/db";
 import { formatDisplayedAspectRatio } from "@/lib/media-display";
+import type { PanoramaScreenshot } from "@/lib/panorama/capture";
 import { getVideoFrameCaptureLabel, type CapturedVideoFrame, type VideoFrameCaptureMode } from "@/lib/video-frame";
 
 interface FullscreenPreviewProps {
   item: StorageItem | null;
   items?: StorageItem[];
   onCaptureVideoFrame: (item: StorageItem, frame: CapturedVideoFrame) => void | Promise<unknown>;
+  onSavePanoramaScreenshots: (item: StorageItem, screenshots: PanoramaScreenshot[]) => void | Promise<void>;
   onClose: () => void;
   onSelectItem?: (item: StorageItem) => void;
 }
@@ -27,9 +30,10 @@ const frameCaptureActions: Array<{
   { icon: SkipForward, mode: "last" },
 ];
 
-export default function FullscreenPreview({ item, items = [], onCaptureVideoFrame, onClose, onSelectItem }: FullscreenPreviewProps) {
+export default function FullscreenPreview({ item, items = [], onCaptureVideoFrame, onSavePanoramaScreenshots, onClose, onSelectItem }: FullscreenPreviewProps) {
   const [copyResult, setCopyResult] = useState<CopyResult>(null);
   const [isFrameMenuOpen, setIsFrameMenuOpen] = useState(false);
+  const [panoramaItem, setPanoramaItem] = useState<StorageItem | null>(null);
   const captureVideoFrameRef = useRef<VideoFrameCaptureRequest | null>(null);
   const previewItems = items.length > 0 ? items : item ? [item] : [];
   const showPreviewStrip = previewItems.length > 1 && Boolean(onSelectItem);
@@ -54,6 +58,10 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
     setIsFrameMenuOpen(false);
     void captureVideoFrameRef.current?.(mode);
   };
+
+  useEffect(() => {
+    if (!item || panoramaItem?.id !== item.id) setPanoramaItem(null);
+  }, [item, panoramaItem?.id]);
 
   return (
     <AnimatePresence>
@@ -160,6 +168,17 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
                 <span className="font-mono">ID: {item.id}</span>
                 <span className="font-mono">模型: {item.model}</span>
                 <span className="font-mono">比例: {formatDisplayedAspectRatio(item)}</span>
+                {item.type === "image" && (
+                  <button
+                    type="button"
+                    onClick={() => setPanoramaItem(item)}
+                    className="imagine-panorama-action inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition"
+                    title="360 查看"
+                  >
+                    <Compass className="h-3.5 w-3.5" />
+                    360 查看
+                  </button>
+                )}
                 <button
                   onClick={() => copyPrompt(item.id, item.prompt)}
                   className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-700 bg-slate-900 px-2.5 text-xs font-medium text-slate-200 transition hover:border-slate-500 hover:text-white"
@@ -171,6 +190,13 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
               </div>
             </div>
           </div>
+          {panoramaItem && (
+            <PanoramaOverlay
+              item={panoramaItem}
+              onClose={() => setPanoramaItem(null)}
+              onSaveScreenshots={onSavePanoramaScreenshots}
+            />
+          )}
         </div>
       )}
     </AnimatePresence>

@@ -7,6 +7,7 @@ import AgentDock from "@/components/agent/AgentDock";
 import CanvasMaskEditor from "@/components/CanvasMaskEditor";
 import FloatingCompareButton from "@/components/assets/FloatingCompareButton";
 import FullscreenPreview from "@/components/assets/FullscreenPreview";
+import PanoramaOverlay from "@/components/panorama/PanoramaOverlay";
 import CreationModeTabs, { type CreationMode } from "@/components/creation/CreationModeTabs";
 import CreatorGenerateButton from "@/components/creation/CreatorGenerateButton";
 import ImageGenerationPanel from "@/components/creation/ImageGenerationPanel";
@@ -262,6 +263,7 @@ export default function Home() {
 
   // Fullscreen Preview Overlay State
   const [fullscreenItem, setFullscreenItem] = useState<StorageItem | null>(null);
+  const [panoramaItem, setPanoramaItem] = useState<StorageItem | null>(null);
 
   // References
   const agentDockRef = useRef<HTMLElement | null>(null);
@@ -269,7 +271,7 @@ export default function Home() {
   const pollingFailuresRef = useRef<Record<string, number>>({});
   const generationAbortControllersRef = useRef<Record<string, AbortController>>({});
   const locallyCanceledItemIdsRef = useRef<Set<string>>(new Set());
-  const isAgentDockSuppressed = showSettings || isMaskOpen || fullscreenItem !== null;
+  const isAgentDockSuppressed = showSettings || isMaskOpen || fullscreenItem !== null || panoramaItem !== null;
 
   const dismissWorkspaceNotice = useCallback((id: string) => {
     setWorkspaceNotices(prev => prev.filter(notice => notice.id !== id));
@@ -452,6 +454,7 @@ export default function Home() {
     setItems,
   });
   const {
+    generateManualAudio,
     generateManualImage,
     generateManualVideo,
   } = useGenerationActions({
@@ -492,6 +495,7 @@ export default function Home() {
     handleClearSelection,
     handleDeleteItem,
     handleDownloadItem,
+    handleSavePanoramaScreenshots,
     retryFailedItem,
     toggleCompare,
     toggleSelectItem,
@@ -856,6 +860,7 @@ export default function Home() {
     agentReferences,
     agentReferenceUrl,
     buildProviderHeaders,
+    generateManualAudio,
     generateManualImage,
     generateManualVideo,
     handleSelectImageModel,
@@ -1052,6 +1057,7 @@ export default function Home() {
       onExportMetadata={exportMetadataJson}
       onLaunchMaskEditor={launchMaskEditor}
       onOpenFullscreen={setFullscreenItem}
+      onOpenPanorama={setPanoramaItem}
       onResetCompare={() => {
         setIsCompareMode(false);
         setCompareItemIds([]);
@@ -1278,6 +1284,7 @@ export default function Home() {
                 agentReferences={agentReferences}
                 agentReferenceUrl={agentReferenceUrl}
                 atDropdownNode={atDropdown.visible && atDropdown.type === "agent-prompt" ? renderAtDropdown("agent-prompt") : null}
+                audioModelGroups={audioModelGroups}
                 autoExecute={autoExecute}
                 chatBottomRef={chatBottomRef}
                 chatModelGroups={chatModelGroups}
@@ -1364,9 +1371,18 @@ export default function Home() {
         item={fullscreenItem}
         items={filteredItems.filter(item => item.status === "complete")}
         onCaptureVideoFrame={handleCaptureVideoFrame}
+        onSavePanoramaScreenshots={handleSavePanoramaScreenshots}
         onClose={() => setFullscreenItem(null)}
         onSelectItem={setFullscreenItem}
       />
+
+      {panoramaItem && (
+        <PanoramaOverlay
+          item={panoramaItem}
+          onClose={() => setPanoramaItem(null)}
+          onSaveScreenshots={handleSavePanoramaScreenshots}
+        />
+      )}
 
       {/* Inpainting Mask Drawer overlay loader */}
       {isMaskOpen && (

@@ -113,6 +113,7 @@ import {
   flushBoardTextForGenerateNode,
   getBoardTextDraft,
 } from "@/lib/board/text-flush-registry";
+import { createPanoramaScreenshotStorageItem, type PanoramaScreenshot } from "@/lib/panorama/capture";
 import { createVideoFrameStorageItem, getVideoFrameCaptureLabel, type CapturedVideoFrame } from "@/lib/video-frame";
 import {
   cleanupWorkspaceAssets,
@@ -2120,6 +2121,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     chatStorageKey: `imagine_agent_chat:${boardController.board.id}`,
     executeToolActionOverride: executeBoardAgentToolAction,
     getBoardContext: buildAgentBoardContext,
+    generateManualAudio,
     generateManualImage,
     generateManualVideo,
     handleSelectImageModel,
@@ -2265,6 +2267,47 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     addAssetToBoard(frameItem, position);
     pushWorkspaceNotice("success", `已保存${getVideoFrameCaptureLabel(frame.mode)}并插入画板`);
   }, [addAssetToBoard, boardController.board.nodes, pushWorkspaceNotice]);
+
+  const handleSavePanoramaScreenshots = useCallback(async (
+    item: StorageItem,
+    screenshots: PanoramaScreenshot[],
+  ): Promise<void> => {
+    if (item.type !== "image") {
+      throw new Error("只有图片资产可以进入全景查看");
+    }
+
+    const sourceNode = boardController.board.nodes.find(node => (
+      node.kind === "asset" && node.asset.assetId === item.id
+    ));
+    const sourceNodeId = sourceNode?.id ?? item.sourceBoardNodeId;
+    const savedItems: StorageItem[] = [];
+    for (const [index, screenshot] of screenshots.entries()) {
+      const screenshotItem = createPanoramaScreenshotStorageItem(
+        item,
+        screenshot,
+        makeClientId(`pano_${index}`),
+        { boardId: resolvedBoardId, sourceBoardNodeId: sourceNodeId },
+      );
+      if (await saveItemOrWarn(screenshotItem, pushWorkspaceNotice)) savedItems.push(screenshotItem);
+    }
+    if (savedItems.length === 0) return;
+    setItems(prev => [
+      ...savedItems,
+      ...prev.filter(prevItem => !savedItems.some(savedItem => savedItem.id === prevItem.id)),
+    ]);
+    const anchorPosition = sourceNode
+      ? { x: sourceNode.position.x + sourceNode.size.width + 40, y: sourceNode.position.y }
+      : undefined;
+    savedItems.forEach((savedItem, index) => {
+      addAssetToBoard(
+        savedItem,
+        anchorPosition
+          ? { x: anchorPosition.x + index * 36, y: anchorPosition.y + index * 36 }
+          : undefined,
+      );
+    });
+    pushWorkspaceNotice("success", `已保存 ${savedItems.length} 张全景截图并插入画板`);
+  }, [addAssetToBoard, boardController.board.nodes, pushWorkspaceNotice, resolvedBoardId]);
 
   const handleImportBoardFiles = useCallback(async (files: File[], position: BoardPoint): Promise<void> => {
     const boardFiles = files.filter(file => mediaReferenceTypeFromMime(file.type) !== null);
@@ -3201,6 +3244,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           agentReferences={agentReferences}
           agentReferenceUrl={agentReferenceUrl}
           atDropdownNode={atDropdown.visible && atDropdown.type === "agent-prompt" ? renderAgentAtDropdown() : null}
+          audioModelGroups={audioModelGroups}
           autoExecute={autoExecute}
           chatBottomRef={chatBottomRef}
           chatModelGroups={chatModelGroups}
@@ -3278,6 +3322,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onCaptureVideoFrame={(item, frame) =>
           handleCaptureVideoFrame(boardController.selectedNodeId ?? "", item, frame)
         }
+        onSavePanoramaScreenshots={handleSavePanoramaScreenshots}
         onClose={() => setFullscreenItem(null)}
         onSelectItem={setFullscreenItem}
       />

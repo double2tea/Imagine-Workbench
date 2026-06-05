@@ -1,5 +1,6 @@
 import {
   Clock3,
+  Compass,
   Download,
   ImageDown,
   Image as ImageIcon,
@@ -42,6 +43,7 @@ interface AssetCardProps {
   onDownload: (item: StorageItem) => void;
   onLaunchMaskEditor: (imageUrl: string, id: string) => void;
   onOpenFullscreen: (item: StorageItem) => void;
+  onOpenPanorama: (item: StorageItem) => void;
   onOpenReferencePreview: (item: StorageItem, index: number) => void;
   onRetry: (item: StorageItem) => void;
   onReuseTask: (item: StorageItem) => void;
@@ -106,6 +108,7 @@ export default function AssetCard({
   onDownload,
   onLaunchMaskEditor,
   onOpenFullscreen,
+  onOpenPanorama,
   onOpenReferencePreview,
   onRetry,
   onReuseTask,
@@ -298,6 +301,12 @@ export default function AssetCard({
                     </button>
                   )}
                   {item.type === "image" && (
+                    <button type="button" onClick={() => runMobileAction(() => onOpenPanorama(item))}>
+                      <Compass className="h-3.5 w-3.5 text-cyan-300" />
+                      全景
+                    </button>
+                  )}
+                  {item.type === "image" && (
                     <button type="button" onClick={() => runMobileAction(() => onLaunchMaskEditor(item.url, item.id))}>
                       <Paintbrush className="h-3.5 w-3.5 text-amber-300" />
                       修改
@@ -362,6 +371,18 @@ export default function AssetCard({
                       </div>
                     )}
                   </div>
+                )}
+
+                {item.type === "image" && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenPanorama(item)}
+                    className="imagine-card-action imagine-panorama-action min-w-0 px-1.5 py-1 rounded-md border text-xs transition-all duration-200 shadow-lg flex items-center justify-center cursor-pointer"
+                    title="360 全景查看"
+                  >
+                    <Compass className="h-3 w-3" />
+                    <span className="text-[9px] font-bold">360</span>
+                  </button>
                 )}
 
                 {item.type === "image" && (

@@ -1,14 +1,19 @@
 import { z } from "zod";
 import type { AgentBoardContext } from "@/lib/agent-context";
 import { PROMPT_TEMPLATES } from "@/lib/prompt-templates";
-import { MODEL_CAPABILITIES, type ProviderModelCapability } from "@/lib/providers/model-catalog";
+import { AGENT_BOARD_ACTION_TYPES, AGENT_WORKBENCH_ACTION_TYPES } from "@/lib/agent-actions";
+import { MODEL_CAPABILITIES, type ModelKind, type ProviderModelCapability } from "@/lib/providers/model-catalog";
 import type { ToolDefinition } from "@/lib/providers/types";
 import { SKILL_REGISTRY } from "./skills";
 
 // -- Tool argument schemas (zod, for runtime validation only) --
 
 const queryModelsSchema = z.object({
-  kind: z.enum(["image", "video", "chat"]).optional(),
+  kind: z.enum(["image", "video", "audio", "chat"]).optional(),
+});
+
+const getAgentCapabilitiesSchema = z.object({
+  topic: z.enum(["summary", "actions", "tools", "context", "media"]).optional(),
 });
 
 const getSkillInfoSchema = z.object({
@@ -16,7 +21,7 @@ const getSkillInfoSchema = z.object({
 });
 
 const getGalleryAssetsSchema = z.object({
-  type: z.enum(["image", "video"]).optional(),
+  type: z.enum(["image", "video", "audio"]).optional(),
   search: z.string().optional(),
 });
 
@@ -60,15 +65,35 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     function: {
       name: "query_models",
       description:
-        "查询当前可用的生成模型及参数能力。kind 过滤：image / video / chat，不传返回全部。" +
-        "返回：模型 ID、提供商、宽高比列表、输出尺寸列表、思考级别、是否异步、是否支持参考图、视频参考模式与数量限制。",
+        "按需查询当前可用的模型及参数能力。kind 过滤：image / video / audio / chat，不传返回全部。" +
+        "返回模型 ID、提供商、尺寸/比例、质量、思考级别、视频时长、参考媒体类型和数量限制。",
       parameters: {
         type: "object",
         properties: {
           kind: {
             type: "string",
-            enum: ["image", "video", "chat"],
+            enum: ["image", "video", "audio", "chat"],
             description: "模型类别过滤，不传返回全部",
+          },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_agent_capabilities",
+      description:
+        "回答用户询问 Agent 能力、可执行动作、可用工具、上下文读取方式或媒体输入能力时调用。" +
+        "返回 Agent 的能力边界、渐进式上下文策略、动作类型和工具列表。",
+      parameters: {
+        type: "object",
+        properties: {
+          topic: {
+            type: "string",
+            enum: ["summary", "actions", "tools", "context", "media"],
+            description: "只查询某类能力；不传返回摘要",
           },
         },
         additionalProperties: false,
@@ -98,14 +123,14 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     function: {
       name: "get_gallery_assets",
       description:
-        "查询当前工作区已生成的图像/视频资产。可按类型过滤或按 prompt 关键词搜索。" +
+        "按需查询当前工作区已生成的图像/视频/音频资产。可按类型过滤或按 prompt 关键词搜索。" +
         "返回匹配项的 ID、类型、宽高比、prompt 摘要。用于引用历史资产做编辑或视频合成。",
       parameters: {
         type: "object",
         properties: {
           type: {
             type: "string",
-            enum: ["image", "video"],
+            enum: ["image", "video", "audio"],
             description: "按类型过滤",
           },
           search: {
@@ -242,6 +267,10 @@ export function executeToolCall(name: string, args: string, ctx: ToolContext): s
         : MODEL_CAPABILITIES;
       return JSON.stringify(filtered.map(formatCapabilities));
     }
+    case "get_agent_capabilities": {
+      const { topic } = getAgentCapabilitiesSchema.parse(JSON.parse(args));
+      return JSON.stringify(formatAgentCapabilities(topic ?? "summary"));
+    }
     case "get_skill_info": {
       const { name: skillName } = getSkillInfoSchema.parse(JSON.parse(args));
       const skill = SKILL_REGISTRY.find(
@@ -340,6 +369,53 @@ function countBy(values: string[]): Record<string, number> {
     acc[value] = (acc[value] ?? 0) + 1;
     return acc;
   }, {});
+}
+
+function modelCountByKind(): Record<ModelKind, number> {
+  return MODEL_CAPABILITIES.reduce<Record<ModelKind, number>>((acc, model) => {
+    acc[model.kind] += 1;
+    return acc;
+  }, { audio: 0, chat: 0, image: 0, video: 0 });
+}
+
+function formatAgentCapabilities(topic: "summary" | "actions" | "tools" | "context" | "media"): Record<string, unknown> {
+  const actions = {
+    workbench: AGENT_WORKBENCH_ACTION_TYPES,
+    board: AGENT_BOARD_ACTION_TYPES,
+  };
+  const tools = TOOL_DEFINITIONS.map(tool => ({
+    name: tool.function.name,
+    description: tool.function.description,
+  }));
+  const contextPolicy = {
+    default: "Use the user's latest message plus lightweight counts only.",
+    progressiveDisclosure: [
+      "Call get_agent_capabilities when the user asks what the Agent can do.",
+      "Call query_models before selecting or explaining model parameters.",
+      "Call get_gallery_assets only when prior generated assets matter.",
+      "Call get_board_context or get_connected_context only on board tasks that need node or edge details.",
+      "Call prompt/template tools only for matching creative planning needs.",
+    ],
+  };
+  const media = {
+    chatReferences: ["image", "video", "audio"],
+    imageGenerationReferences: ["image"],
+    videoGenerationReferences: ["image", "video", "audio"],
+    audioGenerationReferences: ["image", "video", "audio"],
+  };
+
+  if (topic === "actions") return { actions };
+  if (topic === "tools") return { tools };
+  if (topic === "context") return { contextPolicy };
+  if (topic === "media") return { media };
+
+  return {
+    actions,
+    contextPolicy,
+    media,
+    modelCounts: modelCountByKind(),
+    tools,
+  };
 }
 
 // -- Prompt blueprints --
@@ -542,12 +618,14 @@ function formatCapabilities(c: ProviderModelCapability): Record<string, unknown>
     async: c.supportsAsync,
     supportsReferences: c.supportsReferences,
     aspectRatios: c.aspectRatios.map(a => a.value),
+    qualityLevels: c.qualityLevels.map(q => q.value),
     sizes: c.sizes.map(s => s.value),
     thinkingLevels: c.thinkingLevels.map(t => t.value),
-    videoResolutions: c.resolutions.map(r => r.value),
-    videoDurations: c.durations.map(d => d.value),
-    videoPresets: c.presets.map(p => p.value),
-    videoReferenceMode: c.videoReferenceMode,
+    videoResolutions: c.kind === "video" ? c.resolutions.map(r => r.value) : [],
+    videoDurations: c.kind === "video" ? c.durations.map(d => d.value) : [],
+    videoPresets: c.kind === "video" ? c.presets.map(p => p.value) : [],
+    videoReferenceMode: c.kind === "video" ? c.videoReferenceMode : "none",
+    videoReferenceModes: c.kind === "video" ? c.videoReferenceModes : [],
     maxReferenceImages: c.maxReferenceImages,
     minReferenceImages: c.minReferenceImages,
     referenceMediaTypes: c.referenceMediaTypes,
