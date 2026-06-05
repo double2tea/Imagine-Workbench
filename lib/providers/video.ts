@@ -55,6 +55,8 @@ export async function generateVideo(config: ProviderConfig, input: GenerateVideo
       referenceMode: input.referenceMode === "none" ? undefined : input.referenceMode,
       referenceImages: input.referenceMedia.filter(reference => reference.type === "image"),
       referenceMedia: input.referenceMedia,
+      runningHubAccessPassword: input.runningHubAccessPassword,
+      runningHubNodeInfoList: input.runningHubNodeInfoList,
     }, "video");
     if (!result.operationName) throw new Error("RunningHub video response did not include an operation name");
     return {

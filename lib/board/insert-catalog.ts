@@ -5,6 +5,7 @@ import {
   ImagePlus,
   Layers,
   MessageSquareText,
+  Workflow,
   Video,
 } from "lucide-react";
 import {
@@ -13,6 +14,7 @@ import {
   DEFAULT_NOTE_NODE_SIZE,
   DEFAULT_PROMPT_NODE_SIZE,
   DEFAULT_REFERENCE_GROUP_NODE_SIZE,
+  DEFAULT_RUNNINGHUB_APP_NODE_SIZE,
 } from "@/lib/board/defaults";
 import type { BoardSize } from "@/lib/board/types";
 
@@ -21,6 +23,7 @@ export type BoardInsertKind =
   | "reference-group"
   | "image-generate"
   | "video-generate"
+  | "runninghub-app"
   | "agent"
   | "note";
 
@@ -65,6 +68,14 @@ export const BOARD_INSERT_CATALOG: BoardInsertCatalogItem[] = [
     kind: "video-generate",
     label: "视频",
     size: DEFAULT_GENERATE_NODE_SIZE,
+  },
+  {
+    icon: Workflow,
+    iconClassName: "text-emerald-300",
+    iconSurfaceClassName: "bg-emerald-500/10 border-emerald-400/20",
+    kind: "runninghub-app",
+    label: "RH 应用",
+    size: DEFAULT_RUNNINGHUB_APP_NODE_SIZE,
   },
   {
     icon: Bot,

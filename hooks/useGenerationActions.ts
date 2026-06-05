@@ -9,6 +9,7 @@ import {
   type GenerationRequestSnapshot,
   type StorageItem,
 } from "@/lib/db";
+import type { RunningHubTaskNodeBinding } from "@/lib/providers/types";
 import { buildPromptWithReferenceMap } from "@/hooks/useReferenceState";
 import { getMediaReferenceType, mediaReferenceLabel } from "@/lib/media-references";
 import { getImageModelCapabilities, getVideoModelCapabilities, type VideoReferenceMode } from "@/lib/providers/model-catalog";
@@ -46,6 +47,7 @@ interface UseGenerationActionsParams {
 }
 
 interface GenerationOverrides {
+  allowEmptyPrompt?: boolean;
   boardId?: string;
   boardNodeId?: string;
   boardResultStackKey?: string;
@@ -62,6 +64,8 @@ interface GenerationOverrides {
   videoPreset?: string;
   videoReferenceMode?: VideoReferenceMode;
   videoResolution?: string;
+  runningHubAccessPassword?: string;
+  runningHubNodeInfoList?: RunningHubTaskNodeBinding[];
 }
 
 function makeClientId(prefix: string): string {
@@ -219,7 +223,7 @@ export function useGenerationActions({
         ? customImageSizeAspectRatio(requestImageResolution) ?? (overrides.size ?? activeImageAspectRatio)
         : overrides.size ?? activeImageAspectRatio;
 
-    if (!activePrompt.trim()) return false;
+    if (!activePrompt.trim() && overrides.allowEmptyPrompt !== true) return false;
     if (requestIsCustomImageResolution) {
       const sizeError = validateCustomImageSize(requestImageResolution);
       if (sizeError) {
@@ -265,6 +269,8 @@ export function useGenerationActions({
       imageResolution: requestImageResolution,
       imageQuality: requestImageQuality,
       thinkingLevel: requestThinkingLevel,
+      runningHubAccessPassword: overrides.runningHubAccessPassword,
+      runningHubNodeInfoList: overrides.runningHubNodeInfoList,
       referenceMedia: buildReferenceMediaSnapshot(activeReferenceImages, imageReferencePayloads),
     };
     const displayedImageSize = /^\d+x\d+$/.test(requestImageResolution) ? requestImageResolution : requestAspectRatio;
@@ -388,7 +394,7 @@ export function useGenerationActions({
     const requestVideoResolution = overrides.videoResolution ?? activeVideoResolution;
     const requestVideoCapabilities = getVideoModelCapabilities(requestModel);
 
-    if (!activePrompt.trim()) return false;
+    if (!activePrompt.trim() && overrides.allowEmptyPrompt !== true) return false;
     const videoReferences = buildVideoReferences(
       activeReferenceImages,
       activeReferenceImage,
@@ -423,6 +429,8 @@ export function useGenerationActions({
       videoPreset: requestVideoPreset,
       videoReferenceMode: requestVideoReferenceMode === "none" ? undefined : requestVideoReferenceMode,
       videoResolution: requestVideoResolution,
+      runningHubAccessPassword: overrides.runningHubAccessPassword,
+      runningHubNodeInfoList: overrides.runningHubNodeInfoList,
       referenceMedia: buildReferenceMediaSnapshot(videoReferences, videoReferencePayloads),
     };
 
@@ -465,6 +473,8 @@ export function useGenerationActions({
           referenceMode: generationRequest.videoReferenceMode,
           resolutionName: generationRequest.videoResolution,
           model: generationRequest.model,
+          runningHubAccessPassword: generationRequest.runningHubAccessPassword,
+          runningHubNodeInfoList: generationRequest.runningHubNodeInfoList,
         }),
       });
 

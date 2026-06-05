@@ -8,9 +8,11 @@ import {
   resolveRunningHubStandardModelForReferenceMedia,
   resolveRunningHubStandardModelForReferences,
 } from "../lib/providers/runninghub";
+import { parseRunningHubBindingsFromJsonText } from "../lib/board/runninghub-bindings";
 import { createChatCompletionText } from "../lib/providers/chat";
 import { generateRunningHubMedia, getRunningHubMediaStatus } from "../lib/providers/image";
 import { listProviderModels } from "../lib/providers/models";
+import { fetchRunningHubAiAppSchema } from "../lib/providers/runninghub-app";
 import type { ProviderConfig } from "../lib/providers/types";
 
 const runningHubConfig: ProviderConfig = {
@@ -610,8 +612,133 @@ test("runninghub ai app tasks use task output polling endpoint", async () => {
       url: "https://runninghub.example/output.png",
     });
     assert.equal(calls[0]?.url, "https://www.runninghub.cn/task/openapi/ai-app/run");
+    assert.deepEqual(calls[0]?.body, {
+      apiKey: "rh_test_key",
+      webappId: "1877265245566922753",
+    });
     assert.equal(calls[1]?.url, "https://www.runninghub.cn/task/openapi/outputs");
     assert.deepEqual(calls[1]?.body, { apiKey: "rh_test_key", taskId: "task_123" });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("runninghub ai app tasks map custom nodeInfoList bindings", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: Array<{ url: string; body: unknown }> = [];
+  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const url = input.toString();
+    if (url.endsWith("/openapi/v2/media/upload/binary")) {
+      calls.push({ url, body: init?.body instanceof FormData ? "form-data" : init?.body });
+      return Response.json({
+        code: 200,
+        message: "success",
+        data: {
+          download_url: "https://runninghub.example/uploaded.png",
+          filename: "api/uploaded.png",
+        },
+      });
+    }
+    calls.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+    if (url.endsWith("/task/openapi/ai-app/run")) {
+      return Response.json({ code: 0, msg: "success", data: { taskId: "task_custom", taskStatus: "RUNNING" } });
+    }
+    return Response.json({ code: 999, msg: "unexpected endpoint" }, { status: 500 });
+  };
+
+  try {
+    const created = await generateRunningHubMedia(
+      runningHubConfig,
+      {
+        prompt: "node prompt",
+        model: "ai-app-image:1877265245566922753",
+        aspectRatio: "auto",
+        imageResolution: "auto",
+        referenceImages: [{ dataUri: "data:image/png;base64,AA==" }],
+        runningHubAccessPassword: "secret",
+        runningHubNodeInfoList: [
+          { nodeId: "122", fieldName: "prompt", source: "prompt", deliveryMode: "raw" },
+          { nodeId: "14", fieldName: "image", source: "reference", referenceIndex: 0, referenceType: "image", deliveryMode: "url" },
+          { nodeId: "15", fieldName: "optionalImage", source: "reference", referenceIndex: 4, referenceType: "image", deliveryMode: "url" },
+          { nodeId: "16", fieldName: "disabled", source: "literal", value: "skip", enabled: false, deliveryMode: "raw" },
+          { nodeId: "3", fieldName: "seed", source: "literal", value: "12345", valueType: "number", deliveryMode: "raw" },
+          { nodeId: "4", fieldName: "randomSeed", source: "randomSeed", valueType: "number", deliveryMode: "raw" },
+        ],
+      },
+      "image",
+    );
+
+    assert.equal(created.operationName, "runninghub:image:task-output:task_custom");
+    assert.equal(calls[0]?.url, "https://www.runninghub.cn/openapi/v2/media/upload/binary");
+    assert.equal(calls[1]?.url, "https://www.runninghub.cn/task/openapi/ai-app/run");
+    const body = calls[1]?.body;
+    assert.equal(typeof body, "object");
+    assert.notEqual(body, null);
+    const nodeInfoList = body && typeof body === "object" && "nodeInfoList" in body && Array.isArray(body.nodeInfoList)
+      ? body.nodeInfoList as Array<{ fieldValue: unknown }>
+      : [];
+    assert.equal(typeof nodeInfoList[3]?.fieldValue, "number");
+    assert.deepEqual(calls[1]?.body, {
+      apiKey: "rh_test_key",
+      webappId: "1877265245566922753",
+      accessPassword: "secret",
+      nodeInfoList: [
+        { nodeId: "122", fieldName: "prompt", fieldValue: "node prompt" },
+        { nodeId: "14", fieldName: "image", fieldValue: "https://runninghub.example/uploaded.png" },
+        { nodeId: "3", fieldName: "seed", fieldValue: 12345 },
+        { nodeId: "4", fieldName: "randomSeed", fieldValue: nodeInfoList[3]?.fieldValue },
+      ],
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("runninghub ai app schema reads official apiCallDemo curl nodeInfoList", async () => {
+  const originalFetch = globalThis.fetch;
+  const demoCurl = `curl --location 'https://www.runninghub.cn/task/openapi/ai-app/run' \\
+--header 'Content-Type: application/json' \\
+--data '{
+  "webappId": "2013570680079523842",
+  "nodeInfoList": [
+    {
+      "nodeId": "173",
+      "nodeName": "上传手稿",
+      "fieldName": "image",
+      "fieldValue": "api/example.png",
+      "fieldType": "IMAGE",
+      "description": "手稿图片"
+    },
+    {
+      "nodeId": "221",
+      "nodeName": "模型参数",
+      "fieldName": "ratio",
+      "fieldValue": "3:4",
+      "fieldType": "LIST",
+      "fieldData": "[{\\"index\\":\\"1:1\\",\\"name\\":\\"1:1\\"},{\\"index\\":\\"3:4\\",\\"name\\":\\"3:4\\"}]",
+      "description": "输出比例"
+    }
+  ]
+}'`;
+  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const url = input.toString();
+    assert.equal(url, "https://www.runninghub.cn/api/webapp/apiCallDemo?apiKey=rh_test_key&webappId=2013570680079523842");
+    assert.equal(init?.headers && typeof init.headers === "object" && "Authorization" in init.headers, true);
+    return Response.json({ code: 0, data: { curl: demoCurl } });
+  };
+
+  try {
+    const schema = await fetchRunningHubAiAppSchema(runningHubConfig, "2013570680079523842");
+    assert.equal(schema.webappId, "2013570680079523842");
+    assert.equal(schema.nodeInfoList.length, 2);
+    assert.equal(schema.nodeInfoList[0]?.fieldType, "IMAGE");
+
+    const bindings = parseRunningHubBindingsFromJsonText(JSON.stringify({ nodeInfoList: schema.nodeInfoList }));
+    assert.equal(bindings[0]?.source, "reference");
+    assert.equal(bindings[0]?.deliveryMode, "fileName");
+    assert.equal(bindings[0]?.required, true);
+    assert.equal(bindings[1]?.source, "literal");
+    assert.deepEqual(bindings[1]?.options?.map(option => option.value), ["1:1", "3:4"]);
   } finally {
     globalThis.fetch = originalFetch;
   }

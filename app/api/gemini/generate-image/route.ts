@@ -3,6 +3,12 @@ import { getImageModelCapabilities, getImageResolutionOptions, parseProviderMode
 import { generateImage } from "@/lib/providers/image";
 import { dataUriToBlob, optionalText, requireText, resolveProviderConfig } from "@/lib/providers/utils";
 import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, getReferenceImagePayloadError } from "@/lib/reference-images";
+import type {
+  RunningHubTaskBindingDelivery,
+  RunningHubTaskBindingSource,
+  RunningHubTaskBindingValueType,
+  RunningHubTaskNodeBinding,
+} from "@/lib/providers/types";
 
 export const runtime = "edge";
 
@@ -13,6 +19,8 @@ interface GenerateImageBody {
   imageResolution?: unknown;
   imageQuality?: unknown;
   thinkingLevel?: unknown;
+  runningHubAccessPassword?: unknown;
+  runningHubNodeInfoList?: unknown;
   referenceImage?: unknown;
   referenceImages?: unknown;
 }
@@ -33,12 +41,13 @@ export async function POST(req: NextRequest) {
     const imageResolution = resolveImageResolution(modelValue, aspectRatio, requestImageResolution);
     const imageQuality = resolveImageQuality(modelValue, optionalText(body.imageQuality));
     const referenceImages = readReferenceImages(body.referenceImages, body.referenceImage);
+    const runningHubNodeInfoList = readRunningHubNodeInfoList(body.runningHubNodeInfoList);
     const payloadError = getReferenceImagePayloadError(referenceImages);
     if (payloadError) return NextResponse.json({ error: payloadError }, { status: 413 });
     validateReferenceCount(modelValue, referenceImages.length);
 
     const result = await generateImage(config, {
-      prompt: requireText(body.prompt, "Prompt"),
+      prompt: runningHubNodeInfoList ? optionalText(body.prompt) ?? "" : requireText(body.prompt, "Prompt"),
       model: parsed.model,
       aspectRatio,
       imageResolution,
@@ -46,6 +55,8 @@ export async function POST(req: NextRequest) {
       thinkingLevel: optionalText(body.thinkingLevel),
       referenceImages: referenceImages.map(dataUri => ({ dataUri })),
       async: parsed.async,
+      runningHubAccessPassword: optionalText(body.runningHubAccessPassword),
+      runningHubNodeInfoList,
     });
 
     if (result.imageUrl?.startsWith("data:")) {
@@ -179,4 +190,60 @@ function readReferenceImages(referenceImages: unknown, referenceImage: unknown):
     return [referenceImage];
   }
   return [];
+}
+
+function readRunningHubNodeInfoList(value: unknown): RunningHubTaskNodeBinding[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.map(readRunningHubNodeInfoBinding).filter((binding): binding is RunningHubTaskNodeBinding => binding !== null);
+}
+
+function readRunningHubNodeInfoBinding(value: unknown): RunningHubTaskNodeBinding | null {
+  if (typeof value !== "object" || value === null) return null;
+  const record = value as Record<string, unknown>;
+  const nodeId = optionalText(record.nodeId);
+  const fieldName = optionalText(record.fieldName);
+  if (!nodeId || !fieldName) return null;
+  return {
+    nodeId,
+    fieldName,
+    label: optionalText(record.label),
+    source: readBindingSource(record.source),
+    value: optionalText(record.value),
+    valueType: readBindingValueType(record.valueType),
+    enabled: typeof record.enabled === "boolean" ? record.enabled : undefined,
+    required: typeof record.required === "boolean" ? record.required : undefined,
+    referenceIndex: readReferenceIndex(record.referenceIndex),
+    referenceType: record.referenceType === "video" || record.referenceType === "audio" ? record.referenceType : "image",
+    deliveryMode: readBindingDelivery(record.deliveryMode),
+  };
+}
+
+function readBindingSource(value: unknown): RunningHubTaskBindingSource {
+  if (value === "prompt" || value === "reference" || value === "randomSeed") return value;
+  return "literal";
+}
+
+function readBindingValueType(value: unknown): RunningHubTaskBindingValueType | undefined {
+  if (
+    value === "text" ||
+    value === "number" ||
+    value === "boolean" ||
+    value === "image" ||
+    value === "video" ||
+    value === "audio" ||
+    value === "raw"
+  ) {
+    return value;
+  }
+  return undefined;
+}
+
+function readBindingDelivery(value: unknown): RunningHubTaskBindingDelivery {
+  if (value === "url" || value === "fileName") return value;
+  return "raw";
+}
+
+function readReferenceIndex(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0) return undefined;
+  return value;
 }

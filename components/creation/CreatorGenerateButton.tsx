@@ -1,4 +1,5 @@
 import { RefreshCw, Sparkles, Video as VideoIcon } from "lucide-react";
+import ModelPriceBadge from "@/components/creation/ModelPriceBadge";
 
 export type CreatorGenerateMode = "image" | "video";
 
@@ -6,6 +7,10 @@ interface CreatorGenerateButtonProps {
   mode: CreatorGenerateMode;
   disabled: boolean;
   isSubmitting: boolean;
+  priceProvider?: string;
+  priceModelId?: string;
+  priceDuration?: string;
+  priceResolution?: string;
   submitCount: number;
   onGenerate: () => void;
 }
@@ -14,10 +19,15 @@ export default function CreatorGenerateButton({
   mode,
   disabled,
   isSubmitting,
+  priceProvider,
+  priceModelId,
+  priceDuration,
+  priceResolution,
   submitCount,
   onGenerate,
 }: CreatorGenerateButtonProps) {
   const isImage = mode === "image";
+  const showPrice = !isSubmitting && priceProvider && priceModelId;
   const label = isImage ? "生成图片" : "生成视频";
   const submittingLabel = `提交中 (${submitCount})，可继续排队`;
 
@@ -43,6 +53,14 @@ export default function CreatorGenerateButton({
         <VideoIcon className="h-4 w-4 text-white" />
       )}
       {isSubmitting ? submittingLabel : label}
+      {showPrice && (
+        <ModelPriceBadge
+          provider={priceProvider!}
+          modelId={priceModelId!}
+          duration={priceDuration}
+          resolution={priceResolution}
+        />
+      )}
     </button>
   );
 }

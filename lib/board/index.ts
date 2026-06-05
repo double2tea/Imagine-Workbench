@@ -16,6 +16,7 @@ export {
   DEFAULT_NOTE_NODE_SIZE,
   DEFAULT_PROMPT_NODE_SIZE,
   DEFAULT_REFERENCE_GROUP_NODE_SIZE,
+  DEFAULT_RUNNINGHUB_APP_NODE_SIZE,
   createEmptyBoard,
 } from "@/lib/board/defaults";
 export { BOARD_UNDO_LIMIT, cloneBoardHistory, type BoardHistorySnapshot } from "@/lib/board/history";
@@ -30,6 +31,7 @@ export {
 export {
   collectBoardAssetIdsFromNodes,
   collectBoardNodeIdsFromNodes,
+  collectPlacedBoardAssetIdsFromNodes,
   mergeBoardScopedMetas,
 } from "@/lib/assets/board-scope";
 export { BOARD_SNAP_GRID, snapBoardPoint } from "@/lib/board/snap-grid";
@@ -50,6 +52,15 @@ export {
   type BoardGalleryReferenceItem,
   type BoardPromptReference,
 } from "@/lib/board/prompt-references";
+export {
+  analyzeRunningHubBindings,
+  createDefaultRunningHubBinding,
+  createRunningHubBindingId,
+  hasRunningHubBindingIdentity,
+  isRunningHubBindingMissing,
+  parseRunningHubBindingsFromJsonText,
+  type RunningHubBindingReadiness,
+} from "@/lib/board/runninghub-bindings";
 export type {
   BoardAssetNode,
   BoardAssetReference,
@@ -63,6 +74,7 @@ export type {
   BoardGenerateVariantCount,
   BoardGenerationStatus,
   BoardImageGenerateNode,
+  BoardExecutableNode,
   BoardNode,
   BoardNodeBase,
   BoardNodeKind,
@@ -77,11 +89,20 @@ export type {
   BoardReferenceGroupItem,
   BoardReferenceGroupNode,
   BoardReferenceRole,
+  BoardRunningHubAppNode,
+  BoardRunningHubAppNodeUpdate,
+  BoardRunningHubBindingDelivery,
+  BoardRunningHubBindingSource,
+  BoardRunningHubBindingValueType,
+  BoardRunningHubNodeInfoBinding,
+  BoardRunningHubOutputType,
+  BoardRunningHubTargetType,
   BoardSize,
   BoardSummary,
   BoardVideoGenerateNode,
   BoardVideoReferenceMode,
   CreateAgentNodeInput,
+  CreateRunningHubAppNodeInput,
   BoardViewport,
   CreateAssetNodeInput,
   CreateGenerateNodeInput,

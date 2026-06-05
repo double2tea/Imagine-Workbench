@@ -1,5 +1,6 @@
 import { useRef, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { ImagePlus, Loader2, Music, Play, Video, X } from "lucide-react";
+import ModelPriceBadge from "@/components/creation/ModelPriceBadge";
 import BoardPromptTextarea, { type BoardPromptTextareaHandle } from "@/components/board/BoardPromptTextarea";
 import PreviewImage from "@/components/PreviewImage";
 import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
@@ -326,6 +327,7 @@ export default function GenerateBoardNode({
           >
             {node.kind === "image-generate" ? <ImagePlus className="h-3.5 w-3.5" /> : <Video className="h-3.5 w-3.5" />}
             <Play className="h-3 w-3" />
+            {!isProcessing && <ModelPriceBadge provider={node.model.split(":")[0]} modelId={node.model} duration={node.kind === "video-generate" ? node.videoDuration : undefined} resolution={node.kind === "image-generate" ? (node.imageResolution === "custom" ? node.customImageResolution : node.imageResolution) : undefined} />}
           </button>
         )}
       </div>

@@ -14,6 +14,7 @@ import {
 import type { MediaReferenceRole, MediaReferenceType } from "@/lib/media-references";
 import { mediaReferenceFileExtension, mediaReferenceMimeFromDataUri } from "@/lib/media-references";
 import { parseProviderModel, type AiProvider } from "@/lib/providers/model-catalog";
+import type { RunningHubTaskNodeBinding } from "@/lib/providers/types";
 import { getReferenceImagePayloadError, getReferenceMediaPayloadError, prepareReferenceImageUrlForRequest, prepareReferenceMediaUrlForRequest } from "@/lib/reference-images";
 import { createVideoFrameStorageItem, getVideoFrameCaptureLabel, type CapturedVideoFrame } from "@/lib/video-frame";
 
@@ -34,6 +35,8 @@ interface RetryRequestBody {
   referenceImages?: string[];
   referenceMedia?: Array<{ dataUri: string; type: MediaReferenceType; role?: MediaReferenceRole }>;
   images?: string[];
+  runningHubAccessPassword?: string;
+  runningHubNodeInfoList?: RunningHubTaskNodeBinding[];
 }
 
 interface UseAssetActionsParams {
@@ -101,6 +104,8 @@ function buildRetryRequestBody(item: StorageItem): RetryRequestBody {
     prompt: request?.prompt ?? item.prompt,
     model: request?.model ?? item.model,
     aspectRatio: request?.aspectRatio ?? item.aspectRatio,
+    runningHubAccessPassword: request?.runningHubAccessPassword,
+    runningHubNodeInfoList: request?.runningHubNodeInfoList,
   };
 
   if (item.type === "image") {

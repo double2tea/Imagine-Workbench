@@ -4,7 +4,13 @@ import { generateVideo } from "@/lib/providers/video";
 import { optionalText, requireText, resolveProviderConfig } from "@/lib/providers/utils";
 import { mediaReferenceLabel, mediaReferenceTypeFromBase64DataUri, type MediaReferenceType } from "@/lib/media-references";
 import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, getReferenceMediaPayloadError } from "@/lib/reference-images";
-import type { ReferenceMedia } from "@/lib/providers/types";
+import type {
+  ReferenceMedia,
+  RunningHubTaskBindingDelivery,
+  RunningHubTaskBindingSource,
+  RunningHubTaskBindingValueType,
+  RunningHubTaskNodeBinding,
+} from "@/lib/providers/types";
 
 export const runtime = "edge";
 
@@ -20,6 +26,8 @@ interface GenerateVideoBody {
   lastFrame?: unknown;
   images?: unknown;
   referenceMedia?: unknown;
+  runningHubAccessPassword?: unknown;
+  runningHubNodeInfoList?: unknown;
 }
 
 export async function POST(req: NextRequest) {
@@ -33,6 +41,7 @@ export async function POST(req: NextRequest) {
     const config = resolveProviderConfig(req, parsed.provider);
     const capability = getVideoModelCapabilities(modelValue);
     const referenceMedia = readReferenceMedia(body.referenceMedia, body.images, body.image, body.lastFrame);
+    const runningHubNodeInfoList = readRunningHubNodeInfoList(body.runningHubNodeInfoList);
     const formatError = getReferenceMediaFormatError(referenceMedia, capability.referenceMediaTypes);
     if (formatError) return NextResponse.json({ error: formatError }, { status: 400 });
     const payloadError = getReferenceMediaPayloadError(referenceMedia.map(reference => reference.dataUri));
@@ -40,7 +49,7 @@ export async function POST(req: NextRequest) {
     validateReferenceCount(referenceMedia.length, capability.minReferenceImages, capability.maxReferenceImages);
 
     const result = await generateVideo(config, {
-      prompt: requireText(body.prompt, "Prompt"),
+      prompt: runningHubNodeInfoList ? optionalText(body.prompt) ?? "" : requireText(body.prompt, "Prompt"),
       model: parsed.model,
       aspectRatio: optionalText(body.aspectRatio) ?? "16:9",
       durationSeconds: optionalText(body.durationSeconds),
@@ -48,6 +57,8 @@ export async function POST(req: NextRequest) {
       referenceMode: readReferenceMode(body.referenceMode),
       resolutionName: optionalText(body.resolutionName),
       referenceMedia,
+      runningHubAccessPassword: optionalText(body.runningHubAccessPassword),
+      runningHubNodeInfoList,
     });
 
     return NextResponse.json(result);
@@ -123,4 +134,60 @@ function validateReferenceCount(count: number, min: number, max: number): void {
   if (count > max) {
     throw new Error(`Selected video model supports at most ${max} reference image(s)`);
   }
+}
+
+function readRunningHubNodeInfoList(value: unknown): RunningHubTaskNodeBinding[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.map(readRunningHubNodeInfoBinding).filter((binding): binding is RunningHubTaskNodeBinding => binding !== null);
+}
+
+function readRunningHubNodeInfoBinding(value: unknown): RunningHubTaskNodeBinding | null {
+  if (typeof value !== "object" || value === null) return null;
+  const record = value as Record<string, unknown>;
+  const nodeId = optionalText(record.nodeId);
+  const fieldName = optionalText(record.fieldName);
+  if (!nodeId || !fieldName) return null;
+  return {
+    nodeId,
+    fieldName,
+    label: optionalText(record.label),
+    source: readBindingSource(record.source),
+    value: optionalText(record.value),
+    valueType: readBindingValueType(record.valueType),
+    enabled: typeof record.enabled === "boolean" ? record.enabled : undefined,
+    required: typeof record.required === "boolean" ? record.required : undefined,
+    referenceIndex: readReferenceIndex(record.referenceIndex),
+    referenceType: record.referenceType === "video" || record.referenceType === "audio" ? record.referenceType : "image",
+    deliveryMode: readBindingDelivery(record.deliveryMode),
+  };
+}
+
+function readBindingSource(value: unknown): RunningHubTaskBindingSource {
+  if (value === "prompt" || value === "reference" || value === "randomSeed") return value;
+  return "literal";
+}
+
+function readBindingValueType(value: unknown): RunningHubTaskBindingValueType | undefined {
+  if (
+    value === "text" ||
+    value === "number" ||
+    value === "boolean" ||
+    value === "image" ||
+    value === "video" ||
+    value === "audio" ||
+    value === "raw"
+  ) {
+    return value;
+  }
+  return undefined;
+}
+
+function readBindingDelivery(value: unknown): RunningHubTaskBindingDelivery {
+  if (value === "url" || value === "fileName") return value;
+  return "raw";
+}
+
+function readReferenceIndex(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0) return undefined;
+  return value;
 }

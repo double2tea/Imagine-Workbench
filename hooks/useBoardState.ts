@@ -12,6 +12,7 @@ import {
   DEFAULT_NOTE_NODE_SIZE,
   DEFAULT_PROMPT_NODE_SIZE,
   DEFAULT_REFERENCE_GROUP_NODE_SIZE,
+  DEFAULT_RUNNINGHUB_APP_NODE_SIZE,
   createEmptyBoard,
   getBoardFromDB,
   saveBoardToDB,
@@ -29,6 +30,14 @@ import {
   type BoardReferenceGroupItem,
   type BoardReferenceGroupNode,
   type BoardReferenceRole,
+  type BoardRunningHubAppNode,
+  type BoardRunningHubAppNodeUpdate,
+  type BoardRunningHubBindingDelivery,
+  type BoardRunningHubBindingSource,
+  type BoardRunningHubBindingValueType,
+  type BoardRunningHubNodeInfoBinding,
+  type BoardRunningHubOutputType,
+  type BoardRunningHubTargetType,
   type BoardVideoReferenceMode,
   type BoardPromptNode,
   type BoardSize,
@@ -40,6 +49,7 @@ import {
   type CreateNoteNodeInput,
   type CreatePromptNodeInput,
   type CreateReferenceGroupNodeInput,
+  type CreateRunningHubAppNodeInput,
 } from "@/lib/board";
 import { getImageModelCapabilities, getImageResolutionOptions, getVideoModelCapabilities } from "@/lib/providers/model-catalog";
 import { BOARD_PORT_IDS, filterValidBoardEdges, resolveBoardConnectionKind } from "@/lib/board/ports";
@@ -60,6 +70,7 @@ const BOARD_NODE_KINDS = new Set<BoardNode["kind"]>([
   "note",
   "prompt",
   "reference-group",
+  "runninghub-app",
   "video-generate",
 ]);
 
@@ -93,6 +104,7 @@ export interface BoardStateController {
   addPromptNode: (input?: CreatePromptNodeInput) => string;
   addReferenceGroupNode: (input?: CreateReferenceGroupNodeInput) => string;
   addReferenceGroupNodeWithAsset: (input: CreateReferenceGroupNodeInput, assetNodeId: string) => string;
+  addRunningHubAppNode: (input?: CreateRunningHubAppNodeInput) => string;
   addAssetToReferenceGroup: (assetNodeId: string, groupNodeId: string) => void;
   clearBoard: () => void;
   connectPorts: (from: BoardPortRef, to: BoardPortRef) => void;
@@ -113,6 +125,7 @@ export interface BoardStateController {
   updateNodeSize: (nodeId: string, size: BoardSize) => void;
   updateNoteBody: (nodeId: string, body: string) => void;
   updatePromptNode: (nodeId: string, prompt: string) => void;
+  updateRunningHubAppNode: (nodeId: string, input: BoardRunningHubAppNodeUpdate) => void;
 }
 
 function createBoardId(prefix: string): string {
@@ -144,6 +157,7 @@ function duplicateNodeIdPrefix(kind: BoardNode["kind"]): string {
   if (kind === "reference-group") return "ref_group";
   if (kind === "image-generate") return "image_gen";
   if (kind === "video-generate") return "video_gen";
+  if (kind === "runninghub-app") return "rh_app";
   if (kind === "agent") return "agent";
   return "note";
 }
@@ -159,7 +173,7 @@ function cloneBoardNodeForDuplicate(source: BoardNode, stackIndex: number): Boar
     id: createBoardId(duplicateNodeIdPrefix(source.kind)),
     title: source.title,
     position,
-    size: source.size,
+    size: source.kind === "runninghub-app" ? minimumBoardSize(source.size, DEFAULT_RUNNINGHUB_APP_NODE_SIZE) : source.size,
     createdAt,
     updatedAt: createdAt,
   };
@@ -198,6 +212,18 @@ function cloneBoardNodeForDuplicate(source: BoardNode, stackIndex: number): Boar
         videoPreset: source.videoPreset,
         videoReferenceMode: source.videoReferenceMode,
         videoResolution: source.videoResolution,
+      };
+    case "runninghub-app":
+      return {
+        ...shell,
+        kind: "runninghub-app",
+        accessPassword: source.accessPassword,
+        bindings: structuredClone(source.bindings),
+        outputType: source.outputType,
+        prompt: source.prompt,
+        status: "idle",
+        targetId: source.targetId,
+        targetType: source.targetType,
       };
     case "agent":
       return { ...shell, kind: "agent", instruction: source.instruction };
@@ -323,6 +349,13 @@ function normalizeBoardSize(size: unknown, fallback: BoardSize): BoardSize {
   };
 }
 
+function minimumBoardSize(size: BoardSize, minimum: BoardSize): BoardSize {
+  return {
+    width: Math.max(minimum.width, size.width),
+    height: Math.max(minimum.height, size.height),
+  };
+}
+
 function readFiniteNumber(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
@@ -402,10 +435,11 @@ function defaultVideoParams(model: string, aspectRatio?: string): {
 
 function normalizeBoardNode(node: unknown, index: number): BoardNode | null {
   if (!isRecord(node) || !isBoardNodeKind(node.kind)) return null;
+  const normalizedSize = normalizeBoardSize(node.size, defaultNodeSize(node.kind));
   const shell = {
     id: readNonEmptyString(node.id, `${duplicateNodeIdPrefix(node.kind)}_legacy_${index}`),
     position: normalizeBoardPoint(node.position, index),
-    size: normalizeBoardSize(node.size, defaultNodeSize(node.kind)),
+    size: node.kind === "runninghub-app" ? minimumBoardSize(normalizedSize, DEFAULT_RUNNINGHUB_APP_NODE_SIZE) : normalizedSize,
     title: readNonEmptyString(node.title, defaultNodeTitle(node.kind)),
     createdAt: readNonEmptyString(node.createdAt, nowIso()),
     updatedAt: readNonEmptyString(node.updatedAt, nowIso()),
@@ -484,6 +518,23 @@ function normalizeBoardNode(node: unknown, index: number): BoardNode | null {
       errorMessage: typeof node.errorMessage === "string" ? node.errorMessage : undefined,
     };
   }
+  if (node.kind === "runninghub-app") {
+    return {
+      ...shell,
+      kind: "runninghub-app",
+      accessPassword: readOptionalString(node.accessPassword),
+      bindings: Array.isArray(node.bindings) ? normalizeRunningHubBindings(node.bindings) : defaultRunningHubBindings(),
+      outputType: readRunningHubOutputType(node.outputType),
+      prompt: typeof node.prompt === "string" ? node.prompt : "",
+      resultAssetId: typeof node.resultAssetId === "string" ? node.resultAssetId : undefined,
+      resultAssetIds: readOptionalStringArray(node.resultAssetIds),
+      resultStackKey: readOptionalString(node.resultStackKey),
+      status: normalizeGenerationStatus(node.status),
+      targetId: readOptionalString(node.targetId) ?? "",
+      targetType: readRunningHubTargetType(node.targetType),
+      errorMessage: typeof node.errorMessage === "string" ? node.errorMessage : undefined,
+    };
+  }
   if (node.kind === "agent") {
     return {
       ...shell,
@@ -503,6 +554,7 @@ function defaultNodeSize(kind: BoardNode["kind"]): BoardSize {
   if (kind === "prompt") return DEFAULT_PROMPT_NODE_SIZE;
   if (kind === "reference-group") return DEFAULT_REFERENCE_GROUP_NODE_SIZE;
   if (kind === "image-generate" || kind === "video-generate") return DEFAULT_GENERATE_NODE_SIZE;
+  if (kind === "runninghub-app") return DEFAULT_RUNNINGHUB_APP_NODE_SIZE;
   if (kind === "agent") return DEFAULT_AGENT_NODE_SIZE;
   return DEFAULT_NOTE_NODE_SIZE;
 }
@@ -513,8 +565,68 @@ function defaultNodeTitle(kind: BoardNode["kind"]): string {
   if (kind === "reference-group") return "Reference Group";
   if (kind === "image-generate") return "Image Generate";
   if (kind === "video-generate") return "Video Generate";
+  if (kind === "runninghub-app") return "RunningHub App";
   if (kind === "agent") return "Agent";
   return "Note";
+}
+
+function defaultRunningHubBindings(): BoardRunningHubNodeInfoBinding[] {
+  return [];
+}
+
+function readRunningHubTargetType(value: unknown): BoardRunningHubTargetType {
+  return value === "workflow" ? "workflow" : "ai-app";
+}
+
+function readRunningHubOutputType(value: unknown): BoardRunningHubOutputType {
+  return value === "video" ? "video" : "image";
+}
+
+function readRunningHubBindingSource(value: unknown): BoardRunningHubBindingSource {
+  if (value === "prompt" || value === "reference" || value === "randomSeed") return value;
+  return "literal";
+}
+
+function readRunningHubBindingDelivery(value: unknown): BoardRunningHubBindingDelivery {
+  if (value === "url" || value === "fileName") return value;
+  return "raw";
+}
+
+function readRunningHubBindingValueType(value: unknown): BoardRunningHubBindingValueType | undefined {
+  if (
+    value === "text" ||
+    value === "number" ||
+    value === "boolean" ||
+    value === "image" ||
+    value === "video" ||
+    value === "audio" ||
+    value === "raw"
+  ) {
+    return value;
+  }
+  return undefined;
+}
+
+function normalizeRunningHubBindings(bindings: unknown[]): BoardRunningHubNodeInfoBinding[] {
+  const normalized = bindings
+    .filter(isRecord)
+    .map((binding): BoardRunningHubNodeInfoBinding => ({
+      id: readNonEmptyString(binding.id, createBoardId("rh_bind")),
+      nodeId: readOptionalString(binding.nodeId) ?? "",
+      fieldName: readOptionalString(binding.fieldName) ?? "",
+      label: readOptionalString(binding.label),
+      source: readRunningHubBindingSource(binding.source),
+      value: readOptionalString(binding.value) ?? "",
+      valueType: readRunningHubBindingValueType(binding.valueType),
+      enabled: typeof binding.enabled === "boolean" ? binding.enabled : true,
+      required: typeof binding.required === "boolean" ? binding.required : undefined,
+      referenceIndex: typeof binding.referenceIndex === "number" && Number.isInteger(binding.referenceIndex) && binding.referenceIndex >= 0
+        ? binding.referenceIndex
+        : undefined,
+      referenceType: binding.referenceType === "video" || binding.referenceType === "audio" ? binding.referenceType : "image",
+      deliveryMode: readRunningHubBindingDelivery(binding.deliveryMode),
+    }));
+  return normalized;
 }
 
 function normalizeImageModel(value: unknown): string {
@@ -654,6 +766,26 @@ function createGenerateBoardNode(input: CreateGenerateNodeInput, nodes: BoardNod
   };
 }
 
+function createRunningHubAppBoardNode(input: CreateRunningHubAppNodeInput, nodes: BoardNode[]): BoardRunningHubAppNode {
+  const createdAt = nowIso();
+  return {
+    id: createBoardId("rh_app"),
+    kind: "runninghub-app",
+    title: input.title ?? "RunningHub App",
+    targetType: input.targetType ?? "ai-app",
+    outputType: input.outputType ?? "image",
+    targetId: input.targetId ?? "",
+    accessPassword: input.accessPassword,
+    prompt: input.prompt ?? "",
+    bindings: input.bindings ?? defaultRunningHubBindings(),
+    status: "idle",
+    position: input.position ?? moveDefaultPosition(nodes),
+    size: input.size ?? DEFAULT_RUNNINGHUB_APP_NODE_SIZE,
+    createdAt,
+    updatedAt: createdAt,
+  };
+}
+
 function moveDefaultPosition(nodes: BoardNode[]): BoardPoint {
   return {
     x: DEFAULT_NODE_POSITION.x + nodes.length * 36,
@@ -722,6 +854,21 @@ function sameGenerateUpdate(node: BoardImageGenerateNode | BoardVideoGenerateNod
     if ("videoResolution" in input && node.videoResolution !== input.videoResolution) return false;
   }
 
+  return true;
+}
+
+function sameRunningHubAppUpdate(node: BoardRunningHubAppNode, input: BoardRunningHubAppNodeUpdate): boolean {
+  if ("accessPassword" in input && node.accessPassword !== input.accessPassword) return false;
+  if ("bindings" in input && JSON.stringify(node.bindings) !== JSON.stringify(input.bindings ?? [])) return false;
+  if ("errorMessage" in input && node.errorMessage !== input.errorMessage) return false;
+  if ("outputType" in input && node.outputType !== input.outputType) return false;
+  if ("prompt" in input && node.prompt !== input.prompt) return false;
+  if ("resultAssetId" in input && node.resultAssetId !== input.resultAssetId) return false;
+  if ("resultAssetIds" in input && !sameStringList(node.resultAssetIds ?? [], input.resultAssetIds ?? [])) return false;
+  if ("resultStackKey" in input && node.resultStackKey !== input.resultStackKey) return false;
+  if ("status" in input && node.status !== input.status) return false;
+  if ("targetId" in input && node.targetId !== input.targetId) return false;
+  if ("targetType" in input && node.targetType !== input.targetType) return false;
   return true;
 }
 
@@ -989,6 +1136,14 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
 
   const addGenerateNode = useCallback((input: CreateGenerateNodeInput): string => {
     const node = createGenerateBoardNode(input, board.nodes);
+    mutateBoard(currentBoard => touchBoard(currentBoard, [...currentBoard.nodes, node]));
+    setSelectedNodeId(node.id);
+    setSelectedEdgeId(null);
+    return node.id;
+  }, [board.nodes, mutateBoard]);
+
+  const addRunningHubAppNode = useCallback((input: CreateRunningHubAppNodeInput = {}): string => {
+    const node = createRunningHubAppBoardNode(input, board.nodes);
     mutateBoard(currentBoard => touchBoard(currentBoard, [...currentBoard.nodes, node]));
     setSelectedNodeId(node.id);
     setSelectedEdgeId(null);
@@ -1444,6 +1599,28 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     );
   }, [mutateBoard]);
 
+  const updateRunningHubAppNode = useCallback((nodeId: string, input: BoardRunningHubAppNodeUpdate) => {
+    const updatedAt = nowIso();
+    mutateBoard(
+      currentBoard => {
+        let didChange = false;
+        const nextNodes = currentBoard.nodes.map(node =>
+          node.id === nodeId && node.kind === "runninghub-app"
+            ? sameRunningHubAppUpdate(node, input)
+              ? node
+              : (() => {
+                didChange = true;
+                return { ...node, ...input, updatedAt };
+              })()
+            : node
+        );
+        if (!didChange) return currentBoard;
+        return touchBoard(currentBoard, nextNodes, filterValidBoardEdges(nextNodes, currentBoard.edges));
+      },
+      { skipUndo: true },
+    );
+  }, [mutateBoard]);
+
   const updateAgentInstruction = useCallback((nodeId: string, instruction: string) => {
     const updatedAt = nowIso();
     mutateBoard(
@@ -1493,6 +1670,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       addPromptNode,
       addReferenceGroupNode,
       addReferenceGroupNodeWithAsset,
+      addRunningHubAppNode,
       addAssetToReferenceGroup,
       clearBoard,
       connectPorts,
@@ -1513,6 +1691,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       updateNodeSize,
       updateNoteBody,
       updatePromptNode,
+      updateRunningHubAppNode,
     }),
     [
       addAgentNode,
@@ -1524,6 +1703,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       addPromptNode,
       addReferenceGroupNode,
       addReferenceGroupNodeWithAsset,
+      addRunningHubAppNode,
       addAssetToReferenceGroup,
       beginUndoGesture,
       endUndoGesture,
@@ -1560,6 +1740,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       undo,
       updateNoteBody,
       updatePromptNode,
+      updateRunningHubAppNode,
     ],
   );
 }

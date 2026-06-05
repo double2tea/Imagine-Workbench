@@ -1,4 +1,4 @@
-export type BoardNodeKind = "asset" | "prompt" | "reference-group" | "image-generate" | "video-generate" | "agent" | "note";
+export type BoardNodeKind = "asset" | "prompt" | "reference-group" | "image-generate" | "video-generate" | "runninghub-app" | "agent" | "note";
 export type BoardAssetType = "image" | "video" | "audio";
 export type BoardEdgeKind = "reference" | "prompt" | "result" | "agent-context";
 export type BoardPortKind = "asset" | "prompt" | "result" | "agent";
@@ -7,6 +7,17 @@ export type BoardGenerationStatus = "idle" | "processing" | "complete" | "failed
 export type BoardGenerateVariantCount = 1 | 2 | 4;
 export type BoardReferenceRole = "general" | "start" | "end";
 export type BoardVideoReferenceMode = "reference" | "firstLast";
+export type BoardRunningHubTargetType = "ai-app" | "workflow";
+export type BoardRunningHubOutputType = "image" | "video";
+export type BoardRunningHubBindingSource = "literal" | "prompt" | "reference" | "randomSeed";
+export type BoardRunningHubBindingDelivery = "raw" | "url" | "fileName";
+export type BoardRunningHubBindingValueType = "text" | "number" | "boolean" | "image" | "video" | "audio" | "raw";
+
+export interface BoardRunningHubBindingOption {
+  label: string;
+  value: string;
+  description?: string;
+}
 
 export interface BoardPoint {
   x: number;
@@ -112,6 +123,41 @@ export interface BoardVideoGenerateNode extends BoardNodeBase {
   errorMessage?: string;
 }
 
+export interface BoardRunningHubNodeInfoBinding {
+  id: string;
+  nodeId: string;
+  nodeName?: string;
+  fieldName: string;
+  fieldData?: string;
+  description?: string;
+  descriptionEn?: string;
+  label?: string;
+  source: BoardRunningHubBindingSource;
+  value: string;
+  valueType?: BoardRunningHubBindingValueType;
+  options?: BoardRunningHubBindingOption[];
+  enabled?: boolean;
+  required?: boolean;
+  referenceIndex?: number;
+  referenceType?: BoardAssetType;
+  deliveryMode: BoardRunningHubBindingDelivery;
+}
+
+export interface BoardRunningHubAppNode extends BoardNodeBase {
+  kind: "runninghub-app";
+  targetType: BoardRunningHubTargetType;
+  outputType: BoardRunningHubOutputType;
+  targetId: string;
+  accessPassword?: string;
+  prompt: string;
+  bindings: BoardRunningHubNodeInfoBinding[];
+  status: BoardGenerationStatus;
+  resultAssetId?: string;
+  resultAssetIds?: string[];
+  resultStackKey?: string;
+  errorMessage?: string;
+}
+
 export interface BoardAgentNode extends BoardNodeBase {
   kind: "agent";
   instruction: string;
@@ -128,10 +174,12 @@ export type BoardNode =
   | BoardReferenceGroupNode
   | BoardImageGenerateNode
   | BoardVideoGenerateNode
+  | BoardRunningHubAppNode
   | BoardAgentNode
   | BoardNoteNode;
 
 export type BoardGenerateNode = BoardImageGenerateNode | BoardVideoGenerateNode;
+export type BoardExecutableNode = BoardGenerateNode | BoardRunningHubAppNode;
 
 export type BoardGenerateNodeUpdate = Partial<{
   aspectRatio: string;
@@ -151,6 +199,20 @@ export type BoardGenerateNodeUpdate = Partial<{
   videoPreset: string;
   videoReferenceMode: BoardVideoReferenceMode;
   videoResolution: string;
+}>;
+
+export type BoardRunningHubAppNodeUpdate = Partial<{
+  accessPassword: string;
+  bindings: BoardRunningHubNodeInfoBinding[];
+  errorMessage: string;
+  outputType: BoardRunningHubOutputType;
+  prompt: string;
+  resultAssetId: string;
+  resultAssetIds: string[];
+  resultStackKey: string;
+  status: BoardGenerationStatus;
+  targetId: string;
+  targetType: BoardRunningHubTargetType;
 }>;
 
 export interface BoardPortRef {
@@ -229,6 +291,18 @@ export interface CreateAgentNodeInput {
   instruction?: string;
   position?: BoardPoint;
   size?: BoardSize;
+  title?: string;
+}
+
+export interface CreateRunningHubAppNodeInput {
+  accessPassword?: string;
+  bindings?: BoardRunningHubNodeInfoBinding[];
+  outputType?: BoardRunningHubOutputType;
+  position?: BoardPoint;
+  prompt?: string;
+  size?: BoardSize;
+  targetId?: string;
+  targetType?: BoardRunningHubTargetType;
   title?: string;
 }
 

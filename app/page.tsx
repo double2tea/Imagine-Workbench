@@ -1209,6 +1209,10 @@ export default function Home() {
                 disabled={!prompt.trim()}
                 isSubmitting={traditionalSubTab === "image" ? isSubmittingImage : isSubmittingVideo}
                 submitCount={traditionalSubTab === "image" ? imageSubmitCount : videoSubmitCount}
+                priceProvider={traditionalSubTab === "image" ? selectedModel.split(":")[0] : selectedVideoModel.split(":")[0]}
+                priceModelId={traditionalSubTab === "image" ? selectedModel : selectedVideoModel}
+                priceDuration={traditionalSubTab === "video" ? activeVideoDuration ?? videoDuration : undefined}
+                priceResolution={traditionalSubTab === "image" ? activeImageResolution : undefined}
                 onGenerate={traditionalSubTab === "image" ? generateManualImage : generateManualVideo}
               />
             </div>

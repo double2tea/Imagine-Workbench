@@ -1400,8 +1400,9 @@ function runningHubVirtualCapability(model: string, kind?: ModelKind): ProviderM
       supportsReferences: true,
       sizes: RUNNINGHUB_VIDEO_SIZES,
       videoReferenceMode: "reference",
-      maxReferenceImages: 4,
+      maxReferenceImages: 9,
       minReferenceImages: 0,
+      referenceMediaTypes: ["image", "video", "audio"],
     });
   }
   if (resolvedKind === "image") {
@@ -1412,6 +1413,7 @@ function runningHubVirtualCapability(model: string, kind?: ModelKind): ProviderM
       model,
       supportsAsync: false,
       supportsReferences: true,
+      maxReferenceImages: 9,
       sizes: RUNNINGHUB_IMAGE_SIZES,
     });
   }

@@ -1,4 +1,5 @@
 "use client";
+import ModelPriceBadge from "@/components/creation/ModelPriceBadge";
 
 import type { ReactNode } from "react";
 import {
@@ -30,6 +31,8 @@ import type {
   BoardImageGenerateNode,
   BoardNode,
   BoardPortRef,
+  BoardRunningHubAppNode,
+  BoardRunningHubAppNodeUpdate,
   BoardVideoReferenceMode,
   BoardVideoGenerateNode,
 } from "@/lib/board";
@@ -54,6 +57,7 @@ interface BoardInspectorProps {
   onSendAssetToAgent: () => void;
   onSyncAssetReference: () => void;
   onUpdateGenerate: (nodeId: string, input: BoardGenerateNodeUpdate) => void;
+  onUpdateRunningHubApp: (nodeId: string, input: BoardRunningHubAppNodeUpdate) => void;
 }
 
 const DEFAULT_CUSTOM_IMAGE_RESOLUTION = "2560x1440";
@@ -77,6 +81,7 @@ const nodeKindLabels: Record<BoardNode["kind"], string> = {
   note: "备注",
   prompt: "Prompt",
   "reference-group": "参考组",
+  "runninghub-app": "RunningHub 应用",
   "video-generate": "视频生成",
 };
 
@@ -87,6 +92,10 @@ const videoReferenceModeLabels: Record<BoardVideoReferenceMode, string> = {
 
 function isGenerateNode(node: BoardNode | undefined): node is BoardGenerateNode {
   return node?.kind === "image-generate" || node?.kind === "video-generate";
+}
+
+function isExecutableNode(node: BoardNode | undefined): node is BoardGenerateNode | BoardRunningHubAppNode {
+  return isGenerateNode(node) || node?.kind === "runninghub-app";
 }
 
 function truncateText(value: string, maxLength: number): string {
@@ -441,6 +450,7 @@ function ImageGenerateInspector({
       <button type="button" onClick={() => onExecuteGenerate(node.id)} disabled={isProcessing} className={`imagine-primary-action flex !h-9 min-h-0 w-full items-center justify-center gap-2 !rounded-lg text-xs font-semibold transition ${isProcessing ? "bg-[var(--iw-panel-soft)] text-[var(--iw-faint)]" : "bg-blue-600 text-white hover:bg-blue-500"}`}>
         {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
         执行图片节点
+          {!isProcessing && <ModelPriceBadge provider={node.model.split(":")[0]} modelId={node.model} resolution={node.imageResolution === "custom" ? node.customImageResolution : node.imageResolution} />}
       </button>
     </div>
   );
@@ -547,6 +557,58 @@ function VideoGenerateInspector({
       <button type="button" onClick={() => onExecuteGenerate(node.id)} disabled={isProcessing} className={`imagine-primary-action flex !h-9 min-h-0 w-full items-center justify-center gap-2 !rounded-lg text-xs font-semibold transition ${isProcessing ? "bg-[var(--iw-panel-soft)] text-[var(--iw-faint)]" : "bg-blue-600 text-white hover:bg-blue-500"}`}>
         {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
         执行视频节点
+          {!isProcessing && <ModelPriceBadge provider={node.model.split(":")[0]} modelId={node.model} duration={node.videoDuration} />}
+      </button>
+    </div>
+  );
+}
+
+function RunningHubAppInspector({
+  node,
+  onExecuteGenerate,
+  onFocusNode,
+  onUpdateRunningHubApp,
+}: {
+  node: BoardRunningHubAppNode;
+  onExecuteGenerate: (nodeId: string) => void;
+  onFocusNode: (nodeId: string) => void;
+  onUpdateRunningHubApp: (nodeId: string, input: BoardRunningHubAppNodeUpdate) => void;
+}) {
+  const isProcessing = node.status === "processing";
+  return (
+    <div className="space-y-3">
+      <p className={infoChipClass}>
+        {node.targetType === "workflow" ? "Workflow" : "AI App"} / {node.outputType === "video" ? "视频" : "图片"} / {node.bindings.length} 参数
+      </p>
+      <InspectorFocusButton nodeId={node.id} onFocusNode={onFocusNode} />
+      <details className="imagine-panel-disclosure" open>
+        <summary className="imagine-panel-disclosure-summary">RunningHub 目标</summary>
+        <div className="imagine-panel-disclosure-body">
+          <div className="grid grid-cols-2 gap-2">
+            <InspectorField title="类型">
+              <select value={node.targetType} onChange={event => onUpdateRunningHubApp(node.id, { targetType: event.target.value === "workflow" ? "workflow" : "ai-app" })} className={inputClass}>
+                <option value="ai-app">AI App</option>
+                <option value="workflow">Workflow</option>
+              </select>
+            </InspectorField>
+            <InspectorField title="输出">
+              <select value={node.outputType} onChange={event => onUpdateRunningHubApp(node.id, { outputType: event.target.value === "video" ? "video" : "image" })} className={inputClass}>
+                <option value="image">图片</option>
+                <option value="video">视频</option>
+              </select>
+            </InspectorField>
+          </div>
+          <InspectorField title={node.targetType === "workflow" ? "workflowId" : "webappId"}>
+            <input value={node.targetId} onChange={event => onUpdateRunningHubApp(node.id, { targetId: event.target.value })} className={monoInputClass} />
+          </InspectorField>
+          <InspectorField title="访问密码">
+            <input value={node.accessPassword ?? ""} onChange={event => onUpdateRunningHubApp(node.id, { accessPassword: event.target.value })} className={monoInputClass} />
+          </InspectorField>
+        </div>
+      </details>
+      <button type="button" onClick={() => onExecuteGenerate(node.id)} disabled={isProcessing} className={`imagine-primary-action flex !h-9 min-h-0 w-full items-center justify-center gap-2 !rounded-lg text-xs font-semibold transition ${isProcessing ? "bg-[var(--iw-panel-soft)] text-[var(--iw-faint)]" : "bg-emerald-600 text-white hover:bg-emerald-500"}`}>
+        {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+        执行 RunningHub 应用
       </button>
     </div>
   );
@@ -572,6 +634,7 @@ export default function BoardInspector({
   onSendAssetToAgent,
   onSyncAssetReference,
   onUpdateGenerate,
+  onUpdateRunningHubApp,
 }: BoardInspectorProps) {
   const headerTitle = edge ? "连线" : node?.title ?? "检查器";
 
@@ -585,7 +648,7 @@ export default function BoardInspector({
               {edgeKindLabels[edge.kind]}
             </p>
           ) : node ? (
-            <p className="imagine-status-chip mt-1 inline-block font-mono text-[10px]" data-status={isGenerateNode(node) ? node.status : "complete"}>
+            <p className="imagine-status-chip mt-1 inline-block font-mono text-[10px]" data-status={isExecutableNode(node) ? node.status : "complete"}>
               {nodeKindLabels[node.kind]}
             </p>
           ) : (
@@ -654,7 +717,10 @@ export default function BoardInspector({
           {node.kind === "video-generate" && (
             <VideoGenerateInspector node={node} onExecuteGenerate={onExecuteGenerate} onFocusNode={onFocusNode} onUpdateGenerate={onUpdateGenerate} videoModelGroups={videoModelGroups} />
           )}
-          {isGenerateNode(node) && node.status === "failed" && node.errorMessage && (
+          {node.kind === "runninghub-app" && (
+            <RunningHubAppInspector node={node} onExecuteGenerate={onExecuteGenerate} onFocusNode={onFocusNode} onUpdateRunningHubApp={onUpdateRunningHubApp} />
+          )}
+          {isExecutableNode(node) && node.status === "failed" && node.errorMessage && (
             <p className="rounded-md border border-red-400/30 bg-red-500/10 px-2 py-1.5 text-[10px] text-red-200">{node.errorMessage}</p>
           )}
         </div>

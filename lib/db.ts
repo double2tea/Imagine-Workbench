@@ -4,6 +4,7 @@ import {
   type MediaReferenceRole,
   type MediaReferenceType,
 } from "./media-references";
+import type { RunningHubTaskNodeBinding } from "./providers/types";
 
 const DB_NAME = "ImagineWorkbenchDB";
 const DB_VERSION = 2;
@@ -31,6 +32,8 @@ export interface GenerationRequestSnapshot {
   videoPreset?: string;
   videoReferenceMode?: "reference" | "firstLast";
   videoResolution?: string;
+  runningHubAccessPassword?: string;
+  runningHubNodeInfoList?: RunningHubTaskNodeBinding[];
   referenceMedia?: GenerationReferenceMediaSnapshot[];
   /** @deprecated Use referenceMedia. Kept only for reading pre-migration assets. */
   referenceImages?: string[];

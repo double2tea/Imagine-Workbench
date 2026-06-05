@@ -21,6 +21,24 @@ export interface ReferenceMedia extends ReferenceImage {
   type: MediaReferenceType;
 }
 
+export type RunningHubTaskBindingSource = "literal" | "prompt" | "reference" | "randomSeed";
+export type RunningHubTaskBindingDelivery = "raw" | "url" | "fileName";
+export type RunningHubTaskBindingValueType = "text" | "number" | "boolean" | "image" | "video" | "audio" | "raw";
+
+export interface RunningHubTaskNodeBinding {
+  nodeId: string;
+  fieldName: string;
+  label?: string;
+  source: RunningHubTaskBindingSource;
+  value?: string;
+  valueType?: RunningHubTaskBindingValueType;
+  enabled?: boolean;
+  required?: boolean;
+  referenceIndex?: number;
+  referenceType?: MediaReferenceType;
+  deliveryMode: RunningHubTaskBindingDelivery;
+}
+
 export interface GenerateImageInput {
   prompt: string;
   model: string;
@@ -30,6 +48,8 @@ export interface GenerateImageInput {
   thinkingLevel?: string;
   referenceImages: ReferenceImage[];
   async: boolean;
+  runningHubAccessPassword?: string;
+  runningHubNodeInfoList?: RunningHubTaskNodeBinding[];
 }
 
 export interface GenerateImageResult {
@@ -47,6 +67,8 @@ export interface GenerateVideoInput {
   referenceMode?: VideoReferenceMode;
   resolutionName?: string;
   referenceMedia: ReferenceMedia[];
+  runningHubAccessPassword?: string;
+  runningHubNodeInfoList?: RunningHubTaskNodeBinding[];
 }
 
 export interface GenerateVideoResult {

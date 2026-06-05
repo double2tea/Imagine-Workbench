@@ -71,6 +71,7 @@ import {
   DEFAULT_ASSET_NODE_SIZE,
   DEFAULT_GENERATE_NODE_SIZE,
   DEFAULT_REFERENCE_GROUP_NODE_SIZE,
+  DEFAULT_RUNNINGHUB_APP_NODE_SIZE,
   snapBoardPoint,
   type BoardEdge,
   type BoardEdgeKind,
@@ -78,6 +79,7 @@ import {
   type BoardPoint,
   type BoardPortKind,
   type BoardPortRef,
+  type BoardRunningHubNodeInfoBinding,
   type BoardSize,
   type BoardSummary,
   type BoardViewport,
@@ -99,6 +101,7 @@ interface BoardWorkspaceProps {
   onCancelGenerateNode: (nodeId: string) => void;
   onEditAssetImage: (nodeId: string) => void;
   onExecuteGenerateNode: (nodeId: string) => void;
+  onFetchRunningHubAppSchema: (webappId: string) => Promise<BoardRunningHubNodeInfoBinding[]>;
   onImportBoardFiles: (files: File[], position: BoardPoint) => void | Promise<void>;
   onCreateBoard: () => void;
   onDeleteBoard: () => void;
@@ -210,7 +213,7 @@ function findPromptReferenceTargetNodeId(
 ): string | null {
   const node = nodes.find(item => item.id === nodeId);
   if (!node) return null;
-  if (node.kind === "image-generate" || node.kind === "video-generate") return node.id;
+  if (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app") return node.id;
   if (node.kind !== "prompt") return null;
 
   const targetGenerateIds = Array.from(new Set(
@@ -603,7 +606,7 @@ function edgeColor(kind: BoardEdge["kind"]): string {
 }
 
 function generateInputSummaryForNode(node: BoardNodeModel, nodes: BoardNodeModel[], edges: BoardEdge[]): BoardGenerateInputSummary | undefined {
-  if (node.kind !== "image-generate" && node.kind !== "video-generate") return undefined;
+  if (node.kind !== "image-generate" && node.kind !== "video-generate" && node.kind !== "runninghub-app") return undefined;
 
   const promptEdge = edges.find(edge => edge.to.nodeId === node.id && edge.to.portId === "prompt-in");
   const promptNode = promptEdge ? nodes.find(item => item.id === promptEdge.from.nodeId) : undefined;
@@ -629,7 +632,7 @@ function isActiveGenerateTask(item: StorageItem): item is StorageItem & { status
 
 function isCurrentGenerateStackItem(item: StorageItem, node: BoardNodeModel): boolean {
   return (
-    (node.kind === "image-generate" || node.kind === "video-generate") &&
+    (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app") &&
     item.sourceBoardNodeId === node.id &&
     (!node.resultStackKey || item.sourceBoardResultStackKey === node.resultStackKey)
   );
@@ -648,7 +651,7 @@ function activeGenerateTaskForNode(items: StorageItem[], node: BoardNodeModel): 
 }
 
 function resultItemsForGenerateNode(node: BoardNodeModel, items: StorageItem[]): StorageItem[] {
-  if (node.kind !== "image-generate" && node.kind !== "video-generate") return [];
+  if (node.kind !== "image-generate" && node.kind !== "video-generate" && node.kind !== "runninghub-app") return [];
   const ids = node.resultAssetIds ?? (node.resultAssetId ? [node.resultAssetId] : []);
   const byId = new Map(items.map(item => [item.id, item]));
   return ids
@@ -679,6 +682,7 @@ export default function BoardWorkspace({
   onWorkspaceNotice,
   onEditAssetImage,
   onExecuteGenerateNode,
+  onFetchRunningHubAppSchema,
   onImportBoardFiles,
   onCreateBoard,
   onDeleteBoard,
@@ -759,6 +763,7 @@ export default function BoardWorkspace({
     addPromptNode,
     addReferenceGroupNode,
     addReferenceGroupNodeWithAsset,
+    addRunningHubAppNode,
     clearBoard,
     connectPorts,
     deleteEdge,
@@ -772,6 +777,7 @@ export default function BoardWorkspace({
     updateReferenceGroupItemRole,
     updateAgentInstruction,
     updateGenerateNode,
+    updateRunningHubAppNode,
     updateNodesPositions,
     updateNoteBody,
     updatePromptNode,
@@ -873,7 +879,7 @@ export default function BoardWorkspace({
           node,
           resultItems: resultItemsForGenerateNode(node, galleryItems),
         generateReferences:
-          node.kind === "image-generate" || node.kind === "video-generate"
+          node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app"
             ? buildBoardPromptReferences({
               nodes: board.nodes,
               edges: board.edges,
@@ -906,17 +912,26 @@ export default function BoardWorkspace({
         onDelete: trashAndDeleteNode,
         onEditAssetImage,
         onExecuteGenerate: onExecuteGenerateNode,
+        onFetchRunningHubAppSchema,
         onOpenFullscreen,
         onMoveReferenceGroupItem: moveReferenceGroupItem,
         onRemoveReferenceGroupItem: removeReferenceGroupItem,
           onSendAgent: onSendAgentNode,
           onSendAssetToAgent,
-          onSelectGenerateResult: (nodeId: string, assetId: string) => updateGenerateNode(nodeId, { resultAssetId: assetId }),
+          onSelectGenerateResult: (nodeId: string, assetId: string) => {
+            const sourceNode = board.nodes.find(node => node.id === nodeId);
+            if (sourceNode?.kind === "runninghub-app") {
+              updateRunningHubAppNode(nodeId, { resultAssetId: assetId });
+              return;
+            }
+            updateGenerateNode(nodeId, { resultAssetId: assetId });
+          },
           onSelectPromptReference: connectSelectedBoardPromptReference,
         onSetAssetAsReference,
         onUpdateReferenceGroupItemRole: updateReferenceGroupItemRole,
         onUpdateAgent: updateAgentInstruction,
         onUpdateGenerate: updateGenerateNode,
+        onUpdateRunningHubApp: updateRunningHubAppNode,
         onUpdateNote: updateNoteBody,
         onUpdatePrompt: updatePromptNode,
       });
@@ -932,6 +947,7 @@ export default function BoardWorkspace({
     onCaptureVideoFrame,
     onEditAssetImage,
     onExecuteGenerateNode,
+    onFetchRunningHubAppSchema,
     onOpenFullscreen,
     moveReferenceGroupItem,
     removeReferenceGroupItem,
@@ -945,12 +961,13 @@ export default function BoardWorkspace({
     updateGenerateNode,
     updateNoteBody,
     updatePromptNode,
+    updateRunningHubAppNode,
   ]);
 
   const generateTaskByNodeId = useMemo(() => {
     const map = new Map<string, BoardGenerateTaskSummary>();
     for (const node of board.nodes) {
-      if (node.kind !== "image-generate" && node.kind !== "video-generate") continue;
+      if (node.kind !== "image-generate" && node.kind !== "video-generate" && node.kind !== "runninghub-app") continue;
       const task = activeGenerateTaskForNode(galleryItems, node);
       if (task) map.set(node.id, task);
     }
@@ -973,7 +990,7 @@ export default function BoardWorkspace({
             ...cachedData,
             node,
             generateTaskSummary:
-              node.kind === "image-generate" || node.kind === "video-generate"
+              node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app"
                 ? generateTaskByNodeId.get(node.id)
                 : undefined,
           },
@@ -1071,7 +1088,7 @@ export default function BoardWorkspace({
   };
 
   const handleNodeDoubleClick: NodeMouseHandler<BoardFlowNode> = (_event, node) => {
-    if (node.data.node.kind === "image-generate" || node.data.node.kind === "video-generate") {
+    if (node.data.node.kind === "image-generate" || node.data.node.kind === "video-generate" || node.data.node.kind === "runninghub-app") {
       onExecuteGenerateNode(node.id);
     }
   };
@@ -1206,6 +1223,7 @@ export default function BoardWorkspace({
     if (kind === "reference-group") return addReferenceGroupNode({ position });
     if (kind === "agent") return addAgentNode({ position });
     if (kind === "note") return addNoteNode({ position });
+    if (kind === "runninghub-app") return addRunningHubAppNode({ position });
     if (kind === "video-generate") {
       return addGenerateNode({ kind: "video-generate", model: DEFAULT_VIDEO_MODEL, aspectRatio: "auto", position });
     }
@@ -1216,7 +1234,7 @@ export default function BoardWorkspace({
       imageResolution: "1024x1024",
       position,
     });
-  }, [addAgentNode, addGenerateNode, addNoteNode, addPromptNode, addReferenceGroupNode]);
+  }, [addAgentNode, addGenerateNode, addNoteNode, addPromptNode, addReferenceGroupNode, addRunningHubAppNode]);
 
   const addQuickNodeAtPoint = useCallback((kind: BoardInsertKind, point: BoardPoint): void => {
     const item = BOARD_INSERT_CATALOG.find(current => current.kind === kind);
@@ -1257,25 +1275,35 @@ export default function BoardWorkspace({
       setQuickInsertMenu(null);
       return;
     }
-  }, [addGenerateNodeWithConnection, addReferenceGroupNodeWithAsset, board.nodes, centeredNodePosition]);
+    if (kind === "runninghub-app") {
+      const nodeId = addRunningHubAppNode({ position: centeredNodePosition(point, DEFAULT_RUNNINGHUB_APP_NODE_SIZE) });
+      connectPorts(from, {
+        nodeId,
+        portId: from.portKind === "prompt" ? BOARD_PORT_IDS.promptIn : BOARD_PORT_IDS.referenceIn,
+        portKind: from.portKind === "prompt" ? "prompt" : "asset",
+      });
+      setQuickInsertMenu(null);
+    }
+  }, [addGenerateNodeWithConnection, addReferenceGroupNodeWithAsset, addRunningHubAppNode, board.nodes, centeredNodePosition, connectPorts]);
 
   const quickInsertMenuItems = useMemo(() => {
     const from = quickInsertMenu?.connectionFrom;
     if (!from) return [BOARD_QUICK_INSERT_IMPORT_ITEM, ...BOARD_INSERT_CATALOG];
     const sourceNode = board.nodes.find(node => node.id === from.nodeId);
     if (from.portKind === "prompt") {
-      return BOARD_INSERT_CATALOG.filter(item => item.kind === "image-generate" || item.kind === "video-generate");
+      return BOARD_INSERT_CATALOG.filter(item => item.kind === "image-generate" || item.kind === "video-generate" || item.kind === "runninghub-app");
     }
     if (from.portKind !== "asset") return [];
     if (sourceNode?.kind === "asset") {
       return BOARD_INSERT_CATALOG.filter(item =>
         item.kind === "image-generate" ||
         item.kind === "video-generate" ||
-        item.kind === "reference-group",
+        item.kind === "reference-group" ||
+        item.kind === "runninghub-app",
       );
     }
     if (sourceNode?.kind === "reference-group") {
-      return BOARD_INSERT_CATALOG.filter(item => item.kind === "image-generate" || item.kind === "video-generate");
+      return BOARD_INSERT_CATALOG.filter(item => item.kind === "image-generate" || item.kind === "video-generate" || item.kind === "runninghub-app");
     }
     return [];
   }, [board.nodes, quickInsertMenu?.connectionFrom]);
@@ -1345,6 +1373,21 @@ export default function BoardWorkspace({
       rememberPastedPosition();
       return;
     }
+    if (node.kind === "runninghub-app") {
+      addRunningHubAppNode({
+        accessPassword: node.accessPassword,
+        bindings: node.bindings,
+        outputType: node.outputType,
+        position,
+        prompt: node.prompt,
+        size: node.size,
+        targetId: node.targetId,
+        targetType: node.targetType,
+        title: node.title,
+      });
+      rememberPastedPosition();
+      return;
+    }
     if (node.kind === "agent") {
       addAgentNode({ instruction: node.instruction, position, size: node.size, title: node.title });
       rememberPastedPosition();
@@ -1352,7 +1395,7 @@ export default function BoardWorkspace({
     }
     addNoteNode({ body: node.body, position, size: node.size, title: node.title });
     rememberPastedPosition();
-  }, [addAgentNode, addAssetNode, addGenerateNode, addNoteNode, addPromptNode, addReferenceGroupNode]);
+  }, [addAgentNode, addAssetNode, addGenerateNode, addNoteNode, addPromptNode, addReferenceGroupNode, addRunningHubAppNode]);
 
   const handleConnectEnd = useCallback<OnConnectEnd>((event, connectionState) => {
     if (connectionState.isValid || !connectionState.fromNode || !connectionState.fromHandle) return;
@@ -1404,7 +1447,7 @@ export default function BoardWorkspace({
     }
     if (sourceKind === "result") {
       const sourceNode = board.nodes.find(node => node.id === sourceNodeId);
-      if (sourceNode?.kind !== "image-generate" && sourceNode?.kind !== "video-generate") return;
+      if (sourceNode?.kind !== "image-generate" && sourceNode?.kind !== "video-generate" && sourceNode?.kind !== "runninghub-app") return;
       if (!sourceNode.resultAssetId) {
         onConnectionError("生成结果尚未就绪");
         return;
@@ -1785,7 +1828,7 @@ export default function BoardWorkspace({
                 onEditAssetImage(node.id);
                 closeOverlayMenus();
               } : undefined,
-              onExecute: node.kind === "image-generate" || node.kind === "video-generate"
+              onExecute: node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app"
                 ? () => {
                   onExecuteGenerateNode(node.id);
                   closeOverlayMenus();
