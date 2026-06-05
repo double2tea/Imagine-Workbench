@@ -1,7 +1,7 @@
 "use client";
 
 import { Upload } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import {
   BaseEdge,
   Background,
@@ -411,7 +411,7 @@ function boardIntendedSelectionSnapshot(
   return { edgeId: null, nodeId: nodeIds[0] ?? null, nodeIds };
 }
 
-function BoardEdgeComponent({
+const BoardEdgeComponent = memo(function BoardEdgeComponent({
   data,
   id,
   markerEnd,
@@ -480,7 +480,7 @@ function BoardEdgeComponent({
       ) : null}
     </>
   );
-}
+});
 
 const edgeTypes = { smoothstep: BoardEdgeComponent };
 const reactFlowConnectionLineStyle = { stroke: "#60a5fa", strokeDasharray: "7 5", strokeWidth: 2.5 };
@@ -793,6 +793,44 @@ function pastedNodePosition(node: BoardNodeModel): BoardPoint {
   };
 }
 
+function batchConnectionToTarget(
+  nodes: BoardNodeModel[],
+  source: BoardNodeModel,
+  target: BoardNodeModel,
+): { from: BoardPortRef; to: BoardPortRef } | null {
+  if (source.id === target.id) return null;
+  const outputPort = (() => {
+    if (source.kind === "prompt") return { portId: BOARD_PORT_IDS.promptOut, portKind: "prompt" as const };
+    if (source.kind === "asset" || source.kind === "reference-group" || source.kind === "result") {
+      return { portId: BOARD_PORT_IDS.assetOut, portKind: "asset" as const };
+    }
+    return null;
+  })();
+  if (!outputPort) return null;
+
+  const inputPort = (() => {
+    if (target.kind === "reference-group" && outputPort.portKind === "asset") {
+      return { portId: BOARD_PORT_IDS.assetIn, portKind: "asset" as const };
+    }
+    if (target.kind === "agent" && outputPort.portKind === "asset") {
+      return { portId: BOARD_PORT_IDS.agentContextIn, portKind: "agent" as const };
+    }
+    if (target.kind === "image-generate" || target.kind === "video-generate" || target.kind === "runninghub-app") {
+      return outputPort.portKind === "prompt"
+        ? { portId: BOARD_PORT_IDS.promptIn, portKind: "prompt" as const }
+        : { portId: BOARD_PORT_IDS.referenceIn, portKind: "asset" as const };
+    }
+    return null;
+  })();
+  if (!inputPort) return null;
+
+  const connection = {
+    from: { nodeId: source.id, ...outputPort },
+    to: { nodeId: target.id, ...inputPort },
+  };
+  return isValidBoardPortConnection(nodes, connection.from, connection.to) ? connection : null;
+}
+
 export default function BoardWorkspace({
   boardSummaries,
   children,
@@ -891,10 +929,12 @@ export default function BoardWorkspace({
     addPromptNode,
     addReferenceGroupNode,
     addReferenceGroupNodeWithAsset,
+    addReferenceGroupNodeWithAssets,
     addResultNodeWithConnection,
     addRunningHubAppNode,
     clearBoard,
     connectPorts,
+    connectPortsBatch,
     deleteEdge,
     deleteNode,
     moveGenerateReferenceEdge,
@@ -973,17 +1013,6 @@ export default function BoardWorkspace({
     if (!audioNode) return;
     updateNodeSize(audioNode.id, DEFAULT_AUDIO_ASSET_NODE_SIZE);
   }, [board.nodes, updateNodeSize]);
-
-  const boardResultConnectionIndex = useMemo(() => {
-    const resultSourceNodeIdsWithConnection = new Set<string>();
-
-    for (const edge of board.edges) {
-      if (edge.from.portId !== BOARD_PORT_IDS.resultOut) continue;
-      resultSourceNodeIdsWithConnection.add(edge.from.nodeId);
-    }
-
-    return { resultSourceNodeIdsWithConnection };
-  }, [boardGraphContentKey]);
 
   const closeOverlayMenus = useCallback(() => {
     setQuickInsertMenu(null);
@@ -1192,7 +1221,6 @@ export default function BoardWorkspace({
   }, [
       boardGraphContentKey,
       boardPromptReferenceGraphIndex,
-      boardResultConnectionIndex,
       galleryReferenceFingerprint,
       galleryReferenceItems,
       galleryItemById,
@@ -1348,7 +1376,7 @@ export default function BoardWorkspace({
     return refs && isValidBoardPortConnection(board.nodes, refs.from, refs.to) ? refs : null;
   }, [board.nodes]);
 
-  const handleConnect: OnConnect = (connection) => {
+  const handleConnect = useCallback<OnConnect>((connection) => {
     const refs = readValidConnectionRefs(connection);
     if (!refs) {
       onConnectionError("端口类型不兼容：图片可连参考/Agent，Prompt 可连生成，生成结果可连资产。");
@@ -1360,6 +1388,20 @@ export default function BoardWorkspace({
         onConnectionError("请将生成结果拖到空白处创建结果资产节点");
         return;
       }
+      if (selectedNodeIds.length > 1 && selectedNodeIds.includes(refs.from.nodeId) && targetNode) {
+        const connections = selectedNodeIds
+          .map(nodeId => board.nodes.find(node => node.id === nodeId))
+          .filter((node): node is BoardNodeModel => node !== undefined)
+          .map(sourceNode => batchConnectionToTarget(board.nodes, sourceNode, targetNode))
+          .filter((connection): connection is { from: BoardPortRef; to: BoardPortRef } => connection !== null);
+        if (connections.length > 1) {
+          connectPortsBatch(connections);
+          selectNode(targetNode.id);
+          selectEdge(null);
+          updateSelectedNodeIds([targetNode.id]);
+          return;
+        }
+      }
       if (targetNode?.kind === "reference-group") {
         addAssetToReferenceGroup(refs.from.nodeId, refs.to.nodeId);
       }
@@ -1367,7 +1409,7 @@ export default function BoardWorkspace({
     } catch (error) {
       onConnectionError(error instanceof Error ? error.message : "连接失败");
     }
-  };
+  }, [addAssetToReferenceGroup, board.nodes, connectPorts, connectPortsBatch, onConnectionError, readValidConnectionRefs, selectEdge, selectedNodeIds, selectNode, updateSelectedNodeIds]);
 
   const handleSelectionChange = useCallback<OnSelectionChangeFunc<BoardFlowNode, BoardFlowEdge>>(({ nodes, edges }) => {
     if (isSyncingFlowNodesRef.current) return;
@@ -1394,24 +1436,24 @@ export default function BoardWorkspace({
     selectNode(nextSelection.nodeId);
   }, [board.nodes, selectEdge, selectedEdgeId, selectedNodeId, selectedNodeIds, selectNode, updateSelectedNodeIds]);
 
-  const handleNodeClick: NodeMouseHandler<BoardFlowNode> = () => {
+  const handleNodeClick = useCallback<NodeMouseHandler<BoardFlowNode>>(() => {
     closeOverlayMenus();
-  };
+  }, [closeOverlayMenus]);
 
-  const handleNodeDoubleClick: NodeMouseHandler<BoardFlowNode> = (_event, node) => {
+  const handleNodeDoubleClick = useCallback<NodeMouseHandler<BoardFlowNode>>((_event, node) => {
     if (node.data.node.kind === "image-generate" || node.data.node.kind === "video-generate" || node.data.node.kind === "runninghub-app") {
       onExecuteGenerateNode(node.id);
     }
-  };
+  }, [onExecuteGenerateNode]);
 
-  const handleNodeContextMenu: NodeMouseHandler<BoardFlowNode> = (event, node) => {
+  const handleNodeContextMenu = useCallback<NodeMouseHandler<BoardFlowNode>>((event, node) => {
     event.preventDefault();
     closeOverlayMenus();
     setNodeContextMenu({ nodeId: node.id, clientX: event.clientX, clientY: event.clientY });
     selectNode(node.id);
     selectEdge(null);
-    updateSelectedNodeIds([node.id]);
-  };
+    if (selectedNodeIds.length <= 1) updateSelectedNodeIds([node.id]);
+  }, [closeOverlayMenus, selectEdge, selectedNodeIds.length, selectNode, updateSelectedNodeIds]);
 
   const handleReconnect = useCallback<OnReconnect<BoardFlowEdge>>((oldEdge, newConnection) => {
     const refs = readValidConnectionRefs(newConnection);
@@ -1430,12 +1472,12 @@ export default function BoardWorkspace({
     }
   }, [addAssetToReferenceGroup, onConnectionError, readValidConnectionRefs, reconnectEdge]);
 
-  const handleEdgeClick: EdgeMouseHandler<BoardFlowEdge> = (_event, edge) => {
+  const handleEdgeClick = useCallback<EdgeMouseHandler<BoardFlowEdge>>((_event, edge) => {
     closeOverlayMenus();
     selectEdge(edge.id);
     selectNode(null);
     updateSelectedNodeIds([]);
-  };
+  }, [closeOverlayMenus, selectEdge, selectNode, updateSelectedNodeIds]);
 
   const handleNodeDragStart = useCallback<OnNodeDrag<BoardFlowNode>>(() => {
     isNodeDragActiveRef.current = true;
@@ -1480,18 +1522,35 @@ export default function BoardWorkspace({
   }, [setViewport]);
 
 
-  const handleNodesDelete: OnNodesDelete<BoardFlowNode> = nodes => {
+  const handleNodesDelete = useCallback<OnNodesDelete<BoardFlowNode>>(nodes => {
     for (const node of nodes) trashAndDeleteNode(node.id);
     updateSelectedNodeIds([]);
-  };
+  }, [trashAndDeleteNode, updateSelectedNodeIds]);
 
   const deleteBoardEdge = useCallback((edgeId: string): void => {
     deleteEdge(edgeId);
   }, [deleteEdge]);
 
-  const handleEdgesDelete: OnEdgesDelete<BoardFlowEdge> = edges => {
+  const handleEdgesDelete = useCallback<OnEdgesDelete<BoardFlowEdge>>(edges => {
     for (const edge of edges) deleteBoardEdge(edge.id);
-  };
+  }, [deleteBoardEdge]);
+
+  const handleEdgeDoubleClick = useCallback<EdgeMouseHandler<BoardFlowEdge>>((_event, edge) => {
+    deleteBoardEdge(edge.id);
+  }, [deleteBoardEdge]);
+
+  const handleFlowInit = useCallback((instance: ReactFlowInstance<BoardFlowNode, BoardFlowEdge>): void => {
+    flowInstanceRef.current = instance;
+    setFlowReady(true);
+  }, []);
+
+  const handlePaneClick = useCallback((): void => {
+    flowHostRef.current?.focus();
+    closeOverlayMenus();
+    selectNode(null);
+    selectEdge(null);
+    updateSelectedNodeIds([]);
+  }, [closeOverlayMenus, selectEdge, selectNode, updateSelectedNodeIds]);
 
   const snapToGrid = board.config.snapToGrid;
 
@@ -1628,6 +1687,59 @@ export default function BoardWorkspace({
     }
     return [];
   }, [board.nodes, quickInsertMenu?.connectionFrom]);
+
+  const groupSelectedAssetNodes = useCallback((): void => {
+    const assetNodes = selectedNodeIds
+      .map(nodeId => board.nodes.find(node => node.id === nodeId))
+      .filter((node): node is BoardNodeModel & { kind: "asset" } => node?.kind === "asset");
+    if (assetNodes.length < 2) {
+      onConnectionError("请选择至少两个媒体资产再打组");
+      return;
+    }
+    const bounds = assetNodes.reduce(
+      (current, node) => ({
+        maxX: Math.max(current.maxX, node.position.x + node.size.width),
+        maxY: Math.max(current.maxY, node.position.y + node.size.height),
+        minX: Math.min(current.minX, node.position.x),
+        minY: Math.min(current.minY, node.position.y),
+      }),
+      { maxX: -Infinity, maxY: -Infinity, minX: Infinity, minY: Infinity },
+    );
+    const groupId = addReferenceGroupNodeWithAssets(
+      {
+        position: centeredNodePosition(
+          {
+            x: (bounds.minX + bounds.maxX) / 2,
+            y: (bounds.minY + bounds.maxY) / 2,
+          },
+          DEFAULT_REFERENCE_GROUP_NODE_SIZE,
+        ),
+        title: `参考组 (${assetNodes.length})`,
+      },
+      assetNodes.map(node => node.id),
+    );
+    updateSelectedNodeIds([groupId]);
+    closeOverlayMenus();
+  }, [addReferenceGroupNodeWithAssets, board.nodes, centeredNodePosition, closeOverlayMenus, onConnectionError, selectedNodeIds, updateSelectedNodeIds]);
+
+  const connectSelectedNodesToTarget = useCallback((targetNodeId: string): void => {
+    const targetNode = board.nodes.find(node => node.id === targetNodeId);
+    if (!targetNode) return;
+    const connections = selectedNodeIds
+      .map(nodeId => board.nodes.find(node => node.id === nodeId))
+      .filter((node): node is BoardNodeModel => node !== undefined)
+      .map(sourceNode => batchConnectionToTarget(board.nodes, sourceNode, targetNode))
+      .filter((connection): connection is { from: BoardPortRef; to: BoardPortRef } => connection !== null);
+    if (connections.length === 0) {
+      onConnectionError("所选节点没有可连接到此节点的端口");
+      return;
+    }
+    connectPortsBatch(connections);
+    selectNode(targetNode.id);
+    selectEdge(null);
+    updateSelectedNodeIds([targetNode.id]);
+    closeOverlayMenus();
+  }, [board.nodes, closeOverlayMenus, connectPortsBatch, onConnectionError, selectEdge, selectedNodeIds, selectNode, updateSelectedNodeIds]);
 
   const pasteCopiedNode = useCallback((): void => {
     const copied = copiedNodeRef.current;
@@ -2087,12 +2199,9 @@ export default function BoardWorkspace({
             onConnect={handleConnect}
             onConnectEnd={handleConnectEnd}
             onEdgeClick={handleEdgeClick}
-            onEdgeDoubleClick={(_event, edge) => deleteBoardEdge(edge.id)}
+            onEdgeDoubleClick={handleEdgeDoubleClick}
             onEdgesDelete={handleEdgesDelete}
-            onInit={(instance) => {
-              flowInstanceRef.current = instance;
-              setFlowReady(true);
-            }}
+            onInit={handleFlowInit}
             onMoveEnd={handleMoveEnd}
             onNodeClick={handleNodeClick}
             onNodeContextMenu={handleNodeContextMenu}
@@ -2101,13 +2210,7 @@ export default function BoardWorkspace({
             onNodeDragStop={handleNodeDragStop}
             onNodesChange={handleNodesChange}
             onNodesDelete={handleNodesDelete}
-            onPaneClick={() => {
-              flowHostRef.current?.focus();
-              closeOverlayMenus();
-              selectNode(null);
-              selectEdge(null);
-              updateSelectedNodeIds([]);
-            }}
+            onPaneClick={handlePaneClick}
             onPaneContextMenu={openQuickInsertMenu}
             proOptions={reactFlowProOptions}
             zoomOnScroll={false}
@@ -2156,8 +2259,19 @@ export default function BoardWorkspace({
             const copyableImageUrl = (node.kind === "asset" || node.kind === "result") && node.asset.type === "image"
               ? node.asset.url
               : null;
+            const selectedAssetCount = selectedNodeIds.filter(nodeId => {
+              const selectedNode = board.nodes.find(item => item.id === nodeId);
+              return selectedNode?.kind === "asset";
+            }).length;
+            const selectedBatchConnectionCount = selectedNodeIds.filter(nodeId => {
+              const selectedNode = board.nodes.find(item => item.id === nodeId);
+              return selectedNode ? batchConnectionToTarget(board.nodes, selectedNode, node) !== null : false;
+            }).length;
             const actions = buildBoardNodeContextMenuActions({
               node,
+              onConnectSelected: selectedBatchConnectionCount > 0
+                ? () => connectSelectedNodesToTarget(node.id)
+                : undefined,
               onCompare: compareReferenceUrl && node.kind === "asset"
                 ? () => {
                   setAssetCompare({ originalUrl: compareReferenceUrl, resultUrl: node.asset.url });
@@ -2185,6 +2299,9 @@ export default function BoardWorkspace({
                 onEditAssetImage(node.id);
                 closeOverlayMenus();
               } : undefined,
+              onGroupSelected: selectedAssetCount > 1
+                ? groupSelectedAssetNodes
+                : undefined,
               onExecute: node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app"
                 ? () => {
                   onExecuteGenerateNode(node.id);

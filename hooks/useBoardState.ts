@@ -125,10 +125,12 @@ export interface BoardStateController {
   addPromptNode: (input?: CreatePromptNodeInput) => string;
   addReferenceGroupNode: (input?: CreateReferenceGroupNodeInput) => string;
   addReferenceGroupNodeWithAsset: (input: CreateReferenceGroupNodeInput, assetNodeId: string) => string;
+  addReferenceGroupNodeWithAssets: (input: CreateReferenceGroupNodeInput, assetNodeIds: string[]) => string;
   addRunningHubAppNode: (input?: CreateRunningHubAppNodeInput) => string;
   addAssetToReferenceGroup: (assetNodeId: string, groupNodeId: string) => void;
   clearBoard: () => void;
   connectPorts: (from: BoardPortRef, to: BoardPortRef) => void;
+  connectPortsBatch: (connections: Array<{ from: BoardPortRef; to: BoardPortRef }>) => void;
   deleteEdge: (edgeId: string) => void;
   deleteNode: (nodeId: string) => void;
   moveReferenceGroupItem: (groupNodeId: string, assetId: string, direction: "up" | "down") => void;
@@ -1276,6 +1278,40 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     return node.id;
   }, [board.nodes, mutateBoard]);
 
+  const addReferenceGroupNodeWithAssets = useCallback((input: CreateReferenceGroupNodeInput, assetNodeIds: string[]): string => {
+    if (assetNodeIds.length === 0) throw new Error("请选择要打组的媒体资产");
+    const node = createReferenceGroupBoardNode(input, board.nodes);
+    mutateBoard(currentBoard => {
+      const assetNodes = assetNodeIds.map(assetNodeId => {
+        const assetNode = currentBoard.nodes.find(currentNode => currentNode.id === assetNodeId);
+        if (assetNode?.kind !== "asset") throw new Error("参考组只支持媒体资产");
+        return assetNode;
+      });
+      const references = assetNodes.reduce<BoardReferenceGroupItem[]>((items, assetNode) => {
+        const reference = referenceGroupItemFromAssetNode(assetNode);
+        return items.some(item => item.assetId === reference.assetId) ? items : [...items, reference];
+      }, node.references);
+      const nextNode: BoardReferenceGroupNode = { ...node, references };
+      const nextNodes = [...currentBoard.nodes, nextNode];
+      const nextEdges = assetNodes.reduce<BoardEdge[]>((edges, assetNode) => {
+        const from: BoardPortRef = { nodeId: assetNode.id, portId: BOARD_PORT_IDS.assetOut, portKind: "asset" };
+        const to: BoardPortRef = { nodeId: node.id, portId: BOARD_PORT_IDS.assetIn, portKind: "asset" };
+        if (findMatchingEdge(edges, from, to)) return edges;
+        return connectEdge(nextNodes, edges, {
+          id: createBoardId("edge"),
+          kind: resolveBoardConnectionKind(nextNodes, from, to),
+          from,
+          to,
+          createdAt: nowIso(),
+        });
+      }, currentBoard.edges);
+      return touchBoard(currentBoard, nextNodes, nextEdges);
+    });
+    setSelectedNodeId(node.id);
+    setSelectedEdgeId(null);
+    return node.id;
+  }, [board.nodes, mutateBoard]);
+
   const addGenerateNode = useCallback((input: CreateGenerateNodeInput): string => {
     const node = createGenerateBoardNode(input, board.nodes);
     mutateBoard(currentBoard => touchBoard(currentBoard, [...currentBoard.nodes, node]));
@@ -1554,6 +1590,44 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     });
     setSelectedEdgeId(edgeId);
     setSelectedNodeId(null);
+  }, [mutateBoard]);
+
+  const connectPortsBatch = useCallback((connections: Array<{ from: BoardPortRef; to: BoardPortRef }>) => {
+    if (connections.length === 0) return;
+    mutateBoard(currentBoard => {
+      let nextNodes = currentBoard.nodes;
+      let nextEdges = currentBoard.edges;
+      let didChange = false;
+      const updatedAt = nowIso();
+
+      for (const connection of connections) {
+        if (findMatchingEdge(nextEdges, connection.from, connection.to)) continue;
+        nextNodes = resolveBoardConnectionNodesWithCompatibleModel(nextNodes, connection.from, connection.to);
+        const edge: BoardEdge = {
+          ...createBoardEdge(nextNodes, connection.from, connection.to),
+          id: createBoardId("edge"),
+        };
+        nextEdges = connectEdge(nextNodes, nextEdges, edge);
+        didChange = true;
+
+        const sourceNode = nextNodes.find(node => node.id === connection.from.nodeId);
+        if (
+          sourceNode?.kind === "asset" &&
+          connection.to.portId === BOARD_PORT_IDS.assetIn
+        ) {
+          const reference = referenceGroupItemFromAssetNode(sourceNode);
+          nextNodes = nextNodes.map(node => {
+            if (node.id !== connection.to.nodeId || node.kind !== "reference-group") return node;
+            if (node.references.some(item => item.assetId === reference.assetId)) return node;
+            return { ...node, references: [...node.references, reference], updatedAt };
+          });
+        }
+      }
+
+      return didChange ? touchBoard(currentBoard, nextNodes, nextEdges) : currentBoard;
+    });
+    setSelectedNodeId(null);
+    setSelectedEdgeId(null);
   }, [mutateBoard]);
 
   const addAssetToReferenceGroup = useCallback((assetNodeId: string, groupNodeId: string) => {
@@ -1892,10 +1966,12 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       addPromptNode,
       addReferenceGroupNode,
       addReferenceGroupNodeWithAsset,
+      addReferenceGroupNodeWithAssets,
       addRunningHubAppNode,
       addAssetToReferenceGroup,
       clearBoard,
       connectPorts,
+      connectPortsBatch,
       deleteEdge,
       deleteNode,
       moveReferenceGroupItem,
@@ -1930,6 +2006,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       addPromptNode,
       addReferenceGroupNode,
       addReferenceGroupNodeWithAsset,
+      addReferenceGroupNodeWithAssets,
       addRunningHubAppNode,
       addAssetToReferenceGroup,
       beginUndoGesture,
@@ -1940,6 +2017,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       clearBoard,
       completeGenerationResult,
       connectPorts,
+      connectPortsBatch,
       deleteEdge,
       deleteNode,
       duplicateNode,
