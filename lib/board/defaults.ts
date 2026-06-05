@@ -15,8 +15,13 @@ export const DEFAULT_BOARD_CONFIG: BoardConfig = {
 };
 
 export const DEFAULT_ASSET_NODE_SIZE: BoardSize = {
-  width: 320,
+  width: 360,
   height: 280,
+};
+
+export const DEFAULT_AUDIO_ASSET_NODE_SIZE: BoardSize = {
+  width: 340,
+  height: 260,
 };
 
 export const DEFAULT_NOTE_NODE_SIZE: BoardSize = {
@@ -35,8 +40,8 @@ export const DEFAULT_REFERENCE_GROUP_NODE_SIZE: BoardSize = {
 };
 
 export const DEFAULT_GENERATE_NODE_SIZE: BoardSize = {
-  width: 340,
-  height: 260,
+  width: 420,
+  height: 300,
 };
 
 export const DEFAULT_RUNNINGHUB_APP_NODE_SIZE: BoardSize = {

@@ -1,8 +1,8 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useEffect, useState } from "react";
 import { Handle, Position, useConnection, type Node, type NodeProps } from "@xyflow/react";
-import { ImagePlus, Layers, Music, Trash2, Video, Workflow } from "lucide-react";
+import { ImagePlus, Layers, Music, Video, Workflow } from "lucide-react";
 import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
 import PreviewImage from "@/components/PreviewImage";
 import type {
@@ -84,6 +84,11 @@ interface BoardHandleProps {
 }
 
 function nodeIcon(node: BoardNodeModel) {
+  if (node.kind === "asset" || node.kind === "result") {
+    if (node.asset.type === "image") return <ImagePlus className="h-3.5 w-3.5 text-blue-500" />;
+    if (node.asset.type === "video") return <Video className="h-3.5 w-3.5 text-violet-500" />;
+    return <Music className="h-3.5 w-3.5 text-cyan-500" />;
+  }
   if (node.kind === "image-generate") return <ImagePlus className="h-3.5 w-3.5 text-blue-300" />;
   if (node.kind === "video-generate") return <Video className="h-3.5 w-3.5 text-violet-300" />;
   if (node.kind === "runninghub-app") return <Workflow className="h-3.5 w-3.5 text-emerald-300" />;
@@ -220,7 +225,19 @@ function GenerateReferenceShelf({
 function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
   const { node } = data;
   const isMediaNode = node.kind === "asset" || node.kind === "result";
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [draftTitle, setDraftTitle] = useState(node.title);
   const ports = getBoardNodePortDefinitions(node, { hasResultConnection: data.hasResultConnection });
+
+  useEffect(() => {
+    if (!isEditingTitle) setDraftTitle(node.title);
+  }, [isEditingTitle, node.title]);
+
+  const commitTitleEdit = () => {
+    setIsEditingTitle(false);
+    if (draftTitle !== node.title) data.onUpdateNodeTitle(node.id, draftTitle);
+  };
+
   const handleForPort = (port: (typeof ports)[number]) => {
     if (port.id === BOARD_PORT_IDS.promptIn) {
       return <BoardHandle key={port.id} id={port.id} type="target" position={Position.Left} kind={port.kind} label={port.label} top={78} zone="segment" zoneHeight={64} />;
@@ -261,27 +278,51 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
 
       <div
         className={[
-          "flex h-9 items-center justify-between gap-2 px-3",
+          "flex h-9 items-center gap-2",
           isMediaNode
-            ? "pointer-events-none absolute inset-x-0 -top-10 z-30 opacity-0 transition-opacity duration-200 board-asset-node-chrome"
-            : "rounded-t-lg imagine-board-node-header",
+            ? "pointer-events-none absolute -top-10 left-0 z-30 max-w-full board-asset-node-chrome"
+            : "rounded-t-lg px-3 imagine-board-node-header",
         ].join(" ")}
       >
-        <h2 className="flex min-w-0 items-center gap-2 truncate text-xs font-semibold">
-          {nodeIcon(node)}
-          <span className="truncate">{node.title}</span>
-        </h2>
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            data.onDelete(node.id);
-          }}
-          className="nodrag pointer-events-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[var(--iw-muted)] transition hover:bg-red-500/10 hover:text-red-300"
-          title="删除节点"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
+        {isEditingTitle ? (
+          <input
+            autoFocus
+            className={[
+              "nodrag pointer-events-auto h-7 min-w-0 rounded-md border border-blue-400 bg-[var(--iw-panel)] px-2 text-xs font-semibold text-[var(--iw-text)] outline-none ring-2 ring-blue-500/20",
+              isMediaNode ? "w-48 shadow-sm" : "w-full",
+            ].join(" ")}
+            value={draftTitle}
+            onBlur={commitTitleEdit}
+            onChange={event => setDraftTitle(event.target.value)}
+            onDoubleClick={event => event.stopPropagation()}
+            onKeyDown={event => {
+              if (event.key === "Enter") commitTitleEdit();
+              if (event.key === "Escape") {
+                setDraftTitle(node.title);
+                setIsEditingTitle(false);
+              }
+            }}
+            onPointerDown={event => event.stopPropagation()}
+          />
+        ) : (
+          <h2
+            className={[
+              "nodrag pointer-events-auto flex min-w-0 items-center gap-2 truncate text-xs font-semibold text-[var(--iw-text)]",
+              isMediaNode
+                ? "rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)]/92 px-2.5 shadow-sm backdrop-blur"
+                : "",
+            ].join(" ")}
+            title="双击重命名"
+            onDoubleClick={event => {
+              event.stopPropagation();
+              setDraftTitle(node.title);
+              setIsEditingTitle(true);
+            }}
+          >
+            {nodeIcon(node)}
+            <span className="truncate">{node.title}</span>
+          </h2>
+        )}
       </div>
       <div
         className={[

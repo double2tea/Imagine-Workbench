@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { BOARD_UNDO_LIMIT, cloneBoardHistory, type BoardHistorySnapshot } from "@/lib/board/history";
 import {
   DEFAULT_AGENT_NODE_SIZE,
+  DEFAULT_AUDIO_ASSET_NODE_SIZE,
   DEFAULT_ASSET_NODE_SIZE,
   DEFAULT_BOARD_CONFIG,
   DEFAULT_BOARD_ID,
@@ -591,7 +592,7 @@ function normalizeBoardNode(node: unknown, index: number): BoardNode | null {
 }
 
 function defaultNodeSize(kind: BoardNode["kind"]): BoardSize {
-  if (kind === "asset") return DEFAULT_ASSET_NODE_SIZE;
+  if (kind === "asset" || kind === "result") return DEFAULT_ASSET_NODE_SIZE;
   if (kind === "prompt") return DEFAULT_PROMPT_NODE_SIZE;
   if (kind === "reference-group") return DEFAULT_REFERENCE_GROUP_NODE_SIZE;
   if (kind === "image-generate" || kind === "video-generate") return DEFAULT_GENERATE_NODE_SIZE;
@@ -615,6 +616,11 @@ function defaultAssetNodeTitle(type: BoardAssetReference["type"]): string {
   if (type === "image") return "图片资产";
   if (type === "video") return "视频资产";
   return "音频资产";
+}
+
+function defaultAssetNodeSize(type: BoardAssetReference["type"]): BoardSize {
+  if (type === "audio") return DEFAULT_AUDIO_ASSET_NODE_SIZE;
+  return DEFAULT_ASSET_NODE_SIZE;
 }
 
 function defaultRunningHubBindings(): BoardRunningHubNodeInfoBinding[] {
@@ -750,7 +756,7 @@ function createAssetBoardNode(input: CreateAssetNodeInput, nodes: BoardNode[]): 
     title: input.title ?? defaultAssetNodeTitle(input.asset.type),
     asset: input.asset,
     position: input.position ?? moveDefaultPosition(nodes),
-    size: input.size ?? DEFAULT_ASSET_NODE_SIZE,
+    size: input.size ?? defaultAssetNodeSize(input.asset.type),
     createdAt,
     updatedAt: createdAt,
   };
@@ -768,7 +774,7 @@ function createResultBoardNode(input: CreateResultNodeInput, nodes: BoardNode[])
     resultAssetIds: input.resultAssetIds,
     asset: input.asset,
     position: input.position ?? moveDefaultPosition(nodes),
-    size: input.size ?? DEFAULT_ASSET_NODE_SIZE,
+    size: input.size ?? defaultAssetNodeSize(input.asset.type),
     createdAt,
     updatedAt: createdAt,
   };

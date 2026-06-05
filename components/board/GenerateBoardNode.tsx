@@ -62,6 +62,7 @@ interface GenerateBoardNodeProps {
 }
 
 type GenerateContextTone = "failed" | "neutral" | "ok" | "processing" | "prompt" | "reference" | "result";
+type GenerateStatusLineTone = "complete" | "failed" | "idle" | "processing";
 
 interface BoardResultStackProps {
   activeAssetId?: string;
@@ -143,17 +144,6 @@ function statusText(node: GenerateNode): string {
   return node.kind === "image-generate" ? "图片" : "视频";
 }
 
-function statusSteps(status: GenerateNode["status"]): Array<{ key: string; label: string; state: "done" | "active" | "idle" | "failed" }> {
-  const activeIndex = status === "idle" ? 0 : status === "processing" ? 1 : 2;
-  return ["准备", "生成", "结果"].map((label, index) => {
-    if (status === "failed") return { key: label, label, state: index === activeIndex ? "failed" : index < activeIndex ? "done" : "idle" };
-    if (status === "complete") return { key: label, label, state: "done" };
-    if (index < activeIndex) return { key: label, label, state: "done" };
-    if (index === activeIndex) return { key: label, label, state: "active" };
-    return { key: label, label, state: "idle" };
-  });
-}
-
 function contextToneClass(tone: GenerateContextTone): string {
   if (tone === "prompt") return "border-teal-400/20 bg-teal-500/10 text-teal-100";
   if (tone === "reference") return "border-blue-400/20 bg-blue-500/10 text-blue-100";
@@ -178,6 +168,29 @@ function runContext(node: GenerateNode, taskSummary: BoardGenerateTaskSummary | 
   if (node.status === "failed") return { title: "失败", tone: "failed" };
   if (node.status === "processing") return { title: "处理中", tone: "processing" };
   return { title: "待运行", tone: "neutral" };
+}
+
+function statusLineTone(node: GenerateNode, taskSummary: BoardGenerateTaskSummary | undefined): GenerateStatusLineTone {
+  if (taskSummary?.status === "pending" || taskSummary?.status === "processing" || node.status === "processing") return "processing";
+  if (node.status === "complete") return "complete";
+  if (node.status === "failed") return "failed";
+  return "idle";
+}
+
+function statusLineWidth(tone: GenerateStatusLineTone, taskSummary: BoardGenerateTaskSummary | undefined): string {
+  if (tone === "processing") {
+    if (taskSummary?.status === "processing") return `${Math.max(8, Math.min(100, taskSummary.progress))}%`;
+    return "28%";
+  }
+  if (tone === "complete" || tone === "failed") return "100%";
+  return "18%";
+}
+
+function statusLineClass(tone: GenerateStatusLineTone): string {
+  if (tone === "processing") return "bg-blue-500 shadow-[0_0_14px_rgba(59,130,246,0.45)] animate-pulse";
+  if (tone === "complete") return "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.35)]";
+  if (tone === "failed") return "bg-red-400 shadow-[0_0_12px_rgba(248,113,113,0.32)]";
+  return "bg-slate-500/45";
 }
 
 export default function GenerateBoardNode({
@@ -228,9 +241,9 @@ export default function GenerateBoardNode({
       : [],
     [activeVideoReferenceMode, node.kind, referencePreviews, videoCapabilities],
   );
-  const steps = statusSteps(node.status);
   const result = resultContext(hasResultConnection, resultItems.length);
   const run = runContext(node, taskSummary);
+  const lineTone = statusLineTone(node, taskSummary);
   const promptContext = promptPreview !== null
     ? { title: promptSourceTitle ?? "已连接", tone: "prompt" as const }
     : { title: "节点内", tone: "neutral" as const };
@@ -314,17 +327,17 @@ export default function GenerateBoardNode({
           placeholder={promptPreview !== null ? "已连接 Prompt 节点，请在提示节点编辑" : "可直接写提示词，输入 @ 引用参考图"}
         />
       </div>
-      <div className="grid grid-cols-4 gap-1.5">
+      <div className="flex min-w-0 items-center gap-1 overflow-hidden rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-1">
         {contextItems.map(item => (
-          <div
+          <span
             key={item.key}
             data-tone={item.tone}
-            className={`imagine-generate-context-chip min-w-0 rounded-md border px-1.5 py-1 ${contextToneClass(item.tone)}`}
+            className={`imagine-generate-context-chip flex min-w-0 flex-1 items-center justify-center gap-1 rounded px-1.5 py-1 ${contextToneClass(item.tone)}`}
             title={item.tooltip}
           >
-            <span className="block truncate text-[8px] font-semibold uppercase opacity-70">{item.label}</span>
-            <span className="block truncate text-[10px] font-semibold">{item.title}</span>
-          </div>
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-current opacity-70" />
+            <span className="truncate text-[10px] font-semibold">{item.label === "Prompt" ? "Prompt" : item.label} · {item.title}</span>
+          </span>
         ))}
       </div>
       {showReferencePreviews && referencePreviews.length > 0 && (
@@ -417,22 +430,12 @@ export default function GenerateBoardNode({
           </button>
         )}
       </div>
-      {taskSummary && (
-        <div className="h-1.5 overflow-hidden rounded-full bg-[var(--iw-panel-soft)]" title={`任务进度 ${taskSummary.progress}%`}>
-          <div className="h-full rounded-full bg-blue-500 transition-[width]" style={{ width: `${taskSummary.progress}%` }} />
-        </div>
-      )}
-      <div className="grid grid-cols-3 gap-1.5" role="list" aria-label="生成进度">
-        {steps.map(step => (
-          <span
-            key={step.key}
-            className="imagine-board-progress-step h-1.5 rounded-full"
-            data-state={step.state}
-            title={step.label}
-            aria-label={step.label}
-            role="listitem"
-          />
-        ))}
+      <div className="h-1 overflow-hidden rounded-full bg-[var(--iw-panel-soft)]" title={`状态：${run.title}`}>
+        <div
+          className={`h-full rounded-full transition-[width] ${statusLineClass(lineTone)}`}
+          data-state={lineTone}
+          style={{ width: statusLineWidth(lineTone, taskSummary) }}
+        />
       </div>
     </div>
   );

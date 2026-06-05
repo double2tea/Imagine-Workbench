@@ -70,6 +70,7 @@ import { useThemeModeSnapshot } from "@/lib/theme-mode";
 import type { CapturedVideoFrame } from "@/lib/video-frame";
 import {
   BOARD_SNAP_GRID,
+  DEFAULT_AUDIO_ASSET_NODE_SIZE,
   DEFAULT_ASSET_NODE_SIZE,
   DEFAULT_GENERATE_NODE_SIZE,
   DEFAULT_REFERENCE_GROUP_NODE_SIZE,
@@ -123,7 +124,40 @@ interface BoardWorkspaceProps {
 }
 
 type BoardFlowEdge = Edge<{ kind: BoardEdgeKind; processing?: boolean }, "smoothstep">;
+
+const MEDIA_NODE_MIN_HEIGHT = 220;
+const MEDIA_NODE_MAX_HEIGHT = 330;
+const MEDIA_NODE_MIN_WIDTH = 300;
+const MEDIA_NODE_MAX_WIDTH = 500;
+const MEDIA_NODE_TARGET_AREA = 115000;
 type BoardHandleDirection = "input" | "output";
+
+function mediaNodeSizeForAspectRatio(aspectRatio: number): BoardSize {
+  let width = Math.sqrt(MEDIA_NODE_TARGET_AREA * aspectRatio);
+  let height = width / aspectRatio;
+
+  if (height > MEDIA_NODE_MAX_HEIGHT) {
+    height = MEDIA_NODE_MAX_HEIGHT;
+    width = height * aspectRatio;
+  }
+  if (height < MEDIA_NODE_MIN_HEIGHT) {
+    height = MEDIA_NODE_MIN_HEIGHT;
+    width = height * aspectRatio;
+  }
+  if (width > MEDIA_NODE_MAX_WIDTH) {
+    width = MEDIA_NODE_MAX_WIDTH;
+    height = width / aspectRatio;
+  }
+  if (width < MEDIA_NODE_MIN_WIDTH) {
+    width = MEDIA_NODE_MIN_WIDTH;
+    height = width / aspectRatio;
+  }
+
+  return {
+    width: Math.round(width),
+    height: Math.round(height),
+  };
+}
 
 interface QuickInsertMenu {
   clientX: number;
@@ -871,10 +905,33 @@ export default function BoardWorkspace({
     if (!Number.isFinite(aspectRatio) || aspectRatio <= 0) return;
     const node = boardPromptReferenceGraphIndex.nodeById.get(nodeId);
     if (node?.kind !== "asset" && node?.kind !== "result") return;
-    const height = Math.round(node.size.width / aspectRatio);
-    if (Math.abs(node.size.height - height) <= 1) return;
-    updateNodeSize(nodeId, { width: node.size.width, height });
+    const size = mediaNodeSizeForAspectRatio(aspectRatio);
+    if (Math.abs(node.size.width - size.width) <= 1 && Math.abs(node.size.height - size.height) <= 1) return;
+    updateNodeSize(nodeId, size);
   }, [boardPromptReferenceGraphIndex, updateNodeSize]);
+
+  useEffect(() => {
+    const undersizedGenerateNode = board.nodes.find(node =>
+      (node.kind === "image-generate" || node.kind === "video-generate") &&
+      (node.size.width < DEFAULT_GENERATE_NODE_SIZE.width || node.size.height < DEFAULT_GENERATE_NODE_SIZE.height),
+    );
+    if (undersizedGenerateNode) {
+      updateNodeSize(undersizedGenerateNode.id, {
+        width: Math.max(undersizedGenerateNode.size.width, DEFAULT_GENERATE_NODE_SIZE.width),
+        height: Math.max(undersizedGenerateNode.size.height, DEFAULT_GENERATE_NODE_SIZE.height),
+      });
+      return;
+    }
+
+    const audioNode = board.nodes.find(node =>
+      (node.kind === "asset" || node.kind === "result") &&
+      node.asset.type === "audio" &&
+      (Math.abs(node.size.width - DEFAULT_AUDIO_ASSET_NODE_SIZE.width) > 1 ||
+        Math.abs(node.size.height - DEFAULT_AUDIO_ASSET_NODE_SIZE.height) > 1),
+    );
+    if (!audioNode) return;
+    updateNodeSize(audioNode.id, DEFAULT_AUDIO_ASSET_NODE_SIZE);
+  }, [board.nodes, updateNodeSize]);
 
   const boardResultConnectionIndex = useMemo(() => {
     const resultSourceNodeIdsWithConnection = new Set<string>();

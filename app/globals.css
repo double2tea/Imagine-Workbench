@@ -138,12 +138,6 @@ html[data-imagine-theme="light"],
   letter-spacing: 0;
 }
 
-.board-node-shell:is([data-kind="asset"], [data-kind="result"]):is(:hover, :focus-within) .board-asset-node-chrome,
-.board-node-shell:is([data-kind="asset"], [data-kind="result"])[data-selected="true"] .board-asset-node-chrome {
-  opacity: 1;
-  pointer-events: auto;
-}
-
 .imagine-board-node-selected,
 .imagine-board-node[data-selected="true"] {
   border-color: var(--iw-board-accent-amber);
@@ -1772,10 +1766,10 @@ html[data-imagine-theme="light"] .imagine-root-body {
   align-items: center;
   justify-content: center;
   border-radius: var(--iw-radius-sm);
-  border: 1px solid var(--iw-border);
-  background: color-mix(in srgb, var(--iw-bg) 88%, transparent);
+  border: 1px solid color-mix(in srgb, var(--iw-border) 45%, transparent);
+  background: color-mix(in srgb, var(--iw-panel) 28%, transparent);
   color: var(--iw-text);
-  box-shadow: var(--iw-card-shadow);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--iw-bg) 20%, transparent);
   backdrop-filter: blur(10px);
   transition:
     background 160ms var(--iw-ease-out),
@@ -1784,6 +1778,8 @@ html[data-imagine-theme="light"] .imagine-root-body {
 }
 
 .imagine-board-asset-action:hover {
+  border-color: color-mix(in srgb, var(--iw-accent) 42%, transparent);
+  background: color-mix(in srgb, var(--iw-panel) 48%, transparent) !important;
   transform: translateY(-1px);
 }
 
