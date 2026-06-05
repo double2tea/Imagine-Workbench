@@ -1,21 +1,25 @@
 "use client";
 
-import { getModelPrice, getShowPriceSetting } from "@/lib/providers/pricing";
+import { calculateModelPrice, getShowPriceSetting } from "@/lib/providers/pricing";
 
 interface ModelPriceBadgeProps {
   provider: string;
   modelId: string;
+  duration?: string;
+  resolution?: string;
 }
 
-export default function ModelPriceBadge({ provider, modelId }: ModelPriceBadgeProps) {
+export default function ModelPriceBadge({ provider, modelId, duration, resolution }: ModelPriceBadgeProps) {
   if (!getShowPriceSetting()) return null;
 
-  const price = getModelPrice(provider, modelId);
+  const price = calculateModelPrice(provider, modelId, { duration, resolution });
   if (!price) return null;
 
-  const formatted = price.price < 1
-    ? `≈¥${price.price.toFixed(2)}/${price.unit}`
-    : `≈¥${price.price.toFixed(2).replace(/\.?0+$/, "")}/${price.unit}`;
+  const formatted = price.isCalculated
+    ? `≈¥${price.totalPrice.toFixed(2).replace(/\.?0+$/, "")}`
+    : price.price < 1
+      ? `≈¥${price.price.toFixed(2)}/${price.unit}`
+      : `≈¥${price.price.toFixed(2).replace(/\.?0+$/, "")}/${price.unit}`;
 
   return (
     <span className="text-[10px] font-medium text-[var(--iw-muted)]">

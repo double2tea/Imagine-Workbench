@@ -5,6 +5,13 @@ export interface ModelPrice {
   unit: string;
 }
 
+export interface CalculatedModelPrice extends ModelPrice {
+  /** Total calculated price after applying factor (e.g., seconds × unit price) */
+  totalPrice: number;
+  /** Whether this price was calculated from a variable unit with duration */
+  isCalculated: boolean;
+}
+
 interface ProviderPriceEntry {
   /** Substring matched against model ID path (after `api:/openapi/v2/`) */
   pathMatch: string;
@@ -52,6 +59,10 @@ const RUNNINGHUB_PRICES: ProviderPriceEntry[] = [
   { pathMatch: "rhart-image-n-g31-flash-official/text-to-image", price: 0.14, unit: "张" },
   { pathMatch: "rhart-image-n-g31-flash-official/image-to-image", price: 0.14, unit: "张" },
 
+  // --- Gemini Flash (channel/low price) ---
+  { pathMatch: "rhart-image-n-g31-flash/text-to-image", price: 0.08, unit: "次" },
+  { pathMatch: "rhart-image-n-g31-flash/image-to-image", price: 0.08, unit: "次" },
+
   // --- Youchuan ---
   { pathMatch: "youchuan/text-to-image-v81", price: 0.54, unit: "次" },
 
@@ -90,4 +101,26 @@ export function getModelPrice(provider: string, modelId: string): ModelPrice | n
     if (modelId.includes(entry.pathMatch)) return { price: entry.price, unit: entry.unit };
   }
   return null;
+}
+
+/**
+ * Calculate model price with optional parameters like duration or resolution.
+ * For per-second units and known duration, returns total price.
+ * Falls back to unit-price display when duration is unknown or irrelevant.
+ */
+export function calculateModelPrice(
+  provider: string,
+  modelId: string,
+  options?: { duration?: string; resolution?: string },
+): CalculatedModelPrice | null {
+  const base = getModelPrice(provider, modelId);
+  if (!base) return null;
+
+  if (base.unit === "秒" && options?.duration) {
+    const seconds = parseFloat(options.duration);
+    if (!isNaN(seconds) && seconds > 0) {
+      return { ...base, totalPrice: base.price * seconds, isCalculated: true };
+    }
+  }
+  return { ...base, totalPrice: base.price, isCalculated: false };
 }

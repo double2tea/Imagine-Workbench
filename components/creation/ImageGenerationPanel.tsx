@@ -389,7 +389,7 @@ export default function ImageGenerationPanel({
             <Sparkles className="h-4 w-4 shrink-0 text-white" />
           )}
           <span className="truncate">{isSubmitting ? `提交中 (${submitCount})，可继续排队` : "生成图片"}</span>
-          {!isSubmitting && <ModelPriceBadge provider={selectedModel.split(":")[0]} modelId={selectedModel} />}
+          {!isSubmitting && <ModelPriceBadge provider={selectedModel.split(":")[0]} modelId={selectedModel} resolution={imageResolution} />}
         </button>
       )}
     </div>
