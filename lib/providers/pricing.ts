@@ -87,6 +87,11 @@ const RUNNINGHUB_PRICES: ProviderPriceEntry[] = [
   // --- Youchuan ---
   { pathMatch: "youchuan/text-to-image-v81", price: 0.54, unit: "次" },
 
+  // --- Gemini Omni Flash (provisional manual pricing) ---
+  { pathMatch: "gemini-omni-flash/text-to-video", price: 1.95, unit: "次" },
+  { pathMatch: "gemini-omni-flash/image-to-video", price: 1.95, unit: "次" },
+  { pathMatch: "gemini-omni-flash/video-edit", price: 1.95, unit: "次" },
+
   // --- Veo 3.1 Fast Official ---
   { pathMatch: "rhart-video-v3.1-fast-official/reference-to-video", price: 4.03, unit: "次" },
   { pathMatch: "rhart-video-v3.1-fast-official/text-to-video", price: 2.35, unit: "次" },
@@ -136,19 +141,20 @@ export function calculateModelPrice(
   const effectiveModelId = resolveEffectivePriceModelId(provider, modelId, options);
   const base = getModelPrice(provider, effectiveModelId);
   if (!base) return null;
+  const resolvedBase = resolveOptionPriceOverride(provider, effectiveModelId, base, options);
 
-  if (base.unit === "秒" && options?.duration) {
+  if (resolvedBase.unit === "秒" && options?.duration) {
     const seconds = parseFloat(options.duration);
     if (!isNaN(seconds) && seconds > 0) {
       return {
-        ...base,
-        totalPrice: base.price * seconds,
+        ...resolvedBase,
+        totalPrice: resolvedBase.price * seconds,
         isCalculated: true,
-        detail: `¥${formatPriceValue(base.price)}/${base.unit} × ${seconds}s`,
+        detail: `¥${formatPriceValue(resolvedBase.price)}/${resolvedBase.unit} × ${seconds}s`,
       };
     }
   }
-  return { ...base, totalPrice: base.price, isCalculated: false };
+  return { ...resolvedBase, totalPrice: resolvedBase.price, isCalculated: false };
 }
 
 export function formatPriceValue(value: number): string {
@@ -174,4 +180,16 @@ function resolveEffectivePriceModelId(provider: string, modelId: string, options
       : undefined,
   );
   return `runninghub:${routedModel.model}`;
+}
+
+function resolveOptionPriceOverride(
+  provider: string,
+  modelId: string,
+  base: ModelPrice,
+  options: ModelPriceOptions | undefined,
+): ModelPrice {
+  if (provider === "runninghub" && modelId.includes("gemini-omni-flash") && options?.videoResolution?.toLowerCase() === "4k") {
+    return { ...base, price: 3.15 };
+  }
+  return base;
 }

@@ -39,6 +39,10 @@ test("getModelPrice returns known RunningHub price", () => {
     getModelPrice("runninghub", "runninghub:api:/openapi/v2/rhart-image-n-pro-official/text-to-image-ultra"),
     { price: 0.98, unit: "次" },
   );
+  assert.deepEqual(
+    getModelPrice("runninghub", "runninghub:api:/openapi/v2/gemini-omni-flash/text-to-video"),
+    { price: 1.95, unit: "次" },
+  );
 });
 
 test("getModelPrice returns null for unknown model and provider", () => {
@@ -82,6 +86,29 @@ test("calculateModelPrice routes RunningHub video references to the billed model
       videoReferenceMode: "none",
     }),
     { price: 2.35, unit: "次", totalPrice: 2.35, isCalculated: false },
+  );
+});
+
+test("calculateModelPrice applies provisional Gemini Omni Flash 4k price", () => {
+  assert.deepEqual(
+    calculateModelPrice("runninghub", "runninghub:api:/openapi/v2/gemini-omni-flash/text-to-video", {
+      videoResolution: "1080p",
+    }),
+    { price: 1.95, unit: "次", totalPrice: 1.95, isCalculated: false },
+  );
+  assert.deepEqual(
+    calculateModelPrice("runninghub", "runninghub:api:/openapi/v2/gemini-omni-flash/text-to-video", {
+      videoResolution: "4k",
+    }),
+    { price: 3.15, unit: "次", totalPrice: 3.15, isCalculated: false },
+  );
+  assert.deepEqual(
+    calculateModelPrice("runninghub", "runninghub:api:/openapi/v2/gemini-omni-flash/text-to-video", {
+      referenceTypes: ["video"],
+      videoReferenceMode: "reference",
+      videoResolution: "4K",
+    }),
+    { price: 3.15, unit: "次", totalPrice: 3.15, isCalculated: false },
   );
 });
 
