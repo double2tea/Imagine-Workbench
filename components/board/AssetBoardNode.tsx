@@ -1,4 +1,4 @@
-import { Download, ImageDown, Maximize2, Paintbrush, Send, SlidersHorizontal } from "lucide-react";
+import { Download, ImageDown, Maximize2, Paintbrush, SlidersHorizontal } from "lucide-react";
 import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
 import { useRef } from "react";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
@@ -21,7 +21,6 @@ interface AssetBoardNodeProps {
   onOpenFullscreen?: (item: StorageItem) => void;
   onSelectStackAsset?: (assetId: string) => void;
   onSendToAgent?: (nodeId: string) => void;
-  onSetAsReference?: (nodeId: string) => void;
   stackItems?: StorageItem[];
 }
 
@@ -58,7 +57,6 @@ export default function AssetBoardNode({
   onOpenFullscreen,
   onSelectStackAsset,
   onSendToAgent,
-  onSetAsReference,
   stackItems = [],
 }: AssetBoardNodeProps) {
   const item = boardAssetToStorageItem(node, boardId);
@@ -81,14 +79,6 @@ export default function AssetBoardNode({
                 <SlidersHorizontal className="h-3.5 w-3.5" />
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => onSetAsReference?.(node.id)}
-              className="imagine-board-asset-action nodrag text-cyan-200 hover:border-cyan-500/40 hover:bg-cyan-600 hover:text-white"
-              title="设为参考图"
-            >
-              <Send className="h-3.5 w-3.5" />
-            </button>
             <button
               type="button"
               onClick={() => onSendToAgent?.(node.id)}
@@ -169,6 +159,7 @@ export default function AssetBoardNode({
             onCaptureFrameRequestReady={request => {
               captureVideoFrameRef.current = request;
             }}
+            showFullscreenButton={false}
           />
         </div>
       )}

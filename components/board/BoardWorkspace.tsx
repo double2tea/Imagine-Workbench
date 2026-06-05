@@ -91,6 +91,7 @@ import {
 import { BOARD_PORT_IDS, isValidBoardConnection as isValidBoardPortConnection } from "@/lib/board/ports";
 import { BOARD_INSERT_CATALOG, type BoardInsertKind } from "@/lib/board/insert-catalog";
 import { findResultNodeForSource, resultNodeDefaultPosition } from "@/lib/board/utils";
+import type { GenerationTask } from "@/lib/generation-tasks";
 import { DEFAULT_VIDEO_MODEL } from "@/lib/providers/model-catalog";
 
 interface BoardWorkspaceProps {
@@ -98,6 +99,7 @@ interface BoardWorkspaceProps {
   controller: BoardStateController;
   children?: ReactNode;
   galleryItems?: StorageItem[];
+  generationTasks?: GenerationTask[];
   onBack: () => void;
   onCaptureVideoFrame: (nodeId: string, item: StorageItem, frame: CapturedVideoFrame) => void | Promise<void>;
   onConnectionError: (message: string) => void;
@@ -115,7 +117,6 @@ interface BoardWorkspaceProps {
   onSelectBoard: (boardId: string) => void;
   onSendAssetToAgent: (nodeId: string) => void;
   onSendAgentNode: (nodeId: string) => void;
-  onSetAssetAsReference: (nodeId: string) => void;
   assetCompareRequest?: { originalUrl: string; resultUrl: string } | null;
   focusNodeRequest?: { nodeId: string; seq: number } | null;
   onAssetCompareRequestHandled?: () => void;
@@ -737,6 +738,10 @@ function isActiveGenerateTask(item: StorageItem): item is StorageItem & { status
   return item.status === "pending" || item.status === "processing";
 }
 
+function isActiveBoardGenerationTask(task: GenerationTask): task is GenerationTask & { status: "pending" | "processing" } {
+  return task.status === "pending" || task.status === "processing";
+}
+
 function isCurrentGenerateStackItem(item: StorageItem, node: BoardNodeModel): boolean {
   return (
     (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app") &&
@@ -745,8 +750,40 @@ function isCurrentGenerateStackItem(item: StorageItem, node: BoardNodeModel): bo
   );
 }
 
+function isCurrentGenerateStackTask(task: GenerationTask, node: BoardNodeModel): boolean {
+  return (
+    (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app") &&
+    task.source.boardNodeId === node.id &&
+    (!node.resultStackKey || task.source.resultStackKey === node.resultStackKey)
+  );
+}
+
+function buildGenerationTaskFingerprint(tasks: GenerationTask[]): string {
+  return tasks
+    .map(task => [
+      task.id,
+      task.status,
+      task.progress,
+      task.createdAt,
+      task.source.boardNodeId ?? "",
+      task.source.resultStackKey ?? "",
+    ].join(":"))
+    .join("|");
+}
+
 function isResultSourceNode(node: BoardNodeModel | undefined): node is Extract<BoardNodeModel, { kind: "image-generate" | "video-generate" | "runninghub-app" }> {
   return node?.kind === "image-generate" || node?.kind === "video-generate" || node?.kind === "runninghub-app";
+}
+
+async function copyImageUrlToClipboard(url: string): Promise<void> {
+  if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) {
+    throw new Error("当前浏览器不支持复制图片到剪贴板");
+  }
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`图片读取失败：HTTP ${response.status}`);
+  const blob = await response.blob();
+  if (!blob.type.startsWith("image/")) throw new Error("当前资产不是可复制的图片");
+  await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
 }
 
 function pastedNodePosition(node: BoardNodeModel): BoardPoint {
@@ -761,6 +798,7 @@ export default function BoardWorkspace({
   children,
   controller,
   galleryItems = [],
+  generationTasks = [],
   onBack,
   onCancelGenerateNode,
   onCaptureVideoFrame,
@@ -778,7 +816,6 @@ export default function BoardWorkspace({
   onSelectBoard,
   onSendAssetToAgent,
   onSendAgentNode,
-  onSetAssetAsReference,
   assetCompareRequest = null,
   focusNodeRequest = null,
   onAssetCompareRequestHandled,
@@ -824,6 +861,10 @@ export default function BoardWorkspace({
   const galleryTaskFingerprint = useMemo(
     () => buildGalleryTaskFingerprint(galleryItems),
     [galleryItems],
+  );
+  const generationTaskFingerprint = useMemo(
+    () => buildGenerationTaskFingerprint(generationTasks),
+    [generationTasks],
   );
   const {
     board,
@@ -1135,7 +1176,6 @@ export default function BoardWorkspace({
           }
         },
         onSelectPromptReference: connectSelectedBoardPromptReference,
-        onSetAssetAsReference,
         onUpdateReferenceGroupItemRole: updateReferenceGroupItemRole,
         onUpdateAgent: updateAgentInstruction,
         onUpdateGenerate: updateGenerateNode,
@@ -1170,7 +1210,6 @@ export default function BoardWorkspace({
     onSendAssetToAgent,
     onSendAgentNode,
     connectSelectedBoardPromptReference,
-    onSetAssetAsReference,
     measureAssetAspectRatio,
     trashAndDeleteNode,
     updateReferenceGroupItemRole,
@@ -1185,28 +1224,53 @@ export default function BoardWorkspace({
 
   const generateTaskByNodeId = useMemo(() => {
     const map = new Map<string, BoardGenerateTaskSummary>();
-    const activeItemByNodeId = new Map<string, StorageItem & { status: "pending" | "processing" }>();
+    const activeByNodeId = new Map<string, {
+      createdAt: string;
+      id: string;
+      progress: number;
+      status: "pending" | "processing";
+    }>();
 
     for (const item of galleryItems) {
       if (!item.sourceBoardNodeId || !isActiveGenerateTask(item)) continue;
       const sourceNode = boardPromptReferenceGraphIndex.nodeById.get(item.sourceBoardNodeId);
       if (!sourceNode || !isCurrentGenerateStackItem(item, sourceNode)) continue;
-      const current = activeItemByNodeId.get(sourceNode.id);
+      const current = activeByNodeId.get(sourceNode.id);
       if (!current || new Date(item.createdAt).getTime() > new Date(current.createdAt).getTime()) {
-        activeItemByNodeId.set(sourceNode.id, item);
+        activeByNodeId.set(sourceNode.id, {
+          createdAt: item.createdAt,
+          id: item.id,
+          progress: Math.max(0, Math.min(100, item.progress)),
+          status: item.status,
+        });
       }
     }
 
-    for (const [nodeId, item] of activeItemByNodeId) {
+    for (const task of generationTasks) {
+      if (!isActiveBoardGenerationTask(task) || !task.source.boardNodeId) continue;
+      const sourceNode = boardPromptReferenceGraphIndex.nodeById.get(task.source.boardNodeId);
+      if (!sourceNode || !isCurrentGenerateStackTask(task, sourceNode)) continue;
+      const current = activeByNodeId.get(sourceNode.id);
+      if (!current || new Date(task.createdAt).getTime() > new Date(current.createdAt).getTime()) {
+        activeByNodeId.set(sourceNode.id, {
+          createdAt: task.createdAt,
+          id: task.id,
+          progress: Math.max(0, Math.min(100, task.progress)),
+          status: task.status,
+        });
+      }
+    }
+
+    for (const [nodeId, task] of activeByNodeId) {
       map.set(nodeId, {
-        id: item.id,
-        progress: Math.max(0, Math.min(100, item.progress)),
-        status: item.status,
+        id: task.id,
+        progress: task.progress,
+        status: task.status,
       });
     }
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- task fingerprint gates progress-only polls
-  }, [boardGraphContentKey, boardPromptReferenceGraphIndex, galleryTaskFingerprint]);
+  }, [boardGraphContentKey, boardPromptReferenceGraphIndex, galleryTaskFingerprint, generationTaskFingerprint]);
 
   const flowNodes = useMemo<BoardFlowNode[]>(
     () =>
@@ -2089,11 +2153,23 @@ export default function BoardWorkspace({
             const compareReferenceUrl = node.kind === "asset" && node.asset.type === "image"
               ? assetCompareReferenceUrl(node.id, board.nodes, board.edges)
               : null;
+            const copyableImageUrl = (node.kind === "asset" || node.kind === "result") && node.asset.type === "image"
+              ? node.asset.url
+              : null;
             const actions = buildBoardNodeContextMenuActions({
               node,
               onCompare: compareReferenceUrl && node.kind === "asset"
                 ? () => {
                   setAssetCompare({ originalUrl: compareReferenceUrl, resultUrl: node.asset.url });
+                  closeOverlayMenus();
+                }
+                : undefined,
+              onCopyImage: copyableImageUrl
+                ? () => {
+                  void copyImageUrlToClipboard(copyableImageUrl).then(
+                    () => onWorkspaceNotice("success", "图片已复制到剪贴板"),
+                    error => onWorkspaceNotice("error", error instanceof Error ? error.message : "复制图片失败"),
+                  );
                   closeOverlayMenus();
                 }
                 : undefined,
@@ -2126,10 +2202,6 @@ export default function BoardWorkspace({
                     closeOverlayMenus();
                   }
                   : undefined,
-              onSetReference: node.kind === "asset" ? () => {
-                onSetAssetAsReference(node.id);
-                closeOverlayMenus();
-              } : undefined,
             });
             return (
               <BoardNodeContextMenu

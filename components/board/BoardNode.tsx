@@ -54,7 +54,6 @@ export interface BoardFlowNodeData extends Record<string, unknown> {
   onSelectPromptReference: (nodeId: string, reference: BoardPromptReference) => void;
   onSelectAssetStackResult: (nodeId: string, assetId: string) => void;
   onSelectGenerateResult: (nodeId: string, assetId: string) => void;
-  onSetAssetAsReference: (nodeId: string) => void;
   onUpdateReferenceGroupItemRole: (nodeId: string, assetId: string, role: BoardReferenceRole) => void;
   onUpdateAgent: (nodeId: string, instruction: string) => void;
   onUpdateGenerate: (nodeId: string, input: BoardGenerateNodeUpdate) => void;
@@ -345,7 +344,6 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             onOpenFullscreen={data.onOpenFullscreen}
             onSelectStackAsset={assetId => data.onSelectAssetStackResult(node.id, assetId)}
             onSendToAgent={data.onSendAssetToAgent}
-            onSetAsReference={data.onSetAssetAsReference}
           />
         )}
         {node.kind === "result" && (

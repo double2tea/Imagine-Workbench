@@ -22,6 +22,7 @@ interface VideoAssetPlayerProps {
   onCaptureFrame?: (item: StorageItem, frame: CapturedVideoFrame) => void | Promise<unknown>;
   onCaptureFrameRequestReady?: (request: VideoFrameCaptureRequest | null) => void;
   preload?: "none" | "metadata" | "auto";
+  showFullscreenButton?: boolean;
 }
 
 function formatTime(value: number): string {
@@ -46,6 +47,7 @@ export default function VideoAssetPlayer({
   onCaptureFrame,
   onCaptureFrameRequestReady,
   preload = "metadata",
+  showFullscreenButton = true,
 }: VideoAssetPlayerProps) {
   const showAlert = useAlert();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -188,14 +190,16 @@ export default function VideoAssetPlayer({
           >
             {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
           </button>
-          <button
-            type="button"
-            onClick={requestFullscreen}
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-white transition hover:bg-white/12"
-            title="全屏播放"
-          >
-            <Maximize2 className="h-4 w-4" />
-          </button>
+          {showFullscreenButton && (
+            <button
+              type="button"
+              onClick={requestFullscreen}
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-white transition hover:bg-white/12"
+              title="全屏播放"
+            >
+              <Maximize2 className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
     </div>

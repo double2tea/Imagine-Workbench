@@ -20,16 +20,17 @@ interface BoardNodeContextMenuProps {
 export function buildBoardNodeContextMenuActions(input: {
   node: BoardNode;
   onCompare?: () => void;
+  onCopyImage?: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
   onEditImage?: () => void;
   onExecute?: () => void;
   onSendAgent?: () => void;
-  onSetReference?: () => void;
 }): BoardNodeContextMenuAction[] {
   const actions: BoardNodeContextMenuAction[] = [
     { id: "duplicate", label: "复制节点", onSelect: input.onDuplicate },
   ];
+  if (input.onCopyImage) actions.push({ id: "copy-image", label: "复制图片", onSelect: input.onCopyImage });
   if ((input.node.kind === "image-generate" || input.node.kind === "video-generate" || input.node.kind === "runninghub-app") && input.onExecute) {
     actions.push({ id: "execute", label: "执行生成", onSelect: input.onExecute });
   }
@@ -38,7 +39,6 @@ export function buildBoardNodeContextMenuActions(input: {
     if (input.onEditImage) actions.push({ id: "edit", label: "编辑图片", onSelect: input.onEditImage });
   }
   if (input.node.kind === "asset") {
-    if (input.onSetReference) actions.push({ id: "reference", label: "设为参考", onSelect: input.onSetReference });
     if (input.onSendAgent) actions.push({ id: "agent", label: "发送到 Agent", onSelect: input.onSendAgent });
   }
   if (input.node.kind === "agent" && input.onSendAgent) {

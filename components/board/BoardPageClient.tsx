@@ -45,10 +45,13 @@ import { useProviderSettings } from "@/hooks/useProviderSettings";
 import {
   buildStorageItem,
   clearAllDB,
-  deleteFromDB,
   saveToDB,
   type StorageItem,
 } from "@/lib/db";
+import {
+  cancelGenerationTask,
+  type GenerationTask,
+} from "@/lib/generation-tasks";
 import {
   DEFAULT_IMAGE_MODEL,
   DEFAULT_VIDEO_MODEL,
@@ -127,7 +130,7 @@ import {
 import { CLEAR_WORKSPACE_ASSETS_MESSAGE } from "@/lib/workspace-messages";
 
 type NoticeType = "error" | "info" | "success";
-type MaskDestination = "creative" | "agent";
+type MaskDestination = "creative" | "agent" | "board-asset";
 type BoardMode = "image" | "video";
 type GenerateBoardNode = BoardImageGenerateNode | BoardVideoGenerateNode;
 type ExecutableBoardNode = GenerateBoardNode | BoardRunningHubAppNode;
@@ -742,15 +745,28 @@ function hasActiveSourceItems(items: StorageItem[], sourceNode: ExecutableBoardN
   return items.some(item => isSourceStackItem(item, sourceNode) && (item.status === "pending" || item.status === "processing"));
 }
 
-function nextSourceNodeStatus(items: StorageItem[], sourceNode: ExecutableBoardNode, itemStatus: StorageItem["status"]): BoardGenerationStatus {
-  if (hasActiveSourceItems(items, sourceNode)) return "processing";
+function isSourceStackTask(task: GenerationTask, sourceNode: ExecutableBoardNode): boolean {
+  return task.source.boardNodeId === sourceNode.id && (!sourceNode.resultStackKey || task.source.resultStackKey === sourceNode.resultStackKey);
+}
+
+function hasActiveSourceTasks(tasks: GenerationTask[], sourceNode: ExecutableBoardNode): boolean {
+  return tasks.some(task => isSourceStackTask(task, sourceNode) && (task.status === "pending" || task.status === "processing"));
+}
+
+function nextSourceNodeStatus(
+  items: StorageItem[],
+  tasks: GenerationTask[],
+  sourceNode: ExecutableBoardNode,
+  itemStatus: StorageItem["status"],
+): BoardGenerationStatus {
+  if (hasActiveSourceItems(items, sourceNode) || hasActiveSourceTasks(tasks, sourceNode)) return "processing";
   if (items.some(item => isSourceStackItem(item, sourceNode) && item.status === "complete")) return "complete";
   return itemStatus === "failed" ? "failed" : "complete";
 }
 
-function activeSourceItemForNode(items: StorageItem[], sourceBoardNodeId: string): StorageItem | undefined {
-  return items
-    .filter(item => item.sourceBoardNodeId === sourceBoardNodeId && (item.status === "pending" || item.status === "processing"))
+function activeSourceTaskForNode(tasks: GenerationTask[], sourceNode: ExecutableBoardNode): GenerationTask | undefined {
+  return tasks
+    .filter(task => isSourceStackTask(task, sourceNode) && (task.status === "pending" || task.status === "processing"))
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0];
 }
 
@@ -939,6 +955,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const [maskTargetUrl, setMaskTargetUrl] = useState("");
   const [maskTargetId, setMaskTargetId] = useState("");
   const [maskDestination, setMaskDestination] = useState<MaskDestination>("creative");
+  const [maskSourceNodeId, setMaskSourceNodeId] = useState<string | null>(null);
   const [fullscreenItem, setFullscreenItem] = useState<StorageItem | null>(null);
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
   const focusNodeSeqRef = useRef(0);
@@ -950,6 +967,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const [assetCompareRequest, setAssetCompareRequest] = useState<{ originalUrl: string; resultUrl: string } | null>(null);
   const [cancelingBoardItemIds, setCancelingBoardItemIds] = useState<string[]>([]);
   const handledBoardItemIdsRef = useRef<Set<string>>(new Set());
+  const handledBoardTaskIdsRef = useRef<Set<string>>(new Set());
   const pollingFailuresRef = useRef<Record<string, number>>({});
   const generationAbortControllersRef = useRef<Record<string, AbortController>>({});
   const locallyCanceledItemIdsRef = useRef<Set<string>>(new Set());
@@ -1140,6 +1158,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
   useEffect(() => {
     handledBoardItemIdsRef.current.clear();
+    handledBoardTaskIdsRef.current.clear();
   }, [resolvedBoardId]);
 
   useEffect(() => {
@@ -1267,10 +1286,11 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     }
   };
 
-  const launchMaskEditor = useCallback((imageUrl: string, id: string, destination: MaskDestination = "creative") => {
+  const launchMaskEditor = useCallback((imageUrl: string, id: string, destination: MaskDestination = "creative", sourceNodeId?: string) => {
     setMaskTargetUrl(imageUrl);
     setMaskTargetId(id);
     setMaskDestination(destination);
+    setMaskSourceNodeId(sourceNodeId ?? null);
     setIsMaskOpen(true);
   }, []);
 
@@ -1290,6 +1310,40 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       setAgentReferences([{ id: nextReferenceId, url: compressedMergedImage }]);
       setAgentInput("In the marked region, change: ");
       setIsAgentDockOpen(true);
+    } else if (maskDestination === "board-asset") {
+      const sourceNode = maskSourceNodeId
+        ? boardController.board.nodes.find(node => node.id === maskSourceNodeId)
+        : undefined;
+      if (sourceNode?.kind !== "asset" || sourceNode.asset.type !== "image") {
+        pushWorkspaceNotice("error", "未找到要编辑的图片资产节点");
+        return;
+      }
+      const editedItem = buildStorageItem(
+        {
+          id: makeClientId("img_edit"),
+          type: "image",
+          url: compressedMergedImage,
+          prompt: `${sourceNode.title} 局部编辑`,
+          model: "board-local-edit",
+          aspectRatio: "auto",
+          createdAt: new Date().toISOString(),
+          status: "complete",
+          progress: 100,
+          maskOriginalId: sourceNode.asset.assetId,
+        },
+        { boardId: resolvedBoardId },
+      );
+      if (!await saveItemOrWarn(editedItem, pushWorkspaceNotice)) return;
+      setItems(prev => [editedItem, ...prev]);
+      const editedNodeId = boardController.addAssetNode({
+        asset: storageItemToBoardAssetReference(editedItem),
+        position: {
+          x: sourceNode.position.x + sourceNode.size.width + 40,
+          y: sourceNode.position.y,
+        },
+      });
+      boardController.selectNode(editedNodeId);
+      boardController.selectEdge(null);
     } else {
       setReferenceImage(compressedMergedImage);
       setReferenceImages([{ id: nextReferenceId, url: compressedMergedImage, role: "general" }]);
@@ -1302,7 +1356,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       "success",
       maskDestination === "agent"
         ? "蒙版已应用到 Agent 参考图，可在对话中继续描述修改"
-        : "蒙版已写入参考图，可继续编辑提示词并生成",
+        : maskDestination === "board-asset"
+          ? "已生成局部编辑资产节点"
+          : "蒙版已写入参考图，可继续编辑提示词并生成",
     );
   };
 
@@ -2079,32 +2135,38 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   });
 
   const cancelBoardGenerationNode = useCallback(async (nodeId: string): Promise<void> => {
-    const item = activeSourceItemForNode(items, nodeId);
-    if (!item) {
-      boardController.updateGenerateNode(nodeId, {
+    const sourceNode = findExecutableNodeById(boardController.board.nodes, nodeId);
+    const task = sourceNode ? activeSourceTaskForNode(generationTasks, sourceNode) : undefined;
+    if (!sourceNode || !task) {
+      const update = {
         errorMessage: "未找到可取消的关联任务",
         status: "failed",
-      });
+      } as const;
+      if (sourceNode?.kind === "runninghub-app") {
+        boardController.updateRunningHubAppNode(nodeId, update);
+      } else {
+        boardController.updateGenerateNode(nodeId, update);
+      }
       return;
     }
 
-    const operationName = item.operationName;
-    if (cancelingBoardItemIds.includes(item.id)) return;
-    const canCancelRemote = operationName?.startsWith("12ai:video:") === true;
+    const operationName = task.operationName;
+    if (cancelingBoardItemIds.includes(task.id)) return;
+    const canCancelRemote = task.canCancelRemote && Boolean(operationName);
     const confirmText = canCancelRemote
       ? "确定要取消这个视频生成任务吗？"
       : "确定要本地取消这个任务吗？远端生成可能仍会继续。";
     if (!(await confirmAction({ message: confirmText, tone: "danger", confirmLabel: "取消任务" }))) return;
 
-    setCancelingBoardItemIds(prev => [...prev, item.id]);
+    setCancelingBoardItemIds(prev => [...prev, task.id]);
     try {
-      const controller = generationAbortControllersRef.current[item.id];
+      const controller = generationAbortControllersRef.current[task.id];
       if (controller) {
-        locallyCanceledItemIdsRef.current.add(item.id);
+        locallyCanceledItemIdsRef.current.add(task.id);
         controller.abort();
       }
       if (!canCancelRemote) {
-        locallyCanceledItemIdsRef.current.add(item.id);
+        locallyCanceledItemIdsRef.current.add(task.id);
       }
 
       if (canCancelRemote && operationName) {
@@ -2118,18 +2180,23 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         }
       }
 
-      await deleteFromDB(item.id);
-      delete pollingFailuresRef.current[item.id];
-      setItems(prev => prev.filter(current => current.id !== item.id));
-      boardController.updateGenerateNode(nodeId, {
+      const canceledTask = await cancelGenerationTask(task.id);
+      setGenerationTasks(prev => prev.map(current => current.id === canceledTask.id ? canceledTask : current));
+      delete pollingFailuresRef.current[task.id];
+      const update = {
         errorMessage: canCancelRemote ? "远端生成任务已取消" : "任务已从本地取消",
         status: "failed",
-      });
+      } as const;
+      if (sourceNode.kind === "runninghub-app") {
+        boardController.updateRunningHubAppNode(nodeId, update);
+      } else {
+        boardController.updateGenerateNode(nodeId, update);
+      }
       pushWorkspaceNotice("success", canCancelRemote ? "视频生成任务已取消" : "任务已从本地取消");
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, "任务取消失败"));
     } finally {
-      setCancelingBoardItemIds(prev => prev.filter(id => id !== item.id));
+      setCancelingBoardItemIds(prev => prev.filter(id => id !== task.id));
     }
   }, [
     boardController,
@@ -2137,10 +2204,11 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     cancelingBoardItemIds,
     confirmAction,
     generationAbortControllersRef,
-    items,
+    generationTasks,
     locallyCanceledItemIdsRef,
     pollingFailuresRef,
     pushWorkspaceNotice,
+    setGenerationTasks,
   ]);
 
   const addAssetToBoard = useCallback((asset: StorageItem, position?: BoardPoint): string => {
@@ -2238,17 +2306,6 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     pushWorkspaceNotice("success", "已将选中节点作为生成参考图");
   };
 
-  const useBoardAssetAsReference = useCallback((nodeId: string) => {
-    const references = activeBoardReference(boardController.board.nodes, nodeId, items, resolveBoardReferenceUrl);
-    if (references.length === 0) {
-      pushWorkspaceNotice("info", "请选择一个图片资产节点");
-      return;
-    }
-    setReferenceImage(references[0].url);
-    setReferenceImages(references);
-    pushWorkspaceNotice("success", "已将节点作为生成参考图");
-  }, [boardController.board.nodes, items, pushWorkspaceNotice, resolveBoardReferenceUrl, setReferenceImage, setReferenceImages]);
-
   const useSelectedBoardAssetForAgent = () => {
     const references = activeBoardReference(boardController.board.nodes, boardController.selectedNodeId, items, resolveBoardReferenceUrl);
     if (references.length === 0) {
@@ -2287,7 +2344,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       pushWorkspaceNotice("info", "请选择一个图片资产节点");
       return;
     }
-    launchMaskEditor(node.asset.url, node.asset.assetId);
+    launchMaskEditor(node.asset.url, node.asset.assetId, "board-asset", node.id);
   }, [boardController.board.nodes, launchMaskEditor, pushWorkspaceNotice]);
 
   const resolveGenerateNodeInputs = useCallback((nodeId: string) => {
@@ -2626,7 +2683,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         if (!sourceNode) continue;
         if (!isSourceStackItem(item, sourceNode)) continue;
         handledBoardItems.add(item.id);
-        const nextStatus = nextSourceNodeStatus(items, sourceNode, item.status);
+        const nextStatus = nextSourceNodeStatus(items, generationTasks, sourceNode, item.status);
         const resultAssetIds = sourceStackResultAssetIds(items, sourceNode, item.id);
         const activeResultAssetId = resultAssetIds[resultAssetIds.length - 1] ?? item.id;
         const activeResultItem = items.find(candidate => candidate.id === activeResultAssetId && candidate.status === "complete") ?? item;
@@ -2648,7 +2705,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         if (!sourceNode) continue;
         if (!isSourceStackItem(item, sourceNode)) continue;
         handledBoardItems.add(item.id);
-        const nextStatus = nextSourceNodeStatus(items, sourceNode, item.status);
+        const nextStatus = nextSourceNodeStatus(items, generationTasks, sourceNode, item.status);
         const update = {
           errorMessage: nextStatus === "failed" ? item.errorMessage ?? "生成失败" : undefined,
           status: nextStatus,
@@ -2661,7 +2718,56 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         continue;
       }
     }
-  }, [boardAssetsLoading, boardController, items]);
+  }, [boardAssetsLoading, boardController, generationTasks, items]);
+
+  useEffect(() => {
+    if (boardController.saveStatus === "loading") return;
+    if (boardAssetsLoading) return;
+    if (!isBoardAssetScopeLoaded) return;
+    const handledBoardTasks = handledBoardTaskIdsRef.current;
+    for (const task of generationTasks) {
+      const sourceBoardNodeId = task.source.boardNodeId;
+      if (!sourceBoardNodeId) continue;
+      const sourceNode = findExecutableNodeById(boardController.board.nodes, sourceBoardNodeId);
+      if (!sourceNode) continue;
+      if (!isSourceStackTask(task, sourceNode)) continue;
+
+      if (task.status === "pending" || task.status === "processing") {
+        if (sourceNode.status !== "processing" || sourceNode.errorMessage) {
+          const update = {
+            errorMessage: undefined,
+            status: "processing",
+          } as const;
+          if (sourceNode.kind === "runninghub-app") {
+            boardController.updateRunningHubAppNode(sourceBoardNodeId, update);
+          } else {
+            boardController.updateGenerateNode(sourceBoardNodeId, update);
+          }
+        }
+        continue;
+      }
+
+      if (handledBoardTasks.has(task.id)) continue;
+      if (task.status !== "failed" && task.status !== "canceled") continue;
+
+      handledBoardTasks.add(task.id);
+      const nextStatus: BoardGenerationStatus =
+        hasActiveSourceItems(items, sourceNode) || hasActiveSourceTasks(generationTasks, sourceNode)
+          ? "processing"
+          : items.some(item => isSourceStackItem(item, sourceNode) && item.status === "complete")
+            ? "complete"
+            : "failed";
+      const update = {
+        errorMessage: nextStatus === "failed" ? task.errorMessage ?? (task.status === "canceled" ? "任务已取消" : "生成失败") : undefined,
+        status: nextStatus,
+      };
+      if (sourceNode.kind === "runninghub-app") {
+        boardController.updateRunningHubAppNode(sourceBoardNodeId, update);
+      } else {
+        boardController.updateGenerateNode(sourceBoardNodeId, update);
+      }
+    }
+  }, [boardAssetsLoading, boardController, generationTasks, isBoardAssetScopeLoaded, items]);
 
   const handleClearProject = async () => {
     if (!(await confirmAction({
@@ -2672,6 +2778,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     try {
       await clearAllDB();
       handledBoardItemIdsRef.current = new Set();
+      handledBoardTaskIdsRef.current = new Set();
       setItems([]);
       pushWorkspaceNotice("success", "本地资产库已清空");
     } catch (error) {
@@ -3009,6 +3116,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         boardSummaries={boardSummariesForToolbar}
         controller={boardController}
         galleryItems={items}
+        generationTasks={generationTasks}
         assetCompareRequest={assetCompareRequest}
         focusNodeRequest={focusNodeRequest}
         onAssetCompareRequestHandled={() => setAssetCompareRequest(null)}
@@ -3031,7 +3139,6 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onSelectBoard={handleSelectBoard}
         onSendAssetToAgent={useBoardAssetForAgent}
         onSendAgentNode={handleSendAgentNode}
-        onSetAssetAsReference={useBoardAssetAsReference}
       >
         <BoardSidePanel
           assetCount={items.length}

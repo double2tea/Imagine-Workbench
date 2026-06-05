@@ -109,13 +109,41 @@ export function useMediaPolling({
   setItems,
 }: UseMediaPollingParams) {
   useEffect(() => {
-    const processingTasks = generationTasks.filter(task => task.status === "processing" && task.operationName);
-    if (processingTasks.length === 0) return;
+    const activeTasks = generationTasks.filter(task => task.status === "pending" || task.status === "processing");
+    if (activeTasks.length === 0) return;
 
     const interval = setInterval(async () => {
       const completedItems: StorageItem[] = [];
 
-      for (const task of processingTasks) {
+      for (const task of activeTasks) {
+        if (task.status === "pending") {
+          if (!isProcessingTimedOut(task)) continue;
+          const timeoutMessage = "任务超过 2 小时仍未进入远端队列，已停止等待。";
+          const failedTask = await updateTaskOrWarn(task.id, {
+            status: "failed",
+            progress: 100,
+            errorMessage: timeoutMessage,
+          }, pushWorkspaceNotice);
+          delete pollingFailuresRef.current[task.id];
+          if (failedTask) setGenerationTasks(current => upsertGenerationTask(current, failedTask));
+          pushWorkspaceNotice("error", timeoutMessage);
+          continue;
+        }
+
+        if (!task.operationName) {
+          if (!isProcessingTimedOut(task)) continue;
+          const timeoutMessage = "任务超过 2 小时仍缺少远端任务 ID，已停止等待。";
+          const failedTask = await updateTaskOrWarn(task.id, {
+            status: "failed",
+            progress: 100,
+            errorMessage: timeoutMessage,
+          }, pushWorkspaceNotice);
+          delete pollingFailuresRef.current[task.id];
+          if (failedTask) setGenerationTasks(current => upsertGenerationTask(current, failedTask));
+          pushWorkspaceNotice("error", timeoutMessage);
+          continue;
+        }
+
         if (task.operationName) {
           if (locallyCanceledItemIdsRef.current.has(task.id)) continue;
           try {
@@ -191,7 +219,16 @@ export function useMediaPolling({
                   },
                   { boardId: task.source.boardId },
                 );
-                if (!await saveItemOrWarn(completedItem, pushWorkspaceNotice)) continue;
+                if (!await saveItemOrWarn(completedItem, pushWorkspaceNotice)) {
+                  const failedTask = await updateTaskOrWarn(task.id, {
+                    status: "failed",
+                    progress: 100,
+                    errorMessage: "结果资产本地存储失败",
+                  }, pushWorkspaceNotice);
+                  delete pollingFailuresRef.current[task.id];
+                  if (failedTask) setGenerationTasks(current => upsertGenerationTask(current, failedTask));
+                  continue;
+                }
                 completedItems.push(completedItem);
                 const completedTask = await updateTaskOrWarn(task.id, {
                   activeResultAssetId: completedAssetId,

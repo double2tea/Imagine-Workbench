@@ -117,6 +117,7 @@ export default function ResultBoardNode({
             onCaptureFrameRequestReady={request => {
               captureVideoFrameRef.current = request;
             }}
+            showFullscreenButton={false}
           />
         </div>
       )}
