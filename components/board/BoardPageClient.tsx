@@ -1141,7 +1141,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     setItems,
   });
 
-  const { generateManualImage, generateManualVideo } = useGenerationActions({
+  const { generateManualAudio, generateManualImage, generateManualVideo } = useGenerationActions({
     boardId: resolvedBoardId,
     activeImageAspectRatio,
     activeImageModel,
@@ -1998,6 +1998,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     return handledBoardAction(true);
   }, [
     boardController,
+    generateManualAudio,
     generateManualImage,
     generateManualVideo,
     items,
@@ -2327,8 +2328,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         });
 
         const model = runningHubAppModelValue(node);
-        const didStart = node.outputType === "image"
-          ? await generateManualImage({
+        let didStart = false;
+        if (node.outputType === "image") {
+          didStart = await generateManualImage({
             allowEmptyPrompt: true,
             boardId: resolvedBoardId,
             boardNodeId: nodeId,
@@ -2342,8 +2344,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             runningHubAccessPassword: node.accessPassword,
             runningHubNodeInfoList: runningHubNodeInfoBindings(node),
             size: "auto",
-          })
-          : await generateManualVideo({
+          });
+        } else if (node.outputType === "video") {
+          didStart = await generateManualVideo({
             allowEmptyPrompt: true,
             boardId: resolvedBoardId,
             boardNodeId: nodeId,
@@ -2356,6 +2359,20 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             runningHubNodeInfoList: runningHubNodeInfoBindings(node),
             size: "auto",
           });
+        } else {
+          didStart = await generateManualAudio({
+            allowEmptyPrompt: true,
+            boardId: resolvedBoardId,
+            boardNodeId: nodeId,
+            boardResultStackKey: resultStackKey,
+            model,
+            prompt: nodePrompt,
+            referenceImage: references[0]?.url ?? null,
+            referenceImages: references,
+            runningHubAccessPassword: node.accessPassword,
+            runningHubNodeInfoList: runningHubNodeInfoBindings(node),
+          });
+        }
         if (!didStart) {
           boardController.updateRunningHubAppNode(nodeId, {
             errorMessage: "RunningHub 应用请求未启动，请检查节点参数",

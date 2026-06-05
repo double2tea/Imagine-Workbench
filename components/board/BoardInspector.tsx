@@ -608,10 +608,11 @@ function RunningHubAppInspector({
   onUpdateRunningHubApp: (nodeId: string, input: BoardRunningHubAppNodeUpdate) => void;
 }) {
   const isProcessing = node.status === "processing";
+  const outputLabel = node.outputType === "audio" ? "音频" : node.outputType === "video" ? "视频" : "图片";
   return (
     <div className="space-y-3">
       <p className={infoChipClass}>
-        {node.targetType === "workflow" ? "Workflow" : "AI App"} / {node.outputType === "video" ? "视频" : "图片"} / {node.bindings.length} 参数
+        {node.targetType === "workflow" ? "Workflow" : "AI App"} / {outputLabel} / {node.bindings.length} 参数
       </p>
       <InspectorFocusButton nodeId={node.id} onFocusNode={onFocusNode} />
       <details className="imagine-panel-disclosure" open>
@@ -625,9 +626,10 @@ function RunningHubAppInspector({
               </select>
             </InspectorField>
             <InspectorField title="输出">
-              <select value={node.outputType} onChange={event => onUpdateRunningHubApp(node.id, { outputType: event.target.value === "video" ? "video" : "image" })} className={inputClass}>
+              <select value={node.outputType} onChange={event => onUpdateRunningHubApp(node.id, { outputType: event.target.value === "audio" ? "audio" : event.target.value === "video" ? "video" : "image" })} className={inputClass}>
                 <option value="image">图片</option>
                 <option value="video">视频</option>
+                <option value="audio">音频</option>
               </select>
             </InspectorField>
           </div>

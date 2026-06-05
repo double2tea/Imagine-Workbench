@@ -6,7 +6,7 @@ import {
   resolveRunningHubStandardModelForReferenceMedia,
   validateRunningHubStandardReferenceCount,
 } from "./runninghub";
-import type { GenerateImageInput, GenerateImageResult, MediaStatusResult, ProviderConfig, ReferenceMedia, RunningHubTaskNodeBinding } from "./types";
+import type { GenerateImageInput, GenerateImageResult, MediaStatusResult, ProviderConfig, ProviderMediaType, ReferenceMedia, RunningHubTaskNodeBinding } from "./types";
 import { mediaReferenceFileExtension, mediaReferenceLabel, mediaReferenceTypeFromMime } from "../media-references";
 import {
   dataUriToBlob,
@@ -210,6 +210,38 @@ export async function downloadImage(config: ProviderConfig, taskId: string): Pro
   });
 }
 
+export async function downloadRunningHubMedia(
+  config: ProviderConfig,
+  mediaType: ProviderMediaType,
+  taskId: string,
+): Promise<Response> {
+  const status = await getRunningHubMediaStatus(config, mediaType, taskId);
+  if (!status.url) throw new Error(`RunningHub ${mediaType} task is complete but did not expose a result URL`);
+
+  const res = await fetch(status.url);
+  if (!res.ok) throw new Error(`Failed to download RunningHub ${mediaType}: HTTP ${res.status}`);
+
+  return new Response(res.body, {
+    headers: {
+      "Content-Type": res.headers.get("Content-Type") ?? defaultRunningHubContentType(mediaType),
+      "Content-Disposition": `inline; filename="${mediaType}_${Date.now()}.${defaultRunningHubExtension(mediaType)}"`,
+      "Cache-Control": "public, max-age=31536000",
+    },
+  });
+}
+
+function defaultRunningHubContentType(mediaType: ProviderMediaType): string {
+  if (mediaType === "image") return "image/png";
+  if (mediaType === "audio") return "audio/mpeg";
+  return "video/mp4";
+}
+
+function defaultRunningHubExtension(mediaType: ProviderMediaType): string {
+  if (mediaType === "image") return "png";
+  if (mediaType === "audio") return "mp3";
+  return "mp4";
+}
+
 export async function getAsyncImageStatus(config: ProviderConfig, taskId: string): Promise<MediaStatusResult> {
   if (config.provider === "modelscope") {
     return getModelScopeImageStatus(config, taskId);
@@ -320,7 +352,7 @@ async function getModelScopeImageStatus(config: ProviderConfig, taskId: string):
 export async function generateRunningHubMedia(
   config: ProviderConfig,
   input: RunningHubMediaInput,
-  mediaType: "image" | "video",
+  mediaType: ProviderMediaType,
 ): Promise<GenerateImageResult> {
   const request = await buildRunningHubRequest(config, input, mediaType);
   const response = await postJson<RunningHubCreateResponse>(`${config.baseUrl}${request.endpoint}`, config, request.body);
@@ -378,7 +410,7 @@ function summarizeRunningHubCreateResponse(response: RunningHubCreateResponse): 
 
 export async function getRunningHubMediaStatus(
   config: ProviderConfig,
-  mediaType: "image" | "video",
+  mediaType: ProviderMediaType,
   taskId: string,
 ): Promise<MediaStatusResult> {
   const operationTask = parseRunningHubOperationTaskId(taskId);
@@ -409,7 +441,7 @@ export async function getRunningHubMediaStatus(
 
 async function getRunningHubTaskOutputStatus(
   config: ProviderConfig,
-  mediaType: "image" | "video",
+  mediaType: ProviderMediaType,
   taskId: string,
 ): Promise<MediaStatusResult> {
   const response = await postJson<RunningHubTaskOutputsResponse>(`${config.baseUrl}/task/openapi/outputs`, config, {
@@ -459,15 +491,16 @@ function readFailedReason(reason: unknown): string {
   return typeof reason === "string" && reason.trim() ? reason : "RunningHub task failed";
 }
 
-function readRunningHubOutputUrl(results: RunningHubMediaOutput[], mediaType: "image" | "video"): string | undefined {
+function readRunningHubOutputUrl(results: RunningHubMediaOutput[], mediaType: ProviderMediaType): string | undefined {
   return results.find(result => isRunningHubOutputMediaType(result, mediaType))?.url
     ?? results.find(result => isRunningHubOutputMediaType(result, mediaType))?.fileUrl;
 }
 
-function isRunningHubOutputMediaType(result: RunningHubMediaOutput, mediaType: "image" | "video"): boolean {
+function isRunningHubOutputMediaType(result: RunningHubMediaOutput, mediaType: ProviderMediaType): boolean {
   const marker = (result.fileType ?? result.outputType ?? result.url ?? result.fileUrl ?? "").toLowerCase();
   if (mediaType === "image") return /\.(png|jpe?g|webp|gif)(\?|$)/.test(marker) || /^(png|jpe?g|webp|gif|image)\b/.test(marker);
-  return /\.(mp4|mov|webm|m4v)(\?|$)/.test(marker) || /^(mp4|mov|webm|m4v|video)\b/.test(marker);
+  if (mediaType === "video") return /\.(mp4|mov|webm|m4v)(\?|$)/.test(marker) || /^(mp4|mov|webm|m4v|video)\b/.test(marker);
+  return /\.(mp3|wav|m4a|aac|ogg|flac)(\?|$)/.test(marker) || /^(mp3|wav|m4a|aac|ogg|flac|audio)\b/.test(marker);
 }
 
 function readModelScopeReferenceImages(input: GenerateImageInput): string | string[] | undefined {
@@ -491,10 +524,10 @@ function readModelScopeImageUrl(response: ModelScopeImageCreateResponse): string
 async function buildRunningHubRequest(
   config: ProviderConfig,
   input: RunningHubMediaInput,
-  mediaType: "image" | "video",
+  mediaType: ProviderMediaType,
 ): Promise<RunningHubRequest> {
   const size = mediaType === "image" ? input.imageResolution : input.aspectRatio;
-  const standardModel = getRunningHubStandardModel(input.model, mediaType);
+  const standardModel = mediaType === "audio" ? null : getRunningHubStandardModel(input.model, mediaType);
   if (standardModel) {
     const references = input.referenceMedia ?? input.referenceImages.map(reference => ({ ...reference, type: "image" as const }));
     validateRunningHubStandardReferenceCount(standardModel, references.length);
@@ -539,7 +572,7 @@ async function buildRunningHubRequest(
       };
     }
   }
-  const expectedPrefix = mediaType === "image" ? "ai-app-image:" : "ai-app-video:";
+  const expectedPrefix = `ai-app-${mediaType}:`;
   if (input.model.startsWith(expectedPrefix)) {
     const webappId = input.model.slice(expectedPrefix.length).trim();
     if (!webappId) throw new Error(`RunningHub ${mediaType} AI App model is missing webappId`);
@@ -556,7 +589,7 @@ async function buildRunningHubRequest(
       },
     };
   }
-  const workflowPrefix = mediaType === "image" ? "workflow-image:" : "workflow-video:";
+  const workflowPrefix = `workflow-${mediaType}:`;
   if (input.model.startsWith(workflowPrefix)) {
     const workflowId = input.model.slice(workflowPrefix.length).trim();
     if (!workflowId) throw new Error(`RunningHub ${mediaType} workflow model is missing workflowId`);

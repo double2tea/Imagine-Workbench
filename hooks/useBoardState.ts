@@ -579,7 +579,8 @@ function readRunningHubTargetType(value: unknown): BoardRunningHubTargetType {
 }
 
 function readRunningHubOutputType(value: unknown): BoardRunningHubOutputType {
-  return value === "video" ? "video" : "image";
+  if (value === "video" || value === "audio") return value;
+  return "image";
 }
 
 function readRunningHubBindingSource(value: unknown): BoardRunningHubBindingSource {

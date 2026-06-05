@@ -623,6 +623,40 @@ test("runninghub ai app tasks use task output polling endpoint", async () => {
   }
 });
 
+test("runninghub ai app audio tasks use task output polling endpoint", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: Array<{ url: string; body: unknown }> = [];
+  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const url = input.toString();
+    calls.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+    if (url.endsWith("/task/openapi/ai-app/run")) {
+      return Response.json({ code: 0, msg: "success", data: { taskId: "audio_task_123", taskStatus: "RUNNING" } });
+    }
+    return Response.json({ code: 999, msg: "unexpected endpoint" }, { status: 500 });
+  };
+
+  try {
+    const created = await generateRunningHubMedia(
+      runningHubConfig,
+      {
+        prompt: "audio app prompt",
+        model: "ai-app-audio:2061323800511344642",
+        aspectRatio: "auto",
+        imageResolution: "auto",
+        referenceImages: [],
+      },
+      "audio",
+    );
+    assert.equal(created.operationName, "runninghub:audio:task-output:audio_task_123");
+    assert.deepEqual(calls[0]?.body, {
+      apiKey: "rh_test_key",
+      webappId: "2061323800511344642",
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("runninghub ai app tasks map custom nodeInfoList bindings", async () => {
   const originalFetch = globalThis.fetch;
   const calls: Array<{ url: string; body: unknown }> = [];
@@ -818,6 +852,32 @@ test("runninghub polling selects output url by requested media type", async () =
       progress: 100,
       status: "success",
       url: "https://runninghub.example/output.mp4",
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("runninghub polling selects audio output url by requested media type", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (): Promise<Response> => Response.json({
+    code: 0,
+    msg: "success",
+    data: [
+      { fileUrl: "https://runninghub.example/thumb.png", fileType: "png" },
+      { fileUrl: "https://runninghub.example/output.mp4", fileType: "mp4" },
+      { fileUrl: "https://runninghub.example/output.wav", fileType: "wav" },
+    ],
+  });
+
+  try {
+    const status = await getRunningHubMediaStatus(runningHubConfig, "audio", "task-output:audio_123");
+    assert.deepEqual(status, {
+      done: true,
+      mediaType: "audio",
+      progress: 100,
+      status: "success",
+      url: "https://runninghub.example/output.wav",
     });
   } finally {
     globalThis.fetch = originalFetch;

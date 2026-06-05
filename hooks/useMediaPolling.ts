@@ -101,11 +101,17 @@ export function useMediaPolling({
             }
 
             if (statusRecord.done === true) {
-              const mediaType = statusRecord.mediaType === "image" ? "image" : "video";
+              const mediaType = statusRecord.mediaType === "image"
+                ? "image"
+                : statusRecord.mediaType === "audio"
+                  ? "audio"
+                  : "video";
               const downloadEndpoint =
                 mediaType === "image"
                   ? "/api/gemini/image-download"
-                  : "/api/gemini/video-download";
+                  : mediaType === "audio"
+                    ? "/api/runninghub/audio-download"
+                    : "/api/gemini/video-download";
 
               const dlRes = await fetch(downloadEndpoint, {
                 method: "POST",

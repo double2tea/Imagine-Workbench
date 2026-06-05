@@ -76,9 +76,24 @@ export interface GenerateVideoResult {
   source: string;
 }
 
+export interface GenerateAudioInput {
+  prompt: string;
+  model: string;
+  referenceMedia: ReferenceMedia[];
+  runningHubAccessPassword?: string;
+  runningHubNodeInfoList?: RunningHubTaskNodeBinding[];
+}
+
+export interface GenerateAudioResult {
+  operationName: string;
+  source: string;
+}
+
+export type ProviderMediaType = "image" | "video" | "audio";
+
 export interface MediaStatusResult {
   done: boolean;
-  mediaType: "image" | "video";
+  mediaType: ProviderMediaType;
   progress: number;
   status: string;
   url?: string;

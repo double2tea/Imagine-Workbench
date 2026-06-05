@@ -1175,7 +1175,7 @@ function readRunningHubTargetType(record: Record<string, unknown>, field: string
 
 function readRunningHubOutputType(record: Record<string, unknown>, field: string): BoardRunningHubOutputType {
   const value = record[field];
-  if (value !== "image" && value !== "video") throw new Error(`${field} RunningHub 输出类型无效`);
+  if (value !== "image" && value !== "video" && value !== "audio") throw new Error(`${field} RunningHub 输出类型无效`);
   return value;
 }
 

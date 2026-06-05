@@ -1,5 +1,5 @@
 import type { AiProvider } from "./model-catalog";
-import type { ProviderConfig } from "./types";
+import type { ProviderConfig, ProviderMediaType } from "./types";
 import { getProviderMeta, isKnownProvider, resolveProviderApiKey, resolveProviderBaseUrl, resolveProviderVideoBaseUrl } from "./registry";
 
 export function requireText(value: unknown, name: string): string {
@@ -115,13 +115,13 @@ export function aspectRatioToVideoSize(aspectRatio: string, provider: AiProvider
   return "1280x720";
 }
 
-export function mediaOperationName(provider: AiProvider, mediaType: "image" | "video", id: string): string {
+export function mediaOperationName(provider: AiProvider, mediaType: ProviderMediaType, id: string): string {
   return `${provider}:${mediaType}:${id}`;
 }
 
 export function parseMediaOperationName(operationName: string): {
   provider: AiProvider;
-  mediaType: "image" | "video";
+  mediaType: ProviderMediaType;
   id: string;
 } {
   const parts = operationName.split(":");
@@ -130,7 +130,7 @@ export function parseMediaOperationName(operationName: string): {
   }
   const provider = parts[0];
   const mediaType = parts[1];
-  if (!isKnownProvider(provider) || (mediaType !== "image" && mediaType !== "video")) {
+  if (!isKnownProvider(provider) || (mediaType !== "image" && mediaType !== "video" && mediaType !== "audio")) {
     throw new Error("Unsupported media operation name");
   }
   return { provider, mediaType, id: parts.slice(2).join(":") };

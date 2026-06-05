@@ -88,6 +88,7 @@ function readTargetType(value: string): BoardRunningHubTargetType {
 }
 
 function readOutputType(value: string): BoardRunningHubOutputType {
+  if (value === "audio") return "audio";
   return value === "video" ? "video" : "image";
 }
 
@@ -465,6 +466,7 @@ export default function RunningHubAppBoardNode({
             >
               <option value="image">图片输出</option>
               <option value="video">视频输出</option>
+              <option value="audio">音频输出</option>
             </select>
             <input
               value={node.accessPassword ?? ""}

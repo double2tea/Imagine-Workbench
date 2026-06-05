@@ -509,7 +509,138 @@ export function useGenerationActions({
     return true;
   };
 
+  const generateManualAudio = async (overrides: GenerationOverrides = {}) => {
+    const activePrompt = overrides.prompt ?? prompt;
+    const activeReferenceImage = overrides.referenceImage ?? referenceImage;
+    const activeReferenceImages = overrides.referenceImages ?? referenceImages;
+    const requestModel = overrides.model ?? selectedVideoModel;
+
+    if (!activePrompt.trim() && overrides.allowEmptyPrompt !== true) return false;
+    const audioReferences = [...activeReferenceImages];
+    if (audioReferences.length === 0 && activeReferenceImage) {
+      audioReferences.push({ id: "legacy-reference", url: activeReferenceImage });
+    }
+    const audioReferenceUrls = audioReferences.map(reference => reference.url);
+    let audioReferencePayloads: string[];
+    try {
+      audioReferencePayloads = await Promise.all(audioReferenceUrls.map(prepareReferenceMediaUrlForRequest));
+    } catch (error) {
+      pushWorkspaceNotice("error", toErrorMessage(error, "参考媒体读取失败"));
+      return false;
+    }
+    const audioPayloadError = getReferenceMediaPayloadError(audioReferencePayloads);
+    if (audioPayloadError) {
+      pushWorkspaceNotice("error", audioPayloadError);
+      return false;
+    }
+
+    setVideoSubmitCount(prev => prev + 1);
+    const generationPrompt = buildPromptWithReferenceMap(activePrompt, audioReferences, audioReferenceUrls);
+    const generationRequest: GenerationRequestSnapshot = {
+      prompt: generationPrompt,
+      model: requestModel,
+      aspectRatio: "audio",
+      runningHubAccessPassword: overrides.runningHubAccessPassword,
+      runningHubNodeInfoList: overrides.runningHubNodeInfoList,
+      referenceMedia: buildReferenceMediaSnapshot(audioReferences, audioReferencePayloads),
+    };
+
+    const tempId = makeClientId("temp_audio");
+    const newItem = buildStorageItem(
+      {
+        id: tempId,
+        type: "audio",
+        url: "",
+        prompt: activePrompt,
+        model: requestModel,
+        aspectRatio: "audio",
+        createdAt: new Date().toISOString(),
+        status: "processing",
+        progress: 12,
+        generationRequest,
+        sourceBoardNodeId: overrides.boardNodeId,
+        sourceBoardResultStackKey: overrides.boardResultStackKey,
+      },
+      { boardId: resolveScopeBoardId(overrides) },
+    );
+
+    setItems(prev => [newItem, ...prev]);
+
+    const controller = new AbortController();
+    generationAbortControllersRef.current[tempId] = controller;
+
+    try {
+      const headers = buildProviderHeaders(requestModel);
+      const res = await fetch("/api/runninghub/generate-audio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        signal: controller.signal,
+        body: JSON.stringify({
+          prompt: generationRequest.prompt,
+          model: generationRequest.model,
+          referenceMedia: generationRequest.referenceMedia?.map(reference => ({
+            dataUri: reference.url,
+            type: reference.type,
+          })),
+          runningHubAccessPassword: generationRequest.runningHubAccessPassword,
+          runningHubNodeInfoList: generationRequest.runningHubNodeInfoList,
+        }),
+      });
+
+      if (res.ok) {
+        const data: unknown = await res.json();
+        const activeOperationName = getStringField(data, "operationName");
+        if (!activeOperationName) {
+          throw new Error("音频接口返回缺少 operationName");
+        }
+
+        const compilingItem = buildStorageItem(
+          {
+            ...newItem,
+            id: makeClientId("aud"),
+            operationName: activeOperationName,
+            status: "processing",
+          },
+          { boardId: resolveScopeBoardId(overrides) },
+        );
+
+        if (!await saveItemOrWarn(compilingItem, pushWorkspaceNotice)) {
+          setItems(prev => [compilingItem, ...prev.filter(item => item.id !== tempId)]);
+          return true;
+        }
+        setItems(prev => [compilingItem, ...prev.filter(item => item.id !== tempId)]);
+      } else {
+        throw new Error(await readFetchError(res, "音频生成请求失败"));
+      }
+    } catch (error) {
+      if (locallyCanceledItemIdsRef.current.has(tempId) || isAbortError(error)) {
+        locallyCanceledItemIdsRef.current.delete(tempId);
+        return true;
+      }
+      console.error(error);
+      const message = toErrorMessage(error, "音频生成失败");
+      const failedItem = buildStorageItem(
+        {
+          ...newItem,
+          status: "failed",
+          progress: 100,
+          errorMessage: message,
+        },
+        { boardId: resolveScopeBoardId(overrides) },
+      );
+      await saveItemOrWarn(failedItem, pushWorkspaceNotice);
+      setItems(prev => [failedItem, ...prev.filter(item => item.id !== tempId)]);
+      pushWorkspaceNotice("error", message);
+      return true;
+    } finally {
+      delete generationAbortControllersRef.current[tempId];
+      setVideoSubmitCount(prev => Math.max(0, prev - 1));
+    }
+    return true;
+  };
+
   return {
+    generateManualAudio,
     generateManualImage,
     generateManualVideo,
   };
