@@ -279,7 +279,6 @@ function cloneBoardNodeForDuplicate(source: BoardNode, stackIndex: number): Boar
 }
 
 function duplicatedInputEdgesForClones(
-  nodes: BoardNode[],
   edges: BoardEdge[],
   sources: BoardNode[],
   clones: BoardNode[],
@@ -288,7 +287,6 @@ function duplicatedInputEdgesForClones(
   const clonedTargetIds = new Set(sources
     .filter(source => source.kind === "image-generate" || source.kind === "video-generate" || source.kind === "runninghub-app")
     .map(source => source.id));
-  const nextNodes = [...nodes, ...clones];
   return edges.flatMap(edge => {
     if (!clonedTargetIds.has(edge.to.nodeId)) return [];
     if (edge.kind !== "prompt" && edge.kind !== "reference") return [];
@@ -299,8 +297,7 @@ function duplicatedInputEdgesForClones(
       ? { ...edge.from, nodeId: clonedSourceId }
       : edge.from;
     const to = { ...edge.to, nodeId: clonedTargetId };
-    if (!filterValidBoardEdges(nextNodes, [{ ...edge, id: createBoardId("edge"), from, to, createdAt: nowIso() }]).length) return [];
-    return [createBoardEdge(nextNodes, from, to)];
+    return [{ ...edge, id: createBoardId("edge"), from, to, createdAt: nowIso() }];
   });
 }
 
@@ -1606,7 +1603,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
 
     const clones = sources.map((source, index) => cloneBoardNodeForDuplicate(source, index));
     mutateBoard(currentBoard => {
-      const inputEdges = duplicatedInputEdgesForClones(currentBoard.nodes, currentBoard.edges, sources, clones);
+      const inputEdges = duplicatedInputEdgesForClones(currentBoard.edges, sources, clones);
       return touchBoard(currentBoard, [...currentBoard.nodes, ...clones], [...currentBoard.edges, ...inputEdges]);
     });
     const lastClone = clones[clones.length - 1];

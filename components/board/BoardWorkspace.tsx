@@ -175,6 +175,7 @@ interface QuickInsertMenu {
 }
 
 interface CopiedBoardNode {
+  inputEdges: BoardEdge[];
   node: BoardNodeModel;
 }
 
@@ -1801,10 +1802,11 @@ export default function BoardWorkspace({
   const pasteCopiedNode = useCallback((): void => {
     const copied = copiedNodeRef.current;
     if (!copied) return;
-    const { node } = copied;
+    const { inputEdges, node } = copied;
     const position = pastedNodePosition(node);
     const rememberPastedPosition = (): void => {
       copiedNodeRef.current = {
+        inputEdges,
         node: {
           ...node,
           position,
@@ -1828,7 +1830,12 @@ export default function BoardWorkspace({
       return;
     }
     if (node.kind === "image-generate") {
-      addGenerateNode({
+      const inputConnections = inputEdges
+        .map(edge => ({ from: edge.from, targetPortId: edge.to.portId }))
+        .filter((connection): connection is { from: BoardPortRef; targetPortId: typeof BOARD_PORT_IDS.promptIn | typeof BOARD_PORT_IDS.referenceIn } =>
+          connection.targetPortId === BOARD_PORT_IDS.promptIn || connection.targetPortId === BOARD_PORT_IDS.referenceIn,
+        );
+      const input = {
         kind: "image-generate",
         aspectRatio: node.aspectRatio,
         customImageResolution: node.customImageResolution,
@@ -1841,12 +1848,19 @@ export default function BoardWorkspace({
         thinkingLevel: node.thinkingLevel,
         title: node.title,
         variantCount: node.variantCount,
-      });
+      } as const;
+      if (inputConnections.length > 0) addGenerateNodeWithConnections(input, inputConnections);
+      else addGenerateNode(input);
       rememberPastedPosition();
       return;
     }
     if (node.kind === "video-generate") {
-      addGenerateNode({
+      const inputConnections = inputEdges
+        .map(edge => ({ from: edge.from, targetPortId: edge.to.portId }))
+        .filter((connection): connection is { from: BoardPortRef; targetPortId: typeof BOARD_PORT_IDS.promptIn | typeof BOARD_PORT_IDS.referenceIn } =>
+          connection.targetPortId === BOARD_PORT_IDS.promptIn || connection.targetPortId === BOARD_PORT_IDS.referenceIn,
+        );
+      const input = {
         kind: "video-generate",
         aspectRatio: node.aspectRatio,
         model: node.model,
@@ -1859,7 +1873,9 @@ export default function BoardWorkspace({
         videoPreset: node.videoPreset,
         videoReferenceMode: node.videoReferenceMode,
         videoResolution: node.videoResolution,
-      });
+      } as const;
+      if (inputConnections.length > 0) addGenerateNodeWithConnections(input, inputConnections);
+      else addGenerateNode(input);
       rememberPastedPosition();
       return;
     }
@@ -1902,7 +1918,7 @@ export default function BoardWorkspace({
     }
     addNoteNode({ body: node.body, position, size: node.size, title: node.title });
     rememberPastedPosition();
-  }, [addAgentNode, addAssetNode, addGenerateNode, addNoteNode, addPromptNode, addReferenceGroupNode, addResultNodeWithConnection, addRunningHubAppNode]);
+  }, [addAgentNode, addAssetNode, addGenerateNode, addGenerateNodeWithConnections, addNoteNode, addPromptNode, addReferenceGroupNode, addResultNodeWithConnection, addRunningHubAppNode]);
 
   const handleConnectStart = useCallback<OnConnectStart>(() => {
     setIsConnectionActive(true);
@@ -2135,7 +2151,13 @@ export default function BoardWorkspace({
       if (key === "c") {
         const selectedNode = board.nodes.find(node => node.id === selectedNodeIds[0]);
         if (!selectedNode) return;
-        copiedNodeRef.current = { node: selectedNode };
+        copiedNodeRef.current = {
+          inputEdges: board.edges.filter(edge =>
+            edge.to.nodeId === selectedNode.id &&
+            (edge.kind === "prompt" || edge.kind === "reference")
+          ),
+          node: selectedNode,
+        };
         event.preventDefault();
         return;
       }
