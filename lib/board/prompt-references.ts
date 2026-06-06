@@ -36,8 +36,11 @@ export interface BoardGalleryReferenceItem {
 export interface BoardPromptReferenceGraphIndex {
   assetReferences: readonly BoardPromptReference[];
   incomingEdgesByTargetNode: ReadonlyMap<string, readonly BoardEdge[]>;
+  nodeReferences: readonly ReferenceImageRef[];
   nodeById: ReadonlyMap<string, BoardNode>;
   outgoingEdgesBySourceNode: ReadonlyMap<string, readonly BoardEdge[]>;
+  referenceCandidatesByGenerateNode: ReadonlyMap<string, readonly ReferenceImageRef[]>;
+  targetGenerateIdsByPromptNode: ReadonlyMap<string, readonly string[]>;
 }
 
 const GALLERY_REFERENCE_LIMIT = 24;
@@ -50,9 +53,13 @@ export function buildBoardPromptReferenceGraphIndex(
   const incomingEdgesByTargetNode = new Map<string, BoardEdge[]>();
   const outgoingEdgesBySourceNode = new Map<string, BoardEdge[]>();
   const assetReferences: BoardPromptReference[] = [];
+  const nodeReferences: ReferenceImageRef[] = [];
+  const referenceCandidatesByGenerateNode = new Map<string, ReferenceImageRef[]>();
+  const targetGenerateIdsByPromptNode = new Map<string, string[]>();
 
   for (const node of nodes) {
     nodeById.set(node.id, node);
+    nodeReferences.push(...boardNodeReferences(node));
     if (node.kind === "asset") {
       assetReferences.push({
         id: node.asset.assetId,
@@ -72,9 +79,34 @@ export function buildBoardPromptReferenceGraphIndex(
     const outgoing = outgoingEdgesBySourceNode.get(edge.from.nodeId) ?? [];
     outgoing.push(edge);
     outgoingEdgesBySourceNode.set(edge.from.nodeId, outgoing);
+
+    if (edge.to.portId === "reference-in") {
+      const references = boardNodeReferences(nodeById.get(edge.from.nodeId));
+      if (references.length > 0) {
+        const targetReferences = referenceCandidatesByGenerateNode.get(edge.to.nodeId) ?? [];
+        targetReferences.push(...references);
+        referenceCandidatesByGenerateNode.set(edge.to.nodeId, targetReferences);
+      }
+    }
+
+    if (edge.to.portId === "prompt-in") {
+      const targetGenerateIds = targetGenerateIdsByPromptNode.get(edge.from.nodeId) ?? [];
+      if (!targetGenerateIds.includes(edge.to.nodeId)) {
+        targetGenerateIds.push(edge.to.nodeId);
+        targetGenerateIdsByPromptNode.set(edge.from.nodeId, targetGenerateIds);
+      }
+    }
   }
 
-  return { assetReferences, incomingEdgesByTargetNode, nodeById, outgoingEdgesBySourceNode };
+  return {
+    assetReferences,
+    incomingEdgesByTargetNode,
+    nodeReferences,
+    nodeById,
+    outgoingEdgesBySourceNode,
+    referenceCandidatesByGenerateNode,
+    targetGenerateIdsByPromptNode,
+  };
 }
 
 function generateNodeReferenceTypes(node: BoardNode | undefined): ReadonlySet<MediaReferenceType> | null {
@@ -101,9 +133,9 @@ function boardNodeReferences(node: BoardNode | undefined): ReferenceImageRef[] {
   return [];
 }
 
-function uniqueReferences(references: BoardPromptReference[]): BoardPromptReference[] {
+function uniqueReferences<T extends ReferenceImageRef>(references: readonly T[]): T[] {
   const seen = new Set<string>();
-  const unique: BoardPromptReference[] = [];
+  const unique: T[] = [];
   for (const reference of references) {
     const key = `${reference.id}:${reference.url}`;
     if (seen.has(key)) continue;
@@ -122,30 +154,21 @@ function generateReferenceCandidatesFromIndex(
   index: BoardPromptReferenceGraphIndex,
   generateNodeId: string,
 ): ReferenceImageRef[] {
-  return uniqueReferences(
-    (index.incomingEdgesByTargetNode.get(generateNodeId) ?? [])
-      .filter(edge => edge.to.portId === "reference-in")
-      .flatMap(edge => boardNodeReferences(index.nodeById.get(edge.from.nodeId))),
-  );
+  return uniqueReferences(index.referenceCandidatesByGenerateNode.get(generateNodeId) ?? []);
 }
 
 function promptReferenceCandidates(
-  nodes: BoardNode[],
   index: BoardPromptReferenceGraphIndex,
   promptNodeId: string,
 ): ReferenceImageRef[] {
-  const targetGenerateIds = Array.from(new Set(
-    (index.outgoingEdgesBySourceNode.get(promptNodeId) ?? [])
-      .filter(edge => edge.to.portId === "prompt-in")
-      .map(edge => edge.to.nodeId),
-  ));
+  const targetGenerateIds = index.targetGenerateIdsByPromptNode.get(promptNodeId) ?? [];
   if (targetGenerateIds.length === 1) return generateReferenceCandidatesFromIndex(index, targetGenerateIds[0]);
   if (targetGenerateIds.length > 1) {
     return uniqueReferences(
       targetGenerateIds.flatMap(generateNodeId => generateReferenceCandidatesFromIndex(index, generateNodeId)),
     );
   }
-  return uniqueReferences(nodes.flatMap(node => boardNodeReferences(node)));
+  return uniqueReferences(index.nodeReferences);
 }
 
 function boardMediaAssetReferences(
@@ -180,11 +203,7 @@ function acceptedTypesForFocus(
   if (focus.kind === "generate") {
     return generateNodeReferenceTypes(index.nodeById.get(focus.nodeId));
   }
-  const targetGenerateIds = Array.from(new Set(
-    (index.outgoingEdgesBySourceNode.get(focus.nodeId) ?? [])
-      .filter(edge => edge.to.portId === "prompt-in")
-      .map(edge => edge.to.nodeId),
-  ));
+  const targetGenerateIds = index.targetGenerateIdsByPromptNode.get(focus.nodeId) ?? [];
   if (targetGenerateIds.length !== 1) return null;
   return generateNodeReferenceTypes(index.nodeById.get(targetGenerateIds[0]));
 }
@@ -198,7 +217,7 @@ export function buildBoardPromptReferences(input: {
 }): BoardPromptReference[] {
   const index = input.index ?? buildBoardPromptReferenceGraphIndex(input.nodes, input.edges);
   const wiredRaw = input.focus.kind === "prompt"
-    ? promptReferenceCandidates(input.nodes, index, input.focus.nodeId)
+    ? promptReferenceCandidates(index, input.focus.nodeId)
     : generateReferenceCandidatesFromIndex(index, input.focus.nodeId);
   const acceptedTypes = acceptedTypesForFocus(index, input.focus);
 

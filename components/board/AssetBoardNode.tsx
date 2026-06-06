@@ -1,4 +1,4 @@
-import { Download, ImageDown, Maximize2, Paintbrush, SlidersHorizontal } from "lucide-react";
+import { Compass, Download, ImageDown, Maximize2, Music, Paintbrush, SlidersHorizontal, Video } from "lucide-react";
 import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
 import { useRef } from "react";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
@@ -13,12 +13,14 @@ interface AssetBoardNodeProps {
   activeStackAssetId?: string;
   boardId: string;
   compareReferenceUrl?: string | null;
+  isSelected?: boolean;
   node: BoardAssetNode;
   onCaptureVideoFrame?: (nodeId: string, item: StorageItem, frame: CapturedVideoFrame) => void | Promise<void>;
   onCompare?: () => void;
   onEditImage?: (nodeId: string) => void;
   onMeasureAspectRatio?: (nodeId: string, aspectRatio: number) => void;
   onOpenFullscreen?: (item: StorageItem) => void;
+  onOpenPanorama?: (item: StorageItem) => void;
   onSelectStackAsset?: (assetId: string) => void;
   onSendToAgent?: (nodeId: string) => void;
   stackItems?: StorageItem[];
@@ -36,6 +38,7 @@ function boardAssetToStorageItem(node: BoardAssetNode, boardId: string): Storage
       createdAt: node.createdAt,
       status: "complete",
       progress: 100,
+      sourceBoardNodeId: node.id,
     },
     { boardId },
   );
@@ -45,16 +48,31 @@ function boardAssetExtension(asset: BoardAssetNode["asset"]): string {
   return mediaReferenceFileExtension(mediaReferenceMimeFromDataUri(asset.url), asset.type);
 }
 
+function LightweightMediaPreview({ type }: { type: "audio" | "video" }) {
+  const Icon = type === "audio" ? Music : Video;
+  return (
+    <div
+      aria-label={type === "audio" ? "音频资产" : "视频资产"}
+      className="flex h-full w-full items-center justify-center bg-[var(--iw-panel-soft)] text-[var(--iw-muted)]"
+      role="img"
+    >
+      <Icon className="h-9 w-9 opacity-70" />
+    </div>
+  );
+}
+
 export default function AssetBoardNode({
   activeStackAssetId,
   boardId,
   compareReferenceUrl,
+  isSelected = false,
   node,
   onCaptureVideoFrame,
   onCompare,
   onEditImage,
   onMeasureAspectRatio,
   onOpenFullscreen,
+  onOpenPanorama,
   onSelectStackAsset,
   onSendToAgent,
   stackItems = [],
@@ -62,6 +80,7 @@ export default function AssetBoardNode({
   const item = boardAssetToStorageItem(node, boardId);
   const stackCount = stackItems.length;
   const hasStackSwitcher = stackCount > 1;
+  const shouldRenderRichMedia = node.asset.type === "image" || isSelected;
   const captureVideoFrameRef = useRef<VideoFrameCaptureRequest | null>(null);
 
   return (
@@ -95,9 +114,17 @@ export default function AssetBoardNode({
             >
               <Paintbrush className="h-3.5 w-3.5" />
             </button>
+            <button
+              type="button"
+              onClick={() => onOpenPanorama?.(item)}
+              className="imagine-board-asset-action imagine-panorama-action nodrag"
+              title="360 全景查看"
+            >
+              <Compass className="h-3.5 w-3.5" />
+            </button>
           </>
         )}
-        {node.asset.type === "video" && onCaptureVideoFrame && (
+        {node.asset.type === "video" && onCaptureVideoFrame && isSelected && (
           <button
             type="button"
             onClick={() => void captureVideoFrameRef.current?.("current")}
@@ -141,9 +168,9 @@ export default function AssetBoardNode({
             }
           }}
         />
-      ) : node.asset.type === "audio" ? (
+      ) : node.asset.type === "audio" && shouldRenderRichMedia ? (
         <BoardAudioWaveform src={node.asset.url} />
-      ) : (
+      ) : node.asset.type === "video" && shouldRenderRichMedia ? (
         <div className="relative h-full w-full">
           <VideoAssetPlayer
             item={item}
@@ -162,6 +189,8 @@ export default function AssetBoardNode({
             showFullscreenButton={false}
           />
         </div>
+      ) : (
+        <LightweightMediaPreview type={node.asset.type} />
       )}
       {hasStackSwitcher && (
         <div className="absolute bottom-3 left-1/2 z-30 flex -translate-x-1/2 gap-2 opacity-0 transition-opacity duration-200 group-hover/board-video:opacity-100">

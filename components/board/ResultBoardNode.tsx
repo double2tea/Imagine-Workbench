@@ -1,4 +1,4 @@
-import { Download, ImageDown, Maximize2 } from "lucide-react";
+import { Compass, Download, ImageDown, Maximize2, Music, Video } from "lucide-react";
 import { useRef } from "react";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
 import BoardAudioWaveform from "@/components/board/BoardAudioWaveform";
@@ -10,11 +10,13 @@ import type { CapturedVideoFrame } from "@/lib/video-frame";
 
 interface ResultBoardNodeProps {
   boardId: string;
+  isSelected?: boolean;
   node: BoardResultNode;
   stackItems: StorageItem[];
   onCaptureVideoFrame?: (nodeId: string, item: StorageItem, frame: CapturedVideoFrame) => void | Promise<void>;
   onMeasureAspectRatio?: (nodeId: string, aspectRatio: number) => void;
   onOpenFullscreen?: (item: StorageItem) => void;
+  onOpenPanorama?: (item: StorageItem) => void;
   onSelectStackAsset?: (assetId: string) => void;
 }
 
@@ -30,6 +32,8 @@ function resultNodeToStorageItem(node: BoardResultNode, boardId: string): Storag
       createdAt: node.createdAt,
       status: "complete",
       progress: 100,
+      sourceBoardNodeId: node.id,
+      sourceBoardResultStackKey: node.resultStackKey,
     },
     { boardId },
   );
@@ -39,23 +43,49 @@ function boardAssetExtension(asset: BoardResultNode["asset"]): string {
   return mediaReferenceFileExtension(mediaReferenceMimeFromDataUri(asset.url), asset.type);
 }
 
+function LightweightMediaPreview({ type }: { type: "audio" | "video" }) {
+  const Icon = type === "audio" ? Music : Video;
+  return (
+    <div
+      aria-label={type === "audio" ? "音频结果" : "视频结果"}
+      className="flex h-full w-full items-center justify-center bg-[var(--iw-panel-soft)] text-[var(--iw-muted)]"
+      role="img"
+    >
+      <Icon className="h-9 w-9 opacity-70" />
+    </div>
+  );
+}
+
 export default function ResultBoardNode({
   boardId,
+  isSelected = false,
   node,
   stackItems,
   onCaptureVideoFrame,
   onMeasureAspectRatio,
   onOpenFullscreen,
+  onOpenPanorama,
   onSelectStackAsset,
 }: ResultBoardNodeProps) {
   const item = resultNodeToStorageItem(node, boardId);
   const hasStackSwitcher = stackItems.length > 1;
+  const shouldRenderRichMedia = node.asset.type === "image" || isSelected;
   const captureVideoFrameRef = useRef<VideoFrameCaptureRequest | null>(null);
 
   return (
     <div className="group/board-video relative flex h-full min-h-0 items-center justify-center overflow-hidden bg-[var(--iw-panel-soft)]">
       <div className="absolute left-2 top-2 z-30 flex gap-1 opacity-0 transition-opacity duration-200 hover:opacity-100 group-hover/board-video:opacity-100">
-        {node.asset.type === "video" && onCaptureVideoFrame && (
+        {node.asset.type === "image" && (
+          <button
+            type="button"
+            onClick={() => onOpenPanorama?.(item)}
+            className="imagine-board-asset-action imagine-panorama-action nodrag"
+            title="360 全景查看"
+          >
+            <Compass className="h-3.5 w-3.5" />
+          </button>
+        )}
+        {node.asset.type === "video" && onCaptureVideoFrame && isSelected && (
           <button
             type="button"
             onClick={() => void captureVideoFrameRef.current?.("current")}
@@ -99,9 +129,9 @@ export default function ResultBoardNode({
             }
           }}
         />
-      ) : node.asset.type === "audio" ? (
+      ) : node.asset.type === "audio" && shouldRenderRichMedia ? (
         <BoardAudioWaveform src={node.asset.url} />
-      ) : (
+      ) : node.asset.type === "video" && shouldRenderRichMedia ? (
         <div className="relative h-full w-full">
           <VideoAssetPlayer
             item={item}
@@ -120,6 +150,8 @@ export default function ResultBoardNode({
             showFullscreenButton={false}
           />
         </div>
+      ) : (
+        <LightweightMediaPreview type={node.asset.type} />
       )}
       {hasStackSwitcher && (
         <div className="absolute bottom-3 left-1/2 z-30 flex -translate-x-1/2 gap-2 opacity-0 transition-opacity duration-200 group-hover/board-video:opacity-100">

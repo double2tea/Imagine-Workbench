@@ -113,6 +113,7 @@ interface BoardWorkspaceProps {
   onDeleteBoard: () => void;
   onOpenSettings: () => void;
   onOpenFullscreen: (item: StorageItem) => void;
+  onOpenPanorama: (item: StorageItem) => void;
   onRenameBoard: () => void;
   onSelectBoard: (boardId: string) => void;
   onSendAssetToAgent: (nodeId: string) => void;
@@ -850,6 +851,7 @@ export default function BoardWorkspace({
   onDeleteBoard,
   onOpenSettings,
   onOpenFullscreen,
+  onOpenPanorama,
   onRenameBoard,
   onSelectBoard,
   onSendAssetToAgent,
@@ -971,8 +973,8 @@ export default function BoardWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [boardGraphContentKey],
   );
-  const boardNodePositionsKey = useMemo(
-    () => board.nodes.map(node => `${node.id}:${node.position.x},${node.position.y}`).join("|"),
+  const boardNodeGeometryKey = useMemo(
+    () => board.nodes.map(node => `${node.id}:${node.position.x},${node.position.y}:${node.size.width}x${node.size.height}`).join("|"),
     [board.nodes],
   );
   const galleryItemById = useMemo(
@@ -1182,6 +1184,7 @@ export default function BoardWorkspace({
         onExecuteGenerate: onExecuteGenerateNode,
         onFetchRunningHubAppSchema,
         onOpenFullscreen,
+        onOpenPanorama,
         onMaterializeGenerateResult: materializeGenerateResult,
         onMoveGenerateReferenceEdge: moveGenerateReferenceEdge,
         onMoveReferenceGroupItem: moveReferenceGroupItem,
@@ -1230,6 +1233,7 @@ export default function BoardWorkspace({
     onFetchRunningHubAppSchema,
     onConnectionError,
     onOpenFullscreen,
+    onOpenPanorama,
     materializeGenerateResult,
     moveReferenceGroupItem,
     moveGenerateReferenceEdge,
@@ -1320,9 +1324,9 @@ export default function BoardWorkspace({
           },
         };
       }),
-    // board.nodes read inside; graph + position keys gate rebuilds
+    // board.nodes read inside; graph content + geometry keys gate rebuilds
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [boardGraphContentKey, boardNodePositionsKey, flowNodeDataById, generateTaskByNodeId],
+    [boardGraphContentKey, boardNodeGeometryKey, flowNodeDataById, generateTaskByNodeId],
   );
   const [reactFlowNodes, setReactFlowNodes, onNodesChange] = useNodesState<BoardFlowNode>([]);
   const reactFlowNodesRef = useRef<BoardFlowNode[]>(reactFlowNodes);
@@ -1553,6 +1557,7 @@ export default function BoardWorkspace({
 
   const snapToGrid = board.config.snapToGrid;
   const onlyRenderVisibleBoardElements = board.nodes.length > 80;
+  const shouldRenderMiniMap = board.config.showMiniMap && !isNodeDragActive;
 
   const flowPositionFromClient = useCallback((clientX: number, clientY: number): BoardPoint => {
     const instance = flowInstanceRef.current;
@@ -2184,7 +2189,7 @@ export default function BoardWorkspace({
           >
             {board.config.showGrid && <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="var(--iw-board-handle)" />}
             <Controls className="imagine-board-controls" />
-            {board.config.showMiniMap && (
+            {shouldRenderMiniMap && (
               <MiniMap
                 className="imagine-board-minimap"
                 nodeColor={getBoardVar("--iw-board-minimap-node", themeMode === "light" ? "#1e40af" : "#1d4ed8")}

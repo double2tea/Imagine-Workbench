@@ -6,13 +6,13 @@ import type { BoardNode } from "../lib/board/types";
 
 const timestamp = "2026-06-05T00:00:00.000Z";
 
-function assetNode(url: string): BoardNode {
+function assetNode(url: string, size = { width: 240, height: 180 }): BoardNode {
   return {
     id: "asset_1",
     kind: "asset",
     title: "Asset",
     position: { x: 0, y: 0 },
-    size: { width: 240, height: 180 },
+    size,
     createdAt: timestamp,
     updatedAt: timestamp,
     asset: {
@@ -52,6 +52,13 @@ test("board graph content key changes when asset urls change", () => {
   const second = buildBoardGraphContentKey([assetNode("blob:second")], []);
 
   assert.notEqual(first, second);
+});
+
+test("board graph content key ignores node size changes", () => {
+  const first = buildBoardGraphContentKey([assetNode("blob:first", { width: 240, height: 180 })], []);
+  const second = buildBoardGraphContentKey([assetNode("blob:first", { width: 360, height: 240 })], []);
+
+  assert.equal(first, second);
 });
 
 test("board graph content key changes when reference group item urls change", () => {

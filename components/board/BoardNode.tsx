@@ -40,6 +40,7 @@ export interface BoardFlowNodeData extends Record<string, unknown> {
   onCancelGenerate: (nodeId: string) => void;
   onOpenAssetCompare?: (nodeId: string) => void;
   onOpenFullscreen: (item: StorageItem) => void;
+  onOpenPanorama: (item: StorageItem) => void;
   promptReferences: BoardPromptReference[];
   onCaptureVideoFrame: (nodeId: string, item: StorageItem, frame: CapturedVideoFrame) => void | Promise<void>;
   onEditAssetImage: (nodeId: string) => void;
@@ -72,6 +73,7 @@ export type BoardFlowNode = Node<BoardFlowNodeData, "board">;
 type BoardHandleZone = "edge" | "segment";
 
 interface BoardHandleProps {
+  connectionInProgress: boolean;
   id: string;
   kind: BoardPortKind;
   label: string;
@@ -103,10 +105,9 @@ function handleClass(kind: BoardPortKind): string {
   return "!border-blue-200 !bg-blue-400";
 }
 
-function BoardHandle({ id, kind, label, position, top, type, zone = "edge", zoneHeight }: BoardHandleProps) {
+function BoardHandle({ connectionInProgress, id, kind, label, position, top, type, zone = "edge", zoneHeight }: BoardHandleProps) {
   const isEdgeZone = zone === "edge";
   const segmentHeight = zoneHeight ?? 72;
-  const connectionInProgress = useConnection(connection => connection.inProgress);
   return (
     <Handle
       id={id}
@@ -226,6 +227,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
   const isMediaNode = node.kind === "asset" || node.kind === "result";
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [draftTitle, setDraftTitle] = useState(node.title);
+  const connectionInProgress = useConnection(connection => connection.inProgress);
   const ports = useMemo(
     () => getBoardNodePortDefinitions(node, { hasResultConnection: data.hasResultConnection }),
     [data.hasResultConnection, node],
@@ -242,17 +244,57 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
 
   const handleForPort = (port: (typeof ports)[number]) => {
     if (port.id === BOARD_PORT_IDS.promptIn) {
-      return <BoardHandle key={port.id} id={port.id} type="target" position={Position.Left} kind={port.kind} label={port.label} top={78} zone="segment" zoneHeight={64} />;
+      return (
+        <BoardHandle
+          key={port.id}
+          connectionInProgress={connectionInProgress}
+          id={port.id}
+          type="target"
+          position={Position.Left}
+          kind={port.kind}
+          label={port.label}
+          top={78}
+          zone="segment"
+          zoneHeight={64}
+        />
+      );
     }
     if (port.id === BOARD_PORT_IDS.referenceIn) {
-      return <BoardHandle key={port.id} id={port.id} type="target" position={Position.Left} kind={port.kind} label={port.label} top={126} zone="segment" zoneHeight={64} />;
+      return (
+        <BoardHandle
+          key={port.id}
+          connectionInProgress={connectionInProgress}
+          id={port.id}
+          type="target"
+          position={Position.Left}
+          kind={port.kind}
+          label={port.label}
+          top={126}
+          zone="segment"
+          zoneHeight={64}
+        />
+      );
     }
     if (port.id === BOARD_PORT_IDS.agentContextIn) {
-      return <BoardHandle key={port.id} id={port.id} type="target" position={Position.Left} kind={port.kind} label={port.label} top={92} zone="segment" zoneHeight={72} />;
+      return (
+        <BoardHandle
+          key={port.id}
+          connectionInProgress={connectionInProgress}
+          id={port.id}
+          type="target"
+          position={Position.Left}
+          kind={port.kind}
+          label={port.label}
+          top={92}
+          zone="segment"
+          zoneHeight={72}
+        />
+      );
     }
     return (
       <BoardHandle
         key={port.id}
+        connectionInProgress={connectionInProgress}
         id={port.id}
         type={port.direction === "output" ? "source" : "target"}
         position={port.direction === "output" ? Position.Right : Position.Left}
@@ -336,6 +378,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
         {node.kind === "asset" && (
           <AssetBoardNode
             boardId={data.boardId}
+            isSelected={selected === true}
             node={node}
             activeStackAssetId={node.asset.assetId}
             stackItems={data.assetStackItems}
@@ -345,6 +388,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             onEditImage={data.onEditAssetImage}
             onMeasureAspectRatio={data.onMeasureAssetAspectRatio}
             onOpenFullscreen={data.onOpenFullscreen}
+            onOpenPanorama={data.onOpenPanorama}
             onSelectStackAsset={assetId => data.onSelectAssetStackResult(node.id, assetId)}
             onSendToAgent={data.onSendAssetToAgent}
           />
@@ -352,11 +396,13 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
         {node.kind === "result" && (
           <ResultBoardNode
             boardId={data.boardId}
+            isSelected={selected === true}
             node={node}
             stackItems={data.assetStackItems}
             onCaptureVideoFrame={data.onCaptureVideoFrame}
             onMeasureAspectRatio={data.onMeasureAssetAspectRatio}
             onOpenFullscreen={data.onOpenFullscreen}
+            onOpenPanorama={data.onOpenPanorama}
             onSelectStackAsset={assetId => data.onSelectAssetStackResult(node.id, assetId)}
           />
         )}
