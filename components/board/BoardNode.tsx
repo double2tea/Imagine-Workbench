@@ -130,7 +130,7 @@ function BoardHandle({ id, kind, label, position, top, type, zone = "edge", zone
 }
 
 function nodeBodyOverflowClass(kind: BoardNodeModel["kind"]): string {
-  if (kind === "prompt" || kind === "runninghub-app") {
+  if (kind === "asset" || kind === "prompt" || kind === "runninghub-app") {
     return "overflow-visible";
   }
   return "overflow-hidden";
