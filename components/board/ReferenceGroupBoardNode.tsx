@@ -50,7 +50,7 @@ export default function ReferenceGroupBoardNode({
           >
             <div className="h-12 w-12 overflow-hidden rounded-md bg-[var(--iw-panel)]">
               {reference.type === "image" ? (
-                <PreviewImage src={reference.url} alt="" className="h-full w-full object-cover" />
+                <PreviewImage src={reference.url} alt="" draggable={false} className="h-full w-full select-none object-cover" />
               ) : reference.type === "video" ? (
                 <Video className="m-auto h-full w-5 text-[var(--iw-faint)]" />
               ) : (

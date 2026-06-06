@@ -44,7 +44,7 @@ function LightweightMediaPreview({ type }: { type: "audio" | "video" }) {
   return (
     <div
       aria-label={type === "audio" ? "音频结果" : "视频结果"}
-      className="flex h-full w-full items-center justify-center bg-[var(--iw-panel-soft)] text-[var(--iw-muted)]"
+      className="board-media-preview flex h-full w-full items-center justify-center bg-[var(--iw-panel-soft)] text-[var(--iw-muted)]"
       role="img"
     >
       <Icon className="h-9 w-9 opacity-70" />
@@ -77,8 +77,8 @@ export default function ResultBoardNode({
   const captureVideoFrameRef = useRef<VideoFrameCaptureRequest | null>(null);
 
   return (
-    <div className="group/board-video relative flex h-full min-h-0 items-center justify-center overflow-hidden bg-[var(--iw-panel-soft)]">
-      <div className="absolute left-2 top-2 z-30 flex gap-1 opacity-0 transition-opacity duration-200 hover:opacity-100 group-hover/board-video:opacity-100">
+    <div className="board-media-node group/board-video relative flex h-full min-h-0 items-center justify-center overflow-hidden bg-[var(--iw-panel-soft)]">
+      <div className="board-media-controls absolute left-2 top-2 z-30 flex gap-1 opacity-0 transition-opacity duration-200 hover:opacity-100 group-hover/board-video:opacity-100">
         {node.asset.type === "image" && (
           <button
             type="button"
@@ -117,7 +117,7 @@ export default function ResultBoardNode({
         </button>
       </div>
       {hasStackSwitcher && (
-        <div className="pointer-events-none absolute right-2 top-2 z-30 rounded-md bg-slate-950/80 px-2 py-1 text-xs font-semibold text-white opacity-0 shadow-lg backdrop-blur transition-opacity duration-200 group-hover/board-video:opacity-100">
+        <div className="board-media-stack-badge pointer-events-none absolute right-2 top-2 z-30 rounded-md bg-slate-950/80 px-2 py-1 text-xs font-semibold text-white opacity-0 shadow-lg backdrop-blur transition-opacity duration-200 group-hover/board-video:opacity-100">
           {stackItems.length}
         </div>
       )}
@@ -125,7 +125,8 @@ export default function ResultBoardNode({
         <PreviewImage
           src={node.asset.url}
           alt={node.title}
-          className="h-full w-full object-cover"
+          draggable={false}
+          className="board-media-preview h-full w-full select-none object-cover"
           onLoad={event => {
             const image = event.currentTarget;
             if (image.naturalWidth > 0 && image.naturalHeight > 0) {
@@ -137,12 +138,13 @@ export default function ResultBoardNode({
         <PreviewImage
           src={item.url}
           alt={node.title}
-          className="h-full w-full object-cover"
+          draggable={false}
+          className="board-media-preview h-full w-full select-none object-cover"
         />
       ) : node.asset.type === "audio" && shouldRenderAudio ? (
         <BoardAudioWaveform src={node.asset.url} />
       ) : node.asset.type === "video" && shouldRenderVideoPlayer ? (
-        <div className="relative h-full w-full">
+        <div className="board-media-player relative h-full w-full">
           <VideoAssetPlayer
             item={item}
             controlsVisibility="hover"
@@ -164,7 +166,7 @@ export default function ResultBoardNode({
         <LightweightMediaPreview type={node.asset.type} />
       )}
       {hasStackSwitcher && (
-        <div className="absolute bottom-3 left-1/2 z-30 flex -translate-x-1/2 gap-2 opacity-0 transition-opacity duration-200 group-hover/board-video:opacity-100">
+        <div className="board-media-stack-switcher absolute bottom-3 left-1/2 z-30 flex -translate-x-1/2 gap-2 opacity-0 transition-opacity duration-200 group-hover/board-video:opacity-100">
           {stackItems.map((stackItem, index) => {
             const isActive = stackItem.id === node.activeAssetId;
             return (

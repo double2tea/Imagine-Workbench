@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import { Music, Upload, Video } from "lucide-react";
 import { useBoardMediaImport } from "@/components/board/BoardMediaImportContext";
 import PreviewImage from "@/components/PreviewImage";
-import { useResolvedAssetUrl } from "@/hooks/useResolvedAssetUrl";
 import { ensureHydratedStorageItem } from "@/lib/assets/ensure-hydrated";
 import { IMAGINE_BOARD_ASSET_DRAG_TYPE } from "@/lib/board/interaction";
 import type { StorageItem } from "@/lib/db";
@@ -32,7 +31,6 @@ function BoardSideAssetRow({
   item: StorageItem;
   onAddToBoard: (item: StorageItem) => void;
 }) {
-  const previewUrl = useResolvedAssetUrl(item);
   const [adding, setAdding] = useState(false);
 
   const handleAdd = async () => {
@@ -66,7 +64,7 @@ function BoardSideAssetRow({
     >
       <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg bg-[var(--iw-panel)]">
         {item.type === "image" && item.status === "complete" ? (
-          <PreviewImage src={previewUrl} alt="" className="h-full w-full object-cover" />
+          <PreviewImage src={item.url} alt="" draggable={false} className="h-full w-full select-none object-cover" />
         ) : item.type === "audio" ? (
           <Music className="h-4 w-4 text-[var(--iw-faint)]" />
         ) : (

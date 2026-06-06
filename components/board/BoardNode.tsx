@@ -196,7 +196,7 @@ function GenerateReferenceShelf({
             title={reference.role ? `参考 ${index + 1} · ${reference.role}` : `参考 ${index + 1}`}
           >
             {type === "image" ? (
-              <PreviewImage src={reference.url} alt="" className="h-full w-full object-cover" />
+              <PreviewImage src={reference.url} alt="" draggable={false} className="h-full w-full select-none object-cover" />
             ) : type === "video" ? (
               <div className="flex h-full w-full items-center justify-center">
                 <Video className="h-4 w-4 text-violet-200" />

@@ -3,7 +3,7 @@ import type {ImgHTMLAttributes} from "react";
 
 type PreviewImageProps = Pick<
   ImgHTMLAttributes<HTMLImageElement>,
-  "alt" | "className" | "decoding" | "fetchPriority" | "loading" | "onClick" | "onLoad" | "referrerPolicy" | "src" | "style"
+  "alt" | "className" | "decoding" | "draggable" | "fetchPriority" | "loading" | "onClick" | "onLoad" | "referrerPolicy" | "src" | "style"
 >;
 
 function previewImageSrc(src: PreviewImageProps["src"]): PreviewImageProps["src"] {

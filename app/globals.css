@@ -2763,6 +2763,15 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
   filter: none;
 }
 
+.board-media-node {
+  contain: paint;
+}
+
+.board-media-preview {
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
 .board-canvas.is-node-dragging .react-flow__edge-path,
 .board-canvas.is-node-dragging .react-flow__connection-path {
   animation: none !important;
@@ -2799,6 +2808,20 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 
 .board-canvas.is-node-dragging .board-node-handle {
   box-shadow: none !important;
+}
+
+.board-canvas.is-node-dragging .board-media-controls,
+.board-canvas.is-node-dragging .board-media-stack-badge,
+.board-canvas.is-node-dragging .board-media-stack-switcher,
+.board-canvas.is-node-dragging .board-asset-node-chrome {
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.board-canvas.is-node-dragging .board-media-player {
+  pointer-events: none !important;
 }
 
 .board-quick-insert-menu {

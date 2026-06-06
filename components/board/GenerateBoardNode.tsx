@@ -106,7 +106,7 @@ export function BoardResultStack({
               title={`结果 ${index + 1}`}
             >
               {item.type === "image" ? (
-                <PreviewImage src={item.url} alt="" className="h-full w-full object-cover" />
+                <PreviewImage src={item.url} alt="" draggable={false} className="h-full w-full select-none object-cover" />
               ) : item.type === "video" ? (
                 <Video className="m-auto h-full w-4 text-violet-200" />
               ) : (
@@ -350,7 +350,7 @@ export default function GenerateBoardNode({
                 title={reference.role ? `参考媒体 · ${reference.role}` : "参考媒体"}
               >
                 {getMediaReferenceType(reference) === "image" ? (
-                  <PreviewImage src={reference.url} alt="" className="h-full w-full object-cover" />
+                  <PreviewImage src={reference.url} alt="" draggable={false} className="h-full w-full select-none object-cover" />
                 ) : getMediaReferenceType(reference) === "video" ? (
                   <Video className="m-auto h-full w-3.5 text-[var(--iw-faint)]" />
                 ) : (
