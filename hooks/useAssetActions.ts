@@ -11,6 +11,7 @@ import {
   saveToDB,
   type StorageItem,
 } from "@/lib/db";
+import { createWorkspaceSafetySnapshot } from "@/lib/data-management";
 import type { MediaReferenceRole, MediaReferenceType } from "@/lib/media-references";
 import { mediaReferenceFileExtension, mediaReferenceMimeFromDataUri } from "@/lib/media-references";
 import { createPanoramaScreenshotStorageItem, type PanoramaScreenshot } from "@/lib/panorama/capture";
@@ -303,6 +304,7 @@ export function useAssetActions({
       tone: "danger",
       confirmLabel: "清空",
     })) {
+      await createWorkspaceSafetySnapshot("clear-assets");
       await clearAllDB();
       setItems([]);
       setCompareItemIds([]);

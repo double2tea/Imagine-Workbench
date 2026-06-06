@@ -72,6 +72,8 @@ import {
   cleanupWorkspaceAssets,
   clearLocalStorageGroup,
   createLocalUploadAsset,
+  createWorkspaceSafetySnapshot,
+  downloadLatestWorkspaceSafetySnapshot,
   exportCompleteWorkspaceBackup,
   importWorkspaceBackup,
   previewWorkspaceBackup,
@@ -576,7 +578,7 @@ export default function Home() {
     }
   };
 
-  const reuseTaskInComposer = (item: StorageItem) => {
+  function reuseTaskInComposer(item: StorageItem): void {
     if (item.type === "audio") {
       pushWorkspaceNotice("error", "音频资产没有可复用的生成参数");
       return;
@@ -632,7 +634,7 @@ export default function Home() {
 
     window.scrollTo({ top: 0, behavior: "smooth" });
     pushWorkspaceNotice("success", "已回填任务参数到左侧工作面板");
-  };
+  }
 
   useEffect(() => {
     const readyTimer = window.setTimeout(() => {
@@ -888,6 +890,7 @@ export default function Home() {
       return;
     }
     try {
+      await createWorkspaceSafetySnapshot("clear-assets");
       await clearAllDB();
       setItems([]);
       setSelectedItemIds([]);
@@ -912,6 +915,15 @@ export default function Home() {
       pushWorkspaceNotice("success", `已导出备份：${result.fileName}`);
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, "完整备份导出失败"));
+    }
+  }, [pushWorkspaceNotice]);
+
+  const handleDataDownloadSafetySnapshot = useCallback(async () => {
+    try {
+      const result = await downloadLatestWorkspaceSafetySnapshot();
+      pushWorkspaceNotice("success", `已下载安全快照：${result.fileName}`);
+    } catch (error) {
+      pushWorkspaceNotice("error", toErrorMessage(error, "安全快照下载失败"));
     }
   }, [pushWorkspaceNotice]);
 
@@ -1353,6 +1365,7 @@ export default function Home() {
         onClearCredentials={clearProviderCredentials}
         onClearLocalStorage={handleDataClearLocalStorage}
         onClose={() => setShowSettings(false)}
+        onDownloadSafetySnapshot={handleDataDownloadSafetySnapshot}
         onExportWorkspace={handleDataExportWorkspace}
         onImportLocalAssets={handleDataImportLocalAssets}
         onImportWorkspace={handleDataImportWorkspace}

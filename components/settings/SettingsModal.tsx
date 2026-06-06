@@ -43,6 +43,7 @@ interface SettingsModalProps {
   onClearLocalStorage: (kind: LocalStorageCleanupKind) => Promise<void>;
   onClose: () => void;
   onClearAssets: () => Promise<void>;
+  onDownloadSafetySnapshot: () => Promise<void>;
   onDuplicateCurrentBoard?: () => Promise<void>;
   onExportCurrentBoard?: (includeCredentials: boolean) => Promise<void>;
   onExportWorkspace: (includeCredentials: boolean) => Promise<void>;
@@ -89,6 +90,7 @@ export default function SettingsModal({
   onClearLocalStorage,
   onClearAssets,
   onClose,
+  onDownloadSafetySnapshot,
   onDuplicateCurrentBoard,
   onExportCurrentBoard,
   onExportWorkspace,
@@ -198,6 +200,7 @@ export default function SettingsModal({
                   onCleanupAssets={onCleanupAssets}
                   onClearAssets={onClearAssets}
                   onClearLocalStorage={onClearLocalStorage}
+                  onDownloadSafetySnapshot={onDownloadSafetySnapshot}
                   onDuplicateCurrentBoard={onDuplicateCurrentBoard}
                   onExportCurrentBoard={onExportCurrentBoard}
                   onExportWorkspace={onExportWorkspace}

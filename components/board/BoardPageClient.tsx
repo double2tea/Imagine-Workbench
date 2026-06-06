@@ -129,6 +129,8 @@ import {
   cleanupWorkspaceAssets,
   clearLocalStorageGroup,
   createLocalUploadAsset,
+  createWorkspaceSafetySnapshot,
+  downloadLatestWorkspaceSafetySnapshot,
   exportBoardWorkspaceBackup,
   exportCompleteWorkspaceBackup,
   importWorkspaceBackup,
@@ -3052,6 +3054,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       confirmLabel: "清空资产",
     }))) return;
     try {
+      await createWorkspaceSafetySnapshot("clear-assets");
       await clearAllDB();
       handledBoardItemIdsRef.current = new Set();
       handledBoardTaskIdsRef.current = new Set();
@@ -3085,6 +3088,15 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       pushWorkspaceNotice("error", toErrorMessage(error, "当前画板导出失败"));
     }
   }, [boardController, pushWorkspaceNotice]);
+
+  const handleDataDownloadSafetySnapshot = useCallback(async () => {
+    try {
+      const result = await downloadLatestWorkspaceSafetySnapshot();
+      pushWorkspaceNotice("success", `已下载安全快照：${result.fileName}`);
+    } catch (error) {
+      pushWorkspaceNotice("error", toErrorMessage(error, "安全快照下载失败"));
+    }
+  }, [pushWorkspaceNotice]);
 
   const handleDataImportWorkspace = useCallback(async (file: File, includeCredentials: boolean) => {
     try {
@@ -3533,6 +3545,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onClearCredentials={clearProviderCredentials}
         onClearLocalStorage={handleDataClearLocalStorage}
         onClose={() => setShowSettings(false)}
+        onDownloadSafetySnapshot={handleDataDownloadSafetySnapshot}
         onDuplicateCurrentBoard={duplicateCurrentBoard}
         onExportCurrentBoard={handleDataExportCurrentBoard}
         onExportWorkspace={handleDataExportWorkspace}

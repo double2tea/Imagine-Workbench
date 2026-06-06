@@ -49,6 +49,10 @@ const BOARD_INDEX_FILE = "boards/index.json";
 const SETTINGS_FILE = "settings/local-storage.json";
 const MAX_BACKUP_FILE_COUNT = 10000;
 const STALE_PROCESSING_MS = 2 * 60 * 60 * 1000;
+const SAFETY_DB_NAME = "ImagineWorkbenchSafetyDB";
+const SAFETY_DB_VERSION = 1;
+const SAFETY_SNAPSHOT_STORE = "workspace_safety_snapshots";
+const LATEST_SAFETY_SNAPSHOT_ID = "latest";
 
 const MODEL_CACHE_KEYS = [
   "imagine_chat_model_options",
@@ -105,6 +109,12 @@ export type LocalStorageCleanupKind =
   | "provider-credentials"
   | "ui-preferences";
 
+export type WorkspaceSafetySnapshotReason =
+  | "clear-assets"
+  | "restore-workspace"
+  | "reset-boards"
+  | "cleanup-assets";
+
 export interface WorkspaceBackupManifest {
   app: typeof BACKUP_APP_NAME;
   schemaVersion: typeof WORKSPACE_BACKUP_SCHEMA_VERSION;
@@ -124,6 +134,18 @@ export interface WorkspaceExportResult {
   boardCount: number;
   fileName: string;
   settingsKeyCount: number;
+}
+
+export interface WorkspaceSafetySnapshotSummary {
+  assetCount: number;
+  boardCount: number;
+  createdAt: string;
+  fileName: string;
+  id: string;
+  origin: string;
+  reason: WorkspaceSafetySnapshotReason;
+  settingsKeyCount: number;
+  sizeBytes: number;
 }
 
 export interface WorkspaceImportPreview {
@@ -184,6 +206,10 @@ export interface WorkspaceDataSummary {
     quota?: number;
     usage?: number;
   };
+  safety: {
+    latestSnapshot: WorkspaceSafetySnapshotSummary | null;
+    origin: string;
+  };
 }
 
 interface WorkspaceBackupAssetRecord extends Omit<StorageItem, "url"> {
@@ -207,12 +233,22 @@ interface DataUriParts {
   mimeType: string;
 }
 
+interface WorkspaceBackupArchive extends WorkspaceExportResult {
+  blob: Blob;
+  exportedAt: string;
+}
+
+interface WorkspaceSafetySnapshotRecord extends WorkspaceSafetySnapshotSummary {
+  blob: Blob;
+}
+
 export async function getWorkspaceDataSummary(items: StorageItem[] = []): Promise<WorkspaceDataSummary> {
   const assets = items.length > 0 ? items : await getAllFromDB();
   const boards = await listBoardsFromDB();
   const boardAssetIds = collectBoardAssetIds(boards);
   const assetIds = new Set(assets.map(item => item.id));
   const stores = await getAssetDatabaseDiagnostics();
+  const latestSnapshot = await getLatestWorkspaceSafetySnapshotSummary();
   const largest = assets
     .map(item => ({ id: item.id, label: item.prompt || item.model || item.id, bytes: estimateAssetBytes(item) }))
     .sort((left, right) => right.bytes - left.bytes)
@@ -257,6 +293,10 @@ export async function getWorkspaceDataSummary(items: StorageItem[] = []): Promis
     browserStorage: browserStorage
       ? { quota: browserStorage.quota, usage: browserStorage.usage }
       : undefined,
+    safety: {
+      latestSnapshot,
+      origin: currentWorkspaceOrigin(),
+    },
   };
 }
 
@@ -313,6 +353,7 @@ export async function importWorkspaceBackup(
   includeCredentials: boolean,
 ): Promise<WorkspaceImportResult> {
   const parsed = await parseWorkspaceBackup(file);
+  await createWorkspaceSafetySnapshot("restore-workspace");
   await clearAllDB();
   await clearBoardsFromDB();
   clearManagedLocalStorage(includeCredentials);
@@ -335,6 +376,7 @@ export async function importWorkspaceBackup(
 }
 
 export async function resetBoardsToDefault(): Promise<void> {
+  await createWorkspaceSafetySnapshot("reset-boards");
   await clearBoardsFromDB();
   await saveBoardToDB(createEmptyBoard(DEFAULT_BOARD_ID));
 }
@@ -343,6 +385,9 @@ export async function cleanupWorkspaceAssets(kind: WorkspaceCleanupKind): Promis
   const assets = await getAllFromDB();
   const boardAssetIds = collectBoardAssetIds(await listBoardsFromDB());
   const ids = cleanupTargetIds(kind, assets, boardAssetIds);
+  if (ids.length > 0) {
+    await createWorkspaceSafetySnapshot("cleanup-assets");
+  }
   for (const id of ids) {
     await deleteFromDB(id);
   }
@@ -371,6 +416,51 @@ export function clearLocalStorageGroup(kind: LocalStorageCleanupKind): number {
   });
   keys.forEach(key => window.localStorage.removeItem(key));
   return keys.length;
+}
+
+export function formatWorkspaceSafetySnapshotReason(reason: WorkspaceSafetySnapshotReason): string {
+  if (reason === "clear-assets") return "清空资产";
+  if (reason === "restore-workspace") return "恢复备份";
+  if (reason === "reset-boards") return "重置画板";
+  return "清理资产";
+}
+
+export async function createWorkspaceSafetySnapshot(
+  reason: WorkspaceSafetySnapshotReason,
+): Promise<WorkspaceSafetySnapshotSummary> {
+  const archive = await createWorkspaceBackupArchive({
+    assets: await getAllFromDB(),
+    boards: await listBoardsFromDB(),
+    filePrefix: `Imagine_Workbench_Safety_${reason}`,
+    includeCredentials: false,
+    includeSettings: true,
+  });
+  const record: WorkspaceSafetySnapshotRecord = {
+    assetCount: archive.assetCount,
+    blob: archive.blob,
+    boardCount: archive.boardCount,
+    createdAt: archive.exportedAt,
+    fileName: archive.fileName,
+    id: LATEST_SAFETY_SNAPSHOT_ID,
+    origin: currentWorkspaceOrigin(),
+    reason,
+    settingsKeyCount: archive.settingsKeyCount,
+    sizeBytes: archive.blob.size,
+  };
+  await saveWorkspaceSafetySnapshotRecord(record);
+  return toSafetySnapshotSummary(record);
+}
+
+export async function getLatestWorkspaceSafetySnapshotSummary(): Promise<WorkspaceSafetySnapshotSummary | null> {
+  const record = await getLatestWorkspaceSafetySnapshotRecord();
+  return record ? toSafetySnapshotSummary(record) : null;
+}
+
+export async function downloadLatestWorkspaceSafetySnapshot(): Promise<WorkspaceSafetySnapshotSummary> {
+  const record = await getLatestWorkspaceSafetySnapshotRecord();
+  if (!record) throw new Error("没有可下载的安全快照");
+  downloadBlob(record.blob, record.fileName);
+  return toSafetySnapshotSummary(record);
 }
 
 export async function createLocalUploadAsset(
@@ -464,6 +554,23 @@ async function exportWorkspaceBackup(input: {
   includeCredentials: boolean;
   includeSettings: boolean;
 }): Promise<WorkspaceExportResult> {
+  const archive = await createWorkspaceBackupArchive(input);
+  downloadBlob(archive.blob, archive.fileName);
+  return {
+    assetCount: archive.assetCount,
+    boardCount: archive.boardCount,
+    fileName: archive.fileName,
+    settingsKeyCount: archive.settingsKeyCount,
+  };
+}
+
+async function createWorkspaceBackupArchive(input: {
+  assets: StorageItem[];
+  boards: BoardDocument[];
+  filePrefix: string;
+  includeCredentials: boolean;
+  includeSettings: boolean;
+}): Promise<WorkspaceBackupArchive> {
   const zip = new JSZip();
   const assetRecords: WorkspaceBackupAssetRecord[] = [];
   for (const asset of input.assets) {
@@ -494,10 +601,12 @@ async function exportWorkspaceBackup(input: {
   if (input.includeSettings) zip.file(SETTINGS_FILE, JSON.stringify(settings, null, 2));
 
   const fileName = `${input.filePrefix}_${compactTimestamp(exportedAt)}.zip`;
-  downloadBlob(await zip.generateAsync({ type: "blob" }), fileName);
+  const blob = await zip.generateAsync({ type: "blob" });
   return {
     assetCount: assetRecords.length,
+    blob,
     boardCount: input.boards.length,
+    exportedAt,
     fileName,
     settingsKeyCount: Object.keys(settings.localStorage).length,
   };
@@ -1008,6 +1117,70 @@ function downloadBlob(blob: Blob, fileName: string): void {
   anchor.click();
   document.body.removeChild(anchor);
   URL.revokeObjectURL(url);
+}
+
+function currentWorkspaceOrigin(): string {
+  return typeof window === "undefined" ? "" : window.location.origin;
+}
+
+function openSafetySnapshotDatabase(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === "undefined") {
+      reject(new Error("IndexedDB 不可用"));
+      return;
+    }
+    const request = indexedDB.open(SAFETY_DB_NAME, SAFETY_DB_VERSION);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(SAFETY_SNAPSHOT_STORE)) {
+        db.createObjectStore(SAFETY_SNAPSHOT_STORE, { keyPath: "id" });
+      }
+    };
+    request.onerror = () => reject(request.error ?? new Error("安全快照数据库打开失败"));
+    request.onsuccess = () => resolve(request.result);
+  });
+}
+
+async function saveWorkspaceSafetySnapshotRecord(record: WorkspaceSafetySnapshotRecord): Promise<void> {
+  const db = await openSafetySnapshotDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(SAFETY_SNAPSHOT_STORE, "readwrite");
+    transaction.onerror = () => {
+      db.close();
+      reject(transaction.error ?? new Error("安全快照保存失败"));
+    };
+    transaction.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    transaction.objectStore(SAFETY_SNAPSHOT_STORE).put(record);
+  });
+}
+
+async function getLatestWorkspaceSafetySnapshotRecord(): Promise<WorkspaceSafetySnapshotRecord | null> {
+  const db = await openSafetySnapshotDatabase();
+  return new Promise((resolve, reject) => {
+    let record: WorkspaceSafetySnapshotRecord | null = null;
+    const transaction = db.transaction(SAFETY_SNAPSHOT_STORE, "readonly");
+    transaction.onerror = () => {
+      db.close();
+      reject(transaction.error ?? new Error("安全快照读取失败"));
+    };
+    transaction.oncomplete = () => {
+      db.close();
+      resolve(record);
+    };
+    const request = transaction.objectStore(SAFETY_SNAPSHOT_STORE).get(LATEST_SAFETY_SNAPSHOT_ID);
+    request.onsuccess = () => {
+      record = (request.result as WorkspaceSafetySnapshotRecord | undefined) ?? null;
+    };
+  });
+}
+
+function toSafetySnapshotSummary(record: WorkspaceSafetySnapshotRecord): WorkspaceSafetySnapshotSummary {
+  const { blob: _blob, ...summary } = record;
+  void _blob;
+  return summary;
 }
 
 function parseDataUri(value: string): DataUriParts | null {

@@ -1,7 +1,13 @@
 import { Download, FileArchive, FileInput, HardDrive, RefreshCw, Shield, Trash2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { usePriceDisplaySetting } from "@/hooks/usePriceDisplaySetting";
-import { formatBytes, type LocalStorageCleanupKind, type WorkspaceCleanupKind, type WorkspaceDataSummary } from "@/lib/data-management";
+import {
+  formatBytes,
+  formatWorkspaceSafetySnapshotReason,
+  type LocalStorageCleanupKind,
+  type WorkspaceCleanupKind,
+  type WorkspaceDataSummary,
+} from "@/lib/data-management";
 
 interface DataManagementWorkspaceProps {
   hasCurrentBoard: boolean;
@@ -10,6 +16,7 @@ interface DataManagementWorkspaceProps {
   onCleanupAssets: (kind: WorkspaceCleanupKind) => Promise<void>;
   onClearAssets: () => Promise<void>;
   onClearLocalStorage: (kind: LocalStorageCleanupKind) => Promise<void>;
+  onDownloadSafetySnapshot: () => Promise<void>;
   onDuplicateCurrentBoard?: () => Promise<void>;
   onExportCurrentBoard?: (includeCredentials: boolean) => Promise<void>;
   onExportWorkspace: (includeCredentials: boolean) => Promise<void>;
@@ -43,6 +50,7 @@ export default function DataManagementWorkspace({
   onCleanupAssets,
   onClearAssets,
   onClearLocalStorage,
+  onDownloadSafetySnapshot,
   onDuplicateCurrentBoard,
   onExportCurrentBoard,
   onExportWorkspace,
@@ -88,6 +96,7 @@ export default function DataManagementWorkspace({
   const quota = summary?.browserStorage?.quota;
   const usage = summary?.browserStorage?.usage;
   const assetStores = assetSummary?.stores;
+  const latestSafetySnapshot = summary?.safety.latestSnapshot ?? null;
   const hasAssetReferenceGap = (assetSummary?.missingBoardReferences ?? 0) > 0;
   const hasAssetStoreGap = assetSummary && assetStores
     ? assetStores.metaRecords !== assetSummary.total || assetStores.legacyAssetRecords > 0
@@ -171,6 +180,13 @@ export default function DataManagementWorkspace({
           资产库：meta {assetStores.metaRecords} / hash {assetStores.sharedBlobRecords} / legacy blob {assetStores.legacyBlobRecords} / legacy assets {assetStores.legacyAssetRecords} / preview {assetStores.previewRecords}；画板缺失引用 {assetSummary.missingBoardReferences}
         </div>
       ) : null}
+      {summary?.safety ? (
+        <div className="rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-3 py-2 text-[11px] leading-5 text-[var(--iw-muted)]">
+          当前来源：{summary.safety.origin || "--"}；最后安全快照：{latestSafetySnapshot
+            ? `${formatWorkspaceSafetySnapshotReason(latestSafetySnapshot.reason)} · ${new Date(latestSafetySnapshot.createdAt).toLocaleString()} · ${formatBytes(latestSafetySnapshot.sizeBytes)}`
+            : "无"}
+        </div>
+      ) : null}
 
       <section className="rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -205,6 +221,16 @@ export default function DataManagementWorkspace({
               >
                 <HardDrive className="h-3.5 w-3.5" />
                 当前画板
+              </button>
+            ) : null}
+            {latestSafetySnapshot ? (
+              <button
+                type="button"
+                onClick={() => void runAction("下载安全快照中", onDownloadSafetySnapshot)}
+                className="imagine-secondary-action flex h-9 items-center gap-1.5 rounded-lg border border-[var(--iw-border)] px-3 text-[11px] font-semibold text-[var(--iw-text)]"
+              >
+                <Download className="h-3.5 w-3.5" />
+                最后快照
               </button>
             ) : null}
             <button
