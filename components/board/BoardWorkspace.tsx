@@ -1536,12 +1536,6 @@ export default function BoardWorkspace({
     closeOverlayMenus();
   }, [closeOverlayMenus]);
 
-  const handleNodeDoubleClick = useCallback<NodeMouseHandler<BoardFlowNode>>((_event, node) => {
-    if (node.data.node.kind === "image-generate" || node.data.node.kind === "video-generate" || node.data.node.kind === "runninghub-app") {
-      onExecuteGenerateNode(node.id);
-    }
-  }, [onExecuteGenerateNode]);
-
   const handleNodeContextMenu = useCallback<NodeMouseHandler<BoardFlowNode>>((event, node) => {
     event.preventDefault();
     closeOverlayMenus();
@@ -2349,7 +2343,6 @@ export default function BoardWorkspace({
             onMoveEnd={handleMoveEnd}
             onNodeClick={handleNodeClick}
             onNodeContextMenu={handleNodeContextMenu}
-            onNodeDoubleClick={handleNodeDoubleClick}
             onNodeDragStart={handleNodeDragStart}
             onNodeDragStop={handleNodeDragStop}
             onNodesChange={handleNodesChange}
