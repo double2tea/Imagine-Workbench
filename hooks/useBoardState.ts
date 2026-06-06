@@ -110,6 +110,7 @@ export interface BoardStateController {
   restoreNodeWithEdges: (node: BoardNode, edges: BoardEdge[]) => void;
   addAgentNode: (input?: CreateAgentNodeInput) => string;
   addAssetNode: (input: CreateAssetNodeInput) => string;
+  addAssetNodes: (inputs: CreateAssetNodeInput[]) => string[];
   addAssetNodeWithConnection: (input: CreateAssetNodeInput, from: BoardPortRef) => string;
   addResultNodeWithConnection: (input: CreateResultNodeInput, from: BoardPortRef) => string;
   completeGenerationResult: (sourceNodeId: string, update: CompleteGenerationResultUpdate) => void;
@@ -1129,6 +1130,20 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     return node.id;
   }, [board.nodes, mutateBoard]);
 
+  const addAssetNodes = useCallback((inputs: CreateAssetNodeInput[]): string[] => {
+    if (inputs.length === 0) return [];
+    const nodesToAdd: BoardNode[] = [];
+    for (const input of inputs) {
+      const node = createAssetBoardNode(input, [...board.nodes, ...nodesToAdd]);
+      nodesToAdd.push(node);
+    }
+    mutateBoard(currentBoard => touchBoard(currentBoard, [...currentBoard.nodes, ...nodesToAdd]));
+    const lastNode = nodesToAdd[nodesToAdd.length - 1];
+    setSelectedNodeId(lastNode.id);
+    setSelectedEdgeId(null);
+    return nodesToAdd.map(node => node.id);
+  }, [board.nodes, mutateBoard]);
+
   const addAssetNodeWithConnection = useCallback((input: CreateAssetNodeInput, from: BoardPortRef): string => {
     const node = createAssetBoardNode(input, board.nodes);
     const to: BoardPortRef = { nodeId: node.id, portId: BOARD_PORT_IDS.assetIn, portKind: "asset" };
@@ -1922,6 +1937,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       restoreNodeWithEdges,
       addAgentNode,
       addAssetNode,
+      addAssetNodes,
       addAssetNodeWithConnection,
       addResultNodeWithConnection,
       completeGenerationResult,
@@ -1962,6 +1978,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     [
       addAgentNode,
       addAssetNode,
+      addAssetNodes,
       addAssetNodeWithConnection,
       addResultNodeWithConnection,
       addGenerateNode,

@@ -77,6 +77,7 @@ import {
 import {
   DEFAULT_BOARD_ID,
   DEFAULT_AGENT_NODE_SIZE,
+  DEFAULT_ASSET_NODE_SIZE,
   DEFAULT_GENERATE_NODE_SIZE,
   DEFAULT_NOTE_NODE_SIZE,
   DEFAULT_PROMPT_NODE_SIZE,
@@ -246,6 +247,16 @@ function boardUploadIdPrefix(type: MediaReferenceType, index: number): string {
   if (type === "video") return `board_video_${index}`;
   if (type === "audio") return `board_audio_${index}`;
   return `board_image_${index}`;
+}
+
+const BOARD_IMPORT_GRID_COLUMNS = 4;
+const BOARD_IMPORT_NODE_GAP = 40;
+
+function boardImportNodePosition(origin: BoardPoint, index: number): BoardPoint {
+  return {
+    x: origin.x + (index % BOARD_IMPORT_GRID_COLUMNS) * (DEFAULT_ASSET_NODE_SIZE.width + BOARD_IMPORT_NODE_GAP),
+    y: origin.y + Math.floor(index / BOARD_IMPORT_GRID_COLUMNS) * (DEFAULT_ASSET_NODE_SIZE.height + BOARD_IMPORT_NODE_GAP),
+  };
 }
 
 function getProviderLabel(provider: AiProvider): string {
@@ -2333,19 +2344,28 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         );
         if (!await saveItemOrWarn(item, pushWorkspaceNotice)) continue;
         importedItems.push(item);
-        addAssetToBoard(item, { x: position.x + index * 36, y: position.y + index * 36 });
       } catch (error) {
         pushWorkspaceNotice("error", toErrorMessage(error, `${file.name || "文件"} 导入失败`));
       }
     }
 
     if (importedItems.length === 0) return;
+    boardController.addAssetNodes(importedItems.map((item, index) => ({
+      asset: {
+        assetId: item.id,
+        type: item.type,
+        url: item.url,
+        prompt: item.prompt,
+        model: item.model,
+      },
+      position: boardImportNodePosition(position, index),
+    })));
     setItems(prev => [
       ...importedItems,
       ...prev.filter(item => !importedItems.some(importedItem => importedItem.id === item.id)),
     ]);
     pushWorkspaceNotice("success", `已导入 ${importedItems.length} 个文件到画板`);
-  }, [addAssetToBoard, pushWorkspaceNotice, resolvedBoardId]);
+  }, [boardController, pushWorkspaceNotice, resolvedBoardId]);
 
   const useSelectedBoardAssetAsReference = () => {
     const references = activeBoardReference(boardController.board.nodes, boardController.selectedNodeId, items, resolveBoardReferenceUrl);

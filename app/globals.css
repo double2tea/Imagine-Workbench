@@ -2769,6 +2769,15 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
   filter: none !important;
 }
 
+.board-canvas.is-node-dragging .react-flow__node *,
+.board-canvas.is-node-dragging .react-flow__node *::before,
+.board-canvas.is-node-dragging .react-flow__node *::after,
+.board-canvas.is-node-dragging .react-flow__edge *,
+.board-canvas.is-node-dragging .react-flow__edge *::before,
+.board-canvas.is-node-dragging .react-flow__edge *::after {
+  animation: none !important;
+}
+
 .board-canvas.is-node-dragging .board-node-shell,
 .board-canvas.is-node-dragging .board-node-handle,
 .board-canvas.is-node-dragging .imagine-mark {
