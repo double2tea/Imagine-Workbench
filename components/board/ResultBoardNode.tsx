@@ -1,8 +1,9 @@
 import { Compass, Download, ImageDown, Maximize2, Music, Video } from "lucide-react";
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
 import BoardAudioWaveform from "@/components/board/BoardAudioWaveform";
 import PreviewImage from "@/components/PreviewImage";
+import useSelectedBoardVideoItem from "@/components/board/useSelectedBoardVideoItem";
 import type { BoardResultNode } from "@/lib/board";
 import { buildStorageItem, type StorageItem } from "@/lib/db";
 import type { CapturedVideoFrame } from "@/lib/video-frame";
@@ -64,16 +65,12 @@ export default function ResultBoardNode({
   onOpenPanorama,
   onSelectStackAsset,
 }: ResultBoardNodeProps) {
-  const item = resultNodeToStorageItem(node, boardId);
+  const item = useMemo(() => resultNodeToStorageItem(node, boardId), [boardId, node]);
   const hasStackSwitcher = stackItems.length > 1;
   const isImagePreviewUrl = item.url.startsWith("data:image/");
-  const isPlayableVideoUrl =
-    item.url.startsWith("data:video/") ||
-    item.url.startsWith("blob:") ||
-    item.url.startsWith("http://") ||
-    item.url.startsWith("https://");
   const shouldRenderAudio = node.asset.type === "audio" && isSelected && item.url.trim();
-  const shouldRenderVideoPlayer = node.asset.type === "video" && isSelected && isPlayableVideoUrl;
+  const videoItem = useSelectedBoardVideoItem(item, isSelected);
+  const shouldRenderVideoPlayer = videoItem !== null;
   const captureVideoFrameRef = useRef<VideoFrameCaptureRequest | null>(null);
 
   return (
@@ -89,7 +86,7 @@ export default function ResultBoardNode({
             <Compass className="h-3.5 w-3.5" />
           </button>
         )}
-        {node.asset.type === "video" && onCaptureVideoFrame && isSelected && isPlayableVideoUrl && (
+        {node.asset.type === "video" && onCaptureVideoFrame && shouldRenderVideoPlayer && (
           <button
             type="button"
             onClick={() => void captureVideoFrameRef.current?.("current")}
@@ -134,19 +131,10 @@ export default function ResultBoardNode({
             }
           }}
         />
-      ) : node.asset.type === "video" && isImagePreviewUrl ? (
-        <PreviewImage
-          src={item.url}
-          alt={node.title}
-          draggable={false}
-          className="board-media-preview h-full w-full select-none object-cover"
-        />
-      ) : node.asset.type === "audio" && shouldRenderAudio ? (
-        <BoardAudioWaveform src={node.asset.url} />
       ) : node.asset.type === "video" && shouldRenderVideoPlayer ? (
         <div className="board-media-player relative h-full w-full">
           <VideoAssetPlayer
-            item={item}
+            item={videoItem}
             controlsVisibility="hover"
             loop={false}
             className="h-full w-full object-cover"
@@ -162,14 +150,18 @@ export default function ResultBoardNode({
             showFullscreenButton={false}
           />
         </div>
+      ) : node.asset.type === "video" && isImagePreviewUrl ? (
+        <PreviewImage
+          src={item.url}
+          alt={node.title}
+          draggable={false}
+          className="board-media-preview h-full w-full select-none object-cover"
+        />
+      ) : node.asset.type === "audio" && shouldRenderAudio ? (
+        <BoardAudioWaveform src={node.asset.url} />
       ) : (
         <LightweightMediaPreview type={node.asset.type} />
       )}
-      {node.asset.type === "video" && isImagePreviewUrl ? (
-        <span className="pointer-events-none absolute right-2 bottom-2 z-20 flex h-6 w-6 items-center justify-center rounded bg-black/65 text-violet-100 shadow-sm">
-          <Video className="h-4 w-4" />
-        </span>
-      ) : null}
       {hasStackSwitcher && (
         <div className="board-media-stack-switcher absolute bottom-3 left-1/2 z-30 flex -translate-x-1/2 gap-2 opacity-0 transition-opacity duration-200 group-hover/board-video:opacity-100">
           {stackItems.map((stackItem, index) => {
