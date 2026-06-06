@@ -1,4 +1,4 @@
-import { Download, ImageDown, Maximize2, Music, Video } from "lucide-react";
+import { Compass, Download, ImageDown, Maximize2, Music, Video } from "lucide-react";
 import { useRef } from "react";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
 import BoardAudioWaveform from "@/components/board/BoardAudioWaveform";
@@ -16,6 +16,7 @@ interface ResultBoardNodeProps {
   onCaptureVideoFrame?: (nodeId: string, item: StorageItem, frame: CapturedVideoFrame) => void | Promise<void>;
   onMeasureAspectRatio?: (nodeId: string, aspectRatio: number) => void;
   onOpenFullscreen?: (item: StorageItem) => void;
+  onOpenPanorama?: (item: StorageItem) => void;
   onSelectStackAsset?: (assetId: string) => void;
 }
 
@@ -31,6 +32,8 @@ function resultNodeToStorageItem(node: BoardResultNode, boardId: string): Storag
       createdAt: node.createdAt,
       status: "complete",
       progress: 100,
+      sourceBoardNodeId: node.id,
+      sourceBoardResultStackKey: node.resultStackKey,
     },
     { boardId },
   );
@@ -61,6 +64,7 @@ export default function ResultBoardNode({
   onCaptureVideoFrame,
   onMeasureAspectRatio,
   onOpenFullscreen,
+  onOpenPanorama,
   onSelectStackAsset,
 }: ResultBoardNodeProps) {
   const item = resultNodeToStorageItem(node, boardId);
@@ -71,6 +75,16 @@ export default function ResultBoardNode({
   return (
     <div className="group/board-video relative flex h-full min-h-0 items-center justify-center overflow-hidden bg-[var(--iw-panel-soft)]">
       <div className="absolute left-2 top-2 z-30 flex gap-1 opacity-0 transition-opacity duration-200 hover:opacity-100 group-hover/board-video:opacity-100">
+        {node.asset.type === "image" && (
+          <button
+            type="button"
+            onClick={() => onOpenPanorama?.(item)}
+            className="imagine-board-asset-action imagine-panorama-action nodrag"
+            title="360 全景查看"
+          >
+            <Compass className="h-3.5 w-3.5" />
+          </button>
+        )}
         {node.asset.type === "video" && onCaptureVideoFrame && isSelected && (
           <button
             type="button"

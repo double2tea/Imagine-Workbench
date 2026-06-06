@@ -1,4 +1,4 @@
-import { Download, ImageDown, Maximize2, Music, Paintbrush, SlidersHorizontal, Video } from "lucide-react";
+import { Compass, Download, ImageDown, Maximize2, Music, Paintbrush, SlidersHorizontal, Video } from "lucide-react";
 import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
 import { useRef } from "react";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
@@ -20,6 +20,7 @@ interface AssetBoardNodeProps {
   onEditImage?: (nodeId: string) => void;
   onMeasureAspectRatio?: (nodeId: string, aspectRatio: number) => void;
   onOpenFullscreen?: (item: StorageItem) => void;
+  onOpenPanorama?: (item: StorageItem) => void;
   onSelectStackAsset?: (assetId: string) => void;
   onSendToAgent?: (nodeId: string) => void;
   stackItems?: StorageItem[];
@@ -37,6 +38,7 @@ function boardAssetToStorageItem(node: BoardAssetNode, boardId: string): Storage
       createdAt: node.createdAt,
       status: "complete",
       progress: 100,
+      sourceBoardNodeId: node.id,
     },
     { boardId },
   );
@@ -70,6 +72,7 @@ export default function AssetBoardNode({
   onEditImage,
   onMeasureAspectRatio,
   onOpenFullscreen,
+  onOpenPanorama,
   onSelectStackAsset,
   onSendToAgent,
   stackItems = [],
@@ -110,6 +113,14 @@ export default function AssetBoardNode({
               title="局部编辑"
             >
               <Paintbrush className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onOpenPanorama?.(item)}
+              className="imagine-board-asset-action imagine-panorama-action nodrag"
+              title="360 全景查看"
+            >
+              <Compass className="h-3.5 w-3.5" />
             </button>
           </>
         )}
