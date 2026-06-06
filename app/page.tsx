@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useState, useEffect, useRef, useSyncExternalStore } from "react";
+import React, { useCallback, useMemo, useState, useEffect, useRef, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
 import AgentDock from "@/components/agent/AgentDock";
@@ -24,6 +24,7 @@ import WorkspaceHeader from "@/components/workbench/WorkspaceHeader";
 import WorkspaceNotices, { type WorkspaceNotice } from "@/components/workbench/WorkspaceNotices";
 import {
   clearAllDB,
+  deleteFromDB,
   getGenerationReferenceMedia,
   hydrateAssets,
   listAllAssetMetas,
@@ -39,6 +40,11 @@ import { useClipboardImageImport } from "@/hooks/useClipboardImageImport";
 import { useGenerationActions } from "@/hooks/useGenerationActions";
 import { useGenerationTaskStore } from "@/hooks/useGenerationTaskStore";
 import { useMediaPolling } from "@/hooks/useMediaPolling";
+import {
+  cancelGenerationTask,
+  deleteGenerationTask,
+  generationTaskToGalleryItem,
+} from "@/lib/generation-tasks";
 import {
   IMAGE_REFERENCE_LIMIT,
   removePromptReferenceTokens,
@@ -212,6 +218,19 @@ export default function Home() {
     setTraditionalSubTab("video");
   };
 
+  const workspaceGalleryItems = useMemo(() => {
+    const taskItems = generationTasks
+      .filter(task => !task.source.boardId)
+      .map(generationTaskToGalleryItem)
+      .filter((item): item is StorageItem => item !== null);
+    if (taskItems.length === 0) return items;
+    const taskItemIds = new Set(taskItems.map(item => item.id));
+    return mergeStorageItems(
+      items.filter(item => !taskItemIds.has(item.id)),
+      taskItems,
+    );
+  }, [generationTasks, items]);
+
   const {
     assetDateEnd,
     assetDatePreset,
@@ -245,7 +264,7 @@ export default function Home() {
     setIsCompareMode,
     setSearchQuery,
     setSelectedItemIds,
-  } = useAssetWorkspaceState(items);
+  } = useAssetWorkspaceState(workspaceGalleryItems);
 
   // Agent State
   const [agentInput, setAgentInput] = useState("");
@@ -489,13 +508,10 @@ export default function Home() {
   });
   const {
     cancelProcessingItem,
-    deleteItemsByStatus,
     exportMetadataJson,
-    handleBatchDelete,
     handleBatchDownloadZip,
     handleCaptureVideoFrame,
     handleClearSelection,
-    handleDeleteItem,
     handleDownloadItem,
     handleSavePanoramaScreenshots,
     retryFailedItem,
@@ -521,6 +537,120 @@ export default function Home() {
     setItems,
     setSelectedItemIds,
   });
+
+  const cancelGalleryItem = useCallback(async (item: StorageItem) => {
+    const task = generationTasks.find(entry => entry.id === item.id);
+    if (!task) {
+      await cancelProcessingItem(item);
+      return;
+    }
+    const confirmText = task.canCancelRemote
+      ? "确定要取消这个生成任务吗？"
+      : "确定要本地取消这个任务吗？远端生成可能仍会继续。";
+    if (!(await confirmAction({ message: confirmText, tone: "danger", confirmLabel: "取消任务" }))) return;
+
+    setCancelingItemIds(prev => [...prev, task.id]);
+    try {
+      const controller = generationAbortControllersRef.current[task.id];
+      if (controller) {
+        locallyCanceledItemIdsRef.current.add(task.id);
+        controller.abort();
+      }
+      if (!task.canCancelRemote) {
+        locallyCanceledItemIdsRef.current.add(task.id);
+      }
+      if (task.canCancelRemote && task.operationName) {
+        const res = await fetch("/api/gemini/cancel-media", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...buildProviderHeaders(task.operationName) },
+          body: JSON.stringify({ operationName: task.operationName }),
+        });
+
+        if (!res.ok) {
+          throw new Error(await readFetchError(res, "任务取消失败"));
+        }
+      }
+
+      const canceledTask = await cancelGenerationTask(task.id);
+      setGenerationTasks(prev => prev.map(entry => entry.id === canceledTask.id ? canceledTask : entry));
+      delete pollingFailuresRef.current[task.id];
+      pushWorkspaceNotice("success", task.canCancelRemote ? "生成任务已取消" : "任务已从本地取消");
+    } catch (error) {
+      pushWorkspaceNotice("error", toErrorMessage(error, "任务取消失败"));
+    } finally {
+      setCancelingItemIds(prev => prev.filter(id => id !== task.id));
+    }
+  }, [
+    buildProviderHeaders,
+    cancelProcessingItem,
+    confirmAction,
+    generationTasks,
+    pushWorkspaceNotice,
+    setCancelingItemIds,
+    setGenerationTasks,
+  ]);
+
+  const deleteGalleryRecords = useCallback(async (ids: string[]) => {
+    const idSet = new Set(ids);
+    const taskIds = new Set(generationTasks.filter(task => idSet.has(task.id)).map(task => task.id));
+    const assetIds = ids.filter(id => !taskIds.has(id));
+
+    for (const task of generationTasks) {
+      if (!idSet.has(task.id)) continue;
+      if (task.status === "pending" || task.status === "processing") {
+        const controller = generationAbortControllersRef.current[task.id];
+        if (controller) {
+          locallyCanceledItemIdsRef.current.add(task.id);
+          controller.abort();
+        }
+        await cancelGenerationTask(task.id);
+      } else {
+        await deleteGenerationTask(task.id);
+      }
+      delete pollingFailuresRef.current[task.id];
+    }
+    for (const id of assetIds) {
+      await deleteFromDB(id);
+    }
+
+    setGenerationTasks(prev => prev.filter(task => !taskIds.has(task.id)));
+    setItems(prev => prev.filter(item => !assetIds.includes(item.id)));
+    setSelectedItemIds(prev => prev.filter(id => !idSet.has(id)));
+    setCompareItemIds(prev => prev.filter(id => !idSet.has(id)));
+  }, [generationTasks, setCompareItemIds, setGenerationTasks, setItems, setSelectedItemIds]);
+
+  const handleGalleryBatchDelete = async () => {
+    if (selectedItemIds.length === 0) return;
+    if (!(await confirmAction({
+      message: `确定要彻底删除已选中的 ${selectedItemIds.length} 项创意资产或任务吗？`,
+      tone: "danger",
+      confirmLabel: "删除",
+    }))) {
+      return;
+    }
+    await deleteGalleryRecords(selectedItemIds);
+  };
+
+  const handleGalleryDeleteItem = async (item: StorageItem) => {
+    if (!(await confirmAction({ message: "确定要删除此创意项或任务吗？", tone: "danger", confirmLabel: "删除" }))) {
+      return;
+    }
+    await deleteGalleryRecords([item.id]);
+  };
+
+  const deleteGalleryItemsByStatus = async (statuses: StorageItem["status"][]) => {
+    const ids = workspaceGalleryItems.filter(item => statuses.includes(item.status)).map(item => item.id);
+    if (ids.length === 0) return;
+    if (!(await confirmAction({
+      message: `确定要删除 ${ids.length} 个 ${statuses.join("/")} 任务吗？`,
+      tone: "danger",
+      confirmLabel: "删除",
+    }))) {
+      return;
+    }
+    await deleteGalleryRecords(ids);
+  };
+
   const imageModelGroups = getProviderModelGroups(imageModelOptions);
   const videoModelGroups = getProviderModelGroups(videoModelOptions);
   const audioModelGroups = getProviderModelGroups(audioModelOptions);
@@ -635,6 +765,15 @@ export default function Home() {
     window.scrollTo({ top: 0, behavior: "smooth" });
     pushWorkspaceNotice("success", "已回填任务参数到左侧工作面板");
   }
+
+  const retryGalleryItem = useCallback((item: StorageItem) => {
+    if (!generationTasks.some(task => task.id === item.id)) {
+      void retryFailedItem(item);
+      return;
+    }
+    reuseTaskInComposer(item);
+    pushWorkspaceNotice("info", "已复用失败任务参数，可重新点击生成");
+  }, [generationTasks, pushWorkspaceNotice, retryFailedItem, reuseTaskInComposer]);
 
   useEffect(() => {
     const readyTimer = window.setTimeout(() => {
@@ -1046,7 +1185,7 @@ export default function Home() {
       filterType={filterType}
       filteredItems={filteredItems}
       inFlightCount={assetStats.statusCounts.processing + assetStats.statusCounts.pending}
-      itemsCount={items.length}
+      itemsCount={workspaceGalleryItems.length}
       dateOptions={assetStats.dateOptions}
       modelOptions={assetStats.modelOptions}
       searchQuery={searchQuery}
@@ -1058,13 +1197,13 @@ export default function Home() {
       isCompareMode={isCompareMode}
       initialVisibleItems={isDesktopLayout ? 48 : 18}
       onApplyVideoReference={applyAsVideoReference}
-      onBatchDelete={handleBatchDelete}
+      onBatchDelete={handleGalleryBatchDelete}
       onBatchDownloadZip={handleBatchDownloadZip}
-      onCancelItem={cancelProcessingItem}
+      onCancelItem={cancelGalleryItem}
       onCaptureVideoFrame={handleCaptureVideoFrame}
       onClearSelection={handleClearSelection}
-      onDeleteItem={handleDeleteItem}
-      onDeleteItemsByStatus={deleteItemsByStatus}
+      onDeleteItem={handleGalleryDeleteItem}
+      onDeleteItemsByStatus={deleteGalleryItemsByStatus}
       onDownloadItem={handleDownloadItem}
       onExportMetadata={exportMetadataJson}
       onLaunchMaskEditor={launchMaskEditor}
@@ -1074,7 +1213,7 @@ export default function Home() {
         setIsCompareMode(false);
         setCompareItemIds([]);
       }}
-      onRetryItem={retryFailedItem}
+      onRetryItem={retryGalleryItem}
       onReuseTask={reuseTaskInComposer}
       onSetAssetDateEnd={setAssetDateEnd}
       onSetAssetDatePreset={setAssetDatePreset}

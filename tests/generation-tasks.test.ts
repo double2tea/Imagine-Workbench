@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   createGenerationTask,
   createRetryGenerationTask,
+  generationTaskToGalleryItem,
   generationTaskRequestSnapshot,
   legacyStorageItemToGenerationTask,
   legacyStorageItemsToGenerationTasks,
@@ -115,6 +116,46 @@ test("legacyStorageItemsToGenerationTasks excludes completed assets and sorts ne
   ]);
 
   assert.deepEqual(tasks.map(task => task.legacyAssetId), ["newer", "older"]);
+});
+
+test("generationTaskToGalleryItem maps active workspace tasks to gallery placeholders", () => {
+  const task = createGenerationTask({
+    id: "task_gallery",
+    mediaType: "video",
+    prompt: "人物拿着汉堡走向海边",
+    model: "12ai/video-model",
+    status: "processing",
+    progress: 35,
+    createdAt: timestamp,
+    source: { surface: "workspace" },
+    operationName: "12ai:video:task_1",
+    request: requestWithPassword,
+  });
+
+  assert.deepEqual(generationTaskToGalleryItem(task), {
+    id: "task_gallery",
+    type: "video",
+    url: "",
+    prompt: "人物拿着汉堡走向海边",
+    model: "12ai/video-model",
+    aspectRatio: "1:1",
+    createdAt: timestamp,
+    status: "processing",
+    progress: 35,
+    scope: "workspace",
+    boardId: "",
+    operationName: "12ai:video:task_1",
+    errorMessage: undefined,
+    generationRequest: {
+      prompt: "a calm studio scene",
+      model: "runninghub:ai-app-image:123",
+      aspectRatio: "1:1",
+      referenceMedia: [{ url: "data:image/png;base64,AA==", type: "image" }],
+    },
+    sourceBoardNodeId: undefined,
+    sourceBoardResultStackKey: undefined,
+    hasBlob: false,
+  });
 });
 
 test("createRetryGenerationTask creates a new pending attempt from a failed task", () => {

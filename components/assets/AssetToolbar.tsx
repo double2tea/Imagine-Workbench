@@ -145,7 +145,7 @@ export default function AssetToolbar({
               {inFlightCount > 0 && (
                 <span className="font-mono text-[10px] text-indigo-300">{inFlightCount} 项进行中</span>
               )}
-              <span className="imagine-meta-chip font-mono text-[10px]">{itemsCount} 项资产</span>
+              <span className="imagine-meta-chip font-mono text-[10px]">{itemsCount} 项</span>
             </div>
           </div>
           <div className="mb-3 flex items-center justify-between gap-2 lg:hidden">

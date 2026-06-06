@@ -144,6 +144,31 @@ export function legacyStorageItemsToGenerationTasks(items: StorageItem[]): Gener
   return sortedTasks(items.map(legacyStorageItemToGenerationTask).filter((task): task is GenerationTask => task !== null));
 }
 
+export function generationTaskToGalleryItem(task: GenerationTask): StorageItem | null {
+  if (task.status !== "pending" && task.status !== "processing" && task.status !== "failed") {
+    return null;
+  }
+  return {
+    id: task.id,
+    type: task.mediaType,
+    url: "",
+    prompt: task.prompt,
+    model: task.model,
+    aspectRatio: task.request?.aspectRatio ?? (task.mediaType === "audio" ? "audio" : "auto"),
+    createdAt: task.createdAt,
+    status: task.status,
+    progress: task.progress,
+    scope: task.source.boardId ? "board" : "workspace",
+    boardId: task.source.boardId ?? "",
+    operationName: task.operationName,
+    errorMessage: task.errorMessage,
+    generationRequest: task.request,
+    sourceBoardNodeId: task.source.boardNodeId,
+    sourceBoardResultStackKey: task.source.resultStackKey,
+    hasBlob: false,
+  };
+}
+
 export async function saveGenerationTask(task: GenerationTask): Promise<void> {
   const db = await openDatabase();
   return new Promise((resolve, reject) => {
@@ -212,6 +237,17 @@ export async function cancelGenerationTask(id: string): Promise<GenerationTask> 
   return updateGenerationTask(id, {
     status: "canceled",
     progress: 100,
+  });
+}
+
+export async function deleteGenerationTask(id: string): Promise<void> {
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(GENERATION_TASK_STORE, "readwrite");
+    transaction.objectStore(GENERATION_TASK_STORE).delete(id);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error ?? new Error("Generation task delete failed"));
+    transaction.onabort = () => reject(transaction.error ?? new Error("Generation task delete aborted"));
   });
 }
 
