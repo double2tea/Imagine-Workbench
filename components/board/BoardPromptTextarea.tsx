@@ -1,17 +1,6 @@
 "use client";
 
-import {
-  forwardRef,
-  useEffect,
-  useImperativeHandle,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type ClipboardEvent,
-  type CompositionEvent,
-  type KeyboardEvent,
-  type ReactNode,
-} from "react";
+import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import MediaReferenceThumbnail from "@/components/reference/MediaReferenceThumbnail";
 import PromptReferenceDropdown from "@/components/reference/PromptReferenceDropdown";
@@ -29,155 +18,26 @@ function detectAtSearch(value: string, caret: number): string | null {
 
 const promptReferenceTokenPattern = /@(图片|视频|音频)(\d+)/g;
 
-type PromptEditorPart =
-  | { kind: "text"; text: string }
-  | { index: number; kind: "reference"; reference: BoardPromptReference; token: string };
+interface PromptReferenceThumbnail {
+  index: number;
+  reference: BoardPromptReference;
+  token: string;
+}
 
-function getPromptEditorParts(prompt: string, references: readonly BoardPromptReference[]): PromptEditorPart[] {
-  const parts: PromptEditorPart[] = [];
-  let lastIndex = 0;
+function resolvePromptReferenceThumbnails(prompt: string, references: readonly BoardPromptReference[]): PromptReferenceThumbnail[] {
+  const seen = new Set<number>();
+  const thumbnails: PromptReferenceThumbnail[] = [];
   for (const match of prompt.matchAll(promptReferenceTokenPattern)) {
-    const matchText = match[0];
-    const matchIndex = match.index ?? 0;
-    if (matchIndex > lastIndex) parts.push({ kind: "text", text: prompt.slice(lastIndex, matchIndex) });
-
     const parsed = Number(match[2]);
-    const reference = Number.isInteger(parsed) ? references[parsed - 1] : undefined;
-    if (reference) {
-      parts.push({ index: parsed - 1, kind: "reference", reference, token: matchText });
-    } else {
-      parts.push({ kind: "text", text: matchText });
-    }
-    lastIndex = matchIndex + matchText.length;
+    if (!Number.isInteger(parsed) || parsed < 1) continue;
+    const index = parsed - 1;
+    if (seen.has(index)) continue;
+    const reference = references[index];
+    if (!reference) continue;
+    seen.add(index);
+    thumbnails.push({ index, reference, token: match[0] });
   }
-  if (lastIndex < prompt.length) parts.push({ kind: "text", text: prompt.slice(lastIndex) });
-  return parts;
-}
-
-function serializeEditorNode(node: Node): string {
-  if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? "";
-  if (!(node instanceof HTMLElement)) return "";
-  const token = node.dataset.promptReferenceToken;
-  if (token) return token;
-  if (node.tagName === "BR") return "\n";
-  let text = "";
-  node.childNodes.forEach(child => {
-    text += serializeEditorNode(child);
-  });
-  return text;
-}
-
-function serializeEditorNodes(nodes: Iterable<Node>): string {
-  let text = "";
-  for (const node of nodes) {
-    text += serializeEditorNode(node);
-  }
-  return text;
-}
-
-function getEditorPlainText(editor: HTMLElement): string {
-  return serializeEditorNodes(editor.childNodes);
-}
-
-function getRangeTextOffset(editor: HTMLElement, container: Node, offset: number): number {
-  const range = document.createRange();
-  range.selectNodeContents(editor);
-  range.setEnd(container, offset);
-  const fragment = range.cloneContents();
-  return serializeEditorNodes(fragment.childNodes).length;
-}
-
-function getEditorSelectionRange(editor: HTMLElement): { end: number; start: number } | null {
-  const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0) return null;
-  const range = selection.getRangeAt(0);
-  if (!editor.contains(range.startContainer) || !editor.contains(range.endContainer)) return null;
-  const start = getRangeTextOffset(editor, range.startContainer, range.startOffset);
-  const end = getRangeTextOffset(editor, range.endContainer, range.endOffset);
-  return start <= end ? { start, end } : { start: end, end: start };
-}
-
-function setEditorCaret(editor: HTMLElement, caret: number): void {
-  const selection = window.getSelection();
-  if (!selection) return;
-  const range = document.createRange();
-  let remaining = Math.max(0, caret);
-
-  const findPosition = (node: Node): boolean => {
-    if (node.nodeType === Node.TEXT_NODE) {
-      const length = node.textContent?.length ?? 0;
-      if (remaining <= length) {
-        range.setStart(node, remaining);
-        return true;
-      }
-      remaining -= length;
-      return false;
-    }
-    if (!(node instanceof HTMLElement)) return false;
-    const token = node.dataset.promptReferenceToken;
-    if (token) {
-      const parent = node.parentNode;
-      if (!parent) return false;
-      const childIndex = Array.from(parent.childNodes).indexOf(node);
-      if (remaining <= token.length) {
-        range.setStart(parent, childIndex + 1);
-        return true;
-      }
-      remaining -= token.length;
-      return false;
-    }
-    if (node.tagName === "BR") {
-      if (remaining <= 1) {
-        const parent = node.parentNode;
-        if (!parent) return false;
-        range.setStart(parent, Array.from(parent.childNodes).indexOf(node) + 1);
-        return true;
-      }
-      remaining -= 1;
-      return false;
-    }
-    for (const child of Array.from(node.childNodes)) {
-      if (findPosition(child)) return true;
-    }
-    return false;
-  };
-
-  if (!findPosition(editor)) range.selectNodeContents(editor);
-  range.collapse(false);
-  selection.removeAllRanges();
-  selection.addRange(range);
-}
-
-function insertTextAtEditorSelection(text: string): void {
-  const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0) return;
-  const range = selection.getRangeAt(0);
-  range.deleteContents();
-  const textNode = document.createTextNode(text);
-  range.insertNode(textNode);
-  range.setStart(textNode, text.length);
-  range.collapse(true);
-  selection.removeAllRanges();
-  selection.addRange(range);
-}
-
-function getSelectedEditorText(editor: HTMLElement): string | null {
-  const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0) return null;
-  const range = selection.getRangeAt(0);
-  if (range.collapsed) return "";
-  if (!editor.contains(range.startContainer) || !editor.contains(range.endContainer)) return null;
-  return serializeEditorNodes(range.cloneContents().childNodes);
-}
-
-function deleteEditorSelection(): void {
-  const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0) return;
-  const range = selection.getRangeAt(0);
-  range.deleteContents();
-  range.collapse(true);
-  selection.removeAllRanges();
-  selection.addRange(range);
+  return thumbnails;
 }
 
 export interface BoardPromptTextareaHandle {
@@ -216,16 +76,17 @@ const BoardPromptTextarea = forwardRef<BoardPromptTextareaHandle, BoardPromptTex
   },
   forwardedRef,
 ) {
-  const editorRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const shellRef = useRef<HTMLDivElement | null>(null);
-  const isComposingRef = useRef(false);
-  const pendingCaretRef = useRef<number | null>(null);
   const [atSearch, setAtSearch] = useState<string | null>(null);
   const [dropdownAnchor, setDropdownAnchor] = useState<{ left: number; top: number; width: number } | null>(null);
   const { flush, getValue, setValue, value: draftValue } = useDebouncedTextCommit(value, onChange);
   const displayValue = readOnly ? value : draftValue;
+  const promptReferenceThumbnails = useMemo(
+    () => resolvePromptReferenceThumbnails(displayValue, references),
+    [displayValue, references],
+  );
   const isAtSearchOpen = atSearch !== null;
-  const editorParts = getPromptEditorParts(displayValue, references);
 
   useEffect(() => {
     if (!commitId || readOnly) return;
@@ -243,25 +104,17 @@ const BoardPromptTextarea = forwardRef<BoardPromptTextareaHandle, BoardPromptTex
         flush(next);
       },
       getSelectionRange: () => ({
-        start: editorRef.current ? (getEditorSelectionRange(editorRef.current)?.start ?? displayValue.length) : displayValue.length,
-        end: editorRef.current ? (getEditorSelectionRange(editorRef.current)?.end ?? displayValue.length) : displayValue.length,
+        start: textareaRef.current?.selectionStart ?? displayValue.length,
+        end: textareaRef.current?.selectionEnd ?? displayValue.length,
       }),
       focusAt: (caret: number) => {
-        const element = editorRef.current;
+        const element = textareaRef.current;
         element?.focus();
-        if (element) setEditorCaret(element, caret);
+        element?.setSelectionRange(caret, caret);
       },
     }),
     [displayValue.length, flush, getValue, readOnly, value],
   );
-
-  useLayoutEffect(() => {
-    const editor = editorRef.current;
-    const caret = pendingCaretRef.current;
-    if (!editor || caret === null || document.activeElement !== editor) return;
-    pendingCaretRef.current = null;
-    setEditorCaret(editor, caret);
-  }, [displayValue]);
 
   useLayoutEffect(() => {
     if (!isAtSearchOpen) {
@@ -286,69 +139,9 @@ const BoardPromptTextarea = forwardRef<BoardPromptTextareaHandle, BoardPromptTex
     onSlashCommand?.(detectPromptTemplateSlashCommand(nextValue, caret));
   };
 
-  const syncEditorValue = (): void => {
-    const editor = editorRef.current;
-    if (!editor) return;
-    const selectionRange = getEditorSelectionRange(editor);
-    const nextValue = getEditorPlainText(editor);
-    pendingCaretRef.current = selectionRange?.end ?? nextValue.length;
-    handleChange(nextValue, selectionRange?.end ?? null);
-  };
-
-  const handleInput = (): void => {
-    if (isComposingRef.current) return;
-    syncEditorValue();
-  };
-
-  const handleCompositionStart = (_event: CompositionEvent<HTMLDivElement>): void => {
-    isComposingRef.current = true;
-  };
-
-  const handleCompositionEnd = (_event: CompositionEvent<HTMLDivElement>): void => {
-    isComposingRef.current = false;
-    syncEditorValue();
-  };
-
-  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
-    if (event.nativeEvent.isComposing || isComposingRef.current) return;
-    if (readOnly || event.key !== "Enter") return;
-    event.preventDefault();
-    insertTextAtEditorSelection("\n");
-    syncEditorValue();
-  };
-
-  const handlePaste = (event: ClipboardEvent<HTMLDivElement>): void => {
-    if (isComposingRef.current) return;
-    if (readOnly) return;
-    event.preventDefault();
-    insertTextAtEditorSelection(event.clipboardData.getData("text/plain"));
-    syncEditorValue();
-  };
-
-  const writeSelectedTextToClipboard = (event: ClipboardEvent<HTMLDivElement>): boolean => {
-    const editor = editorRef.current;
-    if (!editor) return false;
-    const selectedText = getSelectedEditorText(editor);
-    if (selectedText === null || selectedText.length === 0) return false;
-    event.preventDefault();
-    event.clipboardData.setData("text/plain", selectedText);
-    return true;
-  };
-
-  const handleCopy = (event: ClipboardEvent<HTMLDivElement>): void => {
-    writeSelectedTextToClipboard(event);
-  };
-
-  const handleCut = (event: ClipboardEvent<HTMLDivElement>): void => {
-    const hasSelection = writeSelectedTextToClipboard(event);
-    if (!hasSelection || readOnly) return;
-    deleteEditorSelection();
-    syncEditorValue();
-  };
-
   const handleSelectReference = (index: number): void => {
-    const editor = editorRef.current;
-    const caret = editor ? (getEditorSelectionRange(editor)?.end ?? displayValue.length) : displayValue.length;
+    const textarea = textareaRef.current;
+    const caret = textarea?.selectionStart ?? displayValue.length;
     const searchLength = atSearch?.length ?? 0;
     const start = Math.max(0, caret - searchLength - 1);
     const reference = references[index];
@@ -356,13 +149,12 @@ const BoardPromptTextarea = forwardRef<BoardPromptTextareaHandle, BoardPromptTex
     const token = getMediaReferencePromptToken(index, getMediaReferenceType(reference));
     const nextPrompt = `${displayValue.slice(0, start)}${token} ${displayValue.slice(caret)}`;
     const nextCaret = start + `${token} `.length;
-    pendingCaretRef.current = nextCaret;
     flush(nextPrompt);
     onSelectReference?.(reference, index);
     setAtSearch(null);
     window.requestAnimationFrame(() => {
-      editor?.focus();
-      if (editor) setEditorCaret(editor, nextCaret);
+      textarea?.focus();
+      textarea?.setSelectionRange(nextCaret, nextCaret);
     });
   };
 
@@ -391,20 +183,11 @@ const BoardPromptTextarea = forwardRef<BoardPromptTextareaHandle, BoardPromptTex
       <div className="relative flex h-full min-h-0 flex-col p-2 pt-2">
         {atDropdownPortal}
         <div className="relative flex min-h-0 flex-1">
-          <div
-            ref={editorRef}
-            role="textbox"
-            aria-multiline="true"
-            contentEditable={!readOnly}
-            data-placeholder={placeholder}
-            suppressContentEditableWarning
-            onInput={handleInput}
-            onCompositionStart={handleCompositionStart}
-            onCompositionEnd={handleCompositionEnd}
-            onKeyDown={handleKeyDown}
-            onCopy={handleCopy}
-            onCut={handleCut}
-            onPaste={handlePaste}
+          <textarea
+            ref={textareaRef}
+            value={displayValue}
+            readOnly={readOnly}
+            onChange={(event) => handleChange(event.target.value, event.target.selectionStart)}
             onBlur={() => {
               if (readOnly) return;
               flush();
@@ -413,27 +196,28 @@ const BoardPromptTextarea = forwardRef<BoardPromptTextareaHandle, BoardPromptTex
                 onSlashCommand?.(null);
               }, 120);
             }}
-            className={`${className} relative z-10 overflow-auto whitespace-pre-wrap break-words caret-[var(--iw-text)] empty:before:text-[var(--iw-faint)] empty:before:content-[attr(data-placeholder)]`}
-          >
-            {editorParts.map((part, index) => {
-              if (part.kind === "text") return <span key={`text:${index}`}>{part.text}</span>;
-              const type = getMediaReferenceType(part.reference);
-              return (
-                <span
-                  key={`reference:${index}:${part.token}:${part.reference.id}:${part.reference.url}`}
-                  contentEditable={false}
-                  data-prompt-reference-token={part.token}
-                  className="relative mx-1 inline-flex h-8 w-8 translate-y-1 items-center justify-center overflow-hidden rounded-md border border-white/15 bg-slate-950 align-baseline shadow-sm"
-                  title={`${part.token} · ${mediaReferenceLabel(type)} · ${part.reference.id}`}
-                >
-                  <MediaReferenceThumbnail reference={part.reference} alt={part.token} className="h-full w-full" />
-                  <span className="absolute bottom-0 right-0 rounded-tl bg-black/65 px-1 text-[8px] font-semibold leading-3 text-white">
-                    {part.index + 1}
+            className={`${className} relative z-10 caret-[var(--iw-text)] ${promptReferenceThumbnails.length > 0 ? "!pb-14" : ""}`}
+            placeholder={placeholder}
+          />
+          {promptReferenceThumbnails.length > 0 ? (
+            <div className="pointer-events-none absolute inset-x-2 bottom-2 z-20 flex max-w-full items-center gap-1 overflow-hidden rounded-md border border-white/10 bg-slate-950/75 px-1.5 py-1 shadow-sm backdrop-blur">
+              {promptReferenceThumbnails.map(thumbnail => {
+                const type = getMediaReferenceType(thumbnail.reference);
+                return (
+                  <span
+                    key={`${thumbnail.token}:${thumbnail.reference.id}:${thumbnail.reference.url}:${thumbnail.index}`}
+                    className="relative inline-flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/15 bg-slate-950 shadow-sm"
+                    title={`${thumbnail.token} · ${mediaReferenceLabel(type)} · ${thumbnail.reference.id}`}
+                  >
+                    <MediaReferenceThumbnail reference={thumbnail.reference} alt={thumbnail.token} className="h-full w-full" />
+                    <span className="absolute bottom-0 right-0 rounded-tl bg-black/65 px-1 text-[8px] font-semibold leading-3 text-white">
+                      {thumbnail.index + 1}
+                    </span>
                   </span>
-                </span>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
