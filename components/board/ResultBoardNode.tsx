@@ -165,6 +165,11 @@ export default function ResultBoardNode({
       ) : (
         <LightweightMediaPreview type={node.asset.type} />
       )}
+      {node.asset.type === "video" && isImagePreviewUrl ? (
+        <span className="pointer-events-none absolute right-2 bottom-2 z-20 flex h-6 w-6 items-center justify-center rounded bg-black/65 text-violet-100 shadow-sm">
+          <Video className="h-4 w-4" />
+        </span>
+      ) : null}
       {hasStackSwitcher && (
         <div className="board-media-stack-switcher absolute bottom-3 left-1/2 z-30 flex -translate-x-1/2 gap-2 opacity-0 transition-opacity duration-200 group-hover/board-video:opacity-100">
           {stackItems.map((stackItem, index) => {

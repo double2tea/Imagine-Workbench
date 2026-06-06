@@ -6,6 +6,7 @@ import {
   collectBoardNodeIdsFromNodes,
   mergeBoardScopedMetas,
 } from "@/lib/assets/board-scope";
+import { ensureAssetPreviewUrl } from "@/lib/assets/previews";
 import { resolveAssetPreviewUrl } from "@/lib/assets/resolve-url";
 import type { BoardNode } from "@/lib/board/types";
 import {
@@ -46,11 +47,15 @@ async function hydrateAssetPreviews(metas: StorageItemMeta[]): Promise<StorageIt
   const hydrated: StorageItem[] = [];
   for (let offset = 0; offset < metas.length; offset += batchSize) {
     const slice = metas.slice(offset, offset + batchSize);
-    const chunk = await Promise.all(slice.map(async meta => ({
-      ...meta,
-      url: await resolveAssetPreviewUrl(meta),
-    })));
-    hydrated.push(...chunk);
+    const previewUrls = await Promise.all(slice.map(meta => resolveAssetPreviewUrl(meta)));
+    for (let index = 0; index < slice.length; index += 1) {
+      const meta = slice[index];
+      let url = previewUrls[index] ?? "";
+      if (!url && meta.type === "video" && meta.hasBlob) {
+        url = await ensureAssetPreviewUrl(meta);
+      }
+      hydrated.push({ ...meta, url });
+    }
   }
   return hydrated;
 }

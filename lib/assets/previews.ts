@@ -1,11 +1,14 @@
 "use client";
 
 import {
+  getAssetPreviewRecord,
+  hydrateAsset,
   saveAssetPreviewRecord,
   saveToDB,
   updateAssetPreviewMetadata,
   type AssetPreviewRecord,
   type StorageItem,
+  type StorageItemMeta,
 } from "@/lib/db";
 import { invalidateCachedAssetUrl } from "@/lib/assets/resolve-url";
 
@@ -79,16 +82,28 @@ function createVideoPreview(item: StorageItem): Promise<AssetPreviewRecord> {
     const video = document.createElement("video");
     video.muted = true;
     video.playsInline = true;
-    video.preload = "metadata";
+    video.preload = "auto";
+    let didFinish = false;
+    let timeout: number | undefined;
 
     const cleanup = (): void => {
+      if (timeout !== undefined) window.clearTimeout(timeout);
       video.removeAttribute("src");
       video.load();
     };
 
+    const fail = (error: Error): void => {
+      if (didFinish) return;
+      didFinish = true;
+      cleanup();
+      reject(error);
+    };
+
     const finish = (): void => {
+      if (didFinish) return;
       try {
         const record = drawPreview(video, video.videoWidth, video.videoHeight);
+        didFinish = true;
         cleanup();
         resolve({
           assetId: item.id,
@@ -97,24 +112,30 @@ function createVideoPreview(item: StorageItem): Promise<AssetPreviewRecord> {
           ...record,
         });
       } catch (error) {
-        cleanup();
-        reject(error);
+        fail(error instanceof Error ? error : new Error("视频预览绘制失败"));
       }
     };
 
+    timeout = window.setTimeout(() => fail(new Error("视频预览生成超时")), 8000);
     video.onerror = () => {
-      cleanup();
-      reject(new Error("视频预览加载失败"));
+      fail(new Error("视频预览加载失败"));
     };
-    video.onloadedmetadata = () => {
+    const seekToPreviewFrame = (): void => {
       const targetTime = Number.isFinite(video.duration) && video.duration > 0
         ? Math.min(0.1, video.duration)
         : 0;
       if (targetTime === 0) {
-        finish();
         return;
       }
-      video.currentTime = targetTime;
+      try {
+        video.currentTime = targetTime;
+      } catch (error) {
+        fail(error instanceof Error ? error : new Error("视频预览定位失败"));
+      }
+    };
+    video.onloadedmetadata = seekToPreviewFrame;
+    video.onloadeddata = () => {
+      if (!Number.isFinite(video.duration) || video.duration <= 0) finish();
     };
     video.onseeked = finish;
     video.src = item.url;
@@ -165,5 +186,30 @@ export async function saveItemWithPreview(item: StorageItem): Promise<StorageIte
       previewStatus: "failed",
       previewUpdatedAt: updatedAt,
     };
+  }
+}
+
+export async function ensureAssetPreviewUrl(meta: StorageItemMeta): Promise<string> {
+  const existing = await getAssetPreviewRecord(meta.id);
+  if (existing) return existing.dataUrl;
+
+  const item = await hydrateAsset(meta);
+  try {
+    const preview = await createAssetPreviewRecord(item);
+    if (!preview) {
+      const updatedAt = new Date().toISOString();
+      await updateAssetPreviewMetadata(item.id, { status: "missing", updatedAt });
+      invalidateCachedAssetUrl(item.id);
+      return isRemoteUrl(item.url) ? item.url : "";
+    }
+    await saveAssetPreviewRecord(preview);
+    await updateAssetPreviewMetadata(item.id, { status: "ready", updatedAt: preview.createdAt });
+    invalidateCachedAssetUrl(item.id);
+    return preview.dataUrl;
+  } catch {
+    const updatedAt = new Date().toISOString();
+    await updateAssetPreviewMetadata(item.id, { status: "failed", updatedAt });
+    invalidateCachedAssetUrl(item.id);
+    return isRemoteUrl(item.url) ? item.url : "";
   }
 }

@@ -14,28 +14,21 @@ export default function MediaReferenceThumbnail({
   reference,
 }: MediaReferenceThumbnailProps) {
   const type = getMediaReferenceType(reference);
+  const isImagePreviewUrl = reference.url.startsWith("data:image/");
   return (
     <span className={`relative flex items-center justify-center overflow-hidden bg-[var(--iw-panel-soft)] ${className}`}>
-      {type === "image" ? (
+      {type === "image" || (type === "video" && isImagePreviewUrl) ? (
         <PreviewImage src={reference.url} alt={alt} draggable={false} className="board-media-preview h-full w-full select-none object-cover" />
       ) : type === "video" ? (
-        <>
-          <video
-            aria-label={alt}
-            className="board-media-preview h-full w-full select-none object-cover"
-            draggable={false}
-            muted
-            playsInline
-            preload="metadata"
-            src={reference.url}
-          />
-          <span className="absolute left-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded bg-black/65 text-violet-100 shadow-sm">
-            <Video className="h-3 w-3" />
-          </span>
-        </>
+        <Video className="h-4 w-4 text-violet-200" />
       ) : (
         <Music className="h-4 w-4 text-cyan-200" />
       )}
+      {type === "video" ? (
+        <span className="absolute left-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded bg-black/65 text-violet-100 shadow-sm">
+          <Video className="h-3 w-3" />
+        </span>
+      ) : null}
     </span>
   );
 }

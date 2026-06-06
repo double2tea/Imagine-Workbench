@@ -980,6 +980,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     reload: reloadBoardAssets,
     setItems,
   } = useBoardAssetStore(resolvedBoardId, boardController.board.nodes);
+  const updateBoardAssetReferenceUrls = boardController.updateAssetReferenceUrls;
   const { generationTasks, setGenerationTasks } = useGenerationTaskStore({ boardId: resolvedBoardId });
   const [boardSummaries, setBoardSummaries] = useState<BoardSummary[]>([]);
   const [, setMode] = useState<BoardMode>("image");
@@ -1324,6 +1325,13 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   useEffect(() => {
     void reloadBoardAssets();
   }, [reloadBoardAssets, resolvedBoardId]);
+
+  useEffect(() => {
+    const videoPreviewUpdates = items
+      .filter(item => item.type === "video" && item.url.startsWith("data:image/"))
+      .map(item => ({ assetId: item.id, url: item.url }));
+    updateBoardAssetReferenceUrls(videoPreviewUpdates);
+  }, [items, updateBoardAssetReferenceUrls]);
 
   useEffect(() => {
     if (boardController.saveStatus === "loading") return;
