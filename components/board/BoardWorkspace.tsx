@@ -866,6 +866,23 @@ function selectedReferenceGroupAssetNodeIds(
   return referenceGroupAssetNodeIds(nodes, contextNodeId, nodeIds);
 }
 
+function quickInsertSourceRefs(
+  nodes: BoardNodeModel[],
+  from: BoardPortRef,
+  selectedNodeIds: string[],
+): BoardPortRef[] {
+  if (from.portKind !== "asset" || !selectedNodeIds.includes(from.nodeId)) return [from];
+  const seenNodeIds = new Set<string>();
+  const refs = selectedNodeIds.flatMap(nodeId => {
+    if (seenNodeIds.has(nodeId)) return [];
+    seenNodeIds.add(nodeId);
+    const node = nodes.find(item => item.id === nodeId);
+    if (node?.kind !== "asset" && node?.kind !== "reference-group" && node?.kind !== "result") return [];
+    return [{ nodeId, portId: BOARD_PORT_IDS.assetOut, portKind: "asset" as const }];
+  });
+  return refs.length > 0 ? refs : [from];
+}
+
 export default function BoardWorkspace({
   boardSummaries,
   children,
@@ -962,7 +979,7 @@ export default function BoardWorkspace({
     addAssetNode,
     addAssetToReferenceGroup,
     addGenerateNode,
-    addGenerateNodeWithConnection,
+    addGenerateNodeWithConnections,
     addNoteNode,
     addPromptNode,
     addReferenceGroupNode,
@@ -1671,7 +1688,10 @@ export default function BoardWorkspace({
   const addConnectedQuickNodeAtPoint = useCallback((kind: BoardInsertKind, point: BoardPoint, from: BoardPortRef, selectionSnapshot: string[]): void => {
     if (kind === "image-generate") {
       try {
-        addGenerateNodeWithConnection(
+        const targetPortId = from.portKind === "prompt" ? BOARD_PORT_IDS.promptIn : BOARD_PORT_IDS.referenceIn;
+        const connections = quickInsertSourceRefs(board.nodes, from, selectionSnapshot)
+          .map(sourceRef => ({ from: sourceRef, targetPortId }));
+        addGenerateNodeWithConnections(
           {
             kind: "image-generate",
             model: from.portKind === "asset" ? DEFAULT_BOARD_REFERENCE_IMAGE_MODEL : DEFAULT_BOARD_IMAGE_MODEL,
@@ -1679,8 +1699,7 @@ export default function BoardWorkspace({
             imageResolution: "1024x1024",
             position: centeredNodePosition(point, DEFAULT_GENERATE_NODE_SIZE),
           },
-          from,
-          from.portKind === "prompt" ? BOARD_PORT_IDS.promptIn : BOARD_PORT_IDS.referenceIn,
+          connections,
         );
         setQuickInsertMenu(null);
       } catch (error) {
@@ -1690,10 +1709,12 @@ export default function BoardWorkspace({
     }
     if (kind === "video-generate") {
       try {
-        addGenerateNodeWithConnection(
+        const targetPortId = from.portKind === "prompt" ? BOARD_PORT_IDS.promptIn : BOARD_PORT_IDS.referenceIn;
+        const connections = quickInsertSourceRefs(board.nodes, from, selectionSnapshot)
+          .map(sourceRef => ({ from: sourceRef, targetPortId }));
+        addGenerateNodeWithConnections(
           { kind: "video-generate", model: DEFAULT_VIDEO_MODEL, aspectRatio: "auto", position: centeredNodePosition(point, DEFAULT_GENERATE_NODE_SIZE) },
-          from,
-          from.portKind === "prompt" ? BOARD_PORT_IDS.promptIn : BOARD_PORT_IDS.referenceIn,
+          connections,
         );
         setQuickInsertMenu(null);
       } catch (error) {
@@ -1717,7 +1738,7 @@ export default function BoardWorkspace({
       });
       setQuickInsertMenu(null);
     }
-  }, [addGenerateNodeWithConnection, addReferenceGroupNodeWithAssets, addRunningHubAppNode, board.nodes, centeredNodePosition, connectPorts, onConnectionError]);
+  }, [addGenerateNodeWithConnections, addReferenceGroupNodeWithAssets, addRunningHubAppNode, board.nodes, centeredNodePosition, connectPorts, onConnectionError]);
 
   const quickInsertMenuItems = useMemo(() => {
     const from = quickInsertMenu?.connectionFrom;

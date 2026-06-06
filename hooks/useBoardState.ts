@@ -123,6 +123,10 @@ export interface BoardStateController {
     from: BoardPortRef,
     targetPortId: typeof BOARD_PORT_IDS.promptIn | typeof BOARD_PORT_IDS.referenceIn,
   ) => string;
+  addGenerateNodeWithConnections: (
+    input: CreateGenerateNodeInput,
+    connections: Array<{ from: BoardPortRef; targetPortId: typeof BOARD_PORT_IDS.promptIn | typeof BOARD_PORT_IDS.referenceIn }>,
+  ) => string;
   addNoteNode: (input?: CreateNoteNodeInput) => string;
   addPromptNode: (input?: CreatePromptNodeInput) => string;
   addReferenceGroupNode: (input?: CreateReferenceGroupNodeInput) => string;
@@ -1324,33 +1328,55 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     return node.id;
   }, [board.nodes, mutateBoard]);
 
+  const addGenerateNodeWithConnections = useCallback((
+    input: CreateGenerateNodeInput,
+    connections: Array<{ from: BoardPortRef; targetPortId: typeof BOARD_PORT_IDS.promptIn | typeof BOARD_PORT_IDS.referenceIn }>,
+  ): string => {
+    if (connections.length === 0) throw new Error("新建生成节点至少需要一个连接来源");
+    const node = createGenerateBoardNode(input, board.nodes);
+    const edgeIds = connections.map(() => createBoardId("edge"));
+    mutateBoard(currentBoard => {
+      let nextNodes = [...currentBoard.nodes, node];
+      let nextEdges = currentBoard.edges;
+      let firstEdgeId: string | null = null;
+      for (let index = 0; index < connections.length; index += 1) {
+        const connection = connections[index];
+        if (!connection) continue;
+        const to: BoardPortRef = {
+          nodeId: node.id,
+          portId: connection.targetPortId,
+          portKind: connection.targetPortId === BOARD_PORT_IDS.promptIn ? "prompt" : "asset",
+        };
+        try {
+          nextNodes = resolveBoardConnectionNodesWithCompatibleModel(nextNodes, connection.from, to);
+          const edge: BoardEdge = {
+            id: edgeIds[index] ?? createBoardId("edge"),
+            kind: resolveBoardConnectionKind(nextNodes, connection.from, to),
+            from: connection.from,
+            to,
+            createdAt: nowIso(),
+          };
+          nextEdges = connectEdge(nextNodes, nextEdges, edge);
+          firstEdgeId ??= edge.id;
+        } catch {
+          // Incompatible selected nodes are ignored for batch quick-insert.
+        }
+      }
+      if (!firstEdgeId) throw new Error("所选节点没有可连接到新生成节点的端口");
+      return touchBoard(currentBoard, nextNodes, nextEdges);
+    });
+    setSelectedNodeId(null);
+    setSelectedEdgeId(edgeIds[0] ?? null);
+    return node.id;
+  }, [board.nodes, mutateBoard]);
+
   const addGenerateNodeWithConnection = useCallback((
     input: CreateGenerateNodeInput,
     from: BoardPortRef,
     targetPortId: typeof BOARD_PORT_IDS.promptIn | typeof BOARD_PORT_IDS.referenceIn,
   ): string => {
-    const node = createGenerateBoardNode(input, board.nodes);
-    const to: BoardPortRef = {
-      nodeId: node.id,
-      portId: targetPortId,
-      portKind: targetPortId === BOARD_PORT_IDS.promptIn ? "prompt" : "asset",
-    };
-    const edgeId = createBoardId("edge");
-    mutateBoard(currentBoard => {
-      const nextNodes = resolveBoardConnectionNodesWithCompatibleModel([...currentBoard.nodes, node], from, to);
-      const edge: BoardEdge = {
-        id: edgeId,
-        kind: resolveBoardConnectionKind(nextNodes, from, to),
-        from,
-        to,
-        createdAt: nowIso(),
-      };
-      return touchBoard(currentBoard, nextNodes, connectEdge(nextNodes, currentBoard.edges, edge));
-    });
-    setSelectedNodeId(null);
-    setSelectedEdgeId(edgeId);
-    return node.id;
-  }, [board.nodes, mutateBoard]);
+    return addGenerateNodeWithConnections(input, [{ from, targetPortId }]);
+  }, [addGenerateNodeWithConnections]);
 
   const addAgentNode = useCallback((input: CreateAgentNodeInput = {}): string => {
     const createdAt = nowIso();
@@ -1994,6 +2020,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       completeGenerationResult,
       addGenerateNode,
       addGenerateNodeWithConnection,
+      addGenerateNodeWithConnections,
       addNoteNode,
       addPromptNode,
       addReferenceGroupNode,
@@ -2036,6 +2063,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       addResultNodeWithConnection,
       addGenerateNode,
       addGenerateNodeWithConnection,
+      addGenerateNodeWithConnections,
       addNoteNode,
       addPromptNode,
       addReferenceGroupNode,
