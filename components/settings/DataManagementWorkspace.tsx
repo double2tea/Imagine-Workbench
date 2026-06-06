@@ -6,6 +6,7 @@ import { formatBytes, type LocalStorageCleanupKind, type WorkspaceCleanupKind, t
 interface DataManagementWorkspaceProps {
   hasCurrentBoard: boolean;
   summary: WorkspaceDataSummary | null;
+  summaryError: string | null;
   onCleanupAssets: (kind: WorkspaceCleanupKind) => Promise<void>;
   onClearAssets: () => Promise<void>;
   onClearLocalStorage: (kind: LocalStorageCleanupKind) => Promise<void>;
@@ -38,6 +39,7 @@ function StatCard({ label, primary, secondary }: StatCardProps) {
 export default function DataManagementWorkspace({
   hasCurrentBoard,
   summary,
+  summaryError,
   onCleanupAssets,
   onClearAssets,
   onClearLocalStorage,
@@ -85,6 +87,11 @@ export default function DataManagementWorkspace({
   const storageSummary = summary?.localStorage;
   const quota = summary?.browserStorage?.quota;
   const usage = summary?.browserStorage?.usage;
+  const assetStores = assetSummary?.stores;
+  const hasAssetReferenceGap = (assetSummary?.missingBoardReferences ?? 0) > 0;
+  const hasAssetStoreGap = assetSummary && assetStores
+    ? assetStores.metaRecords !== assetSummary.total || assetStores.legacyAssetRecords > 0
+    : false;
 
   return (
     <div className="flex max-w-4xl flex-col gap-4">
@@ -126,12 +133,17 @@ export default function DataManagementWorkspace({
           {busyLabel}...
         </div>
       ) : null}
+      {summaryError ? (
+        <div className="rounded-lg border border-red-500/25 bg-red-950/20 px-3 py-2 text-[11px] leading-5 text-red-200">
+          数据统计读取失败：{summaryError}
+        </div>
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="资产"
           primary={assetSummary ? String(assetSummary.total) : "--"}
-          secondary={assetSummary ? `${assetSummary.image} 图 / ${assetSummary.video} 视频 · ${formatBytes(assetSummary.estimatedBytes)}` : "等待统计"}
+          secondary={assetSummary ? `${assetSummary.image} 图 / ${assetSummary.video} 视频 · 画板引用 ${assetSummary.referencedByBoards}` : "等待统计"}
         />
         <StatCard
           label="画板"
@@ -149,6 +161,16 @@ export default function DataManagementWorkspace({
           secondary={quota !== undefined ? `配额 ${formatBytes(quota)}` : "浏览器未返回配额"}
         />
       </div>
+      {assetSummary && assetStores ? (
+        <div className={[
+          "rounded-lg border px-3 py-2 text-[11px] leading-5",
+          hasAssetReferenceGap || hasAssetStoreGap
+            ? "border-amber-400/30 bg-amber-500/10 text-amber-100"
+            : "border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)]",
+        ].join(" ")}>
+          资产库：meta {assetStores.metaRecords} / hash {assetStores.sharedBlobRecords} / legacy blob {assetStores.legacyBlobRecords} / legacy assets {assetStores.legacyAssetRecords} / preview {assetStores.previewRecords}；画板缺失引用 {assetSummary.missingBoardReferences}
+        </div>
+      ) : null}
 
       <section className="rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-3">
         <div className="flex flex-wrap items-center justify-between gap-3">

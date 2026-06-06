@@ -24,6 +24,8 @@ const generateNode: BoardNode = {
   imageResolution: "1K",
   status: "complete",
   variantCount: 4,
+  resultAssetId: "asset_generate_b",
+  resultAssetIds: ["asset_generate_a", "asset_generate_b"],
   resultStackKey: "stack-1",
 };
 
@@ -86,7 +88,7 @@ const referenceGroupNode: BoardNode = {
 test("collectBoardAssetIdsFromNodes includes result node stack assets", () => {
   assert.deepEqual(
     Array.from(collectBoardAssetIdsFromNodes([generateNode, resultNode, assetNode, referenceGroupNode])).sort(),
-    ["asset_a", "asset_b", "asset_c", "asset_d"],
+    ["asset_a", "asset_b", "asset_c", "asset_d", "asset_generate_a", "asset_generate_b"],
   );
 });
 

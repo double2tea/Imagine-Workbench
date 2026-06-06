@@ -66,6 +66,10 @@ const TABS: { key: SettingsTab; label: string }[] = [
   { key: "data", label: "数据" },
 ];
 
+function formatSettingsError(error: unknown): string {
+  return error instanceof Error && error.message.trim() ? error.message : "数据统计读取失败";
+}
+
 export default function SettingsModal({
   audioModelGroups,
   chatModelGroups,
@@ -102,9 +106,16 @@ export default function SettingsModal({
 }: SettingsModalProps) {
   const [tab, setTab] = useState<SettingsTab>("connections");
   const [dataSummary, setDataSummary] = useState<WorkspaceDataSummary | null>(null);
+  const [dataSummaryError, setDataSummaryError] = useState<string | null>(null);
 
   const refreshDataSummary = useCallback(async () => {
-    setDataSummary(await getWorkspaceDataSummary());
+    try {
+      setDataSummaryError(null);
+      setDataSummary(await getWorkspaceDataSummary());
+    } catch (error) {
+      setDataSummary(null);
+      setDataSummaryError(formatSettingsError(error));
+    }
   }, []);
 
   useEffect(() => {
@@ -183,6 +194,7 @@ export default function SettingsModal({
                 <DataManagementWorkspace
                   hasCurrentBoard={hasCurrentBoard}
                   summary={dataSummary}
+                  summaryError={dataSummaryError}
                   onCleanupAssets={onCleanupAssets}
                   onClearAssets={onClearAssets}
                   onClearLocalStorage={onClearLocalStorage}

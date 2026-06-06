@@ -96,6 +96,15 @@ interface AssetBlobPayloadRecord {
   data: string;
 }
 
+export interface AssetDatabaseDiagnostics {
+  version: number;
+  metaRecords: number;
+  legacyBlobRecords: number;
+  sharedBlobRecords: number;
+  previewRecords: number;
+  legacyAssetRecords: number;
+}
+
 export interface AssetPreviewRecord {
   assetId: string;
   type: StorageItemType;
@@ -306,6 +315,17 @@ function readHashBlobPayload(db: IDBDatabase, hash: string): Promise<string | nu
   });
 }
 
+function countStoreRecords(db: IDBDatabase, storeName: string): Promise<number> {
+  if (!db.objectStoreNames.contains(storeName)) return Promise.resolve(0);
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(storeName, "readonly");
+    const request = transaction.objectStore(storeName).count();
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error ?? new Error(`IndexedDB ${storeName} count failed`));
+    transaction.onerror = () => reject(transaction.error ?? request.error ?? new Error(`IndexedDB ${storeName} count transaction failed`));
+  });
+}
+
 function writeMigratedBlobRecord(
   db: IDBDatabase,
   meta: StorageItemMeta,
@@ -452,6 +472,31 @@ export async function getAssetPreviewRecord(id: string): Promise<AssetPreviewRec
     };
     request.onerror = () => reject(request.error);
   });
+}
+
+export async function getAssetDatabaseDiagnostics(): Promise<AssetDatabaseDiagnostics> {
+  const db = await openDatabase();
+  const [
+    metaRecords,
+    legacyBlobRecords,
+    sharedBlobRecords,
+    previewRecords,
+    legacyAssetRecords,
+  ] = await Promise.all([
+    countStoreRecords(db, META_STORE),
+    countStoreRecords(db, BLOB_STORE),
+    countStoreRecords(db, HASH_BLOB_STORE),
+    countStoreRecords(db, PREVIEW_STORE),
+    countStoreRecords(db, LEGACY_STORE),
+  ]);
+  return {
+    version: DB_VERSION,
+    metaRecords,
+    legacyBlobRecords,
+    sharedBlobRecords,
+    previewRecords,
+    legacyAssetRecords,
+  };
 }
 
 export async function saveAssetPreviewRecord(record: AssetPreviewRecord): Promise<void> {

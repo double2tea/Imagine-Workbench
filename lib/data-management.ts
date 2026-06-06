@@ -27,10 +27,12 @@ import {
   buildStorageItem,
   clearAllDB,
   deleteFromDB,
+  getAssetDatabaseDiagnostics,
   getAllFromDB,
   hydrateAssets,
   listBoardScopedAssetMetas,
   saveToDB,
+  type AssetDatabaseDiagnostics,
   type GenerationReferenceMediaSnapshot,
   type GenerationRequestSnapshot,
   type StorageItem,
@@ -155,10 +157,13 @@ export interface WorkspaceDataSummary {
     failed: number;
     image: number;
     largest: Array<{ id: string; label: string; bytes: number }>;
+    missingBoardReferences: number;
     orphaned: number;
     pending: number;
     processing: number;
+    referencedByBoards: number;
     staleProcessing: number;
+    stores: AssetDatabaseDiagnostics;
     total: number;
     video: number;
     estimatedBytes: number;
@@ -206,6 +211,8 @@ export async function getWorkspaceDataSummary(items: StorageItem[] = []): Promis
   const assets = items.length > 0 ? items : await getAllFromDB();
   const boards = await listBoardsFromDB();
   const boardAssetIds = collectBoardAssetIds(boards);
+  const assetIds = new Set(assets.map(item => item.id));
+  const stores = await getAssetDatabaseDiagnostics();
   const largest = assets
     .map(item => ({ id: item.id, label: item.prompt || item.model || item.id, bytes: estimateAssetBytes(item) }))
     .sort((left, right) => right.bytes - left.bytes)
@@ -221,10 +228,13 @@ export async function getWorkspaceDataSummary(items: StorageItem[] = []): Promis
       failed: assets.filter(item => item.status === "failed").length,
       image: assets.filter(item => item.type === "image").length,
       largest,
+      missingBoardReferences: Array.from(boardAssetIds).filter(assetId => !assetIds.has(assetId)).length,
       orphaned: findOrphanAssetIds(assets, boardAssetIds).length,
       pending: assets.filter(item => item.status === "pending").length,
       processing: assets.filter(item => item.status === "processing").length,
+      referencedByBoards: boardAssetIds.size,
       staleProcessing: findStaleProcessingAssetIds(assets).length,
+      stores,
       total: assets.length,
       video: assets.filter(item => item.type === "video").length,
       estimatedBytes: assets.reduce((total, item) => total + estimateAssetBytes(item), 0),
