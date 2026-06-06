@@ -23,12 +23,14 @@ import {
   type NodeMouseHandler,
   type OnConnect,
   type OnConnectEnd,
+  type OnConnectStart,
   type OnEdgesDelete,
   type OnNodeDrag,
   type OnNodesChange,
   type OnNodesDelete,
   type OnReconnect,
   type OnSelectionChangeFunc,
+  type ReactFlowProps,
   type ReactFlowInstance,
   useNodesState,
   useReactFlow,
@@ -126,6 +128,8 @@ interface BoardWorkspaceProps {
 }
 
 type BoardFlowEdge = Edge<{ kind: BoardEdgeKind; processing?: boolean }, "smoothstep">;
+type BoardReconnectStartHandler = NonNullable<ReactFlowProps<BoardFlowNode, BoardFlowEdge>["onReconnectStart"]>;
+type BoardReconnectEndHandler = NonNullable<ReactFlowProps<BoardFlowNode, BoardFlowEdge>["onReconnectEnd"]>;
 
 const MEDIA_NODE_MIN_HEIGHT = 220;
 const MEDIA_NODE_MAX_HEIGHT = 330;
@@ -879,6 +883,7 @@ export default function BoardWorkspace({
   const [trashedNodes, setTrashedNodes] = useState<BoardTrashEntry[]>([]);
   const [assetCompare, setAssetCompare] = useState<{ originalUrl: string; resultUrl: string } | null>(null);
   const [flowReady, setFlowReady] = useState(false);
+  const [isConnectionActive, setIsConnectionActive] = useState(false);
   const [isNodeDragActive, setIsNodeDragActive] = useState(false);
   const updateSelectedNodeIds = useCallback((nextIds: string[]): void => {
     setSelectedNodeIds(currentIds => {
@@ -1475,6 +1480,14 @@ export default function BoardWorkspace({
     }
   }, [addAssetToReferenceGroup, onConnectionError, readValidConnectionRefs, reconnectEdge]);
 
+  const handleReconnectStart = useCallback<BoardReconnectStartHandler>(() => {
+    setIsConnectionActive(true);
+  }, []);
+
+  const handleReconnectEnd = useCallback<BoardReconnectEndHandler>(() => {
+    setIsConnectionActive(false);
+  }, []);
+
   const handleEdgeClick = useCallback<EdgeMouseHandler<BoardFlowEdge>>((_event, edge) => {
     closeOverlayMenus();
     selectEdge(edge.id);
@@ -1820,7 +1833,12 @@ export default function BoardWorkspace({
     rememberPastedPosition();
   }, [addAgentNode, addAssetNode, addGenerateNode, addNoteNode, addPromptNode, addReferenceGroupNode, addResultNodeWithConnection, addRunningHubAppNode]);
 
+  const handleConnectStart = useCallback<OnConnectStart>(() => {
+    setIsConnectionActive(true);
+  }, []);
+
   const handleConnectEnd = useCallback<OnConnectEnd>((event, connectionState) => {
+    setIsConnectionActive(false);
     if (connectionState.isValid || !connectionState.fromNode || !connectionState.fromHandle) return;
     if (!(event instanceof MouseEvent) && !(event instanceof TouchEvent)) return;
     const clientPoint = event instanceof MouseEvent
@@ -2134,7 +2152,7 @@ export default function BoardWorkspace({
           onDoubleClick={handleFlowDoubleClick}
           onDragOver={handleBoardDragOver}
           onDrop={handleBoardDrop}
-          className={`board-canvas relative min-h-0 bg-[var(--iw-board-canvas-bg)]${isNodeDragActive ? " is-node-dragging" : ""}`}
+          className={`board-canvas relative min-h-0 bg-[var(--iw-board-canvas-bg)]${isNodeDragActive ? " is-node-dragging" : ""}${isConnectionActive ? " is-connecting" : ""}`}
         >
           <ReactFlow
             nodes={reactFlowNodes}
@@ -2165,12 +2183,15 @@ export default function BoardWorkspace({
             elementsSelectable
             multiSelectionKeyCode="Shift"
             onReconnect={handleReconnect}
+            onReconnectStart={handleReconnectStart}
+            onReconnectEnd={handleReconnectEnd}
             onSelectionChange={handleSelectionChange}
             panOnDrag={isCoarsePointer ? true : reactFlowPanOnDrag}
             panOnScroll
             panOnScrollMode={PanOnScrollMode.Free}
             selectionOnDrag={!isCoarsePointer}
             onConnect={handleConnect}
+            onConnectStart={handleConnectStart}
             onConnectEnd={handleConnectEnd}
             onEdgeClick={handleEdgeClick}
             onEdgeDoubleClick={handleEdgeDoubleClick}

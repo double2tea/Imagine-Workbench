@@ -2662,7 +2662,7 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 
 .board-node-shell:is(:hover, :focus-within) .board-node-handle,
 .board-node-shell[data-selected="true"] .board-node-handle,
-.board-node-handle[data-connecting="true"].connectionindicator,
+.board-canvas.is-connecting .board-node-handle.connectionindicator,
 .board-node-handle.connectingfrom,
 .board-node-handle.connectingto {
   --board-handle-scale: 1;
@@ -2675,22 +2675,22 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 .board-node-shell[data-selected="true"] .board-connection-zone-edge,
 .board-node-shell:is(:hover, :focus-within) .board-connection-zone-segment,
 .board-node-shell[data-selected="true"] .board-connection-zone-segment,
-.board-node-handle[data-connecting="true"].board-connection-zone-edge.connectionindicator,
-.board-node-handle[data-connecting="true"].board-connection-zone-segment.connectionindicator {
+.board-canvas.is-connecting .board-node-handle.board-connection-zone-edge.connectionindicator,
+.board-canvas.is-connecting .board-node-handle.board-connection-zone-segment.connectionindicator {
   opacity: 0.24 !important;
   background: color-mix(in srgb, var(--iw-panel) 8%, transparent) !important;
   border-color: color-mix(in srgb, var(--iw-border) 28%, transparent) !important;
   box-shadow: none;
 }
 
-.board-node-handle[data-connecting="true"].board-connection-zone-edge.connectionindicator,
-.board-node-handle[data-connecting="true"].board-connection-zone-segment.connectionindicator {
+.board-canvas.is-connecting .board-node-handle.board-connection-zone-edge.connectionindicator,
+.board-canvas.is-connecting .board-node-handle.board-connection-zone-segment.connectionindicator {
   opacity: 0.32 !important;
 }
 
 .board-node-shell:is(:hover, :focus-within) .board-node-handle.connectionindicator,
 .board-node-shell[data-selected="true"] .board-node-handle.connectionindicator,
-.board-node-handle[data-connecting="true"].connectionindicator,
+.board-canvas.is-connecting .board-node-handle.connectionindicator,
 .board-node-handle.connectingfrom {
   pointer-events: all !important;
 }
@@ -2732,7 +2732,7 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
     0 0 20px rgba(96, 165, 250, 0.4) !important;
 }
 
-.board-node-handle[data-connecting="true"].connectionindicator:not(.connectingfrom) {
+.board-canvas.is-connecting .board-node-handle.connectionindicator:not(.connectingfrom) {
   animation: none;
 }
 

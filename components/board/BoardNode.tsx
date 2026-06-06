@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useEffect, useMemo, useState } from "react";
-import { Handle, Position, useConnection, type Node, type NodeProps } from "@xyflow/react";
+import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import { ImagePlus, Layers, Music, Video, Workflow } from "lucide-react";
 import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
 import PreviewImage from "@/components/PreviewImage";
@@ -73,7 +73,6 @@ export type BoardFlowNode = Node<BoardFlowNodeData, "board">;
 type BoardHandleZone = "edge" | "segment";
 
 interface BoardHandleProps {
-  connectionInProgress: boolean;
   id: string;
   kind: BoardPortKind;
   label: string;
@@ -105,7 +104,7 @@ function handleClass(kind: BoardPortKind): string {
   return "!border-blue-200 !bg-blue-400";
 }
 
-function BoardHandle({ connectionInProgress, id, kind, label, position, top, type, zone = "edge", zoneHeight }: BoardHandleProps) {
+function BoardHandle({ id, kind, label, position, top, type, zone = "edge", zoneHeight }: BoardHandleProps) {
   const isEdgeZone = zone === "edge";
   const segmentHeight = zoneHeight ?? 72;
   return (
@@ -113,7 +112,6 @@ function BoardHandle({ connectionInProgress, id, kind, label, position, top, typ
       id={id}
       type={type}
       position={position}
-      data-connecting={connectionInProgress ? "true" : "false"}
       className={[
         "board-node-handle",
         `board-node-handle-${kind}`,
@@ -227,7 +225,6 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
   const isMediaNode = node.kind === "asset" || node.kind === "result";
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [draftTitle, setDraftTitle] = useState(node.title);
-  const connectionInProgress = useConnection(connection => connection.inProgress);
   const ports = useMemo(
     () => getBoardNodePortDefinitions(node, { hasResultConnection: data.hasResultConnection }),
     [data.hasResultConnection, node],
@@ -247,7 +244,6 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
       return (
         <BoardHandle
           key={port.id}
-          connectionInProgress={connectionInProgress}
           id={port.id}
           type="target"
           position={Position.Left}
@@ -263,7 +259,6 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
       return (
         <BoardHandle
           key={port.id}
-          connectionInProgress={connectionInProgress}
           id={port.id}
           type="target"
           position={Position.Left}
@@ -279,7 +274,6 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
       return (
         <BoardHandle
           key={port.id}
-          connectionInProgress={connectionInProgress}
           id={port.id}
           type="target"
           position={Position.Left}
@@ -294,7 +288,6 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
     return (
       <BoardHandle
         key={port.id}
-        connectionInProgress={connectionInProgress}
         id={port.id}
         type={port.direction === "output" ? "source" : "target"}
         position={port.direction === "output" ? Position.Right : Position.Left}
