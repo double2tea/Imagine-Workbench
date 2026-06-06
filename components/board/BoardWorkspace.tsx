@@ -15,6 +15,7 @@ import {
   MiniMap,
   PanOnScrollMode,
   ReactFlow,
+  SelectionMode,
   getSmoothStepPath,
   type Edge,
   type EdgeMouseHandler,
@@ -884,6 +885,40 @@ function quickInsertSourceRefs(
     return [{ nodeId, portId: BOARD_PORT_IDS.assetOut, portKind: "asset" as const }];
   });
   return refs.length > 0 ? refs : [from];
+}
+
+function boardNodeAtPoint(
+  nodes: BoardNodeModel[],
+  point: BoardPoint,
+  sourceNodeId: string,
+): BoardNodeModel | null {
+  for (let index = nodes.length - 1; index >= 0; index -= 1) {
+    const node = nodes[index];
+    if (!node || node.id === sourceNodeId) continue;
+    if (
+      point.x >= node.position.x &&
+      point.x <= node.position.x + node.size.width &&
+      point.y >= node.position.y &&
+      point.y <= node.position.y + node.size.height
+    ) {
+      return node;
+    }
+  }
+  return null;
+}
+
+function batchConnectionsFromSourceToTarget(
+  nodes: BoardNodeModel[],
+  sourceNodeId: string,
+  targetNode: BoardNodeModel,
+  selectedNodeIds: string[],
+): Array<{ from: BoardPortRef; to: BoardPortRef }> {
+  const sourceNodeIds = selectedNodeIds.includes(sourceNodeId) ? selectedNodeIds : [sourceNodeId];
+  return sourceNodeIds
+    .map(nodeId => nodes.find(node => node.id === nodeId))
+    .filter((node): node is BoardNodeModel => node !== undefined)
+    .map(sourceNode => batchConnectionToTarget(nodes, sourceNode, targetNode))
+    .filter((connection): connection is { from: BoardPortRef; to: BoardPortRef } => connection !== null);
 }
 
 export default function BoardWorkspace({
@@ -1943,6 +1978,20 @@ export default function BoardWorkspace({
     if (sourceDirection !== "output") return;
 
     const flowPoint = flowPositionFromClient(clientPoint.x, clientPoint.y);
+    const targetNode = boardNodeAtPoint(board.nodes, flowPoint, sourceNodeId);
+    if (targetNode) {
+      const connections = batchConnectionsFromSourceToTarget(board.nodes, sourceNodeId, targetNode, selectedNodeIds);
+      if (connections.length === 0) {
+        onConnectionError("所选节点没有可连接到此节点的端口");
+        return;
+      }
+      connectPortsBatch(connections);
+      selectNode(targetNode.id);
+      selectEdge(null);
+      updateSelectedNodeIds([targetNode.id]);
+      return;
+    }
+
     if (sourceKind === "prompt") {
       setQuickInsertMenu({
         clientX: clientPoint.x,
@@ -2006,7 +2055,7 @@ export default function BoardWorkspace({
       selectEdge(null);
       return;
     }
-  }, [addResultNodeWithConnection, board.nodes, centeredNodePosition, connectPorts, flowPositionFromClient, onConnectionError, selectEdge, selectedNodeIds, selectNode]);
+  }, [addResultNodeWithConnection, board.nodes, centeredNodePosition, connectPorts, connectPortsBatch, flowPositionFromClient, onConnectionError, selectEdge, selectedNodeIds, selectNode, updateSelectedNodeIds]);
 
   const openQuickInsertMenu = useCallback((event: ReactMouseEvent | MouseEvent): void => {
     event.preventDefault();
@@ -2281,6 +2330,7 @@ export default function BoardWorkspace({
             edgesReconnectable
             elementsSelectable
             multiSelectionKeyCode="Shift"
+            selectionMode={SelectionMode.Partial}
             onReconnect={handleReconnect}
             onReconnectStart={handleReconnectStart}
             onReconnectEnd={handleReconnectEnd}
