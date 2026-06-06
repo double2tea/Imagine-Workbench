@@ -278,6 +278,32 @@ function cloneBoardNodeForDuplicate(source: BoardNode, stackIndex: number): Boar
   }
 }
 
+function duplicatedInputEdgesForClones(
+  nodes: BoardNode[],
+  edges: BoardEdge[],
+  sources: BoardNode[],
+  clones: BoardNode[],
+): BoardEdge[] {
+  const cloneIdBySourceId = new Map(sources.map((source, index) => [source.id, clones[index]?.id]));
+  const clonedTargetIds = new Set(sources
+    .filter(source => source.kind === "image-generate" || source.kind === "video-generate" || source.kind === "runninghub-app")
+    .map(source => source.id));
+  const nextNodes = [...nodes, ...clones];
+  return edges.flatMap(edge => {
+    if (!clonedTargetIds.has(edge.to.nodeId)) return [];
+    if (edge.kind !== "prompt" && edge.kind !== "reference") return [];
+    const clonedTargetId = cloneIdBySourceId.get(edge.to.nodeId);
+    if (!clonedTargetId) return [];
+    const clonedSourceId = cloneIdBySourceId.get(edge.from.nodeId);
+    const from = clonedSourceId
+      ? { ...edge.from, nodeId: clonedSourceId }
+      : edge.from;
+    const to = { ...edge.to, nodeId: clonedTargetId };
+    if (!filterValidBoardEdges(nextNodes, [{ ...edge, id: createBoardId("edge"), from, to, createdAt: nowIso() }]).length) return [];
+    return [createBoardEdge(nextNodes, from, to)];
+  });
+}
+
 function normalizeBoard(board: unknown, fallbackId: string = DEFAULT_BOARD_ID): BoardDocument {
   const boardRecord = isRecord(board) ? board : {};
   const nodes = Array.isArray(boardRecord.nodes) ? normalizeBoardNodes(boardRecord.nodes) : [];
@@ -1579,7 +1605,10 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     if (sources.length === 0) return [];
 
     const clones = sources.map((source, index) => cloneBoardNodeForDuplicate(source, index));
-    mutateBoard(currentBoard => touchBoard(currentBoard, [...currentBoard.nodes, ...clones]));
+    mutateBoard(currentBoard => {
+      const inputEdges = duplicatedInputEdgesForClones(currentBoard.nodes, currentBoard.edges, sources, clones);
+      return touchBoard(currentBoard, [...currentBoard.nodes, ...clones], [...currentBoard.edges, ...inputEdges]);
+    });
     const lastClone = clones[clones.length - 1];
     if (lastClone) {
       setSelectedNodeId(lastClone.id);
