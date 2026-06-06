@@ -1556,7 +1556,9 @@ export default function BoardWorkspace({
   }, [closeOverlayMenus, selectEdge, selectNode, updateSelectedNodeIds]);
 
   const snapToGrid = board.config.snapToGrid;
-  const onlyRenderVisibleBoardElements = board.nodes.length > 20;
+  // Always virtualize during drag to reduce the number of DOM nodes React Flow must track
+  // per frame — mitigates the #5674 internal re-render issue on perf-sensitive drag frames.
+  const onlyRenderVisibleBoardElements = isNodeDragActive || board.nodes.length > 20;
   const shouldRenderMiniMap = board.config.showMiniMap && !isNodeDragActive;
 
   const flowPositionFromClient = useCallback((clientX: number, clientY: number): BoardPoint => {
