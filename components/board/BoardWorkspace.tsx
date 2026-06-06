@@ -1556,7 +1556,7 @@ export default function BoardWorkspace({
   }, [closeOverlayMenus, selectEdge, selectNode, updateSelectedNodeIds]);
 
   const snapToGrid = board.config.snapToGrid;
-  const onlyRenderVisibleBoardElements = board.nodes.length > 80;
+  const onlyRenderVisibleBoardElements = board.nodes.length > 20;
   const shouldRenderMiniMap = board.config.showMiniMap && !isNodeDragActive;
 
   const flowPositionFromClient = useCallback((clientX: number, clientY: number): BoardPoint => {
@@ -2144,6 +2144,7 @@ export default function BoardWorkspace({
             minZoom={0.25}
             maxZoom={1.8}
             onlyRenderVisibleElements={onlyRenderVisibleBoardElements}
+            elevateEdgesOnSelect
             connectOnClick={false}
             connectionMode={ConnectionMode.Loose}
             connectionRadius={48}
