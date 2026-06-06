@@ -4,7 +4,7 @@ import { memo, useEffect, useMemo, useState } from "react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import { ImagePlus, Layers, Music, Video, Workflow } from "lucide-react";
 import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
-import PreviewImage from "@/components/PreviewImage";
+import MediaReferenceThumbnail from "@/components/reference/MediaReferenceThumbnail";
 import type {
   BoardAgentNode,
   BoardGenerateNodeUpdate,
@@ -23,7 +23,6 @@ import ReferenceGroupBoardNode from "@/components/board/ReferenceGroupBoardNode"
 import ResultBoardNode from "@/components/board/ResultBoardNode";
 import RunningHubAppBoardNode from "@/components/board/RunningHubAppBoardNode";
 import type { StorageItem } from "@/lib/db";
-import { getMediaReferenceType } from "@/lib/media-references";
 import type { BoardPromptReference } from "@/lib/board/prompt-references";
 import { BOARD_PORT_IDS, getBoardNodePortDefinitions } from "@/lib/board/ports";
 import type { CapturedVideoFrame } from "@/lib/video-frame";
@@ -157,7 +156,6 @@ function GenerateReferenceShelf({
   return (
     <div className="nodrag nopan absolute -top-12 left-0 z-40 flex max-w-full gap-1 overflow-hidden rounded-lg border border-blue-400/20 bg-slate-950/88 p-1 shadow-xl backdrop-blur">
       {references.slice(0, 6).map((reference, index) => {
-        const type = getMediaReferenceType(reference);
         const canReorder = typeof reference.sourceEdgeId === "string";
         return (
           <div
@@ -195,17 +193,7 @@ function GenerateReferenceShelf({
             }`}
             title={reference.role ? `参考 ${index + 1} · ${reference.role}` : `参考 ${index + 1}`}
           >
-            {type === "image" ? (
-              <PreviewImage src={reference.url} alt="" draggable={false} className="h-full w-full select-none object-cover" />
-            ) : type === "video" ? (
-              <div className="flex h-full w-full items-center justify-center">
-                <Video className="h-4 w-4 text-violet-200" />
-              </div>
-            ) : (
-              <div className="flex h-full w-full items-center justify-center">
-                <Music className="h-4 w-4 text-cyan-200" />
-              </div>
-            )}
+            <MediaReferenceThumbnail reference={reference} alt="" className="h-full w-full" />
             <span className="absolute bottom-0 right-0 rounded-tl bg-black/65 px-1 text-[8px] font-semibold text-white">
               {index + 1}
             </span>

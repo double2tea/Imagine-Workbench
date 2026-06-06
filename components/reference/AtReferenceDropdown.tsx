@@ -1,6 +1,5 @@
-import { Music, Video } from "lucide-react";
-import PreviewImage from "@/components/PreviewImage";
 import AtDropdownShell, { AtDropdownHeader } from "@/components/reference/AtDropdownShell";
+import MediaReferenceThumbnail from "@/components/reference/MediaReferenceThumbnail";
 import type { StorageItem } from "@/lib/db";
 
 interface AtReferenceDropdownProps {
@@ -31,13 +30,7 @@ export default function AtReferenceDropdown({ items, search, onSelect }: AtRefer
           className="imagine-at-dropdown-item nodrag select-none"
         >
           <div className="imagine-at-dropdown-thumb">
-            {item.type === "image" ? (
-              <PreviewImage src={item.url} alt="at option" className="h-full w-full object-cover" />
-            ) : item.type === "video" ? (
-              <Video className="h-4 w-4 text-[var(--iw-faint)]" />
-            ) : (
-              <Music className="h-4 w-4 text-[var(--iw-faint)]" />
-            )}
+            <MediaReferenceThumbnail reference={item} alt="at option" className="h-full w-full" />
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate font-mono text-[10px] font-bold text-[var(--iw-accent-strong)]">

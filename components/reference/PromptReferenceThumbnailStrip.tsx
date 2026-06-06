@@ -1,6 +1,5 @@
-import { Film, Music } from "lucide-react";
 import type { ReactNode } from "react";
-import PreviewImage from "@/components/PreviewImage";
+import MediaReferenceThumbnail from "@/components/reference/MediaReferenceThumbnail";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import {
   getMediaReferencePromptToken,
@@ -54,13 +53,7 @@ function renderReferenceChip(thumbnail: PromptReferenceThumbnail): ReactNode {
     >
       {token}
       <span className="absolute left-1/2 top-1/2 inline-flex h-8 w-8 -translate-x-1/2 -translate-y-[42%] items-center justify-center overflow-hidden rounded-md border border-white/15 bg-slate-950 align-baseline shadow-sm">
-        {type === "image" ? (
-          <PreviewImage src={reference.url} alt={token} className="h-full w-full object-cover" />
-        ) : type === "video" ? (
-          <Film className="h-4 w-4 text-violet-200" />
-        ) : (
-          <Music className="h-4 w-4 text-cyan-200" />
-        )}
+        <MediaReferenceThumbnail reference={reference} alt={token} className="h-full w-full" />
         <span className="absolute bottom-0 right-0 rounded-tl bg-black/65 px-1 text-[8px] font-semibold leading-3 text-white">
           {index + 1}
         </span>

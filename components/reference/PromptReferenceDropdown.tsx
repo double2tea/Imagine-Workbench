@@ -1,6 +1,5 @@
-import { Music } from "lucide-react";
-import PreviewImage from "@/components/PreviewImage";
 import AtDropdownShell, { AtDropdownHeader } from "@/components/reference/AtDropdownShell";
+import MediaReferenceThumbnail from "@/components/reference/MediaReferenceThumbnail";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import {
   getMediaReferencePromptToken,
@@ -78,13 +77,7 @@ function ReferenceRow({ item, onSelect }: { item: FilteredReferenceItem; onSelec
       className="imagine-at-dropdown-item nodrag"
     >
       <div className="imagine-at-dropdown-thumb">
-        {mediaType === "image" ? (
-          <PreviewImage src={item.reference.url} alt={item.token} className="h-full w-full object-cover" />
-        ) : mediaType === "video" ? (
-          <video src={item.reference.url} muted className="h-full w-full object-cover" />
-        ) : (
-          <Music className="h-4 w-4 text-[var(--iw-faint)]" />
-        )}
+        <MediaReferenceThumbnail reference={item.reference} alt={item.token} className="h-full w-full" />
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate font-mono text-[10px] font-bold text-[var(--iw-accent-strong)]">{item.token}</p>

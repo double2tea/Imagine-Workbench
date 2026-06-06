@@ -1,12 +1,11 @@
 import { useMemo, useRef, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { ImagePlus, Loader2, Music, Play, Plus, Video, X } from "lucide-react";
+import { ImagePlus, Loader2, Play, Plus, Video, X } from "lucide-react";
 import ModelPriceBadge from "@/components/creation/ModelPriceBadge";
 import BoardPromptTextarea, { type BoardPromptTextareaHandle } from "@/components/board/BoardPromptTextarea";
-import PreviewImage from "@/components/PreviewImage";
+import MediaReferenceThumbnail from "@/components/reference/MediaReferenceThumbnail";
 import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import type { StorageItem } from "@/lib/db";
-import { getMediaReferenceType } from "@/lib/media-references";
 import type { BoardGenerateNodeUpdate, BoardGenerateVariantCount, BoardImageGenerateNode, BoardVideoGenerateNode } from "@/lib/board";
 import type { BoardPromptReference } from "@/lib/board/prompt-references";
 import {
@@ -105,13 +104,7 @@ export function BoardResultStack({
               }`}
               title={`结果 ${index + 1}`}
             >
-              {item.type === "image" ? (
-                <PreviewImage src={item.url} alt="" draggable={false} className="h-full w-full select-none object-cover" />
-              ) : item.type === "video" ? (
-                <Video className="m-auto h-full w-4 text-violet-200" />
-              ) : (
-                <Music className="m-auto h-full w-4 text-emerald-200" />
-              )}
+              <MediaReferenceThumbnail reference={item} alt="" className="h-full w-full" />
               <span className="absolute bottom-0 right-0 rounded-tl bg-black/60 px-1 text-[8px] font-semibold text-white">
                 {index + 1}
               </span>
@@ -349,13 +342,7 @@ export default function GenerateBoardNode({
                 className="h-6 w-6 overflow-hidden rounded border border-blue-400/30 bg-[var(--iw-panel-soft)]"
                 title={reference.role ? `参考媒体 · ${reference.role}` : "参考媒体"}
               >
-                {getMediaReferenceType(reference) === "image" ? (
-                  <PreviewImage src={reference.url} alt="" draggable={false} className="h-full w-full select-none object-cover" />
-                ) : getMediaReferenceType(reference) === "video" ? (
-                  <Video className="m-auto h-full w-3.5 text-[var(--iw-faint)]" />
-                ) : (
-                  <Music className="m-auto h-full w-3.5 text-[var(--iw-faint)]" />
-                )}
+                <MediaReferenceThumbnail reference={reference} alt="" className="h-full w-full" />
               </div>
             ))}
             {referencePreviews.length > 4 && (

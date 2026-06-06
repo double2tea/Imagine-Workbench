@@ -1,7 +1,7 @@
 "use client";
 
-import { ArrowDown, ArrowUp, Music, Video, X } from "lucide-react";
-import PreviewImage from "@/components/PreviewImage";
+import { ArrowDown, ArrowUp, X } from "lucide-react";
+import MediaReferenceThumbnail from "@/components/reference/MediaReferenceThumbnail";
 import type { BoardReferenceGroupNode, BoardReferenceRole } from "@/lib/board";
 import { getMediaReferencePromptToken, mediaReferenceLabel } from "@/lib/media-references";
 
@@ -49,13 +49,7 @@ export default function ReferenceGroupBoardNode({
             style={{ contentVisibility: "auto", containIntrinsicSize: "64px" }}
           >
             <div className="h-12 w-12 overflow-hidden rounded-md bg-[var(--iw-panel)]">
-              {reference.type === "image" ? (
-                <PreviewImage src={reference.url} alt="" draggable={false} className="h-full w-full select-none object-cover" />
-              ) : reference.type === "video" ? (
-                <Video className="m-auto h-full w-5 text-[var(--iw-faint)]" />
-              ) : (
-                <Music className="m-auto h-full w-5 text-[var(--iw-faint)]" />
-              )}
+              <MediaReferenceThumbnail reference={reference} alt="" className="h-full w-full" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
