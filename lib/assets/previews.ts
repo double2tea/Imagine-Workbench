@@ -120,25 +120,9 @@ function createVideoPreview(item: StorageItem): Promise<AssetPreviewRecord> {
     video.onerror = () => {
       fail(new Error("视频预览加载失败"));
     };
-    const seekToPreviewFrame = (): void => {
-      const targetTime = Number.isFinite(video.duration) && video.duration > 0
-        ? Math.min(0.1, video.duration)
-        : 0;
-      if (targetTime === 0) {
-        return;
-      }
-      try {
-        video.currentTime = targetTime;
-      } catch (error) {
-        fail(error instanceof Error ? error : new Error("视频预览定位失败"));
-      }
-    };
-    video.onloadedmetadata = seekToPreviewFrame;
-    video.onloadeddata = () => {
-      if (!Number.isFinite(video.duration) || video.duration <= 0) finish();
-    };
-    video.onseeked = finish;
+    video.onloadeddata = finish;
     video.src = item.url;
+    video.load();
   });
 }
 
