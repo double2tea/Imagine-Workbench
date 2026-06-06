@@ -115,6 +115,7 @@ export interface BoardStateController {
   addResultNodeWithConnection: (input: CreateResultNodeInput, from: BoardPortRef) => string;
   completeGenerationResult: (sourceNodeId: string, update: CompleteGenerationResultUpdate) => void;
   updateAssetNodeAsset: (nodeId: string, asset: BoardAssetReference, resultAssetIds?: string[]) => void;
+  updateAssetReferenceUrls: (updates: Array<{ assetId: string; url: string }>) => void;
   updateResultNodeAsset: (nodeId: string, assetId: string) => void;
   addGenerateNode: (input: CreateGenerateNodeInput) => string;
   addGenerateNodeWithConnection: (
@@ -1840,6 +1841,41 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     );
   }, [mutateBoard]);
 
+  const updateAssetReferenceUrls = useCallback((updates: Array<{ assetId: string; url: string }>) => {
+    if (updates.length === 0) return;
+    const urlByAssetId = new Map(updates.filter(update => update.url.trim()).map(update => [update.assetId, update.url]));
+    if (urlByAssetId.size === 0) return;
+    const updatedAt = nowIso();
+    mutateBoard(
+      currentBoard => {
+        let didChange = false;
+        const nextNodes = currentBoard.nodes.map(node => {
+          if (node.kind === "asset" || node.kind === "result") {
+            const nextUrl = urlByAssetId.get(node.asset.assetId);
+            if (!nextUrl || node.asset.url === nextUrl) return node;
+            didChange = true;
+            return { ...node, asset: { ...node.asset, url: nextUrl }, updatedAt };
+          }
+          if (node.kind === "reference-group") {
+            let didUpdateReferences = false;
+            const references = node.references.map(reference => {
+              const nextUrl = urlByAssetId.get(reference.assetId);
+              if (!nextUrl || reference.url === nextUrl) return reference;
+              didUpdateReferences = true;
+              return { ...reference, url: nextUrl };
+            });
+            if (!didUpdateReferences) return node;
+            didChange = true;
+            return { ...node, references, updatedAt };
+          }
+          return node;
+        });
+        return didChange ? touchBoard(currentBoard, nextNodes) : currentBoard;
+      },
+      { skipUndo: true },
+    );
+  }, [mutateBoard]);
+
   const updatePromptNode = useCallback((nodeId: string, prompt: string) => {
     const updatedAt = nowIso();
     mutateBoard(
@@ -1964,6 +2000,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       updateBoardTitle,
       updateReferenceGroupItemRole,
       updateAssetNodeAsset,
+      updateAssetReferenceUrls,
       updateResultNodeAsset,
       updateAgentInstruction,
       updateGenerateNode,
@@ -2020,6 +2057,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       updateBoardTitle,
       updateReferenceGroupItemRole,
       updateAssetNodeAsset,
+      updateAssetReferenceUrls,
       updateResultNodeAsset,
       updateAgentInstruction,
       updateGenerateNode,

@@ -6,7 +6,6 @@ import BoardAudioWaveform from "@/components/board/BoardAudioWaveform";
 import PreviewImage from "@/components/PreviewImage";
 import type { BoardAssetNode } from "@/lib/board";
 import { buildStorageItem, type StorageItem } from "@/lib/db";
-import { mediaReferenceFileExtension, mediaReferenceMimeFromDataUri } from "@/lib/media-references";
 import type { CapturedVideoFrame } from "@/lib/video-frame";
 
 interface AssetBoardNodeProps {
@@ -17,6 +16,7 @@ interface AssetBoardNodeProps {
   node: BoardAssetNode;
   onCaptureVideoFrame?: (nodeId: string, item: StorageItem, frame: CapturedVideoFrame) => void | Promise<void>;
   onCompare?: () => void;
+  onDownload?: (item: StorageItem) => void;
   onEditImage?: (nodeId: string) => void;
   onMeasureAspectRatio?: (nodeId: string, aspectRatio: number) => void;
   onOpenFullscreen?: (item: StorageItem) => void;
@@ -44,10 +44,6 @@ function boardAssetToStorageItem(node: BoardAssetNode, boardId: string): Storage
   );
 }
 
-function boardAssetExtension(asset: BoardAssetNode["asset"]): string {
-  return mediaReferenceFileExtension(mediaReferenceMimeFromDataUri(asset.url), asset.type);
-}
-
 function LightweightMediaPreview({ type }: { type: "audio" | "video" }) {
   const Icon = type === "audio" ? Music : Video;
   return (
@@ -69,6 +65,7 @@ export default function AssetBoardNode({
   node,
   onCaptureVideoFrame,
   onCompare,
+  onDownload,
   onEditImage,
   onMeasureAspectRatio,
   onOpenFullscreen,
@@ -80,7 +77,14 @@ export default function AssetBoardNode({
   const item = boardAssetToStorageItem(node, boardId);
   const stackCount = stackItems.length;
   const hasStackSwitcher = stackCount > 1;
-  const shouldRenderRichMedia = node.asset.type === "image" || isSelected;
+  const isImagePreviewUrl = item.url.startsWith("data:image/");
+  const isPlayableVideoUrl =
+    item.url.startsWith("data:video/") ||
+    item.url.startsWith("blob:") ||
+    item.url.startsWith("http://") ||
+    item.url.startsWith("https://");
+  const shouldRenderAudio = node.asset.type === "audio" && isSelected && item.url.trim();
+  const shouldRenderVideoPlayer = node.asset.type === "video" && isSelected && isPlayableVideoUrl;
   const captureVideoFrameRef = useRef<VideoFrameCaptureRequest | null>(null);
 
   return (
@@ -124,7 +128,7 @@ export default function AssetBoardNode({
             </button>
           </>
         )}
-        {node.asset.type === "video" && onCaptureVideoFrame && isSelected && (
+        {node.asset.type === "video" && onCaptureVideoFrame && isSelected && isPlayableVideoUrl && (
           <button
             type="button"
             onClick={() => void captureVideoFrameRef.current?.("current")}
@@ -142,14 +146,14 @@ export default function AssetBoardNode({
         >
           <Maximize2 className="h-3.5 w-3.5" />
         </button>
-        <a
-          href={node.asset.url}
-          download={`${node.asset.assetId}.${boardAssetExtension(node.asset)}`}
+        <button
+          type="button"
+          onClick={() => onDownload?.(item)}
           className="imagine-board-asset-action nodrag hover:bg-slate-700 hover:text-white"
           title="下载"
         >
           <Download className="h-3.5 w-3.5" />
-        </a>
+        </button>
       </div>
       {hasStackSwitcher && (
         <div className="pointer-events-none absolute right-2 top-2 z-30 rounded-md bg-slate-950/80 px-2 py-1 text-xs font-semibold text-white opacity-0 shadow-lg backdrop-blur transition-opacity duration-200 group-hover/board-video:opacity-100">
@@ -168,9 +172,15 @@ export default function AssetBoardNode({
             }
           }}
         />
-      ) : node.asset.type === "audio" && shouldRenderRichMedia ? (
+      ) : node.asset.type === "video" && isImagePreviewUrl ? (
+        <PreviewImage
+          src={item.url}
+          alt={node.title}
+          className="h-full w-full object-cover"
+        />
+      ) : node.asset.type === "audio" && shouldRenderAudio ? (
         <BoardAudioWaveform src={node.asset.url} />
-      ) : node.asset.type === "video" && shouldRenderRichMedia ? (
+      ) : node.asset.type === "video" && shouldRenderVideoPlayer ? (
         <div className="relative h-full w-full">
           <VideoAssetPlayer
             item={item}

@@ -39,6 +39,7 @@ export interface BoardFlowNodeData extends Record<string, unknown> {
   onDelete: (nodeId: string) => void;
   onCancelGenerate: (nodeId: string) => void;
   onOpenAssetCompare?: (nodeId: string) => void;
+  onDownloadAsset: (item: StorageItem) => void;
   onOpenFullscreen: (item: StorageItem) => void;
   onOpenPanorama: (item: StorageItem) => void;
   promptReferences: BoardPromptReference[];
@@ -379,6 +380,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             onCaptureVideoFrame={data.onCaptureVideoFrame}
             onCompare={data.onOpenAssetCompare ? () => data.onOpenAssetCompare?.(node.id) : undefined}
             onEditImage={data.onEditAssetImage}
+            onDownload={data.onDownloadAsset}
             onMeasureAspectRatio={data.onMeasureAssetAspectRatio}
             onOpenFullscreen={data.onOpenFullscreen}
             onOpenPanorama={data.onOpenPanorama}
@@ -393,6 +395,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             node={node}
             stackItems={data.assetStackItems}
             onCaptureVideoFrame={data.onCaptureVideoFrame}
+            onDownload={data.onDownloadAsset}
             onMeasureAspectRatio={data.onMeasureAssetAspectRatio}
             onOpenFullscreen={data.onOpenFullscreen}
             onOpenPanorama={data.onOpenPanorama}

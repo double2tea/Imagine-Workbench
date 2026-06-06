@@ -1,6 +1,7 @@
 import { useEffect, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
+import { saveItemWithPreview } from "@/lib/assets/previews";
 import { readFetchError } from "@/lib/client-fetch-error";
-import { buildStorageItem, saveToDB, type GenerationRequestSnapshot, type StorageItem } from "@/lib/db";
+import { buildStorageItem, type GenerationRequestSnapshot, type StorageItem } from "@/lib/db";
 import { updateGenerationTask, type GenerationTask, type GenerationTaskUpdate } from "@/lib/generation-tasks";
 
 type NoticeType = "error" | "info" | "success";
@@ -35,15 +36,14 @@ function isProcessingTimedOut(task: GenerationTask): boolean {
 async function saveItemOrWarn(
   item: StorageItem,
   pushWorkspaceNotice: (type: NoticeType, message: string) => void,
-): Promise<boolean> {
+): Promise<StorageItem | null> {
   try {
-    await saveToDB(item);
-    return true;
+    return await saveItemWithPreview(item);
   } catch (error) {
     const message = toErrorMessage(error, "IndexedDB 写入失败");
     console.error("IndexedDB Save Failed:", error);
     pushWorkspaceNotice("error", `本地存储失败，刷新后可能丢失：${message}`);
-    return false;
+    return null;
   }
 }
 
@@ -219,7 +219,8 @@ export function useMediaPolling({
                   },
                   { boardId: task.source.boardId },
                 );
-                if (!await saveItemOrWarn(completedItem, pushWorkspaceNotice)) {
+                const savedCompletedItem = await saveItemOrWarn(completedItem, pushWorkspaceNotice);
+                if (!savedCompletedItem) {
                   const failedTask = await updateTaskOrWarn(task.id, {
                     status: "failed",
                     progress: 100,
@@ -229,7 +230,7 @@ export function useMediaPolling({
                   if (failedTask) setGenerationTasks(current => upsertGenerationTask(current, failedTask));
                   continue;
                 }
-                completedItems.push(completedItem);
+                completedItems.push(savedCompletedItem);
                 const completedTask = await updateTaskOrWarn(task.id, {
                   activeResultAssetId: completedAssetId,
                   resultAssetIds: [completedAssetId],

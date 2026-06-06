@@ -7,13 +7,15 @@ import {
 import type { RunningHubTaskNodeBinding } from "./providers/types";
 
 const DB_NAME = "ImagineWorkbenchDB";
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const META_STORE = "assets_meta";
 const BLOB_STORE = "assets_blob";
+const PREVIEW_STORE = "asset_previews";
 const LEGACY_STORE = "assets";
 export const GENERATION_TASK_STORE = "generation_tasks";
 
 export type AssetScope = "workspace" | "board";
+export type AssetPreviewStatus = "ready" | "missing" | "failed";
 export type StorageItemType = "image" | "video" | "audio";
 
 export interface GenerationReferenceMediaSnapshot {
@@ -61,6 +63,8 @@ export interface StorageItemMeta {
   /** Remote http(s) URL only when hasBlob is false. */
   url?: string;
   hasBlob: boolean;
+  previewStatus?: AssetPreviewStatus;
+  previewUpdatedAt?: string;
 }
 
 /** Hydrated asset record used across UI and generation flows. */
@@ -82,6 +86,16 @@ export function getGenerationReferenceMedia(
 interface AssetBlobRecord {
   id: string;
   data: string;
+}
+
+export interface AssetPreviewRecord {
+  assetId: string;
+  type: StorageItemType;
+  dataUrl: string;
+  width: number;
+  height: number;
+  mimeType: string;
+  createdAt: string;
 }
 
 interface LegacyStorageItem {
@@ -127,12 +141,17 @@ function normalizeBoardId(boardId: string | undefined, scope: AssetScope): strin
 
 function normalizeMeta(meta: StorageItemMeta): StorageItemMeta {
   const scope: AssetScope = meta.scope === "board" ? "board" : "workspace";
+  const previewStatus = meta.previewStatus === "ready" || meta.previewStatus === "missing" || meta.previewStatus === "failed"
+    ? meta.previewStatus
+    : undefined;
   return {
     ...meta,
     scope,
     boardId: normalizeBoardId(meta.boardId, scope),
     hasBlob: Boolean(meta.hasBlob),
     url: meta.url && isRemoteUrl(meta.url) ? meta.url : undefined,
+    previewStatus,
+    previewUpdatedAt: meta.previewUpdatedAt,
   };
 }
 
@@ -246,6 +265,10 @@ export function openDatabase(): Promise<IDBDatabase> {
         db.createObjectStore(BLOB_STORE, { keyPath: "id" });
       }
 
+      if (!db.objectStoreNames.contains(PREVIEW_STORE)) {
+        db.createObjectStore(PREVIEW_STORE, { keyPath: "assetId" });
+      }
+
       if (!db.objectStoreNames.contains(GENERATION_TASK_STORE)) {
         const tasks = db.createObjectStore(GENERATION_TASK_STORE, { keyPath: "id" });
         tasks.createIndex("by_boardId", "source.boardId", { unique: false });
@@ -293,6 +316,57 @@ export async function getAssetBlobPayload(id: string): Promise<string | null> {
       resolve(record?.data ?? null);
     };
     request.onerror = () => reject(request.error);
+  });
+}
+
+export async function getAssetPreviewRecord(id: string): Promise<AssetPreviewRecord | null> {
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(PREVIEW_STORE, "readonly");
+    const request = transaction.objectStore(PREVIEW_STORE).get(id);
+    request.onsuccess = () => {
+      resolve((request.result as AssetPreviewRecord | undefined) ?? null);
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function saveAssetPreviewRecord(record: AssetPreviewRecord): Promise<void> {
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(PREVIEW_STORE, "readwrite");
+    transaction.objectStore(PREVIEW_STORE).put(record);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error ?? new Error("IndexedDB preview save failed"));
+    transaction.onabort = () => reject(transaction.error ?? new Error("IndexedDB preview save aborted"));
+  });
+}
+
+export async function updateAssetPreviewMetadata(
+  id: string,
+  preview: { status: AssetPreviewStatus; updatedAt: string },
+): Promise<void> {
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(META_STORE, "readwrite");
+    const store = transaction.objectStore(META_STORE);
+    const request = store.get(id);
+    request.onsuccess = () => {
+      const current = request.result as StorageItemMeta | undefined;
+      if (!current) {
+        reject(new Error(`Missing asset metadata for preview ${id}`));
+        return;
+      }
+      store.put(normalizeMeta({
+        ...current,
+        previewStatus: preview.status,
+        previewUpdatedAt: preview.updatedAt,
+      }));
+    };
+    request.onerror = () => reject(request.error);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error ?? new Error("IndexedDB preview metadata update failed"));
+    transaction.onabort = () => reject(transaction.error ?? new Error("IndexedDB preview metadata update aborted"));
   });
 }
 
@@ -439,9 +513,10 @@ export async function saveToDB(item: StorageItem): Promise<void> {
 export async function deleteFromDB(id: string): Promise<void> {
   const db = await openDatabase();
   return new Promise((resolve, reject) => {
-    const transaction = db.transaction([META_STORE, BLOB_STORE], "readwrite");
+    const transaction = db.transaction([META_STORE, BLOB_STORE, PREVIEW_STORE], "readwrite");
     transaction.objectStore(META_STORE).delete(id);
     transaction.objectStore(BLOB_STORE).delete(id);
+    transaction.objectStore(PREVIEW_STORE).delete(id);
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error ?? new Error("IndexedDB delete failed"));
   });
@@ -450,7 +525,7 @@ export async function deleteFromDB(id: string): Promise<void> {
 export async function clearAllDB(): Promise<void> {
   const db = await openDatabase();
   return new Promise((resolve, reject) => {
-    const stores = [META_STORE, BLOB_STORE];
+    const stores = [META_STORE, BLOB_STORE, PREVIEW_STORE];
     if (db.objectStoreNames.contains(LEGACY_STORE)) stores.push(LEGACY_STORE);
     const transaction = db.transaction(stores, "readwrite");
     for (const storeName of stores) {

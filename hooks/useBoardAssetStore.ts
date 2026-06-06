@@ -6,9 +6,9 @@ import {
   collectBoardNodeIdsFromNodes,
   mergeBoardScopedMetas,
 } from "@/lib/assets/board-scope";
+import { resolveAssetPreviewUrl } from "@/lib/assets/resolve-url";
 import type { BoardNode } from "@/lib/board/types";
 import {
-  hydrateAssets,
   listBoardScopedAssetMetas,
   mergeStorageItems,
   metaToPlaceholderItem,
@@ -41,6 +41,20 @@ function boardAssetScopeKey(boardId: string, referencedAssetIdsKey: string, boar
   return [boardId, referencedAssetIdsKey, boardNodeIdsKey].join(ID_KEY_SEPARATOR);
 }
 
+async function hydrateAssetPreviews(metas: StorageItemMeta[]): Promise<StorageItem[]> {
+  const batchSize = 48;
+  const hydrated: StorageItem[] = [];
+  for (let offset = 0; offset < metas.length; offset += batchSize) {
+    const slice = metas.slice(offset, offset + batchSize);
+    const chunk = await Promise.all(slice.map(async meta => ({
+      ...meta,
+      url: await resolveAssetPreviewUrl(meta),
+    })));
+    hydrated.push(...chunk);
+  }
+  return hydrated;
+}
+
 export function useBoardAssetStore(boardId: string, nodes: BoardNode[]): UseBoardAssetStoreResult {
   const referencedAssetIdsKey = useMemo(() => assetIdKey(collectBoardAssetIdsFromNodes(nodes)), [nodes]);
   const boardNodeIdsKey = useMemo(() => assetIdKey(collectBoardNodeIdsFromNodes(nodes)), [nodes]);
@@ -69,18 +83,9 @@ export function useBoardAssetStore(boardId: string, nodes: BoardNode[]): UseBoar
       setMetas(scopedMetas);
       const placeholders = scopedMetas.map(metaToPlaceholderItem);
       setItems(placeholders);
-      const priorityIds = new Set(referencedAssetIds);
-      const priorityMetas = scopedMetas.filter(meta => priorityIds.has(meta.id));
-      const restMetas = scopedMetas.filter(meta => !priorityIds.has(meta.id));
-      const hydratedPriority = priorityMetas.length > 0 ? await hydrateAssets(priorityMetas) : [];
+      const hydratedPreviews = await hydrateAssetPreviews(scopedMetas);
       if (activeReloadTokenRef.current !== reloadToken) return;
-      setItems(current => mergeStorageItems(current, hydratedPriority));
-      const hydrateRest = restMetas.slice(0, 48);
-      if (hydrateRest.length > 0) {
-        const hydratedRest = await hydrateAssets(hydrateRest);
-        if (activeReloadTokenRef.current !== reloadToken) return;
-        setItems(current => mergeStorageItems(current, hydratedRest));
-      }
+      setItems(current => mergeStorageItems(current, hydratedPreviews));
       didLoadScope = true;
     } finally {
       if (activeReloadTokenRef.current === reloadToken) {

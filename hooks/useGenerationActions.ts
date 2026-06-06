@@ -1,10 +1,10 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
+import { saveItemWithPreview } from "@/lib/assets/previews";
 import { readFetchError } from "@/lib/client-fetch-error";
 import { readImageGenerationPayload } from "@/lib/client-image-response";
 import {
   buildStorageItem,
-  saveToDB,
   type GenerationReferenceMediaSnapshot,
   type GenerationRequestSnapshot,
   type StorageItem,
@@ -101,15 +101,14 @@ function isAbortError(error: unknown): boolean {
 async function saveItemOrWarn(
   item: StorageItem,
   pushWorkspaceNotice: (type: NoticeType, message: string) => void,
-): Promise<boolean> {
+): Promise<StorageItem | null> {
   try {
-    await saveToDB(item);
-    return true;
+    return await saveItemWithPreview(item);
   } catch (error) {
     const message = toErrorMessage(error, "IndexedDB 写入失败");
     console.error("IndexedDB Save Failed:", error);
     pushWorkspaceNotice("error", `本地存储失败，刷新后可能丢失：${message}`);
-    return false;
+    return null;
   }
 }
 
@@ -404,7 +403,8 @@ export function useGenerationActions({
           { boardId: resolveScopeBoardId(overrides) },
         );
 
-        if (!await saveItemOrWarn(completedItem, pushWorkspaceNotice)) {
+        const savedCompletedItem = await saveItemOrWarn(completedItem, pushWorkspaceNotice);
+        if (!savedCompletedItem) {
           const failedTask = await updateTaskOrWarn(taskId, {
             status: "failed",
             progress: 100,
@@ -413,7 +413,7 @@ export function useGenerationActions({
           if (failedTask) recordGenerationTask(failedTask);
           return true;
         }
-        setItems(prev => [completedItem, ...prev]);
+        setItems(prev => [savedCompletedItem, ...prev]);
         const completeTask = await updateTaskOrWarn(taskId, {
           activeResultAssetId: completedAssetId,
           resultAssetIds: [completedAssetId],

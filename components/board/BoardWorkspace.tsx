@@ -113,6 +113,7 @@ interface BoardWorkspaceProps {
   onImportBoardFiles: (files: File[], position: BoardPoint) => void | Promise<void>;
   onCreateBoard: () => void;
   onDeleteBoard: () => void;
+  onDownloadAsset: (item: StorageItem) => void;
   onOpenSettings: () => void;
   onOpenFullscreen: (item: StorageItem) => void;
   onOpenPanorama: (item: StorageItem) => void;
@@ -853,6 +854,7 @@ export default function BoardWorkspace({
   onImportBoardFiles,
   onCreateBoard,
   onDeleteBoard,
+  onDownloadAsset,
   onOpenSettings,
   onOpenFullscreen,
   onOpenPanorama,
@@ -1185,6 +1187,7 @@ export default function BoardWorkspace({
           setAssetCompare({ originalUrl, resultUrl: assetNode.asset.url });
         },
         onDelete: trashAndDeleteNode,
+        onDownloadAsset,
         onEditAssetImage,
         onExecuteGenerate: onExecuteGenerateNode,
         onFetchRunningHubAppSchema,
@@ -1233,6 +1236,7 @@ export default function BoardWorkspace({
       galleryItemById,
     onCancelGenerateNode,
     onCaptureVideoFrame,
+    onDownloadAsset,
     onEditAssetImage,
     onExecuteGenerateNode,
     onFetchRunningHubAppSchema,

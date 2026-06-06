@@ -31,6 +31,8 @@ import { useAgentController } from "@/hooks/useAgentController";
 import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
 import { useBoardAssetStore } from "@/hooks/useBoardAssetStore";
 import { collectPlacedBoardAssetIdsFromNodes } from "@/lib/assets/board-scope";
+import { saveItemWithPreview } from "@/lib/assets/previews";
+import { resolveAssetOriginalUrl } from "@/lib/assets/resolve-url";
 import { findResultNodeForSource } from "@/lib/board/utils";
 import { generateReferenceCandidates } from "@/lib/board/prompt-references";
 import { useBoardState } from "@/hooks/useBoardState";
@@ -46,7 +48,6 @@ import { useProviderSettings } from "@/hooks/useProviderSettings";
 import {
   buildStorageItem,
   clearAllDB,
-  saveToDB,
   type StorageItem,
 } from "@/lib/db";
 import {
@@ -107,7 +108,14 @@ import {
   parseRunningHubBindingsFromJsonText,
 } from "@/lib/board";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
-import { getMediaReferenceType, mediaReferenceLabel, mediaReferenceTypeFromMime, type MediaReferenceType } from "@/lib/media-references";
+import {
+  getMediaReferenceType,
+  mediaReferenceFileExtension,
+  mediaReferenceLabel,
+  mediaReferenceMimeFromDataUri,
+  mediaReferenceTypeFromMime,
+  type MediaReferenceType,
+} from "@/lib/media-references";
 import {
   flushAllBoardText,
   flushBoardText,
@@ -144,6 +152,8 @@ type AgentBoardUpdateAction = AgentToolAction & { type: "update_board_node" };
 type AgentBoardPatchAction = AgentToolAction & { type: "apply_board_patch" };
 type AgentImageToVideoAction = AgentToolAction & { type: "continue_image_to_video" };
 type BoardAgentActionResult = boolean | { handled: true; success: boolean };
+
+const LARGE_BOARD_DATA_URL_MIN_LENGTH = 120_000;
 
 interface BoardPageProps {
   boardId?: string;
@@ -191,13 +201,12 @@ function readRunningHubAppSchemaResult(value: unknown): { name?: string; nodeInf
 async function saveItemOrWarn(
   item: StorageItem,
   pushWorkspaceNotice: (type: NoticeType, message: string) => void,
-): Promise<boolean> {
+): Promise<StorageItem | null> {
   try {
-    await saveToDB(item);
-    return true;
+    return await saveItemWithPreview(item);
   } catch (error) {
     pushWorkspaceNotice("error", `本地存储失败，刷新后可能丢失：${toErrorMessage(error, "IndexedDB 写入失败")}`);
-    return false;
+    return null;
   }
 }
 
@@ -238,6 +247,37 @@ async function createBoardUploadItem(
       status: "complete",
       progress: 100,
       operationName: "board-upload",
+    },
+    { boardId },
+  );
+}
+
+type BoardMediaReferenceLike = Pick<BoardAssetReference, "assetId" | "model" | "prompt" | "type" | "url">;
+
+function isLargeBoardDataUrl(url: string): boolean {
+  return url.startsWith("data:") && url.length >= LARGE_BOARD_DATA_URL_MIN_LENGTH;
+}
+
+function boardMediaReferenceToStorageItem(
+  reference: BoardMediaReferenceLike,
+  createdAt: string,
+  boardId: string,
+  sourceBoardNodeId?: string,
+  sourceBoardResultStackKey?: string,
+): StorageItem {
+  return buildStorageItem(
+    {
+      id: reference.assetId,
+      type: reference.type,
+      url: reference.url,
+      prompt: reference.prompt,
+      model: reference.model,
+      aspectRatio: "auto",
+      createdAt,
+      status: "complete",
+      progress: 100,
+      sourceBoardNodeId,
+      sourceBoardResultStackKey,
     },
     { boardId },
   );
@@ -1011,6 +1051,64 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     };
   }, [pushWorkspaceNotice]);
 
+  useEffect(() => {
+    const legacyItemsById = new Map<string, StorageItem>();
+    for (const node of boardController.board.nodes) {
+      if (node.kind === "asset" && isLargeBoardDataUrl(node.asset.url)) {
+        legacyItemsById.set(
+          node.asset.assetId,
+          boardMediaReferenceToStorageItem(node.asset, node.createdAt, resolvedBoardId, node.id, node.resultStackKey),
+        );
+      } else if (node.kind === "result" && isLargeBoardDataUrl(node.asset.url)) {
+        legacyItemsById.set(
+          node.asset.assetId,
+          boardMediaReferenceToStorageItem(node.asset, node.createdAt, resolvedBoardId, node.sourceNodeId, node.resultStackKey),
+        );
+      } else if (node.kind === "reference-group") {
+        for (const reference of node.references) {
+          if (isLargeBoardDataUrl(reference.url)) {
+            legacyItemsById.set(
+              reference.assetId,
+              boardMediaReferenceToStorageItem(reference, node.createdAt, resolvedBoardId),
+            );
+          }
+        }
+      }
+    }
+    if (legacyItemsById.size === 0) return;
+
+    let isActive = true;
+    void (async () => {
+      const previewItems: StorageItem[] = [];
+      const updates: Array<{ assetId: string; url: string }> = [];
+      for (const item of legacyItemsById.values()) {
+        const previewItem = await saveItemWithPreview(item);
+        if (!isActive) return;
+        if (!previewItem.url.trim()) continue;
+        previewItems.push(previewItem);
+        updates.push({ assetId: previewItem.id, url: previewItem.url });
+      }
+      if (!isActive || updates.length === 0) return;
+      setItems(prev => [
+        ...previewItems,
+        ...prev.filter(item => !previewItems.some(previewItem => previewItem.id === item.id)),
+      ]);
+      boardController.updateAssetReferenceUrls(updates);
+    })().catch(error => {
+      if (isActive) pushWorkspaceNotice("error", toErrorMessage(error, "旧画板媒体预览迁移失败"));
+    });
+
+    return () => {
+      isActive = false;
+    };
+  }, [
+    boardController.board.nodes,
+    boardController.updateAssetReferenceUrls,
+    pushWorkspaceNotice,
+    resolvedBoardId,
+    setItems,
+  ]);
+
   const {
     addFetchedModels,
     addManualModels,
@@ -1132,6 +1230,54 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const resolveBoardReferenceUrl = useCallback<BoardReferenceUrlResolver>((assetId, fallbackUrl) => {
     const item = items.find(entry => entry.id === assetId);
     return item && item.status === "complete" && item.url.trim() ? item.url : fallbackUrl;
+  }, [items]);
+  const resolveOriginalStorageItem = useCallback(async (item: StorageItem): Promise<StorageItem> => {
+    const storedItem = items.find(entry => entry.id === item.id) ?? item;
+    const originalUrl = await resolveAssetOriginalUrl(storedItem);
+    if (!originalUrl.trim()) {
+      throw new Error("找不到原始媒体");
+    }
+    return { ...storedItem, url: originalUrl };
+  }, [items]);
+  const handleOpenFullscreen = useCallback((item: StorageItem | null) => {
+    if (!item) {
+      setFullscreenItem(null);
+      return;
+    }
+    void resolveOriginalStorageItem(item).then(
+      setFullscreenItem,
+      error => pushWorkspaceNotice("error", toErrorMessage(error, "原始媒体读取失败")),
+    );
+  }, [pushWorkspaceNotice, resolveOriginalStorageItem]);
+  const handleOpenPanorama = useCallback((item: StorageItem) => {
+    void resolveOriginalStorageItem(item).then(
+      setPanoramaItem,
+      error => pushWorkspaceNotice("error", toErrorMessage(error, "原始图片读取失败")),
+    );
+  }, [pushWorkspaceNotice, resolveOriginalStorageItem]);
+  const handleDownloadAsset = useCallback((item: StorageItem) => {
+    void resolveOriginalStorageItem(item).then(
+      originalItem => {
+        const link = document.createElement("a");
+        const extension = mediaReferenceFileExtension(mediaReferenceMimeFromDataUri(originalItem.url), originalItem.type);
+        link.href = originalItem.url;
+        link.download = `${originalItem.id}.${extension}`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      },
+      error => pushWorkspaceNotice("error", toErrorMessage(error, "原始媒体下载失败")),
+    );
+  }, [pushWorkspaceNotice, resolveOriginalStorageItem]);
+  const resolveOriginalReferences = useCallback(async (references: ReferenceImageRef[]): Promise<ReferenceImageRef[]> => {
+    return Promise.all(references.map(async reference => {
+      const item = items.find(entry => entry.id === reference.id);
+      const originalUrl = item ? await resolveAssetOriginalUrl(item) : reference.url;
+      if (!originalUrl.trim()) {
+        throw new Error("找不到参考媒体原图");
+      }
+      return { ...reference, url: originalUrl };
+    }));
   }, [items]);
   void handleImageUpload;
   void handleReferenceDropAsset;
@@ -1351,10 +1497,11 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         },
         { boardId: resolvedBoardId },
       );
-      if (!await saveItemOrWarn(editedItem, pushWorkspaceNotice)) return;
-      setItems(prev => [editedItem, ...prev]);
+      const savedEditedItem = await saveItemOrWarn(editedItem, pushWorkspaceNotice);
+      if (!savedEditedItem) return;
+      setItems(prev => [savedEditedItem, ...prev]);
       const editedNodeId = boardController.addAssetNode({
-        asset: storageItemToBoardAssetReference(editedItem),
+        asset: storageItemToBoardAssetReference(savedEditedItem),
         title: editedTitle,
         position: {
           x: sourceNode.position.x + sourceNode.size.width + 40,
@@ -1524,13 +1671,14 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           resolveBoardReferenceUrl,
         );
         const promptValue = runInputs.prompt;
+        const runReferences = await resolveOriginalReferences(runInputs.references);
         if (!promptValue) {
           boardController.updateGenerateNode(item.id, { status: "failed", errorMessage: "批量生成节点缺少提示词" });
           runFailureCount += 1;
           continue;
         }
         const capability = getModelCapability(model, operation.kind === "image-generate" ? "image" : "video");
-        if (runInputs.references.length > 0 && !capability.supportsReferences) {
+        if (runReferences.length > 0 && !capability.supportsReferences) {
           boardController.updateGenerateNode(item.id, { status: "failed", errorMessage: "当前模型不支持参考图输入" });
           runFailureCount += 1;
           continue;
@@ -1556,8 +1704,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             isCustomImageResolution: isCustomImageResolutionValue(operation.imageResolution ?? defaults.imageResolution),
             model,
             prompt: promptValue,
-            referenceImage: runInputs.references[0]?.url ?? null,
-            referenceImages: runInputs.references,
+            referenceImage: runReferences[0]?.url ?? null,
+            referenceImages: runReferences,
             size: operation.aspectRatio ?? defaults.aspectRatio,
             thinkingLevel: operation.thinkingLevel ?? defaults.thinkingLevel,
           });
@@ -1568,7 +1716,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         } else {
           const defaults = videoActionDefaults(model, operation.aspectRatio);
           const videoCapability = getVideoModelCapabilities(model);
-          if (runInputs.references.length < videoCapability.minReferenceImages || runInputs.references.length > videoCapability.maxReferenceImages) {
+          if (runReferences.length < videoCapability.minReferenceImages || runReferences.length > videoCapability.maxReferenceImages) {
             runFailureCount += 1;
             boardController.updateGenerateNode(item.id, {
               status: "failed",
@@ -1592,8 +1740,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             boardResultStackKey: resultStackKey,
             model,
             prompt: promptValue,
-            referenceImage: runInputs.references[0]?.url ?? null,
-            referenceImages: runInputs.references,
+            referenceImage: runReferences[0]?.url ?? null,
+            referenceImages: runReferences,
             size: operation.aspectRatio ?? defaults.aspectRatio,
             videoDuration: operation.videoDuration ?? defaults.videoDuration,
             videoPreset: operation.videoPreset ?? defaults.videoPreset,
@@ -2108,6 +2256,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     generateManualVideo,
     items,
     pushWorkspaceNotice,
+    resolveOriginalReferences,
     resolvedBoardId,
   ]);
 
@@ -2270,14 +2419,15 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     }
 
     const frameItem = createVideoFrameStorageItem(item, frame, makeClientId("frame"));
-    if (!await saveItemOrWarn(frameItem, pushWorkspaceNotice)) return;
-    setItems(prev => [frameItem, ...prev]);
+    const savedFrameItem = await saveItemOrWarn(frameItem, pushWorkspaceNotice);
+    if (!savedFrameItem) return;
+    setItems(prev => [savedFrameItem, ...prev]);
 
     const sourceNode = boardController.board.nodes.find(node => node.id === sourceNodeId);
     const position = sourceNode
       ? { x: sourceNode.position.x + sourceNode.size.width + 40, y: sourceNode.position.y }
       : undefined;
-    addAssetToBoard(frameItem, position);
+    addAssetToBoard(savedFrameItem, position);
     pushWorkspaceNotice("success", `已保存${getVideoFrameCaptureLabel(frame.mode)}并插入画板`);
   }, [addAssetToBoard, boardController.board.nodes, pushWorkspaceNotice]);
 
@@ -2303,7 +2453,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         makeClientId(`pano_${index}`),
         { boardId: resolvedBoardId, sourceBoardNodeId: sourceNodeId },
       );
-      if (await saveItemOrWarn(screenshotItem, pushWorkspaceNotice)) savedItems.push(screenshotItem);
+      const savedScreenshotItem = await saveItemOrWarn(screenshotItem, pushWorkspaceNotice);
+      if (savedScreenshotItem) savedItems.push(savedScreenshotItem);
     }
     if (savedItems.length === 0) return;
     setItems(prev => [
@@ -2342,8 +2493,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           makeClientId(boardUploadIdPrefix(mediaType, index)),
           resolvedBoardId,
         );
-        if (!await saveItemOrWarn(item, pushWorkspaceNotice)) continue;
-        importedItems.push(item);
+        const savedItem = await saveItemOrWarn(item, pushWorkspaceNotice);
+        if (!savedItem) continue;
+        importedItems.push(savedItem);
       } catch (error) {
         pushWorkspaceNotice("error", toErrorMessage(error, `${file.name || "文件"} 导入失败`));
       }
@@ -2373,9 +2525,14 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       pushWorkspaceNotice("info", "请选择一个图片资产节点");
       return;
     }
-    setReferenceImage(references[0].url);
-    setReferenceImages(references);
-    pushWorkspaceNotice("success", "已将选中节点作为生成参考图");
+    void resolveOriginalReferences(references).then(
+      originalReferences => {
+        setReferenceImage(originalReferences[0].url);
+        setReferenceImages(originalReferences);
+        pushWorkspaceNotice("success", "已将选中节点作为生成参考图");
+      },
+      error => pushWorkspaceNotice("error", toErrorMessage(error, "参考媒体读取失败")),
+    );
   };
 
   const useSelectedBoardAssetForAgent = () => {
@@ -2384,10 +2541,15 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       pushWorkspaceNotice("info", "请选择一个图片资产节点");
       return;
     }
-    setAgentReferenceId(references[0].id);
-    setAgentReferenceUrl(references[0].url);
-    setAgentReferences(references);
-    setIsAgentDockOpen(true);
+    void resolveOriginalReferences(references).then(
+      originalReferences => {
+        setAgentReferenceId(originalReferences[0].id);
+        setAgentReferenceUrl(originalReferences[0].url);
+        setAgentReferences(originalReferences);
+        setIsAgentDockOpen(true);
+      },
+      error => pushWorkspaceNotice("error", toErrorMessage(error, "参考媒体读取失败")),
+    );
   };
 
   const useBoardAssetForAgent = useCallback((nodeId: string) => {
@@ -2396,15 +2558,21 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       pushWorkspaceNotice("info", "请选择一个图片资产节点");
       return;
     }
-    setAgentReferenceId(references[0].id);
-    setAgentReferenceUrl(references[0].url);
-    setAgentReferences(references);
-    setIsAgentDockOpen(true);
+    void resolveOriginalReferences(references).then(
+      originalReferences => {
+        setAgentReferenceId(originalReferences[0].id);
+        setAgentReferenceUrl(originalReferences[0].url);
+        setAgentReferences(originalReferences);
+        setIsAgentDockOpen(true);
+      },
+      error => pushWorkspaceNotice("error", toErrorMessage(error, "参考媒体读取失败")),
+    );
   }, [
     boardController.board.nodes,
     items,
     pushWorkspaceNotice,
     resolveBoardReferenceUrl,
+    resolveOriginalReferences,
     setAgentReferenceId,
     setAgentReferenceUrl,
     setAgentReferences,
@@ -2416,8 +2584,33 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       pushWorkspaceNotice("info", "请选择一个图片资产节点");
       return;
     }
-    launchMaskEditor(node.asset.url, node.asset.assetId, "board-asset", node.id);
-  }, [boardController.board.nodes, launchMaskEditor, pushWorkspaceNotice]);
+    const item = items.find(entry => entry.id === node.asset.assetId) ?? buildStorageItem(
+      {
+        id: node.asset.assetId,
+        type: node.asset.type,
+        url: node.asset.url,
+        prompt: node.asset.prompt,
+        model: node.asset.model,
+        aspectRatio: "auto",
+        createdAt: node.createdAt,
+        status: "complete",
+        progress: 100,
+        sourceBoardNodeId: node.id,
+      },
+      { boardId: resolvedBoardId },
+    );
+    void resolveOriginalStorageItem(item).then(
+      originalItem => launchMaskEditor(originalItem.url, node.asset.assetId, "board-asset", node.id),
+      error => pushWorkspaceNotice("error", toErrorMessage(error, "原始图片读取失败")),
+    );
+  }, [
+    boardController.board.nodes,
+    items,
+    launchMaskEditor,
+    pushWorkspaceNotice,
+    resolvedBoardId,
+    resolveOriginalStorageItem,
+  ]);
 
   const resolveGenerateNodeInputs = useCallback((nodeId: string) => {
     const node = boardController.board.nodes.find(item => item.id === nodeId);
@@ -2465,7 +2658,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     try {
       const candidateNode = boardController.board.nodes.find(item => item.id === nodeId);
       if (candidateNode?.kind === "runninghub-app") {
-        const { node, prompt: nodePrompt, references } = resolveRunningHubAppNodeInputs(nodeId);
+        const { node, prompt: nodePrompt, references: previewReferences } = resolveRunningHubAppNodeInputs(nodeId);
+        const references = await resolveOriginalReferences(previewReferences);
         flushBoardTextForGenerateNode(boardController.board.nodes, boardController.board.edges, nodeId);
         const errorMessage = runningHubAppNodeError(node, nodePrompt, references.length);
         if (errorMessage) {
@@ -2540,7 +2734,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         return;
       }
 
-      const { node, prompt: nodePrompt, references } = resolveGenerateNodeInputs(nodeId);
+      const { node, prompt: nodePrompt, references: previewReferences } = resolveGenerateNodeInputs(nodeId);
+      const references = await resolveOriginalReferences(previewReferences);
       flushBoardTextForGenerateNode(boardController.board.nodes, boardController.board.edges, nodeId);
       const nextPrompt = nodePrompt.trim();
       if (!nextPrompt) {
@@ -2656,6 +2851,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     generateManualVideo,
     pushWorkspaceNotice,
     resolveGenerateNodeInputs,
+    resolveOriginalReferences,
     resolveRunningHubAppNodeInputs,
     resolvedBoardId,
   ]);
@@ -2915,8 +3111,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           makeClientId(boardUploadIdPrefix(mediaType, index).replace("board_", "local_")),
           { boardId: resolvedBoardId },
         );
-        if (!await saveItemOrWarn(item, pushWorkspaceNotice)) continue;
-        importedItems.push(item);
+        const savedItem = await saveItemOrWarn(item, pushWorkspaceNotice);
+        if (!savedItem) continue;
+        importedItems.push(savedItem);
       } catch (error) {
         pushWorkspaceNotice("error", toErrorMessage(error, `${file.name || "媒体"} 导入失败`));
       }
@@ -3201,12 +3398,13 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onWorkspaceNotice={pushWorkspaceNotice}
         onCreateBoard={handleCreateBoard}
         onDeleteBoard={handleDeleteBoard}
+        onDownloadAsset={handleDownloadAsset}
         onEditAssetImage={editBoardAssetImage}
         onExecuteGenerateNode={handleExecuteGenerateNode}
         onFetchRunningHubAppSchema={fetchRunningHubAppSchema}
         onImportBoardFiles={handleImportBoardFiles}
-        onOpenFullscreen={setFullscreenItem}
-        onOpenPanorama={setPanoramaItem}
+        onOpenFullscreen={handleOpenFullscreen}
+        onOpenPanorama={handleOpenPanorama}
         onOpenSettings={handleOpenSettings}
         onRenameBoard={renameBoardPage}
         onSelectBoard={handleSelectBoard}
@@ -3240,7 +3438,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
                 : undefined}
               onExecuteGenerate={(nodeId) => void handleExecuteGenerateNode(nodeId)}
               onFocusNode={requestFocusNode}
-              onOpenFullscreen={setFullscreenItem}
+              onOpenFullscreen={handleOpenFullscreen}
               onOpenSettings={() => setShowSettings(true)}
               onSendAssetToAgent={useSelectedBoardAssetForAgent}
               onSyncAssetReference={useSelectedBoardAssetAsReference}
@@ -3349,7 +3547,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         }
         onSavePanoramaScreenshots={handleSavePanoramaScreenshots}
         onClose={() => setFullscreenItem(null)}
-        onSelectItem={setFullscreenItem}
+        onSelectItem={handleOpenFullscreen}
       />
       {panoramaItem && (
         <PanoramaOverlay
