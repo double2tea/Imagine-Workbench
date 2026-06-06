@@ -312,19 +312,39 @@ test("image model selector hides duplicate async variants", () => {
 
 test("gpt image 2 exposes extended 4k-capable image sizes", () => {
   const capability = getModelCapability("12ai:gpt-image-2", "image");
+  const xstxCapability = getModelCapability("xstx:gpt-image-2", "image");
+  const xstx2kCapability = getModelCapability("xstx:gpt-image-2-2k", "image");
 
   assert.ok(capability.sizes.some(option => option.value === "512x512" && option.label === "512p"));
   assert.ok(capability.sizes.some(option => option.value === "1536x1024" && option.label === "1K"));
   assert.ok(capability.sizes.some(option => option.value === "1024x1536" && option.label === "1K"));
   assert.ok(capability.sizes.some(option => option.value === "1792x1008" && option.label === "1K"));
+  assert.ok(capability.sizes.some(option => option.value === "2048x1024" && option.label === "2K"));
+  assert.ok(capability.sizes.some(option => option.value === "1024x2048" && option.label === "2K"));
+  assert.ok(capability.sizes.some(option => option.value === "2560x1280" && option.label === "2.5K"));
+  assert.ok(capability.sizes.some(option => option.value === "1280x2560" && option.label === "2.5K"));
   assert.ok(capability.sizes.some(option => option.value === "2048x1152" && option.label === "2K"));
   assert.ok(capability.sizes.some(option => option.value === "2880x2880" && option.label === "4K"));
+  assert.ok(capability.sizes.some(option => option.value === "3840x1920" && option.label === "4K"));
+  assert.ok(capability.sizes.some(option => option.value === "1920x3840" && option.label === "4K"));
   assert.ok(capability.sizes.some(option => option.value === "3840x2160" && option.label === "4K"));
   assert.ok(capability.sizes.some(option => option.value === "2160x3840" && option.label === "4K"));
-  assert.deepEqual(capability.aspectRatios.map(option => option.value), ["1:1", "3:2", "2:3", "4:3", "3:4", "7:4", "4:7", "16:9", "9:16"]);
+  assert.deepEqual(capability.aspectRatios.map(option => option.value), ["1:1", "2:1", "1:2", "3:2", "2:3", "4:3", "3:4", "7:4", "4:7", "16:9", "9:16"]);
+  assert.deepEqual(xstxCapability.aspectRatios.map(option => option.value), capability.aspectRatios.map(option => option.value));
+  assert.equal(xstxCapability.sizes.some(option => option.value === "3840x1920"), true);
+  assert.equal(xstx2kCapability.sizes.some(option => option.value === "2048x1024"), true);
+  assert.equal(xstx2kCapability.sizes.some(option => option.value === "3840x1920"), false);
 });
 
 test("image resolution labels hide pixel dimensions while keeping request values", () => {
+  assert.deepEqual(getImageResolutionOptions("12ai:gpt-image-2", "2:1"), [
+    { value: "auto", label: "Auto" },
+    { value: "2048x1024", label: "2K" },
+    { value: "2560x1280", label: "2.5K" },
+    { value: "3840x1920", label: "4K" },
+    { value: "custom", label: "自定义尺寸" },
+  ]);
+
   assert.deepEqual(getImageResolutionOptions("12ai:gpt-image-2", "16:9"), [
     { value: "auto", label: "Auto" },
     { value: "1792x1008", label: "1K" },
@@ -432,6 +452,7 @@ test("runninghub exposes concrete standard model capabilities", () => {
   const veo = getModelCapability("runninghub:api:/openapi/v2/rhart-video-v3.1-fast-official/text-to-video", "video");
   const veoStartEndHidden = "runninghub:api:/openapi/v2/rhart-video-v3.1-fast/start-end-to-video";
   const gptImage = getModelCapability("runninghub:api:/openapi/v2/rhart-image-g-2-official/text-to-image", "image");
+  const gptImageChannel = getModelCapability("runninghub:api:/openapi/v2/rhart-image-g-2/text-to-image", "image");
   const gptImageEditHidden = "runninghub:api:/openapi/v2/rhart-image-g-2-official/image-to-image";
   const geminiFlash = getModelCapability("runninghub:api:/openapi/v2/rhart-image-n-g31-flash-official/text-to-image", "image");
   const geminiProUltra = getModelCapability("runninghub:api:/openapi/v2/rhart-image-n-pro-official/text-to-image-ultra", "image");
@@ -505,6 +526,7 @@ test("runninghub exposes concrete standard model capabilities", () => {
   ]);
   assert.deepEqual(gptImage.qualityLevels.map(option => option.value), ["low", "medium", "high"]);
   assert.deepEqual(gptImage.sizes.map(option => option.value), ["1k", "2k", "4k"]);
+  assert.equal(gptImageChannel.aspectRatios.some(option => option.value === "2:1"), false);
   assert.equal(geminiFlash.maxReferenceImages, 14);
   assert.deepEqual(geminiFlash.aspectRatios.map(option => option.value), [
     "1:1",

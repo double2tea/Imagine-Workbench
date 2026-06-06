@@ -138,6 +138,12 @@ const GPT_IMAGE_SIZES: ParameterOption[] = [
   imageResolutionOption("2304x1728"),
   imageResolutionOption("1728x2304"),
   imageResolutionOption("2880x2880"),
+  imageResolutionOption("2048x1024"),
+  imageResolutionOption("1024x2048"),
+  imageResolutionOption("2560x1280"),
+  imageResolutionOption("1280x2560"),
+  imageResolutionOption("3840x1920"),
+  imageResolutionOption("1920x3840"),
   imageResolutionOption("2048x1152"),
   imageResolutionOption("2560x1440"),
   imageResolutionOption("1440x2560"),
@@ -154,6 +160,8 @@ const GPT_IMAGE_SIZES: ParameterOption[] = [
 
 const GPT_IMAGE_RATIOS: ParameterOption[] = [
   { value: "1:1", label: "1:1 Square" },
+  { value: "2:1", label: "2:1 Panorama" },
+  { value: "1:2", label: "1:2 Portrait" },
   { value: "3:2", label: "3:2 Landscape" },
   { value: "2:3", label: "2:3 Portrait" },
   { value: "4:3", label: "4:3 Landscape" },
@@ -942,7 +950,12 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     supportsAsync: false,
     supportsReferences: true,
     aspectRatios: GPT_IMAGE_RATIOS,
-    sizes: GPT_IMAGE_SIZES.filter(s => s.value !== "3840x2160" && s.value !== "2160x3840"),
+    sizes: GPT_IMAGE_SIZES.filter(s =>
+      s.value !== "3840x2160" &&
+      s.value !== "2160x3840" &&
+      s.value !== "3840x1920" &&
+      s.value !== "1920x3840"
+    ),
   }),
   imageCapability({
     value: "xstx:gpt-image-2-4k",
