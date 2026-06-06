@@ -63,6 +63,7 @@ import {
   resolveBoardConnectionNodesWithCompatibleModel,
 } from "@/lib/board/ports";
 import { findResultNodeForSource, isResultSourceNode, resultNodeDefaultPosition } from "@/lib/board/utils";
+import { findAvailableBoardNodePosition } from "@/lib/board/placement";
 
 export type BoardSaveStatus = "idle" | "loading" | "saving" | "saved" | "error";
 
@@ -194,13 +195,8 @@ function duplicateNodeIdPrefix(kind: BoardNode["kind"]): string {
   return "note";
 }
 
-function cloneBoardNodeForDuplicate(source: BoardNode, stackIndex: number): BoardNode {
+function cloneBoardNodeForDuplicate(source: BoardNode, position: BoardPoint): BoardNode {
   const createdAt = nowIso();
-  const offset = 28 * (stackIndex + 1);
-  const position = {
-    x: source.position.x + offset,
-    y: source.position.y + offset,
-  };
   const shell = {
     id: createBoardId(duplicateNodeIdPrefix(source.kind)),
     title: source.title,
@@ -1601,7 +1597,20 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       .filter((node): node is BoardNode => node !== undefined);
     if (sources.length === 0) return [];
 
-    const clones = sources.map((source, index) => cloneBoardNodeForDuplicate(source, index));
+    const occupiedNodes = [...board.nodes];
+    const clones = sources.map(source => {
+      const size = source.kind === "runninghub-app"
+        ? minimumBoardSize(source.size, DEFAULT_RUNNINGHUB_APP_NODE_SIZE)
+        : source.size;
+      const position = findAvailableBoardNodePosition(
+        occupiedNodes,
+        { x: source.position.x + source.size.width + 48, y: source.position.y },
+        size,
+      );
+      const clone = cloneBoardNodeForDuplicate(source, position);
+      occupiedNodes.push(clone);
+      return clone;
+    });
     mutateBoard(currentBoard => {
       const inputEdges = duplicatedInputEdgesForClones(currentBoard.edges, sources, clones);
       return touchBoard(currentBoard, [...currentBoard.nodes, ...clones], [...currentBoard.edges, ...inputEdges]);

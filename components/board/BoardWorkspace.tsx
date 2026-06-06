@@ -93,6 +93,7 @@ import {
 import { BOARD_PORT_IDS, isValidBoardConnection as isValidBoardPortConnection } from "@/lib/board/ports";
 import { BOARD_INSERT_CATALOG, type BoardInsertKind } from "@/lib/board/insert-catalog";
 import { findResultNodeForSource, resultNodeDefaultPosition } from "@/lib/board/utils";
+import { findAvailableBoardNodePosition } from "@/lib/board/placement";
 import type { GenerationTask } from "@/lib/generation-tasks";
 import { DEFAULT_VIDEO_MODEL } from "@/lib/providers/model-catalog";
 
@@ -794,11 +795,12 @@ async function copyImageUrlToClipboard(url: string): Promise<void> {
   await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
 }
 
-function pastedNodePosition(node: BoardNodeModel): BoardPoint {
-  return {
-    x: node.position.x + 36,
-    y: node.position.y + 36,
-  };
+function pastedNodePosition(nodes: BoardNodeModel[], node: BoardNodeModel): BoardPoint {
+  return findAvailableBoardNodePosition(
+    nodes,
+    { x: node.position.x + node.size.width + 48, y: node.position.y },
+    node.size,
+  );
 }
 
 function batchConnectionToTarget(
@@ -1803,7 +1805,7 @@ export default function BoardWorkspace({
     const copied = copiedNodeRef.current;
     if (!copied) return;
     const { inputEdges, node } = copied;
-    const position = pastedNodePosition(node);
+    const position = pastedNodePosition(board.nodes, node);
     const rememberPastedPosition = (): void => {
       copiedNodeRef.current = {
         inputEdges,
@@ -1918,7 +1920,7 @@ export default function BoardWorkspace({
     }
     addNoteNode({ body: node.body, position, size: node.size, title: node.title });
     rememberPastedPosition();
-  }, [addAgentNode, addAssetNode, addGenerateNode, addGenerateNodeWithConnections, addNoteNode, addPromptNode, addReferenceGroupNode, addResultNodeWithConnection, addRunningHubAppNode]);
+  }, [addAgentNode, addAssetNode, addGenerateNode, addGenerateNodeWithConnections, addNoteNode, addPromptNode, addReferenceGroupNode, addResultNodeWithConnection, addRunningHubAppNode, board.nodes]);
 
   const handleConnectStart = useCallback<OnConnectStart>(() => {
     setIsConnectionActive(true);
