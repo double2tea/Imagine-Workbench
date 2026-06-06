@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
   type ClipboardEvent,
+  type CompositionEvent,
   type KeyboardEvent,
   type ReactNode,
 } from "react";
@@ -66,12 +67,16 @@ function serializeEditorNode(node: Node): string {
   return text;
 }
 
-function getEditorPlainText(editor: HTMLElement): string {
+function serializeEditorNodes(nodes: Iterable<Node>): string {
   let text = "";
-  editor.childNodes.forEach(child => {
-    text += serializeEditorNode(child);
-  });
+  for (const node of nodes) {
+    text += serializeEditorNode(node);
+  }
   return text;
+}
+
+function getEditorPlainText(editor: HTMLElement): string {
+  return serializeEditorNodes(editor.childNodes);
 }
 
 function getRangeTextOffset(editor: HTMLElement, container: Node, offset: number): number {
@@ -79,11 +84,7 @@ function getRangeTextOffset(editor: HTMLElement, container: Node, offset: number
   range.selectNodeContents(editor);
   range.setEnd(container, offset);
   const fragment = range.cloneContents();
-  let text = "";
-  fragment.childNodes.forEach(child => {
-    text += serializeEditorNode(child);
-  });
-  return text.length;
+  return serializeEditorNodes(fragment.childNodes).length;
 }
 
 function getEditorSelectionRange(editor: HTMLElement): { end: number; start: number } | null {
@@ -160,6 +161,25 @@ function insertTextAtEditorSelection(text: string): void {
   selection.addRange(range);
 }
 
+function getSelectedEditorText(editor: HTMLElement): string | null {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return null;
+  const range = selection.getRangeAt(0);
+  if (range.collapsed) return "";
+  if (!editor.contains(range.startContainer) || !editor.contains(range.endContainer)) return null;
+  return serializeEditorNodes(range.cloneContents().childNodes);
+}
+
+function deleteEditorSelection(): void {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return;
+  const range = selection.getRangeAt(0);
+  range.deleteContents();
+  range.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
 export interface BoardPromptTextareaHandle {
   flush: (value?: string) => void;
   focusAt: (caret: number) => void;
@@ -198,6 +218,7 @@ const BoardPromptTextarea = forwardRef<BoardPromptTextareaHandle, BoardPromptTex
 ) {
   const editorRef = useRef<HTMLDivElement | null>(null);
   const shellRef = useRef<HTMLDivElement | null>(null);
+  const isComposingRef = useRef(false);
   const pendingCaretRef = useRef<number | null>(null);
   const [atSearch, setAtSearch] = useState<string | null>(null);
   const [dropdownAnchor, setDropdownAnchor] = useState<{ left: number; top: number; width: number } | null>(null);
@@ -265,7 +286,7 @@ const BoardPromptTextarea = forwardRef<BoardPromptTextareaHandle, BoardPromptTex
     onSlashCommand?.(detectPromptTemplateSlashCommand(nextValue, caret));
   };
 
-  const handleInput = (): void => {
+  const syncEditorValue = (): void => {
     const editor = editorRef.current;
     if (!editor) return;
     const selectionRange = getEditorSelectionRange(editor);
@@ -274,18 +295,55 @@ const BoardPromptTextarea = forwardRef<BoardPromptTextareaHandle, BoardPromptTex
     handleChange(nextValue, selectionRange?.end ?? null);
   };
 
+  const handleInput = (): void => {
+    if (isComposingRef.current) return;
+    syncEditorValue();
+  };
+
+  const handleCompositionStart = (_event: CompositionEvent<HTMLDivElement>): void => {
+    isComposingRef.current = true;
+  };
+
+  const handleCompositionEnd = (_event: CompositionEvent<HTMLDivElement>): void => {
+    isComposingRef.current = false;
+    syncEditorValue();
+  };
+
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+    if (event.nativeEvent.isComposing || isComposingRef.current) return;
     if (readOnly || event.key !== "Enter") return;
     event.preventDefault();
     insertTextAtEditorSelection("\n");
-    handleInput();
+    syncEditorValue();
   };
 
   const handlePaste = (event: ClipboardEvent<HTMLDivElement>): void => {
+    if (isComposingRef.current) return;
     if (readOnly) return;
     event.preventDefault();
     insertTextAtEditorSelection(event.clipboardData.getData("text/plain"));
-    handleInput();
+    syncEditorValue();
+  };
+
+  const writeSelectedTextToClipboard = (event: ClipboardEvent<HTMLDivElement>): boolean => {
+    const editor = editorRef.current;
+    if (!editor) return false;
+    const selectedText = getSelectedEditorText(editor);
+    if (selectedText === null || selectedText.length === 0) return false;
+    event.preventDefault();
+    event.clipboardData.setData("text/plain", selectedText);
+    return true;
+  };
+
+  const handleCopy = (event: ClipboardEvent<HTMLDivElement>): void => {
+    writeSelectedTextToClipboard(event);
+  };
+
+  const handleCut = (event: ClipboardEvent<HTMLDivElement>): void => {
+    const hasSelection = writeSelectedTextToClipboard(event);
+    if (!hasSelection || readOnly) return;
+    deleteEditorSelection();
+    syncEditorValue();
   };
 
   const handleSelectReference = (index: number): void => {
@@ -341,7 +399,11 @@ const BoardPromptTextarea = forwardRef<BoardPromptTextareaHandle, BoardPromptTex
             data-placeholder={placeholder}
             suppressContentEditableWarning
             onInput={handleInput}
+            onCompositionStart={handleCompositionStart}
+            onCompositionEnd={handleCompositionEnd}
             onKeyDown={handleKeyDown}
+            onCopy={handleCopy}
+            onCut={handleCut}
             onPaste={handlePaste}
             onBlur={() => {
               if (readOnly) return;
