@@ -283,29 +283,6 @@ function migrateLegacyStore(db: IDBDatabase, transaction: IDBTransaction): void 
   };
 }
 
-function readObjectStoreKeys(db: IDBDatabase, storeName: string): Promise<IDBValidKey[]> {
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(storeName, "readonly");
-    const request = transaction.objectStore(storeName).getAllKeys();
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error(`IndexedDB ${storeName} keys read failed`));
-    transaction.onerror = () => reject(transaction.error ?? request.error ?? new Error(`IndexedDB ${storeName} transaction failed`));
-  });
-}
-
-function readAssetMetaRecord(db: IDBDatabase, id: string): Promise<StorageItemMeta | null> {
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(META_STORE, "readonly");
-    const request = transaction.objectStore(META_STORE).get(id);
-    request.onsuccess = () => {
-      const value = request.result as StorageItemMeta | undefined;
-      resolve(value ? normalizeMeta(value) : null);
-    };
-    request.onerror = () => reject(request.error ?? new Error(`IndexedDB asset ${id} metadata read failed`));
-    transaction.onerror = () => reject(transaction.error ?? request.error ?? new Error(`IndexedDB asset ${id} metadata transaction failed`));
-  });
-}
-
 function readLegacyBlobRecord(db: IDBDatabase, id: string): Promise<AssetBlobRecord | null> {
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(BLOB_STORE, "readonly");
@@ -329,16 +306,6 @@ function readHashBlobPayload(db: IDBDatabase, hash: string): Promise<string | nu
   });
 }
 
-function deleteLegacyBlobRecord(db: IDBDatabase, id: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(BLOB_STORE, "readwrite");
-    transaction.objectStore(BLOB_STORE).delete(id);
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error ?? new Error(`IndexedDB legacy blob ${id} delete failed`));
-    transaction.onabort = () => reject(transaction.error ?? new Error(`IndexedDB legacy blob ${id} delete aborted`));
-  });
-}
-
 function writeMigratedBlobRecord(
   db: IDBDatabase,
   meta: StorageItemMeta,
@@ -346,42 +313,45 @@ function writeMigratedBlobRecord(
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([META_STORE, BLOB_STORE, HASH_BLOB_STORE], "readwrite");
-    transaction.objectStore(META_STORE).put(meta);
-    transaction.objectStore(HASH_BLOB_STORE).put(payload);
-    transaction.objectStore(BLOB_STORE).delete(meta.id);
+    const metaStore = transaction.objectStore(META_STORE);
+    const blobStore = transaction.objectStore(BLOB_STORE);
+    const hashBlobStore = transaction.objectStore(HASH_BLOB_STORE);
+    const request = metaStore.get(meta.id);
+    request.onsuccess = () => {
+      const current = request.result as StorageItemMeta | undefined;
+      const currentMeta = current ? normalizeMeta(current) : null;
+      if (!currentMeta?.hasBlob) {
+        blobStore.delete(meta.id);
+        return;
+      }
+      if (currentMeta.contentHash && currentMeta.contentHash !== payload.hash) {
+        blobStore.delete(meta.id);
+        return;
+      }
+      hashBlobStore.put(payload);
+      if (!currentMeta.contentHash) {
+        metaStore.put(normalizeMeta({ ...currentMeta, contentHash: payload.hash }));
+      }
+      blobStore.delete(meta.id);
+    };
+    request.onerror = () => reject(request.error ?? new Error(`IndexedDB asset ${meta.id} metadata read failed`));
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error ?? new Error(`IndexedDB blob ${meta.id} migration failed`));
     transaction.onabort = () => reject(transaction.error ?? new Error(`IndexedDB blob ${meta.id} migration aborted`));
   });
 }
 
-async function migrateLegacyBlobRecords(db: IDBDatabase): Promise<void> {
-  const keys = await readObjectStoreKeys(db, BLOB_STORE);
-  for (const key of keys) {
-    if (typeof key !== "string") continue;
-    const [record, meta] = await Promise.all([
-      readLegacyBlobRecord(db, key),
-      readAssetMetaRecord(db, key),
-    ]);
-    if (!record) continue;
-    if (!meta?.hasBlob) {
-      await deleteLegacyBlobRecord(db, key);
-      continue;
-    }
-    const hash = await computeAssetContentHash(record.data);
-    await writeMigratedBlobRecord(
-      db,
-      normalizeMeta({ ...meta, hasBlob: true, contentHash: hash }),
-      { hash, data: record.data },
-    );
-  }
-}
-
-let legacyBlobMigrationPromise: Promise<void> | null = null;
-
-function migrateLegacyBlobRecordsOnce(db: IDBDatabase): Promise<void> {
-  legacyBlobMigrationPromise ??= migrateLegacyBlobRecords(db);
-  return legacyBlobMigrationPromise;
+async function migrateLegacyBlobRecord(
+  db: IDBDatabase,
+  meta: StorageItemMeta,
+  record: AssetBlobRecord,
+): Promise<void> {
+  const hash = await computeAssetContentHash(record.data);
+  await writeMigratedBlobRecord(
+    db,
+    normalizeMeta({ ...meta, hasBlob: true, contentHash: hash }),
+    { hash, data: record.data },
+  );
 }
 
 export function openDatabase(): Promise<IDBDatabase> {
@@ -429,13 +399,7 @@ export function openDatabase(): Promise<IDBDatabase> {
       }
     };
 
-    request.onsuccess = () => {
-      const db = request.result;
-      migrateLegacyBlobRecordsOnce(db).then(
-        () => resolve(db),
-        error => reject(error instanceof Error ? error : new Error("IndexedDB blob migration failed")),
-      );
-    };
+    request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error ?? new Error("IndexedDB open failed"));
   });
 }
@@ -460,14 +424,16 @@ export async function getAssetMetasByIds(ids: string[]): Promise<StorageItemMeta
   return sortMetas(metas.filter((meta): meta is StorageItemMeta => meta !== null));
 }
 
-async function getAssetBlobPayloadForMeta(meta: Pick<StorageItemMeta, "id" | "contentHash">): Promise<string | null> {
+async function getAssetBlobPayloadForMeta(meta: StorageItemMeta): Promise<string | null> {
   const db = await openDatabase();
   if (meta.contentHash) {
     const payload = await readHashBlobPayload(db, meta.contentHash);
     if (payload !== null) return payload;
   }
   const legacyRecord = await readLegacyBlobRecord(db, meta.id);
-  return legacyRecord?.data ?? null;
+  if (!legacyRecord) return null;
+  await migrateLegacyBlobRecord(db, meta, legacyRecord);
+  return legacyRecord.data;
 }
 
 export async function getAssetBlobPayload(id: string): Promise<string | null> {
