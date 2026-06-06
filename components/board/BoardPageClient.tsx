@@ -18,7 +18,6 @@ import { isCustomImageResolutionValue } from "@/lib/agent-tool-action";
 import AtReferenceDropdown from "@/components/reference/AtReferenceDropdown";
 import CanvasMaskEditor from "@/components/CanvasMaskEditor";
 import FullscreenPreview from "@/components/assets/FullscreenPreview";
-import PanoramaOverlay from "@/components/panorama/PanoramaOverlay";
 import BoardInspector from "@/components/board/BoardInspector";
 import BoardSidePanel from "@/components/board/BoardSidePanel";
 import BoardSideAssetList from "@/components/board/BoardSideAssetList";
@@ -959,7 +958,6 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const [maskDestination, setMaskDestination] = useState<MaskDestination>("creative");
   const [maskSourceNodeId, setMaskSourceNodeId] = useState<string | null>(null);
   const [fullscreenItem, setFullscreenItem] = useState<StorageItem | null>(null);
-  const [panoramaItem, setPanoramaItem] = useState<StorageItem | null>(null);
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
   const focusNodeSeqRef = useRef(0);
   const [focusNodeRequest, setFocusNodeRequest] = useState<{ nodeId: string; seq: number } | null>(null);
@@ -2279,11 +2277,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     }
 
     const sourceNode = boardController.board.nodes.find(node => (
-      item.sourceBoardNodeId
-        ? node.id === item.sourceBoardNodeId
-        : node.kind === "asset" && node.asset.assetId === item.id
+      node.kind === "asset" && node.asset.assetId === item.id
     ));
-    const sourceNodeId = sourceNode?.id;
+    const sourceNodeId = sourceNode?.id ?? item.sourceBoardNodeId;
     const savedItems: StorageItem[] = [];
     for (const [index, screenshot] of screenshots.entries()) {
       const screenshotItem = createPanoramaScreenshotStorageItem(
@@ -3186,7 +3182,6 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onFetchRunningHubAppSchema={fetchRunningHubAppSchema}
         onImportBoardFiles={handleImportBoardFiles}
         onOpenFullscreen={setFullscreenItem}
-        onOpenPanorama={setPanoramaItem}
         onOpenSettings={handleOpenSettings}
         onRenameBoard={renameBoardPage}
         onSelectBoard={handleSelectBoard}
@@ -3242,7 +3237,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         />
       </BoardWorkspace>
 
-      {!showSettings && !isMaskOpen && !fullscreenItem && !panoramaItem && (
+      {!showSettings && !isMaskOpen && !fullscreenItem && (
         <AgentDock
           activeCountdownId={activeCountdownId}
           agentReferenceId={agentReferenceId}
@@ -3331,13 +3326,6 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onClose={() => setFullscreenItem(null)}
         onSelectItem={setFullscreenItem}
       />
-      {panoramaItem && (
-        <PanoramaOverlay
-          item={panoramaItem}
-          onClose={() => setPanoramaItem(null)}
-          onSaveScreenshots={handleSavePanoramaScreenshots}
-        />
-      )}
       {isMaskOpen && (
         <CanvasMaskEditor
           imageUrl={maskTargetUrl}

@@ -40,7 +40,6 @@ export interface BoardFlowNodeData extends Record<string, unknown> {
   onCancelGenerate: (nodeId: string) => void;
   onOpenAssetCompare?: (nodeId: string) => void;
   onOpenFullscreen: (item: StorageItem) => void;
-  onOpenPanorama: (item: StorageItem) => void;
   promptReferences: BoardPromptReference[];
   onCaptureVideoFrame: (nodeId: string, item: StorageItem, frame: CapturedVideoFrame) => void | Promise<void>;
   onEditAssetImage: (nodeId: string) => void;
@@ -388,7 +387,6 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             onEditImage={data.onEditAssetImage}
             onMeasureAspectRatio={data.onMeasureAssetAspectRatio}
             onOpenFullscreen={data.onOpenFullscreen}
-            onOpenPanorama={data.onOpenPanorama}
             onSelectStackAsset={assetId => data.onSelectAssetStackResult(node.id, assetId)}
             onSendToAgent={data.onSendAssetToAgent}
           />
@@ -402,7 +400,6 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             onCaptureVideoFrame={data.onCaptureVideoFrame}
             onMeasureAspectRatio={data.onMeasureAssetAspectRatio}
             onOpenFullscreen={data.onOpenFullscreen}
-            onOpenPanorama={data.onOpenPanorama}
             onSelectStackAsset={assetId => data.onSelectAssetStackResult(node.id, assetId)}
           />
         )}

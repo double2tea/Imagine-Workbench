@@ -113,7 +113,6 @@ interface BoardWorkspaceProps {
   onDeleteBoard: () => void;
   onOpenSettings: () => void;
   onOpenFullscreen: (item: StorageItem) => void;
-  onOpenPanorama: (item: StorageItem) => void;
   onRenameBoard: () => void;
   onSelectBoard: (boardId: string) => void;
   onSendAssetToAgent: (nodeId: string) => void;
@@ -851,7 +850,6 @@ export default function BoardWorkspace({
   onDeleteBoard,
   onOpenSettings,
   onOpenFullscreen,
-  onOpenPanorama,
   onRenameBoard,
   onSelectBoard,
   onSendAssetToAgent,
@@ -1184,7 +1182,6 @@ export default function BoardWorkspace({
         onExecuteGenerate: onExecuteGenerateNode,
         onFetchRunningHubAppSchema,
         onOpenFullscreen,
-        onOpenPanorama,
         onMaterializeGenerateResult: materializeGenerateResult,
         onMoveGenerateReferenceEdge: moveGenerateReferenceEdge,
         onMoveReferenceGroupItem: moveReferenceGroupItem,
@@ -1233,7 +1230,6 @@ export default function BoardWorkspace({
     onFetchRunningHubAppSchema,
     onConnectionError,
     onOpenFullscreen,
-    onOpenPanorama,
     materializeGenerateResult,
     moveReferenceGroupItem,
     moveGenerateReferenceEdge,
