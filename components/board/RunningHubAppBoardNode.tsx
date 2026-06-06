@@ -503,7 +503,6 @@ export default function RunningHubAppBoardNode({
             onSelectReference={onSelectReference}
             references={references}
             readOnly={promptPreview !== null}
-            overlayClassName="p-2 text-xs leading-5"
             className={`nodrag nowheel min-h-[146px] flex-1 resize-none rounded-md imagine-board-input !p-2 text-xs leading-5 outline-none ${
               promptPreview !== null ? "cursor-default opacity-85" : ""
             }`}

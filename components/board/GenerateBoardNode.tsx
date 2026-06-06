@@ -310,7 +310,6 @@ export default function GenerateBoardNode({
           onChange={(prompt) => onUpdate({ prompt })}
           onSelectReference={onSelectReference}
           onSlashCommand={handleSlashCommand}
-          overlayClassName="p-2 pr-20 text-xs leading-5"
           references={references}
           readOnly={promptPreview !== null}
           headerRight={promptPreview === null ? <PromptTemplatePicker ref={templatePickerRef} compact onApply={handleApplyPromptTemplate} /> : undefined}
