@@ -2776,6 +2776,14 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
   transition: none !important;
 }
 
+.board-canvas.is-node-dragging .board-node-shell * {
+  transition: none !important;
+}
+
+.board-canvas.is-node-dragging .board-node-shell [class*="backdrop-blur"] {
+  backdrop-filter: none !important;
+}
+
 .board-canvas.is-node-dragging .board-node-shell {
   box-shadow: 0 0 0 1px var(--iw-board-border) !important;
 }

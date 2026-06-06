@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { Handle, Position, useConnection, type Node, type NodeProps } from "@xyflow/react";
 import { ImagePlus, Layers, Music, Video, Workflow } from "lucide-react";
 import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
@@ -226,7 +226,10 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
   const isMediaNode = node.kind === "asset" || node.kind === "result";
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [draftTitle, setDraftTitle] = useState(node.title);
-  const ports = getBoardNodePortDefinitions(node, { hasResultConnection: data.hasResultConnection });
+  const ports = useMemo(
+    () => getBoardNodePortDefinitions(node, { hasResultConnection: data.hasResultConnection }),
+    [data.hasResultConnection, node],
+  );
 
   useEffect(() => {
     if (!isEditingTitle) setDraftTitle(node.title);
@@ -422,4 +425,8 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
   );
 }
 
-export default memo(BoardNode);
+function sameBoardNodeProps(previous: NodeProps<BoardFlowNode>, next: NodeProps<BoardFlowNode>): boolean {
+  return previous.selected === next.selected && previous.data === next.data;
+}
+
+export default memo(BoardNode, sameBoardNodeProps);

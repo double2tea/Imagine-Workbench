@@ -1552,6 +1552,7 @@ export default function BoardWorkspace({
   }, [closeOverlayMenus, selectEdge, selectNode, updateSelectedNodeIds]);
 
   const snapToGrid = board.config.snapToGrid;
+  const onlyRenderVisibleBoardElements = board.nodes.length > 80;
 
   const flowPositionFromClient = useCallback((clientX: number, clientY: number): BoardPoint => {
     const instance = flowInstanceRef.current;
@@ -2137,7 +2138,7 @@ export default function BoardWorkspace({
             defaultViewport={board.viewport}
             minZoom={0.25}
             maxZoom={1.8}
-            onlyRenderVisibleElements
+            onlyRenderVisibleElements={onlyRenderVisibleBoardElements}
             connectOnClick={false}
             connectionMode={ConnectionMode.Loose}
             connectionRadius={48}
