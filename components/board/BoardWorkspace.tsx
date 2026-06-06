@@ -171,6 +171,7 @@ interface QuickInsertMenu {
   connectionFrom?: BoardPortRef;
   clientY: number;
   position: BoardPoint;
+  selectedNodeIds: string[];
 }
 
 interface CopiedBoardNode {
@@ -837,6 +838,34 @@ function batchConnectionToTarget(
   return isValidBoardPortConnection(nodes, connection.from, connection.to) ? connection : null;
 }
 
+function referenceGroupAssetNodeIds(
+  nodes: BoardNodeModel[],
+  sourceNodeId: string,
+  selectedNodeIds: string[],
+): string[] {
+  const sourceNode = nodes.find(node => node.id === sourceNodeId);
+  if (sourceNode?.kind !== "asset" || sourceNode.asset.type !== "image") return [];
+  const nodeIds = selectedNodeIds.length > 1 && selectedNodeIds.includes(sourceNodeId)
+    ? selectedNodeIds
+    : [sourceNodeId];
+  const seenNodeIds = new Set<string>();
+  return nodeIds.filter(nodeId => {
+    if (seenNodeIds.has(nodeId)) return false;
+    seenNodeIds.add(nodeId);
+    const node = nodes.find(item => item.id === nodeId);
+    return node?.kind === "asset" && node.asset.type === "image";
+  });
+}
+
+function selectedReferenceGroupAssetNodeIds(
+  nodes: BoardNodeModel[],
+  contextNodeId: string,
+  selectedNodeIds: string[],
+): string[] {
+  const nodeIds = selectedNodeIds.includes(contextNodeId) ? selectedNodeIds : [contextNodeId];
+  return referenceGroupAssetNodeIds(nodes, contextNodeId, nodeIds);
+}
+
 export default function BoardWorkspace({
   boardSummaries,
   children,
@@ -937,7 +966,7 @@ export default function BoardWorkspace({
     addNoteNode,
     addPromptNode,
     addReferenceGroupNode,
-    addReferenceGroupNodeWithAsset,
+    addReferenceGroupNodeWithAssets,
     addResultNodeWithConnection,
     addRunningHubAppNode,
     clearBoard,
@@ -1639,7 +1668,7 @@ export default function BoardWorkspace({
     setQuickInsertMenu(null);
   }, [addQuickNode, centeredNodePosition]);
 
-  const addConnectedQuickNodeAtPoint = useCallback((kind: BoardInsertKind, point: BoardPoint, from: BoardPortRef): void => {
+  const addConnectedQuickNodeAtPoint = useCallback((kind: BoardInsertKind, point: BoardPoint, from: BoardPortRef, selectionSnapshot: string[]): void => {
     if (kind === "image-generate") {
       try {
         addGenerateNodeWithConnection(
@@ -1673,9 +1702,9 @@ export default function BoardWorkspace({
       return;
     }
     if (kind === "reference-group") {
-      const sourceNode = board.nodes.find(node => node.id === from.nodeId);
-      if (sourceNode?.kind !== "asset" || sourceNode.asset.type !== "image") return;
-      addReferenceGroupNodeWithAsset({ position: centeredNodePosition(point, DEFAULT_REFERENCE_GROUP_NODE_SIZE) }, from.nodeId);
+      const assetNodeIds = referenceGroupAssetNodeIds(board.nodes, from.nodeId, selectionSnapshot);
+      if (assetNodeIds.length === 0) return;
+      addReferenceGroupNodeWithAssets({ position: centeredNodePosition(point, DEFAULT_REFERENCE_GROUP_NODE_SIZE) }, assetNodeIds);
       setQuickInsertMenu(null);
       return;
     }
@@ -1688,7 +1717,7 @@ export default function BoardWorkspace({
       });
       setQuickInsertMenu(null);
     }
-  }, [addGenerateNodeWithConnection, addReferenceGroupNodeWithAsset, addRunningHubAppNode, board.nodes, centeredNodePosition, connectPorts, onConnectionError]);
+  }, [addGenerateNodeWithConnection, addReferenceGroupNodeWithAssets, addRunningHubAppNode, board.nodes, centeredNodePosition, connectPorts, onConnectionError]);
 
   const quickInsertMenuItems = useMemo(() => {
     const from = quickInsertMenu?.connectionFrom;
@@ -1730,6 +1759,23 @@ export default function BoardWorkspace({
     updateSelectedNodeIds([targetNode.id]);
     closeOverlayMenus();
   }, [board.nodes, closeOverlayMenus, connectPortsBatch, onConnectionError, selectEdge, selectedNodeIds, selectNode, updateSelectedNodeIds]);
+
+  const createReferenceGroupFromSelected = useCallback((contextNodeId: string): void => {
+    const contextNode = board.nodes.find(node => node.id === contextNodeId);
+    if (!contextNode) return;
+    const assetNodeIds = selectedReferenceGroupAssetNodeIds(board.nodes, contextNodeId, selectedNodeIds);
+    if (assetNodeIds.length === 0) {
+      onConnectionError("请选择图片资产节点");
+      return;
+    }
+    addReferenceGroupNodeWithAssets({
+      position: {
+        x: contextNode.position.x + contextNode.size.width + 72,
+        y: contextNode.position.y,
+      },
+    }, assetNodeIds);
+    closeOverlayMenus();
+  }, [addReferenceGroupNodeWithAssets, board.nodes, closeOverlayMenus, onConnectionError, selectedNodeIds]);
 
   const pasteCopiedNode = useCallback((): void => {
     const copied = copiedNodeRef.current;
@@ -1864,6 +1910,7 @@ export default function BoardWorkspace({
         clientY: clientPoint.y,
         connectionFrom: { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "prompt" },
         position: flowPoint,
+        selectedNodeIds,
       });
       return;
     }
@@ -1876,6 +1923,7 @@ export default function BoardWorkspace({
             clientY: clientPoint.y,
             connectionFrom: { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "asset" },
             position: flowPoint,
+            selectedNodeIds,
           });
           return;
         }
@@ -1887,6 +1935,7 @@ export default function BoardWorkspace({
         clientY: clientPoint.y,
         connectionFrom: { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "asset" },
         position: flowPoint,
+        selectedNodeIds,
       });
       return;
     }
@@ -1918,7 +1967,7 @@ export default function BoardWorkspace({
       selectEdge(null);
       return;
     }
-  }, [addResultNodeWithConnection, board.nodes, centeredNodePosition, connectPorts, flowPositionFromClient, onConnectionError, selectEdge, selectNode]);
+  }, [addResultNodeWithConnection, board.nodes, centeredNodePosition, connectPorts, flowPositionFromClient, onConnectionError, selectEdge, selectedNodeIds, selectNode]);
 
   const openQuickInsertMenu = useCallback((event: ReactMouseEvent | MouseEvent): void => {
     event.preventDefault();
@@ -1930,6 +1979,7 @@ export default function BoardWorkspace({
       clientX: event.clientX,
       clientY: event.clientY,
       position: flowPositionFromClient(event.clientX, event.clientY),
+      selectedNodeIds: [],
     });
   }, [flowPositionFromClient, selectEdge, selectNode, updateSelectedNodeIds]);
 
@@ -2242,7 +2292,7 @@ export default function BoardWorkspace({
                 }
                 const quickKind = kind as BoardInsertKind;
                 if (quickInsertMenu.connectionFrom) {
-                  addConnectedQuickNodeAtPoint(quickKind, position, quickInsertMenu.connectionFrom);
+                  addConnectedQuickNodeAtPoint(quickKind, position, quickInsertMenu.connectionFrom, quickInsertMenu.selectedNodeIds);
                   return;
                 }
                 addQuickNodeAtPoint(quickKind, position);
@@ -2266,6 +2316,9 @@ export default function BoardWorkspace({
               node,
               onConnectSelected: selectedBatchConnectionCount > 0
                 ? () => connectSelectedNodesToTarget(node.id)
+                : undefined,
+              onCreateReferenceGroup: node.kind === "asset" && node.asset.type === "image"
+                ? () => createReferenceGroupFromSelected(node.id)
                 : undefined,
               onCompare: compareReferenceUrl && node.kind === "asset"
                 ? () => {

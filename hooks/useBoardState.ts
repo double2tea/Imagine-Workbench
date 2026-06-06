@@ -127,6 +127,7 @@ export interface BoardStateController {
   addPromptNode: (input?: CreatePromptNodeInput) => string;
   addReferenceGroupNode: (input?: CreateReferenceGroupNodeInput) => string;
   addReferenceGroupNodeWithAsset: (input: CreateReferenceGroupNodeInput, assetNodeId: string) => string;
+  addReferenceGroupNodeWithAssets: (input: CreateReferenceGroupNodeInput, assetNodeIds: string[]) => string;
   addRunningHubAppNode: (input?: CreateRunningHubAppNodeInput) => string;
   addAssetToReferenceGroup: (assetNodeId: string, groupNodeId: string) => void;
   clearBoard: () => void;
@@ -1266,32 +1267,46 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     return node.id;
   }, [board.nodes, mutateBoard]);
 
-  const addReferenceGroupNodeWithAsset = useCallback((input: CreateReferenceGroupNodeInput, assetNodeId: string): string => {
+  const addReferenceGroupNodeWithAssets = useCallback((input: CreateReferenceGroupNodeInput, assetNodeIds: string[]): string => {
+    if (assetNodeIds.length === 0) throw new Error("参考组至少需要一个媒体资产");
     const node = createReferenceGroupBoardNode(input, board.nodes);
-    const from: BoardPortRef = { nodeId: assetNodeId, portId: BOARD_PORT_IDS.assetOut, portKind: "asset" };
     const to: BoardPortRef = { nodeId: node.id, portId: BOARD_PORT_IDS.assetIn, portKind: "asset" };
-    const edgeId = createBoardId("edge");
+    const edgeIds = assetNodeIds.map(() => createBoardId("edge"));
     mutateBoard(currentBoard => {
-      const assetNode = currentBoard.nodes.find(currentNode => currentNode.id === assetNodeId);
-      if (assetNode?.kind !== "asset") {
-        throw new Error("参考组只支持媒体资产");
-      }
-      const reference = referenceGroupItemFromAssetNode(assetNode);
-      const nextNode: BoardReferenceGroupNode = { ...node, references: [reference, ...node.references] };
+      const assetNodes = assetNodeIds.map(assetNodeId => {
+        const assetNode = currentBoard.nodes.find(currentNode => currentNode.id === assetNodeId);
+        if (assetNode?.kind !== "asset") throw new Error("参考组只支持媒体资产");
+        return assetNode;
+      });
+      const seenAssetIds = new Set<string>();
+      const references = assetNodes.flatMap(assetNode => {
+        if (seenAssetIds.has(assetNode.asset.assetId)) return [];
+        seenAssetIds.add(assetNode.asset.assetId);
+        return [referenceGroupItemFromAssetNode(assetNode)];
+      });
+      const nextNode: BoardReferenceGroupNode = { ...node, references: [...references, ...node.references] };
       const nextNodes = [...currentBoard.nodes, nextNode];
-      const edge: BoardEdge = {
-        id: edgeId,
-        kind: resolveBoardConnectionKind(nextNodes, from, to),
-        from,
-        to,
-        createdAt: nowIso(),
-      };
-      return touchBoard(currentBoard, nextNodes, connectEdge(nextNodes, currentBoard.edges, edge));
+      const nextEdges = assetNodes.reduce((edges, assetNode, index) => {
+        const from: BoardPortRef = { nodeId: assetNode.id, portId: BOARD_PORT_IDS.assetOut, portKind: "asset" };
+        const edge: BoardEdge = {
+          id: edgeIds[index] ?? createBoardId("edge"),
+          kind: resolveBoardConnectionKind(nextNodes, from, to),
+          from,
+          to,
+          createdAt: nowIso(),
+        };
+        return connectEdge(nextNodes, edges, edge);
+      }, currentBoard.edges);
+      return touchBoard(currentBoard, nextNodes, nextEdges);
     });
     setSelectedNodeId(null);
-    setSelectedEdgeId(edgeId);
+    setSelectedEdgeId(edgeIds[0] ?? null);
     return node.id;
   }, [board.nodes, mutateBoard]);
+
+  const addReferenceGroupNodeWithAsset = useCallback((input: CreateReferenceGroupNodeInput, assetNodeId: string): string => {
+    return addReferenceGroupNodeWithAssets(input, [assetNodeId]);
+  }, [addReferenceGroupNodeWithAssets]);
 
   const addGenerateNode = useCallback((input: CreateGenerateNodeInput): string => {
     const node = createGenerateBoardNode(input, board.nodes);
@@ -1983,6 +1998,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       addPromptNode,
       addReferenceGroupNode,
       addReferenceGroupNodeWithAsset,
+      addReferenceGroupNodeWithAssets,
       addRunningHubAppNode,
       addAssetToReferenceGroup,
       clearBoard,
@@ -2024,6 +2040,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       addPromptNode,
       addReferenceGroupNode,
       addReferenceGroupNodeWithAsset,
+      addReferenceGroupNodeWithAssets,
       addRunningHubAppNode,
       addAssetToReferenceGroup,
       beginUndoGesture,
