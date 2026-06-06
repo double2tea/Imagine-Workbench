@@ -7,9 +7,10 @@ import {
 import type { RunningHubTaskNodeBinding } from "./providers/types";
 
 const DB_NAME = "ImagineWorkbenchDB";
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 const META_STORE = "assets_meta";
 const BLOB_STORE = "assets_blob";
+const HASH_BLOB_STORE = "asset_blob_payloads";
 const PREVIEW_STORE = "asset_previews";
 const LEGACY_STORE = "assets";
 export const GENERATION_TASK_STORE = "generation_tasks";
@@ -63,6 +64,8 @@ export interface StorageItemMeta {
   /** Remote http(s) URL only when hasBlob is false. */
   url?: string;
   hasBlob: boolean;
+  /** SHA-256 hash for shared local media payloads. */
+  contentHash?: string;
   previewStatus?: AssetPreviewStatus;
   previewUpdatedAt?: string;
 }
@@ -85,6 +88,11 @@ export function getGenerationReferenceMedia(
 
 interface AssetBlobRecord {
   id: string;
+  data: string;
+}
+
+interface AssetBlobPayloadRecord {
+  hash: string;
   data: string;
 }
 
@@ -139,8 +147,14 @@ function normalizeBoardId(boardId: string | undefined, scope: AssetScope): strin
   return "";
 }
 
+function normalizeContentHash(value: string | undefined): string | undefined {
+  const hash = value?.trim();
+  return hash ? hash : undefined;
+}
+
 function normalizeMeta(meta: StorageItemMeta): StorageItemMeta {
   const scope: AssetScope = meta.scope === "board" ? "board" : "workspace";
+  const hasBlob = Boolean(meta.hasBlob);
   const previewStatus = meta.previewStatus === "ready" || meta.previewStatus === "missing" || meta.previewStatus === "failed"
     ? meta.previewStatus
     : undefined;
@@ -148,8 +162,9 @@ function normalizeMeta(meta: StorageItemMeta): StorageItemMeta {
     ...meta,
     scope,
     boardId: normalizeBoardId(meta.boardId, scope),
-    hasBlob: Boolean(meta.hasBlob),
-    url: meta.url && isRemoteUrl(meta.url) ? meta.url : undefined,
+    hasBlob,
+    contentHash: hasBlob ? normalizeContentHash(meta.contentHash) : undefined,
+    url: !hasBlob && meta.url && isRemoteUrl(meta.url) ? meta.url : undefined,
     previewStatus,
     previewUpdatedAt: meta.previewUpdatedAt,
   };
@@ -189,6 +204,19 @@ function splitIncomingItem(item: StorageItem): { meta: StorageItemMeta; blob: st
   return { meta, blob };
 }
 
+function bufferToHex(buffer: ArrayBuffer): string {
+  let hex = "";
+  for (const byte of new Uint8Array(buffer)) {
+    hex += byte.toString(16).padStart(2, "0");
+  }
+  return hex;
+}
+
+export async function computeAssetContentHash(payload: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(payload));
+  return `sha256:${bufferToHex(digest)}`;
+}
+
 function legacyToMeta(raw: LegacyStorageItem): { meta: StorageItemMeta; blob: string | null } {
   const scope: AssetScope = raw.scope === "board" || raw.boardId?.trim() ? "board" : "workspace";
   const boardId = normalizeBoardId(raw.boardId, scope);
@@ -216,6 +244,21 @@ function legacyToMeta(raw: LegacyStorageItem): { meta: StorageItemMeta; blob: st
   return { meta, blob };
 }
 
+function ensureMetaIndexes(meta: IDBObjectStore): void {
+  if (!meta.indexNames.contains("by_boardId")) {
+    meta.createIndex("by_boardId", "boardId", { unique: false });
+  }
+  if (!meta.indexNames.contains("by_status")) {
+    meta.createIndex("by_status", "status", { unique: false });
+  }
+  if (!meta.indexNames.contains("by_createdAt")) {
+    meta.createIndex("by_createdAt", "createdAt", { unique: false });
+  }
+  if (!meta.indexNames.contains("by_contentHash")) {
+    meta.createIndex("by_contentHash", "contentHash", { unique: false });
+  }
+}
+
 function migrateLegacyStore(db: IDBDatabase, transaction: IDBTransaction): void {
   if (!db.objectStoreNames.contains(LEGACY_STORE)) return;
   const legacy = transaction.objectStore(LEGACY_STORE);
@@ -240,6 +283,107 @@ function migrateLegacyStore(db: IDBDatabase, transaction: IDBTransaction): void 
   };
 }
 
+function readObjectStoreKeys(db: IDBDatabase, storeName: string): Promise<IDBValidKey[]> {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(storeName, "readonly");
+    const request = transaction.objectStore(storeName).getAllKeys();
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error ?? new Error(`IndexedDB ${storeName} keys read failed`));
+    transaction.onerror = () => reject(transaction.error ?? request.error ?? new Error(`IndexedDB ${storeName} transaction failed`));
+  });
+}
+
+function readAssetMetaRecord(db: IDBDatabase, id: string): Promise<StorageItemMeta | null> {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(META_STORE, "readonly");
+    const request = transaction.objectStore(META_STORE).get(id);
+    request.onsuccess = () => {
+      const value = request.result as StorageItemMeta | undefined;
+      resolve(value ? normalizeMeta(value) : null);
+    };
+    request.onerror = () => reject(request.error ?? new Error(`IndexedDB asset ${id} metadata read failed`));
+    transaction.onerror = () => reject(transaction.error ?? request.error ?? new Error(`IndexedDB asset ${id} metadata transaction failed`));
+  });
+}
+
+function readLegacyBlobRecord(db: IDBDatabase, id: string): Promise<AssetBlobRecord | null> {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(BLOB_STORE, "readonly");
+    const request = transaction.objectStore(BLOB_STORE).get(id);
+    request.onsuccess = () => resolve((request.result as AssetBlobRecord | undefined) ?? null);
+    request.onerror = () => reject(request.error ?? new Error(`IndexedDB legacy blob ${id} read failed`));
+    transaction.onerror = () => reject(transaction.error ?? request.error ?? new Error(`IndexedDB legacy blob ${id} transaction failed`));
+  });
+}
+
+function readHashBlobPayload(db: IDBDatabase, hash: string): Promise<string | null> {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(HASH_BLOB_STORE, "readonly");
+    const request = transaction.objectStore(HASH_BLOB_STORE).get(hash);
+    request.onsuccess = () => {
+      const record = request.result as AssetBlobPayloadRecord | undefined;
+      resolve(record?.data ?? null);
+    };
+    request.onerror = () => reject(request.error ?? new Error(`IndexedDB blob ${hash} read failed`));
+    transaction.onerror = () => reject(transaction.error ?? request.error ?? new Error(`IndexedDB blob ${hash} transaction failed`));
+  });
+}
+
+function deleteLegacyBlobRecord(db: IDBDatabase, id: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(BLOB_STORE, "readwrite");
+    transaction.objectStore(BLOB_STORE).delete(id);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error ?? new Error(`IndexedDB legacy blob ${id} delete failed`));
+    transaction.onabort = () => reject(transaction.error ?? new Error(`IndexedDB legacy blob ${id} delete aborted`));
+  });
+}
+
+function writeMigratedBlobRecord(
+  db: IDBDatabase,
+  meta: StorageItemMeta,
+  payload: AssetBlobPayloadRecord,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([META_STORE, BLOB_STORE, HASH_BLOB_STORE], "readwrite");
+    transaction.objectStore(META_STORE).put(meta);
+    transaction.objectStore(HASH_BLOB_STORE).put(payload);
+    transaction.objectStore(BLOB_STORE).delete(meta.id);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error ?? new Error(`IndexedDB blob ${meta.id} migration failed`));
+    transaction.onabort = () => reject(transaction.error ?? new Error(`IndexedDB blob ${meta.id} migration aborted`));
+  });
+}
+
+async function migrateLegacyBlobRecords(db: IDBDatabase): Promise<void> {
+  const keys = await readObjectStoreKeys(db, BLOB_STORE);
+  for (const key of keys) {
+    if (typeof key !== "string") continue;
+    const [record, meta] = await Promise.all([
+      readLegacyBlobRecord(db, key),
+      readAssetMetaRecord(db, key),
+    ]);
+    if (!record) continue;
+    if (!meta?.hasBlob) {
+      await deleteLegacyBlobRecord(db, key);
+      continue;
+    }
+    const hash = await computeAssetContentHash(record.data);
+    await writeMigratedBlobRecord(
+      db,
+      normalizeMeta({ ...meta, hasBlob: true, contentHash: hash }),
+      { hash, data: record.data },
+    );
+  }
+}
+
+let legacyBlobMigrationPromise: Promise<void> | null = null;
+
+function migrateLegacyBlobRecordsOnce(db: IDBDatabase): Promise<void> {
+  legacyBlobMigrationPromise ??= migrateLegacyBlobRecords(db);
+  return legacyBlobMigrationPromise;
+}
+
 export function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (typeof window === "undefined") {
@@ -256,13 +400,17 @@ export function openDatabase(): Promise<IDBDatabase> {
 
       if (!db.objectStoreNames.contains(META_STORE)) {
         const meta = db.createObjectStore(META_STORE, { keyPath: "id" });
-        meta.createIndex("by_boardId", "boardId", { unique: false });
-        meta.createIndex("by_status", "status", { unique: false });
-        meta.createIndex("by_createdAt", "createdAt", { unique: false });
+        ensureMetaIndexes(meta);
+      } else {
+        ensureMetaIndexes(transaction.objectStore(META_STORE));
       }
 
       if (!db.objectStoreNames.contains(BLOB_STORE)) {
         db.createObjectStore(BLOB_STORE, { keyPath: "id" });
+      }
+
+      if (!db.objectStoreNames.contains(HASH_BLOB_STORE)) {
+        db.createObjectStore(HASH_BLOB_STORE, { keyPath: "hash" });
       }
 
       if (!db.objectStoreNames.contains(PREVIEW_STORE)) {
@@ -281,7 +429,13 @@ export function openDatabase(): Promise<IDBDatabase> {
       }
     };
 
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      const db = request.result;
+      migrateLegacyBlobRecordsOnce(db).then(
+        () => resolve(db),
+        error => reject(error instanceof Error ? error : new Error("IndexedDB blob migration failed")),
+      );
+    };
     request.onerror = () => reject(request.error ?? new Error("IndexedDB open failed"));
   });
 }
@@ -306,17 +460,20 @@ export async function getAssetMetasByIds(ids: string[]): Promise<StorageItemMeta
   return sortMetas(metas.filter((meta): meta is StorageItemMeta => meta !== null));
 }
 
-export async function getAssetBlobPayload(id: string): Promise<string | null> {
+async function getAssetBlobPayloadForMeta(meta: Pick<StorageItemMeta, "id" | "contentHash">): Promise<string | null> {
   const db = await openDatabase();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(BLOB_STORE, "readonly");
-    const request = transaction.objectStore(BLOB_STORE).get(id);
-    request.onsuccess = () => {
-      const record = request.result as AssetBlobRecord | undefined;
-      resolve(record?.data ?? null);
-    };
-    request.onerror = () => reject(request.error);
-  });
+  if (meta.contentHash) {
+    const payload = await readHashBlobPayload(db, meta.contentHash);
+    if (payload !== null) return payload;
+  }
+  const legacyRecord = await readLegacyBlobRecord(db, meta.id);
+  return legacyRecord?.data ?? null;
+}
+
+export async function getAssetBlobPayload(id: string): Promise<string | null> {
+  const meta = await getAssetMeta(id);
+  if (!meta?.hasBlob) return null;
+  return getAssetBlobPayloadForMeta(meta);
 }
 
 export async function getAssetPreviewRecord(id: string): Promise<AssetPreviewRecord | null> {
@@ -374,7 +531,7 @@ export async function hydrateAsset(meta: StorageItemMeta): Promise<StorageItem> 
   const normalized = normalizeMeta(meta);
   let url = normalized.url ?? "";
   if (!url && normalized.hasBlob) {
-    url = (await getAssetBlobPayload(normalized.id)) ?? "";
+    url = (await getAssetBlobPayloadForMeta(normalized)) ?? "";
   }
   return { ...normalized, url };
 }
@@ -491,28 +648,35 @@ export async function listBoardScopedAssetMetas(
 
 export async function saveToDB(item: StorageItem): Promise<void> {
   const { meta, blob } = splitIncomingItem(item);
+  const previousMeta = await getAssetMeta(meta.id);
+  const contentHash = blob ? await computeAssetContentHash(blob) : undefined;
+  const nextMeta = normalizeMeta({ ...meta, contentHash, hasBlob: Boolean(blob) });
   const db = await openDatabase();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([META_STORE, BLOB_STORE], "readwrite");
+  await new Promise<void>((resolve, reject) => {
+    const transaction = db.transaction([META_STORE, BLOB_STORE, HASH_BLOB_STORE], "readwrite");
     const metaStore = transaction.objectStore(META_STORE);
     const blobStore = transaction.objectStore(BLOB_STORE);
+    const hashBlobStore = transaction.objectStore(HASH_BLOB_STORE);
 
-    metaStore.put(meta);
-    if (blob) {
-      blobStore.put({ id: meta.id, data: blob } satisfies AssetBlobRecord);
-    } else if (!meta.hasBlob) {
-      blobStore.delete(meta.id);
+    metaStore.put(nextMeta);
+    blobStore.delete(nextMeta.id);
+    if (blob && contentHash) {
+      hashBlobStore.put({ hash: contentHash, data: blob } satisfies AssetBlobPayloadRecord);
     }
 
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error ?? new Error("IndexedDB save failed"));
     transaction.onabort = () => reject(transaction.error ?? new Error("IndexedDB save aborted"));
   });
+  if (previousMeta?.contentHash && previousMeta.contentHash !== nextMeta.contentHash) {
+    await deleteUnreferencedHashBlobPayload(previousMeta.contentHash);
+  }
 }
 
 export async function deleteFromDB(id: string): Promise<void> {
+  const meta = await getAssetMeta(id);
   const db = await openDatabase();
-  return new Promise((resolve, reject) => {
+  await new Promise<void>((resolve, reject) => {
     const transaction = db.transaction([META_STORE, BLOB_STORE, PREVIEW_STORE], "readwrite");
     transaction.objectStore(META_STORE).delete(id);
     transaction.objectStore(BLOB_STORE).delete(id);
@@ -520,12 +684,15 @@ export async function deleteFromDB(id: string): Promise<void> {
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error ?? new Error("IndexedDB delete failed"));
   });
+  if (meta?.contentHash) {
+    await deleteUnreferencedHashBlobPayload(meta.contentHash);
+  }
 }
 
 export async function clearAllDB(): Promise<void> {
   const db = await openDatabase();
   return new Promise((resolve, reject) => {
-    const stores = [META_STORE, BLOB_STORE, PREVIEW_STORE];
+    const stores = [META_STORE, BLOB_STORE, HASH_BLOB_STORE, PREVIEW_STORE];
     if (db.objectStoreNames.contains(LEGACY_STORE)) stores.push(LEGACY_STORE);
     const transaction = db.transaction(stores, "readwrite");
     for (const storeName of stores) {
@@ -533,6 +700,24 @@ export async function clearAllDB(): Promise<void> {
     }
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error ?? new Error("IndexedDB clear failed"));
+  });
+}
+
+async function deleteUnreferencedHashBlobPayload(hash: string): Promise<void> {
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([META_STORE, HASH_BLOB_STORE], "readwrite");
+    const metaStore = transaction.objectStore(META_STORE);
+    const request = metaStore.index("by_contentHash").getKey(hash);
+    request.onsuccess = () => {
+      if (request.result === undefined) {
+        transaction.objectStore(HASH_BLOB_STORE).delete(hash);
+      }
+    };
+    request.onerror = () => reject(request.error ?? new Error(`IndexedDB blob ${hash} reference check failed`));
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error ?? new Error(`IndexedDB blob ${hash} cleanup failed`));
+    transaction.onabort = () => reject(transaction.error ?? new Error(`IndexedDB blob ${hash} cleanup aborted`));
   });
 }
 
