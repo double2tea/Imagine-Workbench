@@ -46,6 +46,7 @@ export interface BoardFlowNodeData extends Record<string, unknown> {
   onEditAssetImage: (nodeId: string) => void;
   onExecuteGenerate: (nodeId: string) => void;
   onFetchRunningHubAppSchema: (webappId: string) => Promise<BoardRunningHubAppSchemaResult>;
+  onFocusReferenceSource: (nodeId: string) => void;
   onMoveReferenceGroupItem: (nodeId: string, assetId: string, direction: "up" | "down") => void;
   onMoveGenerateReferenceEdge: (nodeId: string, sourceEdgeId: string, targetEdgeId: string) => void;
   onMaterializeGenerateResult: (nodeId: string, assetId: string) => void;
@@ -145,10 +146,12 @@ function getReferenceShelfDragImage(): HTMLCanvasElement {
 
 function GenerateReferenceShelf({
   nodeId,
+  onFocusReferenceSource,
   onMoveReference,
   references,
 }: {
   nodeId: string;
+  onFocusReferenceSource: (nodeId: string) => void;
   onMoveReference: (nodeId: string, sourceEdgeId: string, targetEdgeId: string) => void;
   references: BoardGenerateInputSummary["referencePreviews"];
 }) {
@@ -158,11 +161,17 @@ function GenerateReferenceShelf({
       {references.slice(0, 6).map((reference, index) => {
         const canReorder = typeof reference.sourceEdgeId === "string";
         return (
-          <div
+          <button
             key={`${reference.id}:${reference.url}:${index}`}
+            type="button"
             draggable={canReorder}
+            disabled={!reference.sourceNodeId}
             onPointerDown={(event) => {
               event.stopPropagation();
+            }}
+            onClick={(event) => {
+              event.stopPropagation();
+              if (reference.sourceNodeId) onFocusReferenceSource(reference.sourceNodeId);
             }}
             onDragStart={(event) => {
               if (!reference.sourceEdgeId) return;
@@ -191,13 +200,13 @@ function GenerateReferenceShelf({
             className={`relative h-9 w-9 shrink-0 overflow-hidden rounded-md border border-white/15 bg-slate-900 ${
               canReorder ? "cursor-grab active:cursor-grabbing" : ""
             }`}
-            title={reference.role ? `参考 ${index + 1} · ${reference.role}` : `参考 ${index + 1}`}
+            title={reference.role ? `参考 ${index + 1} · ${reference.role} · 跳转来源` : `参考 ${index + 1} · 跳转来源`}
           >
             <MediaReferenceThumbnail reference={reference} alt="" className="h-full w-full" />
             <span className="absolute bottom-0 right-0 rounded-tl bg-black/65 px-1 text-[8px] font-semibold text-white">
               {index + 1}
             </span>
-          </div>
+          </button>
         );
       })}
       {references.length > 6 ? (
@@ -298,6 +307,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
         <GenerateReferenceShelf
           nodeId={node.id}
           references={data.generateInputSummary?.referencePreviews ?? []}
+          onFocusReferenceSource={data.onFocusReferenceSource}
           onMoveReference={data.onMoveGenerateReferenceEdge}
         />
       ) : null}

@@ -296,6 +296,7 @@ function sameGenerateInputSummary(
       reference.id === other.id &&
       reference.role === other.role &&
       reference.sourceEdgeId === other.sourceEdgeId &&
+      reference.sourceNodeId === other.sourceNodeId &&
       reference.type === other.type &&
       reference.url === other.url
     );
@@ -714,6 +715,7 @@ function generateInputSummaryForNode(
           id: sourceNode.asset.assetId,
           role: "general" as const,
           sourceEdgeId: edge.id,
+          sourceNodeId: sourceNode.id,
           type: sourceNode.asset.type,
           url: sourceNode.asset.url,
         }];
@@ -723,6 +725,7 @@ function generateInputSummaryForNode(
           id: reference.assetId,
           role: reference.role,
           sourceEdgeId: edge.id,
+          sourceNodeId: sourceNode.id,
           type: reference.type,
           url: reference.url,
         }));
@@ -1127,6 +1130,21 @@ export default function BoardWorkspace({
     onFocusNodeRequestHandled?.();
   }, [board.nodes, flowReady, focusNodeRequest, onFocusNodeRequestHandled]);
 
+  const focusReferenceSourceNode = useCallback((nodeId: string): void => {
+    const node = board.nodes.find(entry => entry.id === nodeId);
+    if (!node) return;
+    selectNode(node.id);
+    updateSelectedNodeIds([node.id]);
+    const instance = flowInstanceRef.current;
+    if (!flowReady || !instance) return;
+    const centerX = node.position.x + node.size.width / 2;
+    const centerY = node.position.y + node.size.height / 2;
+    void instance.setCenter(centerX, centerY, {
+      zoom: Math.max(instance.getZoom(), 0.85),
+      duration: 240,
+    });
+  }, [board.nodes, flowReady, selectNode, updateSelectedNodeIds]);
+
   useEffect(() => {
     if (!assetCompareRequest) return;
     setAssetCompare(assetCompareRequest);
@@ -1275,6 +1293,7 @@ export default function BoardWorkspace({
         onEditAssetImage,
         onExecuteGenerate: onExecuteGenerateNode,
         onFetchRunningHubAppSchema,
+        onFocusReferenceSource: focusReferenceSourceNode,
         onOpenFullscreen,
         onOpenPanorama,
         onMaterializeGenerateResult: materializeGenerateResult,
@@ -1324,6 +1343,7 @@ export default function BoardWorkspace({
     onEditAssetImage,
     onExecuteGenerateNode,
     onFetchRunningHubAppSchema,
+    focusReferenceSourceNode,
     onConnectionError,
     onOpenFullscreen,
     onOpenPanorama,

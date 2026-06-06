@@ -107,13 +107,6 @@ function createReferenceChip(part: Extract<PromptEditorPart, { kind: "reference"
     chip.append(audioMark);
   }
 
-  if (type === "video") {
-    const videoBadge = document.createElement("span");
-    videoBadge.className = "absolute left-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded bg-black/65 text-[9px] font-semibold text-violet-100 shadow-sm";
-    videoBadge.textContent = "V";
-    chip.append(videoBadge);
-  }
-
   const indexBadge = document.createElement("span");
   indexBadge.className = "absolute bottom-0 right-0 rounded-tl bg-black/65 px-1 text-[8px] font-semibold leading-3 text-white";
   indexBadge.textContent = String(part.index + 1);

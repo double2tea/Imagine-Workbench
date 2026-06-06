@@ -25,6 +25,7 @@ export interface BoardGenerateReferencePreview {
   id: string;
   role?: string;
   sourceEdgeId?: string;
+  sourceNodeId?: string;
   type?: ReferenceImageRef["type"];
   url: string;
 }
