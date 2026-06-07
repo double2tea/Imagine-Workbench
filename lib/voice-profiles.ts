@@ -1,5 +1,6 @@
-import type { AiProvider } from "@/lib/providers/model-catalog";
-import { MIMO_BUILT_IN_VOICES } from "@/lib/providers/mimo-voices";
+import type { AiProvider } from "./providers/model-catalog";
+import { tryParseProviderModel, type AudioOperationMode } from "./providers/model-catalog";
+import { MIMO_BUILT_IN_VOICES } from "./providers/mimo-voices";
 
 const VOICE_DB_NAME = "ImagineWorkbenchVoiceDB";
 const VOICE_DB_VERSION = 1;
@@ -40,6 +41,20 @@ export const BUILT_IN_VOICE_PROFILES: VoiceProfile[] = MIMO_BUILT_IN_VOICES.map(
 
 function getBuiltInVoiceProfile(id: string): VoiceProfile | null {
   return BUILT_IN_VOICE_PROFILES.find(profile => profile.id === id) ?? null;
+}
+
+export function getVisibleVoiceProfilesForAudioModel(
+  model: string,
+  mode: AudioOperationMode,
+  savedProfiles: VoiceProfile[],
+): VoiceProfile[] {
+  const parsedModel = tryParseProviderModel(model, "12ai");
+  if (!parsedModel) return [];
+  const providerProfiles = savedProfiles.filter(profile => profile.provider === parsedModel.provider && profile.source !== "builtin");
+  if (mode === "tts" && parsedModel.provider === "mimo" && parsedModel.model === "mimo-v2.5-tts") {
+    return [...BUILT_IN_VOICE_PROFILES, ...providerProfiles];
+  }
+  return providerProfiles;
 }
 
 function normalizeVoiceProfile(input: VoiceProfile): VoiceProfile {

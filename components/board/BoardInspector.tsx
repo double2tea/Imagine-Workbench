@@ -22,7 +22,6 @@ import {
   getImageResolutionOptions,
   getModelCapability,
   getVideoModelCapabilities,
-  parseProviderModel,
   type AudioOperationMode,
 } from "@/lib/providers/model-catalog";
 import { includeCurrentModelOption, type BoardModelOptionGroup } from "@/lib/board/model-options";
@@ -43,7 +42,7 @@ import type {
   BoardVideoGenerateNode,
 } from "@/lib/board";
 import { selectVideoReferenceTypesForMode } from "@/lib/video-reference-selection";
-import { listVoiceProfiles, type VoiceProfile } from "@/lib/voice-profiles";
+import { getVisibleVoiceProfilesForAudioModel, listVoiceProfiles, type VoiceProfile } from "@/lib/voice-profiles";
 
 interface BoardInspectorProps {
   audioModelGroups: BoardModelOptionGroup[];
@@ -721,14 +720,13 @@ function AudioOperationInspector({
   const selectableAudioModelGroups = filterModelGroupsForReferenceTypes(audioModelGroups, "audio", requiredReferenceTypes);
   const isProcessing = node.status === "processing";
   const [voiceProfiles, setVoiceProfiles] = useState<VoiceProfile[]>([]);
-  const selectedProvider = parseProviderModel(node.model, "12ai").provider;
-  const visibleVoiceProfiles = voiceProfiles.filter(profile => profile.provider === selectedProvider);
+  const visibleVoiceProfiles = getVisibleVoiceProfilesForAudioModel(node.model, node.audioMode, voiceProfiles);
 
   useEffect(() => {
     let active = true;
     void listVoiceProfiles().then(
       profiles => {
-        if (active) setVoiceProfiles(profiles.filter(profile => profile.source !== "builtin"));
+        if (active) setVoiceProfiles(profiles);
       },
       () => {
         if (active) setVoiceProfiles([]);
@@ -776,7 +774,7 @@ function AudioOperationInspector({
         >
           <option value="">不使用保存音色</option>
           {node.voiceProfileId && !visibleVoiceProfiles.some(profile => profile.id === node.voiceProfileId) && (
-            <option value={node.voiceProfileId}>{node.voiceProfileId}</option>
+            <option value={node.voiceProfileId}>当前音色不可用于此模式</option>
           )}
           {visibleVoiceProfiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
         </select>

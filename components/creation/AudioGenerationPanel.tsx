@@ -15,7 +15,7 @@ import {
 } from "@/lib/prompt-templates";
 import { getMediaReferenceType } from "@/lib/media-references";
 import { parseProviderModel, type AudioModelCapabilities, type AudioOperationMode } from "@/lib/providers/model-catalog";
-import { BUILT_IN_VOICE_PROFILES, deleteVoiceProfile, listVoiceProfiles, saveVoiceProfile, type VoiceProfile, type VoiceProfileSource } from "@/lib/voice-profiles";
+import { deleteVoiceProfile, getVisibleVoiceProfilesForAudioModel, listVoiceProfiles, saveVoiceProfile, type VoiceProfile, type VoiceProfileSource } from "@/lib/voice-profiles";
 
 interface AudioGenerationPanelProps {
   atDropdownNode: ReactNode;
@@ -109,15 +109,9 @@ export default function AudioGenerationPanel({
   const referenceLimit = capabilities.maxReferenceMedia;
   const acceptedMediaTypes = capabilities.referenceMediaTypes;
   const promptReferenceThumbnails = resolvePromptReferenceThumbnails(prompt, referenceImages, acceptedMediaTypes);
-  const selectedParsedModel = parseProviderModel(selectedModel, "12ai");
-  const selectedProvider = selectedParsedModel.provider;
   const visibleVoiceProfiles = useMemo(
-    () => {
-      const savedProfiles = voiceProfiles.filter(profile => profile.provider === selectedProvider && profile.source !== "builtin");
-      if (mode !== "tts" || selectedProvider !== "mimo" || selectedParsedModel.model !== "mimo-v2.5-tts") return savedProfiles;
-      return [...BUILT_IN_VOICE_PROFILES, ...savedProfiles];
-    },
-    [mode, selectedParsedModel.model, selectedProvider, voiceProfiles],
+    () => getVisibleVoiceProfilesForAudioModel(selectedModel, mode, voiceProfiles),
+    [mode, selectedModel, voiceProfiles],
   );
   const selectedVoiceProfile = visibleVoiceProfiles.find(profile => profile.id === selectedVoiceProfileId);
   const referenceAudioAssetIds = useMemo(
@@ -189,6 +183,7 @@ export default function AudioGenerationPanel({
     }
 
     const source: VoiceProfileSource = mode === "voice_clone" ? "cloned" : "designed";
+    const selectedProvider = parseProviderModel(selectedModel, "12ai").provider;
     const profile = await saveVoiceProfile({
       id: `voice_${Date.now()}`,
       name,
