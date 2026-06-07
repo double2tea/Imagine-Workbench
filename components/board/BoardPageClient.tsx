@@ -314,8 +314,14 @@ function activeExecutableResultItem(
   node: ExecutableBoardNode,
   items: StorageItem[],
 ): StorageItem | undefined {
-  const activeAssetId = findResultNodeForSource(nodes, node.id)?.activeAssetId ?? node.resultAssetId;
-  return activeAssetId ? items.find(item => item.id === activeAssetId && item.status === "complete") : undefined;
+  const resultNode = findResultNodeForSource(nodes, node.id);
+  if (resultNode) {
+    const resultItem = items.find(item => item.id === resultNode.activeAssetId && item.status === "complete");
+    if (resultItem) return resultItem;
+  }
+  return node.resultAssetId
+    ? items.find(item => item.id === node.resultAssetId && item.status === "complete")
+    : undefined;
 }
 
 function activeBoardReference(

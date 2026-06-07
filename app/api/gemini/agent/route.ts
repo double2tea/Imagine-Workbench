@@ -42,7 +42,7 @@ const boardContextSchema = z.object({
   selectedEdgeId: z.string().nullable(),
   nodes: z.array(z.object({
     id: z.string(),
-    kind: z.enum(["asset", "prompt", "reference-group", "image-generate", "video-generate", "runninghub-app", "agent", "note", "result"]),
+    kind: z.enum(["asset", "prompt", "reference-group", "group", "image-generate", "video-generate", "runninghub-app", "agent", "note", "result"]),
     title: z.string(),
     prompt: z.string().optional(),
     model: z.string().optional(),
