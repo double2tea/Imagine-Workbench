@@ -43,6 +43,10 @@ function getBuiltInVoiceProfile(id: string): VoiceProfile | null {
   return BUILT_IN_VOICE_PROFILES.find(profile => profile.id === id) ?? null;
 }
 
+export function isBuiltInVoiceProfileId(id: string): boolean {
+  return getBuiltInVoiceProfile(id) !== null;
+}
+
 export function getVisibleVoiceProfilesForAudioModel(
   model: string,
   mode: AudioOperationMode,

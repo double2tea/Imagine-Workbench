@@ -6,7 +6,7 @@ import { generateMimoTts, generateMimoTtsVoiceClone, generateMimoTtsVoiceDesign 
 import { generateAudioOperation } from "../lib/providers/audio";
 import { listProviderModels } from "../lib/providers/models";
 import type { ProviderConfig } from "../lib/providers/types";
-import { getVisibleVoiceProfilesForAudioModel, type VoiceProfile } from "../lib/voice-profiles";
+import { getVisibleVoiceProfilesForAudioModel, isBuiltInVoiceProfileId, type VoiceProfile } from "../lib/voice-profiles";
 
 const mimoConfig: ProviderConfig = {
   provider: "mimo",
@@ -54,6 +54,8 @@ test("visible audio voice profiles include MiMo built-ins only for built-in TTS"
   const ttsProfiles = getVisibleVoiceProfilesForAudioModel("mimo:mimo-v2.5-tts", "tts", [savedVoiceProfile]);
   assert.equal(ttsProfiles.some(profile => profile.id === "mimo_builtin_Chloe"), true);
   assert.equal(ttsProfiles.some(profile => profile.id === savedVoiceProfile.id), true);
+  assert.equal(isBuiltInVoiceProfileId("mimo_builtin_mimo_default"), true);
+  assert.equal(isBuiltInVoiceProfileId(savedVoiceProfile.id), false);
 
   const designProfiles = getVisibleVoiceProfilesForAudioModel("mimo:mimo-v2.5-tts-voicedesign", "voice_design", [savedVoiceProfile]);
   assert.equal(designProfiles.some(profile => profile.source === "builtin"), false);

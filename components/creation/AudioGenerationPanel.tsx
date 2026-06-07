@@ -15,7 +15,7 @@ import {
 } from "@/lib/prompt-templates";
 import { getMediaReferenceType } from "@/lib/media-references";
 import { parseProviderModel, type AudioModelCapabilities, type AudioOperationMode } from "@/lib/providers/model-catalog";
-import { deleteVoiceProfile, getVisibleVoiceProfilesForAudioModel, listVoiceProfiles, saveVoiceProfile, type VoiceProfile, type VoiceProfileSource } from "@/lib/voice-profiles";
+import { deleteVoiceProfile, getVisibleVoiceProfilesForAudioModel, isBuiltInVoiceProfileId, listVoiceProfiles, saveVoiceProfile, type VoiceProfile, type VoiceProfileSource } from "@/lib/voice-profiles";
 
 interface AudioGenerationPanelProps {
   atDropdownNode: ReactNode;
@@ -114,6 +114,9 @@ export default function AudioGenerationPanel({
     [mode, selectedModel, voiceProfiles],
   );
   const selectedVoiceProfile = visibleVoiceProfiles.find(profile => profile.id === selectedVoiceProfileId);
+  const defaultBuiltInVoiceProfile = visibleVoiceProfiles.find(
+    profile => profile.source === "builtin" && profile.providerVoiceId === "mimo_default",
+  ) ?? visibleVoiceProfiles.find(profile => profile.source === "builtin");
   const referenceAudioAssetIds = useMemo(
     () => referenceImages.filter(reference => getMediaReferenceType(reference) === "audio").map(reference => reference.id),
     [referenceImages],
@@ -143,6 +146,24 @@ export default function AudioGenerationPanel({
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!canUseVoiceProfile) {
+      if (selectedVoiceProfileId && isBuiltInVoiceProfileId(selectedVoiceProfileId)) {
+        onSelectVoiceProfile("");
+      }
+      return;
+    }
+    if (selectedVoiceProfileId) {
+      if (isBuiltInVoiceProfileId(selectedVoiceProfileId) && !selectedVoiceProfile) {
+        onSelectVoiceProfile("");
+      }
+      return;
+    }
+    if (mode === "tts" && defaultBuiltInVoiceProfile) {
+      onSelectVoiceProfile(defaultBuiltInVoiceProfile.id);
+    }
+  }, [canUseVoiceProfile, defaultBuiltInVoiceProfile, mode, onSelectVoiceProfile, selectedVoiceProfile, selectedVoiceProfileId]);
 
   const handleApplyPromptTemplate = (template: PromptTemplate, applyMode: PromptTemplateApplyMode): void => {
     if (slashCommand && applyMode === "insert") {
@@ -383,7 +404,7 @@ export default function AudioGenerationPanel({
               onChange={event => onSelectVoiceProfile(event.target.value)}
               className="imagine-select h-9 py-0 text-xs"
             >
-              <option value="">不使用保存音色</option>
+              <option value="">使用模型默认音色</option>
               {selectedVoiceProfileId && !selectedVoiceProfile && (
                 <option value={selectedVoiceProfileId}>当前音色不可用于此模式</option>
               )}
