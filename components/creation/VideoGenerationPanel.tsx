@@ -233,7 +233,7 @@ export default function VideoGenerationPanel({
         </div>
       </div>
 
-      <div className={`grid grid-cols-1 gap-3 ${controlGridClass}`}>
+      <div className="grid grid-cols-1 gap-3">
         <div>
           <label className="imagine-section-label mb-1.5 block">视频生成模型</label>
           <ModelSelectCombobox

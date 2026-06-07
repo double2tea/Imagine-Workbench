@@ -48,7 +48,7 @@ export default function ModelSelectCombobox({
 
   return (
     <div
-      className="relative"
+      className="relative min-w-0"
       onBlur={(event) => {
         const relatedTarget = event.relatedTarget;
         if (!(relatedTarget instanceof Node) || !event.currentTarget.contains(relatedTarget)) {
@@ -62,7 +62,7 @@ export default function ModelSelectCombobox({
         aria-haspopup="listbox"
         aria-label={ariaLabel}
         onClick={() => setOpen(prev => !prev)}
-        className={`imagine-select flex h-10 w-full items-center justify-between gap-2 py-0 text-left font-mono text-[11px] ${focusClassByAccent[accent]}`}
+        className={`imagine-select flex h-10 w-full min-w-0 items-center justify-between gap-2 overflow-hidden py-0 text-left font-mono text-[11px] ${focusClassByAccent[accent]}`}
       >
         <span className="min-w-0 truncate">{selectedOption?.label ?? value}</span>
         <ChevronDown className={`h-4 w-4 shrink-0 transition ${open ? "rotate-180" : ""}`} />

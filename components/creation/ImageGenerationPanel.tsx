@@ -208,7 +208,7 @@ export default function ImageGenerationPanel({
         </div>
       </div>
 
-      <div className="imagine-parameter-grid grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="imagine-parameter-grid grid grid-cols-1 gap-3">
         <div className="imagine-parameter-field">
           <div className="imagine-parameter-label-row">
             <label className="imagine-section-label">图片生成模型</label>
