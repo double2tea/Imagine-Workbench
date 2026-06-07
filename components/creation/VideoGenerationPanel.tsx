@@ -1,6 +1,7 @@
 import { useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from "react";
 import { RefreshCw, Sparkles, Video as VideoIcon } from "lucide-react";
 import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
+import ModelSelectCombobox, { type ModelOptionGroup } from "@/components/creation/ModelSelectCombobox";
 import ModelPriceBadge from "@/components/creation/ModelPriceBadge";
 import ReferenceImagePicker, { type ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import PromptReferenceInlineOverlay, { resolvePromptReferenceThumbnails } from "@/components/reference/PromptReferenceThumbnailStrip";
@@ -13,14 +14,8 @@ import {
   type PromptTemplateApplyMode,
   type PromptTemplateSlashCommand,
 } from "@/lib/prompt-templates";
-import type { ModelOption, ParameterOption, VideoModelCapabilities, VideoReferenceMode } from "@/lib/providers/model-catalog";
+import type { ParameterOption, VideoModelCapabilities, VideoReferenceMode } from "@/lib/providers/model-catalog";
 import { selectVideoReferenceTypesForMode } from "@/lib/video-reference-selection";
-
-interface ModelOptionGroup {
-  provider: string;
-  label: string;
-  options: ModelOption[];
-}
 
 interface VideoGenerationPanelProps {
   atDropdownNode: ReactNode;
@@ -111,7 +106,6 @@ export default function VideoGenerationPanel({
 }: VideoGenerationPanelProps) {
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
   const [slashCommand, setSlashCommand] = useState<PromptTemplateSlashCommand | null>(null);
-  const [modelFilter, setModelFilter] = useState("");
   const [isDragOver, setIsDragOver] = useState(false);
   const acceptedReferenceText = capabilities.referenceMediaTypes.includes("audio")
     ? "图片 / 视频 / 音频"
@@ -242,39 +236,13 @@ export default function VideoGenerationPanel({
       <div className={`grid grid-cols-1 gap-3 ${controlGridClass}`}>
         <div>
           <label className="imagine-section-label mb-1.5 block">视频生成模型</label>
-          <div className="overflow-hidden rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)] transition-colors duration-150 focus-within:border-violet-400/45">
-            <input
-              type="search"
-              placeholder="搜索模型"
-              value={modelFilter}
-              onChange={(event) => setModelFilter(event.target.value)}
-              className="h-8 w-full border-0 border-b border-[var(--iw-border)] bg-transparent px-3 text-[11px] text-[var(--iw-text)] outline-none placeholder:text-[var(--iw-faint)]"
-              aria-label="搜索视频模型"
-            />
-            <select
-              value={selectedModel}
-              onChange={(event) => onSelectModel(event.target.value)}
-              className="h-10 w-full border-0 bg-transparent px-3 font-mono text-[11px] text-[var(--iw-text)] outline-none"
-            >
-              {modelGroups.map(group => {
-                const filteredOptions = modelFilter
-                  ? group.options.filter(option =>
-                      option.label.toLowerCase().includes(modelFilter.toLowerCase()) ||
-                      option.value.toLowerCase().includes(modelFilter.toLowerCase()) ||
-                      selectedModel === option.value
-                    )
-                  : group.options;
-                if (filteredOptions.length === 0) return null;
-                return (
-                  <optgroup key={group.provider} label={group.label}>
-                    {filteredOptions.map(option => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </optgroup>
-                );
-              })}
-            </select>
-          </div>
+          <ModelSelectCombobox
+            accent="violet"
+            ariaLabel="选择视频模型"
+            groups={modelGroups}
+            value={selectedModel}
+            onChange={onSelectModel}
+          />
         </div>
 
         <div>

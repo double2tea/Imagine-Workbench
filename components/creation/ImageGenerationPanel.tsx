@@ -1,6 +1,7 @@
 import { useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from "react";
 import { RefreshCw, Sparkles } from "lucide-react";
 import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
+import ModelSelectCombobox, { type ModelOptionGroup } from "@/components/creation/ModelSelectCombobox";
 import ModelPriceBadge from "@/components/creation/ModelPriceBadge";
 import ReferenceImagePicker, { type ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import PromptReferenceInlineOverlay, { resolvePromptReferenceThumbnails } from "@/components/reference/PromptReferenceThumbnailStrip";
@@ -13,13 +14,7 @@ import {
   type PromptTemplateApplyMode,
   type PromptTemplateSlashCommand,
 } from "@/lib/prompt-templates";
-import type { ImageModelCapabilities, ModelOption } from "@/lib/providers/model-catalog";
-
-interface ModelOptionGroup {
-  provider: string;
-  label: string;
-  options: ModelOption[];
-}
+import type { ImageModelCapabilities } from "@/lib/providers/model-catalog";
 
 interface ImageGenerationPanelProps {
   atDropdownNode: ReactNode;
@@ -100,7 +95,6 @@ export default function ImageGenerationPanel({
 }: ImageGenerationPanelProps) {
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
   const [slashCommand, setSlashCommand] = useState<PromptTemplateSlashCommand | null>(null);
-  const [modelFilter, setModelFilter] = useState("");
   const [isDragOver, setIsDragOver] = useState(false);
   const presetResolutionOptions = imageResolutionOptions.filter(option => option.value !== "custom");
   const supportsCustomImageSize = imageResolutionOptions.some(option => option.value === "custom");
@@ -230,39 +224,13 @@ export default function ImageGenerationPanel({
               </label>
             )}
           </div>
-          <div className="overflow-hidden rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)] transition-colors duration-150 focus-within:border-blue-400/45">
-            <input
-              type="search"
-              placeholder="搜索模型"
-              value={modelFilter}
-              onChange={(event) => setModelFilter(event.target.value)}
-              className="h-8 w-full border-0 border-b border-[var(--iw-border)] bg-transparent px-3 text-[11px] text-[var(--iw-text)] outline-none placeholder:text-[var(--iw-faint)]"
-              aria-label="搜索图片模型"
-            />
-            <select
-              value={selectedModel}
-              onChange={(event) => onSelectModel(event.target.value)}
-              className="h-10 w-full border-0 bg-transparent px-3 font-mono text-[11px] text-[var(--iw-text)] outline-none"
-            >
-              {modelGroups.map(group => {
-                const filteredOptions = modelFilter
-                  ? group.options.filter(option =>
-                      option.label.toLowerCase().includes(modelFilter.toLowerCase()) ||
-                      option.value.toLowerCase().includes(modelFilter.toLowerCase()) ||
-                      selectedModel === option.value
-                    )
-                  : group.options;
-                if (filteredOptions.length === 0) return null;
-                return (
-                  <optgroup key={group.provider} label={group.label}>
-                    {filteredOptions.map(option => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </optgroup>
-                );
-              })}
-            </select>
-          </div>
+          <ModelSelectCombobox
+            accent="blue"
+            ariaLabel="选择图片模型"
+            groups={modelGroups}
+            value={selectedModel}
+            onChange={onSelectModel}
+          />
         </div>
 
         <div className="imagine-parameter-field">
