@@ -1,5 +1,6 @@
 import { AGENT_BOARD_PATCH_MAX_OPERATIONS, type AgentGenerationParams, type AgentToolAction } from "@/lib/agent-actions";
 import {
+  getAudioModelCapabilities,
   getImageModelCapabilities,
   getImageResolutionOptions,
   getVideoModelCapabilities,
@@ -81,7 +82,15 @@ export function resolveAudioActionParams(
   model: string,
   current: AgentGenerationParams = {},
 ): AgentGenerationParams {
-  return { ...current, model };
+  const capabilities = getAudioModelCapabilities(model);
+  const audioMode = current.audioMode && capabilities.modes.includes(current.audioMode)
+    ? current.audioMode
+    : capabilities.defaultMode;
+  const audioFormat = current.audioFormat && capabilities.formats.some(option => option.value === current.audioFormat)
+    ? current.audioFormat
+    : firstOptionValue(capabilities.formats, "wav");
+
+  return { ...current, model, audioFormat, audioMode };
 }
 
 function isImageActionType(type: AgentToolAction["type"]): boolean {
@@ -93,7 +102,7 @@ function isVideoActionType(type: AgentToolAction["type"]): boolean {
 }
 
 function isAudioActionType(type: AgentToolAction["type"]): boolean {
-  return type === "generate_audio";
+  return type === "generate_audio" || type === "create_board_audio_flow";
 }
 
 export function prepareAgentActionDraft(action: AgentToolAction): AgentToolAction {
@@ -125,6 +134,10 @@ export function prepareAgentActionDraft(action: AgentToolAction): AgentToolActio
         videoDuration: params.videoDuration,
         videoPreset: params.videoPreset,
         videoReferenceMode: params.videoReferenceMode,
+        audioFormat: params.audioFormat,
+        audioMode: params.audioMode,
+        audioStylePrompt: params.audioStylePrompt,
+        voiceProfileId: params.voiceProfileId,
       },
     };
   }
@@ -197,7 +210,8 @@ export function validateAgentToolAction(
     action.type === "generate_video" ||
     action.type === "generate_audio" ||
     action.type === "create_board_image_flow" ||
-    action.type === "create_board_video_flow"
+    action.type === "create_board_video_flow" ||
+    action.type === "create_board_audio_flow"
   ) {
     if (!params.prompt?.trim()) return "请先填写提示词";
     if (!params.model?.trim()) return "请先选择生成模型";
@@ -235,7 +249,11 @@ export function validateAgentToolAction(
       params.videoResolution?.trim() ||
       params.videoDuration?.trim() ||
       params.videoPreset?.trim() ||
-      params.videoReferenceMode
+      params.videoReferenceMode ||
+      params.audioFormat?.trim() ||
+      params.audioMode ||
+      params.audioStylePrompt?.trim() ||
+      params.voiceProfileId?.trim()
       ? null
       : "请先填写要更新的节点内容";
   }

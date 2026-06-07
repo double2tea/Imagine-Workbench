@@ -101,6 +101,24 @@ function serializeNodeContent(node: BoardNode): string {
           node.resultStackKey ?? "",
           fingerprintLargeText(node.errorMessage ?? ""),
       ].join("|");
+    case "audio-operation":
+      return [
+        "audio-op",
+        node.id,
+        node.title,
+        node.model,
+        node.status,
+        fingerprintLargeText(node.prompt),
+        node.audioMode,
+        node.audioFormat,
+        node.audioStylePrompt ?? "",
+        node.voiceProfileId ?? "",
+        node.variantCount,
+        node.resultAssetId ?? "",
+        node.resultAssetIds?.join(",") ?? "",
+        node.resultStackKey ?? "",
+        fingerprintLargeText(node.errorMessage ?? ""),
+      ].join("|");
     case "runninghub-app":
       return [
         "runninghub-app",

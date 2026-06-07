@@ -9,10 +9,12 @@ import {
   resolveVideoActionParams,
 } from "@/lib/agent-tool-action";
 import {
+  getAudioModelCapabilities,
   getImageModelCapabilities,
   getImageResolutionOptions,
   getVideoModelCapabilities,
   type AiProvider,
+  type AudioOperationMode,
   type ModelOption,
 } from "@/lib/providers/model-catalog";
 
@@ -40,8 +42,17 @@ function isVideoActionType(type: AgentToolAction["type"]): boolean {
 }
 
 function isAudioActionType(type: AgentToolAction["type"]): boolean {
-  return type === "generate_audio";
+  return type === "generate_audio" || type === "create_board_audio_flow";
 }
+
+const audioModeLabels: Record<AudioOperationMode, string> = {
+  asr: "ASR",
+  music: "音乐",
+  sfx: "音效",
+  tts: "TTS",
+  voice_clone: "音色克隆",
+  voice_design: "音色设计",
+};
 
 function firstOptionValue(options: Array<{ value: string }>, fallback: string): string {
   return options[0]?.value ?? fallback;
@@ -103,6 +114,10 @@ export function AgentPendingActionEditor({
   const videoCapabilities = useMemo(
     () => (isVideo && videoModel ? getVideoModelCapabilities(videoModel) : null),
     [isVideo, videoModel],
+  );
+  const audioCapabilities = useMemo(
+    () => (isAudio && audioModel ? getAudioModelCapabilities(audioModel) : null),
+    [audioModel, isAudio],
   );
 
   const modelGroups = useMemo(
@@ -466,6 +481,42 @@ export function AgentPendingActionEditor({
             {videoCapabilities.referenceModes.map(option => (
               <option key={option} value={option}>
                 {option === "firstLast" ? "首尾帧 / 关键帧" : "全能参考"}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      {isAudio && audioCapabilities && audioCapabilities.modes.length > 0 && (
+        <label className="imagine-agent-action-field">
+          <span className="imagine-agent-action-field-label">音频模式</span>
+          <select
+            value={params.audioMode ?? audioCapabilities.defaultMode}
+            disabled={disabled}
+            onChange={event => updateParams({ audioMode: event.target.value as AudioOperationMode })}
+            className="imagine-agent-model-select w-full"
+          >
+            {audioCapabilities.modes.map(option => (
+              <option key={option} value={option}>
+                {audioModeLabels[option]}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      {isAudio && audioCapabilities && audioCapabilities.formats.length > 0 && (
+        <label className="imagine-agent-action-field">
+          <span className="imagine-agent-action-field-label">音频格式</span>
+          <select
+            value={params.audioFormat ?? audioCapabilities.formats[0]?.value ?? ""}
+            disabled={disabled}
+            onChange={event => updateParams({ audioFormat: event.target.value })}
+            className="imagine-agent-model-select w-full"
+          >
+            {audioCapabilities.formats.map(option => (
+              <option key={option.value} value={option.value}>
+                {option.label}
               </option>
             ))}
           </select>

@@ -22,6 +22,7 @@ import type {
   BoardSize,
   BoardViewport,
 } from "@/lib/board/types";
+import type { AudioOperationMode } from "@/lib/providers/model-catalog";
 import { collectBoardAssetIdsFromNodes } from "@/lib/assets/board-scope";
 import {
   buildStorageItem,
@@ -766,6 +767,11 @@ function readVideoReferenceMode(value: unknown): "reference" | "firstLast" | und
   return value === "reference" || value === "firstLast" ? value : undefined;
 }
 
+function readAudioOperationMode(value: unknown): AudioOperationMode {
+  if (value === "tts" || value === "voice_design" || value === "voice_clone" || value === "music" || value === "sfx" || value === "asr") return value;
+  return "tts";
+}
+
 function parseGenerationReferenceMedia(value: unknown): GenerationReferenceMediaSnapshot[] | undefined {
   if (value === undefined) return undefined;
   if (!Array.isArray(value)) throw new Error("referenceMedia 格式无效");
@@ -904,6 +910,24 @@ function parseBoardNode(value: unknown): BoardNode {
         errorMessage: readOptionalString(value, "errorMessage"),
     };
   }
+  if (kind === "audio-operation") {
+    return {
+      ...base,
+      kind,
+      prompt: readText(value, "prompt"),
+      model: readString(value, "model"),
+      audioMode: readAudioOperationMode(value.audioMode),
+      audioFormat: readOptionalString(value, "audioFormat") ?? "wav",
+      audioStylePrompt: readOptionalString(value, "audioStylePrompt"),
+      voiceProfileId: readOptionalString(value, "voiceProfileId"),
+      variantCount: readVariantCount(value, "variantCount"),
+      status: readGenerationStatus(value, "status"),
+      resultAssetId: readOptionalString(value, "resultAssetId"),
+      resultAssetIds: readOptionalStringArray(value, "resultAssetIds"),
+      resultStackKey: readOptionalString(value, "resultStackKey"),
+      errorMessage: readOptionalString(value, "errorMessage"),
+    };
+  }
   if (kind === "runninghub-app") {
     return {
       ...base,
@@ -940,7 +964,8 @@ function parseBoardNode(value: unknown): BoardNode {
       },
     };
   }
-  return { ...base, kind, body: readText(value, "body") };
+  if (kind === "note") return { ...base, kind, body: readText(value, "body") };
+  throw new Error(`不支持的画板节点类型: ${kind}`);
 }
 
 function parseReferenceGroupItem(value: unknown): BoardReferenceGroupItem {
@@ -1362,6 +1387,7 @@ function readBoardNodeKind(record: Record<string, unknown>, field: string): Boar
     value !== "reference-group" &&
     value !== "image-generate" &&
     value !== "video-generate" &&
+    value !== "audio-operation" &&
     value !== "runninghub-app" &&
     value !== "agent" &&
     value !== "note" &&

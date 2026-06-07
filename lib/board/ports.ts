@@ -2,6 +2,7 @@ import type { BoardEdge, BoardEdgeKind, BoardNode, BoardPortDefinition, BoardPor
 import { dedupeBoardEdgesByEndpoints } from "./edge-dedupe";
 import type { MediaReferenceType } from "@/lib/media-references";
 import {
+  getAudioModelCapabilities,
   getImageModelCapabilities,
   getImageResolutionOptions,
   getModelCapabilities,
@@ -25,8 +26,8 @@ interface BoardNodePortOptions {
   hasResultConnection?: boolean;
 }
 
-function isGenerateNode(node: BoardNode): node is BoardNode & { kind: "image-generate" | "video-generate"; model: string } {
-  return node.kind === "image-generate" || node.kind === "video-generate";
+function isGenerateNode(node: BoardNode): node is BoardNode & { kind: "image-generate" | "video-generate" | "audio-operation"; model: string } {
+  return node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation";
 }
 
 function isExecutableNode(node: BoardNode): boolean {
@@ -37,7 +38,8 @@ export function boardNodeSupportsReferenceInput(node: BoardNode): boolean {
   if (node.kind === "runninghub-app") return true;
   if (!isGenerateNode(node)) return false;
   try {
-    if (getModelCapability(node.model, node.kind === "image-generate" ? "image" : "video").supportsReferences) {
+    const kind = node.kind === "image-generate" ? "image" : node.kind === "audio-operation" ? "audio" : "video";
+    if (getModelCapability(node.model, kind).supportsReferences) {
       return true;
     }
   } catch {
@@ -123,7 +125,8 @@ function getReferenceSourceMediaTypes(source: BoardNode): MediaReferenceType[] {
   return [];
 }
 
-function getGenerateAcceptedReferenceTypes(node: BoardNode & { kind: "image-generate" | "video-generate"; model: string }): MediaReferenceType[] {
+function getGenerateAcceptedReferenceTypes(node: BoardNode & { kind: "image-generate" | "video-generate" | "audio-operation"; model: string }): MediaReferenceType[] {
+  if (node.kind === "audio-operation") return getAudioModelCapabilities(node.model).referenceMediaTypes;
   if (node.kind === "video-generate") return getVideoModelCapabilities(node.model).referenceMediaTypes;
   return getModelCapability(node.model, "image").referenceMediaTypes;
 }
@@ -132,13 +135,13 @@ function isAutoSelectableCapability(item: ReturnType<typeof getModelCapabilities
   return item.supportsReferences && !item.supportsAsync && !item.value.includes("<");
 }
 
-function hasCompatibleReferenceModel(kind: "image-generate" | "video-generate"): boolean {
-  const modelKind = kind === "image-generate" ? "image" : "video";
+function hasCompatibleReferenceModel(kind: "image-generate" | "video-generate" | "audio-operation"): boolean {
+  const modelKind = kind === "image-generate" ? "image" : kind === "audio-operation" ? "audio" : "video";
   return getModelCapabilities(modelKind).some(isAutoSelectableCapability);
 }
 
 function acceptsReferenceTypes(
-  node: BoardNode & { kind: "image-generate" | "video-generate"; model: string },
+  node: BoardNode & { kind: "image-generate" | "video-generate" | "audio-operation"; model: string },
   referenceTypes: MediaReferenceType[],
 ): boolean {
   if (referenceTypes.length === 0) return false;
@@ -151,11 +154,11 @@ function acceptsReferenceTypes(
 }
 
 function findCompatibleGenerateModel(
-  kind: "image-generate" | "video-generate",
+  kind: "image-generate" | "video-generate" | "audio-operation",
   referenceTypes: MediaReferenceType[],
 ): string | null {
   if (referenceTypes.length === 0) return null;
-  const modelKind = kind === "image-generate" ? "image" : "video";
+  const modelKind = kind === "image-generate" ? "image" : kind === "audio-operation" ? "audio" : "video";
   const capability = getModelCapabilities(modelKind).find(item =>
     isAutoSelectableCapability(item) &&
     referenceTypes.every(type => item.referenceMediaTypes.includes(type))
@@ -168,7 +171,7 @@ function firstOptionValue(options: Array<{ value: string }>, fallback: string): 
 }
 
 function patchGenerateNodeForModel(
-  node: BoardNode & { kind: "image-generate" | "video-generate"; model: string },
+  node: BoardNode & { kind: "image-generate" | "video-generate" | "audio-operation"; model: string },
   model: string,
 ): BoardNode {
   if (node.kind === "image-generate") {
@@ -192,6 +195,20 @@ function patchGenerateNodeForModel(
       thinkingLevel: capabilities.thinkingLevels.some(option => option.value === node.thinkingLevel)
         ? node.thinkingLevel
         : capabilities.thinkingLevels[0]?.value,
+    };
+  }
+
+  if (node.kind === "audio-operation") {
+    const capabilities = getAudioModelCapabilities(model);
+    return {
+      ...node,
+      audioFormat: capabilities.formats.some(option => option.value === node.audioFormat)
+        ? node.audioFormat
+        : capabilities.formats[0]?.value ?? "wav",
+      audioMode: capabilities.modes.includes(node.audioMode)
+        ? node.audioMode
+        : capabilities.defaultMode,
+      model,
     };
   }
 
@@ -259,11 +276,14 @@ function isAcceptedGenerateReferenceSource(source: BoardNode, target: BoardNode)
   if (source.kind === "reference-group") {
     if (source.references.length === 0) return false;
     if (target.kind === "image-generate") return source.references.every(reference => reference.type === "image");
-    const acceptedTypes = getVideoModelCapabilities(target.model).referenceMediaTypes;
+    const acceptedTypes = target.kind === "audio-operation"
+      ? getAudioModelCapabilities(target.model).referenceMediaTypes
+      : getVideoModelCapabilities(target.model).referenceMediaTypes;
     return source.references.every(reference => acceptedTypes.includes(reference.type));
   }
   if (source.kind !== "asset" && source.kind !== "result") return false;
   if (target.kind === "image-generate") return source.asset.type === "image";
+  if (target.kind === "audio-operation") return getAudioModelCapabilities(target.model).referenceMediaTypes.includes(source.asset.type);
   return getVideoModelCapabilities(target.model).referenceMediaTypes.includes(source.asset.type);
 }
 

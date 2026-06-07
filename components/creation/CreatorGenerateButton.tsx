@@ -1,7 +1,7 @@
-import { RefreshCw, Sparkles, Video as VideoIcon } from "lucide-react";
+import { AudioLines, RefreshCw, Sparkles, Video as VideoIcon } from "lucide-react";
 import ModelPriceBadge from "@/components/creation/ModelPriceBadge";
 
-export type CreatorGenerateMode = "image" | "video";
+export type CreatorGenerateMode = "image" | "video" | "audio";
 
 interface CreatorGenerateButtonProps {
   mode: CreatorGenerateMode;
@@ -37,8 +37,9 @@ export default function CreatorGenerateButton({
   onGenerate,
 }: CreatorGenerateButtonProps) {
   const isImage = mode === "image";
+  const isAudio = mode === "audio";
   const showPrice = !isSubmitting && priceProvider && priceModelId;
-  const label = isImage ? "生成图片" : "生成视频";
+  const label = isImage ? "生成图片" : isAudio ? "生成音频" : "生成视频";
   const submittingLabel = `提交中 (${submitCount})，可继续排队`;
 
   return (
@@ -52,13 +53,17 @@ export default function CreatorGenerateButton({
           ? "cursor-not-allowed opacity-60"
           : isImage
             ? "bg-blue-600 text-white hover:bg-blue-500 active:scale-[0.98] shadow-lg shadow-blue-950/30 cursor-pointer"
-            : "bg-violet-600 text-white hover:bg-violet-500 active:scale-[0.98] shadow-lg shadow-violet-950/30 cursor-pointer"
+            : isAudio
+              ? "bg-cyan-600 text-white hover:bg-cyan-500 active:scale-[0.98] shadow-lg shadow-cyan-950/30 cursor-pointer"
+              : "bg-violet-600 text-white hover:bg-violet-500 active:scale-[0.98] shadow-lg shadow-violet-950/30 cursor-pointer"
       }`}
     >
       {isSubmitting ? (
         <RefreshCw className="h-4 w-4 animate-spin text-white" />
       ) : isImage ? (
         <Sparkles className="h-4 w-4 text-white" />
+      ) : isAudio ? (
+        <AudioLines className="h-4 w-4 text-white" />
       ) : (
         <VideoIcon className="h-4 w-4 text-white" />
       )}

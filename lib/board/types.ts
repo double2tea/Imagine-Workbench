@@ -1,4 +1,6 @@
-export type BoardNodeKind = "asset" | "prompt" | "reference-group" | "group" | "image-generate" | "video-generate" | "runninghub-app" | "agent" | "note" | "result";
+import type { AudioOperationMode } from "@/lib/providers/model-catalog";
+
+export type BoardNodeKind = "asset" | "prompt" | "reference-group" | "group" | "image-generate" | "video-generate" | "audio-operation" | "runninghub-app" | "agent" | "note" | "result";
 export type BoardAssetType = "image" | "video" | "audio";
 export type BoardEdgeKind = "reference" | "prompt" | "result" | "agent-context";
 export type BoardPortKind = "asset" | "prompt" | "result" | "agent";
@@ -131,6 +133,22 @@ export interface BoardVideoGenerateNode extends BoardNodeBase {
   errorMessage?: string;
 }
 
+export interface BoardAudioOperationNode extends BoardNodeBase {
+  kind: "audio-operation";
+  prompt: string;
+  model: string;
+  audioMode: AudioOperationMode;
+  audioFormat: string;
+  audioStylePrompt?: string;
+  voiceProfileId?: string;
+  variantCount: BoardGenerateVariantCount;
+  status: BoardGenerationStatus;
+  resultAssetId?: string;
+  resultAssetIds?: string[];
+  resultStackKey?: string;
+  errorMessage?: string;
+}
+
 export interface BoardRunningHubNodeInfoBinding {
   id: string;
   nodeId: string;
@@ -198,17 +216,21 @@ export type BoardNode =
   | BoardGroupNode
   | BoardImageGenerateNode
   | BoardVideoGenerateNode
+  | BoardAudioOperationNode
   | BoardRunningHubAppNode
   | BoardAgentNode
   | BoardNoteNode
   | BoardResultNode;
 
-export type BoardGenerateNode = BoardImageGenerateNode | BoardVideoGenerateNode;
+export type BoardGenerateNode = BoardImageGenerateNode | BoardVideoGenerateNode | BoardAudioOperationNode;
 export type BoardExecutableNode = BoardGenerateNode | BoardRunningHubAppNode;
-export type BoardResultSourceNode = BoardImageGenerateNode | BoardVideoGenerateNode | BoardRunningHubAppNode;
+export type BoardResultSourceNode = BoardImageGenerateNode | BoardVideoGenerateNode | BoardAudioOperationNode | BoardRunningHubAppNode;
 
 export type BoardGenerateNodeUpdate = Partial<{
   aspectRatio: string;
+  audioFormat: string;
+  audioMode: AudioOperationMode;
+  audioStylePrompt: string;
   customImageResolution: string;
   errorMessage: string;
   imageQuality: string;
@@ -225,6 +247,7 @@ export type BoardGenerateNodeUpdate = Partial<{
   videoPreset: string;
   videoReferenceMode: BoardVideoReferenceMode;
   videoResolution: string;
+  voiceProfileId: string;
 }>;
 
 export type BoardRunningHubAppNodeUpdate = Partial<{
@@ -316,10 +339,13 @@ export interface CreateGroupNodeInput {
 }
 
 export interface CreateGenerateNodeInput {
-  kind: "image-generate" | "video-generate";
+  kind: "image-generate" | "video-generate" | "audio-operation";
   prompt?: string;
   model: string;
-  aspectRatio: string;
+  aspectRatio?: string;
+  audioFormat?: string;
+  audioMode?: AudioOperationMode;
+  audioStylePrompt?: string;
   customImageResolution?: string;
   imageQuality?: string;
   imageResolution?: string;
@@ -329,6 +355,7 @@ export interface CreateGenerateNodeInput {
   videoPreset?: string;
   videoReferenceMode?: BoardVideoReferenceMode;
   videoResolution?: string;
+  voiceProfileId?: string;
   position?: BoardPoint;
   size?: BoardSize;
   title?: string;

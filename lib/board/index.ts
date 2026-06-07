@@ -72,6 +72,7 @@ export {
   type RunningHubBindingReadiness,
 } from "@/lib/board/runninghub-bindings";
 export type {
+  BoardAudioOperationNode,
   BoardAssetNode,
   BoardAssetReference,
   BoardAssetType,

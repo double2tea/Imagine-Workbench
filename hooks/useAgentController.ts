@@ -11,6 +11,7 @@ import type { CreationMode } from "@/components/creation/CreationModeTabs";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import type { StorageItem } from "@/lib/db";
 import { getSendableAgentMediaReferences } from "@/lib/agent-chat-model";
+import type { AudioOperationMode } from "@/lib/providers/model-catalog";
 
 interface UseAgentControllerParams {
   agentInput: string;
@@ -62,6 +63,9 @@ function normalizeRestoredAgentMessages(messages: ChatMessage[]): ChatMessage[] 
 }
 
 interface GenerationOverrides {
+  audioFormat?: string;
+  audioMode?: AudioOperationMode;
+  audioStylePrompt?: string;
   imageQuality?: string;
   imageResolution?: string;
   isCustomImageResolution?: boolean;
@@ -75,6 +79,7 @@ interface GenerationOverrides {
   videoPreset?: string;
   videoReferenceMode?: "reference" | "firstLast";
   videoResolution?: string;
+  voiceProfileId?: string;
 }
 
 interface ExecuteToolActionOverrideInput {
@@ -325,12 +330,16 @@ export function useAgentController({
     } else if (type === "generate_audio") {
       setPrompt(params.prompt || "");
       bridgeActionReferences(actionReferences);
-      setTraditionalSubTab("video");
+      setTraditionalSubTab("audio");
       setTimeout(() => {
         generateManualAudio({
           ...actionReferenceOverride,
+          audioFormat: params.audioFormat,
+          audioMode: params.audioMode,
+          audioStylePrompt: params.audioStylePrompt,
           model: params.model,
           prompt: params.prompt || "",
+          voiceProfileId: params.voiceProfileId,
         });
       }, 500);
     } else if (type === "edit_image") {

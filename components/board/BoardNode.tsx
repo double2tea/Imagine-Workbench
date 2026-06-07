@@ -2,7 +2,7 @@
 
 import { memo, useEffect, useMemo, useState } from "react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
-import { ImagePlus, Layers, Music, Video, Workflow } from "lucide-react";
+import { AudioLines, ImagePlus, Layers, Music, Video, Workflow } from "lucide-react";
 import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
 import MediaReferenceThumbnail from "@/components/reference/MediaReferenceThumbnail";
 import type {
@@ -60,6 +60,7 @@ function nodeIcon(node: BoardNodeModel) {
   }
   if (node.kind === "image-generate") return <ImagePlus className="h-3.5 w-3.5 text-blue-300" />;
   if (node.kind === "video-generate") return <Video className="h-3.5 w-3.5 text-violet-300" />;
+  if (node.kind === "audio-operation") return <AudioLines className="h-3.5 w-3.5 text-cyan-300" />;
   if (node.kind === "runninghub-app") return <Workflow className="h-3.5 w-3.5 text-emerald-300" />;
   if (node.kind === "agent") return <AgentIdentityMark variant="inline" />;
   if (node.kind === "reference-group") return <Layers className="h-3.5 w-3.5 text-cyan-300" />;
@@ -319,7 +320,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
       style={{ height: node.size.height, width: node.size.width }}
     >
       {ports.map(handleForPort)}
-      {selected && (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app") ? (
+      {selected && (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation" || node.kind === "runninghub-app") ? (
         <GenerateReferenceShelf
           nodeId={node.id}
           references={data.generateInputSummary?.referencePreviews ?? []}
@@ -432,7 +433,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             onRoleChange={(assetId, role) => c.onUpdateReferenceGroupItemRole(node.id, assetId, role)}
           />
         )}
-        {(node.kind === "image-generate" || node.kind === "video-generate") && (
+        {(node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation") && (
           <GenerateBoardNode
             hasResultConnection={data.hasResultConnection}
             inputSummary={data.generateInputSummary}

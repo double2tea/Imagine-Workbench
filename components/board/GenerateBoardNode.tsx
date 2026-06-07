@@ -1,12 +1,12 @@
 import { memo, useMemo, useRef, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { ImagePlus, Loader2, Play, Plus, Video, X } from "lucide-react";
+import { AudioLines, ImagePlus, Loader2, Play, Plus, Video, X } from "lucide-react";
 import ModelPriceBadge from "@/components/creation/ModelPriceBadge";
 import BoardPromptTextarea, { type BoardPromptTextareaHandle } from "@/components/board/BoardPromptTextarea";
 import MediaReferenceThumbnail from "@/components/reference/MediaReferenceThumbnail";
 import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import type { StorageItem } from "@/lib/db";
-import type { BoardGenerateNodeUpdate, BoardGenerateVariantCount, BoardImageGenerateNode, BoardVideoGenerateNode } from "@/lib/board";
+import type { BoardAudioOperationNode, BoardGenerateNodeUpdate, BoardGenerateVariantCount, BoardImageGenerateNode, BoardVideoGenerateNode } from "@/lib/board";
 import type { BoardPromptReference } from "@/lib/board/prompt-references";
 import {
   applyPromptTemplateText,
@@ -18,7 +18,7 @@ import {
 import { getVideoModelCapabilities } from "@/lib/providers/model-catalog";
 import { selectVideoReferenceTypesForMode } from "@/lib/video-reference-selection";
 
-type GenerateNode = BoardImageGenerateNode | BoardVideoGenerateNode;
+type GenerateNode = BoardImageGenerateNode | BoardVideoGenerateNode | BoardAudioOperationNode;
 const variantCountOptions: BoardGenerateVariantCount[] = [1, 2, 4];
 
 export interface BoardGenerateReferencePreview {
@@ -135,7 +135,9 @@ function statusText(node: GenerateNode): string {
   if (node.status === "processing") return "处理中";
   if (node.status === "complete") return "已完成";
   if (node.status === "failed") return "失败";
-  return node.kind === "image-generate" ? "图片" : "视频";
+  if (node.kind === "image-generate") return "图片";
+  if (node.kind === "video-generate") return "视频";
+  return "音频";
 }
 
 function contextToneClass(tone: GenerateContextTone): string {
@@ -264,7 +266,9 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
   ];
   const paramSummary = node.kind === "image-generate"
     ? `${node.model} / ${node.imageResolution === "custom" ? node.customImageResolution : node.imageResolution} / x${node.variantCount}`
-    : `${node.model} / ${node.aspectRatio}${node.videoDuration ? ` / ${node.videoDuration}s` : ""} / x${node.variantCount}`;
+    : node.kind === "video-generate"
+      ? `${node.model} / ${node.aspectRatio}${node.videoDuration ? ` / ${node.videoDuration}s` : ""} / x${node.variantCount}`
+      : `${node.model} / ${node.audioMode} / ${node.audioFormat} / x${node.variantCount}`;
   const statusLabel = taskSummary
     ? `${taskSummary.status === "pending" ? "排队" : "处理中"} ${taskSummary.progress}% / ${paramSummary}`
     : `${statusText(node)} / ${paramSummary}`;
@@ -399,7 +403,13 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
             disabled={isProcessing}
             className="nodrag flex h-8 items-center justify-center gap-1.5 rounded-md bg-blue-600 px-3 text-xs font-semibold text-white transition hover:bg-blue-500 disabled:bg-[var(--iw-panel-soft)] disabled:text-[var(--iw-faint)]"
           >
-            {node.kind === "image-generate" ? <ImagePlus className="h-3.5 w-3.5" /> : <Video className="h-3.5 w-3.5" />}
+            {node.kind === "image-generate" ? (
+              <ImagePlus className="h-3.5 w-3.5" />
+            ) : node.kind === "video-generate" ? (
+              <Video className="h-3.5 w-3.5" />
+            ) : (
+              <AudioLines className="h-3.5 w-3.5" />
+            )}
             <Play className="h-3 w-3" />
             {!isProcessing && (
               <ModelPriceBadge

@@ -1,4 +1,4 @@
-import type { AiProvider, VideoReferenceMode } from "./model-catalog";
+import type { AiProvider, AudioOperationMode, AudioOutputKind, VideoReferenceMode } from "./model-catalog";
 import type { MediaReferenceType } from "@/lib/media-references";
 
 export interface ProviderCredentials {
@@ -88,6 +88,31 @@ export interface GenerateAudioResult {
   operationName: string;
   source: string;
 }
+
+export interface GenerateAudioOperationInput extends GenerateAudioInput {
+  mode: AudioOperationMode;
+  format?: string;
+  stylePrompt?: string;
+  voiceProfileId?: string;
+}
+
+export interface DirectAudioOperationResult {
+  type: "direct";
+  outputKind: Extract<AudioOutputKind, "audio">;
+  audioBase64: string;
+  format: string;
+  model: string;
+  mimeType: string;
+  sampleRateHz?: number;
+  source: string;
+}
+
+export interface AsyncAudioOperationResult extends GenerateAudioResult {
+  type: "async";
+  outputKind: Extract<AudioOutputKind, "audio">;
+}
+
+export type GenerateAudioOperationResult = DirectAudioOperationResult | AsyncAudioOperationResult;
 
 export type MimoTtsFormat = "wav" | "pcm16";
 

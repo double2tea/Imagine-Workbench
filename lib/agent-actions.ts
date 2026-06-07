@@ -1,3 +1,5 @@
+import type { AudioOperationMode } from "@/lib/providers/model-catalog";
+
 export const AGENT_WORKBENCH_ACTION_TYPES = [
   "none",
   "optimize_prompt",
@@ -11,6 +13,7 @@ export const AGENT_BOARD_ACTION_TYPES = [
   "none",
   "create_board_image_flow",
   "create_board_video_flow",
+  "create_board_audio_flow",
   "create_board_note",
   "update_board_node",
   "apply_board_patch",
@@ -23,7 +26,7 @@ export type AgentWorkbenchActionType = (typeof AGENT_WORKBENCH_ACTION_TYPES)[num
 export type AgentBoardActionType = (typeof AGENT_BOARD_ACTION_TYPES)[number];
 export type AgentToolActionType = AgentWorkbenchActionType | AgentBoardActionType;
 
-export type AgentBoardPatchNodeKind = "prompt" | "note" | "image-generate" | "video-generate" | "agent";
+export type AgentBoardPatchNodeKind = "prompt" | "note" | "image-generate" | "video-generate" | "audio-operation" | "agent";
 export type AgentBoardPatchPortKind = "asset" | "prompt" | "result" | "agent";
 export type AgentVideoReferenceMode = "reference" | "firstLast";
 
@@ -66,6 +69,10 @@ export interface AgentBoardPatchCreateNodeOperation {
   videoDuration?: string;
   videoPreset?: string;
   videoReferenceMode?: AgentVideoReferenceMode;
+  audioFormat?: string;
+  audioMode?: AudioOperationMode;
+  audioStylePrompt?: string;
+  voiceProfileId?: string;
   run?: boolean;
 }
 
@@ -84,6 +91,10 @@ export interface AgentBoardPatchUpdateNodeOperation {
   videoDuration?: string;
   videoPreset?: string;
   videoReferenceMode?: AgentVideoReferenceMode;
+  audioFormat?: string;
+  audioMode?: AudioOperationMode;
+  audioStylePrompt?: string;
+  voiceProfileId?: string;
 }
 
 export interface AgentBoardPatchConnectPortsOperation {
@@ -116,6 +127,10 @@ export interface AgentGenerationParams {
   videoDuration?: string;
   videoPreset?: string;
   videoReferenceMode?: AgentVideoReferenceMode;
+  audioFormat?: string;
+  audioMode?: AudioOperationMode;
+  audioStylePrompt?: string;
+  voiceProfileId?: string;
   title?: string;
   body?: string;
   instruction?: string;

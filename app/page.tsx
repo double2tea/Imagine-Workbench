@@ -9,6 +9,7 @@ import FloatingCompareButton from "@/components/assets/FloatingCompareButton";
 import FullscreenPreview from "@/components/assets/FullscreenPreview";
 import PanoramaOverlay from "@/components/panorama/PanoramaOverlay";
 import CreationModeTabs, { type CreationMode } from "@/components/creation/CreationModeTabs";
+import AudioGenerationPanel from "@/components/creation/AudioGenerationPanel";
 import CreatorGenerateButton from "@/components/creation/CreatorGenerateButton";
 import ImageGenerationPanel from "@/components/creation/ImageGenerationPanel";
 import VideoGenerationPanel from "@/components/creation/VideoGenerationPanel";
@@ -53,9 +54,11 @@ import {
 } from "@/hooks/useReferenceState";
 import { useProviderSettings } from "@/hooks/useProviderSettings";
 import {
+  DEFAULT_AUDIO_MODEL,
   DEFAULT_IMAGE_MODEL,
   DEFAULT_VIDEO_MODEL,
   formatProviderModel,
+  getAudioModelCapabilities,
   getImageAspectRatioFromResolution,
   getImageModelCapabilities,
   getImageResolutionOptions,
@@ -63,6 +66,7 @@ import {
   supportsAsyncImageGeneration,
   tryParseProviderModel,
   type AiProvider,
+  type AudioOperationMode,
   type ModelOption,
   type VideoReferenceMode,
 } from "@/lib/providers/model-catalog";
@@ -181,6 +185,9 @@ export default function Home() {
   const [negativePrompt, setNegativePrompt] = useState("");
   const [selectedModel, setSelectedModel] = useState(DEFAULT_IMAGE_MODEL);
   const [selectedVideoModel, setSelectedVideoModel] = useState(DEFAULT_VIDEO_MODEL);
+  const [selectedAudioModel, setSelectedAudioModel] = useState(DEFAULT_AUDIO_MODEL);
+  const [selectedAudioMode, setSelectedAudioMode] = useState<AudioOperationMode>("tts");
+  const [audioFormat, setAudioFormat] = useState("wav");
   const [aspectRatio, setAspectRatio] = useState("1:1");
   const [imageResolution, setImageResolution] = useState("1K");
   const [imageQuality, setImageQuality] = useState("auto");
@@ -316,6 +323,7 @@ export default function Home() {
   } = useProviderSettings({ pushWorkspaceNotice });
 
   const imageCapabilities = getImageModelCapabilities(selectedModel);
+  const audioCapabilities = getAudioModelCapabilities(selectedAudioModel);
   const customImageAspectRatio = imageResolution === "custom"
     ? getImageAspectRatioFromResolution(customImageSize.trim())
     : null;
@@ -324,6 +332,13 @@ export default function Home() {
   const videoCapabilities = getVideoModelCapabilities(selectedVideoModel);
   const isSubmittingImage = imageSubmitCount > 0;
   const isSubmittingVideo = videoSubmitCount > 0;
+  const isSubmittingAudio = videoSubmitCount > 0;
+  const activeAudioMode = audioCapabilities.modes.includes(selectedAudioMode)
+    ? selectedAudioMode
+    : audioCapabilities.defaultMode;
+  const activeAudioFormat = audioCapabilities.formats.some(option => option.value === audioFormat)
+    ? audioFormat
+    : audioCapabilities.formats[0]?.value ?? "wav";
   const canUseAsyncImageGeneration = supportsAsyncImageGeneration(selectedModel);
   const activeImageResolution = imageResolution === "custom" ? customImageSize.trim() : imageResolution;
   const activeImageQuality = imageCapabilities.qualities.some(option => option.value === imageQuality) ? imageQuality : undefined;
@@ -379,6 +394,8 @@ export default function Home() {
     toggleReferenceRole,
   } = useReferenceState({
     agentInput,
+    audioReferenceLimit: audioCapabilities.maxReferenceMedia,
+    audioReferenceMediaTypes: audioCapabilities.referenceMediaTypes,
     imageReferenceLimit: imageCapabilities.maxReferenceImages,
     imageReferenceMediaTypes: imageCapabilities.referenceMediaTypes,
     prompt,
@@ -693,6 +710,17 @@ export default function Home() {
     }
     if (!capabilities.referenceModes.includes(selectedVideoReferenceMode)) {
       setSelectedVideoReferenceMode(capabilities.referenceMode);
+    }
+  };
+
+  const handleSelectAudioModel = (model: string) => {
+    const capabilities = getAudioModelCapabilities(model);
+    setSelectedAudioModel(model);
+    if (!capabilities.modes.includes(selectedAudioMode)) {
+      setSelectedAudioMode(capabilities.defaultMode);
+    }
+    if (capabilities.formats.length > 0 && !capabilities.formats.some(option => option.value === audioFormat)) {
+      setAudioFormat(capabilities.formats[0].value);
     }
   };
 
@@ -1230,8 +1258,43 @@ export default function Home() {
     />
   );
 
-  const renderCreationPanel = (showGenerateButton: boolean) =>
-    traditionalSubTab === "image" ? (
+  const renderCreationPanel = (showGenerateButton: boolean) => {
+    if (traditionalSubTab === "audio") {
+      return (
+        <AudioGenerationPanel
+          showGenerateButton={showGenerateButton}
+          atDropdownNode={atDropdown.visible && atDropdown.type === "audio-prompt" ? renderAtDropdown("audio-prompt") : null}
+          capabilities={audioCapabilities}
+          formatOptions={audioCapabilities.formats}
+          isOptimizing={isOptimizing}
+          isSubmitting={isSubmittingAudio}
+          mode={activeAudioMode}
+          modelGroups={audioModelGroups}
+          prompt={prompt}
+          referenceImages={referenceImages}
+          selectedFormat={activeAudioFormat}
+          selectedModel={selectedAudioModel}
+          submitCount={videoSubmitCount}
+          onClearReferences={() => {
+            setReferenceImages([]);
+            setReferenceImage(null);
+            setPrompt(removePromptReferenceTokens);
+          }}
+          onGenerate={() => generateManualAudio({ audioFormat: activeAudioFormat, audioMode: activeAudioMode, model: selectedAudioModel })}
+          onOptimizePrompt={optimizeActivePrompt}
+          onPromptChange={value => handleTextareaChange(value, "audio-prompt")}
+          onPromptDropAsset={event => handlePromptDropAsset(event, "audio-prompt")}
+          onReferenceDropAsset={asset => handleReferenceDropAsset(asset, "audio-prompt")}
+          onReferenceDropFiles={files => handleReferenceDropFiles(files, "audio-prompt")}
+          onReferenceRemove={removeReferenceImage}
+          onReferenceUpload={event => handleReferenceUpload(event, "audio-prompt")}
+          onSelectFormat={setAudioFormat}
+          onSelectMode={setSelectedAudioMode}
+          onSelectModel={handleSelectAudioModel}
+        />
+      );
+    }
+    return traditionalSubTab === "image" ? (
       <ImageGenerationPanel
         showGenerateButton={showGenerateButton}
         atDropdownNode={atDropdown.visible && atDropdown.type === "image-prompt" ? renderAtDropdown("image-prompt") : null}
@@ -1323,6 +1386,7 @@ export default function Home() {
         onSelectSize={setAspectRatio}
       />
     );
+  };
 
   return (
     <div
@@ -1400,10 +1464,10 @@ export default function Home() {
               <CreatorGenerateButton
                 mode={traditionalSubTab}
                 disabled={!prompt.trim()}
-                isSubmitting={traditionalSubTab === "image" ? isSubmittingImage : isSubmittingVideo}
+                isSubmitting={traditionalSubTab === "image" ? isSubmittingImage : traditionalSubTab === "audio" ? isSubmittingAudio : isSubmittingVideo}
                 submitCount={traditionalSubTab === "image" ? imageSubmitCount : videoSubmitCount}
-                priceProvider={traditionalSubTab === "image" ? selectedModel.split(":")[0] : selectedVideoModel.split(":")[0]}
-                priceModelId={traditionalSubTab === "image" ? selectedModel : selectedVideoModel}
+                priceProvider={traditionalSubTab === "image" ? selectedModel.split(":")[0] : traditionalSubTab === "audio" ? selectedAudioModel.split(":")[0] : selectedVideoModel.split(":")[0]}
+                priceModelId={traditionalSubTab === "image" ? selectedModel : traditionalSubTab === "audio" ? selectedAudioModel : selectedVideoModel}
                 priceDuration={traditionalSubTab === "video" ? activeVideoDuration ?? videoDuration : undefined}
                 priceResolution={traditionalSubTab === "image" ? activeImageResolution : undefined}
                 priceImageQuality={traditionalSubTab === "image" ? imageQuality : undefined}
@@ -1411,7 +1475,17 @@ export default function Home() {
                 priceThinkingLevel={traditionalSubTab === "image" ? imageThinkingLevel : undefined}
                 priceVideoReferenceMode={traditionalSubTab === "video" ? activeVideoReferenceMode : undefined}
                 priceVideoResolution={traditionalSubTab === "video" ? videoResolution : undefined}
-                onGenerate={traditionalSubTab === "image" ? generateManualImage : generateManualVideo}
+                onGenerate={() => {
+                  if (traditionalSubTab === "image") {
+                    generateManualImage();
+                    return;
+                  }
+                  if (traditionalSubTab === "audio") {
+                    generateManualAudio({ audioFormat: activeAudioFormat, audioMode: activeAudioMode, model: selectedAudioModel });
+                    return;
+                  }
+                  generateManualVideo();
+                }}
               />
             </div>
 

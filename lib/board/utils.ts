@@ -2,8 +2,8 @@ import type { BoardNode, BoardPoint, BoardSize } from "@/lib/board/types";
 
 export function isResultSourceNode(
   node: BoardNode | undefined,
-): node is Extract<BoardNode, { kind: "image-generate" | "video-generate" | "runninghub-app" }> {
-  return node?.kind === "image-generate" || node?.kind === "video-generate" || node?.kind === "runninghub-app";
+): node is Extract<BoardNode, { kind: "image-generate" | "video-generate" | "audio-operation" | "runninghub-app" }> {
+  return node?.kind === "image-generate" || node?.kind === "video-generate" || node?.kind === "audio-operation" || node?.kind === "runninghub-app";
 }
 
 export function findResultNodeForSource(

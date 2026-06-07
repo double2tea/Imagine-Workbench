@@ -16,16 +16,19 @@ import {
 } from "lucide-react";
 import type { StorageItem } from "@/lib/db";
 import {
+  getAudioModelCapabilities,
   getImageAspectRatioFromResolution,
   getImageModelCapabilities,
   getImageResolutionOptions,
   getModelCapability,
   getVideoModelCapabilities,
+  type AudioOperationMode,
 } from "@/lib/providers/model-catalog";
 import { includeCurrentModelOption, type BoardModelOptionGroup } from "@/lib/board/model-options";
 import type { MediaReferenceType } from "@/lib/media-references";
 import { getBoardNodePortDefinition } from "@/lib/board/ports";
 import type {
+  BoardAudioOperationNode,
   BoardEdge,
   BoardGenerateNode,
   BoardGenerateNodeUpdate,
@@ -41,6 +44,7 @@ import type {
 import { selectVideoReferenceTypesForMode } from "@/lib/video-reference-selection";
 
 interface BoardInspectorProps {
+  audioModelGroups: BoardModelOptionGroup[];
   edge: BoardEdge | undefined;
   imageModelGroups: BoardModelOptionGroup[];
   incomingCount: number;
@@ -83,6 +87,7 @@ const nodeKindLabels: Record<BoardNode["kind"], string> = {
   agent: "Agent",
   asset: "资产",
   group: "组",
+  "audio-operation": "音频操作",
   "image-generate": "图片生成",
   note: "备注",
   prompt: "Prompt",
@@ -97,8 +102,17 @@ const videoReferenceModeLabels: Record<BoardVideoReferenceMode, string> = {
   firstLast: "首尾帧 / 关键帧",
 };
 
+const audioModeLabels: Record<AudioOperationMode, string> = {
+  asr: "ASR",
+  music: "音乐",
+  sfx: "音效",
+  tts: "TTS",
+  voice_clone: "音色克隆",
+  voice_design: "音色设计",
+};
+
 function isGenerateNode(node: BoardNode | undefined): node is BoardGenerateNode {
-  return node?.kind === "image-generate" || node?.kind === "video-generate";
+  return node?.kind === "image-generate" || node?.kind === "video-generate" || node?.kind === "audio-operation";
 }
 
 function isExecutableNode(node: BoardNode | undefined): node is BoardGenerateNode | BoardRunningHubAppNode {
@@ -124,12 +138,16 @@ function generateParamSummary(node: BoardGenerateNode): string {
     const resolution = node.imageResolution === "custom" ? node.customImageResolution : node.imageResolution;
     return `${node.model} / ${resolution} / x${node.variantCount}`;
   }
-  return `${node.model} / ${node.aspectRatio}${node.videoDuration ? ` / ${node.videoDuration}s` : ""} / x${node.variantCount}`;
+  if (node.kind === "video-generate") {
+    return `${node.model} / ${node.aspectRatio}${node.videoDuration ? ` / ${node.videoDuration}s` : ""} / x${node.variantCount}`;
+  }
+  return `${node.model} / ${node.audioMode} / ${node.audioFormat} / x${node.variantCount}`;
 }
 
 function modelSupportsReferences(node: BoardGenerateNode): boolean {
   try {
-    return getModelCapability(node.model, node.kind === "image-generate" ? "image" : "video").supportsReferences;
+    const kind = node.kind === "image-generate" ? "image" : node.kind === "video-generate" ? "video" : "audio";
+    return getModelCapability(node.model, kind).supportsReferences;
   } catch {
     return false;
   }
@@ -147,11 +165,11 @@ function getInputReferenceTypes(inputSummary?: BoardGenerateInputSummary): Media
   return types;
 }
 
-function getModelReferenceTypes(kind: "image" | "video", model: string): MediaReferenceType[] {
+function getModelReferenceTypes(kind: "image" | "video" | "audio", model: string): MediaReferenceType[] {
   try {
-    return kind === "image"
-      ? getImageModelCapabilities(model).referenceMediaTypes
-      : getVideoModelCapabilities(model).referenceMediaTypes;
+    if (kind === "image") return getImageModelCapabilities(model).referenceMediaTypes;
+    if (kind === "video") return getVideoModelCapabilities(model).referenceMediaTypes;
+    return getAudioModelCapabilities(model).referenceMediaTypes;
   } catch {
     return [];
   }
@@ -159,7 +177,7 @@ function getModelReferenceTypes(kind: "image" | "video", model: string): MediaRe
 
 function filterModelGroupsForReferenceTypes(
   groups: BoardModelOptionGroup[],
-  kind: "image" | "video",
+  kind: "image" | "video" | "audio",
   referenceTypes: MediaReferenceType[],
 ): BoardModelOptionGroup[] {
   if (referenceTypes.length === 0) return groups;
@@ -233,6 +251,19 @@ function videoModelPatch(model: string, current: BoardVideoGenerateNode): BoardG
     videoResolution: capabilities.resolutions.some(option => option.value === current.videoResolution)
       ? current.videoResolution
       : capabilities.resolutions[0]?.value,
+  };
+}
+
+function audioModelPatch(model: string, current: BoardAudioOperationNode): BoardGenerateNodeUpdate {
+  const capabilities = getAudioModelCapabilities(model);
+  return {
+    audioFormat: capabilities.formats.some(option => option.value === current.audioFormat)
+      ? current.audioFormat
+      : firstOption(capabilities.formats, "wav"),
+    audioMode: capabilities.modes.includes(current.audioMode)
+      ? current.audioMode
+      : capabilities.defaultMode,
+    model,
   };
 }
 
@@ -667,6 +698,80 @@ function VideoGenerateInspector({
   );
 }
 
+function AudioOperationInspector({
+  audioModelGroups,
+  inputSummary,
+  node,
+  onExecuteGenerate,
+  onFocusNode,
+  onUpdateGenerate,
+}: {
+  audioModelGroups: BoardModelOptionGroup[];
+  inputSummary?: BoardGenerateInputSummary;
+  node: BoardAudioOperationNode;
+  onExecuteGenerate: (nodeId: string) => void;
+  onFocusNode: (nodeId: string) => void;
+  onUpdateGenerate: (nodeId: string, input: BoardGenerateNodeUpdate) => void;
+}) {
+  const capabilities = getAudioModelCapabilities(node.model);
+  const supportsReferences = modelSupportsReferences(node);
+  const requiredReferenceTypes = getInputReferenceTypes(inputSummary);
+  const selectableAudioModelGroups = filterModelGroupsForReferenceTypes(audioModelGroups, "audio", requiredReferenceTypes);
+  const isProcessing = node.status === "processing";
+
+  const advancedFields = (
+    <div className="imagine-panel-disclosure-body">
+      <InspectorField title="模型">
+        <ModelSelect
+          allowUnknownCurrent={requiredReferenceTypes.length === 0}
+          groups={selectableAudioModelGroups}
+          value={node.model}
+          onChange={model => onUpdateGenerate(node.id, audioModelPatch(model, node))}
+        />
+      </InspectorField>
+      <div className="grid grid-cols-2 gap-2">
+        <InspectorField title="模式">
+          <select
+            value={node.audioMode}
+            onChange={event => onUpdateGenerate(node.id, { audioMode: event.target.value as AudioOperationMode })}
+            className={inputClass}
+          >
+            {capabilities.modes.map(mode => <option key={mode} value={mode}>{audioModeLabels[mode]}</option>)}
+          </select>
+        </InspectorField>
+        <InspectorField title="格式">
+          <select value={node.audioFormat} onChange={event => onUpdateGenerate(node.id, { audioFormat: event.target.value })} className={inputClass}>
+            {capabilities.formats.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </InspectorField>
+      </div>
+      <InspectorField title="变体">
+        <VariantCountSelect value={node.variantCount} onChange={variantCount => onUpdateGenerate(node.id, { variantCount })} />
+      </InspectorField>
+      <p className={infoChipClass}>
+        参考媒体：{supportsReferences ? `${capabilities.referenceMediaTypes.join(" / ")} · ${capabilities.maxReferenceMedia}` : "不支持"}
+      </p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-3">
+      <p className={infoChipClass}>{generateParamSummary(node)}</p>
+      <p className="text-[10px] leading-5 text-[var(--iw-faint)]">主执行在画布节点；此处可细调音频参数。</p>
+      <InspectorFocusButton nodeId={node.id} onFocusNode={onFocusNode} />
+      <details className="imagine-panel-disclosure" open>
+        <summary className="imagine-panel-disclosure-summary">高级参数</summary>
+        {advancedFields}
+      </details>
+      <button type="button" onClick={() => onExecuteGenerate(node.id)} disabled={isProcessing} className={`imagine-primary-action flex !h-9 min-h-0 w-full items-center justify-center gap-2 !rounded-lg text-xs font-semibold transition ${isProcessing ? "bg-[var(--iw-panel-soft)] text-[var(--iw-faint)]" : "bg-blue-600 text-white hover:bg-blue-500"}`}>
+        {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+        执行音频节点
+        {!isProcessing && <ModelPriceBadge provider={node.model.split(":")[0]} modelId={node.model} />}
+      </button>
+    </div>
+  );
+}
+
 function RunningHubAppInspector({
   node,
   onExecuteGenerate,
@@ -721,6 +826,7 @@ function RunningHubAppInspector({
 }
 
 export default function BoardInspector({
+  audioModelGroups,
   edge,
   imageModelGroups,
   incomingCount,
@@ -831,6 +937,9 @@ export default function BoardInspector({
           )}
           {node.kind === "video-generate" && (
             <VideoGenerateInspector inputSummary={generateInputSummary} node={node} onExecuteGenerate={onExecuteGenerate} onFocusNode={onFocusNode} onUpdateGenerate={onUpdateGenerate} videoModelGroups={videoModelGroups} />
+          )}
+          {node.kind === "audio-operation" && (
+            <AudioOperationInspector audioModelGroups={audioModelGroups} inputSummary={generateInputSummary} node={node} onExecuteGenerate={onExecuteGenerate} onFocusNode={onFocusNode} onUpdateGenerate={onUpdateGenerate} />
           )}
           {node.kind === "runninghub-app" && (
             <RunningHubAppInspector node={node} onExecuteGenerate={onExecuteGenerate} onFocusNode={onFocusNode} onUpdateRunningHubApp={onUpdateRunningHubApp} />

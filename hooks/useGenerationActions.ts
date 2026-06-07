@@ -22,7 +22,7 @@ import {
 import type { RunningHubTaskNodeBinding } from "@/lib/providers/types";
 import { buildPromptWithReferenceMap } from "@/hooks/useReferenceState";
 import { getMediaReferenceType, mediaReferenceLabel } from "@/lib/media-references";
-import { getImageModelCapabilities, getVideoModelCapabilities, isMimoWorkbenchTtsModel, type VideoReferenceMode } from "@/lib/providers/model-catalog";
+import { getAudioModelCapabilities, getImageModelCapabilities, getVideoModelCapabilities, type AudioOperationMode, type VideoReferenceMode } from "@/lib/providers/model-catalog";
 import { getReferenceImagePayloadError, getReferenceMediaPayloadError, prepareReferenceImageUrlForRequest, prepareReferenceMediaUrlForRequest } from "@/lib/reference-images";
 import { selectVideoReferencesForMode } from "@/lib/video-reference-selection";
 
@@ -60,6 +60,10 @@ interface UseGenerationActionsParams {
 
 interface GenerationOverrides {
   allowEmptyPrompt?: boolean;
+  audioMode?: AudioOperationMode;
+  audioFormat?: string;
+  audioStylePrompt?: string;
+  voiceProfileId?: string;
   boardId?: string;
   boardNodeId?: string;
   boardResultStackKey?: string;
@@ -605,126 +609,11 @@ export function useGenerationActions({
       return false;
     }
     if (!activePrompt.trim() && overrides.allowEmptyPrompt !== true) return false;
+    const audioCapabilities = getAudioModelCapabilities(requestModel);
+    const audioMode = overrides.audioMode ?? audioCapabilities.defaultMode;
     const audioReferences = [...activeReferenceImages];
     if (audioReferences.length === 0 && activeReferenceImage) {
       audioReferences.push({ id: "legacy-reference", url: activeReferenceImage });
-    }
-    if (isMimoWorkbenchTtsModel(requestModel)) {
-      if (audioReferences.length > 0) {
-        pushWorkspaceNotice("error", "MiMo 内置 TTS 不支持参考媒体");
-        return false;
-      }
-
-      setVideoSubmitCount(prev => prev + 1);
-      const createdAt = new Date().toISOString();
-      const generationRequest: GenerationRequestSnapshot = {
-        prompt: activePrompt,
-        model: requestModel,
-        aspectRatio: "audio",
-      };
-      const taskId = makeClientId("task_aud");
-      const task = createGenerationTask({
-        id: taskId,
-        mediaType: "audio",
-        prompt: activePrompt,
-        model: requestModel,
-        status: "pending",
-        progress: 12,
-        createdAt,
-        source: resolveTaskSource(overrides),
-        request: generationRequest,
-      });
-      if (!await saveTaskOrWarn(task, pushWorkspaceNotice)) {
-        setVideoSubmitCount(prev => Math.max(0, prev - 1));
-        return true;
-      }
-      recordGenerationTask(task);
-
-      const controller = new AbortController();
-      generationAbortControllersRef.current[taskId] = controller;
-
-      try {
-        const headers = buildProviderHeaders(requestModel);
-        const res = await fetch("/api/mimo/generate-tts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...headers },
-          signal: controller.signal,
-          body: JSON.stringify({
-            model: "mimo-v2.5-tts",
-            text: generationRequest.prompt,
-          }),
-        });
-
-        if (!res.ok) {
-          throw new Error(await readFetchError(res, "MiMo 音频生成请求失败"));
-        }
-
-        const data: unknown = await res.json();
-        const audioBase64 = getStringField(data, "audioBase64");
-        const mimeType = getStringField(data, "mimeType");
-        if (!audioBase64 || !mimeType) {
-          throw new Error("MiMo 音频接口返回格式不正确");
-        }
-        const completedAssetId = makeClientId("aud");
-        const completedItem = buildStorageItem(
-          {
-            id: completedAssetId,
-            type: "audio",
-            url: `data:${mimeType};base64,${audioBase64}`,
-            prompt: activePrompt,
-            model: requestModel,
-            aspectRatio: "audio",
-            createdAt,
-            status: "complete",
-            progress: 100,
-            generationRequest,
-            sourceBoardNodeId: overrides.boardNodeId,
-            sourceBoardResultStackKey: overrides.boardResultStackKey,
-          },
-          { boardId: resolveScopeBoardId(overrides) },
-        );
-
-        const savedCompletedItem = await saveAudioItemOrWarn(completedItem, pushWorkspaceNotice);
-        if (!savedCompletedItem) {
-          const failedTask = await updateTaskOrWarn(taskId, {
-            status: "failed",
-            progress: 100,
-            errorMessage: "结果资产本地存储失败",
-          }, pushWorkspaceNotice);
-          if (failedTask) recordGenerationTask(failedTask);
-          return true;
-        }
-        setItems(prev => [savedCompletedItem, ...prev]);
-        const completeTask = await updateTaskOrWarn(taskId, {
-          activeResultAssetId: completedAssetId,
-          resultAssetIds: [completedAssetId],
-          status: "complete",
-          progress: 100,
-        }, pushWorkspaceNotice);
-        if (completeTask) recordGenerationTask(completeTask);
-        pushWorkspaceNotice("success", "MiMo 音频生成完成");
-      } catch (error) {
-        if (locallyCanceledItemIdsRef.current.has(taskId) || isAbortError(error)) {
-          locallyCanceledItemIdsRef.current.delete(taskId);
-          const canceledTask = await cancelTaskOrWarn(taskId, pushWorkspaceNotice);
-          if (canceledTask) recordGenerationTask(canceledTask);
-          return true;
-        }
-        console.error(error);
-        const message = toErrorMessage(error, "MiMo 音频生成失败");
-        const failedTask = await updateTaskOrWarn(taskId, {
-          status: "failed",
-          progress: 100,
-          errorMessage: message,
-        }, pushWorkspaceNotice);
-        if (failedTask) recordGenerationTask(failedTask);
-        pushWorkspaceNotice("error", message);
-        return true;
-      } finally {
-        delete generationAbortControllersRef.current[taskId];
-        setVideoSubmitCount(prev => Math.max(0, prev - 1));
-      }
-      return true;
     }
     const audioReferenceUrls = audioReferences.map(reference => reference.url);
     let audioReferencePayloads: string[];
@@ -774,13 +663,17 @@ export function useGenerationActions({
 
     try {
       const headers = buildProviderHeaders(requestModel);
-      const res = await fetch("/api/gemini/generate-audio", {
+      const res = await fetch("/api/audio/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
         signal: controller.signal,
         body: JSON.stringify({
+          mode: audioMode,
           prompt: generationRequest.prompt,
           model: generationRequest.model,
+          format: overrides.audioFormat,
+          stylePrompt: overrides.audioStylePrompt,
+          voiceProfileId: overrides.voiceProfileId,
           referenceMedia: generationRequest.referenceMedia?.map(reference => ({
             dataUri: reference.url,
             type: reference.type,
@@ -792,6 +685,52 @@ export function useGenerationActions({
 
       if (res.ok) {
         const data: unknown = await res.json();
+        const resultType = getStringField(data, "type");
+        if (resultType === "direct") {
+          const audioBase64 = getStringField(data, "audioBase64");
+          const mimeType = getStringField(data, "mimeType");
+          if (!audioBase64 || !mimeType) {
+            throw new Error("音频接口返回格式不正确");
+          }
+          const completedAssetId = makeClientId("aud");
+          const completedItem = buildStorageItem(
+            {
+              id: completedAssetId,
+              type: "audio",
+              url: `data:${mimeType};base64,${audioBase64}`,
+              prompt: activePrompt,
+              model: requestModel,
+              aspectRatio: "audio",
+              createdAt: task.createdAt,
+              status: "complete",
+              progress: 100,
+              generationRequest,
+              sourceBoardNodeId: overrides.boardNodeId,
+              sourceBoardResultStackKey: overrides.boardResultStackKey,
+            },
+            { boardId: resolveScopeBoardId(overrides) },
+          );
+          const savedCompletedItem = await saveAudioItemOrWarn(completedItem, pushWorkspaceNotice);
+          if (!savedCompletedItem) {
+            const failedTask = await updateTaskOrWarn(taskId, {
+              status: "failed",
+              progress: 100,
+              errorMessage: "结果资产本地存储失败",
+            }, pushWorkspaceNotice);
+            if (failedTask) recordGenerationTask(failedTask);
+            return true;
+          }
+          const completeTask = await updateTaskOrWarn(taskId, {
+            activeResultAssetId: completedAssetId,
+            resultAssetIds: [completedAssetId],
+            status: "complete",
+            progress: 100,
+          }, pushWorkspaceNotice);
+          if (completeTask) recordGenerationTask(completeTask);
+          setItems(prev => [savedCompletedItem, ...prev]);
+          pushWorkspaceNotice("success", "音频生成完成");
+          return true;
+        }
         const activeOperationName = getStringField(data, "operationName");
         if (!activeOperationName) {
           throw new Error("音频接口返回缺少 operationName");

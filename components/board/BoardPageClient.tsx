@@ -55,8 +55,10 @@ import {
   type GenerationTask,
 } from "@/lib/generation-tasks";
 import {
+  DEFAULT_AUDIO_MODEL,
   DEFAULT_IMAGE_MODEL,
   DEFAULT_VIDEO_MODEL,
+  getAudioModelCapabilities,
   getImageAspectRatioFromResolution,
   getImageModelCapabilities,
   getImageResolutionOptions,
@@ -65,6 +67,7 @@ import {
   supportsAsyncImageGeneration,
   tryParseProviderModel,
   type AiProvider,
+  type AudioOperationMode,
   type ModelOption,
   type VideoReferenceMode,
 } from "@/lib/providers/model-catalog";
@@ -91,6 +94,7 @@ import {
   type BoardDocument,
   type BoardGenerateNodeUpdate,
   type BoardGenerationStatus,
+  type BoardAudioOperationNode,
   type BoardImageGenerateNode,
   type BoardNode,
   type BoardPoint,
@@ -145,11 +149,11 @@ import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 
 type NoticeType = "error" | "info" | "success";
 type MaskDestination = "creative" | "agent" | "board-asset";
-type BoardMode = "image" | "video";
-type GenerateBoardNode = BoardImageGenerateNode | BoardVideoGenerateNode;
+type BoardMode = "image" | "video" | "audio";
+type GenerateBoardNode = BoardImageGenerateNode | BoardVideoGenerateNode | BoardAudioOperationNode;
 type ExecutableBoardNode = GenerateBoardNode | BoardRunningHubAppNode;
-type AgentGenerateAction = AgentToolAction & { type: "generate_image" | "generate_video" };
-type AgentBoardFlowAction = AgentToolAction & { type: "create_board_image_flow" | "create_board_video_flow" };
+type AgentGenerateAction = AgentToolAction & { type: "generate_image" | "generate_video" | "generate_audio" };
+type AgentBoardFlowAction = AgentToolAction & { type: "create_board_image_flow" | "create_board_video_flow" | "create_board_audio_flow" };
 type AgentBoardNoteAction = AgentToolAction & { type: "create_board_note" };
 type AgentBoardUpdateAction = AgentToolAction & { type: "update_board_node" };
 type AgentBoardPatchAction = AgentToolAction & { type: "apply_board_patch" };
@@ -332,7 +336,7 @@ function activeBoardReference(
 ): ReferenceImageRef[] {
   const node = nodes.find(item => item.id === selectedNodeId);
   if (!node) return [];
-  if (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app") {
+  if (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation" || node.kind === "runninghub-app") {
     const item = activeExecutableResultItem(nodes, node, items);
     return item ? [{ id: item.id, type: item.type, url: resolveUrl(item.id, item.url), role: "general" }] : [];
   }
@@ -357,7 +361,7 @@ function boardNodeReferences(
       url: resolveUrl(reference.assetId, reference.url),
     }));
   }
-  if (node?.kind === "image-generate" || node?.kind === "video-generate" || node?.kind === "runninghub-app") {
+  if (node?.kind === "image-generate" || node?.kind === "video-generate" || node?.kind === "audio-operation" || node?.kind === "runninghub-app") {
     const item = activeExecutableResultItem(nodes, node, items);
     return item ? [{ id: item.id, type: item.type, url: resolveUrl(item.id, item.url), role: "general" }] : [];
   }
@@ -369,7 +373,7 @@ function boardNodeReferences(
 }
 
 function isGenerateBoardNode(node: BoardDocument["nodes"][number] | undefined): node is GenerateBoardNode {
-  return node?.kind === "image-generate" || node?.kind === "video-generate";
+  return node?.kind === "image-generate" || node?.kind === "video-generate" || node?.kind === "audio-operation";
 }
 
 function isExecutableBoardNode(node: BoardDocument["nodes"][number] | undefined): node is ExecutableBoardNode {
@@ -459,12 +463,23 @@ function videoActionDefaults(model: string, aspectRatio: string | undefined): {
   };
 }
 
+function audioActionDefaults(model: string): {
+  audioFormat: string;
+  audioMode: AudioOperationMode;
+} {
+  const capabilities = getAudioModelCapabilities(model);
+  return {
+    audioFormat: firstOptionValue(capabilities.formats, "wav"),
+    audioMode: capabilities.defaultMode,
+  };
+}
+
 function isAgentGenerateAction(action: AgentToolAction): action is AgentGenerateAction {
-  return action.type === "generate_image" || action.type === "generate_video";
+  return action.type === "generate_image" || action.type === "generate_video" || action.type === "generate_audio";
 }
 
 function isAgentBoardFlowAction(action: AgentToolAction): action is AgentBoardFlowAction {
-  return action.type === "create_board_image_flow" || action.type === "create_board_video_flow";
+  return action.type === "create_board_image_flow" || action.type === "create_board_video_flow" || action.type === "create_board_audio_flow";
 }
 
 function isAgentBoardNoteAction(action: AgentToolAction): action is AgentBoardNoteAction {
@@ -512,7 +527,8 @@ function buildGenerateNodeUpdate(
   const prompt = params?.prompt?.trim();
   if (prompt) update.prompt = prompt;
   if (params?.model?.trim()) {
-    getModelCapability(params.model, node.kind === "image-generate" ? "image" : "video");
+    const kind = node.kind === "image-generate" ? "image" : node.kind === "video-generate" ? "video" : "audio";
+    getModelCapability(params.model, kind);
     update.model = params.model;
   }
   if (params?.aspectRatio?.trim()) update.aspectRatio = params.aspectRatio;
@@ -520,11 +536,16 @@ function buildGenerateNodeUpdate(
     if (params?.imageResolution?.trim()) update.imageResolution = params.imageResolution;
     if (params?.imageQuality?.trim()) update.imageQuality = params.imageQuality;
     if (params?.thinkingLevel?.trim()) update.thinkingLevel = params.thinkingLevel;
-  } else {
+  } else if (node.kind === "video-generate") {
     if (params?.videoResolution?.trim()) update.videoResolution = params.videoResolution;
     if (params?.videoDuration?.trim()) update.videoDuration = params.videoDuration;
     if (params?.videoPreset?.trim()) update.videoPreset = params.videoPreset;
     if (params?.videoReferenceMode) update.videoReferenceMode = params.videoReferenceMode;
+  } else {
+    if (params?.audioFormat?.trim()) update.audioFormat = params.audioFormat;
+    if (params?.audioMode) update.audioMode = params.audioMode;
+    if (params?.audioStylePrompt?.trim()) update.audioStylePrompt = params.audioStylePrompt;
+    if (params?.voiceProfileId?.trim()) update.voiceProfileId = params.voiceProfileId;
   }
   return update;
 }
@@ -569,6 +590,25 @@ function createPreviewBoardNode(operation: AgentBoardPatchCreateNodeOperation, i
       ...(operation.imageResolution ? { imageResolution: operation.imageResolution } : {}),
       ...(operation.imageQuality ? { imageQuality: operation.imageQuality } : {}),
       ...(operation.thinkingLevel ? { thinkingLevel: operation.thinkingLevel } : {}),
+    };
+  }
+  if (operation.kind === "audio-operation") {
+    const model = operation.model ?? DEFAULT_AUDIO_MODEL;
+    const defaults = audioActionDefaults(model);
+    getModelCapability(model, "audio");
+    return {
+      ...base,
+      ...defaults,
+      kind: "audio-operation",
+      size: DEFAULT_GENERATE_NODE_SIZE,
+      model,
+      prompt: operation.prompt ?? "",
+      status: "idle",
+      variantCount: 1,
+      ...(operation.audioFormat ? { audioFormat: operation.audioFormat } : {}),
+      ...(operation.audioMode ? { audioMode: operation.audioMode } : {}),
+      ...(operation.audioStylePrompt ? { audioStylePrompt: operation.audioStylePrompt } : {}),
+      ...(operation.voiceProfileId ? { voiceProfileId: operation.voiceProfileId } : {}),
     };
   }
   const model = operation.model ?? DEFAULT_VIDEO_MODEL;
@@ -620,7 +660,7 @@ function updatePreviewNode(node: BoardNode, operation: AgentBoardPatchOperation)
     if (!instruction?.trim()) throw new Error("Agent 节点更新缺少 instruction");
     return { ...node, instruction, updatedAt };
   }
-  if (node.kind === "image-generate" || node.kind === "video-generate") {
+  if (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation") {
     if (node.status === "processing") throw new Error("生成中的节点不可直接更新");
     const update = buildGenerateNodeUpdate(node, operation);
     if (!hasGenerateNodeUpdate(update)) throw new Error("生成节点更新缺少参数");
@@ -738,13 +778,14 @@ function summarizeBoardNodeForAgent(node: BoardDocument["nodes"][number], draftT
       };
     case "image-generate":
     case "video-generate":
+    case "audio-operation":
       return {
         id: node.id,
         kind: node.kind,
         title: node.title,
         prompt: sliceAgentText(draftText ?? node.prompt),
         model: node.model,
-        aspectRatio: node.aspectRatio,
+        aspectRatio: node.kind === "audio-operation" ? undefined : node.aspectRatio,
         status: node.status,
       };
     case "runninghub-app":
@@ -870,6 +911,8 @@ function resultStackKeyForNode(node: ExecutableBoardNode, edges: BoardDocument["
     ? `${node.aspectRatio}|${node.imageResolution}|${node.customImageResolution}`
       : node.kind === "video-generate"
         ? `${node.aspectRatio}|${node.videoResolution ?? ""}`
+        : node.kind === "audio-operation"
+          ? `${node.audioMode}|${node.audioFormat}|${node.voiceProfileId ?? ""}`
       : `${node.targetType}|${node.outputType}|${node.targetId}|${node.bindings.map(binding => [
         binding.nodeId,
         binding.fieldName,
@@ -1156,6 +1199,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
   const imageCapabilities = getImageModelCapabilities(selectedModel);
   const videoCapabilities = getVideoModelCapabilities(selectedVideoModel);
+  const audioCapabilities = getAudioModelCapabilities(DEFAULT_AUDIO_MODEL);
   const selectedImageProviderModel = tryParseProviderModel(selectedModel, selectedProvider) ?? {
     provider: selectedProvider,
     model: selectedModel,
@@ -1217,6 +1261,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     toggleReferenceRole,
   } = useReferenceState({
     agentInput,
+    audioReferenceLimit: audioCapabilities.maxReferenceMedia,
+    audioReferenceMediaTypes: audioCapabilities.referenceMediaTypes,
     imageReferenceLimit: imageCapabilities.maxReferenceImages,
     imageReferenceMediaTypes: imageCapabilities.referenceMediaTypes,
     prompt,
@@ -1641,7 +1687,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
                 ...(operation.imageQuality ? { imageQuality: operation.imageQuality } : {}),
                 ...(operation.thinkingLevel ? { thinkingLevel: operation.thinkingLevel } : {}),
               });
-            } else {
+            } else if (operation.kind === "video-generate") {
               const model = operation.model ?? DEFAULT_VIDEO_MODEL;
               nodeId = boardController.addGenerateNode({
                 kind: operation.kind,
@@ -1656,9 +1702,23 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
                 ...(operation.videoPreset ? { videoPreset: operation.videoPreset } : {}),
                 ...(operation.videoReferenceMode ? { videoReferenceMode: operation.videoReferenceMode } : {}),
               });
+            } else {
+              const model = operation.model ?? DEFAULT_AUDIO_MODEL;
+              nodeId = boardController.addGenerateNode({
+                kind: operation.kind,
+                title: operation.title,
+                position: operation.position,
+                prompt: operation.prompt,
+                model,
+                ...audioActionDefaults(model),
+                ...(operation.audioFormat ? { audioFormat: operation.audioFormat } : {}),
+                ...(operation.audioMode ? { audioMode: operation.audioMode } : {}),
+                ...(operation.audioStylePrompt ? { audioStylePrompt: operation.audioStylePrompt } : {}),
+                ...(operation.voiceProfileId ? { voiceProfileId: operation.voiceProfileId } : {}),
+              });
             }
             tempToRealIds.set(operation.tempId, nodeId);
-            if ((patch.run || operation.run) && (operation.kind === "image-generate" || operation.kind === "video-generate")) {
+            if ((patch.run || operation.run) && (operation.kind === "image-generate" || operation.kind === "video-generate" || operation.kind === "audio-operation")) {
               runQueue.push({ id: nodeId, operation });
             }
             return;
@@ -1672,7 +1732,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
               boardController.updateNoteBody(nodeId, operation.body ?? operation.prompt ?? "");
             } else if (node?.kind === "agent") {
               boardController.updateAgentInstruction(nodeId, operation.instruction ?? operation.prompt ?? "");
-            } else if (node?.kind === "image-generate" || node?.kind === "video-generate") {
+            } else if (node?.kind === "image-generate" || node?.kind === "video-generate" || node?.kind === "audio-operation") {
               boardController.updateGenerateNode(nodeId, buildGenerateNodeUpdate(node, operation));
             }
             return;
@@ -1689,7 +1749,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       let runFailureCount = 0;
       for (const item of runQueue) {
         const operation = item.operation;
-        const model = operation.model ?? (operation.kind === "image-generate" ? DEFAULT_IMAGE_MODEL : DEFAULT_VIDEO_MODEL);
+        const model = operation.model ?? (
+          operation.kind === "image-generate" ? DEFAULT_IMAGE_MODEL : operation.kind === "video-generate" ? DEFAULT_VIDEO_MODEL : DEFAULT_AUDIO_MODEL
+        );
         const runInputs = resolveBoardPatchRunInputs(
           patch,
           operation,
@@ -1706,7 +1768,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           runFailureCount += 1;
           continue;
         }
-        const capability = getModelCapability(model, operation.kind === "image-generate" ? "image" : "video");
+        const capability = getModelCapability(model, operation.kind === "image-generate" ? "image" : operation.kind === "video-generate" ? "video" : "audio");
         if (runReferences.length > 0 && !capability.supportsReferences) {
           boardController.updateGenerateNode(item.id, { status: "failed", errorMessage: "当前模型不支持参考图输入" });
           runFailureCount += 1;
@@ -1742,7 +1804,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             runFailureCount += 1;
             boardController.updateGenerateNode(item.id, { status: "failed", errorMessage: "图片生成请求未启动" });
           }
-        } else {
+        } else if (operation.kind === "video-generate") {
           const defaults = videoActionDefaults(model, operation.aspectRatio);
           const videoCapability = getVideoModelCapabilities(model);
           if (runReferences.length < videoCapability.minReferenceImages || runReferences.length > videoCapability.maxReferenceImages) {
@@ -1780,6 +1842,45 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           if (!didStart) {
             runFailureCount += 1;
             boardController.updateGenerateNode(item.id, { status: "failed", errorMessage: "视频生成请求未启动" });
+          }
+        } else {
+          const defaults = audioActionDefaults(model);
+          const audioCapability = getAudioModelCapabilities(model);
+          const unsupportedAudioReference = runReferences.find(reference => !audioCapability.referenceMediaTypes.includes(getMediaReferenceType(reference)));
+          if (unsupportedAudioReference) {
+            runFailureCount += 1;
+            boardController.updateGenerateNode(item.id, {
+              status: "failed",
+              errorMessage: `当前音频模型不支持${mediaReferenceLabel(getMediaReferenceType(unsupportedAudioReference))}输入`,
+            });
+            continue;
+          }
+          const resultStackKey = resultStackKeyForNode(
+            patchGenerateNodeForStackKey(operation, item.id),
+            patchInputEdgesForNode(patch, item.id, tempToRealIds),
+          );
+          boardController.updateGenerateNode(item.id, {
+            status: "processing",
+            errorMessage: undefined,
+            prompt: promptValue,
+            resultStackKey,
+          });
+          const didStart = await generateManualAudio({
+            audioFormat: operation.audioFormat ?? defaults.audioFormat,
+            audioMode: operation.audioMode ?? defaults.audioMode,
+            audioStylePrompt: operation.audioStylePrompt,
+            boardId: resolvedBoardId,
+            boardNodeId: item.id,
+            boardResultStackKey: resultStackKey,
+            model,
+            prompt: promptValue,
+            referenceImage: runReferences[0]?.url ?? null,
+            referenceImages: runReferences,
+            voiceProfileId: operation.voiceProfileId,
+          });
+          if (!didStart) {
+            runFailureCount += 1;
+            boardController.updateGenerateNode(item.id, { status: "failed", errorMessage: "音频生成请求未启动" });
           }
         }
       }
@@ -1942,12 +2043,12 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         pushWorkspaceNotice("error", "未找到 Agent 要更新的画板节点");
         return handledBoardAction(false);
       }
-      if ((node.kind === "image-generate" || node.kind === "video-generate") && node.status === "processing") {
+      if ((node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation") && node.status === "processing") {
         pushWorkspaceNotice("error", "生成中的节点不可直接改参数，请等待完成或取消任务");
         return handledBoardAction(false);
       }
 
-      if (node.kind === "image-generate" || node.kind === "video-generate") {
+      if (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation") {
         flushBoardTextForGenerateNode(boardController.board.nodes, boardController.board.edges, node.id);
       } else {
         flushBoardText([node.id]);
@@ -1989,7 +2090,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         } finally {
           boardController.endUndoGesture();
         }
-      } else if (node.kind === "image-generate" || node.kind === "video-generate") {
+      } else if (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation") {
         let update: BoardGenerateNodeUpdate;
         try {
           update = buildGenerateNodeUpdate(node, action.params);
@@ -2043,8 +2144,14 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       return handledBoardAction(false);
     }
 
-    const kind = action.type === "generate_image" || action.type === "create_board_image_flow" ? "image-generate" : "video-generate";
-    const model = action.params?.model || (kind === "image-generate" ? DEFAULT_IMAGE_MODEL : DEFAULT_VIDEO_MODEL);
+    const kind = action.type === "generate_image" || action.type === "create_board_image_flow"
+      ? "image-generate"
+      : action.type === "generate_video" || action.type === "create_board_video_flow"
+        ? "video-generate"
+        : "audio-operation";
+    const model = action.params?.model || (
+      kind === "image-generate" ? DEFAULT_IMAGE_MODEL : kind === "video-generate" ? DEFAULT_VIDEO_MODEL : DEFAULT_AUDIO_MODEL
+    );
     if (isPlaceholderRunningHubModel(model)) {
       pushWorkspaceNotice("error", "请先填写真实的 RunningHub webappId 或 workflowId");
       return handledBoardAction(false);
@@ -2159,6 +2266,114 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       if (!didStart) {
         boardController.updateGenerateNode(generateNodeId, {
           errorMessage: "图片生成请求未启动，请检查节点参数",
+          status: "failed",
+        });
+        return handledBoardAction(false);
+      }
+      return handledBoardAction(true);
+    }
+
+    if (kind === "audio-operation") {
+      const defaults = {
+        ...audioActionDefaults(model),
+        ...(action.params?.audioFormat ? { audioFormat: action.params.audioFormat } : {}),
+        ...(action.params?.audioMode ? { audioMode: action.params.audioMode } : {}),
+        ...(action.params?.audioStylePrompt ? { audioStylePrompt: action.params.audioStylePrompt } : {}),
+        ...(action.params?.voiceProfileId ? { voiceProfileId: action.params.voiceProfileId } : {}),
+      };
+      const generateNodeId = boardController.addGenerateNode({
+        kind,
+        model,
+        position: generatePosition,
+        prompt: promptFromAgent,
+        ...defaults,
+      });
+      boardController.connectPorts(
+        { nodeId: promptNodeId, portId: "prompt-out", portKind: "prompt" },
+        { nodeId: generateNodeId, portId: "prompt-in", portKind: "prompt" },
+      );
+
+      const capability = getModelCapability(model, "audio");
+      if (references.length > 0 && !capability.supportsReferences) {
+        const message = "Agent 选中的音频模型不支持参考媒体输入";
+        boardController.updateGenerateNode(generateNodeId, { errorMessage: message, status: "failed" });
+        pushWorkspaceNotice("error", message);
+        return handledBoardAction(false);
+      }
+      const audioCapability = getAudioModelCapabilities(model);
+      const unsupportedAudioReference = references.find(reference => !audioCapability.referenceMediaTypes.includes(getMediaReferenceType(reference)));
+      if (unsupportedAudioReference) {
+        const message = `当前音频模型不支持${mediaReferenceLabel(getMediaReferenceType(unsupportedAudioReference))}输入`;
+        boardController.updateGenerateNode(generateNodeId, { errorMessage: message, status: "failed" });
+        pushWorkspaceNotice("error", message);
+        return handledBoardAction(false);
+      }
+
+      const referenceNodeIds: string[] = [];
+      references.forEach((reference, index) => {
+        const matchedItem = items.find(item => item.id === reference.id);
+        const referenceType = getMediaReferenceType(reference);
+        const assetNodeId = boardController.addAssetNode({
+          asset: {
+            assetId: reference.id,
+            model: matchedItem?.model ?? "agent-reference",
+            prompt: matchedItem?.prompt ?? "Agent reference",
+            type: referenceType,
+            url: reference.url,
+          },
+          position: { x: 120 + index * 140, y: generatePosition.y + 280 },
+        });
+        referenceNodeIds.push(assetNodeId);
+        boardController.connectPorts(
+          { nodeId: assetNodeId, portId: "asset-out", portKind: "asset" },
+          { nodeId: generateNodeId, portId: "reference-in", portKind: "asset" },
+        );
+      });
+
+      if (!shouldRun) {
+        pushWorkspaceNotice("success", "已创建 Agent 音频生成节点流程");
+        return handledBoardAction(true);
+      }
+
+      const resultStackKey = resultStackKeyForConfig({
+        edges: [
+          {
+            id: "agent-prompt-edge",
+            kind: "prompt",
+            from: { nodeId: promptNodeId, portId: BOARD_PORT_IDS.promptOut, portKind: "prompt" },
+            to: { nodeId: generateNodeId, portId: BOARD_PORT_IDS.promptIn, portKind: "prompt" },
+            createdAt: "",
+          },
+          ...referenceNodeIds.map((assetNodeId, index) => ({
+            id: `agent-reference-edge-${index}`,
+            kind: "reference" as const,
+            from: { nodeId: assetNodeId, portId: BOARD_PORT_IDS.assetOut, portKind: "asset" as const },
+            to: { nodeId: generateNodeId, portId: BOARD_PORT_IDS.referenceIn, portKind: "asset" as const },
+            createdAt: "",
+          })),
+        ],
+        kind: "audio-operation",
+        model,
+        nodeId: generateNodeId,
+        sizeKey: `${defaults.audioMode}|${defaults.audioFormat}`,
+      });
+      boardController.updateGenerateNode(generateNodeId, { errorMessage: undefined, resultStackKey, status: "processing" });
+      const didStart = await generateManualAudio({
+        audioFormat: defaults.audioFormat,
+        audioMode: defaults.audioMode,
+        audioStylePrompt: defaults.audioStylePrompt,
+        boardId: resolvedBoardId,
+        boardNodeId: generateNodeId,
+        boardResultStackKey: resultStackKey,
+        model,
+        prompt: promptFromAgent,
+        referenceImage: references[0]?.url ?? null,
+        referenceImages: references,
+        voiceProfileId: defaults.voiceProfileId,
+      });
+      if (!didStart) {
+        boardController.updateGenerateNode(generateNodeId, {
+          errorMessage: "音频生成请求未启动，请检查节点参数",
           status: "failed",
         });
         return handledBoardAction(false);
@@ -2668,7 +2883,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   }, [boardController.board.edges, boardController.board.nodes, items, resolveBoardReferenceUrl]);
 
   const resolveGenerateNodeInputs = useCallback((nodeId: string) => {
-    return resolveExecutableNodeInputs(nodeId, isGenerateBoardNode, "请选择图片或视频生成节点");
+    return resolveExecutableNodeInputs(nodeId, isGenerateBoardNode, "请选择图片、视频或音频生成节点");
   }, [resolveExecutableNodeInputs]);
 
   const resolveRunningHubAppNodeInputs = useCallback((nodeId: string) => {
@@ -2770,7 +2985,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         pushWorkspaceNotice("error", message);
         return;
       }
-      const capability = getModelCapability(node.model, node.kind === "image-generate" ? "image" : "video");
+      const capabilityKind = node.kind === "image-generate" ? "image" : node.kind === "video-generate" ? "video" : "audio";
+      const capability = getModelCapability(node.model, capabilityKind);
       if (references.length > 0 && !capability.supportsReferences) {
         boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: "当前模型不支持参考媒体输入" });
         pushWorkspaceNotice("error", "当前模型不支持参考媒体输入");
@@ -2778,9 +2994,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       }
       const unsupportedReference = references.find(reference => {
         const type = getMediaReferenceType(reference);
-        return node.kind === "image-generate"
-          ? type !== "image"
-          : !getVideoModelCapabilities(node.model).referenceMediaTypes.includes(type);
+        if (node.kind === "image-generate") return type !== "image";
+        if (node.kind === "video-generate") return !getVideoModelCapabilities(node.model).referenceMediaTypes.includes(type);
+        return !getAudioModelCapabilities(node.model).referenceMediaTypes.includes(type);
       });
       if (unsupportedReference) {
         const message = `当前模型不支持${mediaReferenceLabel(getMediaReferenceType(unsupportedReference))}输入`;
@@ -2836,7 +3052,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
               status: "failed",
             });
           }
-        } else {
+        } else if (node.kind === "video-generate") {
           let didStartAny = false;
           for (let remaining = node.variantCount; remaining > 0; remaining -= 1) {
             const didStart = await generateManualVideo({
@@ -2859,6 +3075,31 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         if (!didStartAny) {
           boardController.updateGenerateNode(nodeId, {
             errorMessage: "视频生成请求未启动，请检查节点参数",
+            status: "failed",
+          });
+        }
+      } else {
+        let didStartAny = false;
+        for (let remaining = node.variantCount; remaining > 0; remaining -= 1) {
+          const didStart = await generateManualAudio({
+            audioFormat: node.audioFormat,
+            audioMode: node.audioMode,
+            audioStylePrompt: node.audioStylePrompt,
+            boardId: resolvedBoardId,
+            boardNodeId: nodeId,
+            boardResultStackKey: resultStackKey,
+            model: node.model,
+            prompt: nextPrompt,
+            referenceImage: references[0]?.url ?? null,
+            referenceImages: references,
+            voiceProfileId: node.voiceProfileId,
+          });
+          if (!didStart) break;
+          didStartAny = true;
+        }
+        if (!didStartAny) {
+          boardController.updateGenerateNode(nodeId, {
+            errorMessage: "音频生成请求未启动，请检查节点参数",
             status: "failed",
           });
         }
@@ -3337,7 +3578,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     ? boardController.board.edges.filter(edge => edge.from.nodeId === selectedBoardNode.id)
     : [];
   const selectedGenerateInputSummary = useMemo(() => {
-    if (selectedBoardNode?.kind !== "image-generate" && selectedBoardNode?.kind !== "video-generate") return undefined;
+    if (selectedBoardNode?.kind !== "image-generate" && selectedBoardNode?.kind !== "video-generate" && selectedBoardNode?.kind !== "audio-operation") return undefined;
     const references = generateReferenceCandidates(boardController.board.nodes, boardController.board.edges, selectedBoardNode.id);
     return {
       promptPreview: null,
@@ -3448,6 +3689,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           revealKey={boardController.selectedNodeId ?? boardController.selectedEdgeId}
           inspectorPanel={(
             <BoardInspector
+              audioModelGroups={audioModelGroups}
               edge={selectedBoardEdge}
               generateInputSummary={selectedGenerateInputSummary}
               imageModelGroups={imageModelGroups}

@@ -1,5 +1,13 @@
 import { generateRunningHubMedia, getRunningHubMediaStatus, downloadRunningHubMedia } from "./image";
-import type { GenerateAudioInput, GenerateAudioResult, MediaStatusResult, ProviderConfig } from "./types";
+import { generateMimoTts, MIMO_TTS_MODEL } from "./mimo-tts";
+import type {
+  GenerateAudioInput,
+  GenerateAudioOperationInput,
+  GenerateAudioOperationResult,
+  GenerateAudioResult,
+  MediaStatusResult,
+  ProviderConfig,
+} from "./types";
 
 export async function generateAudio(
   config: ProviderConfig,
@@ -29,6 +37,42 @@ export async function generateAudio(
     operationName: result.operationName,
     source: result.source,
   };
+}
+
+export async function generateAudioOperation(
+  config: ProviderConfig,
+  input: GenerateAudioOperationInput,
+): Promise<GenerateAudioOperationResult> {
+  if (config.provider === "mimo") {
+    if (input.mode !== "tts" || input.model !== MIMO_TTS_MODEL) {
+      throw new Error("MiMo audio operation currently supports built-in TTS only");
+    }
+    if (input.referenceMedia.length > 0) {
+      throw new Error("MiMo built-in TTS does not support reference media");
+    }
+    const result = await generateMimoTts(config, {
+      text: input.prompt,
+      format: input.format === "pcm16" ? "pcm16" : "wav",
+      stylePrompt: input.stylePrompt,
+    });
+    return {
+      type: "direct",
+      outputKind: "audio",
+      source: "mimo",
+      ...result,
+    };
+  }
+
+  if (config.provider === "runninghub") {
+    const result = await generateAudio(config, input);
+    return {
+      type: "async",
+      outputKind: "audio",
+      ...result,
+    };
+  }
+
+  throw new Error(`${config.provider} audio operation is not supported yet`);
 }
 
 export async function getAudioStatus(config: ProviderConfig, taskId: string): Promise<MediaStatusResult> {
