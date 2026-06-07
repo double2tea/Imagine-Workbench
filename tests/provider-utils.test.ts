@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { formatDisplayedAspectRatio } from "../lib/media-display";
 import { readRunningHubNodeInfoList } from "../lib/providers/runninghub-node-info";
-import { aspectRatioToOpenAiSize, aspectRatioToVideoSize, parseProviderResponseBody } from "../lib/providers/utils";
+import { aspectRatioToOpenAiSize, aspectRatioToVideoSize, authHeaders, parseProviderResponseBody } from "../lib/providers/utils";
 
 test("parseProviderResponseBody parses JSON response text", () => {
   assert.deepEqual(parseProviderResponseBody('{"ok":true}'), { ok: true });
@@ -11,6 +11,21 @@ test("parseProviderResponseBody parses JSON response text", () => {
 
 test("parseProviderResponseBody converts plain text provider errors", () => {
   assert.deepEqual(parseProviderResponseBody("error code: 502"), { error: "error code: 502" });
+});
+
+test("authHeaders uses MiMo api-key header", () => {
+  assert.deepEqual(authHeaders({
+    provider: "mimo",
+    apiKey: "mimo_key",
+    baseUrl: "https://api.xiaomimimo.com",
+    videoBaseUrl: "https://api.xiaomimimo.com",
+  }), { "api-key": "mimo_key" });
+  assert.deepEqual(authHeaders({
+    provider: "12ai",
+    apiKey: "twelve_key",
+    baseUrl: "https://cdn.12ai.org",
+    videoBaseUrl: "https://new.12ai.org",
+  }), { Authorization: "Bearer twelve_key" });
 });
 
 test("grok2api image sizes preserve selected dimensions", () => {

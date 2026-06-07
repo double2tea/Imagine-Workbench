@@ -89,6 +89,24 @@ export interface GenerateAudioResult {
   source: string;
 }
 
+export type MimoTtsFormat = "wav" | "pcm16";
+
+export interface MimoTtsInput {
+  text: string;
+  stylePrompt?: string;
+  voice?: string;
+  format?: MimoTtsFormat;
+  optimizeTextPreview?: boolean;
+}
+
+export interface MimoTtsResult {
+  audioBase64: string;
+  format: MimoTtsFormat;
+  model: string;
+  mimeType: string;
+  sampleRateHz?: number;
+}
+
 export type ProviderMediaType = "image" | "video" | "audio";
 
 export interface MediaStatusResult {

@@ -21,7 +21,7 @@ export function resolveProviderConfig(req: Request, provider: AiProvider): Provi
   const videoBaseUrl = resolveProviderVideoBaseUrl(provider);
 
   const apiKey = headerKey || envKey;
-  if ((provider === "12ai" || provider === "agnes" || provider === "modelscope" || provider === "runninghub") && !apiKey) {
+  if ((provider === "12ai" || provider === "agnes" || provider === "modelscope" || provider === "runninghub" || provider === "mimo") && !apiKey) {
     const meta = getProviderMeta(provider);
     throw new Error(`${meta.label} API key is required. Set ${meta.envApiKey} or provide a custom API key.`);
   }
@@ -35,7 +35,9 @@ export function resolveProviderConfig(req: Request, provider: AiProvider): Provi
 }
 
 export function authHeaders(config: ProviderConfig): HeadersInit {
-  return config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {};
+  if (!config.apiKey) return {};
+  if (config.provider === "mimo") return { "api-key": config.apiKey };
+  return { Authorization: `Bearer ${config.apiKey}` };
 }
 
 export async function postJson<T>(url: string, config: ProviderConfig, body: unknown): Promise<T> {

@@ -24,6 +24,9 @@ export async function listProviderModels(config: ProviderConfig, kind: ModelKind
   if (config.provider === "agnes") {
     return staticProviderModels(config.provider, kind);
   }
+  if (config.provider === "mimo") {
+    return staticProviderModels(config.provider, kind);
+  }
 
   const response = await getJson<OpenAiModelsResponse>(`${config.baseUrl}/v1/models`, config);
   if (!Array.isArray(response.data)) {

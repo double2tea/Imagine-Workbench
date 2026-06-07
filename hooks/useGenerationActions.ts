@@ -5,6 +5,7 @@ import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 import { readImageGenerationPayload } from "@/lib/client-image-response";
 import {
   buildStorageItem,
+  saveToDB,
   type GenerationReferenceMediaSnapshot,
   type GenerationRequestSnapshot,
   type StorageItem,
@@ -21,7 +22,7 @@ import {
 import type { RunningHubTaskNodeBinding } from "@/lib/providers/types";
 import { buildPromptWithReferenceMap } from "@/hooks/useReferenceState";
 import { getMediaReferenceType, mediaReferenceLabel } from "@/lib/media-references";
-import { getImageModelCapabilities, getVideoModelCapabilities, type VideoReferenceMode } from "@/lib/providers/model-catalog";
+import { getImageModelCapabilities, getVideoModelCapabilities, isMimoWorkbenchTtsModel, type VideoReferenceMode } from "@/lib/providers/model-catalog";
 import { getReferenceImagePayloadError, getReferenceMediaPayloadError, prepareReferenceImageUrlForRequest, prepareReferenceMediaUrlForRequest } from "@/lib/reference-images";
 import { selectVideoReferencesForMode } from "@/lib/video-reference-selection";
 
@@ -104,6 +105,21 @@ async function saveItemOrWarn(
     const message = toErrorMessage(error, "IndexedDB 写入失败");
     console.error("IndexedDB Save Failed:", error);
     pushWorkspaceNotice("error", `本地存储失败，刷新后可能丢失：${message}`);
+    return null;
+  }
+}
+
+async function saveAudioItemOrWarn(
+  item: StorageItem,
+  pushWorkspaceNotice: (type: NoticeType, message: string) => void,
+): Promise<StorageItem | null> {
+  try {
+    await saveToDB(item);
+    return item;
+  } catch (error) {
+    const message = toErrorMessage(error, "IndexedDB 写入失败");
+    console.error("IndexedDB Audio Save Failed:", error);
+    pushWorkspaceNotice("error", `本地音频存储失败，刷新后可能丢失：${message}`);
     return null;
   }
 }
@@ -592,6 +608,123 @@ export function useGenerationActions({
     const audioReferences = [...activeReferenceImages];
     if (audioReferences.length === 0 && activeReferenceImage) {
       audioReferences.push({ id: "legacy-reference", url: activeReferenceImage });
+    }
+    if (isMimoWorkbenchTtsModel(requestModel)) {
+      if (audioReferences.length > 0) {
+        pushWorkspaceNotice("error", "MiMo 内置 TTS 不支持参考媒体");
+        return false;
+      }
+
+      setVideoSubmitCount(prev => prev + 1);
+      const createdAt = new Date().toISOString();
+      const generationRequest: GenerationRequestSnapshot = {
+        prompt: activePrompt,
+        model: requestModel,
+        aspectRatio: "audio",
+      };
+      const taskId = makeClientId("task_aud");
+      const task = createGenerationTask({
+        id: taskId,
+        mediaType: "audio",
+        prompt: activePrompt,
+        model: requestModel,
+        status: "pending",
+        progress: 12,
+        createdAt,
+        source: resolveTaskSource(overrides),
+        request: generationRequest,
+      });
+      if (!await saveTaskOrWarn(task, pushWorkspaceNotice)) {
+        setVideoSubmitCount(prev => Math.max(0, prev - 1));
+        return true;
+      }
+      recordGenerationTask(task);
+
+      const controller = new AbortController();
+      generationAbortControllersRef.current[taskId] = controller;
+
+      try {
+        const headers = buildProviderHeaders(requestModel);
+        const res = await fetch("/api/mimo/generate-tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...headers },
+          signal: controller.signal,
+          body: JSON.stringify({
+            model: "mimo-v2.5-tts",
+            text: generationRequest.prompt,
+          }),
+        });
+
+        if (!res.ok) {
+          throw new Error(await readFetchError(res, "MiMo 音频生成请求失败"));
+        }
+
+        const data: unknown = await res.json();
+        const audioBase64 = getStringField(data, "audioBase64");
+        const mimeType = getStringField(data, "mimeType");
+        if (!audioBase64 || !mimeType) {
+          throw new Error("MiMo 音频接口返回格式不正确");
+        }
+        const completedAssetId = makeClientId("aud");
+        const completedItem = buildStorageItem(
+          {
+            id: completedAssetId,
+            type: "audio",
+            url: `data:${mimeType};base64,${audioBase64}`,
+            prompt: activePrompt,
+            model: requestModel,
+            aspectRatio: "audio",
+            createdAt,
+            status: "complete",
+            progress: 100,
+            generationRequest,
+            sourceBoardNodeId: overrides.boardNodeId,
+            sourceBoardResultStackKey: overrides.boardResultStackKey,
+          },
+          { boardId: resolveScopeBoardId(overrides) },
+        );
+
+        const savedCompletedItem = await saveAudioItemOrWarn(completedItem, pushWorkspaceNotice);
+        if (!savedCompletedItem) {
+          const failedTask = await updateTaskOrWarn(taskId, {
+            status: "failed",
+            progress: 100,
+            errorMessage: "结果资产本地存储失败",
+          }, pushWorkspaceNotice);
+          if (failedTask) recordGenerationTask(failedTask);
+          return true;
+        }
+        setItems(prev => [savedCompletedItem, ...prev]);
+        const completeTask = await updateTaskOrWarn(taskId, {
+          activeResultAssetId: completedAssetId,
+          resultAssetIds: [completedAssetId],
+          status: "complete",
+          progress: 100,
+        }, pushWorkspaceNotice);
+        if (completeTask) recordGenerationTask(completeTask);
+        pushWorkspaceNotice("success", "MiMo 音频生成完成");
+      } catch (error) {
+        if (locallyCanceledItemIdsRef.current.has(taskId) || isAbortError(error)) {
+          locallyCanceledItemIdsRef.current.delete(taskId);
+          const canceledTask = await cancelTaskOrWarn(taskId, pushWorkspaceNotice);
+          if (canceledTask) recordGenerationTask(canceledTask);
+          return true;
+        }
+        console.error(error);
+        const message = toErrorMessage(error, "MiMo 音频生成失败");
+        const failedTask = await updateTaskOrWarn(taskId, {
+          status: "failed",
+          progress: 100,
+          errorMessage: message,
+        }, pushWorkspaceNotice);
+        if (failedTask) recordGenerationTask(failedTask);
+        pushWorkspaceNotice("error", message);
+        return true;
+      } finally {
+        delete generationAbortControllersRef.current[taskId];
+        setVideoSubmitCount(prev => Math.max(0, prev - 1));
+      }
+      return true;
     }
     const audioReferenceUrls = audioReferences.map(reference => reference.url);
     let audioReferencePayloads: string[];

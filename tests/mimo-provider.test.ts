@@ -1,0 +1,111 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import { generateMimoTts, generateMimoTtsVoiceDesign } from "../lib/providers/mimo-tts";
+import { listProviderModels } from "../lib/providers/models";
+import type { ProviderConfig } from "../lib/providers/types";
+
+const mimoConfig: ProviderConfig = {
+  provider: "mimo",
+  apiKey: "mimo_test_key",
+  baseUrl: "https://api.xiaomimimo.com",
+  videoBaseUrl: "https://api.xiaomimimo.com",
+};
+
+test("mimo model listing uses static chat models without fetching", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (): Promise<Response> => {
+    throw new Error("MiMo static model listing should not fetch");
+  };
+
+  try {
+    const chatModels = await listProviderModels(mimoConfig, "chat");
+    const allModels = await listProviderModels(mimoConfig, "all");
+    const audioModels = await listProviderModels(mimoConfig, "audio");
+
+    assert.equal(chatModels.some(option => option.value === "mimo:mimo-v2.5-pro"), true);
+    assert.equal(allModels.some(option => option.value === "mimo:mimo-v2.5"), true);
+    assert.deepEqual(audioModels, [{ value: "mimo:mimo-v2.5-tts", label: "MiMo V2.5 TTS" }]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("mimo built-in TTS sends chat completions audio request", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: Array<{ url: string; headers: Headers; body: unknown }> = [];
+  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    calls.push({
+      url: input.toString(),
+      headers: new Headers(init?.headers),
+      body: init?.body ? JSON.parse(String(init.body)) as unknown : null,
+    });
+    return Response.json({ choices: [{ message: { audio: { data: "audio_base64" } } }] });
+  };
+
+  try {
+    const result = await generateMimoTts(mimoConfig, {
+      text: "Hello world",
+      stylePrompt: "Bright voice",
+      voice: "Chloe",
+      format: "wav",
+    });
+
+    assert.deepEqual(result, {
+      audioBase64: "audio_base64",
+      format: "wav",
+      model: "mimo-v2.5-tts",
+      mimeType: "audio/wav",
+    });
+    assert.equal(calls[0]?.url, "https://api.xiaomimimo.com/v1/chat/completions");
+    assert.equal(calls[0]?.headers.get("api-key"), "mimo_test_key");
+    assert.deepEqual(calls[0]?.body, {
+      model: "mimo-v2.5-tts",
+      messages: [
+        { role: "user", content: "Bright voice" },
+        { role: "assistant", content: "Hello world" },
+      ],
+      audio: { format: "wav", voice: "Chloe" },
+      stream: false,
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("mimo voice design maps optimizeTextPreview inside audio object", async () => {
+  const originalFetch = globalThis.fetch;
+  const bodies: unknown[] = [];
+  globalThis.fetch = async (_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    bodies.push(init?.body ? JSON.parse(String(init.body)) as unknown : null);
+    return Response.json({ choices: [{ message: { audio: { data: "pcm_base64" } } }] });
+  };
+
+  try {
+    const result = await generateMimoTtsVoiceDesign(mimoConfig, {
+      text: "Designed voice text",
+      stylePrompt: "Warm young narrator",
+      format: "pcm16",
+      optimizeTextPreview: true,
+    });
+
+    assert.deepEqual(result, {
+      audioBase64: "pcm_base64",
+      format: "pcm16",
+      model: "mimo-v2.5-tts-voicedesign",
+      mimeType: "audio/pcm",
+      sampleRateHz: 24000,
+    });
+    assert.deepEqual(bodies[0], {
+      model: "mimo-v2.5-tts-voicedesign",
+      messages: [
+        { role: "user", content: "Warm young narrator" },
+        { role: "assistant", content: "Designed voice text" },
+      ],
+      audio: { format: "pcm16", optimize_text_preview: true },
+      stream: false,
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

@@ -14,6 +14,7 @@ import {
   getModelCapabilities,
   getModelCapability,
   getVideoModelCapabilities,
+  isMimoWorkbenchTtsModel,
   parseProviderModel,
   supportsAsyncImageGeneration,
   tryParseProviderModel,
@@ -585,6 +586,19 @@ test("agent chat defaults use 12AI Gemini 3.1 Flash Lite", () => {
   assert.equal(CHAT_MODEL_OPTIONS["12ai"].some(option => option.value === "12ai:deepseek-v4-flash"), false);
   assert.equal(CHAT_MODEL_OPTIONS["12ai"].some(option => option.value === DEFAULT_CHAT_MODEL), true);
   assert.equal(CHAT_MODEL_OPTIONS["12ai"].some(option => option.value === DEFAULT_VISION_CHAT_MODEL), true);
+});
+
+test("mimo exposes chat models and built-in workbench TTS only", () => {
+  assert.equal(getProviderMeta("mimo").supportsChat, true);
+  assert.equal(getProviderMeta("mimo").supportsAudio, true);
+  assert.equal(CHAT_MODEL_OPTIONS["mimo"].some(option => option.value === "mimo:mimo-v2.5-pro"), true);
+  assert.equal(CHAT_MODEL_OPTIONS["mimo"].some(option => option.value === "mimo:mimo-v2.5"), true);
+  assert.equal(CHAT_MODEL_OPTIONS["mimo"].some(option => option.value === "mimo:mimo-v2-flash"), true);
+  assert.deepEqual(AUDIO_MODEL_OPTIONS["mimo"], [{ value: "mimo:mimo-v2.5-tts", label: "MiMo V2.5 TTS" }]);
+  assert.deepEqual(getModelCapabilities("audio", "mimo").map(capability => capability.value), ["mimo:mimo-v2.5-tts"]);
+  assert.equal(isMimoWorkbenchTtsModel("mimo:mimo-v2.5-tts"), true);
+  assert.equal(isMimoWorkbenchTtsModel("mimo-v2.5-tts"), false);
+  assert.equal(isMimoWorkbenchTtsModel("mimo:mimo-v2.5-tts-voiceclone"), false);
 });
 
 test("xstx chat defaults use pricing model identifiers", () => {

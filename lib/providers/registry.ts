@@ -106,6 +106,21 @@ export const PROVIDER_REGISTRY = [
     supportsAudio: true,
     supportsChat: true,
   },
+  {
+    key: "mimo",
+    label: "MiMo",
+    envApiKey: "MIMO_API_KEY",
+    envBaseUrl: "MIMO_BASE_URL",
+    defaultBaseUrl: "https://api.xiaomimimo.com",
+    defaultVideoBaseUrl: "https://api.xiaomimimo.com",
+    apiKeyPlaceholder: "your_mimo_api_key",
+    registerUrl: "https://platform.xiaomimimo.com",
+    hasEditableBaseUrl: true,
+    supportsImage: false,
+    supportsVideo: false,
+    supportsAudio: true,
+    supportsChat: true,
+  },
 ] as const;
 
 export type AiProvider = (typeof PROVIDER_REGISTRY)[number]["key"];
