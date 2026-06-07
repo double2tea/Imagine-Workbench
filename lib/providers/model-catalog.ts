@@ -1133,28 +1133,6 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     minReferenceImages: 0,
     referenceMediaTypes: ["image", "video", "audio"],
   }),
-  audioCapability({
-    value: "runninghub:ai-app-audio:<webappId>",
-    label: "RunningHub AI App Audio",
-    provider: "runninghub",
-    model: "ai-app-audio:<webappId>",
-    audioModes: ["tts", "music", "sfx", "voice_clone"],
-    supportsReferences: true,
-    maxReferenceMedia: 9,
-    minReferenceMedia: 0,
-    referenceMediaTypes: ["image", "video", "audio"],
-  }),
-  audioCapability({
-    value: "runninghub:workflow-audio:<workflowId>",
-    label: "RunningHub Workflow Audio",
-    provider: "runninghub",
-    model: "workflow-audio:<workflowId>",
-    audioModes: ["tts", "music", "sfx", "voice_clone"],
-    supportsReferences: true,
-    maxReferenceMedia: 9,
-    minReferenceMedia: 0,
-    referenceMediaTypes: ["image", "video", "audio"],
-  }),
 ];
 
 export const IMAGE_MODEL_OPTIONS = buildProviderOptionsRecord("image", false);
@@ -1661,21 +1639,8 @@ function greatestCommonDivisor(a: number, b: number): number {
 
 function runningHubVirtualCapability(model: string, kind?: ModelKind): ProviderModelCapability {
   const lower = model.toLowerCase();
-  const isAudio = lower.includes("audio");
   const isVideo = lower.includes("video");
-  const resolvedKind: ModelKind = kind ?? (isAudio ? "audio" : isVideo ? "video" : "image");
-  if (resolvedKind === "audio") {
-    return audioCapability({
-      value: formatProviderModel("runninghub", model),
-      label: `RunningHub ${model}`,
-      provider: "runninghub",
-      model,
-      supportsReferences: true,
-      maxReferenceMedia: 9,
-      minReferenceMedia: 0,
-      referenceMediaTypes: ["image", "video", "audio"],
-    });
-  }
+  const resolvedKind: ModelKind = kind ?? (isVideo ? "video" : "image");
   if (resolvedKind === "video") {
     return videoCapability({
       value: formatProviderModel("runninghub", model),

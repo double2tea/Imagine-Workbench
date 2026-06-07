@@ -401,18 +401,16 @@ function formatAgentCapabilities(topic: "summary" | "actions" | "tools" | "conte
     chatReferences: ["image", "video", "audio"],
     imageGenerationReferences: ["image"],
     videoGenerationReferences: ["image", "video", "audio"],
-    audioGenerationReferences: ["image", "video", "audio"],
+    audioGenerationReferences: ["audio"],
   };
   const audioPlanning = {
     modes: {
       tts: "Narration, dialogue, voiceover, spoken lines.",
       voice_design: "Create a described voice; put the voice description in audioStylePrompt.",
       voice_clone: "Use only when the user provides or requests an authorized audio reference.",
-      music: "Background score, music bed, motif, or transition music.",
-      sfx: "Impact, ambience, Foley, UI sound, and other sound effects.",
       asr: "Transcription intent only when an audio-capable model declares ASR support.",
     },
-    boardPattern: "Use separate audio-operation nodes when narration, music, and SFX are separate deliverables.",
+    boardPattern: "Use audio-operation nodes only for supported audio functions returned by query_models({kind:\"audio\"}); RunningHub audio uses RunningHub App / Workflow nodes.",
     actionPattern: "Use generate_audio on the workbench and create_board_audio_flow on board.",
   };
 

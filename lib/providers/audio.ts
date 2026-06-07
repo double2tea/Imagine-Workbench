@@ -136,15 +136,6 @@ export async function generateAudioOperation(
     throw new Error("MiMo audio operation currently supports built-in TTS, voice design, voice clone, and ASR only");
   }
 
-  if (config.provider === "runninghub") {
-    const result = await generateAudio(config, input);
-    return {
-      type: "async",
-      outputKind: "audio",
-      ...result,
-    };
-  }
-
   throw new Error(`${config.provider} audio operation is not supported yet`);
 }
 

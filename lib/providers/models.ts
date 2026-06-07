@@ -115,10 +115,8 @@ function runningHubStaticModels(kind: ModelKindFilter): ModelOption[] {
   const virtualModels = [
     { value: "runninghub:ai-app-image:<webappId>", label: "RunningHub AI App Image", kind: "image" },
     { value: "runninghub:ai-app-video:<webappId>", label: "RunningHub AI App Video", kind: "video" },
-    { value: "runninghub:ai-app-audio:<webappId>", label: "RunningHub AI App Audio", kind: "audio" },
     { value: "runninghub:workflow-image:<workflowId>", label: "RunningHub Workflow Image", kind: "image" },
     { value: "runninghub:workflow-video:<workflowId>", label: "RunningHub Workflow Video", kind: "video" },
-    { value: "runninghub:workflow-audio:<workflowId>", label: "RunningHub Workflow Audio", kind: "audio" },
   ].filter(model => kind === "all" || model.kind === kind);
   return [
     ...(kind === "all" ? chatModels.map(model => ({ value: model.value, label: model.label })) : []),

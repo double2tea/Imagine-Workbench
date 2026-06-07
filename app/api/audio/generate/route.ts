@@ -39,8 +39,8 @@ export async function POST(req: NextRequest) {
     if (body.voiceProfileId) {
       return NextResponse.json({ error: "Voice profile IDs must be resolved before calling audio generation" }, { status: 400 });
     }
-    const parsed = parseProviderModel(body.model, "runninghub");
-    if (parsed.provider !== "runninghub" && parsed.provider !== "mimo") {
+    const parsed = parseProviderModel(body.model, "mimo");
+    if (parsed.provider !== "mimo") {
       return NextResponse.json({ error: `${parsed.provider} audio operation is not supported yet` }, { status: 400 });
     }
 
