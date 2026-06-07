@@ -582,8 +582,12 @@ export function useGenerationActions({
     const activePrompt = overrides.prompt ?? prompt;
     const activeReferenceImage = overrides.referenceImage ?? referenceImage;
     const activeReferenceImages = overrides.referenceImages ?? referenceImages;
-    const requestModel = overrides.model ?? selectedVideoModel;
+    const requestModel = overrides.model?.trim();
 
+    if (!requestModel) {
+      pushWorkspaceNotice("error", "音频生成需要明确音频模型");
+      return false;
+    }
     if (!activePrompt.trim() && overrides.allowEmptyPrompt !== true) return false;
     const audioReferences = [...activeReferenceImages];
     if (audioReferences.length === 0 && activeReferenceImage) {

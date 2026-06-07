@@ -56,7 +56,3 @@ export async function resolveAssetOriginalUrl(meta: Pick<StorageItemMeta, "id" |
 
   return rememberUrl(originalUrlCache, ORIGINAL_URL_CACHE_MAX, meta.id, meta.url ?? "");
 }
-
-export async function resolveAssetUrl(meta: Pick<StorageItemMeta, "id" | "url" | "hasBlob">): Promise<string> {
-  return resolveAssetOriginalUrl(meta);
-}

@@ -309,6 +309,15 @@ function getProviderModelGroups(optionsByProvider: Record<AiProvider, ModelOptio
 
 type BoardReferenceUrlResolver = (assetId: string, fallbackUrl: string) => string;
 
+function activeExecutableResultItem(
+  nodes: BoardDocument["nodes"],
+  node: ExecutableBoardNode,
+  items: StorageItem[],
+): StorageItem | undefined {
+  const activeAssetId = findResultNodeForSource(nodes, node.id)?.activeAssetId ?? node.resultAssetId;
+  return activeAssetId ? items.find(item => item.id === activeAssetId && item.status === "complete") : undefined;
+}
+
 function activeBoardReference(
   nodes: ReturnType<typeof useBoardState>["board"]["nodes"],
   selectedNodeId: string | null,
@@ -318,7 +327,7 @@ function activeBoardReference(
   const node = nodes.find(item => item.id === selectedNodeId);
   if (!node) return [];
   if (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app") {
-    const item = items.find(current => current.id === node.resultAssetId && current.status === "complete");
+    const item = activeExecutableResultItem(nodes, node, items);
     return item ? [{ id: item.id, type: item.type, url: resolveUrl(item.id, item.url), role: "general" }] : [];
   }
   if (node.kind !== "asset") return [];
@@ -327,6 +336,7 @@ function activeBoardReference(
 
 function boardNodeReferences(
   node: BoardDocument["nodes"][number] | undefined,
+  nodes: BoardDocument["nodes"],
   items: StorageItem[],
   resolveUrl: BoardReferenceUrlResolver,
 ): ReferenceImageRef[] {
@@ -342,7 +352,11 @@ function boardNodeReferences(
     }));
   }
   if (node?.kind === "image-generate" || node?.kind === "video-generate" || node?.kind === "runninghub-app") {
-    const item = items.find(current => current.id === node.resultAssetId && current.status === "complete");
+    const item = activeExecutableResultItem(nodes, node, items);
+    return item ? [{ id: item.id, type: item.type, url: resolveUrl(item.id, item.url), role: "general" }] : [];
+  }
+  if (node?.kind === "result") {
+    const item = items.find(current => current.id === node.activeAssetId && current.status === "complete");
     return item ? [{ id: item.id, type: item.type, url: resolveUrl(item.id, item.url), role: "general" }] : [];
   }
   return [];
@@ -354,6 +368,10 @@ function isGenerateBoardNode(node: BoardDocument["nodes"][number] | undefined): 
 
 function isExecutableBoardNode(node: BoardDocument["nodes"][number] | undefined): node is ExecutableBoardNode {
   return isGenerateBoardNode(node) || node?.kind === "runninghub-app";
+}
+
+function isRunningHubAppBoardNode(node: BoardDocument["nodes"][number] | undefined): node is BoardRunningHubAppNode {
+  return node?.kind === "runninghub-app";
 }
 
 function runningHubAppModelValue(node: BoardRunningHubAppNode): string {
@@ -673,7 +691,7 @@ function resolveBoardPatchRunInputs(
     if (operation.to.portId === BOARD_PORT_IDS.referenceIn) {
       const sourceNodeId = resolvePatchNodeId(operation.from.nodeId, tempToRealIds);
       const sourceNode = currentNodes.find(node => node.id === sourceNodeId);
-      references.push(...boardNodeReferences(sourceNode, items, resolveUrl));
+      references.push(...boardNodeReferences(sourceNode, currentNodes, items, resolveUrl));
     }
   });
   return { prompt, references };
@@ -1792,9 +1810,10 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           prompt: sourceNode.asset.prompt,
           url: resolveBoardReferenceUrl(sourceNode.asset.assetId, sourceNode.asset.url),
         }
-        : sourceNode.kind === "image-generate" && sourceNode.resultAssetId
+        : sourceNode.kind === "image-generate"
           ? (() => {
-            const item = items.find(current => current.id === sourceNode.resultAssetId && current.type === "image" && current.status === "complete");
+            const item = activeExecutableResultItem(boardController.board.nodes, sourceNode, items);
+            if (item?.type !== "image") return null;
             return item
               ? { assetId: item.id, model: item.model, prompt: item.prompt, url: resolveBoardReferenceUrl(item.id, item.url) }
               : null;
@@ -2617,10 +2636,14 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     resolveOriginalStorageItem,
   ]);
 
-  const resolveGenerateNodeInputs = useCallback((nodeId: string) => {
+  const resolveExecutableNodeInputs = useCallback(<T extends ExecutableBoardNode,>(
+    nodeId: string,
+    isExpectedNode: (node: BoardDocument["nodes"][number] | undefined) => node is T,
+    errorMessage: string,
+  ) => {
     const node = boardController.board.nodes.find(item => item.id === nodeId);
-    if (!isGenerateBoardNode(node)) {
-      throw new Error("请选择图片或视频生成节点");
+    if (!isExpectedNode(node)) {
+      throw new Error(errorMessage);
     }
 
     const promptEdge = boardController.board.edges.find(edge => edge.to.nodeId === nodeId && edge.to.portId === "prompt-in");
@@ -2633,31 +2656,18 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     const references: ReferenceImageRef[] = boardController.board.edges
       .filter(edge => edge.to.nodeId === nodeId && edge.to.portId === "reference-in")
       .map(edge => boardController.board.nodes.find(item => item.id === edge.from.nodeId))
-      .flatMap(item => boardNodeReferences(item, items, resolveBoardReferenceUrl));
+      .flatMap(item => boardNodeReferences(item, boardController.board.nodes, items, resolveBoardReferenceUrl));
 
     return { node, prompt: resolvedPrompt, references };
   }, [boardController.board.edges, boardController.board.nodes, items, resolveBoardReferenceUrl]);
+
+  const resolveGenerateNodeInputs = useCallback((nodeId: string) => {
+    return resolveExecutableNodeInputs(nodeId, isGenerateBoardNode, "请选择图片或视频生成节点");
+  }, [resolveExecutableNodeInputs]);
 
   const resolveRunningHubAppNodeInputs = useCallback((nodeId: string) => {
-    const node = boardController.board.nodes.find(item => item.id === nodeId);
-    if (node?.kind !== "runninghub-app") {
-      throw new Error("请选择 RunningHub 应用节点");
-    }
-
-    const promptEdge = boardController.board.edges.find(edge => edge.to.nodeId === nodeId && edge.to.portId === "prompt-in");
-    const promptNode = promptEdge
-      ? boardController.board.nodes.find(item => item.id === promptEdge.from.nodeId)
-      : undefined;
-    const resolvedPrompt = promptNode?.kind === "prompt"
-      ? (getBoardTextDraft(promptNode.id) ?? promptNode.prompt)
-      : (getBoardTextDraft(node.id) ?? node.prompt);
-    const references: ReferenceImageRef[] = boardController.board.edges
-      .filter(edge => edge.to.nodeId === nodeId && edge.to.portId === "reference-in")
-      .map(edge => boardController.board.nodes.find(item => item.id === edge.from.nodeId))
-      .flatMap(item => boardNodeReferences(item, items, resolveBoardReferenceUrl));
-
-    return { node, prompt: resolvedPrompt, references };
-  }, [boardController.board.edges, boardController.board.nodes, items, resolveBoardReferenceUrl]);
+    return resolveExecutableNodeInputs(nodeId, isRunningHubAppBoardNode, "请选择 RunningHub 应用节点");
+  }, [resolveExecutableNodeInputs]);
 
   const handleExecuteGenerateNode = useCallback(async (nodeId: string) => {
     try {
@@ -2852,6 +2862,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     }
   }, [
     boardController,
+    generateManualAudio,
     generateManualImage,
     generateManualVideo,
     pushWorkspaceNotice,
@@ -2874,7 +2885,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     const references = boardController.board.edges
       .filter(edge => edge.to.nodeId === nodeId && edge.to.portId === "agent-context-in")
       .map(edge => boardController.board.nodes.find(item => item.id === edge.from.nodeId))
-      .flatMap(item => boardNodeReferences(item, items, resolveBoardReferenceUrl))
+      .flatMap(item => boardNodeReferences(item, boardController.board.nodes, items, resolveBoardReferenceUrl))
       .slice(0, IMAGE_REFERENCE_LIMIT);
 
     setAgentReferences(references);
