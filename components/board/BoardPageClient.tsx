@@ -33,6 +33,7 @@ import { useBoardAssetStore } from "@/hooks/useBoardAssetStore";
 import { collectPlacedBoardAssetIdsFromNodes } from "@/lib/assets/board-scope";
 import { saveItemWithPreview } from "@/lib/assets/previews";
 import { resolveAssetOriginalUrl } from "@/lib/assets/resolve-url";
+import { estimateBoardNoteSize, estimateBoardPromptSize } from "@/lib/board/text-node-size";
 import { findResultNodeForSource } from "@/lib/board/utils";
 import { generateReferenceCandidates } from "@/lib/board/prompt-references";
 import { useBoardState } from "@/hooks/useBoardState";
@@ -85,8 +86,6 @@ import {
   DEFAULT_AGENT_NODE_SIZE,
   DEFAULT_ASSET_NODE_SIZE,
   DEFAULT_GENERATE_NODE_SIZE,
-  DEFAULT_NOTE_NODE_SIZE,
-  DEFAULT_PROMPT_NODE_SIZE,
   BOARD_PORT_IDS,
   createEmptyBoard,
   deleteBoardFromDB,
@@ -590,10 +589,12 @@ function createPreviewBoardNode(operation: AgentBoardPatchCreateNodeOperation, i
     updatedAt: createdAt,
   };
   if (operation.kind === "prompt") {
-    return { ...base, kind: "prompt", size: DEFAULT_PROMPT_NODE_SIZE, prompt: operation.prompt ?? "" };
+    const prompt = operation.prompt ?? "";
+    return { ...base, kind: "prompt", size: estimateBoardPromptSize(prompt), prompt };
   }
   if (operation.kind === "note") {
-    return { ...base, kind: "note", size: DEFAULT_NOTE_NODE_SIZE, body: operation.body ?? operation.prompt ?? "" };
+    const body = operation.body ?? operation.prompt ?? "";
+    return { ...base, kind: "note", size: estimateBoardNoteSize(body), body };
   }
   if (operation.kind === "agent") {
     return { ...base, kind: "agent", size: DEFAULT_AGENT_NODE_SIZE, instruction: operation.instruction ?? operation.prompt ?? "" };

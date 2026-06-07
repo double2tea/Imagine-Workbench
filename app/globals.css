@@ -249,11 +249,6 @@ html[data-imagine-theme="light"],
   color: var(--iw-text);
 }
 
-.imagine-board-node-note {
-  background: #fefce8;
-  color: #0f172a;
-}
-
 .imagine-board-edge {
   /* hook for future per-kind refinements */
 }

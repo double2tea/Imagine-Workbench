@@ -72,6 +72,7 @@ import {
   resolveBoardConnectionKind,
   resolveBoardConnectionNodesWithCompatibleModel,
 } from "@/lib/board/ports";
+import { clampBoardTextNodeSize, estimateBoardNoteSize, estimateBoardPromptSize } from "@/lib/board/text-node-size";
 import { findResultNodeForSource, isResultSourceNode, resultNodeDefaultPosition } from "@/lib/board/utils";
 import { findAvailableBoardNodePosition } from "@/lib/board/placement";
 
@@ -612,10 +613,16 @@ function normalizeBoardNode(node: unknown, index: number): BoardNode | null {
     };
   }
   if (node.kind === "prompt") {
+    const prompt = typeof node.prompt === "string" ? node.prompt : "";
+    const estimatedPromptSize = estimateBoardPromptSize(prompt);
     return {
       ...shell,
       kind: "prompt",
-      prompt: typeof node.prompt === "string" ? node.prompt : "",
+      prompt,
+      size: clampBoardTextNodeSize({
+        width: Math.max(shell.size.width, estimatedPromptSize.width),
+        height: Math.max(shell.size.height, estimatedPromptSize.height),
+      }, DEFAULT_PROMPT_NODE_SIZE),
     };
   }
   if (node.kind === "reference-group") {
@@ -716,12 +723,19 @@ function normalizeBoardNode(node: unknown, index: number): BoardNode | null {
       instruction: typeof node.instruction === "string" ? node.instruction : "",
     };
   }
+  const noteBody = typeof node.body === "string" ? node.body : "";
+  const noteVariant = node.variant === "transcript" ? "transcript" : "plain";
+  const estimatedNoteSize = estimateBoardNoteSize(noteBody, noteVariant);
   return {
     ...shell,
     kind: "note",
-    body: typeof node.body === "string" ? node.body : "",
+    body: noteBody,
     source: normalizeNoteSource(node.source),
-    variant: node.variant === "transcript" ? "transcript" : "plain",
+    size: clampBoardTextNodeSize({
+      width: Math.max(shell.size.width, estimatedNoteSize.width),
+      height: Math.max(shell.size.height, estimatedNoteSize.height),
+    }, DEFAULT_NOTE_NODE_SIZE),
+    variant: noteVariant,
   };
 }
 
@@ -1480,13 +1494,14 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
   const addPromptNode = useCallback((input: CreatePromptNodeInput = {}): string => {
     const createdAt = nowIso();
     const nodeId = createBoardId("prompt");
+    const prompt = input.prompt ?? "";
     const node: BoardPromptNode = {
       id: nodeId,
       kind: "prompt",
       title: input.title ?? "Prompt",
-      prompt: input.prompt ?? "",
+      prompt,
       position: input.position ?? moveDefaultPosition(board.nodes),
-      size: input.size ?? DEFAULT_PROMPT_NODE_SIZE,
+      size: input.size ? clampBoardTextNodeSize(input.size, DEFAULT_PROMPT_NODE_SIZE) : estimateBoardPromptSize(prompt),
       createdAt,
       updatedAt: createdAt,
     };
@@ -1690,15 +1705,17 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
   const addNoteNode = useCallback((input: CreateNoteNodeInput = {}): string => {
     const createdAt = nowIso();
     const nodeId = createBoardId("note");
+    const body = input.body ?? "";
+    const variant = input.variant ?? "plain";
     const node: BoardNode = {
       id: nodeId,
       kind: "note",
       title: input.title ?? "Note",
-      body: input.body ?? "",
+      body,
       source: input.source,
-      variant: input.variant ?? "plain",
+      variant,
       position: input.position ?? moveDefaultPosition(board.nodes),
-      size: input.size ?? DEFAULT_NOTE_NODE_SIZE,
+      size: input.size ? clampBoardTextNodeSize(input.size, DEFAULT_NOTE_NODE_SIZE) : estimateBoardNoteSize(body, variant),
       createdAt,
       updatedAt: createdAt,
     };
@@ -1712,15 +1729,17 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
   const addNoteNodeWithConnection = useCallback((input: CreateNoteNodeInput, from: BoardPortRef): string => {
     const createdAt = nowIso();
     const nodeId = createBoardId("note");
+    const body = input.body ?? "";
+    const variant = input.variant ?? "plain";
     const node: BoardNode = {
       id: nodeId,
       kind: "note",
       title: input.title ?? "Note",
-      body: input.body ?? "",
+      body,
       source: input.source,
-      variant: input.variant ?? "plain",
+      variant,
       position: input.position ?? moveDefaultPosition(board.nodes),
-      size: input.size ?? DEFAULT_NOTE_NODE_SIZE,
+      size: input.size ? clampBoardTextNodeSize(input.size, DEFAULT_NOTE_NODE_SIZE) : estimateBoardNoteSize(body, variant),
       createdAt,
       updatedAt: createdAt,
     };
@@ -2270,7 +2289,19 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     mutateBoard(
       currentBoard => touchBoard(
         currentBoard,
-        currentBoard.nodes.map(node => (node.id === nodeId && node.kind === "prompt" ? { ...node, prompt, updatedAt } : node)),
+        currentBoard.nodes.map(node => {
+          if (node.id !== nodeId || node.kind !== "prompt") return node;
+          const estimatedSize = estimateBoardPromptSize(prompt);
+          return {
+            ...node,
+            prompt,
+            size: clampBoardTextNodeSize({
+              width: Math.max(node.size.width, estimatedSize.width),
+              height: Math.max(node.size.height, estimatedSize.height),
+            }, DEFAULT_PROMPT_NODE_SIZE),
+            updatedAt,
+          };
+        }),
       ),
       { skipUndo: true },
     );
@@ -2336,7 +2367,19 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     mutateBoard(
       currentBoard => touchBoard(
         currentBoard,
-        currentBoard.nodes.map(node => (node.id === nodeId && node.kind === "note" ? { ...node, body, updatedAt } : node)),
+        currentBoard.nodes.map(node => {
+          if (node.id !== nodeId || node.kind !== "note") return node;
+          const estimatedSize = estimateBoardNoteSize(body, node.variant ?? "plain");
+          return {
+            ...node,
+            body,
+            size: clampBoardTextNodeSize({
+              width: Math.max(node.size.width, estimatedSize.width),
+              height: Math.max(node.size.height, estimatedSize.height),
+            }, DEFAULT_NOTE_NODE_SIZE),
+            updatedAt,
+          };
+        }),
       ),
       { skipUndo: true },
     );
