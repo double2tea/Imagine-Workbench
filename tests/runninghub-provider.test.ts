@@ -1180,7 +1180,14 @@ test("chat completions can request json object responses", async () => {
 test("chat json parser reports plain text as a json parse error", () => {
   assert.throws(
     () => parseJsonObjectText("plain response"),
-    ChatJsonParseError,
+    (error: unknown) => error instanceof ChatJsonParseError && error.kind === "missing",
+  );
+});
+
+test("chat json parser distinguishes malformed json objects", () => {
+  assert.throws(
+    () => parseJsonObjectText("{bad json}"),
+    (error: unknown) => error instanceof ChatJsonParseError && error.kind === "malformed",
   );
 });
 

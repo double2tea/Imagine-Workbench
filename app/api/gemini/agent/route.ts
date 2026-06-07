@@ -463,6 +463,7 @@ function parseAgentPayloadText(text: string): unknown {
     return parseJsonObjectText(text);
   } catch (error) {
     if (!(error instanceof ChatJsonParseError)) throw error;
+    if (error.kind !== "missing") throw error;
     const fallbackText = text.trim();
     return {
       thought: "Provider returned plain text instead of Agent JSON.",

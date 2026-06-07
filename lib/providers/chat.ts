@@ -14,10 +14,15 @@ interface ChatCompletionOptions {
   responseFormat?: { type: "json_object" };
 }
 
+export type ChatJsonParseErrorKind = "missing" | "malformed";
+
 export class ChatJsonParseError extends Error {
-  constructor(message = "Chat completion did not return valid JSON") {
+  kind: ChatJsonParseErrorKind;
+
+  constructor(kind: ChatJsonParseErrorKind, message = "Chat completion did not return valid JSON") {
     super(message);
     this.name = "ChatJsonParseError";
+    this.kind = kind;
   }
 }
 
@@ -99,8 +104,8 @@ export function parseJsonObjectText(text: string): unknown {
       return JSON.parse(trimmed.slice(start, end + 1));
     }
   } catch (error) {
-    throw new ChatJsonParseError(error instanceof Error ? error.message : undefined);
+    throw new ChatJsonParseError("malformed", error instanceof Error ? error.message : undefined);
   }
 
-  throw new ChatJsonParseError();
+  throw new ChatJsonParseError("missing");
 }
