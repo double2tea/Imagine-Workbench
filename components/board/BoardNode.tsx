@@ -7,12 +7,8 @@ import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
 import MediaReferenceThumbnail from "@/components/reference/MediaReferenceThumbnail";
 import type {
   BoardAgentNode,
-  BoardGenerateNodeUpdate,
   BoardNode as BoardNodeModel,
   BoardPortKind,
-  BoardReferenceRole,
-  BoardRunningHubAppNodeUpdate,
-  BoardRunningHubAppSchemaResult,
 } from "@/lib/board";
 import AgentBoardNode from "@/components/board/AgentBoardNode";
 import AssetBoardNode from "@/components/board/AssetBoardNode";
@@ -25,7 +21,7 @@ import RunningHubAppBoardNode from "@/components/board/RunningHubAppBoardNode";
 import type { StorageItem } from "@/lib/db";
 import type { BoardPromptReference } from "@/lib/board/prompt-references";
 import { BOARD_PORT_IDS, getBoardNodePortDefinitions } from "@/lib/board/ports";
-import type { CapturedVideoFrame } from "@/lib/video-frame";
+import { useBoardNodeCallbacks } from "@/lib/board/callbacks";
 
 export interface BoardFlowNodeData extends Record<string, unknown> {
   boardId: string;
@@ -35,35 +31,7 @@ export interface BoardFlowNodeData extends Record<string, unknown> {
   generateTaskSummary?: BoardGenerateTaskSummary;
   hasResultConnection?: boolean;
   node: BoardNodeModel;
-  onDelete: (nodeId: string) => void;
-  onCancelGenerate: (nodeId: string) => void;
-  onOpenAssetCompare?: (nodeId: string) => void;
-  onDownloadAsset: (item: StorageItem) => void;
-  onOpenFullscreen: (item: StorageItem) => void;
-  onOpenPanorama: (item: StorageItem) => void;
   promptReferences: BoardPromptReference[];
-  onCaptureVideoFrame: (nodeId: string, item: StorageItem, frame: CapturedVideoFrame) => void | Promise<void>;
-  onEditAssetImage: (nodeId: string) => void;
-  onExecuteGenerate: (nodeId: string) => void;
-  onFetchRunningHubAppSchema: (webappId: string) => Promise<BoardRunningHubAppSchemaResult>;
-  onFocusReferenceSource: (nodeId: string) => void;
-  onMoveReferenceGroupItem: (nodeId: string, assetId: string, direction: "up" | "down") => void;
-  onMoveGenerateReferenceEdge: (nodeId: string, sourceEdgeId: string, targetEdgeId: string) => void;
-  onMaterializeGenerateResult: (nodeId: string, assetId: string) => void;
-  onRemoveReferenceGroupItem: (nodeId: string, assetId: string) => void;
-  onSendAgent: (nodeId: string) => void;
-  onSendAssetToAgent: (nodeId: string) => void;
-  onSelectPromptReference: (nodeId: string, reference: BoardPromptReference) => void;
-  onSelectAssetStackResult: (nodeId: string, assetId: string) => void;
-  onSelectGenerateResult: (nodeId: string, assetId: string) => void;
-  onUpdateReferenceGroupItemRole: (nodeId: string, assetId: string, role: BoardReferenceRole) => void;
-  onUpdateAgent: (nodeId: string, instruction: string) => void;
-  onUpdateGenerate: (nodeId: string, input: BoardGenerateNodeUpdate) => void;
-  onMeasureAssetAspectRatio: (nodeId: string, aspectRatio: number) => void;
-  onUpdateNodeTitle: (nodeId: string, title: string) => void;
-  onUpdateRunningHubApp: (nodeId: string, input: BoardRunningHubAppNodeUpdate) => void;
-  onUpdateNote: (nodeId: string, body: string) => void;
-  onUpdatePrompt: (nodeId: string, prompt: string) => void;
   activeResultAssetId?: string;
   assetStackItems: StorageItem[];
   resultItems: StorageItem[];
@@ -219,6 +187,7 @@ function GenerateReferenceShelf({
 }
 
 function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
+  const c = useBoardNodeCallbacks();
   const { node } = data;
   const isMediaNode = node.kind === "asset" || node.kind === "result";
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -234,7 +203,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
 
   const commitTitleEdit = () => {
     setIsEditingTitle(false);
-    if (draftTitle !== node.title) data.onUpdateNodeTitle(node.id, draftTitle);
+    if (draftTitle !== node.title) c.onUpdateNodeTitle(node.id, draftTitle);
   };
 
   const handleForPort = (port: (typeof ports)[number]) => {
@@ -307,8 +276,8 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
         <GenerateReferenceShelf
           nodeId={node.id}
           references={data.generateInputSummary?.referencePreviews ?? []}
-          onFocusReferenceSource={data.onFocusReferenceSource}
-          onMoveReference={data.onMoveGenerateReferenceEdge}
+          onFocusReferenceSource={c.onFocusReferenceSource}
+          onMoveReference={c.onMoveGenerateReferenceEdge}
         />
       ) : null}
 
@@ -375,15 +344,15 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             activeStackAssetId={node.asset.assetId}
             stackItems={data.assetStackItems}
             compareReferenceUrl={data.compareReferenceUrl}
-            onCaptureVideoFrame={data.onCaptureVideoFrame}
-            onCompare={data.onOpenAssetCompare ? () => data.onOpenAssetCompare?.(node.id) : undefined}
-            onEditImage={data.onEditAssetImage}
-            onDownload={data.onDownloadAsset}
-            onMeasureAspectRatio={data.onMeasureAssetAspectRatio}
-            onOpenFullscreen={data.onOpenFullscreen}
-            onOpenPanorama={data.onOpenPanorama}
-            onSelectStackAsset={assetId => data.onSelectAssetStackResult(node.id, assetId)}
-            onSendToAgent={data.onSendAssetToAgent}
+            onCaptureVideoFrame={c.onCaptureVideoFrame}
+            onCompare={c.onOpenAssetCompare ? () => c.onOpenAssetCompare?.(node.id) : undefined}
+            onEditImage={c.onEditAssetImage}
+            onDownload={c.onDownloadAsset}
+            onMeasureAspectRatio={c.onMeasureAssetAspectRatio}
+            onOpenFullscreen={c.onOpenFullscreen}
+            onOpenPanorama={c.onOpenPanorama}
+            onSelectStackAsset={assetId => c.onSelectAssetStackResult(node.id, assetId)}
+            onSendToAgent={c.onSendAssetToAgent}
           />
         )}
         {node.kind === "result" && (
@@ -392,28 +361,28 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             isSelected={selected === true}
             node={node}
             stackItems={data.assetStackItems}
-            onCaptureVideoFrame={data.onCaptureVideoFrame}
-            onDownload={data.onDownloadAsset}
-            onMeasureAspectRatio={data.onMeasureAssetAspectRatio}
-            onOpenFullscreen={data.onOpenFullscreen}
-            onOpenPanorama={data.onOpenPanorama}
-            onSelectStackAsset={assetId => data.onSelectAssetStackResult(node.id, assetId)}
+            onCaptureVideoFrame={c.onCaptureVideoFrame}
+            onDownload={c.onDownloadAsset}
+            onMeasureAspectRatio={c.onMeasureAssetAspectRatio}
+            onOpenFullscreen={c.onOpenFullscreen}
+            onOpenPanorama={c.onOpenPanorama}
+            onSelectStackAsset={assetId => c.onSelectAssetStackResult(node.id, assetId)}
           />
         )}
         {node.kind === "prompt" && (
           <PromptBoardNode
             node={node}
             references={data.promptReferences}
-            onChange={prompt => data.onUpdatePrompt(node.id, prompt)}
-            onSelectReference={reference => data.onSelectPromptReference(node.id, reference)}
+            onChange={prompt => c.onUpdatePrompt(node.id, prompt)}
+            onSelectReference={reference => c.onSelectPromptReference(node.id, reference)}
           />
         )}
         {node.kind === "reference-group" && (
           <ReferenceGroupBoardNode
             node={node}
-            onMove={(assetId, direction) => data.onMoveReferenceGroupItem(node.id, assetId, direction)}
-            onRemove={assetId => data.onRemoveReferenceGroupItem(node.id, assetId)}
-            onRoleChange={(assetId, role) => data.onUpdateReferenceGroupItemRole(node.id, assetId, role)}
+            onMove={(assetId, direction) => c.onMoveReferenceGroupItem(node.id, assetId, direction)}
+            onRemove={assetId => c.onRemoveReferenceGroupItem(node.id, assetId)}
+            onRoleChange={(assetId, role) => c.onUpdateReferenceGroupItemRole(node.id, assetId, role)}
           />
         )}
         {(node.kind === "image-generate" || node.kind === "video-generate") && (
@@ -426,13 +395,13 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             activeResultAssetId={data.activeResultAssetId}
             showReferencePreviews={false}
             taskSummary={data.generateTaskSummary}
-            onCancel={() => data.onCancelGenerate(node.id)}
-            onExecute={() => data.onExecuteGenerate(node.id)}
-            onMaterializeResult={assetId => data.onMaterializeGenerateResult(node.id, assetId)}
-            onOpenResult={data.onOpenFullscreen}
-            onSelectResult={assetId => data.onSelectGenerateResult(node.id, assetId)}
-            onSelectReference={reference => data.onSelectPromptReference(node.id, reference)}
-            onUpdate={input => data.onUpdateGenerate(node.id, input)}
+            onCancel={() => c.onCancelGenerate(node.id)}
+            onExecute={() => c.onExecuteGenerate(node.id)}
+            onMaterializeResult={assetId => c.onMaterializeGenerateResult(node.id, assetId)}
+            onOpenResult={c.onOpenFullscreen}
+            onSelectResult={assetId => c.onSelectGenerateResult(node.id, assetId)}
+            onSelectReference={reference => c.onSelectPromptReference(node.id, reference)}
+            onUpdate={input => c.onUpdateGenerate(node.id, input)}
           />
         )}
         {node.kind === "runninghub-app" && (
@@ -441,13 +410,13 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             inputSummary={data.generateInputSummary}
             node={node}
             references={data.generateReferences}
-            onExecute={() => data.onExecuteGenerate(node.id)}
-            onFetchAppSchema={data.onFetchRunningHubAppSchema}
-            onMaterializeResult={assetId => data.onMaterializeGenerateResult(node.id, assetId)}
-            onOpenResult={data.onOpenFullscreen}
-            onSelectResult={assetId => data.onSelectGenerateResult(node.id, assetId)}
-            onSelectReference={reference => data.onSelectPromptReference(node.id, reference)}
-            onUpdate={input => data.onUpdateRunningHubApp(node.id, input)}
+            onExecute={() => c.onExecuteGenerate(node.id)}
+            onFetchAppSchema={c.onFetchRunningHubAppSchema}
+            onMaterializeResult={assetId => c.onMaterializeGenerateResult(node.id, assetId)}
+            onOpenResult={c.onOpenFullscreen}
+            onSelectResult={assetId => c.onSelectGenerateResult(node.id, assetId)}
+            onSelectReference={reference => c.onSelectPromptReference(node.id, reference)}
+            onUpdate={input => c.onUpdateRunningHubApp(node.id, input)}
             resultItems={data.resultItems}
             activeResultAssetId={data.activeResultAssetId}
           />
@@ -455,11 +424,11 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
         {node.kind === "agent" && (
           <AgentBoardNode
             node={node as BoardAgentNode}
-            onSend={() => data.onSendAgent(node.id)}
-            onUpdate={(instruction) => data.onUpdateAgent(node.id, instruction)}
+            onSend={() => c.onSendAgent(node.id)}
+            onUpdate={(instruction) => c.onUpdateAgent(node.id, instruction)}
           />
         )}
-        {node.kind === "note" && <NoteBoardNode node={node} onChange={body => data.onUpdateNote(node.id, body)} />}
+        {node.kind === "note" && <NoteBoardNode node={node} onChange={body => c.onUpdateNote(node.id, body)} />}
       </div>
     </article>
   );

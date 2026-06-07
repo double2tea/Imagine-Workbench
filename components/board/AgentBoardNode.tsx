@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Send } from "lucide-react";
 import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
 import DebouncedBoardTextarea from "@/components/board/DebouncedBoardTextarea";
@@ -9,7 +10,7 @@ interface AgentBoardNodeProps {
   onUpdate: (instruction: string) => void;
 }
 
-export default function AgentBoardNode({ node, onSend, onUpdate }: AgentBoardNodeProps) {
+const AgentBoardNode = memo(function AgentBoardNode({ node, onSend, onUpdate }: AgentBoardNodeProps) {
   return (
     <div className="flex h-full min-h-0 flex-col gap-2 p-3">
       <DebouncedBoardTextarea
@@ -29,4 +30,6 @@ export default function AgentBoardNode({ node, onSend, onUpdate }: AgentBoardNod
       </button>
     </div>
   );
-}
+});
+
+export default AgentBoardNode;

@@ -91,6 +91,7 @@ import {
   type BoardViewport,
   type CreateAssetNodeInput,
 } from "@/lib/board";
+import { BoardNodeCallbacksContext, type BoardNodeCallbacks } from "@/lib/board/callbacks";
 import { BOARD_PORT_IDS, isValidBoardConnection as isValidBoardPortConnection } from "@/lib/board/ports";
 import { BOARD_INSERT_CATALOG, type BoardInsertKind } from "@/lib/board/insert-catalog";
 import { findResultNodeForSource, resultNodeDefaultPosition } from "@/lib/board/utils";
@@ -776,8 +777,7 @@ function buildGenerationTaskFingerprint(tasks: GenerationTask[]): string {
     .map(task => [
       task.id,
       task.status,
-      task.progress,
-      task.createdAt,
+      Math.round(task.progress / 10) * 10,
       task.source.boardNodeId ?? "",
       task.source.resultStackKey ?? "",
     ].join(":"))
@@ -966,6 +966,8 @@ export default function BoardWorkspace({
   const pendingDragPositionByIdRef = useRef<Map<string, BoardPoint>>(new Map());
   const selectionRef = useRef<BoardSelectionSnapshot>({ edgeId: null, nodeId: null, nodeIds: [] });
   const isSyncingFlowNodesRef = useRef(false);
+  const prevFlowDataRef = useRef<Map<string, BoardFlowNode["data"]>>(new Map());
+  const prevFlowNodesRef = useRef<BoardFlowNode[] | null>(null);
   const [quickInsertMenu, setQuickInsertMenu] = useState<QuickInsertMenu | null>(null);
   const [nodeContextMenu, setNodeContextMenu] = useState<BoardNodeContextMenuState | null>(null);
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
@@ -1040,7 +1042,6 @@ export default function BoardWorkspace({
     setViewport,
     updateBoardConfig,
     updateReferenceGroupItemRole,
-    updateAssetNodeAsset,
     updateResultNodeAsset,
     updateAgentInstruction,
     updateGenerateNode,
@@ -1233,11 +1234,34 @@ export default function BoardWorkspace({
 
   const flowNodeDataById = useMemo(() => {
     const dataById = new Map<string, BoardFlowNode["data"]>();
-    // Build result node index for generate nodes to look up
     const resultNodeBySourceId = new Map<string, BoardNodeModel & { kind: "result" }>();
     for (const node of board.nodes) {
       if (node.kind === "result") resultNodeBySourceId.set(node.sourceNodeId, node);
     }
+
+    // Pre-compute references for all prompt/generate nodes in one pass through the graph index
+    const generateRefsByNodeId = new Map<string, BoardPromptReference[]>();
+    const promptRefsByNodeId = new Map<string, BoardPromptReference[]>();
+    for (const node of board.nodes) {
+      if (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app") {
+        generateRefsByNodeId.set(node.id, buildBoardPromptReferences({
+          nodes: board.nodes,
+          edges: board.edges,
+          focus: { kind: "generate", nodeId: node.id },
+          galleryItems: galleryReferenceItems,
+          index: boardPromptReferenceGraphIndex,
+        }));
+      } else if (node.kind === "prompt") {
+        promptRefsByNodeId.set(node.id, buildBoardPromptReferences({
+          nodes: board.nodes,
+          edges: board.edges,
+          focus: { kind: "prompt", nodeId: node.id },
+          galleryItems: galleryReferenceItems,
+          index: boardPromptReferenceGraphIndex,
+        }));
+      }
+    }
+
     for (const node of board.nodes) {
       const connectedResultNode = node.kind === "result" ? node : resultNodeBySourceId.get(node.id);
       const resultAssetIds = node.kind === "result"
@@ -1255,115 +1279,81 @@ export default function BoardWorkspace({
         resultItems: connectedResultNode
           ? connectedResultNode.resultAssetIds.map(id => galleryItemById.get(id)).filter((item): item is StorageItem => item !== undefined && item.status === "complete")
           : [],
-        generateReferences:
-          node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app"
-            ? buildBoardPromptReferences({
-              nodes: board.nodes,
-              edges: board.edges,
-              focus: { kind: "generate", nodeId: node.id },
-              galleryItems: galleryReferenceItems,
-              index: boardPromptReferenceGraphIndex,
-            })
-            : [],
-        promptReferences:
-          node.kind === "prompt"
-            ? buildBoardPromptReferences({
-              nodes: board.nodes,
-              edges: board.edges,
-              focus: { kind: "prompt", nodeId: node.id },
-              galleryItems: galleryReferenceItems,
-              index: boardPromptReferenceGraphIndex,
-            })
-            : [],
+        generateReferences: generateRefsByNodeId.get(node.id) ?? [],
+        promptReferences: promptRefsByNodeId.get(node.id) ?? [],
         compareReferenceUrl:
           node.kind === "asset" && node.asset.type === "image"
             ? assetCompareReferenceUrl(node.id, board.nodes, board.edges, boardPromptReferenceGraphIndex)
             : null,
-        onCaptureVideoFrame,
-        onCancelGenerate: onCancelGenerateNode,
-        onOpenAssetCompare: (nodeId: string) => {
-          const assetNode = board.nodes.find(item => item.id === nodeId);
-          if (assetNode?.kind !== "asset" || assetNode.asset.type !== "image") return;
-          const originalUrl = assetCompareReferenceUrl(nodeId, board.nodes, board.edges, boardPromptReferenceGraphIndex);
-          if (!originalUrl) return;
-          setAssetCompare({ originalUrl, resultUrl: assetNode.asset.url });
-        },
-        onDelete: trashAndDeleteNode,
-        onDownloadAsset,
-        onEditAssetImage,
-        onExecuteGenerate: onExecuteGenerateNode,
-        onFetchRunningHubAppSchema,
-        onFocusReferenceSource: focusReferenceSourceNode,
-        onOpenFullscreen,
-        onOpenPanorama,
-        onMaterializeGenerateResult: materializeGenerateResult,
-        onMoveGenerateReferenceEdge: moveGenerateReferenceEdge,
-        onMoveReferenceGroupItem: moveReferenceGroupItem,
-        onRemoveReferenceGroupItem: removeReferenceGroupItem,
-        onSendAgent: onSendAgentNode,
-        onSendAssetToAgent,
-        onSelectAssetStackResult: (nodeId: string, assetId: string) => {
-          const item = galleryItemById.get(assetId);
-          if (!item || item.status !== "complete") {
-            onConnectionError("找不到生成结果资产");
-            return;
-          }
-          updateResultNodeAsset(nodeId, assetId);
-        },
-        onSelectGenerateResult: (nodeId: string, assetId: string) => {
-          const item = galleryItemById.get(assetId);
-          const connectedResultNode = findResultNodeForSource(board.nodes, nodeId);
-          if (item?.status === "complete" && connectedResultNode) {
-            updateResultNodeAsset(connectedResultNode.id, assetId);
-          }
-        },
-        onSelectPromptReference: connectSelectedBoardPromptReference,
-        onUpdateReferenceGroupItemRole: updateReferenceGroupItemRole,
-        onUpdateAgent: updateAgentInstruction,
-        onUpdateGenerate: updateGenerateNode,
-        onMeasureAssetAspectRatio: measureAssetAspectRatio,
-        onUpdateNodeTitle: updateNodeTitle,
-        onUpdateRunningHubApp: updateRunningHubAppNode,
-        onUpdateNote: updateNoteBody,
-        onUpdatePrompt: updatePromptNode,
       });
     }
     return dataById;
-    // board.nodes / board.edges read when graph content changes; omit to skip position-only updates
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-      boardGraphContentKey,
-      boardPromptReferenceGraphIndex,
-      galleryReferenceFingerprint,
-      galleryReferenceItems,
-      galleryItemById,
-    onCancelGenerateNode,
+    boardGraphContentKey,
+    boardPromptReferenceGraphIndex,
+    galleryReferenceFingerprint,
+    galleryReferenceItems,
+    galleryItemById,
+  ]);
+
+  const boardNodeCallbacks = useMemo<BoardNodeCallbacks>(() => ({
     onCaptureVideoFrame,
+    onCancelGenerate: onCancelGenerateNode,
+    onDelete: trashAndDeleteNode,
     onDownloadAsset,
     onEditAssetImage,
-    onExecuteGenerateNode,
+    onExecuteGenerate: onExecuteGenerateNode,
     onFetchRunningHubAppSchema,
-    focusReferenceSourceNode,
-    onConnectionError,
+    onFocusReferenceSource: focusReferenceSourceNode,
     onOpenFullscreen,
     onOpenPanorama,
-    materializeGenerateResult,
-    moveReferenceGroupItem,
-    moveGenerateReferenceEdge,
-    removeReferenceGroupItem,
+    onMaterializeGenerateResult: materializeGenerateResult,
+    onMoveGenerateReferenceEdge: moveGenerateReferenceEdge,
+    onMoveReferenceGroupItem: moveReferenceGroupItem,
+    onRemoveReferenceGroupItem: removeReferenceGroupItem,
+    onSendAgent: onSendAgentNode,
     onSendAssetToAgent,
-    onSendAgentNode,
-    connectSelectedBoardPromptReference,
-    measureAssetAspectRatio,
-    trashAndDeleteNode,
-    updateReferenceGroupItemRole,
-    updateAssetNodeAsset,
-    updateAgentInstruction,
-    updateGenerateNode,
-    updateNodeTitle,
-    updateNoteBody,
-    updatePromptNode,
-    updateRunningHubAppNode,
+    onSelectPromptReference: connectSelectedBoardPromptReference,
+    onUpdateReferenceGroupItemRole: updateReferenceGroupItemRole,
+    onUpdateAgent: updateAgentInstruction,
+    onUpdateGenerate: updateGenerateNode,
+    onMeasureAssetAspectRatio: measureAssetAspectRatio,
+    onUpdateNodeTitle: updateNodeTitle,
+    onUpdateRunningHubApp: updateRunningHubAppNode,
+    onUpdateNote: updateNoteBody,
+    onUpdatePrompt: updatePromptNode,
+    onOpenAssetCompare: (nodeId: string) => {
+      const assetNode = board.nodes.find(item => item.id === nodeId);
+      if (assetNode?.kind !== "asset" || assetNode.asset.type !== "image") return;
+      const originalUrl = assetCompareReferenceUrl(nodeId, board.nodes, board.edges, boardPromptReferenceGraphIndex);
+      if (!originalUrl) return;
+      setAssetCompare({ originalUrl, resultUrl: assetNode.asset.url });
+    },
+    onSelectAssetStackResult: (nodeId: string, assetId: string) => {
+      const item = galleryItemById.get(assetId);
+      if (!item || item.status !== "complete") {
+        onConnectionError("找不到生成结果资产");
+        return;
+      }
+      updateResultNodeAsset(nodeId, assetId);
+    },
+    onSelectGenerateResult: (nodeId: string, assetId: string) => {
+      const item = galleryItemById.get(assetId);
+      const connectedResultNode = findResultNodeForSource(board.nodes, nodeId);
+      if (item?.status === "complete" && connectedResultNode) {
+        updateResultNodeAsset(connectedResultNode.id, assetId);
+      }
+    },
+  }), [
+    onCancelGenerateNode, onCaptureVideoFrame, trashAndDeleteNode, onDownloadAsset, onEditAssetImage,
+    onExecuteGenerateNode, onFetchRunningHubAppSchema, focusReferenceSourceNode, onOpenFullscreen,
+    onOpenPanorama, materializeGenerateResult, moveGenerateReferenceEdge, moveReferenceGroupItem,
+    removeReferenceGroupItem, onSendAgentNode, onSendAssetToAgent, connectSelectedBoardPromptReference,
+    updateReferenceGroupItemRole, updateAgentInstruction, updateGenerateNode, measureAssetAspectRatio,
+    updateNodeTitle, updateRunningHubAppNode, updateNoteBody, updatePromptNode,
+    board.nodes, board.edges, boardPromptReferenceGraphIndex, galleryItemById, onConnectionError,
+    updateResultNodeAsset,
   ]);
 
   const generateTaskByNodeId = useMemo(() => {
@@ -1406,9 +1396,11 @@ export default function BoardWorkspace({
     }
 
     for (const [nodeId, task] of activeByNodeId) {
+      // Round progress to nearest 10 to avoid full recomputation on tiny progress bumps
+      const roundedProgress = Math.round(task.progress / 10) * 10;
       map.set(nodeId, {
         id: task.id,
-        progress: task.progress,
+        progress: roundedProgress,
         status: task.status,
       });
     }
@@ -1417,26 +1409,53 @@ export default function BoardWorkspace({
   }, [boardGraphContentKey, boardPromptReferenceGraphIndex, galleryTaskFingerprint, generationTaskFingerprint]);
 
   const flowNodes = useMemo<BoardFlowNode[]>(
-    () =>
-      board.nodes.map(node => {
+    () => {
+      const prevData = prevFlowDataRef.current;
+      const nextData = new Map<string, BoardFlowNode["data"]>();
+      const result = board.nodes.map(node => {
         const cachedData = flowNodeDataById.get(node.id);
         if (!cachedData) {
           throw new Error(`Missing flow data for board node ${node.id}`);
         }
-        return {
-          id: node.id,
-          type: "board",
-          position: node.position,
-          data: {
+        const taskSummary =
+          node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app"
+            ? generateTaskByNodeId.get(node.id)
+            : undefined;
+        const existing = prevData.get(node.id);
+        let data: BoardFlowNode["data"];
+        if (
+          existing &&
+          existing.node === node &&
+          existing.generateTaskSummary === taskSummary &&
+          existing.generateReferences === cachedData.generateReferences &&
+          existing.promptReferences === cachedData.promptReferences &&
+          existing.generateInputSummary === cachedData.generateInputSummary &&
+          existing.hasResultConnection === cachedData.hasResultConnection &&
+          existing.activeResultAssetId === cachedData.activeResultAssetId &&
+          existing.resultItems === cachedData.resultItems &&
+          existing.assetStackItems === cachedData.assetStackItems &&
+          existing.compareReferenceUrl === cachedData.compareReferenceUrl &&
+          existing.boardId === cachedData.boardId
+        ) {
+          data = existing;
+        } else {
+          data = {
             ...cachedData,
             node,
-            generateTaskSummary:
-              node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app"
-                ? generateTaskByNodeId.get(node.id)
-                : undefined,
-          },
+            generateTaskSummary: taskSummary,
+          };
+        }
+        nextData.set(node.id, data);
+        return {
+          id: node.id,
+          type: "board" as const,
+          position: node.position,
+          data,
         };
-      }),
+      });
+      prevFlowDataRef.current = nextData;
+      return result;
+    },
     // board.nodes read inside; graph content + geometry keys gate rebuilds
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [boardGraphContentKey, boardNodeGeometryKey, flowNodeDataById, generateTaskByNodeId],
@@ -1446,12 +1465,21 @@ export default function BoardWorkspace({
   useLayoutEffect(() => {
     reactFlowNodesRef.current = reactFlowNodes;
   }, [reactFlowNodes]);
+  const hasInitialSyncRef = useRef(false);
   useLayoutEffect(() => {
     if (isNodeDragActiveRef.current) return;
+    if (
+      flowNodes === prevFlowNodesRef.current &&
+      hasInitialSyncRef.current
+    ) return;
+    prevFlowNodesRef.current = flowNodes;
+    skipPositionSyncRef.current = true;
     isSyncingFlowNodesRef.current = true;
     setReactFlowNodes(current => syncReactFlowNodesFromBoard(current, flowNodes, selectedNodeId, selectedNodeIds));
     queueMicrotask(() => {
       isSyncingFlowNodesRef.current = false;
+      hasInitialSyncRef.current = true;
+      skipPositionSyncRef.current = false;
     });
   }, [flowNodes, selectedNodeId, selectedNodeIds, setReactFlowNodes]);
   const flowEdgeColorByKind = useMemo(
@@ -1619,14 +1647,17 @@ export default function BoardWorkspace({
     beginUndoGesture();
     updateNodesPositions(Array.from(positionById, ([nodeId, position]) => ({ nodeId, position })));
     endUndoGesture();
+    skipPositionSyncRef.current = false;
   }, [beginUndoGesture, endUndoGesture, updateNodesPositions]);
 
+  const skipPositionSyncRef = useRef(false);
   const handleNodesChange = useCallback<OnNodesChange<BoardFlowNode>>((changes) => {
     onNodesChange(changes);
 
     const settledPositions: Array<{ nodeId: string; position: BoardPoint }> = [];
     for (const change of changes) {
       if (change.type !== "position" || !change.position || change.dragging === true) continue;
+      if (skipPositionSyncRef.current) continue;
       if (isNodeDragActiveRef.current) {
         pendingDragPositionByIdRef.current.set(change.id, change.position);
         continue;
@@ -1675,9 +1706,7 @@ export default function BoardWorkspace({
   }, [closeOverlayMenus, selectEdge, selectNode, updateSelectedNodeIds]);
 
   const snapToGrid = board.config.snapToGrid;
-  // Always virtualize during drag to reduce the number of DOM nodes React Flow must track
-  // per frame — mitigates the #5674 internal re-render issue on perf-sensitive drag frames.
-  const onlyRenderVisibleBoardElements = isNodeDragActive || board.nodes.length > 20;
+  const onlyRenderVisibleBoardElements = true;
   const shouldRenderMiniMap = board.config.showMiniMap && !isNodeDragActive;
 
   const flowPositionFromClient = useCallback((clientX: number, clientY: number): BoardPoint => {
@@ -2333,6 +2362,7 @@ export default function BoardWorkspace({
           onDrop={handleBoardDrop}
           className={`board-canvas relative min-h-0 bg-[var(--iw-board-canvas-bg)]${isNodeDragActive ? " is-node-dragging" : ""}${isConnectionActive ? " is-connecting" : ""}`}
         >
+          <BoardNodeCallbacksContext.Provider value={boardNodeCallbacks}>
           <ReactFlow
             nodes={reactFlowNodes}
             edges={flowEdges}
@@ -2402,6 +2432,7 @@ export default function BoardWorkspace({
               />
             )}
           </ReactFlow>
+          </BoardNodeCallbacksContext.Provider>
           {board.nodes.length === 0 && <BoardEmptyHint />}
           {quickInsertMenu ? (
             <BoardQuickInsertMenu

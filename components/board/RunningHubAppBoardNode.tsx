@@ -13,7 +13,7 @@ import {
   Settings2,
   Trash2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import BoardPromptTextarea from "@/components/board/BoardPromptTextarea";
 import { BoardResultStack, type BoardGenerateInputSummary } from "@/components/board/GenerateBoardNode";
 import type { StorageItem } from "@/lib/db";
@@ -239,7 +239,7 @@ function resultStatusLabel(hasResultConnection: boolean, resultCount: number): s
   return "未生成";
 }
 
-export default function RunningHubAppBoardNode({
+const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
   hasResultConnection = false,
   inputSummary,
   node,
@@ -678,4 +678,6 @@ export default function RunningHubAppBoardNode({
 
     </div>
   );
-}
+});
+
+export default RunningHubAppBoardNode;

@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { memo, useRef } from "react";
 import BoardPromptTextarea, { type BoardPromptTextareaHandle } from "@/components/board/BoardPromptTextarea";
 import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
 import type { BoardPromptNode } from "@/lib/board";
@@ -18,7 +18,7 @@ interface PromptBoardNodeProps {
   references: BoardPromptReference[];
 }
 
-export default function PromptBoardNode({ node, onChange, onSelectReference, references }: PromptBoardNodeProps) {
+const PromptBoardNode = memo(function PromptBoardNode({ node, onChange, onSelectReference, references }: PromptBoardNodeProps) {
   const textareaRef = useRef<BoardPromptTextareaHandle | null>(null);
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
   const slashCommandRef = useRef<PromptTemplateSlashCommand | null>(null);
@@ -63,4 +63,6 @@ export default function PromptBoardNode({ node, onChange, onSelectReference, ref
       placeholder="写提示词，输入 @ 引用参考图"
     />
   );
-}
+});
+
+export default PromptBoardNode;

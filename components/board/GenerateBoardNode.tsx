@@ -1,4 +1,4 @@
-import { useMemo, useRef, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { memo, useMemo, useRef, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { ImagePlus, Loader2, Play, Plus, Video, X } from "lucide-react";
 import ModelPriceBadge from "@/components/creation/ModelPriceBadge";
 import BoardPromptTextarea, { type BoardPromptTextareaHandle } from "@/components/board/BoardPromptTextarea";
@@ -187,7 +187,7 @@ function statusLineClass(tone: GenerateStatusLineTone): string {
   return "bg-slate-500/45";
 }
 
-export default function GenerateBoardNode({
+const GenerateBoardNode = memo(function GenerateBoardNode({
   hasResultConnection = false,
   inputSummary,
   node,
@@ -426,4 +426,6 @@ export default function GenerateBoardNode({
       </div>
     </div>
   );
-}
+});
+
+export default GenerateBoardNode;

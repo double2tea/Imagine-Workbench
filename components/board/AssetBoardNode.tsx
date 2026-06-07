@@ -1,6 +1,6 @@
 import { Compass, Download, ImageDown, Maximize2, Music, Paintbrush, SlidersHorizontal, Video } from "lucide-react";
 import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
-import { useMemo, useRef } from "react";
+import { memo, useMemo, useRef } from "react";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
 import BoardAudioWaveform from "@/components/board/BoardAudioWaveform";
 import PreviewImage from "@/components/PreviewImage";
@@ -58,7 +58,7 @@ function LightweightMediaPreview({ type }: { type: "audio" | "video" }) {
   );
 }
 
-export default function AssetBoardNode({
+const AssetBoardNode = memo(function AssetBoardNode({
   activeStackAssetId,
   boardId,
   compareReferenceUrl,
@@ -228,4 +228,6 @@ export default function AssetBoardNode({
       )}
     </div>
   );
-}
+});
+
+export default AssetBoardNode;

@@ -1,5 +1,5 @@
 import { Compass, Download, ImageDown, Maximize2, Music, Video } from "lucide-react";
-import { useMemo, useRef } from "react";
+import { memo, useMemo, useRef } from "react";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
 import BoardAudioWaveform from "@/components/board/BoardAudioWaveform";
 import PreviewImage from "@/components/PreviewImage";
@@ -53,7 +53,7 @@ function LightweightMediaPreview({ type }: { type: "audio" | "video" }) {
   );
 }
 
-export default function ResultBoardNode({
+const ResultBoardNode = memo(function ResultBoardNode({
   boardId,
   isSelected = false,
   node,
@@ -187,4 +187,6 @@ export default function ResultBoardNode({
       )}
     </div>
   );
-}
+});
+
+export default ResultBoardNode;

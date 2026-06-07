@@ -1,3 +1,4 @@
+import { memo } from "react";
 import DebouncedBoardTextarea from "@/components/board/DebouncedBoardTextarea";
 import type { BoardNoteNode } from "@/lib/board";
 
@@ -6,7 +7,7 @@ interface NoteBoardNodeProps {
   onChange: (body: string) => void;
 }
 
-export default function NoteBoardNode({ node, onChange }: NoteBoardNodeProps) {
+const NoteBoardNode = memo(function NoteBoardNode({ node, onChange }: NoteBoardNodeProps) {
   return (
     <DebouncedBoardTextarea
       commitId={node.id}
@@ -16,4 +17,6 @@ export default function NoteBoardNode({ node, onChange }: NoteBoardNodeProps) {
       placeholder="笔记"
     />
   );
-}
+});
+
+export default NoteBoardNode;

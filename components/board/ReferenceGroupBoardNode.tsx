@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { ArrowDown, ArrowUp, X } from "lucide-react";
 import MediaReferenceThumbnail from "@/components/reference/MediaReferenceThumbnail";
 import type { BoardReferenceGroupNode, BoardReferenceRole } from "@/lib/board";
@@ -25,7 +26,7 @@ function nextRole(role: BoardReferenceRole): BoardReferenceRole {
   return roleOrder[(index + 1) % roleOrder.length];
 }
 
-export default function ReferenceGroupBoardNode({
+const ReferenceGroupBoardNode = memo(function ReferenceGroupBoardNode({
   node,
   onMove,
   onRemove,
@@ -114,4 +115,6 @@ export default function ReferenceGroupBoardNode({
       </div>
     </div>
   );
-}
+});
+
+export default ReferenceGroupBoardNode;
