@@ -1,7 +1,7 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import { saveItemWithPreview } from "@/lib/assets/previews";
-import { readFetchError } from "@/lib/client-fetch-error";
+import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 import { readImageGenerationPayload } from "@/lib/client-image-response";
 import {
   buildStorageItem,
@@ -81,10 +81,6 @@ interface GenerationOverrides {
 
 function makeClientId(prefix: string): string {
   return `${prefix}_${Date.now()}`;
-}
-
-function toErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message.trim() ? error.message : fallback;
 }
 
 function getStringField(value: unknown, field: string): string | null {

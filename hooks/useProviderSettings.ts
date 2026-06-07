@@ -13,6 +13,7 @@ import {
 } from "@/lib/providers/model-catalog";
 import { getProviderMeta, isKnownProvider, PROVIDER_KEYS } from "@/lib/providers/registry";
 import type { ProviderCredentials } from "@/lib/providers/types";
+import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 
 type ModelCategory = "chat" | "image" | "video" | "audio";
 type NoticeType = "error" | "info" | "success";
@@ -26,26 +27,6 @@ function defaultProviderCredentials(): Record<AiProvider, ProviderCredentials> {
   const record = {} as Record<AiProvider, ProviderCredentials>;
   for (const provider of PROVIDER_KEYS) record[provider] = { apiKey: "", baseUrl: "" };
   return record;
-}
-
-function getStringField(value: unknown, field: string): string | null {
-  if (typeof value !== "object" || value === null || !(field in value)) return null;
-  const record = value as Record<string, unknown>;
-  const fieldValue = record[field];
-  return typeof fieldValue === "string" && fieldValue.trim() ? fieldValue : null;
-}
-
-function toErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message.trim() ? error.message : fallback;
-}
-
-async function readFetchError(response: Response, fallback: string): Promise<string> {
-  try {
-    const data: unknown = await response.json();
-    return getStringField(data, "error") ?? getStringField(data, "message") ?? `${fallback} (HTTP ${response.status})`;
-  } catch {
-    return `${fallback} (HTTP ${response.status})`;
-  }
 }
 
 function isModelOption(value: unknown): value is ModelOption {

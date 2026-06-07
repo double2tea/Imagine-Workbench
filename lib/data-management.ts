@@ -58,6 +58,7 @@ const MODEL_CACHE_KEYS = [
   "imagine_chat_model_options",
   "imagine_image_model_options",
   "imagine_video_model_options",
+  "imagine_audio_model_options",
 ] as const;
 
 const PROVIDER_SETTING_KEYS = [

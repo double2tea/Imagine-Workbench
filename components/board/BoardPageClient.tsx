@@ -141,6 +141,7 @@ import {
   type WorkspaceCleanupKind,
 } from "@/lib/data-management";
 import { CLEAR_WORKSPACE_ASSETS_MESSAGE } from "@/lib/workspace-messages";
+import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 
 type NoticeType = "error" | "info" | "success";
 type MaskDestination = "creative" | "agent" | "board-asset";
@@ -174,19 +175,6 @@ function getStringField(value: unknown, field: string): string | null {
 
 function isUnknownRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
-}
-
-function toErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message.trim() ? error.message : fallback;
-}
-
-async function readFetchError(response: Response, fallback: string): Promise<string> {
-  try {
-    const data: unknown = await response.json();
-    return getStringField(data, "error") ?? getStringField(data, "message") ?? `${fallback} (HTTP ${response.status})`;
-  } catch {
-    return `${fallback} (HTTP ${response.status})`;
-  }
 }
 
 function readRunningHubAppSchemaResult(value: unknown): { name?: string; nodeInfoList: unknown[]; webappId: string } {

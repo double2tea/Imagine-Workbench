@@ -2,7 +2,7 @@ import type { Dispatch, MouseEvent, MutableRefObject, SetStateAction } from "rea
 import JSZip from "jszip";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
 import type { CompareViewType } from "@/components/assets/ComparePanel";
-import { readFetchError } from "@/lib/client-fetch-error";
+import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 import { readImageGenerationPayload } from "@/lib/client-image-response";
 import {
   clearAllDB,
@@ -71,10 +71,6 @@ function getStringField(value: unknown, field: string): string | null {
   const record = value as Record<string, unknown>;
   const fieldValue = record[field];
   return typeof fieldValue === "string" && fieldValue.trim() ? fieldValue : null;
-}
-
-function toErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message.trim() ? error.message : fallback;
 }
 
 function defaultDownloadMimeType(type: StorageItem["type"]): string {

@@ -15,6 +15,7 @@ import {
 } from "@/lib/media-references";
 import type { VideoReferenceMode } from "@/lib/providers/model-catalog";
 import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, compressReferenceImageFile } from "@/lib/reference-images";
+import { toErrorMessage } from "@/lib/client-fetch-error";
 
 export type AtDropdownTarget = "image-prompt" | "video-prompt" | "agent-prompt";
 type PromptReferenceTarget = Exclude<AtDropdownTarget, "agent-prompt">;
@@ -43,10 +44,6 @@ interface UseReferenceStateParams {
 
 function makeClientId(prefix: string): string {
   return `${prefix}_${Date.now()}`;
-}
-
-function toErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message.trim() ? error.message : fallback;
 }
 
 function readFileAsDataUrl(file: File): Promise<string> {

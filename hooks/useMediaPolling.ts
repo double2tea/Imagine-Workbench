@@ -1,6 +1,6 @@
 import { useEffect, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import { saveItemWithPreview } from "@/lib/assets/previews";
-import { readFetchError } from "@/lib/client-fetch-error";
+import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 import { buildStorageItem, type GenerationRequestSnapshot, type StorageItem } from "@/lib/db";
 import { updateGenerationTask, type GenerationTask, type GenerationTaskUpdate } from "@/lib/generation-tasks";
 
@@ -15,10 +15,6 @@ interface UseMediaPollingParams {
   pushWorkspaceNotice: (type: NoticeType, message: string) => void;
   setGenerationTasks: Dispatch<SetStateAction<GenerationTask[]>>;
   setItems: Dispatch<SetStateAction<StorageItem[]>>;
-}
-
-function toErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message.trim() ? error.message : fallback;
 }
 
 function getStringField(value: unknown, field: string): string | null {

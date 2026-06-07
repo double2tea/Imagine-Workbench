@@ -65,10 +65,14 @@ const ResultBoardNode = memo(function ResultBoardNode({
   onOpenPanorama,
   onSelectStackAsset,
 }: ResultBoardNodeProps) {
-  const item = useMemo(() => resultNodeToStorageItem(node, boardId), [boardId, node]);
+  const fallbackItem = useMemo(() => resultNodeToStorageItem(node, boardId), [boardId, node]);
+  const item = useMemo(
+    () => stackItems.find(stackItem => stackItem.id === node.activeAssetId) ?? fallbackItem,
+    [fallbackItem, node.activeAssetId, stackItems],
+  );
   const hasStackSwitcher = stackItems.length > 1;
   const isImagePreviewUrl = item.url.startsWith("data:image/");
-  const shouldRenderAudio = node.asset.type === "audio" && isSelected && item.url.trim();
+  const shouldRenderAudio = item.type === "audio" && isSelected && item.url.trim();
   const videoItem = useSelectedBoardVideoItem(item, isSelected);
   const shouldRenderVideoPlayer = videoItem !== null;
   const captureVideoFrameRef = useRef<VideoFrameCaptureRequest | null>(null);
@@ -76,7 +80,7 @@ const ResultBoardNode = memo(function ResultBoardNode({
   return (
     <div className="board-media-node group/board-video relative flex h-full min-h-0 items-center justify-center overflow-hidden bg-[var(--iw-panel-soft)]">
       <div className="board-media-controls absolute left-2 top-2 z-30 flex gap-1 opacity-0 transition-opacity duration-200 hover:opacity-100 group-hover/board-video:opacity-100">
-        {node.asset.type === "image" && (
+        {item.type === "image" && (
           <button
             type="button"
             onClick={() => onOpenPanorama?.(item)}
@@ -86,7 +90,7 @@ const ResultBoardNode = memo(function ResultBoardNode({
             <Compass className="h-3.5 w-3.5" />
           </button>
         )}
-        {node.asset.type === "video" && onCaptureVideoFrame && shouldRenderVideoPlayer && (
+        {item.type === "video" && onCaptureVideoFrame && shouldRenderVideoPlayer && (
           <button
             type="button"
             onClick={() => void captureVideoFrameRef.current?.("current")}
@@ -118,9 +122,9 @@ const ResultBoardNode = memo(function ResultBoardNode({
           {stackItems.length}
         </div>
       )}
-      {node.asset.type === "image" ? (
+      {item.type === "image" ? (
         <PreviewImage
-          src={node.asset.url}
+          src={item.url}
           alt={node.title}
           draggable={false}
           className="board-media-preview h-full w-full select-none object-cover"
@@ -131,7 +135,7 @@ const ResultBoardNode = memo(function ResultBoardNode({
             }
           }}
         />
-      ) : node.asset.type === "video" && shouldRenderVideoPlayer ? (
+      ) : item.type === "video" && shouldRenderVideoPlayer ? (
         <div className="board-media-player relative h-full w-full">
           <VideoAssetPlayer
             item={videoItem}
@@ -150,17 +154,17 @@ const ResultBoardNode = memo(function ResultBoardNode({
             showFullscreenButton={false}
           />
         </div>
-      ) : node.asset.type === "video" && isImagePreviewUrl ? (
+      ) : item.type === "video" && isImagePreviewUrl ? (
         <PreviewImage
           src={item.url}
           alt={node.title}
           draggable={false}
           className="board-media-preview h-full w-full select-none object-cover"
         />
-      ) : node.asset.type === "audio" && shouldRenderAudio ? (
-        <BoardAudioWaveform src={node.asset.url} />
+      ) : item.type === "audio" && shouldRenderAudio ? (
+        <BoardAudioWaveform src={item.url} />
       ) : (
-        <LightweightMediaPreview type={node.asset.type} />
+        <LightweightMediaPreview type={item.type} />
       )}
       {hasStackSwitcher && (
         <div className="board-media-stack-switcher absolute bottom-3 left-1/2 z-30 flex -translate-x-1/2 gap-2 opacity-0 transition-opacity duration-200 group-hover/board-video:opacity-100">

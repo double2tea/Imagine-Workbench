@@ -1079,10 +1079,6 @@ export const VIDEO_MODEL_OPTIONS = buildProviderOptionsRecord("video", true);
 export const AUDIO_MODEL_OPTIONS = buildProviderOptionsRecord("audio", true);
 export const CHAT_MODEL_OPTIONS = buildProviderOptionsRecord("chat", true);
 
-export function getChatModelOptions(provider: AiProvider): ModelOption[] {
-  return CHAT_MODEL_OPTIONS[provider];
-}
-
 export function getModelCapability(value: string, kind?: ModelKind): ProviderModelCapability {
   const parsed = parseProviderModel(value, "12ai");
   const capability = findModelCapability(parsed.provider, parsed.model, parsed.async, kind);

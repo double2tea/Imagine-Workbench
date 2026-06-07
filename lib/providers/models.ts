@@ -80,14 +80,10 @@ function staticProviderModels(provider: AiProvider, kind: ModelKindFilter): Mode
   if (provider === "runninghub") return runningHubStaticModels(kind);
   if (provider === "modelscope") return modelScopeStaticModels(kind);
 
-  const options = [
-    { value: "agnes:agnes-2.0-flash", label: "Agnes AI Agnes 2.0 Flash" },
-    { value: "agnes:agnes-1.5-flash", label: "Agnes AI Agnes 1.5 Flash" },
-    { value: "agnes:agnes-image-2.1-flash", label: "Agnes AI Image 2.1 Flash" },
-    { value: "agnes:agnes-video-v2.0", label: "Agnes AI Video V2.0" },
-  ].filter(option => parseOptionProvider(option.value) === provider);
-
-  return options.filter(option => matchesKind(option.value, kind));
+  return getModelCapabilities(kind === "all" ? undefined : kind, provider).map(capability => ({
+    value: capability.value,
+    label: capability.label,
+  }));
 }
 
 function modelScopeStaticModels(kind: ModelKindFilter): ModelOption[] {
@@ -126,13 +122,6 @@ function runningHubStaticModels(kind: ModelKindFilter): ModelOption[] {
     ...standardModels,
     ...virtualModels.map(model => ({ value: model.value, label: model.label })),
   ];
-}
-
-function parseOptionProvider(value: string): AiProvider | null {
-  const separator = value.indexOf(":");
-  if (separator === -1) return null;
-  const provider = value.slice(0, separator);
-  return provider === "agnes" || provider === "modelscope" || provider === "runninghub" ? provider : null;
 }
 
 function readModelId(value: unknown, provider: AiProvider, kind: ModelKindFilter): ModelOption[] {

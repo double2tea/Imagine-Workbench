@@ -2,6 +2,7 @@ import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 import { IMAGE_REFERENCE_LIMIT } from "@/hooks/useReferenceState";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import { compressReferenceImageFile } from "@/lib/reference-images";
+import { toErrorMessage } from "@/lib/client-fetch-error";
 
 type NoticeType = "error" | "info" | "success";
 
@@ -26,10 +27,6 @@ function readPastedImageFile(dataTransfer: DataTransfer): File | null {
     item => item.kind === "file" && item.type.startsWith("image/"),
   );
   return imageItem?.getAsFile() ?? null;
-}
-
-function toErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message.trim() ? error.message : fallback;
 }
 
 export function useClipboardImageImport({

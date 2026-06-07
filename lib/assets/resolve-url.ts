@@ -27,10 +27,6 @@ export function invalidateCachedAssetUrl(id: string): void {
   previewUrlCache.delete(id);
 }
 
-export function peekCachedAssetPreviewUrl(id: string): string | undefined {
-  return previewUrlCache.get(id);
-}
-
 export async function resolveAssetPreviewUrl(meta: Pick<StorageItemMeta, "id" | "type" | "url" | "hasBlob">): Promise<string> {
   if (previewUrlCache.has(meta.id)) return previewUrlCache.get(meta.id) ?? "";
 

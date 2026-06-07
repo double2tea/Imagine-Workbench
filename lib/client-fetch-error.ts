@@ -16,6 +16,10 @@ function summarizeTextResponse(text: string): string | null {
   return normalized ? normalized.slice(0, 180) : null;
 }
 
+export function toErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message.trim() ? error.message : fallback;
+}
+
 export async function readFetchError(response: Response, fallback: string): Promise<string> {
   const statusText = `${fallback} (HTTP ${response.status})`;
   const text = await response.text();
