@@ -1,4 +1,5 @@
 import type { AiProvider } from "@/lib/providers/model-catalog";
+import { MIMO_BUILT_IN_VOICES } from "@/lib/providers/mimo-voices";
 
 const VOICE_DB_NAME = "ImagineWorkbenchVoiceDB";
 const VOICE_DB_VERSION = 1;
@@ -23,6 +24,23 @@ export type VoiceProfileInput = Omit<VoiceProfile, "createdAt" | "updatedAt"> & 
   createdAt?: string;
   updatedAt?: string;
 };
+
+const BUILT_IN_PROFILE_TIMESTAMP = "2026-06-07T00:00:00.000Z";
+
+export const BUILT_IN_VOICE_PROFILES: VoiceProfile[] = MIMO_BUILT_IN_VOICES.map(voice => ({
+  id: `mimo_builtin_${voice}`,
+  name: voice === "mimo_default" ? "MiMo 默认" : voice,
+  provider: "mimo",
+  source: "builtin",
+  providerVoiceId: voice,
+  referenceAudioAssetIds: [],
+  createdAt: BUILT_IN_PROFILE_TIMESTAMP,
+  updatedAt: BUILT_IN_PROFILE_TIMESTAMP,
+}));
+
+function getBuiltInVoiceProfile(id: string): VoiceProfile | null {
+  return BUILT_IN_VOICE_PROFILES.find(profile => profile.id === id) ?? null;
+}
 
 function normalizeVoiceProfile(input: VoiceProfile): VoiceProfile {
   return {
@@ -98,6 +116,9 @@ export async function listVoiceProfiles(): Promise<VoiceProfile[]> {
 }
 
 export async function getVoiceProfile(id: string): Promise<VoiceProfile | null> {
+  const builtInProfile = getBuiltInVoiceProfile(id);
+  if (builtInProfile) return builtInProfile;
+
   const db = await openVoiceProfileDatabase();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(VOICE_PROFILE_STORE, "readonly");

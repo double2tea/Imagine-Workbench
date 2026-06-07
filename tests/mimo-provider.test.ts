@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { generateMimoTts, generateMimoTtsVoiceDesign } from "../lib/providers/mimo-tts";
+import { generateMimoTts, generateMimoTtsVoiceClone, generateMimoTtsVoiceDesign } from "../lib/providers/mimo-tts";
 import { generateAudioOperation } from "../lib/providers/audio";
 import { listProviderModels } from "../lib/providers/models";
 import type { ProviderConfig } from "../lib/providers/types";
@@ -29,6 +29,7 @@ test("mimo model listing uses static chat models without fetching", async () => 
     assert.deepEqual(audioModels, [
       { value: "mimo:mimo-v2.5-tts", label: "MiMo V2.5 TTS" },
       { value: "mimo:mimo-v2.5-tts-voicedesign", label: "MiMo V2.5 Voice Design" },
+      { value: "mimo:mimo-v2.5-tts-voiceclone", label: "MiMo V2.5 Voice Clone" },
     ]);
   } finally {
     globalThis.fetch = originalFetch;
@@ -114,6 +115,42 @@ test("mimo voice design maps optimizeTextPreview inside audio object", async () 
   }
 });
 
+test("mimo voice clone sends reference audio as voice", async () => {
+  const originalFetch = globalThis.fetch;
+  const bodies: unknown[] = [];
+  globalThis.fetch = async (_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    bodies.push(init?.body ? JSON.parse(String(init.body)) as unknown : null);
+    return Response.json({ choices: [{ message: { audio: { data: "clone_base64" } } }] });
+  };
+
+  try {
+    const result = await generateMimoTtsVoiceClone(mimoConfig, {
+      text: "Clone this line",
+      stylePrompt: "Calm narration",
+      voice: "data:audio/mpeg;base64,voice_audio",
+      format: "wav",
+    });
+
+    assert.deepEqual(result, {
+      audioBase64: "clone_base64",
+      format: "wav",
+      model: "mimo-v2.5-tts-voiceclone",
+      mimeType: "audio/wav",
+    });
+    assert.deepEqual(bodies[0], {
+      model: "mimo-v2.5-tts-voiceclone",
+      messages: [
+        { role: "user", content: "Calm narration" },
+        { role: "assistant", content: "Clone this line" },
+      ],
+      audio: { format: "wav", voice: "data:audio/mpeg;base64,voice_audio" },
+      stream: false,
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("mimo audio operation routes voice design to direct adapter", async () => {
   const originalFetch = globalThis.fetch;
   const bodies: unknown[] = [];
@@ -148,6 +185,41 @@ test("mimo audio operation routes voice design to direct adapter", async () => {
   }
 });
 
+test("mimo audio operation routes voice clone to direct adapter", async () => {
+  const originalFetch = globalThis.fetch;
+  const bodies: unknown[] = [];
+  globalThis.fetch = async (_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    bodies.push(init?.body ? JSON.parse(String(init.body)) as unknown : null);
+    return Response.json({ choices: [{ message: { audio: { data: "cloned_audio" } } }] });
+  };
+
+  try {
+    const result = await generateAudioOperation(mimoConfig, {
+      mode: "voice_clone",
+      prompt: "Read this line",
+      model: "mimo-v2.5-tts-voiceclone",
+      referenceMedia: [{ dataUri: "data:audio/wav;base64,voice_audio", type: "audio" }],
+      format: "wav",
+      stylePrompt: "Bright ad read",
+      voiceCloneConsentAccepted: true,
+    });
+
+    assert.equal(result.type, "direct");
+    assert.equal(result.audioBase64, "cloned_audio");
+    assert.deepEqual(bodies[0], {
+      model: "mimo-v2.5-tts-voiceclone",
+      messages: [
+        { role: "user", content: "Bright ad read" },
+        { role: "assistant", content: "Read this line" },
+      ],
+      audio: { format: "wav", voice: "data:audio/wav;base64,voice_audio" },
+      stream: false,
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("audio operation rejects unresolved voice profile ids", async () => {
   await assert.rejects(
     () => generateAudioOperation(mimoConfig, {
@@ -158,6 +230,19 @@ test("audio operation rejects unresolved voice profile ids", async () => {
       voiceProfileId: "voice_profile_only_in_indexeddb",
     }),
     /Voice profile IDs must be resolved/,
+  );
+});
+
+test("mimo audio operation rejects voice clone without one audio reference", async () => {
+  await assert.rejects(
+    () => generateAudioOperation(mimoConfig, {
+      mode: "voice_clone",
+      prompt: "Read this line",
+      model: "mimo-v2.5-tts-voiceclone",
+      referenceMedia: [],
+      voiceCloneConsentAccepted: true,
+    }),
+    /requires exactly one audio reference/,
   );
 });
 

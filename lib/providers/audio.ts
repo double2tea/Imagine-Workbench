@@ -1,5 +1,12 @@
 import { generateRunningHubMedia, getRunningHubMediaStatus, downloadRunningHubMedia } from "./image";
-import { generateMimoTts, generateMimoTtsVoiceDesign, MIMO_TTS_MODEL, MIMO_TTS_VOICE_DESIGN_MODEL } from "./mimo-tts";
+import {
+  generateMimoTts,
+  generateMimoTtsVoiceClone,
+  generateMimoTtsVoiceDesign,
+  MIMO_TTS_MODEL,
+  MIMO_TTS_VOICE_CLONE_MODEL,
+  MIMO_TTS_VOICE_DESIGN_MODEL,
+} from "./mimo-tts";
 import type {
   GenerateAudioInput,
   GenerateAudioOperationInput,
@@ -51,15 +58,15 @@ export async function generateAudioOperation(
   }
 
   if (config.provider === "mimo") {
-    if (input.referenceMedia.length > 0) {
-      throw new Error("MiMo audio operation does not support reference media yet");
-    }
-
     if (input.mode === "tts" && input.model === MIMO_TTS_MODEL) {
+      if (input.referenceMedia.length > 0) {
+        throw new Error("MiMo built-in TTS does not accept reference media");
+      }
       const result = await generateMimoTts(config, {
         text: input.prompt,
         format: input.format === "pcm16" ? "pcm16" : "wav",
         stylePrompt: input.stylePrompt,
+        voice: input.voice,
       });
       return {
         type: "direct",
@@ -70,6 +77,9 @@ export async function generateAudioOperation(
     }
 
     if (input.mode === "voice_design" && input.model === MIMO_TTS_VOICE_DESIGN_MODEL) {
+      if (input.referenceMedia.length > 0) {
+        throw new Error("MiMo voice design does not accept reference media");
+      }
       const result = await generateMimoTtsVoiceDesign(config, {
         text: input.prompt,
         format: input.format === "pcm16" ? "pcm16" : "wav",
@@ -83,7 +93,26 @@ export async function generateAudioOperation(
       };
     }
 
-    throw new Error("MiMo audio operation currently supports built-in TTS and voice design only");
+    if (input.mode === "voice_clone" && input.model === MIMO_TTS_VOICE_CLONE_MODEL) {
+      const audioReferences = input.referenceMedia.filter(reference => reference.type === "audio");
+      if (audioReferences.length !== 1 || audioReferences.length !== input.referenceMedia.length) {
+        throw new Error("MiMo voice clone requires exactly one audio reference");
+      }
+      const result = await generateMimoTtsVoiceClone(config, {
+        text: input.prompt,
+        format: input.format === "pcm16" ? "pcm16" : "wav",
+        stylePrompt: input.stylePrompt,
+        voice: audioReferences[0].dataUri,
+      });
+      return {
+        type: "direct",
+        outputKind: "audio",
+        source: "mimo",
+        ...result,
+      };
+    }
+
+    throw new Error("MiMo audio operation currently supports built-in TTS, voice design, and voice clone only");
   }
 
   if (config.provider === "runninghub") {

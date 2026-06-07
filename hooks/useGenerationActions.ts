@@ -648,6 +648,7 @@ export function useGenerationActions({
       return false;
     }
     let profileStylePrompt: string | undefined;
+    let profileVoice: string | undefined;
     let profileReferences: ReferenceImageRef[] = [];
     if (overrides.voiceProfileId) {
       try {
@@ -655,7 +656,9 @@ export function useGenerationActions({
         if (!profile) throw new Error("找不到选中的音色");
         const parsedModel = parseProviderModel(requestModel, "12ai");
         if (profile.provider !== parsedModel.provider) throw new Error("选中的音色与当前模型提供方不一致");
+        if (profile.source === "builtin" && audioMode !== "tts") throw new Error("内置音色仅支持朗读模式");
         profileStylePrompt = profile.designPrompt;
+        profileVoice = profile.providerVoiceId;
         profileReferences = await readVoiceProfileReferences(profile.referenceAudioAssetIds);
       } catch (error) {
         pushWorkspaceNotice("error", toErrorMessage(error, "音色读取失败"));
@@ -729,6 +732,7 @@ export function useGenerationActions({
           model: generationRequest.model,
           format: overrides.audioFormat,
           stylePrompt: resolvedAudioStylePrompt,
+          voice: profileVoice,
           voiceCloneConsentAccepted: overrides.voiceCloneConsentAccepted,
           referenceMedia: generationRequest.referenceMedia?.map(reference => ({
             dataUri: reference.url,

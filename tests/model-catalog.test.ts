@@ -597,15 +597,17 @@ test("mimo exposes chat models and workbench TTS voice design", () => {
   assert.deepEqual(AUDIO_MODEL_OPTIONS["mimo"], [
     { value: "mimo:mimo-v2.5-tts", label: "MiMo V2.5 TTS" },
     { value: "mimo:mimo-v2.5-tts-voicedesign", label: "MiMo V2.5 Voice Design" },
+    { value: "mimo:mimo-v2.5-tts-voiceclone", label: "MiMo V2.5 Voice Clone" },
   ]);
   assert.deepEqual(getModelCapabilities("audio", "mimo").map(capability => capability.value), [
     "mimo:mimo-v2.5-tts",
     "mimo:mimo-v2.5-tts-voicedesign",
+    "mimo:mimo-v2.5-tts-voiceclone",
   ]);
   assert.equal(isMimoWorkbenchTtsModel("mimo:mimo-v2.5-tts"), true);
   assert.equal(isMimoWorkbenchTtsModel("mimo:mimo-v2.5-tts-voicedesign"), true);
   assert.equal(isMimoWorkbenchTtsModel("mimo-v2.5-tts"), false);
-  assert.equal(isMimoWorkbenchTtsModel("mimo:mimo-v2.5-tts-voiceclone"), false);
+  assert.equal(isMimoWorkbenchTtsModel("mimo:mimo-v2.5-tts-voiceclone"), true);
 });
 
 test("xstx chat defaults use pricing model identifiers", () => {

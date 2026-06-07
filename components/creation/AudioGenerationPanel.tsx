@@ -15,7 +15,7 @@ import {
 } from "@/lib/prompt-templates";
 import { getMediaReferenceType } from "@/lib/media-references";
 import { parseProviderModel, type AudioModelCapabilities, type AudioOperationMode } from "@/lib/providers/model-catalog";
-import { deleteVoiceProfile, listVoiceProfiles, saveVoiceProfile, type VoiceProfile, type VoiceProfileSource } from "@/lib/voice-profiles";
+import { BUILT_IN_VOICE_PROFILES, deleteVoiceProfile, listVoiceProfiles, saveVoiceProfile, type VoiceProfile, type VoiceProfileSource } from "@/lib/voice-profiles";
 
 interface AudioGenerationPanelProps {
   atDropdownNode: ReactNode;
@@ -109,10 +109,15 @@ export default function AudioGenerationPanel({
   const referenceLimit = capabilities.maxReferenceMedia;
   const acceptedMediaTypes = capabilities.referenceMediaTypes;
   const promptReferenceThumbnails = resolvePromptReferenceThumbnails(prompt, referenceImages, acceptedMediaTypes);
-  const selectedProvider = parseProviderModel(selectedModel, "12ai").provider;
+  const selectedParsedModel = parseProviderModel(selectedModel, "12ai");
+  const selectedProvider = selectedParsedModel.provider;
   const visibleVoiceProfiles = useMemo(
-    () => voiceProfiles.filter(profile => profile.provider === selectedProvider && profile.source !== "builtin"),
-    [selectedProvider, voiceProfiles],
+    () => {
+      const savedProfiles = voiceProfiles.filter(profile => profile.provider === selectedProvider && profile.source !== "builtin");
+      if (mode !== "tts" || selectedProvider !== "mimo" || selectedParsedModel.model !== "mimo-v2.5-tts") return savedProfiles;
+      return [...BUILT_IN_VOICE_PROFILES, ...savedProfiles];
+    },
+    [mode, selectedParsedModel.model, selectedProvider, voiceProfiles],
   );
   const selectedVoiceProfile = visibleVoiceProfiles.find(profile => profile.id === selectedVoiceProfileId);
   const referenceAudioAssetIds = useMemo(
@@ -359,7 +364,7 @@ export default function AudioGenerationPanel({
         <div className="rounded-md border border-cyan-400/15 bg-cyan-500/8 p-3">
           <div className="mb-2 flex items-center justify-between gap-2">
             <label className="imagine-section-label">音色库</label>
-            {selectedVoiceProfile && (
+            {selectedVoiceProfile && selectedVoiceProfile.source !== "builtin" && (
               <button
                 type="button"
                 onClick={() => void handleDeleteVoiceProfile()}
@@ -377,6 +382,9 @@ export default function AudioGenerationPanel({
               className="imagine-select h-9 py-0 text-xs"
             >
               <option value="">不使用保存音色</option>
+              {selectedVoiceProfileId && !selectedVoiceProfile && (
+                <option value={selectedVoiceProfileId}>当前音色不可用于此模式</option>
+              )}
               {visibleVoiceProfiles.map(profile => (
                 <option key={profile.id} value={profile.id}>{profile.name}</option>
               ))}

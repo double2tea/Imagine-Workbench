@@ -770,6 +770,21 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
       { value: "pcm16", label: "PCM16" },
     ],
   }),
+  audioCapability({
+    value: "mimo:mimo-v2.5-tts-voiceclone",
+    label: "MiMo V2.5 Voice Clone",
+    provider: "mimo",
+    model: "mimo-v2.5-tts-voiceclone",
+    audioModes: ["voice_clone"],
+    supportsReferences: true,
+    maxReferenceMedia: 1,
+    minReferenceMedia: 1,
+    referenceMediaTypes: ["audio"],
+    formats: [
+      { value: "wav", label: "WAV" },
+      { value: "pcm16", label: "PCM16" },
+    ],
+  }),
   chatCapability({
     value: formatProviderModel("runninghub", RUNNINGHUB_DEFAULT_LLM_MODEL),
     label: "RunningHub Qwen 3.7 Max",
@@ -1203,7 +1218,8 @@ export function isMimoWorkbenchTtsModel(value: string): boolean {
   const parsed = tryParseProviderModel(value, "12ai");
   return parsed?.provider === "mimo" && (
     parsed.model === "mimo-v2.5-tts" ||
-    parsed.model === "mimo-v2.5-tts-voicedesign"
+    parsed.model === "mimo-v2.5-tts-voicedesign" ||
+    parsed.model === "mimo-v2.5-tts-voiceclone"
   );
 }
 

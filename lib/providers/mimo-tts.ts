@@ -1,21 +1,10 @@
 import type { MimoTtsFormat, MimoTtsInput, MimoTtsResult, ProviderConfig } from "./types";
 import { isRecord, postJson, requireText } from "./utils";
+import { MIMO_BUILT_IN_VOICES } from "./mimo-voices";
 
 export const MIMO_TTS_MODEL = "mimo-v2.5-tts";
 export const MIMO_TTS_VOICE_DESIGN_MODEL = "mimo-v2.5-tts-voicedesign";
 export const MIMO_TTS_VOICE_CLONE_MODEL = "mimo-v2.5-tts-voiceclone";
-
-export const MIMO_BUILT_IN_VOICES = [
-  "mimo_default",
-  "冰糖",
-  "茉莉",
-  "苏打",
-  "白桦",
-  "Mia",
-  "Chloe",
-  "Milo",
-  "Dean",
-] as const;
 
 type MimoTtsModel =
   | typeof MIMO_TTS_MODEL

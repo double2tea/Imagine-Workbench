@@ -93,6 +93,7 @@ export interface GenerateAudioOperationInput extends GenerateAudioInput {
   mode: AudioOperationMode;
   format?: string;
   stylePrompt?: string;
+  voice?: string;
   voiceProfileId?: string;
   voiceCloneConsentAccepted?: boolean;
 }
