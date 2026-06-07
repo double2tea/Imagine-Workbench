@@ -357,12 +357,7 @@ export default function AssetCard({
             <div className={`imagine-card-actions-shell absolute inset-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-30 pointer-events-none group-hover:pointer-events-auto ${
               item.type === "video" ? "bottom-[2.85rem]" : item.type === "audio" ? "bottom-[3.75rem]" : "bottom-3"
             }`}>
-              <div className={[
-                "imagine-card-actions flex flex-wrap items-center justify-center gap-1 rounded-xl border p-1 backdrop-blur-md",
-                item.type === "audio"
-                  ? "imagine-audio-card-actions border-transparent bg-transparent shadow-none"
-                  : "border-white/10 bg-slate-950/80 shadow-xl",
-              ].join(" ")}>
+              <div className="imagine-card-actions imagine-floating-card-actions flex flex-wrap items-center justify-center gap-1 rounded-xl border border-transparent bg-transparent p-1 shadow-none backdrop-blur-md">
                 {item.type === "video" && (
                   <div className="relative">
                     <button

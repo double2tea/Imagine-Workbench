@@ -3681,22 +3681,28 @@ html[data-imagine-theme="light"] .imagine-generate-context-chip[data-tone="faile
   color: currentColor !important;
 }
 
-.imagine-workbench-shell.imagine-theme-light .imagine-audio-card-actions {
-  background: rgba(15, 23, 42, 0.5) !important;
-  border-color: rgba(226, 232, 240, 0.16) !important;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.18) !important;
+.imagine-workbench-shell.imagine-theme-light .imagine-card-actions.imagine-floating-card-actions,
+html.imagine-theme-light .imagine-card-actions.imagine-floating-card-actions,
+html[data-imagine-theme="light"] .imagine-card-actions.imagine-floating-card-actions {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
 }
 
-.imagine-workbench-shell.imagine-theme-light .imagine-audio-card-actions .imagine-card-action {
-  background: rgba(15, 23, 42, 0.38) !important;
-  border-color: rgba(226, 232, 240, 0.16) !important;
-  color: #e5edf5 !important;
+.imagine-workbench-shell.imagine-theme-light .imagine-card-actions.imagine-floating-card-actions .imagine-card-action,
+html.imagine-theme-light .imagine-card-actions.imagine-floating-card-actions .imagine-card-action,
+html[data-imagine-theme="light"] .imagine-card-actions.imagine-floating-card-actions .imagine-card-action {
+  background: rgba(255, 255, 255, 0.42) !important;
+  border-color: rgba(100, 116, 139, 0.16) !important;
+  color: #253246 !important;
 }
 
-.imagine-workbench-shell.imagine-theme-light .imagine-audio-card-actions .imagine-card-action:hover {
-  background: rgba(51, 65, 85, 0.76) !important;
-  border-color: rgba(226, 232, 240, 0.28) !important;
-  color: #ffffff !important;
+.imagine-workbench-shell.imagine-theme-light .imagine-card-actions.imagine-floating-card-actions .imagine-card-action:hover,
+html.imagine-theme-light .imagine-card-actions.imagine-floating-card-actions .imagine-card-action:hover,
+html[data-imagine-theme="light"] .imagine-card-actions.imagine-floating-card-actions .imagine-card-action:hover {
+  background: rgba(255, 255, 255, 0.62) !important;
+  border-color: rgba(100, 116, 139, 0.24) !important;
+  color: #0f172a !important;
 }
 
 .imagine-workbench-shell.imagine-theme-light .imagine-panorama-action {
