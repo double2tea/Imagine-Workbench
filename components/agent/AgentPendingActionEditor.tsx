@@ -10,8 +10,12 @@ import {
 } from "@/lib/agent-tool-action";
 import {
   ASR_LANGUAGE_OPTIONS,
-  AUDIO_MODE_LABELS,
+  audioFunctionOptionsForProvider,
+  audioFunctionValue,
   audioOperationFormatOptions,
+  audioProviderFromModel,
+  audioProviderOptions,
+  parseAudioFunctionValue,
 } from "@/lib/audio-operation-rules";
 import {
   getAudioModelCapabilities,
@@ -19,7 +23,6 @@ import {
   getImageResolutionOptions,
   getVideoModelCapabilities,
   type AiProvider,
-  type AudioOperationMode,
   type ModelOption,
 } from "@/lib/providers/model-catalog";
 
@@ -119,6 +122,16 @@ export function AgentPendingActionEditor({
     ? params.audioMode
     : audioCapabilities?.defaultMode;
   const audioFormatOptions = audioCapabilities ? audioOperationFormatOptions(audioCapabilities) : [];
+  const selectedAudioProvider = isAudio && audioModel ? audioProviderFromModel(audioModel) : audioModelGroups[0]?.provider;
+  const audioProviderChoices = useMemo(
+    () => audioProviderOptions(audioModelGroups),
+    [audioModelGroups],
+  );
+  const audioFunctionOptions = useMemo(
+    () => selectedAudioProvider ? audioFunctionOptionsForProvider(audioModelGroups, selectedAudioProvider, getAudioModelCapabilities) : [],
+    [audioModelGroups, selectedAudioProvider],
+  );
+  const selectedAudioFunctionValue = isAudio && audioModel && activeAudioMode ? audioFunctionValue(audioModel, activeAudioMode) : "";
 
   const modelGroups = useMemo(
     () => (isImage ? imageModelGroups : isVideo ? videoModelGroups : isAudio ? audioModelGroups : []),
@@ -175,6 +188,28 @@ export function AgentPendingActionEditor({
       ? params.imageResolution
       : firstOptionValue(resolutionSource, "1K");
     updateParams({ aspectRatio, imageResolution });
+  };
+
+  const resolveAudioParamsForMode = (model: string, audioMode: NonNullable<typeof activeAudioMode>): AgentGenerationParams => {
+    return resolveAudioActionParams(model, {
+      ...params,
+      audioMode,
+      voiceCloneConsentAccepted: audioMode === "voice_clone" ? params.voiceCloneConsentAccepted : undefined,
+    });
+  };
+
+  const handleAudioProviderChange = (value: string) => {
+    const provider = audioProviderChoices.find(option => option.value === value)?.value;
+    if (!provider) return;
+    const firstFunction = audioFunctionOptionsForProvider(audioModelGroups, provider, getAudioModelCapabilities)[0];
+    if (!firstFunction) return;
+    onChange(patchAgentToolAction(action, resolveAudioParamsForMode(firstFunction.model, firstFunction.mode)));
+  };
+
+  const handleAudioFunctionChange = (value: string) => {
+    const parsed = parseAudioFunctionValue(value);
+    if (!parsed) return;
+    onChange(patchAgentToolAction(action, resolveAudioParamsForMode(parsed.model, parsed.mode)));
   };
 
   return (
@@ -297,7 +332,7 @@ export function AgentPendingActionEditor({
         </div>
       )}
 
-      {(isImage || isVideo || isAudio) && modelGroups.length > 0 && (
+      {(isImage || isVideo) && modelGroups.length > 0 && (
         <label className="imagine-agent-action-field">
           <span className="imagine-agent-action-field-label">生成模型</span>
           <select
@@ -320,6 +355,39 @@ export function AgentPendingActionEditor({
                   </option>
                 ))}
               </optgroup>
+            ))}
+          </select>
+        </label>
+      )}
+
+      {isAudio && audioProviderChoices.length > 0 && (
+        <label className="imagine-agent-action-field">
+          <span className="imagine-agent-action-field-label">服务商</span>
+          <select
+            value={selectedAudioProvider ?? ""}
+            disabled={disabled}
+            onChange={event => handleAudioProviderChange(event.target.value)}
+            className="imagine-agent-model-select w-full"
+          >
+            {audioProviderChoices.map(option => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      {isAudio && audioFunctionOptions.length > 0 && (
+        <label className="imagine-agent-action-field">
+          <span className="imagine-agent-action-field-label">功能</span>
+          <select
+            value={audioFunctionOptions.some(option => option.value === selectedAudioFunctionValue) ? selectedAudioFunctionValue : ""}
+            disabled={disabled}
+            onChange={event => handleAudioFunctionChange(event.target.value)}
+            className="imagine-agent-model-select w-full"
+          >
+            {!audioFunctionOptions.some(option => option.value === selectedAudioFunctionValue) && <option value="" disabled>当前功能不可用</option>}
+            {audioFunctionOptions.map(option => (
+              <option key={option.value} value={option.value}>{option.label}</option>
             ))}
           </select>
         </label>
@@ -487,24 +555,6 @@ export function AgentPendingActionEditor({
         </label>
       )}
 
-      {isAudio && audioCapabilities && audioCapabilities.modes.length > 0 && (
-        <label className="imagine-agent-action-field">
-          <span className="imagine-agent-action-field-label">音频模式</span>
-          <select
-            value={params.audioMode ?? audioCapabilities.defaultMode}
-            disabled={disabled}
-            onChange={event => updateParams({ audioMode: event.target.value as AudioOperationMode })}
-            className="imagine-agent-model-select w-full"
-          >
-            {audioCapabilities.modes.map(option => (
-              <option key={option} value={option}>
-                {AUDIO_MODE_LABELS[option]}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-
       {isAudio && audioCapabilities && audioFormatOptions.length > 0 && (
         <label className="imagine-agent-action-field">
           <span className="imagine-agent-action-field-label">音频格式</span>
@@ -549,6 +599,19 @@ export function AgentPendingActionEditor({
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
           </select>
+        </label>
+      )}
+
+      {isAudio && activeAudioMode === "voice_clone" && (
+        <label className="imagine-agent-action-field flex-row items-start gap-2 text-[11px] leading-5 text-[var(--iw-muted)]">
+          <input
+            type="checkbox"
+            checked={params.voiceCloneConsentAccepted === true}
+            disabled={disabled}
+            onChange={event => updateParams({ voiceCloneConsentAccepted: event.target.checked })}
+            className="mt-1 h-3.5 w-3.5 rounded border-[var(--iw-border)] bg-transparent"
+          />
+          <span>我确认拥有参考音频的使用权，并允许用于本次音色克隆。</span>
         </label>
       )}
 

@@ -105,6 +105,15 @@ function getStringField(value: unknown, field: string): string | null {
   return typeof fieldValue === "string" && fieldValue.trim() ? fieldValue : null;
 }
 
+function isRunningHubAudioRequest(model: string, runningHubNodeInfoList?: RunningHubTaskNodeBinding[]): boolean {
+  const parsed = parseProviderModel(model, "12ai");
+  return parsed.provider === "runninghub" || (runningHubNodeInfoList?.length ?? 0) > 0;
+}
+
+function audioGenerationEndpoint(model: string, runningHubNodeInfoList?: RunningHubTaskNodeBinding[]): string {
+  return isRunningHubAudioRequest(model, runningHubNodeInfoList) ? "/api/runninghub/generate-audio" : "/api/audio/generate";
+}
+
 async function readVoiceProfileReferences(assetIds: string[]): Promise<ReferenceImageRef[]> {
   if (assetIds.length === 0) return [];
   const metas = await getAssetMetasByIds(assetIds);
@@ -644,9 +653,10 @@ export function useGenerationActions({
       pushWorkspaceNotice("error", "音频生成需要明确音频模型");
       return false;
     }
-    const audioCapabilities = getAudioModelCapabilities(requestModel);
-    const audioMode = overrides.audioMode ?? audioCapabilities.defaultMode;
-    if (!activePrompt.trim() && audioOperationRequiresTextInput(audioMode) && overrides.allowEmptyPrompt !== true) return false;
+    const isRunningHubAudio = isRunningHubAudioRequest(requestModel, overrides.runningHubNodeInfoList);
+    const audioCapabilities = isRunningHubAudio ? null : getAudioModelCapabilities(requestModel);
+    const audioMode = overrides.audioMode ?? audioCapabilities?.defaultMode;
+    if (!activePrompt.trim() && audioMode !== undefined && audioOperationRequiresTextInput(audioMode) && overrides.allowEmptyPrompt !== true) return false;
     if (audioMode === "voice_clone" && overrides.voiceCloneConsentAccepted !== true) {
       pushWorkspaceNotice("error", "音色克隆需要先确认参考音频授权");
       return false;
@@ -688,15 +698,15 @@ export function useGenerationActions({
       return false;
     }
     const audioReferenceTypes = audioReferences.map(reference => getMediaReferenceType(reference) ?? "image");
-    if (audioReferenceTypes.some(type => !audioCapabilities.referenceMediaTypes.includes(type))) {
+    if (audioCapabilities && audioReferenceTypes.some(type => !audioCapabilities.referenceMediaTypes.includes(type))) {
       pushWorkspaceNotice("error", "当前音频模型不支持所选参考媒体类型");
       return false;
     }
-    if (audioReferences.length < audioCapabilities.minReferenceMedia) {
+    if (audioCapabilities && audioReferences.length < audioCapabilities.minReferenceMedia) {
       pushWorkspaceNotice("error", audioOperationMissingReferenceMessage(audioCapabilities));
       return false;
     }
-    if (audioCapabilities.maxReferenceMedia >= 0 && audioReferences.length > audioCapabilities.maxReferenceMedia) {
+    if (audioCapabilities && audioCapabilities.maxReferenceMedia >= 0 && audioReferences.length > audioCapabilities.maxReferenceMedia) {
       pushWorkspaceNotice("error", `当前音频模型最多支持 ${audioCapabilities.maxReferenceMedia} 个参考媒体`);
       return false;
     }
@@ -743,7 +753,7 @@ export function useGenerationActions({
 
     try {
       const headers = buildProviderHeaders(requestModel);
-      const res = await fetch("/api/audio/generate", {
+      const res = await fetch(audioGenerationEndpoint(requestModel, generationRequest.runningHubNodeInfoList), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
         signal: controller.signal,

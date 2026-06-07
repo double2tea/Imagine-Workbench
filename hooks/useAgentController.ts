@@ -66,6 +66,7 @@ interface GenerationOverrides {
   audioFormat?: string;
   audioMode?: AudioOperationMode;
   audioStylePrompt?: string;
+  asrLanguage?: "auto" | "zh" | "en";
   imageQuality?: string;
   imageResolution?: string;
   isCustomImageResolution?: boolean;
@@ -79,6 +80,7 @@ interface GenerationOverrides {
   videoPreset?: string;
   videoReferenceMode?: "reference" | "firstLast";
   videoResolution?: string;
+  voiceCloneConsentAccepted?: boolean;
   voiceProfileId?: string;
 }
 
@@ -339,8 +341,10 @@ export function useAgentController({
           audioFormat: params.audioFormat,
           audioMode: params.audioMode,
           audioStylePrompt: params.audioStylePrompt,
+          asrLanguage: params.asrLanguage,
           model: params.model,
           prompt: params.prompt || "",
+          voiceCloneConsentAccepted: params.voiceCloneConsentAccepted,
           voiceProfileId: params.voiceProfileId,
         });
       }, 500);
