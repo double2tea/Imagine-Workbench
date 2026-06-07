@@ -61,7 +61,7 @@ import {
   boardNodesWithAbsolutePositions,
   childPositionAfterUngroup,
   createBoardGroupLayout,
-  resolveMovedBoardNodeParent,
+  resolveMovedBoardNodeParents,
 } from "@/lib/board";
 import { getImageModelCapabilities, getImageResolutionOptions, getVideoModelCapabilities } from "@/lib/providers/model-catalog";
 import {
@@ -2010,9 +2010,13 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
           if (!position) return node;
           return { ...node, position };
         });
+        const parentResolutionById = resolveMovedBoardNodeParents(
+          provisionalNodes,
+          Array.from(positionById.keys()),
+        );
         const nextNodes = provisionalNodes.map((node, index) => {
           if (!positionById.has(node.id)) return node;
-          const resolution = resolveMovedBoardNodeParent(provisionalNodes, node.id);
+          const resolution = parentResolutionById.get(node.id);
           if (!resolution) return node;
           const currentNode = currentBoard.nodes[index];
           if (!currentNode) return node;

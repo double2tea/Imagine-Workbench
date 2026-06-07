@@ -28,10 +28,7 @@ function nodeById(nodes: BoardNode[]): Map<string, BoardNode> {
   return new Map(nodes.map(node => [node.id, node]));
 }
 
-export function boardNodeAbsolutePosition(nodes: BoardNode[], nodeId: string): BoardPoint | null {
-  const nodesById = nodeById(nodes);
-  const node = nodesById.get(nodeId);
-  if (!node) return null;
+function absolutePositionForNode(nodesById: Map<string, BoardNode>, node: BoardNode): BoardPoint | null {
   const seen = new Set<string>([node.id]);
   let x = node.position.x;
   let y = node.position.y;
@@ -50,15 +47,22 @@ export function boardNodeAbsolutePosition(nodes: BoardNode[], nodeId: string): B
   return { x, y };
 }
 
+export function boardNodeAbsolutePosition(nodes: BoardNode[], nodeId: string): BoardPoint | null {
+  const nodesById = nodeById(nodes);
+  const node = nodesById.get(nodeId);
+  return node ? absolutePositionForNode(nodesById, node) : null;
+}
+
 export function boardNodesWithAbsolutePositions(nodes: BoardNode[]): BoardNode[] {
+  const nodesById = nodeById(nodes);
   return nodes.map(node => {
-    const position = boardNodeAbsolutePosition(nodes, node.id);
+    const position = absolutePositionForNode(nodesById, node);
     return position ? { ...node, position } : node;
   });
 }
 
-function rectForNode(nodes: BoardNode[], node: BoardNode): BoardNodeRect | null {
-  const position = boardNodeAbsolutePosition(nodes, node.id);
+function rectForNode(nodesById: Map<string, BoardNode>, node: BoardNode): BoardNodeRect | null {
+  const position = absolutePositionForNode(nodesById, node);
   if (!position) return null;
   return {
     x: position.x,
@@ -98,8 +102,12 @@ function isDescendantOf(nodesById: Map<string, BoardNode>, nodeId: string, ances
   return false;
 }
 
-function containingGroupForNode(nodes: BoardNode[], node: BoardNode, absolutePosition: BoardPoint): (BoardNode & { kind: "group" }) | null {
-  const nodesById = nodeById(nodes);
+function containingGroupForNode(
+  nodes: BoardNode[],
+  nodesById: Map<string, BoardNode>,
+  node: BoardNode,
+  absolutePosition: BoardPoint,
+): (BoardNode & { kind: "group" }) | null {
   const center = {
     x: absolutePosition.x + node.size.width / 2,
     y: absolutePosition.y + node.size.height / 2,
@@ -110,7 +118,7 @@ function containingGroupForNode(nodes: BoardNode[], node: BoardNode, absolutePos
     if (candidate.kind !== "group") continue;
     if (candidate.id === node.id) continue;
     if (isDescendantOf(nodesById, candidate.id, node.id)) continue;
-    const rect = rectForNode(nodes, candidate);
+    const rect = rectForNode(nodesById, candidate);
     if (!rect || !pointInsideRect(center, rect)) continue;
     const area = candidate.size.width * candidate.size.height;
     if (!best || area < best.area) best = { area, group: candidate };
@@ -119,9 +127,8 @@ function containingGroupForNode(nodes: BoardNode[], node: BoardNode, absolutePos
   return best?.group ?? null;
 }
 
-function topLevelSelection(nodes: BoardNode[], nodeIds: string[]): BoardNode[] {
+function topLevelSelection(nodesById: Map<string, BoardNode>, nodeIds: string[]): BoardNode[] {
   const selectedIds = new Set(nodeIds);
-  const nodesById = nodeById(nodes);
   const seen = new Set<string>();
   return nodeIds.flatMap(nodeId => {
     if (seen.has(nodeId)) return [];
@@ -141,14 +148,16 @@ function commonParentId(nodes: BoardNode[]): string | undefined {
 }
 
 export function createBoardGroupLayout(nodes: BoardNode[], nodeIds: string[]): BoardGroupLayout | null {
-  const children = topLevelSelection(nodes, nodeIds);
+  const nodesById = nodeById(nodes);
+  const children = topLevelSelection(nodesById, nodeIds);
   if (children.length < 2) return null;
-  const rects = children.map(node => rectForNode(nodes, node)).filter((rect): rect is BoardNodeRect => rect !== null);
+  const rects = children.map(node => rectForNode(nodesById, node)).filter((rect): rect is BoardNodeRect => rect !== null);
   const bounds = boundsForRects(rects);
   if (!bounds) return null;
 
   const parentId = commonParentId(children);
-  const parentPosition = parentId ? boardNodeAbsolutePosition(nodes, parentId) : undefined;
+  const parent = parentId ? nodesById.get(parentId) : undefined;
+  const parentPosition = parent ? absolutePositionForNode(nodesById, parent) : undefined;
   const absolutePosition = {
     x: bounds.x - BOARD_GROUP_PADDING_X,
     y: bounds.y - BOARD_GROUP_PADDING_TOP,
@@ -158,7 +167,7 @@ export function createBoardGroupLayout(nodes: BoardNode[], nodeIds: string[]): B
     : absolutePosition;
   const childPositions = new Map<string, BoardPoint>();
   for (const child of children) {
-    const childPosition = boardNodeAbsolutePosition(nodes, child.id);
+    const childPosition = absolutePositionForNode(nodesById, child);
     if (!childPosition) return null;
     childPositions.set(child.id, {
       x: childPosition.x - absolutePosition.x,
@@ -178,15 +187,19 @@ export function createBoardGroupLayout(nodes: BoardNode[], nodeIds: string[]): B
   };
 }
 
-export function resolveMovedBoardNodeParent(nodes: BoardNode[], nodeId: string): BoardNodeMoveParentResolution | null {
-  const node = nodeById(nodes).get(nodeId);
+function resolveMovedBoardNodeParentWithIndex(
+  nodes: BoardNode[],
+  nodesById: Map<string, BoardNode>,
+  nodeId: string,
+): BoardNodeMoveParentResolution | null {
+  const node = nodesById.get(nodeId);
   if (!node) return null;
-  const absolutePosition = boardNodeAbsolutePosition(nodes, node.id);
+  const absolutePosition = absolutePositionForNode(nodesById, node);
   if (!absolutePosition) return null;
-  const parent = containingGroupForNode(nodes, node, absolutePosition);
+  const parent = containingGroupForNode(nodes, nodesById, node, absolutePosition);
   if (!parent) return { position: absolutePosition };
 
-  const parentPosition = boardNodeAbsolutePosition(nodes, parent.id);
+  const parentPosition = absolutePositionForNode(nodesById, parent);
   if (!parentPosition) return null;
   return {
     parentId: parent.id,
@@ -197,15 +210,35 @@ export function resolveMovedBoardNodeParent(nodes: BoardNode[], nodeId: string):
   };
 }
 
+export function resolveMovedBoardNodeParent(nodes: BoardNode[], nodeId: string): BoardNodeMoveParentResolution | null {
+  return resolveMovedBoardNodeParentWithIndex(nodes, nodeById(nodes), nodeId);
+}
+
+export function resolveMovedBoardNodeParents(
+  nodes: BoardNode[],
+  nodeIds: string[],
+): Map<string, BoardNodeMoveParentResolution> {
+  const nodesById = nodeById(nodes);
+  const resolutions = new Map<string, BoardNodeMoveParentResolution>();
+  for (const nodeId of nodeIds) {
+    const resolution = resolveMovedBoardNodeParentWithIndex(nodes, nodesById, nodeId);
+    if (resolution) resolutions.set(nodeId, resolution);
+  }
+  return resolutions;
+}
+
 export function childPositionAfterUngroup(nodes: BoardNode[], group: BoardNode & { kind: "group" }, child: BoardNode): BoardPoint | null {
-  const groupPosition = boardNodeAbsolutePosition(nodes, group.id);
+  const nodesById = nodeById(nodes);
+  const groupPosition = absolutePositionForNode(nodesById, group);
   if (!groupPosition) return null;
   const absolutePosition = {
     x: groupPosition.x + child.position.x,
     y: groupPosition.y + child.position.y,
   };
   if (!group.parentId) return absolutePosition;
-  const parentPosition = boardNodeAbsolutePosition(nodes, group.parentId);
+  const parent = nodesById.get(group.parentId);
+  if (!parent) return null;
+  const parentPosition = absolutePositionForNode(nodesById, parent);
   if (!parentPosition) return null;
   return {
     x: absolutePosition.x - parentPosition.x,
