@@ -3004,7 +3004,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       const references = await resolveOriginalReferences(previewReferences);
       flushBoardTextForGenerateNode(boardController.board.nodes, boardController.board.edges, nodeId);
       const nextPrompt = nodePrompt.trim();
-      if (!nextPrompt) {
+      const isAsrAudioOperation = node.kind === "audio-operation" && node.audioMode === "asr";
+      if (!nextPrompt && !isAsrAudioOperation) {
         boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: "生成节点需要提示词输入" });
         pushWorkspaceNotice("error", "生成节点需要提示词输入");
         return;
@@ -3030,6 +3031,12 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       });
       if (unsupportedReference) {
         const message = `当前模型不支持${mediaReferenceLabel(getMediaReferenceType(unsupportedReference))}输入`;
+        boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: message });
+        pushWorkspaceNotice("error", message);
+        return;
+      }
+      if (isAsrAudioOperation && !references.some(reference => getMediaReferenceType(reference) === "audio")) {
+        const message = "ASR 转写需要连接或拖入一个音频参考";
         boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: message });
         pushWorkspaceNotice("error", message);
         return;
