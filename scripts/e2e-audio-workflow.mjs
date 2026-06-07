@@ -106,6 +106,32 @@ try {
   const boardRes = await fetch(`${baseUrl}/board`);
   assert.equal(boardRes.ok, true, "Board surface should respond");
 
+  const cloneWithoutConsentRes = await fetch(`${baseUrl}/api/audio/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "runninghub:ai-app-audio:test-app",
+      mode: "voice_clone",
+      prompt: "Clone this voice without consent.",
+      referenceMedia: [],
+    }),
+  });
+  assert.equal(cloneWithoutConsentRes.status, 400);
+  assert.match(await cloneWithoutConsentRes.text(), /音色克隆需要先确认参考音频授权/);
+
+  const unresolvedVoiceProfileRes = await fetch(`${baseUrl}/api/audio/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "mimo:mimo-v2.5-tts",
+      mode: "tts",
+      prompt: "Read this with an unresolved profile.",
+      voiceProfileId: "voice_profile_only_in_indexeddb",
+    }),
+  });
+  assert.equal(unresolvedVoiceProfileRes.status, 400);
+  assert.match(await unresolvedVoiceProfileRes.text(), /Voice profile IDs must be resolved/);
+
   const audioRes = await fetch(`${baseUrl}/api/audio/generate`, {
     method: "POST",
     headers: {

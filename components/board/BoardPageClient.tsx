@@ -546,6 +546,7 @@ function buildGenerateNodeUpdate(
     if (params?.audioMode) update.audioMode = params.audioMode;
     if (params?.audioStylePrompt?.trim()) update.audioStylePrompt = params.audioStylePrompt;
     if (params?.voiceProfileId?.trim()) update.voiceProfileId = params.voiceProfileId;
+    if (typeof params?.voiceCloneConsentAccepted === "boolean") update.voiceCloneConsentAccepted = params.voiceCloneConsentAccepted;
   }
   return update;
 }
@@ -609,6 +610,7 @@ function createPreviewBoardNode(operation: AgentBoardPatchCreateNodeOperation, i
       ...(operation.audioMode ? { audioMode: operation.audioMode } : {}),
       ...(operation.audioStylePrompt ? { audioStylePrompt: operation.audioStylePrompt } : {}),
       ...(operation.voiceProfileId ? { voiceProfileId: operation.voiceProfileId } : {}),
+      ...(operation.voiceCloneConsentAccepted ? { voiceCloneConsentAccepted: operation.voiceCloneConsentAccepted } : {}),
     };
   }
   const model = operation.model ?? DEFAULT_VIDEO_MODEL;
@@ -912,7 +914,7 @@ function resultStackKeyForNode(node: ExecutableBoardNode, edges: BoardDocument["
       : node.kind === "video-generate"
         ? `${node.aspectRatio}|${node.videoResolution ?? ""}`
         : node.kind === "audio-operation"
-          ? `${node.audioMode}|${node.audioFormat}|${node.voiceProfileId ?? ""}`
+          ? `${node.audioMode}|${node.audioFormat}|${node.voiceCloneConsentAccepted === true ? "clone-consent" : ""}|${node.voiceProfileId ?? ""}`
       : `${node.targetType}|${node.outputType}|${node.targetId}|${node.bindings.map(binding => [
         binding.nodeId,
         binding.fieldName,
@@ -1068,6 +1070,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const [, setIsOptimizing] = useState(false);
   const [imageSubmitCount, setImageSubmitCount] = useState(0);
   const [, setVideoSubmitCount] = useState(0);
+  const [, setAudioSubmitCount] = useState(0);
   const [workspaceNotices, setWorkspaceNotices] = useState<WorkspaceNotice[]>([]);
   const [isMaskOpen, setIsMaskOpen] = useState(false);
   const [maskTargetUrl, setMaskTargetUrl] = useState("");
@@ -1450,6 +1453,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     selectedModel,
     selectedVideoModel,
     setGenerationTasks,
+    setAudioSubmitCount,
     setImageSubmitCount,
     setItems,
     setVideoSubmitCount,
@@ -1715,6 +1719,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
                 ...(operation.audioMode ? { audioMode: operation.audioMode } : {}),
                 ...(operation.audioStylePrompt ? { audioStylePrompt: operation.audioStylePrompt } : {}),
                 ...(operation.voiceProfileId ? { voiceProfileId: operation.voiceProfileId } : {}),
+                ...(operation.voiceCloneConsentAccepted ? { voiceCloneConsentAccepted: operation.voiceCloneConsentAccepted } : {}),
               });
             }
             tempToRealIds.set(operation.tempId, nodeId);
@@ -1876,6 +1881,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             prompt: promptValue,
             referenceImage: runReferences[0]?.url ?? null,
             referenceImages: runReferences,
+            voiceCloneConsentAccepted: operation.voiceCloneConsentAccepted,
             voiceProfileId: operation.voiceProfileId,
           });
           if (!didStart) {
@@ -2280,6 +2286,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         ...(action.params?.audioMode ? { audioMode: action.params.audioMode } : {}),
         ...(action.params?.audioStylePrompt ? { audioStylePrompt: action.params.audioStylePrompt } : {}),
         ...(action.params?.voiceProfileId ? { voiceProfileId: action.params.voiceProfileId } : {}),
+        ...(action.params?.voiceCloneConsentAccepted ? { voiceCloneConsentAccepted: action.params.voiceCloneConsentAccepted } : {}),
       };
       const generateNodeId = boardController.addGenerateNode({
         kind,
@@ -2355,7 +2362,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         kind: "audio-operation",
         model,
         nodeId: generateNodeId,
-        sizeKey: `${defaults.audioMode}|${defaults.audioFormat}`,
+        sizeKey: `${defaults.audioMode}|${defaults.audioFormat}|${defaults.voiceCloneConsentAccepted === true ? "clone-consent" : ""}|${defaults.voiceProfileId ?? ""}`,
       });
       boardController.updateGenerateNode(generateNodeId, { errorMessage: undefined, resultStackKey, status: "processing" });
       const didStart = await generateManualAudio({
@@ -2369,6 +2376,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         prompt: promptFromAgent,
         referenceImage: references[0]?.url ?? null,
         referenceImages: references,
+        voiceCloneConsentAccepted: defaults.voiceCloneConsentAccepted,
         voiceProfileId: defaults.voiceProfileId,
       });
       if (!didStart) {
@@ -3092,6 +3100,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             prompt: nextPrompt,
             referenceImage: references[0]?.url ?? null,
             referenceImages: references,
+            voiceCloneConsentAccepted: node.voiceCloneConsentAccepted,
             voiceProfileId: node.voiceProfileId,
           });
           if (!didStart) break;

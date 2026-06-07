@@ -272,6 +272,7 @@ export default function Home() {
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [imageSubmitCount, setImageSubmitCount] = useState(0);
   const [videoSubmitCount, setVideoSubmitCount] = useState(0);
+  const [audioSubmitCount, setAudioSubmitCount] = useState(0);
   const [workspaceNotices, setWorkspaceNotices] = useState<WorkspaceNotice[]>([]);
 
   // Interactive Mask Editor State
@@ -334,7 +335,7 @@ export default function Home() {
   const videoCapabilities = getVideoModelCapabilities(selectedVideoModel);
   const isSubmittingImage = imageSubmitCount > 0;
   const isSubmittingVideo = videoSubmitCount > 0;
-  const isSubmittingAudio = videoSubmitCount > 0;
+  const isSubmittingAudio = audioSubmitCount > 0;
   const activeAudioMode = audioCapabilities.modes.includes(selectedAudioMode)
     ? selectedAudioMode
     : audioCapabilities.defaultMode;
@@ -507,6 +508,7 @@ export default function Home() {
     selectedModel,
     selectedVideoModel,
     setGenerationTasks,
+    setAudioSubmitCount,
     setImageSubmitCount,
     setItems,
     setVideoSubmitCount,
@@ -1301,7 +1303,7 @@ export default function Home() {
           selectedFormat={activeAudioFormat}
           selectedModel={selectedAudioModel}
           selectedVoiceProfileId={selectedVoiceProfileId}
-          submitCount={videoSubmitCount}
+          submitCount={audioSubmitCount}
           voiceCloneConsentAccepted={voiceCloneConsentAccepted}
           audioStylePrompt={audioStylePrompt}
           onClearReferences={() => {
@@ -1497,7 +1499,7 @@ export default function Home() {
                 mode={traditionalSubTab}
                 disabled={!prompt.trim() || (traditionalSubTab === "audio" && activeAudioMode === "voice_clone" && !voiceCloneConsentAccepted)}
                 isSubmitting={traditionalSubTab === "image" ? isSubmittingImage : traditionalSubTab === "audio" ? isSubmittingAudio : isSubmittingVideo}
-                submitCount={traditionalSubTab === "image" ? imageSubmitCount : videoSubmitCount}
+                submitCount={traditionalSubTab === "image" ? imageSubmitCount : traditionalSubTab === "audio" ? audioSubmitCount : videoSubmitCount}
                 priceProvider={traditionalSubTab === "image" ? selectedModel.split(":")[0] : traditionalSubTab === "audio" ? selectedAudioModel.split(":")[0] : selectedVideoModel.split(":")[0]}
                 priceModelId={traditionalSubTab === "image" ? selectedModel : traditionalSubTab === "audio" ? selectedAudioModel : selectedVideoModel}
                 priceDuration={traditionalSubTab === "video" ? activeVideoDuration ?? videoDuration : undefined}

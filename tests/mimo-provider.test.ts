@@ -147,3 +147,28 @@ test("mimo audio operation routes voice design to direct adapter", async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+test("audio operation rejects unresolved voice profile ids", async () => {
+  await assert.rejects(
+    () => generateAudioOperation(mimoConfig, {
+      mode: "tts",
+      prompt: "Read this line",
+      model: "mimo-v2.5-tts",
+      referenceMedia: [],
+      voiceProfileId: "voice_profile_only_in_indexeddb",
+    }),
+    /Voice profile IDs must be resolved/,
+  );
+});
+
+test("audio operation requires consent for voice clone mode", async () => {
+  await assert.rejects(
+    () => generateAudioOperation(mimoConfig, {
+      mode: "voice_clone",
+      prompt: "Read this line",
+      model: "mimo-v2.5-tts-voiceclone",
+      referenceMedia: [],
+    }),
+    /音色克隆需要先确认参考音频授权/,
+  );
+});

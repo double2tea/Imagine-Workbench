@@ -141,6 +141,7 @@ export interface BoardAudioOperationNode extends BoardNodeBase {
   audioFormat: string;
   audioStylePrompt?: string;
   voiceProfileId?: string;
+  voiceCloneConsentAccepted?: boolean;
   variantCount: BoardGenerateVariantCount;
   status: BoardGenerationStatus;
   resultAssetId?: string;
@@ -247,6 +248,7 @@ export type BoardGenerateNodeUpdate = Partial<{
   videoPreset: string;
   videoReferenceMode: BoardVideoReferenceMode;
   videoResolution: string;
+  voiceCloneConsentAccepted: boolean;
   voiceProfileId: string;
 }>;
 
@@ -355,6 +357,7 @@ export interface CreateGenerateNodeInput {
   videoPreset?: string;
   videoReferenceMode?: BoardVideoReferenceMode;
   videoResolution?: string;
+  voiceCloneConsentAccepted?: boolean;
   voiceProfileId?: string;
   position?: BoardPoint;
   size?: BoardSize;

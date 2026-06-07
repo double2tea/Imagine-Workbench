@@ -2039,6 +2039,7 @@ export default function BoardWorkspace({
         size: node.size,
         title: node.title,
         variantCount: node.variantCount,
+        voiceCloneConsentAccepted: node.voiceCloneConsentAccepted,
         voiceProfileId: node.voiceProfileId,
       } as const;
       if (inputConnections.length > 0) addGenerateNodeWithConnections(input, inputConnections);

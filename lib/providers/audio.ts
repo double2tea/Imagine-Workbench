@@ -43,6 +43,13 @@ export async function generateAudioOperation(
   config: ProviderConfig,
   input: GenerateAudioOperationInput,
 ): Promise<GenerateAudioOperationResult> {
+  if (input.mode === "voice_clone" && input.voiceCloneConsentAccepted !== true) {
+    throw new Error("音色克隆需要先确认参考音频授权");
+  }
+  if (input.voiceProfileId) {
+    throw new Error("Voice profile IDs must be resolved before audio operation");
+  }
+
   if (config.provider === "mimo") {
     if (input.referenceMedia.length > 0) {
       throw new Error("MiMo audio operation does not support reference media yet");

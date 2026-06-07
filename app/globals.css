@@ -3591,6 +3591,30 @@ html[data-imagine-theme="light"] .imagine-generate-context-chip[data-tone="faile
   box-shadow: none !important;
 }
 
+.imagine-audio-waveform-media {
+  --iw-audio-wave-bg: linear-gradient(180deg, rgba(30, 41, 59, 0.96), rgba(15, 23, 42, 0.98));
+  --iw-audio-wave-border: rgba(51, 65, 85, 0.7);
+  --iw-audio-wave-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --iw-audio-wave-text: #f1f5f9;
+  --iw-audio-wave-text-muted: #cbd5e1;
+  --iw-audio-wave-accent: #8aa4b8;
+  --iw-audio-wave-idle: rgba(148, 163, 184, 0.42);
+  --iw-audio-wave-line: rgba(226, 232, 240, 0.22);
+  --iw-audio-wave-icon: #94a3b8;
+  --iw-audio-wave-icon-strong: #f8fafc;
+  --iw-audio-wave-hover: rgba(255, 255, 255, 0.1);
+  --iw-audio-wave-play-bg: rgba(51, 65, 85, 0.9);
+  --iw-audio-wave-play-text: #f8fafc;
+  --iw-audio-wave-play-border: rgba(255, 255, 255, 0.15);
+  --iw-audio-wave-play-shadow: 0 10px 24px rgba(15, 23, 42, 0.28);
+}
+
+.imagine-audio-mode-button[data-active="true"] {
+  background: rgba(6, 182, 212, 0.16) !important;
+  border-color: rgba(103, 232, 249, 0.5) !important;
+  color: #cffafe !important;
+}
+
 .imagine-panorama-action {
   background: rgba(8, 47, 73, 0.86) !important;
   border-color: rgba(34, 211, 238, 0.34) !important;
@@ -3646,9 +3670,37 @@ html[data-imagine-theme="light"] .imagine-generate-context-chip[data-tone="faile
 }
 
 .imagine-theme-light .imagine-audio-type-badge {
-  background: rgba(15, 23, 42, 0.46) !important;
-  border-color: rgba(226, 232, 240, 0.16) !important;
-  color: #f8fafc !important;
+  background: rgba(255, 255, 255, 0.78) !important;
+  border-color: rgba(100, 116, 139, 0.18) !important;
+  color: #334155 !important;
+}
+
+.imagine-theme-light .imagine-audio-mode-button[data-active="true"],
+html.imagine-theme-light .imagine-audio-mode-button[data-active="true"],
+html[data-imagine-theme="light"] .imagine-audio-mode-button[data-active="true"] {
+  background: rgba(6, 182, 212, 0.12) !important;
+  border-color: rgba(6, 182, 212, 0.45) !important;
+  color: #0e7490 !important;
+}
+
+.imagine-theme-light .imagine-audio-waveform-media,
+html.imagine-theme-light .imagine-audio-waveform-media,
+html[data-imagine-theme="light"] .imagine-audio-waveform-media {
+  --iw-audio-wave-bg: linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(241, 245, 249, 0.96));
+  --iw-audio-wave-border: rgba(100, 116, 139, 0.24);
+  --iw-audio-wave-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.84);
+  --iw-audio-wave-text: #253246;
+  --iw-audio-wave-text-muted: rgba(37, 50, 70, 0.76);
+  --iw-audio-wave-accent: #64748b;
+  --iw-audio-wave-idle: rgba(71, 85, 105, 0.28);
+  --iw-audio-wave-line: rgba(51, 65, 85, 0.18);
+  --iw-audio-wave-icon: rgba(71, 85, 105, 0.72);
+  --iw-audio-wave-icon-strong: #253246;
+  --iw-audio-wave-hover: rgba(100, 116, 139, 0.12);
+  --iw-audio-wave-play-bg: rgba(255, 255, 255, 0.36);
+  --iw-audio-wave-play-text: #253246;
+  --iw-audio-wave-play-border: rgba(100, 116, 139, 0.18);
+  --iw-audio-wave-play-shadow: 0 10px 22px rgba(15, 23, 42, 0.1);
 }
 
 .imagine-workbench-shell.imagine-theme-light .imagine-asset-hover-scrim {

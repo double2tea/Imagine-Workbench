@@ -355,7 +355,7 @@ export default function AssetCard({
 
             <div className="imagine-asset-hover-scrim absolute inset-0 bg-slate-950/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10 pointer-events-none" />
             <div className={`imagine-card-actions-shell absolute inset-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-30 pointer-events-none group-hover:pointer-events-auto ${
-              item.type === "video" ? "bottom-[2.85rem]" : "bottom-3"
+              item.type === "video" ? "bottom-[2.85rem]" : item.type === "audio" ? "bottom-16" : "bottom-3"
             }`}>
               <div className="imagine-card-actions imagine-floating-card-actions flex flex-wrap items-center justify-center gap-1 rounded-xl border border-transparent bg-transparent p-1 shadow-none">
                 {item.type === "video" && (

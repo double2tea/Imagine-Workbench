@@ -5,6 +5,8 @@ import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 import { readImageGenerationPayload } from "@/lib/client-image-response";
 import {
   buildStorageItem,
+  getAssetMetasByIds,
+  hydrateAssets,
   saveToDB,
   type GenerationReferenceMediaSnapshot,
   type GenerationRequestSnapshot,
@@ -22,9 +24,10 @@ import {
 import type { RunningHubTaskNodeBinding } from "@/lib/providers/types";
 import { buildPromptWithReferenceMap } from "@/hooks/useReferenceState";
 import { getMediaReferenceType, mediaReferenceLabel } from "@/lib/media-references";
-import { getAudioModelCapabilities, getImageModelCapabilities, getVideoModelCapabilities, type AudioOperationMode, type VideoReferenceMode } from "@/lib/providers/model-catalog";
+import { getAudioModelCapabilities, getImageModelCapabilities, getVideoModelCapabilities, parseProviderModel, type AudioOperationMode, type VideoReferenceMode } from "@/lib/providers/model-catalog";
 import { getReferenceImagePayloadError, getReferenceMediaPayloadError, prepareReferenceImageUrlForRequest, prepareReferenceMediaUrlForRequest } from "@/lib/reference-images";
 import { selectVideoReferencesForMode } from "@/lib/video-reference-selection";
+import { getVoiceProfile } from "@/lib/voice-profiles";
 
 type NoticeType = "error" | "info" | "success";
 
@@ -51,6 +54,7 @@ interface UseGenerationActionsParams {
   selectedModel: string;
   selectedVideoModel: string;
   setGenerationTasks: Dispatch<SetStateAction<GenerationTask[]>>;
+  setAudioSubmitCount: Dispatch<SetStateAction<number>>;
   setImageSubmitCount: Dispatch<SetStateAction<number>>;
   setItems: Dispatch<SetStateAction<StorageItem[]>>;
   setVideoSubmitCount: Dispatch<SetStateAction<number>>;
@@ -94,6 +98,31 @@ function getStringField(value: unknown, field: string): string | null {
   const record = value as Record<string, unknown>;
   const fieldValue = record[field];
   return typeof fieldValue === "string" && fieldValue.trim() ? fieldValue : null;
+}
+
+async function readVoiceProfileReferences(assetIds: string[]): Promise<ReferenceImageRef[]> {
+  if (assetIds.length === 0) return [];
+  const metas = await getAssetMetasByIds(assetIds);
+  const items = await hydrateAssets(metas);
+  const itemsById = new Map(items.map(item => [item.id, item]));
+  return assetIds.map(id => {
+    const item = itemsById.get(id);
+    if (!item || item.type !== "audio" || !item.url) {
+      throw new Error("选中的音色参考音频已不存在");
+    }
+    return { id: item.id, type: "audio", url: item.url };
+  });
+}
+
+function mergeReferences(
+  baseReferences: ReferenceImageRef[],
+  profileReferences: ReferenceImageRef[],
+): ReferenceImageRef[] {
+  const merged = new Map(baseReferences.map(reference => [reference.id, reference]));
+  for (const reference of profileReferences) {
+    merged.set(reference.id, reference);
+  }
+  return Array.from(merged.values());
 }
 
 function isAbortError(error: unknown): boolean {
@@ -259,6 +288,7 @@ export function useGenerationActions({
   selectedModel,
   selectedVideoModel,
   setGenerationTasks,
+  setAudioSubmitCount,
   setImageSubmitCount,
   setItems,
   setVideoSubmitCount,
@@ -612,7 +642,27 @@ export function useGenerationActions({
     if (!activePrompt.trim() && overrides.allowEmptyPrompt !== true) return false;
     const audioCapabilities = getAudioModelCapabilities(requestModel);
     const audioMode = overrides.audioMode ?? audioCapabilities.defaultMode;
-    const audioReferences = [...activeReferenceImages];
+    if (audioMode === "voice_clone" && overrides.voiceCloneConsentAccepted !== true) {
+      pushWorkspaceNotice("error", "音色克隆需要先确认参考音频授权");
+      return false;
+    }
+    let profileStylePrompt: string | undefined;
+    let profileReferences: ReferenceImageRef[] = [];
+    if (overrides.voiceProfileId) {
+      try {
+        const profile = await getVoiceProfile(overrides.voiceProfileId);
+        if (!profile) throw new Error("找不到选中的音色");
+        const parsedModel = parseProviderModel(requestModel, "12ai");
+        if (profile.provider !== parsedModel.provider) throw new Error("选中的音色与当前模型提供方不一致");
+        profileStylePrompt = profile.designPrompt;
+        profileReferences = await readVoiceProfileReferences(profile.referenceAudioAssetIds);
+      } catch (error) {
+        pushWorkspaceNotice("error", toErrorMessage(error, "音色读取失败"));
+        return false;
+      }
+    }
+    const resolvedAudioStylePrompt = profileStylePrompt ?? overrides.audioStylePrompt;
+    const audioReferences = mergeReferences(activeReferenceImages, profileReferences);
     if (audioReferences.length === 0 && activeReferenceImage) {
       audioReferences.push({ id: "legacy-reference", url: activeReferenceImage });
     }
@@ -630,7 +680,7 @@ export function useGenerationActions({
       return false;
     }
 
-    setVideoSubmitCount(prev => prev + 1);
+    setAudioSubmitCount(prev => prev + 1);
     const generationPrompt = buildPromptWithReferenceMap(activePrompt, audioReferences, audioReferenceUrls);
     const generationRequest: GenerationRequestSnapshot = {
       prompt: generationPrompt,
@@ -641,7 +691,7 @@ export function useGenerationActions({
       referenceMedia: buildReferenceMediaSnapshot(audioReferences, audioReferencePayloads),
       audioFormat: overrides.audioFormat,
       audioMode,
-      audioStylePrompt: overrides.audioStylePrompt,
+      audioStylePrompt: resolvedAudioStylePrompt,
       voiceProfileId: overrides.voiceProfileId,
     };
 
@@ -658,7 +708,7 @@ export function useGenerationActions({
       request: generationRequest,
     });
     if (!await saveTaskOrWarn(task, pushWorkspaceNotice)) {
-      setVideoSubmitCount(prev => Math.max(0, prev - 1));
+      setAudioSubmitCount(prev => Math.max(0, prev - 1));
       return true;
     }
     recordGenerationTask(task);
@@ -677,8 +727,7 @@ export function useGenerationActions({
           prompt: generationRequest.prompt,
           model: generationRequest.model,
           format: overrides.audioFormat,
-          stylePrompt: overrides.audioStylePrompt,
-          voiceProfileId: overrides.voiceProfileId,
+          stylePrompt: resolvedAudioStylePrompt,
           voiceCloneConsentAccepted: overrides.voiceCloneConsentAccepted,
           referenceMedia: generationRequest.referenceMedia?.map(reference => ({
             dataUri: reference.url,
@@ -771,7 +820,7 @@ export function useGenerationActions({
       return true;
     } finally {
       delete generationAbortControllersRef.current[taskId];
-      setVideoSubmitCount(prev => Math.max(0, prev - 1));
+      setAudioSubmitCount(prev => Math.max(0, prev - 1));
     }
     return true;
   };

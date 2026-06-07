@@ -272,6 +272,7 @@ function cloneBoardNodeForDuplicate(source: BoardNode, position: BoardPoint): Bo
         prompt: source.prompt,
         status: "idle",
         variantCount: source.variantCount,
+        voiceCloneConsentAccepted: source.voiceCloneConsentAccepted,
         voiceProfileId: source.voiceProfileId,
       };
     case "runninghub-app":
@@ -686,6 +687,7 @@ function normalizeBoardNode(node: unknown, index: number): BoardNode | null {
       resultStackKey: readOptionalString(node.resultStackKey),
       status: normalizeGenerationStatus(node.status),
       variantCount: normalizeVariantCount(node.variantCount),
+      voiceCloneConsentAccepted: node.voiceCloneConsentAccepted === true,
       voiceProfileId: readOptionalString(node.voiceProfileId),
       errorMessage: typeof node.errorMessage === "string" ? node.errorMessage : undefined,
     };
@@ -1044,6 +1046,7 @@ function createGenerateBoardNode(input: CreateGenerateNodeInput, nodes: BoardNod
       audioFormat: input.audioFormat ?? audioDefaults.audioFormat,
       audioMode: input.audioMode ?? audioDefaults.audioMode,
       audioStylePrompt: input.audioStylePrompt,
+      voiceCloneConsentAccepted: input.voiceCloneConsentAccepted,
       voiceProfileId: input.voiceProfileId,
     };
   }
@@ -1147,6 +1150,7 @@ function sameGenerateUpdate(node: BoardImageGenerateNode | BoardVideoGenerateNod
     if ("audioFormat" in input && node.audioFormat !== input.audioFormat) return false;
     if ("audioMode" in input && node.audioMode !== input.audioMode) return false;
     if ("audioStylePrompt" in input && node.audioStylePrompt !== input.audioStylePrompt) return false;
+    if ("voiceCloneConsentAccepted" in input && node.voiceCloneConsentAccepted !== input.voiceCloneConsentAccepted) return false;
     if ("voiceProfileId" in input && node.voiceProfileId !== input.voiceProfileId) return false;
   }
 

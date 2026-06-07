@@ -72,6 +72,7 @@ export interface AgentBoardPatchCreateNodeOperation {
   audioFormat?: string;
   audioMode?: AudioOperationMode;
   audioStylePrompt?: string;
+  voiceCloneConsentAccepted?: boolean;
   voiceProfileId?: string;
   run?: boolean;
 }
@@ -94,6 +95,7 @@ export interface AgentBoardPatchUpdateNodeOperation {
   audioFormat?: string;
   audioMode?: AudioOperationMode;
   audioStylePrompt?: string;
+  voiceCloneConsentAccepted?: boolean;
   voiceProfileId?: string;
 }
 
@@ -130,6 +132,7 @@ export interface AgentGenerationParams {
   audioFormat?: string;
   audioMode?: AudioOperationMode;
   audioStylePrompt?: string;
+  voiceCloneConsentAccepted?: boolean;
   voiceProfileId?: string;
   title?: string;
   body?: string;

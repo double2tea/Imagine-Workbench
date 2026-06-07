@@ -151,9 +151,9 @@ export default function AudioWaveformPreview({
   const progress = duration > 0 ? currentTime / duration : 0;
   const isCompact = size === "compact";
   const isMediaTone = tone === "media";
-  const accentColor = isMediaTone ? "#8aa4b8" : "var(--iw-accent)";
-  const idleWaveColor = isMediaTone ? "rgba(148, 163, 184, 0.42)" : "color-mix(in srgb, var(--iw-text) 22%, transparent)";
-  const lineColor = isMediaTone ? "rgba(226, 232, 240, 0.22)" : "color-mix(in srgb, var(--iw-text) 36%, transparent)";
+  const accentColor = isMediaTone ? "var(--iw-audio-wave-accent)" : "var(--iw-accent)";
+  const idleWaveColor = isMediaTone ? "var(--iw-audio-wave-idle)" : "color-mix(in srgb, var(--iw-text) 22%, transparent)";
+  const lineColor = isMediaTone ? "var(--iw-audio-wave-line)" : "color-mix(in srgb, var(--iw-text) 36%, transparent)";
   const seekBy = (seconds: number) => {
     if (!interactive) return;
     const audio = audioRef.current;
@@ -167,14 +167,14 @@ export default function AudioWaveformPreview({
   return (
     <div
       className={[
-        "flex h-full w-full flex-col overflow-hidden rounded-lg border border-[var(--iw-board-border)] text-[var(--iw-text)] shadow-inner",
+        "imagine-audio-waveform-preview flex h-full w-full flex-col overflow-hidden rounded-lg border border-[var(--iw-board-border)] text-[var(--iw-text)] shadow-inner",
         isCompact ? "justify-between gap-2 px-3 pb-3 pt-8" : "justify-between px-5 pb-6 pt-5",
-        isMediaTone ? "border-slate-700/70 text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]" : "",
+        isMediaTone ? "imagine-audio-waveform-media border-[var(--iw-audio-wave-border)] text-[var(--iw-audio-wave-text)] shadow-[var(--iw-audio-wave-shadow)]" : "",
         className,
       ].join(" ")}
       style={{
         background: isMediaTone
-          ? "linear-gradient(180deg, rgba(30,41,59,0.96), rgba(15,23,42,0.98))"
+          ? "var(--iw-audio-wave-bg)"
           : "linear-gradient(180deg, color-mix(in srgb, var(--iw-accent) 10%, var(--iw-panel)), var(--iw-panel))",
       }}
     >
@@ -191,7 +191,7 @@ export default function AudioWaveformPreview({
       )}
       {!isCompact && (
         <div className="flex items-center justify-end gap-2">
-          <div className={["text-xs font-semibold tabular-nums", isMediaTone ? "text-slate-300" : "text-[color-mix(in_srgb,var(--iw-text)_58%,transparent)]"].join(" ")}>
+          <div className={["text-xs font-semibold tabular-nums", isMediaTone ? "text-[var(--iw-audio-wave-text-muted)]" : "text-[color-mix(in_srgb,var(--iw-text)_58%,transparent)]"].join(" ")}>
             {interactive ? `${formatTime(currentTime)} / ${formatTime(duration)}` : formatTime(duration)}
           </div>
         </div>
@@ -265,7 +265,7 @@ export default function AudioWaveformPreview({
             disabled={!interactive}
             className={[
               "nodrag flex shrink-0 items-center justify-center rounded-full transition",
-              isMediaTone ? "text-slate-400 hover:bg-white/10 hover:text-slate-100" : "text-[var(--iw-muted)] hover:bg-[var(--iw-accent-soft)] hover:text-[var(--iw-text)]",
+              isMediaTone ? "text-[var(--iw-audio-wave-icon)] hover:bg-[var(--iw-audio-wave-hover)] hover:text-[var(--iw-audio-wave-icon-strong)]" : "text-[var(--iw-muted)] hover:bg-[var(--iw-accent-soft)] hover:text-[var(--iw-text)]",
               isCompact ? "h-6 w-6" : "h-8 w-8",
             ].join(" ")}
             onClick={() => seekBy(-5)}
@@ -280,8 +280,8 @@ export default function AudioWaveformPreview({
               "nodrag flex shrink-0 items-center justify-center rounded-full transition hover:scale-105",
               isMediaTone
                 ? isCompact
-                  ? "text-slate-100 hover:bg-white/10"
-                  : "bg-slate-700/90 text-slate-100 ring-1 ring-white/15 shadow-[0_10px_24px_rgba(15,23,42,0.28)]"
+                  ? "text-[var(--iw-audio-wave-icon-strong)] hover:bg-[var(--iw-audio-wave-hover)]"
+                  : "bg-[var(--iw-audio-wave-play-bg)] text-[var(--iw-audio-wave-play-text)] ring-1 ring-[var(--iw-audio-wave-play-border)] shadow-[var(--iw-audio-wave-play-shadow)]"
                 : "bg-[var(--iw-accent)] text-white shadow-[0_12px_30px_var(--iw-accent-glow)]",
               isCompact ? "h-8 w-8" : "h-12 w-12",
             ].join(" ")}
@@ -301,7 +301,7 @@ export default function AudioWaveformPreview({
               : <Play className={`${isCompact ? "h-4 w-4" : "h-5 w-5"} translate-x-0.5`} />}
           </button>
           {isCompact && (
-            <span className={["min-w-16 text-center text-[10px] font-semibold tabular-nums", isMediaTone ? "text-slate-300" : "text-[color-mix(in_srgb,var(--iw-text)_64%,transparent)]"].join(" ")}>
+            <span className={["min-w-16 text-center text-[10px] font-semibold tabular-nums", isMediaTone ? "text-[var(--iw-audio-wave-text-muted)]" : "text-[color-mix(in_srgb,var(--iw-text)_64%,transparent)]"].join(" ")}>
               {formatTime(currentTime)} / {formatTime(duration)}
             </span>
           )}
@@ -310,7 +310,7 @@ export default function AudioWaveformPreview({
             disabled={!interactive}
             className={[
               "nodrag flex shrink-0 items-center justify-center rounded-full transition",
-              isMediaTone ? "text-slate-400 hover:bg-white/10 hover:text-slate-100" : "text-[var(--iw-muted)] hover:bg-[var(--iw-accent-soft)] hover:text-[var(--iw-text)]",
+              isMediaTone ? "text-[var(--iw-audio-wave-icon)] hover:bg-[var(--iw-audio-wave-hover)] hover:text-[var(--iw-audio-wave-icon-strong)]" : "text-[var(--iw-muted)] hover:bg-[var(--iw-accent-soft)] hover:text-[var(--iw-text)]",
               isCompact ? "h-6 w-6" : "h-8 w-8",
             ].join(" ")}
             onClick={() => seekBy(5)}

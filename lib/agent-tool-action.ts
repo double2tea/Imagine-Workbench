@@ -137,6 +137,7 @@ export function prepareAgentActionDraft(action: AgentToolAction): AgentToolActio
         audioFormat: params.audioFormat,
         audioMode: params.audioMode,
         audioStylePrompt: params.audioStylePrompt,
+        voiceCloneConsentAccepted: params.voiceCloneConsentAccepted,
         voiceProfileId: params.voiceProfileId,
       },
     };
@@ -253,6 +254,7 @@ export function validateAgentToolAction(
       params.audioFormat?.trim() ||
       params.audioMode ||
       params.audioStylePrompt?.trim() ||
+      typeof params.voiceCloneConsentAccepted === "boolean" ||
       params.voiceProfileId?.trim()
       ? null
       : "请先填写要更新的节点内容";

@@ -29,6 +29,12 @@ export async function POST(req: NextRequest) {
     if (bodySizeError) return NextResponse.json({ error: bodySizeError }, { status: 413 });
 
     const body = audioGenerateBodySchema.parse(await req.json());
+    if (body.mode === "voice_clone" && body.voiceCloneConsentAccepted !== true) {
+      return NextResponse.json({ error: "音色克隆需要先确认参考音频授权" }, { status: 400 });
+    }
+    if (body.voiceProfileId) {
+      return NextResponse.json({ error: "Voice profile IDs must be resolved before calling audio generation" }, { status: 400 });
+    }
     const parsed = parseProviderModel(body.model, "runninghub");
     if (parsed.provider !== "runninghub" && parsed.provider !== "mimo") {
       return NextResponse.json({ error: `${parsed.provider} audio operation is not supported yet` }, { status: 400 });
@@ -49,7 +55,7 @@ export async function POST(req: NextRequest) {
       referenceMedia,
       format: body.format,
       stylePrompt: body.stylePrompt,
-      voiceProfileId: body.voiceProfileId,
+      voiceCloneConsentAccepted: body.voiceCloneConsentAccepted,
       runningHubAccessPassword: optionalText(body.runningHubAccessPassword),
       runningHubNodeInfoList,
     });

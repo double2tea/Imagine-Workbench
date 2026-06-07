@@ -310,7 +310,7 @@ export default function AudioGenerationPanel({
               type="button"
               onClick={() => onSelectMode(item)}
               data-active={mode === item}
-              className={`flex h-9 items-center justify-center gap-1.5 rounded-md border text-xs font-semibold transition ${
+              className={`imagine-audio-mode-button flex h-9 items-center justify-center gap-1.5 rounded-md border text-xs font-semibold transition ${
                 mode === item
                   ? "border-cyan-300/50 bg-cyan-500/16 text-cyan-100"
                   : "border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)] hover:text-[var(--iw-text)]"

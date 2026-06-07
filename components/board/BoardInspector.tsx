@@ -22,6 +22,7 @@ import {
   getImageResolutionOptions,
   getModelCapability,
   getVideoModelCapabilities,
+  parseProviderModel,
   type AudioOperationMode,
 } from "@/lib/providers/model-catalog";
 import { includeCurrentModelOption, type BoardModelOptionGroup } from "@/lib/board/model-options";
@@ -720,6 +721,8 @@ function AudioOperationInspector({
   const selectableAudioModelGroups = filterModelGroupsForReferenceTypes(audioModelGroups, "audio", requiredReferenceTypes);
   const isProcessing = node.status === "processing";
   const [voiceProfiles, setVoiceProfiles] = useState<VoiceProfile[]>([]);
+  const selectedProvider = parseProviderModel(node.model, "12ai").provider;
+  const visibleVoiceProfiles = voiceProfiles.filter(profile => profile.provider === selectedProvider);
 
   useEffect(() => {
     let active = true;
@@ -772,12 +775,23 @@ function AudioOperationInspector({
           className={inputClass}
         >
           <option value="">不使用保存音色</option>
-          {node.voiceProfileId && !voiceProfiles.some(profile => profile.id === node.voiceProfileId) && (
+          {node.voiceProfileId && !visibleVoiceProfiles.some(profile => profile.id === node.voiceProfileId) && (
             <option value={node.voiceProfileId}>{node.voiceProfileId}</option>
           )}
-          {voiceProfiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
+          {visibleVoiceProfiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
         </select>
       </InspectorField>
+      {node.audioMode === "voice_clone" && (
+        <label className="flex items-start gap-2 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2.5 py-2 text-[11px] leading-5 text-[var(--iw-muted)]">
+          <input
+            type="checkbox"
+            checked={node.voiceCloneConsentAccepted === true}
+            onChange={event => onUpdateGenerate(node.id, { voiceCloneConsentAccepted: event.target.checked })}
+            className="mt-1 h-3.5 w-3.5 rounded border-[var(--iw-border)] bg-transparent"
+          />
+          我确认拥有参考音频的使用权，并允许用于本次音色克隆。
+        </label>
+      )}
       <p className={infoChipClass}>
         参考媒体：{supportsReferences ? `${capabilities.referenceMediaTypes.join(" / ")} · ${capabilities.maxReferenceMedia}` : "不支持"}
       </p>

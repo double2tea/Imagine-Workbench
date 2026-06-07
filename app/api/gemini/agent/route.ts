@@ -111,6 +111,7 @@ const agentActionSchema = z.object({
       audioFormat: z.string().optional(),
       audioMode: audioOperationModeSchema.optional(),
       audioStylePrompt: z.string().optional(),
+      voiceCloneConsentAccepted: z.boolean().optional(),
       voiceProfileId: z.string().optional(),
     })
     .optional(),
@@ -148,6 +149,7 @@ const agentBoardPatchCreateNodeSchema = z.object({
   audioFormat: z.string().optional(),
   audioMode: audioOperationModeSchema.optional(),
   audioStylePrompt: z.string().optional(),
+  voiceCloneConsentAccepted: z.boolean().optional(),
   voiceProfileId: z.string().optional(),
   run: z.boolean().optional(),
 });
@@ -170,6 +172,7 @@ const agentBoardPatchUpdateNodeSchema = z.object({
   audioFormat: z.string().optional(),
   audioMode: audioOperationModeSchema.optional(),
   audioStylePrompt: z.string().optional(),
+  voiceCloneConsentAccepted: z.boolean().optional(),
   voiceProfileId: z.string().optional(),
 });
 
@@ -217,6 +220,7 @@ const agentBoardActionSchema = z.object({
       audioFormat: z.string().optional(),
       audioMode: audioOperationModeSchema.optional(),
       audioStylePrompt: z.string().optional(),
+      voiceCloneConsentAccepted: z.boolean().optional(),
       voiceProfileId: z.string().optional(),
       title: z.string().optional(),
       body: z.string().optional(),
@@ -298,7 +302,7 @@ export async function POST(req: NextRequest) {
         "The user is operating a spatial board. Read board details progressively: call get_board_context(summary) for broad board questions and get_connected_context for selected-node work.\n" +
         "For board mutations, prefer boardAction over recommendedAction. Do not invent a general DAG or ComfyUI workflow.\n" +
         "Allowed boardAction.type values: none, create_board_image_flow, create_board_video_flow, create_board_audio_flow, create_board_note, update_board_node, apply_board_patch, continue_image_to_video.\n" +
-        "create_board_image_flow/create_board_video_flow/create_board_audio_flow should include params.prompt and may include params.model, params.aspectRatio, params.referenceImageId, params.run. Audio actions may include params.audioMode, params.audioFormat, params.audioStylePrompt, params.voiceProfileId.\n" +
+        "create_board_image_flow/create_board_video_flow/create_board_audio_flow should include params.prompt and may include params.model, params.aspectRatio, params.referenceImageId, params.run. Audio actions may include params.audioMode, params.audioFormat, params.audioStylePrompt, params.voiceProfileId, params.voiceCloneConsentAccepted.\n" +
         "For audio board planning, use separate audio-operation nodes for narration, music beds, and SFX when they are distinct deliverables. Use audioMode tts for narration, music for score beds, sfx for sound effects, voice_design when the user describes a new voice, and voice_clone only when the user provides or asks to use an authorized audio reference.\n" +
         "Use update_board_node when the user asks to revise the selected/current board node or a specific node. Include params.nodeId when known; otherwise omit it to target the current selection. Use params.prompt for Prompt and generation nodes, params.body for Note nodes, and params.instruction for Agent nodes. If no target can be resolved, return boardAction.type none and ask the user to select a node.\n" +
         "Use apply_board_patch for multi-shot storyboard plans. Put the plan in params.boardPatch.operations. Allowed operations are create_node, update_node, connect_ports. Use tempId for created nodes and refer to it from later connect_ports operations. Keep patches to 36 operations or fewer; split larger scripts into follow-ups. Default params.boardPatch.run to false unless the user explicitly asks to run generation.\n" +
@@ -330,7 +334,7 @@ export async function POST(req: NextRequest) {
       `${contextSummary}\n\n` +
       "## Output\n" +
       "Return ONLY valid JSON:\n" +
-      '{"thought":"...","text":"Chinese user-facing reply","activeSkills":["..."],"recommendedAction":{"type":"none|optimize_prompt|generate_image|edit_image|generate_video|generate_audio","params":{"prompt":"...","model":"...","aspectRatio":"...","referenceImageId":"...","imageResolution":"...","imageQuality":"...","thinkingLevel":"...","videoResolution":"...","videoDuration":"...","videoPreset":"...","videoReferenceMode":"reference|firstLast","audioMode":"tts|voice_design|voice_clone|music|sfx|asr","audioFormat":"wav","audioStylePrompt":"...","voiceProfileId":"..."}},"boardAction":{"type":"none|create_board_image_flow|create_board_video_flow|create_board_audio_flow|create_board_note|update_board_node|apply_board_patch|continue_image_to_video","params":{"nodeId":"...","prompt":"...","model":"...","aspectRatio":"...","referenceImageId":"...","imageResolution":"...","imageQuality":"...","thinkingLevel":"...","videoResolution":"...","videoDuration":"...","videoPreset":"...","videoReferenceMode":"reference|firstLast","audioMode":"tts|voice_design|voice_clone|music|sfx|asr","audioFormat":"wav","audioStylePrompt":"...","voiceProfileId":"...","title":"...","body":"...","instruction":"...","boardPatch":{"title":"...","run":false,"shots":[{"id":"S1","scene":"...","shot":"...","beat":"...","imagePrompt":"...","videoPrompt":"...","run":false}],"operations":[{"op":"create_node","tempId":"shot1_prompt","kind":"prompt","title":"S1 Prompt","prompt":"...","position":{"x":120,"y":160}},{"op":"create_node","tempId":"shot1_audio","kind":"audio-operation","title":"S1 Audio","prompt":"...","model":"...","audioMode":"tts","audioFormat":"wav","run":false,"position":{"x":520,"y":160}},{"op":"connect_ports","from":{"nodeId":"shot1_prompt","portId":"prompt-out","portKind":"prompt"},"to":{"nodeId":"shot1_audio","portId":"prompt-in","portKind":"prompt"}}]},"run":true}},"suggestedFollowUps":["...","..."]}\n\n' +
+      '{"thought":"...","text":"Chinese user-facing reply","activeSkills":["..."],"recommendedAction":{"type":"none|optimize_prompt|generate_image|edit_image|generate_video|generate_audio","params":{"prompt":"...","model":"...","aspectRatio":"...","referenceImageId":"...","imageResolution":"...","imageQuality":"...","thinkingLevel":"...","videoResolution":"...","videoDuration":"...","videoPreset":"...","videoReferenceMode":"reference|firstLast","audioMode":"tts|voice_design|voice_clone|music|sfx|asr","audioFormat":"wav","audioStylePrompt":"...","voiceProfileId":"...","voiceCloneConsentAccepted":true}},"boardAction":{"type":"none|create_board_image_flow|create_board_video_flow|create_board_audio_flow|create_board_note|update_board_node|apply_board_patch|continue_image_to_video","params":{"nodeId":"...","prompt":"...","model":"...","aspectRatio":"...","referenceImageId":"...","imageResolution":"...","imageQuality":"...","thinkingLevel":"...","videoResolution":"...","videoDuration":"...","videoPreset":"...","videoReferenceMode":"reference|firstLast","audioMode":"tts|voice_design|voice_clone|music|sfx|asr","audioFormat":"wav","audioStylePrompt":"...","voiceProfileId":"...","voiceCloneConsentAccepted":true,"title":"...","body":"...","instruction":"...","boardPatch":{"title":"...","run":false,"shots":[{"id":"S1","scene":"...","shot":"...","beat":"...","imagePrompt":"...","videoPrompt":"...","run":false}],"operations":[{"op":"create_node","tempId":"shot1_prompt","kind":"prompt","title":"S1 Prompt","prompt":"...","position":{"x":120,"y":160}},{"op":"create_node","tempId":"shot1_audio","kind":"audio-operation","title":"S1 Audio","prompt":"...","model":"...","audioMode":"tts","audioFormat":"wav","run":false,"position":{"x":520,"y":160}},{"op":"connect_ports","from":{"nodeId":"shot1_prompt","portId":"prompt-out","portKind":"prompt"},"to":{"nodeId":"shot1_audio","portId":"prompt-in","portKind":"prompt"}}]},"run":true}},"suggestedFollowUps":["...","..."]}\n\n' +
       referenceMsg;
 
     const tools = getAgentTools();
