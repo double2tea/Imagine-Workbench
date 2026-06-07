@@ -10,17 +10,30 @@ interface ChatCompletionResponse {
   }>;
 }
 
+interface ChatCompletionOptions {
+  responseFormat?: { type: "json_object" };
+}
+
+export class ChatJsonParseError extends Error {
+  constructor(message = "Chat completion did not return valid JSON") {
+    super(message);
+    this.name = "ChatJsonParseError";
+  }
+}
+
 export async function createChatCompletionText(
   config: ProviderConfig,
   model: string,
   messages: ChatMessageInput[],
   temperature: number,
+  options: ChatCompletionOptions = {},
 ): Promise<string> {
   const response = await postJson<ChatCompletionResponse>(chatCompletionsUrl(config), config, {
     model,
     messages,
     temperature,
     stream: false,
+    ...(options.responseFormat ? { response_format: options.responseFormat } : {}),
     ...runningHubChatDefaults(config),
   });
 
@@ -45,6 +58,7 @@ export async function createChatCompletionWithTools(
   messages: ChatMessageInput[],
   tools: ToolDefinition[],
   temperature: number,
+  options: ChatCompletionOptions = {},
 ): Promise<ChatCompletionWithToolsResponse> {
   return postJson<ChatCompletionWithToolsResponse>(chatCompletionsUrl(config), config, {
     model,
@@ -53,6 +67,7 @@ export async function createChatCompletionWithTools(
     tool_choice: "auto",
     temperature,
     stream: false,
+    ...(options.responseFormat ? { response_format: options.responseFormat } : {}),
     ...runningHubChatDefaults(config),
   });
 }
@@ -68,20 +83,24 @@ function runningHubChatDefaults(config: ProviderConfig): Record<string, unknown>
 
 export function parseJsonObjectText(text: string): unknown {
   const trimmed = text.trim();
-  if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
-    return JSON.parse(trimmed);
+  try {
+    if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+      return JSON.parse(trimmed);
+    }
+
+    const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (fenced?.[1]) {
+      return JSON.parse(fenced[1]);
+    }
+
+    const start = trimmed.indexOf("{");
+    const end = trimmed.lastIndexOf("}");
+    if (start !== -1 && end > start) {
+      return JSON.parse(trimmed.slice(start, end + 1));
+    }
+  } catch (error) {
+    throw new ChatJsonParseError(error instanceof Error ? error.message : undefined);
   }
 
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-  if (fenced?.[1]) {
-    return JSON.parse(fenced[1]);
-  }
-
-  const start = trimmed.indexOf("{");
-  const end = trimmed.lastIndexOf("}");
-  if (start !== -1 && end > start) {
-    return JSON.parse(trimmed.slice(start, end + 1));
-  }
-
-  throw new Error("Chat completion did not return valid JSON");
+  throw new ChatJsonParseError();
 }

@@ -9,7 +9,7 @@ import {
   resolveRunningHubStandardModelForReferences,
 } from "../lib/providers/runninghub";
 import { parseRunningHubBindingsFromJsonText } from "../lib/board/runninghub-bindings";
-import { createChatCompletionText } from "../lib/providers/chat";
+import { ChatJsonParseError, createChatCompletionText, createChatCompletionWithTools, parseJsonObjectText } from "../lib/providers/chat";
 import { generateAudio, getAudioStatus } from "../lib/providers/audio";
 import { downloadRunningHubMedia, generateRunningHubMedia, getRunningHubMediaStatus } from "../lib/providers/image";
 import { listProviderModels } from "../lib/providers/models";
@@ -1127,6 +1127,61 @@ test("runninghub chat completions use llm endpoint", async () => {
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("chat completions can request json object responses", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: Array<{ body: unknown }> = [];
+  globalThis.fetch = async (_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    calls.push({ body: init?.body ? JSON.parse(String(init.body)) : undefined });
+    return Response.json({ choices: [{ message: { content: "{\"ok\":true}" } }] });
+  };
+
+  try {
+    const response = await createChatCompletionWithTools(
+      runningHubConfig,
+      "qwen/qwen3.7-max",
+      [{ role: "user", content: "Return JSON" }],
+      [{
+        type: "function",
+        function: {
+          name: "noop",
+          description: "No operation",
+          parameters: { type: "object", properties: {} },
+        },
+      }],
+      0,
+      { responseFormat: { type: "json_object" } },
+    );
+
+    assert.equal(response.choices[0]?.message.content, "{\"ok\":true}");
+    assert.deepEqual(calls[0]?.body, {
+      model: "qwen/qwen3.7-max",
+      messages: [{ role: "user", content: "Return JSON" }],
+      tools: [{
+        type: "function",
+        function: {
+          name: "noop",
+          description: "No operation",
+          parameters: { type: "object", properties: {} },
+        },
+      }],
+      tool_choice: "auto",
+      temperature: 0,
+      stream: false,
+      response_format: { type: "json_object" },
+      reasoning_effort: "none",
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("chat json parser reports plain text as a json parse error", () => {
+  assert.throws(
+    () => parseJsonObjectText("plain response"),
+    ChatJsonParseError,
+  );
 });
 
 test("runninghub v2 query business errors fail fast", async () => {

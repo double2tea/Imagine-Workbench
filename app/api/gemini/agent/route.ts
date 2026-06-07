@@ -2,7 +2,7 @@ import { z } from "zod";
 import { NextRequest, NextResponse } from "next/server";
 import type { AgentSurface } from "@/lib/agent-context";
 import { AGENT_BOARD_ACTION_TYPES, AGENT_WORKBENCH_ACTION_TYPES } from "@/lib/agent-actions";
-import { createChatCompletionText, createChatCompletionWithTools, parseJsonObjectText } from "@/lib/providers/chat";
+import { ChatJsonParseError, createChatCompletionText, createChatCompletionWithTools, parseJsonObjectText } from "@/lib/providers/chat";
 import {
   getSendableAgentMediaReferences,
   parseAgentAudioDataUrl,
@@ -238,6 +238,7 @@ function validateActiveSkills(skills: string[]): string[] {
 }
 
 const MAX_TOOL_ROUNDS = 3;
+const AGENT_CHAT_RESPONSE_OPTIONS = { responseFormat: { type: "json_object" as const } };
 
 interface AgentToolCallSummary {
   name: string;
@@ -425,7 +426,14 @@ async function runAgentLoop(
   const toolCallLog: AgentToolCallSummary[] = [];
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
-    const completion = await createChatCompletionWithTools(config, model, conversation, tools, 0.75);
+    const completion = await createChatCompletionWithTools(
+      config,
+      model,
+      conversation,
+      tools,
+      0.75,
+      AGENT_CHAT_RESPONSE_OPTIONS,
+    );
     const choice = completion.choices?.[0];
     if (!choice) throw new Error("Chat completion returned no choices");
 
@@ -443,11 +451,28 @@ async function runAgentLoop(
       continue;
     }
 
-    return { payload: parseJsonObjectText(readContent(choice.message.content)), toolCalls: toolCallLog };
+    return { payload: parseAgentPayloadText(readContent(choice.message.content)), toolCalls: toolCallLog };
   }
 
-  const final = await createChatCompletionText(config, model, conversation, 0.75);
-  return { payload: parseJsonObjectText(final), toolCalls: toolCallLog };
+  const final = await createChatCompletionText(config, model, conversation, 0.75, AGENT_CHAT_RESPONSE_OPTIONS);
+  return { payload: parseAgentPayloadText(final), toolCalls: toolCallLog };
+}
+
+function parseAgentPayloadText(text: string): unknown {
+  try {
+    return parseJsonObjectText(text);
+  } catch (error) {
+    if (!(error instanceof ChatJsonParseError)) throw error;
+    const fallbackText = text.trim();
+    return {
+      thought: "Provider returned plain text instead of Agent JSON.",
+      text: fallbackText || "我收到了模型回复，但它没有返回可执行的 Agent JSON。",
+      activeSkills: [],
+      recommendedAction: { type: "none" },
+      boardAction: { type: "none" },
+      suggestedFollowUps: [],
+    };
+  }
 }
 
 function readContent(value: string | null): string {
