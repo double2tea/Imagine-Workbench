@@ -23,6 +23,7 @@ import {
 } from "@/lib/generation-tasks";
 import type { RunningHubTaskNodeBinding } from "@/lib/providers/types";
 import { buildPromptWithReferenceMap } from "@/hooks/useReferenceState";
+import { audioOperationMissingReferenceMessage, audioOperationRequiresTextInput, readOptionalAudioFormat } from "@/lib/audio-operation-rules";
 import { getMediaReferenceType, mediaReferenceLabel } from "@/lib/media-references";
 import { getAudioModelCapabilities, getImageModelCapabilities, getVideoModelCapabilities, parseProviderModel, type AudioOperationMode, type VideoReferenceMode } from "@/lib/providers/model-catalog";
 import { getProviderMeta } from "@/lib/providers/registry";
@@ -645,7 +646,7 @@ export function useGenerationActions({
     }
     const audioCapabilities = getAudioModelCapabilities(requestModel);
     const audioMode = overrides.audioMode ?? audioCapabilities.defaultMode;
-    if (!activePrompt.trim() && audioMode !== "asr" && overrides.allowEmptyPrompt !== true) return false;
+    if (!activePrompt.trim() && audioOperationRequiresTextInput(audioMode) && overrides.allowEmptyPrompt !== true) return false;
     if (audioMode === "voice_clone" && overrides.voiceCloneConsentAccepted !== true) {
       pushWorkspaceNotice("error", "音色克隆需要先确认参考音频授权");
       return false;
@@ -692,7 +693,7 @@ export function useGenerationActions({
       return false;
     }
     if (audioReferences.length < audioCapabilities.minReferenceMedia) {
-      pushWorkspaceNotice("error", `当前音频模型需要 ${audioCapabilities.minReferenceMedia} 个参考媒体`);
+      pushWorkspaceNotice("error", audioOperationMissingReferenceMessage(audioCapabilities));
       return false;
     }
     if (audioCapabilities.maxReferenceMedia >= 0 && audioReferences.length > audioCapabilities.maxReferenceMedia) {
@@ -703,6 +704,7 @@ export function useGenerationActions({
     setAudioSubmitCount(prev => prev + 1);
     const generationPrompt = buildPromptWithReferenceMap(activePrompt, audioReferences, audioReferenceUrls);
     const resultMediaType: StorageItem["type"] = audioMode === "asr" ? "transcript" : "audio";
+    const requestAudioFormat = readOptionalAudioFormat(overrides.audioFormat);
     const generationRequest: GenerationRequestSnapshot = {
       prompt: generationPrompt,
       model: requestModel,
@@ -710,7 +712,7 @@ export function useGenerationActions({
       runningHubAccessPassword: overrides.runningHubAccessPassword,
       runningHubNodeInfoList: overrides.runningHubNodeInfoList,
       referenceMedia: buildReferenceMediaSnapshot(audioReferences, audioReferencePayloads),
-      audioFormat: overrides.audioFormat,
+      audioFormat: requestAudioFormat,
       audioMode,
       audioStylePrompt: resolvedAudioStylePrompt,
       asrLanguage: overrides.asrLanguage,
@@ -749,7 +751,7 @@ export function useGenerationActions({
           mode: audioMode,
           prompt: generationRequest.prompt,
           model: generationRequest.model,
-          format: overrides.audioFormat,
+          format: requestAudioFormat,
           stylePrompt: resolvedAudioStylePrompt,
           asrLanguage: overrides.asrLanguage,
           voice: profileVoice,

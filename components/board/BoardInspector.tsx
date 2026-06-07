@@ -15,6 +15,7 @@ import {
   Trash2,
 } from "lucide-react";
 import type { StorageItem } from "@/lib/db";
+import { audioOperationFormatOptions } from "@/lib/audio-operation-rules";
 import {
   getAudioModelCapabilities,
   getImageAspectRatioFromResolution,
@@ -145,7 +146,7 @@ function generateParamSummary(node: BoardGenerateNode): string {
   return [
     node.model,
     node.audioMode,
-    getAudioModelCapabilities(node.model).formats.length > 0 ? node.audioFormat : "",
+    audioOperationFormatOptions(getAudioModelCapabilities(node.model)).length > 0 ? node.audioFormat : "",
     `x${node.variantCount}`,
   ].filter(value => value.trim().length > 0).join(" / ");
 }
@@ -262,11 +263,12 @@ function videoModelPatch(model: string, current: BoardVideoGenerateNode): BoardG
 
 function audioModelPatch(model: string, current: BoardAudioOperationNode): BoardGenerateNodeUpdate {
   const capabilities = getAudioModelCapabilities(model);
+  const formatOptions = audioOperationFormatOptions(capabilities);
   return {
-    audioFormat: capabilities.formats.some(option => option.value === current.audioFormat)
+    audioFormat: formatOptions.some(option => option.value === current.audioFormat)
       ? current.audioFormat
-      : capabilities.formats.length > 0
-        ? firstOption(capabilities.formats, "wav")
+      : formatOptions.length > 0
+        ? firstOption(formatOptions, "wav")
         : "",
     audioMode: capabilities.modes.includes(current.audioMode)
       ? current.audioMode
@@ -722,6 +724,7 @@ function AudioOperationInspector({
   onUpdateGenerate: (nodeId: string, input: BoardGenerateNodeUpdate) => void;
 }) {
   const capabilities = getAudioModelCapabilities(node.model);
+  const formatOptions = audioOperationFormatOptions(capabilities);
   const supportsReferences = modelSupportsReferences(node);
   const requiredReferenceTypes = getInputReferenceTypes(inputSummary);
   const selectableAudioModelGroups = filterModelGroupsForReferenceTypes(audioModelGroups, "audio", requiredReferenceTypes);
@@ -732,7 +735,7 @@ function AudioOperationInspector({
   const defaultBuiltInVoiceProfile = visibleVoiceProfiles.find(
     profile => profile.source === "builtin" && profile.providerVoiceId === "mimo_default",
   ) ?? visibleVoiceProfiles.find(profile => profile.source === "builtin");
-  const showAudioFormat = capabilities.formats.length > 0;
+  const showAudioFormat = formatOptions.length > 0;
   const showVoiceProfile = node.audioMode === "tts" || node.audioMode === "voice_design" || node.audioMode === "voice_clone";
 
   useEffect(() => {
@@ -791,7 +794,7 @@ function AudioOperationInspector({
         {showAudioFormat && (
           <InspectorField title="格式">
             <select value={node.audioFormat} onChange={event => onUpdateGenerate(node.id, { audioFormat: event.target.value })} className={inputClass}>
-              {capabilities.formats.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+              {formatOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
           </InspectorField>
         )}

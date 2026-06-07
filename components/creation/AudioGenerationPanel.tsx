@@ -13,6 +13,7 @@ import {
   type PromptTemplateApplyMode,
   type PromptTemplateSlashCommand,
 } from "@/lib/prompt-templates";
+import { audioOperationRequiresTextInput } from "@/lib/audio-operation-rules";
 import { getMediaReferenceType } from "@/lib/media-references";
 import { parseProviderModel, type AudioModelCapabilities, type AudioOperationMode } from "@/lib/providers/model-catalog";
 import { deleteVoiceProfile, getVisibleVoiceProfilesForAudioModel, isBuiltInVoiceProfileId, listVoiceProfiles, saveVoiceProfile, type VoiceProfile, type VoiceProfileSource } from "@/lib/voice-profiles";
@@ -126,11 +127,13 @@ export default function AudioGenerationPanel({
   const showVoiceProfileLibrary = canUseVoiceProfile && (canSaveVoiceProfile || visibleVoiceProfiles.length > 0 || selectedVoiceProfile !== undefined);
   const needsCloneConsent = mode === "voice_clone";
   const stylePromptLabel = mode === "voice_design" ? "音色描述" : mode === "voice_clone" ? "演绎风格" : "风格提示";
-  const hasAudioReference = referenceImages.some(reference => getMediaReferenceType(reference) === "audio");
-  const hasRequiredInput = mode === "asr" ? hasAudioReference : prompt.trim().length > 0;
-  const promptPlaceholder = mode === "asr"
-    ? "可留空；上传或拖入音频参考后开始转写"
-    : "写下要朗读、生成音乐或音效的内容... 输入 @ 可引用作品";
+  const textInputRequired = audioOperationRequiresTextInput(mode);
+  const referenceCount = referenceImages.filter(reference => acceptedMediaTypes.includes(getMediaReferenceType(reference))).length;
+  const hasRequiredReferences = referenceCount >= capabilities.minReferenceMedia;
+  const hasRequiredInput = (!textInputRequired || prompt.trim().length > 0) && hasRequiredReferences;
+  const promptPlaceholder = textInputRequired
+    ? "写下要朗读、生成音乐或音效的内容... 输入 @ 可引用作品"
+    : "文本可留空；上传或拖入所需参考媒体后执行";
 
   useEffect(() => {
     let active = true;

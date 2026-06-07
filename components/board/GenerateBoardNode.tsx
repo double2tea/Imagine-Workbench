@@ -15,6 +15,7 @@ import {
   type PromptTemplateApplyMode,
   type PromptTemplateSlashCommand,
 } from "@/lib/prompt-templates";
+import { audioOperationFormatOptions, audioOperationRequiresTextInput } from "@/lib/audio-operation-rules";
 import { getAudioModelCapabilities, getVideoModelCapabilities } from "@/lib/providers/model-catalog";
 import { selectVideoReferenceTypesForMode } from "@/lib/video-reference-selection";
 
@@ -216,7 +217,9 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
   const slashCommandRef = useRef<PromptTemplateSlashCommand | null>(null);
   const isProcessing = node.status === "processing" || taskSummary?.status === "processing" || taskSummary?.status === "pending";
-  const isAsrAudioNode = node.kind === "audio-operation" && node.audioMode === "asr";
+  const isAudioNode = node.kind === "audio-operation";
+  const textInputRequired = !isAudioNode || audioOperationRequiresTextInput(node.audioMode);
+  const usesOptionalTextInput = isAudioNode && !textInputRequired;
   const promptPreview = inputSummary?.promptPreview ?? null;
   const promptSourceTitle = inputSummary?.promptSourceTitle;
   const referenceCount = inputSummary?.referenceCount ?? 0;
@@ -247,12 +250,12 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
   const result = resultContext(hasResultConnection, resultItems.length);
   const run = runContext(node, taskSummary);
   const lineTone = statusLineTone(node, taskSummary);
-  const promptContext = isAsrAudioNode && promptPreview === null && !node.prompt.trim()
+  const promptContext = usesOptionalTextInput && promptPreview === null && !node.prompt.trim()
     ? { title: "可选", tone: "neutral" as const }
     : promptPreview !== null
     ? { title: promptSourceTitle ?? "已连接", tone: "prompt" as const }
     : { title: "节点内", tone: "neutral" as const };
-  const promptContextLabel = isAsrAudioNode ? "备注" : "Prompt";
+  const promptContextLabel = isAudioNode ? textInputRequired ? "文本" : "备注" : "Prompt";
   const referenceContext = referenceCount > 0
     ? { title: `${referenceCount} 个`, tone: "reference" as const }
     : { title: "无", tone: "neutral" as const };
@@ -262,8 +265,8 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
       label: promptContextLabel,
       title: promptContext.title,
       tone: promptContext.tone,
-      tooltip: isAsrAudioNode
-        ? promptPreview !== null ? `备注来自 ${promptSourceTitle ?? "Prompt 节点"}` : "ASR 可留空；连接音频参考即可转写"
+      tooltip: isAudioNode
+        ? promptPreview !== null ? `${promptContextLabel}来自 ${promptSourceTitle ?? "Prompt 节点"}` : textInputRequired ? "使用节点内音频文本" : "文本可留空；连接所需参考媒体后执行"
         : promptPreview !== null ? `来自 ${promptSourceTitle ?? "Prompt 节点"}` : "使用节点内提示词",
     },
     { key: "references", label: "参考", title: referenceContext.title, tone: referenceContext.tone },
@@ -283,7 +286,7 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
       : [
         node.model,
         node.audioMode,
-        getAudioModelCapabilities(node.model).formats.length > 0 ? node.audioFormat : "",
+        audioOperationFormatOptions(getAudioModelCapabilities(node.model)).length > 0 ? node.audioFormat : "",
         `x${node.variantCount}`,
       ].filter(value => value.trim().length > 0).join(" / ");
   const statusLabel = taskSummary
@@ -334,13 +337,13 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
           onSlashCommand={handleSlashCommand}
           references={references}
           readOnly={promptPreview !== null}
-          headerRight={promptPreview === null && !isAsrAudioNode ? <PromptTemplatePicker ref={templatePickerRef} compact onApply={handleApplyPromptTemplate} /> : undefined}
+          headerRight={promptPreview === null && !usesOptionalTextInput ? <PromptTemplatePicker ref={templatePickerRef} compact onApply={handleApplyPromptTemplate} /> : undefined}
           className={`nodrag nowheel h-full w-full resize-none rounded-md imagine-board-input !p-2 !pr-20 text-xs leading-5 outline-none placeholder:text-[var(--iw-faint)] focus:border-[var(--iw-border)] ${
             promptPreview !== null ? "cursor-default opacity-85" : ""
           }`}
           placeholder={promptPreview !== null
-            ? isAsrAudioNode ? "已连接备注节点，请在提示节点编辑" : "已连接 Prompt 节点，请在提示节点编辑"
-            : isAsrAudioNode ? "ASR 可留空；连接或拖入音频资产后执行转写" : "可直接写提示词，输入 @ 引用参考图"}
+            ? isAudioNode ? `已连接${promptContextLabel}节点，请在提示节点编辑` : "已连接 Prompt 节点，请在提示节点编辑"
+            : usesOptionalTextInput ? "文本可留空；连接或拖入所需参考媒体后执行" : isAudioNode ? "输入音频操作文本，输入 @ 引用支持的参考媒体" : "可直接写提示词，输入 @ 引用参考图"}
         />
       </div>
       <div className="flex min-w-0 items-center gap-1 overflow-hidden rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-1">

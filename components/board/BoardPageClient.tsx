@@ -40,6 +40,7 @@ import { useClipboardImageImport } from "@/hooks/useClipboardImageImport";
 import { useGenerationActions } from "@/hooks/useGenerationActions";
 import { useGenerationTaskStore } from "@/hooks/useGenerationTaskStore";
 import { useMediaPolling } from "@/hooks/useMediaPolling";
+import { audioOperationMissingReferenceMessage, audioOperationRequiresTextInput } from "@/lib/audio-operation-rules";
 import {
   IMAGE_REFERENCE_LIMIT,
   useReferenceState,
@@ -3004,8 +3005,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       const references = await resolveOriginalReferences(previewReferences);
       flushBoardTextForGenerateNode(boardController.board.nodes, boardController.board.edges, nodeId);
       const nextPrompt = nodePrompt.trim();
-      const isAsrAudioOperation = node.kind === "audio-operation" && node.audioMode === "asr";
-      if (!nextPrompt && !isAsrAudioOperation) {
+      const audioCapabilities = node.kind === "audio-operation" ? getAudioModelCapabilities(node.model) : null;
+      const requiresTextInput = node.kind !== "audio-operation" || audioOperationRequiresTextInput(node.audioMode);
+      if (!nextPrompt && requiresTextInput) {
         boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: "生成节点需要提示词输入" });
         pushWorkspaceNotice("error", "生成节点需要提示词输入");
         return;
@@ -3035,8 +3037,14 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         pushWorkspaceNotice("error", message);
         return;
       }
-      if (isAsrAudioOperation && !references.some(reference => getMediaReferenceType(reference) === "audio")) {
-        const message = "ASR 转写需要连接或拖入一个音频参考";
+      if (audioCapabilities && references.length < audioCapabilities.minReferenceMedia) {
+        const message = audioOperationMissingReferenceMessage(audioCapabilities);
+        boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: message });
+        pushWorkspaceNotice("error", message);
+        return;
+      }
+      if (audioCapabilities && audioCapabilities.maxReferenceMedia > 0 && references.length > audioCapabilities.maxReferenceMedia) {
+        const message = `当前音频模式最多支持 ${audioCapabilities.maxReferenceMedia} 个参考媒体`;
         boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: message });
         pushWorkspaceNotice("error", message);
         return;

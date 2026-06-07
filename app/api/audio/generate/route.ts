@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { readOptionalAudioFormat } from "@/lib/audio-operation-rules";
 import { mediaReferenceLabel, mediaReferenceTypeFromBase64DataUri, type MediaReferenceType } from "@/lib/media-references";
 import { generateAudioOperation } from "@/lib/providers/audio";
 import { parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
@@ -15,7 +16,7 @@ const audioGenerateBodySchema = z.object({
   model: z.string().trim().min(1),
   prompt: z.string().optional(),
   mode: z.enum(["tts", "voice_design", "voice_clone", "music", "sfx", "asr"]),
-  format: z.string().trim().min(1).optional(),
+  format: z.string().transform(readOptionalAudioFormat).optional(),
   stylePrompt: z.string().trim().min(1).optional(),
   voice: z.string().trim().min(1).optional(),
   voiceProfileId: z.string().trim().min(1).optional(),

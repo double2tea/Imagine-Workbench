@@ -41,6 +41,7 @@ import { useClipboardImageImport } from "@/hooks/useClipboardImageImport";
 import { useGenerationActions } from "@/hooks/useGenerationActions";
 import { useGenerationTaskStore } from "@/hooks/useGenerationTaskStore";
 import { useMediaPolling } from "@/hooks/useMediaPolling";
+import { audioOperationFormatOptions, audioOperationRequiresTextInput } from "@/lib/audio-operation-rules";
 import {
   cancelGenerationTask,
   deleteGenerationTask,
@@ -341,9 +342,10 @@ export default function Home() {
   const activeAudioMode = audioCapabilities.modes.includes(selectedAudioMode)
     ? selectedAudioMode
     : audioCapabilities.defaultMode;
-  const activeAudioFormat = audioCapabilities.formats.some(option => option.value === audioFormat)
+  const audioFormatOptions = audioOperationFormatOptions(audioCapabilities);
+  const activeAudioFormat = audioFormatOptions.some(option => option.value === audioFormat)
     ? audioFormat
-    : audioCapabilities.formats[0]?.value ?? "wav";
+    : audioFormatOptions[0]?.value ?? "";
   const canUseAsyncImageGeneration = supportsAsyncImageGeneration(selectedModel);
   const activeImageResolution = imageResolution === "custom" ? customImageSize.trim() : imageResolution;
   const activeImageQuality = imageCapabilities.qualities.some(option => option.value === imageQuality) ? imageQuality : undefined;
@@ -411,12 +413,12 @@ export default function Home() {
     setAgentInput,
     setPrompt,
   });
-  const hasAudioReferenceForAsr = referenceImages.some(reference => getMediaReferenceType(reference) === "audio");
+  const audioTextInputRequired = audioOperationRequiresTextInput(activeAudioMode);
+  const activeAudioReferenceCount = referenceImages.filter(reference => audioCapabilities.referenceMediaTypes.includes(getMediaReferenceType(reference))).length;
+  const hasRequiredAudioReferences = activeAudioReferenceCount >= audioCapabilities.minReferenceMedia;
   const isCreatorGenerateDisabled =
     traditionalSubTab === "audio"
-      ? activeAudioMode === "asr"
-        ? !hasAudioReferenceForAsr
-        : !prompt.trim() || (activeAudioMode === "voice_clone" && !voiceCloneConsentAccepted)
+      ? (audioTextInputRequired && !prompt.trim()) || !hasRequiredAudioReferences || (activeAudioMode === "voice_clone" && !voiceCloneConsentAccepted)
       : !prompt.trim();
 
   const canUseBackgroundImageGeneration =
@@ -531,10 +533,10 @@ export default function Home() {
       return;
     }
     void generateManualAudio({
-      audioFormat: activeAudioFormat,
+      audioFormat: activeAudioFormat || undefined,
       audioMode: activeAudioMode,
       audioStylePrompt: audioStylePrompt.trim() || undefined,
-      allowEmptyPrompt: activeAudioMode === "asr",
+      allowEmptyPrompt: !audioTextInputRequired,
       model: selectedAudioModel,
       voiceCloneConsentAccepted,
       voiceProfileId: selectedVoiceProfileId || undefined,
@@ -1306,7 +1308,7 @@ export default function Home() {
           showGenerateButton={showGenerateButton}
           atDropdownNode={atDropdown.visible && atDropdown.type === "audio-prompt" ? renderAtDropdown("audio-prompt") : null}
           capabilities={audioCapabilities}
-          formatOptions={audioCapabilities.formats}
+          formatOptions={audioFormatOptions}
           isOptimizing={isOptimizing}
           isSubmitting={isSubmittingAudio}
           mode={activeAudioMode}
