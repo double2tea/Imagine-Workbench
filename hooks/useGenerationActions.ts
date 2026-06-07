@@ -64,6 +64,7 @@ interface GenerationOverrides {
   audioFormat?: string;
   audioStylePrompt?: string;
   voiceProfileId?: string;
+  voiceCloneConsentAccepted?: boolean;
   boardId?: string;
   boardNodeId?: string;
   boardResultStackKey?: string;
@@ -638,6 +639,10 @@ export function useGenerationActions({
       runningHubAccessPassword: overrides.runningHubAccessPassword,
       runningHubNodeInfoList: overrides.runningHubNodeInfoList,
       referenceMedia: buildReferenceMediaSnapshot(audioReferences, audioReferencePayloads),
+      audioFormat: overrides.audioFormat,
+      audioMode,
+      audioStylePrompt: overrides.audioStylePrompt,
+      voiceProfileId: overrides.voiceProfileId,
     };
 
     const taskId = makeClientId("task_aud");
@@ -674,6 +679,7 @@ export function useGenerationActions({
           format: overrides.audioFormat,
           stylePrompt: overrides.audioStylePrompt,
           voiceProfileId: overrides.voiceProfileId,
+          voiceCloneConsentAccepted: overrides.voiceCloneConsentAccepted,
           referenceMedia: generationRequest.referenceMedia?.map(reference => ({
             dataUri: reference.url,
             type: reference.type,

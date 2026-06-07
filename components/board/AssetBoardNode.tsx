@@ -79,7 +79,7 @@ const AssetBoardNode = memo(function AssetBoardNode({
   const stackCount = stackItems.length;
   const hasStackSwitcher = stackCount > 1;
   const isImagePreviewUrl = item.url.startsWith("data:image/");
-  const shouldRenderAudio = node.asset.type === "audio" && isSelected && item.url.trim();
+  const shouldRenderAudio = node.asset.type === "audio" && item.url.trim();
   const videoItem = useSelectedBoardVideoItem(item, isSelected);
   const shouldRenderVideoPlayer = videoItem !== null;
   const captureVideoFrameRef = useRef<VideoFrameCaptureRequest | null>(null);
@@ -198,7 +198,7 @@ const AssetBoardNode = memo(function AssetBoardNode({
           className="board-media-preview h-full w-full select-none object-cover"
         />
       ) : node.asset.type === "audio" && shouldRenderAudio ? (
-        <BoardAudioWaveform src={node.asset.url} />
+        <BoardAudioWaveform src={node.asset.url} interactive={isSelected} />
       ) : (
         <LightweightMediaPreview type={node.asset.type} />
       )}

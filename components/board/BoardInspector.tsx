@@ -2,7 +2,7 @@
 import ModelPriceBadge from "@/components/creation/ModelPriceBadge";
 import type { BoardGenerateInputSummary } from "@/components/board/GenerateBoardNode";
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   Crosshair,
   Loader2,
@@ -42,6 +42,7 @@ import type {
   BoardVideoGenerateNode,
 } from "@/lib/board";
 import { selectVideoReferenceTypesForMode } from "@/lib/video-reference-selection";
+import { listVoiceProfiles, type VoiceProfile } from "@/lib/voice-profiles";
 
 interface BoardInspectorProps {
   audioModelGroups: BoardModelOptionGroup[];
@@ -718,6 +719,22 @@ function AudioOperationInspector({
   const requiredReferenceTypes = getInputReferenceTypes(inputSummary);
   const selectableAudioModelGroups = filterModelGroupsForReferenceTypes(audioModelGroups, "audio", requiredReferenceTypes);
   const isProcessing = node.status === "processing";
+  const [voiceProfiles, setVoiceProfiles] = useState<VoiceProfile[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    void listVoiceProfiles().then(
+      profiles => {
+        if (active) setVoiceProfiles(profiles.filter(profile => profile.source !== "builtin"));
+      },
+      () => {
+        if (active) setVoiceProfiles([]);
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const advancedFields = (
     <div className="imagine-panel-disclosure-body">
@@ -747,6 +764,19 @@ function AudioOperationInspector({
       </div>
       <InspectorField title="变体">
         <VariantCountSelect value={node.variantCount} onChange={variantCount => onUpdateGenerate(node.id, { variantCount })} />
+      </InspectorField>
+      <InspectorField title="音色">
+        <select
+          value={node.voiceProfileId ?? ""}
+          onChange={event => onUpdateGenerate(node.id, { voiceProfileId: event.target.value || undefined })}
+          className={inputClass}
+        >
+          <option value="">不使用保存音色</option>
+          {node.voiceProfileId && !voiceProfiles.some(profile => profile.id === node.voiceProfileId) && (
+            <option value={node.voiceProfileId}>{node.voiceProfileId}</option>
+          )}
+          {voiceProfiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
+        </select>
       </InspectorField>
       <p className={infoChipClass}>
         参考媒体：{supportsReferences ? `${capabilities.referenceMediaTypes.join(" / ")} · ${capabilities.maxReferenceMedia}` : "不支持"}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from "react";
-import { AudioLines, Music, RefreshCw, Sparkles, Wand2 } from "lucide-react";
+import { AudioLines, Music, RefreshCw, Sparkles, Trash2, Wand2 } from "lucide-react";
 import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
 import ReferenceImagePicker, { type ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import PromptReferenceInlineOverlay, { resolvePromptReferenceThumbnails } from "@/components/reference/PromptReferenceThumbnailStrip";
@@ -12,8 +12,9 @@ import {
   type PromptTemplateApplyMode,
   type PromptTemplateSlashCommand,
 } from "@/lib/prompt-templates";
-import type { AudioModelCapabilities, AudioOperationMode, ModelOption } from "@/lib/providers/model-catalog";
-import { listVoiceProfiles, type VoiceProfile } from "@/lib/voice-profiles";
+import { getMediaReferenceType } from "@/lib/media-references";
+import { parseProviderModel, type AudioModelCapabilities, type AudioOperationMode, type ModelOption } from "@/lib/providers/model-catalog";
+import { deleteVoiceProfile, listVoiceProfiles, saveVoiceProfile, type VoiceProfile, type VoiceProfileSource } from "@/lib/voice-profiles";
 
 interface ModelOptionGroup {
   provider: string;
@@ -33,7 +34,10 @@ interface AudioGenerationPanelProps {
   referenceImages: ReferenceImageRef[];
   selectedFormat: string;
   selectedModel: string;
+  selectedVoiceProfileId: string;
   submitCount: number;
+  voiceCloneConsentAccepted: boolean;
+  audioStylePrompt: string;
   onClearReferences: () => void;
   onGenerate: () => void;
   onOptimizePrompt: () => void;
@@ -46,6 +50,9 @@ interface AudioGenerationPanelProps {
   onSelectFormat: (value: string) => void;
   onSelectMode: (value: AudioOperationMode) => void;
   onSelectModel: (value: string) => void;
+  onSelectVoiceProfile: (value: string) => void;
+  onVoiceCloneConsentChange: (value: boolean) => void;
+  onAudioStylePromptChange: (value: string) => void;
   showGenerateButton?: boolean;
 }
 
@@ -76,7 +83,10 @@ export default function AudioGenerationPanel({
   referenceImages,
   selectedFormat,
   selectedModel,
+  selectedVoiceProfileId,
   submitCount,
+  voiceCloneConsentAccepted,
+  audioStylePrompt,
   onClearReferences,
   onGenerate,
   onOptimizePrompt,
@@ -89,19 +99,33 @@ export default function AudioGenerationPanel({
   onSelectFormat,
   onSelectMode,
   onSelectModel,
+  onSelectVoiceProfile,
+  onVoiceCloneConsentChange,
+  onAudioStylePromptChange,
   showGenerateButton = true,
 }: AudioGenerationPanelProps) {
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
   const [slashCommand, setSlashCommand] = useState<PromptTemplateSlashCommand | null>(null);
   const [voiceProfiles, setVoiceProfiles] = useState<VoiceProfile[]>([]);
+  const [voiceProfileName, setVoiceProfileName] = useState("");
+  const [voiceProfileMessage, setVoiceProfileMessage] = useState("");
   const supportedModes = capabilities.modes;
   const referenceLimit = capabilities.maxReferenceMedia;
   const acceptedMediaTypes = capabilities.referenceMediaTypes;
   const promptReferenceThumbnails = resolvePromptReferenceThumbnails(prompt, referenceImages, acceptedMediaTypes);
-  const visibleVoiceProfileCount = useMemo(
-    () => voiceProfiles.filter(profile => profile.source !== "builtin").length,
-    [voiceProfiles],
+  const selectedProvider = parseProviderModel(selectedModel, "12ai").provider;
+  const visibleVoiceProfiles = useMemo(
+    () => voiceProfiles.filter(profile => profile.provider === selectedProvider && profile.source !== "builtin"),
+    [selectedProvider, voiceProfiles],
   );
+  const selectedVoiceProfile = visibleVoiceProfiles.find(profile => profile.id === selectedVoiceProfileId);
+  const referenceAudioAssetIds = useMemo(
+    () => referenceImages.filter(reference => getMediaReferenceType(reference) === "audio").map(reference => reference.id),
+    [referenceImages],
+  );
+  const canSaveVoiceProfile = mode === "voice_design" || mode === "voice_clone";
+  const needsCloneConsent = mode === "voice_clone";
+  const stylePromptLabel = mode === "voice_design" ? "音色描述" : mode === "voice_clone" ? "演绎风格" : "风格提示";
 
   useEffect(() => {
     let active = true;
@@ -134,6 +158,54 @@ export default function AudioGenerationPanel({
     const command = detectPromptTemplateSlashCommand(value, caret);
     setSlashCommand(command);
     if (command) templatePickerRef.current?.open(command.search);
+  };
+
+  const refreshVoiceProfiles = async (): Promise<void> => {
+    const profiles = await listVoiceProfiles();
+    setVoiceProfiles(profiles);
+  };
+
+  const handleSaveVoiceProfile = async (): Promise<void> => {
+    const name = voiceProfileName.trim();
+    if (!name) {
+      setVoiceProfileMessage("先输入音色名称");
+      return;
+    }
+    if (mode === "voice_clone" && referenceAudioAssetIds.length === 0) {
+      setVoiceProfileMessage("克隆音色需要至少一个音频参考");
+      return;
+    }
+    if (mode === "voice_clone" && !voiceCloneConsentAccepted) {
+      setVoiceProfileMessage("保存克隆音色前请确认参考音频授权");
+      return;
+    }
+    const designPrompt = audioStylePrompt.trim();
+    if (mode === "voice_design" && !designPrompt) {
+      setVoiceProfileMessage("设计音色需要填写音色描述");
+      return;
+    }
+
+    const source: VoiceProfileSource = mode === "voice_clone" ? "cloned" : "designed";
+    const profile = await saveVoiceProfile({
+      id: `voice_${Date.now()}`,
+      name,
+      provider: selectedProvider,
+      source,
+      designPrompt: designPrompt || undefined,
+      referenceAudioAssetIds: mode === "voice_clone" ? referenceAudioAssetIds : [],
+    });
+    await refreshVoiceProfiles();
+    onSelectVoiceProfile(profile.id);
+    setVoiceProfileName("");
+    setVoiceProfileMessage("已保存音色");
+  };
+
+  const handleDeleteVoiceProfile = async (): Promise<void> => {
+    if (!selectedVoiceProfileId) return;
+    await deleteVoiceProfile(selectedVoiceProfileId);
+    await refreshVoiceProfiles();
+    onSelectVoiceProfile("");
+    setVoiceProfileMessage("已删除音色");
   };
 
   return (
@@ -256,17 +328,78 @@ export default function AudioGenerationPanel({
         onUpload={onReferenceUpload}
       />
 
-      {visibleVoiceProfileCount > 0 && (
-        <div className="rounded-md border border-cyan-400/15 bg-cyan-500/8 px-3 py-2 text-[11px] text-cyan-100">
-          已有 {visibleVoiceProfileCount} 个可复用音色档案
+      {(mode === "voice_design" || mode === "voice_clone") && (
+        <div>
+          <label className="imagine-section-label mb-1.5 block">{stylePromptLabel}</label>
+          <input
+            value={audioStylePrompt}
+            onChange={event => onAudioStylePromptChange(event.target.value)}
+            placeholder={mode === "voice_design" ? "例如：温暖、年轻、自然叙事感" : "例如：平静讲述、广告旁白、轻松口播"}
+            className="imagine-input h-9 w-full rounded-md px-3 text-xs"
+          />
         </div>
       )}
+
+      <div className="rounded-md border border-cyan-400/15 bg-cyan-500/8 p-3">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <label className="imagine-section-label">音色库</label>
+          {selectedVoiceProfile && (
+            <button
+              type="button"
+              onClick={() => void handleDeleteVoiceProfile()}
+              className="flex h-7 items-center gap-1 rounded-md border border-red-400/20 px-2 text-[10px] font-semibold text-red-200 transition hover:bg-red-500/10"
+            >
+              <Trash2 className="h-3 w-3" />
+              删除
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+          <select
+            value={selectedVoiceProfileId}
+            onChange={event => onSelectVoiceProfile(event.target.value)}
+            className="imagine-select h-9 py-0 text-xs"
+          >
+            <option value="">不使用保存音色</option>
+            {visibleVoiceProfiles.map(profile => (
+              <option key={profile.id} value={profile.id}>{profile.name}</option>
+            ))}
+          </select>
+          <input
+            value={voiceProfileName}
+            onChange={event => setVoiceProfileName(event.target.value)}
+            placeholder={canSaveVoiceProfile ? "新音色名称" : "切到设计/克隆后保存"}
+            disabled={!canSaveVoiceProfile}
+            className="imagine-input h-9 rounded-md px-3 text-xs disabled:cursor-not-allowed disabled:opacity-60"
+          />
+          <button
+            type="button"
+            onClick={() => void handleSaveVoiceProfile()}
+            disabled={!canSaveVoiceProfile}
+            className="imagine-secondary-action h-9 rounded-md border px-3 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            保存
+          </button>
+        </div>
+        {needsCloneConsent && (
+          <label className="mt-2 flex items-start gap-2 text-[11px] leading-5 text-cyan-100">
+            <input
+              type="checkbox"
+              checked={voiceCloneConsentAccepted}
+              onChange={event => onVoiceCloneConsentChange(event.target.checked)}
+              className="mt-1 h-3.5 w-3.5 rounded border-cyan-400/30 bg-slate-950 text-cyan-500 focus:ring-cyan-400/30"
+            />
+            我确认拥有参考音频的使用权，并允许用于本次音色克隆。
+          </label>
+        )}
+        {voiceProfileMessage && <p className="mt-2 text-[11px] text-cyan-100">{voiceProfileMessage}</p>}
+      </div>
 
       {showGenerateButton && (
         <button
           type="button"
           onClick={onGenerate}
-          disabled={isSubmitting || !prompt.trim()}
+          disabled={isSubmitting || !prompt.trim() || (needsCloneConsent && !voiceCloneConsentAccepted)}
           className="imagine-primary-action flex w-full items-center justify-center gap-2 rounded-lg bg-cyan-600 py-3 text-xs font-bold text-white transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isSubmitting ? <RefreshCw className="h-4 w-4 animate-spin text-white" /> : <AudioLines className="h-4 w-4 text-white" />}

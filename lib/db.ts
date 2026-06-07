@@ -4,6 +4,7 @@ import {
   type MediaReferenceRole,
   type MediaReferenceType,
 } from "./media-references";
+import type { AudioOperationMode } from "./providers/model-catalog";
 import type { RunningHubTaskNodeBinding } from "./providers/types";
 
 const DB_NAME = "ImagineWorkbenchDB";
@@ -36,6 +37,10 @@ export interface GenerationRequestSnapshot {
   videoPreset?: string;
   videoReferenceMode?: "reference" | "firstLast";
   videoResolution?: string;
+  audioFormat?: string;
+  audioMode?: AudioOperationMode;
+  audioStylePrompt?: string;
+  voiceProfileId?: string;
   runningHubAccessPassword?: string;
   runningHubNodeInfoList?: RunningHubTaskNodeBinding[];
   referenceMedia?: GenerationReferenceMediaSnapshot[];

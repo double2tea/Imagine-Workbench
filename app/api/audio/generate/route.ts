@@ -17,6 +17,7 @@ const audioGenerateBodySchema = z.object({
   format: z.string().trim().min(1).optional(),
   stylePrompt: z.string().trim().min(1).optional(),
   voiceProfileId: z.string().trim().min(1).optional(),
+  voiceCloneConsentAccepted: z.boolean().optional(),
   referenceMedia: z.unknown().optional(),
   runningHubAccessPassword: z.unknown().optional(),
   runningHubNodeInfoList: z.unknown().optional(),

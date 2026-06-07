@@ -756,6 +756,20 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     minReferenceMedia: 0,
     formats: [{ value: "wav", label: "WAV" }],
   }),
+  audioCapability({
+    value: "mimo:mimo-v2.5-tts-voicedesign",
+    label: "MiMo V2.5 Voice Design",
+    provider: "mimo",
+    model: "mimo-v2.5-tts-voicedesign",
+    audioModes: ["voice_design"],
+    supportsReferences: false,
+    maxReferenceMedia: 0,
+    minReferenceMedia: 0,
+    formats: [
+      { value: "wav", label: "WAV" },
+      { value: "pcm16", label: "PCM16" },
+    ],
+  }),
   chatCapability({
     value: formatProviderModel("runninghub", RUNNINGHUB_DEFAULT_LLM_MODEL),
     label: "RunningHub Qwen 3.7 Max",
@@ -1187,7 +1201,10 @@ export function isAgentCompatibleModelId(model: string): boolean {
 
 export function isMimoWorkbenchTtsModel(value: string): boolean {
   const parsed = tryParseProviderModel(value, "12ai");
-  return parsed?.provider === "mimo" && parsed.model === "mimo-v2.5-tts";
+  return parsed?.provider === "mimo" && (
+    parsed.model === "mimo-v2.5-tts" ||
+    parsed.model === "mimo-v2.5-tts-voicedesign"
+  );
 }
 
 export function getImageModelCapabilities(value: string): ImageModelCapabilities {

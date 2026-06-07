@@ -188,6 +188,9 @@ export default function Home() {
   const [selectedAudioModel, setSelectedAudioModel] = useState(DEFAULT_AUDIO_MODEL);
   const [selectedAudioMode, setSelectedAudioMode] = useState<AudioOperationMode>("tts");
   const [audioFormat, setAudioFormat] = useState("wav");
+  const [audioStylePrompt, setAudioStylePrompt] = useState("");
+  const [selectedVoiceProfileId, setSelectedVoiceProfileId] = useState("");
+  const [voiceCloneConsentAccepted, setVoiceCloneConsentAccepted] = useState(false);
   const [aspectRatio, setAspectRatio] = useState("1:1");
   const [imageResolution, setImageResolution] = useState("1K");
   const [imageQuality, setImageQuality] = useState("auto");
@@ -511,6 +514,21 @@ export default function Home() {
     videoReferenceLimit,
     videoReferenceMode: activeVideoReferenceMode,
   });
+
+  const generateActiveAudio = () => {
+    if (activeAudioMode === "voice_clone" && !voiceCloneConsentAccepted) {
+      pushWorkspaceNotice("error", "音色克隆需要先确认参考音频授权");
+      return;
+    }
+    void generateManualAudio({
+      audioFormat: activeAudioFormat,
+      audioMode: activeAudioMode,
+      audioStylePrompt: audioStylePrompt.trim() || undefined,
+      model: selectedAudioModel,
+      voiceCloneConsentAccepted,
+      voiceProfileId: selectedVoiceProfileId || undefined,
+    });
+  };
   const {
     cancelProcessingItem,
     exportMetadataJson,
@@ -716,6 +734,7 @@ export default function Home() {
   const handleSelectAudioModel = (model: string) => {
     const capabilities = getAudioModelCapabilities(model);
     setSelectedAudioModel(model);
+    setSelectedVoiceProfileId("");
     if (!capabilities.modes.includes(selectedAudioMode)) {
       setSelectedAudioMode(capabilities.defaultMode);
     }
@@ -724,11 +743,12 @@ export default function Home() {
     }
   };
 
+  const handleSelectAudioMode = (mode: AudioOperationMode) => {
+    setSelectedAudioMode(mode);
+    if (mode !== "voice_clone") setVoiceCloneConsentAccepted(false);
+  };
+
   function reuseTaskInComposer(item: StorageItem): void {
-    if (item.type === "audio") {
-      pushWorkspaceNotice("error", "音频资产没有可复用的生成参数");
-      return;
-    }
     const request = item.generationRequest;
     const model = request?.model ?? item.model;
     const references: ReferenceImageRef[] = getGenerationReferenceMedia(request).map((reference, index) => {
@@ -747,7 +767,14 @@ export default function Home() {
     setReferenceImages(references);
     setReferenceImage(references[0]?.url ?? null);
 
-    if (item.type === "image") {
+    if (item.type === "audio") {
+      handleSelectAudioModel(model);
+      if (request?.audioMode) handleSelectAudioMode(request.audioMode);
+      if (request?.audioFormat) setAudioFormat(request.audioFormat);
+      setAudioStylePrompt(request?.audioStylePrompt ?? "");
+      setSelectedVoiceProfileId(request?.voiceProfileId ?? "");
+      setTraditionalSubTab("audio");
+    } else if (item.type === "image") {
       const imageModel = getSelectableStoredImageModel(model, selectedProvider);
       const nextAspectRatio = request?.aspectRatio ?? item.aspectRatio;
       const capabilities = getImageModelCapabilities(imageModel);
@@ -1274,13 +1301,16 @@ export default function Home() {
           referenceImages={referenceImages}
           selectedFormat={activeAudioFormat}
           selectedModel={selectedAudioModel}
+          selectedVoiceProfileId={selectedVoiceProfileId}
           submitCount={videoSubmitCount}
+          voiceCloneConsentAccepted={voiceCloneConsentAccepted}
+          audioStylePrompt={audioStylePrompt}
           onClearReferences={() => {
             setReferenceImages([]);
             setReferenceImage(null);
             setPrompt(removePromptReferenceTokens);
           }}
-          onGenerate={() => generateManualAudio({ audioFormat: activeAudioFormat, audioMode: activeAudioMode, model: selectedAudioModel })}
+          onGenerate={generateActiveAudio}
           onOptimizePrompt={optimizeActivePrompt}
           onPromptChange={value => handleTextareaChange(value, "audio-prompt")}
           onPromptDropAsset={event => handlePromptDropAsset(event, "audio-prompt")}
@@ -1289,8 +1319,11 @@ export default function Home() {
           onReferenceRemove={removeReferenceImage}
           onReferenceUpload={event => handleReferenceUpload(event, "audio-prompt")}
           onSelectFormat={setAudioFormat}
-          onSelectMode={setSelectedAudioMode}
+          onSelectMode={handleSelectAudioMode}
           onSelectModel={handleSelectAudioModel}
+          onSelectVoiceProfile={setSelectedVoiceProfileId}
+          onVoiceCloneConsentChange={setVoiceCloneConsentAccepted}
+          onAudioStylePromptChange={setAudioStylePrompt}
         />
       );
     }
@@ -1463,7 +1496,7 @@ export default function Home() {
             <div className="imagine-creator-generate-footer hidden shrink-0 lg:block">
               <CreatorGenerateButton
                 mode={traditionalSubTab}
-                disabled={!prompt.trim()}
+                disabled={!prompt.trim() || (traditionalSubTab === "audio" && activeAudioMode === "voice_clone" && !voiceCloneConsentAccepted)}
                 isSubmitting={traditionalSubTab === "image" ? isSubmittingImage : traditionalSubTab === "audio" ? isSubmittingAudio : isSubmittingVideo}
                 submitCount={traditionalSubTab === "image" ? imageSubmitCount : videoSubmitCount}
                 priceProvider={traditionalSubTab === "image" ? selectedModel.split(":")[0] : traditionalSubTab === "audio" ? selectedAudioModel.split(":")[0] : selectedVideoModel.split(":")[0]}
@@ -1481,7 +1514,7 @@ export default function Home() {
                     return;
                   }
                   if (traditionalSubTab === "audio") {
-                    generateManualAudio({ audioFormat: activeAudioFormat, audioMode: activeAudioMode, model: selectedAudioModel });
+                    generateActiveAudio();
                     return;
                   }
                   generateManualVideo();

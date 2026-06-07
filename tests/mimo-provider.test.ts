@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { generateMimoTts, generateMimoTtsVoiceDesign } from "../lib/providers/mimo-tts";
+import { generateAudioOperation } from "../lib/providers/audio";
 import { listProviderModels } from "../lib/providers/models";
 import type { ProviderConfig } from "../lib/providers/types";
 
@@ -25,7 +26,10 @@ test("mimo model listing uses static chat models without fetching", async () => 
 
     assert.equal(chatModels.some(option => option.value === "mimo:mimo-v2.5-pro"), true);
     assert.equal(allModels.some(option => option.value === "mimo:mimo-v2.5"), true);
-    assert.deepEqual(audioModels, [{ value: "mimo:mimo-v2.5-tts", label: "MiMo V2.5 TTS" }]);
+    assert.deepEqual(audioModels, [
+      { value: "mimo:mimo-v2.5-tts", label: "MiMo V2.5 TTS" },
+      { value: "mimo:mimo-v2.5-tts-voicedesign", label: "MiMo V2.5 Voice Design" },
+    ]);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -103,6 +107,40 @@ test("mimo voice design maps optimizeTextPreview inside audio object", async () 
         { role: "assistant", content: "Designed voice text" },
       ],
       audio: { format: "pcm16", optimize_text_preview: true },
+      stream: false,
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("mimo audio operation routes voice design to direct adapter", async () => {
+  const originalFetch = globalThis.fetch;
+  const bodies: unknown[] = [];
+  globalThis.fetch = async (_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    bodies.push(init?.body ? JSON.parse(String(init.body)) as unknown : null);
+    return Response.json({ choices: [{ message: { audio: { data: "designed_audio" } } }] });
+  };
+
+  try {
+    const result = await generateAudioOperation(mimoConfig, {
+      mode: "voice_design",
+      prompt: "Read this line",
+      model: "mimo-v2.5-tts-voicedesign",
+      referenceMedia: [],
+      format: "wav",
+      stylePrompt: "Warm documentary narrator",
+    });
+
+    assert.equal(result.type, "direct");
+    assert.equal(result.audioBase64, "designed_audio");
+    assert.deepEqual(bodies[0], {
+      model: "mimo-v2.5-tts-voicedesign",
+      messages: [
+        { role: "user", content: "Warm documentary narrator" },
+        { role: "assistant", content: "Read this line" },
+      ],
+      audio: { format: "wav" },
       stream: false,
     });
   } finally {

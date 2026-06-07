@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import { useRef, useState, type DragEvent } from "react";
+import AudioWaveformPreview from "@/components/audio/AudioWaveformPreview";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
 import PreviewImage from "@/components/PreviewImage";
 import { makeReferenceDropToken, REFERENCE_ASSET_MIME } from "@/components/reference/referenceDrag";
@@ -92,6 +93,20 @@ function processingTitle(type: StorageItem["type"]): string {
   if (type === "video") return "视频合成中";
   if (type === "audio") return "音频处理中";
   return "图像生成中";
+}
+
+function AudioProcessingWaveform() {
+  return (
+    <div className="mt-3 flex h-12 w-full max-w-44 items-center gap-1.5 rounded-lg border border-cyan-400/10 bg-cyan-500/8 px-3">
+      {Array.from({ length: 18 }).map((_, index) => (
+        <span
+          key={index}
+          className="w-1 rounded-full bg-cyan-300/45"
+          style={{ height: `${18 + ((index * 7) % 28)}px` }}
+        />
+      ))}
+    </div>
+  );
 }
 
 export default function AssetCard({
@@ -173,6 +188,7 @@ export default function AssetCard({
             <span className="imagine-generation-progress-label">
               {item.progress}% · {item.status === "pending" ? "排队" : "处理中"}
             </span>
+            {item.type === "audio" && <AudioProcessingWaveform />}
             <button
               type="button"
               onClick={() => onCancel(item)}
@@ -230,8 +246,8 @@ export default function AssetCard({
                 }}
               />
             ) : (
-              <div className="flex h-full w-full items-center justify-center px-4">
-                <audio src={item.url} controls className="w-full" />
+              <div className="flex h-full w-full items-center justify-center p-3">
+                <AudioWaveformPreview src={item.url} size="compact" />
               </div>
             )}
 

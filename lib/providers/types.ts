@@ -94,6 +94,7 @@ export interface GenerateAudioOperationInput extends GenerateAudioInput {
   format?: string;
   stylePrompt?: string;
   voiceProfileId?: string;
+  voiceCloneConsentAccepted?: boolean;
 }
 
 export interface DirectAudioOperationResult {

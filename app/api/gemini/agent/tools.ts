@@ -403,14 +403,27 @@ function formatAgentCapabilities(topic: "summary" | "actions" | "tools" | "conte
     videoGenerationReferences: ["image", "video", "audio"],
     audioGenerationReferences: ["image", "video", "audio"],
   };
+  const audioPlanning = {
+    modes: {
+      tts: "Narration, dialogue, voiceover, spoken lines.",
+      voice_design: "Create a described voice; put the voice description in audioStylePrompt.",
+      voice_clone: "Use only when the user provides or requests an authorized audio reference.",
+      music: "Background score, music bed, motif, or transition music.",
+      sfx: "Impact, ambience, Foley, UI sound, and other sound effects.",
+      asr: "Transcription intent only when an audio-capable model declares ASR support.",
+    },
+    boardPattern: "Use separate audio-operation nodes when narration, music, and SFX are separate deliverables.",
+    actionPattern: "Use generate_audio on the workbench and create_board_audio_flow on board.",
+  };
 
   if (topic === "actions") return { actions };
   if (topic === "tools") return { tools };
   if (topic === "context") return { contextPolicy };
-  if (topic === "media") return { media };
+  if (topic === "media") return { media, audioPlanning };
 
   return {
     actions,
+    audioPlanning,
     contextPolicy,
     media,
     modelCounts: modelCountByKind(),

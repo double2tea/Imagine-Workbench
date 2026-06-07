@@ -72,7 +72,7 @@ const ResultBoardNode = memo(function ResultBoardNode({
   );
   const hasStackSwitcher = stackItems.length > 1;
   const isImagePreviewUrl = item.url.startsWith("data:image/");
-  const shouldRenderAudio = item.type === "audio" && isSelected && item.url.trim();
+  const shouldRenderAudio = item.type === "audio" && item.url.trim();
   const videoItem = useSelectedBoardVideoItem(item, isSelected);
   const shouldRenderVideoPlayer = videoItem !== null;
   const captureVideoFrameRef = useRef<VideoFrameCaptureRequest | null>(null);
@@ -162,7 +162,7 @@ const ResultBoardNode = memo(function ResultBoardNode({
           className="board-media-preview h-full w-full select-none object-cover"
         />
       ) : item.type === "audio" && shouldRenderAudio ? (
-        <BoardAudioWaveform src={item.url} />
+        <BoardAudioWaveform src={item.url} interactive={isSelected} />
       ) : (
         <LightweightMediaPreview type={item.type} />
       )}

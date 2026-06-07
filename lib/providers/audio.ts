@@ -1,5 +1,5 @@
 import { generateRunningHubMedia, getRunningHubMediaStatus, downloadRunningHubMedia } from "./image";
-import { generateMimoTts, MIMO_TTS_MODEL } from "./mimo-tts";
+import { generateMimoTts, generateMimoTtsVoiceDesign, MIMO_TTS_MODEL, MIMO_TTS_VOICE_DESIGN_MODEL } from "./mimo-tts";
 import type {
   GenerateAudioInput,
   GenerateAudioOperationInput,
@@ -44,23 +44,39 @@ export async function generateAudioOperation(
   input: GenerateAudioOperationInput,
 ): Promise<GenerateAudioOperationResult> {
   if (config.provider === "mimo") {
-    if (input.mode !== "tts" || input.model !== MIMO_TTS_MODEL) {
-      throw new Error("MiMo audio operation currently supports built-in TTS only");
-    }
     if (input.referenceMedia.length > 0) {
-      throw new Error("MiMo built-in TTS does not support reference media");
+      throw new Error("MiMo audio operation does not support reference media yet");
     }
-    const result = await generateMimoTts(config, {
-      text: input.prompt,
-      format: input.format === "pcm16" ? "pcm16" : "wav",
-      stylePrompt: input.stylePrompt,
-    });
-    return {
-      type: "direct",
-      outputKind: "audio",
-      source: "mimo",
-      ...result,
-    };
+
+    if (input.mode === "tts" && input.model === MIMO_TTS_MODEL) {
+      const result = await generateMimoTts(config, {
+        text: input.prompt,
+        format: input.format === "pcm16" ? "pcm16" : "wav",
+        stylePrompt: input.stylePrompt,
+      });
+      return {
+        type: "direct",
+        outputKind: "audio",
+        source: "mimo",
+        ...result,
+      };
+    }
+
+    if (input.mode === "voice_design" && input.model === MIMO_TTS_VOICE_DESIGN_MODEL) {
+      const result = await generateMimoTtsVoiceDesign(config, {
+        text: input.prompt,
+        format: input.format === "pcm16" ? "pcm16" : "wav",
+        stylePrompt: input.stylePrompt,
+      });
+      return {
+        type: "direct",
+        outputKind: "audio",
+        source: "mimo",
+        ...result,
+      };
+    }
+
+    throw new Error("MiMo audio operation currently supports built-in TTS and voice design only");
   }
 
   if (config.provider === "runninghub") {
