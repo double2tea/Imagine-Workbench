@@ -78,7 +78,10 @@ import {
   DEFAULT_GENERATE_NODE_SIZE,
   DEFAULT_REFERENCE_GROUP_NODE_SIZE,
   DEFAULT_RUNNINGHUB_APP_NODE_SIZE,
+  boardNodeAbsolutePosition,
+  boardNodesWithAbsolutePositions,
   snapBoardPoint,
+  sortBoardNodesForReactFlow,
   type BoardEdge,
   type BoardEdgeKind,
   type BoardNode as BoardNodeModel,
@@ -228,6 +231,7 @@ function sameBoardNodeRenderModel(left: BoardNodeModel, right: BoardNodeModel): 
     (
       left.id === right.id &&
       left.kind === right.kind &&
+      left.parentId === right.parentId &&
       left.title === right.title &&
       left.updatedAt === right.updatedAt &&
       left.size.width === right.size.width &&
@@ -331,6 +335,7 @@ function sameFlowNodeModel(left: BoardFlowNode, right: BoardFlowNode): boolean {
   return (
     left.id === right.id &&
     left.type === right.type &&
+    left.parentId === right.parentId &&
     sameFlowNodeDataModel(left.data, right.data) &&
     left.position.x === right.position.x &&
     left.position.y === right.position.y
@@ -800,9 +805,10 @@ async function copyImageUrlToClipboard(url: string): Promise<void> {
 }
 
 function pastedNodePosition(nodes: BoardNodeModel[], node: BoardNodeModel): BoardPoint {
+  const position = boardNodeAbsolutePosition(nodes, node.id) ?? node.position;
   return findAvailableBoardNodePosition(
-    nodes,
-    { x: node.position.x + node.size.width + 48, y: node.position.y },
+    boardNodesWithAbsolutePositions(nodes),
+    { x: position.x + node.size.width + 48, y: position.y },
     node.size,
   );
 }
@@ -895,14 +901,17 @@ function boardNodeAtPoint(
   point: BoardPoint,
   sourceNodeId: string,
 ): BoardNodeModel | null {
-  for (let index = nodes.length - 1; index >= 0; index -= 1) {
-    const node = nodes[index];
+  const orderedNodes = sortBoardNodesForReactFlow(nodes);
+  for (let index = orderedNodes.length - 1; index >= 0; index -= 1) {
+    const node = orderedNodes[index];
     if (!node || node.id === sourceNodeId) continue;
+    const position = boardNodeAbsolutePosition(nodes, node.id);
+    if (!position) continue;
     if (
-      point.x >= node.position.x &&
-      point.x <= node.position.x + node.size.width &&
-      point.y >= node.position.y &&
-      point.y <= node.position.y + node.size.height
+      point.x >= position.x &&
+      point.x <= position.x + node.size.width &&
+      point.y >= position.y &&
+      point.y <= position.y + node.size.height
     ) {
       return node;
     }
@@ -1016,6 +1025,7 @@ export default function BoardWorkspace({
     undo,
     duplicateNode,
     duplicateNodes,
+    groupNodes,
     reconnectEdge,
     restoreNodeWithEdges,
     addAgentNode,
@@ -1023,6 +1033,7 @@ export default function BoardWorkspace({
     addAssetToReferenceGroup,
     addGenerateNode,
     addGenerateNodeWithConnections,
+    addGroupNode,
     addNoteNode,
     addPromptNode,
     addReferenceGroupNode,
@@ -1046,6 +1057,7 @@ export default function BoardWorkspace({
     updateAgentInstruction,
     updateGenerateNode,
     updateRunningHubAppNode,
+    ungroupNode,
     updateNodeSize,
     updateNodeTitle,
     updateNodesPositions,
@@ -1069,7 +1081,7 @@ export default function BoardWorkspace({
     [boardGraphContentKey],
   );
   const boardNodeGeometryKey = useMemo(
-    () => board.nodes.map(node => `${node.id}:${node.position.x},${node.position.y}:${node.size.width}x${node.size.height}`).join("|"),
+    () => board.nodes.map(node => `${node.id}:${node.parentId ?? ""}:${node.position.x},${node.position.y}:${node.size.width}x${node.size.height}`).join("|"),
     [board.nodes],
   );
   const galleryItemById = useMemo(
@@ -1412,7 +1424,7 @@ export default function BoardWorkspace({
     () => {
       const prevData = prevFlowDataRef.current;
       const nextData = new Map<string, BoardFlowNode["data"]>();
-      const result = board.nodes.map(node => {
+      const result = sortBoardNodesForReactFlow(board.nodes).map(node => {
         const cachedData = flowNodeDataById.get(node.id);
         if (!cachedData) {
           throw new Error(`Missing flow data for board node ${node.id}`);
@@ -1449,6 +1461,7 @@ export default function BoardWorkspace({
         return {
           id: node.id,
           type: "board" as const,
+          parentId: node.parentId,
           position: node.position,
           data,
         };
@@ -1883,6 +1896,25 @@ export default function BoardWorkspace({
     closeOverlayMenus();
   }, [addReferenceGroupNodeWithAssets, board.nodes, closeOverlayMenus, onConnectionError, selectedNodeIds]);
 
+  const createGroupFromSelected = useCallback((contextNodeId: string): void => {
+    const nodeIds = selectedNodeIds.includes(contextNodeId)
+      ? selectedNodeIds
+      : [...selectedNodeIds, contextNodeId];
+    const groupId = groupNodes(nodeIds);
+    if (!groupId) {
+      onConnectionError("至少选择两个节点才能打组");
+      return;
+    }
+    updateSelectedNodeIds([groupId]);
+    closeOverlayMenus();
+  }, [closeOverlayMenus, groupNodes, onConnectionError, selectedNodeIds, updateSelectedNodeIds]);
+
+  const ungroupSelectedNode = useCallback((nodeId: string): void => {
+    ungroupNode(nodeId);
+    updateSelectedNodeIds([]);
+    closeOverlayMenus();
+  }, [closeOverlayMenus, ungroupNode, updateSelectedNodeIds]);
+
   const pasteCopiedNode = useCallback((): void => {
     const copied = copiedNodeRef.current;
     if (!copied) return;
@@ -1910,6 +1942,11 @@ export default function BoardWorkspace({
     }
     if (node.kind === "reference-group") {
       addReferenceGroupNode({ position, references: node.references, size: node.size, title: node.title });
+      rememberPastedPosition();
+      return;
+    }
+    if (node.kind === "group") {
+      addGroupNode({ position, size: node.size, title: node.title });
       rememberPastedPosition();
       return;
     }
@@ -2002,7 +2039,7 @@ export default function BoardWorkspace({
     }
     addNoteNode({ body: node.body, position, size: node.size, title: node.title });
     rememberPastedPosition();
-  }, [addAgentNode, addAssetNode, addGenerateNode, addGenerateNodeWithConnections, addNoteNode, addPromptNode, addReferenceGroupNode, addResultNodeWithConnection, addRunningHubAppNode, board.nodes]);
+  }, [addAgentNode, addAssetNode, addGenerateNode, addGenerateNodeWithConnections, addGroupNode, addNoteNode, addPromptNode, addReferenceGroupNode, addResultNodeWithConnection, addRunningHubAppNode, board.nodes]);
 
   const handleConnectStart = useCallback<OnConnectStart>(() => {
     setIsConnectionActive(true);
@@ -2472,6 +2509,12 @@ export default function BoardWorkspace({
               node,
               onConnectSelected: selectedBatchConnectionCount > 0
                 ? () => connectSelectedNodesToTarget(node.id)
+                : undefined,
+              onGroupSelected: selectedNodeIds.length > 1 && selectedNodeIds.includes(node.id)
+                ? () => createGroupFromSelected(node.id)
+                : undefined,
+              onUngroup: node.kind === "group"
+                ? () => ungroupSelectedNode(node.id)
                 : undefined,
               onCreateReferenceGroup: node.kind === "asset" && node.asset.type === "image"
                 ? () => createReferenceGroupFromSelected(node.id)

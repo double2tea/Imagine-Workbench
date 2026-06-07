@@ -9,6 +9,7 @@ import {
   DEFAULT_BOARD_CONFIG,
   DEFAULT_BOARD_ID,
   DEFAULT_GENERATE_NODE_SIZE,
+  DEFAULT_GROUP_NODE_SIZE,
   DEFAULT_NODE_POSITION,
   DEFAULT_NOTE_NODE_SIZE,
   DEFAULT_PROMPT_NODE_SIZE,
@@ -25,6 +26,7 @@ import {
   type BoardGenerateNodeUpdate,
   type BoardGenerateVariantCount,
   type BoardGenerationStatus,
+  type BoardGroupNode,
   type BoardImageGenerateNode,
   type BoardNode,
   type BoardPoint,
@@ -49,11 +51,16 @@ import {
   type CreateAgentNodeInput,
   type CreateAssetNodeInput,
   type CreateGenerateNodeInput,
+  type CreateGroupNodeInput,
   type CreateNoteNodeInput,
   type CreatePromptNodeInput,
   type CreateReferenceGroupNodeInput,
   type CreateResultNodeInput,
   type CreateRunningHubAppNodeInput,
+  boardNodeAbsolutePosition,
+  boardNodesWithAbsolutePositions,
+  childPositionAfterUngroup,
+  createBoardGroupLayout,
 } from "@/lib/board";
 import { getImageModelCapabilities, getImageResolutionOptions, getVideoModelCapabilities } from "@/lib/providers/model-catalog";
 import {
@@ -83,6 +90,7 @@ const BOARD_VIEWPORT_ZOOM_EPSILON = 0.001;
 const BOARD_NODE_KINDS = new Set<BoardNode["kind"]>([
   "agent",
   "asset",
+  "group",
   "image-generate",
   "note",
   "prompt",
@@ -119,6 +127,9 @@ export interface BoardStateController {
   updateAssetReferenceUrls: (updates: Array<{ assetId: string; url: string }>) => void;
   updateResultNodeAsset: (nodeId: string, assetId: string) => void;
   addGenerateNode: (input: CreateGenerateNodeInput) => string;
+  addGroupNode: (input?: CreateGroupNodeInput) => string;
+  groupNodes: (nodeIds: string[]) => string | null;
+  ungroupNode: (nodeId: string) => void;
   addGenerateNodeWithConnection: (
     input: CreateGenerateNodeInput,
     from: BoardPortRef,
@@ -187,6 +198,7 @@ function duplicateNodeIdPrefix(kind: BoardNode["kind"]): string {
   if (kind === "asset") return "asset";
   if (kind === "prompt") return "prompt";
   if (kind === "reference-group") return "ref_group";
+  if (kind === "group") return "group";
   if (kind === "image-generate") return "image_gen";
   if (kind === "video-generate") return "video_gen";
   if (kind === "runninghub-app") return "rh_app";
@@ -199,6 +211,7 @@ function cloneBoardNodeForDuplicate(source: BoardNode, position: BoardPoint): Bo
   const createdAt = nowIso();
   const shell = {
     id: createBoardId(duplicateNodeIdPrefix(source.kind)),
+    parentId: source.parentId,
     title: source.title,
     position,
     size: source.kind === "runninghub-app" ? minimumBoardSize(source.size, DEFAULT_RUNNINGHUB_APP_NODE_SIZE) : source.size,
@@ -213,6 +226,8 @@ function cloneBoardNodeForDuplicate(source: BoardNode, position: BoardPoint): Bo
       return { ...shell, kind: "prompt", prompt: source.prompt };
     case "reference-group":
       return { ...shell, kind: "reference-group", references: structuredClone(source.references) };
+    case "group":
+      return { ...shell, kind: "group" };
     case "image-generate":
       return {
         ...shell,
@@ -324,7 +339,30 @@ function normalizeBoardNodes(nodes: unknown[]): BoardNode[] {
     normalizedNodes.push(normalizedNode);
   });
 
-  return normalizedNodes;
+  return normalizeBoardNodeParents(normalizedNodes);
+}
+
+function nodeHasValidParent(node: BoardNode, nodesById: Map<string, BoardNode>): boolean {
+  if (!node.parentId) return true;
+  const seen = new Set<string>([node.id]);
+  let parentId: string | undefined = node.parentId;
+  while (parentId) {
+    if (seen.has(parentId)) return false;
+    seen.add(parentId);
+    const parent = nodesById.get(parentId);
+    if (!parent || parent.kind !== "group") return false;
+    parentId = parent.parentId;
+  }
+  return true;
+}
+
+function normalizeBoardNodeParents(nodes: BoardNode[]): BoardNode[] {
+  const nodesById = new Map(nodes.map(node => [node.id, node]));
+  return nodes.map(node => {
+    if (nodeHasValidParent(node, nodesById)) return node;
+    const { parentId: _parentId, ...nodeWithoutParent } = node;
+    return nodeWithoutParent;
+  });
 }
 
 function normalizeBoardEdges(nodes: BoardNode[], edges: unknown[]): BoardEdge[] {
@@ -499,6 +537,7 @@ function normalizeBoardNode(node: unknown, index: number): BoardNode | null {
   const normalizedSize = normalizeBoardSize(node.size, defaultNodeSize(node.kind));
   const shell = {
     id: readNonEmptyString(node.id, `${duplicateNodeIdPrefix(node.kind)}_legacy_${index}`),
+    parentId: readOptionalString(node.parentId),
     position: normalizeBoardPoint(node.position, index),
     size: node.kind === "runninghub-app" ? minimumBoardSize(normalizedSize, DEFAULT_RUNNINGHUB_APP_NODE_SIZE) : normalizedSize,
     title: readNonEmptyString(node.title, defaultNodeTitle(node.kind)),
@@ -552,6 +591,12 @@ function normalizeBoardNode(node: unknown, index: number): BoardNode | null {
       ...shell,
       kind: "reference-group",
       references: Array.isArray(node.references) ? normalizeReferenceGroupItems(node.references) : [],
+    };
+  }
+  if (node.kind === "group") {
+    return {
+      ...shell,
+      kind: "group",
     };
   }
   if (node.kind === "image-generate") {
@@ -627,6 +672,7 @@ function defaultNodeSize(kind: BoardNode["kind"]): BoardSize {
   if (kind === "asset" || kind === "result") return DEFAULT_ASSET_NODE_SIZE;
   if (kind === "prompt") return DEFAULT_PROMPT_NODE_SIZE;
   if (kind === "reference-group") return DEFAULT_REFERENCE_GROUP_NODE_SIZE;
+  if (kind === "group") return DEFAULT_GROUP_NODE_SIZE;
   if (kind === "image-generate" || kind === "video-generate") return DEFAULT_GENERATE_NODE_SIZE;
   if (kind === "runninghub-app") return DEFAULT_RUNNINGHUB_APP_NODE_SIZE;
   if (kind === "agent") return DEFAULT_AGENT_NODE_SIZE;
@@ -637,6 +683,7 @@ function defaultNodeTitle(kind: BoardNode["kind"]): string {
   if (kind === "asset") return "Asset";
   if (kind === "prompt") return "Prompt";
   if (kind === "reference-group") return "Reference Group";
+  if (kind === "group") return "新建组";
   if (kind === "image-generate") return "Image Generate";
   if (kind === "video-generate") return "Video Generate";
   if (kind === "runninghub-app") return "RunningHub App";
@@ -824,6 +871,20 @@ function createReferenceGroupBoardNode(
     references: input.references ?? [],
     position: input.position ?? moveDefaultPosition(nodes),
     size: input.size ?? DEFAULT_REFERENCE_GROUP_NODE_SIZE,
+    createdAt,
+    updatedAt: createdAt,
+  };
+}
+
+function createGroupBoardNode(input: CreateGroupNodeInput, nodes: BoardNode[]): BoardGroupNode {
+  const createdAt = nowIso();
+  return {
+    id: createBoardId("group"),
+    kind: "group",
+    title: input.title ?? "新建组",
+    parentId: input.parentId,
+    position: input.position ?? moveDefaultPosition(nodes),
+    size: input.size ?? DEFAULT_GROUP_NODE_SIZE,
     createdAt,
     updatedAt: createdAt,
   };
@@ -1290,6 +1351,66 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     return node.id;
   }, [board.nodes, mutateBoard]);
 
+  const addGroupNode = useCallback((input: CreateGroupNodeInput = {}): string => {
+    const node = createGroupBoardNode(input, board.nodes);
+    mutateBoard(currentBoard => touchBoard(currentBoard, [...currentBoard.nodes, node]));
+    setSelectedNodeId(node.id);
+    setSelectedEdgeId(null);
+    return node.id;
+  }, [board.nodes, mutateBoard]);
+
+  const groupNodes = useCallback((nodeIds: string[]): string | null => {
+    if (!createBoardGroupLayout(boardRef.current.nodes, nodeIds)) return null;
+    const groupId = createBoardId("group");
+    mutateBoard(currentBoard => {
+      const layout = createBoardGroupLayout(currentBoard.nodes, nodeIds);
+      if (!layout) return currentBoard;
+      const updatedAt = nowIso();
+      const groupNode: BoardGroupNode = {
+        id: groupId,
+        kind: "group",
+        title: "新建组",
+        parentId: layout.parentId,
+        position: layout.position,
+        size: layout.size,
+        createdAt: updatedAt,
+        updatedAt,
+      };
+      const childIds = new Set(layout.childNodeIds);
+      const firstChildIndex = currentBoard.nodes.findIndex(node => childIds.has(node.id));
+      const nextNodes = currentBoard.nodes.map(node => {
+        const position = layout.childPositions.get(node.id);
+        return position ? { ...node, parentId: groupId, position, updatedAt } : node;
+      });
+      const insertIndex = firstChildIndex >= 0 ? firstChildIndex : nextNodes.length;
+      return touchBoard(
+        currentBoard,
+        [...nextNodes.slice(0, insertIndex), groupNode, ...nextNodes.slice(insertIndex)],
+      );
+    });
+    setSelectedNodeId(groupId);
+    setSelectedEdgeId(null);
+    return groupId;
+  }, [mutateBoard]);
+
+  const ungroupNode = useCallback((nodeId: string): void => {
+    mutateBoard(currentBoard => {
+      const group = currentBoard.nodes.find(node => node.id === nodeId);
+      if (group?.kind !== "group") return currentBoard;
+      const updatedAt = nowIso();
+      const nextNodes = currentBoard.nodes.flatMap(node => {
+        if (node.id === group.id) return [];
+        if (node.parentId !== group.id) return [node];
+        const position = childPositionAfterUngroup(currentBoard.nodes, group, node);
+        if (!position) return [node];
+        return [{ ...node, parentId: group.parentId, position, updatedAt }];
+      });
+      return touchBoard(currentBoard, nextNodes);
+    });
+    setSelectedNodeId(null);
+    setSelectedEdgeId(null);
+  }, [mutateBoard]);
+
   const addReferenceGroupNodeWithAssets = useCallback((input: CreateReferenceGroupNodeInput, assetNodeIds: string[]): string => {
     if (assetNodeIds.length === 0) throw new Error("参考组至少需要一个媒体资产");
     const node = createReferenceGroupBoardNode(input, board.nodes);
@@ -1447,6 +1568,17 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     mutateBoard(currentBoard => {
       const deletedNode = currentBoard.nodes.find(node => node.id === nodeId);
       const updatedAt = nowIso();
+      if (deletedNode?.kind === "group") {
+        const remainingNodes = currentBoard.nodes.flatMap(node => {
+          if (node.id === deletedNode.id) return [];
+          if (node.parentId !== deletedNode.id) return [node];
+          const position = childPositionAfterUngroup(currentBoard.nodes, deletedNode, node);
+          if (!position) return [node];
+          return [{ ...node, parentId: deletedNode.parentId, position, updatedAt }];
+        });
+        const remainingEdges = currentBoard.edges.filter(edge => edge.from.nodeId !== nodeId && edge.to.nodeId !== nodeId);
+        return touchBoard(currentBoard, remainingNodes, remainingEdges);
+      }
       const removedGroupReferences = deletedNode?.kind === "asset"
         ? currentBoard.edges
           .filter(edge => edge.from.nodeId === nodeId && edge.to.portId === "asset-in")
@@ -1602,12 +1734,17 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       const size = source.kind === "runninghub-app"
         ? minimumBoardSize(source.size, DEFAULT_RUNNINGHUB_APP_NODE_SIZE)
         : source.size;
+      const sourcePosition = boardNodesWithAbsolutePositions(board.nodes).find(node => node.id === source.id)?.position ?? source.position;
       const position = findAvailableBoardNodePosition(
-        occupiedNodes,
-        { x: source.position.x + source.size.width + 48, y: source.position.y },
+        boardNodesWithAbsolutePositions(occupiedNodes),
+        { x: sourcePosition.x + source.size.width + 48, y: sourcePosition.y },
         size,
       );
-      const clone = cloneBoardNodeForDuplicate(source, position);
+      const parentPosition = source.parentId ? boardNodeAbsolutePosition(board.nodes, source.parentId) : null;
+      const clonePosition = parentPosition
+        ? { x: position.x - parentPosition.x, y: position.y - parentPosition.y }
+        : position;
+      const clone = cloneBoardNodeForDuplicate(source, clonePosition);
       occupiedNodes.push(clone);
       return clone;
     });
@@ -2054,8 +2191,10 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       addResultNodeWithConnection,
       completeGenerationResult,
       addGenerateNode,
+      addGroupNode,
       addGenerateNodeWithConnection,
       addGenerateNodeWithConnections,
+      groupNodes,
       addNoteNode,
       addPromptNode,
       addReferenceGroupNode,
@@ -2082,6 +2221,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       updateResultNodeAsset,
       updateAgentInstruction,
       updateGenerateNode,
+      ungroupNode,
       updateNodeTitle,
       updateNodePosition,
       updateNodesPositions,
@@ -2097,8 +2237,10 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       addAssetNodeWithConnection,
       addResultNodeWithConnection,
       addGenerateNode,
+      addGroupNode,
       addGenerateNodeWithConnection,
       addGenerateNodeWithConnections,
+      groupNodes,
       addNoteNode,
       addPromptNode,
       addReferenceGroupNode,
@@ -2141,6 +2283,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       updateResultNodeAsset,
       updateAgentInstruction,
       updateGenerateNode,
+      ungroupNode,
       updateNodeTitle,
       updateNodePosition,
       updateNodesPositions,

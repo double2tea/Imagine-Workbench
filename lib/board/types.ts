@@ -1,4 +1,4 @@
-export type BoardNodeKind = "asset" | "prompt" | "reference-group" | "image-generate" | "video-generate" | "runninghub-app" | "agent" | "note" | "result";
+export type BoardNodeKind = "asset" | "prompt" | "reference-group" | "group" | "image-generate" | "video-generate" | "runninghub-app" | "agent" | "note" | "result";
 export type BoardAssetType = "image" | "video" | "audio";
 export type BoardEdgeKind = "reference" | "prompt" | "result" | "agent-context";
 export type BoardPortKind = "asset" | "prompt" | "result" | "agent";
@@ -58,6 +58,7 @@ export interface BoardAssetReference {
 
 export interface BoardNodeBase {
   id: string;
+  parentId?: string;
   position: BoardPoint;
   size: BoardSize;
   title: string;
@@ -90,6 +91,10 @@ export interface BoardReferenceGroupItem {
 export interface BoardReferenceGroupNode extends BoardNodeBase {
   kind: "reference-group";
   references: BoardReferenceGroupItem[];
+}
+
+export interface BoardGroupNode extends BoardNodeBase {
+  kind: "group";
 }
 
 export interface BoardImageGenerateNode extends BoardNodeBase {
@@ -190,6 +195,7 @@ export type BoardNode =
   | BoardAssetNode
   | BoardPromptNode
   | BoardReferenceGroupNode
+  | BoardGroupNode
   | BoardImageGenerateNode
   | BoardVideoGenerateNode
   | BoardRunningHubAppNode
@@ -298,6 +304,13 @@ export interface CreatePromptNodeInput {
 export interface CreateReferenceGroupNodeInput {
   position?: BoardPoint;
   references?: BoardReferenceGroupItem[];
+  size?: BoardSize;
+  title?: string;
+}
+
+export interface CreateGroupNodeInput {
+  parentId?: string;
+  position?: BoardPoint;
   size?: BoardSize;
   title?: string;
 }

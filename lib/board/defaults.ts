@@ -39,6 +39,11 @@ export const DEFAULT_REFERENCE_GROUP_NODE_SIZE: BoardSize = {
   height: 260,
 };
 
+export const DEFAULT_GROUP_NODE_SIZE: BoardSize = {
+  width: 640,
+  height: 420,
+};
+
 export const DEFAULT_GENERATE_NODE_SIZE: BoardSize = {
   width: 420,
   height: 300,

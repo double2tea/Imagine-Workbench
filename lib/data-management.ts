@@ -836,6 +836,7 @@ function parseBoardNode(value: unknown): BoardNode {
   const kind = readBoardNodeKind(value, "kind");
   const base = {
     id: readString(value, "id"),
+    parentId: readOptionalString(value, "parentId"),
     position: parseBoardPoint(value.position),
     size: parseBoardSize(value.size),
     title: readString(value, "title"),
@@ -863,6 +864,7 @@ function parseBoardNode(value: unknown): BoardNode {
   if (kind === "reference-group") {
     return { ...base, kind, references: readArray(value, "references").map(parseReferenceGroupItem) };
   }
+  if (kind === "group") return { ...base, kind };
   if (kind === "image-generate") {
     return {
       ...base,
@@ -1354,6 +1356,7 @@ function readBoardNodeKind(record: Record<string, unknown>, field: string): Boar
   const value = record[field];
   if (
     value !== "asset" &&
+    value !== "group" &&
     value !== "prompt" &&
     value !== "reference-group" &&
     value !== "image-generate" &&

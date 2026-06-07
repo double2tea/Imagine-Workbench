@@ -61,6 +61,8 @@ function serializeNodeContent(node: BoardNode): string {
       return `prompt|${node.id}|${node.title}|${fingerprintLargeText(node.prompt)}`;
     case "reference-group":
       return `refgroup|${node.id}|${node.title}|${node.references.map(serializeReferenceGroupItem).join(",")}`;
+    case "group":
+      return `group|${node.id}|${node.title}`;
     case "image-generate":
       return [
         "image-gen",

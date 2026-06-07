@@ -26,13 +26,17 @@ export function buildBoardNodeContextMenuActions(input: {
   onEditImage?: () => void;
   onExecute?: () => void;
   onConnectSelected?: () => void;
+  onGroupSelected?: () => void;
   onCreateReferenceGroup?: () => void;
   onSendAgent?: () => void;
+  onUngroup?: () => void;
 }): BoardNodeContextMenuAction[] {
   const actions: BoardNodeContextMenuAction[] = [
     { id: "duplicate", label: "复制节点", onSelect: input.onDuplicate },
   ];
   if (input.onConnectSelected) actions.push({ id: "connect-selected", label: "所选节点连到此节点", onSelect: input.onConnectSelected });
+  if (input.onGroupSelected) actions.push({ id: "group-selected", label: "打组", onSelect: input.onGroupSelected });
+  if (input.onUngroup) actions.push({ id: "ungroup", label: "取消分组", onSelect: input.onUngroup });
   if (input.onCreateReferenceGroup) actions.push({ id: "create-reference-group", label: "所选图片建参考组", onSelect: input.onCreateReferenceGroup });
   if (input.onCopyImage) actions.push({ id: "copy-image", label: "复制图片", onSelect: input.onCopyImage });
   if ((input.node.kind === "image-generate" || input.node.kind === "video-generate" || input.node.kind === "runninghub-app") && input.onExecute) {

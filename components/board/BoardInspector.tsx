@@ -82,6 +82,7 @@ const edgeKindLabels: Record<BoardEdge["kind"], string> = {
 const nodeKindLabels: Record<BoardNode["kind"], string> = {
   agent: "Agent",
   asset: "资产",
+  group: "组",
   "image-generate": "图片生成",
   note: "备注",
   prompt: "Prompt",

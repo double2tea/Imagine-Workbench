@@ -717,6 +717,13 @@ function summarizeBoardNodeForAgent(node: BoardDocument["nodes"][number], draftT
         title: node.title,
         body: `${node.references.length} references`,
       };
+    case "group":
+      return {
+        id: node.id,
+        kind: node.kind,
+        title: node.title,
+        body: "Board group",
+      };
     case "image-generate":
     case "video-generate":
       return {

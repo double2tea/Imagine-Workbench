@@ -13,6 +13,7 @@ export {
   DEFAULT_BOARD_ID,
   DEFAULT_BOARD_VIEWPORT,
   DEFAULT_GENERATE_NODE_SIZE,
+  DEFAULT_GROUP_NODE_SIZE,
   DEFAULT_NODE_POSITION,
   DEFAULT_NOTE_NODE_SIZE,
   DEFAULT_PROMPT_NODE_SIZE,
@@ -20,6 +21,13 @@ export {
   DEFAULT_RUNNINGHUB_APP_NODE_SIZE,
   createEmptyBoard,
 } from "@/lib/board/defaults";
+export {
+  boardNodeAbsolutePosition,
+  boardNodesWithAbsolutePositions,
+  childPositionAfterUngroup,
+  createBoardGroupLayout,
+  sortBoardNodesForReactFlow,
+} from "@/lib/board/grouping";
 export { BOARD_UNDO_LIMIT, cloneBoardHistory, type BoardHistorySnapshot } from "@/lib/board/history";
 export {
   clearBoardsFromDB,
@@ -73,6 +81,7 @@ export type {
   BoardGenerateNodeUpdate,
   BoardGenerateVariantCount,
   BoardGenerationStatus,
+  BoardGroupNode,
   BoardImageGenerateNode,
   BoardExecutableNode,
   BoardResultSourceNode,
@@ -106,6 +115,7 @@ export type {
   BoardVideoGenerateNode,
   BoardVideoReferenceMode,
   CreateAgentNodeInput,
+  CreateGroupNodeInput,
   CreateResultNodeInput,
   CreateRunningHubAppNodeInput,
   BoardViewport,

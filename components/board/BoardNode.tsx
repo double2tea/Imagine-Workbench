@@ -63,6 +63,7 @@ function nodeIcon(node: BoardNodeModel) {
   if (node.kind === "runninghub-app") return <Workflow className="h-3.5 w-3.5 text-emerald-300" />;
   if (node.kind === "agent") return <AgentIdentityMark variant="inline" />;
   if (node.kind === "reference-group") return <Layers className="h-3.5 w-3.5 text-cyan-300" />;
+  if (node.kind === "group") return <Layers className="h-3.5 w-3.5 text-emerald-300" />;
   return null;
 }
 
@@ -102,6 +103,7 @@ function nodeBodyOverflowClass(kind: BoardNodeModel["kind"]): string {
   if (kind === "asset" || kind === "prompt" || kind === "runninghub-app") {
     return "overflow-visible";
   }
+  if (kind === "group") return "overflow-visible";
   return "overflow-hidden";
 }
 
@@ -263,6 +265,54 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
       />
     );
   };
+
+  if (node.kind === "group") {
+    return (
+      <article
+        className={[
+          "board-node-shell board-group-node-shell relative h-full rounded-lg border border-dashed bg-[var(--iw-panel)]/30 shadow-sm backdrop-blur-[1px]",
+          selected ? "border-emerald-400/90 ring-2 ring-emerald-400/20" : "border-[var(--iw-border)]",
+        ].join(" ")}
+        data-kind={node.kind}
+        data-selected={selected ? "true" : "false"}
+        style={{ height: node.size.height, width: node.size.width }}
+      >
+        <div className="absolute -top-9 left-0 flex h-8 max-w-full items-center gap-2">
+          {isEditingTitle ? (
+            <input
+              autoFocus
+              className="nodrag pointer-events-auto h-7 w-48 rounded-md border border-emerald-400 bg-[var(--iw-panel)] px-2 text-xs font-semibold text-[var(--iw-text)] outline-none ring-2 ring-emerald-500/20"
+              value={draftTitle}
+              onBlur={commitTitleEdit}
+              onChange={event => setDraftTitle(event.target.value)}
+              onDoubleClick={event => event.stopPropagation()}
+              onKeyDown={event => {
+                if (event.key === "Enter") commitTitleEdit();
+                if (event.key === "Escape") {
+                  setDraftTitle(node.title);
+                  setIsEditingTitle(false);
+                }
+              }}
+              onPointerDown={event => event.stopPropagation()}
+            />
+          ) : (
+            <h2
+              className="nodrag pointer-events-auto flex min-w-0 items-center gap-2 truncate rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)]/92 px-2.5 py-1 text-xs font-semibold text-[var(--iw-text)] shadow-sm backdrop-blur"
+              title="双击重命名"
+              onDoubleClick={event => {
+                event.stopPropagation();
+                setDraftTitle(node.title);
+                setIsEditingTitle(true);
+              }}
+            >
+              {nodeIcon(node)}
+              <span className="truncate">{node.title}</span>
+            </h2>
+          )}
+        </div>
+      </article>
+    );
+  }
 
   return (
     <article
