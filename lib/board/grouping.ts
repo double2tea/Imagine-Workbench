@@ -19,6 +19,11 @@ export interface BoardGroupLayout {
   size: BoardSize;
 }
 
+export interface BoardNodeMoveParentResolution {
+  parentId?: string;
+  position: BoardPoint;
+}
+
 function nodeById(nodes: BoardNode[]): Map<string, BoardNode> {
   return new Map(nodes.map(node => [node.id, node]));
 }
@@ -72,6 +77,15 @@ function boundsForRects(rects: BoardNodeRect[]): BoardNodeRect | null {
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 }
 
+function pointInsideRect(point: BoardPoint, rect: BoardNodeRect): boolean {
+  return (
+    point.x >= rect.x &&
+    point.x <= rect.x + rect.width &&
+    point.y >= rect.y &&
+    point.y <= rect.y + rect.height
+  );
+}
+
 function isDescendantOf(nodesById: Map<string, BoardNode>, nodeId: string, ancestorId: string): boolean {
   const seen = new Set<string>([nodeId]);
   let parentId = nodesById.get(nodeId)?.parentId;
@@ -82,6 +96,27 @@ function isDescendantOf(nodesById: Map<string, BoardNode>, nodeId: string, ances
     parentId = nodesById.get(parentId)?.parentId;
   }
   return false;
+}
+
+function containingGroupForNode(nodes: BoardNode[], node: BoardNode, absolutePosition: BoardPoint): (BoardNode & { kind: "group" }) | null {
+  const nodesById = nodeById(nodes);
+  const center = {
+    x: absolutePosition.x + node.size.width / 2,
+    y: absolutePosition.y + node.size.height / 2,
+  };
+  let best: { area: number; group: BoardNode & { kind: "group" } } | null = null;
+
+  for (const candidate of nodes) {
+    if (candidate.kind !== "group") continue;
+    if (candidate.id === node.id) continue;
+    if (isDescendantOf(nodesById, candidate.id, node.id)) continue;
+    const rect = rectForNode(nodes, candidate);
+    if (!rect || !pointInsideRect(center, rect)) continue;
+    const area = candidate.size.width * candidate.size.height;
+    if (!best || area < best.area) best = { area, group: candidate };
+  }
+
+  return best?.group ?? null;
 }
 
 function topLevelSelection(nodes: BoardNode[], nodeIds: string[]): BoardNode[] {
@@ -139,6 +174,25 @@ export function createBoardGroupLayout(nodes: BoardNode[], nodeIds: string[]): B
     size: {
       width: bounds.width + BOARD_GROUP_PADDING_X * 2,
       height: bounds.height + BOARD_GROUP_PADDING_TOP + BOARD_GROUP_PADDING_BOTTOM,
+    },
+  };
+}
+
+export function resolveMovedBoardNodeParent(nodes: BoardNode[], nodeId: string): BoardNodeMoveParentResolution | null {
+  const node = nodeById(nodes).get(nodeId);
+  if (!node) return null;
+  const absolutePosition = boardNodeAbsolutePosition(nodes, node.id);
+  if (!absolutePosition) return null;
+  const parent = containingGroupForNode(nodes, node, absolutePosition);
+  if (!parent) return { position: absolutePosition };
+
+  const parentPosition = boardNodeAbsolutePosition(nodes, parent.id);
+  if (!parentPosition) return null;
+  return {
+    parentId: parent.id,
+    position: {
+      x: absolutePosition.x - parentPosition.x,
+      y: absolutePosition.y - parentPosition.y,
     },
   };
 }

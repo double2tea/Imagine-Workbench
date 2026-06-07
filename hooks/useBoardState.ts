@@ -61,6 +61,7 @@ import {
   boardNodesWithAbsolutePositions,
   childPositionAfterUngroup,
   createBoardGroupLayout,
+  resolveMovedBoardNodeParent,
 } from "@/lib/board";
 import { getImageModelCapabilities, getImageResolutionOptions, getVideoModelCapabilities } from "@/lib/providers/model-catalog";
 import {
@@ -2004,12 +2005,31 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     mutateBoard(
       currentBoard => {
         let didChange = false;
-        const nextNodes = currentBoard.nodes.map(node => {
+        const provisionalNodes = currentBoard.nodes.map(node => {
           const position = positionById.get(node.id);
           if (!position) return node;
-          if (node.position.x === position.x && node.position.y === position.y) return node;
+          return { ...node, position };
+        });
+        const nextNodes = provisionalNodes.map((node, index) => {
+          if (!positionById.has(node.id)) return node;
+          const resolution = resolveMovedBoardNodeParent(provisionalNodes, node.id);
+          if (!resolution) return node;
+          const currentNode = currentBoard.nodes[index];
+          if (!currentNode) return node;
+          const nextNode = {
+            ...node,
+            parentId: resolution.parentId,
+            position: resolution.position,
+          };
+          if (
+            currentNode.parentId === nextNode.parentId &&
+            currentNode.position.x === nextNode.position.x &&
+            currentNode.position.y === nextNode.position.y
+          ) {
+            return currentNode;
+          }
           didChange = true;
-          return { ...node, position, updatedAt };
+          return { ...nextNode, updatedAt };
         });
         return didChange ? touchBoard(currentBoard, nextNodes) : currentBoard;
       },

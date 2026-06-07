@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   childPositionAfterUngroup,
   createBoardGroupLayout,
+  resolveMovedBoardNodeParent,
   sortBoardNodesForReactFlow,
 } from "../lib/board/grouping";
 import type { BoardGroupNode, BoardNode } from "../lib/board/types";
@@ -74,4 +75,49 @@ test("sortBoardNodesForReactFlow puts parent groups before children", () => {
   const group = groupNode({ id: "group_1", position: { x: 52, y: 128 } });
 
   assert.deepEqual(sortBoardNodesForReactFlow([child, group]).map(node => node.id), ["group_1", "note_a"]);
+});
+
+test("resolveMovedBoardNodeParent releases a child dragged outside its group", () => {
+  const group = groupNode({ id: "group_1", position: { x: 100, y: 100 }, size: { width: 400, height: 300 } });
+  const child = noteNode({ id: "note_a", parentId: group.id, position: { x: 500, y: 40 }, size: { width: 100, height: 60 } });
+
+  const resolution = resolveMovedBoardNodeParent([group, child], child.id);
+
+  assert.ok(resolution);
+  assert.equal(resolution.parentId, undefined);
+  assert.deepEqual(resolution.position, { x: 600, y: 140 });
+});
+
+test("resolveMovedBoardNodeParent attaches a root node dragged into a group", () => {
+  const group = groupNode({ id: "group_1", position: { x: 100, y: 100 }, size: { width: 400, height: 300 } });
+  const child = noteNode({ id: "note_a", position: { x: 140, y: 160 }, size: { width: 100, height: 60 } });
+
+  const resolution = resolveMovedBoardNodeParent([group, child], child.id);
+
+  assert.ok(resolution);
+  assert.equal(resolution.parentId, group.id);
+  assert.deepEqual(resolution.position, { x: 40, y: 60 });
+});
+
+test("resolveMovedBoardNodeParent chooses the smallest containing group", () => {
+  const outer = groupNode({ id: "group_outer", position: { x: 0, y: 0 }, size: { width: 500, height: 500 } });
+  const inner = groupNode({ id: "group_inner", parentId: outer.id, position: { x: 100, y: 100 }, size: { width: 200, height: 200 } });
+  const child = noteNode({ id: "note_a", position: { x: 150, y: 150 }, size: { width: 80, height: 60 } });
+
+  const resolution = resolveMovedBoardNodeParent([outer, inner, child], child.id);
+
+  assert.ok(resolution);
+  assert.equal(resolution.parentId, inner.id);
+  assert.deepEqual(resolution.position, { x: 50, y: 50 });
+});
+
+test("resolveMovedBoardNodeParent does not attach a group to its descendant", () => {
+  const outer = groupNode({ id: "group_outer", position: { x: 90, y: 90 }, size: { width: 500, height: 500 } });
+  const inner = groupNode({ id: "group_inner", parentId: outer.id, position: { x: 80, y: 80 }, size: { width: 260, height: 260 } });
+
+  const resolution = resolveMovedBoardNodeParent([outer, inner], outer.id);
+
+  assert.ok(resolution);
+  assert.equal(resolution.parentId, undefined);
+  assert.deepEqual(resolution.position, { x: 90, y: 90 });
 });

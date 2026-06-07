@@ -26,6 +26,7 @@ export {
   boardNodesWithAbsolutePositions,
   childPositionAfterUngroup,
   createBoardGroupLayout,
+  resolveMovedBoardNodeParent,
   sortBoardNodesForReactFlow,
 } from "@/lib/board/grouping";
 export { BOARD_UNDO_LIMIT, cloneBoardHistory, type BoardHistorySnapshot } from "@/lib/board/history";
