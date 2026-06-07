@@ -137,6 +137,7 @@ export function prepareAgentActionDraft(action: AgentToolAction): AgentToolActio
         audioFormat: params.audioFormat,
         audioMode: params.audioMode,
         audioStylePrompt: params.audioStylePrompt,
+        asrLanguage: params.asrLanguage,
         voiceCloneConsentAccepted: params.voiceCloneConsentAccepted,
         voiceProfileId: params.voiceProfileId,
       },
@@ -254,6 +255,7 @@ export function validateAgentToolAction(
       params.audioFormat?.trim() ||
       params.audioMode ||
       params.audioStylePrompt?.trim() ||
+      params.asrLanguage ||
       typeof params.voiceCloneConsentAccepted === "boolean" ||
       params.voiceProfileId?.trim()
       ? null

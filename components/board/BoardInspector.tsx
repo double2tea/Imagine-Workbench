@@ -15,7 +15,15 @@ import {
   Trash2,
 } from "lucide-react";
 import type { StorageItem } from "@/lib/db";
-import { audioOperationFormatOptions } from "@/lib/audio-operation-rules";
+import {
+  ASR_LANGUAGE_OPTIONS,
+  audioFunctionOptionsForProvider,
+  audioFunctionValue,
+  audioOperationFormatOptions,
+  audioProviderFromModel,
+  audioProviderOptions,
+  parseAudioFunctionValue,
+} from "@/lib/audio-operation-rules";
 import {
   getAudioModelCapabilities,
   getImageAspectRatioFromResolution,
@@ -23,7 +31,6 @@ import {
   getImageResolutionOptions,
   getModelCapability,
   getVideoModelCapabilities,
-  type AudioOperationMode,
 } from "@/lib/providers/model-catalog";
 import { includeCurrentModelOption, type BoardModelOptionGroup } from "@/lib/board/model-options";
 import type { MediaReferenceType } from "@/lib/media-references";
@@ -102,15 +109,6 @@ const nodeKindLabels: Record<BoardNode["kind"], string> = {
 const videoReferenceModeLabels: Record<BoardVideoReferenceMode, string> = {
   reference: "全能参考",
   firstLast: "首尾帧 / 关键帧",
-};
-
-const audioModeLabels: Record<AudioOperationMode, string> = {
-  asr: "ASR",
-  music: "音乐",
-  sfx: "音效",
-  tts: "TTS",
-  voice_clone: "音色克隆",
-  voice_design: "音色设计",
 };
 
 function isGenerateNode(node: BoardNode | undefined): node is BoardGenerateNode {
@@ -274,6 +272,16 @@ function audioModelPatch(model: string, current: BoardAudioOperationNode): Board
       ? current.audioMode
       : capabilities.defaultMode,
     model,
+  };
+}
+
+function audioFunctionPatch(model: string, audioMode: BoardAudioOperationNode["audioMode"], current: BoardAudioOperationNode): BoardGenerateNodeUpdate {
+  const basePatch = audioModelPatch(model, current);
+  return {
+    ...basePatch,
+    audioMode,
+    ...(audioMode !== "voice_clone" ? { voiceCloneConsentAccepted: false } : {}),
+    ...(audioMode !== "tts" && audioMode !== "voice_design" && audioMode !== "voice_clone" ? { voiceProfileId: undefined } : {}),
   };
 }
 
@@ -728,6 +736,10 @@ function AudioOperationInspector({
   const supportsReferences = modelSupportsReferences(node);
   const requiredReferenceTypes = getInputReferenceTypes(inputSummary);
   const selectableAudioModelGroups = filterModelGroupsForReferenceTypes(audioModelGroups, "audio", requiredReferenceTypes);
+  const selectedProvider = audioProviderFromModel(node.model);
+  const providerOptions = audioProviderOptions(selectableAudioModelGroups);
+  const functionOptions = audioFunctionOptionsForProvider(selectableAudioModelGroups, selectedProvider, getAudioModelCapabilities);
+  const selectedFunctionValue = audioFunctionValue(node.model, node.audioMode);
   const isProcessing = node.status === "processing";
   const [voiceProfiles, setVoiceProfiles] = useState<VoiceProfile[]>([]);
   const visibleVoiceProfiles = getVisibleVoiceProfilesForAudioModel(node.model, node.audioMode, voiceProfiles);
@@ -737,6 +749,21 @@ function AudioOperationInspector({
   ) ?? visibleVoiceProfiles.find(profile => profile.source === "builtin");
   const showAudioFormat = formatOptions.length > 0;
   const showVoiceProfile = node.audioMode === "tts" || node.audioMode === "voice_design" || node.audioMode === "voice_clone";
+  const stylePromptLabel = node.audioMode === "voice_design" ? "音色描述" : "演绎风格";
+
+  const handleProviderChange = (value: string): void => {
+    const provider = providerOptions.find(option => option.value === value)?.value;
+    if (!provider) return;
+    const firstFunction = audioFunctionOptionsForProvider(selectableAudioModelGroups, provider, getAudioModelCapabilities)[0];
+    if (!firstFunction) return;
+    onUpdateGenerate(node.id, audioFunctionPatch(firstFunction.model, firstFunction.mode, node));
+  };
+
+  const handleFunctionChange = (value: string): void => {
+    const parsed = parseAudioFunctionValue(value);
+    if (!parsed) return;
+    onUpdateGenerate(node.id, audioFunctionPatch(parsed.model, parsed.mode, node));
+  };
 
   useEffect(() => {
     let active = true;
@@ -773,24 +800,22 @@ function AudioOperationInspector({
 
   const advancedFields = (
     <div className="imagine-panel-disclosure-body">
-      <InspectorField title="模型">
-        <ModelSelect
-          allowUnknownCurrent={requiredReferenceTypes.length === 0}
-          groups={selectableAudioModelGroups}
-          value={node.model}
-          onChange={model => onUpdateGenerate(node.id, audioModelPatch(model, node))}
-        />
+      <InspectorField title="服务商">
+        <select value={selectedProvider} onChange={event => handleProviderChange(event.target.value)} className={inputClass}>
+          {providerOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+        </select>
+      </InspectorField>
+      <InspectorField title="功能">
+        <select
+          value={functionOptions.some(option => option.value === selectedFunctionValue) ? selectedFunctionValue : ""}
+          onChange={event => handleFunctionChange(event.target.value)}
+          className={inputClass}
+        >
+          {!functionOptions.some(option => option.value === selectedFunctionValue) && <option value="" disabled>当前功能不可用</option>}
+          {functionOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+        </select>
       </InspectorField>
       <div className={`grid gap-2 ${showAudioFormat ? "grid-cols-2" : "grid-cols-1"}`}>
-        <InspectorField title="模式">
-          <select
-            value={node.audioMode}
-            onChange={event => onUpdateGenerate(node.id, { audioMode: event.target.value as AudioOperationMode })}
-            className={inputClass}
-          >
-            {capabilities.modes.map(mode => <option key={mode} value={mode}>{audioModeLabels[mode]}</option>)}
-          </select>
-        </InspectorField>
         {showAudioFormat && (
           <InspectorField title="格式">
             <select value={node.audioFormat} onChange={event => onUpdateGenerate(node.id, { audioFormat: event.target.value })} className={inputClass}>
@@ -802,6 +827,23 @@ function AudioOperationInspector({
       <InspectorField title="变体">
         <VariantCountSelect value={node.variantCount} onChange={variantCount => onUpdateGenerate(node.id, { variantCount })} />
       </InspectorField>
+      {(node.audioMode === "voice_design" || node.audioMode === "voice_clone") && (
+        <InspectorField title={stylePromptLabel}>
+          <input
+            value={node.audioStylePrompt ?? ""}
+            onChange={event => onUpdateGenerate(node.id, { audioStylePrompt: event.target.value })}
+            placeholder={node.audioMode === "voice_design" ? "例如：温暖、年轻、自然叙事感" : "例如：平静讲述、广告旁白、轻松口播"}
+            className={inputClass}
+          />
+        </InspectorField>
+      )}
+      {node.audioMode === "asr" && (
+        <InspectorField title="转写语言">
+          <select value={node.asrLanguage ?? "auto"} onChange={event => onUpdateGenerate(node.id, { asrLanguage: event.target.value as "auto" | "zh" | "en" })} className={inputClass}>
+            {ASR_LANGUAGE_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </InspectorField>
+      )}
       {showVoiceProfile && (
         <InspectorField title="音色">
           <select

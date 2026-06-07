@@ -140,6 +140,7 @@ export interface BoardAudioOperationNode extends BoardNodeBase {
   audioMode: AudioOperationMode;
   audioFormat: string;
   audioStylePrompt?: string;
+  asrLanguage?: "auto" | "zh" | "en";
   voiceProfileId?: string;
   voiceCloneConsentAccepted?: boolean;
   variantCount: BoardGenerateVariantCount;
@@ -242,6 +243,7 @@ export type BoardGenerateNodeUpdate = Partial<{
   audioFormat: string;
   audioMode: AudioOperationMode;
   audioStylePrompt: string;
+  asrLanguage: "auto" | "zh" | "en";
   customImageResolution: string;
   errorMessage: string;
   imageQuality: string;
@@ -360,6 +362,7 @@ export interface CreateGenerateNodeInput {
   audioFormat?: string;
   audioMode?: AudioOperationMode;
   audioStylePrompt?: string;
+  asrLanguage?: "auto" | "zh" | "en";
   customImageResolution?: string;
   imageQuality?: string;
   imageResolution?: string;

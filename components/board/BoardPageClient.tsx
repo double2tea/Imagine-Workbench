@@ -41,7 +41,7 @@ import { useClipboardImageImport } from "@/hooks/useClipboardImageImport";
 import { useGenerationActions } from "@/hooks/useGenerationActions";
 import { useGenerationTaskStore } from "@/hooks/useGenerationTaskStore";
 import { useMediaPolling } from "@/hooks/useMediaPolling";
-import { audioOperationMissingReferenceMessage, audioOperationRequiresTextInput } from "@/lib/audio-operation-rules";
+import { audioOperationMissingReferenceMessage, audioOperationRequiresStylePrompt, audioOperationRequiresTextInput } from "@/lib/audio-operation-rules";
 import {
   IMAGE_REFERENCE_LIMIT,
   useReferenceState,
@@ -568,6 +568,7 @@ function buildGenerateNodeUpdate(
     if (params?.audioFormat?.trim()) update.audioFormat = params.audioFormat;
     if (params?.audioMode) update.audioMode = params.audioMode;
     if (params?.audioStylePrompt?.trim()) update.audioStylePrompt = params.audioStylePrompt;
+    if (params?.asrLanguage) update.asrLanguage = params.asrLanguage;
     if (params?.voiceProfileId?.trim()) update.voiceProfileId = params.voiceProfileId;
     if (typeof params?.voiceCloneConsentAccepted === "boolean") update.voiceCloneConsentAccepted = params.voiceCloneConsentAccepted;
   }
@@ -634,6 +635,7 @@ function createPreviewBoardNode(operation: AgentBoardPatchCreateNodeOperation, i
       ...(operation.audioFormat ? { audioFormat: operation.audioFormat } : {}),
       ...(operation.audioMode ? { audioMode: operation.audioMode } : {}),
       ...(operation.audioStylePrompt ? { audioStylePrompt: operation.audioStylePrompt } : {}),
+      ...(operation.asrLanguage ? { asrLanguage: operation.asrLanguage } : {}),
       ...(operation.voiceProfileId ? { voiceProfileId: operation.voiceProfileId } : {}),
       ...(operation.voiceCloneConsentAccepted ? { voiceCloneConsentAccepted: operation.voiceCloneConsentAccepted } : {}),
     };
@@ -1753,6 +1755,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
                 ...(operation.audioFormat ? { audioFormat: operation.audioFormat } : {}),
                 ...(operation.audioMode ? { audioMode: operation.audioMode } : {}),
                 ...(operation.audioStylePrompt ? { audioStylePrompt: operation.audioStylePrompt } : {}),
+                ...(operation.asrLanguage ? { asrLanguage: operation.asrLanguage } : {}),
                 ...(operation.voiceProfileId ? { voiceProfileId: operation.voiceProfileId } : {}),
                 ...(operation.voiceCloneConsentAccepted ? { voiceCloneConsentAccepted: operation.voiceCloneConsentAccepted } : {}),
               });
@@ -1906,10 +1909,18 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             prompt: promptValue,
             resultStackKey,
           });
+          if (audioOperationRequiresStylePrompt(operation.audioMode ?? defaults.audioMode) && !operation.audioStylePrompt?.trim()) {
+            const message = "音色设计需要填写音色描述";
+            runFailureCount += 1;
+            boardController.updateGenerateNode(item.id, { status: "failed", errorMessage: message });
+            pushWorkspaceNotice("error", message);
+            continue;
+          }
           const didStart = await generateManualAudio({
             audioFormat: operation.audioFormat ?? defaults.audioFormat,
             audioMode: operation.audioMode ?? defaults.audioMode,
             audioStylePrompt: operation.audioStylePrompt,
+            asrLanguage: operation.asrLanguage,
             boardId: resolvedBoardId,
             boardNodeId: item.id,
             boardResultStackKey: resultStackKey,
@@ -2321,6 +2332,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         ...(action.params?.audioFormat ? { audioFormat: action.params.audioFormat } : {}),
         ...(action.params?.audioMode ? { audioMode: action.params.audioMode } : {}),
         ...(action.params?.audioStylePrompt ? { audioStylePrompt: action.params.audioStylePrompt } : {}),
+        ...(action.params?.asrLanguage ? { asrLanguage: action.params.asrLanguage } : {}),
         ...(action.params?.voiceProfileId ? { voiceProfileId: action.params.voiceProfileId } : {}),
         ...(action.params?.voiceCloneConsentAccepted ? { voiceCloneConsentAccepted: action.params.voiceCloneConsentAccepted } : {}),
       };
@@ -2398,13 +2410,14 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         kind: "audio-operation",
         model,
         nodeId: generateNodeId,
-        sizeKey: `${defaults.audioMode}|${defaults.audioFormat}|${defaults.voiceCloneConsentAccepted === true ? "clone-consent" : ""}|${defaults.voiceProfileId ?? ""}`,
+        sizeKey: `${defaults.audioMode}|${defaults.audioFormat}|${defaults.asrLanguage ?? ""}|${defaults.voiceCloneConsentAccepted === true ? "clone-consent" : ""}|${defaults.voiceProfileId ?? ""}`,
       });
       boardController.updateGenerateNode(generateNodeId, { errorMessage: undefined, resultStackKey, status: "processing" });
       const didStart = await generateManualAudio({
         audioFormat: defaults.audioFormat,
         audioMode: defaults.audioMode,
         audioStylePrompt: defaults.audioStylePrompt,
+        asrLanguage: defaults.asrLanguage,
         boardId: resolvedBoardId,
         boardNodeId: generateNodeId,
         boardResultStackKey: resultStackKey,
@@ -3013,6 +3026,12 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         pushWorkspaceNotice("error", "生成节点需要提示词输入");
         return;
       }
+      if (node.kind === "audio-operation" && audioOperationRequiresStylePrompt(node.audioMode) && !node.audioStylePrompt?.trim()) {
+        const message = "音色设计需要填写音色描述";
+        boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: message });
+        pushWorkspaceNotice("error", message);
+        return;
+      }
       if (isPlaceholderRunningHubModel(node.model)) {
         const message = "请先填写真实的 RunningHub webappId 或 workflowId";
         boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: message });
@@ -3131,6 +3150,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             audioFormat: node.audioFormat,
             audioMode: node.audioMode,
             audioStylePrompt: node.audioStylePrompt,
+            asrLanguage: node.asrLanguage,
             boardId: resolvedBoardId,
             boardNodeId: nodeId,
             boardResultStackKey: resultStackKey,

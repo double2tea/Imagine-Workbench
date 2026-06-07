@@ -36,6 +36,7 @@ const boardPortRefSchema = z.object({
 });
 
 const audioOperationModeSchema = z.enum(["tts", "voice_design", "voice_clone", "music", "sfx", "asr"]);
+const asrLanguageSchema = z.enum(["auto", "zh", "en"]);
 
 const boardContextSchema = z.object({
   boardId: z.string(),
@@ -111,6 +112,7 @@ const agentActionSchema = z.object({
       audioFormat: z.string().optional(),
       audioMode: audioOperationModeSchema.optional(),
       audioStylePrompt: z.string().optional(),
+      asrLanguage: asrLanguageSchema.optional(),
       voiceCloneConsentAccepted: z.boolean().optional(),
       voiceProfileId: z.string().optional(),
     })
@@ -149,6 +151,7 @@ const agentBoardPatchCreateNodeSchema = z.object({
   audioFormat: z.string().optional(),
   audioMode: audioOperationModeSchema.optional(),
   audioStylePrompt: z.string().optional(),
+  asrLanguage: asrLanguageSchema.optional(),
   voiceCloneConsentAccepted: z.boolean().optional(),
   voiceProfileId: z.string().optional(),
   run: z.boolean().optional(),
@@ -172,6 +175,7 @@ const agentBoardPatchUpdateNodeSchema = z.object({
   audioFormat: z.string().optional(),
   audioMode: audioOperationModeSchema.optional(),
   audioStylePrompt: z.string().optional(),
+  asrLanguage: asrLanguageSchema.optional(),
   voiceCloneConsentAccepted: z.boolean().optional(),
   voiceProfileId: z.string().optional(),
 });
@@ -220,6 +224,7 @@ const agentBoardActionSchema = z.object({
       audioFormat: z.string().optional(),
       audioMode: audioOperationModeSchema.optional(),
       audioStylePrompt: z.string().optional(),
+      asrLanguage: asrLanguageSchema.optional(),
       voiceCloneConsentAccepted: z.boolean().optional(),
       voiceProfileId: z.string().optional(),
       title: z.string().optional(),

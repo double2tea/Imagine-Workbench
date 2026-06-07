@@ -112,6 +112,7 @@ function serializeNodeContent(node: BoardNode): string {
         node.audioMode,
         node.audioFormat,
         node.audioStylePrompt ?? "",
+        node.asrLanguage ?? "",
         node.voiceCloneConsentAccepted === true ? "clone-consent" : "",
         node.voiceProfileId ?? "",
         node.variantCount,

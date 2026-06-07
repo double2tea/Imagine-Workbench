@@ -15,7 +15,7 @@ import {
   type PromptTemplateApplyMode,
   type PromptTemplateSlashCommand,
 } from "@/lib/prompt-templates";
-import { audioOperationFormatOptions, audioOperationRequiresTextInput } from "@/lib/audio-operation-rules";
+import { AUDIO_MODE_LABELS, audioOperationFormatOptions, audioOperationRequiresTextInput } from "@/lib/audio-operation-rules";
 import { getAudioModelCapabilities, getVideoModelCapabilities } from "@/lib/providers/model-catalog";
 import { selectVideoReferenceTypesForMode } from "@/lib/video-reference-selection";
 
@@ -285,7 +285,7 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
       ? `${node.model} / ${node.aspectRatio}${node.videoDuration ? ` / ${node.videoDuration}s` : ""} / x${node.variantCount}`
       : [
         node.model,
-        node.audioMode,
+        AUDIO_MODE_LABELS[node.audioMode],
         audioOperationFormatOptions(getAudioModelCapabilities(node.model)).length > 0 ? node.audioFormat : "",
         `x${node.variantCount}`,
       ].filter(value => value.trim().length > 0).join(" / ");

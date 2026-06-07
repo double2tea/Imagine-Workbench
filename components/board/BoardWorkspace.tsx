@@ -2036,6 +2036,7 @@ export default function BoardWorkspace({
         audioFormat: node.audioFormat,
         audioMode: node.audioMode,
         audioStylePrompt: node.audioStylePrompt,
+        asrLanguage: node.asrLanguage,
         model: node.model,
         position,
         prompt: node.prompt,

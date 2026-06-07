@@ -494,6 +494,11 @@ function readOptionalStringArray(value: unknown): string[] | undefined {
   return value.filter((item): item is string => typeof item === "string" && item.length > 0);
 }
 
+function readAsrLanguage(value: unknown): "auto" | "zh" | "en" {
+  if (value === "zh" || value === "en") return value;
+  return "auto";
+}
+
 function readVideoReferenceMode(value: unknown): BoardVideoReferenceMode | undefined {
   return value === "reference" || value === "firstLast" ? value : undefined;
 }
@@ -691,6 +696,7 @@ function normalizeBoardNode(node: unknown, index: number): BoardNode | null {
         : defaults.audioFormat,
       audioMode: readAudioOperationMode(node.audioMode, model),
       audioStylePrompt: readOptionalString(node.audioStylePrompt),
+      asrLanguage: readAsrLanguage(node.asrLanguage),
       model,
       prompt: typeof node.prompt === "string" ? node.prompt : "",
       resultStackKey: readOptionalString(node.resultStackKey),
@@ -1073,6 +1079,7 @@ function createGenerateBoardNode(input: CreateGenerateNodeInput, nodes: BoardNod
       audioFormat: input.audioFormat ?? audioDefaults.audioFormat,
       audioMode: input.audioMode ?? audioDefaults.audioMode,
       audioStylePrompt: input.audioStylePrompt,
+      asrLanguage: input.asrLanguage ?? "auto",
       voiceCloneConsentAccepted: input.voiceCloneConsentAccepted,
       voiceProfileId: input.voiceProfileId,
     };
@@ -1177,6 +1184,7 @@ function sameGenerateUpdate(node: BoardImageGenerateNode | BoardVideoGenerateNod
     if ("audioFormat" in input && node.audioFormat !== input.audioFormat) return false;
     if ("audioMode" in input && node.audioMode !== input.audioMode) return false;
     if ("audioStylePrompt" in input && node.audioStylePrompt !== input.audioStylePrompt) return false;
+    if ("asrLanguage" in input && node.asrLanguage !== input.asrLanguage) return false;
     if ("voiceCloneConsentAccepted" in input && node.voiceCloneConsentAccepted !== input.voiceCloneConsentAccepted) return false;
     if ("voiceProfileId" in input && node.voiceProfileId !== input.voiceProfileId) return false;
   }

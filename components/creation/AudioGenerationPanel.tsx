@@ -1,10 +1,20 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from "react";
-import { AudioLines, Music, RefreshCw, Sparkles, Trash2, Wand2 } from "lucide-react";
+import { AudioLines, RefreshCw, Sparkles, Trash2 } from "lucide-react";
 import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
-import ModelSelectCombobox, { type ModelOptionGroup } from "@/components/creation/ModelSelectCombobox";
+import type { ModelOptionGroup } from "@/components/creation/ModelSelectCombobox";
 import ReferenceImagePicker, { type ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import PromptReferenceInlineOverlay, { resolvePromptReferenceThumbnails } from "@/components/reference/PromptReferenceThumbnailStrip";
 import { type DraggedReferenceAsset, hasDraggedReferenceAsset } from "@/components/reference/referenceDrag";
+import {
+  ASR_LANGUAGE_OPTIONS,
+  audioOperationRequiresTextInput,
+  audioOperationRequiresStylePrompt,
+  audioFunctionOptionsForProvider,
+  audioFunctionValue,
+  audioProviderFromModel,
+  audioProviderOptions,
+  parseAudioFunctionValue,
+} from "@/lib/audio-operation-rules";
 import {
   applyPromptTemplateText,
   detectPromptTemplateSlashCommand,
@@ -13,9 +23,8 @@ import {
   type PromptTemplateApplyMode,
   type PromptTemplateSlashCommand,
 } from "@/lib/prompt-templates";
-import { audioOperationRequiresTextInput } from "@/lib/audio-operation-rules";
 import { getMediaReferenceType } from "@/lib/media-references";
-import { parseProviderModel, type AudioModelCapabilities, type AudioOperationMode } from "@/lib/providers/model-catalog";
+import { getAudioModelCapabilities, parseProviderModel, type AudioModelCapabilities, type AudioOperationMode } from "@/lib/providers/model-catalog";
 import { deleteVoiceProfile, getVisibleVoiceProfilesForAudioModel, isBuiltInVoiceProfileId, listVoiceProfiles, saveVoiceProfile, type VoiceProfile, type VoiceProfileSource } from "@/lib/voice-profiles";
 
 interface AudioGenerationPanelProps {
@@ -34,6 +43,7 @@ interface AudioGenerationPanelProps {
   submitCount: number;
   voiceCloneConsentAccepted: boolean;
   audioStylePrompt: string;
+  asrLanguage: "auto" | "zh" | "en";
   onClearReferences: () => void;
   onGenerate: () => void;
   onOptimizePrompt: () => void;
@@ -49,22 +59,8 @@ interface AudioGenerationPanelProps {
   onSelectVoiceProfile: (value: string) => void;
   onVoiceCloneConsentChange: (value: boolean) => void;
   onAudioStylePromptChange: (value: string) => void;
+  onAsrLanguageChange: (value: "auto" | "zh" | "en") => void;
   showGenerateButton?: boolean;
-}
-
-const AUDIO_MODE_LABELS: Record<AudioOperationMode, string> = {
-  asr: "转写",
-  music: "音乐",
-  sfx: "音效",
-  tts: "朗读",
-  voice_clone: "克隆",
-  voice_design: "设计音色",
-};
-
-function audioModeIcon(mode: AudioOperationMode) {
-  if (mode === "music") return <Music className="h-3.5 w-3.5" />;
-  if (mode === "sfx") return <Wand2 className="h-3.5 w-3.5" />;
-  return <AudioLines className="h-3.5 w-3.5" />;
 }
 
 export default function AudioGenerationPanel({
@@ -83,6 +79,7 @@ export default function AudioGenerationPanel({
   submitCount,
   voiceCloneConsentAccepted,
   audioStylePrompt,
+  asrLanguage,
   onClearReferences,
   onGenerate,
   onOptimizePrompt,
@@ -98,6 +95,7 @@ export default function AudioGenerationPanel({
   onSelectVoiceProfile,
   onVoiceCloneConsentChange,
   onAudioStylePromptChange,
+  onAsrLanguageChange,
   showGenerateButton = true,
 }: AudioGenerationPanelProps) {
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
@@ -106,7 +104,10 @@ export default function AudioGenerationPanel({
   const [voiceProfiles, setVoiceProfiles] = useState<VoiceProfile[]>([]);
   const [voiceProfileName, setVoiceProfileName] = useState("");
   const [voiceProfileMessage, setVoiceProfileMessage] = useState("");
-  const supportedModes = capabilities.modes;
+  const selectedProvider = audioProviderFromModel(selectedModel);
+  const providerOptions = audioProviderOptions(modelGroups);
+  const functionOptions = audioFunctionOptionsForProvider(modelGroups, selectedProvider, getAudioModelCapabilities);
+  const selectedFunctionValue = audioFunctionValue(selectedModel, mode);
   const referenceLimit = capabilities.maxReferenceMedia;
   const acceptedMediaTypes = capabilities.referenceMediaTypes;
   const promptReferenceThumbnails = resolvePromptReferenceThumbnails(prompt, referenceImages, acceptedMediaTypes);
@@ -128,12 +129,29 @@ export default function AudioGenerationPanel({
   const needsCloneConsent = mode === "voice_clone";
   const stylePromptLabel = mode === "voice_design" ? "音色描述" : mode === "voice_clone" ? "演绎风格" : "风格提示";
   const textInputRequired = audioOperationRequiresTextInput(mode);
+  const stylePromptRequired = audioOperationRequiresStylePrompt(mode);
   const referenceCount = referenceImages.filter(reference => acceptedMediaTypes.includes(getMediaReferenceType(reference))).length;
   const hasRequiredReferences = referenceCount >= capabilities.minReferenceMedia;
-  const hasRequiredInput = (!textInputRequired || prompt.trim().length > 0) && hasRequiredReferences;
+  const hasRequiredInput = (!textInputRequired || prompt.trim().length > 0) && (!stylePromptRequired || audioStylePrompt.trim().length > 0) && hasRequiredReferences;
   const promptPlaceholder = textInputRequired
     ? "写下要朗读、生成音乐或音效的内容... 输入 @ 可引用作品"
     : "文本可留空；上传或拖入所需参考媒体后执行";
+
+  const handleProviderChange = (value: string): void => {
+    const provider = providerOptions.find(option => option.value === value)?.value;
+    if (!provider) return;
+    const firstFunction = audioFunctionOptionsForProvider(modelGroups, provider, getAudioModelCapabilities)[0];
+    if (!firstFunction) return;
+    onSelectModel(firstFunction.model);
+    onSelectMode(firstFunction.mode);
+  };
+
+  const handleFunctionChange = (value: string): void => {
+    const parsed = parseAudioFunctionValue(value);
+    if (!parsed) return;
+    onSelectModel(parsed.model);
+    onSelectMode(parsed.mode);
+  };
 
   useEffect(() => {
     let active = true;
@@ -313,14 +331,21 @@ export default function AudioGenerationPanel({
 
       <div className="grid grid-cols-1 gap-3">
         <div>
-          <label className="imagine-section-label mb-1.5 block">音频模型</label>
-          <ModelSelectCombobox
-            accent="cyan"
-            ariaLabel="选择音频模型"
-            groups={modelGroups}
-            value={selectedModel}
-            onChange={onSelectModel}
-          />
+          <label className="imagine-section-label mb-1.5 block">服务商</label>
+          <select value={selectedProvider} onChange={(event) => handleProviderChange(event.target.value)} className="imagine-select py-2.5">
+            {providerOptions.map(option => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="imagine-section-label mb-1.5 block">功能</label>
+          <select value={functionOptions.some(option => option.value === selectedFunctionValue) ? selectedFunctionValue : ""} onChange={(event) => handleFunctionChange(event.target.value)} className="imagine-select py-2.5">
+            {!functionOptions.some(option => option.value === selectedFunctionValue) && <option value="" disabled>当前功能不可用</option>}
+            {functionOptions.map(option => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
         </div>
         {formatOptions.length > 0 && (
           <div>
@@ -332,28 +357,6 @@ export default function AudioGenerationPanel({
             </select>
           </div>
         )}
-      </div>
-
-      <div>
-        <label className="imagine-section-label mb-1.5 block">任务模式</label>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {supportedModes.map(item => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => onSelectMode(item)}
-              data-active={mode === item}
-              className={`imagine-audio-mode-button flex h-9 items-center justify-center gap-1.5 rounded-md border text-xs font-semibold transition ${
-                mode === item
-                  ? "border-cyan-300/50 bg-cyan-500/16 text-cyan-100"
-                  : "border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)] hover:text-[var(--iw-text)]"
-              }`}
-            >
-              {audioModeIcon(item)}
-              {AUDIO_MODE_LABELS[item]}
-            </button>
-          ))}
-        </div>
       </div>
 
       <ReferenceImagePicker
@@ -383,6 +386,17 @@ export default function AudioGenerationPanel({
             placeholder={mode === "voice_design" ? "例如：温暖、年轻、自然叙事感" : "例如：平静讲述、广告旁白、轻松口播"}
             className="imagine-input h-9 w-full rounded-md px-3 text-xs"
           />
+        </div>
+      )}
+
+      {mode === "asr" && (
+        <div>
+          <label className="imagine-section-label mb-1.5 block">转写语言</label>
+          <select value={asrLanguage} onChange={event => onAsrLanguageChange(event.target.value as "auto" | "zh" | "en")} className="imagine-select py-2.5">
+            {ASR_LANGUAGE_OPTIONS.map(option => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
         </div>
       )}
 

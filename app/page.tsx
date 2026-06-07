@@ -41,7 +41,7 @@ import { useClipboardImageImport } from "@/hooks/useClipboardImageImport";
 import { useGenerationActions } from "@/hooks/useGenerationActions";
 import { useGenerationTaskStore } from "@/hooks/useGenerationTaskStore";
 import { useMediaPolling } from "@/hooks/useMediaPolling";
-import { audioOperationFormatOptions, audioOperationRequiresTextInput } from "@/lib/audio-operation-rules";
+import { audioOperationFormatOptions, audioOperationRequiresStylePrompt, audioOperationRequiresTextInput } from "@/lib/audio-operation-rules";
 import {
   cancelGenerationTask,
   deleteGenerationTask,
@@ -190,6 +190,7 @@ export default function Home() {
   const [selectedAudioMode, setSelectedAudioMode] = useState<AudioOperationMode>("tts");
   const [audioFormat, setAudioFormat] = useState("wav");
   const [audioStylePrompt, setAudioStylePrompt] = useState("");
+  const [asrLanguage, setAsrLanguage] = useState<"auto" | "zh" | "en">("auto");
   const [selectedVoiceProfileId, setSelectedVoiceProfileId] = useState("");
   const [voiceCloneConsentAccepted, setVoiceCloneConsentAccepted] = useState(false);
   const [aspectRatio, setAspectRatio] = useState("1:1");
@@ -414,11 +415,12 @@ export default function Home() {
     setPrompt,
   });
   const audioTextInputRequired = audioOperationRequiresTextInput(activeAudioMode);
+  const audioStylePromptRequired = audioOperationRequiresStylePrompt(activeAudioMode);
   const activeAudioReferenceCount = referenceImages.filter(reference => audioCapabilities.referenceMediaTypes.includes(getMediaReferenceType(reference))).length;
   const hasRequiredAudioReferences = activeAudioReferenceCount >= audioCapabilities.minReferenceMedia;
   const isCreatorGenerateDisabled =
     traditionalSubTab === "audio"
-      ? (audioTextInputRequired && !prompt.trim()) || !hasRequiredAudioReferences || (activeAudioMode === "voice_clone" && !voiceCloneConsentAccepted)
+      ? (audioTextInputRequired && !prompt.trim()) || (audioStylePromptRequired && !audioStylePrompt.trim()) || !hasRequiredAudioReferences || (activeAudioMode === "voice_clone" && !voiceCloneConsentAccepted)
       : !prompt.trim();
 
   const canUseBackgroundImageGeneration =
@@ -532,10 +534,15 @@ export default function Home() {
       pushWorkspaceNotice("error", "音色克隆需要先确认参考音频授权");
       return;
     }
+    if (audioStylePromptRequired && !audioStylePrompt.trim()) {
+      pushWorkspaceNotice("error", "音色设计需要填写音色描述");
+      return;
+    }
     void generateManualAudio({
       audioFormat: activeAudioFormat || undefined,
       audioMode: activeAudioMode,
       audioStylePrompt: audioStylePrompt.trim() || undefined,
+      asrLanguage,
       allowEmptyPrompt: !audioTextInputRequired,
       model: selectedAudioModel,
       voiceCloneConsentAccepted,
@@ -785,6 +792,7 @@ export default function Home() {
       if (request?.audioMode) handleSelectAudioMode(request.audioMode);
       if (request?.audioFormat) setAudioFormat(request.audioFormat);
       setAudioStylePrompt(request?.audioStylePrompt ?? "");
+      setAsrLanguage(request?.asrLanguage ?? "auto");
       setSelectedVoiceProfileId(request?.voiceProfileId ?? "");
       setTraditionalSubTab("audio");
     } else if (item.type === "image") {
@@ -1321,6 +1329,7 @@ export default function Home() {
           submitCount={audioSubmitCount}
           voiceCloneConsentAccepted={voiceCloneConsentAccepted}
           audioStylePrompt={audioStylePrompt}
+          asrLanguage={asrLanguage}
           onClearReferences={() => {
             setReferenceImages([]);
             setReferenceImage(null);
@@ -1340,6 +1349,7 @@ export default function Home() {
           onSelectVoiceProfile={setSelectedVoiceProfileId}
           onVoiceCloneConsentChange={setVoiceCloneConsentAccepted}
           onAudioStylePromptChange={setAudioStylePrompt}
+          onAsrLanguageChange={setAsrLanguage}
         />
       );
     }
