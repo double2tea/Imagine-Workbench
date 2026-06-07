@@ -3,6 +3,7 @@ import { memo, useMemo, useRef } from "react";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
 import BoardAudioWaveform from "@/components/board/BoardAudioWaveform";
 import PreviewImage from "@/components/PreviewImage";
+import useBoardAudioItem from "@/components/board/useBoardAudioItem";
 import useSelectedBoardVideoItem from "@/components/board/useSelectedBoardVideoItem";
 import type { BoardResultNode } from "@/lib/board";
 import { buildStorageItem, type StorageItem } from "@/lib/db";
@@ -72,7 +73,8 @@ const ResultBoardNode = memo(function ResultBoardNode({
   );
   const hasStackSwitcher = stackItems.length > 1;
   const isImagePreviewUrl = item.url.startsWith("data:image/");
-  const shouldRenderAudio = item.type === "audio" && item.url.trim();
+  const audioItem = useBoardAudioItem(item);
+  const playableAudioItem = audioItem ?? (item.type === "audio" && item.url.trim() ? item : null);
   const videoItem = useSelectedBoardVideoItem(item, isSelected);
   const shouldRenderVideoPlayer = videoItem !== null;
   const captureVideoFrameRef = useRef<VideoFrameCaptureRequest | null>(null);
@@ -161,8 +163,8 @@ const ResultBoardNode = memo(function ResultBoardNode({
           draggable={false}
           className="board-media-preview h-full w-full select-none object-cover"
         />
-      ) : item.type === "audio" && shouldRenderAudio ? (
-        <BoardAudioWaveform src={item.url} interactive={isSelected} />
+      ) : playableAudioItem ? (
+        <BoardAudioWaveform src={playableAudioItem.url} interactive={isSelected} />
       ) : (
         <LightweightMediaPreview type={item.type} />
       )}

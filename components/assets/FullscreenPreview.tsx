@@ -1,6 +1,7 @@
 import { Check, Clock3, Compass, Copy, Film, ImageDown, Music, type LucideIcon, SkipBack, SkipForward, X } from "lucide-react";
 import { AnimatePresence } from "motion/react";
 import { useEffect, useRef, useState } from "react";
+import AudioWaveformPreview from "@/components/audio/AudioWaveformPreview";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
 import PanoramaOverlay from "@/components/panorama/PanoramaOverlay";
 import PreviewImage from "@/components/PreviewImage";
@@ -124,9 +125,13 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
                   </div>
                 </div>
               ) : (
-                <div className="flex h-full w-full flex-col items-center justify-center gap-4 px-6">
-                  <Music className="h-12 w-12 text-slate-500" />
-                  <audio src={item.url} controls className="w-full max-w-2xl" />
+                <div className="flex h-full w-full items-center justify-center px-4 sm:px-8">
+                  <AudioWaveformPreview
+                    src={item.url}
+                    size="full"
+                    tone="media"
+                    className="h-[min(52vh,420px)] max-h-full w-full max-w-5xl rounded-2xl"
+                  />
                 </div>
               )}
             </div>

@@ -1279,14 +1279,17 @@ export default function BoardWorkspace({
       const resultAssetIds = node.kind === "result"
         ? node.resultAssetIds
         : connectedResultNode?.resultAssetIds;
+      const assetStackItems = node.kind === "asset"
+        ? [galleryItemById.get(node.asset.assetId)].filter((item): item is StorageItem => item !== undefined && item.status === "complete")
+        : resultAssetIds
+          ? resultAssetIds.map(id => galleryItemById.get(id)).filter((item): item is StorageItem => item !== undefined && item.status === "complete")
+          : [];
       dataById.set(node.id, {
         boardId: board.id,
         generateInputSummary: generateInputSummaryForNode(node, boardPromptReferenceGraphIndex),
         hasResultConnection: connectedResultNode !== undefined,
         activeResultAssetId: connectedResultNode?.activeAssetId,
-        assetStackItems: resultAssetIds
-          ? resultAssetIds.map(id => galleryItemById.get(id)).filter((item): item is StorageItem => item !== undefined && item.status === "complete")
-          : [],
+        assetStackItems,
         node,
         resultItems: connectedResultNode
           ? connectedResultNode.resultAssetIds.map(id => galleryItemById.get(id)).filter((item): item is StorageItem => item !== undefined && item.status === "complete")

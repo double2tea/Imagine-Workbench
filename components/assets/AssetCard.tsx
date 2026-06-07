@@ -247,7 +247,7 @@ export default function AssetCard({
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center p-3">
-                <AudioWaveformPreview src={item.url} size="compact" />
+                <AudioWaveformPreview src={item.url} size="compact" tone="media" />
               </div>
             )}
 
@@ -354,9 +354,12 @@ export default function AssetCard({
 
             <div className="imagine-asset-hover-scrim absolute inset-0 bg-slate-950/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10 pointer-events-none" />
             <div className={`imagine-card-actions-shell absolute inset-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-30 pointer-events-none group-hover:pointer-events-auto ${
-              item.type === "video" ? "bottom-[2.85rem]" : "bottom-3"
+              item.type === "video" ? "bottom-[2.85rem]" : item.type === "audio" ? "bottom-[3.75rem]" : "bottom-3"
             }`}>
-              <div className="imagine-card-actions flex flex-wrap items-center justify-center gap-1 rounded-xl border border-white/10 bg-slate-950/80 p-1 backdrop-blur-md shadow-xl">
+              <div className={[
+                "imagine-card-actions flex flex-wrap items-center justify-center gap-1 rounded-xl border border-white/10 bg-slate-950/80 p-1 backdrop-blur-md shadow-xl",
+                item.type === "audio" ? "imagine-audio-card-actions" : "",
+              ].join(" ")}>
                 {item.type === "video" && (
                   <div className="relative">
                     <button

@@ -8,5 +8,5 @@ interface BoardAudioWaveformProps {
 }
 
 export default function BoardAudioWaveform({ src, interactive = true }: BoardAudioWaveformProps) {
-  return <AudioWaveformPreview src={src} interactive={interactive} size="full" />;
+  return <AudioWaveformPreview src={src} interactive={interactive} size="full" tone="media" />;
 }

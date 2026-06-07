@@ -8,6 +8,7 @@ interface AudioWaveformPreviewProps {
   className?: string;
   interactive?: boolean;
   size?: "compact" | "full";
+  tone?: "surface" | "media";
 }
 
 const SOURCE_POINT_COUNT = 160;
@@ -87,6 +88,7 @@ export default function AudioWaveformPreview({
   className = "",
   interactive = true,
   size = "full",
+  tone = "surface",
 }: AudioWaveformPreviewProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const waveformRef = useRef<HTMLDivElement | null>(null);
@@ -96,15 +98,25 @@ export default function AudioWaveformPreview({
   const [isDragging, setIsDragging] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [peaks, setPeaks] = useState<number[]>(() => Array.from({ length: SOURCE_POINT_COUNT }, () => 0.12));
+  const sourceUrl = src.trim();
   const barCount = size === "compact" ? COMPACT_VISIBLE_POINT_COUNT : FULL_VISIBLE_POINT_COUNT;
   const visiblePeaks = useMemo(() => resamplePeaks(peaks, barCount), [barCount, peaks]);
   const points = useMemo(() => waveformPoints(visiblePeaks, WAVEFORM_AMPLITUDE), [visiblePeaks]);
 
   useEffect(() => {
     let isCancelled = false;
+    if (!sourceUrl) {
+      setCurrentTime(0);
+      setDuration(0);
+      setIsPlaying(false);
+      setPeaks(Array.from({ length: SOURCE_POINT_COUNT }, () => 0.12));
+      return () => {
+        isCancelled = true;
+      };
+    }
 
     async function loadWaveform() {
-      const response = await fetch(src);
+      const response = await fetch(sourceUrl);
       const arrayBuffer = await response.arrayBuffer();
       const context = new AudioContext();
       const buffer = await context.decodeAudioData(arrayBuffer);
@@ -120,7 +132,7 @@ export default function AudioWaveformPreview({
     return () => {
       isCancelled = true;
     };
-  }, [src]);
+  }, [sourceUrl]);
 
   const seekToClientX = (clientX: number) => {
     if (!interactive) return;
@@ -137,6 +149,12 @@ export default function AudioWaveformPreview({
   };
 
   const progress = duration > 0 ? currentTime / duration : 0;
+  const isCompact = size === "compact";
+  const isMediaTone = tone === "media";
+  const showTransportControls = interactive;
+  const accentColor = isMediaTone ? "#8aa4b8" : "var(--iw-accent)";
+  const idleWaveColor = isMediaTone ? "rgba(148, 163, 184, 0.42)" : "color-mix(in srgb, var(--iw-text) 22%, transparent)";
+  const lineColor = isMediaTone ? "rgba(226, 232, 240, 0.22)" : "color-mix(in srgb, var(--iw-text) 36%, transparent)";
   const seekBy = (seconds: number) => {
     if (!interactive) return;
     const audio = audioRef.current;
@@ -146,23 +164,25 @@ export default function AudioWaveformPreview({
     audio.currentTime = nextTime;
     setCurrentTime(nextTime);
   };
-  const isCompact = size === "compact";
 
   return (
     <div
       className={[
-        "flex h-full w-full flex-col justify-between overflow-hidden rounded-lg border border-[var(--iw-board-border)] text-[var(--iw-text)] shadow-inner",
-        isCompact ? "px-4 pb-4 pt-3" : "px-5 pb-6 pt-5",
+        "flex h-full w-full flex-col overflow-hidden rounded-lg border border-[var(--iw-board-border)] text-[var(--iw-text)] shadow-inner",
+        isCompact ? "justify-between gap-2 px-3 pb-3 pt-8" : "justify-between px-5 pb-6 pt-5",
+        isMediaTone ? "border-slate-700/70 text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]" : "",
         className,
       ].join(" ")}
       style={{
-        background: "linear-gradient(180deg, color-mix(in srgb, var(--iw-accent) 10%, var(--iw-panel)), var(--iw-panel))",
+        background: isMediaTone
+          ? "linear-gradient(180deg, rgba(30,41,59,0.96), rgba(15,23,42,0.98))"
+          : "linear-gradient(180deg, color-mix(in srgb, var(--iw-accent) 10%, var(--iw-panel)), var(--iw-panel))",
       }}
     >
-      {interactive && (
+      {interactive && sourceUrl && (
         <audio
           ref={audioRef}
-          src={src}
+          src={sourceUrl}
           onDurationChange={event => setDuration(event.currentTarget.duration)}
           onEnded={() => setIsPlaying(false)}
           onPause={() => setIsPlaying(false)}
@@ -170,17 +190,19 @@ export default function AudioWaveformPreview({
           onTimeUpdate={event => setCurrentTime(event.currentTarget.currentTime)}
         />
       )}
-      <div className="flex items-center justify-end gap-2">
-        <div className={`${isCompact ? "text-[10px]" : "text-xs"} font-semibold tabular-nums text-[color-mix(in_srgb,var(--iw-text)_58%,transparent)]`}>
-          {interactive ? `${formatTime(currentTime)} / ${formatTime(duration)}` : formatTime(duration)}
+      {!isCompact && (
+        <div className="flex items-center justify-end gap-2">
+          <div className={["text-xs font-semibold tabular-nums", isMediaTone ? "text-slate-300" : "text-[color-mix(in_srgb,var(--iw-text)_58%,transparent)]"].join(" ")}>
+            {interactive ? `${formatTime(currentTime)} / ${formatTime(duration)}` : formatTime(duration)}
+          </div>
         </div>
-      </div>
+      )}
       <div
         ref={waveformRef}
         className={[
           "relative cursor-ew-resize px-2",
           interactive ? "nodrag" : "pointer-events-none",
-          isCompact ? "h-20" : "h-28",
+          isCompact ? "min-h-0 flex-1" : "h-28",
         ].join(" ")}
         onPointerDown={event => {
           if (!interactive) return;
@@ -210,38 +232,53 @@ export default function AudioWaveformPreview({
               <rect height="100" width={Math.min(100, Math.max(0, progress * 100))} x="0" y="0" />
             </clipPath>
           </defs>
-          <polygon points={points} style={{ fill: "color-mix(in srgb, var(--iw-text) 22%, transparent)" }} />
-          <polygon clipPath={`url(#${clipPathId})`} points={points} style={{ fill: "var(--iw-accent)" }} />
+          <polygon points={points} style={{ fill: idleWaveColor }} />
+          <polygon clipPath={`url(#${clipPathId})`} points={points} style={{ fill: accentColor }} />
           <polyline
             fill="none"
             points={points.split(" ").slice(0, visiblePeaks.length).join(" ")}
             strokeWidth="0.6"
-            style={{ stroke: "color-mix(in srgb, var(--iw-text) 36%, transparent)" }}
+            style={{ stroke: lineColor }}
             vectorEffect="non-scaling-stroke"
           />
         </svg>
         {interactive && (
           <span
-            className="pointer-events-none absolute bottom-2 top-2 w-0.5 bg-[var(--iw-accent)] shadow-[0_0_14px_var(--iw-accent-glow)]"
-            style={{ left: `${Math.min(100, Math.max(0, progress * 100))}%` }}
+            className="pointer-events-none absolute bottom-2 top-2 w-0.5 shadow-[0_0_14px_currentColor]"
+            style={{ backgroundColor: accentColor, color: accentColor, left: `${Math.min(100, Math.max(0, progress * 100))}%` }}
           >
-            <span className="absolute -top-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-[var(--iw-accent)]" />
+            <span className="absolute -top-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45" style={{ backgroundColor: accentColor }} />
           </span>
         )}
       </div>
-      {interactive && (
-        <div className={`flex items-center justify-center ${isCompact ? "gap-5" : "gap-8"}`}>
+      {showTransportControls && (
+        <div className={[
+          "flex shrink-0 items-center justify-center",
+          isCompact
+            ? "h-8 gap-2 rounded-full px-2 shadow-sm backdrop-blur"
+            : "gap-8",
+          isCompact && isMediaTone ? "bg-slate-950/55 ring-1 ring-white/10" : "",
+          isCompact && !isMediaTone ? "bg-[color-mix(in_srgb,var(--iw-panel)_82%,transparent)]" : "",
+        ].join(" ")}>
           <button
             type="button"
-            className="nodrag flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--iw-muted)] transition hover:bg-[var(--iw-accent-soft)] hover:text-[var(--iw-text)]"
+            className={[
+              "nodrag flex shrink-0 items-center justify-center rounded-full transition",
+              isMediaTone ? "text-slate-400 hover:bg-white/10 hover:text-slate-100" : "text-[var(--iw-muted)] hover:bg-[var(--iw-accent-soft)] hover:text-[var(--iw-text)]",
+              isCompact ? "h-6 w-6" : "h-8 w-8",
+            ].join(" ")}
             onClick={() => seekBy(-5)}
             title="后退 5 秒"
           >
-            <Rewind className="h-4 w-4" />
+            <Rewind className={isCompact ? "h-3.5 w-3.5" : "h-4 w-4"} />
           </button>
           <button
             type="button"
-            className={`${isCompact ? "h-10 w-10" : "h-12 w-12"} nodrag flex shrink-0 items-center justify-center rounded-full bg-[var(--iw-accent)] text-white shadow-[0_12px_30px_var(--iw-accent-glow)] transition hover:scale-105`}
+            className={[
+              "nodrag flex shrink-0 items-center justify-center rounded-full transition hover:scale-105",
+              isMediaTone ? "bg-slate-700/90 text-slate-100 ring-1 ring-white/15 shadow-[0_10px_24px_rgba(15,23,42,0.28)]" : "bg-[var(--iw-accent)] text-white shadow-[0_12px_30px_var(--iw-accent-glow)]",
+              isCompact ? "h-8 w-8" : "h-12 w-12",
+            ].join(" ")}
             onClick={() => {
               const audio = audioRef.current;
               if (!audio) return;
@@ -253,15 +290,26 @@ export default function AudioWaveformPreview({
             }}
             title={isPlaying ? "暂停" : "播放"}
           >
-            {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5 translate-x-0.5" />}
+            {isPlaying
+              ? <Pause className={isCompact ? "h-4 w-4" : "h-5 w-5"} />
+              : <Play className={`${isCompact ? "h-4 w-4" : "h-5 w-5"} translate-x-0.5`} />}
           </button>
+          {isCompact && (
+            <span className={["min-w-16 text-center text-[10px] font-semibold tabular-nums", isMediaTone ? "text-slate-300" : "text-[color-mix(in_srgb,var(--iw-text)_64%,transparent)]"].join(" ")}>
+              {formatTime(currentTime)} / {formatTime(duration)}
+            </span>
+          )}
           <button
             type="button"
-            className="nodrag flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--iw-muted)] transition hover:bg-[var(--iw-accent-soft)] hover:text-[var(--iw-text)]"
+            className={[
+              "nodrag flex shrink-0 items-center justify-center rounded-full transition",
+              isMediaTone ? "text-slate-400 hover:bg-white/10 hover:text-slate-100" : "text-[var(--iw-muted)] hover:bg-[var(--iw-accent-soft)] hover:text-[var(--iw-text)]",
+              isCompact ? "h-6 w-6" : "h-8 w-8",
+            ].join(" ")}
             onClick={() => seekBy(5)}
             title="前进 5 秒"
           >
-            <FastForward className="h-4 w-4" />
+            <FastForward className={isCompact ? "h-3.5 w-3.5" : "h-4 w-4"} />
           </button>
         </div>
       )}
