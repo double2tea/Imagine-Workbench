@@ -809,6 +809,54 @@ function referenceGroupItemFromAssetNode(assetNode: BoardNode & { kind: "asset" 
   };
 }
 
+function referenceGroupItemsFromAssetNodes(assetNodes: Array<BoardNode & { kind: "asset" }>): BoardReferenceGroupItem[] {
+  const seenAssetIds = new Set<string>();
+  return assetNodes.flatMap(assetNode => {
+    if (seenAssetIds.has(assetNode.asset.assetId)) return [];
+    seenAssetIds.add(assetNode.asset.assetId);
+    return [referenceGroupItemFromAssetNode(assetNode)];
+  });
+}
+
+function appendReferenceGroupItem(
+  node: BoardReferenceGroupNode,
+  reference: BoardReferenceGroupItem,
+  updatedAt: string,
+): BoardReferenceGroupNode {
+  if (node.references.some(item => item.assetId === reference.assetId)) return node;
+  return { ...node, references: [...node.references, reference], updatedAt };
+}
+
+function assetNodeIdsForReference(nodes: BoardNode[], assetId: string): string[] {
+  return nodes
+    .filter(node => node.kind === "asset" && node.asset.assetId === assetId)
+    .map(node => node.id);
+}
+
+function removeReferenceGroupAsset(
+  nodes: BoardNode[],
+  edges: BoardEdge[],
+  groupNodeId: string,
+  assetId: string,
+  updatedAt: string,
+): { nodes: BoardNode[]; edges: BoardEdge[] } {
+  const assetNodeIds = assetNodeIdsForReference(nodes, assetId);
+  return {
+    nodes: nodes.map(node =>
+      node.id === groupNodeId && node.kind === "reference-group"
+        ? { ...node, references: node.references.filter(item => item.assetId !== assetId), updatedAt }
+        : node,
+    ),
+    edges: edges.filter(edge =>
+      !(
+        edge.to.nodeId === groupNodeId &&
+        edge.to.portId === BOARD_PORT_IDS.assetIn &&
+        assetNodeIds.includes(edge.from.nodeId)
+      ),
+    ),
+  };
+}
+
 function normalizeGenerationStatus(status: unknown): BoardGenerationStatus {
   if (status === "processing" || status === "complete" || status === "failed") return status;
   return "idle";
@@ -1422,12 +1470,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
         if (assetNode?.kind !== "asset") throw new Error("参考组只支持媒体资产");
         return assetNode;
       });
-      const seenAssetIds = new Set<string>();
-      const references = assetNodes.flatMap(assetNode => {
-        if (seenAssetIds.has(assetNode.asset.assetId)) return [];
-        seenAssetIds.add(assetNode.asset.assetId);
-        return [referenceGroupItemFromAssetNode(assetNode)];
-      });
+      const references = referenceGroupItemsFromAssetNodes(assetNodes);
       const nextNode: BoardReferenceGroupNode = { ...node, references: [...references, ...node.references] };
       const nextNodes = [...currentBoard.nodes, nextNode];
       const nextEdges = assetNodes.reduce((edges, assetNode, index) => {
@@ -1633,26 +1676,15 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       const targetNode = currentBoard.nodes.find(node => node.id === edge.to.nodeId);
       const sourceNode = currentBoard.nodes.find(node => node.id === edge.from.nodeId);
       if (targetNode?.kind === "reference-group" && sourceNode?.kind === "asset") {
-        const assetId = sourceNode.asset.assetId;
-        const assetNodeIds = currentBoard.nodes
-          .filter(node => node.kind === "asset" && node.asset.assetId === assetId)
-          .map(node => node.id);
         const updatedAt = nowIso();
-        return touchBoard(
-          currentBoard,
-          currentBoard.nodes.map(node =>
-            node.id === targetNode.id && node.kind === "reference-group"
-              ? { ...node, references: node.references.filter(item => item.assetId !== assetId), updatedAt }
-              : node,
-          ),
-          currentBoard.edges.filter(boardEdge =>
-            !(
-              boardEdge.to.nodeId === targetNode.id &&
-              boardEdge.to.portId === BOARD_PORT_IDS.assetIn &&
-              assetNodeIds.includes(boardEdge.from.nodeId)
-            ),
-          ),
+        const nextBoard = removeReferenceGroupAsset(
+          currentBoard.nodes,
+          currentBoard.edges,
+          targetNode.id,
+          sourceNode.asset.assetId,
+          updatedAt,
         );
+        return touchBoard(currentBoard, nextBoard.nodes, nextBoard.edges);
       }
       return touchBoard(currentBoard, currentBoard.nodes, currentBoard.edges.filter(boardEdge => boardEdge.id !== edgeId));
     });
@@ -1696,8 +1728,8 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
         if (node.id === oldEdge.to.nodeId && oldEdge.to.portId === BOARD_PORT_IDS.assetIn) {
           references = oldReference ? references.filter(item => item.assetId !== oldReference.assetId) : references;
         }
-        if (node.id === to.nodeId && to.portId === BOARD_PORT_IDS.assetIn && nextReference && !references.some(item => item.assetId === nextReference.assetId)) {
-          references = [...references, nextReference];
+        if (node.id === to.nodeId && to.portId === BOARD_PORT_IDS.assetIn && nextReference) {
+          references = appendReferenceGroupItem({ ...node, references }, nextReference, updatedAt).references;
         }
         return references === node.references ? node : { ...node, references, updatedAt };
       });
@@ -1805,16 +1837,13 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
         didChange = true;
 
         const sourceNode = nextNodes.find(node => node.id === connection.from.nodeId);
-        if (
-          sourceNode?.kind === "asset" &&
-          connection.to.portId === BOARD_PORT_IDS.assetIn
-        ) {
+        if (sourceNode?.kind === "asset" && connection.to.portId === BOARD_PORT_IDS.assetIn) {
           const reference = referenceGroupItemFromAssetNode(sourceNode);
-          nextNodes = nextNodes.map(node => {
-            if (node.id !== connection.to.nodeId || node.kind !== "reference-group") return node;
-            if (node.references.some(item => item.assetId === reference.assetId)) return node;
-            return { ...node, references: [...node.references, reference], updatedAt };
-          });
+          nextNodes = nextNodes.map(node =>
+            node.id === connection.to.nodeId && node.kind === "reference-group"
+              ? appendReferenceGroupItem(node, reference, updatedAt)
+              : node,
+          );
         }
       }
 
@@ -1837,8 +1866,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
         currentBoard.nodes.map(node => {
           if (node.id !== groupNodeId) return node;
           if (node.kind !== "reference-group") throw new Error("目标节点不是参考组");
-          if (node.references.some(item => item.assetId === reference.assetId)) return node;
-          return { ...node, references: [...node.references, reference], updatedAt };
+          return appendReferenceGroupItem(node, reference, updatedAt);
         }),
       );
     });
@@ -1847,24 +1875,8 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
   const removeReferenceGroupItem = useCallback((groupNodeId: string, assetId: string) => {
     const updatedAt = nowIso();
     mutateBoard(currentBoard => {
-      const assetNodeIds = currentBoard.nodes
-        .filter(node => node.kind === "asset" && node.asset.assetId === assetId)
-        .map(node => node.id);
-      return touchBoard(
-        currentBoard,
-        currentBoard.nodes.map(node =>
-          node.id === groupNodeId && node.kind === "reference-group"
-            ? { ...node, references: node.references.filter(item => item.assetId !== assetId), updatedAt }
-            : node,
-        ),
-        currentBoard.edges.filter(edge =>
-          !(
-            edge.to.nodeId === groupNodeId &&
-            edge.to.portId === "asset-in" &&
-            assetNodeIds.includes(edge.from.nodeId)
-          ),
-        ),
-      );
+      const nextBoard = removeReferenceGroupAsset(currentBoard.nodes, currentBoard.edges, groupNodeId, assetId, updatedAt);
+      return touchBoard(currentBoard, nextBoard.nodes, nextBoard.edges);
     });
   }, [mutateBoard]);
 
