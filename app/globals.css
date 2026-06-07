@@ -3645,6 +3645,12 @@ html[data-imagine-theme="light"] .imagine-generate-context-chip[data-tone="faile
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
 }
 
+.imagine-theme-light .imagine-audio-type-badge {
+  background: rgba(15, 23, 42, 0.46) !important;
+  border-color: rgba(226, 232, 240, 0.16) !important;
+  color: #f8fafc !important;
+}
+
 .imagine-workbench-shell.imagine-theme-light .imagine-asset-hover-scrim {
   background: rgba(15, 23, 42, 0.16) !important;
   background-image: none !important;

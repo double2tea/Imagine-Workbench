@@ -151,7 +151,6 @@ export default function AudioWaveformPreview({
   const progress = duration > 0 ? currentTime / duration : 0;
   const isCompact = size === "compact";
   const isMediaTone = tone === "media";
-  const showTransportControls = interactive;
   const accentColor = isMediaTone ? "#8aa4b8" : "var(--iw-accent)";
   const idleWaveColor = isMediaTone ? "rgba(148, 163, 184, 0.42)" : "color-mix(in srgb, var(--iw-text) 22%, transparent)";
   const lineColor = isMediaTone ? "rgba(226, 232, 240, 0.22)" : "color-mix(in srgb, var(--iw-text) 36%, transparent)";
@@ -251,17 +250,19 @@ export default function AudioWaveformPreview({
           </span>
         )}
       </div>
-      {showTransportControls && (
-        <div className={[
+      <div
+        aria-hidden={!interactive}
+        className={[
           "flex shrink-0 items-center justify-center",
           isCompact
-            ? "h-8 gap-2 rounded-full px-2 shadow-sm backdrop-blur"
+            ? "h-8 gap-3 px-2"
             : "gap-8",
-          isCompact && isMediaTone ? "bg-slate-950/55 ring-1 ring-white/10" : "",
-          isCompact && !isMediaTone ? "bg-[color-mix(in_srgb,var(--iw-panel)_82%,transparent)]" : "",
-        ].join(" ")}>
+          !interactive ? "pointer-events-none opacity-0" : "",
+        ].join(" ")}
+      >
           <button
             type="button"
+            disabled={!interactive}
             className={[
               "nodrag flex shrink-0 items-center justify-center rounded-full transition",
               isMediaTone ? "text-slate-400 hover:bg-white/10 hover:text-slate-100" : "text-[var(--iw-muted)] hover:bg-[var(--iw-accent-soft)] hover:text-[var(--iw-text)]",
@@ -274,9 +275,14 @@ export default function AudioWaveformPreview({
           </button>
           <button
             type="button"
+            disabled={!interactive}
             className={[
               "nodrag flex shrink-0 items-center justify-center rounded-full transition hover:scale-105",
-              isMediaTone ? "bg-slate-700/90 text-slate-100 ring-1 ring-white/15 shadow-[0_10px_24px_rgba(15,23,42,0.28)]" : "bg-[var(--iw-accent)] text-white shadow-[0_12px_30px_var(--iw-accent-glow)]",
+              isMediaTone
+                ? isCompact
+                  ? "text-slate-100 hover:bg-white/10"
+                  : "bg-slate-700/90 text-slate-100 ring-1 ring-white/15 shadow-[0_10px_24px_rgba(15,23,42,0.28)]"
+                : "bg-[var(--iw-accent)] text-white shadow-[0_12px_30px_var(--iw-accent-glow)]",
               isCompact ? "h-8 w-8" : "h-12 w-12",
             ].join(" ")}
             onClick={() => {
@@ -301,6 +307,7 @@ export default function AudioWaveformPreview({
           )}
           <button
             type="button"
+            disabled={!interactive}
             className={[
               "nodrag flex shrink-0 items-center justify-center rounded-full transition",
               isMediaTone ? "text-slate-400 hover:bg-white/10 hover:text-slate-100" : "text-[var(--iw-muted)] hover:bg-[var(--iw-accent-soft)] hover:text-[var(--iw-text)]",
@@ -311,8 +318,7 @@ export default function AudioWaveformPreview({
           >
             <FastForward className={isCompact ? "h-3.5 w-3.5" : "h-4 w-4"} />
           </button>
-        </div>
-      )}
+      </div>
     </div>
   );
 }

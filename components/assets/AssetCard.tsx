@@ -263,7 +263,7 @@ export default function AssetCard({
                   VIDEO
                 </span>
               ) : (
-                <span className="imagine-asset-type-badge flex items-center gap-1.5 px-2 py-1 text-[9px] font-bold tracking-wider uppercase rounded bg-emerald-500/80 backdrop-blur-md text-white border border-emerald-400/25">
+                <span className="imagine-asset-type-badge imagine-audio-type-badge flex items-center gap-1.5 px-2 py-1 text-[9px] font-bold tracking-wider uppercase rounded border border-white/12 bg-slate-950/46 text-slate-100 backdrop-blur-md">
                   <Music className="h-3 w-3" />
                   AUDIO
                 </span>
