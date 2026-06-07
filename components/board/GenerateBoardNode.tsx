@@ -1,5 +1,5 @@
 import { memo, useMemo, useRef, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { AudioLines, ImagePlus, Loader2, Play, Plus, Video, X } from "lucide-react";
+import { AudioLines, FileText, ImagePlus, Loader2, Play, Plus, Video, X } from "lucide-react";
 import ModelPriceBadge from "@/components/creation/ModelPriceBadge";
 import BoardPromptTextarea, { type BoardPromptTextareaHandle } from "@/components/board/BoardPromptTextarea";
 import MediaReferenceThumbnail from "@/components/reference/MediaReferenceThumbnail";
@@ -15,7 +15,7 @@ import {
   type PromptTemplateApplyMode,
   type PromptTemplateSlashCommand,
 } from "@/lib/prompt-templates";
-import { getVideoModelCapabilities } from "@/lib/providers/model-catalog";
+import { getAudioModelCapabilities, getVideoModelCapabilities } from "@/lib/providers/model-catalog";
 import { selectVideoReferenceTypesForMode } from "@/lib/video-reference-selection";
 
 type GenerateNode = BoardImageGenerateNode | BoardVideoGenerateNode | BoardAudioOperationNode;
@@ -105,7 +105,13 @@ export function BoardResultStack({
               }`}
               title={`结果 ${index + 1}`}
             >
-              <MediaReferenceThumbnail reference={item} alt="" className="h-full w-full" />
+              {item.type === "transcript" ? (
+                <div className="flex h-full w-full items-center justify-center bg-cyan-950/35">
+                  <FileText className="h-4 w-4 text-cyan-200" />
+                </div>
+              ) : (
+                <MediaReferenceThumbnail reference={{ type: item.type, url: item.url }} alt="" className="h-full w-full" />
+              )}
               <span className="absolute bottom-0 right-0 rounded-tl bg-black/60 px-1 text-[8px] font-semibold text-white">
                 {index + 1}
               </span>
@@ -268,7 +274,12 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
     ? `${node.model} / ${node.imageResolution === "custom" ? node.customImageResolution : node.imageResolution} / x${node.variantCount}`
     : node.kind === "video-generate"
       ? `${node.model} / ${node.aspectRatio}${node.videoDuration ? ` / ${node.videoDuration}s` : ""} / x${node.variantCount}`
-      : `${node.model} / ${node.audioMode} / ${node.audioFormat} / x${node.variantCount}`;
+      : [
+        node.model,
+        node.audioMode,
+        getAudioModelCapabilities(node.model).formats.length > 0 ? node.audioFormat : "",
+        `x${node.variantCount}`,
+      ].filter(value => value.trim().length > 0).join(" / ");
   const statusLabel = taskSummary
     ? `${taskSummary.status === "pending" ? "排队" : "处理中"} ${taskSummary.progress}% / ${paramSummary}`
     : `${statusText(node)} / ${paramSummary}`;

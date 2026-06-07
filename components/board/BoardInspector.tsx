@@ -142,7 +142,12 @@ function generateParamSummary(node: BoardGenerateNode): string {
   if (node.kind === "video-generate") {
     return `${node.model} / ${node.aspectRatio}${node.videoDuration ? ` / ${node.videoDuration}s` : ""} / x${node.variantCount}`;
   }
-  return `${node.model} / ${node.audioMode} / ${node.audioFormat} / x${node.variantCount}`;
+  return [
+    node.model,
+    node.audioMode,
+    getAudioModelCapabilities(node.model).formats.length > 0 ? node.audioFormat : "",
+    `x${node.variantCount}`,
+  ].filter(value => value.trim().length > 0).join(" / ");
 }
 
 function modelSupportsReferences(node: BoardGenerateNode): boolean {
@@ -260,7 +265,9 @@ function audioModelPatch(model: string, current: BoardAudioOperationNode): Board
   return {
     audioFormat: capabilities.formats.some(option => option.value === current.audioFormat)
       ? current.audioFormat
-      : firstOption(capabilities.formats, "wav"),
+      : capabilities.formats.length > 0
+        ? firstOption(capabilities.formats, "wav")
+        : "",
     audioMode: capabilities.modes.includes(current.audioMode)
       ? current.audioMode
       : capabilities.defaultMode,
@@ -721,6 +728,8 @@ function AudioOperationInspector({
   const isProcessing = node.status === "processing";
   const [voiceProfiles, setVoiceProfiles] = useState<VoiceProfile[]>([]);
   const visibleVoiceProfiles = getVisibleVoiceProfilesForAudioModel(node.model, node.audioMode, voiceProfiles);
+  const showAudioFormat = capabilities.formats.length > 0;
+  const showVoiceProfile = node.audioMode === "tts" || node.audioMode === "voice_design" || node.audioMode === "voice_clone";
 
   useEffect(() => {
     let active = true;
@@ -747,7 +756,7 @@ function AudioOperationInspector({
           onChange={model => onUpdateGenerate(node.id, audioModelPatch(model, node))}
         />
       </InspectorField>
-      <div className="grid grid-cols-2 gap-2">
+      <div className={`grid gap-2 ${showAudioFormat ? "grid-cols-2" : "grid-cols-1"}`}>
         <InspectorField title="模式">
           <select
             value={node.audioMode}
@@ -757,28 +766,32 @@ function AudioOperationInspector({
             {capabilities.modes.map(mode => <option key={mode} value={mode}>{audioModeLabels[mode]}</option>)}
           </select>
         </InspectorField>
-        <InspectorField title="格式">
-          <select value={node.audioFormat} onChange={event => onUpdateGenerate(node.id, { audioFormat: event.target.value })} className={inputClass}>
-            {capabilities.formats.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-          </select>
-        </InspectorField>
+        {showAudioFormat && (
+          <InspectorField title="格式">
+            <select value={node.audioFormat} onChange={event => onUpdateGenerate(node.id, { audioFormat: event.target.value })} className={inputClass}>
+              {capabilities.formats.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </InspectorField>
+        )}
       </div>
       <InspectorField title="变体">
         <VariantCountSelect value={node.variantCount} onChange={variantCount => onUpdateGenerate(node.id, { variantCount })} />
       </InspectorField>
-      <InspectorField title="音色">
-        <select
-          value={node.voiceProfileId ?? ""}
-          onChange={event => onUpdateGenerate(node.id, { voiceProfileId: event.target.value || undefined })}
-          className={inputClass}
-        >
-          <option value="">不使用保存音色</option>
-          {node.voiceProfileId && !visibleVoiceProfiles.some(profile => profile.id === node.voiceProfileId) && (
-            <option value={node.voiceProfileId}>当前音色不可用于此模式</option>
-          )}
-          {visibleVoiceProfiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
-        </select>
-      </InspectorField>
+      {showVoiceProfile && (
+        <InspectorField title="音色">
+          <select
+            value={node.voiceProfileId ?? ""}
+            onChange={event => onUpdateGenerate(node.id, { voiceProfileId: event.target.value || undefined })}
+            className={inputClass}
+          >
+            <option value="">不使用保存音色</option>
+            {node.voiceProfileId && !visibleVoiceProfiles.some(profile => profile.id === node.voiceProfileId) && (
+              <option value={node.voiceProfileId}>当前音色不可用于此模式</option>
+            )}
+            {visibleVoiceProfiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
+          </select>
+        </InspectorField>
+      )}
       {node.audioMode === "voice_clone" && (
         <label className="flex items-start gap-2 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2.5 py-2 text-[11px] leading-5 text-[var(--iw-muted)]">
           <input

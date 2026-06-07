@@ -758,6 +758,12 @@ function parseGenerationRequest(value: unknown): GenerationRequestSnapshot | und
     videoPreset: readOptionalString(value, "videoPreset"),
     videoReferenceMode: readVideoReferenceMode(value.videoReferenceMode),
     videoResolution: readOptionalString(value, "videoResolution"),
+    audioFormat: readOptionalString(value, "audioFormat"),
+    audioMode: readOptionalAudioOperationMode(value.audioMode),
+    audioStylePrompt: readOptionalString(value, "audioStylePrompt"),
+    asrLanguage: readAsrLanguage(value.asrLanguage),
+    optimizeTextPreview: readOptionalBoolean(value, "optimizeTextPreview"),
+    voiceProfileId: readOptionalString(value, "voiceProfileId"),
     referenceMedia: parseGenerationReferenceMedia(value.referenceMedia),
     referenceImages: readOptionalStringArray(value, "referenceImages"),
   };
@@ -770,6 +776,15 @@ function readVideoReferenceMode(value: unknown): "reference" | "firstLast" | und
 function readAudioOperationMode(value: unknown): AudioOperationMode {
   if (value === "tts" || value === "voice_design" || value === "voice_clone" || value === "music" || value === "sfx" || value === "asr") return value;
   return "tts";
+}
+
+function readOptionalAudioOperationMode(value: unknown): AudioOperationMode | undefined {
+  if (value === undefined) return undefined;
+  return readAudioOperationMode(value);
+}
+
+function readAsrLanguage(value: unknown): "auto" | "zh" | "en" | undefined {
+  return value === "auto" || value === "zh" || value === "en" ? value : undefined;
 }
 
 function parseGenerationReferenceMedia(value: unknown): GenerationReferenceMediaSnapshot[] | undefined {
@@ -964,8 +979,24 @@ function parseBoardNode(value: unknown): BoardNode {
       },
     };
   }
-  if (kind === "note") return { ...base, kind, body: readText(value, "body") };
+  if (kind === "note") return {
+    ...base,
+    kind,
+    body: readText(value, "body"),
+    source: parseBoardNoteSource(value.source),
+    variant: value.variant === "transcript" ? "transcript" : "plain",
+  };
   throw new Error(`不支持的画板节点类型: ${kind}`);
+}
+
+function parseBoardNoteSource(value: unknown): { assetId: string; model: string; sourceNodeId?: string } | undefined {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) throw new Error("note source 格式无效");
+  return {
+    assetId: readString(value, "assetId"),
+    model: readString(value, "model"),
+    sourceNodeId: readOptionalString(value, "sourceNodeId"),
+  };
 }
 
 function parseReferenceGroupItem(value: unknown): BoardReferenceGroupItem {
@@ -1310,6 +1341,13 @@ function readOptionalString(record: Record<string, unknown>, field: string): str
   return value;
 }
 
+function readOptionalBoolean(record: Record<string, unknown>, field: string): boolean | undefined {
+  const value = record[field];
+  if (value === undefined) return undefined;
+  if (typeof value !== "boolean") throw new Error(`${field} 必须是布尔值`);
+  return value;
+}
+
 function readOptionalSafePath(record: Record<string, unknown>, field: string): string | undefined {
   const value = readOptionalString(record, field);
   if (value && value.includes("..")) throw new Error(`${field} 路径无效`);
@@ -1352,7 +1390,7 @@ function readOptionalLiteral<T extends string>(record: Record<string, unknown>, 
 
 function readAssetType(record: Record<string, unknown>, field: string): StorageItem["type"] {
   const value = record[field];
-  if (value !== "image" && value !== "video" && value !== "audio") throw new Error(`${field} 类型无效`);
+  if (value !== "image" && value !== "video" && value !== "audio" && value !== "transcript") throw new Error(`${field} 类型无效`);
   return value;
 }
 

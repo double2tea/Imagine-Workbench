@@ -27,6 +27,7 @@ import { getMediaReferenceType, mediaReferenceLabel } from "@/lib/media-referenc
 import { getAudioModelCapabilities, getImageModelCapabilities, getVideoModelCapabilities, parseProviderModel, type AudioOperationMode, type VideoReferenceMode } from "@/lib/providers/model-catalog";
 import { getProviderMeta } from "@/lib/providers/registry";
 import { getReferenceImagePayloadError, getReferenceMediaPayloadError, prepareReferenceImageUrlForRequest, prepareReferenceMediaUrlForRequest } from "@/lib/reference-images";
+import { transcriptPreview, transcriptToDataUrl } from "@/lib/transcripts";
 import { selectVideoReferencesForMode } from "@/lib/video-reference-selection";
 import { getVoiceProfile } from "@/lib/voice-profiles";
 
@@ -68,6 +69,8 @@ interface GenerationOverrides {
   audioMode?: AudioOperationMode;
   audioFormat?: string;
   audioStylePrompt?: string;
+  asrLanguage?: "auto" | "zh" | "en";
+  optimizeTextPreview?: boolean;
   voiceProfileId?: string;
   voiceCloneConsentAccepted?: boolean;
   boardId?: string;
@@ -144,7 +147,7 @@ async function saveItemOrWarn(
   }
 }
 
-async function saveAudioItemOrWarn(
+async function saveDirectItemOrWarn(
   item: StorageItem,
   pushWorkspaceNotice: (type: NoticeType, message: string) => void,
 ): Promise<StorageItem | null> {
@@ -153,8 +156,8 @@ async function saveAudioItemOrWarn(
     return item;
   } catch (error) {
     const message = toErrorMessage(error, "IndexedDB 写入失败");
-    console.error("IndexedDB Audio Save Failed:", error);
-    pushWorkspaceNotice("error", `本地音频存储失败，刷新后可能丢失：${message}`);
+    console.error("IndexedDB Direct Asset Save Failed:", error);
+    pushWorkspaceNotice("error", `本地结果存储失败，刷新后可能丢失：${message}`);
     return null;
   }
 }
@@ -640,9 +643,9 @@ export function useGenerationActions({
       pushWorkspaceNotice("error", "音频生成需要明确音频模型");
       return false;
     }
-    if (!activePrompt.trim() && overrides.allowEmptyPrompt !== true) return false;
     const audioCapabilities = getAudioModelCapabilities(requestModel);
     const audioMode = overrides.audioMode ?? audioCapabilities.defaultMode;
+    if (!activePrompt.trim() && audioMode !== "asr" && overrides.allowEmptyPrompt !== true) return false;
     if (audioMode === "voice_clone" && overrides.voiceCloneConsentAccepted !== true) {
       pushWorkspaceNotice("error", "音色克隆需要先确认参考音频授权");
       return false;
@@ -683,27 +686,43 @@ export function useGenerationActions({
       pushWorkspaceNotice("error", audioPayloadError);
       return false;
     }
+    const audioReferenceTypes = audioReferences.map(reference => getMediaReferenceType(reference) ?? "image");
+    if (audioReferenceTypes.some(type => !audioCapabilities.referenceMediaTypes.includes(type))) {
+      pushWorkspaceNotice("error", "当前音频模型不支持所选参考媒体类型");
+      return false;
+    }
+    if (audioReferences.length < audioCapabilities.minReferenceMedia) {
+      pushWorkspaceNotice("error", `当前音频模型需要 ${audioCapabilities.minReferenceMedia} 个参考媒体`);
+      return false;
+    }
+    if (audioCapabilities.maxReferenceMedia >= 0 && audioReferences.length > audioCapabilities.maxReferenceMedia) {
+      pushWorkspaceNotice("error", `当前音频模型最多支持 ${audioCapabilities.maxReferenceMedia} 个参考媒体`);
+      return false;
+    }
 
     setAudioSubmitCount(prev => prev + 1);
     const generationPrompt = buildPromptWithReferenceMap(activePrompt, audioReferences, audioReferenceUrls);
+    const resultMediaType: StorageItem["type"] = audioMode === "asr" ? "transcript" : "audio";
     const generationRequest: GenerationRequestSnapshot = {
       prompt: generationPrompt,
       model: requestModel,
-      aspectRatio: "audio",
+      aspectRatio: resultMediaType === "transcript" ? "transcript" : "audio",
       runningHubAccessPassword: overrides.runningHubAccessPassword,
       runningHubNodeInfoList: overrides.runningHubNodeInfoList,
       referenceMedia: buildReferenceMediaSnapshot(audioReferences, audioReferencePayloads),
       audioFormat: overrides.audioFormat,
       audioMode,
       audioStylePrompt: resolvedAudioStylePrompt,
+      asrLanguage: overrides.asrLanguage,
+      optimizeTextPreview: overrides.optimizeTextPreview,
       voiceProfileId: overrides.voiceProfileId,
     };
 
-    const taskId = makeClientId("task_aud");
+    const taskId = makeClientId(resultMediaType === "transcript" ? "task_txt" : "task_aud");
     const task = createGenerationTask({
       id: taskId,
-      mediaType: "audio",
-      prompt: activePrompt,
+      mediaType: resultMediaType,
+      prompt: activePrompt.trim() || (resultMediaType === "transcript" ? "音频转写" : activePrompt),
       model: requestModel,
       status: "pending",
       progress: 12,
@@ -732,8 +751,10 @@ export function useGenerationActions({
           model: generationRequest.model,
           format: overrides.audioFormat,
           stylePrompt: resolvedAudioStylePrompt,
+          asrLanguage: overrides.asrLanguage,
           voice: profileVoice,
           voiceCloneConsentAccepted: overrides.voiceCloneConsentAccepted,
+          optimizeTextPreview: overrides.optimizeTextPreview,
           referenceMedia: generationRequest.referenceMedia?.map(reference => ({
             dataUri: reference.url,
             type: reference.type,
@@ -747,6 +768,51 @@ export function useGenerationActions({
         const data: unknown = await res.json();
         const resultType = getStringField(data, "type");
         if (resultType === "direct") {
+          const outputKind = getStringField(data, "outputKind");
+          if (outputKind === "transcript") {
+            const transcript = getStringField(data, "transcript");
+            if (!transcript) {
+              throw new Error("音频接口返回转写格式不正确");
+            }
+            const completedAssetId = makeClientId("txt");
+            const completedItem = buildStorageItem(
+              {
+                id: completedAssetId,
+                type: "transcript",
+                url: transcriptToDataUrl(transcript),
+                prompt: activePrompt.trim() || transcriptPreview(transcript, 80) || "音频转写",
+                model: requestModel,
+                aspectRatio: "transcript",
+                createdAt: task.createdAt,
+                status: "complete",
+                progress: 100,
+                generationRequest,
+                sourceBoardNodeId: overrides.boardNodeId,
+                sourceBoardResultStackKey: overrides.boardResultStackKey,
+              },
+              { boardId: resolveScopeBoardId(overrides) },
+            );
+            const savedCompletedItem = await saveDirectItemOrWarn(completedItem, pushWorkspaceNotice);
+            if (!savedCompletedItem) {
+              const failedTask = await updateTaskOrWarn(taskId, {
+                status: "failed",
+                progress: 100,
+                errorMessage: "结果资产本地存储失败",
+              }, pushWorkspaceNotice);
+              if (failedTask) recordGenerationTask(failedTask);
+              return true;
+            }
+            const completeTask = await updateTaskOrWarn(taskId, {
+              activeResultAssetId: completedAssetId,
+              resultAssetIds: [completedAssetId],
+              status: "complete",
+              progress: 100,
+            }, pushWorkspaceNotice);
+            if (completeTask) recordGenerationTask(completeTask);
+            setItems(prev => [savedCompletedItem, ...prev]);
+            pushWorkspaceNotice("success", "音频转写完成");
+            return true;
+          }
           const audioBase64 = getStringField(data, "audioBase64");
           const mimeType = getStringField(data, "mimeType");
           if (!audioBase64 || !mimeType) {
@@ -770,7 +836,7 @@ export function useGenerationActions({
             },
             { boardId: resolveScopeBoardId(overrides) },
           );
-          const savedCompletedItem = await saveAudioItemOrWarn(completedItem, pushWorkspaceNotice);
+          const savedCompletedItem = await saveDirectItemOrWarn(completedItem, pushWorkspaceNotice);
           if (!savedCompletedItem) {
             const failedTask = await updateTaskOrWarn(taskId, {
               status: "failed",

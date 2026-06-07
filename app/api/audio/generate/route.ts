@@ -11,6 +11,7 @@ import { getReferenceMediaPayloadError, REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES }
 export const runtime = "edge";
 
 const audioGenerateBodySchema = z.object({
+  asrLanguage: z.enum(["auto", "zh", "en"]).optional(),
   model: z.string().trim().min(1),
   prompt: z.string().optional(),
   mode: z.enum(["tts", "voice_design", "voice_clone", "music", "sfx", "asr"]),
@@ -19,6 +20,7 @@ const audioGenerateBodySchema = z.object({
   voice: z.string().trim().min(1).optional(),
   voiceProfileId: z.string().trim().min(1).optional(),
   voiceCloneConsentAccepted: z.boolean().optional(),
+  optimizeTextPreview: z.boolean().optional(),
   referenceMedia: z.unknown().optional(),
   runningHubAccessPassword: z.unknown().optional(),
   runningHubNodeInfoList: z.unknown().optional(),
@@ -51,13 +53,15 @@ export async function POST(req: NextRequest) {
     const config = resolveProviderConfig(req, parsed.provider);
     const result = await generateAudioOperation(config, {
       mode: body.mode,
-      prompt: runningHubNodeInfoList ? optionalText(body.prompt) ?? "" : requireText(body.prompt, "Prompt"),
+      prompt: body.mode === "asr" || runningHubNodeInfoList ? optionalText(body.prompt) ?? "" : requireText(body.prompt, "Prompt"),
       model: parsed.model,
       referenceMedia,
+      asrLanguage: body.asrLanguage,
       format: body.format,
       stylePrompt: body.stylePrompt,
       voice: body.voice,
       voiceCloneConsentAccepted: body.voiceCloneConsentAccepted,
+      optimizeTextPreview: body.optimizeTextPreview,
       runningHubAccessPassword: optionalText(body.runningHubAccessPassword),
       runningHubNodeInfoList,
     });

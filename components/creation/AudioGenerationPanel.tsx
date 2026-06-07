@@ -123,6 +123,11 @@ export default function AudioGenerationPanel({
   const showVoiceProfileLibrary = canUseVoiceProfile && (canSaveVoiceProfile || visibleVoiceProfiles.length > 0 || selectedVoiceProfile !== undefined);
   const needsCloneConsent = mode === "voice_clone";
   const stylePromptLabel = mode === "voice_design" ? "音色描述" : mode === "voice_clone" ? "演绎风格" : "风格提示";
+  const hasAudioReference = referenceImages.some(reference => getMediaReferenceType(reference) === "audio");
+  const hasRequiredInput = mode === "asr" ? hasAudioReference : prompt.trim().length > 0;
+  const promptPlaceholder = mode === "asr"
+    ? "可留空；上传或拖入音频参考后开始转写"
+    : "写下要朗读、生成音乐或音效的内容... 输入 @ 可引用作品";
 
   useEffect(() => {
     let active = true;
@@ -260,7 +265,7 @@ export default function AudioGenerationPanel({
                 setIsDragOver(false);
                 onPromptDropAsset(event);
               }}
-              placeholder="写下要朗读、生成音乐或音效的内容... 输入 @ 可引用作品"
+              placeholder={promptPlaceholder}
               className={`imagine-field-textarea relative z-10 h-24 text-sm leading-6 caret-[var(--iw-text)] transition-all duration-200 ${
                 isDragOver ? "scale-[1.01]" : ""
               } ${
@@ -293,14 +298,16 @@ export default function AudioGenerationPanel({
             onChange={onSelectModel}
           />
         </div>
-        <div>
-          <label className="imagine-section-label mb-1.5 block">输出格式</label>
-          <select value={selectedFormat} onChange={(event) => onSelectFormat(event.target.value)} className="imagine-select py-2.5">
-            {(formatOptions.length > 0 ? formatOptions : [{ value: "wav", label: "WAV" }]).map(option => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-        </div>
+        {formatOptions.length > 0 && (
+          <div>
+            <label className="imagine-section-label mb-1.5 block">输出格式</label>
+            <select value={selectedFormat} onChange={(event) => onSelectFormat(event.target.value)} className="imagine-select py-2.5">
+              {formatOptions.map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       <div>
@@ -421,11 +428,11 @@ export default function AudioGenerationPanel({
         <button
           type="button"
           onClick={onGenerate}
-          disabled={isSubmitting || !prompt.trim() || (needsCloneConsent && !voiceCloneConsentAccepted)}
+          disabled={isSubmitting || !hasRequiredInput || (needsCloneConsent && !voiceCloneConsentAccepted)}
           className="imagine-primary-action flex w-full items-center justify-center gap-2 rounded-lg bg-cyan-600 py-3 text-xs font-bold text-white transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isSubmitting ? <RefreshCw className="h-4 w-4 animate-spin text-white" /> : <AudioLines className="h-4 w-4 text-white" />}
-          {isSubmitting ? `提交中 (${submitCount})，可继续排队` : "生成音频"}
+          {isSubmitting ? `提交中 (${submitCount})，可继续排队` : mode === "asr" ? "转写音频" : "生成音频"}
         </button>
       )}
     </div>

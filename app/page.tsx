@@ -411,6 +411,13 @@ export default function Home() {
     setAgentInput,
     setPrompt,
   });
+  const hasAudioReferenceForAsr = referenceImages.some(reference => getMediaReferenceType(reference) === "audio");
+  const isCreatorGenerateDisabled =
+    traditionalSubTab === "audio"
+      ? activeAudioMode === "asr"
+        ? !hasAudioReferenceForAsr
+        : !prompt.trim() || (activeAudioMode === "voice_clone" && !voiceCloneConsentAccepted)
+      : !prompt.trim();
 
   const canUseBackgroundImageGeneration =
     canUseAsyncImageGeneration &&
@@ -527,6 +534,7 @@ export default function Home() {
       audioFormat: activeAudioFormat,
       audioMode: activeAudioMode,
       audioStylePrompt: audioStylePrompt.trim() || undefined,
+      allowEmptyPrompt: activeAudioMode === "asr",
       model: selectedAudioModel,
       voiceCloneConsentAccepted,
       voiceProfileId: selectedVoiceProfileId || undefined,
@@ -766,11 +774,11 @@ export default function Home() {
       return { id: `${item.id}_reference_${index + 1}`, type: reference.type, url: reference.url, role };
     });
 
-    setPrompt(item.prompt);
+    setPrompt(item.type === "transcript" ? request?.prompt ?? "" : item.prompt);
     setReferenceImages(references);
     setReferenceImage(references[0]?.url ?? null);
 
-    if (item.type === "audio") {
+    if (item.type === "audio" || item.type === "transcript") {
       handleSelectAudioModel(model);
       if (request?.audioMode) handleSelectAudioMode(request.audioMode);
       if (request?.audioFormat) setAudioFormat(request.audioFormat);
@@ -1022,7 +1030,10 @@ export default function Home() {
       <AtReferenceDropdown
         items={agentAtItems}
         search={atDropdown.search}
-        onSelect={(item) => handleSelectAtItem(item.url, item.id, type, item.type)}
+        onSelect={(item) => {
+          if (item.type === "transcript") return;
+          handleSelectAtItem(item.url, item.id, type, item.type);
+        }}
       />
     );
   };
@@ -1499,7 +1510,7 @@ export default function Home() {
             <div className="imagine-creator-generate-footer hidden shrink-0 lg:block">
               <CreatorGenerateButton
                 mode={traditionalSubTab}
-                disabled={!prompt.trim() || (traditionalSubTab === "audio" && activeAudioMode === "voice_clone" && !voiceCloneConsentAccepted)}
+                disabled={isCreatorGenerateDisabled}
                 isSubmitting={traditionalSubTab === "image" ? isSubmittingImage : traditionalSubTab === "audio" ? isSubmittingAudio : isSubmittingVideo}
                 submitCount={traditionalSubTab === "image" ? imageSubmitCount : traditionalSubTab === "audio" ? audioSubmitCount : videoSubmitCount}
                 priceProvider={traditionalSubTab === "image" ? selectedModel.split(":")[0] : traditionalSubTab === "audio" ? selectedAudioModel.split(":")[0] : selectedVideoModel.split(":")[0]}

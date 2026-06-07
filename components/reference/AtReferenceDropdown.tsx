@@ -1,6 +1,7 @@
 import AtDropdownShell, { AtDropdownHeader } from "@/components/reference/AtDropdownShell";
 import MediaReferenceThumbnail from "@/components/reference/MediaReferenceThumbnail";
 import type { StorageItem } from "@/lib/db";
+import type { MediaReferenceType } from "@/lib/media-references";
 
 interface AtReferenceDropdownProps {
   items: StorageItem[];
@@ -10,13 +11,15 @@ interface AtReferenceDropdownProps {
 
 export default function AtReferenceDropdown({ items, search, onSelect }: AtReferenceDropdownProps) {
   const query = search.toLowerCase();
-  const filtered = items.filter(item =>
-    item.id.toLowerCase().includes(query) ||
-    item.prompt.toLowerCase().includes(query),
-  );
+  const filtered = items
+    .filter((item): item is StorageItem & { type: MediaReferenceType } => item.type === "image" || item.type === "video" || item.type === "audio")
+    .filter(item =>
+      item.id.toLowerCase().includes(query) ||
+      item.prompt.toLowerCase().includes(query),
+    );
 
   if (filtered.length === 0) {
-    return <AtDropdownShell empty>未找到可引用图片</AtDropdownShell>;
+    return <AtDropdownShell empty>未找到可引用媒体</AtDropdownShell>;
   }
 
   return (

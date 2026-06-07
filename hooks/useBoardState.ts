@@ -29,6 +29,7 @@ import {
   type BoardGenerationStatus,
   type BoardGroupNode,
   type BoardImageGenerateNode,
+  type BoardNoteNode,
   type BoardNode,
   type BoardPoint,
   type BoardPortRef,
@@ -144,6 +145,7 @@ export interface BoardStateController {
     connections: Array<{ from: BoardPortRef; targetPortId: typeof BOARD_PORT_IDS.promptIn | typeof BOARD_PORT_IDS.referenceIn }>,
   ) => string;
   addNoteNode: (input?: CreateNoteNodeInput) => string;
+  addNoteNodeWithConnection: (input: CreateNoteNodeInput, from: BoardPortRef) => string;
   addPromptNode: (input?: CreatePromptNodeInput) => string;
   addReferenceGroupNode: (input?: CreateReferenceGroupNodeInput) => string;
   addReferenceGroupNodeWithAsset: (input: CreateReferenceGroupNodeInput, assetNodeId: string) => string;
@@ -557,7 +559,7 @@ function defaultAudioParams(model: string): {
 } {
   const capabilities = getAudioModelCapabilities(model);
   return {
-    audioFormat: capabilities.formats[0]?.value ?? "wav",
+    audioFormat: capabilities.formats[0]?.value ?? "",
     audioMode: capabilities.defaultMode,
   };
 }
@@ -718,6 +720,17 @@ function normalizeBoardNode(node: unknown, index: number): BoardNode | null {
     ...shell,
     kind: "note",
     body: typeof node.body === "string" ? node.body : "",
+    source: normalizeNoteSource(node.source),
+    variant: node.variant === "transcript" ? "transcript" : "plain",
+  };
+}
+
+function normalizeNoteSource(value: unknown): BoardNoteNode["source"] {
+  if (!isRecord(value) || typeof value.assetId !== "string" || typeof value.model !== "string") return undefined;
+  return {
+    assetId: value.assetId,
+    model: value.model,
+    sourceNodeId: readOptionalString(value.sourceNodeId),
   };
 }
 
@@ -1682,6 +1695,8 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       kind: "note",
       title: input.title ?? "Note",
       body: input.body ?? "",
+      source: input.source,
+      variant: input.variant ?? "plain",
       position: input.position ?? moveDefaultPosition(board.nodes),
       size: input.size ?? DEFAULT_NOTE_NODE_SIZE,
       createdAt,
@@ -1689,6 +1704,39 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     };
 
     mutateBoard(currentBoard => touchBoard(currentBoard, [...currentBoard.nodes, node]));
+    setSelectedNodeId(nodeId);
+    setSelectedEdgeId(null);
+    return nodeId;
+  }, [board.nodes, mutateBoard]);
+
+  const addNoteNodeWithConnection = useCallback((input: CreateNoteNodeInput, from: BoardPortRef): string => {
+    const createdAt = nowIso();
+    const nodeId = createBoardId("note");
+    const node: BoardNode = {
+      id: nodeId,
+      kind: "note",
+      title: input.title ?? "Note",
+      body: input.body ?? "",
+      source: input.source,
+      variant: input.variant ?? "plain",
+      position: input.position ?? moveDefaultPosition(board.nodes),
+      size: input.size ?? DEFAULT_NOTE_NODE_SIZE,
+      createdAt,
+      updatedAt: createdAt,
+    };
+    const to: BoardPortRef = { nodeId, portId: BOARD_PORT_IDS.noteIn, portKind: "result" };
+
+    mutateBoard(currentBoard => {
+      const nextNodes = [...currentBoard.nodes, node];
+      const edge: BoardEdge = {
+        id: createBoardId("edge"),
+        kind: resolveBoardConnectionKind(nextNodes, from, to),
+        from,
+        to,
+        createdAt: nowIso(),
+      };
+      return touchBoard(currentBoard, nextNodes, connectEdge(nextNodes, currentBoard.edges, edge));
+    });
     setSelectedNodeId(nodeId);
     setSelectedEdgeId(null);
     return nodeId;
@@ -2324,6 +2372,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       addGenerateNodeWithConnections,
       groupNodes,
       addNoteNode,
+      addNoteNodeWithConnection,
       addPromptNode,
       addReferenceGroupNode,
       addReferenceGroupNodeWithAsset,
@@ -2370,6 +2419,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       addGenerateNodeWithConnections,
       groupNodes,
       addNoteNode,
+      addNoteNodeWithConnection,
       addPromptNode,
       addReferenceGroupNode,
       addReferenceGroupNodeWithAsset,

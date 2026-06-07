@@ -78,6 +78,7 @@ import {
   compressReferenceImageDataUrl,
   compressReferenceImageFile,
 } from "@/lib/reference-images";
+import { transcriptFromDataUrl } from "@/lib/transcripts";
 import {
   DEFAULT_BOARD_ID,
   DEFAULT_AGENT_NODE_SIZE,
@@ -328,6 +329,28 @@ function activeExecutableResultItem(
     : undefined;
 }
 
+function isMediaStorageItem(item: StorageItem): item is StorageItem & { type: MediaReferenceType } {
+  return item.type === "image" || item.type === "video" || item.type === "audio";
+}
+
+function boardAssetDownloadExtension(item: StorageItem): string {
+  if (item.type === "transcript") return "txt";
+  return mediaReferenceFileExtension(mediaReferenceMimeFromDataUri(item.url), item.type);
+}
+
+function boardAssetReferenceFromStorageItem(item: StorageItem): BoardAssetReference {
+  if (!isMediaStorageItem(item)) {
+    throw new Error("Transcript items cannot be placed as board media assets");
+  }
+  return {
+    assetId: item.id,
+    type: item.type,
+    url: item.url,
+    prompt: item.prompt,
+    model: item.model,
+  };
+}
+
 function activeBoardReference(
   nodes: ReturnType<typeof useBoardState>["board"]["nodes"],
   selectedNodeId: string | null,
@@ -338,7 +361,7 @@ function activeBoardReference(
   if (!node) return [];
   if (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation" || node.kind === "runninghub-app") {
     const item = activeExecutableResultItem(nodes, node, items);
-    return item ? [{ id: item.id, type: item.type, url: resolveUrl(item.id, item.url), role: "general" }] : [];
+    return item && isMediaStorageItem(item) ? [{ id: item.id, type: item.type, url: resolveUrl(item.id, item.url), role: "general" }] : [];
   }
   if (node.kind !== "asset") return [];
   return [{ id: node.asset.assetId, type: node.asset.type, url: resolveUrl(node.asset.assetId, node.asset.url), role: "general" }];
@@ -363,11 +386,11 @@ function boardNodeReferences(
   }
   if (node?.kind === "image-generate" || node?.kind === "video-generate" || node?.kind === "audio-operation" || node?.kind === "runninghub-app") {
     const item = activeExecutableResultItem(nodes, node, items);
-    return item ? [{ id: item.id, type: item.type, url: resolveUrl(item.id, item.url), role: "general" }] : [];
+    return item && isMediaStorageItem(item) ? [{ id: item.id, type: item.type, url: resolveUrl(item.id, item.url), role: "general" }] : [];
   }
   if (node?.kind === "result") {
     const item = items.find(current => current.id === node.activeAssetId && current.status === "complete");
-    return item ? [{ id: item.id, type: item.type, url: resolveUrl(item.id, item.url), role: "general" }] : [];
+    return item && isMediaStorageItem(item) ? [{ id: item.id, type: item.type, url: resolveUrl(item.id, item.url), role: "general" }] : [];
   }
   return [];
 }
@@ -469,7 +492,7 @@ function audioActionDefaults(model: string): {
 } {
   const capabilities = getAudioModelCapabilities(model);
   return {
-    audioFormat: firstOptionValue(capabilities.formats, "wav"),
+    audioFormat: firstOptionValue(capabilities.formats, ""),
     audioMode: capabilities.defaultMode,
   };
 }
@@ -840,12 +863,17 @@ function hasResultAssetConnection(edges: BoardDocument["edges"], sourceNodeId: s
 }
 
 function storageItemToBoardAssetReference(item: StorageItem): BoardAssetReference {
+  return boardAssetReferenceFromStorageItem(item);
+}
+
+function hasTranscriptNoteForAsset(nodes: BoardDocument["nodes"], assetId: string): boolean {
+  return nodes.some(node => node.kind === "note" && node.source?.assetId === assetId);
+}
+
+function transcriptNotePosition(sourceNode: ExecutableBoardNode): BoardPoint {
   return {
-    assetId: item.id,
-    model: item.model,
-    prompt: item.prompt,
-    type: item.type,
-    url: item.url,
+    x: sourceNode.position.x + sourceNode.size.width + 48,
+    y: sourceNode.position.y,
   };
 }
 
@@ -1008,7 +1036,7 @@ function pruneUnavailableRunningHubResultAssets(
 
 function sourceStackResultAssetIds(items: StorageItem[], sourceNode: ExecutableBoardNode, activeAssetId: string): string[] {
   const completedIds = items
-    .filter(item => isSourceStackItem(item, sourceNode) && item.status === "complete")
+    .filter(item => item.type !== "transcript" && isSourceStackItem(item, sourceNode) && item.status === "complete")
     .sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime())
     .map(item => item.id);
   return completedIds.includes(activeAssetId) ? completedIds : appendResultAssetId(sourceNode, activeAssetId);
@@ -1332,7 +1360,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     void resolveOriginalStorageItem(item).then(
       originalItem => {
         const link = document.createElement("a");
-        const extension = mediaReferenceFileExtension(mediaReferenceMimeFromDataUri(originalItem.url), originalItem.type);
+        const extension = boardAssetDownloadExtension(originalItem);
         link.href = originalItem.url;
         link.download = `${originalItem.id}.${extension}`;
         document.body.appendChild(link);
@@ -1384,7 +1412,10 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       <AtReferenceDropdown
         items={agentAtItems}
         search={atDropdown.search}
-        onSelect={(item) => handleSelectAtItem(item.url, item.id, "agent-prompt", item.type)}
+        onSelect={(item) => {
+          if (item.type === "transcript") return;
+          handleSelectAtItem(item.url, item.id, "agent-prompt", item.type);
+        }}
       />
     );
   }, [agentReferences, atDropdown.search, handleSelectAtItem, resolvedBoardId, searchableReferenceImages]);
@@ -1770,7 +1801,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         );
         const promptValue = runInputs.prompt;
         const runReferences = await resolveOriginalReferences(runInputs.references);
-        if (!promptValue) {
+        const isAsrAudioOperation = operation.kind === "audio-operation" && (operation.audioMode ?? audioActionDefaults(model).audioMode) === "asr";
+        if (!promptValue && !isAsrAudioOperation) {
           boardController.updateGenerateNode(item.id, { status: "failed", errorMessage: "批量生成节点缺少提示词" });
           runFailureCount += 1;
           continue;
@@ -2637,13 +2669,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
   const addAssetToBoard = useCallback((asset: StorageItem, position?: BoardPoint): string => {
     const assetNodeId = boardController.addAssetNode({
-      asset: {
-        assetId: asset.id,
-        type: asset.type,
-        url: asset.url,
-        prompt: asset.prompt,
-        model: asset.model,
-      },
+      asset: boardAssetReferenceFromStorageItem(asset),
       position,
     });
 
@@ -2758,13 +2784,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
     if (importedItems.length === 0) return;
     boardController.addAssetNodes(importedItems.map((item, index) => ({
-      asset: {
-        assetId: item.id,
-        type: item.type,
-        url: item.url,
-        prompt: item.prompt,
-        model: item.model,
-      },
+      asset: boardAssetReferenceFromStorageItem(item),
       position: boardImportNodePosition(position, index),
     })));
     setItems(prev => [
@@ -3226,6 +3246,35 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         if (!isSourceStackItem(item, sourceNode)) continue;
         handledBoardItems.add(item.id);
         const nextStatus = nextSourceNodeStatus(items, generationTasks, sourceNode, item.status);
+        if (item.type === "transcript") {
+          const update = {
+            errorMessage: undefined,
+            status: nextStatus,
+          } as const;
+          if (sourceNode.kind === "runninghub-app") {
+            boardController.updateRunningHubAppNode(sourceBoardNodeId, update);
+          } else {
+            boardController.updateGenerateNode(sourceBoardNodeId, update);
+          }
+          if (!hasTranscriptNoteForAsset(boardController.board.nodes, item.id)) {
+            boardController.addNoteNodeWithConnection(
+              {
+                body: transcriptFromDataUrl(item.url),
+                position: transcriptNotePosition(sourceNode),
+                size: { width: 360, height: 260 },
+                source: {
+                  assetId: item.id,
+                  model: item.model,
+                  sourceNodeId: sourceBoardNodeId,
+                },
+                title: "转写结果",
+                variant: "transcript",
+              },
+              { nodeId: sourceBoardNodeId, portId: BOARD_PORT_IDS.resultOut, portKind: "result" },
+            );
+          }
+          continue;
+        }
         const resultAssetIds = sourceStackResultAssetIds(items, sourceNode, item.id);
         const activeResultAssetId = resultAssetIds[resultAssetIds.length - 1] ?? item.id;
         const activeResultItem = items.find(candidate => candidate.id === activeResultAssetId && candidate.status === "complete") ?? item;

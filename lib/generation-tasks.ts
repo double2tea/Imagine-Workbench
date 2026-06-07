@@ -154,7 +154,7 @@ export function generationTaskToGalleryItem(task: GenerationTask): StorageItem |
     url: "",
     prompt: task.prompt,
     model: task.model,
-    aspectRatio: task.request?.aspectRatio ?? (task.mediaType === "audio" ? "audio" : "auto"),
+    aspectRatio: task.request?.aspectRatio ?? (task.mediaType === "audio" ? "audio" : task.mediaType === "transcript" ? "transcript" : "auto"),
     createdAt: task.createdAt,
     status: task.status,
     progress: task.progress,

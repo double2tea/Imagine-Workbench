@@ -105,16 +105,20 @@ export default function BoardSideAssetList({
 }: BoardSideAssetListProps) {
   const [visibleLimit, setVisibleLimit] = useState(PAGE_SIZE);
   const [filter, setFilter] = useState<AssetFilter>("all");
+  const mediaItems = useMemo(
+    () => items.filter(item => item.type === "image" || item.type === "video" || item.type === "audio"),
+    [items],
+  );
 
   const filteredItems = useMemo(() => {
-    if (filter === "image") return items.filter(item => item.type === "image");
-    if (filter === "video") return items.filter(item => item.type === "video");
-    if (filter === "audio") return items.filter(item => item.type === "audio");
+    if (filter === "image") return mediaItems.filter(item => item.type === "image");
+    if (filter === "video") return mediaItems.filter(item => item.type === "video");
+    if (filter === "audio") return mediaItems.filter(item => item.type === "audio");
     if (filter === "active") {
-      return items.filter(item => item.status === "pending" || item.status === "processing");
+      return mediaItems.filter(item => item.status === "pending" || item.status === "processing");
     }
-    return items;
-  }, [filter, items]);
+    return mediaItems;
+  }, [filter, mediaItems]);
 
   const visibleItems = filteredItems.slice(0, visibleLimit);
 

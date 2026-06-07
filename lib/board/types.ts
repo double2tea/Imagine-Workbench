@@ -196,9 +196,19 @@ export interface BoardAgentNode extends BoardNodeBase {
   instruction: string;
 }
 
+export type BoardNoteVariant = "plain" | "transcript";
+
+export interface BoardTranscriptNoteSource {
+  assetId: string;
+  model: string;
+  sourceNodeId?: string;
+}
+
 export interface BoardNoteNode extends BoardNodeBase {
   kind: "note";
   body: string;
+  source?: BoardTranscriptNoteSource;
+  variant?: BoardNoteVariant;
 }
 
 export interface BoardResultNode extends BoardNodeBase {
@@ -316,7 +326,9 @@ export interface CreateNoteNodeInput {
   body?: string;
   position?: BoardPoint;
   size?: BoardSize;
+  source?: BoardTranscriptNoteSource;
   title?: string;
+  variant?: BoardNoteVariant;
 }
 
 export interface CreatePromptNodeInput {

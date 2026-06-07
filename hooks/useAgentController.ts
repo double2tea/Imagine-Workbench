@@ -247,7 +247,9 @@ export function useAgentController({
       if (agentReference) return [agentReference];
 
       const matchedAsset = items.find(item => item.id === referenceImageId);
-      if (matchedAsset) return [{ id: matchedAsset.id, type: matchedAsset.type, url: matchedAsset.url, role: "general" }];
+      if (matchedAsset && matchedAsset.type !== "transcript") {
+        return [{ id: matchedAsset.id, type: matchedAsset.type, url: matchedAsset.url, role: "general" }];
+      }
     }
 
     return activeAgentReferences;

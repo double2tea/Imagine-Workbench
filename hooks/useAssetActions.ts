@@ -76,10 +76,12 @@ function getStringField(value: unknown, field: string): string | null {
 function defaultDownloadMimeType(type: StorageItem["type"]): string {
   if (type === "image") return "image/png";
   if (type === "video") return "video/mp4";
+  if (type === "transcript") return "text/plain;charset=utf-8";
   return "audio/mpeg";
 }
 
 function assetDownloadExtension(item: StorageItem): string {
+  if (item.type === "transcript") return "txt";
   return mediaReferenceFileExtension(mediaReferenceMimeFromDataUri(item.url), item.type);
 }
 
@@ -339,7 +341,7 @@ export function useAssetActions({
 
   const retryFailedItem = async (item: StorageItem) => {
     if (item.status !== "failed") return;
-    if (item.type === "audio") {
+    if (item.type === "audio" || item.type === "transcript") {
       pushWorkspaceNotice("error", "音频资产不支持生成重试");
       return;
     }

@@ -90,12 +90,14 @@ export interface GenerateAudioResult {
 }
 
 export interface GenerateAudioOperationInput extends GenerateAudioInput {
+  asrLanguage?: MimoAsrLanguage;
   mode: AudioOperationMode;
   format?: string;
   stylePrompt?: string;
   voice?: string;
   voiceProfileId?: string;
   voiceCloneConsentAccepted?: boolean;
+  optimizeTextPreview?: boolean;
 }
 
 export interface DirectAudioOperationResult {
@@ -114,7 +116,15 @@ export interface AsyncAudioOperationResult extends GenerateAudioResult {
   outputKind: Extract<AudioOutputKind, "audio">;
 }
 
-export type GenerateAudioOperationResult = DirectAudioOperationResult | AsyncAudioOperationResult;
+export interface TranscriptAudioOperationResult {
+  type: "direct";
+  outputKind: Extract<AudioOutputKind, "transcript">;
+  model: string;
+  source: string;
+  transcript: string;
+}
+
+export type GenerateAudioOperationResult = DirectAudioOperationResult | AsyncAudioOperationResult | TranscriptAudioOperationResult;
 
 export type MimoTtsFormat = "wav" | "pcm16";
 
@@ -132,6 +142,18 @@ export interface MimoTtsResult {
   model: string;
   mimeType: string;
   sampleRateHz?: number;
+}
+
+export type MimoAsrLanguage = "auto" | "zh" | "en";
+
+export interface MimoAsrInput {
+  audio: string;
+  language?: MimoAsrLanguage;
+}
+
+export interface MimoAsrResult {
+  model: string;
+  transcript: string;
 }
 
 export type ProviderMediaType = "image" | "video" | "audio";

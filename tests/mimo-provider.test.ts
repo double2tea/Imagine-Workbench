@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { generateMimoAsr } from "../lib/providers/mimo-asr";
 import { generateMimoTts, generateMimoTtsVoiceClone, generateMimoTtsVoiceDesign } from "../lib/providers/mimo-tts";
 import { generateAudioOperation } from "../lib/providers/audio";
 import { listProviderModels } from "../lib/providers/models";
@@ -42,6 +43,7 @@ test("mimo model listing uses static chat models without fetching", async () => 
       { value: "mimo:mimo-v2.5-tts", label: "MiMo V2.5 TTS" },
       { value: "mimo:mimo-v2.5-tts-voicedesign", label: "MiMo V2.5 Voice Design" },
       { value: "mimo:mimo-v2.5-tts-voiceclone", label: "MiMo V2.5 Voice Clone" },
+      { value: "mimo:mimo-v2.5-asr", label: "MiMo V2.5 ASR" },
     ]);
   } finally {
     globalThis.fetch = originalFetch;
@@ -173,6 +175,47 @@ test("mimo voice clone sends reference audio as voice", async () => {
   }
 });
 
+test("mimo ASR sends input audio and reads transcript text", async () => {
+  const originalFetch = globalThis.fetch;
+  const bodies: unknown[] = [];
+  globalThis.fetch = async (_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    bodies.push(init?.body ? JSON.parse(String(init.body)) as unknown : null);
+    return Response.json({ choices: [{ message: { content: "你好世界" } }] });
+  };
+
+  try {
+    const result = await generateMimoAsr(mimoConfig, {
+      audio: "data:audio/wav;base64,audio_payload",
+      language: "zh",
+    });
+
+    assert.deepEqual(result, {
+      model: "mimo-v2.5-asr",
+      transcript: "你好世界",
+    });
+    assert.deepEqual(bodies[0], {
+      model: "mimo-v2.5-asr",
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_audio",
+              input_audio: {
+                data: "data:audio/wav;base64,audio_payload",
+              },
+            },
+          ],
+        },
+      ],
+      asr_options: { language: "zh" },
+      stream: false,
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("mimo audio operation routes voice design to direct adapter", async () => {
   const originalFetch = globalThis.fetch;
   const bodies: unknown[] = [];
@@ -192,6 +235,8 @@ test("mimo audio operation routes voice design to direct adapter", async () => {
     });
 
     assert.equal(result.type, "direct");
+    assert.equal(result.outputKind, "audio");
+    if (result.outputKind !== "audio") throw new Error("Expected audio result");
     assert.equal(result.audioBase64, "designed_audio");
     assert.deepEqual(bodies[0], {
       model: "mimo-v2.5-tts-voicedesign",
@@ -227,6 +272,8 @@ test("mimo audio operation routes voice clone to direct adapter", async () => {
     });
 
     assert.equal(result.type, "direct");
+    assert.equal(result.outputKind, "audio");
+    if (result.outputKind !== "audio") throw new Error("Expected audio result");
     assert.equal(result.audioBase64, "cloned_audio");
     assert.deepEqual(bodies[0], {
       model: "mimo-v2.5-tts-voiceclone",
@@ -236,6 +283,33 @@ test("mimo audio operation routes voice clone to direct adapter", async () => {
       ],
       audio: { format: "wav", voice: "data:audio/wav;base64,voice_audio" },
       stream: false,
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("mimo audio operation routes ASR to transcript adapter", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (): Promise<Response> => {
+    return Response.json({ choices: [{ message: { content: "转写结果" } }] });
+  };
+
+  try {
+    const result = await generateAudioOperation(mimoConfig, {
+      mode: "asr",
+      prompt: "",
+      model: "mimo-v2.5-asr",
+      referenceMedia: [{ dataUri: "data:audio/wav;base64,voice_audio", type: "audio" }],
+      asrLanguage: "auto",
+    });
+
+    assert.deepEqual(result, {
+      type: "direct",
+      outputKind: "transcript",
+      source: "mimo",
+      model: "mimo-v2.5-asr",
+      transcript: "转写结果",
     });
   } finally {
     globalThis.fetch = originalFetch;

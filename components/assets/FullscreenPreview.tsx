@@ -1,4 +1,4 @@
-import { Check, Clock3, Compass, Copy, Film, ImageDown, Music, type LucideIcon, SkipBack, SkipForward, X } from "lucide-react";
+import { Check, Clock3, Compass, Copy, FileText, Film, ImageDown, Music, type LucideIcon, SkipBack, SkipForward, X } from "lucide-react";
 import { AnimatePresence } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import AudioWaveformPreview from "@/components/audio/AudioWaveformPreview";
@@ -8,6 +8,7 @@ import PreviewImage from "@/components/PreviewImage";
 import type { StorageItem } from "@/lib/db";
 import { formatDisplayedAspectRatio } from "@/lib/media-display";
 import type { PanoramaScreenshot } from "@/lib/panorama/capture";
+import { transcriptFromDataUrl } from "@/lib/transcripts";
 import { getVideoFrameCaptureLabel, type CapturedVideoFrame, type VideoFrameCaptureMode } from "@/lib/video-frame";
 
 interface FullscreenPreviewProps {
@@ -124,7 +125,7 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
                     )}
                   </div>
                 </div>
-              ) : (
+              ) : item.type === "audio" ? (
                 <div className="flex h-full w-full items-center justify-center px-4 sm:px-8">
                   <AudioWaveformPreview
                     src={item.url}
@@ -132,6 +133,18 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
                     tone="media"
                     className="h-[min(52vh,420px)] max-h-full w-full max-w-5xl rounded-2xl"
                   />
+                </div>
+              ) : (
+                <div className="flex h-full w-full items-center justify-center px-4 sm:px-8">
+                  <div className="max-h-full w-full max-w-5xl overflow-auto rounded-2xl border border-slate-800 bg-slate-900/72 p-5 text-slate-100 shadow-2xl">
+                    <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-cyan-100">
+                      <FileText className="h-4 w-4" />
+                      转写文本
+                    </div>
+                    <p className="whitespace-pre-wrap text-sm leading-7 text-slate-200">
+                      {transcriptFromDataUrl(item.url) || "无转写文本"}
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
@@ -155,9 +168,13 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
                         <div className="flex h-full w-full items-center justify-center bg-slate-900">
                           <Film className="h-5 w-5 text-slate-300" />
                         </div>
-                      ) : (
+                      ) : previewItem.type === "audio" ? (
                         <div className="flex h-full w-full items-center justify-center bg-slate-900">
                           <Music className="h-5 w-5 text-slate-300" />
+                        </div>
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-slate-900">
+                          <FileText className="h-5 w-5 text-slate-300" />
                         </div>
                       )}
                     </button>

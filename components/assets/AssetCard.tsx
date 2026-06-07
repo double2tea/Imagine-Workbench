@@ -2,6 +2,7 @@ import {
   Clock3,
   Compass,
   Download,
+  FileText,
   ImageDown,
   Image as ImageIcon,
   type LucideIcon,
@@ -28,6 +29,7 @@ import { mediaReferenceLabel } from "@/lib/media-references";
 import { formatDisplayedAspectRatio } from "@/lib/media-display";
 import { tryParseProviderModel, type AiProvider } from "@/lib/providers/model-catalog";
 import { getProviderMeta } from "@/lib/providers/registry";
+import { transcriptFromDataUrl } from "@/lib/transcripts";
 import { getVideoFrameCaptureLabel, type CapturedVideoFrame, type VideoFrameCaptureMode } from "@/lib/video-frame";
 
 interface AssetCardProps {
@@ -92,6 +94,7 @@ type FrameMenuPlacement = "hover" | "meta";
 function processingTitle(type: StorageItem["type"]): string {
   if (type === "video") return "视频合成中";
   if (type === "audio") return "音频处理中";
+  if (type === "transcript") return "音频转写中";
   return "图像生成中";
 }
 
@@ -135,9 +138,10 @@ export default function AssetCard({
   const [frameMenuPlacement, setFrameMenuPlacement] = useState<FrameMenuPlacement | null>(null);
   const captureVideoFrameRef = useRef<VideoFrameCaptureRequest | null>(null);
   const provider = tryParseProviderModel(item.model, selectedProvider)?.provider ?? selectedProvider;
-  const isDraggableReference = item.status === "complete";
+  const isDraggableReference = item.status === "complete" && item.type !== "transcript";
   const failedTitle = isContentSafetyError(item.errorMessage) ? "内容安全拦截" : "生成失败 / 链接中断";
   const referenceMedia = getGenerationReferenceMedia(item.generationRequest);
+  const transcriptText = item.type === "transcript" ? transcriptFromDataUrl(item.url) : "";
 
   const handleDragStart = (event: DragEvent<HTMLDivElement>) => {
     if (!isDraggableReference) {
@@ -245,10 +249,21 @@ export default function AssetCard({
                   captureVideoFrameRef.current = request;
                 }}
               />
-            ) : (
+            ) : item.type === "audio" ? (
               <div className="flex h-full w-full items-center justify-center p-3">
                 <AudioWaveformPreview src={item.url} size="compact" tone="media" />
               </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onOpenFullscreen(item)}
+                className="flex h-full w-full cursor-pointer flex-col items-start justify-start gap-3 p-4 text-left"
+              >
+                <FileText className="h-5 w-5 shrink-0 text-cyan-200" />
+                <p className="line-clamp-6 whitespace-pre-wrap text-xs leading-5 text-slate-200">
+                  {transcriptText || "无转写文本"}
+                </p>
+              </button>
             )}
 
             <div className="absolute top-3 right-3 z-10 flex gap-1.5">
@@ -262,10 +277,15 @@ export default function AssetCard({
                   <span className="h-1.5 w-1.5 rounded-full bg-red-400 animate-ping" />
                   VIDEO
                 </span>
-              ) : (
+              ) : item.type === "audio" ? (
                 <span className="imagine-asset-type-badge imagine-audio-type-badge flex items-center gap-1.5 px-2 py-1 text-[9px] font-bold tracking-wider uppercase rounded border border-white/12 bg-slate-950/46 text-slate-100 backdrop-blur-md">
                   <Music className="h-3 w-3" />
                   AUDIO
+                </span>
+              ) : (
+                <span className="imagine-asset-type-badge flex items-center gap-1.5 px-2 py-1 text-[9px] font-bold tracking-wider uppercase rounded border border-cyan-400/20 bg-cyan-500/18 text-cyan-100 backdrop-blur-md">
+                  <FileText className="h-3 w-3" />
+                  TEXT
                 </span>
               )}
             </div>
@@ -337,10 +357,12 @@ export default function AssetCard({
                     <SlidersHorizontal className="h-3.5 w-3.5 text-cyan-300" />
                     复用
                   </button>
-                  <button type="button" onClick={() => runMobileAction(() => onToggleCompare(item.id))}>
-                    <RefreshCw className="h-3.5 w-3.5 text-blue-300" />
-                    {inCompare ? "取消对比" : "对比"}
-                  </button>
+                  {item.type !== "transcript" && (
+                    <button type="button" onClick={() => runMobileAction(() => onToggleCompare(item.id))}>
+                      <RefreshCw className="h-3.5 w-3.5 text-blue-300" />
+                      {inCompare ? "取消对比" : "对比"}
+                    </button>
+                  )}
                   <button type="button" onClick={() => runMobileAction(() => onOpenFullscreen(item))}>
                     <Maximize2 className="h-3.5 w-3.5 text-slate-300" />
                     放大
@@ -461,19 +483,21 @@ export default function AssetCard({
                   <span className="text-[9px] font-bold">下载</span>
                 </button>
 
-                <button
-                  onClick={() => onToggleCompare(item.id)}
-                  className={`imagine-card-action min-w-0 px-1.5 py-1 rounded-md border transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer ${
-                    inCompare
-                      ? "bg-blue-600 border-blue-500 text-white"
-                      : "bg-slate-900/90 border-white/5 text-slate-300 hover:text-white hover:bg-slate-800"
-                  }`}
-                  title="加入左右侧滑块对比面板"
-                  aria-label={inCompare ? "从对比面板移除" : "加入对比面板"}
-                >
-                  <RefreshCw className="h-3 w-3 text-blue-400" />
-                  <span className="text-[9px] font-bold">对比</span>
-                </button>
+                {item.type !== "transcript" && (
+                  <button
+                    onClick={() => onToggleCompare(item.id)}
+                    className={`imagine-card-action min-w-0 px-1.5 py-1 rounded-md border transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer ${
+                      inCompare
+                        ? "bg-blue-600 border-blue-500 text-white"
+                        : "bg-slate-900/90 border-white/5 text-slate-300 hover:text-white hover:bg-slate-800"
+                    }`}
+                    title="加入左右侧滑块对比面板"
+                    aria-label={inCompare ? "从对比面板移除" : "加入对比面板"}
+                  >
+                    <RefreshCw className="h-3 w-3 text-blue-400" />
+                    <span className="text-[9px] font-bold">对比</span>
+                  </button>
+                )}
 
                 <button
                   onClick={() => onOpenFullscreen(item)}

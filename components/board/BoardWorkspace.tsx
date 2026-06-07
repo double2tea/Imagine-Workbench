@@ -670,6 +670,9 @@ function pasteMediaFiles(dataTransfer: DataTransfer): File[] {
 }
 
 function storageItemToBoardAsset(item: StorageItem): CreateAssetNodeInput["asset"] {
+  if (item.type === "transcript") {
+    throw new Error("Transcript items cannot be placed as board media assets");
+  }
   return {
     assetId: item.id,
     type: item.type,
@@ -2084,7 +2087,7 @@ export default function BoardWorkspace({
       rememberPastedPosition();
       return;
     }
-    addNoteNode({ body: node.body, position, size: node.size, title: node.title });
+    addNoteNode({ body: node.body, position, size: node.size, source: node.source, title: node.title, variant: node.variant });
     rememberPastedPosition();
   }, [addAgentNode, addAssetNode, addGenerateNode, addGenerateNodeWithConnections, addGroupNode, addNoteNode, addPromptNode, addReferenceGroupNode, addResultNodeWithConnection, addRunningHubAppNode, board.nodes]);
 

@@ -165,8 +165,10 @@ const ResultBoardNode = memo(function ResultBoardNode({
         />
       ) : playableAudioItem ? (
         <BoardAudioWaveform src={playableAudioItem.url} interactive={isSelected} />
-      ) : (
+      ) : item.type === "audio" || item.type === "video" ? (
         <LightweightMediaPreview type={item.type} />
+      ) : (
+        <LightweightMediaPreview type="audio" />
       )}
       {hasStackSwitcher && (
         <div className="board-media-stack-switcher absolute bottom-3 left-1/2 z-30 flex -translate-x-1/2 gap-2 opacity-0 transition-opacity duration-200 group-hover/board-video:opacity-100">

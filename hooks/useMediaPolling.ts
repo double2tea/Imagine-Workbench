@@ -84,6 +84,7 @@ async function updateTaskOrWarn(
 function completedAssetIdPrefix(mediaType: StorageItem["type"]): string {
   if (mediaType === "image") return "img";
   if (mediaType === "audio") return "aud";
+  if (mediaType === "transcript") return "txt";
   return "vid";
 }
 

@@ -7,6 +7,7 @@ import {
   MIMO_TTS_VOICE_CLONE_MODEL,
   MIMO_TTS_VOICE_DESIGN_MODEL,
 } from "./mimo-tts";
+import { generateMimoAsr, MIMO_ASR_MODEL } from "./mimo-asr";
 import type {
   GenerateAudioInput,
   GenerateAudioOperationInput,
@@ -67,6 +68,7 @@ export async function generateAudioOperation(
         format: input.format === "pcm16" ? "pcm16" : "wav",
         stylePrompt: input.stylePrompt,
         voice: input.voice,
+        optimizeTextPreview: input.optimizeTextPreview,
       });
       return {
         type: "direct",
@@ -84,6 +86,7 @@ export async function generateAudioOperation(
         text: input.prompt,
         format: input.format === "pcm16" ? "pcm16" : "wav",
         stylePrompt: input.stylePrompt,
+        optimizeTextPreview: input.optimizeTextPreview,
       });
       return {
         type: "direct",
@@ -103,6 +106,7 @@ export async function generateAudioOperation(
         format: input.format === "pcm16" ? "pcm16" : "wav",
         stylePrompt: input.stylePrompt,
         voice: audioReferences[0].dataUri,
+        optimizeTextPreview: input.optimizeTextPreview,
       });
       return {
         type: "direct",
@@ -112,7 +116,24 @@ export async function generateAudioOperation(
       };
     }
 
-    throw new Error("MiMo audio operation currently supports built-in TTS, voice design, and voice clone only");
+    if (input.mode === "asr" && input.model === MIMO_ASR_MODEL) {
+      const audioReferences = input.referenceMedia.filter(reference => reference.type === "audio");
+      if (audioReferences.length !== 1 || audioReferences.length !== input.referenceMedia.length) {
+        throw new Error("MiMo ASR requires exactly one audio reference");
+      }
+      const result = await generateMimoAsr(config, {
+        audio: audioReferences[0].dataUri,
+        language: input.asrLanguage,
+      });
+      return {
+        type: "direct",
+        outputKind: "transcript",
+        source: "mimo",
+        ...result,
+      };
+    }
+
+    throw new Error("MiMo audio operation currently supports built-in TTS, voice design, voice clone, and ASR only");
   }
 
   if (config.provider === "runninghub") {
