@@ -1,6 +1,13 @@
 import type { AiProvider } from "./model-catalog";
 import type { ProviderConfig, ProviderMediaType } from "./types";
-import { getProviderMeta, isKnownProvider, resolveProviderApiKey, resolveProviderBaseUrl, resolveProviderVideoBaseUrl } from "./registry";
+import {
+  getProviderMeta,
+  isKnownProvider,
+  MIMO_TOKEN_PLAN_DEFAULT_BASE_URL,
+  resolveProviderApiKey,
+  resolveProviderBaseUrl,
+  resolveProviderVideoBaseUrl,
+} from "./registry";
 
 export function requireText(value: unknown, name: string): string {
   if (typeof value !== "string" || value.trim().length === 0) {
@@ -14,10 +21,10 @@ export function optionalText(value: unknown): string | undefined {
 }
 
 export function resolveProviderConfig(req: Request, provider: AiProvider): ProviderConfig {
-  const headerKey = req.headers.get("x-ai-api-key") ?? "";
-  const headerBaseUrl = req.headers.get("x-ai-base-url") ?? "";
-  const envKey = resolveProviderApiKey(provider);
-  const baseUrl = headerBaseUrl || resolveProviderBaseUrl(provider);
+  const headerKey = trimCredential(req.headers.get("x-ai-api-key") ?? "");
+  const headerBaseUrl = trimCredential(req.headers.get("x-ai-base-url") ?? "");
+  const envKey = trimCredential(resolveProviderApiKey(provider));
+  const configuredBaseUrl = headerBaseUrl || trimCredential(resolveProviderBaseUrl(provider));
   const videoBaseUrl = resolveProviderVideoBaseUrl(provider);
 
   const apiKey = headerKey || envKey;
@@ -25,11 +32,12 @@ export function resolveProviderConfig(req: Request, provider: AiProvider): Provi
     const meta = getProviderMeta(provider);
     throw new Error(`${meta.label} API key is required. Set ${meta.envApiKey} or provide a custom API key.`);
   }
+  const resolvedBaseUrl = resolveProviderRequestBaseUrl(provider, apiKey, configuredBaseUrl);
 
   return {
     provider,
     apiKey,
-    baseUrl: trimTrailingSlash(baseUrl),
+    baseUrl: resolvedBaseUrl,
     videoBaseUrl: trimTrailingSlash(videoBaseUrl),
   };
 }
@@ -50,6 +58,12 @@ export async function postJson<T>(url: string, config: ProviderConfig, body: unk
     body: JSON.stringify(body),
   });
   return parseJsonResponse<T>(res);
+}
+
+export function openAiCompatibleUrl(baseUrl: string, path: `/v1/${string}`): string {
+  const normalizedBaseUrl = trimTrailingSlash(baseUrl);
+  if (normalizedBaseUrl.endsWith("/v1")) return `${normalizedBaseUrl}${path.slice(3)}`;
+  return `${normalizedBaseUrl}${path}`;
 }
 
 export async function getJson<T>(url: string, config: ProviderConfig): Promise<T> {
@@ -140,6 +154,31 @@ export function parseMediaOperationName(operationName: string): {
 
 function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, "");
+}
+
+function trimCredential(value: string): string {
+  return value.trim();
+}
+
+function isMimoTokenPlanKey(apiKey: string): boolean {
+  return apiKey.startsWith("tp-");
+}
+
+function resolveProviderRequestBaseUrl(provider: AiProvider, apiKey: string, baseUrl: string): string {
+  const resolvedBaseUrl = trimTrailingSlash(baseUrl);
+  if (provider !== "mimo" || !isMimoTokenPlanKey(apiKey) || isMimoTokenPlanBaseUrl(resolvedBaseUrl)) {
+    return resolvedBaseUrl;
+  }
+  return MIMO_TOKEN_PLAN_DEFAULT_BASE_URL;
+}
+
+function isMimoTokenPlanBaseUrl(baseUrl: string): boolean {
+  try {
+    const host = new URL(baseUrl).host;
+    return host.startsWith("token-plan-") && host.endsWith(".xiaomimimo.com");
+  } catch {
+    return false;
+  }
 }
 
 async function parseJsonResponse<T>(res: Response): Promise<T> {

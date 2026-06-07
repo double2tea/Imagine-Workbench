@@ -1,6 +1,6 @@
 import type { ChatCompletionWithToolsResponse, ChatMessageInput, ProviderConfig, ToolDefinition } from "./types";
 import { runningHubLlmBaseUrl } from "./runninghub";
-import { postJson, requireText } from "./utils";
+import { openAiCompatibleUrl, postJson, requireText } from "./utils";
 
 interface ChatCompletionResponse {
   choices?: Array<{
@@ -79,7 +79,7 @@ export async function createChatCompletionWithTools(
 
 function chatCompletionsUrl(config: ProviderConfig): string {
   const baseUrl = config.provider === "runninghub" ? runningHubLlmBaseUrl(config.baseUrl) : config.baseUrl;
-  return `${baseUrl}/v1/chat/completions`;
+  return openAiCompatibleUrl(baseUrl, "/v1/chat/completions");
 }
 
 function runningHubChatDefaults(config: ProviderConfig): Record<string, unknown> {

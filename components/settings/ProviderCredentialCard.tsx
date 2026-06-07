@@ -8,6 +8,7 @@ interface ProviderCredentialCardProps {
   baseUrl: string;
   baseUrlPlaceholder: string;
   clearLabel: string;
+  credentialHint?: string;
   endpoints?: string[];
   provider: AiProvider;
   providerTest: ProviderTestState;
@@ -26,6 +27,7 @@ export function ProviderCredentialCard({
   baseUrl,
   baseUrlPlaceholder,
   clearLabel,
+  credentialHint,
   endpoints,
   provider,
   providerTest,
@@ -64,6 +66,9 @@ export function ProviderCredentialCard({
             className="imagine-input font-mono"
           />
         </>
+      ) : null}
+      {credentialHint ? (
+        <p className="mt-2 text-[10px] leading-relaxed text-[var(--iw-faint)]">{credentialHint}</p>
       ) : null}
       {endpoints ? (
         <div className="imagine-settings-endpoints">

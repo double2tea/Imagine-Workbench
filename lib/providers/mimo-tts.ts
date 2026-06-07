@@ -1,5 +1,5 @@
 import type { MimoTtsFormat, MimoTtsInput, MimoTtsResult, ProviderConfig } from "./types";
-import { isRecord, postJson, requireText } from "./utils";
+import { isRecord, openAiCompatibleUrl, postJson, requireText } from "./utils";
 import { MIMO_BUILT_IN_VOICES } from "./mimo-voices";
 
 export const MIMO_TTS_MODEL = "mimo-v2.5-tts";
@@ -91,7 +91,7 @@ async function requestMimoTts(
   model: MimoTtsModel,
   request: { messages: MimoTtsRequestMessage[]; audio: MimoTtsRequestAudio },
 ): Promise<MimoTtsResult> {
-  const response = await postJson<MimoTtsResponse>(`${config.baseUrl}/v1/chat/completions`, config, {
+  const response = await postJson<MimoTtsResponse>(openAiCompatibleUrl(config.baseUrl, "/v1/chat/completions"), config, {
     model,
     messages: request.messages,
     audio: request.audio,

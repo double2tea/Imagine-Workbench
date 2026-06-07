@@ -3,7 +3,14 @@ import test from "node:test";
 
 import { formatDisplayedAspectRatio } from "../lib/media-display";
 import { readRunningHubNodeInfoList } from "../lib/providers/runninghub-node-info";
-import { aspectRatioToOpenAiSize, aspectRatioToVideoSize, authHeaders, parseProviderResponseBody } from "../lib/providers/utils";
+import {
+  aspectRatioToOpenAiSize,
+  aspectRatioToVideoSize,
+  authHeaders,
+  openAiCompatibleUrl,
+  parseProviderResponseBody,
+  resolveProviderConfig,
+} from "../lib/providers/utils";
 
 test("parseProviderResponseBody parses JSON response text", () => {
   assert.deepEqual(parseProviderResponseBody('{"ok":true}'), { ok: true });
@@ -26,6 +33,43 @@ test("authHeaders uses MiMo api-key header", () => {
     baseUrl: "https://cdn.12ai.org",
     videoBaseUrl: "https://new.12ai.org",
   }), { Authorization: "Bearer twelve_key" });
+});
+
+test("resolveProviderConfig routes MiMo keys by prefix", () => {
+  const standardConfig = resolveProviderConfig(
+    new Request("https://local.test", { headers: { "x-ai-api-key": " sk_standard_key " } }),
+    "mimo",
+  );
+  assert.equal(standardConfig.apiKey, "sk_standard_key");
+  assert.equal(standardConfig.baseUrl, "https://api.xiaomimimo.com");
+
+  const tokenPlanConfig = resolveProviderConfig(
+    new Request("https://local.test", { headers: { "x-ai-api-key": "tp-token-plan-key" } }),
+    "mimo",
+  );
+  assert.equal(tokenPlanConfig.baseUrl, "https://token-plan-cn.xiaomimimo.com/v1");
+
+  const tokenPlanSgpConfig = resolveProviderConfig(
+    new Request("https://local.test", {
+      headers: {
+        "x-ai-api-key": "tp-token-plan-key",
+        "x-ai-base-url": " https://token-plan-sgp.xiaomimimo.com/v1/ ",
+      },
+    }),
+    "mimo",
+  );
+  assert.equal(tokenPlanSgpConfig.baseUrl, "https://token-plan-sgp.xiaomimimo.com/v1");
+});
+
+test("openAiCompatibleUrl supports root and v1 base URLs", () => {
+  assert.equal(
+    openAiCompatibleUrl("https://api.xiaomimimo.com", "/v1/chat/completions"),
+    "https://api.xiaomimimo.com/v1/chat/completions",
+  );
+  assert.equal(
+    openAiCompatibleUrl("https://token-plan-cn.xiaomimimo.com/v1", "/v1/chat/completions"),
+    "https://token-plan-cn.xiaomimimo.com/v1/chat/completions",
+  );
 });
 
 test("grok2api image sizes preserve selected dimensions", () => {

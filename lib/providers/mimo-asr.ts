@@ -1,5 +1,5 @@
 import type { MimoAsrInput, MimoAsrResult, ProviderConfig } from "./types";
-import { isRecord, postJson, requireText } from "./utils";
+import { isRecord, openAiCompatibleUrl, postJson, requireText } from "./utils";
 
 export const MIMO_ASR_MODEL = "mimo-v2.5-asr";
 
@@ -16,7 +16,7 @@ export async function generateMimoAsr(
   input: MimoAsrInput,
 ): Promise<MimoAsrResult> {
   const audio = requireText(input.audio, "MiMo ASR reference audio");
-  const response = await postJson<MimoAsrResponse>(`${config.baseUrl}/v1/chat/completions`, config, {
+  const response = await postJson<MimoAsrResponse>(openAiCompatibleUrl(config.baseUrl, "/v1/chat/completions"), config, {
     model: MIMO_ASR_MODEL,
     messages: [
       {
