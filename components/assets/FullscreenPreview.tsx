@@ -94,7 +94,7 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
                       captureVideoFrameRef.current = request;
                     }}
                   />
-                  <div className="absolute bottom-[3.85rem] right-4 z-30 opacity-0 transition-opacity duration-200 group-hover/fullscreen-video:opacity-100 sm:right-6">
+                  <div className="absolute bottom-[3.85rem] right-4 z-30 opacity-0 transition-opacity duration-[160ms] group-hover/fullscreen-video:opacity-100 sm:right-6">
                     <button
                       type="button"
                       onClick={() => setIsFrameMenuOpen(prev => !prev)}

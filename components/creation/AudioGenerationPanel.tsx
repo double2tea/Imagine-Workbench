@@ -106,6 +106,8 @@ export default function AudioGenerationPanel({
 }: AudioGenerationPanelProps) {
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
   const [slashCommand, setSlashCommand] = useState<PromptTemplateSlashCommand | null>(null);
+  const [modelFilter, setModelFilter] = useState("");
+  const [isDragOver, setIsDragOver] = useState(false);
   const [voiceProfiles, setVoiceProfiles] = useState<VoiceProfile[]>([]);
   const [voiceProfileName, setVoiceProfileName] = useState("");
   const [voiceProfileMessage, setVoiceProfileMessage] = useState("");
@@ -234,19 +236,38 @@ export default function AudioGenerationPanel({
           </div>
         </div>
 
-        <div className="imagine-field-shell relative p-3">
+        <div className={`imagine-field-shell relative p-3 transition-all duration-200 ${
+          isDragOver ? "border-blue-400/40 ring-2 ring-blue-400/40" : ""
+        }`}>
           {atDropdownNode}
           <div className="relative">
             <textarea
               value={prompt}
               onChange={(event) => handlePromptChange(event.target.value, event.target.selectionStart)}
+              onDragEnter={(event) => {
+                if (!hasDraggedReferenceAsset(event.dataTransfer)) return;
+                event.preventDefault();
+                setIsDragOver(true);
+              }}
               onDragOver={(event) => {
                 if (!hasDraggedReferenceAsset(event.dataTransfer)) return;
                 event.dataTransfer.dropEffect = "copy";
+                event.preventDefault();
               }}
-              onDrop={onPromptDropAsset}
+              onDragLeave={(event) => {
+                const relatedTarget = event.relatedTarget;
+                if (!(relatedTarget instanceof Node) || !event.currentTarget.contains(relatedTarget)) {
+                  setIsDragOver(false);
+                }
+              }}
+              onDrop={(event) => {
+                setIsDragOver(false);
+                onPromptDropAsset(event);
+              }}
               placeholder="写下要朗读、生成音乐或音效的内容... 输入 @ 可引用作品"
-              className={`imagine-field-textarea relative z-10 h-24 text-sm leading-6 caret-[var(--iw-text)] ${
+              className={`imagine-field-textarea relative z-10 h-24 text-sm leading-6 caret-[var(--iw-text)] transition-all duration-200 ${
+                isDragOver ? "scale-[1.01]" : ""
+              } ${
                 promptReferenceThumbnails.length > 0 ? "!text-transparent" : ""
               }`}
             />
@@ -268,15 +289,39 @@ export default function AudioGenerationPanel({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <label className="imagine-section-label mb-1.5 block">音频模型</label>
-          <select value={selectedModel} onChange={(event) => onSelectModel(event.target.value)} className="imagine-select py-2.5">
-            {modelGroups.map(group => (
-              <optgroup key={group.provider} label={group.label}>
-                {group.options.map(option => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
+          <div className="overflow-hidden rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)] transition-colors duration-150 focus-within:border-cyan-400/45">
+            <input
+              type="search"
+              placeholder="搜索模型"
+              value={modelFilter}
+              onChange={(event) => setModelFilter(event.target.value)}
+              className="h-8 w-full border-0 border-b border-[var(--iw-border)] bg-transparent px-3 text-[11px] text-[var(--iw-text)] outline-none placeholder:text-[var(--iw-faint)]"
+              aria-label="搜索音频模型"
+            />
+            <select
+              value={selectedModel}
+              onChange={(event) => onSelectModel(event.target.value)}
+              className="h-10 w-full border-0 bg-transparent px-3 font-mono text-[11px] text-[var(--iw-text)] outline-none"
+            >
+              {modelGroups.map(group => {
+                const filteredOptions = modelFilter
+                  ? group.options.filter(option =>
+                      option.label.toLowerCase().includes(modelFilter.toLowerCase()) ||
+                      option.value.toLowerCase().includes(modelFilter.toLowerCase()) ||
+                      selectedModel === option.value
+                    )
+                  : group.options;
+                if (filteredOptions.length === 0) return null;
+                return (
+                  <optgroup key={group.provider} label={group.label}>
+                    {filteredOptions.map(option => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </optgroup>
+                );
+              })}
+            </select>
+          </div>
         </div>
         <div>
           <label className="imagine-section-label mb-1.5 block">输出格式</label>

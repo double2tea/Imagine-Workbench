@@ -515,7 +515,7 @@ export default function CanvasMaskEditor({
       className={`imagine-secondary-action flex h-9 min-w-16 items-center justify-center gap-1.5 rounded-md px-2.5 text-[11px] font-semibold transition ${
         editorMode === mode
           ? "bg-blue-600 text-white shadow-sm shadow-blue-950/40"
-          : "text-slate-400 hover:bg-slate-800 hover:text-slate-100"
+          : "text-[var(--iw-muted)] hover:bg-[var(--iw-panel-soft)] hover:text-[var(--iw-text)]"
       }`}
       title={hint}
     >
@@ -525,15 +525,15 @@ export default function CanvasMaskEditor({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 p-4 backdrop-blur-md">
-      <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-900 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3 sm:px-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--iw-bg)]/85 p-4 backdrop-blur-md">
+      <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl border border-[var(--iw-border)] bg-[var(--iw-panel)] shadow-2xl">
+        <div className="flex items-center justify-between border-b border-[var(--iw-border)] px-4 py-3 sm:px-5">
           <div className="min-w-0">
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-100">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--iw-text)]">
               <Paintbrush className="h-4 w-4 text-blue-300" />
               图片编辑器
             </h3>
-            <p className="mt-1 text-xs text-slate-450">{activeMode.label}: {activeMode.hint}</p>
+            <p className="mt-1 text-xs text-[var(--iw-muted)]">{activeMode.label}: {activeMode.hint}</p>
           </div>
           <button
             type="button"
@@ -545,15 +545,15 @@ export default function CanvasMaskEditor({
           </button>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-auto bg-slate-950/40 p-4 sm:p-6">
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-auto bg-[var(--iw-bg)]/40 p-4 sm:p-6">
           {!imgLoaded ? (
-            <div className="flex flex-col items-center justify-center gap-2 text-slate-400">
+            <div className="flex flex-col items-center justify-center gap-2 text-[var(--iw-muted)]">
               <RefreshCw className="h-8 w-8 animate-spin" />
               <span className="text-sm">正在加载工作面板像素...</span>
             </div>
           ) : (
             <div
-              className="relative shrink-0 select-none overflow-hidden rounded-lg border border-slate-800 bg-slate-800 shadow-inner"
+              className="relative shrink-0 select-none overflow-hidden rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] shadow-inner"
               style={{
                 width: canvasSize.width,
                 height: canvasSize.height,
@@ -606,7 +606,7 @@ export default function CanvasMaskEditor({
                   <span className="absolute left-2/3 top-0 h-full border-l border-blue-100/35" />
                   <span className="absolute left-0 top-1/3 w-full border-t border-blue-100/35" />
                   <span className="absolute left-0 top-2/3 w-full border-t border-blue-100/35" />
-                  <span className="absolute left-2 top-2 rounded bg-slate-950/75 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-blue-100 shadow-sm">
+                  <span className="absolute left-2 top-2 rounded bg-[var(--iw-bg)]/75 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-blue-100 shadow-sm">
                     {cropSizeLabel}
                   </span>
                   {(["nw", "ne", "se", "sw", "n", "e", "s", "w"] as const).map(handle => {
@@ -618,7 +618,7 @@ export default function CanvasMaskEditor({
                     return (
                       <span
                         key={handle}
-                        className="absolute h-3 w-3 rounded-sm border border-blue-200 bg-slate-950 shadow-sm shadow-blue-950/40"
+                        className="absolute h-3 w-3 rounded-sm border border-blue-200 bg-[var(--iw-bg)] shadow-sm shadow-blue-950/40"
                         style={{
                           left: isWest ? 0 : isEast ? "100%" : "50%",
                           top: isNorth ? 0 : isSouth ? "100%" : "50%",
@@ -633,25 +633,25 @@ export default function CanvasMaskEditor({
           )}
         </div>
 
-        <div className="border-t border-slate-800 bg-slate-900/60 px-4 py-3 sm:px-5">
+        <div className="border-t border-[var(--iw-border)] bg-[var(--iw-panel)]/60 px-4 py-3 sm:px-5">
           <div className="grid gap-3 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-start">
             <div className="min-w-0">
-              <span className="mb-1.5 block text-[10px] font-semibold tracking-widest text-slate-500">工具</span>
-              <div className="flex flex-wrap items-center rounded-lg border border-slate-700 bg-slate-800/80 p-0.5">
+              <span className="mb-1.5 block text-[10px] font-semibold tracking-widest text-[var(--iw-muted)]">工具</span>
+              <div className="flex flex-wrap items-center rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)]/80 p-0.5">
                 {EDITOR_MODE_OPTIONS.map(option => renderModeButton(option))}
               </div>
             </div>
 
             <div className="min-w-0">
               <div className="mb-1.5 flex items-center justify-between gap-3">
-                <span className="text-[10px] font-semibold tracking-widest text-slate-500">参数</span>
-                <span className="truncate text-[10px] text-slate-500">{activeMode.hint}</span>
+                <span className="text-[10px] font-semibold tracking-widest text-[var(--iw-muted)]">参数</span>
+                <span className="truncate text-[10px] text-[var(--iw-muted)]">{activeMode.hint}</span>
               </div>
 
               {(editorMode === "mask" || editorMode === "erase") && (
-                <div className="flex min-h-10 flex-wrap items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/35 px-3 py-2">
-                  <div className="flex items-center gap-2 text-xs text-slate-300">
-                    <Sliders className="h-3.5 w-3.5 text-slate-400" />
+                <div className="flex min-h-10 flex-wrap items-center gap-2 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-bg)]/35 px-3 py-2">
+                  <div className="flex items-center gap-2 text-xs text-[var(--iw-text)]">
+                    <Sliders className="h-3.5 w-3.5 text-[var(--iw-muted)]" />
                     <span className="w-11 font-mono">{brushSize}px</span>
                     <input
                       type="range"
@@ -684,16 +684,16 @@ export default function CanvasMaskEditor({
               )}
 
               {editorMode === "text" && (
-                <div className="flex min-h-10 flex-wrap items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/35 px-3 py-2">
+                <div className="flex min-h-10 flex-wrap items-center gap-2 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-bg)]/35 px-3 py-2">
                   <input
                     type="text"
                     value={textValue}
                     onChange={(event) => setTextValue(event.target.value)}
-                    className="h-8 w-40 rounded-md border border-slate-800 bg-slate-950/70 px-3 text-xs text-slate-100 outline-none transition focus:border-blue-400/45"
+                    className="h-8 w-40 rounded-md border border-[var(--iw-border)] bg-[var(--iw-bg)]/70 px-3 text-xs text-[var(--iw-text)] outline-none transition focus:border-blue-400/45"
                     aria-label="文字内容"
                   />
                   <div className="flex items-center gap-2">
-                    <span className="w-8 font-mono text-xs text-slate-400">{textSize}</span>
+                    <span className="w-8 font-mono text-xs text-[var(--iw-muted)]">{textSize}</span>
                     <input
                       type="range"
                       min="16"
@@ -704,7 +704,7 @@ export default function CanvasMaskEditor({
                       aria-label="文字大小"
                     />
                   </div>
-                  <div className="flex h-8 items-center gap-1 rounded-md border border-slate-800 bg-slate-950/60 px-2">
+                  <div className="flex h-8 items-center gap-1 rounded-md border border-[var(--iw-border)] bg-[var(--iw-bg)]/60 px-2">
                     {TEXT_COLORS.map(color => (
                       <button
                         key={color}
@@ -730,8 +730,8 @@ export default function CanvasMaskEditor({
               )}
 
               {editorMode === "crop" && (
-                <div className="flex min-h-10 flex-wrap items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/35 px-3 py-2">
-                  <div className="flex h-8 max-w-full items-center gap-1 overflow-x-auto rounded-md border border-slate-800 bg-slate-950/60 px-1.5">
+                <div className="flex min-h-10 flex-wrap items-center gap-2 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-bg)]/35 px-3 py-2">
+                  <div className="flex h-8 max-w-full items-center gap-1 overflow-x-auto rounded-md border border-[var(--iw-border)] bg-[var(--iw-bg)]/60 px-1.5">
                     {CROP_PRESETS.map(preset => (
                       <button
                         key={preset.id}
@@ -740,14 +740,14 @@ export default function CanvasMaskEditor({
                         className={`h-6 shrink-0 rounded px-2 font-mono text-[10px] font-semibold transition ${
                           cropPresetId === preset.id
                             ? "bg-blue-600 text-white"
-                            : "text-slate-500 hover:bg-slate-800 hover:text-slate-200"
+                            : "text-[var(--iw-muted)] hover:bg-[var(--iw-panel-soft)] hover:text-[var(--iw-text)]"
                         }`}
                       >
                         {preset.label}
                       </button>
                     ))}
                   </div>
-                  <span className="rounded-md border border-slate-800 bg-slate-950/60 px-2.5 py-1.5 font-mono text-[10px] text-slate-400">
+                  <span className="rounded-md border border-[var(--iw-border)] bg-[var(--iw-bg)]/60 px-2.5 py-1.5 font-mono text-[10px] text-[var(--iw-muted)]">
                     {cropSizeLabel}
                   </span>
                   <button
@@ -757,7 +757,7 @@ export default function CanvasMaskEditor({
                     className={`imagine-secondary-action flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition ${
                       canApplyCrop
                         ? "border border-blue-400/30 bg-blue-500/16 text-blue-100 hover:bg-blue-500/24"
-                        : "border border-slate-800 bg-slate-950/45 text-slate-600"
+                        : "border border-[var(--iw-border)] bg-[var(--iw-bg)]/45 text-[var(--iw-muted)]"
                     }`}
                   >
                     <Crop className="h-3.5 w-3.5" />
@@ -776,7 +776,7 @@ export default function CanvasMaskEditor({
             </div>
 
             <div className="min-w-0">
-              <span className="mb-1.5 block text-[10px] font-semibold tracking-widest text-slate-500">操作</span>
+              <span className="mb-1.5 block text-[10px] font-semibold tracking-widest text-[var(--iw-muted)]">操作</span>
               <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                 <button
                   type="button"
@@ -794,7 +794,7 @@ export default function CanvasMaskEditor({
                   className={`imagine-primary-action flex h-10 items-center gap-1.5 rounded-lg px-4 text-xs font-semibold text-white transition ${
                     canApply
                       ? "bg-blue-600 shadow-md shadow-blue-950/30 hover:bg-blue-500"
-                      : "cursor-not-allowed border border-slate-800 bg-slate-800 text-slate-500"
+                      : "cursor-not-allowed border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)]"
                   }`}
                 >
                   <Check className="h-4 w-4" />

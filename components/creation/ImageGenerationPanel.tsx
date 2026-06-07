@@ -100,6 +100,8 @@ export default function ImageGenerationPanel({
 }: ImageGenerationPanelProps) {
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
   const [slashCommand, setSlashCommand] = useState<PromptTemplateSlashCommand | null>(null);
+  const [modelFilter, setModelFilter] = useState("");
+  const [isDragOver, setIsDragOver] = useState(false);
   const presetResolutionOptions = imageResolutionOptions.filter(option => option.value !== "custom");
   const supportsCustomImageSize = imageResolutionOptions.some(option => option.value === "custom");
   const isCustomImageResolution = imageResolution === "custom";
@@ -162,19 +164,38 @@ export default function ImageGenerationPanel({
           </div>
         </div>
 
-        <div className="imagine-field-shell relative p-3">
+        <div className={`imagine-field-shell relative p-3 transition-all duration-200 ${
+          isDragOver ? "border-blue-400/40 ring-2 ring-blue-400/40" : ""
+        }`}>
           {atDropdownNode}
           <div className="relative">
             <textarea
               value={prompt}
               onChange={(event) => handlePromptChange(event.target.value, event.target.selectionStart)}
+              onDragEnter={(event) => {
+                if (!hasDraggedReferenceAsset(event.dataTransfer)) return;
+                event.preventDefault();
+                setIsDragOver(true);
+              }}
               onDragOver={(event) => {
                 if (!hasDraggedReferenceAsset(event.dataTransfer)) return;
                 event.dataTransfer.dropEffect = "copy";
+                event.preventDefault();
               }}
-              onDrop={onPromptDropAsset}
+              onDragLeave={(event) => {
+                const relatedTarget = event.relatedTarget;
+                if (!(relatedTarget instanceof Node) || !event.currentTarget.contains(relatedTarget)) {
+                  setIsDragOver(false);
+                }
+              }}
+              onDrop={(event) => {
+                setIsDragOver(false);
+                onPromptDropAsset(event);
+              }}
               placeholder="写下你想创造的图片奇思妙想... 输入 @ 可引用作品"
-              className={`imagine-field-textarea relative z-10 h-24 text-sm leading-6 caret-[var(--iw-text)] ${
+              className={`imagine-field-textarea relative z-10 h-24 text-sm leading-6 caret-[var(--iw-text)] transition-all duration-200 ${
+                isDragOver ? "scale-[1.01]" : ""
+              } ${
                 promptReferenceThumbnails.length > 0 ? "!text-transparent" : ""
               }`}
             />
@@ -209,19 +230,39 @@ export default function ImageGenerationPanel({
               </label>
             )}
           </div>
-          <select
-            value={selectedModel}
-            onChange={(event) => onSelectModel(event.target.value)}
-            className="imagine-select py-2.5"
-          >
-            {modelGroups.map(group => (
-              <optgroup key={group.provider} label={group.label}>
-                {group.options.map(option => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
+          <div className="overflow-hidden rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)] transition-colors duration-150 focus-within:border-blue-400/45">
+            <input
+              type="search"
+              placeholder="搜索模型"
+              value={modelFilter}
+              onChange={(event) => setModelFilter(event.target.value)}
+              className="h-8 w-full border-0 border-b border-[var(--iw-border)] bg-transparent px-3 text-[11px] text-[var(--iw-text)] outline-none placeholder:text-[var(--iw-faint)]"
+              aria-label="搜索图片模型"
+            />
+            <select
+              value={selectedModel}
+              onChange={(event) => onSelectModel(event.target.value)}
+              className="h-10 w-full border-0 bg-transparent px-3 font-mono text-[11px] text-[var(--iw-text)] outline-none"
+            >
+              {modelGroups.map(group => {
+                const filteredOptions = modelFilter
+                  ? group.options.filter(option =>
+                      option.label.toLowerCase().includes(modelFilter.toLowerCase()) ||
+                      option.value.toLowerCase().includes(modelFilter.toLowerCase()) ||
+                      selectedModel === option.value
+                    )
+                  : group.options;
+                if (filteredOptions.length === 0) return null;
+                return (
+                  <optgroup key={group.provider} label={group.label}>
+                    {filteredOptions.map(option => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </optgroup>
+                );
+              })}
+            </select>
+          </div>
         </div>
 
         <div className="imagine-parameter-field">
@@ -377,9 +418,9 @@ export default function ImageGenerationPanel({
           type="button"
           onClick={onGenerate}
           disabled={!prompt.trim()}
-          className={`imagine-primary-action mt-1 flex w-full items-center justify-center gap-2 rounded-lg py-3 text-xs font-bold transition duration-200 ${
+          className={`imagine-primary-action mt-1 flex w-full items-center justify-center gap-2 rounded-lg py-3 text-xs font-bold transition duration-[160ms] ${
             !prompt.trim()
-              ? "cursor-not-allowed opacity-60"
+              ? "cursor-not-allowed opacity-45"
               : "cursor-pointer bg-blue-600 text-white shadow-lg shadow-blue-950/30 hover:bg-blue-500 active:scale-[0.98]"
           }`}
         >

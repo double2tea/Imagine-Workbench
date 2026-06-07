@@ -71,7 +71,7 @@ function FilterChip({ active, count, empty = false, label, onClick }: FilterChip
       data-active={active}
       data-empty={empty}
       onClick={onClick}
-      className="imagine-filter-chip cursor-pointer transition focus:outline-none"
+      className="imagine-filter-chip cursor-pointer transition-colors duration-150 focus:outline-none"
     >
       <span>{label}</span>
       {count !== undefined && <span className="imagine-filter-chip-count">{count}</span>}
@@ -166,13 +166,13 @@ export default function AssetToolbar({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="搜索提示词、模型..."
-            className="imagine-toolbar-search h-9 rounded-lg border border-slate-800 bg-slate-950/55 pr-4 text-xs text-slate-200 placeholder-slate-600 transition focus:border-blue-400/35 focus:outline-none"
+            className="imagine-toolbar-search h-9 rounded-lg border border-slate-800 bg-slate-950/55 pr-4 text-xs text-slate-200 placeholder-slate-600 transition-colors duration-150 focus:border-blue-400/35 focus:outline-none"
           />
         </div>
         <select
           value={assetModelFilter}
           onChange={(e) => setAssetModelFilter(e.target.value)}
-          className="imagine-toolbar-select h-9 min-w-0 rounded-lg border border-slate-800 bg-slate-950/55 px-3 font-mono text-[10px] text-slate-300 transition focus:border-blue-400/35 focus:outline-none sm:min-w-[9rem]"
+          className="imagine-toolbar-select h-9 min-w-0 rounded-lg border border-slate-800 bg-slate-950/55 px-3 font-mono text-[10px] text-slate-300 transition-colors duration-150 focus:border-blue-400/35 focus:outline-none sm:min-w-[9rem]"
           aria-label="按模型筛选"
         >
           <option value="all">全部模型</option>
@@ -183,14 +183,14 @@ export default function AssetToolbar({
         <button
           type="button"
           onClick={exportMetadataJson}
-          className="imagine-secondary-action h-9 shrink-0 rounded-lg border border-slate-800 bg-slate-950/55 px-3 text-[10px] font-semibold text-slate-300 transition hover:bg-slate-900"
+          className="imagine-secondary-action h-9 shrink-0 rounded-lg border border-slate-800 bg-slate-950/55 px-3 text-[10px] font-semibold text-slate-300 transition-colors duration-150 hover:bg-slate-900"
         >
           导出
         </button>
         <button
           type="button"
           onClick={() => deleteItemsByStatus(["failed", "pending"])}
-          className="imagine-danger-action h-9 shrink-0 rounded-lg border border-red-500/20 bg-red-950/20 px-3 text-[10px] font-semibold text-red-300 transition hover:bg-red-950/35"
+          className="imagine-danger-action h-9 shrink-0 rounded-lg border border-red-500/20 bg-red-950/20 px-3 text-[10px] font-semibold text-red-300 transition-colors duration-150 hover:bg-red-950/35"
         >
           清失败
         </button>
