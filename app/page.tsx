@@ -9,6 +9,7 @@ import FloatingCompareButton from "@/components/assets/FloatingCompareButton";
 import FullscreenPreview from "@/components/assets/FullscreenPreview";
 import PanoramaOverlay from "@/components/panorama/PanoramaOverlay";
 import CreationModeTabs, { type CreationMode } from "@/components/creation/CreationModeTabs";
+import AudioGenerationPanel from "@/components/creation/AudioGenerationPanel";
 import CreatorGenerateButton from "@/components/creation/CreatorGenerateButton";
 import ImageGenerationPanel from "@/components/creation/ImageGenerationPanel";
 import VideoGenerationPanel from "@/components/creation/VideoGenerationPanel";
@@ -40,6 +41,7 @@ import { useClipboardImageImport } from "@/hooks/useClipboardImageImport";
 import { useGenerationActions } from "@/hooks/useGenerationActions";
 import { useGenerationTaskStore } from "@/hooks/useGenerationTaskStore";
 import { useMediaPolling } from "@/hooks/useMediaPolling";
+import { audioOperationFormatOptions, audioOperationRequiresStylePrompt, audioOperationRequiresTextInput } from "@/lib/audio-operation-rules";
 import {
   cancelGenerationTask,
   deleteGenerationTask,
@@ -53,9 +55,11 @@ import {
 } from "@/hooks/useReferenceState";
 import { useProviderSettings } from "@/hooks/useProviderSettings";
 import {
+  DEFAULT_AUDIO_MODEL,
   DEFAULT_IMAGE_MODEL,
   DEFAULT_VIDEO_MODEL,
   formatProviderModel,
+  getAudioModelCapabilities,
   getImageAspectRatioFromResolution,
   getImageModelCapabilities,
   getImageResolutionOptions,
@@ -63,6 +67,7 @@ import {
   supportsAsyncImageGeneration,
   tryParseProviderModel,
   type AiProvider,
+  type AudioOperationMode,
   type ModelOption,
   type VideoReferenceMode,
 } from "@/lib/providers/model-catalog";
@@ -181,6 +186,13 @@ export default function Home() {
   const [negativePrompt, setNegativePrompt] = useState("");
   const [selectedModel, setSelectedModel] = useState(DEFAULT_IMAGE_MODEL);
   const [selectedVideoModel, setSelectedVideoModel] = useState(DEFAULT_VIDEO_MODEL);
+  const [selectedAudioModel, setSelectedAudioModel] = useState(DEFAULT_AUDIO_MODEL);
+  const [selectedAudioMode, setSelectedAudioMode] = useState<AudioOperationMode>("tts");
+  const [audioFormat, setAudioFormat] = useState("wav");
+  const [audioStylePrompt, setAudioStylePrompt] = useState("");
+  const [asrLanguage, setAsrLanguage] = useState<"auto" | "zh" | "en">("auto");
+  const [selectedVoiceProfileId, setSelectedVoiceProfileId] = useState("");
+  const [voiceCloneConsentAccepted, setVoiceCloneConsentAccepted] = useState(false);
   const [aspectRatio, setAspectRatio] = useState("1:1");
   const [imageResolution, setImageResolution] = useState("1K");
   const [imageQuality, setImageQuality] = useState("auto");
@@ -262,6 +274,7 @@ export default function Home() {
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [imageSubmitCount, setImageSubmitCount] = useState(0);
   const [videoSubmitCount, setVideoSubmitCount] = useState(0);
+  const [audioSubmitCount, setAudioSubmitCount] = useState(0);
   const [workspaceNotices, setWorkspaceNotices] = useState<WorkspaceNotice[]>([]);
 
   // Interactive Mask Editor State
@@ -280,6 +293,7 @@ export default function Home() {
   const pollingFailuresRef = useRef<Record<string, number>>({});
   const generationAbortControllersRef = useRef<Record<string, AbortController>>({});
   const locallyCanceledItemIdsRef = useRef<Set<string>>(new Set());
+  const workspaceNoticeSequenceRef = useRef(0);
   const isAgentDockSuppressed = showSettings || isMaskOpen || fullscreenItem !== null || panoramaItem !== null;
 
   const dismissWorkspaceNotice = useCallback((id: string) => {
@@ -287,10 +301,10 @@ export default function Home() {
   }, [setWorkspaceNotices]);
 
   const pushWorkspaceNotice = useCallback((type: NoticeType, message: string) => {
-    const id = makeClientId("notice");
+    workspaceNoticeSequenceRef.current += 1;
+    const id = `${makeClientId("notice")}_${workspaceNoticeSequenceRef.current}`;
     setWorkspaceNotices(prev => [{ id, type, message }, ...prev].slice(0, 4));
-    window.setTimeout(() => dismissWorkspaceNotice(id), 8000);
-  }, [dismissWorkspaceNotice, setWorkspaceNotices]);
+  }, [setWorkspaceNotices]);
 
   const {
     addFetchedModels,
@@ -316,6 +330,7 @@ export default function Home() {
   } = useProviderSettings({ pushWorkspaceNotice });
 
   const imageCapabilities = getImageModelCapabilities(selectedModel);
+  const audioCapabilities = getAudioModelCapabilities(selectedAudioModel);
   const customImageAspectRatio = imageResolution === "custom"
     ? getImageAspectRatioFromResolution(customImageSize.trim())
     : null;
@@ -324,6 +339,14 @@ export default function Home() {
   const videoCapabilities = getVideoModelCapabilities(selectedVideoModel);
   const isSubmittingImage = imageSubmitCount > 0;
   const isSubmittingVideo = videoSubmitCount > 0;
+  const isSubmittingAudio = audioSubmitCount > 0;
+  const activeAudioMode = audioCapabilities.modes.includes(selectedAudioMode)
+    ? selectedAudioMode
+    : audioCapabilities.defaultMode;
+  const audioFormatOptions = audioOperationFormatOptions(audioCapabilities);
+  const activeAudioFormat = audioFormatOptions.some(option => option.value === audioFormat)
+    ? audioFormat
+    : audioFormatOptions[0]?.value ?? "";
   const canUseAsyncImageGeneration = supportsAsyncImageGeneration(selectedModel);
   const activeImageResolution = imageResolution === "custom" ? customImageSize.trim() : imageResolution;
   const activeImageQuality = imageCapabilities.qualities.some(option => option.value === imageQuality) ? imageQuality : undefined;
@@ -379,6 +402,8 @@ export default function Home() {
     toggleReferenceRole,
   } = useReferenceState({
     agentInput,
+    audioReferenceLimit: audioCapabilities.maxReferenceMedia,
+    audioReferenceMediaTypes: audioCapabilities.referenceMediaTypes,
     imageReferenceLimit: imageCapabilities.maxReferenceImages,
     imageReferenceMediaTypes: imageCapabilities.referenceMediaTypes,
     prompt,
@@ -389,6 +414,14 @@ export default function Home() {
     setAgentInput,
     setPrompt,
   });
+  const audioTextInputRequired = audioOperationRequiresTextInput(activeAudioMode);
+  const audioStylePromptRequired = audioOperationRequiresStylePrompt(activeAudioMode);
+  const activeAudioReferenceCount = referenceImages.filter(reference => audioCapabilities.referenceMediaTypes.includes(getMediaReferenceType(reference))).length;
+  const hasRequiredAudioReferences = activeAudioReferenceCount >= audioCapabilities.minReferenceMedia;
+  const isCreatorGenerateDisabled =
+    traditionalSubTab === "audio"
+      ? (audioTextInputRequired && !prompt.trim()) || (audioStylePromptRequired && !audioStylePrompt.trim()) || !hasRequiredAudioReferences || (activeAudioMode === "voice_clone" && !voiceCloneConsentAccepted)
+      : !prompt.trim();
 
   const canUseBackgroundImageGeneration =
     canUseAsyncImageGeneration &&
@@ -488,12 +521,34 @@ export default function Home() {
     selectedModel,
     selectedVideoModel,
     setGenerationTasks,
+    setAudioSubmitCount,
     setImageSubmitCount,
     setItems,
     setVideoSubmitCount,
     videoReferenceLimit,
     videoReferenceMode: activeVideoReferenceMode,
   });
+
+  const generateActiveAudio = () => {
+    if (activeAudioMode === "voice_clone" && !voiceCloneConsentAccepted) {
+      pushWorkspaceNotice("error", "音色克隆需要先确认参考音频授权");
+      return;
+    }
+    if (audioStylePromptRequired && !audioStylePrompt.trim()) {
+      pushWorkspaceNotice("error", "音色设计需要填写音色描述");
+      return;
+    }
+    void generateManualAudio({
+      audioFormat: activeAudioFormat || undefined,
+      audioMode: activeAudioMode,
+      audioStylePrompt: audioStylePrompt.trim() || undefined,
+      asrLanguage,
+      allowEmptyPrompt: !audioTextInputRequired,
+      model: selectedAudioModel,
+      voiceCloneConsentAccepted,
+      voiceProfileId: selectedVoiceProfileId || undefined,
+    });
+  };
   const {
     cancelProcessingItem,
     exportMetadataJson,
@@ -696,11 +751,24 @@ export default function Home() {
     }
   };
 
-  function reuseTaskInComposer(item: StorageItem): void {
-    if (item.type === "audio") {
-      pushWorkspaceNotice("error", "音频资产没有可复用的生成参数");
-      return;
+  const handleSelectAudioModel = (model: string) => {
+    const capabilities = getAudioModelCapabilities(model);
+    setSelectedAudioModel(model);
+    setSelectedVoiceProfileId("");
+    if (!capabilities.modes.includes(selectedAudioMode)) {
+      setSelectedAudioMode(capabilities.defaultMode);
     }
+    if (capabilities.formats.length > 0 && !capabilities.formats.some(option => option.value === audioFormat)) {
+      setAudioFormat(capabilities.formats[0].value);
+    }
+  };
+
+  const handleSelectAudioMode = (mode: AudioOperationMode) => {
+    setSelectedAudioMode(mode);
+    if (mode !== "voice_clone") setVoiceCloneConsentAccepted(false);
+  };
+
+  function reuseTaskInComposer(item: StorageItem): void {
     const request = item.generationRequest;
     const model = request?.model ?? item.model;
     const references: ReferenceImageRef[] = getGenerationReferenceMedia(request).map((reference, index) => {
@@ -715,11 +783,19 @@ export default function Home() {
       return { id: `${item.id}_reference_${index + 1}`, type: reference.type, url: reference.url, role };
     });
 
-    setPrompt(item.prompt);
+    setPrompt(item.type === "transcript" ? request?.prompt ?? "" : item.prompt);
     setReferenceImages(references);
     setReferenceImage(references[0]?.url ?? null);
 
-    if (item.type === "image") {
+    if (item.type === "audio" || item.type === "transcript") {
+      handleSelectAudioModel(model);
+      if (request?.audioMode) handleSelectAudioMode(request.audioMode);
+      if (request?.audioFormat) setAudioFormat(request.audioFormat);
+      setAudioStylePrompt(request?.audioStylePrompt ?? "");
+      setAsrLanguage(request?.asrLanguage ?? "auto");
+      setSelectedVoiceProfileId(request?.voiceProfileId ?? "");
+      setTraditionalSubTab("audio");
+    } else if (item.type === "image") {
       const imageModel = getSelectableStoredImageModel(model, selectedProvider);
       const nextAspectRatio = request?.aspectRatio ?? item.aspectRatio;
       const capabilities = getImageModelCapabilities(imageModel);
@@ -964,7 +1040,10 @@ export default function Home() {
       <AtReferenceDropdown
         items={agentAtItems}
         search={atDropdown.search}
-        onSelect={(item) => handleSelectAtItem(item.url, item.id, type, item.type)}
+        onSelect={(item) => {
+          if (item.type === "transcript") return;
+          handleSelectAtItem(item.url, item.id, type, item.type);
+        }}
       />
     );
   };
@@ -1230,8 +1309,51 @@ export default function Home() {
     />
   );
 
-  const renderCreationPanel = (showGenerateButton: boolean) =>
-    traditionalSubTab === "image" ? (
+  const renderCreationPanel = (showGenerateButton: boolean) => {
+    if (traditionalSubTab === "audio") {
+      return (
+        <AudioGenerationPanel
+          showGenerateButton={showGenerateButton}
+          atDropdownNode={atDropdown.visible && atDropdown.type === "audio-prompt" ? renderAtDropdown("audio-prompt") : null}
+          capabilities={audioCapabilities}
+          formatOptions={audioFormatOptions}
+          isOptimizing={isOptimizing}
+          isSubmitting={isSubmittingAudio}
+          mode={activeAudioMode}
+          modelGroups={audioModelGroups}
+          prompt={prompt}
+          referenceImages={referenceImages}
+          selectedFormat={activeAudioFormat}
+          selectedModel={selectedAudioModel}
+          selectedVoiceProfileId={selectedVoiceProfileId}
+          submitCount={audioSubmitCount}
+          voiceCloneConsentAccepted={voiceCloneConsentAccepted}
+          audioStylePrompt={audioStylePrompt}
+          asrLanguage={asrLanguage}
+          onClearReferences={() => {
+            setReferenceImages([]);
+            setReferenceImage(null);
+            setPrompt(removePromptReferenceTokens);
+          }}
+          onGenerate={generateActiveAudio}
+          onOptimizePrompt={optimizeActivePrompt}
+          onPromptChange={value => handleTextareaChange(value, "audio-prompt")}
+          onPromptDropAsset={event => handlePromptDropAsset(event, "audio-prompt")}
+          onReferenceDropAsset={asset => handleReferenceDropAsset(asset, "audio-prompt")}
+          onReferenceDropFiles={files => handleReferenceDropFiles(files, "audio-prompt")}
+          onReferenceRemove={removeReferenceImage}
+          onReferenceUpload={event => handleReferenceUpload(event, "audio-prompt")}
+          onSelectFormat={setAudioFormat}
+          onSelectMode={handleSelectAudioMode}
+          onSelectModel={handleSelectAudioModel}
+          onSelectVoiceProfile={setSelectedVoiceProfileId}
+          onVoiceCloneConsentChange={setVoiceCloneConsentAccepted}
+          onAudioStylePromptChange={setAudioStylePrompt}
+          onAsrLanguageChange={setAsrLanguage}
+        />
+      );
+    }
+    return traditionalSubTab === "image" ? (
       <ImageGenerationPanel
         showGenerateButton={showGenerateButton}
         atDropdownNode={atDropdown.visible && atDropdown.type === "image-prompt" ? renderAtDropdown("image-prompt") : null}
@@ -1323,6 +1445,7 @@ export default function Home() {
         onSelectSize={setAspectRatio}
       />
     );
+  };
 
   return (
     <div
@@ -1347,7 +1470,7 @@ export default function Home() {
       <main
         className={`imagine-main-grid ${
           isAgentDockOpen ? "imagine-main-grid-agent-open" : "imagine-main-grid-agent-closed"
-        } flex-1 w-full max-w-[1880px] mx-auto px-4 pt-5 sm:px-6 sm:pt-6 grid grid-cols-1 lg:grid-cols-[minmax(360px,420px)_minmax(0,1fr)] xl:grid-cols-[minmax(390px,440px)_minmax(0,1fr)] gap-5 xl:gap-6 items-start z-10`}
+        } flex-1 w-full max-w-[1880px] mx-auto px-4 pt-5 sm:px-6 sm:pt-6 grid grid-cols-1 lg:grid-cols-[minmax(400px,480px)_minmax(0,1fr)] xl:grid-cols-[minmax(430px,520px)_minmax(0,1fr)] gap-5 xl:gap-6 items-start z-10`}
       >
 
         <section className="imagine-creator-panel imagine-creation-sidebar flex flex-col gap-4 min-w-0">
@@ -1399,11 +1522,11 @@ export default function Home() {
             <div className="imagine-creator-generate-footer hidden shrink-0 lg:block">
               <CreatorGenerateButton
                 mode={traditionalSubTab}
-                disabled={!prompt.trim()}
-                isSubmitting={traditionalSubTab === "image" ? isSubmittingImage : isSubmittingVideo}
-                submitCount={traditionalSubTab === "image" ? imageSubmitCount : videoSubmitCount}
-                priceProvider={traditionalSubTab === "image" ? selectedModel.split(":")[0] : selectedVideoModel.split(":")[0]}
-                priceModelId={traditionalSubTab === "image" ? selectedModel : selectedVideoModel}
+                disabled={isCreatorGenerateDisabled}
+                isSubmitting={traditionalSubTab === "image" ? isSubmittingImage : traditionalSubTab === "audio" ? isSubmittingAudio : isSubmittingVideo}
+                submitCount={traditionalSubTab === "image" ? imageSubmitCount : traditionalSubTab === "audio" ? audioSubmitCount : videoSubmitCount}
+                priceProvider={traditionalSubTab === "image" ? selectedModel.split(":")[0] : traditionalSubTab === "audio" ? selectedAudioModel.split(":")[0] : selectedVideoModel.split(":")[0]}
+                priceModelId={traditionalSubTab === "image" ? selectedModel : traditionalSubTab === "audio" ? selectedAudioModel : selectedVideoModel}
                 priceDuration={traditionalSubTab === "video" ? activeVideoDuration ?? videoDuration : undefined}
                 priceResolution={traditionalSubTab === "image" ? activeImageResolution : undefined}
                 priceImageQuality={traditionalSubTab === "image" ? imageQuality : undefined}
@@ -1411,7 +1534,17 @@ export default function Home() {
                 priceThinkingLevel={traditionalSubTab === "image" ? imageThinkingLevel : undefined}
                 priceVideoReferenceMode={traditionalSubTab === "video" ? activeVideoReferenceMode : undefined}
                 priceVideoResolution={traditionalSubTab === "video" ? videoResolution : undefined}
-                onGenerate={traditionalSubTab === "image" ? generateManualImage : generateManualVideo}
+                onGenerate={() => {
+                  if (traditionalSubTab === "image") {
+                    generateManualImage();
+                    return;
+                  }
+                  if (traditionalSubTab === "audio") {
+                    generateActiveAudio();
+                    return;
+                  }
+                  generateManualVideo();
+                }}
               />
             </div>
 

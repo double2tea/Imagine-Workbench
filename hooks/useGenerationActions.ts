@@ -5,6 +5,9 @@ import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 import { readImageGenerationPayload } from "@/lib/client-image-response";
 import {
   buildStorageItem,
+  getAssetMetasByIds,
+  hydrateAssets,
+  saveToDB,
   type GenerationReferenceMediaSnapshot,
   type GenerationRequestSnapshot,
   type StorageItem,
@@ -20,10 +23,14 @@ import {
 } from "@/lib/generation-tasks";
 import type { RunningHubTaskNodeBinding } from "@/lib/providers/types";
 import { buildPromptWithReferenceMap } from "@/hooks/useReferenceState";
+import { audioOperationMissingReferenceMessage, audioOperationRequiresTextInput, readOptionalAudioFormat } from "@/lib/audio-operation-rules";
 import { getMediaReferenceType, mediaReferenceLabel } from "@/lib/media-references";
-import { getImageModelCapabilities, getVideoModelCapabilities, type VideoReferenceMode } from "@/lib/providers/model-catalog";
+import { getAudioModelCapabilities, getImageModelCapabilities, getVideoModelCapabilities, parseProviderModel, type AudioOperationMode, type VideoReferenceMode } from "@/lib/providers/model-catalog";
+import { getProviderMeta } from "@/lib/providers/registry";
 import { getReferenceImagePayloadError, getReferenceMediaPayloadError, prepareReferenceImageUrlForRequest, prepareReferenceMediaUrlForRequest } from "@/lib/reference-images";
+import { transcriptPreview, transcriptToDataUrl } from "@/lib/transcripts";
 import { selectVideoReferencesForMode } from "@/lib/video-reference-selection";
+import { getVoiceProfile } from "@/lib/voice-profiles";
 
 type NoticeType = "error" | "info" | "success";
 
@@ -50,6 +57,7 @@ interface UseGenerationActionsParams {
   selectedModel: string;
   selectedVideoModel: string;
   setGenerationTasks: Dispatch<SetStateAction<GenerationTask[]>>;
+  setAudioSubmitCount: Dispatch<SetStateAction<number>>;
   setImageSubmitCount: Dispatch<SetStateAction<number>>;
   setItems: Dispatch<SetStateAction<StorageItem[]>>;
   setVideoSubmitCount: Dispatch<SetStateAction<number>>;
@@ -59,6 +67,13 @@ interface UseGenerationActionsParams {
 
 interface GenerationOverrides {
   allowEmptyPrompt?: boolean;
+  audioMode?: AudioOperationMode;
+  audioFormat?: string;
+  audioStylePrompt?: string;
+  asrLanguage?: "auto" | "zh" | "en";
+  optimizeTextPreview?: boolean;
+  voiceProfileId?: string;
+  voiceCloneConsentAccepted?: boolean;
   boardId?: string;
   boardNodeId?: string;
   boardResultStackKey?: string;
@@ -90,6 +105,40 @@ function getStringField(value: unknown, field: string): string | null {
   return typeof fieldValue === "string" && fieldValue.trim() ? fieldValue : null;
 }
 
+function isRunningHubAudioRequest(model: string, runningHubNodeInfoList?: RunningHubTaskNodeBinding[]): boolean {
+  const parsed = parseProviderModel(model, "12ai");
+  return parsed.provider === "runninghub" || (runningHubNodeInfoList?.length ?? 0) > 0;
+}
+
+function audioGenerationEndpoint(model: string, runningHubNodeInfoList?: RunningHubTaskNodeBinding[]): string {
+  return isRunningHubAudioRequest(model, runningHubNodeInfoList) ? "/api/runninghub/generate-audio" : "/api/audio/generate";
+}
+
+async function readVoiceProfileReferences(assetIds: string[]): Promise<ReferenceImageRef[]> {
+  if (assetIds.length === 0) return [];
+  const metas = await getAssetMetasByIds(assetIds);
+  const items = await hydrateAssets(metas);
+  const itemsById = new Map(items.map(item => [item.id, item]));
+  return assetIds.map(id => {
+    const item = itemsById.get(id);
+    if (!item || item.type !== "audio" || !item.url) {
+      throw new Error("选中的音色参考音频已不存在");
+    }
+    return { id: item.id, type: "audio", url: item.url };
+  });
+}
+
+function mergeReferences(
+  baseReferences: ReferenceImageRef[],
+  profileReferences: ReferenceImageRef[],
+): ReferenceImageRef[] {
+  const merged = new Map(baseReferences.map(reference => [reference.id, reference]));
+  for (const reference of profileReferences) {
+    merged.set(reference.id, reference);
+  }
+  return Array.from(merged.values());
+}
+
 function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
@@ -104,6 +153,21 @@ async function saveItemOrWarn(
     const message = toErrorMessage(error, "IndexedDB 写入失败");
     console.error("IndexedDB Save Failed:", error);
     pushWorkspaceNotice("error", `本地存储失败，刷新后可能丢失：${message}`);
+    return null;
+  }
+}
+
+async function saveDirectItemOrWarn(
+  item: StorageItem,
+  pushWorkspaceNotice: (type: NoticeType, message: string) => void,
+): Promise<StorageItem | null> {
+  try {
+    await saveToDB(item);
+    return item;
+  } catch (error) {
+    const message = toErrorMessage(error, "IndexedDB 写入失败");
+    console.error("IndexedDB Direct Asset Save Failed:", error);
+    pushWorkspaceNotice("error", `本地结果存储失败，刷新后可能丢失：${message}`);
     return null;
   }
 }
@@ -238,6 +302,7 @@ export function useGenerationActions({
   selectedModel,
   selectedVideoModel,
   setGenerationTasks,
+  setAudioSubmitCount,
   setImageSubmitCount,
   setItems,
   setVideoSubmitCount,
@@ -588,8 +653,34 @@ export function useGenerationActions({
       pushWorkspaceNotice("error", "音频生成需要明确音频模型");
       return false;
     }
-    if (!activePrompt.trim() && overrides.allowEmptyPrompt !== true) return false;
-    const audioReferences = [...activeReferenceImages];
+    const isRunningHubAudio = isRunningHubAudioRequest(requestModel, overrides.runningHubNodeInfoList);
+    const audioCapabilities = isRunningHubAudio ? null : getAudioModelCapabilities(requestModel);
+    const audioMode = overrides.audioMode ?? audioCapabilities?.defaultMode;
+    if (!activePrompt.trim() && audioMode !== undefined && audioOperationRequiresTextInput(audioMode) && overrides.allowEmptyPrompt !== true) return false;
+    if (audioMode === "voice_clone" && overrides.voiceCloneConsentAccepted !== true) {
+      pushWorkspaceNotice("error", "音色克隆需要先确认参考音频授权");
+      return false;
+    }
+    let profileStylePrompt: string | undefined;
+    let profileVoice: string | undefined;
+    let profileReferences: ReferenceImageRef[] = [];
+    if (overrides.voiceProfileId) {
+      try {
+        const profile = await getVoiceProfile(overrides.voiceProfileId);
+        if (!profile) throw new Error("找不到选中的音色");
+        const parsedModel = parseProviderModel(requestModel, "12ai");
+        if (profile.provider !== parsedModel.provider) throw new Error("选中的音色与当前模型提供方不一致");
+        if (profile.source === "builtin" && audioMode !== "tts") throw new Error("内置音色仅支持朗读模式");
+        profileStylePrompt = profile.designPrompt;
+        profileVoice = profile.providerVoiceId;
+        profileReferences = await readVoiceProfileReferences(profile.referenceAudioAssetIds);
+      } catch (error) {
+        pushWorkspaceNotice("error", toErrorMessage(error, "音色读取失败"));
+        return false;
+      }
+    }
+    const resolvedAudioStylePrompt = profileStylePrompt ?? overrides.audioStylePrompt;
+    const audioReferences = mergeReferences(activeReferenceImages, profileReferences);
     if (audioReferences.length === 0 && activeReferenceImage) {
       audioReferences.push({ id: "legacy-reference", url: activeReferenceImage });
     }
@@ -606,23 +697,44 @@ export function useGenerationActions({
       pushWorkspaceNotice("error", audioPayloadError);
       return false;
     }
+    const audioReferenceTypes = audioReferences.map(reference => getMediaReferenceType(reference) ?? "image");
+    if (audioCapabilities && audioReferenceTypes.some(type => !audioCapabilities.referenceMediaTypes.includes(type))) {
+      pushWorkspaceNotice("error", "当前音频模型不支持所选参考媒体类型");
+      return false;
+    }
+    if (audioCapabilities && audioReferences.length < audioCapabilities.minReferenceMedia) {
+      pushWorkspaceNotice("error", audioOperationMissingReferenceMessage(audioCapabilities));
+      return false;
+    }
+    if (audioCapabilities && audioCapabilities.maxReferenceMedia >= 0 && audioReferences.length > audioCapabilities.maxReferenceMedia) {
+      pushWorkspaceNotice("error", `当前音频模型最多支持 ${audioCapabilities.maxReferenceMedia} 个参考媒体`);
+      return false;
+    }
 
-    setVideoSubmitCount(prev => prev + 1);
+    setAudioSubmitCount(prev => prev + 1);
     const generationPrompt = buildPromptWithReferenceMap(activePrompt, audioReferences, audioReferenceUrls);
+    const resultMediaType: StorageItem["type"] = audioMode === "asr" ? "transcript" : "audio";
+    const requestAudioFormat = readOptionalAudioFormat(overrides.audioFormat);
     const generationRequest: GenerationRequestSnapshot = {
       prompt: generationPrompt,
       model: requestModel,
-      aspectRatio: "audio",
+      aspectRatio: resultMediaType === "transcript" ? "transcript" : "audio",
       runningHubAccessPassword: overrides.runningHubAccessPassword,
       runningHubNodeInfoList: overrides.runningHubNodeInfoList,
       referenceMedia: buildReferenceMediaSnapshot(audioReferences, audioReferencePayloads),
+      audioFormat: requestAudioFormat,
+      audioMode,
+      audioStylePrompt: resolvedAudioStylePrompt,
+      asrLanguage: overrides.asrLanguage,
+      optimizeTextPreview: overrides.optimizeTextPreview,
+      voiceProfileId: overrides.voiceProfileId,
     };
 
-    const taskId = makeClientId("task_aud");
+    const taskId = makeClientId(resultMediaType === "transcript" ? "task_txt" : "task_aud");
     const task = createGenerationTask({
       id: taskId,
-      mediaType: "audio",
-      prompt: activePrompt,
+      mediaType: resultMediaType,
+      prompt: activePrompt.trim() || (resultMediaType === "transcript" ? "音频转写" : activePrompt),
       model: requestModel,
       status: "pending",
       progress: 12,
@@ -631,7 +743,7 @@ export function useGenerationActions({
       request: generationRequest,
     });
     if (!await saveTaskOrWarn(task, pushWorkspaceNotice)) {
-      setVideoSubmitCount(prev => Math.max(0, prev - 1));
+      setAudioSubmitCount(prev => Math.max(0, prev - 1));
       return true;
     }
     recordGenerationTask(task);
@@ -641,13 +753,20 @@ export function useGenerationActions({
 
     try {
       const headers = buildProviderHeaders(requestModel);
-      const res = await fetch("/api/gemini/generate-audio", {
+      const res = await fetch(audioGenerationEndpoint(requestModel, generationRequest.runningHubNodeInfoList), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
         signal: controller.signal,
         body: JSON.stringify({
+          mode: audioMode,
           prompt: generationRequest.prompt,
           model: generationRequest.model,
+          format: requestAudioFormat,
+          stylePrompt: resolvedAudioStylePrompt,
+          asrLanguage: overrides.asrLanguage,
+          voice: profileVoice,
+          voiceCloneConsentAccepted: overrides.voiceCloneConsentAccepted,
+          optimizeTextPreview: overrides.optimizeTextPreview,
           referenceMedia: generationRequest.referenceMedia?.map(reference => ({
             dataUri: reference.url,
             type: reference.type,
@@ -659,6 +778,97 @@ export function useGenerationActions({
 
       if (res.ok) {
         const data: unknown = await res.json();
+        const resultType = getStringField(data, "type");
+        if (resultType === "direct") {
+          const outputKind = getStringField(data, "outputKind");
+          if (outputKind === "transcript") {
+            const transcript = getStringField(data, "transcript");
+            if (!transcript) {
+              throw new Error("音频接口返回转写格式不正确");
+            }
+            const completedAssetId = makeClientId("txt");
+            const completedItem = buildStorageItem(
+              {
+                id: completedAssetId,
+                type: "transcript",
+                url: transcriptToDataUrl(transcript),
+                prompt: activePrompt.trim() || transcriptPreview(transcript, 80) || "音频转写",
+                model: requestModel,
+                aspectRatio: "transcript",
+                createdAt: task.createdAt,
+                status: "complete",
+                progress: 100,
+                generationRequest,
+                sourceBoardNodeId: overrides.boardNodeId,
+                sourceBoardResultStackKey: overrides.boardResultStackKey,
+              },
+              { boardId: resolveScopeBoardId(overrides) },
+            );
+            const savedCompletedItem = await saveDirectItemOrWarn(completedItem, pushWorkspaceNotice);
+            if (!savedCompletedItem) {
+              const failedTask = await updateTaskOrWarn(taskId, {
+                status: "failed",
+                progress: 100,
+                errorMessage: "结果资产本地存储失败",
+              }, pushWorkspaceNotice);
+              if (failedTask) recordGenerationTask(failedTask);
+              return true;
+            }
+            const completeTask = await updateTaskOrWarn(taskId, {
+              activeResultAssetId: completedAssetId,
+              resultAssetIds: [completedAssetId],
+              status: "complete",
+              progress: 100,
+            }, pushWorkspaceNotice);
+            if (completeTask) recordGenerationTask(completeTask);
+            setItems(prev => [savedCompletedItem, ...prev]);
+            pushWorkspaceNotice("success", "音频转写完成");
+            return true;
+          }
+          const audioBase64 = getStringField(data, "audioBase64");
+          const mimeType = getStringField(data, "mimeType");
+          if (!audioBase64 || !mimeType) {
+            throw new Error("音频接口返回格式不正确");
+          }
+          const completedAssetId = makeClientId("aud");
+          const completedItem = buildStorageItem(
+            {
+              id: completedAssetId,
+              type: "audio",
+              url: `data:${mimeType};base64,${audioBase64}`,
+              prompt: activePrompt,
+              model: requestModel,
+              aspectRatio: "audio",
+              createdAt: task.createdAt,
+              status: "complete",
+              progress: 100,
+              generationRequest,
+              sourceBoardNodeId: overrides.boardNodeId,
+              sourceBoardResultStackKey: overrides.boardResultStackKey,
+            },
+            { boardId: resolveScopeBoardId(overrides) },
+          );
+          const savedCompletedItem = await saveDirectItemOrWarn(completedItem, pushWorkspaceNotice);
+          if (!savedCompletedItem) {
+            const failedTask = await updateTaskOrWarn(taskId, {
+              status: "failed",
+              progress: 100,
+              errorMessage: "结果资产本地存储失败",
+            }, pushWorkspaceNotice);
+            if (failedTask) recordGenerationTask(failedTask);
+            return true;
+          }
+          const completeTask = await updateTaskOrWarn(taskId, {
+            activeResultAssetId: completedAssetId,
+            resultAssetIds: [completedAssetId],
+            status: "complete",
+            progress: 100,
+          }, pushWorkspaceNotice);
+          if (completeTask) recordGenerationTask(completeTask);
+          setItems(prev => [savedCompletedItem, ...prev]);
+          pushWorkspaceNotice("success", "音频生成完成");
+          return true;
+        }
         const activeOperationName = getStringField(data, "operationName");
         if (!activeOperationName) {
           throw new Error("音频接口返回缺少 operationName");
@@ -672,7 +882,10 @@ export function useGenerationActions({
         }, pushWorkspaceNotice);
         if (processingTask) recordGenerationTask(processingTask);
       } else {
-        throw new Error(await readFetchError(res, "音频生成请求失败"));
+        const parsedModel = parseProviderModel(requestModel, "12ai");
+        const providerLabel = getProviderMeta(parsedModel.provider).label;
+        const message = await readFetchError(res, "音频生成请求失败");
+        throw new Error(`${providerLabel}（${requestModel}）音频生成请求失败：${message}`);
       }
     } catch (error) {
       if (locallyCanceledItemIdsRef.current.has(taskId) || isAbortError(error)) {
@@ -693,7 +906,7 @@ export function useGenerationActions({
       return true;
     } finally {
       delete generationAbortControllersRef.current[taskId];
-      setVideoSubmitCount(prev => Math.max(0, prev - 1));
+      setAudioSubmitCount(prev => Math.max(0, prev - 1));
     }
     return true;
   };

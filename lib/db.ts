@@ -4,6 +4,7 @@ import {
   type MediaReferenceRole,
   type MediaReferenceType,
 } from "./media-references";
+import type { AudioOperationMode } from "./providers/model-catalog";
 import type { RunningHubTaskNodeBinding } from "./providers/types";
 
 const DB_NAME = "ImagineWorkbenchDB";
@@ -17,7 +18,7 @@ export const GENERATION_TASK_STORE = "generation_tasks";
 
 export type AssetScope = "workspace" | "board";
 export type AssetPreviewStatus = "ready" | "missing" | "failed";
-export type StorageItemType = "image" | "video" | "audio";
+export type StorageItemType = "image" | "video" | "audio" | "transcript";
 
 export interface GenerationReferenceMediaSnapshot {
   url: string;
@@ -36,6 +37,12 @@ export interface GenerationRequestSnapshot {
   videoPreset?: string;
   videoReferenceMode?: "reference" | "firstLast";
   videoResolution?: string;
+  audioFormat?: string;
+  audioMode?: AudioOperationMode;
+  audioStylePrompt?: string;
+  asrLanguage?: "auto" | "zh" | "en";
+  optimizeTextPreview?: boolean;
+  voiceProfileId?: string;
   runningHubAccessPassword?: string;
   runningHubNodeInfoList?: RunningHubTaskNodeBinding[];
   referenceMedia?: GenerationReferenceMediaSnapshot[];

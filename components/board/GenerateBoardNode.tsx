@@ -1,12 +1,12 @@
 import { memo, useMemo, useRef, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { ImagePlus, Loader2, Play, Plus, Video, X } from "lucide-react";
+import { AudioLines, FileText, ImagePlus, Loader2, Play, Plus, Video, X } from "lucide-react";
 import ModelPriceBadge from "@/components/creation/ModelPriceBadge";
 import BoardPromptTextarea, { type BoardPromptTextareaHandle } from "@/components/board/BoardPromptTextarea";
 import MediaReferenceThumbnail from "@/components/reference/MediaReferenceThumbnail";
 import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import type { StorageItem } from "@/lib/db";
-import type { BoardGenerateNodeUpdate, BoardGenerateVariantCount, BoardImageGenerateNode, BoardVideoGenerateNode } from "@/lib/board";
+import type { BoardAudioOperationNode, BoardGenerateNodeUpdate, BoardGenerateVariantCount, BoardImageGenerateNode, BoardVideoGenerateNode } from "@/lib/board";
 import type { BoardPromptReference } from "@/lib/board/prompt-references";
 import {
   applyPromptTemplateText,
@@ -15,10 +15,11 @@ import {
   type PromptTemplateApplyMode,
   type PromptTemplateSlashCommand,
 } from "@/lib/prompt-templates";
-import { getVideoModelCapabilities } from "@/lib/providers/model-catalog";
+import { AUDIO_MODE_LABELS, audioOperationFormatOptions, audioOperationRequiresTextInput } from "@/lib/audio-operation-rules";
+import { getAudioModelCapabilities, getVideoModelCapabilities } from "@/lib/providers/model-catalog";
 import { selectVideoReferenceTypesForMode } from "@/lib/video-reference-selection";
 
-type GenerateNode = BoardImageGenerateNode | BoardVideoGenerateNode;
+type GenerateNode = BoardImageGenerateNode | BoardVideoGenerateNode | BoardAudioOperationNode;
 const variantCountOptions: BoardGenerateVariantCount[] = [1, 2, 4];
 
 export interface BoardGenerateReferencePreview {
@@ -105,7 +106,13 @@ export function BoardResultStack({
               }`}
               title={`结果 ${index + 1}`}
             >
-              <MediaReferenceThumbnail reference={item} alt="" className="h-full w-full" />
+              {item.type === "transcript" ? (
+                <div className="flex h-full w-full items-center justify-center bg-cyan-950/35">
+                  <FileText className="h-4 w-4 text-cyan-200" />
+                </div>
+              ) : (
+                <MediaReferenceThumbnail reference={{ type: item.type, url: item.url }} alt="" className="h-full w-full" />
+              )}
               <span className="absolute bottom-0 right-0 rounded-tl bg-black/60 px-1 text-[8px] font-semibold text-white">
                 {index + 1}
               </span>
@@ -135,7 +142,9 @@ function statusText(node: GenerateNode): string {
   if (node.status === "processing") return "处理中";
   if (node.status === "complete") return "已完成";
   if (node.status === "failed") return "失败";
-  return node.kind === "image-generate" ? "图片" : "视频";
+  if (node.kind === "image-generate") return "图片";
+  if (node.kind === "video-generate") return "视频";
+  return "音频";
 }
 
 function contextToneClass(tone: GenerateContextTone): string {
@@ -208,6 +217,9 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
   const slashCommandRef = useRef<PromptTemplateSlashCommand | null>(null);
   const isProcessing = node.status === "processing" || taskSummary?.status === "processing" || taskSummary?.status === "pending";
+  const isAudioNode = node.kind === "audio-operation";
+  const textInputRequired = !isAudioNode || audioOperationRequiresTextInput(node.audioMode);
+  const usesOptionalTextInput = isAudioNode && !textInputRequired;
   const promptPreview = inputSummary?.promptPreview ?? null;
   const promptSourceTitle = inputSummary?.promptSourceTitle;
   const referenceCount = inputSummary?.referenceCount ?? 0;
@@ -238,19 +250,24 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
   const result = resultContext(hasResultConnection, resultItems.length);
   const run = runContext(node, taskSummary);
   const lineTone = statusLineTone(node, taskSummary);
-  const promptContext = promptPreview !== null
+  const promptContext = usesOptionalTextInput && promptPreview === null && !node.prompt.trim()
+    ? { title: "可选", tone: "neutral" as const }
+    : promptPreview !== null
     ? { title: promptSourceTitle ?? "已连接", tone: "prompt" as const }
     : { title: "节点内", tone: "neutral" as const };
+  const promptContextLabel = isAudioNode ? textInputRequired ? "文本" : "备注" : "Prompt";
   const referenceContext = referenceCount > 0
     ? { title: `${referenceCount} 个`, tone: "reference" as const }
     : { title: "无", tone: "neutral" as const };
   const contextItems: Array<{ key: string; label: string; title: string; tone: GenerateContextTone; tooltip?: string }> = [
     {
       key: "prompt",
-      label: "Prompt",
+      label: promptContextLabel,
       title: promptContext.title,
       tone: promptContext.tone,
-      tooltip: promptPreview !== null ? `来自 ${promptSourceTitle ?? "Prompt 节点"}` : "使用节点内提示词",
+      tooltip: isAudioNode
+        ? promptPreview !== null ? `${promptContextLabel}来自 ${promptSourceTitle ?? "Prompt 节点"}` : textInputRequired ? "使用节点内音频文本" : "文本可留空；连接所需参考媒体后执行"
+        : promptPreview !== null ? `来自 ${promptSourceTitle ?? "Prompt 节点"}` : "使用节点内提示词",
     },
     { key: "references", label: "参考", title: referenceContext.title, tone: referenceContext.tone },
     { key: "result", label: "结果", title: result.title, tone: result.tone },
@@ -264,7 +281,14 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
   ];
   const paramSummary = node.kind === "image-generate"
     ? `${node.model} / ${node.imageResolution === "custom" ? node.customImageResolution : node.imageResolution} / x${node.variantCount}`
-    : `${node.model} / ${node.aspectRatio}${node.videoDuration ? ` / ${node.videoDuration}s` : ""} / x${node.variantCount}`;
+    : node.kind === "video-generate"
+      ? `${node.model} / ${node.aspectRatio}${node.videoDuration ? ` / ${node.videoDuration}s` : ""} / x${node.variantCount}`
+      : [
+        node.model,
+        AUDIO_MODE_LABELS[node.audioMode],
+        audioOperationFormatOptions(getAudioModelCapabilities(node.model)).length > 0 ? node.audioFormat : "",
+        `x${node.variantCount}`,
+      ].filter(value => value.trim().length > 0).join(" / ");
   const statusLabel = taskSummary
     ? `${taskSummary.status === "pending" ? "排队" : "处理中"} ${taskSummary.progress}% / ${paramSummary}`
     : `${statusText(node)} / ${paramSummary}`;
@@ -313,11 +337,13 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
           onSlashCommand={handleSlashCommand}
           references={references}
           readOnly={promptPreview !== null}
-          headerRight={promptPreview === null ? <PromptTemplatePicker ref={templatePickerRef} compact onApply={handleApplyPromptTemplate} /> : undefined}
+          headerRight={promptPreview === null && !usesOptionalTextInput ? <PromptTemplatePicker ref={templatePickerRef} compact onApply={handleApplyPromptTemplate} /> : undefined}
           className={`nodrag nowheel h-full w-full resize-none rounded-md imagine-board-input !p-2 !pr-20 text-xs leading-5 outline-none placeholder:text-[var(--iw-faint)] focus:border-[var(--iw-border)] ${
             promptPreview !== null ? "cursor-default opacity-85" : ""
           }`}
-          placeholder={promptPreview !== null ? "已连接 Prompt 节点，请在提示节点编辑" : "可直接写提示词，输入 @ 引用参考图"}
+          placeholder={promptPreview !== null
+            ? isAudioNode ? `已连接${promptContextLabel}节点，请在提示节点编辑` : "已连接 Prompt 节点，请在提示节点编辑"
+            : usesOptionalTextInput ? "文本可留空；连接或拖入所需参考媒体后执行" : isAudioNode ? "输入音频操作文本，输入 @ 引用支持的参考媒体" : "可直接写提示词，输入 @ 引用参考图"}
         />
       </div>
       <div className="flex min-w-0 items-center gap-1 overflow-hidden rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-1">
@@ -329,7 +355,7 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
             title={item.tooltip}
           >
             <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-current opacity-70" />
-            <span className="truncate text-[10px] font-semibold">{item.label === "Prompt" ? "Prompt" : item.label} · {item.title}</span>
+            <span className="truncate text-[10px] font-semibold">{item.label} · {item.title}</span>
           </span>
         ))}
       </div>
@@ -399,7 +425,13 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
             disabled={isProcessing}
             className="nodrag flex h-8 items-center justify-center gap-1.5 rounded-md bg-blue-600 px-3 text-xs font-semibold text-white transition hover:bg-blue-500 disabled:bg-[var(--iw-panel-soft)] disabled:text-[var(--iw-faint)]"
           >
-            {node.kind === "image-generate" ? <ImagePlus className="h-3.5 w-3.5" /> : <Video className="h-3.5 w-3.5" />}
+            {node.kind === "image-generate" ? (
+              <ImagePlus className="h-3.5 w-3.5" />
+            ) : node.kind === "video-generate" ? (
+              <Video className="h-3.5 w-3.5" />
+            ) : (
+              <AudioLines className="h-3.5 w-3.5" />
+            )}
             <Play className="h-3 w-3" />
             {!isProcessing && (
               <ModelPriceBadge

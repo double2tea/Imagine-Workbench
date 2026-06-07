@@ -658,7 +658,7 @@ test("runninghub ai app audio tasks use task output polling endpoint", async () 
   }
 });
 
-test("generic audio adapter routes runninghub ai app audio tasks", async () => {
+test("runninghub audio app adapter routes ai app audio tasks", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
     const url = input.toString();
@@ -933,7 +933,7 @@ test("runninghub audio download preserves upstream audio extension", async () =>
   }
 });
 
-test("generic audio status uses runninghub task output polling", async () => {
+test("runninghub audio status uses task output polling", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (): Promise<Response> => Response.json({
     code: 0,
@@ -1063,13 +1063,12 @@ test("runninghub model listing filters standard models by metadata kind", async 
     const allModels = await listProviderModels(runningHubConfig, "all");
     const imageModels = await listProviderModels(runningHubConfig, "image");
     const videoModels = await listProviderModels(runningHubConfig, "video");
-    const audioModels = await listProviderModels(runningHubConfig, "audio");
 
     assert.equal(calls[0], "https://llm.runninghub.cn/v1/models");
     assert.equal(chatModels.some(option => option.value === "runninghub:qwen/qwen3.7-max"), true);
     assert.equal(allModels.some(option => option.value === "runninghub:qwen/qwen3.7-max"), true);
-    assert.equal(allModels.some(option => option.value === "runninghub:ai-app-audio:<webappId>"), true);
-    assert.equal(audioModels.some(option => option.value === "runninghub:ai-app-audio:<webappId>"), true);
+    assert.equal(allModels.some(option => option.value === "runninghub:ai-app-audio:<webappId>"), false);
+    assert.deepEqual(await listProviderModels(runningHubConfig, "audio"), []);
     assert.equal(
       imageModels.some(option => option.value === "runninghub:api:/openapi/v2/bytedance/seedance-2.0-global-fast/image-to-video"),
       false,

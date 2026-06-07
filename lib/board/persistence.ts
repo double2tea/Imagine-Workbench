@@ -107,7 +107,7 @@ function migrateBoardDocument(doc: BoardDocument): BoardDocument {
   );
   const hasLegacyGenerate = doc.nodes.some(
     node =>
-      (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app") &&
+      (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation" || node.kind === "runninghub-app") &&
       ("resultAssetId" in node || "resultAssetIds" in node),
   );
   if (!hasLegacyAsset && !hasLegacyGenerate) return doc;
@@ -130,7 +130,7 @@ function migrateBoardDocument(doc: BoardDocument): BoardDocument {
         continue;
       }
     }
-    if (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app") {
+    if (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation" || node.kind === "runninghub-app") {
       const { resultAssetId: _ra, resultAssetIds: _ras, ...rest } = node as typeof node & { resultAssetId?: unknown; resultAssetIds?: unknown };
       migratedNodes.push(rest as typeof node);
       continue;

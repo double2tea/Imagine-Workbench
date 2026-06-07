@@ -143,7 +143,7 @@ export default function VideoAssetPlayer({
 
       <div
         className={[
-          "absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/86 via-black/50 to-transparent px-4 pb-2.5 pt-6 text-white transition-opacity duration-200",
+          "absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/86 via-black/50 to-transparent px-4 pb-2.5 pt-6 text-white transition-opacity duration-[160ms]",
           controlsVisibility === "hover" ? "pointer-events-none opacity-0 group-hover/video:pointer-events-auto group-hover/video:opacity-100" : "opacity-100",
         ].join(" ")}
         onClick={event => event.stopPropagation()}

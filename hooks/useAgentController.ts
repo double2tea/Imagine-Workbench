@@ -11,6 +11,7 @@ import type { CreationMode } from "@/components/creation/CreationModeTabs";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import type { StorageItem } from "@/lib/db";
 import { getSendableAgentMediaReferences } from "@/lib/agent-chat-model";
+import type { AudioOperationMode } from "@/lib/providers/model-catalog";
 
 interface UseAgentControllerParams {
   agentInput: string;
@@ -62,6 +63,10 @@ function normalizeRestoredAgentMessages(messages: ChatMessage[]): ChatMessage[] 
 }
 
 interface GenerationOverrides {
+  audioFormat?: string;
+  audioMode?: AudioOperationMode;
+  audioStylePrompt?: string;
+  asrLanguage?: "auto" | "zh" | "en";
   imageQuality?: string;
   imageResolution?: string;
   isCustomImageResolution?: boolean;
@@ -75,6 +80,8 @@ interface GenerationOverrides {
   videoPreset?: string;
   videoReferenceMode?: "reference" | "firstLast";
   videoResolution?: string;
+  voiceCloneConsentAccepted?: boolean;
+  voiceProfileId?: string;
 }
 
 interface ExecuteToolActionOverrideInput {
@@ -242,7 +249,9 @@ export function useAgentController({
       if (agentReference) return [agentReference];
 
       const matchedAsset = items.find(item => item.id === referenceImageId);
-      if (matchedAsset) return [{ id: matchedAsset.id, type: matchedAsset.type, url: matchedAsset.url, role: "general" }];
+      if (matchedAsset && matchedAsset.type !== "transcript") {
+        return [{ id: matchedAsset.id, type: matchedAsset.type, url: matchedAsset.url, role: "general" }];
+      }
     }
 
     return activeAgentReferences;
@@ -325,12 +334,18 @@ export function useAgentController({
     } else if (type === "generate_audio") {
       setPrompt(params.prompt || "");
       bridgeActionReferences(actionReferences);
-      setTraditionalSubTab("video");
+      setTraditionalSubTab("audio");
       setTimeout(() => {
         generateManualAudio({
           ...actionReferenceOverride,
+          audioFormat: params.audioFormat,
+          audioMode: params.audioMode,
+          audioStylePrompt: params.audioStylePrompt,
+          asrLanguage: params.asrLanguage,
           model: params.model,
           prompt: params.prompt || "",
+          voiceCloneConsentAccepted: params.voiceCloneConsentAccepted,
+          voiceProfileId: params.voiceProfileId,
         });
       }, 500);
     } else if (type === "edit_image") {

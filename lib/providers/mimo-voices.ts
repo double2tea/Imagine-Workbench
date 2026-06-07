@@ -1,0 +1,11 @@
+export const MIMO_BUILT_IN_VOICES = [
+  "mimo_default",
+  "冰糖",
+  "茉莉",
+  "苏打",
+  "白桦",
+  "Mia",
+  "Chloe",
+  "Milo",
+  "Dean",
+] as const;

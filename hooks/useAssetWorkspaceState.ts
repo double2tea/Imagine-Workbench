@@ -63,7 +63,7 @@ export function useAssetWorkspaceState(items: StorageItem[]) {
   const assetStats = useMemo<AssetStats>(() => {
     const dateCounts = new Map<string, number>();
     const models = new Set<string>();
-    const typeCounts: Record<StorageItem["type"], number> = { audio: 0, image: 0, video: 0 };
+    const typeCounts: Record<StorageItem["type"], number> = { audio: 0, image: 0, transcript: 0, video: 0 };
     const statusCounts: Record<StorageItem["status"], number> = {
       complete: 0,
       failed: 0,
@@ -100,6 +100,7 @@ export function useAssetWorkspaceState(items: StorageItem[]) {
       if (filterType === "images" && item.type !== "image") return false;
       if (filterType === "videos" && item.type !== "video") return false;
       if (filterType === "audios" && item.type !== "audio") return false;
+      if (filterType === "transcripts" && item.type !== "transcript") return false;
       if (assetStatusFilter !== "all" && item.status !== assetStatusFilter) return false;
       if (assetModelFilter !== "all" && item.model !== assetModelFilter) return false;
       const dateKey = getAssetDateKey(item.createdAt);
@@ -113,7 +114,7 @@ export function useAssetWorkspaceState(items: StorageItem[]) {
   }, [assetDateEnd, assetDatePreset, assetDateStart, assetModelFilter, assetStatusFilter, deferredSearchQuery, filterType, items]);
 
   const searchableReferenceImages = useMemo(
-    () => items.filter(item => item.status === "complete"),
+    () => items.filter(item => item.status === "complete" && item.type !== "transcript"),
     [items],
   );
 

@@ -1,4 +1,4 @@
-import type { AiProvider, VideoReferenceMode } from "./model-catalog";
+import type { AiProvider, AudioOperationMode, AudioOutputKind, VideoReferenceMode } from "./model-catalog";
 import type { MediaReferenceType } from "@/lib/media-references";
 
 export interface ProviderCredentials {
@@ -87,6 +87,73 @@ export interface GenerateAudioInput {
 export interface GenerateAudioResult {
   operationName: string;
   source: string;
+}
+
+export interface GenerateAudioOperationInput extends GenerateAudioInput {
+  asrLanguage?: MimoAsrLanguage;
+  mode: AudioOperationMode;
+  format?: string;
+  stylePrompt?: string;
+  voice?: string;
+  voiceProfileId?: string;
+  voiceCloneConsentAccepted?: boolean;
+  optimizeTextPreview?: boolean;
+}
+
+export interface DirectAudioOperationResult {
+  type: "direct";
+  outputKind: Extract<AudioOutputKind, "audio">;
+  audioBase64: string;
+  format: string;
+  model: string;
+  mimeType: string;
+  sampleRateHz?: number;
+  source: string;
+}
+
+export interface AsyncAudioOperationResult extends GenerateAudioResult {
+  type: "async";
+  outputKind: Extract<AudioOutputKind, "audio">;
+}
+
+export interface TranscriptAudioOperationResult {
+  type: "direct";
+  outputKind: Extract<AudioOutputKind, "transcript">;
+  model: string;
+  source: string;
+  transcript: string;
+}
+
+export type GenerateAudioOperationResult = DirectAudioOperationResult | AsyncAudioOperationResult | TranscriptAudioOperationResult;
+
+export type MimoTtsFormat = "wav" | "pcm16";
+
+export interface MimoTtsInput {
+  text: string;
+  stylePrompt?: string;
+  voice?: string;
+  format?: MimoTtsFormat;
+  optimizeTextPreview?: boolean;
+}
+
+export interface MimoTtsResult {
+  audioBase64: string;
+  format: MimoTtsFormat;
+  model: string;
+  mimeType: string;
+  sampleRateHz?: number;
+}
+
+export type MimoAsrLanguage = "auto" | "zh" | "en";
+
+export interface MimoAsrInput {
+  audio: string;
+  language?: MimoAsrLanguage;
+}
+
+export interface MimoAsrResult {
+  model: string;
+  transcript: string;
 }
 
 export type ProviderMediaType = "image" | "video" | "audio";

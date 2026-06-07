@@ -188,6 +188,7 @@ const ACTION_LABELS: Record<AgentToolAction["type"], string> = {
   generate_audio: "生成音频",
   create_board_image_flow: "创建图片节点流程",
   create_board_video_flow: "创建视频节点流程",
+  create_board_audio_flow: "创建音频节点流程",
   create_board_note: "创建画板笔记",
   update_board_node: "更新画板节点",
   apply_board_patch: "应用画板补丁",

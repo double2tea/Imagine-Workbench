@@ -2,6 +2,7 @@ import {
   Clock3,
   Compass,
   Download,
+  FileText,
   ImageDown,
   Image as ImageIcon,
   type LucideIcon,
@@ -19,6 +20,7 @@ import {
   X,
 } from "lucide-react";
 import { useRef, useState, type DragEvent } from "react";
+import AudioWaveformPreview from "@/components/audio/AudioWaveformPreview";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
 import PreviewImage from "@/components/PreviewImage";
 import { makeReferenceDropToken, REFERENCE_ASSET_MIME } from "@/components/reference/referenceDrag";
@@ -27,6 +29,7 @@ import { mediaReferenceLabel } from "@/lib/media-references";
 import { formatDisplayedAspectRatio } from "@/lib/media-display";
 import { tryParseProviderModel, type AiProvider } from "@/lib/providers/model-catalog";
 import { getProviderMeta } from "@/lib/providers/registry";
+import { transcriptFromDataUrl } from "@/lib/transcripts";
 import { getVideoFrameCaptureLabel, type CapturedVideoFrame, type VideoFrameCaptureMode } from "@/lib/video-frame";
 
 interface AssetCardProps {
@@ -91,7 +94,22 @@ type FrameMenuPlacement = "hover" | "meta";
 function processingTitle(type: StorageItem["type"]): string {
   if (type === "video") return "视频合成中";
   if (type === "audio") return "音频处理中";
+  if (type === "transcript") return "音频转写中";
   return "图像生成中";
+}
+
+function AudioProcessingWaveform() {
+  return (
+    <div className="mt-3 flex h-12 w-full max-w-44 items-center gap-1.5 rounded-lg border border-cyan-400/10 bg-cyan-500/8 px-3">
+      {Array.from({ length: 18 }).map((_, index) => (
+        <span
+          key={index}
+          className="w-1 rounded-full bg-cyan-300/45"
+          style={{ height: `${18 + ((index * 7) % 28)}px` }}
+        />
+      ))}
+    </div>
+  );
 }
 
 export default function AssetCard({
@@ -120,9 +138,10 @@ export default function AssetCard({
   const [frameMenuPlacement, setFrameMenuPlacement] = useState<FrameMenuPlacement | null>(null);
   const captureVideoFrameRef = useRef<VideoFrameCaptureRequest | null>(null);
   const provider = tryParseProviderModel(item.model, selectedProvider)?.provider ?? selectedProvider;
-  const isDraggableReference = item.status === "complete";
+  const isDraggableReference = item.status === "complete" && item.type !== "transcript";
   const failedTitle = isContentSafetyError(item.errorMessage) ? "内容安全拦截" : "生成失败 / 链接中断";
   const referenceMedia = getGenerationReferenceMedia(item.generationRequest);
+  const transcriptText = item.type === "transcript" ? transcriptFromDataUrl(item.url) : "";
 
   const handleDragStart = (event: DragEvent<HTMLDivElement>) => {
     if (!isDraggableReference) {
@@ -152,7 +171,7 @@ export default function AssetCard({
       data-status={item.status}
       data-type={item.type}
       onDragStart={handleDragStart}
-      className={`imagine-asset-card relative flex h-full flex-col overflow-hidden rounded-2xl group border bg-slate-900 shadow-xl transition-all duration-300 ${
+      className={`imagine-asset-card relative flex h-full flex-col overflow-hidden rounded-[10px] group border bg-slate-900 shadow-xl transition-all duration-300 ${
         selected ? "border-blue-500 ring-2 ring-blue-500/20" : "border-slate-850 hover:border-slate-750"
       }`}
     >
@@ -173,6 +192,7 @@ export default function AssetCard({
             <span className="imagine-generation-progress-label">
               {item.progress}% · {item.status === "pending" ? "排队" : "处理中"}
             </span>
+            {item.type === "audio" && <AudioProcessingWaveform />}
             <button
               type="button"
               onClick={() => onCancel(item)}
@@ -229,10 +249,21 @@ export default function AssetCard({
                   captureVideoFrameRef.current = request;
                 }}
               />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center px-4">
-                <audio src={item.url} controls className="w-full" />
+            ) : item.type === "audio" ? (
+              <div className="flex h-full w-full items-center justify-center p-3">
+                <AudioWaveformPreview src={item.url} size="compact" tone="media" />
               </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onOpenFullscreen(item)}
+                className="flex h-full w-full cursor-pointer flex-col items-start justify-start gap-3 p-4 text-left"
+              >
+                <FileText className="h-5 w-5 shrink-0 text-cyan-200" />
+                <p className="line-clamp-6 whitespace-pre-wrap text-xs leading-5 text-slate-200">
+                  {transcriptText || "无转写文本"}
+                </p>
+              </button>
             )}
 
             <div className="absolute top-3 right-3 z-10 flex gap-1.5">
@@ -246,10 +277,15 @@ export default function AssetCard({
                   <span className="h-1.5 w-1.5 rounded-full bg-red-400 animate-ping" />
                   VIDEO
                 </span>
-              ) : (
-                <span className="imagine-asset-type-badge flex items-center gap-1.5 px-2 py-1 text-[9px] font-bold tracking-wider uppercase rounded bg-emerald-500/80 backdrop-blur-md text-white border border-emerald-400/25">
+              ) : item.type === "audio" ? (
+                <span className="imagine-asset-type-badge imagine-audio-type-badge flex items-center gap-1.5 px-2 py-1 text-[9px] font-bold tracking-wider uppercase rounded border border-white/12 bg-slate-950/46 text-slate-100 backdrop-blur-md">
                   <Music className="h-3 w-3" />
                   AUDIO
+                </span>
+              ) : (
+                <span className="imagine-asset-type-badge flex items-center gap-1.5 px-2 py-1 text-[9px] font-bold tracking-wider uppercase rounded border border-cyan-400/20 bg-cyan-500/18 text-cyan-100 backdrop-blur-md">
+                  <FileText className="h-3 w-3" />
+                  TEXT
                 </span>
               )}
             </div>
@@ -259,6 +295,7 @@ export default function AssetCard({
                 type="checkbox"
                 checked={selected}
                 onChange={() => onToggleSelect(item.id)}
+                aria-label={selected ? "取消选择此资产" : "选择此资产"}
                 className="h-4.5 w-4.5 bg-slate-950/85 border-white/10 text-blue-500 focus:ring-0 rounded-md cursor-pointer checked:bg-blue-600 flex items-center justify-center transition"
               />
             </div>
@@ -320,10 +357,12 @@ export default function AssetCard({
                     <SlidersHorizontal className="h-3.5 w-3.5 text-cyan-300" />
                     复用
                   </button>
-                  <button type="button" onClick={() => runMobileAction(() => onToggleCompare(item.id))}>
-                    <RefreshCw className="h-3.5 w-3.5 text-blue-300" />
-                    {inCompare ? "取消对比" : "对比"}
-                  </button>
+                  {item.type !== "transcript" && (
+                    <button type="button" onClick={() => runMobileAction(() => onToggleCompare(item.id))}>
+                      <RefreshCw className="h-3.5 w-3.5 text-blue-300" />
+                      {inCompare ? "取消对比" : "对比"}
+                    </button>
+                  )}
                   <button type="button" onClick={() => runMobileAction(() => onOpenFullscreen(item))}>
                     <Maximize2 className="h-3.5 w-3.5 text-slate-300" />
                     放大
@@ -338,16 +377,17 @@ export default function AssetCard({
 
             <div className="imagine-asset-hover-scrim absolute inset-0 bg-slate-950/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10 pointer-events-none" />
             <div className={`imagine-card-actions-shell absolute inset-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-30 pointer-events-none group-hover:pointer-events-auto ${
-              item.type === "video" ? "bottom-[2.85rem]" : "bottom-3"
+              item.type === "video" ? "bottom-[2.85rem]" : item.type === "audio" ? "bottom-16" : "bottom-3"
             }`}>
-              <div className="imagine-card-actions flex flex-wrap items-center justify-center gap-1 rounded-xl border border-white/10 bg-slate-950/80 p-1 backdrop-blur-md shadow-xl">
+              <div className="imagine-card-actions imagine-floating-card-actions flex flex-wrap items-center justify-center gap-1 rounded-xl border border-transparent bg-transparent p-1 shadow-none">
                 {item.type === "video" && (
                   <div className="relative">
                     <button
                       type="button"
                       onClick={() => setFrameMenuPlacement(prev => prev === "hover" ? null : "hover")}
-                      className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-cyan-600 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
+                      className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-cyan-600 border border-white/5 rounded-md text-xs text-white transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
                       title="截取视频帧"
+                      aria-label="截取视频帧"
                     >
                       <ImageDown className="h-3 w-3 text-cyan-200 group-hover:text-white" />
                       <span className="text-[9px] font-bold">截帧</span>
@@ -377,8 +417,9 @@ export default function AssetCard({
                   <button
                     type="button"
                     onClick={() => onOpenPanorama(item)}
-                    className="imagine-card-action imagine-panorama-action min-w-0 px-1.5 py-1 rounded-md border text-xs transition-all duration-200 shadow-lg flex items-center justify-center cursor-pointer"
+                    className="imagine-card-action imagine-panorama-action min-w-0 px-1.5 py-1 rounded-md border text-xs transition-all duration-[160ms] shadow-lg flex items-center justify-center cursor-pointer"
                     title="360 全景查看"
+                    aria-label="360 全景查看"
                   >
                     <Compass className="h-3 w-3" />
                     <span className="text-[9px] font-bold">360</span>
@@ -388,8 +429,9 @@ export default function AssetCard({
                 {item.type === "image" && (
                   <button
                     onClick={() => onApplyVideoReference(item)}
-                    className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-purple-600 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
+                    className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-purple-600 border border-white/5 rounded-md text-xs text-white transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
                     title="以此图首帧生图动态 Veo 航拍影片"
+                    aria-label="以此图首帧生成视频"
                   >
                     <VideoIcon className="h-3 w-3 text-purple-450 group-hover:text-white" />
                     <span className="text-[9px] font-bold">生视频</span>
@@ -399,10 +441,11 @@ export default function AssetCard({
                 {item.type === "image" && (
                   <button
                     onClick={() => onUseAgentReference(item)}
-                    className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-blue-600 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
+                    className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-blue-600 border border-white/5 rounded-md text-xs text-white transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
                     title="引用该图片至 Agent 智能代理进行对话与局部修改"
+                    aria-label="引用至 Agent"
                   >
-                    <Sparkles className="h-3 w-3 text-blue-455 text-blue-400 group-hover:text-white animate-pulse" />
+                    <Sparkles className="h-3 w-3 text-blue-400 group-hover:text-white animate-pulse" />
                     <span className="text-[9px] font-bold">Agent</span>
                   </button>
                 )}
@@ -410,8 +453,9 @@ export default function AssetCard({
                 {item.type === "image" && (
                   <button
                     onClick={() => onLaunchMaskEditor(item.url, item.id)}
-                    className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-amber-600 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
+                    className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-amber-600 border border-white/5 rounded-md text-xs text-white transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
                     title="对该图片局部进行笔刷遮罩修改 & 创意局部重绘"
+                    aria-label="局部修改"
                   >
                     <Paintbrush className="h-3 w-3 text-amber-500 group-hover:text-white" />
                     <span className="text-[9px] font-bold">修改</span>
@@ -421,8 +465,9 @@ export default function AssetCard({
                 <button
                   type="button"
                   onClick={() => onReuseTask(item)}
-                  className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-cyan-600 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
+                  className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-cyan-600 border border-white/5 rounded-md text-xs text-white transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
                   title="将此任务的提示词、模型、尺寸与参考图回填到左侧工作面板"
+                  aria-label="复用任务参数"
                 >
                   <SlidersHorizontal className="h-3 w-3 text-cyan-300 group-hover:text-white" />
                   <span className="text-[9px] font-bold">复用</span>
@@ -430,38 +475,44 @@ export default function AssetCard({
 
                 <button
                   onClick={() => onDownload(item)}
-                  className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-emerald-600 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
+                  className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-emerald-600 border border-white/5 rounded-md text-xs text-white transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
                   title="下载该文件到本地"
+                  aria-label="下载文件"
                 >
                   <Download className="h-3 w-3 text-emerald-400 group-hover:text-white" />
                   <span className="text-[9px] font-bold">下载</span>
                 </button>
 
-                <button
-                  onClick={() => onToggleCompare(item.id)}
-                  className={`imagine-card-action min-w-0 px-1.5 py-1 rounded-md border transition-all duration-200 shadow-lg flex items-center justify-center gap-0.5 cursor-pointer ${
-                    inCompare
-                      ? "bg-blue-600 border-blue-500 text-white"
-                      : "bg-slate-900/90 border-white/5 text-slate-300 hover:text-white hover:bg-slate-800"
-                  }`}
-                  title="加入左右侧滑块对比面板"
-                >
-                  <RefreshCw className="h-3 w-3 text-blue-400" />
-                  <span className="text-[9px] font-bold">对比</span>
-                </button>
+                {item.type !== "transcript" && (
+                  <button
+                    onClick={() => onToggleCompare(item.id)}
+                    className={`imagine-card-action min-w-0 px-1.5 py-1 rounded-md border transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer ${
+                      inCompare
+                        ? "bg-blue-600 border-blue-500 text-white"
+                        : "bg-slate-900/90 border-white/5 text-slate-300 hover:text-white hover:bg-slate-800"
+                    }`}
+                    title="加入左右侧滑块对比面板"
+                    aria-label={inCompare ? "从对比面板移除" : "加入对比面板"}
+                  >
+                    <RefreshCw className="h-3 w-3 text-blue-400" />
+                    <span className="text-[9px] font-bold">对比</span>
+                  </button>
+                )}
 
                 <button
                   onClick={() => onOpenFullscreen(item)}
-                  className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-slate-800 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center cursor-pointer"
+                  className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-slate-800 border border-white/5 rounded-md text-xs text-white transition-all duration-[160ms] shadow-lg flex items-center justify-center cursor-pointer"
                   title="全屏大画幅细节放大"
+                  aria-label="全屏预览"
                 >
                   <Maximize2 className="h-3 w-3 text-slate-300" />
                 </button>
 
                 <button
                   onClick={() => onDelete(item)}
-                  className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-red-600 border border-white/5 rounded-md text-xs text-white transition-all duration-200 shadow-lg flex items-center justify-center cursor-pointer"
+                  className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-red-600 border border-white/5 rounded-md text-xs text-white transition-all duration-[160ms] shadow-lg flex items-center justify-center cursor-pointer"
                   title="移除此项"
+                  aria-label="删除资产"
                 >
                   <Trash2 className="h-3 w-3 text-red-300" />
                 </button>

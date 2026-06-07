@@ -1,6 +1,7 @@
 import { useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from "react";
 import { RefreshCw, Sparkles } from "lucide-react";
 import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
+import ModelSelectCombobox, { type ModelOptionGroup } from "@/components/creation/ModelSelectCombobox";
 import ModelPriceBadge from "@/components/creation/ModelPriceBadge";
 import ReferenceImagePicker, { type ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import PromptReferenceInlineOverlay, { resolvePromptReferenceThumbnails } from "@/components/reference/PromptReferenceThumbnailStrip";
@@ -13,13 +14,7 @@ import {
   type PromptTemplateApplyMode,
   type PromptTemplateSlashCommand,
 } from "@/lib/prompt-templates";
-import type { ImageModelCapabilities, ModelOption } from "@/lib/providers/model-catalog";
-
-interface ModelOptionGroup {
-  provider: string;
-  label: string;
-  options: ModelOption[];
-}
+import type { ImageModelCapabilities } from "@/lib/providers/model-catalog";
 
 interface ImageGenerationPanelProps {
   atDropdownNode: ReactNode;
@@ -100,6 +95,7 @@ export default function ImageGenerationPanel({
 }: ImageGenerationPanelProps) {
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
   const [slashCommand, setSlashCommand] = useState<PromptTemplateSlashCommand | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
   const presetResolutionOptions = imageResolutionOptions.filter(option => option.value !== "custom");
   const supportsCustomImageSize = imageResolutionOptions.some(option => option.value === "custom");
   const isCustomImageResolution = imageResolution === "custom";
@@ -162,19 +158,38 @@ export default function ImageGenerationPanel({
           </div>
         </div>
 
-        <div className="imagine-field-shell relative p-3">
+        <div className={`imagine-field-shell relative p-3 transition-all duration-200 ${
+          isDragOver ? "border-blue-400/40 ring-2 ring-blue-400/40" : ""
+        }`}>
           {atDropdownNode}
           <div className="relative">
             <textarea
               value={prompt}
               onChange={(event) => handlePromptChange(event.target.value, event.target.selectionStart)}
+              onDragEnter={(event) => {
+                if (!hasDraggedReferenceAsset(event.dataTransfer)) return;
+                event.preventDefault();
+                setIsDragOver(true);
+              }}
               onDragOver={(event) => {
                 if (!hasDraggedReferenceAsset(event.dataTransfer)) return;
                 event.dataTransfer.dropEffect = "copy";
+                event.preventDefault();
               }}
-              onDrop={onPromptDropAsset}
+              onDragLeave={(event) => {
+                const relatedTarget = event.relatedTarget;
+                if (!(relatedTarget instanceof Node) || !event.currentTarget.contains(relatedTarget)) {
+                  setIsDragOver(false);
+                }
+              }}
+              onDrop={(event) => {
+                setIsDragOver(false);
+                onPromptDropAsset(event);
+              }}
               placeholder="写下你想创造的图片奇思妙想... 输入 @ 可引用作品"
-              className={`imagine-field-textarea relative z-10 h-24 text-sm leading-6 caret-[var(--iw-text)] ${
+              className={`imagine-field-textarea relative z-10 h-24 text-sm leading-6 caret-[var(--iw-text)] transition-all duration-200 ${
+                isDragOver ? "scale-[1.01]" : ""
+              } ${
                 promptReferenceThumbnails.length > 0 ? "!text-transparent" : ""
               }`}
             />
@@ -193,7 +208,7 @@ export default function ImageGenerationPanel({
         </div>
       </div>
 
-      <div className="imagine-parameter-grid grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="imagine-parameter-grid grid grid-cols-1 gap-3">
         <div className="imagine-parameter-field">
           <div className="imagine-parameter-label-row">
             <label className="imagine-section-label">图片生成模型</label>
@@ -209,19 +224,13 @@ export default function ImageGenerationPanel({
               </label>
             )}
           </div>
-          <select
+          <ModelSelectCombobox
+            accent="blue"
+            ariaLabel="选择图片模型"
+            groups={modelGroups}
             value={selectedModel}
-            onChange={(event) => onSelectModel(event.target.value)}
-            className="imagine-select py-2.5"
-          >
-            {modelGroups.map(group => (
-              <optgroup key={group.provider} label={group.label}>
-                {group.options.map(option => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
+            onChange={onSelectModel}
+          />
         </div>
 
         <div className="imagine-parameter-field">
@@ -377,9 +386,9 @@ export default function ImageGenerationPanel({
           type="button"
           onClick={onGenerate}
           disabled={!prompt.trim()}
-          className={`imagine-primary-action mt-1 flex w-full items-center justify-center gap-2 rounded-lg py-3 text-xs font-bold transition duration-200 ${
+          className={`imagine-primary-action mt-1 flex w-full items-center justify-center gap-2 rounded-lg py-3 text-xs font-bold transition duration-[160ms] ${
             !prompt.trim()
-              ? "cursor-not-allowed opacity-60"
+              ? "cursor-not-allowed opacity-45"
               : "cursor-pointer bg-blue-600 text-white shadow-lg shadow-blue-950/30 hover:bg-blue-500 active:scale-[0.98]"
           }`}
         >

@@ -1,5 +1,21 @@
 import { generateRunningHubMedia, getRunningHubMediaStatus, downloadRunningHubMedia } from "./image";
-import type { GenerateAudioInput, GenerateAudioResult, MediaStatusResult, ProviderConfig } from "./types";
+import {
+  generateMimoTts,
+  generateMimoTtsVoiceClone,
+  generateMimoTtsVoiceDesign,
+  MIMO_TTS_MODEL,
+  MIMO_TTS_VOICE_CLONE_MODEL,
+  MIMO_TTS_VOICE_DESIGN_MODEL,
+} from "./mimo-tts";
+import { generateMimoAsr, MIMO_ASR_MODEL } from "./mimo-asr";
+import type {
+  GenerateAudioInput,
+  GenerateAudioOperationInput,
+  GenerateAudioOperationResult,
+  GenerateAudioResult,
+  MediaStatusResult,
+  ProviderConfig,
+} from "./types";
 
 export async function generateAudio(
   config: ProviderConfig,
@@ -29,6 +45,98 @@ export async function generateAudio(
     operationName: result.operationName,
     source: result.source,
   };
+}
+
+export async function generateAudioOperation(
+  config: ProviderConfig,
+  input: GenerateAudioOperationInput,
+): Promise<GenerateAudioOperationResult> {
+  if (input.mode === "voice_clone" && input.voiceCloneConsentAccepted !== true) {
+    throw new Error("音色克隆需要先确认参考音频授权");
+  }
+  if (input.voiceProfileId) {
+    throw new Error("Voice profile IDs must be resolved before audio operation");
+  }
+
+  if (config.provider === "mimo") {
+    if (input.mode === "tts" && input.model === MIMO_TTS_MODEL) {
+      if (input.referenceMedia.length > 0) {
+        throw new Error("MiMo built-in TTS does not accept reference media");
+      }
+      const result = await generateMimoTts(config, {
+        text: input.prompt,
+        format: input.format === "pcm16" ? "pcm16" : "wav",
+        stylePrompt: input.stylePrompt,
+        voice: input.voice,
+        optimizeTextPreview: input.optimizeTextPreview,
+      });
+      return {
+        type: "direct",
+        outputKind: "audio",
+        source: "mimo",
+        ...result,
+      };
+    }
+
+    if (input.mode === "voice_design" && input.model === MIMO_TTS_VOICE_DESIGN_MODEL) {
+      if (input.referenceMedia.length > 0) {
+        throw new Error("MiMo voice design does not accept reference media");
+      }
+      const result = await generateMimoTtsVoiceDesign(config, {
+        text: input.prompt,
+        format: input.format === "pcm16" ? "pcm16" : "wav",
+        stylePrompt: input.stylePrompt,
+        optimizeTextPreview: input.optimizeTextPreview,
+      });
+      return {
+        type: "direct",
+        outputKind: "audio",
+        source: "mimo",
+        ...result,
+      };
+    }
+
+    if (input.mode === "voice_clone" && input.model === MIMO_TTS_VOICE_CLONE_MODEL) {
+      const audioReferences = input.referenceMedia.filter(reference => reference.type === "audio");
+      if (audioReferences.length !== 1 || audioReferences.length !== input.referenceMedia.length) {
+        throw new Error("MiMo voice clone requires exactly one audio reference");
+      }
+      const result = await generateMimoTtsVoiceClone(config, {
+        text: input.prompt,
+        format: input.format === "pcm16" ? "pcm16" : "wav",
+        stylePrompt: input.stylePrompt,
+        voice: audioReferences[0].dataUri,
+        optimizeTextPreview: input.optimizeTextPreview,
+      });
+      return {
+        type: "direct",
+        outputKind: "audio",
+        source: "mimo",
+        ...result,
+      };
+    }
+
+    if (input.mode === "asr" && input.model === MIMO_ASR_MODEL) {
+      const audioReferences = input.referenceMedia.filter(reference => reference.type === "audio");
+      if (audioReferences.length !== 1 || audioReferences.length !== input.referenceMedia.length) {
+        throw new Error("MiMo ASR requires exactly one audio reference");
+      }
+      const result = await generateMimoAsr(config, {
+        audio: audioReferences[0].dataUri,
+        language: input.asrLanguage,
+      });
+      return {
+        type: "direct",
+        outputKind: "transcript",
+        source: "mimo",
+        ...result,
+      };
+    }
+
+    throw new Error("MiMo audio operation currently supports built-in TTS, voice design, voice clone, and ASR only");
+  }
+
+  throw new Error(`${config.provider} audio operation is not supported yet`);
 }
 
 export async function getAudioStatus(config: ProviderConfig, taskId: string): Promise<MediaStatusResult> {

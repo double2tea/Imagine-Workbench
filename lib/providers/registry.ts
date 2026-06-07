@@ -7,6 +7,8 @@ export interface ProviderMeta {
   defaultBaseUrl: string;
   defaultVideoBaseUrl: string;
   apiKeyPlaceholder: string;
+  credentialHint?: string;
+  endpointInfo?: string[];
   registerUrl?: string;
   hasEditableBaseUrl: boolean;
   supportsImage: boolean;
@@ -14,6 +16,8 @@ export interface ProviderMeta {
   supportsAudio: boolean;
   supportsChat: boolean;
 }
+
+export const MIMO_TOKEN_PLAN_DEFAULT_BASE_URL = "https://token-plan-cn.xiaomimimo.com/v1";
 
 export const PROVIDER_REGISTRY = [
   {
@@ -103,6 +107,26 @@ export const PROVIDER_REGISTRY = [
     hasEditableBaseUrl: true,
     supportsImage: true,
     supportsVideo: true,
+    supportsAudio: false,
+    supportsChat: true,
+  },
+  {
+    key: "mimo",
+    label: "MiMo",
+    envApiKey: "MIMO_API_KEY",
+    envBaseUrl: "MIMO_BASE_URL",
+    defaultBaseUrl: "https://api.xiaomimimo.com",
+    defaultVideoBaseUrl: "https://api.xiaomimimo.com",
+    apiKeyPlaceholder: "sk-... or tp-...",
+    credentialHint: "sk- key 自动使用标准 API；tp- key 自动使用 Token Plan CN 端点。SGP/AMS Token Plan 可在 Base URL 填订阅页地址。",
+    endpointInfo: [
+      "Standard: https://api.xiaomimimo.com/v1",
+      `Token Plan default: ${MIMO_TOKEN_PLAN_DEFAULT_BASE_URL}`,
+    ],
+    registerUrl: "https://platform.xiaomimimo.com",
+    hasEditableBaseUrl: true,
+    supportsImage: false,
+    supportsVideo: false,
     supportsAudio: true,
     supportsChat: true,
   },

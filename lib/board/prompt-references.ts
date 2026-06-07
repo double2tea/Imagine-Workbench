@@ -1,7 +1,7 @@
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import type { BoardEdge, BoardNode } from "@/lib/board/types";
 import type { MediaReferenceType } from "@/lib/media-references";
-import { getVideoModelCapabilities } from "@/lib/providers/model-catalog";
+import { getAudioModelCapabilities, getVideoModelCapabilities } from "@/lib/providers/model-catalog";
 
 export type BoardPromptReferenceSource = "连线" | "画板" | "库";
 
@@ -112,6 +112,7 @@ export function buildBoardPromptReferenceGraphIndex(
 function generateNodeReferenceTypes(node: BoardNode | undefined): ReadonlySet<MediaReferenceType> | null {
   if (node?.kind === "image-generate") return new Set<MediaReferenceType>(["image"]);
   if (node?.kind === "video-generate") return new Set(getVideoModelCapabilities(node.model).referenceMediaTypes);
+  if (node?.kind === "audio-operation") return new Set(getAudioModelCapabilities(node.model).referenceMediaTypes);
   if (node?.kind === "runninghub-app") return new Set<MediaReferenceType>(["image", "video", "audio"]);
   return null;
 }
@@ -253,7 +254,7 @@ export function assetCompareReferenceUrl(
     .find(edge => edge.from.portId === "result-out");
   if (!resultEdge) return null;
   const sourceNode = index.nodeById.get(resultEdge.from.nodeId);
-  if (sourceNode?.kind !== "image-generate" && sourceNode?.kind !== "video-generate" && sourceNode?.kind !== "runninghub-app") return null;
+  if (sourceNode?.kind !== "image-generate" && sourceNode?.kind !== "video-generate" && sourceNode?.kind !== "audio-operation" && sourceNode?.kind !== "runninghub-app") return null;
   const references = generateReferenceCandidatesFromIndex(index, sourceNode.id);
   return references[0]?.url ?? null;
 }

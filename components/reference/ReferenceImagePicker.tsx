@@ -179,7 +179,7 @@ export default function ReferenceImagePicker({
                   <button
                     type="button"
                     onClick={() => onRoleChange?.(reference.id, getNextRole(reference))}
-                    className={`absolute inset-x-0 bottom-0 py-1 text-[8px] font-sans font-bold text-center text-white backdrop-blur-subtle cursor-pointer transition-colors ${
+                    className={`absolute inset-x-0 bottom-0 py-1 text-[9px] font-sans font-bold text-center text-white backdrop-blur-subtle cursor-pointer transition-colors ${
                       isStart ? "bg-emerald-600/80" : isEnd ? "bg-amber-600/80" : "bg-black/60 hover:bg-black/80"
                     }`}
                     title="点击切换：首帧 / 尾帧 / 普通参考"
@@ -187,7 +187,7 @@ export default function ReferenceImagePicker({
                     {isStart ? `首帧 ${token}` : isEnd ? `尾帧 ${token}` : `${mediaReferenceLabel(mediaType)} ${token}`}
                   </button>
                 ) : (
-                  <div className="absolute bottom-0 inset-x-0 bg-black/65 text-[8px] font-mono text-slate-300 truncate px-1 py-0.5 text-center">
+                  <div className="absolute bottom-0 inset-x-0 bg-black/65 text-[9px] font-mono text-slate-300 truncate px-1 py-0.5 text-center">
                     {token}
                   </div>
                 )}
@@ -198,7 +198,7 @@ export default function ReferenceImagePicker({
           {canAdd && (
             <label className="imagine-reference-add-tile">
               <span className="font-bold text-lg leading-none">+</span>
-              <span className="mt-0.5 text-[8px] font-semibold">{addLabel}</span>
+              <span className="mt-0.5 text-[9px] font-semibold">{addLabel}</span>
               <input type="file" accept={accept} onChange={onUpload} className="hidden" />
             </label>
           )}

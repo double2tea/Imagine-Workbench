@@ -258,6 +258,7 @@ export function ConnectionSettingsWorkspace({
             baseUrl={selectedProviderCreds.baseUrl}
             baseUrlPlaceholder={selectedProviderMeta.defaultBaseUrl}
             clearLabel={providerClearLabel(selectedProvider)}
+            credentialHint={selectedProviderMeta.credentialHint}
             endpoints={providerEndpointInfo(selectedProvider)}
             provider={selectedProvider}
             providerTest={providerTest}

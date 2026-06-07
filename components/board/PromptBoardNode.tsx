@@ -60,6 +60,7 @@ const PromptBoardNode = memo(function PromptBoardNode({ node, onChange, onSelect
       onSlashCommand={handleSlashCommand}
       references={references}
       headerRight={<PromptTemplatePicker ref={templatePickerRef} accent="teal" compact onApply={handleApplyPromptTemplate} />}
+      className="nodrag nowheel nopan h-full w-full resize-none overflow-y-auto overscroll-contain imagine-board-input !p-3 !pr-20 text-xs leading-5 outline-none placeholder:text-[var(--iw-faint)]"
       placeholder="写提示词，输入 @ 引用参考图"
     />
   );

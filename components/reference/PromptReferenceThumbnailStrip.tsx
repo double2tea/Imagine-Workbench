@@ -54,7 +54,7 @@ function renderReferenceChip(thumbnail: PromptReferenceThumbnail): ReactNode {
       {token}
       <span className="absolute left-1/2 top-1/2 inline-flex h-8 w-8 -translate-x-1/2 -translate-y-[42%] items-center justify-center overflow-hidden rounded-md border border-white/15 bg-slate-950 align-baseline shadow-sm">
         <MediaReferenceThumbnail reference={reference} alt={token} className="h-full w-full" />
-        <span className="absolute bottom-0 right-0 rounded-tl bg-black/65 px-1 text-[8px] font-semibold leading-3 text-white">
+        <span className="absolute bottom-0 right-0 rounded-tl bg-black/65 px-1 text-[9px] font-semibold leading-3 text-white">
           {index + 1}
         </span>
       </span>

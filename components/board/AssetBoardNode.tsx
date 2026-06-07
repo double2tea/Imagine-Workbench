@@ -4,6 +4,7 @@ import { memo, useMemo, useRef } from "react";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
 import BoardAudioWaveform from "@/components/board/BoardAudioWaveform";
 import PreviewImage from "@/components/PreviewImage";
+import useBoardAudioItem from "@/components/board/useBoardAudioItem";
 import useSelectedBoardVideoItem from "@/components/board/useSelectedBoardVideoItem";
 import type { BoardAssetNode } from "@/lib/board";
 import { buildStorageItem, type StorageItem } from "@/lib/db";
@@ -75,11 +76,18 @@ const AssetBoardNode = memo(function AssetBoardNode({
   onSendToAgent,
   stackItems = [],
 }: AssetBoardNodeProps) {
-  const item = useMemo(() => boardAssetToStorageItem(node, boardId), [boardId, node]);
+  const fallbackItem = useMemo(() => boardAssetToStorageItem(node, boardId), [boardId, node]);
+  const item = useMemo(
+    () => node.asset.type === "audio"
+      ? stackItems.find(stackItem => stackItem.id === node.asset.assetId) ?? fallbackItem
+      : fallbackItem,
+    [fallbackItem, node.asset.assetId, node.asset.type, stackItems],
+  );
   const stackCount = stackItems.length;
   const hasStackSwitcher = stackCount > 1;
   const isImagePreviewUrl = item.url.startsWith("data:image/");
-  const shouldRenderAudio = node.asset.type === "audio" && isSelected && item.url.trim();
+  const audioItem = useBoardAudioItem(item);
+  const playableAudioItem = audioItem ?? (item.type === "audio" && item.url.trim() ? item : null);
   const videoItem = useSelectedBoardVideoItem(item, isSelected);
   const shouldRenderVideoPlayer = videoItem !== null;
   const captureVideoFrameRef = useRef<VideoFrameCaptureRequest | null>(null);
@@ -197,8 +205,8 @@ const AssetBoardNode = memo(function AssetBoardNode({
           draggable={false}
           className="board-media-preview h-full w-full select-none object-cover"
         />
-      ) : node.asset.type === "audio" && shouldRenderAudio ? (
-        <BoardAudioWaveform src={node.asset.url} />
+      ) : playableAudioItem ? (
+        <BoardAudioWaveform src={playableAudioItem.url} interactive={isSelected} />
       ) : (
         <LightweightMediaPreview type={node.asset.type} />
       )}

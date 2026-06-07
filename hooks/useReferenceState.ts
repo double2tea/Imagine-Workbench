@@ -17,7 +17,7 @@ import type { VideoReferenceMode } from "@/lib/providers/model-catalog";
 import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, compressReferenceImageFile } from "@/lib/reference-images";
 import { toErrorMessage } from "@/lib/client-fetch-error";
 
-export type AtDropdownTarget = "image-prompt" | "video-prompt" | "agent-prompt";
+export type AtDropdownTarget = "image-prompt" | "video-prompt" | "audio-prompt" | "agent-prompt";
 type PromptReferenceTarget = Exclude<AtDropdownTarget, "agent-prompt">;
 type NoticeType = "error" | "info" | "success";
 
@@ -31,6 +31,8 @@ interface AtDropdownState {
 
 interface UseReferenceStateParams {
   agentInput: string;
+  audioReferenceLimit: number;
+  audioReferenceMediaTypes: MediaReferenceType[];
   imageReferenceLimit: number;
   imageReferenceMediaTypes: MediaReferenceType[];
   prompt: string;
@@ -122,6 +124,8 @@ export function removePromptReferenceTokens(prompt: string): string {
 
 export function useReferenceState({
   agentInput,
+  audioReferenceLimit,
+  audioReferenceMediaTypes,
   imageReferenceLimit,
   imageReferenceMediaTypes,
   prompt,
@@ -143,11 +147,17 @@ export function useReferenceState({
     search: "",
   });
 
-  const getReferenceLimitForTarget = (target: PromptReferenceTarget): number =>
-    target === "video-prompt" ? videoReferenceLimit : imageReferenceLimit;
+  const getReferenceLimitForTarget = (target: PromptReferenceTarget): number => {
+    if (target === "video-prompt") return videoReferenceLimit;
+    if (target === "audio-prompt") return audioReferenceLimit;
+    return imageReferenceLimit;
+  };
 
-  const getAcceptedMediaTypesForTarget = (target: PromptReferenceTarget): MediaReferenceType[] =>
-    target === "video-prompt" ? videoReferenceMediaTypes : imageReferenceMediaTypes;
+  const getAcceptedMediaTypesForTarget = (target: PromptReferenceTarget): MediaReferenceType[] => {
+    if (target === "video-prompt") return videoReferenceMediaTypes;
+    if (target === "audio-prompt") return audioReferenceMediaTypes;
+    return imageReferenceMediaTypes;
+  };
 
   const isAcceptedReferenceType = (type: MediaReferenceType, target: PromptReferenceTarget): boolean =>
     getAcceptedMediaTypesForTarget(target).includes(type);

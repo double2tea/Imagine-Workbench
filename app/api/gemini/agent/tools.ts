@@ -401,16 +401,27 @@ function formatAgentCapabilities(topic: "summary" | "actions" | "tools" | "conte
     chatReferences: ["image", "video", "audio"],
     imageGenerationReferences: ["image"],
     videoGenerationReferences: ["image", "video", "audio"],
-    audioGenerationReferences: ["image", "video", "audio"],
+    audioGenerationReferences: ["audio"],
+  };
+  const audioPlanning = {
+    modes: {
+      tts: "Narration, dialogue, voiceover, spoken lines.",
+      voice_design: "Create a described voice; put the voice description in audioStylePrompt.",
+      voice_clone: "Use only when the user provides or requests an authorized audio reference.",
+      asr: "Transcription intent only when an audio-capable model declares ASR support.",
+    },
+    boardPattern: "Use audio-operation nodes only for supported audio functions returned by query_models({kind:\"audio\"}); RunningHub audio uses RunningHub App / Workflow nodes.",
+    actionPattern: "Use generate_audio on the workbench and create_board_audio_flow on board.",
   };
 
   if (topic === "actions") return { actions };
   if (topic === "tools") return { tools };
   if (topic === "context") return { contextPolicy };
-  if (topic === "media") return { media };
+  if (topic === "media") return { media, audioPlanning };
 
   return {
     actions,
+    audioPlanning,
     contextPolicy,
     media,
     modelCounts: modelCountByKind(),
@@ -626,6 +637,9 @@ function formatCapabilities(c: ProviderModelCapability): Record<string, unknown>
     videoPresets: c.kind === "video" ? c.presets.map(p => p.value) : [],
     videoReferenceMode: c.kind === "video" ? c.videoReferenceMode : "none",
     videoReferenceModes: c.kind === "video" ? c.videoReferenceModes : [],
+    audioModes: c.kind === "audio" ? c.audioModes : [],
+    audioDefaultMode: c.kind === "audio" ? c.audioDefaultMode : undefined,
+    audioOutputKinds: c.kind === "audio" ? c.audioOutputKinds : [],
     maxReferenceImages: c.maxReferenceImages,
     minReferenceImages: c.minReferenceImages,
     referenceMediaTypes: c.referenceMediaTypes,

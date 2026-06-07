@@ -148,7 +148,7 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
 
   const handleSaveCredential = useCallback((provider: AiProvider, field: keyof ProviderCredentials, value: string) => {
     setProviderCredentials(prev => {
-      const next = { ...prev, [provider]: { ...prev[provider], [field]: value } };
+      const next = { ...prev, [provider]: { ...prev[provider], [field]: value.trim() } };
       try { localStorage.setItem("imagine_provider_credentials", JSON.stringify(next)); } catch { /* storage unavailable */ }
       return next;
     });

@@ -22,12 +22,14 @@ import {
   type BoardConfig,
   type BoardDocument,
   type BoardEdge,
+  type BoardAudioOperationNode,
   type BoardAssetReference,
   type BoardGenerateNodeUpdate,
   type BoardGenerateVariantCount,
   type BoardGenerationStatus,
   type BoardGroupNode,
   type BoardImageGenerateNode,
+  type BoardNoteNode,
   type BoardNode,
   type BoardPoint,
   type BoardPortRef,
@@ -63,13 +65,14 @@ import {
   createBoardGroupLayout,
   resolveMovedBoardNodeParents,
 } from "@/lib/board";
-import { getImageModelCapabilities, getImageResolutionOptions, getVideoModelCapabilities } from "@/lib/providers/model-catalog";
+import { DEFAULT_AUDIO_MODEL, getAudioModelCapabilities, getImageModelCapabilities, getImageResolutionOptions, getVideoModelCapabilities } from "@/lib/providers/model-catalog";
 import {
   BOARD_PORT_IDS,
   filterValidBoardEdges,
   resolveBoardConnectionKind,
   resolveBoardConnectionNodesWithCompatibleModel,
 } from "@/lib/board/ports";
+import { clampBoardTextNodeSize, estimateBoardNoteSize, estimateBoardPromptSize } from "@/lib/board/text-node-size";
 import { findResultNodeForSource, isResultSourceNode, resultNodeDefaultPosition } from "@/lib/board/utils";
 import { findAvailableBoardNodePosition } from "@/lib/board/placement";
 
@@ -86,12 +89,14 @@ const DEFAULT_CUSTOM_IMAGE_RESOLUTION = "2560x1440";
 const DEFAULT_VARIANT_COUNT: BoardGenerateVariantCount = 1;
 const DEFAULT_BOARD_IMAGE_MODEL = "modelscope:Qwen/Qwen-Image";
 const DEFAULT_BOARD_VIDEO_MODEL = "12ai:veo_3_1-fast";
+const DEFAULT_BOARD_AUDIO_MODEL = DEFAULT_AUDIO_MODEL;
 const BOARD_VIEWPORT_POSITION_EPSILON = 0.5;
 const BOARD_VIEWPORT_ZOOM_EPSILON = 0.001;
 const BOARD_NODE_KINDS = new Set<BoardNode["kind"]>([
   "agent",
   "asset",
   "group",
+  "audio-operation",
   "image-generate",
   "note",
   "prompt",
@@ -141,6 +146,7 @@ export interface BoardStateController {
     connections: Array<{ from: BoardPortRef; targetPortId: typeof BOARD_PORT_IDS.promptIn | typeof BOARD_PORT_IDS.referenceIn }>,
   ) => string;
   addNoteNode: (input?: CreateNoteNodeInput) => string;
+  addNoteNodeWithConnection: (input: CreateNoteNodeInput, from: BoardPortRef) => string;
   addPromptNode: (input?: CreatePromptNodeInput) => string;
   addReferenceGroupNode: (input?: CreateReferenceGroupNodeInput) => string;
   addReferenceGroupNodeWithAsset: (input: CreateReferenceGroupNodeInput, assetNodeId: string) => string;
@@ -202,6 +208,7 @@ function duplicateNodeIdPrefix(kind: BoardNode["kind"]): string {
   if (kind === "group") return "group";
   if (kind === "image-generate") return "image_gen";
   if (kind === "video-generate") return "video_gen";
+  if (kind === "audio-operation") return "audio_op";
   if (kind === "runninghub-app") return "rh_app";
   if (kind === "agent") return "agent";
   if (kind === "result") return "result";
@@ -257,6 +264,20 @@ function cloneBoardNodeForDuplicate(source: BoardNode, position: BoardPoint): Bo
         videoReferenceMode: source.videoReferenceMode,
         videoResolution: source.videoResolution,
       };
+    case "audio-operation":
+      return {
+        ...shell,
+        kind: "audio-operation",
+        audioFormat: source.audioFormat,
+        audioMode: source.audioMode,
+        audioStylePrompt: source.audioStylePrompt,
+        model: source.model,
+        prompt: source.prompt,
+        status: "idle",
+        variantCount: source.variantCount,
+        voiceCloneConsentAccepted: source.voiceCloneConsentAccepted,
+        voiceProfileId: source.voiceProfileId,
+      };
     case "runninghub-app":
       return {
         ...shell,
@@ -297,7 +318,7 @@ function duplicatedInputEdgesForClones(
 ): BoardEdge[] {
   const cloneIdBySourceId = new Map(sources.map((source, index) => [source.id, clones[index]?.id]));
   const clonedTargetIds = new Set(sources
-    .filter(source => source.kind === "image-generate" || source.kind === "video-generate" || source.kind === "runninghub-app")
+    .filter(source => source.kind === "image-generate" || source.kind === "video-generate" || source.kind === "audio-operation" || source.kind === "runninghub-app")
     .map(source => source.id));
   return edges.flatMap(edge => {
     if (!clonedTargetIds.has(edge.to.nodeId)) return [];
@@ -473,6 +494,11 @@ function readOptionalStringArray(value: unknown): string[] | undefined {
   return value.filter((item): item is string => typeof item === "string" && item.length > 0);
 }
 
+function readAsrLanguage(value: unknown): "auto" | "zh" | "en" {
+  if (value === "zh" || value === "en") return value;
+  return "auto";
+}
+
 function readVideoReferenceMode(value: unknown): BoardVideoReferenceMode | undefined {
   return value === "reference" || value === "firstLast" ? value : undefined;
 }
@@ -533,6 +559,17 @@ function defaultVideoParams(model: string, aspectRatio?: string): {
   };
 }
 
+function defaultAudioParams(model: string): {
+  audioFormat: string;
+  audioMode: BoardAudioOperationNode["audioMode"];
+} {
+  const capabilities = getAudioModelCapabilities(model);
+  return {
+    audioFormat: capabilities.formats[0]?.value ?? "",
+    audioMode: capabilities.defaultMode,
+  };
+}
+
 function normalizeBoardNode(node: unknown, index: number): BoardNode | null {
   if (!isRecord(node) || !isBoardNodeKind(node.kind)) return null;
   const normalizedSize = normalizeBoardSize(node.size, defaultNodeSize(node.kind));
@@ -581,10 +618,16 @@ function normalizeBoardNode(node: unknown, index: number): BoardNode | null {
     };
   }
   if (node.kind === "prompt") {
+    const prompt = typeof node.prompt === "string" ? node.prompt : "";
+    const estimatedPromptSize = estimateBoardPromptSize(prompt);
     return {
       ...shell,
       kind: "prompt",
-      prompt: typeof node.prompt === "string" ? node.prompt : "",
+      prompt,
+      size: clampBoardTextNodeSize({
+        width: Math.max(shell.size.width, estimatedPromptSize.width),
+        height: Math.max(shell.size.height, estimatedPromptSize.height),
+      }, DEFAULT_PROMPT_NODE_SIZE),
     };
   }
   if (node.kind === "reference-group") {
@@ -640,6 +683,30 @@ function normalizeBoardNode(node: unknown, index: number): BoardNode | null {
       errorMessage: typeof node.errorMessage === "string" ? node.errorMessage : undefined,
     };
   }
+  if (node.kind === "audio-operation") {
+    const model = normalizeAudioModel(node.model);
+    const defaults = defaultAudioParams(model);
+    const audioFormat = readOptionalString(node.audioFormat);
+    const capabilities = getAudioModelCapabilities(model);
+    return {
+      ...shell,
+      kind: "audio-operation",
+      audioFormat: audioFormat && capabilities.formats.some(option => option.value === audioFormat)
+        ? audioFormat
+        : defaults.audioFormat,
+      audioMode: readAudioOperationMode(node.audioMode, model),
+      audioStylePrompt: readOptionalString(node.audioStylePrompt),
+      asrLanguage: readAsrLanguage(node.asrLanguage),
+      model,
+      prompt: typeof node.prompt === "string" ? node.prompt : "",
+      resultStackKey: readOptionalString(node.resultStackKey),
+      status: normalizeGenerationStatus(node.status),
+      variantCount: normalizeVariantCount(node.variantCount),
+      voiceCloneConsentAccepted: node.voiceCloneConsentAccepted === true,
+      voiceProfileId: readOptionalString(node.voiceProfileId),
+      errorMessage: typeof node.errorMessage === "string" ? node.errorMessage : undefined,
+    };
+  }
   if (node.kind === "runninghub-app") {
     return {
       ...shell,
@@ -662,10 +729,28 @@ function normalizeBoardNode(node: unknown, index: number): BoardNode | null {
       instruction: typeof node.instruction === "string" ? node.instruction : "",
     };
   }
+  const noteBody = typeof node.body === "string" ? node.body : "";
+  const noteVariant = node.variant === "transcript" ? "transcript" : "plain";
+  const estimatedNoteSize = estimateBoardNoteSize(noteBody, noteVariant);
   return {
     ...shell,
     kind: "note",
-    body: typeof node.body === "string" ? node.body : "",
+    body: noteBody,
+    source: normalizeNoteSource(node.source),
+    size: clampBoardTextNodeSize({
+      width: Math.max(shell.size.width, estimatedNoteSize.width),
+      height: Math.max(shell.size.height, estimatedNoteSize.height),
+    }, DEFAULT_NOTE_NODE_SIZE),
+    variant: noteVariant,
+  };
+}
+
+function normalizeNoteSource(value: unknown): BoardNoteNode["source"] {
+  if (!isRecord(value) || typeof value.assetId !== "string" || typeof value.model !== "string") return undefined;
+  return {
+    assetId: value.assetId,
+    model: value.model,
+    sourceNodeId: readOptionalString(value.sourceNodeId),
   };
 }
 
@@ -674,7 +759,7 @@ function defaultNodeSize(kind: BoardNode["kind"]): BoardSize {
   if (kind === "prompt") return DEFAULT_PROMPT_NODE_SIZE;
   if (kind === "reference-group") return DEFAULT_REFERENCE_GROUP_NODE_SIZE;
   if (kind === "group") return DEFAULT_GROUP_NODE_SIZE;
-  if (kind === "image-generate" || kind === "video-generate") return DEFAULT_GENERATE_NODE_SIZE;
+  if (kind === "image-generate" || kind === "video-generate" || kind === "audio-operation") return DEFAULT_GENERATE_NODE_SIZE;
   if (kind === "runninghub-app") return DEFAULT_RUNNINGHUB_APP_NODE_SIZE;
   if (kind === "agent") return DEFAULT_AGENT_NODE_SIZE;
   return DEFAULT_NOTE_NODE_SIZE;
@@ -687,6 +772,7 @@ function defaultNodeTitle(kind: BoardNode["kind"]): string {
   if (kind === "group") return "新建组";
   if (kind === "image-generate") return "Image Generate";
   if (kind === "video-generate") return "Video Generate";
+  if (kind === "audio-operation") return "Audio Operation";
   if (kind === "runninghub-app") return "RunningHub App";
   if (kind === "agent") return "Agent";
   return "Note";
@@ -781,6 +867,23 @@ function normalizeVideoModel(value: unknown): string {
   } catch {
     return DEFAULT_BOARD_VIDEO_MODEL;
   }
+}
+
+function normalizeAudioModel(value: unknown): string {
+  const model = readNonEmptyString(value, DEFAULT_BOARD_AUDIO_MODEL);
+  try {
+    getAudioModelCapabilities(model);
+    return model;
+  } catch {
+    return DEFAULT_BOARD_AUDIO_MODEL;
+  }
+}
+
+function readAudioOperationMode(value: unknown, model: string): BoardAudioOperationNode["audioMode"] {
+  const capabilities = getAudioModelCapabilities(model);
+  return typeof value === "string" && capabilities.modes.includes(value as BoardAudioOperationNode["audioMode"])
+    ? value as BoardAudioOperationNode["audioMode"]
+    : capabilities.defaultMode;
 }
 
 function normalizeReferenceGroupItems(items: unknown[]): BoardReferenceGroupItem[] {
@@ -939,12 +1042,12 @@ function createGroupBoardNode(input: CreateGroupNodeInput, nodes: BoardNode[]): 
   };
 }
 
-function createGenerateBoardNode(input: CreateGenerateNodeInput, nodes: BoardNode[]): BoardImageGenerateNode | BoardVideoGenerateNode {
+function createGenerateBoardNode(input: CreateGenerateNodeInput, nodes: BoardNode[]): BoardImageGenerateNode | BoardVideoGenerateNode | BoardAudioOperationNode {
   const createdAt = nowIso();
-  const nodeId = createBoardId(input.kind === "image-generate" ? "image_gen" : "video_gen");
+  const nodeId = createBoardId(input.kind === "image-generate" ? "image_gen" : input.kind === "audio-operation" ? "audio_op" : "video_gen");
   const baseNode = {
     id: nodeId,
-    title: input.title ?? (input.kind === "image-generate" ? "Image Generate" : "Video Generate"),
+    title: input.title ?? (input.kind === "image-generate" ? "Image Generate" : input.kind === "audio-operation" ? "Audio Operation" : "Video Generate"),
     prompt: input.prompt ?? "",
     model: input.model,
     status: "idle" as BoardGenerationStatus,
@@ -965,6 +1068,20 @@ function createGenerateBoardNode(input: CreateGenerateNodeInput, nodes: BoardNod
       imageQuality: input.imageQuality ?? imageDefaults.imageQuality,
       imageResolution: input.imageResolution ?? imageDefaults.imageResolution,
       thinkingLevel: input.thinkingLevel ?? imageDefaults.thinkingLevel,
+    };
+  }
+
+  if (input.kind === "audio-operation") {
+    const audioDefaults = defaultAudioParams(input.model);
+    return {
+      ...baseNode,
+      kind: "audio-operation",
+      audioFormat: input.audioFormat ?? audioDefaults.audioFormat,
+      audioMode: input.audioMode ?? audioDefaults.audioMode,
+      audioStylePrompt: input.audioStylePrompt,
+      asrLanguage: input.asrLanguage ?? "auto",
+      voiceCloneConsentAccepted: input.voiceCloneConsentAccepted,
+      voiceProfileId: input.voiceProfileId,
     };
   }
 
@@ -1039,8 +1156,7 @@ function findMatchingEdge(edges: BoardEdge[], from: BoardPortRef, to: BoardPortR
   );
 }
 
-function sameGenerateUpdate(node: BoardImageGenerateNode | BoardVideoGenerateNode, input: BoardGenerateNodeUpdate): boolean {
-  if ("aspectRatio" in input && node.aspectRatio !== input.aspectRatio) return false;
+function sameGenerateUpdate(node: BoardImageGenerateNode | BoardVideoGenerateNode | BoardAudioOperationNode, input: BoardGenerateNodeUpdate): boolean {
   if ("errorMessage" in input && node.errorMessage !== input.errorMessage) return false;
   if ("model" in input && node.model !== input.model) return false;
   if ("prompt" in input && node.prompt !== input.prompt) return false;
@@ -1049,6 +1165,7 @@ function sameGenerateUpdate(node: BoardImageGenerateNode | BoardVideoGenerateNod
   if ("variantCount" in input && node.variantCount !== input.variantCount) return false;
 
   if (node.kind === "image-generate") {
+    if ("aspectRatio" in input && node.aspectRatio !== input.aspectRatio) return false;
     if ("customImageResolution" in input && node.customImageResolution !== input.customImageResolution) return false;
     if ("imageQuality" in input && node.imageQuality !== input.imageQuality) return false;
     if ("imageResolution" in input && node.imageResolution !== input.imageResolution) return false;
@@ -1056,10 +1173,20 @@ function sameGenerateUpdate(node: BoardImageGenerateNode | BoardVideoGenerateNod
   }
 
   if (node.kind === "video-generate") {
+    if ("aspectRatio" in input && node.aspectRatio !== input.aspectRatio) return false;
     if ("videoDuration" in input && node.videoDuration !== input.videoDuration) return false;
     if ("videoPreset" in input && node.videoPreset !== input.videoPreset) return false;
     if ("videoReferenceMode" in input && node.videoReferenceMode !== input.videoReferenceMode) return false;
     if ("videoResolution" in input && node.videoResolution !== input.videoResolution) return false;
+  }
+
+  if (node.kind === "audio-operation") {
+    if ("audioFormat" in input && node.audioFormat !== input.audioFormat) return false;
+    if ("audioMode" in input && node.audioMode !== input.audioMode) return false;
+    if ("audioStylePrompt" in input && node.audioStylePrompt !== input.audioStylePrompt) return false;
+    if ("asrLanguage" in input && node.asrLanguage !== input.asrLanguage) return false;
+    if ("voiceCloneConsentAccepted" in input && node.voiceCloneConsentAccepted !== input.voiceCloneConsentAccepted) return false;
+    if ("voiceProfileId" in input && node.voiceProfileId !== input.voiceProfileId) return false;
   }
 
   return true;
@@ -1375,13 +1502,14 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
   const addPromptNode = useCallback((input: CreatePromptNodeInput = {}): string => {
     const createdAt = nowIso();
     const nodeId = createBoardId("prompt");
+    const prompt = input.prompt ?? "";
     const node: BoardPromptNode = {
       id: nodeId,
       kind: "prompt",
       title: input.title ?? "Prompt",
-      prompt: input.prompt ?? "",
+      prompt,
       position: input.position ?? moveDefaultPosition(board.nodes),
-      size: input.size ?? DEFAULT_PROMPT_NODE_SIZE,
+      size: input.size ? clampBoardTextNodeSize(input.size, DEFAULT_PROMPT_NODE_SIZE) : estimateBoardPromptSize(prompt),
       createdAt,
       updatedAt: createdAt,
     };
@@ -1585,18 +1713,57 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
   const addNoteNode = useCallback((input: CreateNoteNodeInput = {}): string => {
     const createdAt = nowIso();
     const nodeId = createBoardId("note");
+    const body = input.body ?? "";
+    const variant = input.variant ?? "plain";
     const node: BoardNode = {
       id: nodeId,
       kind: "note",
       title: input.title ?? "Note",
-      body: input.body ?? "",
+      body,
+      source: input.source,
+      variant,
       position: input.position ?? moveDefaultPosition(board.nodes),
-      size: input.size ?? DEFAULT_NOTE_NODE_SIZE,
+      size: input.size ? clampBoardTextNodeSize(input.size, DEFAULT_NOTE_NODE_SIZE) : estimateBoardNoteSize(body, variant),
       createdAt,
       updatedAt: createdAt,
     };
 
     mutateBoard(currentBoard => touchBoard(currentBoard, [...currentBoard.nodes, node]));
+    setSelectedNodeId(nodeId);
+    setSelectedEdgeId(null);
+    return nodeId;
+  }, [board.nodes, mutateBoard]);
+
+  const addNoteNodeWithConnection = useCallback((input: CreateNoteNodeInput, from: BoardPortRef): string => {
+    const createdAt = nowIso();
+    const nodeId = createBoardId("note");
+    const body = input.body ?? "";
+    const variant = input.variant ?? "plain";
+    const node: BoardNode = {
+      id: nodeId,
+      kind: "note",
+      title: input.title ?? "Note",
+      body,
+      source: input.source,
+      variant,
+      position: input.position ?? moveDefaultPosition(board.nodes),
+      size: input.size ? clampBoardTextNodeSize(input.size, DEFAULT_NOTE_NODE_SIZE) : estimateBoardNoteSize(body, variant),
+      createdAt,
+      updatedAt: createdAt,
+    };
+    const to: BoardPortRef = { nodeId, portId: BOARD_PORT_IDS.noteIn, portKind: "result" };
+
+    mutateBoard(currentBoard => {
+      const nextNodes = [...currentBoard.nodes, node];
+      const edge: BoardEdge = {
+        id: createBoardId("edge"),
+        kind: resolveBoardConnectionKind(nextNodes, from, to),
+        from,
+        to,
+        createdAt: nowIso(),
+      };
+      return touchBoard(currentBoard, nextNodes, connectEdge(nextNodes, currentBoard.edges, edge));
+    });
     setSelectedNodeId(nodeId);
     setSelectedEdgeId(null);
     return nodeId;
@@ -2130,7 +2297,19 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     mutateBoard(
       currentBoard => touchBoard(
         currentBoard,
-        currentBoard.nodes.map(node => (node.id === nodeId && node.kind === "prompt" ? { ...node, prompt, updatedAt } : node)),
+        currentBoard.nodes.map(node => {
+          if (node.id !== nodeId || node.kind !== "prompt") return node;
+          const estimatedSize = estimateBoardPromptSize(prompt);
+          return {
+            ...node,
+            prompt,
+            size: clampBoardTextNodeSize({
+              width: Math.max(node.size.width, estimatedSize.width),
+              height: Math.max(node.size.height, estimatedSize.height),
+            }, DEFAULT_PROMPT_NODE_SIZE),
+            updatedAt,
+          };
+        }),
       ),
       { skipUndo: true },
     );
@@ -2142,7 +2321,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       currentBoard => {
         let didChange = false;
         const nextNodes = currentBoard.nodes.map(node =>
-          node.id === nodeId && (node.kind === "image-generate" || node.kind === "video-generate")
+          node.id === nodeId && (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation")
             ? sameGenerateUpdate(node, input)
               ? node
               : (() => {
@@ -2196,7 +2375,19 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     mutateBoard(
       currentBoard => touchBoard(
         currentBoard,
-        currentBoard.nodes.map(node => (node.id === nodeId && node.kind === "note" ? { ...node, body, updatedAt } : node)),
+        currentBoard.nodes.map(node => {
+          if (node.id !== nodeId || node.kind !== "note") return node;
+          const estimatedSize = estimateBoardNoteSize(body, node.variant ?? "plain");
+          return {
+            ...node,
+            body,
+            size: clampBoardTextNodeSize({
+              width: Math.max(node.size.width, estimatedSize.width),
+              height: Math.max(node.size.height, estimatedSize.height),
+            }, DEFAULT_NOTE_NODE_SIZE),
+            updatedAt,
+          };
+        }),
       ),
       { skipUndo: true },
     );
@@ -2232,6 +2423,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       addGenerateNodeWithConnections,
       groupNodes,
       addNoteNode,
+      addNoteNodeWithConnection,
       addPromptNode,
       addReferenceGroupNode,
       addReferenceGroupNodeWithAsset,
@@ -2278,6 +2470,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       addGenerateNodeWithConnections,
       groupNodes,
       addNoteNode,
+      addNoteNodeWithConnection,
       addPromptNode,
       addReferenceGroupNode,
       addReferenceGroupNodeWithAsset,

@@ -3,6 +3,7 @@ import { getProviderMeta } from "@/lib/providers/registry";
 
 export function providerEndpointInfo(provider: AiProvider): string[] | undefined {
   const meta = getProviderMeta(provider);
+  if (meta.endpointInfo) return meta.endpointInfo;
   if (
     !meta.hasEditableBaseUrl &&
     meta.defaultVideoBaseUrl &&

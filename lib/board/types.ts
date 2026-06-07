@@ -1,4 +1,6 @@
-export type BoardNodeKind = "asset" | "prompt" | "reference-group" | "group" | "image-generate" | "video-generate" | "runninghub-app" | "agent" | "note" | "result";
+import type { AudioOperationMode } from "@/lib/providers/model-catalog";
+
+export type BoardNodeKind = "asset" | "prompt" | "reference-group" | "group" | "image-generate" | "video-generate" | "audio-operation" | "runninghub-app" | "agent" | "note" | "result";
 export type BoardAssetType = "image" | "video" | "audio";
 export type BoardEdgeKind = "reference" | "prompt" | "result" | "agent-context";
 export type BoardPortKind = "asset" | "prompt" | "result" | "agent";
@@ -131,6 +133,24 @@ export interface BoardVideoGenerateNode extends BoardNodeBase {
   errorMessage?: string;
 }
 
+export interface BoardAudioOperationNode extends BoardNodeBase {
+  kind: "audio-operation";
+  prompt: string;
+  model: string;
+  audioMode: AudioOperationMode;
+  audioFormat: string;
+  audioStylePrompt?: string;
+  asrLanguage?: "auto" | "zh" | "en";
+  voiceProfileId?: string;
+  voiceCloneConsentAccepted?: boolean;
+  variantCount: BoardGenerateVariantCount;
+  status: BoardGenerationStatus;
+  resultAssetId?: string;
+  resultAssetIds?: string[];
+  resultStackKey?: string;
+  errorMessage?: string;
+}
+
 export interface BoardRunningHubNodeInfoBinding {
   id: string;
   nodeId: string;
@@ -177,9 +197,19 @@ export interface BoardAgentNode extends BoardNodeBase {
   instruction: string;
 }
 
+export type BoardNoteVariant = "plain" | "transcript";
+
+export interface BoardTranscriptNoteSource {
+  assetId: string;
+  model: string;
+  sourceNodeId?: string;
+}
+
 export interface BoardNoteNode extends BoardNodeBase {
   kind: "note";
   body: string;
+  source?: BoardTranscriptNoteSource;
+  variant?: BoardNoteVariant;
 }
 
 export interface BoardResultNode extends BoardNodeBase {
@@ -198,17 +228,22 @@ export type BoardNode =
   | BoardGroupNode
   | BoardImageGenerateNode
   | BoardVideoGenerateNode
+  | BoardAudioOperationNode
   | BoardRunningHubAppNode
   | BoardAgentNode
   | BoardNoteNode
   | BoardResultNode;
 
-export type BoardGenerateNode = BoardImageGenerateNode | BoardVideoGenerateNode;
+export type BoardGenerateNode = BoardImageGenerateNode | BoardVideoGenerateNode | BoardAudioOperationNode;
 export type BoardExecutableNode = BoardGenerateNode | BoardRunningHubAppNode;
-export type BoardResultSourceNode = BoardImageGenerateNode | BoardVideoGenerateNode | BoardRunningHubAppNode;
+export type BoardResultSourceNode = BoardImageGenerateNode | BoardVideoGenerateNode | BoardAudioOperationNode | BoardRunningHubAppNode;
 
 export type BoardGenerateNodeUpdate = Partial<{
   aspectRatio: string;
+  audioFormat: string;
+  audioMode: AudioOperationMode;
+  audioStylePrompt: string;
+  asrLanguage: "auto" | "zh" | "en";
   customImageResolution: string;
   errorMessage: string;
   imageQuality: string;
@@ -225,6 +260,8 @@ export type BoardGenerateNodeUpdate = Partial<{
   videoPreset: string;
   videoReferenceMode: BoardVideoReferenceMode;
   videoResolution: string;
+  voiceCloneConsentAccepted: boolean;
+  voiceProfileId: string;
 }>;
 
 export type BoardRunningHubAppNodeUpdate = Partial<{
@@ -291,7 +328,9 @@ export interface CreateNoteNodeInput {
   body?: string;
   position?: BoardPoint;
   size?: BoardSize;
+  source?: BoardTranscriptNoteSource;
   title?: string;
+  variant?: BoardNoteVariant;
 }
 
 export interface CreatePromptNodeInput {
@@ -316,10 +355,14 @@ export interface CreateGroupNodeInput {
 }
 
 export interface CreateGenerateNodeInput {
-  kind: "image-generate" | "video-generate";
+  kind: "image-generate" | "video-generate" | "audio-operation";
   prompt?: string;
   model: string;
-  aspectRatio: string;
+  aspectRatio?: string;
+  audioFormat?: string;
+  audioMode?: AudioOperationMode;
+  audioStylePrompt?: string;
+  asrLanguage?: "auto" | "zh" | "en";
   customImageResolution?: string;
   imageQuality?: string;
   imageResolution?: string;
@@ -329,6 +372,8 @@ export interface CreateGenerateNodeInput {
   videoPreset?: string;
   videoReferenceMode?: BoardVideoReferenceMode;
   videoResolution?: string;
+  voiceCloneConsentAccepted?: boolean;
+  voiceProfileId?: string;
   position?: BoardPoint;
   size?: BoardSize;
   title?: string;

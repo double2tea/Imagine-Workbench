@@ -7,7 +7,7 @@ import {
   mergeBoardScopedMetas,
 } from "@/lib/assets/board-scope";
 import { ensureAssetPreviewUrl } from "@/lib/assets/previews";
-import { resolveAssetPreviewUrl } from "@/lib/assets/resolve-url";
+import { resolveAssetOriginalUrl, resolveAssetPreviewUrl } from "@/lib/assets/resolve-url";
 import type { BoardNode } from "@/lib/board/types";
 import {
   listBoardScopedAssetMetas,
@@ -51,6 +51,9 @@ async function hydrateAssetPreviews(metas: StorageItemMeta[]): Promise<StorageIt
     for (let index = 0; index < slice.length; index += 1) {
       const meta = slice[index];
       let url = previewUrls[index] ?? "";
+      if (meta.type === "transcript" && meta.hasBlob) {
+        url = await resolveAssetOriginalUrl(meta);
+      }
       if (!url && meta.type === "video" && meta.hasBlob) {
         url = await ensureAssetPreviewUrl(meta);
       }

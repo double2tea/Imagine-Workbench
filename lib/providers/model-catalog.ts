@@ -37,6 +37,9 @@ export interface VideoModelCapabilities {
 }
 
 export interface AudioModelCapabilities {
+  modes: AudioOperationMode[];
+  outputKinds: AudioOutputKind[];
+  defaultMode: AudioOperationMode;
   formats: ParameterOption[];
   durations: ParameterOption[];
   maxReferenceMedia: number;
@@ -45,6 +48,8 @@ export interface AudioModelCapabilities {
 }
 
 export type ModelKind = "chat" | "image" | "video" | "audio";
+export type AudioOperationMode = "tts" | "voice_design" | "voice_clone" | "music" | "sfx" | "asr";
+export type AudioOutputKind = "audio" | "voice_profile" | "transcript";
 export type VideoReferenceMode = "none" | "reference" | "firstLast";
 
 export interface ProviderModelCapability {
@@ -62,6 +67,9 @@ export interface ProviderModelCapability {
   resolutions: ParameterOption[];
   durations: ParameterOption[];
   presets: ParameterOption[];
+  audioModes: AudioOperationMode[];
+  audioOutputKinds: AudioOutputKind[];
+  audioDefaultMode?: AudioOperationMode;
   videoReferenceMode: VideoReferenceMode;
   videoReferenceModes: VideoReferenceMode[];
   maxReferenceImages: number;
@@ -71,6 +79,7 @@ export interface ProviderModelCapability {
 
 export const DEFAULT_IMAGE_MODEL = "12ai:gemini-3.1-flash-image-preview";
 export const DEFAULT_VIDEO_MODEL = "12ai:veo_3_1-fast";
+export const DEFAULT_AUDIO_MODEL = "mimo:mimo-v2.5-tts";
 export const DEFAULT_CHAT_MODEL = "12ai:gemini-3.1-flash-lite-preview";
 /** @deprecated Agent no longer auto-switches models; alias kept for existing imports/tests. */
 export const DEFAULT_VISION_CHAT_MODEL = DEFAULT_CHAT_MODEL;
@@ -719,6 +728,78 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     }),
   ),
   chatCapability({
+    value: "mimo:mimo-v2.5-pro",
+    label: "MiMo V2.5 Pro",
+    provider: "mimo",
+    model: "mimo-v2.5-pro",
+  }),
+  chatCapability({
+    value: "mimo:mimo-v2.5",
+    label: "MiMo V2.5",
+    provider: "mimo",
+    model: "mimo-v2.5",
+  }),
+  chatCapability({
+    value: "mimo:mimo-v2-flash",
+    label: "MiMo V2 Flash",
+    provider: "mimo",
+    model: "mimo-v2-flash",
+  }),
+  audioCapability({
+    value: "mimo:mimo-v2.5-tts",
+    label: "MiMo V2.5 TTS",
+    provider: "mimo",
+    model: "mimo-v2.5-tts",
+    audioModes: ["tts"],
+    supportsReferences: false,
+    maxReferenceMedia: 0,
+    minReferenceMedia: 0,
+    formats: [{ value: "wav", label: "WAV" }],
+  }),
+  audioCapability({
+    value: "mimo:mimo-v2.5-tts-voicedesign",
+    label: "MiMo V2.5 Voice Design",
+    provider: "mimo",
+    model: "mimo-v2.5-tts-voicedesign",
+    audioModes: ["voice_design"],
+    supportsReferences: false,
+    maxReferenceMedia: 0,
+    minReferenceMedia: 0,
+    formats: [
+      { value: "wav", label: "WAV" },
+      { value: "pcm16", label: "PCM16" },
+    ],
+  }),
+  audioCapability({
+    value: "mimo:mimo-v2.5-tts-voiceclone",
+    label: "MiMo V2.5 Voice Clone",
+    provider: "mimo",
+    model: "mimo-v2.5-tts-voiceclone",
+    audioModes: ["voice_clone"],
+    supportsReferences: true,
+    maxReferenceMedia: 1,
+    minReferenceMedia: 1,
+    referenceMediaTypes: ["audio"],
+    formats: [
+      { value: "wav", label: "WAV" },
+      { value: "pcm16", label: "PCM16" },
+    ],
+  }),
+  audioCapability({
+    value: "mimo:mimo-v2.5-asr",
+    label: "MiMo V2.5 ASR",
+    provider: "mimo",
+    model: "mimo-v2.5-asr",
+    audioModes: ["asr"],
+    audioOutputKinds: ["transcript"],
+    audioDefaultMode: "asr",
+    supportsReferences: true,
+    maxReferenceMedia: 1,
+    minReferenceMedia: 1,
+    referenceMediaTypes: ["audio"],
+    formats: [],
+  }),
+  chatCapability({
     value: formatProviderModel("runninghub", RUNNINGHUB_DEFAULT_LLM_MODEL),
     label: "RunningHub Qwen 3.7 Max",
     provider: "runninghub",
@@ -1052,26 +1133,6 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
     minReferenceImages: 0,
     referenceMediaTypes: ["image", "video", "audio"],
   }),
-  audioCapability({
-    value: "runninghub:ai-app-audio:<webappId>",
-    label: "RunningHub AI App Audio",
-    provider: "runninghub",
-    model: "ai-app-audio:<webappId>",
-    supportsReferences: true,
-    maxReferenceMedia: 9,
-    minReferenceMedia: 0,
-    referenceMediaTypes: ["image", "video", "audio"],
-  }),
-  audioCapability({
-    value: "runninghub:workflow-audio:<workflowId>",
-    label: "RunningHub Workflow Audio",
-    provider: "runninghub",
-    model: "workflow-audio:<workflowId>",
-    supportsReferences: true,
-    maxReferenceMedia: 9,
-    minReferenceMedia: 0,
-    referenceMediaTypes: ["image", "video", "audio"],
-  }),
 ];
 
 export const IMAGE_MODEL_OPTIONS = buildProviderOptionsRecord("image", false);
@@ -1145,6 +1206,15 @@ export function isAgentCompatibleModelId(model: string): boolean {
   return true;
 }
 
+export function isMimoWorkbenchTtsModel(value: string): boolean {
+  const parsed = tryParseProviderModel(value, "12ai");
+  return parsed?.provider === "mimo" && (
+    parsed.model === "mimo-v2.5-tts" ||
+    parsed.model === "mimo-v2.5-tts-voicedesign" ||
+    parsed.model === "mimo-v2.5-tts-voiceclone"
+  );
+}
+
 export function getImageModelCapabilities(value: string): ImageModelCapabilities {
   const capability = getKnownCapability(value, "image");
   if (capability) {
@@ -1201,7 +1271,11 @@ export function getVideoModelCapabilities(value: string): VideoModelCapabilities
 
 export function getAudioModelCapabilities(value: string): AudioModelCapabilities {
   const capability = getKnownCapability(value, "audio");
+  const modes = capability?.audioModes ?? ["tts"];
   return {
+    modes,
+    outputKinds: capability?.audioOutputKinds ?? ["audio"],
+    defaultMode: capability?.audioDefaultMode ?? modes[0] ?? "tts",
     formats: capability?.presets ?? [],
     durations: capability?.durations ?? [],
     maxReferenceMedia: capability?.maxReferenceImages ?? 0,
@@ -1285,6 +1359,9 @@ interface VideoCapabilityInput extends CapabilityInput {
 }
 
 interface AudioCapabilityInput extends CapabilityInput {
+  audioModes?: AudioOperationMode[];
+  audioOutputKinds?: AudioOutputKind[];
+  audioDefaultMode?: AudioOperationMode;
   supportsReferences: boolean;
   formats?: ParameterOption[];
   durations?: ParameterOption[];
@@ -1309,6 +1386,8 @@ function imageCapability(input: ImageCapabilityInput): ProviderModelCapability {
     resolutions: [],
     durations: [],
     presets: [],
+    audioModes: [],
+    audioOutputKinds: [],
     videoReferenceMode: "none",
     videoReferenceModes: [],
     maxReferenceImages: input.maxReferenceImages ?? 0,
@@ -1333,6 +1412,8 @@ function videoCapability(input: VideoCapabilityInput): ProviderModelCapability {
     resolutions: input.resolutions ?? [],
     durations: input.durations ?? [],
     presets: input.presets ?? [],
+    audioModes: [],
+    audioOutputKinds: [],
     videoReferenceMode: input.videoReferenceMode,
     videoReferenceModes: input.videoReferenceModes ?? (input.videoReferenceMode === "none" ? [] : [input.videoReferenceMode]),
     maxReferenceImages: input.maxReferenceImages,
@@ -1342,6 +1423,7 @@ function videoCapability(input: VideoCapabilityInput): ProviderModelCapability {
 }
 
 function audioCapability(input: AudioCapabilityInput): ProviderModelCapability {
+  const audioModes = input.audioModes ?? ["tts"];
   return {
     value: input.value,
     label: input.label,
@@ -1357,6 +1439,9 @@ function audioCapability(input: AudioCapabilityInput): ProviderModelCapability {
     resolutions: [],
     durations: input.durations ?? [],
     presets: input.formats ?? [],
+    audioModes,
+    audioOutputKinds: input.audioOutputKinds ?? ["audio"],
+    audioDefaultMode: input.audioDefaultMode ?? audioModes[0],
     videoReferenceMode: "none",
     videoReferenceModes: [],
     maxReferenceImages: input.maxReferenceMedia,
@@ -1381,6 +1466,8 @@ function chatCapability(input: CapabilityInput): ProviderModelCapability {
     resolutions: [],
     durations: [],
     presets: [],
+    audioModes: [],
+    audioOutputKinds: [],
     videoReferenceMode: "none",
     videoReferenceModes: [],
     maxReferenceImages: 0,
@@ -1552,21 +1639,8 @@ function greatestCommonDivisor(a: number, b: number): number {
 
 function runningHubVirtualCapability(model: string, kind?: ModelKind): ProviderModelCapability {
   const lower = model.toLowerCase();
-  const isAudio = lower.includes("audio");
   const isVideo = lower.includes("video");
-  const resolvedKind: ModelKind = kind ?? (isAudio ? "audio" : isVideo ? "video" : "image");
-  if (resolvedKind === "audio") {
-    return audioCapability({
-      value: formatProviderModel("runninghub", model),
-      label: `RunningHub ${model}`,
-      provider: "runninghub",
-      model,
-      supportsReferences: true,
-      maxReferenceMedia: 9,
-      minReferenceMedia: 0,
-      referenceMediaTypes: ["image", "video", "audio"],
-    });
-  }
+  const resolvedKind: ModelKind = kind ?? (isVideo ? "video" : "image");
   if (resolvedKind === "video") {
     return videoCapability({
       value: formatProviderModel("runninghub", model),

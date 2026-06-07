@@ -100,7 +100,7 @@ import { BOARD_INSERT_CATALOG, type BoardInsertKind } from "@/lib/board/insert-c
 import { findResultNodeForSource, resultNodeDefaultPosition } from "@/lib/board/utils";
 import { findAvailableBoardNodePosition } from "@/lib/board/placement";
 import type { GenerationTask } from "@/lib/generation-tasks";
-import { DEFAULT_VIDEO_MODEL } from "@/lib/providers/model-catalog";
+import { DEFAULT_AUDIO_MODEL, DEFAULT_VIDEO_MODEL } from "@/lib/providers/model-catalog";
 
 interface BoardWorkspaceProps {
   boardSummaries: BoardSummary[];
@@ -272,7 +272,7 @@ function findPromptReferenceTargetNodeId(
 ): string | null {
   const node = nodes.find(item => item.id === nodeId);
   if (!node) return null;
-  if (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app") return node.id;
+  if (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation" || node.kind === "runninghub-app") return node.id;
   if (node.kind !== "prompt") return null;
 
   const targetGenerateIds = Array.from(new Set(
@@ -670,6 +670,9 @@ function pasteMediaFiles(dataTransfer: DataTransfer): File[] {
 }
 
 function storageItemToBoardAsset(item: StorageItem): CreateAssetNodeInput["asset"] {
+  if (item.type === "transcript") {
+    throw new Error("Transcript items cannot be placed as board media assets");
+  }
   return {
     assetId: item.id,
     type: item.type,
@@ -763,7 +766,7 @@ function isActiveBoardGenerationTask(task: GenerationTask): task is GenerationTa
 
 function isCurrentGenerateStackItem(item: StorageItem, node: BoardNodeModel): boolean {
   return (
-    (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app") &&
+    (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation" || node.kind === "runninghub-app") &&
     item.sourceBoardNodeId === node.id &&
     (!node.resultStackKey || item.sourceBoardResultStackKey === node.resultStackKey)
   );
@@ -771,7 +774,7 @@ function isCurrentGenerateStackItem(item: StorageItem, node: BoardNodeModel): bo
 
 function isCurrentGenerateStackTask(task: GenerationTask, node: BoardNodeModel): boolean {
   return (
-    (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app") &&
+    (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation" || node.kind === "runninghub-app") &&
     task.source.boardNodeId === node.id &&
     (!node.resultStackKey || task.source.resultStackKey === node.resultStackKey)
   );
@@ -789,8 +792,8 @@ function buildGenerationTaskFingerprint(tasks: GenerationTask[]): string {
     .join("|");
 }
 
-function isResultSourceNode(node: BoardNodeModel | undefined): node is Extract<BoardNodeModel, { kind: "image-generate" | "video-generate" | "runninghub-app" }> {
-  return node?.kind === "image-generate" || node?.kind === "video-generate" || node?.kind === "runninghub-app";
+function isResultSourceNode(node: BoardNodeModel | undefined): node is Extract<BoardNodeModel, { kind: "image-generate" | "video-generate" | "audio-operation" | "runninghub-app" }> {
+  return node?.kind === "image-generate" || node?.kind === "video-generate" || node?.kind === "audio-operation" || node?.kind === "runninghub-app";
 }
 
 async function copyImageUrlToClipboard(url: string): Promise<void> {
@@ -835,7 +838,7 @@ function batchConnectionToTarget(
     if (target.kind === "agent" && outputPort.portKind === "asset") {
       return { portId: BOARD_PORT_IDS.agentContextIn, portKind: "agent" as const };
     }
-    if (target.kind === "image-generate" || target.kind === "video-generate" || target.kind === "runninghub-app") {
+    if (target.kind === "image-generate" || target.kind === "video-generate" || target.kind === "audio-operation" || target.kind === "runninghub-app") {
       return outputPort.portKind === "prompt"
         ? { portId: BOARD_PORT_IDS.promptIn, portKind: "prompt" as const }
         : { portId: BOARD_PORT_IDS.referenceIn, portKind: "asset" as const };
@@ -1101,7 +1104,7 @@ export default function BoardWorkspace({
 
   useEffect(() => {
     const undersizedGenerateNode = board.nodes.find(node =>
-      (node.kind === "image-generate" || node.kind === "video-generate") &&
+      (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation") &&
       (node.size.width < DEFAULT_GENERATE_NODE_SIZE.width || node.size.height < DEFAULT_GENERATE_NODE_SIZE.height),
     );
     if (undersizedGenerateNode) {
@@ -1255,7 +1258,7 @@ export default function BoardWorkspace({
     const generateRefsByNodeId = new Map<string, BoardPromptReference[]>();
     const promptRefsByNodeId = new Map<string, BoardPromptReference[]>();
     for (const node of board.nodes) {
-      if (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app") {
+      if (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation" || node.kind === "runninghub-app") {
         generateRefsByNodeId.set(node.id, buildBoardPromptReferences({
           nodes: board.nodes,
           edges: board.edges,
@@ -1279,14 +1282,17 @@ export default function BoardWorkspace({
       const resultAssetIds = node.kind === "result"
         ? node.resultAssetIds
         : connectedResultNode?.resultAssetIds;
+      const assetStackItems = node.kind === "asset"
+        ? [galleryItemById.get(node.asset.assetId)].filter((item): item is StorageItem => item !== undefined && item.status === "complete")
+        : resultAssetIds
+          ? resultAssetIds.map(id => galleryItemById.get(id)).filter((item): item is StorageItem => item !== undefined && item.status === "complete")
+          : [];
       dataById.set(node.id, {
         boardId: board.id,
         generateInputSummary: generateInputSummaryForNode(node, boardPromptReferenceGraphIndex),
         hasResultConnection: connectedResultNode !== undefined,
         activeResultAssetId: connectedResultNode?.activeAssetId,
-        assetStackItems: resultAssetIds
-          ? resultAssetIds.map(id => galleryItemById.get(id)).filter((item): item is StorageItem => item !== undefined && item.status === "complete")
-          : [],
+        assetStackItems,
         node,
         resultItems: connectedResultNode
           ? connectedResultNode.resultAssetIds.map(id => galleryItemById.get(id)).filter((item): item is StorageItem => item !== undefined && item.status === "complete")
@@ -1430,7 +1436,7 @@ export default function BoardWorkspace({
           throw new Error(`Missing flow data for board node ${node.id}`);
         }
         const taskSummary =
-          node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app"
+          node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation" || node.kind === "runninghub-app"
             ? generateTaskByNodeId.get(node.id)
             : undefined;
         const existing = prevData.get(node.id);
@@ -1764,6 +1770,9 @@ export default function BoardWorkspace({
     if (kind === "agent") return addAgentNode({ position });
     if (kind === "note") return addNoteNode({ position });
     if (kind === "runninghub-app") return addRunningHubAppNode({ position });
+    if (kind === "audio-operation") {
+      return addGenerateNode({ kind: "audio-operation", model: DEFAULT_AUDIO_MODEL, position });
+    }
     if (kind === "video-generate") {
       return addGenerateNode({ kind: "video-generate", model: DEFAULT_VIDEO_MODEL, aspectRatio: "auto", position });
     }
@@ -1820,6 +1829,21 @@ export default function BoardWorkspace({
       }
       return;
     }
+    if (kind === "audio-operation") {
+      try {
+        const targetPortId = from.portKind === "prompt" ? BOARD_PORT_IDS.promptIn : BOARD_PORT_IDS.referenceIn;
+        const connections = quickInsertSourceRefs(board.nodes, from, selectionSnapshot)
+          .map(sourceRef => ({ from: sourceRef, targetPortId }));
+        addGenerateNodeWithConnections(
+          { kind: "audio-operation", model: DEFAULT_AUDIO_MODEL, position: centeredNodePosition(point, DEFAULT_GENERATE_NODE_SIZE) },
+          connections,
+        );
+        setQuickInsertMenu(null);
+      } catch (error) {
+        onConnectionError(error instanceof Error ? error.message : "连接失败");
+      }
+      return;
+    }
     if (kind === "reference-group") {
       const assetNodeIds = referenceGroupAssetNodeIds(board.nodes, from.nodeId, selectionSnapshot);
       if (assetNodeIds.length === 0) return;
@@ -1843,19 +1867,20 @@ export default function BoardWorkspace({
     if (!from) return [BOARD_QUICK_INSERT_IMPORT_ITEM, ...BOARD_INSERT_CATALOG];
     const sourceNode = board.nodes.find(node => node.id === from.nodeId);
     if (from.portKind === "prompt") {
-      return BOARD_INSERT_CATALOG.filter(item => item.kind === "image-generate" || item.kind === "video-generate" || item.kind === "runninghub-app");
+      return BOARD_INSERT_CATALOG.filter(item => item.kind === "image-generate" || item.kind === "video-generate" || item.kind === "audio-operation" || item.kind === "runninghub-app");
     }
     if (from.portKind !== "asset") return [];
     if (sourceNode?.kind === "asset") {
       return BOARD_INSERT_CATALOG.filter(item =>
         item.kind === "image-generate" ||
         item.kind === "video-generate" ||
+        item.kind === "audio-operation" ||
         item.kind === "reference-group" ||
         item.kind === "runninghub-app",
       );
     }
     if (sourceNode?.kind === "reference-group") {
-      return BOARD_INSERT_CATALOG.filter(item => item.kind === "image-generate" || item.kind === "video-generate" || item.kind === "runninghub-app");
+      return BOARD_INSERT_CATALOG.filter(item => item.kind === "image-generate" || item.kind === "video-generate" || item.kind === "audio-operation" || item.kind === "runninghub-app");
     }
     return [];
   }, [board.nodes, quickInsertMenu?.connectionFrom]);
@@ -2000,6 +2025,32 @@ export default function BoardWorkspace({
       rememberPastedPosition();
       return;
     }
+    if (node.kind === "audio-operation") {
+      const inputConnections = inputEdges
+        .map(edge => ({ from: edge.from, targetPortId: edge.to.portId }))
+        .filter((connection): connection is { from: BoardPortRef; targetPortId: typeof BOARD_PORT_IDS.promptIn | typeof BOARD_PORT_IDS.referenceIn } =>
+          connection.targetPortId === BOARD_PORT_IDS.promptIn || connection.targetPortId === BOARD_PORT_IDS.referenceIn,
+        );
+      const input = {
+        kind: "audio-operation",
+        audioFormat: node.audioFormat,
+        audioMode: node.audioMode,
+        audioStylePrompt: node.audioStylePrompt,
+        asrLanguage: node.asrLanguage,
+        model: node.model,
+        position,
+        prompt: node.prompt,
+        size: node.size,
+        title: node.title,
+        variantCount: node.variantCount,
+        voiceCloneConsentAccepted: node.voiceCloneConsentAccepted,
+        voiceProfileId: node.voiceProfileId,
+      } as const;
+      if (inputConnections.length > 0) addGenerateNodeWithConnections(input, inputConnections);
+      else addGenerateNode(input);
+      rememberPastedPosition();
+      return;
+    }
     if (node.kind === "runninghub-app") {
       addRunningHubAppNode({
         accessPassword: node.accessPassword,
@@ -2037,7 +2088,7 @@ export default function BoardWorkspace({
       rememberPastedPosition();
       return;
     }
-    addNoteNode({ body: node.body, position, size: node.size, title: node.title });
+    addNoteNode({ body: node.body, position, size: node.size, source: node.source, title: node.title, variant: node.variant });
     rememberPastedPosition();
   }, [addAgentNode, addAssetNode, addGenerateNode, addGenerateNodeWithConnections, addGroupNode, addNoteNode, addPromptNode, addReferenceGroupNode, addResultNodeWithConnection, addRunningHubAppNode, board.nodes]);
 
@@ -2546,7 +2597,7 @@ export default function BoardWorkspace({
                 onEditAssetImage(node.id);
                 closeOverlayMenus();
               } : undefined,
-              onExecute: node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "runninghub-app"
+              onExecute: node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation" || node.kind === "runninghub-app"
                 ? () => {
                   onExecuteGenerateNode(node.id);
                   closeOverlayMenus();

@@ -1,6 +1,7 @@
 import { useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from "react";
 import { RefreshCw, Sparkles, Video as VideoIcon } from "lucide-react";
 import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
+import ModelSelectCombobox, { type ModelOptionGroup } from "@/components/creation/ModelSelectCombobox";
 import ModelPriceBadge from "@/components/creation/ModelPriceBadge";
 import ReferenceImagePicker, { type ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import PromptReferenceInlineOverlay, { resolvePromptReferenceThumbnails } from "@/components/reference/PromptReferenceThumbnailStrip";
@@ -13,14 +14,8 @@ import {
   type PromptTemplateApplyMode,
   type PromptTemplateSlashCommand,
 } from "@/lib/prompt-templates";
-import type { ModelOption, ParameterOption, VideoModelCapabilities, VideoReferenceMode } from "@/lib/providers/model-catalog";
+import type { ParameterOption, VideoModelCapabilities, VideoReferenceMode } from "@/lib/providers/model-catalog";
 import { selectVideoReferenceTypesForMode } from "@/lib/video-reference-selection";
-
-interface ModelOptionGroup {
-  provider: string;
-  label: string;
-  options: ModelOption[];
-}
 
 interface VideoGenerationPanelProps {
   atDropdownNode: ReactNode;
@@ -111,6 +106,7 @@ export default function VideoGenerationPanel({
 }: VideoGenerationPanelProps) {
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
   const [slashCommand, setSlashCommand] = useState<PromptTemplateSlashCommand | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
   const acceptedReferenceText = capabilities.referenceMediaTypes.includes("audio")
     ? "图片 / 视频 / 音频"
     : capabilities.referenceMediaTypes.includes("video")
@@ -187,19 +183,38 @@ export default function VideoGenerationPanel({
           </div>
         </div>
 
-        <div className="imagine-field-shell relative p-3">
+        <div className={`imagine-field-shell relative p-3 transition-all duration-200 ${
+          isDragOver ? "border-blue-400/40 ring-2 ring-blue-400/40" : ""
+        }`}>
           {atDropdownNode}
           <div className="relative">
             <textarea
               value={prompt}
               onChange={(event) => handlePromptChange(event.target.value, event.target.selectionStart)}
+              onDragEnter={(event) => {
+                if (!hasDraggedReferenceAsset(event.dataTransfer)) return;
+                event.preventDefault();
+                setIsDragOver(true);
+              }}
               onDragOver={(event) => {
                 if (!hasDraggedReferenceAsset(event.dataTransfer)) return;
                 event.dataTransfer.dropEffect = "copy";
+                event.preventDefault();
               }}
-              onDrop={onPromptDropAsset}
+              onDragLeave={(event) => {
+                const relatedTarget = event.relatedTarget;
+                if (!(relatedTarget instanceof Node) || !event.currentTarget.contains(relatedTarget)) {
+                  setIsDragOver(false);
+                }
+              }}
+              onDrop={(event) => {
+                setIsDragOver(false);
+                onPromptDropAsset(event);
+              }}
               placeholder={promptPlaceholder}
-              className={`imagine-field-textarea relative z-10 h-24 text-sm leading-6 caret-[var(--iw-text)] ${
+              className={`imagine-field-textarea relative z-10 h-24 text-sm leading-6 caret-[var(--iw-text)] transition-all duration-200 ${
+                isDragOver ? "scale-[1.01]" : ""
+              } ${
                 promptReferenceThumbnails.length > 0 ? "!text-transparent" : ""
               }`}
             />
@@ -218,22 +233,16 @@ export default function VideoGenerationPanel({
         </div>
       </div>
 
-      <div className={`grid grid-cols-1 gap-3 ${controlGridClass}`}>
+      <div className="grid grid-cols-1 gap-3">
         <div>
           <label className="imagine-section-label mb-1.5 block">视频生成模型</label>
-          <select
+          <ModelSelectCombobox
+            accent="violet"
+            ariaLabel="选择视频模型"
+            groups={modelGroups}
             value={selectedModel}
-            onChange={(event) => onSelectModel(event.target.value)}
-            className="imagine-select py-2.5"
-          >
-            {modelGroups.map(group => (
-              <optgroup key={group.provider} label={group.label}>
-                {group.options.map(option => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
+            onChange={onSelectModel}
+          />
         </div>
 
         <div>
@@ -346,7 +355,7 @@ export default function VideoGenerationPanel({
           type="button"
           onClick={onGenerate}
           disabled={!prompt.trim()}
-          className={`imagine-primary-action mt-1 flex w-full items-center justify-center gap-2 rounded-lg py-3 text-xs font-bold transition duration-200 ${
+          className={`imagine-primary-action mt-1 flex w-full items-center justify-center gap-2 rounded-lg py-3 text-xs font-bold transition duration-[160ms] ${
             !prompt.trim()
               ? "cursor-not-allowed opacity-60"
               : "cursor-pointer bg-violet-600 text-white shadow-lg shadow-violet-950/30 hover:bg-violet-500 active:scale-[0.98]"

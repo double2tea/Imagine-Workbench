@@ -1,6 +1,7 @@
-import { Music, Sliders } from "lucide-react";
+import { FileText, Music, Sliders } from "lucide-react";
 import PreviewImage from "@/components/PreviewImage";
 import type { StorageItem } from "@/lib/db";
+import { transcriptFromDataUrl } from "@/lib/transcripts";
 
 export type CompareViewType = "side-by-side" | "wipe-slider";
 
@@ -43,10 +44,17 @@ function CompareFrame({ item, tone }: { item: StorageItem; tone: "blue" | "amber
             <PreviewImage src={item.url} alt={isBlue ? "对比 A" : "对比 B"} className="h-full w-full object-cover" />
           ) : item.type === "video" ? (
             <video src={item.url} controls loop preload="metadata" className="h-full w-full object-cover" />
-          ) : (
+          ) : item.type === "audio" ? (
             <div className="flex w-full flex-col items-center justify-center gap-3 px-3">
               <Music className="h-5 w-5 text-[var(--iw-faint)]" />
               <audio src={item.url} controls className="w-full" />
+            </div>
+          ) : (
+            <div className="flex h-full w-full flex-col gap-2 p-3">
+              <FileText className="h-4 w-4 shrink-0 text-cyan-300" />
+              <p className="line-clamp-6 whitespace-pre-wrap text-xs leading-5 text-[var(--iw-muted)]">
+                {transcriptFromDataUrl(item.url) || "无转写文本"}
+              </p>
             </div>
           )}
         </div>

@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Bot,
+  AudioLines,
   FileText,
   ImagePlus,
   Layers,
@@ -23,6 +24,7 @@ export type BoardInsertKind =
   | "reference-group"
   | "image-generate"
   | "video-generate"
+  | "audio-operation"
   | "runninghub-app"
   | "agent"
   | "note";
@@ -67,6 +69,14 @@ export const BOARD_INSERT_CATALOG: BoardInsertCatalogItem[] = [
     iconSurfaceClassName: "bg-violet-500/10 border-violet-400/20",
     kind: "video-generate",
     label: "视频",
+    size: DEFAULT_GENERATE_NODE_SIZE,
+  },
+  {
+    icon: AudioLines,
+    iconClassName: "text-cyan-300",
+    iconSurfaceClassName: "bg-cyan-500/10 border-cyan-400/20",
+    kind: "audio-operation",
+    label: "音频",
     size: DEFAULT_GENERATE_NODE_SIZE,
   },
   {
