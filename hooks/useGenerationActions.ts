@@ -25,6 +25,7 @@ import type { RunningHubTaskNodeBinding } from "@/lib/providers/types";
 import { buildPromptWithReferenceMap } from "@/hooks/useReferenceState";
 import { getMediaReferenceType, mediaReferenceLabel } from "@/lib/media-references";
 import { getAudioModelCapabilities, getImageModelCapabilities, getVideoModelCapabilities, parseProviderModel, type AudioOperationMode, type VideoReferenceMode } from "@/lib/providers/model-catalog";
+import { getProviderMeta } from "@/lib/providers/registry";
 import { getReferenceImagePayloadError, getReferenceMediaPayloadError, prepareReferenceImageUrlForRequest, prepareReferenceMediaUrlForRequest } from "@/lib/reference-images";
 import { selectVideoReferencesForMode } from "@/lib/video-reference-selection";
 import { getVoiceProfile } from "@/lib/voice-profiles";
@@ -799,7 +800,10 @@ export function useGenerationActions({
         }, pushWorkspaceNotice);
         if (processingTask) recordGenerationTask(processingTask);
       } else {
-        throw new Error(await readFetchError(res, "音频生成请求失败"));
+        const parsedModel = parseProviderModel(requestModel, "12ai");
+        const providerLabel = getProviderMeta(parsedModel.provider).label;
+        const message = await readFetchError(res, "音频生成请求失败");
+        throw new Error(`${providerLabel}（${requestModel}）音频生成请求失败：${message}`);
       }
     } catch (error) {
       if (locallyCanceledItemIdsRef.current.has(taskId) || isAbortError(error)) {

@@ -120,6 +120,8 @@ export default function AudioGenerationPanel({
     [referenceImages],
   );
   const canSaveVoiceProfile = mode === "voice_design" || mode === "voice_clone";
+  const canUseVoiceProfile = mode === "tts" || canSaveVoiceProfile;
+  const showVoiceProfileLibrary = canUseVoiceProfile && (canSaveVoiceProfile || visibleVoiceProfiles.length > 0 || selectedVoiceProfile !== undefined);
   const needsCloneConsent = mode === "voice_clone";
   const stylePromptLabel = mode === "voice_design" ? "音色描述" : mode === "voice_clone" ? "演绎风格" : "风格提示";
 
@@ -353,60 +355,64 @@ export default function AudioGenerationPanel({
         </div>
       )}
 
-      <div className="rounded-md border border-cyan-400/15 bg-cyan-500/8 p-3">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <label className="imagine-section-label">音色库</label>
-          {selectedVoiceProfile && (
-            <button
-              type="button"
-              onClick={() => void handleDeleteVoiceProfile()}
-              className="flex h-7 items-center gap-1 rounded-md border border-red-400/20 px-2 text-[10px] font-semibold text-red-200 transition hover:bg-red-500/10"
+      {showVoiceProfileLibrary && (
+        <div className="rounded-md border border-cyan-400/15 bg-cyan-500/8 p-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <label className="imagine-section-label">音色库</label>
+            {selectedVoiceProfile && (
+              <button
+                type="button"
+                onClick={() => void handleDeleteVoiceProfile()}
+                className="flex h-7 items-center gap-1 rounded-md border border-red-400/20 px-2 text-[10px] font-semibold text-red-200 transition hover:bg-red-500/10"
+              >
+                <Trash2 className="h-3 w-3" />
+                删除
+              </button>
+            )}
+          </div>
+          <div className={`grid grid-cols-1 gap-2 ${canSaveVoiceProfile ? "sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]" : ""}`}>
+            <select
+              value={selectedVoiceProfileId}
+              onChange={event => onSelectVoiceProfile(event.target.value)}
+              className="imagine-select h-9 py-0 text-xs"
             >
-              <Trash2 className="h-3 w-3" />
-              删除
-            </button>
+              <option value="">不使用保存音色</option>
+              {visibleVoiceProfiles.map(profile => (
+                <option key={profile.id} value={profile.id}>{profile.name}</option>
+              ))}
+            </select>
+            {canSaveVoiceProfile && (
+              <>
+                <input
+                  value={voiceProfileName}
+                  onChange={event => setVoiceProfileName(event.target.value)}
+                  placeholder="新音色名称"
+                  className="imagine-input h-9 rounded-md px-3 text-xs"
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleSaveVoiceProfile()}
+                  className="imagine-secondary-action h-9 rounded-md border px-3 text-xs font-semibold"
+                >
+                  保存
+                </button>
+              </>
+            )}
+          </div>
+          {needsCloneConsent && (
+            <label className="mt-2 flex items-start gap-2 text-[11px] leading-5 text-cyan-100">
+              <input
+                type="checkbox"
+                checked={voiceCloneConsentAccepted}
+                onChange={event => onVoiceCloneConsentChange(event.target.checked)}
+                className="mt-1 h-3.5 w-3.5 rounded border-cyan-400/30 bg-slate-950 text-cyan-500 focus:ring-cyan-400/30"
+              />
+              我确认拥有参考音频的使用权，并允许用于本次音色克隆。
+            </label>
           )}
+          {voiceProfileMessage && <p className="mt-2 text-[11px] text-cyan-100">{voiceProfileMessage}</p>}
         </div>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-          <select
-            value={selectedVoiceProfileId}
-            onChange={event => onSelectVoiceProfile(event.target.value)}
-            className="imagine-select h-9 py-0 text-xs"
-          >
-            <option value="">不使用保存音色</option>
-            {visibleVoiceProfiles.map(profile => (
-              <option key={profile.id} value={profile.id}>{profile.name}</option>
-            ))}
-          </select>
-          <input
-            value={voiceProfileName}
-            onChange={event => setVoiceProfileName(event.target.value)}
-            placeholder={canSaveVoiceProfile ? "新音色名称" : "切到设计/克隆后保存"}
-            disabled={!canSaveVoiceProfile}
-            className="imagine-input h-9 rounded-md px-3 text-xs disabled:cursor-not-allowed disabled:opacity-60"
-          />
-          <button
-            type="button"
-            onClick={() => void handleSaveVoiceProfile()}
-            disabled={!canSaveVoiceProfile}
-            className="imagine-secondary-action h-9 rounded-md border px-3 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            保存
-          </button>
-        </div>
-        {needsCloneConsent && (
-          <label className="mt-2 flex items-start gap-2 text-[11px] leading-5 text-cyan-100">
-            <input
-              type="checkbox"
-              checked={voiceCloneConsentAccepted}
-              onChange={event => onVoiceCloneConsentChange(event.target.checked)}
-              className="mt-1 h-3.5 w-3.5 rounded border-cyan-400/30 bg-slate-950 text-cyan-500 focus:ring-cyan-400/30"
-            />
-            我确认拥有参考音频的使用权，并允许用于本次音色克隆。
-          </label>
-        )}
-        {voiceProfileMessage && <p className="mt-2 text-[11px] text-cyan-100">{voiceProfileMessage}</p>}
-      </div>
+      )}
 
       {showGenerateButton && (
         <button

@@ -1093,6 +1093,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const pollingFailuresRef = useRef<Record<string, number>>({});
   const generationAbortControllersRef = useRef<Record<string, AbortController>>({});
   const locallyCanceledItemIdsRef = useRef<Set<string>>(new Set());
+  const workspaceNoticeSequenceRef = useRef(0);
   const confirmAction = useConfirm();
 
   const dismissWorkspaceNotice = useCallback((id: string) => {
@@ -1100,7 +1101,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   }, []);
 
   const pushWorkspaceNotice = useCallback((type: NoticeType, message: string) => {
-    const id = makeClientId("notice");
+    workspaceNoticeSequenceRef.current += 1;
+    const id = `${makeClientId("notice")}_${workspaceNoticeSequenceRef.current}`;
     setWorkspaceNotices(prev => [{ id, type, message }, ...prev].slice(0, 4));
     window.setTimeout(() => dismissWorkspaceNotice(id), 8000);
   }, [dismissWorkspaceNotice]);

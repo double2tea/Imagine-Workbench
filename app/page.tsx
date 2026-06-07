@@ -291,6 +291,7 @@ export default function Home() {
   const pollingFailuresRef = useRef<Record<string, number>>({});
   const generationAbortControllersRef = useRef<Record<string, AbortController>>({});
   const locallyCanceledItemIdsRef = useRef<Set<string>>(new Set());
+  const workspaceNoticeSequenceRef = useRef(0);
   const isAgentDockSuppressed = showSettings || isMaskOpen || fullscreenItem !== null || panoramaItem !== null;
 
   const dismissWorkspaceNotice = useCallback((id: string) => {
@@ -298,7 +299,8 @@ export default function Home() {
   }, [setWorkspaceNotices]);
 
   const pushWorkspaceNotice = useCallback((type: NoticeType, message: string) => {
-    const id = makeClientId("notice");
+    workspaceNoticeSequenceRef.current += 1;
+    const id = `${makeClientId("notice")}_${workspaceNoticeSequenceRef.current}`;
     setWorkspaceNotices(prev => [{ id, type, message }, ...prev].slice(0, 4));
   }, [setWorkspaceNotices]);
 
