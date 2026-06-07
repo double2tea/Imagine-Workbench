@@ -1556,14 +1556,18 @@ export default function BoardWorkspace({
     closeOverlayMenus();
   }, [closeOverlayMenus]);
 
+  const openNodeContextMenu = useCallback((nodeId: string, clientX: number, clientY: number): void => {
+    closeOverlayMenus();
+    setNodeContextMenu({ nodeId, clientX, clientY });
+    selectNode(nodeId);
+    selectEdge(null);
+    if (selectedNodeIds.length <= 1) updateSelectedNodeIds([nodeId]);
+  }, [closeOverlayMenus, selectEdge, selectedNodeIds.length, selectNode, updateSelectedNodeIds]);
+
   const handleNodeContextMenu = useCallback<NodeMouseHandler<BoardFlowNode>>((event, node) => {
     event.preventDefault();
-    closeOverlayMenus();
-    setNodeContextMenu({ nodeId: node.id, clientX: event.clientX, clientY: event.clientY });
-    selectNode(node.id);
-    selectEdge(null);
-    if (selectedNodeIds.length <= 1) updateSelectedNodeIds([node.id]);
-  }, [closeOverlayMenus, selectEdge, selectedNodeIds.length, selectNode, updateSelectedNodeIds]);
+    openNodeContextMenu(node.id, event.clientX, event.clientY);
+  }, [openNodeContextMenu]);
 
   const handleReconnect = useCallback<OnReconnect<BoardFlowEdge>>((oldEdge, newConnection) => {
     const refs = readValidConnectionRefs(newConnection);
@@ -2085,6 +2089,18 @@ export default function BoardWorkspace({
     });
   }, [flowPositionFromClient, selectEdge, selectNode, updateSelectedNodeIds]);
 
+  const handleCanvasContextMenu = useCallback((event: ReactMouseEvent<HTMLElement>): void => {
+    if (event.defaultPrevented || isTextEntryTarget(event.target)) return;
+    event.preventDefault();
+    const position = flowPositionFromClient(event.clientX, event.clientY);
+    const node = boardNodeAtPoint(board.nodes, position, "");
+    if (node) {
+      openNodeContextMenu(node.id, event.clientX, event.clientY);
+      return;
+    }
+    openQuickInsertMenu(event);
+  }, [board.nodes, flowPositionFromClient, openNodeContextMenu, openQuickInsertMenu]);
+
   const handleFlowDoubleClick = useCallback((event: ReactMouseEvent<HTMLElement>): void => {
     if (!(event.target instanceof Element) || !event.target.closest(".react-flow__pane")) return;
     if (
@@ -2311,6 +2327,7 @@ export default function BoardWorkspace({
         <section
           ref={flowHostRef}
           tabIndex={-1}
+          onContextMenu={handleCanvasContextMenu}
           onDoubleClick={handleFlowDoubleClick}
           onDragOver={handleBoardDragOver}
           onDrop={handleBoardDrop}
