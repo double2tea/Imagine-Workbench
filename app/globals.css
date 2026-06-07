@@ -145,6 +145,70 @@ html[data-imagine-theme="light"],
   box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25), var(--iw-card-shadow);
 }
 
+.board-group-node-shell {
+  overflow: visible;
+  border: 1.5px solid rgba(52, 211, 153, 0.72);
+  background:
+    linear-gradient(180deg, rgba(16, 185, 129, 0.11), rgba(16, 185, 129, 0.055));
+  box-shadow:
+    0 0 0 1px rgba(6, 78, 59, 0.42),
+    0 16px 42px rgba(0, 0, 0, 0.18),
+    inset 0 0 0 1px rgba(167, 243, 208, 0.12);
+}
+
+.board-group-node-shell::before {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  pointer-events: none;
+  border: 1px dashed rgba(110, 231, 183, 0.28);
+  border-radius: 6px;
+}
+
+.board-group-node-shell[data-selected="true"] {
+  border-color: rgba(251, 191, 36, 0.95);
+  box-shadow:
+    0 0 0 2px rgba(245, 158, 11, 0.24),
+    0 0 0 1px rgba(52, 211, 153, 0.48),
+    0 18px 48px rgba(0, 0, 0, 0.22),
+    inset 0 0 0 1px rgba(254, 243, 199, 0.18);
+}
+
+.board-group-node-title,
+.board-group-node-title-input {
+  height: 26px;
+  max-width: 100%;
+  border-radius: 8px;
+  border: 1px solid rgba(52, 211, 153, 0.7);
+  background: rgba(6, 78, 59, 0.96);
+  color: #d1fae5;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.board-group-node-title {
+  padding: 0 9px;
+}
+
+.board-group-node-title svg {
+  color: #34d399;
+}
+
+.board-group-node-title-input {
+  width: 192px;
+  padding: 0 9px;
+  outline: none;
+}
+
+.board-group-node-title-input:focus {
+  border-color: rgba(251, 191, 36, 0.9);
+  box-shadow:
+    0 0 0 2px rgba(245, 158, 11, 0.24),
+    0 8px 22px rgba(0, 0, 0, 0.22);
+}
+
 .react-flow__node.dragging .imagine-board-node {
   box-shadow: 0 0 0 1px var(--iw-board-border);
 }
@@ -2969,6 +3033,48 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 .imagine-workbench-shell.imagine-theme-light .imagine-board-node[data-selected="true"] {
   border-color: var(--iw-board-accent-amber) !important;
   box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.2), 0 4px 12px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.04) !important;
+}
+
+.imagine-workbench-shell.imagine-theme-light .board-group-node-shell {
+  border-color: rgba(5, 150, 105, 0.7);
+  background:
+    linear-gradient(180deg, rgba(16, 185, 129, 0.14), rgba(16, 185, 129, 0.075));
+  box-shadow:
+    0 0 0 1px rgba(4, 120, 87, 0.14),
+    0 14px 34px rgba(15, 23, 42, 0.08),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.72);
+}
+
+.imagine-workbench-shell.imagine-theme-light .board-group-node-shell::before {
+  border-color: rgba(5, 150, 105, 0.32);
+}
+
+.imagine-workbench-shell.imagine-theme-light .board-group-node-shell[data-selected="true"] {
+  border-color: rgba(217, 119, 6, 0.9);
+  box-shadow:
+    0 0 0 2px rgba(217, 119, 6, 0.22),
+    0 0 0 1px rgba(5, 150, 105, 0.24),
+    0 14px 34px rgba(15, 23, 42, 0.1),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.82);
+}
+
+.imagine-workbench-shell.imagine-theme-light .board-group-node-title,
+.imagine-workbench-shell.imagine-theme-light .board-group-node-title-input {
+  border-color: rgba(5, 150, 105, 0.34);
+  background: rgba(255, 255, 255, 0.96);
+  color: #065f46;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.1);
+}
+
+.imagine-workbench-shell.imagine-theme-light .board-group-node-title-input:focus {
+  border-color: rgba(217, 119, 6, 0.76);
+  box-shadow:
+    0 0 0 2px rgba(217, 119, 6, 0.18),
+    0 8px 22px rgba(15, 23, 42, 0.1);
+}
+
+.imagine-workbench-shell.imagine-theme-light .board-group-node-title svg {
+  color: #059669;
 }
 
 .imagine-workbench-shell.imagine-theme-light .react-flow__node.dragging .imagine-board-node {

@@ -269,19 +269,16 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
   if (node.kind === "group") {
     return (
       <article
-        className={[
-          "board-node-shell board-group-node-shell relative h-full rounded-lg border border-dashed bg-[var(--iw-panel)]/30 shadow-sm backdrop-blur-[1px]",
-          selected ? "border-emerald-400/90 ring-2 ring-emerald-400/20" : "border-[var(--iw-border)]",
-        ].join(" ")}
+        className="board-node-shell board-group-node-shell relative h-full rounded-lg"
         data-kind={node.kind}
         data-selected={selected ? "true" : "false"}
         style={{ height: node.size.height, width: node.size.width }}
       >
-        <div className="absolute -top-9 left-0 flex h-8 max-w-full items-center gap-2">
+        <div className="absolute -top-3 left-3 z-10 flex h-8 max-w-full items-center gap-2">
           {isEditingTitle ? (
             <input
               autoFocus
-              className="nodrag pointer-events-auto h-7 w-48 rounded-md border border-emerald-400 bg-[var(--iw-panel)] px-2 text-xs font-semibold text-[var(--iw-text)] outline-none ring-2 ring-emerald-500/20"
+              className="nodrag board-group-node-title-input pointer-events-auto"
               value={draftTitle}
               onBlur={commitTitleEdit}
               onChange={event => setDraftTitle(event.target.value)}
@@ -297,7 +294,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             />
           ) : (
             <h2
-              className="nodrag pointer-events-auto flex min-w-0 items-center gap-2 truncate rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)]/92 px-2.5 py-1 text-xs font-semibold text-[var(--iw-text)] shadow-sm backdrop-blur"
+              className="nodrag board-group-node-title pointer-events-auto flex min-w-0 items-center gap-2 truncate"
               title="双击重命名"
               onDoubleClick={event => {
                 event.stopPropagation();
