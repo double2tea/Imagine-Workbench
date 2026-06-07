@@ -1,5 +1,12 @@
 import { mediaReferenceLabel } from "./media-references";
-import { parseProviderModel, type AiProvider, type AudioModelCapabilities, type AudioOperationMode } from "./providers/model-catalog";
+import {
+  getAudioModelCapabilities,
+  getModelCapabilities,
+  parseProviderModel,
+  type AiProvider,
+  type AudioModelCapabilities,
+  type AudioOperationMode,
+} from "./providers/model-catalog";
 
 export type AudioFunctionValue = `${string}::${AudioOperationMode}`;
 
@@ -25,6 +32,12 @@ export interface AudioFunctionOption {
   model: string;
   provider: AiProvider;
   value: AudioFunctionValue;
+}
+
+export interface AudioFunctionSelection {
+  capabilities: AudioModelCapabilities;
+  mode: AudioOperationMode;
+  model: string;
 }
 
 export const AUDIO_MODE_LABELS: Record<AudioOperationMode, string> = {
@@ -106,6 +119,38 @@ export function audioFunctionOptionsForProvider(
       value: audioFunctionValue(option.value, mode),
     }));
   });
+}
+
+export function resolveAudioFunctionSelection(input: {
+  fallbackModel: string;
+  mode?: AudioOperationMode;
+  model?: string;
+}): AudioFunctionSelection {
+  const requestedModel = input.model ?? input.fallbackModel;
+  const requestedMode = input.mode;
+  const requestedCapabilities = getAudioModelCapabilities(requestedModel);
+  if (!requestedMode) {
+    return {
+      capabilities: requestedCapabilities,
+      mode: requestedCapabilities.defaultMode,
+      model: requestedModel,
+    };
+  }
+  if (requestedCapabilities.modes.includes(requestedMode)) {
+    return { capabilities: requestedCapabilities, mode: requestedMode, model: requestedModel };
+  }
+
+  const provider = audioProviderFromModel(requestedModel);
+  const providerMatch = getModelCapabilities("audio", provider).find(capability => capability.audioModes.includes(requestedMode));
+  const match = providerMatch ?? getModelCapabilities("audio").find(capability => capability.audioModes.includes(requestedMode));
+  if (!match) throw new Error(`没有支持 ${AUDIO_MODE_LABELS[requestedMode]} 的音频模型`);
+
+  const model = match.value;
+  return {
+    capabilities: getAudioModelCapabilities(model),
+    mode: requestedMode,
+    model,
+  };
 }
 
 function audioFunctionLabel(modelLabel: string, mode: AudioOperationMode, modeCount: number): string {

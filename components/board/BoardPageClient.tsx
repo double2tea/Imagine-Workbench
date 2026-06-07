@@ -41,7 +41,12 @@ import { useClipboardImageImport } from "@/hooks/useClipboardImageImport";
 import { useGenerationActions } from "@/hooks/useGenerationActions";
 import { useGenerationTaskStore } from "@/hooks/useGenerationTaskStore";
 import { useMediaPolling } from "@/hooks/useMediaPolling";
-import { audioOperationMissingReferenceMessage, audioOperationRequiresStylePrompt, audioOperationRequiresTextInput } from "@/lib/audio-operation-rules";
+import {
+  audioOperationMissingReferenceMessage,
+  audioOperationRequiresStylePrompt,
+  audioOperationRequiresTextInput,
+  resolveAudioFunctionSelection,
+} from "@/lib/audio-operation-rules";
 import {
   IMAGE_REFERENCE_LIMIT,
   useReferenceState,
@@ -620,7 +625,12 @@ function createPreviewBoardNode(operation: AgentBoardPatchCreateNodeOperation, i
     };
   }
   if (operation.kind === "audio-operation") {
-    const model = operation.model ?? DEFAULT_AUDIO_MODEL;
+    const selection = resolveAudioFunctionSelection({
+      fallbackModel: DEFAULT_AUDIO_MODEL,
+      mode: operation.audioMode,
+      model: operation.model,
+    });
+    const model = selection.model;
     const defaults = audioActionDefaults(model);
     getModelCapability(model, "audio");
     return {
@@ -633,7 +643,7 @@ function createPreviewBoardNode(operation: AgentBoardPatchCreateNodeOperation, i
       status: "idle",
       variantCount: 1,
       ...(operation.audioFormat ? { audioFormat: operation.audioFormat } : {}),
-      ...(operation.audioMode ? { audioMode: operation.audioMode } : {}),
+      audioMode: selection.mode,
       ...(operation.audioStylePrompt ? { audioStylePrompt: operation.audioStylePrompt } : {}),
       ...(operation.asrLanguage ? { asrLanguage: operation.asrLanguage } : {}),
       ...(operation.voiceProfileId ? { voiceProfileId: operation.voiceProfileId } : {}),
@@ -1744,7 +1754,12 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
                 ...(operation.videoReferenceMode ? { videoReferenceMode: operation.videoReferenceMode } : {}),
               });
             } else {
-              const model = operation.model ?? DEFAULT_AUDIO_MODEL;
+              const selection = resolveAudioFunctionSelection({
+                fallbackModel: DEFAULT_AUDIO_MODEL,
+                mode: operation.audioMode,
+                model: operation.model,
+              });
+              const model = selection.model;
               nodeId = boardController.addGenerateNode({
                 kind: operation.kind,
                 title: operation.title,
@@ -1753,7 +1768,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
                 model,
                 ...audioActionDefaults(model),
                 ...(operation.audioFormat ? { audioFormat: operation.audioFormat } : {}),
-                ...(operation.audioMode ? { audioMode: operation.audioMode } : {}),
+                audioMode: selection.mode,
                 ...(operation.audioStylePrompt ? { audioStylePrompt: operation.audioStylePrompt } : {}),
                 ...(operation.asrLanguage ? { asrLanguage: operation.asrLanguage } : {}),
                 ...(operation.voiceProfileId ? { voiceProfileId: operation.voiceProfileId } : {}),
@@ -1792,8 +1807,15 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       let runFailureCount = 0;
       for (const item of runQueue) {
         const operation = item.operation;
-        const model = operation.model ?? (
-          operation.kind === "image-generate" ? DEFAULT_IMAGE_MODEL : operation.kind === "video-generate" ? DEFAULT_VIDEO_MODEL : DEFAULT_AUDIO_MODEL
+        const audioSelection = operation.kind === "audio-operation"
+          ? resolveAudioFunctionSelection({
+            fallbackModel: DEFAULT_AUDIO_MODEL,
+            mode: operation.audioMode,
+            model: operation.model,
+          })
+          : null;
+        const model = audioSelection?.model ?? operation.model ?? (
+          operation.kind === "image-generate" ? DEFAULT_IMAGE_MODEL : DEFAULT_VIDEO_MODEL
         );
         const runInputs = resolveBoardPatchRunInputs(
           patch,
@@ -1806,7 +1828,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         );
         const promptValue = runInputs.prompt;
         const runReferences = await resolveOriginalReferences(runInputs.references);
-        const isAsrAudioOperation = operation.kind === "audio-operation" && (operation.audioMode ?? audioActionDefaults(model).audioMode) === "asr";
+        const isAsrAudioOperation = operation.kind === "audio-operation" && audioSelection?.mode === "asr";
         if (!promptValue && !isAsrAudioOperation) {
           boardController.updateGenerateNode(item.id, { status: "failed", errorMessage: "批量生成节点缺少提示词" });
           runFailureCount += 1;
@@ -1890,6 +1912,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         } else {
           const defaults = audioActionDefaults(model);
           const audioCapability = getAudioModelCapabilities(model);
+          const audioMode = audioSelection?.mode ?? defaults.audioMode;
           const unsupportedAudioReference = runReferences.find(reference => !audioCapability.referenceMediaTypes.includes(getMediaReferenceType(reference)));
           if (unsupportedAudioReference) {
             runFailureCount += 1;
@@ -1909,7 +1932,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             prompt: promptValue,
             resultStackKey,
           });
-          if (audioOperationRequiresStylePrompt(operation.audioMode ?? defaults.audioMode) && !operation.audioStylePrompt?.trim()) {
+          if (audioOperationRequiresStylePrompt(audioMode) && !operation.audioStylePrompt?.trim()) {
             const message = "音色设计需要填写音色描述";
             runFailureCount += 1;
             boardController.updateGenerateNode(item.id, { status: "failed", errorMessage: message });
@@ -1918,7 +1941,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           }
           const didStart = await generateManualAudio({
             audioFormat: operation.audioFormat ?? defaults.audioFormat,
-            audioMode: operation.audioMode ?? defaults.audioMode,
+            audioMode,
             audioStylePrompt: operation.audioStylePrompt,
             asrLanguage: operation.asrLanguage,
             boardId: resolvedBoardId,
@@ -2192,19 +2215,26 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     if (!isAgentGenerateAction(action) && !isAgentBoardFlowAction(action)) return false;
 
     const promptFromAgent = action.params?.prompt?.trim() ?? "";
-    if (!promptFromAgent) {
-      pushWorkspaceNotice("error", "Agent 生成动作缺少提示词");
-      return handledBoardAction(false);
-    }
-
     const kind = action.type === "generate_image" || action.type === "create_board_image_flow"
       ? "image-generate"
       : action.type === "generate_video" || action.type === "create_board_video_flow"
         ? "video-generate"
         : "audio-operation";
-    const model = action.params?.model || (
-      kind === "image-generate" ? DEFAULT_IMAGE_MODEL : kind === "video-generate" ? DEFAULT_VIDEO_MODEL : DEFAULT_AUDIO_MODEL
+    const audioSelection = kind === "audio-operation"
+      ? resolveAudioFunctionSelection({
+        fallbackModel: DEFAULT_AUDIO_MODEL,
+        mode: action.params?.audioMode,
+        model: action.params?.model,
+      })
+      : null;
+    const model = audioSelection?.model ?? action.params?.model ?? (
+      kind === "image-generate" ? DEFAULT_IMAGE_MODEL : DEFAULT_VIDEO_MODEL
     );
+    const actionRequiresPrompt = kind !== "audio-operation" || !audioSelection || audioOperationRequiresTextInput(audioSelection.mode);
+    if (!promptFromAgent && actionRequiresPrompt) {
+      pushWorkspaceNotice("error", "Agent 生成动作缺少提示词");
+      return handledBoardAction(false);
+    }
     if (isPlaceholderRunningHubModel(model)) {
       pushWorkspaceNotice("error", "请先填写真实的 RunningHub webappId 或 workflowId");
       return handledBoardAction(false);
@@ -2327,10 +2357,11 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     }
 
     if (kind === "audio-operation") {
+      if (!audioSelection) throw new Error("音频功能解析失败");
       const defaults = {
         ...audioActionDefaults(model),
+        audioMode: audioSelection.mode,
         ...(action.params?.audioFormat ? { audioFormat: action.params.audioFormat } : {}),
-        ...(action.params?.audioMode ? { audioMode: action.params.audioMode } : {}),
         ...(action.params?.audioStylePrompt ? { audioStylePrompt: action.params.audioStylePrompt } : {}),
         ...(action.params?.asrLanguage ? { asrLanguage: action.params.asrLanguage } : {}),
         ...(action.params?.voiceProfileId ? { voiceProfileId: action.params.voiceProfileId } : {}),

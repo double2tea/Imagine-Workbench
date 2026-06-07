@@ -9,6 +9,7 @@ import {
   audioProviderOptions,
   parseAudioFunctionValue,
   readOptionalAudioFormat,
+  resolveAudioFunctionSelection,
 } from "../lib/audio-operation-rules";
 import { getAudioModelCapabilities } from "../lib/providers/model-catalog";
 import type { AudioModelCapabilities } from "../lib/providers/model-catalog";
@@ -74,3 +75,27 @@ test("audio function value round trips model and mode", () => {
   });
   assert.equal(parseAudioFunctionValue("mimo:mimo-v2.5-asr"), null);
 });
+
+test("audio function selection resolves mode-specific MiMo models", () => {
+  assert.deepEqual(
+    pickAudioFunctionSelection(resolveAudioFunctionSelection({
+      fallbackModel: "mimo:mimo-v2.5-tts",
+      mode: "voice_design",
+    })),
+    { mode: "voice_design", model: "mimo:mimo-v2.5-tts-voicedesign" },
+  );
+  assert.deepEqual(
+    pickAudioFunctionSelection(resolveAudioFunctionSelection({
+      fallbackModel: "mimo:mimo-v2.5-tts",
+      mode: "asr",
+    })),
+    { mode: "asr", model: "mimo:mimo-v2.5-asr" },
+  );
+});
+
+function pickAudioFunctionSelection(selection: ReturnType<typeof resolveAudioFunctionSelection>): {
+  mode: ReturnType<typeof resolveAudioFunctionSelection>["mode"];
+  model: string;
+} {
+  return { mode: selection.mode, model: selection.model };
+}
