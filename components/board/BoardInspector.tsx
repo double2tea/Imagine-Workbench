@@ -42,7 +42,7 @@ import type {
   BoardVideoGenerateNode,
 } from "@/lib/board";
 import { selectVideoReferenceTypesForMode } from "@/lib/video-reference-selection";
-import { getVisibleVoiceProfilesForAudioModel, listVoiceProfiles, type VoiceProfile } from "@/lib/voice-profiles";
+import { getVisibleVoiceProfilesForAudioModel, isBuiltInVoiceProfileId, listVoiceProfiles, type VoiceProfile } from "@/lib/voice-profiles";
 
 interface BoardInspectorProps {
   audioModelGroups: BoardModelOptionGroup[];
@@ -728,6 +728,10 @@ function AudioOperationInspector({
   const isProcessing = node.status === "processing";
   const [voiceProfiles, setVoiceProfiles] = useState<VoiceProfile[]>([]);
   const visibleVoiceProfiles = getVisibleVoiceProfilesForAudioModel(node.model, node.audioMode, voiceProfiles);
+  const selectedVoiceProfile = visibleVoiceProfiles.find(profile => profile.id === node.voiceProfileId);
+  const defaultBuiltInVoiceProfile = visibleVoiceProfiles.find(
+    profile => profile.source === "builtin" && profile.providerVoiceId === "mimo_default",
+  ) ?? visibleVoiceProfiles.find(profile => profile.source === "builtin");
   const showAudioFormat = capabilities.formats.length > 0;
   const showVoiceProfile = node.audioMode === "tts" || node.audioMode === "voice_design" || node.audioMode === "voice_clone";
 
@@ -745,6 +749,24 @@ function AudioOperationInspector({
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!showVoiceProfile) {
+      if (node.voiceProfileId && isBuiltInVoiceProfileId(node.voiceProfileId)) {
+        onUpdateGenerate(node.id, { voiceProfileId: undefined });
+      }
+      return;
+    }
+    if (node.voiceProfileId) {
+      if (isBuiltInVoiceProfileId(node.voiceProfileId) && !selectedVoiceProfile) {
+        onUpdateGenerate(node.id, { voiceProfileId: undefined });
+      }
+      return;
+    }
+    if (node.audioMode === "tts" && defaultBuiltInVoiceProfile) {
+      onUpdateGenerate(node.id, { voiceProfileId: defaultBuiltInVoiceProfile.id });
+    }
+  }, [defaultBuiltInVoiceProfile, node.audioMode, node.id, node.voiceProfileId, onUpdateGenerate, selectedVoiceProfile, showVoiceProfile]);
 
   const advancedFields = (
     <div className="imagine-panel-disclosure-body">
@@ -784,7 +806,7 @@ function AudioOperationInspector({
             onChange={event => onUpdateGenerate(node.id, { voiceProfileId: event.target.value || undefined })}
             className={inputClass}
           >
-            <option value="">不使用保存音色</option>
+            <option value="">使用模型默认音色</option>
             {node.voiceProfileId && !visibleVoiceProfiles.some(profile => profile.id === node.voiceProfileId) && (
               <option value={node.voiceProfileId}>当前音色不可用于此模式</option>
             )}
