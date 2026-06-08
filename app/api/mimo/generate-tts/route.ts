@@ -22,6 +22,7 @@ const mimoTtsBodySchema = z.object({
   text: z.string().trim().min(1),
   stylePrompt: z.string().trim().min(1).optional(),
   voice: z.string().trim().min(1).optional(),
+  voiceCloneConsentAccepted: z.boolean().optional(),
   format: z.enum(["wav", "pcm16"]).optional(),
   optimizeTextPreview: z.boolean().optional(),
 });
@@ -86,6 +87,9 @@ function voiceDesignInput(body: MimoTtsBody): MimoTtsInput {
 }
 
 function voiceCloneInput(body: MimoTtsBody): MimoTtsInput {
+  if (body.voiceCloneConsentAccepted !== true) {
+    throw new MimoTtsRequestError("音色克隆需要先确认参考音频授权");
+  }
   if (!body.voice) {
     throw new MimoTtsRequestError("MiMo voice clone requires voice reference audio");
   }

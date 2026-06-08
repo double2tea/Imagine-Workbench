@@ -29,6 +29,25 @@ const generateNode: BoardNode = {
   resultStackKey: "stack-1",
 };
 
+const audioOperationNode: BoardNode = {
+  id: "audio_operation_1",
+  kind: "audio-operation",
+  title: "Audio Operation",
+  position: { x: 0, y: 620 },
+  size: { width: 320, height: 220 },
+  createdAt: timestamp,
+  updatedAt: timestamp,
+  prompt: "test audio",
+  model: "mimo-audio",
+  audioMode: "tts",
+  audioFormat: "mp3",
+  status: "complete",
+  variantCount: 1,
+  resultAssetId: "asset_audio_b",
+  resultAssetIds: ["asset_audio_a", "asset_audio_b"],
+  resultStackKey: "stack-audio",
+};
+
 const resultNode: BoardNode = {
   id: "result_1",
   kind: "result",
@@ -87,8 +106,8 @@ const referenceGroupNode: BoardNode = {
 
 test("collectBoardAssetIdsFromNodes includes result node stack assets", () => {
   assert.deepEqual(
-    Array.from(collectBoardAssetIdsFromNodes([generateNode, resultNode, assetNode, referenceGroupNode])).sort(),
-    ["asset_a", "asset_b", "asset_c", "asset_d", "asset_generate_a", "asset_generate_b"],
+    Array.from(collectBoardAssetIdsFromNodes([generateNode, audioOperationNode, resultNode, assetNode, referenceGroupNode])).sort(),
+    ["asset_a", "asset_audio_a", "asset_audio_b", "asset_b", "asset_c", "asset_d", "asset_generate_a", "asset_generate_b"],
   );
 });
 
@@ -105,7 +124,7 @@ test("collectPlacedBoardAssetIdsFromNodes includes result node assets as placed"
 test("collectPlacedBoardAssetIdsFromNodes excludes generate-only results", () => {
   // Generate node alone (no result node) should NOT place its result assets
   assert.deepEqual(
-    Array.from(collectPlacedBoardAssetIdsFromNodes([generateNode])).sort(),
+    Array.from(collectPlacedBoardAssetIdsFromNodes([generateNode, audioOperationNode])).sort(),
     [],
   );
 });

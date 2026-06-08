@@ -710,7 +710,7 @@ export async function deleteFromDB(id: string): Promise<void> {
 export async function clearAllDB(): Promise<void> {
   const db = await openDatabase();
   return new Promise((resolve, reject) => {
-    const stores = [META_STORE, BLOB_STORE, HASH_BLOB_STORE, PREVIEW_STORE];
+    const stores = [META_STORE, BLOB_STORE, HASH_BLOB_STORE, PREVIEW_STORE, GENERATION_TASK_STORE];
     if (db.objectStoreNames.contains(LEGACY_STORE)) stores.push(LEGACY_STORE);
     const transaction = db.transaction(stores, "readwrite");
     for (const storeName of stores) {

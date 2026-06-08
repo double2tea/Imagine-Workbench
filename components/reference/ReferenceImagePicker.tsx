@@ -89,8 +89,13 @@ export default function ReferenceImagePicker({
   onUpload,
   acceptedMediaTypes = ["image"],
 }: ReferenceImagePickerProps) {
-  const canAdd = maxCount > 0 && references.length < maxCount;
-  const visibleReferences = maxCount > 0 ? references.slice(0, maxCount) : references;
+  const visibleReferenceItems = maxCount > 0
+    ? references
+      .map((reference, index) => ({ index, reference }))
+      .filter(item => allowsMediaType(getMediaReferenceType(item.reference), acceptedMediaTypes))
+      .slice(0, maxCount)
+    : [];
+  const canAdd = maxCount > 0 && visibleReferenceItems.length < maxCount;
   const accept = acceptedMediaTypes.map(type => `${type}/*`).join(",");
 
   const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
@@ -128,7 +133,7 @@ export default function ReferenceImagePicker({
           <Layers className="h-3.5 w-3.5 text-[var(--iw-faint)]" />
           {label}
         </label>
-        {references.length > 0 && (
+        {visibleReferenceItems.length > 0 && (
           <button
             type="button"
             onClick={onClear}
@@ -139,9 +144,9 @@ export default function ReferenceImagePicker({
         )}
       </div>
 
-      {references.length > 0 ? (
+      {visibleReferenceItems.length > 0 ? (
         <div className="imagine-reference-grid">
-          {visibleReferences.map((reference, index) => {
+          {visibleReferenceItems.map(({ reference, index }) => {
             const isStart = roleMode && reference.role === "start";
             const isEnd = roleMode && reference.role === "end";
             const mediaType = getMediaReferenceType(reference);

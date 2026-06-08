@@ -708,7 +708,7 @@ function generateInputSummaryForNode(
   node: BoardNodeModel,
   index: BoardPromptReferenceGraphIndex,
 ): BoardGenerateInputSummary | undefined {
-  if (node.kind !== "image-generate" && node.kind !== "video-generate" && node.kind !== "runninghub-app") return undefined;
+  if (node.kind !== "image-generate" && node.kind !== "video-generate" && node.kind !== "audio-operation" && node.kind !== "runninghub-app") return undefined;
 
   const incomingEdges = index.incomingEdgesByTargetNode.get(node.id) ?? [];
   const promptEdge = incomingEdges.find(edge => edge.to.portId === "prompt-in");

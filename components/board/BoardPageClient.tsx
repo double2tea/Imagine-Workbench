@@ -3439,6 +3439,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       handledBoardItemIdsRef.current = new Set();
       handledBoardTaskIdsRef.current = new Set();
       setItems([]);
+      setGenerationTasks([]);
       pushWorkspaceNotice("success", "本地资产库已清空");
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, "本地资产库清空失败"));

@@ -414,9 +414,12 @@ export default function Home() {
     setAgentInput,
     setPrompt,
   });
+  const audioReferenceImages = referenceImages.filter(reference =>
+    audioCapabilities.referenceMediaTypes.includes(getMediaReferenceType(reference)),
+  );
   const audioTextInputRequired = audioOperationRequiresTextInput(activeAudioMode);
   const audioStylePromptRequired = audioOperationRequiresStylePrompt(activeAudioMode);
-  const activeAudioReferenceCount = referenceImages.filter(reference => audioCapabilities.referenceMediaTypes.includes(getMediaReferenceType(reference))).length;
+  const activeAudioReferenceCount = audioReferenceImages.length;
   const hasRequiredAudioReferences = activeAudioReferenceCount >= audioCapabilities.minReferenceMedia;
   const isCreatorGenerateDisabled =
     traditionalSubTab === "audio"
@@ -545,6 +548,8 @@ export default function Home() {
       asrLanguage,
       allowEmptyPrompt: !audioTextInputRequired,
       model: selectedAudioModel,
+      referenceImage: audioReferenceImages[0]?.url ?? null,
+      referenceImages: audioReferenceImages,
       voiceCloneConsentAccepted,
       voiceProfileId: selectedVoiceProfileId || undefined,
     });
@@ -1003,9 +1008,12 @@ export default function Home() {
 
   const renderAtDropdown = (type: AtDropdownTarget) => {
     if (type !== "agent-prompt") {
-      const acceptedMediaTypes = type === "image-prompt"
-        ? imageCapabilities.referenceMediaTypes
-        : videoCapabilities.referenceMediaTypes;
+      const acceptedMediaTypes =
+        type === "image-prompt"
+          ? imageCapabilities.referenceMediaTypes
+          : type === "audio-prompt"
+            ? audioCapabilities.referenceMediaTypes
+            : videoCapabilities.referenceMediaTypes;
       return (
         <PromptReferenceDropdown
           acceptedMediaTypes={acceptedMediaTypes}
@@ -1331,8 +1339,11 @@ export default function Home() {
           audioStylePrompt={audioStylePrompt}
           asrLanguage={asrLanguage}
           onClearReferences={() => {
-            setReferenceImages([]);
-            setReferenceImage(null);
+            setReferenceImages(prev => {
+              const filtered = prev.filter(reference => !audioCapabilities.referenceMediaTypes.includes(getMediaReferenceType(reference)));
+              setReferenceImage(filtered[0]?.url ?? null);
+              return filtered;
+            });
             setPrompt(removePromptReferenceTokens);
           }}
           onGenerate={generateActiveAudio}

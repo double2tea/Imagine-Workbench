@@ -162,6 +162,9 @@ export function useReferenceState({
   const isAcceptedReferenceType = (type: MediaReferenceType, target: PromptReferenceTarget): boolean =>
     getAcceptedMediaTypesForTarget(target).includes(type);
 
+  const getAcceptedReferenceCountForTarget = (target: PromptReferenceTarget, references: ReferenceImageRef[] = referenceImages): number =>
+    references.filter(reference => isAcceptedReferenceType(getMediaReferenceType(reference), target)).length;
+
   const getDroppedReferenceRole = (target: PromptReferenceTarget, index: number): ReferenceImageRef["role"] => {
     if (target !== "video-prompt" || videoReferenceMode !== "firstLast") return "general";
     if (index === 0) return "start";
@@ -179,7 +182,8 @@ export function useReferenceState({
     if (existingIndex !== -1) return existingIndex;
 
     const limit = getReferenceLimitForTarget(target);
-    if (referenceImages.length >= limit) {
+    const acceptedReferenceCount = getAcceptedReferenceCountForTarget(target);
+    if (acceptedReferenceCount >= limit) {
       pushWorkspaceNotice("error", `参考图已达上限：最多 ${limit} 张`);
       return null;
     }
@@ -189,13 +193,13 @@ export function useReferenceState({
       id: asset.id,
       type,
       url: asset.url,
-      role: getDroppedReferenceRole(target, nextIndex),
+      role: getDroppedReferenceRole(target, acceptedReferenceCount),
     };
 
     setReferenceImage(referenceImages[0]?.url ?? asset.url);
     setReferenceImages(prev => {
       if (prev.some(reference => reference.id === asset.id)) return prev;
-      if (prev.length >= limit) return prev;
+      if (getAcceptedReferenceCountForTarget(target, prev) >= limit) return prev;
       return [...prev, nextReference];
     });
     return nextIndex;
@@ -212,7 +216,7 @@ export function useReferenceState({
       return;
     }
     const limit = getReferenceLimitForTarget(target);
-    if (referenceImages.length >= limit) {
+    if (getAcceptedReferenceCountForTarget(target) >= limit) {
       pushWorkspaceNotice("error", `参考图已达上限：最多 ${limit} 张`);
       return;
     }
@@ -226,13 +230,14 @@ export function useReferenceState({
       const dataUrl = type === "image" ? await compressReferenceImageFile(file) : await readFileAsDataUrl(file);
       setReferenceImages(prev => {
         if (prev.some(reference => reference.id === id)) return prev;
-        if (prev.length >= limit) return prev;
+        const acceptedReferenceCount = getAcceptedReferenceCountForTarget(target, prev);
+        if (acceptedReferenceCount >= limit) return prev;
 
         const nextReference: ReferenceImageRef = {
           id,
           type,
           url: dataUrl,
-          role: getDroppedReferenceRole(target, prev.length),
+          role: getDroppedReferenceRole(target, acceptedReferenceCount),
         };
         if (prev.length === 0) {
           setReferenceImage(dataUrl);
@@ -247,7 +252,7 @@ export function useReferenceState({
 
   const handleReferenceDropFiles = (files: File[], target: PromptReferenceTarget) => {
     const limit = getReferenceLimitForTarget(target);
-    const availableSlots = limit - referenceImages.length;
+    const availableSlots = limit - getAcceptedReferenceCountForTarget(target);
     if (availableSlots <= 0) {
       pushWorkspaceNotice("error", `参考图已达上限：最多 ${limit} 张`);
       return;
@@ -372,17 +377,26 @@ export function useReferenceState({
         pushWorkspaceNotice("error", `当前输入不支持${mediaReferenceLabel(itemType)}参考`);
         return;
       }
+      const existingIndex = referenceImages.findIndex(reference => reference.id === itemId);
+      const limit = getReferenceLimitForTarget(target);
+      if (existingIndex === -1 && getAcceptedReferenceCountForTarget(target) >= limit) {
+        pushWorkspaceNotice("error", `参考图已达上限：最多 ${limit} 张`);
+        return;
+      }
       const lastAtIndex = prompt.lastIndexOf("@");
       const base = lastAtIndex !== -1 ? prompt.substring(0, lastAtIndex) : prompt;
       setPrompt(`${base}[Ref: ${itemId}] `);
       setReferenceImage(itemUrl);
       setReferenceImages(prev => {
         if (prev.some(reference => reference.id === itemId)) return prev;
+        const acceptedReferenceCount = getAcceptedReferenceCountForTarget(target, prev);
+        const limit = getReferenceLimitForTarget(target);
+        if (acceptedReferenceCount >= limit) return prev;
         const role =
           target === "video-prompt" && videoReferenceMode === "firstLast"
-            ? prev.length === 1
+            ? acceptedReferenceCount === 1
               ? "end"
-              : prev.length === 0
+              : acceptedReferenceCount === 0
                 ? "start"
                 : "general"
             : "general";

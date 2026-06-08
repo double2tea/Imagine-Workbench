@@ -268,6 +268,7 @@ export function useAgentController({
     const actionReferences = getActionReferenceImages(params.referenceImageId);
     const validationError = validateAgentToolAction(action, {
       hasEditReference: type !== "edit_image" || actionReferences.length > 0,
+      references: actionReferences,
     });
     if (validationError) {
       onActionValidationError?.(validationError);
@@ -336,18 +337,22 @@ export function useAgentController({
       bridgeActionReferences(actionReferences);
       setTraditionalSubTab("audio");
       setTimeout(() => {
-        generateManualAudio({
-          ...actionReferenceOverride,
-          audioFormat: params.audioFormat,
-          audioMode: params.audioMode,
-          audioStylePrompt: params.audioStylePrompt,
-          asrLanguage: params.asrLanguage,
-          model: params.model,
-          prompt: params.prompt || "",
-          voiceCloneConsentAccepted: params.voiceCloneConsentAccepted,
-          voiceProfileId: params.voiceProfileId,
-        });
+        void (async () => {
+          const didStart = await generateManualAudio({
+            ...actionReferenceOverride,
+            audioFormat: params.audioFormat,
+            audioMode: params.audioMode,
+            audioStylePrompt: params.audioStylePrompt,
+            asrLanguage: params.asrLanguage,
+            model: params.model,
+            prompt: params.prompt || "",
+            voiceCloneConsentAccepted: params.voiceCloneConsentAccepted,
+            voiceProfileId: params.voiceProfileId,
+          });
+          setAgentMessages(prev => prev.map(message => message.id === messageId ? { ...message, interactiveState: didStart ? "completed" : "idle" } : message));
+        })();
       }, 500);
+      return;
     } else if (type === "edit_image") {
       setPrompt(params.prompt || "");
       setTraditionalSubTab("image");

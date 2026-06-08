@@ -39,7 +39,7 @@ export function buildBoardNodeContextMenuActions(input: {
   if (input.onUngroup) actions.push({ id: "ungroup", label: "取消分组", onSelect: input.onUngroup });
   if (input.onCreateReferenceGroup) actions.push({ id: "create-reference-group", label: "所选图片建参考组", onSelect: input.onCreateReferenceGroup });
   if (input.onCopyImage) actions.push({ id: "copy-image", label: "复制图片", onSelect: input.onCopyImage });
-  if ((input.node.kind === "image-generate" || input.node.kind === "video-generate" || input.node.kind === "runninghub-app") && input.onExecute) {
+  if ((input.node.kind === "image-generate" || input.node.kind === "video-generate" || input.node.kind === "audio-operation" || input.node.kind === "runninghub-app") && input.onExecute) {
     actions.push({ id: "execute", label: "执行生成", onSelect: input.onExecute });
   }
   if (input.node.kind === "asset" && input.node.asset.type === "image") {

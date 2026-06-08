@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { authHeaders, resolveProviderConfig } from "@/lib/providers/utils";
+import { authHeaders, openAiCompatibleUrl, resolveProviderConfig } from "@/lib/providers/utils";
 
 export const runtime = "edge";
 
@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = mimoChatBodySchema.parse(await req.json());
     const config = resolveProviderConfig(req, "mimo");
-    const upstream = await fetch(`${config.baseUrl}/v1/chat/completions`, {
+    const upstream = await fetch(openAiCompatibleUrl(config.baseUrl, "/v1/chat/completions"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

@@ -1,9 +1,11 @@
 import { AGENT_BOARD_PATCH_MAX_OPERATIONS, type AgentGenerationParams, type AgentToolAction } from "./agent-actions";
-import { audioOperationRequiresTextInput } from "./audio-operation-rules";
+import { audioOperationMissingReferenceMessage, audioOperationRequiresTextInput } from "./audio-operation-rules";
+import { getMediaReferenceType, mediaReferenceLabel, type MediaReference } from "./media-references";
 import {
   getAudioModelCapabilities,
   getImageModelCapabilities,
   getImageResolutionOptions,
+  getModelCapabilities,
   getVideoModelCapabilities,
 } from "./providers/model-catalog";
 
@@ -106,6 +108,10 @@ function isAudioActionType(type: AgentToolAction["type"]): boolean {
   return type === "generate_audio" || type === "create_board_audio_flow";
 }
 
+function isKnownAudioModel(model: string): boolean {
+  return getModelCapabilities("audio").some(capability => capability.value === model);
+}
+
 export function prepareAgentActionDraft(action: AgentToolAction): AgentToolAction {
   const draft = cloneAgentToolAction(action);
   const params = draft.params ?? {};
@@ -188,6 +194,7 @@ export function isCustomImageResolutionValue(imageResolution: string | undefined
 
 export interface ValidateAgentToolActionContext {
   hasEditReference?: boolean;
+  references?: ReadonlyArray<MediaReference>;
 }
 
 export function validateAgentToolAction(
@@ -210,12 +217,18 @@ export function validateAgentToolAction(
 
   if (action.type === "generate_audio" || action.type === "create_board_audio_flow") {
     if (!params.model?.trim()) return "请先选择生成模型";
+    if (!isKnownAudioModel(params.model)) return "请先选择音频模型";
     const capabilities = getAudioModelCapabilities(params.model);
     const audioMode = params.audioMode && capabilities.modes.includes(params.audioMode)
       ? params.audioMode
       : capabilities.defaultMode;
     if (audioOperationRequiresTextInput(audioMode) && !params.prompt?.trim()) return "请先填写提示词";
     if (audioMode === "voice_clone" && params.voiceCloneConsentAccepted !== true) return "音色克隆需要先确认参考音频授权";
+    const references = context.references ?? [];
+    const unsupportedReference = references.find(reference => !capabilities.referenceMediaTypes.includes(getMediaReferenceType(reference)));
+    if (unsupportedReference) return `当前音频模型不支持${mediaReferenceLabel(getMediaReferenceType(unsupportedReference))}参考`;
+    if (references.length < capabilities.minReferenceMedia) return audioOperationMissingReferenceMessage(capabilities);
+    if (references.length > capabilities.maxReferenceMedia) return `当前音频模型最多支持 ${capabilities.maxReferenceMedia} 个参考媒体`;
     return null;
   }
 
