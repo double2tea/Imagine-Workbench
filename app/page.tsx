@@ -1486,13 +1486,6 @@ export default function Home() {
               {mobileWorkbenchPanel === "create" ? (
                 <section className="imagine-mobile-composer imagine-control-surface flex flex-col gap-3 rounded-xl p-3">
                   <CreationModeTabs value={traditionalSubTab} onChange={setTraditionalSubTab} />
-                  <div className="imagine-creator-meta flex justify-end">
-                    <span className="imagine-meta-chip font-mono text-[10px]">
-                      {assetStats.statusCounts.processing + assetStats.statusCounts.pending > 0
-                        ? `${assetStats.statusCounts.processing + assetStats.statusCounts.pending} 进行中 · ${items.length} 项`
-                        : `${items.length} 项本地资产`}
-                    </span>
-                  </div>
                   {renderCreationPanel(true)}
                 </section>
               ) : (
@@ -1507,13 +1500,6 @@ export default function Home() {
           <div className="imagine-control-surface hidden rounded-xl dark-glass p-4 lg:flex flex-col gap-4 min-h-[500px] max-h-[calc(100vh-5.5rem)] overflow-hidden">
             <div className="imagine-creator-scroll flex min-h-0 flex-1 flex-col gap-3.5">
                 <CreationModeTabs value={traditionalSubTab} onChange={setTraditionalSubTab} />
-                <div className="imagine-creator-meta">
-                  <span className="imagine-meta-chip font-mono text-[10px]">
-                    {assetStats.statusCounts.processing + assetStats.statusCounts.pending > 0
-                      ? `${assetStats.statusCounts.processing + assetStats.statusCounts.pending} 进行中 · ${items.length} 项`
-                      : `${items.length} 项本地资产`}
-                  </span>
-                </div>
 
                 {renderCreationPanel(false)}
 

@@ -9,7 +9,6 @@ const BOARD_SIDE_TAB_KEY = "imagine_board_side_tab";
 export type BoardSidePanelTab = "inspector" | "assets";
 
 interface BoardSidePanelProps {
-  assetCount: number;
   assetsPanel: ReactNode;
   inspectorPanel: ReactNode;
   revealKey?: string | null;
@@ -26,7 +25,7 @@ function readTabPreference(): BoardSidePanelTab {
   return stored === "assets" ? "assets" : "inspector";
 }
 
-export default function BoardSidePanel({ assetCount, assetsPanel, inspectorPanel, revealKey }: BoardSidePanelProps) {
+export default function BoardSidePanel({ assetsPanel, inspectorPanel, revealKey }: BoardSidePanelProps) {
   const [collapsedPreference, setCollapsedPreference] = useState(false);
   const [activeTab, setActiveTab] = useState<BoardSidePanelTab>("inspector");
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -72,7 +71,6 @@ export default function BoardSidePanel({ assetCount, assetsPanel, inspectorPanel
         onClick={() => selectTab("assets")}
       >
         本地资产
-        <span className="ml-1 font-mono text-[10px] font-normal text-[var(--iw-muted)]">{assetCount}</span>
       </button>
     </div>
   );

@@ -3812,7 +3812,6 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onSendAgentNode={handleSendAgentNode}
       >
         <BoardSidePanel
-          assetCount={items.length}
           revealKey={boardController.selectedNodeId ?? boardController.selectedEdgeId}
           inspectorPanel={(
             <BoardInspector
