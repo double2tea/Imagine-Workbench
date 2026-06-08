@@ -26,7 +26,7 @@ export default function WorkspaceHeader({ onClearProject, onOpenSettings }: Work
             <span className="truncate">Imagine Workbench</span>
             <span className="imagine-workspace-badge shrink-0">v1.2</span>
           </h1>
-          <p className="imagine-workspace-subtitle truncate">智能图像与视频生成工作台</p>
+          <p className="imagine-workspace-subtitle truncate">智能图像、视频与音频创作工作台</p>
         </div>
       </div>
 
