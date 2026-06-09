@@ -68,6 +68,7 @@ interface AssetGalleryWorkspaceProps {
   onUseAgentReference: (item: StorageItem) => void;
   visibleItemsStep?: number;
   formatModelLabel: (value: string, fallbackProvider: AiProvider) => string;
+  providerLabelsByKey?: Partial<Record<AiProvider, string>>;
 }
 
 const DEFAULT_VISIBLE_ITEMS = 48;
@@ -130,6 +131,7 @@ export default function AssetGalleryWorkspace({
   onUseAgentReference,
   visibleItemsStep = initialVisibleItems,
   formatModelLabel,
+  providerLabelsByKey,
 }: AssetGalleryWorkspaceProps) {
   const [referencePreview, setReferencePreview] = useState<{ itemId: string; index: number } | null>(null);
   const [collapsedDateKeys, setCollapsedDateKeys] = useState<Set<string>>(() => new Set());
@@ -327,6 +329,7 @@ export default function AssetGalleryWorkspace({
                           priority={priorityItemIdSet.has(item.id)}
                           selected={selectedItemIdSet.has(item.id)}
                           selectedProvider={selectedProvider}
+                          providerLabelsByKey={providerLabelsByKey}
                           onApplyVideoReference={onApplyVideoReference}
                           onCancel={onCancelItem}
                           onCaptureVideoFrame={onCaptureVideoFrame}

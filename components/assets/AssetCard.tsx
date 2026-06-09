@@ -1,4 +1,5 @@
 import {
+  ChevronDown,
   Clock3,
   Compass,
   Download,
@@ -58,6 +59,7 @@ interface AssetCardProps {
   onToggleCompare: (id: string) => void;
   onToggleSelect: (id: string) => void;
   onUseAgentReference: (item: StorageItem) => void;
+  providerLabelsByKey?: Partial<Record<AiProvider, string>>;
 }
 
 function formatModelName(model: string): string {
@@ -92,6 +94,19 @@ const frameCaptureActions: Array<{
   { icon: SkipBack, mode: "first" },
   { icon: Clock3, mode: "current" },
   { icon: SkipForward, mode: "last" },
+];
+
+const quickEditActions: Array<{
+  icon: LucideIcon;
+  label: string;
+  operation: ImageEditFeature;
+  title: string;
+  tone: string;
+}> = [
+  { icon: Paintbrush, label: "重绘", operation: "redraw", title: "绘制蒙版并重绘局部", tone: "text-sky-300" },
+  { icon: X, label: "擦除", operation: "erase", title: "绘制蒙版并擦除区域", tone: "text-rose-300" },
+  { icon: ImageDown, label: "扩图", operation: "outpaint", title: "扩展画面边界", tone: "text-indigo-300" },
+  { icon: Scissors, label: "抠图", operation: "cutout", title: "移除背景并保留主体", tone: "text-emerald-300" },
 ];
 
 type FrameMenuPlacement = "hover" | "meta";
@@ -140,11 +155,14 @@ export default function AssetCard({
   onToggleCompare,
   onToggleSelect,
   onUseAgentReference,
+  providerLabelsByKey,
 }: AssetCardProps) {
   const [isMobileActionsOpen, setIsMobileActionsOpen] = useState(false);
+  const [isQuickEditMenuOpen, setIsQuickEditMenuOpen] = useState(false);
   const [frameMenuPlacement, setFrameMenuPlacement] = useState<FrameMenuPlacement | null>(null);
   const captureVideoFrameRef = useRef<VideoFrameCaptureRequest | null>(null);
   const provider = tryParseProviderModel(item.model, selectedProvider)?.provider ?? selectedProvider;
+  const providerLabel = providerLabelsByKey?.[provider] ?? getProviderMeta(provider).label;
   const isDraggableReference = item.status === "complete" && item.type !== "transcript";
   const failedTitle = isContentSafetyError(item.errorMessage) ? "内容安全拦截" : "生成失败 / 链接中断";
   const referenceMedia = getGenerationReferenceMedia(item.generationRequest);
@@ -163,6 +181,7 @@ export default function AssetCard({
 
   const runMobileAction = (action: () => void) => {
     setIsMobileActionsOpen(false);
+    setIsQuickEditMenuOpen(false);
     action();
   };
 
@@ -495,42 +514,42 @@ export default function AssetCard({
 
                 {item.type === "image" && (
                   <>
-                    <button
-                      onClick={() => onImageQuickEdit(item, "redraw")}
-                      className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-sky-600 border border-white/5 rounded-md text-xs text-white transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
-                      title="绘制蒙版并重绘局部"
-                      aria-label="重绘"
-                    >
-                      <Paintbrush className="h-3 w-3 text-sky-300 group-hover:text-white" />
-                      <span className="text-[9px] font-bold">重绘</span>
-                    </button>
-                    <button
-                      onClick={() => onImageQuickEdit(item, "erase")}
-                      className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-rose-600 border border-white/5 rounded-md text-xs text-white transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
-                      title="绘制蒙版并擦除区域"
-                      aria-label="擦除"
-                    >
-                      <X className="h-3 w-3 text-rose-300 group-hover:text-white" />
-                      <span className="text-[9px] font-bold">擦除</span>
-                    </button>
-                    <button
-                      onClick={() => onImageQuickEdit(item, "outpaint")}
-                      className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-indigo-600 border border-white/5 rounded-md text-xs text-white transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
-                      title="扩展画面边界"
-                      aria-label="扩图"
-                    >
-                      <ImageDown className="h-3 w-3 text-indigo-300 group-hover:text-white" />
-                      <span className="text-[9px] font-bold">扩图</span>
-                    </button>
-                    <button
-                      onClick={() => onImageQuickEdit(item, "cutout")}
-                      className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-emerald-600 border border-white/5 rounded-md text-xs text-white transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
-                      title="移除背景并保留主体"
-                      aria-label="抠图"
-                    >
-                      <Scissors className="h-3 w-3 text-emerald-300 group-hover:text-white" />
-                      <span className="text-[9px] font-bold">抠图</span>
-                    </button>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setIsQuickEditMenuOpen(prev => !prev)}
+                        className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-sky-600 border border-white/5 rounded-md text-xs text-white transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
+                        title="图片快捷编辑"
+                        aria-label="图片快捷编辑"
+                        aria-expanded={isQuickEditMenuOpen}
+                      >
+                        <Paintbrush className="h-3 w-3 text-sky-300 group-hover:text-white" />
+                        <span className="text-[9px] font-bold">编辑</span>
+                        <ChevronDown className={`h-3 w-3 transition ${isQuickEditMenuOpen ? "rotate-180" : ""}`} />
+                      </button>
+                      {isQuickEditMenuOpen && (
+                        <div className="absolute bottom-full left-0 mb-1 grid min-w-24 gap-1 rounded-lg border border-white/12 bg-slate-950/94 p-1 text-xs text-slate-100 shadow-xl backdrop-blur">
+                          {quickEditActions.map(action => {
+                            const Icon = action.icon;
+                            return (
+                              <button
+                                key={action.operation}
+                                type="button"
+                                onClick={() => {
+                                  setIsQuickEditMenuOpen(false);
+                                  onImageQuickEdit(item, action.operation);
+                                }}
+                                className="flex h-8 items-center gap-2 rounded-md px-2 text-left transition hover:bg-white/10"
+                                title={action.title}
+                              >
+                                <Icon className={`h-3.5 w-3.5 ${action.tone}`} />
+                                <span className="whitespace-nowrap">{action.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   </>
                 )}
 
@@ -644,7 +663,7 @@ export default function AssetCard({
         <div className="flex min-h-0 flex-1 flex-col justify-end border-t border-[var(--iw-border)] pt-1.5">
           <div className="flex max-h-10 flex-wrap items-center gap-1 overflow-hidden font-mono text-[10px] text-[var(--iw-faint)]">
             <span className="imagine-meta-chip rounded bg-white/5 px-1.5 py-0.5">
-              {getProviderMeta(provider).label}
+              {providerLabel}
             </span>
             <span className="imagine-meta-chip max-w-[150px] truncate rounded bg-white/5 px-1.5 py-0.5" title={item.model}>
               🤖 {formatModelName(item.model)}

@@ -760,6 +760,13 @@ export default function Home() {
   const videoModelGroups = getProviderModelGroups(videoModelOptions, providerKeys, customProviders);
   const audioModelGroups = getProviderModelGroups(audioModelOptions, providerKeys, customProviders);
   const chatModelGroups = getProviderModelGroups(chatModelOptions, providerKeys, customProviders);
+  const providerLabelsByKey = useMemo<Partial<Record<AiProvider, string>>>(() => {
+    const labels: Partial<Record<AiProvider, string>> = {};
+    customProviders.forEach(provider => {
+      labels[provider.key] = provider.label;
+    });
+    return labels;
+  }, [customProviders]);
   const {
     featureModels: imageEditFeatureModels,
     selectFeatureModel: selectImageEditFeatureModel,
@@ -1471,6 +1478,7 @@ export default function Home() {
       }}
       visibleItemsStep={isDesktopLayout ? 48 : 18}
       formatModelLabel={formatStoredModelLabel}
+      providerLabelsByKey={providerLabelsByKey}
     />
   );
 
