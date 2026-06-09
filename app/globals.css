@@ -1145,8 +1145,8 @@ html[data-imagine-theme="light"] .imagine-settings-overlay {
 
 @media (min-width: 640px) {
   .imagine-settings-panel {
-    width: min(calc(100dvw - 2rem), 80rem);
-    height: min(calc(100dvh - 2rem), 86rem);
+    width: min(calc(100dvw - 2rem), 64rem);
+    height: min(calc(100dvh - 2rem), 52rem);
     max-height: calc(100dvh - 2rem);
   }
 }
