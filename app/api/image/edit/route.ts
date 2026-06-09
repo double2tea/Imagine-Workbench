@@ -12,6 +12,7 @@ interface EditImageBody {
   model?: unknown;
   image?: unknown;
   mask?: unknown;
+  guide?: unknown;
   prompt?: unknown;
   imageResolution?: unknown;
   imageQuality?: unknown;
@@ -31,10 +32,11 @@ export async function POST(req: NextRequest) {
     const modelValue = requireText(body.model, "model");
     const image = requireText(body.image, "image");
     const mask = optionalText(body.mask);
+    const guide = optionalText(body.guide);
     const prompt = optionalText(body.prompt);
     validatePrompt(operation, prompt);
 
-    const payloadError = getReferenceImagePayloadError([image, ...(mask ? [mask] : [])]);
+    const payloadError = getReferenceImagePayloadError([image, ...(mask ? [mask] : []), ...(guide ? [guide] : [])]);
     if (payloadError) return NextResponse.json({ error: payloadError }, { status: 413 });
 
     const parsed = parseProviderModel(modelValue, "12ai");
@@ -45,6 +47,7 @@ export async function POST(req: NextRequest) {
       model: parsed.model,
       image: { dataUri: image },
       ...(mask ? { mask: { dataUri: mask } } : {}),
+      ...(guide ? { guide: { dataUri: guide } } : {}),
       imageResolution: optionalText(body.imageResolution) ?? "auto",
       imageQuality: optionalText(body.imageQuality),
     });

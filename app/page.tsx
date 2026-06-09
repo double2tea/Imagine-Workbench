@@ -1056,12 +1056,14 @@ export default function Home() {
     operation: ImageEditFeature,
     editImageUrl: string,
     maskUrl: string | undefined,
+    guideUrl: string | undefined,
     editPrompt: string,
   ) => {
     const model = imageEditFeatureModels[operation];
     try {
       const image = await prepareReferenceImageUrlForRequest(editImageUrl);
       const mask = maskUrl ? await prepareReferenceImageUrlForRequest(maskUrl) : undefined;
+      const guide = guideUrl ? await prepareReferenceImageUrlForRequest(guideUrl) : undefined;
       const response = await fetch("/api/image/edit", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...buildProviderHeaders(model) },
@@ -1070,6 +1072,7 @@ export default function Home() {
           model,
           image,
           mask,
+          guide,
           prompt: editPrompt,
           imageResolution: "auto",
         }),
@@ -1090,7 +1093,7 @@ export default function Home() {
   const handleImageQuickEdit = (item: StorageItem, operation: ImageEditFeature) => {
     if (item.type !== "image") return;
     if (operation === "cutout") {
-      void runImageQuickEdit(item, operation, item.url, undefined, "");
+      void runImageQuickEdit(item, operation, item.url, undefined, undefined, "");
       return;
     }
     launchMaskEditor(item.url, item.id, "creative", operation, item);
@@ -1119,6 +1122,7 @@ export default function Home() {
         output.operation,
         output.imageBase64,
         output.maskBase64,
+        output.mergedImageBase64,
         output.prompt,
       );
       setIsMaskOpen(false);

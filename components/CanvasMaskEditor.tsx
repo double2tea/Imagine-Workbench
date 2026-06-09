@@ -171,6 +171,20 @@ function drawTextOverlay(ctx: CanvasRenderingContext2D, item: TextOverlay): void
   ctx.fillText(item.value, item.x, item.y);
 }
 
+function drawScaledTextOverlay(
+  ctx: CanvasRenderingContext2D,
+  item: TextOverlay,
+  scaleX: number,
+  scaleY: number,
+): void {
+  drawTextOverlay(ctx, {
+    ...item,
+    x: item.x * scaleX,
+    y: item.y * scaleY,
+    size: item.size * Math.min(scaleX, scaleY),
+  });
+}
+
 function canvasHasVisiblePixels(canvas: HTMLCanvasElement): boolean {
   const ctx = canvas.getContext("2d");
   if (!ctx) return false;
@@ -539,15 +553,20 @@ export default function CanvasMaskEditor({
       return;
     }
 
+    const sourceWidth = img.naturalWidth || img.width;
+    const sourceHeight = img.naturalHeight || img.height;
+    const scaleX = sourceWidth / canvas.width;
+    const scaleY = sourceHeight / canvas.height;
+
     const maskCanvas = document.createElement("canvas");
-    maskCanvas.width = canvas.width;
-    maskCanvas.height = canvas.height;
+    maskCanvas.width = sourceWidth;
+    maskCanvas.height = sourceHeight;
     const maskCtx = maskCanvas.getContext("2d");
     if (!maskCtx) return;
 
     maskCtx.fillStyle = "#000000";
     maskCtx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
-    maskCtx.drawImage(canvas, 0, 0);
+    maskCtx.drawImage(canvas, 0, 0, maskCanvas.width, maskCanvas.height);
 
     const imgData = maskCtx.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
     const data = imgData.data;
@@ -566,22 +585,22 @@ export default function CanvasMaskEditor({
     maskCtx.putImageData(imgData, 0, 0);
 
     const mergeCanvas = document.createElement("canvas");
-    mergeCanvas.width = canvas.width;
-    mergeCanvas.height = canvas.height;
+    mergeCanvas.width = sourceWidth;
+    mergeCanvas.height = sourceHeight;
     const mergeCtx = mergeCanvas.getContext("2d");
     if (!mergeCtx) return;
 
-    mergeCtx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    textItems.forEach(item => drawTextOverlay(mergeCtx, item));
-    mergeCtx.drawImage(canvas, 0, 0);
+    mergeCtx.drawImage(img, 0, 0, sourceWidth, sourceHeight);
+    textItems.forEach(item => drawScaledTextOverlay(mergeCtx, item, scaleX, scaleY));
+    mergeCtx.drawImage(canvas, 0, 0, sourceWidth, sourceHeight);
 
     const baseCanvas = document.createElement("canvas");
-    baseCanvas.width = canvas.width;
-    baseCanvas.height = canvas.height;
+    baseCanvas.width = sourceWidth;
+    baseCanvas.height = sourceHeight;
     const baseCtx = baseCanvas.getContext("2d");
     if (!baseCtx) return;
-    baseCtx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    textItems.forEach(item => drawTextOverlay(baseCtx, item));
+    baseCtx.drawImage(img, 0, 0, sourceWidth, sourceHeight);
+    textItems.forEach(item => drawScaledTextOverlay(baseCtx, item, scaleX, scaleY));
 
     onSaveMask({
       imageBase64: baseCanvas.toDataURL("image/png"),
@@ -594,9 +613,19 @@ export default function CanvasMaskEditor({
   };
 
   const applyOutpaint = (img: HTMLImageElement, width: number, height: number) => {
-    const nextWidth = width + outpaintMargins.left + outpaintMargins.right;
-    const nextHeight = height + outpaintMargins.top + outpaintMargins.bottom;
-    if (nextWidth <= width && nextHeight <= height) return;
+    const sourceWidth = img.naturalWidth || img.width;
+    const sourceHeight = img.naturalHeight || img.height;
+    const scaleX = sourceWidth / width;
+    const scaleY = sourceHeight / height;
+    const margins = {
+      left: Math.round(outpaintMargins.left * scaleX),
+      right: Math.round(outpaintMargins.right * scaleX),
+      top: Math.round(outpaintMargins.top * scaleY),
+      bottom: Math.round(outpaintMargins.bottom * scaleY),
+    };
+    const nextWidth = sourceWidth + margins.left + margins.right;
+    const nextHeight = sourceHeight + margins.top + margins.bottom;
+    if (nextWidth <= sourceWidth && nextHeight <= sourceHeight) return;
 
     const baseCanvas = document.createElement("canvas");
     baseCanvas.width = nextWidth;
@@ -605,7 +634,7 @@ export default function CanvasMaskEditor({
     if (!baseCtx) return;
     baseCtx.fillStyle = "#000000";
     baseCtx.fillRect(0, 0, nextWidth, nextHeight);
-    baseCtx.drawImage(img, outpaintMargins.left, outpaintMargins.top, width, height);
+    baseCtx.drawImage(img, margins.left, margins.top, sourceWidth, sourceHeight);
 
     const maskCanvas = document.createElement("canvas");
     maskCanvas.width = nextWidth;
@@ -615,7 +644,7 @@ export default function CanvasMaskEditor({
     maskCtx.fillStyle = "#ffffff";
     maskCtx.fillRect(0, 0, nextWidth, nextHeight);
     maskCtx.fillStyle = "#000000";
-    maskCtx.fillRect(outpaintMargins.left, outpaintMargins.top, width, height);
+    maskCtx.fillRect(margins.left, margins.top, sourceWidth, sourceHeight);
 
     onSaveMask({
       imageBase64: baseCanvas.toDataURL("image/png"),

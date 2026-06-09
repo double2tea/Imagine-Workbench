@@ -252,7 +252,7 @@ function editInputToGenerateInput(input: EditImageInput): GenerateImageInput {
     aspectRatio: "auto",
     imageResolution: input.imageResolution,
     imageQuality: input.imageQuality,
-    referenceImages: [input.image, ...(input.mask ? [input.mask] : [])],
+    referenceImages: [input.image, ...(input.mask ? [input.mask] : []), ...(input.guide ? [input.guide] : [])],
     async: false,
   };
 }
@@ -263,6 +263,7 @@ function buildImageEditPrompt(input: EditImageInput): string {
     return [
       "The first input image is the source image to edit.",
       "The second input image, when provided, is a black and white mask only; it is not a style or content reference.",
+      "The third input image, when provided, is the same source with a red overlay showing the exact edit region.",
       "Change only the white masked region and preserve the rest of the image.",
       userPrompt ? `Edit instruction: ${userPrompt}` : "Edit instruction: redraw the masked area naturally.",
     ].join("\n");
@@ -271,6 +272,7 @@ function buildImageEditPrompt(input: EditImageInput): string {
     return [
       "The first input image is the source image to edit.",
       "The second input image, when provided, is a black and white mask only; it is not a style or content reference.",
+      "The third input image, when provided, is the same source with a red overlay showing the exact erase region.",
       "Remove the white masked object or area and reconstruct the background naturally.",
       "Preserve the unmasked image exactly as much as possible.",
     ].join("\n");
@@ -279,6 +281,7 @@ function buildImageEditPrompt(input: EditImageInput): string {
     return [
       "The first input image is the expanded source canvas to outpaint.",
       "The second input image, when provided, is a black and white mask only; white areas are the new canvas space to fill.",
+      "The third input image, when provided, is the same canvas with a red overlay showing the expansion/edit region.",
       "Extend the scene naturally with matching perspective, lighting, texture, and camera style.",
       userPrompt ? `Outpaint instruction: ${userPrompt}` : "Outpaint instruction: continue the image beyond its original frame.",
     ].join("\n");

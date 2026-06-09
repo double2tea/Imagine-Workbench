@@ -1681,6 +1681,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     setItems(prev => [item, ...prev]);
     const nodeId = boardController.addAssetNode({
       asset: storageItemToBoardAssetReference(item),
+      size: sourceSize,
       title: `${sourceTitle} ${label}`,
       position: {
         x: sourcePosition.x + sourceSize.width + 40,
@@ -1739,6 +1740,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     operation: ImageEditFeature,
     editImageUrl: string,
     maskUrl: string | undefined,
+    guideUrl: string | undefined,
     editPrompt: string,
   ) {
     const label = IMAGE_EDIT_LABELS[operation];
@@ -1758,6 +1760,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     try {
       const image = await prepareReferenceImageUrlForRequest(editImageUrl);
       const mask = maskUrl ? await prepareReferenceImageUrlForRequest(maskUrl) : undefined;
+      const guide = guideUrl ? await prepareReferenceImageUrlForRequest(guideUrl) : undefined;
       const response = await fetch("/api/image/edit", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...buildProviderHeaders(model) },
@@ -1766,6 +1769,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           model,
           image,
           mask,
+          guide,
           prompt: editPrompt,
           imageResolution: "auto",
         }),
@@ -1801,6 +1805,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         output.operation,
         output.imageBase64,
         output.maskBase64,
+        output.mergedImageBase64,
         output.prompt,
       );
       setIsMaskOpen(false);
@@ -4056,6 +4061,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             originalItem,
             operation,
             originalItem.url,
+            undefined,
             undefined,
             "",
           );
