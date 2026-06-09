@@ -113,6 +113,32 @@ html[data-imagine-theme="light"],
   color-scheme: light;
 }
 
+html {
+  scrollbar-color:
+    color-mix(in srgb, var(--iw-muted) 58%, var(--iw-panel))
+    color-mix(in srgb, var(--iw-bg) 72%, var(--iw-panel));
+  scrollbar-width: thin;
+}
+
+html::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+html::-webkit-scrollbar-track {
+  background: color-mix(in srgb, var(--iw-bg) 72%, var(--iw-panel));
+}
+
+html::-webkit-scrollbar-thumb {
+  border: 2px solid color-mix(in srgb, var(--iw-bg) 72%, var(--iw-panel));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--iw-muted) 58%, var(--iw-panel));
+}
+
+html::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--iw-text) 48%, var(--iw-panel));
+}
+
 /* Board Design System Foundations (PR 1): --iw-board-* vars + .imagine-board-* primitives.
    Base (dark) near shell for cascade. Light variants + data-[edge-kind] after existing board light block (~610).
    Reuses imagine-* elevation/border patterns, canvas-tuned for spatial (nodes/edges/minimap).
@@ -1108,6 +1134,37 @@ html[data-imagine-theme="light"] .imagine-settings-overlay {
   background: var(--iw-panel);
   color: var(--iw-text);
   box-shadow: var(--iw-card-shadow);
+  scrollbar-color:
+    color-mix(in srgb, var(--iw-muted) 58%, var(--iw-panel))
+    color-mix(in srgb, var(--iw-bg) 62%, var(--iw-panel));
+  scrollbar-width: thin;
+}
+
+.imagine-settings-panel * {
+  scrollbar-color:
+    color-mix(in srgb, var(--iw-muted) 58%, var(--iw-panel))
+    color-mix(in srgb, var(--iw-bg) 62%, var(--iw-panel));
+  scrollbar-width: thin;
+}
+
+.imagine-settings-panel ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.imagine-settings-panel ::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--iw-bg) 62%, var(--iw-panel));
+}
+
+.imagine-settings-panel ::-webkit-scrollbar-thumb {
+  border: 2px solid color-mix(in srgb, var(--iw-bg) 62%, var(--iw-panel));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--iw-muted) 58%, var(--iw-panel));
+}
+
+.imagine-settings-panel ::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--iw-text) 48%, var(--iw-panel));
 }
 
 .imagine-settings-header {
@@ -1246,16 +1303,32 @@ html[data-imagine-theme="light"] .imagine-settings-overlay {
 }
 
 .imagine-settings-provider-list {
-  max-height: min(16rem, 42vh);
+  min-height: 12rem;
 }
 
 @media (min-width: 1024px) {
   .imagine-settings-provider-list {
-    max-height: min(24rem, 52vh);
+    min-height: 0;
   }
 }
 
 .imagine-settings-workspace {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.imagine-settings-workspace-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.imagine-settings-workspace-body {
   display: grid;
   min-height: 0;
   flex: 1;
@@ -1264,9 +1337,9 @@ html[data-imagine-theme="light"] .imagine-settings-overlay {
 }
 
 @media (min-width: 1024px) {
-  .imagine-settings-workspace {
+  .imagine-settings-workspace-body {
     grid-template-columns: minmax(9.5rem, 11.5rem) minmax(0, 1fr);
-    align-items: start;
+    align-items: stretch;
   }
 }
 
@@ -1410,6 +1483,10 @@ html[data-imagine-theme="light"] .imagine-settings-overlay {
   border-radius: var(--iw-radius-md);
   border: 1px solid var(--iw-border);
   background: color-mix(in srgb, var(--iw-bg) 48%, var(--iw-panel));
+}
+
+.imagine-settings-list.imagine-settings-provider-list {
+  max-height: none;
 }
 
 .imagine-settings-list-row {

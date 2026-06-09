@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { Check, CheckCircle2, ListPlus, Plus, RefreshCw, Search, Trash2, XCircle } from "lucide-react";
+import { Check, CheckCircle2, ListPlus, Plus, RefreshCw, Search, Trash2, X, XCircle } from "lucide-react";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
 import { ProviderCredentialCard } from "@/components/settings/ProviderCredentialCard";
 import type { ProviderTestState } from "@/components/settings/provider-settings-types";
@@ -92,6 +92,7 @@ export function ConnectionSettingsWorkspace({
   const [manualModels, setManualModels] = useState("");
   const [customProviderName, setCustomProviderName] = useState("");
   const [customProviderBaseUrl, setCustomProviderBaseUrl] = useState("");
+  const [isCustomProviderFormOpen, setIsCustomProviderFormOpen] = useState(false);
   const [fetchedSelection, setFetchedSelection] = useState<FetchedSelection>({ scope: "", values: [] });
 
   const customProviderByKey = useMemo(
@@ -191,6 +192,13 @@ export function ConnectionSettingsWorkspace({
     if (!added) return;
     setCustomProviderName("");
     setCustomProviderBaseUrl("");
+    setIsCustomProviderFormOpen(false);
+  };
+
+  const closeCustomProviderForm = () => {
+    setCustomProviderName("");
+    setCustomProviderBaseUrl("");
+    setIsCustomProviderFormOpen(false);
   };
 
   const confirmDeleteCustomProvider = async () => {
@@ -209,101 +217,128 @@ export function ConnectionSettingsWorkspace({
 
   return (
     <div className="imagine-settings-workspace">
-      <aside className="imagine-settings-workspace-nav">
-        <div className="imagine-settings-card mb-3 p-3">
-          <div className="mb-2 flex items-center justify-between">
-            <div className="imagine-settings-card-title">自定义服务商</div>
+      <div className="imagine-settings-workspace-actions">
+        <div className="imagine-settings-section-title">服务商</div>
+        <button
+          type="button"
+          onClick={() => setIsCustomProviderFormOpen(prev => !prev)}
+          className="imagine-settings-toolbar-btn h-8"
+          aria-expanded={isCustomProviderFormOpen}
+        >
+          <Plus className="h-3.5 w-3.5" />
+          添加自定义服务商
+        </button>
+      </div>
+
+      {isCustomProviderFormOpen ? (
+        <div className="imagine-settings-section imagine-settings-custom-provider-panel">
+          <div className="flex items-center justify-between gap-2">
+            <div className="imagine-settings-section-title">自定义服务商</div>
+            <button
+              type="button"
+              onClick={closeCustomProviderForm}
+              className="imagine-settings-toolbar-btn h-7"
+              aria-label="关闭添加自定义服务商"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(8rem,0.45fr)_minmax(12rem,1fr)_auto]">
+            <input
+              type="text"
+              value={customProviderName}
+              onChange={event => setCustomProviderName(event.target.value)}
+              placeholder="名称"
+              className="imagine-input h-9 text-xs"
+            />
+            <input
+              type="url"
+              value={customProviderBaseUrl}
+              onChange={event => setCustomProviderBaseUrl(event.target.value)}
+              placeholder="https://api.example.com"
+              className="imagine-input h-9 font-mono text-xs"
+            />
             <button
               type="button"
               onClick={submitCustomProvider}
-              className="imagine-settings-toolbar-btn h-7"
-              aria-label="添加自定义服务商"
+              disabled={!customProviderName.trim() || !customProviderBaseUrl.trim()}
+              className="imagine-settings-toolbar-btn h-9 justify-center"
             >
-              <Plus className="h-3 w-3" />
+              <Plus className="h-3.5 w-3.5" />
               添加
             </button>
           </div>
-          <input
-            type="text"
-            value={customProviderName}
-            onChange={event => setCustomProviderName(event.target.value)}
-            placeholder="名称"
-            className="imagine-input h-8 text-xs"
-          />
-          <input
-            type="url"
-            value={customProviderBaseUrl}
-            onChange={event => setCustomProviderBaseUrl(event.target.value)}
-            placeholder="https://api.example.com"
-            className="imagine-input mt-2 h-8 font-mono text-xs"
-          />
         </div>
-        <div className="imagine-settings-provider-search">
-          <Search className="h-3.5 w-3.5 shrink-0 text-[var(--iw-faint)]" aria-hidden />
-          <input
-            type="search"
-            value={providerQuery}
-            onChange={event => setProviderQuery(event.target.value)}
-            placeholder="搜索服务商"
-            className="imagine-toolbar-input imagine-toolbar-search min-h-8 w-full text-xs"
-            aria-label="搜索服务商"
-          />
-        </div>
-        <div className="imagine-settings-list imagine-settings-provider-list min-h-0 flex-1">
-          {filteredProviders.length === 0 ? (
-            <div className="imagine-settings-empty">无匹配服务商</div>
-          ) : (
-            filteredProviders.map(provider => {
-              const meta = getWorkspaceProviderMeta(provider);
-              const creds = providerCredentials[provider] ?? { apiKey: "", baseUrl: "" };
-              const isSelected = provider === selectedProvider;
-              const hasKey = Boolean(creds.apiKey.trim());
-              const testForProvider =
-                providerTest.provider === provider && providerTest.status !== "idle";
-              const countCategory: ModelCategory = section === "credentials" ? "chat" : section;
-              const sectionCount =
-                modelGroupsBySection[countCategory].find(group => group.provider === provider)
-                  ?.options.length ?? 0;
+      ) : null}
 
-              return (
-                <button
-                  key={provider}
-                  type="button"
-                  data-interactive="true"
-                  data-selected={isSelected ? "true" : "false"}
-                  onClick={() => onSelectProvider(provider)}
-                  className="imagine-settings-list-row"
-                >
-                  <span className="min-w-0 flex-1 text-left">
-                    <span className="imagine-settings-list-label">{meta.label}</span>
-                    <span className="imagine-settings-list-value">{provider}</span>
-                  </span>
-                  <span className="flex shrink-0 items-center gap-1.5">
-                    <span className="imagine-settings-provider-count">{sectionCount}</span>
-                    {hasKey ? (
-                      <span className="text-[9px] font-semibold text-emerald-400">Key</span>
-                    ) : null}
-                    {testForProvider && providerTest.status === "testing" ? (
-                      <RefreshCw className="h-3.5 w-3.5 animate-spin text-amber-400" />
-                    ) : null}
-                    {testForProvider && providerTest.status === "success" ? (
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
-                    ) : null}
-                    {testForProvider && providerTest.status === "error" ? (
-                      <XCircle className="h-3.5 w-3.5 text-red-400" />
-                    ) : null}
-                  </span>
-                </button>
-              );
-            })
-          )}
-        </div>
-        <p className="imagine-settings-provider-count px-1">
-          {filteredProviders.length} / {providerKeys.length}
-        </p>
-      </aside>
+      <div className="imagine-settings-workspace-body">
+        <aside className="imagine-settings-workspace-nav">
+          <div className="imagine-settings-provider-search">
+            <Search className="h-3.5 w-3.5 shrink-0 text-[var(--iw-faint)]" aria-hidden />
+            <input
+              type="search"
+              value={providerQuery}
+              onChange={event => setProviderQuery(event.target.value)}
+              placeholder="搜索服务商"
+              className="imagine-toolbar-input imagine-toolbar-search min-h-8 w-full text-xs"
+              aria-label="搜索服务商"
+            />
+          </div>
+          <div className="imagine-settings-list imagine-settings-provider-list min-h-0 flex-1">
+            {filteredProviders.length === 0 ? (
+              <div className="imagine-settings-empty">无匹配服务商</div>
+            ) : (
+              filteredProviders.map(provider => {
+                const meta = getWorkspaceProviderMeta(provider);
+                const creds = providerCredentials[provider] ?? { apiKey: "", baseUrl: "" };
+                const isSelected = provider === selectedProvider;
+                const hasKey = Boolean(creds.apiKey.trim());
+                const testForProvider =
+                  providerTest.provider === provider && providerTest.status !== "idle";
+                const countCategory: ModelCategory = section === "credentials" ? "chat" : section;
+                const sectionCount =
+                  modelGroupsBySection[countCategory].find(group => group.provider === provider)
+                    ?.options.length ?? 0;
 
-      <div className="imagine-settings-workspace-main">
+                return (
+                  <button
+                    key={provider}
+                    type="button"
+                    data-interactive="true"
+                    data-selected={isSelected ? "true" : "false"}
+                    onClick={() => onSelectProvider(provider)}
+                    className="imagine-settings-list-row"
+                  >
+                    <span className="min-w-0 flex-1 text-left">
+                      <span className="imagine-settings-list-label">{meta.label}</span>
+                      <span className="imagine-settings-list-value">{provider}</span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-1.5">
+                      <span className="imagine-settings-provider-count">{sectionCount}</span>
+                      {hasKey ? (
+                        <span className="text-[9px] font-semibold text-emerald-400">Key</span>
+                      ) : null}
+                      {testForProvider && providerTest.status === "testing" ? (
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin text-amber-400" />
+                      ) : null}
+                      {testForProvider && providerTest.status === "success" ? (
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                      ) : null}
+                      {testForProvider && providerTest.status === "error" ? (
+                        <XCircle className="h-3.5 w-3.5 text-red-400" />
+                      ) : null}
+                    </span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+          <p className="imagine-settings-provider-count px-1">
+            {filteredProviders.length} / {providerKeys.length}
+          </p>
+        </aside>
+
+        <div className="imagine-settings-workspace-main">
         <div className="imagine-settings-workspace-segment imagine-settings-segment grid grid-cols-5">
           {WORKSPACE_SECTIONS.map(option => (
             <button
@@ -474,6 +509,7 @@ export function ConnectionSettingsWorkspace({
             </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   );
