@@ -429,6 +429,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             onCaptureVideoFrame={c.onCaptureVideoFrame}
             onCompare={c.onOpenAssetCompare ? () => c.onOpenAssetCompare?.(node.id) : undefined}
             onEditImage={c.onEditAssetImage}
+            onImageQuickEdit={c.onImageQuickEdit}
             onDownload={c.onDownloadAsset}
             onMeasureAspectRatio={c.onMeasureAssetAspectRatio}
             onOpenFullscreen={c.onOpenFullscreen}
@@ -445,6 +446,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             node={node}
             stackItems={data.assetStackItems}
             onCaptureVideoFrame={c.onCaptureVideoFrame}
+            onImageQuickEdit={c.onImageQuickEdit}
             onDownload={c.onDownloadAsset}
             onMeasureAspectRatio={c.onMeasureAssetAspectRatio}
             onOpenFullscreen={c.onOpenFullscreen}

@@ -27,15 +27,26 @@ import {
   type CanvasSize,
   type CropResizeHandle,
 } from "@/lib/canvas-editor";
+import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
+
+export interface CanvasMaskEditorOutput {
+  imageBase64: string;
+  maskBase64: string;
+  mergedImageBase64: string;
+  operation?: ImageEditFeature;
+  prompt: string;
+}
 
 interface CanvasMaskEditorProps {
   imageUrl: string;
   isOpen: boolean;
+  operation?: ImageEditFeature;
+  initialPrompt?: string;
   onClose: () => void;
-  onSaveMask: (maskedImageBase64: string, maskBase64: string) => void;
+  onSaveMask: (output: CanvasMaskEditorOutput) => void;
 }
 
-type EditorMode = "mask" | "erase" | "text" | "crop";
+type EditorMode = "mask" | "erase" | "text" | "crop" | "outpaint";
 type CropPresetId = "free" | "original" | "1:1" | "4:5" | "3:4" | "4:3" | "16:9" | "9:16";
 type CropDragState =
   | { type: "create"; start: CanvasPoint }
@@ -74,7 +85,31 @@ const EDITOR_MODE_OPTIONS: Array<{ mode: EditorMode; label: string; hint: string
   { mode: "erase", label: "橡皮", hint: "擦除已绘制遮罩", icon: <Eraser className="h-3.5 w-3.5" /> },
   { mode: "text", label: "文字", hint: "点击画布放置文字", icon: <Type className="h-3.5 w-3.5" /> },
   { mode: "crop", label: "裁切", hint: "拖动选框或把手调整构图", icon: <Crop className="h-3.5 w-3.5" /> },
+  { mode: "outpaint", label: "扩图", hint: "设置四周扩展像素", icon: <Crop className="h-3.5 w-3.5" /> },
 ];
+
+const OPERATION_COPY: Record<ImageEditFeature, { title: string; hint: string; promptPlaceholder: string }> = {
+  redraw: {
+    title: "重绘",
+    hint: "绘制蒙版并描述要替换的新内容",
+    promptPlaceholder: "例如：把杯子换成玻璃花瓶，保持原有光线",
+  },
+  erase: {
+    title: "擦除",
+    hint: "绘制要移除的区域，系统会补全背景",
+    promptPlaceholder: "可选：补全背景的要求",
+  },
+  outpaint: {
+    title: "扩图",
+    hint: "设置扩展边距并描述延展方向",
+    promptPlaceholder: "例如：向右延展厨房台面和窗外自然光",
+  },
+  cutout: {
+    title: "抠图",
+    hint: "移除背景并保留主体",
+    promptPlaceholder: "可选：主体保留要求",
+  },
+};
 
 function getCropPresetRatio(presetId: CropPresetId, canvasSize: CanvasSize): AspectRatio | null {
   if (presetId === "original") return { width: canvasSize.width, height: canvasSize.height };
@@ -147,6 +182,8 @@ function canvasHasVisiblePixels(canvas: HTMLCanvasElement): boolean {
 export default function CanvasMaskEditor({
   imageUrl,
   isOpen,
+  operation,
+  initialPrompt = "",
   onClose,
   onSaveMask,
 }: CanvasMaskEditorProps) {
@@ -159,6 +196,8 @@ export default function CanvasMaskEditor({
   const [workingImageUrl, setWorkingImageUrl] = useState(imageUrl);
   const [isDrawing, setIsDrawing] = useState(false);
   const [editorMode, setEditorMode] = useState<EditorMode>("mask");
+  const [editPrompt, setEditPrompt] = useState(initialPrompt);
+  const [outpaintMargins, setOutpaintMargins] = useState({ left: 0, right: 0, top: 0, bottom: 0 });
   const [brushSize, setBrushSize] = useState(24);
   const [hasDrawn, setHasDrawn] = useState(false);
   const [hasLocalEdits, setHasLocalEdits] = useState(false);
@@ -172,9 +211,19 @@ export default function CanvasMaskEditor({
   const [cropPresetId, setCropPresetId] = useState<CropPresetId>("free");
   const [cropCursor, setCropCursor] = useState("crosshair");
 
-  const canApply = hasLocalEdits || hasDrawn || textItems.length > 0;
+  const hasOutpaintMargins = Object.values(outpaintMargins).some(value => value > 0);
+  const operationNeedsPrompt = operation === "redraw" || operation === "outpaint";
+  const canApply = operation === "outpaint"
+    ? hasOutpaintMargins && (!operationNeedsPrompt || Boolean(editPrompt.trim()))
+    : operation
+      ? (operation === "cutout" || hasDrawn) && (!operationNeedsPrompt || Boolean(editPrompt.trim()))
+      : hasLocalEdits || hasDrawn || textItems.length > 0;
   const canApplyCrop = cropRect !== null && isUsableCrop(cropRect);
-  const activeMode = EDITOR_MODE_OPTIONS.find(option => option.mode === editorMode) ?? EDITOR_MODE_OPTIONS[0];
+  const visibleModeOptions = operation === "outpaint"
+    ? EDITOR_MODE_OPTIONS.filter(option => option.mode === "outpaint")
+    : EDITOR_MODE_OPTIONS.filter(option => option.mode !== "outpaint");
+  const activeMode = visibleModeOptions.find(option => option.mode === editorMode) ?? visibleModeOptions[0] ?? EDITOR_MODE_OPTIONS[0];
+  const operationCopy = operation ? OPERATION_COPY[operation] : null;
   const cropSizeLabel = cropRect ? `${Math.round(cropRect.width)} x ${Math.round(cropRect.height)}` : "未选择";
 
   useEffect(() => {
@@ -195,6 +244,18 @@ export default function CanvasMaskEditor({
     };
     img.src = workingImageUrl;
   }, [isOpen, workingImageUrl]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setEditPrompt(initialPrompt);
+    if (operation === "outpaint") {
+      setEditorMode("outpaint");
+    } else if (operation === "erase") {
+      setEditorMode("mask");
+    } else {
+      setEditorMode("mask");
+    }
+  }, [initialPrompt, isOpen, operation]);
 
   useEffect(() => {
     if (!imgLoaded || !canvasRef.current) return;
@@ -467,6 +528,11 @@ export default function CanvasMaskEditor({
     const img = bgImgRef.current;
     if (!canvas || !img) return;
 
+    if (operation === "outpaint") {
+      applyOutpaint(img, canvas.width, canvas.height);
+      return;
+    }
+
     const maskCanvas = document.createElement("canvas");
     maskCanvas.width = canvas.width;
     maskCanvas.height = canvas.height;
@@ -503,8 +569,63 @@ export default function CanvasMaskEditor({
     textItems.forEach(item => drawTextOverlay(mergeCtx, item));
     mergeCtx.drawImage(canvas, 0, 0);
 
-    onSaveMask(mergeCanvas.toDataURL("image/png"), maskCanvas.toDataURL("image/png"));
+    const baseCanvas = document.createElement("canvas");
+    baseCanvas.width = canvas.width;
+    baseCanvas.height = canvas.height;
+    const baseCtx = baseCanvas.getContext("2d");
+    if (!baseCtx) return;
+    baseCtx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    textItems.forEach(item => drawTextOverlay(baseCtx, item));
+
+    onSaveMask({
+      imageBase64: baseCanvas.toDataURL("image/png"),
+      maskBase64: maskCanvas.toDataURL("image/png"),
+      mergedImageBase64: mergeCanvas.toDataURL("image/png"),
+      operation,
+      prompt: editPrompt.trim(),
+    });
     onClose();
+  };
+
+  const applyOutpaint = (img: HTMLImageElement, width: number, height: number) => {
+    const nextWidth = width + outpaintMargins.left + outpaintMargins.right;
+    const nextHeight = height + outpaintMargins.top + outpaintMargins.bottom;
+    if (nextWidth <= width && nextHeight <= height) return;
+
+    const baseCanvas = document.createElement("canvas");
+    baseCanvas.width = nextWidth;
+    baseCanvas.height = nextHeight;
+    const baseCtx = baseCanvas.getContext("2d");
+    if (!baseCtx) return;
+    baseCtx.fillStyle = "#000000";
+    baseCtx.fillRect(0, 0, nextWidth, nextHeight);
+    baseCtx.drawImage(img, outpaintMargins.left, outpaintMargins.top, width, height);
+
+    const maskCanvas = document.createElement("canvas");
+    maskCanvas.width = nextWidth;
+    maskCanvas.height = nextHeight;
+    const maskCtx = maskCanvas.getContext("2d");
+    if (!maskCtx) return;
+    maskCtx.fillStyle = "#ffffff";
+    maskCtx.fillRect(0, 0, nextWidth, nextHeight);
+    maskCtx.fillStyle = "#000000";
+    maskCtx.fillRect(outpaintMargins.left, outpaintMargins.top, width, height);
+
+    onSaveMask({
+      imageBase64: baseCanvas.toDataURL("image/png"),
+      maskBase64: maskCanvas.toDataURL("image/png"),
+      mergedImageBase64: baseCanvas.toDataURL("image/png"),
+      operation,
+      prompt: editPrompt.trim(),
+    });
+    onClose();
+  };
+
+  const setOutpaintMargin = (side: keyof typeof outpaintMargins, value: number) => {
+    setOutpaintMargins(prev => ({
+      ...prev,
+      [side]: Math.max(0, Math.min(600, Math.round(value))),
+    }));
   };
 
   const renderModeButton = ({ mode, label, hint, icon }: { mode: EditorMode; label: string; hint: string; icon: React.ReactNode }) => (
@@ -531,9 +652,11 @@ export default function CanvasMaskEditor({
           <div className="min-w-0">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--iw-text)]">
               <Paintbrush className="h-4 w-4 text-blue-300" />
-              图片编辑器
+              {operationCopy ? operationCopy.title : "图片编辑器"}
             </h3>
-            <p className="mt-1 text-xs text-[var(--iw-muted)]">{activeMode.label}: {activeMode.hint}</p>
+            <p className="mt-1 text-xs text-[var(--iw-muted)]">
+              {operationCopy ? operationCopy.hint : `${activeMode.label}: ${activeMode.hint}`}
+            </p>
           </div>
           <button
             type="button"
@@ -638,7 +761,7 @@ export default function CanvasMaskEditor({
             <div className="min-w-0">
               <span className="mb-1.5 block text-[10px] font-semibold tracking-widest text-[var(--iw-muted)]">工具</span>
               <div className="flex flex-wrap items-center rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)]/80 p-0.5">
-                {EDITOR_MODE_OPTIONS.map(option => renderModeButton(option))}
+                {visibleModeOptions.map(option => renderModeButton(option))}
               </div>
             </div>
 
@@ -773,6 +896,37 @@ export default function CanvasMaskEditor({
                   </button>
                 </div>
               )}
+
+              {editorMode === "outpaint" && (
+                <div className="grid min-h-10 grid-cols-2 gap-2 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-bg)]/35 px-3 py-2 sm:grid-cols-4">
+                  {(["left", "right", "top", "bottom"] as const).map(side => (
+                    <label key={side} className="flex items-center gap-2 text-[10px] font-semibold text-[var(--iw-muted)]">
+                      <span className="w-8">{side === "left" ? "左" : side === "right" ? "右" : side === "top" ? "上" : "下"}</span>
+                      <input
+                        type="number"
+                        min="0"
+                        max="600"
+                        value={outpaintMargins[side]}
+                        onChange={event => setOutpaintMargin(side, Number(event.target.value))}
+                        className="imagine-input h-8 min-w-0 font-mono text-xs"
+                        aria-label={`扩图${side}边距`}
+                      />
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              {operation && operation !== "cutout" ? (
+                <div className="mt-2 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-bg)]/35 px-3 py-2">
+                  <textarea
+                    value={editPrompt}
+                    onChange={event => setEditPrompt(event.target.value)}
+                    placeholder={operationCopy?.promptPlaceholder}
+                    className="imagine-field-textarea min-h-16 resize-y text-xs"
+                    aria-label={`${operationCopy?.title ?? "图片编辑"}提示词`}
+                  />
+                </div>
+              ) : null}
             </div>
 
             <div className="min-w-0">

@@ -101,6 +101,7 @@ import { findResultNodeForSource, resultNodeDefaultPosition } from "@/lib/board/
 import { findAvailableBoardNodePosition } from "@/lib/board/placement";
 import type { GenerationTask } from "@/lib/generation-tasks";
 import { DEFAULT_AUDIO_MODEL, DEFAULT_VIDEO_MODEL } from "@/lib/providers/model-catalog";
+import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
 
 interface BoardWorkspaceProps {
   boardSummaries: BoardSummary[];
@@ -114,6 +115,7 @@ interface BoardWorkspaceProps {
   onWorkspaceNotice: (type: WorkspaceNoticeType, message: string) => void;
   onCancelGenerateNode: (nodeId: string) => void;
   onEditAssetImage: (nodeId: string) => void;
+  onImageQuickEdit: (nodeId: string, operation: ImageEditFeature) => void;
   onExecuteGenerateNode: (nodeId: string) => void;
   onFetchRunningHubAppSchema: (webappId: string) => Promise<BoardRunningHubAppSchemaResult>;
   onImportBoardFiles: (files: File[], position: BoardPoint) => void | Promise<void>;
@@ -952,6 +954,7 @@ export default function BoardWorkspace({
   onConnectionError,
   onWorkspaceNotice,
   onEditAssetImage,
+  onImageQuickEdit,
   onExecuteGenerateNode,
   onFetchRunningHubAppSchema,
   onImportBoardFiles,
@@ -1326,6 +1329,7 @@ export default function BoardWorkspace({
     onDelete: trashAndDeleteNode,
     onDownloadAsset,
     onEditAssetImage,
+    onImageQuickEdit,
     onExecuteGenerate: onExecuteGenerateNode,
     onFetchRunningHubAppSchema,
     onFocusReferenceSource: focusReferenceSourceNode,
@@ -1371,7 +1375,7 @@ export default function BoardWorkspace({
       }
     },
   }), [
-    onCancelGenerateNode, onCaptureVideoFrame, trashAndDeleteNode, onDownloadAsset, onEditAssetImage,
+    onCancelGenerateNode, onCaptureVideoFrame, trashAndDeleteNode, onDownloadAsset, onEditAssetImage, onImageQuickEdit,
     onExecuteGenerateNode, onFetchRunningHubAppSchema, focusReferenceSourceNode, onOpenFullscreen,
     onOpenPanorama, onSaveVoiceProfile, materializeGenerateResult, moveGenerateReferenceEdge, moveReferenceGroupItem,
     deleteEdge, removeReferenceGroupItem, onSendAgentNode, onSendAssetToAgent, connectSelectedBoardPromptReference,

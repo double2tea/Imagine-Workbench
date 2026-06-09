@@ -17,7 +17,7 @@ import {
 } from "@/lib/agent-actions";
 import { isCustomImageResolutionValue } from "@/lib/agent-tool-action";
 import AtReferenceDropdown from "@/components/reference/AtReferenceDropdown";
-import CanvasMaskEditor from "@/components/CanvasMaskEditor";
+import CanvasMaskEditor, { type CanvasMaskEditorOutput } from "@/components/CanvasMaskEditor";
 import FullscreenPreview from "@/components/assets/FullscreenPreview";
 import PanoramaOverlay from "@/components/panorama/PanoramaOverlay";
 import BoardInspector from "@/components/board/BoardInspector";
@@ -53,6 +53,8 @@ import {
   useReferenceState,
 } from "@/hooks/useReferenceState";
 import { useProviderSettings } from "@/hooks/useProviderSettings";
+import { useImageEditFeatureModels } from "@/hooks/useImageEditFeatureModels";
+import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
 import {
   buildStorageItem,
   clearAllDB,
@@ -86,6 +88,7 @@ import {
   REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES,
   compressReferenceImageDataUrl,
   compressReferenceImageFile,
+  prepareReferenceImageUrlForRequest,
 } from "@/lib/reference-images";
 import { transcriptFromDataUrl } from "@/lib/transcripts";
 import {
@@ -154,6 +157,7 @@ import {
 } from "@/lib/data-management";
 import { CLEAR_WORKSPACE_ASSETS_MESSAGE } from "@/lib/workspace-messages";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
+import { readImageGenerationPayload } from "@/lib/client-image-response";
 
 type NoticeType = "error" | "info" | "success";
 type MaskDestination = "creative" | "agent" | "board-asset";
@@ -169,6 +173,12 @@ type AgentImageToVideoAction = AgentToolAction & { type: "continue_image_to_vide
 type BoardAgentActionResult = boolean | { handled: true; success: boolean };
 
 const LARGE_BOARD_DATA_URL_MIN_LENGTH = 120_000;
+const IMAGE_EDIT_LABELS: Record<ImageEditFeature, string> = {
+  redraw: "重绘",
+  erase: "擦除",
+  outpaint: "扩图",
+  cutout: "抠图",
+};
 
 interface BoardPageProps {
   boardId?: string;
@@ -1135,6 +1145,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const [maskTargetId, setMaskTargetId] = useState("");
   const [maskDestination, setMaskDestination] = useState<MaskDestination>("creative");
   const [maskSourceNodeId, setMaskSourceNodeId] = useState<string | null>(null);
+  const [maskEditOperation, setMaskEditOperation] = useState<ImageEditFeature | undefined>(undefined);
+  const [maskEditSourceItem, setMaskEditSourceItem] = useState<StorageItem | null>(null);
   const [fullscreenItem, setFullscreenItem] = useState<StorageItem | null>(null);
   const [panoramaItem, setPanoramaItem] = useState<StorageItem | null>(null);
   const [voiceProfileSourceItem, setVoiceProfileSourceItem] = useState<StorageItem | null>(null);
@@ -1611,18 +1623,142 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     }
   };
 
-  const launchMaskEditor = useCallback((imageUrl: string, id: string, destination: MaskDestination = "creative", sourceNodeId?: string) => {
+  const launchMaskEditor = useCallback((
+    imageUrl: string,
+    id: string,
+    destination: MaskDestination = "creative",
+    sourceNodeId?: string,
+    operation?: ImageEditFeature,
+    sourceItem?: StorageItem,
+  ) => {
     setMaskTargetUrl(imageUrl);
     setMaskTargetId(id);
     setMaskDestination(destination);
     setMaskSourceNodeId(sourceNodeId ?? null);
+    setMaskEditOperation(operation);
+    setMaskEditSourceItem(sourceItem ?? null);
     setIsMaskOpen(true);
   }, []);
 
-  const saveMaskOutput = async (mergedImageBase64: string) => {
+  async function saveBoardQuickEditAsset(
+    sourceNodeId: string,
+    sourceTitle: string,
+    sourcePosition: BoardPoint,
+    sourceSize: { width: number; height: number },
+    sourceItem: StorageItem,
+    operation: ImageEditFeature,
+    imageUrl: string,
+    model: string,
+    editPrompt: string,
+  ) {
+    const label = IMAGE_EDIT_LABELS[operation];
+    const editedItem = buildStorageItem(
+      {
+        id: makeClientId("img_edit"),
+        type: "image",
+        url: imageUrl,
+        prompt: editPrompt || `${label}：${sourceItem.prompt || sourceItem.id}`,
+        model,
+        aspectRatio: "auto",
+        createdAt: new Date().toISOString(),
+        status: "complete",
+        progress: 100,
+        maskOriginalId: sourceItem.id,
+        sourceBoardNodeId: sourceNodeId,
+      },
+      { boardId: resolvedBoardId },
+    );
+    const savedEditedItem = await saveItemOrWarn(editedItem, pushWorkspaceNotice);
+    if (!savedEditedItem) return;
+    setItems(prev => [savedEditedItem, ...prev]);
+    const editedNodeId = boardController.addAssetNode({
+      asset: storageItemToBoardAssetReference(savedEditedItem),
+      title: `${sourceTitle} ${label}`,
+      position: {
+        x: sourcePosition.x + sourceSize.width + 40,
+        y: sourcePosition.y,
+      },
+    });
+    boardController.selectNode(editedNodeId);
+    boardController.selectEdge(null);
+    pushWorkspaceNotice("success", `${label}完成，已保存为新画板资产`);
+  }
+
+  async function runBoardImageQuickEdit(
+    sourceNodeId: string,
+    sourceTitle: string,
+    sourcePosition: BoardPoint,
+    sourceSize: { width: number; height: number },
+    sourceItem: StorageItem,
+    operation: ImageEditFeature,
+    editImageUrl: string,
+    maskUrl: string | undefined,
+    editPrompt: string,
+  ) {
+    const label = IMAGE_EDIT_LABELS[operation];
+    const model = imageEditFeatureModels[operation];
+    try {
+      const image = await prepareReferenceImageUrlForRequest(editImageUrl);
+      const mask = maskUrl ? await prepareReferenceImageUrlForRequest(maskUrl) : undefined;
+      const response = await fetch("/api/image/edit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...buildProviderHeaders(model) },
+        body: JSON.stringify({
+          operation,
+          model,
+          image,
+          mask,
+          prompt: editPrompt,
+          imageResolution: "auto",
+        }),
+      });
+      if (!response.ok) throw new Error(await readFetchError(response, `${label}失败`));
+      const payload = await readImageGenerationPayload(response);
+      if (!payload.imageUrl) throw new Error("图片编辑接口没有返回图片");
+      await saveBoardQuickEditAsset(
+        sourceNodeId,
+        sourceTitle,
+        sourcePosition,
+        sourceSize,
+        sourceItem,
+        operation,
+        payload.imageUrl,
+        model,
+        editPrompt,
+      );
+    } catch (error) {
+      pushWorkspaceNotice("error", toErrorMessage(error, `${label}失败`));
+    }
+  }
+
+  const saveMaskOutput = async (output: CanvasMaskEditorOutput) => {
+    if (output.operation && maskEditSourceItem && maskSourceNodeId) {
+      const sourceNode = boardController.board.nodes.find(node => node.id === maskSourceNodeId);
+      if (!sourceNode || (sourceNode.kind !== "asset" && sourceNode.kind !== "result")) {
+        pushWorkspaceNotice("error", "未找到要编辑的图片节点");
+        return;
+      }
+      await runBoardImageQuickEdit(
+        sourceNode.id,
+        sourceNode.title,
+        sourceNode.position,
+        sourceNode.size,
+        maskEditSourceItem,
+        output.operation,
+        output.imageBase64,
+        output.maskBase64,
+        output.prompt,
+      );
+      setIsMaskOpen(false);
+      setMaskEditOperation(undefined);
+      setMaskEditSourceItem(null);
+      setMaskSourceNodeId(null);
+      return;
+    }
+
     let compressedMergedImage: string;
     try {
-      compressedMergedImage = await compressReferenceImageDataUrl(mergedImageBase64);
+      compressedMergedImage = await compressReferenceImageDataUrl(output.mergedImageBase64);
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, "蒙版参考图压缩失败"));
       return;
@@ -1683,6 +1819,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       setMode("image");
     }
     setIsMaskOpen(false);
+    setMaskEditOperation(undefined);
+    setMaskEditSourceItem(null);
+    setMaskSourceNodeId(null);
     pushWorkspaceNotice(
       "success",
       maskDestination === "agent"
@@ -3770,6 +3909,76 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const videoModelGroups = getProviderModelGroups(videoModelOptions, providerKeys, customProviders);
   const audioModelGroups = getProviderModelGroups(audioModelOptions, providerKeys, customProviders);
   const chatModelGroups = getProviderModelGroups(chatModelOptions, providerKeys, customProviders);
+  const availableImageEditModels = useMemo(
+    () => imageModelGroups.flatMap(group => group.options.map(option => option.value)),
+    [imageModelGroups],
+  );
+  const {
+    featureModels: imageEditFeatureModels,
+    selectFeatureModel: selectImageEditFeatureModel,
+  } = useImageEditFeatureModels(availableImageEditModels);
+  const resolveBoardQuickEditSource = (nodeId: string) => {
+    const node = boardController.board.nodes.find(item => item.id === nodeId);
+    if (!node || (node.kind !== "asset" && node.kind !== "result") || node.asset.type !== "image") return null;
+
+    const assetId = node.kind === "result" ? node.activeAssetId : node.asset.assetId;
+    const storedItem = items.find(item => item.id === assetId);
+    if (storedItem) {
+      return {
+        node,
+        item: storedItem,
+      };
+    }
+    if (assetId !== node.asset.assetId) return null;
+
+    return {
+      node,
+      item: buildStorageItem(
+        {
+          id: node.asset.assetId,
+          type: node.asset.type,
+          url: node.asset.url,
+          prompt: node.asset.prompt,
+          model: node.asset.model,
+          aspectRatio: "auto",
+          createdAt: node.createdAt,
+          status: "complete",
+          progress: 100,
+          sourceBoardNodeId: node.id,
+          ...(node.kind === "result" ? { sourceBoardResultStackKey: node.resultStackKey } : {}),
+        },
+        { boardId: resolvedBoardId },
+      ),
+    };
+  };
+  const handleBoardImageQuickEdit = (nodeId: string, operation: ImageEditFeature) => {
+    const source = resolveBoardQuickEditSource(nodeId);
+    if (!source) {
+      pushWorkspaceNotice("info", "请选择一个图片节点");
+      return;
+    }
+
+    void resolveOriginalStorageItem(source.item).then(
+      originalItem => {
+        if (operation === "cutout") {
+          void runBoardImageQuickEdit(
+            source.node.id,
+            source.node.title,
+            source.node.position,
+            source.node.size,
+            originalItem,
+            operation,
+            originalItem.url,
+            undefined,
+            "",
+          );
+          return;
+        }
+        launchMaskEditor(originalItem.url, originalItem.id, "board-asset", source.node.id, operation, originalItem);
+      },
+      error => pushWorkspaceNotice("error", toErrorMessage(error, "原始图片读取失败")),
+    );
+  };
   const boardSummariesForToolbar = useMemo(() => {
     if (boardController.saveStatus === "loading") return boardSummaries;
     const summary = boardSummaryFromDocument(boardController.board);
@@ -3840,6 +4049,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onDeleteBoard={handleDeleteBoard}
         onDownloadAsset={handleDownloadAsset}
         onEditAssetImage={editBoardAssetImage}
+        onImageQuickEdit={handleBoardImageQuickEdit}
         onExecuteGenerateNode={handleExecuteGenerateNode}
         onFetchRunningHubAppSchema={fetchRunningHubAppSchema}
         onImportBoardFiles={handleImportBoardFiles}
@@ -3959,6 +4169,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         providerTest={providerTest}
         selectedChatModel={selectedChatModel}
         selectedProvider={selectedProvider}
+        imageEditFeatureModels={imageEditFeatureModels}
         videoModelGroups={videoModelGroups}
         hasCurrentBoard
         onAddCustomProvider={addCustomProvider}
@@ -3978,6 +4189,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onRepairAssetSources={handleDataRepairAssetSources}
         onResetBoards={handleDataResetBoards}
         onSaveCredential={handleSaveCredential}
+        onSelectImageEditFeatureModel={selectImageEditFeatureModel}
         onSelectChatModel={handleSelectChatModel}
         onSelectProvider={handleSelectProvider}
         onDeleteCustomProvider={deleteCustomProvider}
@@ -4011,7 +4223,13 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         <CanvasMaskEditor
           imageUrl={maskTargetUrl}
           isOpen={isMaskOpen}
-          onClose={() => setIsMaskOpen(false)}
+          operation={maskEditOperation}
+          onClose={() => {
+            setIsMaskOpen(false);
+            setMaskEditOperation(undefined);
+            setMaskEditSourceItem(null);
+            setMaskSourceNodeId(null);
+          }}
           onSaveMask={saveMaskOutput}
         />
       )}

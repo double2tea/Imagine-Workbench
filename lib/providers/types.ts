@@ -53,6 +53,18 @@ export interface GenerateImageInput {
   runningHubNodeInfoList?: RunningHubTaskNodeBinding[];
 }
 
+export type ImageEditOperation = "redraw" | "erase" | "outpaint" | "cutout";
+
+export interface EditImageInput {
+  operation: ImageEditOperation;
+  prompt?: string;
+  model: string;
+  image: ReferenceImage;
+  mask?: ReferenceImage;
+  imageResolution: string;
+  imageQuality?: string;
+}
+
 export interface GenerateImageResult {
   imageUrl?: string;
   operationName?: string;

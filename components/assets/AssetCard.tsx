@@ -5,6 +5,7 @@ import {
   FileText,
   ImageDown,
   Image as ImageIcon,
+  Scissors,
   type LucideIcon,
   Maximize2,
   MoreHorizontal,
@@ -32,6 +33,7 @@ import { tryParseProviderModel, type AiProvider } from "@/lib/providers/model-ca
 import { getProviderMeta } from "@/lib/providers/registry";
 import { transcriptFromDataUrl } from "@/lib/transcripts";
 import { getVideoFrameCaptureLabel, type CapturedVideoFrame, type VideoFrameCaptureMode } from "@/lib/video-frame";
+import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
 
 interface AssetCardProps {
   canceling: boolean;
@@ -46,6 +48,7 @@ interface AssetCardProps {
   onDelete: (item: StorageItem) => void;
   onDownload: (item: StorageItem) => void;
   onLaunchMaskEditor: (imageUrl: string, id: string) => void;
+  onImageQuickEdit: (item: StorageItem, operation: ImageEditFeature) => void;
   onOpenFullscreen: (item: StorageItem) => void;
   onOpenPanorama: (item: StorageItem) => void;
   onOpenReferencePreview: (item: StorageItem, index: number) => void;
@@ -127,6 +130,7 @@ export default function AssetCard({
   onDelete,
   onDownload,
   onLaunchMaskEditor,
+  onImageQuickEdit,
   onOpenFullscreen,
   onOpenPanorama,
   onOpenReferencePreview,
@@ -352,6 +356,30 @@ export default function AssetCard({
                       修改
                     </button>
                   )}
+                  {item.type === "image" && (
+                    <button type="button" onClick={() => runMobileAction(() => onImageQuickEdit(item, "redraw"))}>
+                      <Paintbrush className="h-3.5 w-3.5 text-sky-300" />
+                      重绘
+                    </button>
+                  )}
+                  {item.type === "image" && (
+                    <button type="button" onClick={() => runMobileAction(() => onImageQuickEdit(item, "erase"))}>
+                      <X className="h-3.5 w-3.5 text-rose-300" />
+                      擦除
+                    </button>
+                  )}
+                  {item.type === "image" && (
+                    <button type="button" onClick={() => runMobileAction(() => onImageQuickEdit(item, "outpaint"))}>
+                      <ImageDown className="h-3.5 w-3.5 text-indigo-300" />
+                      扩图
+                    </button>
+                  )}
+                  {item.type === "image" && (
+                    <button type="button" onClick={() => runMobileAction(() => onImageQuickEdit(item, "cutout"))}>
+                      <Scissors className="h-3.5 w-3.5 text-emerald-300" />
+                      抠图
+                    </button>
+                  )}
                   <button type="button" onClick={() => runMobileAction(() => onDownload(item))}>
                     <Download className="h-3.5 w-3.5 text-emerald-300" />
                     下载
@@ -463,6 +491,47 @@ export default function AssetCard({
                     <Paintbrush className="h-3 w-3 text-amber-500 group-hover:text-white" />
                     <span className="text-[9px] font-bold">修改</span>
                   </button>
+                )}
+
+                {item.type === "image" && (
+                  <>
+                    <button
+                      onClick={() => onImageQuickEdit(item, "redraw")}
+                      className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-sky-600 border border-white/5 rounded-md text-xs text-white transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
+                      title="绘制蒙版并重绘局部"
+                      aria-label="重绘"
+                    >
+                      <Paintbrush className="h-3 w-3 text-sky-300 group-hover:text-white" />
+                      <span className="text-[9px] font-bold">重绘</span>
+                    </button>
+                    <button
+                      onClick={() => onImageQuickEdit(item, "erase")}
+                      className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-rose-600 border border-white/5 rounded-md text-xs text-white transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
+                      title="绘制蒙版并擦除区域"
+                      aria-label="擦除"
+                    >
+                      <X className="h-3 w-3 text-rose-300 group-hover:text-white" />
+                      <span className="text-[9px] font-bold">擦除</span>
+                    </button>
+                    <button
+                      onClick={() => onImageQuickEdit(item, "outpaint")}
+                      className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-indigo-600 border border-white/5 rounded-md text-xs text-white transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
+                      title="扩展画面边界"
+                      aria-label="扩图"
+                    >
+                      <ImageDown className="h-3 w-3 text-indigo-300 group-hover:text-white" />
+                      <span className="text-[9px] font-bold">扩图</span>
+                    </button>
+                    <button
+                      onClick={() => onImageQuickEdit(item, "cutout")}
+                      className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-emerald-600 border border-white/5 rounded-md text-xs text-white transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
+                      title="移除背景并保留主体"
+                      aria-label="抠图"
+                    >
+                      <Scissors className="h-3 w-3 text-emerald-300 group-hover:text-white" />
+                      <span className="text-[9px] font-bold">抠图</span>
+                    </button>
+                  </>
                 )}
 
                 <button

@@ -7,7 +7,7 @@ import {
   resolveRunningHubStandardModelForReferenceMedia,
   validateRunningHubStandardReferenceCount,
 } from "./runninghub";
-import type { GenerateImageInput, GenerateImageResult, MediaStatusResult, ProviderConfig, ProviderMediaType, ReferenceMedia, RunningHubTaskNodeBinding } from "./types";
+import type { EditImageInput, GenerateImageInput, GenerateImageResult, MediaStatusResult, ProviderConfig, ProviderMediaType, ReferenceMedia, RunningHubTaskNodeBinding } from "./types";
 import { mediaReferenceFileExtension, mediaReferenceLabel, mediaReferenceTypeFromMime } from "../media-references";
 import {
   dataUriToBlob,
@@ -210,6 +210,25 @@ export async function generateImage(config: ProviderConfig, input: GenerateImage
   return generate12AiGeminiImage(config, input);
 }
 
+export async function editImage(config: ProviderConfig, input: EditImageInput): Promise<GenerateImageResult> {
+  if (!isKnownProvider(config.provider) || config.provider === "grok2api") {
+    return editOpenAiCompatibleImageWithOperation(config, input, config.provider);
+  }
+  if (config.provider === "runninghub") {
+    throw new Error("RunningHub quick image edits require a configured AI App or Standard Model mapping");
+  }
+  if (config.provider === "modelscope") {
+    return generateModelScopeImage(config, editInputToGenerateInput(input));
+  }
+  if (config.provider === "agnes") {
+    return generateAgnesImage(config, editInputToGenerateInput(input));
+  }
+  if (input.model === "gpt-image-2" || input.model === "gpt-image-2-2k" || input.model === "gpt-image-2-4k") {
+    return editOpenAiCompatibleImageWithOperation(config, input, config.provider);
+  }
+  return generate12AiGeminiImage(config, editInputToGenerateInput(input));
+}
+
 export async function downloadImage(config: ProviderConfig, taskId: string): Promise<Response> {
   const status = await getAsyncImageStatus(config, taskId);
   if (!status.url) throw new Error("Image task is complete but did not expose an image URL");
@@ -224,6 +243,48 @@ export async function downloadImage(config: ProviderConfig, taskId: string): Pro
       "Cache-Control": "public, max-age=31536000",
     },
   });
+}
+
+function editInputToGenerateInput(input: EditImageInput): GenerateImageInput {
+  return {
+    prompt: buildImageEditPrompt(input),
+    model: input.model,
+    aspectRatio: "auto",
+    imageResolution: input.imageResolution,
+    imageQuality: input.imageQuality,
+    referenceImages: [input.image, ...(input.mask ? [input.mask] : [])],
+    async: false,
+  };
+}
+
+function buildImageEditPrompt(input: EditImageInput): string {
+  const userPrompt = input.prompt?.trim();
+  if (input.operation === "redraw") {
+    return [
+      "Edit the first image. Use the second image as a black and white mask when provided.",
+      "Change only the white masked region and preserve the rest of the image.",
+      userPrompt ? `Edit instruction: ${userPrompt}` : "Edit instruction: redraw the masked area naturally.",
+    ].join("\n");
+  }
+  if (input.operation === "erase") {
+    return [
+      "Edit the first image. Use the second image as a black and white mask when provided.",
+      "Remove the white masked object or area and reconstruct the background naturally.",
+      "Preserve the unmasked image exactly as much as possible.",
+    ].join("\n");
+  }
+  if (input.operation === "outpaint") {
+    return [
+      "Outpaint the first image. Use the second image as a mask when provided; white areas are the new canvas space to fill.",
+      "Extend the scene naturally with matching perspective, lighting, texture, and camera style.",
+      userPrompt ? `Outpaint instruction: ${userPrompt}` : "Outpaint instruction: continue the image beyond its original frame.",
+    ].join("\n");
+  }
+  return [
+    "Remove the background from the first image and keep the main subject.",
+    "Return a clean cutout-style result with a transparent or plain neutral background if transparency is unavailable.",
+    userPrompt ? `Subject guidance: ${userPrompt}` : "",
+  ].filter(Boolean).join("\n");
 }
 
 export async function downloadRunningHubMedia(
@@ -876,10 +937,14 @@ async function generate12AiGeminiImage(config: ProviderConfig, input: GenerateIm
 
   const generationConfig: Record<string, unknown> = {
     responseModalities: ["IMAGE"],
-    imageConfig: {
-      aspectRatio: input.aspectRatio,
-      ...(supportsGeminiImageSize(input.model) ? { imageSize: input.imageResolution } : {}),
-    },
+    ...(input.aspectRatio === "auto"
+      ? {}
+      : {
+          imageConfig: {
+            aspectRatio: input.aspectRatio,
+            ...(supportsGeminiImageSize(input.model) ? { imageSize: input.imageResolution } : {}),
+          },
+        }),
   };
   if (input.model === "gemini-3.1-flash-image-preview" && input.thinkingLevel) {
     generationConfig.thinkingConfig = {
@@ -1024,6 +1089,39 @@ async function editOpenAiCompatibleImage(
   });
 
   return postForm<OpenAiImageResponse>(openAiCompatibleUrl(config.baseUrl, "/v1/images/edits"), config, form);
+}
+
+async function editOpenAiCompatibleImageWithOperation(
+  config: ProviderConfig,
+  input: EditImageInput,
+  provider: AiProvider,
+): Promise<GenerateImageResult> {
+  if (provider === "grok2api" && input.model !== "grok-imagine-image-edit") {
+    throw new Error("Grok2API image edits require the grok-imagine-image-edit model");
+  }
+
+  const form = new FormData();
+  form.set("model", input.model);
+  form.set("prompt", buildImageEditPrompt(input));
+  form.set("n", "1");
+  form.set("size", provider === "grok2api" ? "1024x1024" : input.imageResolution);
+  form.set("response_format", "b64_json");
+  if (input.imageQuality) {
+    form.set("quality", normalizeOpenAiImageQuality(input.imageQuality));
+  }
+
+  const imageBlob = dataUriToBlob(input.image.dataUri);
+  form.append(provider === "grok2api" ? "image[]" : "image", imageBlob, "image.png");
+  if (input.mask && provider !== "grok2api") {
+    form.append("mask", dataUriToBlob(input.mask.dataUri), "mask.png");
+  } else if (input.mask && provider === "grok2api") {
+    form.append("image[]", dataUriToBlob(input.mask.dataUri), "mask.png");
+  }
+
+  const response = await postForm<OpenAiImageResponse>(openAiCompatibleUrl(config.baseUrl, "/v1/images/edits"), config, form);
+  const imageUrl = readOpenAiImageUrl(response);
+  if (imageUrl) return { imageUrl, source: input.model };
+  throw new Error("Image edit response did not include b64_json or url");
 }
 
 function normalizeOpenAiImageQuality(value: string): string {

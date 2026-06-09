@@ -1,5 +1,6 @@
 import { createContext, useContext } from "react";
 import type { StorageItem } from "@/lib/db";
+import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
 import type { BoardGenerateNodeUpdate, BoardReferenceRole, BoardRunningHubAppNodeUpdate, BoardRunningHubAppSchemaResult } from "@/lib/board/types";
 import type { BoardPromptReference } from "@/lib/board/prompt-references";
 import type { CapturedVideoFrame } from "@/lib/video-frame";
@@ -14,6 +15,7 @@ export interface BoardNodeCallbacks {
   onSaveVoiceProfile: (item: StorageItem) => void;
   onCaptureVideoFrame: (nodeId: string, item: StorageItem, frame: CapturedVideoFrame) => void | Promise<void>;
   onEditAssetImage: (nodeId: string) => void;
+  onImageQuickEdit: (nodeId: string, operation: ImageEditFeature) => void;
   onExecuteGenerate: (nodeId: string) => void;
   onFetchRunningHubAppSchema: (webappId: string) => Promise<BoardRunningHubAppSchemaResult>;
   onFocusReferenceSource: (nodeId: string) => void;

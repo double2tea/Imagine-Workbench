@@ -1,4 +1,4 @@
-import { Compass, Download, ImageDown, Maximize2, Music, Video } from "lucide-react";
+import { Compass, Download, ImageDown, Maximize2, Music, Paintbrush, Scissors, Video, X } from "lucide-react";
 import { memo, useMemo, useRef } from "react";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
 import BoardAudioWaveform from "@/components/board/BoardAudioWaveform";
@@ -8,6 +8,7 @@ import useSelectedBoardVideoItem from "@/components/board/useSelectedBoardVideoI
 import type { BoardResultNode } from "@/lib/board";
 import { compactBoardModelLabel } from "@/lib/board/provenance";
 import { buildStorageItem, type StorageItem } from "@/lib/db";
+import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
 import type { CapturedVideoFrame } from "@/lib/video-frame";
 
 interface ResultBoardNodeProps {
@@ -17,6 +18,7 @@ interface ResultBoardNodeProps {
   stackItems: StorageItem[];
   onCaptureVideoFrame?: (nodeId: string, item: StorageItem, frame: CapturedVideoFrame) => void | Promise<void>;
   onDownload?: (item: StorageItem) => void;
+  onImageQuickEdit?: (nodeId: string, operation: ImageEditFeature) => void;
   onMeasureAspectRatio?: (nodeId: string, aspectRatio: number) => void;
   onOpenFullscreen?: (item: StorageItem) => void;
   onOpenPanorama?: (item: StorageItem) => void;
@@ -62,6 +64,7 @@ const ResultBoardNode = memo(function ResultBoardNode({
   stackItems,
   onCaptureVideoFrame,
   onDownload,
+  onImageQuickEdit,
   onMeasureAspectRatio,
   onOpenFullscreen,
   onOpenPanorama,
@@ -84,14 +87,48 @@ const ResultBoardNode = memo(function ResultBoardNode({
     <div className="board-media-node group/board-video relative flex h-full min-h-0 items-center justify-center overflow-hidden bg-[var(--iw-panel-soft)]">
       <div className="board-media-controls absolute left-2 top-2 z-30 flex gap-1 opacity-0 transition-opacity duration-200 hover:opacity-100 group-hover/board-video:opacity-100">
         {item.type === "image" && (
-          <button
-            type="button"
-            onClick={() => onOpenPanorama?.(item)}
-            className="imagine-board-asset-action imagine-panorama-action nodrag"
-            title="360 全景查看"
-          >
-            <Compass className="h-3.5 w-3.5" />
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => onImageQuickEdit?.(node.id, "redraw")}
+              className="imagine-board-asset-action nodrag text-sky-200 hover:border-sky-500/40 hover:bg-sky-600 hover:text-white"
+              title="重绘"
+            >
+              <Paintbrush className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onImageQuickEdit?.(node.id, "erase")}
+              className="imagine-board-asset-action nodrag text-rose-200 hover:border-rose-500/40 hover:bg-rose-600 hover:text-white"
+              title="擦除"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onImageQuickEdit?.(node.id, "outpaint")}
+              className="imagine-board-asset-action nodrag text-indigo-200 hover:border-indigo-500/40 hover:bg-indigo-600 hover:text-white"
+              title="扩图"
+            >
+              <ImageDown className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onImageQuickEdit?.(node.id, "cutout")}
+              className="imagine-board-asset-action nodrag text-emerald-200 hover:border-emerald-500/40 hover:bg-emerald-600 hover:text-white"
+              title="抠图"
+            >
+              <Scissors className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onOpenPanorama?.(item)}
+              className="imagine-board-asset-action imagine-panorama-action nodrag"
+              title="360 全景查看"
+            >
+              <Compass className="h-3.5 w-3.5" />
+            </button>
+          </>
         )}
         {item.type === "video" && onCaptureVideoFrame && shouldRenderVideoPlayer && (
           <button

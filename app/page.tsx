@@ -4,7 +4,7 @@ import React, { useCallback, useMemo, useState, useEffect, useRef, useSyncExtern
 import { createPortal } from "react-dom";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
 import AgentDock from "@/components/agent/AgentDock";
-import CanvasMaskEditor from "@/components/CanvasMaskEditor";
+import CanvasMaskEditor, { type CanvasMaskEditorOutput } from "@/components/CanvasMaskEditor";
 import SaveVoiceProfileDialog, { type SaveVoiceProfileDialogInput } from "@/components/audio/SaveVoiceProfileDialog";
 import FloatingCompareButton from "@/components/assets/FloatingCompareButton";
 import FullscreenPreview from "@/components/assets/FullscreenPreview";
@@ -25,6 +25,7 @@ import WorkspaceHeader from "@/components/workbench/WorkspaceHeader";
 
 import WorkspaceNotices, { type WorkspaceNotice } from "@/components/workbench/WorkspaceNotices";
 import {
+  buildStorageItem,
   clearAllDB,
   deleteFromDB,
   getGenerationReferenceMedia,
@@ -55,6 +56,8 @@ import {
   type AtDropdownTarget,
 } from "@/hooks/useReferenceState";
 import { useProviderSettings } from "@/hooks/useProviderSettings";
+import { useImageEditFeatureModels } from "@/hooks/useImageEditFeatureModels";
+import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
 import {
   DEFAULT_AUDIO_MODEL,
   DEFAULT_IMAGE_MODEL,
@@ -79,6 +82,7 @@ import {
   REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES,
   compressReferenceImageDataUrl,
   compressReferenceImageFile,
+  prepareReferenceImageUrlForRequest,
 } from "@/lib/reference-images";
 import { selectVideoReferenceTypesForMode } from "@/lib/video-reference-selection";
 import {
@@ -96,10 +100,17 @@ import {
   type WorkspaceCleanupKind,
 } from "@/lib/data-management";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
+import { readImageGenerationPayload } from "@/lib/client-image-response";
 import { CLEAR_WORKSPACE_ASSETS_MESSAGE } from "@/lib/workspace-messages";
 
 type NoticeType = "error" | "info" | "success";
 type MaskDestination = "creative" | "agent";
+const IMAGE_EDIT_LABELS: Record<ImageEditFeature, string> = {
+  redraw: "重绘",
+  erase: "擦除",
+  outpaint: "扩图",
+  cutout: "抠图",
+};
 const DESKTOP_LAYOUT_QUERY = "(min-width: 1024px)";
 
 function subscribeDesktopLayout(onStoreChange: () => void): () => void {
@@ -298,6 +309,8 @@ export default function Home() {
   const [maskTargetUrl, setMaskTargetUrl] = useState("");
   const [maskTargetId, setMaskTargetId] = useState("");
   const [maskDestination, setMaskDestination] = useState<MaskDestination>("creative");
+  const [maskEditOperation, setMaskEditOperation] = useState<ImageEditFeature | undefined>();
+  const [maskEditSourceItem, setMaskEditSourceItem] = useState<StorageItem | null>(null);
 
   // Fullscreen Preview Overlay State
   const [fullscreenItem, setFullscreenItem] = useState<StorageItem | null>(null);
@@ -745,6 +758,14 @@ export default function Home() {
   const videoModelGroups = getProviderModelGroups(videoModelOptions, providerKeys, customProviders);
   const audioModelGroups = getProviderModelGroups(audioModelOptions, providerKeys, customProviders);
   const chatModelGroups = getProviderModelGroups(chatModelOptions, providerKeys, customProviders);
+  const availableImageEditModels = useMemo(
+    () => imageModelGroups.flatMap(group => group.options.map(option => option.value)),
+    [imageModelGroups],
+  );
+  const {
+    featureModels: imageEditFeatureModels,
+    selectFeatureModel: selectImageEditFeatureModel,
+  } = useImageEditFeatureModels(availableImageEditModels);
   const handleSelectImageModel = (model: string) => {
     const capabilities = getImageModelCapabilities(model);
     const nextAspectRatio = capabilities.aspectRatios[0]?.value ?? "1:1";
@@ -1000,18 +1021,110 @@ export default function Home() {
     }
   };
 
+  const saveEditedImageAsset = async (
+    sourceItem: StorageItem,
+    operation: ImageEditFeature,
+    imageUrl: string,
+    model: string,
+    editPrompt: string,
+  ) => {
+    const label = IMAGE_EDIT_LABELS[operation];
+    const item = buildStorageItem({
+      id: makeClientId("img_edit"),
+      type: "image",
+      url: imageUrl,
+      prompt: editPrompt || `${label}：${sourceItem.prompt || sourceItem.id}`,
+      model,
+      aspectRatio: "auto",
+      createdAt: new Date().toISOString(),
+      status: "complete",
+      progress: 100,
+      maskOriginalId: sourceItem.id,
+    });
+    await saveToDB(item);
+    setItems(prev => [item, ...prev]);
+    pushWorkspaceNotice("success", `${label}完成，已保存为新图片资产`);
+  };
+
+  const runImageQuickEdit = async (
+    sourceItem: StorageItem,
+    operation: ImageEditFeature,
+    editImageUrl: string,
+    maskUrl: string | undefined,
+    editPrompt: string,
+  ) => {
+    const model = imageEditFeatureModels[operation];
+    try {
+      const image = await prepareReferenceImageUrlForRequest(editImageUrl);
+      const mask = maskUrl ? await prepareReferenceImageUrlForRequest(maskUrl) : undefined;
+      const response = await fetch("/api/image/edit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...buildProviderHeaders(model) },
+        body: JSON.stringify({
+          operation,
+          model,
+          image,
+          mask,
+          prompt: editPrompt,
+          imageResolution: "auto",
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(await readFetchError(response, `${IMAGE_EDIT_LABELS[operation]}失败`));
+      }
+      const payload = await readImageGenerationPayload(response);
+      if (!payload.imageUrl) {
+        throw new Error("图片编辑接口没有返回图片");
+      }
+      await saveEditedImageAsset(sourceItem, operation, payload.imageUrl, model, editPrompt);
+    } catch (error) {
+      pushWorkspaceNotice("error", toErrorMessage(error, `${IMAGE_EDIT_LABELS[operation]}失败`));
+    }
+  };
+
+  const handleImageQuickEdit = (item: StorageItem, operation: ImageEditFeature) => {
+    if (item.type !== "image") return;
+    if (operation === "cutout") {
+      void runImageQuickEdit(item, operation, item.url, undefined, "");
+      return;
+    }
+    launchMaskEditor(item.url, item.id, "creative", operation, item);
+  };
+
   // Launch mask editor layout dialog
-  const launchMaskEditor = (imageUrl: string, id: string, destination: MaskDestination = "creative") => {
+  const launchMaskEditor = (
+    imageUrl: string,
+    id: string,
+    destination: MaskDestination = "creative",
+    operation?: ImageEditFeature,
+    sourceItem?: StorageItem,
+  ) => {
     setMaskTargetUrl(imageUrl);
     setMaskTargetId(id);
     setMaskDestination(destination);
+    setMaskEditOperation(operation);
+    setMaskEditSourceItem(sourceItem ?? null);
     setIsMaskOpen(true);
   };
 
-  const saveMaskOutput = async (mergedImageBase64: string) => {
+  const saveMaskOutput = async (output: CanvasMaskEditorOutput) => {
+    if (output.operation && maskEditSourceItem) {
+      await runImageQuickEdit(
+        maskEditSourceItem,
+        output.operation,
+        output.imageBase64,
+        output.maskBase64,
+        output.prompt,
+      );
+      setIsMaskOpen(false);
+      setMaskEditOperation(undefined);
+      setMaskEditSourceItem(null);
+      return;
+    }
+
     let compressedMergedImage: string;
     try {
-      compressedMergedImage = await compressReferenceImageDataUrl(mergedImageBase64);
+      compressedMergedImage = await compressReferenceImageDataUrl(output.mergedImageBase64);
     } catch (error) {
       console.error(error);
       pushWorkspaceNotice("error", toErrorMessage(error, "蒙版参考图压缩失败"));
@@ -1040,6 +1153,8 @@ export default function Home() {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
     setIsMaskOpen(false);
+    setMaskEditOperation(undefined);
+    setMaskEditSourceItem(null);
     pushWorkspaceNotice(
       "success",
       maskDestination === "agent"
@@ -1323,6 +1438,7 @@ export default function Home() {
       onDeleteItemsByStatus={deleteGalleryItemsByStatus}
       onDownloadItem={handleDownloadItem}
       onExportMetadata={exportMetadataJson}
+      onImageQuickEdit={handleImageQuickEdit}
       onLaunchMaskEditor={launchMaskEditor}
       onOpenFullscreen={setFullscreenItem}
       onOpenPanorama={setPanoramaItem}
@@ -1661,6 +1777,7 @@ export default function Home() {
         providerTest={providerTest}
         selectedChatModel={selectedChatModel}
         selectedProvider={selectedProvider}
+        imageEditFeatureModels={imageEditFeatureModels}
         videoModelGroups={videoModelGroups}
         onAddCustomProvider={addCustomProvider}
         onCleanupAssets={handleDataCleanupAssets}
@@ -1678,6 +1795,7 @@ export default function Home() {
         onAddManualModels={addManualModels}
         onSaveCredential={handleSaveCredential}
         onSelectChatModel={handleSelectChatModel}
+        onSelectImageEditFeatureModel={selectImageEditFeatureModel}
         onSelectProvider={handleSelectProvider}
         onDeleteCustomProvider={deleteCustomProvider}
         refreshProviderModels={refreshProviderModels}
@@ -1712,7 +1830,14 @@ export default function Home() {
         <CanvasMaskEditor
           imageUrl={maskTargetUrl}
           isOpen={isMaskOpen}
-          onClose={() => { setIsMaskOpen(false); setMaskTargetUrl(""); setMaskTargetId(""); }}
+          operation={maskEditOperation}
+          onClose={() => {
+            setIsMaskOpen(false);
+            setMaskTargetUrl("");
+            setMaskTargetId("");
+            setMaskEditOperation(undefined);
+            setMaskEditSourceItem(null);
+          }}
           onSaveMask={saveMaskOutput}
         />
       )}

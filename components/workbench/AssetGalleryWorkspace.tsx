@@ -8,6 +8,7 @@ import PreviewImage from "@/components/PreviewImage";
 import { getGenerationReferenceMedia, type StorageItem } from "@/lib/db";
 import type { AiProvider } from "@/lib/providers/model-catalog";
 import type { CapturedVideoFrame } from "@/lib/video-frame";
+import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
 
 interface AssetGalleryWorkspaceProps {
   assetDateEnd: string;
@@ -46,6 +47,7 @@ interface AssetGalleryWorkspaceProps {
   onDownloadItem: (item: StorageItem) => void;
   onExportMetadata: () => void;
   onLaunchMaskEditor: (imageUrl: string, id: string) => void;
+  onImageQuickEdit: (item: StorageItem, operation: ImageEditFeature) => void;
   onOpenFullscreen: (item: StorageItem) => void;
   onOpenPanorama: (item: StorageItem) => void;
   onResetCompare: () => void;
@@ -107,6 +109,7 @@ export default function AssetGalleryWorkspace({
   onDownloadItem,
   onExportMetadata,
   onLaunchMaskEditor,
+  onImageQuickEdit,
   onOpenFullscreen,
   onOpenPanorama,
   onResetCompare,
@@ -329,6 +332,7 @@ export default function AssetGalleryWorkspace({
                           onCaptureVideoFrame={onCaptureVideoFrame}
                           onDelete={onDeleteItem}
                           onDownload={onDownloadItem}
+                          onImageQuickEdit={onImageQuickEdit}
                           onLaunchMaskEditor={onLaunchMaskEditor}
                           onOpenFullscreen={onOpenFullscreen}
                           onOpenPanorama={onOpenPanorama}

@@ -4,7 +4,9 @@ import { AnimatePresence, motion } from "motion/react";
 import type { AiProvider, ModelOption } from "@/lib/providers/model-catalog";
 import { ConnectionSettingsWorkspace } from "@/components/settings/ConnectionSettingsWorkspace";
 import DataManagementWorkspace from "@/components/settings/DataManagementWorkspace";
+import { FeatureModelSettingsWorkspace } from "@/components/settings/FeatureModelSettingsWorkspace";
 import type { ProviderTestState } from "@/components/settings/provider-settings-types";
+import type { ImageEditFeature, ImageEditFeatureModels } from "@/hooks/useImageEditFeatureModels";
 import type { CustomProviderDefinition } from "@/lib/providers/registry";
 import type { ProviderCredentials } from "@/lib/providers/types";
 import {
@@ -39,6 +41,7 @@ interface SettingsModalProps {
   providerTest: ProviderTestState;
   selectedChatModel: string;
   selectedProvider: AiProvider;
+  imageEditFeatureModels: ImageEditFeatureModels;
   videoModelGroups: ModelGroup[];
   hasCurrentBoard?: boolean;
   onAddCustomProvider: (label: string, baseUrl: string) => boolean;
@@ -59,16 +62,18 @@ interface SettingsModalProps {
   onAddManualModels: (category: ModelCategory, value: string) => void;
   onSaveCredential: (provider: AiProvider, field: keyof ProviderCredentials, value: string) => void;
   onSelectChatModel: (value: string) => void;
+  onSelectImageEditFeatureModel: (feature: ImageEditFeature, model: string) => void;
   onSelectProvider: (value: AiProvider) => void;
   onDeleteCustomProvider: (provider: AiProvider) => void;
   refreshProviderModels: () => void;
   testProviderConnection: (provider: AiProvider) => void;
 }
 
-type SettingsTab = "connections" | "data";
+type SettingsTab = "connections" | "feature-models" | "data";
 
 const TABS: { key: SettingsTab; label: string }[] = [
   { key: "connections", label: "连接" },
+  { key: "feature-models", label: "功能模型" },
   { key: "data", label: "数据" },
 ];
 
@@ -90,6 +95,7 @@ export default function SettingsModal({
   providerTest,
   selectedChatModel,
   selectedProvider,
+  imageEditFeatureModels,
   videoModelGroups,
   hasCurrentBoard = false,
   onAddCustomProvider,
@@ -110,6 +116,7 @@ export default function SettingsModal({
   onAddManualModels,
   onSaveCredential,
   onSelectChatModel,
+  onSelectImageEditFeatureModel,
   onSelectProvider,
   onDeleteCustomProvider,
   refreshProviderModels,
@@ -202,6 +209,14 @@ export default function SettingsModal({
                   onDeleteCustomProvider={onDeleteCustomProvider}
                   refreshProviderModels={refreshProviderModels}
                   testProviderConnection={testProviderConnection}
+                />
+              )}
+
+              {tab === "feature-models" && (
+                <FeatureModelSettingsWorkspace
+                  featureModels={imageEditFeatureModels}
+                  imageModelGroups={imageModelGroups}
+                  onSelectFeatureModel={onSelectImageEditFeatureModel}
                 />
               )}
 

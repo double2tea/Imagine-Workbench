@@ -1,4 +1,4 @@
-import { Compass, Download, ImageDown, Maximize2, Mic2, Music, Paintbrush, SlidersHorizontal, Video } from "lucide-react";
+import { Compass, Download, ImageDown, Maximize2, Mic2, Music, Paintbrush, Scissors, SlidersHorizontal, Video, X } from "lucide-react";
 import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
 import { memo, useMemo, useRef } from "react";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
@@ -9,6 +9,7 @@ import useSelectedBoardVideoItem from "@/components/board/useSelectedBoardVideoI
 import type { BoardAssetNode } from "@/lib/board";
 import { compactBoardModelLabel } from "@/lib/board/provenance";
 import { buildStorageItem, type StorageItem } from "@/lib/db";
+import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
 import type { CapturedVideoFrame } from "@/lib/video-frame";
 
 interface AssetBoardNodeProps {
@@ -21,6 +22,7 @@ interface AssetBoardNodeProps {
   onCompare?: () => void;
   onDownload?: (item: StorageItem) => void;
   onEditImage?: (nodeId: string) => void;
+  onImageQuickEdit?: (nodeId: string, operation: ImageEditFeature) => void;
   onMeasureAspectRatio?: (nodeId: string, aspectRatio: number) => void;
   onOpenFullscreen?: (item: StorageItem) => void;
   onOpenPanorama?: (item: StorageItem) => void;
@@ -71,6 +73,7 @@ const AssetBoardNode = memo(function AssetBoardNode({
   onCompare,
   onDownload,
   onEditImage,
+  onImageQuickEdit,
   onMeasureAspectRatio,
   onOpenFullscreen,
   onOpenPanorama,
@@ -129,6 +132,38 @@ const AssetBoardNode = memo(function AssetBoardNode({
               title="局部编辑"
             >
               <Paintbrush className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onImageQuickEdit?.(node.id, "redraw")}
+              className="imagine-board-asset-action nodrag text-sky-200 hover:border-sky-500/40 hover:bg-sky-600 hover:text-white"
+              title="重绘"
+            >
+              <Paintbrush className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onImageQuickEdit?.(node.id, "erase")}
+              className="imagine-board-asset-action nodrag text-rose-200 hover:border-rose-500/40 hover:bg-rose-600 hover:text-white"
+              title="擦除"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onImageQuickEdit?.(node.id, "outpaint")}
+              className="imagine-board-asset-action nodrag text-indigo-200 hover:border-indigo-500/40 hover:bg-indigo-600 hover:text-white"
+              title="扩图"
+            >
+              <ImageDown className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onImageQuickEdit?.(node.id, "cutout")}
+              className="imagine-board-asset-action nodrag text-emerald-200 hover:border-emerald-500/40 hover:bg-emerald-600 hover:text-white"
+              title="抠图"
+            >
+              <Scissors className="h-3.5 w-3.5" />
             </button>
             <button
               type="button"
