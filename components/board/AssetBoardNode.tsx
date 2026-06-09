@@ -1,4 +1,4 @@
-import { Compass, Download, ImageDown, Maximize2, Music, Paintbrush, SlidersHorizontal, Video } from "lucide-react";
+import { Compass, Download, ImageDown, Maximize2, Mic2, Music, Paintbrush, SlidersHorizontal, Video } from "lucide-react";
 import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
 import { memo, useMemo, useRef } from "react";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
@@ -24,6 +24,7 @@ interface AssetBoardNodeProps {
   onMeasureAspectRatio?: (nodeId: string, aspectRatio: number) => void;
   onOpenFullscreen?: (item: StorageItem) => void;
   onOpenPanorama?: (item: StorageItem) => void;
+  onSaveVoiceProfile?: (item: StorageItem) => void;
   onSelectStackAsset?: (assetId: string) => void;
   onSendToAgent?: (nodeId: string) => void;
   stackItems?: StorageItem[];
@@ -73,6 +74,7 @@ const AssetBoardNode = memo(function AssetBoardNode({
   onMeasureAspectRatio,
   onOpenFullscreen,
   onOpenPanorama,
+  onSaveVoiceProfile,
   onSelectStackAsset,
   onSendToAgent,
   stackItems = [],
@@ -86,6 +88,9 @@ const AssetBoardNode = memo(function AssetBoardNode({
   );
   const stackCount = stackItems.length;
   const hasStackSwitcher = stackCount > 1;
+  const voiceProfileSourceItem = node.asset.type === "audio"
+    ? stackItems.find(stackItem => stackItem.id === node.asset.assetId && stackItem.type === "audio")
+    : undefined;
   const isImagePreviewUrl = item.url.startsWith("data:image/");
   const audioItem = useBoardAudioItem(item);
   const playableAudioItem = audioItem ?? (item.type === "audio" && item.url.trim() ? item : null);
@@ -143,6 +148,16 @@ const AssetBoardNode = memo(function AssetBoardNode({
             title="截取当前帧"
           >
             <ImageDown className="h-3.5 w-3.5" />
+          </button>
+        )}
+        {voiceProfileSourceItem && (
+          <button
+            type="button"
+            onClick={() => onSaveVoiceProfile?.(voiceProfileSourceItem)}
+            className="imagine-board-asset-action nodrag text-cyan-200 hover:border-cyan-500/40 hover:bg-cyan-600 hover:text-white"
+            title="保存为克隆音色"
+          >
+            <Mic2 className="h-3.5 w-3.5" />
           </button>
         )}
         <button

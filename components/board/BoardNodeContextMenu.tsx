@@ -28,6 +28,7 @@ export function buildBoardNodeContextMenuActions(input: {
   onConnectSelected?: () => void;
   onGroupSelected?: () => void;
   onCreateReferenceGroup?: () => void;
+  onSaveVoiceProfile?: () => void;
   onSendAgent?: () => void;
   onUngroup?: () => void;
 }): BoardNodeContextMenuAction[] {
@@ -47,6 +48,9 @@ export function buildBoardNodeContextMenuActions(input: {
     if (input.onEditImage) actions.push({ id: "edit", label: "编辑图片", onSelect: input.onEditImage });
   }
   if (input.node.kind === "asset") {
+    if (input.node.asset.type === "audio" && input.onSaveVoiceProfile) {
+      actions.push({ id: "save-voice-profile", label: "保存为克隆音色", onSelect: input.onSaveVoiceProfile });
+    }
     if (input.onSendAgent) actions.push({ id: "agent", label: "发送到 Agent", onSelect: input.onSendAgent });
   }
   if (input.node.kind === "agent" && input.onSendAgent) {

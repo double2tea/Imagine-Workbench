@@ -2,7 +2,7 @@ import { formatProviderModel, getModelCapabilities, isAgentCompatibleModelId, ty
 import { getProviderMeta } from "./registry";
 import { RUNNINGHUB_DEFAULT_LLM_MODEL, RUNNINGHUB_STANDARD_MODELS, runningHubLlmBaseUrl } from "./runninghub";
 import type { ProviderConfig } from "./types";
-import { getJson, isRecord } from "./utils";
+import { getJson, isRecord, openAiCompatibleUrl } from "./utils";
 
 export type ModelKindFilter = "chat" | "image" | "video" | "audio" | "all";
 
@@ -28,12 +28,12 @@ export async function listProviderModels(config: ProviderConfig, kind: ModelKind
     return staticProviderModels(config.provider, kind);
   }
 
-  const response = await getJson<OpenAiModelsResponse>(`${config.baseUrl}/v1/models`, config);
+  const response = await getJson<OpenAiModelsResponse>(openAiCompatibleUrl(config.baseUrl, "/v1/models"), config);
   if (!Array.isArray(response.data)) {
     throw new Error("Model list response did not include a data array");
   }
 
-  const options = response.data.flatMap(item => readModelId(item, config.provider, kind));
+  const options = response.data.flatMap(item => readModelId(item, config.provider, kind, providerLabel(config)));
   if (options.length === 0) {
     throw new Error(`No ${kind === "all" ? "" : `${kind} `}models were found in provider model list`);
   }
@@ -50,7 +50,7 @@ async function listModelScopeModels(config: ProviderConfig, kind: ModelKindFilte
       : isRecord(response) && Array.isArray(response.models)
         ? response.models
         : [];
-  const options = rawModels.flatMap(item => readModelId(item, config.provider, kind));
+  const options = rawModels.flatMap(item => readModelId(item, config.provider, kind, providerLabel(config)));
   return dedupeOptions(options.length > 0 ? options : staticProviderModels(config.provider, kind));
 }
 
@@ -72,7 +72,7 @@ async function listRunningHubChatModels(config: ProviderConfig): Promise<ModelOp
   if (!Array.isArray(response.data)) {
     throw new Error("RunningHub LLM model list response did not include a data array");
   }
-  const options = response.data.flatMap(item => readModelId(item, config.provider, "chat"));
+  const options = response.data.flatMap(item => readModelId(item, config.provider, "chat", providerLabel(config)));
   if (options.length === 0) {
     throw new Error("No RunningHub LLM chat models were found in provider model list");
   }
@@ -125,16 +125,20 @@ function runningHubStaticModels(kind: ModelKindFilter): ModelOption[] {
   ];
 }
 
-function readModelId(value: unknown, provider: AiProvider, kind: ModelKindFilter): ModelOption[] {
+function readModelId(value: unknown, provider: AiProvider, kind: ModelKindFilter, label: string): ModelOption[] {
   if (!isRecord(value)) return [];
   const id = readModelValue(value);
   if (!id || !matchesKind(id, kind)) return [];
   return [
     {
       value: formatProviderModel(provider, id),
-      label: `${getProviderMeta(provider).label} ${id}`,
+      label: `${label} ${id}`,
     },
   ];
+}
+
+function providerLabel(config: ProviderConfig): string {
+  return config.providerLabel ?? getProviderMeta(config.provider).label;
 }
 
 function readModelValue(value: Record<string, unknown>): string | undefined {
@@ -150,7 +154,7 @@ function matchesKind(model: string, kind: ModelKindFilter): boolean {
     return lower.includes("video") || lower.includes("veo") || lower.includes("-to-video") || lower.includes("omni_flash");
   }
   if (kind === "audio") {
-    return lower.includes("audio") || lower.includes("tts") || lower.includes("voice") || lower.includes("speech");
+    return lower.includes("audio") || lower.includes("tts") || lower.includes("voice") || lower.includes("speech") || lower.includes("asr");
   }
   return lower.includes("image") || lower.includes("imagen") || lower.includes("imagine") || lower.includes("text-to-image");
 }

@@ -5,6 +5,7 @@ import type { AiProvider, ModelOption } from "@/lib/providers/model-catalog";
 import { ConnectionSettingsWorkspace } from "@/components/settings/ConnectionSettingsWorkspace";
 import DataManagementWorkspace from "@/components/settings/DataManagementWorkspace";
 import type { ProviderTestState } from "@/components/settings/provider-settings-types";
+import type { CustomProviderDefinition } from "@/lib/providers/registry";
 import type { ProviderCredentials } from "@/lib/providers/types";
 import {
   getWorkspaceDataSummary,
@@ -32,12 +33,15 @@ interface SettingsModalProps {
   isLoadingModels: boolean;
   modelListMessage: string;
   open: boolean;
+  customProviders: CustomProviderDefinition[];
   providerCredentials: Record<AiProvider, ProviderCredentials>;
+  providerKeys: AiProvider[];
   providerTest: ProviderTestState;
   selectedChatModel: string;
   selectedProvider: AiProvider;
   videoModelGroups: ModelGroup[];
   hasCurrentBoard?: boolean;
+  onAddCustomProvider: (label: string, baseUrl: string) => boolean;
   onCleanupAssets: (kind: WorkspaceCleanupKind) => Promise<void>;
   onClearCredentials: (provider: AiProvider) => void;
   onClearLocalStorage: (kind: LocalStorageCleanupKind) => Promise<void>;
@@ -56,6 +60,7 @@ interface SettingsModalProps {
   onSaveCredential: (provider: AiProvider, field: keyof ProviderCredentials, value: string) => void;
   onSelectChatModel: (value: string) => void;
   onSelectProvider: (value: AiProvider) => void;
+  onDeleteCustomProvider: (provider: AiProvider) => void;
   refreshProviderModels: () => void;
   testProviderConnection: (provider: AiProvider) => void;
 }
@@ -79,12 +84,15 @@ export default function SettingsModal({
   isLoadingModels,
   modelListMessage,
   open,
+  customProviders,
   providerCredentials,
+  providerKeys,
   providerTest,
   selectedChatModel,
   selectedProvider,
   videoModelGroups,
   hasCurrentBoard = false,
+  onAddCustomProvider,
   onCleanupAssets,
   onClearCredentials,
   onClearLocalStorage,
@@ -103,6 +111,7 @@ export default function SettingsModal({
   onSaveCredential,
   onSelectChatModel,
   onSelectProvider,
+  onDeleteCustomProvider,
   refreshProviderModels,
   testProviderConnection,
 }: SettingsModalProps) {
@@ -172,21 +181,25 @@ export default function SettingsModal({
                 <ConnectionSettingsWorkspace
                   chatModelGroups={chatModelGroups}
                   audioModelGroups={audioModelGroups}
+                  customProviders={customProviders}
                   fetchedModelOptions={fetchedModelOptions}
                   imageModelGroups={imageModelGroups}
                   isLoadingModels={isLoadingModels}
                   modelListMessage={modelListMessage}
                   providerCredentials={providerCredentials}
+                  providerKeys={providerKeys}
                   providerTest={providerTest}
                   selectedChatModel={selectedChatModel}
                   selectedProvider={selectedProvider}
                   videoModelGroups={videoModelGroups}
+                  onAddCustomProvider={onAddCustomProvider}
                   onAddFetchedModels={onAddFetchedModels}
                   onAddManualModels={onAddManualModels}
                   onClearCredentials={onClearCredentials}
                   onSaveCredential={onSaveCredential}
                   onSelectChatModel={onSelectChatModel}
                   onSelectProvider={onSelectProvider}
+                  onDeleteCustomProvider={onDeleteCustomProvider}
                   refreshProviderModels={refreshProviderModels}
                   testProviderConnection={testProviderConnection}
                 />

@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
 import AgentDock from "@/components/agent/AgentDock";
 import CanvasMaskEditor from "@/components/CanvasMaskEditor";
+import SaveVoiceProfileDialog, { type SaveVoiceProfileDialogInput } from "@/components/audio/SaveVoiceProfileDialog";
 import FloatingCompareButton from "@/components/assets/FloatingCompareButton";
 import FullscreenPreview from "@/components/assets/FullscreenPreview";
 import PanoramaOverlay from "@/components/panorama/PanoramaOverlay";
@@ -71,7 +72,8 @@ import {
   type ModelOption,
   type VideoReferenceMode,
 } from "@/lib/providers/model-catalog";
-import { PROVIDER_KEYS, getProviderMeta } from "@/lib/providers/registry";
+import { getProviderMeta, type CustomProviderDefinition } from "@/lib/providers/registry";
+import { saveClonedVoiceProfileFromAsset } from "@/lib/voice-profiles";
 import { getMediaReferenceType, mediaReferenceLabel, mediaReferenceTypeFromMime } from "@/lib/media-references";
 import {
   REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES,
@@ -140,20 +142,24 @@ function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
-function getProviderLabel(provider: AiProvider): string {
-  return getProviderMeta(provider).label;
+function getProviderLabel(provider: AiProvider, customProviders: readonly CustomProviderDefinition[] = []): string {
+  return customProviders.find(item => item.key === provider)?.label ?? getProviderMeta(provider).label;
 }
 
-function getProviderModelGroups(optionsByProvider: Record<AiProvider, ModelOption[]>): Array<{
+function getProviderModelGroups(
+  optionsByProvider: Record<AiProvider, ModelOption[]>,
+  providerKeys: readonly AiProvider[],
+  customProviders: readonly CustomProviderDefinition[],
+): Array<{
   provider: AiProvider;
   label: string;
   options: ModelOption[];
 }> {
-  return ([...PROVIDER_KEYS] as AiProvider[])
+  return [...providerKeys]
     .map(provider => ({
       provider,
-      label: getProviderLabel(provider),
-      options: optionsByProvider[provider],
+      label: getProviderLabel(provider, customProviders),
+      options: optionsByProvider[provider] ?? [],
     }))
     .filter(group => group.options.length > 0);
 }
@@ -168,6 +174,16 @@ function getSelectableStoredImageModel(value: string, fallbackProvider: AiProvid
   const parsed = tryParseProviderModel(value, fallbackProvider);
   if (!parsed) return value;
   return parsed.async ? formatProviderModel(parsed.provider, parsed.model) : value;
+}
+
+function modelProviderIsAvailable(
+  value: string,
+  fallbackProvider: AiProvider,
+  providerKeys: readonly AiProvider[],
+): boolean {
+  const parsed = tryParseProviderModel(value, fallbackProvider);
+  const provider = parsed?.provider ?? fallbackProvider;
+  return providerKeys.includes(provider);
 }
 
 export default function Home() {
@@ -286,6 +302,7 @@ export default function Home() {
   // Fullscreen Preview Overlay State
   const [fullscreenItem, setFullscreenItem] = useState<StorageItem | null>(null);
   const [panoramaItem, setPanoramaItem] = useState<StorageItem | null>(null);
+  const [voiceProfileSourceItem, setVoiceProfileSourceItem] = useState<StorageItem | null>(null);
 
   // References
   const agentDockRef = useRef<HTMLElement | null>(null);
@@ -294,7 +311,7 @@ export default function Home() {
   const generationAbortControllersRef = useRef<Record<string, AbortController>>({});
   const locallyCanceledItemIdsRef = useRef<Set<string>>(new Set());
   const workspaceNoticeSequenceRef = useRef(0);
-  const isAgentDockSuppressed = showSettings || isMaskOpen || fullscreenItem !== null || panoramaItem !== null;
+  const isAgentDockSuppressed = showSettings || isMaskOpen || fullscreenItem !== null || panoramaItem !== null || voiceProfileSourceItem !== null;
 
   const dismissWorkspaceNotice = useCallback((id: string) => {
     setWorkspaceNotices(prev => prev.filter(notice => notice.id !== id));
@@ -307,12 +324,15 @@ export default function Home() {
   }, [setWorkspaceNotices]);
 
   const {
+    addCustomProvider,
     addFetchedModels,
     addManualModels,
     audioModelOptions,
     buildProviderHeaders,
     chatModelOptions,
     clearProviderCredentials,
+    customProviders,
+    deleteCustomProvider,
     handleSaveCredential,
     handleSelectChatModel,
     handleSelectProvider,
@@ -321,6 +341,7 @@ export default function Home() {
     isLoadingModels,
     modelListMessage,
     providerCredentials,
+    providerKeys,
     providerTest,
     refreshProviderModels,
     selectedChatModel,
@@ -328,6 +349,27 @@ export default function Home() {
     testProviderConnection,
     videoModelOptions,
   } = useProviderSettings({ pushWorkspaceNotice });
+
+  useEffect(() => {
+    if (!modelProviderIsAvailable(selectedModel, selectedProvider, providerKeys)) {
+      setSelectedModel(DEFAULT_IMAGE_MODEL);
+    }
+    if (!modelProviderIsAvailable(selectedVideoModel, selectedProvider, providerKeys)) {
+      setSelectedVideoModel(DEFAULT_VIDEO_MODEL);
+    }
+    if (!modelProviderIsAvailable(selectedAudioModel, selectedProvider, providerKeys)) {
+      setSelectedAudioModel(DEFAULT_AUDIO_MODEL);
+    }
+  }, [providerKeys, selectedAudioModel, selectedModel, selectedProvider, selectedVideoModel]);
+
+  const handleSaveVoiceProfileFromAsset = useCallback(async (input: SaveVoiceProfileDialogInput): Promise<void> => {
+    if (!voiceProfileSourceItem) return;
+    await saveClonedVoiceProfileFromAsset(voiceProfileSourceItem, {
+      ...input,
+      fallbackProvider: selectedProvider,
+    });
+    pushWorkspaceNotice("success", "已保存克隆音色");
+  }, [pushWorkspaceNotice, selectedProvider, voiceProfileSourceItem]);
 
   const imageCapabilities = getImageModelCapabilities(selectedModel);
   const audioCapabilities = getAudioModelCapabilities(selectedAudioModel);
@@ -699,10 +741,10 @@ export default function Home() {
     await deleteGalleryRecords(ids);
   };
 
-  const imageModelGroups = getProviderModelGroups(imageModelOptions);
-  const videoModelGroups = getProviderModelGroups(videoModelOptions);
-  const audioModelGroups = getProviderModelGroups(audioModelOptions);
-  const chatModelGroups = getProviderModelGroups(chatModelOptions);
+  const imageModelGroups = getProviderModelGroups(imageModelOptions, providerKeys, customProviders);
+  const videoModelGroups = getProviderModelGroups(videoModelOptions, providerKeys, customProviders);
+  const audioModelGroups = getProviderModelGroups(audioModelOptions, providerKeys, customProviders);
+  const chatModelGroups = getProviderModelGroups(chatModelOptions, providerKeys, customProviders);
   const handleSelectImageModel = (model: string) => {
     const capabilities = getImageModelCapabilities(model);
     const nextAspectRatio = capabilities.aspectRatios[0]?.value ?? "1:1";
@@ -1290,6 +1332,7 @@ export default function Home() {
       }}
       onRetryItem={retryGalleryItem}
       onReuseTask={reuseTaskInComposer}
+      onSaveVoiceProfile={setVoiceProfileSourceItem}
       onSetAssetDateEnd={setAssetDateEnd}
       onSetAssetDatePreset={setAssetDatePreset}
       onSetAssetDateStart={setAssetDateStart}
@@ -1612,11 +1655,14 @@ export default function Home() {
         isLoadingModels={isLoadingModels}
         modelListMessage={modelListMessage}
         open={showSettings}
+        customProviders={customProviders}
         providerCredentials={providerCredentials}
+        providerKeys={providerKeys}
         providerTest={providerTest}
         selectedChatModel={selectedChatModel}
         selectedProvider={selectedProvider}
         videoModelGroups={videoModelGroups}
+        onAddCustomProvider={addCustomProvider}
         onCleanupAssets={handleDataCleanupAssets}
         onClearAssets={handleClearProject}
         onClearCredentials={clearProviderCredentials}
@@ -1633,6 +1679,7 @@ export default function Home() {
         onSaveCredential={handleSaveCredential}
         onSelectChatModel={handleSelectChatModel}
         onSelectProvider={handleSelectProvider}
+        onDeleteCustomProvider={deleteCustomProvider}
         refreshProviderModels={refreshProviderModels}
         testProviderConnection={testProviderConnection}
       />
@@ -1653,6 +1700,12 @@ export default function Home() {
           onSaveScreenshots={handleSavePanoramaScreenshots}
         />
       )}
+
+      <SaveVoiceProfileDialog
+        item={voiceProfileSourceItem}
+        onClose={() => setVoiceProfileSourceItem(null)}
+        onSave={handleSaveVoiceProfileFromAsset}
+      />
 
       {/* Inpainting Mask Drawer overlay loader */}
       {isMaskOpen && (

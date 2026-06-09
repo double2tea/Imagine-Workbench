@@ -1,6 +1,6 @@
 export type { AiProvider } from "./registry";
 import type { AiProvider } from "./registry";
-import { PROVIDER_KEYS, isKnownProvider } from "./registry";
+import { PROVIDER_KEYS, isProviderKey } from "./registry";
 import { RUNNINGHUB_DEFAULT_LLM_MODEL, RUNNINGHUB_STANDARD_MODELS, type RunningHubStandardModel } from "./runninghub";
 import type { MediaReferenceType } from "@/lib/media-references";
 
@@ -1229,9 +1229,9 @@ export function getImageModelCapabilities(value: string): ImageModelCapabilities
     };
   }
   return {
-    aspectRatios: GEMINI_25_RATIOS,
-    resolutions: [],
-    qualities: [],
+    aspectRatios: GPT_IMAGE_RATIOS,
+    resolutions: GPT_IMAGE_SIZES,
+    qualities: GPT_QUALITY_OPTIONS,
     thinkingLevels: [],
     maxReferenceImages: 0,
     minReferenceImages: 0,
@@ -1241,7 +1241,12 @@ export function getImageModelCapabilities(value: string): ImageModelCapabilities
 
 export function getImageResolutionOptions(value: string, aspectRatio: string): ParameterOption[] {
   const capability = getKnownCapability(value, "image");
-  if (!capability) return [];
+  if (!capability) {
+    return GPT_IMAGE_SIZES.filter(option => {
+      if (option.value === "auto" || option.value === "custom") return true;
+      return getPixelSizeAspectRatio(option.value) === aspectRatio;
+    });
+  }
   if (!capability.sizes.some(option => isPixelSize(option.value))) return capability.sizes;
 
   return capability.sizes.filter(option => {
@@ -1307,11 +1312,11 @@ export function parseProviderModel(value: string, fallbackProvider: AiProvider):
 
   const provider = value.slice(0, separator);
   const model = value.slice(separator + 1);
-  if (isKnownProvider(provider)) {
+  if (isProviderKey(provider)) {
     return { provider, model, async: false };
   }
 
-  throw new ProviderModelParseError(`Unknown provider prefix "${provider}" in model "${value}"`);
+  throw new ProviderModelParseError(`Invalid provider prefix "${provider}" in model "${value}"`);
 }
 
 export function tryParseProviderModel(
@@ -1499,9 +1504,21 @@ function getKnownCapability(value: string, kind: ModelKind): ProviderModelCapabi
   const parsed = parseProviderModel(value, "12ai");
   const capability = findModelCapability(parsed.provider, parsed.model, parsed.async, kind);
   if (capability) return capability;
+  if (kind === "audio" && parsed.provider !== "mimo") return customMimoAudioCapability(parsed.provider, parsed.model);
   if (parsed.provider === "runninghub" && kind !== "chat") return runningHubVirtualCapability(parsed.model, kind);
   if (parsed.provider === "modelscope" && kind === "image") return modelScopeVirtualImageCapability(parsed.model);
   return undefined;
+}
+
+function customMimoAudioCapability(provider: AiProvider, model: string): ProviderModelCapability | undefined {
+  const mimoCapability = findModelCapability("mimo", model, false, "audio");
+  if (!mimoCapability) return undefined;
+  return {
+    ...mimoCapability,
+    value: formatProviderModel(provider, model),
+    label: `${provider} ${model}`,
+    provider,
+  };
 }
 
 function modelScopeVirtualImageCapability(model: string): ProviderModelCapability {

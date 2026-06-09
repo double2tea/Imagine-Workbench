@@ -30,7 +30,7 @@ import { getProviderMeta } from "@/lib/providers/registry";
 import { getReferenceImagePayloadError, getReferenceMediaPayloadError, prepareReferenceImageUrlForRequest, prepareReferenceMediaUrlForRequest } from "@/lib/reference-images";
 import { transcriptPreview, transcriptToDataUrl } from "@/lib/transcripts";
 import { selectVideoReferencesForMode } from "@/lib/video-reference-selection";
-import { getVoiceProfile } from "@/lib/voice-profiles";
+import { getVoiceProfile, isVoiceProfileUsableForAudioModel } from "@/lib/voice-profiles";
 
 type NoticeType = "error" | "info" | "success";
 
@@ -668,9 +668,9 @@ export function useGenerationActions({
       try {
         const profile = await getVoiceProfile(overrides.voiceProfileId);
         if (!profile) throw new Error("找不到选中的音色");
-        const parsedModel = parseProviderModel(requestModel, "12ai");
-        if (profile.provider !== parsedModel.provider) throw new Error("选中的音色与当前模型提供方不一致");
-        if (profile.source === "builtin" && audioMode !== "tts") throw new Error("内置音色仅支持朗读模式");
+        if (!audioMode || !isVoiceProfileUsableForAudioModel(profile, requestModel, audioMode)) {
+          throw new Error("当前模型不能使用选中的音色");
+        }
         profileStylePrompt = profile.designPrompt;
         profileVoice = profile.providerVoiceId;
         profileReferences = await readVoiceProfileReferences(profile.referenceAudioAssetIds);

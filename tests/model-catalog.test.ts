@@ -41,15 +41,20 @@ test("parseProviderModel reads provider prefixes", () => {
   });
 });
 
-test("parseProviderModel rejects unknown provider prefixes", () => {
-  assert.throws(
-    () => parseProviderModel("unknown-provider:model-id", "12ai"),
-    /Unknown provider prefix "unknown-provider" in model "unknown-provider:model-id"/,
-  );
+test("parseProviderModel accepts dynamic provider prefixes", () => {
+  assert.deepEqual(parseProviderModel("unknown-provider:model-id", "12ai"), {
+    provider: "unknown-provider",
+    model: "model-id",
+    async: false,
+  });
 });
 
-test("tryParseProviderModel returns null for unknown provider prefixes", () => {
-  assert.equal(tryParseProviderModel("unknown-provider:model-id", "12ai"), null);
+test("tryParseProviderModel returns dynamic provider prefixes", () => {
+  assert.deepEqual(tryParseProviderModel("unknown-provider:model-id", "12ai"), {
+    provider: "unknown-provider",
+    model: "model-id",
+    async: false,
+  });
 });
 
 test("getModelCapability exposes explicit provider capability schema", () => {

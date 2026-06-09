@@ -25,7 +25,17 @@ import {
 } from "@/lib/prompt-templates";
 import { getMediaReferenceType } from "@/lib/media-references";
 import { getAudioModelCapabilities, parseProviderModel, type AudioModelCapabilities, type AudioOperationMode } from "@/lib/providers/model-catalog";
-import { deleteVoiceProfile, getVisibleVoiceProfilesForAudioModel, isBuiltInVoiceProfileId, listVoiceProfiles, saveVoiceProfile, type VoiceProfile, type VoiceProfileSource } from "@/lib/voice-profiles";
+import {
+  VOICE_PROFILES_CHANGED_EVENT,
+  VOICE_PROFILE_TAG_OPTIONS,
+  deleteVoiceProfile,
+  getVisibleVoiceProfilesForAudioModel,
+  isBuiltInVoiceProfileId,
+  listVoiceProfiles,
+  saveVoiceProfile,
+  type VoiceProfile,
+  type VoiceProfileSource,
+} from "@/lib/voice-profiles";
 
 interface AudioGenerationPanelProps {
   atDropdownNode: ReactNode;
@@ -103,6 +113,9 @@ export default function AudioGenerationPanel({
   const [isDragOver, setIsDragOver] = useState(false);
   const [voiceProfiles, setVoiceProfiles] = useState<VoiceProfile[]>([]);
   const [voiceProfileName, setVoiceProfileName] = useState("");
+  const [voiceProfileDescription, setVoiceProfileDescription] = useState("");
+  const [voiceProfileTags, setVoiceProfileTags] = useState<string[]>([]);
+  const [voiceProfileSearch, setVoiceProfileSearch] = useState("");
   const [voiceProfileMessage, setVoiceProfileMessage] = useState("");
   const selectedProvider = audioProviderFromModel(selectedModel);
   const providerOptions = audioProviderOptions(modelGroups);
@@ -115,6 +128,14 @@ export default function AudioGenerationPanel({
     () => getVisibleVoiceProfilesForAudioModel(selectedModel, mode, voiceProfiles),
     [mode, selectedModel, voiceProfiles],
   );
+  const filteredVoiceProfiles = useMemo(() => {
+    const search = voiceProfileSearch.trim().toLowerCase();
+    if (!search) return visibleVoiceProfiles;
+    return visibleVoiceProfiles.filter(profile => {
+      const haystack = [profile.name, profile.description ?? "", ...profile.tags].join(" ").toLowerCase();
+      return haystack.includes(search);
+    });
+  }, [visibleVoiceProfiles, voiceProfileSearch]);
   const selectedVoiceProfile = visibleVoiceProfiles.find(profile => profile.id === selectedVoiceProfileId);
   const defaultBuiltInVoiceProfile = visibleVoiceProfiles.find(
     profile => profile.source === "builtin" && profile.providerVoiceId === "mimo_default",
@@ -155,16 +176,21 @@ export default function AudioGenerationPanel({
 
   useEffect(() => {
     let active = true;
-    void listVoiceProfiles().then(
+    const refresh = (): void => {
+      void listVoiceProfiles().then(
       profiles => {
         if (active) setVoiceProfiles(profiles);
       },
       () => {
         if (active) setVoiceProfiles([]);
       },
-    );
+      );
+    };
+    refresh();
+    window.addEventListener(VOICE_PROFILES_CHANGED_EVENT, refresh);
     return () => {
       active = false;
+      window.removeEventListener(VOICE_PROFILES_CHANGED_EVENT, refresh);
     };
   }, []);
 
@@ -240,12 +266,18 @@ export default function AudioGenerationPanel({
       name,
       provider: selectedProvider,
       source,
+      description: voiceProfileDescription.trim() || undefined,
+      tags: voiceProfileTags,
       designPrompt: designPrompt || undefined,
       referenceAudioAssetIds: mode === "voice_clone" ? referenceAudioAssetIds : [],
+      sourceAssetIds: mode === "voice_clone" ? referenceAudioAssetIds : [],
+      consentAcceptedAt: mode === "voice_clone" ? new Date().toISOString() : undefined,
     });
     await refreshVoiceProfiles();
     onSelectVoiceProfile(profile.id);
     setVoiceProfileName("");
+    setVoiceProfileDescription("");
+    setVoiceProfileTags([]);
     setVoiceProfileMessage("已保存音色");
   };
 
@@ -255,6 +287,10 @@ export default function AudioGenerationPanel({
     await refreshVoiceProfiles();
     onSelectVoiceProfile("");
     setVoiceProfileMessage("已删除音色");
+  };
+
+  const toggleVoiceProfileTag = (tag: string): void => {
+    setVoiceProfileTags(current => current.includes(tag) ? current.filter(value => value !== tag) : [...current, tag]);
   };
 
   return (
@@ -419,7 +455,13 @@ export default function AudioGenerationPanel({
               </button>
             )}
           </div>
-          <div className={`grid grid-cols-1 gap-2 ${canSaveVoiceProfile ? "sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]" : ""}`}>
+          <div className="grid grid-cols-1 gap-2">
+            <input
+              value={voiceProfileSearch}
+              onChange={event => setVoiceProfileSearch(event.target.value)}
+              placeholder="搜索音色、标签或说明"
+              className="imagine-input h-9 rounded-md px-3 text-xs"
+            />
             <select
               value={selectedVoiceProfileId}
               onChange={event => onSelectVoiceProfile(event.target.value)}
@@ -429,8 +471,11 @@ export default function AudioGenerationPanel({
               {selectedVoiceProfileId && !selectedVoiceProfile && (
                 <option value={selectedVoiceProfileId}>当前音色不可用于此模式</option>
               )}
-              {visibleVoiceProfiles.map(profile => (
-                <option key={profile.id} value={profile.id}>{profile.name}</option>
+              {selectedVoiceProfile && !filteredVoiceProfiles.some(profile => profile.id === selectedVoiceProfile.id) && (
+                <option value={selectedVoiceProfile.id}>{selectedVoiceProfile.name}</option>
+              )}
+              {filteredVoiceProfiles.map(profile => (
+                <option key={profile.id} value={profile.id}>{profile.name}{profile.tags.length > 0 ? ` · ${profile.tags.slice(0, 2).join("/")}` : ""}</option>
               ))}
             </select>
             {canSaveVoiceProfile && (
@@ -441,16 +486,51 @@ export default function AudioGenerationPanel({
                   placeholder="新音色名称"
                   className="imagine-input h-9 rounded-md px-3 text-xs"
                 />
+                <textarea
+                  value={voiceProfileDescription}
+                  onChange={event => setVoiceProfileDescription(event.target.value)}
+                  placeholder="简短信息，例如：青年男声，自然口播"
+                  className="imagine-input min-h-16 resize-y rounded-md px-3 py-2 text-xs"
+                  maxLength={180}
+                />
+                <div className="flex flex-wrap gap-1.5">
+                  {VOICE_PROFILE_TAG_OPTIONS.map(tag => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => toggleVoiceProfileTag(tag)}
+                      className={`rounded-md border px-2 py-1 text-[10px] font-semibold transition ${
+                        voiceProfileTags.includes(tag)
+                          ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100"
+                          : "border-cyan-400/15 bg-slate-950/20 text-cyan-100/70 hover:text-cyan-50"
+                      }`}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
                 <button
                   type="button"
                   onClick={() => void handleSaveVoiceProfile()}
                   className="imagine-secondary-action h-9 rounded-md border px-3 text-xs font-semibold"
                 >
-                  保存
+                  保存当前音色
                 </button>
               </>
             )}
           </div>
+          {selectedVoiceProfile && (selectedVoiceProfile.description || selectedVoiceProfile.tags.length > 0) && (
+            <div className="mt-2 rounded-md border border-cyan-400/10 bg-slate-950/20 p-2 text-[11px] text-cyan-100/85">
+              {selectedVoiceProfile.description && <p className="line-clamp-2">{selectedVoiceProfile.description}</p>}
+              {selectedVoiceProfile.tags.length > 0 && (
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {selectedVoiceProfile.tags.map(tag => (
+                    <span key={tag} className="rounded border border-cyan-400/15 px-1.5 py-0.5 text-[10px] text-cyan-100/75">{tag}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           {needsCloneConsent && (
             <label className="mt-2 flex items-start gap-2 text-[11px] leading-5 text-cyan-100">
               <input

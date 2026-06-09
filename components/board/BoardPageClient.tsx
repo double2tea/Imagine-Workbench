@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { flushSync } from "react-dom";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
 import AgentDock from "@/components/agent/AgentDock";
+import SaveVoiceProfileDialog, { type SaveVoiceProfileDialogInput } from "@/components/audio/SaveVoiceProfileDialog";
 import {
   AGENT_BOARD_PATCH_MAX_OPERATIONS,
   type AgentBoardPatch,
@@ -78,7 +79,8 @@ import {
   type ModelOption,
   type VideoReferenceMode,
 } from "@/lib/providers/model-catalog";
-import { getProviderMeta, PROVIDER_KEYS } from "@/lib/providers/registry";
+import { getProviderMeta, type CustomProviderDefinition } from "@/lib/providers/registry";
+import { saveClonedVoiceProfileFromAsset } from "@/lib/voice-profiles";
 import type { RunningHubTaskNodeBinding } from "@/lib/providers/types";
 import {
   REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES,
@@ -299,22 +301,36 @@ function boardImportNodePosition(origin: BoardPoint, index: number): BoardPoint 
   };
 }
 
-function getProviderLabel(provider: AiProvider): string {
-  return getProviderMeta(provider).label;
+function getProviderLabel(provider: AiProvider, customProviders: readonly CustomProviderDefinition[] = []): string {
+  return customProviders.find(item => item.key === provider)?.label ?? getProviderMeta(provider).label;
 }
 
-function getProviderModelGroups(optionsByProvider: Record<AiProvider, ModelOption[]>): Array<{
+function getProviderModelGroups(
+  optionsByProvider: Record<AiProvider, ModelOption[]>,
+  providerKeys: readonly AiProvider[],
+  customProviders: readonly CustomProviderDefinition[],
+): Array<{
   provider: AiProvider;
   label: string;
   options: ModelOption[];
 }> {
-  return ([...PROVIDER_KEYS] as AiProvider[])
+  return [...providerKeys]
     .map(provider => ({
       provider,
-      label: getProviderLabel(provider),
-      options: optionsByProvider[provider],
+      label: getProviderLabel(provider, customProviders),
+      options: optionsByProvider[provider] ?? [],
     }))
     .filter(group => group.options.length > 0);
+}
+
+function modelProviderIsAvailable(
+  value: string,
+  fallbackProvider: AiProvider,
+  providerKeys: readonly AiProvider[],
+): boolean {
+  const parsed = tryParseProviderModel(value, fallbackProvider);
+  const provider = parsed?.provider ?? fallbackProvider;
+  return providerKeys.includes(provider);
 }
 
 type BoardReferenceUrlResolver = (assetId: string, fallbackUrl: string) => string;
@@ -1121,6 +1137,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const [maskSourceNodeId, setMaskSourceNodeId] = useState<string | null>(null);
   const [fullscreenItem, setFullscreenItem] = useState<StorageItem | null>(null);
   const [panoramaItem, setPanoramaItem] = useState<StorageItem | null>(null);
+  const [voiceProfileSourceItem, setVoiceProfileSourceItem] = useState<StorageItem | null>(null);
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
   const focusNodeSeqRef = useRef(0);
   const [focusNodeRequest, setFocusNodeRequest] = useState<{ nodeId: string; seq: number } | null>(null);
@@ -1222,12 +1239,15 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   ]);
 
   const {
+    addCustomProvider,
     addFetchedModels,
     addManualModels,
     audioModelOptions,
     buildProviderHeaders,
     chatModelOptions,
     clearProviderCredentials,
+    customProviders,
+    deleteCustomProvider,
     handleSaveCredential,
     handleSelectChatModel,
     handleSelectProvider,
@@ -1236,6 +1256,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     isLoadingModels,
     modelListMessage,
     providerCredentials,
+    providerKeys,
     providerTest,
     refreshProviderModels,
     selectedChatModel,
@@ -1243,6 +1264,24 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     testProviderConnection,
     videoModelOptions,
   } = useProviderSettings({ pushWorkspaceNotice });
+
+  useEffect(() => {
+    if (!modelProviderIsAvailable(selectedModel, selectedProvider, providerKeys)) {
+      setSelectedModel(DEFAULT_IMAGE_MODEL);
+    }
+    if (!modelProviderIsAvailable(selectedVideoModel, selectedProvider, providerKeys)) {
+      setSelectedVideoModel(DEFAULT_VIDEO_MODEL);
+    }
+  }, [providerKeys, selectedModel, selectedProvider, selectedVideoModel]);
+
+  const handleSaveVoiceProfileFromAsset = useCallback(async (input: SaveVoiceProfileDialogInput): Promise<void> => {
+    if (!voiceProfileSourceItem) return;
+    await saveClonedVoiceProfileFromAsset(voiceProfileSourceItem, {
+      ...input,
+      fallbackProvider: selectedProvider,
+    });
+    pushWorkspaceNotice("success", "已保存克隆音色");
+  }, [pushWorkspaceNotice, selectedProvider, voiceProfileSourceItem]);
 
   const imageCapabilities = getImageModelCapabilities(selectedModel);
   const videoCapabilities = getVideoModelCapabilities(selectedVideoModel);
@@ -3727,10 +3766,10 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const selectedAssetCompareUrl = selectedBoardNode?.kind === "asset" && selectedBoardNode.asset.type === "image"
     ? assetCompareReferenceUrl(selectedBoardNode.id, boardController.board.nodes, boardController.board.edges)
     : null;
-  const imageModelGroups = getProviderModelGroups(imageModelOptions);
-  const videoModelGroups = getProviderModelGroups(videoModelOptions);
-  const audioModelGroups = getProviderModelGroups(audioModelOptions);
-  const chatModelGroups = getProviderModelGroups(chatModelOptions);
+  const imageModelGroups = getProviderModelGroups(imageModelOptions, providerKeys, customProviders);
+  const videoModelGroups = getProviderModelGroups(videoModelOptions, providerKeys, customProviders);
+  const audioModelGroups = getProviderModelGroups(audioModelOptions, providerKeys, customProviders);
+  const chatModelGroups = getProviderModelGroups(chatModelOptions, providerKeys, customProviders);
   const boardSummariesForToolbar = useMemo(() => {
     if (boardController.saveStatus === "loading") return boardSummaries;
     const summary = boardSummaryFromDocument(boardController.board);
@@ -3806,6 +3845,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onImportBoardFiles={handleImportBoardFiles}
         onOpenFullscreen={handleOpenFullscreen}
         onOpenPanorama={handleOpenPanorama}
+        onSaveVoiceProfile={setVoiceProfileSourceItem}
         onOpenSettings={handleOpenSettings}
         onRenameBoard={renameBoardPage}
         onSelectBoard={handleSelectBoard}
@@ -3861,7 +3901,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         />
       </BoardWorkspace>
 
-      {!showSettings && !isMaskOpen && !fullscreenItem && !panoramaItem && (
+      {!showSettings && !isMaskOpen && !fullscreenItem && !panoramaItem && !voiceProfileSourceItem && (
         <AgentDock
           activeCountdownId={activeCountdownId}
           agentReferenceId={agentReferenceId}
@@ -3913,12 +3953,15 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         isLoadingModels={isLoadingModels}
         modelListMessage={modelListMessage}
         open={showSettings}
+        customProviders={customProviders}
         providerCredentials={providerCredentials}
+        providerKeys={providerKeys}
         providerTest={providerTest}
         selectedChatModel={selectedChatModel}
         selectedProvider={selectedProvider}
         videoModelGroups={videoModelGroups}
         hasCurrentBoard
+        onAddCustomProvider={addCustomProvider}
         onAddFetchedModels={addFetchedModels}
         onAddManualModels={addManualModels}
         onCleanupAssets={handleDataCleanupAssets}
@@ -3937,6 +3980,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onSaveCredential={handleSaveCredential}
         onSelectChatModel={handleSelectChatModel}
         onSelectProvider={handleSelectProvider}
+        onDeleteCustomProvider={deleteCustomProvider}
         refreshProviderModels={refreshProviderModels}
         testProviderConnection={testProviderConnection}
       />
@@ -3958,6 +4002,11 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           onSaveScreenshots={handleSavePanoramaScreenshots}
         />
       )}
+      <SaveVoiceProfileDialog
+        item={voiceProfileSourceItem}
+        onClose={() => setVoiceProfileSourceItem(null)}
+        onSave={handleSaveVoiceProfileFromAsset}
+      />
       {isMaskOpen && (
         <CanvasMaskEditor
           imageUrl={maskTargetUrl}

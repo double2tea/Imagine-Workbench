@@ -58,7 +58,7 @@ export async function generateAudioOperation(
     throw new Error("Voice profile IDs must be resolved before audio operation");
   }
 
-  if (config.provider === "mimo") {
+  if (config.provider === "mimo" || isMimoCompatibleAudioModel(input.model)) {
     if (input.mode === "tts" && input.model === MIMO_TTS_MODEL) {
       if (input.referenceMedia.length > 0) {
         throw new Error("MiMo built-in TTS does not accept reference media");
@@ -73,7 +73,7 @@ export async function generateAudioOperation(
       return {
         type: "direct",
         outputKind: "audio",
-        source: "mimo",
+        source: config.provider,
         ...result,
       };
     }
@@ -91,7 +91,7 @@ export async function generateAudioOperation(
       return {
         type: "direct",
         outputKind: "audio",
-        source: "mimo",
+        source: config.provider,
         ...result,
       };
     }
@@ -111,7 +111,7 @@ export async function generateAudioOperation(
       return {
         type: "direct",
         outputKind: "audio",
-        source: "mimo",
+        source: config.provider,
         ...result,
       };
     }
@@ -128,15 +128,22 @@ export async function generateAudioOperation(
       return {
         type: "direct",
         outputKind: "transcript",
-        source: "mimo",
+        source: config.provider,
         ...result,
       };
     }
 
-    throw new Error("MiMo audio operation currently supports built-in TTS, voice design, voice clone, and ASR only");
+    throw new Error(`${config.provider} audio operation currently supports MiMo-compatible TTS, voice design, voice clone, and ASR models only`);
   }
 
   throw new Error(`${config.provider} audio operation is not supported yet`);
+}
+
+function isMimoCompatibleAudioModel(model: string): boolean {
+  return model === MIMO_TTS_MODEL ||
+    model === MIMO_TTS_VOICE_DESIGN_MODEL ||
+    model === MIMO_TTS_VOICE_CLONE_MODEL ||
+    model === MIMO_ASR_MODEL;
 }
 
 export async function getAudioStatus(config: ProviderConfig, taskId: string): Promise<MediaStatusResult> {

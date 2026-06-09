@@ -1,10 +1,12 @@
+import type { StorageItem } from "./db";
 import type { AiProvider } from "./providers/model-catalog";
-import { tryParseProviderModel, type AudioOperationMode } from "./providers/model-catalog";
+import { getAudioModelCapabilities, tryParseProviderModel, type AudioOperationMode } from "./providers/model-catalog";
 import { MIMO_BUILT_IN_VOICES } from "./providers/mimo-voices";
 
 const VOICE_DB_NAME = "ImagineWorkbenchVoiceDB";
 const VOICE_DB_VERSION = 1;
 const VOICE_PROFILE_STORE = "voice_profiles";
+export const VOICE_PROFILES_CHANGED_EVENT = "imagine:voice-profiles-changed";
 
 export type VoiceProfileSource = "builtin" | "designed" | "cloned" | "imported";
 
@@ -13,9 +15,13 @@ export interface VoiceProfile {
   name: string;
   provider: AiProvider;
   source: VoiceProfileSource;
+  description?: string;
+  tags: string[];
   providerVoiceId?: string;
   designPrompt?: string;
   referenceAudioAssetIds: string[];
+  sourceAssetIds?: string[];
+  consentAcceptedAt?: string;
   previewAudioAssetId?: string;
   createdAt: string;
   updatedAt: string;
@@ -28,11 +34,43 @@ export type VoiceProfileInput = Omit<VoiceProfile, "createdAt" | "updatedAt"> & 
 
 const BUILT_IN_PROFILE_TIMESTAMP = "2026-06-07T00:00:00.000Z";
 
+export const VOICE_PROFILE_TAG_OPTIONS = [
+  "男声",
+  "女声",
+  "中性",
+  "儿童",
+  "青年",
+  "中年",
+  "老人",
+  "广告",
+  "自然",
+  "纪录",
+  "综艺",
+  "新闻",
+  "旁白",
+  "播客",
+  "角色",
+  "清亮",
+  "磁性",
+  "沙哑",
+  "甜美",
+  "沉稳",
+  "活泼",
+] as const;
+
+export interface SaveClonedVoiceProfileInput {
+  name: string;
+  description?: string;
+  tags: string[];
+  fallbackProvider: AiProvider;
+}
+
 export const BUILT_IN_VOICE_PROFILES: VoiceProfile[] = MIMO_BUILT_IN_VOICES.map(voice => ({
   id: `mimo_builtin_${voice}`,
   name: voice === "mimo_default" ? "MiMo 默认" : voice,
   provider: "mimo",
   source: "builtin",
+  tags: [],
   providerVoiceId: voice,
   referenceAudioAssetIds: [],
   createdAt: BUILT_IN_PROFILE_TIMESTAMP,
@@ -54,22 +92,79 @@ export function getVisibleVoiceProfilesForAudioModel(
 ): VoiceProfile[] {
   const parsedModel = tryParseProviderModel(model, "12ai");
   if (!parsedModel) return [];
-  const providerProfiles = savedProfiles.filter(profile => profile.provider === parsedModel.provider && profile.source !== "builtin");
+  const providerProfiles = savedProfiles.filter(profile => isVoiceProfileUsableForAudioModel(profile, model, mode));
   if (mode === "tts" && parsedModel.provider === "mimo" && parsedModel.model === "mimo-v2.5-tts") {
     return [...BUILT_IN_VOICE_PROFILES, ...providerProfiles];
   }
   return providerProfiles;
 }
 
+export function isVoiceProfileUsableForAudioModel(
+  profile: VoiceProfile,
+  model: string,
+  mode: AudioOperationMode,
+): boolean {
+  const parsedModel = tryParseProviderModel(model, "12ai");
+  if (!parsedModel) return false;
+  if (profile.source === "builtin") {
+    return mode === "tts" && parsedModel.provider === "mimo" && parsedModel.model === "mimo-v2.5-tts";
+  }
+
+  const capabilities = getAudioModelCapabilities(model);
+  if (!capabilities.modes.includes(mode)) return false;
+  if (profile.source === "cloned") {
+    const withinMin = profile.referenceAudioAssetIds.length >= capabilities.minReferenceMedia;
+    const withinMax = capabilities.maxReferenceMedia === 0 || profile.referenceAudioAssetIds.length <= capabilities.maxReferenceMedia;
+    return mode === "voice_clone" && capabilities.referenceMediaTypes.includes("audio") && withinMin && withinMax;
+  }
+  return profile.provider === parsedModel.provider;
+}
+
+export function voiceProfileDefaultNameFromAsset(item: Pick<StorageItem, "prompt" | "createdAt">): string {
+  const prompt = item.prompt.trim();
+  if (prompt) return prompt.slice(0, 24);
+  const date = new Date(item.createdAt);
+  if (!Number.isFinite(date.getTime())) return "克隆音色";
+  return `克隆音色 ${date.toLocaleDateString("zh-CN")}`;
+}
+
+export async function saveClonedVoiceProfileFromAsset(
+  item: Pick<StorageItem, "id" | "type" | "prompt" | "model" | "createdAt">,
+  input: SaveClonedVoiceProfileInput,
+): Promise<VoiceProfile> {
+  if (item.type !== "audio") throw new Error("只能将音频资产保存为克隆音色");
+  const name = input.name.trim();
+  if (!name) throw new Error("先输入音色名称");
+  const parsedProvider = tryParseProviderModel(item.model, input.fallbackProvider)?.provider ?? input.fallbackProvider;
+  const now = new Date().toISOString();
+  return saveVoiceProfile({
+    id: `voice_${Date.now()}`,
+    name,
+    provider: parsedProvider,
+    source: "cloned",
+    description: input.description?.trim() || undefined,
+    tags: input.tags,
+    referenceAudioAssetIds: [item.id],
+    sourceAssetIds: [item.id],
+    consentAcceptedAt: now,
+  });
+}
+
 function normalizeVoiceProfile(input: VoiceProfile): VoiceProfile {
+  const referenceAudioAssetIds = input.referenceAudioAssetIds.filter(id => id.trim().length > 0);
+  const sourceAssetIds = input.sourceAssetIds?.filter(id => id.trim().length > 0) ?? referenceAudioAssetIds;
   return {
     id: input.id,
     name: input.name.trim(),
     provider: input.provider,
     source: input.source,
+    description: input.description?.trim() || undefined,
+    tags: Array.from(new Set((input.tags ?? []).map(tag => tag.trim()).filter(tag => tag.length > 0))),
     providerVoiceId: input.providerVoiceId?.trim() || undefined,
     designPrompt: input.designPrompt?.trim() || undefined,
-    referenceAudioAssetIds: input.referenceAudioAssetIds.filter(id => id.trim().length > 0),
+    referenceAudioAssetIds,
+    sourceAssetIds,
+    consentAcceptedAt: input.consentAcceptedAt?.trim() || undefined,
     previewAudioAssetId: input.previewAudioAssetId?.trim() || undefined,
     createdAt: input.createdAt,
     updatedAt: input.updatedAt,
@@ -117,6 +212,7 @@ export async function saveVoiceProfile(input: VoiceProfileInput): Promise<VoiceP
     transaction.onerror = () => reject(transaction.error ?? new Error("VoiceProfile save failed"));
     transaction.onabort = () => reject(transaction.error ?? new Error("VoiceProfile save aborted"));
   });
+  window.dispatchEvent(new Event(VOICE_PROFILES_CHANGED_EVENT));
   return profile;
 }
 
@@ -160,4 +256,5 @@ export async function deleteVoiceProfile(id: string): Promise<void> {
     transaction.onerror = () => reject(transaction.error ?? new Error("VoiceProfile delete failed"));
     transaction.onabort = () => reject(transaction.error ?? new Error("VoiceProfile delete aborted"));
   });
+  window.dispatchEvent(new Event(VOICE_PROFILES_CHANGED_EVENT));
 }

@@ -17,6 +17,12 @@ export interface ProviderMeta {
   supportsChat: boolean;
 }
 
+export interface CustomProviderDefinition {
+  key: string;
+  label: string;
+  baseUrl: string;
+}
+
 export const MIMO_TOKEN_PLAN_DEFAULT_BASE_URL = "https://token-plan-cn.xiaomimimo.com/v1";
 
 export const PROVIDER_REGISTRY = [
@@ -132,21 +138,40 @@ export const PROVIDER_REGISTRY = [
   },
 ] as const;
 
-export type AiProvider = (typeof PROVIDER_REGISTRY)[number]["key"];
+export type AiProvider = string;
 export const PROVIDER_KEYS: readonly AiProvider[] = PROVIDER_REGISTRY.map(p => p.key);
 const META_BY_KEY = new Map<string, ProviderMeta>(PROVIDER_REGISTRY.map(p => [p.key, p as ProviderMeta]));
 
 export function getProviderMeta(provider: AiProvider): ProviderMeta {
   const meta = META_BY_KEY.get(provider);
-  if (!meta) throw new Error(`Unknown provider: ${provider}`);
-  return meta;
+  if (meta) return meta;
+  if (!isProviderKey(provider)) throw new Error(`Unknown provider: ${provider}`);
+  return {
+    key: provider,
+    label: provider,
+    envApiKey: "",
+    envBaseUrl: "",
+    defaultBaseUrl: "",
+    defaultVideoBaseUrl: "",
+    apiKeyPlaceholder: "sk-...",
+    hasEditableBaseUrl: true,
+    supportsImage: true,
+    supportsVideo: true,
+    supportsAudio: true,
+    supportsChat: true,
+  };
 }
 
 export function isKnownProvider(value: string): value is AiProvider {
   return META_BY_KEY.has(value);
 }
 
+export function isProviderKey(value: string): value is AiProvider {
+  return /^[a-z0-9][a-z0-9_-]{1,63}$/.test(value);
+}
+
 export function resolveProviderApiKey(provider: AiProvider): string {
+  if (!isKnownProvider(provider)) return "";
   const meta = getProviderMeta(provider);
   return readEnv(meta.envApiKey) ?? readEnv("AI_API_KEY") ?? "";
 }

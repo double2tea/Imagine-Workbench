@@ -61,10 +61,16 @@ test("includeCurrentModelOption preserves unknown provider model values without 
 
   assert.deepEqual(includeCurrentModelOption(groups, "unknown-provider:model-id"), [
     {
+      provider: "unknown-provider",
+      label: "unknown-provider",
+      options: [
+        { value: "unknown-provider:model-id", label: "unknown-provider model-id" },
+      ],
+    },
+    {
       provider: "12ai",
       label: "12AI",
       options: [
-        { value: "unknown-provider:model-id", label: "unknown-provider:model-id" },
         { value: "12ai:gemini-3.1-flash-image-preview", label: "12AI Gemini 3.1 Flash Image" },
       ],
     },

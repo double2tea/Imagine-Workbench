@@ -8,6 +8,7 @@ export interface ProviderCredentials {
 
 export interface ProviderConfig {
   provider: AiProvider;
+  providerLabel?: string;
   apiKey: string;
   baseUrl: string;
   videoBaseUrl: string;

@@ -433,6 +433,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             onMeasureAspectRatio={c.onMeasureAssetAspectRatio}
             onOpenFullscreen={c.onOpenFullscreen}
             onOpenPanorama={c.onOpenPanorama}
+            onSaveVoiceProfile={c.onSaveVoiceProfile}
             onSelectStackAsset={assetId => c.onSelectAssetStackResult(node.id, assetId)}
             onSendToAgent={c.onSendAssetToAgent}
           />

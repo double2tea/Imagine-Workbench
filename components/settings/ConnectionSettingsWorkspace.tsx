@@ -1,13 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Check, CheckCircle2, ListPlus, RefreshCw, Search, XCircle } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { Check, CheckCircle2, ListPlus, Plus, RefreshCw, Search, Trash2, XCircle } from "lucide-react";
+import { useConfirm } from "@/components/confirm/ConfirmProvider";
 import { ProviderCredentialCard } from "@/components/settings/ProviderCredentialCard";
 import type { ProviderTestState } from "@/components/settings/provider-settings-types";
 import { providerClearLabel, providerEndpointInfo } from "@/components/settings/provider-settings-utils";
 import type { AiProvider, ModelOption } from "@/lib/providers/model-catalog";
 
-import { PROVIDER_KEYS, getProviderMeta } from "@/lib/providers/registry";
+import { getProviderMeta, isKnownProvider, type CustomProviderDefinition, type ProviderMeta } from "@/lib/providers/registry";
 import type { ProviderCredentials } from "@/lib/providers/types";
 
 type ModelCategory = "chat" | "image" | "video" | "audio";
@@ -37,21 +38,25 @@ const WORKSPACE_SECTIONS: { key: WorkspaceSection; label: string }[] = [
 export interface ConnectionSettingsWorkspaceProps {
   audioModelGroups: ModelGroup[];
   chatModelGroups: ModelGroup[];
+  customProviders: CustomProviderDefinition[];
   fetchedModelOptions: FetchedModelOptions;
   imageModelGroups: ModelGroup[];
   isLoadingModels: boolean;
   modelListMessage: string;
   providerCredentials: Record<AiProvider, ProviderCredentials>;
+  providerKeys: AiProvider[];
   providerTest: ProviderTestState;
   selectedChatModel: string;
   selectedProvider: AiProvider;
   videoModelGroups: ModelGroup[];
+  onAddCustomProvider: (label: string, baseUrl: string) => boolean;
   onAddFetchedModels: (category: ModelCategory, values: string[]) => void;
   onAddManualModels: (category: ModelCategory, value: string) => void;
   onClearCredentials: (provider: AiProvider) => void;
   onSaveCredential: (provider: AiProvider, field: keyof ProviderCredentials, value: string) => void;
   onSelectChatModel: (value: string) => void;
   onSelectProvider: (value: AiProvider) => void;
+  onDeleteCustomProvider: (provider: AiProvider) => void;
   refreshProviderModels: () => void;
   testProviderConnection: (provider: AiProvider) => void;
 }
@@ -59,40 +64,63 @@ export interface ConnectionSettingsWorkspaceProps {
 export function ConnectionSettingsWorkspace({
   audioModelGroups,
   chatModelGroups,
+  customProviders,
   fetchedModelOptions,
   imageModelGroups,
   isLoadingModels,
   modelListMessage,
   providerCredentials,
+  providerKeys,
   providerTest,
   selectedChatModel,
   selectedProvider,
   videoModelGroups,
+  onAddCustomProvider,
   onAddFetchedModels,
   onAddManualModels,
   onClearCredentials,
   onSaveCredential,
   onSelectChatModel,
   onSelectProvider,
+  onDeleteCustomProvider,
   refreshProviderModels,
   testProviderConnection,
 }: ConnectionSettingsWorkspaceProps) {
+  const confirmAction = useConfirm();
   const [providerQuery, setProviderQuery] = useState("");
   const [section, setSection] = useState<WorkspaceSection>("credentials");
   const [manualModels, setManualModels] = useState("");
+  const [customProviderName, setCustomProviderName] = useState("");
+  const [customProviderBaseUrl, setCustomProviderBaseUrl] = useState("");
   const [fetchedSelection, setFetchedSelection] = useState<FetchedSelection>({ scope: "", values: [] });
+
+  const customProviderByKey = useMemo(
+    () => new Map(customProviders.map(provider => [provider.key, provider])),
+    [customProviders],
+  );
+  const getWorkspaceProviderMeta = useCallback((provider: AiProvider): ProviderMeta => {
+    const customProvider = customProviderByKey.get(provider);
+    if (!customProvider) return getProviderMeta(provider);
+    return {
+      ...getProviderMeta(provider),
+      label: customProvider.label,
+      defaultBaseUrl: customProvider.baseUrl,
+      defaultVideoBaseUrl: customProvider.baseUrl,
+      hasEditableBaseUrl: true,
+    };
+  }, [customProviderByKey]);
 
   const filteredProviders = useMemo(() => {
     const normalized = providerQuery.trim().toLowerCase();
-    if (!normalized) return [...PROVIDER_KEYS];
-    return PROVIDER_KEYS.filter(provider => {
-      const meta = getProviderMeta(provider);
+    if (!normalized) return [...providerKeys];
+    return providerKeys.filter(provider => {
+      const meta = getWorkspaceProviderMeta(provider);
       return (
         meta.label.toLowerCase().includes(normalized) ||
         provider.toLowerCase().includes(normalized)
       );
     });
-  }, [providerQuery]);
+  }, [getWorkspaceProviderMeta, providerKeys, providerQuery]);
 
   const modelGroupsBySection = useMemo(
     () => ({
@@ -118,15 +146,15 @@ export function ConnectionSettingsWorkspace({
   const fetchedOptions =
     section === "credentials"
       ? []
-      : fetchedModelOptions[selectedProvider][modelCategory].filter(
+      : (fetchedModelOptions[selectedProvider]?.[modelCategory] ?? []).filter(
           option => !activeModelValues.has(option.value),
         );
   const fetchedSelectionScope = `${selectedProvider}:${modelCategory}`;
   const selectedFetchedModels =
     fetchedSelection.scope === fetchedSelectionScope ? fetchedSelection.values : [];
 
-  const selectedProviderMeta = getProviderMeta(selectedProvider);
-  const selectedProviderCreds = providerCredentials[selectedProvider];
+  const selectedProviderMeta = getWorkspaceProviderMeta(selectedProvider);
+  const selectedProviderCreds = providerCredentials[selectedProvider] ?? { apiKey: "", baseUrl: "" };
   const selectedProviderCapabilities = [
     selectedProviderMeta.supportsImage ? "图像" : null,
     selectedProviderMeta.supportsVideo ? "视频" : null,
@@ -158,11 +186,58 @@ export function ConnectionSettingsWorkspace({
     setManualModels("");
   };
 
+  const submitCustomProvider = () => {
+    const added = onAddCustomProvider(customProviderName, customProviderBaseUrl);
+    if (!added) return;
+    setCustomProviderName("");
+    setCustomProviderBaseUrl("");
+  };
+
+  const confirmDeleteCustomProvider = async () => {
+    if (isKnownProvider(selectedProvider)) return;
+    if (!(await confirmAction({
+      message: `确认删除 ${selectedProviderMeta.label} 吗？\n这会删除该服务商配置、凭证和已添加模型。`,
+      tone: "danger",
+      confirmLabel: "删除",
+    }))) {
+      return;
+    }
+    onDeleteCustomProvider(selectedProvider);
+  };
+
   const sectionLabel = WORKSPACE_SECTIONS.find(option => option.key === section)?.label ?? "";
 
   return (
     <div className="imagine-settings-workspace">
       <aside className="imagine-settings-workspace-nav">
+        <div className="imagine-settings-card mb-3 p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <div className="imagine-settings-card-title">自定义服务商</div>
+            <button
+              type="button"
+              onClick={submitCustomProvider}
+              className="imagine-settings-toolbar-btn h-7"
+              aria-label="添加自定义服务商"
+            >
+              <Plus className="h-3 w-3" />
+              添加
+            </button>
+          </div>
+          <input
+            type="text"
+            value={customProviderName}
+            onChange={event => setCustomProviderName(event.target.value)}
+            placeholder="名称"
+            className="imagine-input h-8 text-xs"
+          />
+          <input
+            type="url"
+            value={customProviderBaseUrl}
+            onChange={event => setCustomProviderBaseUrl(event.target.value)}
+            placeholder="https://api.example.com"
+            className="imagine-input mt-2 h-8 font-mono text-xs"
+          />
+        </div>
         <div className="imagine-settings-provider-search">
           <Search className="h-3.5 w-3.5 shrink-0 text-[var(--iw-faint)]" aria-hidden />
           <input
@@ -179,8 +254,8 @@ export function ConnectionSettingsWorkspace({
             <div className="imagine-settings-empty">无匹配服务商</div>
           ) : (
             filteredProviders.map(provider => {
-              const meta = getProviderMeta(provider);
-              const creds = providerCredentials[provider];
+              const meta = getWorkspaceProviderMeta(provider);
+              const creds = providerCredentials[provider] ?? { apiKey: "", baseUrl: "" };
               const isSelected = provider === selectedProvider;
               const hasKey = Boolean(creds.apiKey.trim());
               const testForProvider =
@@ -224,7 +299,7 @@ export function ConnectionSettingsWorkspace({
           )}
         </div>
         <p className="imagine-settings-provider-count px-1">
-          {filteredProviders.length} / {PROVIDER_KEYS.length}
+          {filteredProviders.length} / {providerKeys.length}
         </p>
       </aside>
 
@@ -245,7 +320,19 @@ export function ConnectionSettingsWorkspace({
         </div>
 
         <div className="imagine-settings-section">
-          <div className="imagine-settings-section-title">{selectedProviderMeta.label}</div>
+          <div className="flex items-center justify-between gap-2">
+            <div className="imagine-settings-section-title">{selectedProviderMeta.label}</div>
+            {!isKnownProvider(selectedProvider) ? (
+              <button
+                type="button"
+                onClick={() => void confirmDeleteCustomProvider()}
+                className="imagine-settings-toolbar-btn h-7 text-red-300"
+              >
+                <Trash2 className="h-3 w-3" />
+                删除
+              </button>
+            ) : null}
+          </div>
           {selectedProviderCapabilities ? (
             <p className="text-[10px] text-[var(--iw-faint)]">支持：{selectedProviderCapabilities}</p>
           ) : null}

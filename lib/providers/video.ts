@@ -9,6 +9,7 @@ import {
   getJson,
   isRecord,
   mediaOperationName,
+  openAiCompatibleUrl,
   postForm,
   postJson,
 } from "./utils";
@@ -91,7 +92,7 @@ export async function generateVideo(config: ProviderConfig, input: GenerateVideo
 
   const isTwelveAiOmni = config.provider === "12ai" && input.model === TWELVE_AI_OMNI_VIDEO_MODEL;
   const response = await postForm<VideoCreateResponse>(
-    `${getVideoBaseUrl(config, isTwelveAiOmni)}/v1/videos`,
+    openAiCompatibleUrl(getVideoBaseUrl(config, isTwelveAiOmni), "/v1/videos"),
     config,
     form,
   );
@@ -111,7 +112,7 @@ async function generateAgnesVideo(config: ProviderConfig, input: GenerateVideoIn
   const size = aspectRatioToVideoSize(input.aspectRatio, config.provider);
   const dimensions = size ? parseVideoDimensions(size) : undefined;
   const referenceUrls = input.referenceMedia.map(reference => reference.dataUri);
-  const response = await postJson<VideoCreateResponse>(`${config.baseUrl}/v1/videos`, config, {
+  const response = await postJson<VideoCreateResponse>(openAiCompatibleUrl(config.baseUrl, "/v1/videos"), config, {
     model: input.model,
     prompt: input.prompt,
     ...(dimensions ? { width: dimensions.width, height: dimensions.height } : {}),
@@ -133,7 +134,10 @@ export async function getVideoStatus(config: ProviderConfig, taskId: string, mod
 
   const task = parseVideoTaskId(config, taskId, model);
   const baseUrl = getVideoBaseUrl(config, task.isTwelveAiOmni);
-  const response = await getJson<VideoStatusResponse>(`${baseUrl}/v1/videos/${encodeURIComponent(task.id)}`, config);
+  const response = await getJson<VideoStatusResponse>(
+    openAiCompatibleUrl(baseUrl, `/v1/videos/${encodeURIComponent(task.id)}`),
+    config,
+  );
   const statusResponse = readVideoStatusResponse(response);
   const status = statusResponse.status?.toLowerCase() ?? "processing";
   if (VIDEO_FAILED_STATUSES.has(status)) {
@@ -173,7 +177,10 @@ export async function downloadVideo(config: ProviderConfig, taskId: string, mode
 
   const task = parseVideoTaskId(config, taskId, model);
   const baseUrl = getVideoBaseUrl(config, task.isTwelveAiOmni);
-  const status = await getJson<VideoStatusResponse>(`${baseUrl}/v1/videos/${encodeURIComponent(task.id)}`, config);
+  const status = await getJson<VideoStatusResponse>(
+    openAiCompatibleUrl(baseUrl, `/v1/videos/${encodeURIComponent(task.id)}`),
+    config,
+  );
   const videoUrl =
     readVideoUrl(status) ??
     videoContentEndpointUrl(config, baseUrl, task.id);
@@ -200,7 +207,10 @@ async function downloadVideoUrl(config: ProviderConfig, baseUrl: string, videoUr
 export async function cancelVideo(config: ProviderConfig, taskId: string): Promise<void> {
   const task = parseVideoTaskId(config, taskId);
   const baseUrl = getVideoBaseUrl(config, task.isTwelveAiOmni);
-  const response = await deleteJson<VideoDeleteResponse>(`${baseUrl}/v1/videos/${encodeURIComponent(task.id)}`, config);
+  const response = await deleteJson<VideoDeleteResponse>(
+    openAiCompatibleUrl(baseUrl, `/v1/videos/${encodeURIComponent(task.id)}`),
+    config,
+  );
   if (response.success !== true) {
     throw new Error(response.message ?? "Video task cancel failed");
   }
@@ -266,7 +276,7 @@ async function referenceToBlob(reference: GenerateVideoInput["referenceMedia"][n
 
 function videoContentEndpointUrl(config: ProviderConfig, baseUrl: string, taskId: string): string | undefined {
   if (config.provider !== "12ai" && config.provider !== "grok2api") return undefined;
-  return `${baseUrl}/v1/videos/${encodeURIComponent(taskId)}/content`;
+  return openAiCompatibleUrl(baseUrl, `/v1/videos/${encodeURIComponent(taskId)}/content`);
 }
 
 function readVideoUrl(value: VideoStatusResponse): string | undefined {

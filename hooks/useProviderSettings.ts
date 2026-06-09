@@ -1,5 +1,12 @@
-import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import type { ProviderTestState } from "@/components/settings/provider-settings-types";
+import {
+  createCustomProviderKey,
+  CUSTOM_PROVIDERS_STORAGE_KEY,
+  isCustomProviderDefinition,
+  normalizeCustomProviderBaseUrl,
+  normalizeCustomProviderDefinition,
+} from "@/lib/providers/custom-providers";
 import {
   AUDIO_MODEL_OPTIONS,
   CHAT_MODEL_OPTIONS,
@@ -11,7 +18,7 @@ import {
   type AiProvider,
   type ModelOption,
 } from "@/lib/providers/model-catalog";
-import { getProviderMeta, isKnownProvider, PROVIDER_KEYS } from "@/lib/providers/registry";
+import { getProviderMeta, isKnownProvider, isProviderKey, PROVIDER_KEYS, type CustomProviderDefinition } from "@/lib/providers/registry";
 import type { ProviderCredentials } from "@/lib/providers/types";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 
@@ -23,9 +30,9 @@ interface UseProviderSettingsParams {
   pushWorkspaceNotice: (type: NoticeType, message: string) => void;
 }
 
-function defaultProviderCredentials(): Record<AiProvider, ProviderCredentials> {
+function defaultProviderCredentials(providerKeys: readonly AiProvider[]): Record<AiProvider, ProviderCredentials> {
   const record = {} as Record<AiProvider, ProviderCredentials>;
-  for (const provider of PROVIDER_KEYS) record[provider] = { apiKey: "", baseUrl: "" };
+  for (const provider of providerKeys) record[provider] = { apiKey: "", baseUrl: "" };
   return record;
 }
 
@@ -52,11 +59,12 @@ function mergeModelOptions(base: ModelOption[], incoming: ModelOption[]): ModelO
 function mergeProviderModelOptions(
   base: Record<AiProvider, ModelOption[]>,
   incoming: ModelOption[],
+  providerKeys: readonly AiProvider[],
 ): Record<AiProvider, ModelOption[]> {
   const result = { ...base };
-  for (const provider of PROVIDER_KEYS) {
+  for (const provider of providerKeys) {
     result[provider] = mergeModelOptions(
-      base[provider],
+      base[provider] ?? [],
       incoming.filter(option => tryParseProviderModel(option.value, "12ai")?.provider === provider),
     );
   }
@@ -66,17 +74,18 @@ function mergeProviderModelOptions(
 function mergeRecordModelOptions(
   base: Record<AiProvider, ModelOption[]>,
   incoming: unknown,
+  providerKeys: readonly AiProvider[],
   filterFn?: (option: ModelOption) => boolean,
 ): Record<AiProvider, ModelOption[]> {
   if (typeof incoming !== "object" || incoming === null) return base;
   const record = incoming as Record<string, unknown>;
   const result = { ...base };
-  for (const provider of PROVIDER_KEYS) {
+  for (const provider of providerKeys) {
     if (Array.isArray(record[provider])) {
       const options = filterFn
         ? (record[provider] as unknown[]).filter(isModelOption).filter(filterFn)
         : (record[provider] as unknown[]).filter(isModelOption);
-      if (options.length > 0) result[provider] = mergeModelOptions(base[provider], options);
+      if (options.length > 0) result[provider] = mergeModelOptions(base[provider] ?? [], options);
     }
   }
   return result;
@@ -86,7 +95,7 @@ function classifyModelOption(option: ModelOption): ModelCategory {
   const parsed = tryParseProviderModel(option.value, "12ai");
   if (!parsed) return "chat";
   const model = parsed.model.toLowerCase();
-  if (model.includes("audio") || model.includes("tts") || model.includes("voice") || model.includes("speech")) return "audio";
+  if (model.includes("audio") || model.includes("tts") || model.includes("voice") || model.includes("speech") || model.includes("asr")) return "audio";
   if (model.includes("video") || model.includes("veo") || model.includes("omni_flash")) return "video";
   if (model.includes("image") || model.includes("imagen") || model.includes("imagine")) return "image";
   return "chat";
@@ -103,23 +112,30 @@ function isSelectableChatModel(option: ModelOption): boolean {
   return parsed.model !== "gemini-3.1-flash" && !parsed.model.toLowerCase().includes("deepseek");
 }
 
-function hasChatModel(value: string, options: Record<AiProvider, ModelOption[]>): boolean {
-  return PROVIDER_KEYS.some(provider => options[provider].some(option => option.value === value));
-}
-
-function getProviderLabel(provider: AiProvider): string {
-  return getProviderMeta(provider).label;
+function hasChatModel(value: string, options: Record<AiProvider, ModelOption[]>, providerKeys: readonly AiProvider[]): boolean {
+  return providerKeys.some(provider => (options[provider] ?? []).some(option => option.value === value));
 }
 
 export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettingsParams) {
-  const [providerCredentials, setProviderCredentials] = useState<Record<AiProvider, ProviderCredentials>>(defaultProviderCredentials);
+  const [customProviders, setCustomProviders] = useState<CustomProviderDefinition[]>([]);
+  const providerKeys = useMemo(
+    () => [...PROVIDER_KEYS, ...customProviders.map(provider => provider.key)],
+    [customProviders],
+  );
+  const customProviderByKey = useMemo(
+    () => new Map(customProviders.map(provider => [provider.key, provider])),
+    [customProviders],
+  );
+  const [providerCredentials, setProviderCredentials] = useState<Record<AiProvider, ProviderCredentials>>(
+    defaultProviderCredentials(PROVIDER_KEYS),
+  );
   const [selectedProvider, setSelectedProvider] = useState<AiProvider>("12ai");
   const [selectedChatModel, setSelectedChatModel] = useState(DEFAULT_CHAT_MODEL);
   const [chatModelOptions, setChatModelOptions] = useState<Record<AiProvider, ModelOption[]>>(CHAT_MODEL_OPTIONS);
   const [imageModelOptions, setImageModelOptions] = useState<Record<AiProvider, ModelOption[]>>(IMAGE_MODEL_OPTIONS);
   const [videoModelOptions, setVideoModelOptions] = useState<Record<AiProvider, ModelOption[]>>(VIDEO_MODEL_OPTIONS);
   const [audioModelOptions, setAudioModelOptions] = useState<Record<AiProvider, ModelOption[]>>(AUDIO_MODEL_OPTIONS);
-  const [fetchedModelOptions, setFetchedModelOptions] = useState<FetchedModelOptions>(emptyFetchedModelOptions);
+  const [fetchedModelOptions, setFetchedModelOptions] = useState<FetchedModelOptions>(emptyFetchedModelOptions(PROVIDER_KEYS));
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [modelListMessage, setModelListMessage] = useState("");
   const [providerTest, setProviderTest] = useState<ProviderTestState>({
@@ -128,14 +144,18 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
     message: "",
   });
 
+  const getProviderLabel = useCallback((provider: AiProvider): string => (
+    customProviderByKey.get(provider)?.label ?? getProviderMeta(provider).label
+  ), [customProviderByKey]);
+
   const buildProviderHeaders = useCallback((target?: string) => {
     const provider =
-      target && isKnownProvider(target)
+      target && isProviderKey(target)
         ? target
         : target
           ? tryParseProviderModel(target, selectedProvider)?.provider ?? selectedProvider
           : selectedProvider;
-    const chatModelHeader = target && !isKnownProvider(target) ? target : selectedChatModel;
+    const chatModelHeader = target && !isProviderKey(target) ? target : selectedChatModel;
     const headers: Record<string, string> = {
       "x-ai-provider": provider,
       "x-ai-chat-model": chatModelHeader,
@@ -143,12 +163,17 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
     const creds = providerCredentials[provider];
     if (creds?.apiKey) headers["x-ai-api-key"] = creds.apiKey;
     if (creds?.baseUrl) headers["x-ai-base-url"] = creds.baseUrl;
+    const customProvider = customProviderByKey.get(provider);
+    if (customProvider) {
+      headers["x-ai-provider-label"] = customProvider.label;
+    }
     return headers;
-  }, [providerCredentials, selectedChatModel, selectedProvider]);
+  }, [customProviderByKey, providerCredentials, selectedChatModel, selectedProvider]);
 
   const handleSaveCredential = useCallback((provider: AiProvider, field: keyof ProviderCredentials, value: string) => {
     setProviderCredentials(prev => {
-      const next = { ...prev, [provider]: { ...prev[provider], [field]: value.trim() } };
+      const current = prev[provider] ?? { apiKey: "", baseUrl: "" };
+      const next = { ...prev, [provider]: { ...current, [field]: value.trim() } };
       try { localStorage.setItem("imagine_provider_credentials", JSON.stringify(next)); } catch { /* storage unavailable */ }
       return next;
     });
@@ -166,6 +191,82 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
     setSelectedProvider(provider);
     try { localStorage.setItem("imagine_ai_provider", provider); } catch { /* storage unavailable */ }
   };
+
+  const addCustomProvider = useCallback((label: string, baseUrl: string): boolean => {
+    const cleanLabel = label.trim();
+    if (!cleanLabel || !baseUrl.trim()) {
+      const message = "请输入服务商名称和 Base URL";
+      pushWorkspaceNotice("error", message);
+      return false;
+    }
+    let cleanBaseUrl: string;
+    try {
+      cleanBaseUrl = normalizeCustomProviderBaseUrl(baseUrl);
+    } catch (error) {
+      pushWorkspaceNotice("error", error instanceof Error ? error.message : "Base URL 格式无效");
+      return false;
+    }
+    const key = createCustomProviderKey(cleanLabel, providerKeys);
+    const nextProvider = { key, label: cleanLabel, baseUrl: cleanBaseUrl };
+    setCustomProviders(prev => {
+      const next = [...prev, nextProvider];
+      try { localStorage.setItem(CUSTOM_PROVIDERS_STORAGE_KEY, JSON.stringify(next)); } catch { /* storage unavailable */ }
+      return next;
+    });
+    setProviderCredentials(prev => {
+      const next = { ...prev, [key]: { apiKey: "", baseUrl: cleanBaseUrl } };
+      try { localStorage.setItem("imagine_provider_credentials", JSON.stringify(next)); } catch { /* storage unavailable */ }
+      return next;
+    });
+    setChatModelOptions(prev => ({ ...prev, [key]: [] }));
+    setImageModelOptions(prev => ({ ...prev, [key]: [] }));
+    setVideoModelOptions(prev => ({ ...prev, [key]: [] }));
+    setAudioModelOptions(prev => ({ ...prev, [key]: [] }));
+    setFetchedModelOptions(prev => ({
+      ...prev,
+      [key]: { chat: [], image: [], video: [], audio: [] },
+    }));
+    setSelectedProvider(key);
+    try { localStorage.setItem("imagine_ai_provider", key); } catch { /* storage unavailable */ }
+    pushWorkspaceNotice("success", `已添加 ${cleanLabel}`);
+    return true;
+  }, [providerKeys, pushWorkspaceNotice]);
+
+  const deleteCustomProvider = useCallback((provider: AiProvider) => {
+    if (isKnownProvider(provider)) return;
+    const customProvider = customProviderByKey.get(provider);
+    if (!customProvider) return;
+    const selectedChatProvider = tryParseProviderModel(selectedChatModel, selectedProvider)?.provider;
+    setCustomProviders(prev => {
+      const next = prev.filter(item => item.key !== provider);
+      try { localStorage.setItem(CUSTOM_PROVIDERS_STORAGE_KEY, JSON.stringify(next)); } catch { /* storage unavailable */ }
+      return next;
+    });
+    setProviderCredentials(prev => {
+      const next = { ...prev };
+      delete next[provider];
+      try { localStorage.setItem("imagine_provider_credentials", JSON.stringify(next)); } catch { /* storage unavailable */ }
+      return next;
+    });
+    if (selectedChatProvider === provider) {
+      setSelectedChatModel(DEFAULT_CHAT_MODEL);
+      try { localStorage.setItem("imagine_chat_model", DEFAULT_CHAT_MODEL); } catch { /* storage unavailable */ }
+    }
+    removeProviderModelOptions(provider, "chat", setChatModelOptions);
+    removeProviderModelOptions(provider, "image", setImageModelOptions);
+    removeProviderModelOptions(provider, "video", setVideoModelOptions);
+    removeProviderModelOptions(provider, "audio", setAudioModelOptions);
+    setFetchedModelOptions(prev => {
+      const next = { ...prev };
+      delete next[provider];
+      return next;
+    });
+    if (selectedProvider === provider) {
+      setSelectedProvider("12ai");
+      try { localStorage.setItem("imagine_ai_provider", "12ai"); } catch { /* storage unavailable */ }
+    }
+    pushWorkspaceNotice("success", `已删除 ${customProvider.label}`);
+  }, [customProviderByKey, pushWorkspaceNotice, selectedChatModel, selectedProvider]);
 
   const handleSelectChatModel = (model: string) => {
     setSelectedChatModel(model);
@@ -196,7 +297,7 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
       return;
     }
 
-    const byProvider = groupManualModels(selectedProvider, modelNames);
+    const byProvider = groupManualModels(selectedProvider, modelNames, getProviderLabel(selectedProvider), providerKeys);
     if (category === "chat") {
       const next = mergeManualModelGroups(chatModelOptions, byProvider);
       saveModelOptions(category, setChatModelOptions, next);
@@ -218,7 +319,7 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
 
   const addFetchedModels = (category: ModelCategory, values: string[]) => {
     const valueSet = new Set(values);
-    const selectedModels = fetchedModelOptions[selectedProvider][category].filter(option => valueSet.has(option.value));
+    const selectedModels = (fetchedModelOptions[selectedProvider]?.[category] ?? []).filter(option => valueSet.has(option.value));
     if (selectedModels.length === 0) {
       const message = "请选择要添加的模型";
       setModelListMessage(message);
@@ -227,16 +328,16 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
     }
 
     if (category === "chat") {
-      const next = { ...chatModelOptions, [selectedProvider]: mergeModelOptions(chatModelOptions[selectedProvider], selectedModels) };
+      const next = { ...chatModelOptions, [selectedProvider]: mergeModelOptions(chatModelOptions[selectedProvider] ?? [], selectedModels) };
       saveModelOptions(category, setChatModelOptions, next);
     } else if (category === "image") {
-      const next = { ...imageModelOptions, [selectedProvider]: mergeModelOptions(imageModelOptions[selectedProvider], selectedModels) };
+      const next = { ...imageModelOptions, [selectedProvider]: mergeModelOptions(imageModelOptions[selectedProvider] ?? [], selectedModels) };
       saveModelOptions(category, setImageModelOptions, next);
     } else if (category === "video") {
-      const next = { ...videoModelOptions, [selectedProvider]: mergeModelOptions(videoModelOptions[selectedProvider], selectedModels) };
+      const next = { ...videoModelOptions, [selectedProvider]: mergeModelOptions(videoModelOptions[selectedProvider] ?? [], selectedModels) };
       saveModelOptions(category, setVideoModelOptions, next);
     } else {
-      const next = { ...audioModelOptions, [selectedProvider]: mergeModelOptions(audioModelOptions[selectedProvider], selectedModels) };
+      const next = { ...audioModelOptions, [selectedProvider]: mergeModelOptions(audioModelOptions[selectedProvider] ?? [], selectedModels) };
       saveModelOptions(category, setAudioModelOptions, next);
     }
 
@@ -310,22 +411,35 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
   useEffect(() => {
     const restoreSettings = setTimeout(() => {
       const storedCreds = localStorage.getItem("imagine_provider_credentials");
+      const storedCustomProviders = localStorage.getItem(CUSTOM_PROVIDERS_STORAGE_KEY);
+      const restoredCustomProviders = storedCustomProviders
+        ? readStoredCustomProviders(storedCustomProviders)
+        : [];
+      const restoredProviderKeys = [...PROVIDER_KEYS, ...restoredCustomProviders.map(provider => provider.key)];
+      setCustomProviders(restoredCustomProviders);
       if (storedCreds) {
         try {
-          const parsed = JSON.parse(storedCreds);
-          const merged = defaultProviderCredentials();
-          for (const provider of PROVIDER_KEYS) {
-            if (parsed[provider]?.apiKey) merged[provider].apiKey = parsed[provider].apiKey;
-            if (parsed[provider]?.baseUrl) merged[provider].baseUrl = parsed[provider].baseUrl;
+          const parsed = JSON.parse(storedCreds) as Record<string, Partial<ProviderCredentials> | undefined>;
+          const merged = defaultProviderCredentials(restoredProviderKeys);
+          for (const provider of restoredCustomProviders) {
+            merged[provider.key].baseUrl = provider.baseUrl;
+          }
+          for (const provider of restoredProviderKeys) {
+            if (typeof parsed[provider]?.apiKey === "string") merged[provider].apiKey = parsed[provider].apiKey;
+            if (typeof parsed[provider]?.baseUrl === "string") merged[provider].baseUrl = parsed[provider].baseUrl;
           }
           setProviderCredentials(merged);
         } catch { /* ignore corrupt data */ }
       } else {
+        const defaults = defaultProviderCredentials(restoredProviderKeys);
+        for (const provider of restoredCustomProviders) {
+          defaults[provider.key].baseUrl = provider.baseUrl;
+        }
         const legacy12AiKey = localStorage.getItem("imagine_12ai_api_key") ?? localStorage.getItem("imagine_custom_api_key");
         const legacyGrokKey = localStorage.getItem("imagine_grok2api_api_key");
         const legacyGrokBaseUrl = localStorage.getItem("imagine_grok2api_base_url") ?? localStorage.getItem("imagine_custom_api_base_url");
         if (legacy12AiKey || legacyGrokKey || legacyGrokBaseUrl) {
-          const migrated = defaultProviderCredentials();
+          const migrated = defaults;
           if (legacy12AiKey) migrated["12ai"] = { ...migrated["12ai"], apiKey: legacy12AiKey };
           if (legacyGrokKey) migrated["grok2api"] = { ...migrated["grok2api"], apiKey: legacyGrokKey };
           if (legacyGrokBaseUrl) migrated["grok2api"] = { ...migrated["grok2api"], baseUrl: legacyGrokBaseUrl };
@@ -336,11 +450,13 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
           localStorage.removeItem("imagine_grok2api_base_url");
           localStorage.removeItem("imagine_custom_api_base_url");
           try { localStorage.setItem("imagine_provider_credentials", JSON.stringify(migrated)); } catch { /* storage unavailable */ }
+        } else {
+          setProviderCredentials(defaults);
         }
       }
 
       const storedProvider = localStorage.getItem("imagine_ai_provider");
-      if (storedProvider && isKnownProvider(storedProvider)) setSelectedProvider(storedProvider);
+      if (storedProvider && restoredProviderKeys.includes(storedProvider)) setSelectedProvider(storedProvider);
 
       const restoreModelOptions = (
         key: string,
@@ -349,17 +465,21 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
         filterFn?: (option: ModelOption) => boolean,
       ): Record<AiProvider, ModelOption[]> => {
         const stored = localStorage.getItem(key);
-        if (!stored) return defaults;
+        const base = ensureProviderOptions(defaults, restoredProviderKeys);
+        if (!stored) {
+          setter(base);
+          return base;
+        }
         try {
           const parsed = JSON.parse(stored) as unknown;
           const restored = Array.isArray(parsed)
-            ? restoreFlatModelOptions(defaults, parsed, filterFn)
-            : mergeRecordModelOptions(defaults, parsed, filterFn);
+            ? restoreFlatModelOptions(base, parsed, restoredProviderKeys, filterFn)
+            : mergeRecordModelOptions(base, parsed, restoredProviderKeys, filterFn);
           setter(restored);
           return restored;
         } catch (err) {
           console.warn(`Failed to restore model list (${key}):`, err);
-          return defaults;
+          return base;
         }
       };
 
@@ -369,7 +489,9 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
       restoreModelOptions("imagine_audio_model_options", setAudioModelOptions, AUDIO_MODEL_OPTIONS);
 
       const storedChatModel = localStorage.getItem("imagine_chat_model");
-      if (storedChatModel === "12ai:gemini-3.1-flash" || (storedChatModel && !hasChatModel(storedChatModel, restoredChatOptions))) {
+      setFetchedModelOptions(emptyFetchedModelOptions(restoredProviderKeys));
+
+      if (storedChatModel === "12ai:gemini-3.1-flash" || (storedChatModel && !hasChatModel(storedChatModel, restoredChatOptions, restoredProviderKeys))) {
         try { localStorage.setItem("imagine_chat_model", DEFAULT_CHAT_MODEL); } catch { /* storage unavailable */ }
       } else if (storedChatModel) {
         setSelectedChatModel(storedChatModel);
@@ -386,6 +508,9 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
     buildProviderHeaders,
     chatModelOptions,
     clearProviderCredentials,
+    addCustomProvider,
+    customProviders,
+    deleteCustomProvider,
     handleSaveCredential,
     handleSelectChatModel,
     handleSelectProvider,
@@ -394,6 +519,7 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
     isLoadingModels,
     modelListMessage,
     providerCredentials,
+    providerKeys,
     providerTest,
     refreshProviderModels,
     selectedChatModel,
@@ -406,12 +532,13 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
 function restoreFlatModelOptions(
   defaults: Record<AiProvider, ModelOption[]>,
   parsed: unknown[],
+  providerKeys: readonly AiProvider[],
   filterFn?: (option: ModelOption) => boolean,
 ): Record<AiProvider, ModelOption[]> {
   const flat = filterFn
     ? parsed.filter(isModelOption).filter(filterFn)
     : parsed.filter(isModelOption);
-  return flat.length > 0 ? mergeProviderModelOptions(defaults, flat) : defaults;
+  return flat.length > 0 ? mergeProviderModelOptions(defaults, flat, providerKeys) : defaults;
 }
 
 function modelOptionsStorageKey(category: ModelCategory): string {
@@ -440,13 +567,18 @@ function parseManualModelNames(rawInput: string): string[] {
     });
 }
 
-function groupManualModels(fallbackProvider: AiProvider, modelNames: string[]): Record<AiProvider, ModelOption[]> {
-  const grouped = emptyProviderOptions();
+function groupManualModels(
+  fallbackProvider: AiProvider,
+  modelNames: string[],
+  providerLabel: string,
+  providerKeys: readonly AiProvider[],
+): Record<AiProvider, ModelOption[]> {
+  const grouped = emptyProviderOptions(providerKeys);
   for (const modelName of modelNames) {
     const value = formatProviderModel(fallbackProvider, modelName);
     grouped[fallbackProvider].push({
       value,
-      label: `${getProviderLabel(fallbackProvider)} ${modelName}`,
+      label: `${providerLabel} ${modelName}`,
     });
   }
   return grouped;
@@ -459,9 +591,9 @@ function stripModelPrefix(modelName: string): string {
   return trimmed.slice(separator + 1).trim();
 }
 
-function emptyProviderOptions(): Record<AiProvider, ModelOption[]> {
+function emptyProviderOptions(providerKeys: readonly AiProvider[]): Record<AiProvider, ModelOption[]> {
   const record = {} as Record<AiProvider, ModelOption[]>;
-  for (const provider of PROVIDER_KEYS) record[provider] = [];
+  for (const provider of providerKeys) record[provider] = [];
   return record;
 }
 
@@ -470,19 +602,19 @@ function mergeManualModelGroups(
   incoming: Record<AiProvider, ModelOption[]>,
 ): Record<AiProvider, ModelOption[]> {
   const next = { ...current };
-  for (const provider of PROVIDER_KEYS) {
-    next[provider] = mergeModelOptions(current[provider], incoming[provider]);
+  for (const provider of Object.keys(incoming)) {
+    next[provider] = mergeModelOptions(current[provider] ?? [], incoming[provider] ?? []);
   }
   return next;
 }
 
 function countManualModels(groups: Record<AiProvider, ModelOption[]>): number {
-  return PROVIDER_KEYS.reduce((count, provider) => count + groups[provider].length, 0);
+  return Object.values(groups).reduce((count, options) => count + options.length, 0);
 }
 
-function emptyFetchedModelOptions(): FetchedModelOptions {
+function emptyFetchedModelOptions(providerKeys: readonly AiProvider[]): FetchedModelOptions {
   const record = {} as FetchedModelOptions;
-  for (const provider of PROVIDER_KEYS) {
+  for (const provider of providerKeys) {
     record[provider] = {
       chat: [],
       image: [],
@@ -491,4 +623,46 @@ function emptyFetchedModelOptions(): FetchedModelOptions {
     };
   }
   return record;
+}
+
+function ensureProviderOptions(
+  defaults: Record<AiProvider, ModelOption[]>,
+  providerKeys: readonly AiProvider[],
+): Record<AiProvider, ModelOption[]> {
+  const next = { ...defaults };
+  for (const provider of providerKeys) {
+    next[provider] = next[provider] ?? [];
+  }
+  return next;
+}
+
+function readStoredCustomProviders(raw: string): CustomProviderDefinition[] {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    const seen = new Set<string>();
+    return parsed
+      .filter(isCustomProviderDefinition)
+      .map(normalizeCustomProviderDefinition)
+      .filter(provider => {
+        if (seen.has(provider.key)) return false;
+        seen.add(provider.key);
+        return true;
+      });
+  } catch {
+    return [];
+  }
+}
+
+function removeProviderModelOptions(
+  provider: AiProvider,
+  category: ModelCategory,
+  setter: Dispatch<SetStateAction<Record<AiProvider, ModelOption[]>>>,
+): void {
+  setter(prev => {
+    const next = { ...prev };
+    delete next[provider];
+    try { localStorage.setItem(modelOptionsStorageKey(category), JSON.stringify(next)); } catch { /* storage unavailable */ }
+    return next;
+  });
 }

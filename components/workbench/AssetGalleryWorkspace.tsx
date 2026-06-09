@@ -51,6 +51,7 @@ interface AssetGalleryWorkspaceProps {
   onResetCompare: () => void;
   onRetryItem: (item: StorageItem) => void;
   onReuseTask: (item: StorageItem) => void;
+  onSaveVoiceProfile: (item: StorageItem) => void;
   onSetAssetDateEnd: (value: string) => void;
   onSetAssetDatePreset: (value: AssetDatePreset) => void;
   onSetAssetDateStart: (value: string) => void;
@@ -111,6 +112,7 @@ export default function AssetGalleryWorkspace({
   onResetCompare,
   onRetryItem,
   onReuseTask,
+  onSaveVoiceProfile,
   onSetAssetDateEnd,
   onSetAssetDatePreset,
   onSetAssetDateStart,
@@ -333,6 +335,7 @@ export default function AssetGalleryWorkspace({
                           onOpenReferencePreview={(previewItem, index) => setReferencePreview({ itemId: previewItem.id, index })}
                           onRetry={onRetryItem}
                           onReuseTask={onReuseTask}
+                          onSaveVoiceProfile={onSaveVoiceProfile}
                           onToggleCompare={onToggleCompare}
                           onToggleSelect={onToggleSelect}
                           onUseAgentReference={onUseAgentReference}

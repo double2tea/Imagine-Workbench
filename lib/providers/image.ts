@@ -1,4 +1,5 @@
 import type { AiProvider } from "./model-catalog";
+import { isKnownProvider } from "./registry";
 import {
   buildRunningHubStandardBody,
   getRunningHubStandardEndpoint,
@@ -13,6 +14,7 @@ import {
   getJson,
   isRecord,
   mediaOperationName,
+  openAiCompatibleUrl,
   parseProviderResponseBody,
   parseDataUri,
   postForm,
@@ -183,6 +185,10 @@ const MODELSCOPE_IMAGE_SUCCESS_STATUSES = new Set(["succeed", "success", "succee
 const MODELSCOPE_IMAGE_FAILED_STATUSES = new Set(["failed", "fail", "error", "canceled", "cancelled", "timeout", "revoked"]);
 
 export async function generateImage(config: ProviderConfig, input: GenerateImageInput): Promise<GenerateImageResult> {
+  if (!isKnownProvider(config.provider)) {
+    if (input.async) throw new Error("Custom OpenAI-compatible providers do not support async image generation");
+    return generateOpenAiCompatibleImage(config, input, config.provider);
+  }
   if (config.provider === "modelscope") {
     return generateModelScopeImage(config, input);
   }
@@ -989,7 +995,7 @@ async function createOpenAiCompatibleImage(
     body.quality = normalizeOpenAiImageQuality(input.imageQuality);
   }
 
-  return postJson<OpenAiImageResponse>(`${config.baseUrl}/v1/images/generations`, config, body);
+  return postJson<OpenAiImageResponse>(openAiCompatibleUrl(config.baseUrl, "/v1/images/generations"), config, body);
 }
 
 async function editOpenAiCompatibleImage(
@@ -1017,7 +1023,7 @@ async function editOpenAiCompatibleImage(
     form.append(fieldName, blob, `reference_${index + 1}.png`);
   });
 
-  return postForm<OpenAiImageResponse>(`${config.baseUrl}/v1/images/edits`, config, form);
+  return postForm<OpenAiImageResponse>(openAiCompatibleUrl(config.baseUrl, "/v1/images/edits"), config, form);
 }
 
 function normalizeOpenAiImageQuality(value: string): string {

@@ -8,6 +8,7 @@ import {
   type LucideIcon,
   Maximize2,
   MoreHorizontal,
+  Mic2,
   Music,
   Paintbrush,
   RefreshCw,
@@ -50,6 +51,7 @@ interface AssetCardProps {
   onOpenReferencePreview: (item: StorageItem, index: number) => void;
   onRetry: (item: StorageItem) => void;
   onReuseTask: (item: StorageItem) => void;
+  onSaveVoiceProfile: (item: StorageItem) => void;
   onToggleCompare: (id: string) => void;
   onToggleSelect: (id: string) => void;
   onUseAgentReference: (item: StorageItem) => void;
@@ -130,6 +132,7 @@ export default function AssetCard({
   onOpenReferencePreview,
   onRetry,
   onReuseTask,
+  onSaveVoiceProfile,
   onToggleCompare,
   onToggleSelect,
   onUseAgentReference,
@@ -472,6 +475,19 @@ export default function AssetCard({
                   <SlidersHorizontal className="h-3 w-3 text-cyan-300 group-hover:text-white" />
                   <span className="text-[9px] font-bold">复用</span>
                 </button>
+
+                {item.type === "audio" && item.status === "complete" && (
+                  <button
+                    type="button"
+                    onClick={() => onSaveVoiceProfile(item)}
+                    className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-cyan-600 border border-white/5 rounded-md text-xs text-white transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
+                    title="保存为可复用克隆音色"
+                    aria-label="保存为克隆音色"
+                  >
+                    <Mic2 className="h-3 w-3 text-cyan-300 group-hover:text-white" />
+                    <span className="text-[9px] font-bold">音色</span>
+                  </button>
+                )}
 
                 <button
                   onClick={() => onDownload(item)}

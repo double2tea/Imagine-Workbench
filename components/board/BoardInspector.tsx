@@ -50,7 +50,7 @@ import type {
   BoardVideoGenerateNode,
 } from "@/lib/board";
 import { selectVideoReferenceTypesForMode } from "@/lib/video-reference-selection";
-import { getVisibleVoiceProfilesForAudioModel, isBuiltInVoiceProfileId, listVoiceProfiles, type VoiceProfile } from "@/lib/voice-profiles";
+import { VOICE_PROFILES_CHANGED_EVENT, getVisibleVoiceProfilesForAudioModel, isBuiltInVoiceProfileId, listVoiceProfiles, type VoiceProfile } from "@/lib/voice-profiles";
 
 interface BoardInspectorProps {
   audioModelGroups: BoardModelOptionGroup[];
@@ -767,16 +767,21 @@ function AudioOperationInspector({
 
   useEffect(() => {
     let active = true;
-    void listVoiceProfiles().then(
+    const refresh = (): void => {
+      void listVoiceProfiles().then(
       profiles => {
         if (active) setVoiceProfiles(profiles);
       },
       () => {
         if (active) setVoiceProfiles([]);
       },
-    );
+      );
+    };
+    refresh();
+    window.addEventListener(VOICE_PROFILES_CHANGED_EVENT, refresh);
     return () => {
       active = false;
+      window.removeEventListener(VOICE_PROFILES_CHANGED_EVENT, refresh);
     };
   }, []);
 
@@ -855,8 +860,22 @@ function AudioOperationInspector({
             {node.voiceProfileId && !visibleVoiceProfiles.some(profile => profile.id === node.voiceProfileId) && (
               <option value={node.voiceProfileId}>当前音色不可用于此模式</option>
             )}
-            {visibleVoiceProfiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
+            {visibleVoiceProfiles.map(profile => (
+              <option key={profile.id} value={profile.id}>{profile.name}{profile.tags.length > 0 ? ` · ${profile.tags.slice(0, 2).join("/")}` : ""}</option>
+            ))}
           </select>
+          {selectedVoiceProfile && (selectedVoiceProfile.description || selectedVoiceProfile.tags.length > 0) && (
+            <div className="mt-2 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-2 text-[11px] leading-5 text-[var(--iw-muted)]">
+              {selectedVoiceProfile.description && <p className="line-clamp-2">{selectedVoiceProfile.description}</p>}
+              {selectedVoiceProfile.tags.length > 0 && (
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {selectedVoiceProfile.tags.map(tag => (
+                    <span key={tag} className="rounded border border-[var(--iw-border)] px-1.5 py-0.5 text-[10px]">{tag}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </InspectorField>
       )}
       {node.audioMode === "voice_clone" && (

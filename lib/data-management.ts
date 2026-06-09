@@ -23,6 +23,7 @@ import type {
   BoardViewport,
 } from "@/lib/board/types";
 import type { AudioOperationMode } from "@/lib/providers/model-catalog";
+import { CUSTOM_PROVIDERS_STORAGE_KEY } from "@/lib/providers/custom-providers";
 import { collectBoardAssetIdsFromNodes } from "@/lib/assets/board-scope";
 import {
   buildStorageItem,
@@ -65,6 +66,7 @@ const MODEL_CACHE_KEYS = [
 const PROVIDER_SETTING_KEYS = [
   "imagine_ai_provider",
   "imagine_chat_model",
+  CUSTOM_PROVIDERS_STORAGE_KEY,
 ] as const;
 
 const PROVIDER_CREDENTIAL_KEYS = [

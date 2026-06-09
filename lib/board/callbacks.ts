@@ -11,6 +11,7 @@ export interface BoardNodeCallbacks {
   onDownloadAsset: (item: StorageItem) => void;
   onOpenFullscreen: (item: StorageItem) => void;
   onOpenPanorama: (item: StorageItem) => void;
+  onSaveVoiceProfile: (item: StorageItem) => void;
   onCaptureVideoFrame: (nodeId: string, item: StorageItem, frame: CapturedVideoFrame) => void | Promise<void>;
   onEditAssetImage: (nodeId: string) => void;
   onExecuteGenerate: (nodeId: string) => void;

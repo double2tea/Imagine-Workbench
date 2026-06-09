@@ -40,9 +40,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Voice profile IDs must be resolved before calling audio generation" }, { status: 400 });
     }
     const parsed = parseProviderModel(body.model, "mimo");
-    if (parsed.provider !== "mimo") {
-      return NextResponse.json({ error: `${parsed.provider} audio operation is not supported yet` }, { status: 400 });
-    }
 
     const referenceMedia = readReferenceMedia(body.referenceMedia);
     const formatError = getReferenceMediaFormatError(referenceMedia);

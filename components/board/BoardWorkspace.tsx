@@ -123,6 +123,7 @@ interface BoardWorkspaceProps {
   onOpenSettings: () => void;
   onOpenFullscreen: (item: StorageItem) => void;
   onOpenPanorama: (item: StorageItem) => void;
+  onSaveVoiceProfile: (item: StorageItem) => void;
   onRenameBoard: () => void;
   onSelectBoard: (boardId: string) => void;
   onSendAssetToAgent: (nodeId: string) => void;
@@ -960,6 +961,7 @@ export default function BoardWorkspace({
   onOpenSettings,
   onOpenFullscreen,
   onOpenPanorama,
+  onSaveVoiceProfile,
   onRenameBoard,
   onSelectBoard,
   onSendAssetToAgent,
@@ -1329,6 +1331,7 @@ export default function BoardWorkspace({
     onFocusReferenceSource: focusReferenceSourceNode,
     onOpenFullscreen,
     onOpenPanorama,
+    onSaveVoiceProfile,
     onMaterializeGenerateResult: materializeGenerateResult,
     onMoveGenerateReferenceEdge: moveGenerateReferenceEdge,
     onMoveReferenceGroupItem: moveReferenceGroupItem,
@@ -1370,7 +1373,7 @@ export default function BoardWorkspace({
   }), [
     onCancelGenerateNode, onCaptureVideoFrame, trashAndDeleteNode, onDownloadAsset, onEditAssetImage,
     onExecuteGenerateNode, onFetchRunningHubAppSchema, focusReferenceSourceNode, onOpenFullscreen,
-    onOpenPanorama, materializeGenerateResult, moveGenerateReferenceEdge, moveReferenceGroupItem,
+    onOpenPanorama, onSaveVoiceProfile, materializeGenerateResult, moveGenerateReferenceEdge, moveReferenceGroupItem,
     deleteEdge, removeReferenceGroupItem, onSendAgentNode, onSendAssetToAgent, connectSelectedBoardPromptReference,
     updateReferenceGroupItemRole, updateAgentInstruction, updateGenerateNode, measureAssetAspectRatio,
     updateNodeTitle, updateRunningHubAppNode, updateNoteBody, updatePromptNode,
@@ -2601,6 +2604,14 @@ export default function BoardWorkspace({
                 onEditAssetImage(node.id);
                 closeOverlayMenus();
               } : undefined,
+              onSaveVoiceProfile: node.kind === "asset" && node.asset.type === "audio" && galleryItemById.has(node.asset.assetId)
+                ? () => {
+                  const item = galleryItemById.get(node.asset.assetId);
+                  if (!item) return;
+                  onSaveVoiceProfile(item);
+                  closeOverlayMenus();
+                }
+                : undefined,
               onExecute: node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation" || node.kind === "runninghub-app"
                 ? () => {
                   onExecuteGenerateNode(node.id);

@@ -3,6 +3,7 @@ import type { ProviderConfig, ProviderMediaType } from "./types";
 import {
   getProviderMeta,
   isKnownProvider,
+  isProviderKey,
   MIMO_TOKEN_PLAN_DEFAULT_BASE_URL,
   resolveProviderApiKey,
   resolveProviderBaseUrl,
@@ -23,11 +24,18 @@ export function optionalText(value: unknown): string | undefined {
 export function resolveProviderConfig(req: Request, provider: AiProvider): ProviderConfig {
   const headerKey = trimCredential(req.headers.get("x-ai-api-key") ?? "");
   const headerBaseUrl = trimCredential(req.headers.get("x-ai-base-url") ?? "");
+  const providerLabel = optionalText(req.headers.get("x-ai-provider-label"));
   const envKey = trimCredential(resolveProviderApiKey(provider));
   const configuredBaseUrl = headerBaseUrl || trimCredential(resolveProviderBaseUrl(provider));
-  const videoBaseUrl = resolveProviderVideoBaseUrl(provider);
+  const videoBaseUrl = resolveProviderVideoBaseUrl(provider) || configuredBaseUrl;
 
   const apiKey = headerKey || envKey;
+  if (!isKnownProvider(provider) && !apiKey) {
+    throw new Error(`${providerLabel ?? provider} API key is required.`);
+  }
+  if (!isKnownProvider(provider) && !configuredBaseUrl) {
+    throw new Error(`${providerLabel ?? provider} Base URL is required.`);
+  }
   if ((provider === "12ai" || provider === "agnes" || provider === "modelscope" || provider === "runninghub" || provider === "mimo") && !apiKey) {
     const meta = getProviderMeta(provider);
     throw new Error(`${meta.label} API key is required. Set ${meta.envApiKey} or provide a custom API key.`);
@@ -36,6 +44,7 @@ export function resolveProviderConfig(req: Request, provider: AiProvider): Provi
 
   return {
     provider,
+    providerLabel,
     apiKey,
     baseUrl: resolvedBaseUrl,
     videoBaseUrl: trimTrailingSlash(videoBaseUrl),
@@ -146,7 +155,7 @@ export function parseMediaOperationName(operationName: string): {
   }
   const provider = parts[0];
   const mediaType = parts[1];
-  if (!isKnownProvider(provider) || (mediaType !== "image" && mediaType !== "video" && mediaType !== "audio")) {
+  if (!isProviderKey(provider) || (mediaType !== "image" && mediaType !== "video" && mediaType !== "audio")) {
     throw new Error("Unsupported media operation name");
   }
   return { provider, mediaType, id: parts.slice(2).join(":") };

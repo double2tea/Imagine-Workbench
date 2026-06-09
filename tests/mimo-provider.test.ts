@@ -15,15 +15,38 @@ const mimoConfig: ProviderConfig = {
   videoBaseUrl: "https://api.xiaomimimo.com",
 };
 
+const customMimoCompatibleConfig: ProviderConfig = {
+  provider: "newapi",
+  providerLabel: "NewAPI",
+  apiKey: "newapi_test_key",
+  baseUrl: "https://newapi.example.test/v1",
+  videoBaseUrl: "https://newapi.example.test/v1",
+};
+
 const savedVoiceProfile: VoiceProfile = {
   id: "voice_saved",
   name: "Saved Voice",
   provider: "mimo",
   source: "designed",
+  tags: [],
   designPrompt: "Warm voice",
   referenceAudioAssetIds: [],
   createdAt: "2026-06-07T00:00:00.000Z",
   updatedAt: "2026-06-07T00:00:00.000Z",
+};
+
+const clonedVoiceProfile: VoiceProfile = {
+  id: "voice_cloned_generic",
+  name: "Generic Cloned Voice",
+  provider: "12ai",
+  source: "cloned",
+  description: "青年男声，自然口播",
+  tags: ["男声", "青年", "自然"],
+  referenceAudioAssetIds: ["audio_asset_1"],
+  sourceAssetIds: ["audio_asset_1"],
+  consentAcceptedAt: "2026-06-08T00:00:00.000Z",
+  createdAt: "2026-06-08T00:00:00.000Z",
+  updatedAt: "2026-06-08T00:00:00.000Z",
 };
 
 test("mimo model listing uses static chat models without fetching", async () => {
@@ -60,6 +83,27 @@ test("visible audio voice profiles include MiMo built-ins only for built-in TTS"
   const designProfiles = getVisibleVoiceProfilesForAudioModel("mimo:mimo-v2.5-tts-voicedesign", "voice_design", [savedVoiceProfile]);
   assert.equal(designProfiles.some(profile => profile.source === "builtin"), false);
   assert.deepEqual(designProfiles.map(profile => profile.id), [savedVoiceProfile.id]);
+});
+
+test("reference-audio cloned voice profiles are matched by model capability instead of saved provider", () => {
+  const cloneProfiles = getVisibleVoiceProfilesForAudioModel("mimo:mimo-v2.5-tts-voiceclone", "voice_clone", [clonedVoiceProfile]);
+  assert.deepEqual(cloneProfiles.map(profile => profile.id), [clonedVoiceProfile.id]);
+
+  const ttsProfiles = getVisibleVoiceProfilesForAudioModel("mimo:mimo-v2.5-tts", "tts", [clonedVoiceProfile]);
+  assert.equal(ttsProfiles.some(profile => profile.id === clonedVoiceProfile.id), false);
+});
+
+test("cloned voice profiles require enough reference audio for the target model", () => {
+  const incompleteClone: VoiceProfile = {
+    ...clonedVoiceProfile,
+    id: "voice_cloned_without_reference",
+    provider: "mimo",
+    referenceAudioAssetIds: [],
+    sourceAssetIds: [],
+  };
+
+  const cloneProfiles = getVisibleVoiceProfilesForAudioModel("mimo:mimo-v2.5-tts-voiceclone", "voice_clone", [incompleteClone]);
+  assert.deepEqual(cloneProfiles, []);
 });
 
 test("mimo built-in TTS sends chat completions audio request", async () => {
@@ -247,6 +291,54 @@ test("mimo audio operation routes voice design to direct adapter", async () => {
         { role: "assistant", content: "Read this line" },
       ],
       audio: { format: "wav" },
+      stream: false,
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("custom providers can run MiMo-compatible audio models through OpenAI chat completions", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: Array<{ url: string; headers: Headers; body: unknown }> = [];
+  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    calls.push({
+      url: input.toString(),
+      headers: new Headers(init?.headers),
+      body: init?.body ? JSON.parse(String(init.body)) as unknown : null,
+    });
+    return Response.json({ choices: [{ message: { audio: { data: "custom_audio" } } }] });
+  };
+
+  try {
+    const result = await generateAudioOperation(customMimoCompatibleConfig, {
+      mode: "tts",
+      prompt: "Read through proxy",
+      model: "mimo-v2.5-tts",
+      referenceMedia: [],
+      format: "wav",
+      voice: "Chloe",
+    });
+
+    assert.deepEqual(result, {
+      type: "direct",
+      outputKind: "audio",
+      source: "newapi",
+      audioBase64: "custom_audio",
+      format: "wav",
+      model: "mimo-v2.5-tts",
+      mimeType: "audio/wav",
+    });
+    assert.equal(calls[0]?.url, "https://newapi.example.test/v1/chat/completions");
+    assert.equal(calls[0]?.headers.get("Authorization"), "Bearer newapi_test_key");
+    assert.equal(calls[0]?.headers.get("api-key"), null);
+    assert.deepEqual(calls[0]?.body, {
+      model: "mimo-v2.5-tts",
+      messages: [
+        { role: "user", content: "" },
+        { role: "assistant", content: "Read through proxy" },
+      ],
+      audio: { format: "wav", voice: "Chloe" },
       stream: false,
     });
   } finally {
