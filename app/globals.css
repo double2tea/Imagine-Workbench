@@ -2208,7 +2208,7 @@ html[data-imagine-theme="light"] .imagine-root-body {
   [class*="bg-[#0b0d13]"],
   [class*="bg-slate-950"],
   [class*="bg-slate-900"]
-):not([style*="background-image"]):not(.imagine-asset-hover-scrim):not(.imagine-workbench-shell):not(.board-canvas) {
+):not([style*="background-image"]):not(.imagine-asset-hover-scrim):not(.imagine-workbench-shell):not(.board-canvas):not(.board-media-stack-badge):not(.board-media-meta):not(.board-media-stack-switcher) {
   background-color: var(--iw-panel-solid, #ffffff) !important;
   background-image: none !important;
 }
@@ -2393,8 +2393,8 @@ html[data-imagine-theme="light"] .imagine-root-body {
   background-color: #fffbeb !important;
 }
 
-.imagine-workbench-shell.imagine-theme-light [class*="bg-slate-950/45"],
-.imagine-workbench-shell.imagine-theme-light [class*="bg-slate-900/70"] {
+.imagine-workbench-shell.imagine-theme-light [class*="bg-slate-950/45"]:not(.board-media-stack-badge):not(.board-media-meta):not(.board-media-stack-switcher),
+.imagine-workbench-shell.imagine-theme-light [class*="bg-slate-900/70"]:not(.board-media-stack-badge):not(.board-media-meta):not(.board-media-stack-switcher) {
   /* U-PR6 hygiene: opacity-slate catchers; add :not(.imagine-*) in future when no more raw in class attr of imagine-* elems (see AssetToolbar etc which mix). */
   background-color: #f8fafc !important;
 }
@@ -2408,7 +2408,7 @@ html[data-imagine-theme="light"] .imagine-root-body {
   background-color: #fde68a !important;
 }
 
-.imagine-workbench-shell.imagine-theme-light [class*="bg-slate-950/80"] {
+.imagine-workbench-shell.imagine-theme-light [class*="bg-slate-950/80"]:not(.board-media-stack-badge):not(.board-media-meta):not(.board-media-stack-switcher) {
   /* U-PR6 hygiene comment: broad /80 slate (used in legacy modals etc); :not(.imagine-*) safe to consider later. */
   background: rgba(15, 23, 42, 0.35) !important;
 }
