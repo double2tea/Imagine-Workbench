@@ -175,7 +175,7 @@ const ResultBoardNode = memo(function ResultBoardNode({
         </div>
       )}
       <div
-        className="pointer-events-none absolute bottom-2 left-2 z-30 max-w-[calc(100%-1rem)] rounded-md bg-slate-950/72 px-2 py-1 text-[10px] font-semibold text-white/90 opacity-0 shadow-lg backdrop-blur transition-opacity duration-200 group-hover/board-video:opacity-100"
+        className="board-media-meta pointer-events-none absolute bottom-2 left-2 z-30 max-w-[calc(100%-1rem)] rounded-md bg-slate-950/72 px-2 py-1 text-[10px] font-semibold text-white/90 opacity-0 shadow-lg backdrop-blur transition-opacity duration-200 group-hover/board-video:opacity-100"
         title={compactBoardModelLabel(item.model)}
       >
         <span className="block truncate">{item.type} · {compactBoardModelLabel(item.model)}</span>

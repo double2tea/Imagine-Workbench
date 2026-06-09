@@ -2911,6 +2911,22 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
   -webkit-user-drag: none;
 }
 
+.imagine-workbench-shell .board-media-stack-badge,
+.imagine-workbench-shell .board-media-meta,
+.imagine-workbench-shell .board-media-stack-switcher,
+.imagine-workbench-shell.imagine-theme-light .board-media-stack-badge,
+.imagine-workbench-shell.imagine-theme-light .board-media-meta,
+.imagine-workbench-shell.imagine-theme-light .board-media-stack-switcher {
+  background: rgba(15, 23, 42, 0.72) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: rgba(255, 255, 255, 0.92) !important;
+}
+
+.imagine-workbench-shell .board-media-meta,
+.imagine-workbench-shell.imagine-theme-light .board-media-meta {
+  background: rgba(15, 23, 42, 0.64) !important;
+}
+
 .board-canvas.is-node-dragging .react-flow__edge-path,
 .board-canvas.is-node-dragging .react-flow__connection-path {
   animation: none !important;
