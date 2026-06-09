@@ -157,7 +157,7 @@ export default function SettingsModal({
             initial={{ scale: 0.95 }}
             animate={{ scale: 1 }}
             exit={{ scale: 0.95 }}
-            className="imagine-settings-panel flex max-h-[100dvh] min-h-[100dvh] w-full max-w-4xl flex-col overflow-hidden sm:min-h-0 sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl"
+            className="imagine-settings-panel flex w-full flex-col overflow-hidden sm:rounded-2xl"
           >
             <div className="imagine-settings-header flex shrink-0 items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
               <h3 className="imagine-settings-title flex items-center gap-2">

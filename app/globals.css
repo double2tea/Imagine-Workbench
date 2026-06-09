@@ -1130,6 +1130,9 @@ html[data-imagine-theme="light"] .imagine-settings-overlay {
 }
 
 .imagine-settings-panel {
+  width: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
   border: 1px solid var(--iw-border);
   background: var(--iw-panel);
   color: var(--iw-text);
@@ -1138,6 +1141,14 @@ html[data-imagine-theme="light"] .imagine-settings-overlay {
     color-mix(in srgb, var(--iw-muted) 58%, var(--iw-panel))
     color-mix(in srgb, var(--iw-bg) 62%, var(--iw-panel));
   scrollbar-width: thin;
+}
+
+@media (min-width: 640px) {
+  .imagine-settings-panel {
+    width: min(calc(100dvw - 2rem), 80rem);
+    height: min(calc(100dvh - 2rem), 86rem);
+    max-height: calc(100dvh - 2rem);
+  }
 }
 
 .imagine-settings-panel * {
@@ -2402,8 +2413,7 @@ html[data-imagine-theme="light"] .imagine-root-body {
   background: rgba(15, 23, 42, 0.35) !important;
 }
 
-.imagine-workbench-shell.imagine-theme-light .flex.max-h-\[100dvh\].min-h-\[100dvh\].w-full.max-w-4xl,
-.imagine-workbench-shell.imagine-theme-light .flex.max-h-\[100dvh\].min-h-\[100dvh\].w-full {
+.imagine-workbench-shell.imagine-theme-light .imagine-settings-panel {
   background: #ffffff !important;
   border-color: rgba(15, 23, 42, 0.1) !important;
   color: #1e2937;
