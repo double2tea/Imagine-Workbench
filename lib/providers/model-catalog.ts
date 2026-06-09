@@ -1395,7 +1395,7 @@ function imageCapability(input: ImageCapabilityInput): ProviderModelCapability {
     audioOutputKinds: [],
     videoReferenceMode: "none",
     videoReferenceModes: [],
-    maxReferenceImages: input.maxReferenceImages ?? 0,
+    maxReferenceImages: input.supportsReferences ? input.maxReferenceImages ?? 4 : 0,
     minReferenceImages: input.minReferenceImages ?? 0,
     referenceMediaTypes: input.supportsReferences ? input.referenceMediaTypes ?? ["image"] : [],
   };

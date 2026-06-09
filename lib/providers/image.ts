@@ -261,21 +261,24 @@ function buildImageEditPrompt(input: EditImageInput): string {
   const userPrompt = input.prompt?.trim();
   if (input.operation === "redraw") {
     return [
-      "Edit the first image. Use the second image as a black and white mask when provided.",
+      "The first input image is the source image to edit.",
+      "The second input image, when provided, is a black and white mask only; it is not a style or content reference.",
       "Change only the white masked region and preserve the rest of the image.",
       userPrompt ? `Edit instruction: ${userPrompt}` : "Edit instruction: redraw the masked area naturally.",
     ].join("\n");
   }
   if (input.operation === "erase") {
     return [
-      "Edit the first image. Use the second image as a black and white mask when provided.",
+      "The first input image is the source image to edit.",
+      "The second input image, when provided, is a black and white mask only; it is not a style or content reference.",
       "Remove the white masked object or area and reconstruct the background naturally.",
       "Preserve the unmasked image exactly as much as possible.",
     ].join("\n");
   }
   if (input.operation === "outpaint") {
     return [
-      "Outpaint the first image. Use the second image as a mask when provided; white areas are the new canvas space to fill.",
+      "The first input image is the expanded source canvas to outpaint.",
+      "The second input image, when provided, is a black and white mask only; white areas are the new canvas space to fill.",
       "Extend the scene naturally with matching perspective, lighting, texture, and camera style.",
       userPrompt ? `Outpaint instruction: ${userPrompt}` : "Outpaint instruction: continue the image beyond its original frame.",
     ].join("\n");
@@ -923,7 +926,6 @@ function assertRunningHubOk(
 
 async function generate12AiGeminiImage(config: ProviderConfig, input: GenerateImageInput): Promise<GenerateImageResult> {
   const parts = [
-    { text: input.prompt },
     ...input.referenceImages.map(reference => {
       const parsed = parseDataUri(reference.dataUri);
       return {
@@ -933,6 +935,7 @@ async function generate12AiGeminiImage(config: ProviderConfig, input: GenerateIm
         },
       };
     }),
+    { text: input.prompt },
   ];
 
   const generationConfig: Record<string, unknown> = {

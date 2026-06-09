@@ -1648,48 +1648,87 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     setIsMaskOpen(true);
   }, []);
 
-  async function saveBoardQuickEditAsset(
+  async function createBoardQuickEditProcessingAsset(
     sourceNodeId: string,
     sourceTitle: string,
     sourcePosition: BoardPoint,
     sourceSize: { width: number; height: number },
     sourceItem: StorageItem,
     operation: ImageEditFeature,
-    imageUrl: string,
+    previewUrl: string,
     model: string,
     editPrompt: string,
-  ) {
+  ): Promise<{ item: StorageItem; nodeId: string } | null> {
     const label = IMAGE_EDIT_LABELS[operation];
-    const editedItem = buildStorageItem(
+    const item = buildStorageItem(
       {
         id: makeClientId("img_edit"),
         type: "image",
-        url: imageUrl,
+        url: previewUrl,
         prompt: editPrompt || `${label}：${sourceItem.prompt || sourceItem.id}`,
         model,
         aspectRatio: "auto",
         createdAt: new Date().toISOString(),
-        status: "complete",
-        progress: 100,
+        status: "processing",
+        progress: 15,
         maskOriginalId: sourceItem.id,
         sourceBoardNodeId: sourceNodeId,
       },
       { boardId: resolvedBoardId },
     );
-    const savedEditedItem = await saveItemOrWarn(editedItem, pushWorkspaceNotice);
-    if (!savedEditedItem) return;
-    setItems(prev => [savedEditedItem, ...prev]);
-    const editedNodeId = boardController.addAssetNode({
-      asset: storageItemToBoardAssetReference(savedEditedItem),
+    const savedItem = await saveItemOrWarn(item, pushWorkspaceNotice);
+    if (!savedItem) return null;
+    setItems(prev => [savedItem, ...prev]);
+    const nodeId = boardController.addAssetNode({
+      asset: storageItemToBoardAssetReference(savedItem),
       title: `${sourceTitle} ${label}`,
       position: {
         x: sourcePosition.x + sourceSize.width + 40,
         y: sourcePosition.y,
       },
     });
-    boardController.selectNode(editedNodeId);
+    boardController.selectNode(nodeId);
     boardController.selectEdge(null);
+    pushWorkspaceNotice("info", `${label}已开始，结果会在当前节点更新`);
+    return { item: savedItem, nodeId };
+  }
+
+  async function completeBoardQuickEditAsset(
+    nodeId: string,
+    item: StorageItem,
+    operation: ImageEditFeature,
+    imageUrl: string,
+  ) {
+    const nextItem = buildStorageItem(
+      {
+        ...item,
+        url: imageUrl,
+        status: "complete",
+        progress: 100,
+      },
+      { boardId: resolvedBoardId },
+    );
+    const savedItem = await saveItemOrWarn(nextItem, pushWorkspaceNotice);
+    if (!savedItem) return;
+    setItems(prev => prev.map(current => current.id === savedItem.id ? savedItem : current));
+    boardController.updateAssetNodeAsset(nodeId, storageItemToBoardAssetReference(savedItem));
+    const label = IMAGE_EDIT_LABELS[operation];
     pushWorkspaceNotice("success", `${label}完成，已保存为新画板资产`);
+  }
+
+  async function failBoardQuickEditAsset(nodeId: string, item: StorageItem) {
+    const nextItem = buildStorageItem(
+      {
+        ...item,
+        status: "failed",
+        progress: 100,
+      },
+      { boardId: resolvedBoardId },
+    );
+    const savedItem = await saveItemOrWarn(nextItem, pushWorkspaceNotice);
+    if (!savedItem) return;
+    setItems(prev => prev.map(current => current.id === savedItem.id ? savedItem : current));
+    boardController.updateAssetNodeAsset(nodeId, storageItemToBoardAssetReference(savedItem));
   }
 
   async function runBoardImageQuickEdit(
@@ -1705,6 +1744,18 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   ) {
     const label = IMAGE_EDIT_LABELS[operation];
     const model = imageEditFeatureModels[operation];
+    const pending = await createBoardQuickEditProcessingAsset(
+      sourceNodeId,
+      sourceTitle,
+      sourcePosition,
+      sourceSize,
+      sourceItem,
+      operation,
+      editImageUrl,
+      model,
+      editPrompt,
+    );
+    if (!pending) return;
     try {
       const image = await prepareReferenceImageUrlForRequest(editImageUrl);
       const mask = maskUrl ? await prepareReferenceImageUrlForRequest(maskUrl) : undefined;
@@ -1723,18 +1774,14 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       if (!response.ok) throw new Error(await readFetchError(response, `${label}失败`));
       const payload = await readImageGenerationPayload(response);
       if (!payload.imageUrl) throw new Error("图片编辑接口没有返回图片");
-      await saveBoardQuickEditAsset(
-        sourceNodeId,
-        sourceTitle,
-        sourcePosition,
-        sourceSize,
-        sourceItem,
+      await completeBoardQuickEditAsset(
+        pending.nodeId,
+        pending.item,
         operation,
         payload.imageUrl,
-        model,
-        editPrompt,
       );
     } catch (error) {
+      await failBoardQuickEditAsset(pending.nodeId, pending.item);
       pushWorkspaceNotice("error", toErrorMessage(error, `${label}失败`));
     }
   }

@@ -84,13 +84,14 @@ const AssetBoardNode = memo(function AssetBoardNode({
 }: AssetBoardNodeProps) {
   const fallbackItem = useMemo(() => boardAssetToStorageItem(node, boardId), [boardId, node]);
   const item = useMemo(
-    () => node.asset.type === "audio"
-      ? stackItems.find(stackItem => stackItem.id === node.asset.assetId) ?? fallbackItem
-      : fallbackItem,
+    () => stackItems.find(stackItem => stackItem.id === node.asset.assetId) ?? fallbackItem,
     [fallbackItem, node.asset.assetId, node.asset.type, stackItems],
   );
   const stackCount = stackItems.length;
   const hasStackSwitcher = stackCount > 1;
+  const isComplete = item.status === "complete";
+  const isProcessing = item.status === "pending" || item.status === "processing";
+  const isFailed = item.status === "failed";
   const voiceProfileSourceItem = node.asset.type === "audio"
     ? stackItems.find(stackItem => stackItem.id === node.asset.assetId && stackItem.type === "audio")
     : undefined;
@@ -105,7 +106,7 @@ const AssetBoardNode = memo(function AssetBoardNode({
     <div className="board-media-node group/board-video relative h-full min-h-0 overflow-visible">
       <div className="relative flex h-full min-h-0 items-center justify-center overflow-hidden bg-[var(--iw-panel-soft)]">
         <div className="board-media-controls absolute left-2 top-2 z-30 flex gap-1 opacity-0 transition-opacity duration-200 hover:opacity-100 group-hover/board-video:opacity-100">
-        {node.asset.type === "image" && (
+        {node.asset.type === "image" && isComplete && (
           <>
             {compareReferenceUrl && onCompare && (
               <button
@@ -175,7 +176,7 @@ const AssetBoardNode = memo(function AssetBoardNode({
             </button>
           </>
         )}
-        {node.asset.type === "video" && onCaptureVideoFrame && shouldRenderVideoPlayer && (
+        {node.asset.type === "video" && isComplete && onCaptureVideoFrame && shouldRenderVideoPlayer && (
           <button
             type="button"
             onClick={() => void captureVideoFrameRef.current?.("current")}
@@ -185,7 +186,7 @@ const AssetBoardNode = memo(function AssetBoardNode({
             <ImageDown className="h-3.5 w-3.5" />
           </button>
         )}
-        {voiceProfileSourceItem && (
+        {isComplete && voiceProfileSourceItem && (
           <button
             type="button"
             onClick={() => onSaveVoiceProfile?.(voiceProfileSourceItem)}
@@ -266,6 +267,22 @@ const AssetBoardNode = memo(function AssetBoardNode({
         <BoardAudioWaveform src={playableAudioItem.url} interactive={isSelected} />
       ) : (
         <LightweightMediaPreview type={node.asset.type} />
+      )}
+      {(isProcessing || isFailed) && (
+        <div className="pointer-events-none absolute inset-0 z-40 flex flex-col justify-end bg-slate-950/45 p-3 text-white">
+          <div className="rounded-md border border-white/15 bg-slate-950/72 px-3 py-2 shadow-lg backdrop-blur">
+            <div className="flex items-center justify-between gap-3 text-[11px] font-semibold">
+              <span>{isFailed ? "编辑失败" : item.status === "pending" ? "任务已排队" : "编辑处理中"}</span>
+              <span className="font-mono">{item.progress}%</span>
+            </div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/15">
+              <div
+                className={`h-full rounded-full ${isFailed ? "bg-rose-400" : "bg-sky-400"}`}
+                style={{ width: `${item.progress}%` }}
+              />
+            </div>
+          </div>
+        </div>
       )}
       </div>
       {hasStackSwitcher && (

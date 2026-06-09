@@ -86,6 +86,14 @@ test("grok2api image references are limited to the edit model", () => {
   assert.deepEqual(grokImageEdit.sizes, [{ value: "1024x1024", label: "1K" }]);
 });
 
+test("reference-capable image models expose a usable reference limit", () => {
+  const capabilities = getImageModelCapabilities("12ai:gemini-3.1-flash-image-preview");
+
+  assert.equal(capabilities.referenceMediaTypes.includes("image"), true);
+  assert.equal(capabilities.minReferenceImages, 0);
+  assert.equal(capabilities.maxReferenceImages >= 2, true);
+});
+
 test("unknown model capability fails fast", () => {
   assert.throws(
     () => getModelCapability("12ai:not-a-real-model", "image"),

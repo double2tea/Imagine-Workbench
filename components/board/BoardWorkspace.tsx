@@ -1321,7 +1321,7 @@ export default function BoardWorkspace({
         ? node.resultAssetIds
         : connectedResultNode?.resultAssetIds;
       const assetStackItems = node.kind === "asset"
-        ? [galleryItemById.get(node.asset.assetId)].filter((item): item is StorageItem => item !== undefined && item.status === "complete")
+        ? [galleryItemById.get(node.asset.assetId)].filter((item): item is StorageItem => item !== undefined)
         : resultAssetIds
           ? resultAssetIds.map(id => galleryItemById.get(id)).filter((item): item is StorageItem => item !== undefined && item.status === "complete")
           : [];

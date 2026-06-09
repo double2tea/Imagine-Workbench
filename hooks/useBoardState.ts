@@ -2381,7 +2381,13 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
         let didChange = false;
         const nextNodes = currentBoard.nodes.map(node => {
           if (node.id !== nodeId || node.kind !== "asset") return node;
-          if (node.asset.assetId === asset.assetId) return node;
+          if (
+            node.asset.assetId === asset.assetId &&
+            node.asset.type === asset.type &&
+            node.asset.url === asset.url &&
+            node.asset.prompt === asset.prompt &&
+            node.asset.model === asset.model
+          ) return node;
           didChange = true;
           return { ...node, asset, updatedAt };
         });
