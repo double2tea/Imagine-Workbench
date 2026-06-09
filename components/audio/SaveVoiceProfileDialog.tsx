@@ -71,7 +71,7 @@ export default function SaveVoiceProfileDialog({ item, onClose, onSave }: SaveVo
       <div className="w-full max-w-lg rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)] text-[var(--iw-text)] shadow-2xl">
         <div className="flex items-center justify-between border-b border-[var(--iw-border)] px-4 py-3">
           <div className="flex min-w-0 items-center gap-2">
-            <Mic2 className="h-4 w-4 text-cyan-300" />
+            <Mic2 className="h-4 w-4 text-amber-600" />
             <h2 className="truncate text-sm font-semibold">保存为克隆音色</h2>
           </div>
           <button
@@ -120,7 +120,7 @@ export default function SaveVoiceProfileDialog({ item, onClose, onSave }: SaveVo
                         onClick={() => toggleTag(tag)}
                         className={`rounded-md border px-2 py-1 text-[11px] font-semibold transition ${
                           selectedTags.includes(tag)
-                            ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100"
+                            ? "border-amber-500/35 bg-amber-500/10 text-amber-700"
                             : "border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)] hover:text-[var(--iw-text)]"
                         }`}
                       >
@@ -133,12 +133,12 @@ export default function SaveVoiceProfileDialog({ item, onClose, onSave }: SaveVo
             </div>
           </div>
 
-          <label className="flex items-start gap-2 rounded-md border border-cyan-400/15 bg-cyan-500/8 p-3 text-[12px] leading-5 text-[var(--iw-text)]">
+          <label className="flex items-start gap-2 rounded-md border border-amber-500/20 bg-amber-500/8 p-3 text-[12px] leading-5 text-[var(--iw-text)]">
             <input
               type="checkbox"
               checked={consentAccepted}
               onChange={event => setConsentAccepted(event.target.checked)}
-              className="mt-1 h-3.5 w-3.5 rounded border-cyan-400/30 bg-slate-950 text-cyan-500 focus:ring-cyan-400/30"
+              className="mt-1 h-3.5 w-3.5 rounded border-[var(--iw-border)] bg-[var(--iw-panel)] text-amber-600 focus:ring-amber-500/25"
             />
             我确认拥有该参考音频的使用权，并允许保存为可复用克隆音色源。
           </label>

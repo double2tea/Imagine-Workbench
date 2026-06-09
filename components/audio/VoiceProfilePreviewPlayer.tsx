@@ -80,7 +80,7 @@ export default function VoiceProfilePreviewPlayer({ className = "", src }: Voice
         type="button"
         onClick={() => void togglePlayback()}
         disabled={hasError}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[var(--iw-text)] transition hover:bg-cyan-500/15 disabled:cursor-not-allowed disabled:border-[var(--iw-border)] disabled:bg-[var(--iw-panel-soft)] disabled:text-[var(--iw-faint)]"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-amber-500/25 bg-amber-500/10 text-amber-700 transition hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:border-[var(--iw-border)] disabled:bg-[var(--iw-panel-soft)] disabled:text-[var(--iw-faint)]"
         aria-label={isPlaying ? "暂停音色预览" : "播放音色预览"}
         title={isPlaying ? "暂停" : "播放"}
       >
@@ -102,7 +102,7 @@ export default function VoiceProfilePreviewPlayer({ className = "", src }: Voice
           title="点击跳转"
         >
           <span
-            className="absolute inset-y-0 left-0 rounded-full bg-cyan-300"
+            className="absolute inset-y-0 left-0 rounded-full bg-amber-500"
             style={{ width: `${progress}%` }}
           />
         </button>

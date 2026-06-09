@@ -357,7 +357,7 @@ export default function AudioGenerationPanel({
       <div>
         <div className="mb-2 flex items-center justify-between">
           <label className="flex items-center gap-1.5 imagine-section-label">
-            <AudioLines className="h-3.5 w-3.5 text-cyan-300" />
+            <AudioLines className="h-3.5 w-3.5 text-amber-600" />
             音频创作
           </label>
           <div className="flex items-center gap-2">
@@ -368,10 +368,10 @@ export default function AudioGenerationPanel({
               className={`imagine-secondary-action flex h-7 items-center gap-1 rounded-md border px-2.5 text-[11px] font-semibold transition ${
                 isOptimizing || !prompt.trim()
                   ? "cursor-not-allowed opacity-50"
-                  : "cursor-pointer border-cyan-400/25 bg-cyan-500/12 text-cyan-200 hover:bg-cyan-500/18"
+                  : "cursor-pointer border-amber-500/25 bg-amber-500/10 text-amber-700 hover:bg-amber-500/15"
               }`}
             >
-              {isOptimizing ? <RefreshCw className="h-3 w-3 animate-spin text-cyan-300" /> : <Sparkles className="h-3 w-3 text-cyan-300" />}
+              {isOptimizing ? <RefreshCw className="h-3 w-3 animate-spin text-amber-600" /> : <Sparkles className="h-3 w-3 text-amber-600" />}
               <span className="sm:hidden">润色</span>
               <span className="hidden sm:inline">优化音频提示</span>
             </button>
@@ -379,7 +379,7 @@ export default function AudioGenerationPanel({
         </div>
 
         <div className={`imagine-field-shell relative p-3 transition-all duration-200 ${
-          isDragOver ? "border-blue-400/40 ring-2 ring-blue-400/40" : ""
+          isDragOver ? "border-[var(--iw-text)] ring-2 ring-[var(--iw-border)]" : ""
         }`}>
           {atDropdownNode}
           <div className="relative">
@@ -461,7 +461,7 @@ export default function AudioGenerationPanel({
       <ReferenceImagePicker
         acceptedMediaTypes={acceptedMediaTypes}
         addLabel="加参考"
-        browseClassName={referenceLimit > 0 ? "cursor-pointer font-semibold text-cyan-200 hover:text-cyan-100" : "text-[var(--iw-faint)]"}
+        browseClassName={referenceLimit > 0 ? "cursor-pointer font-semibold text-amber-700 underline-offset-2 hover:underline" : "text-[var(--iw-faint)]"}
         clearLabel="清空参考"
         emptyHelp={referenceLimit > 0 ? "可拖入右侧资产或上传音频/视频/图片参考" : "当前模型不支持参考媒体"}
         emptyLabel={referenceLimit > 0 ? "拖入参考媒体" : "无需参考媒体"}
@@ -508,7 +508,7 @@ export default function AudioGenerationPanel({
                 <button
                   type="button"
                   onClick={openNewVoiceProfileEditor}
-                  className="flex h-7 items-center gap-1 rounded-md border border-cyan-400/25 bg-cyan-500/8 px-2 text-[10px] font-semibold text-[var(--iw-text)] transition hover:bg-cyan-500/12"
+                  className="flex h-7 items-center gap-1 rounded-md border border-amber-500/25 bg-amber-500/10 px-2 text-[10px] font-semibold text-amber-700 transition hover:bg-amber-500/15"
                 >
                   保存
                 </button>
@@ -518,7 +518,7 @@ export default function AudioGenerationPanel({
                   <button
                     type="button"
                     onClick={() => openEditVoiceProfileEditor(selectedVoiceProfile)}
-                    className="flex h-7 items-center gap-1 rounded-md border border-cyan-400/25 bg-cyan-500/8 px-2 text-[10px] font-semibold text-[var(--iw-text)] transition hover:bg-cyan-500/12"
+                    className="flex h-7 items-center gap-1 rounded-md border border-amber-500/25 bg-amber-500/10 px-2 text-[10px] font-semibold text-amber-700 transition hover:bg-amber-500/15"
                   >
                     <Pencil className="h-3 w-3" />
                     编辑
@@ -598,7 +598,7 @@ export default function AudioGenerationPanel({
                             onClick={() => toggleVoiceProfileTag(tag)}
                             className={`rounded-md border px-2 py-1 text-[10px] font-semibold transition ${
                               voiceProfileTags.includes(tag)
-                                ? "border-cyan-400/45 bg-cyan-500/12 text-[var(--iw-text)]"
+                                ? "border-amber-500/35 bg-amber-500/10 text-amber-700"
                                 : "border-[var(--iw-border)] bg-[var(--iw-panel)] text-[var(--iw-muted)] hover:text-[var(--iw-text)]"
                             }`}
                           >
@@ -646,7 +646,7 @@ export default function AudioGenerationPanel({
                 type="checkbox"
                 checked={voiceCloneConsentAccepted}
                 onChange={event => onVoiceCloneConsentChange(event.target.checked)}
-                className="mt-1 h-3.5 w-3.5 rounded border-[var(--iw-border)] bg-[var(--iw-panel)] text-cyan-500 focus:ring-cyan-400/30"
+                className="mt-1 h-3.5 w-3.5 rounded border-[var(--iw-border)] bg-[var(--iw-panel)] text-amber-600 focus:ring-amber-500/25"
               />
               我确认拥有参考音频的使用权，并允许用于本次音色克隆。
             </label>
@@ -660,9 +660,9 @@ export default function AudioGenerationPanel({
           type="button"
           onClick={onGenerate}
           disabled={isSubmitting || !hasRequiredInput || (needsCloneConsent && !voiceCloneConsentAccepted)}
-          className="imagine-primary-action flex w-full items-center justify-center gap-2 rounded-lg bg-cyan-600 py-3 text-xs font-bold text-white transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-60"
+          className="imagine-primary-action flex w-full items-center justify-center gap-2 rounded-lg bg-amber-600 py-3 text-xs font-bold text-white transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isSubmitting ? <RefreshCw className="h-4 w-4 animate-spin text-white" /> : <AudioLines className="h-4 w-4 text-white" />}
+          {isSubmitting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <AudioLines className="h-4 w-4" />}
           {isSubmitting ? `提交中 (${submitCount})，可继续排队` : mode === "asr" ? "转写音频" : "生成音频"}
         </button>
       )}
