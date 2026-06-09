@@ -657,13 +657,10 @@ export function useGenerationActions({
     const audioCapabilities = isRunningHubAudio ? null : getAudioModelCapabilities(requestModel);
     const audioMode = overrides.audioMode ?? audioCapabilities?.defaultMode;
     if (!activePrompt.trim() && audioMode !== undefined && audioOperationRequiresTextInput(audioMode) && overrides.allowEmptyPrompt !== true) return false;
-    if (audioMode === "voice_clone" && overrides.voiceCloneConsentAccepted !== true) {
-      pushWorkspaceNotice("error", "音色克隆需要先确认参考音频授权");
-      return false;
-    }
     let profileStylePrompt: string | undefined;
     let profileVoice: string | undefined;
     let profileReferences: ReferenceImageRef[] = [];
+    let profileCloneConsentAccepted = false;
     if (overrides.voiceProfileId) {
       try {
         const profile = await getVoiceProfile(overrides.voiceProfileId);
@@ -673,11 +670,16 @@ export function useGenerationActions({
         }
         profileStylePrompt = profile.designPrompt;
         profileVoice = profile.providerVoiceId;
+        profileCloneConsentAccepted = profile.source === "cloned" && Boolean(profile.consentAcceptedAt);
         profileReferences = await readVoiceProfileReferences(profile.referenceAudioAssetIds);
       } catch (error) {
         pushWorkspaceNotice("error", toErrorMessage(error, "音色读取失败"));
         return false;
       }
+    }
+    if (audioMode === "voice_clone" && overrides.voiceCloneConsentAccepted !== true && !profileCloneConsentAccepted) {
+      pushWorkspaceNotice("error", "音色克隆需要先确认参考音频授权");
+      return false;
     }
     const resolvedAudioStylePrompt = profileStylePrompt ?? overrides.audioStylePrompt;
     const audioReferences = mergeReferences(activeReferenceImages, profileReferences);

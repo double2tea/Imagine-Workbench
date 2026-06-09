@@ -3310,7 +3310,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         pushWorkspaceNotice("error", message);
         return;
       }
-      if (audioCapabilities && references.length < audioCapabilities.minReferenceMedia) {
+      const audioVoiceProfileProvidesReference = node.kind === "audio-operation" && Boolean(node.voiceProfileId);
+      if (audioCapabilities && references.length < audioCapabilities.minReferenceMedia && !audioVoiceProfileProvidesReference) {
         const message = audioOperationMissingReferenceMessage(audioCapabilities);
         boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: message });
         pushWorkspaceNotice("error", message);
@@ -3411,7 +3412,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             prompt: nextPrompt,
             referenceImage: references[0]?.url ?? null,
             referenceImages: references,
-            voiceCloneConsentAccepted: node.voiceCloneConsentAccepted,
+            voiceCloneConsentAccepted: node.voiceProfileId ? true : node.voiceCloneConsentAccepted,
             voiceProfileId: node.voiceProfileId,
           });
           if (!didStart) break;

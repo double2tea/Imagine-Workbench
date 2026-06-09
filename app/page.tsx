@@ -475,10 +475,12 @@ export default function Home() {
   const audioTextInputRequired = audioOperationRequiresTextInput(activeAudioMode);
   const audioStylePromptRequired = audioOperationRequiresStylePrompt(activeAudioMode);
   const activeAudioReferenceCount = audioReferenceImages.length;
-  const hasRequiredAudioReferences = activeAudioReferenceCount >= audioCapabilities.minReferenceMedia;
+  const selectedVoiceProfileProvidesCloneReference = activeAudioMode === "voice_clone" && selectedVoiceProfileId.trim().length > 0;
+  const hasRequiredAudioReferences = activeAudioReferenceCount >= audioCapabilities.minReferenceMedia || selectedVoiceProfileProvidesCloneReference;
+  const needsManualVoiceCloneConsent = activeAudioMode === "voice_clone" && !selectedVoiceProfileProvidesCloneReference;
   const isCreatorGenerateDisabled =
     traditionalSubTab === "audio"
-      ? (audioTextInputRequired && !prompt.trim()) || (audioStylePromptRequired && !audioStylePrompt.trim()) || !hasRequiredAudioReferences || (activeAudioMode === "voice_clone" && !voiceCloneConsentAccepted)
+      ? (audioTextInputRequired && !prompt.trim()) || (audioStylePromptRequired && !audioStylePrompt.trim()) || !hasRequiredAudioReferences || (needsManualVoiceCloneConsent && !voiceCloneConsentAccepted)
       : !prompt.trim();
 
   const canUseBackgroundImageGeneration =
@@ -588,7 +590,7 @@ export default function Home() {
   });
 
   const generateActiveAudio = () => {
-    if (activeAudioMode === "voice_clone" && !voiceCloneConsentAccepted) {
+    if (needsManualVoiceCloneConsent && !voiceCloneConsentAccepted) {
       pushWorkspaceNotice("error", "音色克隆需要先确认参考音频授权");
       return;
     }
@@ -605,7 +607,7 @@ export default function Home() {
       model: selectedAudioModel,
       referenceImage: audioReferenceImages[0]?.url ?? null,
       referenceImages: audioReferenceImages,
-      voiceCloneConsentAccepted,
+      voiceCloneConsentAccepted: selectedVoiceProfileProvidesCloneReference ? true : voiceCloneConsentAccepted,
       voiceProfileId: selectedVoiceProfileId || undefined,
     });
   };

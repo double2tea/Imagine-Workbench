@@ -1,4 +1,5 @@
 "use client";
+import AudioWaveformPreview from "@/components/audio/AudioWaveformPreview";
 import ModelPriceBadge from "@/components/creation/ModelPriceBadge";
 import type { BoardGenerateInputSummary } from "@/components/board/GenerateBoardNode";
 
@@ -14,7 +15,7 @@ import {
   SlidersHorizontal,
   Trash2,
 } from "lucide-react";
-import type { StorageItem } from "@/lib/db";
+import { getAssetMetasByIds, hydrateAssets, type StorageItem } from "@/lib/db";
 import {
   ASR_LANGUAGE_OPTIONS,
   audioFunctionOptionsForProvider,
@@ -745,12 +746,14 @@ function AudioOperationInspector({
   const [voiceProfiles, setVoiceProfiles] = useState<VoiceProfile[]>([]);
   const visibleVoiceProfiles = getVisibleVoiceProfilesForAudioModel(node.model, node.audioMode, voiceProfiles);
   const selectedVoiceProfile = visibleVoiceProfiles.find(profile => profile.id === node.voiceProfileId);
+  const selectedCloneVoiceProfile = selectedVoiceProfile?.source === "cloned" ? selectedVoiceProfile : undefined;
   const defaultBuiltInVoiceProfile = visibleVoiceProfiles.find(
     profile => profile.source === "builtin" && profile.providerVoiceId === "mimo_default",
   ) ?? visibleVoiceProfiles.find(profile => profile.source === "builtin");
   const showAudioFormat = formatOptions.length > 0;
   const showVoiceProfile = node.audioMode === "tts" || node.audioMode === "voice_design" || node.audioMode === "voice_clone";
   const stylePromptLabel = node.audioMode === "voice_design" ? "音色描述" : "演绎风格";
+  const [voiceProfilePreviewUrl, setVoiceProfilePreviewUrl] = useState("");
 
   const handleProviderChange = (value: string): void => {
     const provider = providerOptions.find(option => option.value === value)?.value;
@@ -785,6 +788,27 @@ function AudioOperationInspector({
       window.removeEventListener(VOICE_PROFILES_CHANGED_EVENT, refresh);
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    const previewAssetId = selectedCloneVoiceProfile?.referenceAudioAssetIds[0];
+    if (!previewAssetId) {
+      setVoiceProfilePreviewUrl("");
+      return;
+    }
+    void getAssetMetasByIds([previewAssetId]).then(
+      async metas => {
+        const [item] = await hydrateAssets(metas);
+        if (active) setVoiceProfilePreviewUrl(item?.type === "audio" ? item.url : "");
+      },
+      () => {
+        if (active) setVoiceProfilePreviewUrl("");
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [selectedCloneVoiceProfile]);
 
   useEffect(() => {
     if (!showVoiceProfile) {
@@ -865,6 +889,21 @@ function AudioOperationInspector({
               <option key={profile.id} value={profile.id}>{profile.name}{profile.tags.length > 0 ? ` · ${profile.tags.slice(0, 2).join("/")}` : ""}</option>
             ))}
           </select>
+          {selectedCloneVoiceProfile && (
+            <div className="mt-2 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-2 text-[11px] leading-5 text-[var(--iw-muted)]">
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <span>参考音频由音色库提供</span>
+                <span>{selectedCloneVoiceProfile.referenceAudioAssetIds.length} 个源</span>
+              </div>
+              {voiceProfilePreviewUrl ? (
+                <div className="h-24 overflow-hidden rounded-lg">
+                  <AudioWaveformPreview src={voiceProfilePreviewUrl} size="compact" tone="media" />
+                </div>
+              ) : (
+                <p>源音频不可预览或已缺失</p>
+              )}
+            </div>
+          )}
           {selectedVoiceProfile && (selectedVoiceProfile.description || selectedVoiceProfile.tags.length > 0) && (
             <div className="mt-2 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-2 text-[11px] leading-5 text-[var(--iw-muted)]">
               {selectedVoiceProfile.description && <p className="line-clamp-2">{selectedVoiceProfile.description}</p>}
@@ -879,7 +918,7 @@ function AudioOperationInspector({
           )}
         </InspectorField>
       )}
-      {node.audioMode === "voice_clone" && (
+      {node.audioMode === "voice_clone" && !selectedCloneVoiceProfile && (
         <label className="flex items-start gap-2 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2.5 py-2 text-[11px] leading-5 text-[var(--iw-muted)]">
           <input
             type="checkbox"

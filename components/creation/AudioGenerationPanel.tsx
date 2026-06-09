@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from "react";
-import { AudioLines, RefreshCw, Sparkles, Trash2 } from "lucide-react";
+import { AudioLines, Pencil, RefreshCw, Sparkles, Trash2 } from "lucide-react";
+import AudioWaveformPreview from "@/components/audio/AudioWaveformPreview";
+import { useConfirm } from "@/components/confirm/ConfirmProvider";
 import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
 import type { ModelOptionGroup } from "@/components/creation/ModelSelectCombobox";
 import ReferenceImagePicker, { type ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
@@ -24,6 +26,7 @@ import {
   type PromptTemplateSlashCommand,
 } from "@/lib/prompt-templates";
 import { getMediaReferenceType } from "@/lib/media-references";
+import { getAssetMetasByIds, hydrateAssets } from "@/lib/db";
 import { getAudioModelCapabilities, parseProviderModel, type AudioModelCapabilities, type AudioOperationMode } from "@/lib/providers/model-catalog";
 import {
   VOICE_PROFILES_CHANGED_EVENT,
@@ -108,6 +111,7 @@ export default function AudioGenerationPanel({
   onAsrLanguageChange,
   showGenerateButton = true,
 }: AudioGenerationPanelProps) {
+  const confirmAction = useConfirm();
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
   const [slashCommand, setSlashCommand] = useState<PromptTemplateSlashCommand | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -117,6 +121,9 @@ export default function AudioGenerationPanel({
   const [voiceProfileTags, setVoiceProfileTags] = useState<string[]>([]);
   const [voiceProfileSearch, setVoiceProfileSearch] = useState("");
   const [voiceProfileMessage, setVoiceProfileMessage] = useState("");
+  const [isVoiceProfileEditorOpen, setIsVoiceProfileEditorOpen] = useState(false);
+  const [editingVoiceProfileId, setEditingVoiceProfileId] = useState<string | null>(null);
+  const [voiceProfilePreviewUrl, setVoiceProfilePreviewUrl] = useState("");
   const selectedProvider = audioProviderFromModel(selectedModel);
   const providerOptions = audioProviderOptions(modelGroups);
   const functionOptions = audioFunctionOptionsForProvider(modelGroups, selectedProvider, getAudioModelCapabilities);
@@ -147,13 +154,15 @@ export default function AudioGenerationPanel({
   const canSaveVoiceProfile = mode === "voice_design" || mode === "voice_clone";
   const canUseVoiceProfile = mode === "tts" || canSaveVoiceProfile;
   const showVoiceProfileLibrary = canUseVoiceProfile && (canSaveVoiceProfile || visibleVoiceProfiles.length > 0 || selectedVoiceProfile !== undefined);
-  const needsCloneConsent = mode === "voice_clone";
   const stylePromptLabel = mode === "voice_design" ? "音色描述" : mode === "voice_clone" ? "演绎风格" : "风格提示";
   const textInputRequired = audioOperationRequiresTextInput(mode);
   const stylePromptRequired = audioOperationRequiresStylePrompt(mode);
   const referenceCount = referenceImages.filter(reference => acceptedMediaTypes.includes(getMediaReferenceType(reference))).length;
-  const hasRequiredReferences = referenceCount >= capabilities.minReferenceMedia;
+  const selectedCloneVoiceProfile = selectedVoiceProfile?.source === "cloned" ? selectedVoiceProfile : undefined;
+  const selectedVoiceProfileProvidesCloneReference = mode === "voice_clone" && selectedCloneVoiceProfile !== undefined;
+  const hasRequiredReferences = referenceCount >= capabilities.minReferenceMedia || selectedVoiceProfileProvidesCloneReference;
   const hasRequiredInput = (!textInputRequired || prompt.trim().length > 0) && (!stylePromptRequired || audioStylePrompt.trim().length > 0) && hasRequiredReferences;
+  const needsCloneConsent = mode === "voice_clone" && !selectedVoiceProfileProvidesCloneReference;
   const promptPlaceholder = textInputRequired
     ? "写下要朗读、生成音乐或音效的内容... 输入 @ 可引用作品"
     : "文本可留空；上传或拖入所需参考媒体后执行";
@@ -239,53 +248,103 @@ export default function AudioGenerationPanel({
     setVoiceProfiles(profiles);
   };
 
+  useEffect(() => {
+    let active = true;
+    const previewAssetId = selectedCloneVoiceProfile?.referenceAudioAssetIds[0];
+    if (!previewAssetId) {
+      setVoiceProfilePreviewUrl("");
+      return;
+    }
+    void getAssetMetasByIds([previewAssetId]).then(
+      async metas => {
+        const [item] = await hydrateAssets(metas);
+        if (active) setVoiceProfilePreviewUrl(item?.type === "audio" ? item.url : "");
+      },
+      () => {
+        if (active) setVoiceProfilePreviewUrl("");
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [selectedCloneVoiceProfile]);
+
+  const openNewVoiceProfileEditor = (): void => {
+    setEditingVoiceProfileId(null);
+    setVoiceProfileName("");
+    setVoiceProfileDescription("");
+    setVoiceProfileTags([]);
+    setVoiceProfileMessage("");
+    setIsVoiceProfileEditorOpen(true);
+  };
+
+  const openEditVoiceProfileEditor = (profile: VoiceProfile): void => {
+    setEditingVoiceProfileId(profile.id);
+    setVoiceProfileName(profile.name);
+    setVoiceProfileDescription(profile.description ?? "");
+    setVoiceProfileTags(profile.tags);
+    setVoiceProfileMessage("");
+    setIsVoiceProfileEditorOpen(true);
+  };
+
+  const closeVoiceProfileEditor = (): void => {
+    setIsVoiceProfileEditorOpen(false);
+    setEditingVoiceProfileId(null);
+    setVoiceProfileName("");
+    setVoiceProfileDescription("");
+    setVoiceProfileTags([]);
+  };
+
   const handleSaveVoiceProfile = async (): Promise<void> => {
     const name = voiceProfileName.trim();
     if (!name) {
       setVoiceProfileMessage("先输入音色名称");
       return;
     }
-    if (mode === "voice_clone" && referenceAudioAssetIds.length === 0) {
+    const editingProfile = editingVoiceProfileId ? voiceProfiles.find(profile => profile.id === editingVoiceProfileId) : undefined;
+    if (!editingProfile && mode === "voice_clone" && referenceAudioAssetIds.length === 0) {
       setVoiceProfileMessage("克隆音色需要至少一个音频参考");
       return;
     }
-    if (mode === "voice_clone" && !voiceCloneConsentAccepted) {
+    if (!editingProfile && mode === "voice_clone" && !voiceCloneConsentAccepted) {
       setVoiceProfileMessage("保存克隆音色前请确认参考音频授权");
       return;
     }
     const designPrompt = audioStylePrompt.trim();
-    if (mode === "voice_design" && !designPrompt) {
+    if (!editingProfile && mode === "voice_design" && !designPrompt) {
       setVoiceProfileMessage("设计音色需要填写音色描述");
       return;
     }
-
-    const source: VoiceProfileSource = mode === "voice_clone" ? "cloned" : "designed";
+    const source: VoiceProfileSource = editingProfile?.source ?? (mode === "voice_clone" ? "cloned" : "designed");
     const selectedProvider = parseProviderModel(selectedModel, "12ai").provider;
     const profile = await saveVoiceProfile({
-      id: `voice_${Date.now()}`,
+      id: editingProfile?.id ?? `voice_${Date.now()}`,
       name,
-      provider: selectedProvider,
+      provider: editingProfile?.provider ?? selectedProvider,
       source,
       description: voiceProfileDescription.trim() || undefined,
       tags: voiceProfileTags,
-      designPrompt: designPrompt || undefined,
-      referenceAudioAssetIds: mode === "voice_clone" ? referenceAudioAssetIds : [],
-      sourceAssetIds: mode === "voice_clone" ? referenceAudioAssetIds : [],
-      consentAcceptedAt: mode === "voice_clone" ? new Date().toISOString() : undefined,
+      providerVoiceId: editingProfile?.providerVoiceId,
+      designPrompt: editingProfile ? editingProfile.designPrompt : designPrompt || undefined,
+      referenceAudioAssetIds: editingProfile?.referenceAudioAssetIds ?? (mode === "voice_clone" ? referenceAudioAssetIds : []),
+      sourceAssetIds: editingProfile?.sourceAssetIds ?? (mode === "voice_clone" ? referenceAudioAssetIds : []),
+      consentAcceptedAt: editingProfile?.consentAcceptedAt ?? (mode === "voice_clone" ? new Date().toISOString() : undefined),
+      previewAudioAssetId: editingProfile?.previewAudioAssetId,
+      createdAt: editingProfile?.createdAt,
     });
     await refreshVoiceProfiles();
     onSelectVoiceProfile(profile.id);
-    setVoiceProfileName("");
-    setVoiceProfileDescription("");
-    setVoiceProfileTags([]);
-    setVoiceProfileMessage("已保存音色");
+    closeVoiceProfileEditor();
+    setVoiceProfileMessage(editingProfile ? "已更新音色" : "已保存音色");
   };
 
   const handleDeleteVoiceProfile = async (): Promise<void> => {
     if (!selectedVoiceProfileId) return;
+    if (!(await confirmAction({ message: "确认删除当前音色吗？", tone: "danger", confirmLabel: "删除" }))) return;
     await deleteVoiceProfile(selectedVoiceProfileId);
     await refreshVoiceProfiles();
     onSelectVoiceProfile("");
+    closeVoiceProfileEditor();
     setVoiceProfileMessage("已删除音色");
   };
 
@@ -444,16 +503,37 @@ export default function AudioGenerationPanel({
         <div className="rounded-md border border-cyan-400/15 bg-cyan-500/8 p-3">
           <div className="mb-2 flex items-center justify-between gap-2">
             <label className="imagine-section-label">音色库</label>
-            {selectedVoiceProfile && selectedVoiceProfile.source !== "builtin" && (
-              <button
-                type="button"
-                onClick={() => void handleDeleteVoiceProfile()}
-                className="flex h-7 items-center gap-1 rounded-md border border-red-400/20 px-2 text-[10px] font-semibold text-red-200 transition hover:bg-red-500/10"
-              >
-                <Trash2 className="h-3 w-3" />
-                删除
-              </button>
-            )}
+            <div className="flex items-center gap-1.5">
+              {canSaveVoiceProfile && !isVoiceProfileEditorOpen && (
+                <button
+                  type="button"
+                  onClick={openNewVoiceProfileEditor}
+                  className="flex h-7 items-center gap-1 rounded-md border border-cyan-400/20 px-2 text-[10px] font-semibold text-cyan-100 transition hover:bg-cyan-500/10"
+                >
+                  保存
+                </button>
+              )}
+              {selectedVoiceProfile && selectedVoiceProfile.source !== "builtin" && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => openEditVoiceProfileEditor(selectedVoiceProfile)}
+                    className="flex h-7 items-center gap-1 rounded-md border border-cyan-400/20 px-2 text-[10px] font-semibold text-cyan-100 transition hover:bg-cyan-500/10"
+                  >
+                    <Pencil className="h-3 w-3" />
+                    编辑
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleDeleteVoiceProfile()}
+                    className="flex h-7 items-center gap-1 rounded-md border border-red-400/20 px-2 text-[10px] font-semibold text-red-200 transition hover:bg-red-500/10"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    删除
+                  </button>
+                </>
+              )}
+            </div>
           </div>
           <div className="grid grid-cols-1 gap-2">
             <input
@@ -478,12 +558,27 @@ export default function AudioGenerationPanel({
                 <option key={profile.id} value={profile.id}>{profile.name}{profile.tags.length > 0 ? ` · ${profile.tags.slice(0, 2).join("/")}` : ""}</option>
               ))}
             </select>
-            {canSaveVoiceProfile && (
+            {selectedCloneVoiceProfile && (
+              <div className="rounded-md border border-cyan-400/10 bg-slate-950/20 p-2 text-[11px] text-cyan-100/80">
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <span>参考音频已由音色库提供</span>
+                  <span>{selectedCloneVoiceProfile.referenceAudioAssetIds.length} 个源</span>
+                </div>
+                {voiceProfilePreviewUrl ? (
+                  <div className="h-24 overflow-hidden rounded-lg">
+                    <AudioWaveformPreview src={voiceProfilePreviewUrl} size="compact" tone="media" />
+                  </div>
+                ) : (
+                  <p className="text-cyan-100/55">源音频不可预览或已缺失</p>
+                )}
+              </div>
+            )}
+            {isVoiceProfileEditorOpen && canSaveVoiceProfile && (
               <>
                 <input
                   value={voiceProfileName}
                   onChange={event => setVoiceProfileName(event.target.value)}
-                  placeholder="新音色名称"
+                  placeholder={editingVoiceProfileId ? "音色名称" : "新音色名称"}
                   className="imagine-input h-9 rounded-md px-3 text-xs"
                 />
                 <textarea
@@ -509,13 +604,22 @@ export default function AudioGenerationPanel({
                     </button>
                   ))}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => void handleSaveVoiceProfile()}
-                  className="imagine-secondary-action h-9 rounded-md border px-3 text-xs font-semibold"
-                >
-                  保存当前音色
-                </button>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveVoiceProfile()}
+                    className="imagine-secondary-action h-9 rounded-md border px-3 text-xs font-semibold"
+                  >
+                    {editingVoiceProfileId ? "更新音色" : "保存当前音色"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closeVoiceProfileEditor}
+                    className="imagine-secondary-action h-9 rounded-md border px-3 text-xs font-semibold"
+                  >
+                    取消
+                  </button>
+                </div>
               </>
             )}
           </div>
