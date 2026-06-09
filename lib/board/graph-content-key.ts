@@ -1,4 +1,4 @@
-import type { BoardEdge, BoardNode, BoardReferenceGroupItem } from "@/lib/board/types";
+import type { BoardEdge, BoardMultiGridItem, BoardNode, BoardReferenceGroupItem } from "@/lib/board/types";
 
 const FNV_OFFSET_BASIS = 2_166_136_261;
 const FNV_PRIME = 16_777_619;
@@ -43,6 +43,17 @@ function serializeReferenceGroupItem(item: BoardReferenceGroupItem): string {
   return `${item.assetId}:${item.type}:${item.role}:${fingerprintLargeText(item.url)}`;
 }
 
+function serializeMultiGridItem(item: BoardMultiGridItem): string {
+  return [
+    item.assetId,
+    item.cellIndex ?? "stash",
+    fingerprintLargeText(item.url),
+    item.offsetX,
+    item.offsetY,
+    item.scale,
+  ].join(":");
+}
+
 function serializeNodeContent(node: BoardNode): string {
   switch (node.kind) {
     case "asset":
@@ -63,6 +74,16 @@ function serializeNodeContent(node: BoardNode): string {
       return `refgroup|${node.id}|${node.title}|${node.references.map(serializeReferenceGroupItem).join(",")}`;
     case "group":
       return `group|${node.id}|${node.title}`;
+    case "multi-grid":
+      return [
+        "multi-grid",
+        node.id,
+        node.title,
+        node.aspectRatio,
+        node.gridSize,
+        node.selectedItemId ?? "",
+        node.items.map(serializeMultiGridItem).join(","),
+      ].join("|");
     case "image-generate":
       return [
         "image-gen",

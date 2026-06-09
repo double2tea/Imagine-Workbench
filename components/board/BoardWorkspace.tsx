@@ -76,6 +76,7 @@ import {
   DEFAULT_AUDIO_ASSET_NODE_SIZE,
   DEFAULT_ASSET_NODE_SIZE,
   DEFAULT_GENERATE_NODE_SIZE,
+  DEFAULT_MULTI_GRID_NODE_SIZE,
   DEFAULT_REFERENCE_GROUP_NODE_SIZE,
   DEFAULT_RUNNINGHUB_APP_NODE_SIZE,
   boardNodeAbsolutePosition,
@@ -84,6 +85,7 @@ import {
   sortBoardNodesForReactFlow,
   type BoardEdge,
   type BoardEdgeKind,
+  type BoardAssetReference,
   type BoardNode as BoardNodeModel,
   type BoardPoint,
   type BoardPortKind,
@@ -122,6 +124,7 @@ interface BoardWorkspaceProps {
   onCreateBoard: () => void;
   onDeleteBoard: () => void;
   onDownloadAsset: (item: StorageItem) => void;
+  onExportMultiGrid: (nodeId: string) => void | Promise<void>;
   onOpenSettings: () => void;
   onOpenFullscreen: (item: StorageItem) => void;
   onOpenPanorama: (item: StorageItem) => void;
@@ -841,6 +844,9 @@ function batchConnectionToTarget(
     if (target.kind === "reference-group" && outputPort.portKind === "asset") {
       return { portId: BOARD_PORT_IDS.assetIn, portKind: "asset" as const };
     }
+    if (target.kind === "multi-grid" && outputPort.portKind === "asset") {
+      return { portId: BOARD_PORT_IDS.assetIn, portKind: "asset" as const };
+    }
     if (target.kind === "agent" && outputPort.portKind === "asset") {
       return { portId: BOARD_PORT_IDS.agentContextIn, portKind: "agent" as const };
     }
@@ -858,6 +864,25 @@ function batchConnectionToTarget(
     to: { nodeId: target.id, ...inputPort },
   };
   return isValidBoardPortConnection(nodes, connection.from, connection.to) ? connection : null;
+}
+
+function multiGridImageReferences(
+  nodes: BoardNodeModel[],
+  from: BoardPortRef,
+  selectedNodeIds: string[],
+): BoardAssetReference[] {
+  if (from.portKind !== "asset") return [];
+  const nodeIds = selectedNodeIds.length > 1 && selectedNodeIds.includes(from.nodeId)
+    ? selectedNodeIds
+    : [from.nodeId];
+  const seenAssetIds = new Set<string>();
+  return nodeIds.flatMap(nodeId => {
+    const node = nodes.find(item => item.id === nodeId);
+    if ((node?.kind !== "asset" && node?.kind !== "result") || node.asset.type !== "image") return [];
+    if (seenAssetIds.has(node.asset.assetId)) return [];
+    seenAssetIds.add(node.asset.assetId);
+    return [node.asset];
+  });
 }
 
 function referenceGroupAssetNodeIds(
@@ -961,6 +986,7 @@ export default function BoardWorkspace({
   onCreateBoard,
   onDeleteBoard,
   onDownloadAsset,
+  onExportMultiGrid,
   onOpenSettings,
   onOpenFullscreen,
   onOpenPanorama,
@@ -1041,10 +1067,12 @@ export default function BoardWorkspace({
     restoreNodeWithEdges,
     addAgentNode,
     addAssetNode,
+    addAssetToMultiGrid,
     addAssetToReferenceGroup,
     addGenerateNode,
     addGenerateNodeWithConnections,
     addGroupNode,
+    addMultiGridNode,
     addNoteNode,
     addPromptNode,
     addReferenceGroupNode,
@@ -1067,6 +1095,8 @@ export default function BoardWorkspace({
     updateResultNodeAsset,
     updateAgentInstruction,
     updateGenerateNode,
+    updateMultiGridNode,
+    updateMultiGridItemTransform,
     updateRunningHubAppNode,
     ungroupNode,
     updateNodeSize,
@@ -1347,6 +1377,9 @@ export default function BoardWorkspace({
     onUpdateReferenceGroupItemRole: updateReferenceGroupItemRole,
     onUpdateAgent: updateAgentInstruction,
     onUpdateGenerate: updateGenerateNode,
+    onUpdateMultiGrid: updateMultiGridNode,
+    onUpdateMultiGridItemTransform: updateMultiGridItemTransform,
+    onExportMultiGrid,
     onMeasureAssetAspectRatio: measureAssetAspectRatio,
     onUpdateNodeTitle: updateNodeTitle,
     onUpdateRunningHubApp: updateRunningHubAppNode,
@@ -1379,7 +1412,8 @@ export default function BoardWorkspace({
     onExecuteGenerateNode, onFetchRunningHubAppSchema, focusReferenceSourceNode, onOpenFullscreen,
     onOpenPanorama, onSaveVoiceProfile, materializeGenerateResult, moveGenerateReferenceEdge, moveReferenceGroupItem,
     deleteEdge, removeReferenceGroupItem, onSendAgentNode, onSendAssetToAgent, connectSelectedBoardPromptReference,
-    updateReferenceGroupItemRole, updateAgentInstruction, updateGenerateNode, measureAssetAspectRatio,
+    updateReferenceGroupItemRole, updateAgentInstruction, updateGenerateNode, updateMultiGridNode,
+    updateMultiGridItemTransform, onExportMultiGrid, measureAssetAspectRatio,
     updateNodeTitle, updateRunningHubAppNode, updateNoteBody, updatePromptNode,
     board.nodes, board.edges, boardPromptReferenceGraphIndex, galleryItemById, onConnectionError,
     updateResultNodeAsset,
@@ -1562,6 +1596,18 @@ export default function BoardWorkspace({
         onConnectionError("请将生成结果拖到空白处创建结果资产节点");
         return;
       }
+      if (targetNode?.kind === "multi-grid") {
+        const references = multiGridImageReferences(board.nodes, refs.from, selectedNodeIds);
+        if (references.length === 0) {
+          onConnectionError("多宫格只支持图片资产");
+          return;
+        }
+        references.forEach(reference => addAssetToMultiGrid(targetNode.id, reference));
+        selectNode(targetNode.id);
+        selectEdge(null);
+        updateSelectedNodeIds([targetNode.id]);
+        return;
+      }
       if (selectedNodeIds.length > 1 && selectedNodeIds.includes(refs.from.nodeId) && targetNode) {
         const connections = selectedNodeIds
           .map(nodeId => board.nodes.find(node => node.id === nodeId))
@@ -1583,7 +1629,7 @@ export default function BoardWorkspace({
     } catch (error) {
       onConnectionError(error instanceof Error ? error.message : "连接失败");
     }
-  }, [addAssetToReferenceGroup, board.nodes, connectPorts, connectPortsBatch, onConnectionError, readValidConnectionRefs, selectEdge, selectedNodeIds, selectNode, updateSelectedNodeIds]);
+  }, [addAssetToMultiGrid, addAssetToReferenceGroup, board.nodes, connectPorts, connectPortsBatch, onConnectionError, readValidConnectionRefs, selectEdge, selectedNodeIds, selectNode, updateSelectedNodeIds]);
 
   const handleSelectionChange = useCallback<OnSelectionChangeFunc<BoardFlowNode, BoardFlowEdge>>(({ nodes, edges }) => {
     if (isSyncingFlowNodesRef.current) return;
@@ -1635,6 +1681,18 @@ export default function BoardWorkspace({
     }
     try {
       const targetNode = board.nodes.find(node => node.id === refs.to.nodeId);
+      if (targetNode?.kind === "multi-grid") {
+        const references = multiGridImageReferences(board.nodes, refs.from, [refs.from.nodeId]);
+        if (references.length === 0) {
+          onConnectionError("多宫格只支持图片资产");
+          return;
+        }
+        references.forEach(reference => addAssetToMultiGrid(targetNode.id, reference));
+        deleteEdge(oldEdge.id);
+        selectNode(targetNode.id);
+        selectEdge(null);
+        return;
+      }
       if (targetNode?.kind === "reference-group") {
         addAssetToReferenceGroup(refs.from.nodeId, refs.to.nodeId);
       }
@@ -1642,7 +1700,7 @@ export default function BoardWorkspace({
     } catch (error) {
       onConnectionError(error instanceof Error ? error.message : "重连失败");
     }
-  }, [addAssetToReferenceGroup, onConnectionError, readValidConnectionRefs, reconnectEdge]);
+  }, [addAssetToMultiGrid, addAssetToReferenceGroup, board.nodes, deleteEdge, onConnectionError, readValidConnectionRefs, reconnectEdge, selectEdge, selectNode]);
 
   const handleReconnectStart = useCallback<BoardReconnectStartHandler>(() => {
     setIsConnectionActive(true);
@@ -1778,6 +1836,7 @@ export default function BoardWorkspace({
   const addQuickNode = useCallback((kind: BoardInsertKind, position: BoardPoint): string => {
     if (kind === "prompt") return addPromptNode({ position });
     if (kind === "reference-group") return addReferenceGroupNode({ position });
+    if (kind === "multi-grid") return addMultiGridNode({ position });
     if (kind === "agent") return addAgentNode({ position });
     if (kind === "note") return addNoteNode({ position });
     if (kind === "runninghub-app") return addRunningHubAppNode({ position });
@@ -1794,7 +1853,7 @@ export default function BoardWorkspace({
       imageResolution: "1024x1024",
       position,
     });
-  }, [addAgentNode, addGenerateNode, addNoteNode, addPromptNode, addReferenceGroupNode, addRunningHubAppNode]);
+  }, [addAgentNode, addGenerateNode, addMultiGridNode, addNoteNode, addPromptNode, addReferenceGroupNode, addRunningHubAppNode]);
 
   const addQuickNodeAtPoint = useCallback((kind: BoardInsertKind, point: BoardPoint): void => {
     const item = BOARD_INSERT_CATALOG.find(current => current.kind === kind);
@@ -1862,6 +1921,14 @@ export default function BoardWorkspace({
       setQuickInsertMenu(null);
       return;
     }
+    if (kind === "multi-grid") {
+      const references = multiGridImageReferences(board.nodes, from, selectionSnapshot);
+      if (references.length === 0) return;
+      const nodeId = addMultiGridNode({ position: centeredNodePosition(point, DEFAULT_MULTI_GRID_NODE_SIZE) });
+      references.forEach(reference => addAssetToMultiGrid(nodeId, reference));
+      setQuickInsertMenu(null);
+      return;
+    }
     if (kind === "runninghub-app") {
       const nodeId = addRunningHubAppNode({ position: centeredNodePosition(point, DEFAULT_RUNNINGHUB_APP_NODE_SIZE) });
       connectPorts(from, {
@@ -1871,7 +1938,7 @@ export default function BoardWorkspace({
       });
       setQuickInsertMenu(null);
     }
-  }, [addGenerateNodeWithConnections, addReferenceGroupNodeWithAssets, addRunningHubAppNode, board.nodes, centeredNodePosition, connectPorts, onConnectionError]);
+  }, [addAssetToMultiGrid, addGenerateNodeWithConnections, addMultiGridNode, addReferenceGroupNodeWithAssets, addRunningHubAppNode, board.nodes, centeredNodePosition, connectPorts, onConnectionError]);
 
   const quickInsertMenuItems = useMemo(() => {
     const from = quickInsertMenu?.connectionFrom;
@@ -1887,8 +1954,12 @@ export default function BoardWorkspace({
         item.kind === "video-generate" ||
         item.kind === "audio-operation" ||
         item.kind === "reference-group" ||
+        (sourceNode.asset.type === "image" && item.kind === "multi-grid") ||
         item.kind === "runninghub-app",
       );
+    }
+    if (sourceNode?.kind === "result") {
+      return BOARD_INSERT_CATALOG.filter(item => sourceNode.asset.type === "image" && item.kind === "multi-grid");
     }
     if (sourceNode?.kind === "reference-group") {
       return BOARD_INSERT_CATALOG.filter(item => item.kind === "image-generate" || item.kind === "video-generate" || item.kind === "audio-operation" || item.kind === "runninghub-app");
@@ -1899,6 +1970,23 @@ export default function BoardWorkspace({
   const connectSelectedNodesToTarget = useCallback((targetNodeId: string): void => {
     const targetNode = board.nodes.find(node => node.id === targetNodeId);
     if (!targetNode) return;
+    if (targetNode.kind === "multi-grid") {
+      const references = selectedNodeIds.flatMap(nodeId => {
+        const node = board.nodes.find(item => item.id === nodeId);
+        if ((node?.kind !== "asset" && node?.kind !== "result") || node.asset.type !== "image") return [];
+        return [node.asset];
+      });
+      if (references.length === 0) {
+        onConnectionError("所选节点没有可加入多宫格的图片");
+        return;
+      }
+      references.forEach(reference => addAssetToMultiGrid(targetNode.id, reference));
+      selectNode(targetNode.id);
+      selectEdge(null);
+      updateSelectedNodeIds([targetNode.id]);
+      closeOverlayMenus();
+      return;
+    }
     const connections = selectedNodeIds
       .map(nodeId => board.nodes.find(node => node.id === nodeId))
       .filter((node): node is BoardNodeModel => node !== undefined)
@@ -1913,7 +2001,7 @@ export default function BoardWorkspace({
     selectEdge(null);
     updateSelectedNodeIds([targetNode.id]);
     closeOverlayMenus();
-  }, [board.nodes, closeOverlayMenus, connectPortsBatch, onConnectionError, selectEdge, selectedNodeIds, selectNode, updateSelectedNodeIds]);
+  }, [addAssetToMultiGrid, board.nodes, closeOverlayMenus, connectPortsBatch, onConnectionError, selectEdge, selectedNodeIds, selectNode, updateSelectedNodeIds]);
 
   const createReferenceGroupFromSelected = useCallback((contextNodeId: string): void => {
     const contextNode = board.nodes.find(node => node.id === contextNodeId);
@@ -1983,6 +2071,18 @@ export default function BoardWorkspace({
     }
     if (node.kind === "group") {
       addGroupNode({ position, size: node.size, title: node.title });
+      rememberPastedPosition();
+      return;
+    }
+    if (node.kind === "multi-grid") {
+      addMultiGridNode({
+        aspectRatio: node.aspectRatio,
+        gridSize: node.gridSize,
+        items: structuredClone(node.items),
+        position,
+        size: node.size,
+        title: node.title,
+      });
       rememberPastedPosition();
       return;
     }
@@ -2101,7 +2201,7 @@ export default function BoardWorkspace({
     }
     addNoteNode({ body: node.body, position, size: node.size, source: node.source, title: node.title, variant: node.variant });
     rememberPastedPosition();
-  }, [addAgentNode, addAssetNode, addGenerateNode, addGenerateNodeWithConnections, addGroupNode, addNoteNode, addPromptNode, addReferenceGroupNode, addResultNodeWithConnection, addRunningHubAppNode, board.nodes]);
+  }, [addAgentNode, addAssetNode, addGenerateNode, addGenerateNodeWithConnections, addGroupNode, addMultiGridNode, addNoteNode, addPromptNode, addReferenceGroupNode, addResultNodeWithConnection, addRunningHubAppNode, board.nodes]);
 
   const handleConnectStart = useCallback<OnConnectStart>(() => {
     setIsConnectionActive(true);
@@ -2126,6 +2226,20 @@ export default function BoardWorkspace({
     const flowPoint = flowPositionFromClient(clientPoint.x, clientPoint.y);
     const targetNode = boardNodeAtPoint(board.nodes, flowPoint, sourceNodeId);
     if (targetNode) {
+      if (targetNode.kind === "multi-grid") {
+        if (!sourceKind) return;
+        const from: BoardPortRef = { nodeId: sourceNodeId, portId: sourceHandleId, portKind: sourceKind };
+        const references = multiGridImageReferences(board.nodes, from, selectedNodeIds);
+        if (references.length === 0) {
+          onConnectionError("多宫格只支持图片资产");
+          return;
+        }
+        references.forEach(reference => addAssetToMultiGrid(targetNode.id, reference));
+        selectNode(targetNode.id);
+        selectEdge(null);
+        updateSelectedNodeIds([targetNode.id]);
+        return;
+      }
       const connections = batchConnectionsFromSourceToTarget(board.nodes, sourceNodeId, targetNode, selectedNodeIds);
       if (connections.length === 0) {
         onConnectionError("所选节点没有可连接到此节点的端口");
@@ -2160,6 +2274,18 @@ export default function BoardWorkspace({
             selectedNodeIds,
           });
           return;
+        }
+        return;
+      }
+      if (sourceNode?.kind === "result") {
+        if (sourceNode.asset.type === "image" && sourceHandleId === "asset-out") {
+          setQuickInsertMenu({
+            clientX: clientPoint.x,
+            clientY: clientPoint.y,
+            connectionFrom: { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "asset" },
+            position: flowPoint,
+            selectedNodeIds,
+          });
         }
         return;
       }
@@ -2201,7 +2327,7 @@ export default function BoardWorkspace({
       selectEdge(null);
       return;
     }
-  }, [addResultNodeWithConnection, board.nodes, centeredNodePosition, connectPorts, connectPortsBatch, flowPositionFromClient, onConnectionError, selectEdge, selectedNodeIds, selectNode, updateSelectedNodeIds]);
+  }, [addAssetToMultiGrid, addResultNodeWithConnection, board.nodes, centeredNodePosition, connectPorts, connectPortsBatch, flowPositionFromClient, onConnectionError, selectEdge, selectedNodeIds, selectNode, updateSelectedNodeIds]);
 
   const openQuickInsertMenu = useCallback((event: ReactMouseEvent | MouseEvent): void => {
     event.preventDefault();

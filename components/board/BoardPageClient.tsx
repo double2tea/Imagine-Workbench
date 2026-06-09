@@ -97,6 +97,7 @@ import {
   DEFAULT_ASSET_NODE_SIZE,
   DEFAULT_GENERATE_NODE_SIZE,
   BOARD_PORT_IDS,
+  composeBoardMultiGridImage,
   createEmptyBoard,
   deleteBoardFromDB,
   listBoardSummariesFromDB,
@@ -833,6 +834,13 @@ function summarizeBoardNodeForAgent(node: BoardDocument["nodes"][number], draftT
         kind: node.kind,
         title: node.title,
         body: `${node.references.length} references`,
+      };
+    case "multi-grid":
+      return {
+        id: node.id,
+        kind: node.kind,
+        title: node.title,
+        body: `${node.gridSize}x${node.gridSize} ${node.aspectRatio} · ${node.items.length} images`,
       };
     case "group":
       return {
@@ -2914,6 +2922,42 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     return assetNodeId;
   }, [boardController]);
 
+  const handleExportMultiGrid = useCallback(async (nodeId: string): Promise<void> => {
+    try {
+      const node = boardController.board.nodes.find(item => item.id === nodeId);
+      if (node?.kind !== "multi-grid") {
+        throw new Error("目标节点不是多宫格");
+      }
+      const dataUrl = await composeBoardMultiGridImage(node);
+      const item = buildStorageItem(
+        {
+          id: makeClientId("multi_grid"),
+          type: "image",
+          url: dataUrl,
+          prompt: node.title,
+          model: "multi-grid",
+          aspectRatio: node.aspectRatio,
+          createdAt: new Date().toISOString(),
+          status: "complete",
+          progress: 100,
+          operationName: "multi-grid-export",
+          sourceBoardNodeId: node.id,
+        },
+        { boardId: boardController.board.id },
+      );
+      const savedItem = await saveItemOrWarn(item, pushWorkspaceNotice);
+      if (!savedItem) return;
+      setItems(prev => [savedItem, ...prev]);
+      addAssetToBoard(savedItem, {
+        x: node.position.x + node.size.width + 40,
+        y: node.position.y,
+      });
+      pushWorkspaceNotice("success", "多宫格已导出为图片资产");
+    } catch (error) {
+      pushWorkspaceNotice("error", error instanceof Error ? error.message : "多宫格导出失败");
+    }
+  }, [addAssetToBoard, boardController.board, pushWorkspaceNotice]);
+
   const handleCaptureVideoFrame = useCallback(async (
     sourceNodeId: string,
     item: StorageItem,
@@ -4051,6 +4095,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onEditAssetImage={editBoardAssetImage}
         onImageQuickEdit={handleBoardImageQuickEdit}
         onExecuteGenerateNode={handleExecuteGenerateNode}
+        onExportMultiGrid={handleExportMultiGrid}
         onFetchRunningHubAppSchema={fetchRunningHubAppSchema}
         onImportBoardFiles={handleImportBoardFiles}
         onOpenFullscreen={handleOpenFullscreen}

@@ -96,6 +96,7 @@ const nodeKindLabels: Record<BoardNode["kind"], string> = {
   agent: "Agent",
   asset: "资产",
   group: "组",
+  "multi-grid": "多宫格",
   "audio-operation": "音频操作",
   "image-generate": "图片生成",
   note: "备注",

@@ -1,6 +1,6 @@
 import type { AudioOperationMode } from "@/lib/providers/model-catalog";
 
-export type BoardNodeKind = "asset" | "prompt" | "reference-group" | "group" | "image-generate" | "video-generate" | "audio-operation" | "runninghub-app" | "agent" | "note" | "result";
+export type BoardNodeKind = "asset" | "prompt" | "reference-group" | "group" | "multi-grid" | "image-generate" | "video-generate" | "audio-operation" | "runninghub-app" | "agent" | "note" | "result";
 export type BoardAssetType = "image" | "video" | "audio";
 export type BoardEdgeKind = "reference" | "prompt" | "result" | "agent-context";
 export type BoardPortKind = "asset" | "prompt" | "result" | "agent";
@@ -97,6 +97,28 @@ export interface BoardReferenceGroupNode extends BoardNodeBase {
 
 export interface BoardGroupNode extends BoardNodeBase {
   kind: "group";
+}
+
+export type BoardMultiGridAspectRatio = "1:1" | "4:3" | "3:4" | "16:9" | "9:16" | "2:3" | "3:2";
+export type BoardMultiGridSize = 2 | 3 | 4 | 5;
+
+export interface BoardMultiGridItem {
+  assetId: string;
+  cellIndex?: number;
+  model: string;
+  offsetX: number;
+  offsetY: number;
+  prompt: string;
+  scale: number;
+  url: string;
+}
+
+export interface BoardMultiGridNode extends BoardNodeBase {
+  kind: "multi-grid";
+  aspectRatio: BoardMultiGridAspectRatio;
+  gridSize: BoardMultiGridSize;
+  items: BoardMultiGridItem[];
+  selectedItemId?: string;
 }
 
 export interface BoardImageGenerateNode extends BoardNodeBase {
@@ -226,6 +248,7 @@ export type BoardNode =
   | BoardPromptNode
   | BoardReferenceGroupNode
   | BoardGroupNode
+  | BoardMultiGridNode
   | BoardImageGenerateNode
   | BoardVideoGenerateNode
   | BoardAudioOperationNode
@@ -237,6 +260,13 @@ export type BoardNode =
 export type BoardGenerateNode = BoardImageGenerateNode | BoardVideoGenerateNode | BoardAudioOperationNode;
 export type BoardExecutableNode = BoardGenerateNode | BoardRunningHubAppNode;
 export type BoardResultSourceNode = BoardImageGenerateNode | BoardVideoGenerateNode | BoardAudioOperationNode | BoardRunningHubAppNode;
+
+export type BoardMultiGridNodeUpdate = Partial<{
+  aspectRatio: BoardMultiGridAspectRatio;
+  gridSize: BoardMultiGridSize;
+  items: BoardMultiGridItem[];
+  selectedItemId: string | undefined;
+}>;
 
 export type BoardGenerateNodeUpdate = Partial<{
   aspectRatio: string;
@@ -349,6 +379,15 @@ export interface CreateReferenceGroupNodeInput {
 
 export interface CreateGroupNodeInput {
   parentId?: string;
+  position?: BoardPoint;
+  size?: BoardSize;
+  title?: string;
+}
+
+export interface CreateMultiGridNodeInput {
+  aspectRatio?: BoardMultiGridAspectRatio;
+  gridSize?: BoardMultiGridSize;
+  items?: BoardMultiGridItem[];
   position?: BoardPoint;
   size?: BoardSize;
   title?: string;

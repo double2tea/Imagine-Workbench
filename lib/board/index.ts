@@ -14,6 +14,7 @@ export {
   DEFAULT_BOARD_VIEWPORT,
   DEFAULT_GENERATE_NODE_SIZE,
   DEFAULT_GROUP_NODE_SIZE,
+  DEFAULT_MULTI_GRID_NODE_SIZE,
   DEFAULT_NODE_POSITION,
   DEFAULT_NOTE_NODE_SIZE,
   DEFAULT_PROMPT_NODE_SIZE,
@@ -21,6 +22,19 @@ export {
   DEFAULT_RUNNINGHUB_APP_NODE_SIZE,
   createEmptyBoard,
 } from "@/lib/board/defaults";
+export {
+  BOARD_MULTI_GRID_ASPECT_RATIOS,
+  BOARD_MULTI_GRID_SIZES,
+  DEFAULT_BOARD_MULTI_GRID_ASPECT_RATIO,
+  DEFAULT_BOARD_MULTI_GRID_SIZE,
+  boardMultiGridCellCount,
+  boardMultiGridCoverFrame,
+  firstEmptyBoardMultiGridCell,
+  isBoardMultiGridAspectRatio,
+  isBoardMultiGridSize,
+  normalizeBoardMultiGridItems,
+} from "@/lib/board/multi-grid";
+export { composeBoardMultiGridImage } from "@/lib/board/multi-grid-compose";
 export {
   boardNodeAbsolutePosition,
   boardNodesWithAbsolutePositions,
@@ -86,6 +100,11 @@ export type {
   BoardGenerationStatus,
   BoardGroupNode,
   BoardImageGenerateNode,
+  BoardMultiGridAspectRatio,
+  BoardMultiGridItem,
+  BoardMultiGridNode,
+  BoardMultiGridNodeUpdate,
+  BoardMultiGridSize,
   BoardExecutableNode,
   BoardResultSourceNode,
   BoardNode,
@@ -119,6 +138,7 @@ export type {
   BoardVideoReferenceMode,
   CreateAgentNodeInput,
   CreateGroupNodeInput,
+  CreateMultiGridNodeInput,
   CreateResultNodeInput,
   CreateRunningHubAppNodeInput,
   BoardViewport,

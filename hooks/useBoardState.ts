@@ -10,6 +10,7 @@ import {
   DEFAULT_BOARD_ID,
   DEFAULT_GENERATE_NODE_SIZE,
   DEFAULT_GROUP_NODE_SIZE,
+  DEFAULT_MULTI_GRID_NODE_SIZE,
   DEFAULT_NODE_POSITION,
   DEFAULT_NOTE_NODE_SIZE,
   DEFAULT_PROMPT_NODE_SIZE,
@@ -29,6 +30,9 @@ import {
   type BoardGenerationStatus,
   type BoardGroupNode,
   type BoardImageGenerateNode,
+  type BoardMultiGridItem,
+  type BoardMultiGridNode,
+  type BoardMultiGridNodeUpdate,
   type BoardNoteNode,
   type BoardNode,
   type BoardPoint,
@@ -54,6 +58,7 @@ import {
   type CreateAssetNodeInput,
   type CreateGenerateNodeInput,
   type CreateGroupNodeInput,
+  type CreateMultiGridNodeInput,
   type CreateNoteNodeInput,
   type CreatePromptNodeInput,
   type CreateReferenceGroupNodeInput,
@@ -65,6 +70,14 @@ import {
   createBoardGroupLayout,
   resolveMovedBoardNodeParents,
 } from "@/lib/board";
+import {
+  DEFAULT_BOARD_MULTI_GRID_ASPECT_RATIO,
+  DEFAULT_BOARD_MULTI_GRID_SIZE,
+  firstEmptyBoardMultiGridCell,
+  isBoardMultiGridAspectRatio,
+  isBoardMultiGridSize,
+  normalizeBoardMultiGridItems,
+} from "@/lib/board/multi-grid";
 import { DEFAULT_AUDIO_MODEL, getAudioModelCapabilities, getImageModelCapabilities, getImageResolutionOptions, getVideoModelCapabilities } from "@/lib/providers/model-catalog";
 import {
   BOARD_PORT_IDS,
@@ -96,6 +109,7 @@ const BOARD_NODE_KINDS = new Set<BoardNode["kind"]>([
   "agent",
   "asset",
   "group",
+  "multi-grid",
   "audio-operation",
   "image-generate",
   "note",
@@ -134,6 +148,8 @@ export interface BoardStateController {
   updateResultNodeAsset: (nodeId: string, assetId: string) => void;
   addGenerateNode: (input: CreateGenerateNodeInput) => string;
   addGroupNode: (input?: CreateGroupNodeInput) => string;
+  addMultiGridNode: (input?: CreateMultiGridNodeInput) => string;
+  addAssetToMultiGrid: (nodeId: string, asset: BoardAssetReference, cellIndex?: number) => void;
   groupNodes: (nodeIds: string[]) => string | null;
   ungroupNode: (nodeId: string) => void;
   addGenerateNodeWithConnection: (
@@ -169,6 +185,8 @@ export interface BoardStateController {
   updateReferenceGroupItemRole: (groupNodeId: string, assetId: string, role: BoardReferenceRole) => void;
   updateAgentInstruction: (nodeId: string, instruction: string) => void;
   updateGenerateNode: (nodeId: string, input: BoardGenerateNodeUpdate) => void;
+  updateMultiGridNode: (nodeId: string, input: BoardMultiGridNodeUpdate) => void;
+  updateMultiGridItemTransform: (nodeId: string, assetId: string, transform: Partial<Pick<BoardMultiGridItem, "offsetX" | "offsetY" | "scale">>) => void;
   updateNodeTitle: (nodeId: string, title: string) => void;
   updateNodePosition: (nodeId: string, position: BoardPoint) => void;
   updateNodesPositions: (updates: Array<{ nodeId: string; position: BoardPoint }>) => void;
@@ -206,6 +224,7 @@ function duplicateNodeIdPrefix(kind: BoardNode["kind"]): string {
   if (kind === "prompt") return "prompt";
   if (kind === "reference-group") return "ref_group";
   if (kind === "group") return "group";
+  if (kind === "multi-grid") return "multi_grid";
   if (kind === "image-generate") return "image_gen";
   if (kind === "video-generate") return "video_gen";
   if (kind === "audio-operation") return "audio_op";
@@ -236,6 +255,15 @@ function cloneBoardNodeForDuplicate(source: BoardNode, position: BoardPoint): Bo
       return { ...shell, kind: "reference-group", references: structuredClone(source.references) };
     case "group":
       return { ...shell, kind: "group" };
+    case "multi-grid":
+      return {
+        ...shell,
+        kind: "multi-grid",
+        aspectRatio: source.aspectRatio,
+        gridSize: source.gridSize,
+        items: structuredClone(source.items),
+        selectedItemId: source.selectedItemId,
+      };
     case "image-generate":
       return {
         ...shell,
@@ -643,6 +671,19 @@ function normalizeBoardNode(node: unknown, index: number): BoardNode | null {
       kind: "group",
     };
   }
+  if (node.kind === "multi-grid") {
+    const rawGridSize = typeof node.gridSize === "number" ? node.gridSize : DEFAULT_BOARD_MULTI_GRID_SIZE;
+    const gridSize = isBoardMultiGridSize(rawGridSize) ? rawGridSize : DEFAULT_BOARD_MULTI_GRID_SIZE;
+    const rawAspectRatio = readOptionalString(node.aspectRatio) ?? DEFAULT_BOARD_MULTI_GRID_ASPECT_RATIO;
+    return {
+      ...shell,
+      kind: "multi-grid",
+      aspectRatio: isBoardMultiGridAspectRatio(rawAspectRatio) ? rawAspectRatio : DEFAULT_BOARD_MULTI_GRID_ASPECT_RATIO,
+      gridSize,
+      items: Array.isArray(node.items) ? normalizeMultiGridItems(node.items, gridSize) : [],
+      selectedItemId: readOptionalString(node.selectedItemId),
+    };
+  }
   if (node.kind === "image-generate") {
     const model = normalizeImageModel(node.model);
     const aspectRatio = readOptionalString(node.aspectRatio);
@@ -759,6 +800,7 @@ function defaultNodeSize(kind: BoardNode["kind"]): BoardSize {
   if (kind === "prompt") return DEFAULT_PROMPT_NODE_SIZE;
   if (kind === "reference-group") return DEFAULT_REFERENCE_GROUP_NODE_SIZE;
   if (kind === "group") return DEFAULT_GROUP_NODE_SIZE;
+  if (kind === "multi-grid") return DEFAULT_MULTI_GRID_NODE_SIZE;
   if (kind === "image-generate" || kind === "video-generate" || kind === "audio-operation") return DEFAULT_GENERATE_NODE_SIZE;
   if (kind === "runninghub-app") return DEFAULT_RUNNINGHUB_APP_NODE_SIZE;
   if (kind === "agent") return DEFAULT_AGENT_NODE_SIZE;
@@ -770,6 +812,7 @@ function defaultNodeTitle(kind: BoardNode["kind"]): string {
   if (kind === "prompt") return "Prompt";
   if (kind === "reference-group") return "Reference Group";
   if (kind === "group") return "新建组";
+  if (kind === "multi-grid") return "多宫格";
   if (kind === "image-generate") return "Image Generate";
   if (kind === "video-generate") return "Video Generate";
   if (kind === "audio-operation") return "Audio Operation";
@@ -902,6 +945,27 @@ function normalizeReferenceGroupItems(items: unknown[]): BoardReferenceGroupItem
   return normalizedItems;
 }
 
+function normalizeMultiGridItems(items: unknown[], gridSize: BoardMultiGridNode["gridSize"]): BoardMultiGridItem[] {
+  const normalizedItems: BoardMultiGridItem[] = [];
+  for (const item of items) {
+    if (!isRecord(item) || typeof item.assetId !== "string" || item.assetId.length === 0) continue;
+    const cellIndex = typeof item.cellIndex === "number" && Number.isInteger(item.cellIndex)
+      ? item.cellIndex
+      : undefined;
+    normalizedItems.push({
+      assetId: item.assetId,
+      cellIndex,
+      model: readNonEmptyString(item.model, "unknown"),
+      offsetX: readFiniteNumber(item.offsetX, 0),
+      offsetY: readFiniteNumber(item.offsetY, 0),
+      prompt: readNonEmptyString(item.prompt, "Image"),
+      scale: Math.max(0.25, readFiniteNumber(item.scale, 1)),
+      url: readNonEmptyString(item.url, ""),
+    });
+  }
+  return normalizeBoardMultiGridItems(normalizedItems, gridSize);
+}
+
 function referenceGroupItemFromAssetNode(assetNode: BoardNode & { kind: "asset" }): BoardReferenceGroupItem {
   return {
     assetId: assetNode.asset.assetId,
@@ -929,6 +993,45 @@ function appendReferenceGroupItem(
 ): BoardReferenceGroupNode {
   if (node.references.some(item => item.assetId === reference.assetId)) return node;
   return { ...node, references: [...node.references, reference], updatedAt };
+}
+
+function multiGridItemFromAssetReference(asset: BoardAssetReference, cellIndex?: number): BoardMultiGridItem {
+  if (asset.type !== "image") {
+    throw new Error("多宫格只支持图片资产");
+  }
+  return {
+    assetId: asset.assetId,
+    cellIndex,
+    model: asset.model,
+    offsetX: 0,
+    offsetY: 0,
+    prompt: asset.prompt,
+    scale: 1,
+    url: asset.url,
+  };
+}
+
+function appendMultiGridItem(
+  node: BoardMultiGridNode,
+  item: BoardMultiGridItem,
+  updatedAt: string,
+): BoardMultiGridNode {
+  const targetCellIndex = typeof item.cellIndex === "number"
+    ? item.cellIndex
+    : firstEmptyBoardMultiGridCell(node.items, node.gridSize);
+  const nextItem = { ...item, cellIndex: targetCellIndex };
+  const itemsWithoutAsset = node.items.filter(currentItem => currentItem.assetId !== item.assetId);
+  const displacedItems = targetCellIndex === undefined
+    ? itemsWithoutAsset
+    : itemsWithoutAsset.map(currentItem =>
+      currentItem.cellIndex === targetCellIndex ? { ...currentItem, cellIndex: undefined } : currentItem,
+    );
+  return {
+    ...node,
+    items: normalizeBoardMultiGridItems([...displacedItems, nextItem], node.gridSize),
+    selectedItemId: item.assetId,
+    updatedAt,
+  };
 }
 
 function assetNodeIdsForReference(nodes: BoardNode[], assetId: string): string[] {
@@ -1037,6 +1140,23 @@ function createGroupBoardNode(input: CreateGroupNodeInput, nodes: BoardNode[]): 
     parentId: input.parentId,
     position: input.position ?? moveDefaultPosition(nodes),
     size: input.size ?? DEFAULT_GROUP_NODE_SIZE,
+    createdAt,
+    updatedAt: createdAt,
+  };
+}
+
+function createMultiGridBoardNode(input: CreateMultiGridNodeInput, nodes: BoardNode[]): BoardMultiGridNode {
+  const createdAt = nowIso();
+  const gridSize = input.gridSize ?? DEFAULT_BOARD_MULTI_GRID_SIZE;
+  return {
+    id: createBoardId("multi_grid"),
+    kind: "multi-grid",
+    title: input.title ?? "多宫格",
+    aspectRatio: input.aspectRatio ?? DEFAULT_BOARD_MULTI_GRID_ASPECT_RATIO,
+    gridSize,
+    items: normalizeBoardMultiGridItems(input.items ?? [], gridSize),
+    position: input.position ?? moveDefaultPosition(nodes),
+    size: input.size ?? DEFAULT_MULTI_GRID_NODE_SIZE,
     createdAt,
     updatedAt: createdAt,
   };
@@ -1203,6 +1323,14 @@ function sameRunningHubAppUpdate(node: BoardRunningHubAppNode, input: BoardRunni
   if ("targetId" in input && node.targetId !== input.targetId) return false;
   if ("targetType" in input && node.targetType !== input.targetType) return false;
   return true;
+}
+
+function clampMultiGridOffset(value: number): number {
+  return Math.max(-100, Math.min(100, value));
+}
+
+function clampMultiGridScale(value: number): number {
+  return Math.max(0.5, Math.min(3, value));
 }
 
 export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateController {
@@ -1535,6 +1663,29 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     setSelectedEdgeId(null);
     return node.id;
   }, [board.nodes, mutateBoard]);
+
+  const addMultiGridNode = useCallback((input: CreateMultiGridNodeInput = {}): string => {
+    const node = createMultiGridBoardNode(input, board.nodes);
+    mutateBoard(currentBoard => touchBoard(currentBoard, [...currentBoard.nodes, node]));
+    setSelectedNodeId(node.id);
+    setSelectedEdgeId(null);
+    return node.id;
+  }, [board.nodes, mutateBoard]);
+
+  const addAssetToMultiGrid = useCallback((nodeId: string, asset: BoardAssetReference, cellIndex?: number): void => {
+    const updatedAt = nowIso();
+    const item = multiGridItemFromAssetReference(asset, cellIndex);
+    mutateBoard(currentBoard =>
+      touchBoard(
+        currentBoard,
+        currentBoard.nodes.map(node => {
+          if (node.id !== nodeId) return node;
+          if (node.kind !== "multi-grid") throw new Error("目标节点不是多宫格");
+          return appendMultiGridItem(node, item, updatedAt);
+        }),
+      ),
+    );
+  }, [mutateBoard]);
 
   const groupNodes = useCallback((nodeIds: string[]): string | null => {
     if (!createBoardGroupLayout(boardRef.current.nodes, nodeIds)) return null;
@@ -2284,6 +2435,18 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
             didChange = true;
             return { ...node, references, updatedAt };
           }
+          if (node.kind === "multi-grid") {
+            let didUpdateItems = false;
+            const items = node.items.map(item => {
+              const nextUrl = urlByAssetId.get(item.assetId);
+              if (!nextUrl || item.url === nextUrl) return item;
+              didUpdateItems = true;
+              return { ...item, url: nextUrl };
+            });
+            if (!didUpdateItems) return node;
+            didChange = true;
+            return { ...node, items, updatedAt };
+          }
           return node;
         });
         return didChange ? touchBoard(currentBoard, nextNodes) : currentBoard;
@@ -2332,6 +2495,73 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
         );
         if (!didChange) return currentBoard;
         return touchBoard(currentBoard, nextNodes, filterValidBoardEdges(nextNodes, currentBoard.edges));
+      },
+      { skipUndo: true },
+    );
+  }, [mutateBoard]);
+
+  const updateMultiGridNode = useCallback((nodeId: string, input: BoardMultiGridNodeUpdate) => {
+    const updatedAt = nowIso();
+    mutateBoard(
+      currentBoard => {
+        let didChange = false;
+        const nextNodes = currentBoard.nodes.map(node => {
+          if (node.id !== nodeId || node.kind !== "multi-grid") return node;
+          const gridSize = input.gridSize ?? node.gridSize;
+          const items = normalizeBoardMultiGridItems(input.items ?? node.items, gridSize);
+          const nextNode: BoardMultiGridNode = {
+            ...node,
+            aspectRatio: input.aspectRatio ?? node.aspectRatio,
+            gridSize,
+            items,
+            selectedItemId: "selectedItemId" in input ? input.selectedItemId : node.selectedItemId,
+            updatedAt,
+          };
+          if (
+            nextNode.aspectRatio === node.aspectRatio &&
+            nextNode.gridSize === node.gridSize &&
+            nextNode.selectedItemId === node.selectedItemId &&
+            JSON.stringify(nextNode.items) === JSON.stringify(node.items)
+          ) {
+            return node;
+          }
+          didChange = true;
+          return nextNode;
+        });
+        return didChange ? touchBoard(currentBoard, nextNodes) : currentBoard;
+      },
+      { skipUndo: true },
+    );
+  }, [mutateBoard]);
+
+  const updateMultiGridItemTransform = useCallback((
+    nodeId: string,
+    assetId: string,
+    transform: Partial<Pick<BoardMultiGridItem, "offsetX" | "offsetY" | "scale">>,
+  ) => {
+    const updatedAt = nowIso();
+    mutateBoard(
+      currentBoard => {
+        let didChange = false;
+        const nextNodes = currentBoard.nodes.map(node => {
+          if (node.id !== nodeId || node.kind !== "multi-grid") return node;
+          let didUpdateNode = false;
+          const items = node.items.map(item => {
+            if (item.assetId !== assetId) return item;
+            const nextItem = {
+              ...item,
+              offsetX: transform.offsetX === undefined ? item.offsetX : clampMultiGridOffset(transform.offsetX),
+              offsetY: transform.offsetY === undefined ? item.offsetY : clampMultiGridOffset(transform.offsetY),
+              scale: transform.scale === undefined ? item.scale : clampMultiGridScale(transform.scale),
+            };
+            if (nextItem.offsetX === item.offsetX && nextItem.offsetY === item.offsetY && nextItem.scale === item.scale) return item;
+            didChange = true;
+            didUpdateNode = true;
+            return nextItem;
+          });
+          return didUpdateNode ? { ...node, items, selectedItemId: assetId, updatedAt } : node;
+        });
+        return didChange ? touchBoard(currentBoard, nextNodes) : currentBoard;
       },
       { skipUndo: true },
     );
@@ -2419,6 +2649,8 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       completeGenerationResult,
       addGenerateNode,
       addGroupNode,
+      addMultiGridNode,
+      addAssetToMultiGrid,
       addGenerateNodeWithConnection,
       addGenerateNodeWithConnections,
       groupNodes,
@@ -2449,6 +2681,8 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       updateResultNodeAsset,
       updateAgentInstruction,
       updateGenerateNode,
+      updateMultiGridNode,
+      updateMultiGridItemTransform,
       ungroupNode,
       updateNodeTitle,
       updateNodePosition,
@@ -2466,6 +2700,8 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       addResultNodeWithConnection,
       addGenerateNode,
       addGroupNode,
+      addMultiGridNode,
+      addAssetToMultiGrid,
       addGenerateNodeWithConnection,
       addGenerateNodeWithConnections,
       groupNodes,
@@ -2512,6 +2748,8 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       updateResultNodeAsset,
       updateAgentInstruction,
       updateGenerateNode,
+      updateMultiGridNode,
+      updateMultiGridItemTransform,
       ungroupNode,
       updateNodeTitle,
       updateNodePosition,

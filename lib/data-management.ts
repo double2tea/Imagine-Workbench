@@ -1425,6 +1425,7 @@ function readBoardNodeKind(record: Record<string, unknown>, field: string): Boar
   if (
     value !== "asset" &&
     value !== "group" &&
+    value !== "multi-grid" &&
     value !== "prompt" &&
     value !== "reference-group" &&
     value !== "image-generate" &&

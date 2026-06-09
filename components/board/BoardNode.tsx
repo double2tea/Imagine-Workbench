@@ -2,7 +2,7 @@
 
 import { memo, useEffect, useMemo, useState } from "react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
-import { AudioLines, ImagePlus, Layers, Music, Video, Workflow, X } from "lucide-react";
+import { AudioLines, ImagePlus, Layers, LayoutGrid, Music, Video, Workflow, X } from "lucide-react";
 import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
 import MediaReferenceThumbnail from "@/components/reference/MediaReferenceThumbnail";
 import type {
@@ -13,6 +13,7 @@ import type {
 import AgentBoardNode from "@/components/board/AgentBoardNode";
 import AssetBoardNode from "@/components/board/AssetBoardNode";
 import GenerateBoardNode, { type BoardGenerateInputSummary, type BoardGenerateTaskSummary } from "@/components/board/GenerateBoardNode";
+import MultiGridBoardNode from "@/components/board/MultiGridBoardNode";
 import NoteBoardNode from "@/components/board/NoteBoardNode";
 import PromptBoardNode from "@/components/board/PromptBoardNode";
 import ReferenceGroupBoardNode from "@/components/board/ReferenceGroupBoardNode";
@@ -65,6 +66,7 @@ function nodeIcon(node: BoardNodeModel) {
   if (node.kind === "agent") return <AgentIdentityMark variant="inline" />;
   if (node.kind === "reference-group") return <Layers className="h-3.5 w-3.5 text-cyan-300" />;
   if (node.kind === "group") return <Layers className="h-3.5 w-3.5 text-emerald-300" />;
+  if (node.kind === "multi-grid") return <LayoutGrid className="h-3.5 w-3.5 text-emerald-300" />;
   return null;
 }
 
@@ -468,6 +470,14 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             onMove={(assetId, direction) => c.onMoveReferenceGroupItem(node.id, assetId, direction)}
             onRemove={assetId => c.onRemoveReferenceGroupItem(node.id, assetId)}
             onRoleChange={(assetId, role) => c.onUpdateReferenceGroupItemRole(node.id, assetId, role)}
+          />
+        )}
+        {node.kind === "multi-grid" && (
+          <MultiGridBoardNode
+            node={node}
+            onExport={() => c.onExportMultiGrid(node.id)}
+            onUpdate={input => c.onUpdateMultiGrid(node.id, input)}
+            onUpdateItemTransform={(assetId, transform) => c.onUpdateMultiGridItemTransform(node.id, assetId, transform)}
           />
         )}
         {(node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation") && (

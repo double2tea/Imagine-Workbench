@@ -5,6 +5,7 @@ import {
   FileText,
   ImagePlus,
   Layers,
+  LayoutGrid,
   MessageSquareText,
   Workflow,
   Video,
@@ -12,6 +13,7 @@ import {
 import {
   DEFAULT_AGENT_NODE_SIZE,
   DEFAULT_GENERATE_NODE_SIZE,
+  DEFAULT_MULTI_GRID_NODE_SIZE,
   DEFAULT_NOTE_NODE_SIZE,
   DEFAULT_PROMPT_NODE_SIZE,
   DEFAULT_REFERENCE_GROUP_NODE_SIZE,
@@ -22,6 +24,7 @@ import type { BoardSize } from "@/lib/board/types";
 export type BoardInsertKind =
   | "prompt"
   | "reference-group"
+  | "multi-grid"
   | "image-generate"
   | "video-generate"
   | "audio-operation"
@@ -56,6 +59,14 @@ export const BOARD_INSERT_CATALOG: BoardInsertCatalogItem[] = [
     kind: "reference-group",
     label: "参考组",
     size: DEFAULT_REFERENCE_GROUP_NODE_SIZE,
+  },
+  {
+    icon: LayoutGrid,
+    iconClassName: "text-emerald-300",
+    iconSurfaceClassName: "bg-emerald-500/10 border-emerald-400/20",
+    kind: "multi-grid",
+    label: "多宫格",
+    size: DEFAULT_MULTI_GRID_NODE_SIZE,
   },
   {
     icon: ImagePlus,
@@ -120,6 +131,7 @@ export function boardInsertGroupLabel(kind: BoardInsertKind): BoardInsertGroupLa
     case "runninghub-app":
       return "生成";
     case "agent":
+    case "multi-grid":
     case "note":
       return "组织";
   }

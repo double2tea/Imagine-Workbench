@@ -1,7 +1,14 @@
 import { createContext, useContext } from "react";
 import type { StorageItem } from "@/lib/db";
 import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
-import type { BoardGenerateNodeUpdate, BoardReferenceRole, BoardRunningHubAppNodeUpdate, BoardRunningHubAppSchemaResult } from "@/lib/board/types";
+import type {
+  BoardGenerateNodeUpdate,
+  BoardMultiGridItem,
+  BoardMultiGridNodeUpdate,
+  BoardReferenceRole,
+  BoardRunningHubAppNodeUpdate,
+  BoardRunningHubAppSchemaResult,
+} from "@/lib/board/types";
 import type { BoardPromptReference } from "@/lib/board/prompt-references";
 import type { CapturedVideoFrame } from "@/lib/video-frame";
 
@@ -32,6 +39,9 @@ export interface BoardNodeCallbacks {
   onUpdateReferenceGroupItemRole: (nodeId: string, assetId: string, role: BoardReferenceRole) => void;
   onUpdateAgent: (nodeId: string, instruction: string) => void;
   onUpdateGenerate: (nodeId: string, input: BoardGenerateNodeUpdate) => void;
+  onUpdateMultiGrid: (nodeId: string, input: BoardMultiGridNodeUpdate) => void;
+  onUpdateMultiGridItemTransform: (nodeId: string, assetId: string, transform: Partial<Pick<BoardMultiGridItem, "offsetX" | "offsetY" | "scale">>) => void;
+  onExportMultiGrid: (nodeId: string) => void | Promise<void>;
   onMeasureAssetAspectRatio: (nodeId: string, aspectRatio: number) => void;
   onUpdateNodeTitle: (nodeId: string, title: string) => void;
   onUpdateRunningHubApp: (nodeId: string, input: BoardRunningHubAppNodeUpdate) => void;

@@ -68,6 +68,9 @@ export function getBoardNodePortDefinitions(
       { id: BOARD_PORT_IDS.assetOut, label: "参考组输出", kind: "asset", direction: "output" },
     ];
   }
+  if (node.kind === "multi-grid") {
+    return [{ id: BOARD_PORT_IDS.assetIn, label: "图片输入", kind: "asset", direction: "input" }];
+  }
   if (isGenerateNode(node) || node.kind === "runninghub-app") {
     const ports: BoardPortDefinition[] = [
       { id: BOARD_PORT_IDS.promptIn, label: "提示输入", kind: "prompt", direction: "input" },
@@ -331,6 +334,16 @@ export function resolveBoardConnectionKind(nodes: BoardNode[], from: BoardPortRe
   }
 
   if (
+    (source.node.kind === "asset" || source.node.kind === "result") &&
+    source.node.asset.type === "image" &&
+    target.node.kind === "multi-grid" &&
+    source.port.id === BOARD_PORT_IDS.assetOut &&
+    target.port.id === BOARD_PORT_IDS.assetIn
+  ) {
+    return "reference";
+  }
+
+  if (
     isExecutableNode(source.node) &&
     (target.node.kind === "asset" || target.node.kind === "result") &&
     source.port.id === BOARD_PORT_IDS.resultOut &&
@@ -357,7 +370,7 @@ export function resolveBoardConnectionKind(nodes: BoardNode[], from: BoardPortRe
     return "agent-context";
   }
 
-  throw new Error("端口类型不兼容：媒体可连参考组、Agent 或支持该类型的生成参考，Prompt 可连生成，生成结果可连资产或笔记。");
+  throw new Error("端口类型不兼容：媒体可连参考组、多宫格、Agent 或支持该类型的生成参考，Prompt 可连生成，生成结果可连资产或笔记。");
 }
 
 export function isValidBoardConnection(nodes: BoardNode[], from: BoardPortRef, to: BoardPortRef): boolean {

@@ -22,6 +22,9 @@ export function collectBoardAssetIdsFromNodes(nodes: BoardNode[]): Set<string> {
     if (node.kind === "reference-group") {
       for (const reference of node.references) ids.add(reference.assetId);
     }
+    if (node.kind === "multi-grid") {
+      for (const item of node.items) ids.add(item.assetId);
+    }
   }
   return ids;
 }
@@ -36,6 +39,9 @@ export function collectPlacedBoardAssetIdsFromNodes(nodes: BoardNode[]): Set<str
     }
     if (node.kind === "reference-group") {
       for (const reference of node.references) ids.add(reference.assetId);
+    }
+    if (node.kind === "multi-grid") {
+      for (const item of node.items) ids.add(item.assetId);
     }
   }
   return ids;
