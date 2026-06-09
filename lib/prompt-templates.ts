@@ -74,6 +74,25 @@ export const PROMPT_TEMPLATES: PromptTemplate[] = [
     parameterHint: "适合 1:1、4:3",
   },
   {
+    id: "view-camera-contact-sheet",
+    category: "view",
+    title: "多机位探索",
+    scene: "同一主体的镜头角度筛选",
+    positivePrompt:
+      "camera angle contact sheet, same subject shown from multiple cinematic viewpoints, consistent identity and environment, varied lens height and distance, clear composition options, production planning reference",
+    negativePrompt: "different subjects, inconsistent environment, random style shifts, unreadable grid",
+    parameterHint: "适合 16:9、4:3",
+  },
+  {
+    id: "view-spatial-depth-rebuild",
+    category: "view",
+    title: "空间层次补强",
+    scene: "背景空、纵深弱、场景缺层次",
+    positivePrompt:
+      "enhanced spatial depth, distinct foreground midground and background, believable scale cues, soft atmospheric separation, guided leading lines, subject remains clearly readable",
+    negativePrompt: "flat backdrop, pasted-on subject, confusing scale, overcrowded background",
+  },
+  {
     id: "storyboard-keyframe",
     category: "storyboard",
     title: "关键帧分镜",
@@ -100,6 +119,66 @@ export const PROMPT_TEMPLATES: PromptTemplate[] = [
     positivePrompt:
       "cinematic camera movement plan, slow push-in toward the subject, subtle parallax between foreground and background, natural environmental motion, stable subject identity, filmic timing",
     negativePrompt: "shaky camera, chaotic movement, subject morphing, inconsistent background",
+    parameterHint: "适合视频生成提示词",
+  },
+  {
+    id: "storyboard-shot-grid",
+    category: "storyboard",
+    title: "镜头组宫格",
+    scene: "快速比较构图、机位、景别",
+    positivePrompt:
+      "cinematic shot grid, nine compact storyboard frames exploring the same scene, varied shot sizes from wide medium to close-up, consistent subject continuity, clean readable staging, director planning board",
+    negativePrompt: "unrelated panels, broken continuity, cluttered layout, inconsistent character design",
+    parameterHint: "适合横向画布",
+  },
+  {
+    id: "storyboard-action-continuity",
+    category: "storyboard",
+    title: "连续动作分镜",
+    scene: "动作拆解、转场、视频参考",
+    positivePrompt:
+      "continuous action storyboard, sequential frames showing one motion from anticipation to execution to follow-through, consistent camera axis, readable pose progression, precise timing notes implied by the visuals",
+    negativePrompt: "jump cuts without logic, impossible body motion, inconsistent props, unclear action direction",
+    parameterHint: "适合 16:9 或长横图",
+  },
+  {
+    id: "storyboard-before-moment",
+    category: "storyboard",
+    title: "前因画面推演",
+    scene: "从当前画面反推前几秒",
+    positivePrompt:
+      "pre-moment storyboard frame, infer what happened seconds before the current scene, coherent cause leading into the visible action, same location and subject identity, cinematic continuity",
+    negativePrompt: "unrelated backstory, changed location, inconsistent subject, excessive text labels",
+    parameterHint: "适合补齐视频开头",
+  },
+  {
+    id: "storyboard-after-moment",
+    category: "storyboard",
+    title: "后续画面推演",
+    scene: "从当前画面延展后几秒",
+    positivePrompt:
+      "next-moment storyboard frame, extend the current scene a few seconds forward, clear consequence of the action, consistent subject identity and environment, cinematic visual continuity",
+    negativePrompt: "random outcome, changed style, subject identity drift, unclear progression",
+    parameterHint: "适合补齐视频结尾",
+  },
+  {
+    id: "storyboard-camera-orbit",
+    category: "storyboard",
+    title: "环绕运镜",
+    scene: "产品展示、角色展示、空间揭示",
+    positivePrompt:
+      "controlled orbit camera movement around the subject, stable focal target, smooth parallax across foreground and background, consistent lighting, elegant reveal of shape and environment",
+    negativePrompt: "unstable camera, warped subject, broken perspective, chaotic background motion",
+    parameterHint: "适合视频生成提示词",
+  },
+  {
+    id: "storyboard-camera-follow",
+    category: "storyboard",
+    title: "跟随运镜",
+    scene: "人物移动、产品使用、动作场景",
+    positivePrompt:
+      "smooth tracking camera following the subject, steady screen direction, natural body or object motion, subtle background parallax, clear subject priority, cinematic pacing",
+    negativePrompt: "shaky handheld chaos, subject slipping out of frame, motion smear, identity drift",
     parameterHint: "适合视频生成提示词",
   },
   {
@@ -130,6 +209,15 @@ export const PROMPT_TEMPLATES: PromptTemplate[] = [
       "character expression sheet, same character face across multiple expressions, happy serious surprised angry thoughtful, clean layout, consistent lighting and style",
     negativePrompt: "different identities, inconsistent face shape, random costumes, unreadable layout",
     parameterHint: "适合 1:1、4:3",
+  },
+  {
+    id: "character-performance-shift",
+    category: "character",
+    title: "表演情绪重塑",
+    scene: "保留角色，改变情绪与表演状态",
+    positivePrompt:
+      "same character identity with a redesigned emotional performance, clear facial expression, body language aligned with the mood, consistent costume and lighting, believable acting nuance",
+    negativePrompt: "different person, exaggerated cartoon emotion, mismatched pose, inconsistent costume details",
   },
   {
     id: "product-hero",
@@ -188,6 +276,96 @@ export const PROMPT_TEMPLATES: PromptTemplate[] = [
     positivePrompt:
       "golden hour lighting, warm low-angle sunlight, soft long shadows, gentle atmospheric glow, natural skin tones or material color, calm cinematic warmth",
     negativePrompt: "flat noon light, oversaturated orange, harsh shadows, washed-out detail",
+  },
+  {
+    id: "lighting-key-fill-rim",
+    category: "lighting",
+    title: "三点光校准",
+    scene: "人物、产品、商业棚拍",
+    positivePrompt:
+      "balanced three-point lighting, defined key light, subtle fill light, controlled rim light separating subject from background, clean highlight rolloff, professional studio clarity",
+    negativePrompt: "flat lighting, uncontrolled spill, blown highlights, muddy shadows",
+  },
+  {
+    id: "lighting-back-rim-glow",
+    category: "lighting",
+    title: "逆光轮廓",
+    scene: "人物边缘、产品质感、氛围海报",
+    positivePrompt:
+      "motivated backlight and rim glow, luminous subject edges, readable silhouette, controlled lens bloom, subtle haze catching the light, cinematic separation from background",
+    negativePrompt: "overexposed silhouette, washed-out subject, random glare, lost detail",
+  },
+  {
+    id: "lighting-rembrandt-portrait",
+    category: "lighting",
+    title: "伦勃朗肖像光",
+    scene: "人像、角色设定、戏剧感画面",
+    positivePrompt:
+      "Rembrandt-inspired portrait lighting, angled key light creating a small cheek triangle, rich shadow modeling, natural skin texture, restrained background, painterly cinematic depth",
+    negativePrompt: "flat face lighting, harsh flash, plastic skin, uneven eyes",
+  },
+  {
+    id: "lighting-top-stage",
+    category: "lighting",
+    title: "顶光舞台感",
+    scene: "戏剧人物、舞台、悬疑氛围",
+    positivePrompt:
+      "dramatic overhead stage lighting, focused pool of light, sculpted shadows falling downward, strong mood isolation, subject readable within darkness, theatrical cinematic atmosphere",
+    negativePrompt: "random spotlight, crushed subject detail, noisy darkness, unclear focal point",
+  },
+  {
+    id: "lighting-high-key-clean",
+    category: "lighting",
+    title: "高调明亮光",
+    scene: "美妆、母婴、清爽产品视觉",
+    positivePrompt:
+      "high-key bright lighting, soft low-contrast shadows, clean whites, airy color palette, accurate material detail, polished commercial freshness",
+    negativePrompt: "gray whites, harsh shadow edges, overexposed texture, dirty background",
+  },
+  {
+    id: "lighting-flat-reference",
+    category: "lighting",
+    title: "平光参考",
+    scene: "设定图、材质参考、减少戏剧阴影",
+    positivePrompt:
+      "even flat reference lighting, minimal cast shadows, accurate color and material readability, neutral exposure, clear form description, practical design reference",
+    negativePrompt: "dramatic contrast, color cast, deep shadow hiding details, glossy glare",
+  },
+  {
+    id: "lighting-volumetric-beams",
+    category: "lighting",
+    title: "体积光束",
+    scene: "森林、窗边、舞台、尘雾空间",
+    positivePrompt:
+      "volumetric light beams through visible air, subtle dust or mist catching the light, natural beam direction, readable subject silhouette, cinematic depth without overexposure",
+    negativePrompt: "random light streaks, overexposed haze, hidden subject, artificial glow overlay",
+  },
+  {
+    id: "custom-atmosphere-weather",
+    category: "custom",
+    title: "天气气氛增强",
+    scene: "雨、雪、雾、沙尘等环境情绪",
+    positivePrompt:
+      "Atmosphere: [雨/雪/雾/沙尘/潮湿空气]\nSubject: [主体]\nScene: [场景]\nEffect behavior: particles interact naturally with light, depth, surfaces and motion\nVisual goal: atmospheric enhancement without hiding the subject",
+    negativePrompt: "effect covering the subject, random particles, fake overlay, low visibility",
+  },
+  {
+    id: "custom-biome-glow",
+    category: "custom",
+    title: "生物荧光场效",
+    scene: "奇幻、海底、森林、科幻氛围",
+    positivePrompt:
+      "Environment: [环境]\nBioluminescent elements: [发光植物/浮游生物/菌类/能量纹理]\nLight behavior: soft organic glow, visible interaction with nearby surfaces, layered depth cues\nMood: mysterious but readable",
+    negativePrompt: "random neon, overbright glow, noisy speckles, unreadable subject",
+  },
+  {
+    id: "custom-surreal-afterimage",
+    category: "custom",
+    title: "超现实残影",
+    scene: "梦境、记忆、超现实动态感",
+    positivePrompt:
+      "Subject: [主体]\nSurreal motion idea: elongated afterimage, melting rhythm, dreamlike spatial distortion\nComposition: keep the subject recognizable while the surrounding forms bend with motion\nMood: poetic, uncanny, cinematic",
+    negativePrompt: "unrecognizable subject, random deformation, messy abstraction, broken anatomy",
   },
   {
     id: "custom-structured-brief",
