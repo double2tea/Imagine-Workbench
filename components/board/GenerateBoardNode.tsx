@@ -1,5 +1,5 @@
 import { memo, useMemo, useRef, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { AudioLines, FileText, ImagePlus, Loader2, Play, Plus, Video, X } from "lucide-react";
+import { AudioLines, FileText, ImagePlus, Loader2, Mic2, Play, Plus, Video, X } from "lucide-react";
 import ModelPriceBadge from "@/components/creation/ModelPriceBadge";
 import BoardPromptTextarea, { type BoardPromptTextareaHandle } from "@/components/board/BoardPromptTextarea";
 import MediaReferenceThumbnail from "@/components/reference/MediaReferenceThumbnail";
@@ -56,6 +56,7 @@ interface GenerateBoardNodeProps {
   onExecute: () => void;
   onMaterializeResult?: (assetId: string) => void;
   onOpenResult?: (item: StorageItem) => void;
+  onSaveVoiceProfile?: (item: StorageItem) => void;
   onSelectResult: (assetId: string) => void;
   onSelectReference?: (reference: BoardPromptReference, index: number) => void;
   onUpdate: (input: BoardGenerateNodeUpdate) => void;
@@ -72,6 +73,7 @@ interface BoardResultStackProps {
   hasResultConnection?: boolean;
   onMaterializeResult?: (assetId: string) => void;
   onOpenResult?: (item: StorageItem) => void;
+  onSaveVoiceProfile?: (item: StorageItem) => void;
   onSelectResult: (assetId: string) => void;
   resultItems: StorageItem[];
 }
@@ -81,6 +83,7 @@ export function BoardResultStack({
   hasResultConnection = false,
   onMaterializeResult,
   onOpenResult,
+  onSaveVoiceProfile,
   onSelectResult,
   resultItems,
 }: BoardResultStackProps) {
@@ -149,6 +152,20 @@ export function BoardResultStack({
                   title="放到画板"
                 >
                   <Plus className="h-2.5 w-2.5" />
+                </button>
+              ) : null}
+              {item.type === "audio" && onSaveVoiceProfile ? (
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onSaveVoiceProfile(item);
+                  }}
+                  onPointerDown={stopPointer}
+                  className="absolute bottom-0 left-0 flex h-4 w-4 items-center justify-center rounded-br rounded-tl border-r border-t border-cyan-200/60 bg-cyan-600 text-white shadow transition hover:bg-cyan-500"
+                  title="保存为克隆音色"
+                >
+                  <Mic2 className="h-2.5 w-2.5" />
                 </button>
               ) : null}
             </div>
@@ -225,6 +242,7 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
   onExecute,
   onMaterializeResult,
   onOpenResult,
+  onSaveVoiceProfile,
   onSelectReference,
   onSelectResult,
   onUpdate,
@@ -409,6 +427,7 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
         hasResultConnection={hasResultConnection}
         onMaterializeResult={onMaterializeResult}
         onOpenResult={onOpenResult}
+        onSaveVoiceProfile={onSaveVoiceProfile}
         onSelectResult={onSelectResult}
         resultItems={resultItems}
       />

@@ -4246,6 +4246,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           handleCaptureVideoFrame(boardController.selectedNodeId ?? "", item, frame)
         }
         onSavePanoramaScreenshots={handleSavePanoramaScreenshots}
+        onSaveVoiceProfile={setVoiceProfileSourceItem}
         onClose={() => setFullscreenItem(null)}
         onSelectItem={handleOpenFullscreen}
       />

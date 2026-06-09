@@ -1,4 +1,4 @@
-import { Check, Clock3, Compass, Copy, FileText, Film, ImageDown, Music, type LucideIcon, SkipBack, SkipForward, X } from "lucide-react";
+import { Check, Clock3, Compass, Copy, FileText, Film, ImageDown, Mic2, Music, type LucideIcon, SkipBack, SkipForward, X } from "lucide-react";
 import { AnimatePresence } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import AudioWaveformPreview from "@/components/audio/AudioWaveformPreview";
@@ -16,6 +16,7 @@ interface FullscreenPreviewProps {
   items?: StorageItem[];
   onCaptureVideoFrame: (item: StorageItem, frame: CapturedVideoFrame) => void | Promise<unknown>;
   onSavePanoramaScreenshots: (item: StorageItem, screenshots: PanoramaScreenshot[]) => void | Promise<void>;
+  onSaveVoiceProfile?: (item: StorageItem) => void;
   onClose: () => void;
   onSelectItem?: (item: StorageItem) => void;
 }
@@ -32,7 +33,7 @@ const frameCaptureActions: Array<{
   { icon: SkipForward, mode: "last" },
 ];
 
-export default function FullscreenPreview({ item, items = [], onCaptureVideoFrame, onSavePanoramaScreenshots, onClose, onSelectItem }: FullscreenPreviewProps) {
+export default function FullscreenPreview({ item, items = [], onCaptureVideoFrame, onSavePanoramaScreenshots, onSaveVoiceProfile, onClose, onSelectItem }: FullscreenPreviewProps) {
   const [copyResult, setCopyResult] = useState<CopyResult>(null);
   const [isFrameMenuOpen, setIsFrameMenuOpen] = useState(false);
   const [panoramaItem, setPanoramaItem] = useState<StorageItem | null>(null);
@@ -199,6 +200,17 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
                   >
                     <Compass className="h-3.5 w-3.5" />
                     360 查看
+                  </button>
+                )}
+                {item.type === "audio" && onSaveVoiceProfile && (
+                  <button
+                    type="button"
+                    onClick={() => onSaveVoiceProfile(item)}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-md border border-cyan-400/25 bg-cyan-500/10 px-2.5 text-xs font-medium text-cyan-100 transition hover:border-cyan-300/45 hover:bg-cyan-500/20 hover:text-white"
+                    title="保存为克隆音色"
+                  >
+                    <Mic2 className="h-3.5 w-3.5" />
+                    保存音色
                   </button>
                 )}
                 <button

@@ -1805,6 +1805,7 @@ export default function Home() {
         items={filteredItems.filter(item => item.status === "complete")}
         onCaptureVideoFrame={handleCaptureVideoFrame}
         onSavePanoramaScreenshots={handleSavePanoramaScreenshots}
+        onSaveVoiceProfile={setVoiceProfileSourceItem}
         onClose={() => setFullscreenItem(null)}
         onSelectItem={setFullscreenItem}
       />

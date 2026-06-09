@@ -1,5 +1,5 @@
 "use client";
-import AudioWaveformPreview from "@/components/audio/AudioWaveformPreview";
+import VoiceProfilePreviewPlayer from "@/components/audio/VoiceProfilePreviewPlayer";
 import ModelPriceBadge from "@/components/creation/ModelPriceBadge";
 import type { BoardGenerateInputSummary } from "@/components/board/GenerateBoardNode";
 
@@ -896,9 +896,7 @@ function AudioOperationInspector({
                 <span>{selectedCloneVoiceProfile.referenceAudioAssetIds.length} 个源</span>
               </div>
               {voiceProfilePreviewUrl ? (
-                <div className="h-24 overflow-hidden rounded-lg">
-                  <AudioWaveformPreview src={voiceProfilePreviewUrl} size="compact" tone="media" />
-                </div>
+                <VoiceProfilePreviewPlayer src={voiceProfilePreviewUrl} />
               ) : (
                 <p>源音频不可预览或已缺失</p>
               )}

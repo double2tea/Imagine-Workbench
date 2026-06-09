@@ -46,6 +46,7 @@ interface RunningHubAppBoardNodeProps {
   onFetchAppSchema: (webappId: string) => Promise<BoardRunningHubAppSchemaResult>;
   onMaterializeResult?: (assetId: string) => void;
   onOpenResult?: (item: StorageItem) => void;
+  onSaveVoiceProfile?: (item: StorageItem) => void;
   onSelectResult: (assetId: string) => void;
   onSelectReference?: (reference: BoardPromptReference, index: number) => void;
   onUpdate: (input: BoardRunningHubAppNodeUpdate) => void;
@@ -247,6 +248,7 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
   onFetchAppSchema,
   onMaterializeResult,
   onOpenResult,
+  onSaveVoiceProfile,
   onSelectResult,
   onSelectReference,
   onUpdate,
@@ -524,6 +526,7 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
             activeAssetId={activeResultAssetId}
             onMaterializeResult={onMaterializeResult}
             onOpenResult={onOpenResult}
+            onSaveVoiceProfile={onSaveVoiceProfile}
             onSelectResult={onSelectResult}
             resultItems={resultItems}
           />

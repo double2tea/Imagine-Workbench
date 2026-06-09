@@ -2,7 +2,7 @@
 
 import { Mic2, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { VOICE_PROFILE_TAG_OPTIONS, voiceProfileDefaultNameFromAsset } from "@/lib/voice-profiles";
+import { VOICE_PROFILE_TAG_GROUPS, voiceProfileDefaultNameFromAsset } from "@/lib/voice-profiles";
 import type { StorageItem } from "@/lib/db";
 
 export interface SaveVoiceProfileDialogInput {
@@ -108,20 +108,27 @@ export default function SaveVoiceProfileDialog({ item, onClose, onSave }: SaveVo
 
           <div className="grid gap-2">
             <span className="imagine-section-label">标签</span>
-            <div className="flex flex-wrap gap-1.5">
-              {VOICE_PROFILE_TAG_OPTIONS.map(tag => (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() => toggleTag(tag)}
-                  className={`rounded-md border px-2 py-1 text-[11px] font-semibold transition ${
-                    selectedTags.includes(tag)
-                      ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100"
-                      : "border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)] hover:text-[var(--iw-text)]"
-                  }`}
-                >
-                  {tag}
-                </button>
+            <div className="grid gap-2">
+              {VOICE_PROFILE_TAG_GROUPS.map(group => (
+                <div key={group.label} className="grid gap-1.5">
+                  <span className="text-[10px] font-semibold text-[var(--iw-muted)]">{group.label}</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {group.tags.map(tag => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => toggleTag(tag)}
+                        className={`rounded-md border px-2 py-1 text-[11px] font-semibold transition ${
+                          selectedTags.includes(tag)
+                            ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100"
+                            : "border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)] hover:text-[var(--iw-text)]"
+                        }`}
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           </div>

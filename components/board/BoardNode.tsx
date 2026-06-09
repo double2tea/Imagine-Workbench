@@ -453,6 +453,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             onMeasureAspectRatio={c.onMeasureAssetAspectRatio}
             onOpenFullscreen={c.onOpenFullscreen}
             onOpenPanorama={c.onOpenPanorama}
+            onSaveVoiceProfile={c.onSaveVoiceProfile}
             onSelectStackAsset={assetId => c.onSelectAssetStackResult(node.id, assetId)}
           />
         )}
@@ -494,6 +495,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             onExecute={() => c.onExecuteGenerate(node.id)}
             onMaterializeResult={assetId => c.onMaterializeGenerateResult(node.id, assetId)}
             onOpenResult={c.onOpenFullscreen}
+            onSaveVoiceProfile={c.onSaveVoiceProfile}
             onSelectResult={assetId => c.onSelectGenerateResult(node.id, assetId)}
             onSelectReference={reference => c.onSelectPromptReference(node.id, reference)}
             onUpdate={input => c.onUpdateGenerate(node.id, input)}
@@ -509,6 +511,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             onFetchAppSchema={c.onFetchRunningHubAppSchema}
             onMaterializeResult={assetId => c.onMaterializeGenerateResult(node.id, assetId)}
             onOpenResult={c.onOpenFullscreen}
+            onSaveVoiceProfile={c.onSaveVoiceProfile}
             onSelectResult={assetId => c.onSelectGenerateResult(node.id, assetId)}
             onSelectReference={reference => c.onSelectPromptReference(node.id, reference)}
             onUpdate={input => c.onUpdateRunningHubApp(node.id, input)}

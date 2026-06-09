@@ -1,4 +1,4 @@
-import { Compass, Download, ImageDown, Maximize2, Music, Paintbrush, Scissors, Video, X } from "lucide-react";
+import { Compass, Download, ImageDown, Maximize2, Mic2, Music, Paintbrush, Scissors, Video, X } from "lucide-react";
 import { memo, useMemo, useRef } from "react";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
 import BoardAudioWaveform from "@/components/board/BoardAudioWaveform";
@@ -22,6 +22,7 @@ interface ResultBoardNodeProps {
   onMeasureAspectRatio?: (nodeId: string, aspectRatio: number) => void;
   onOpenFullscreen?: (item: StorageItem) => void;
   onOpenPanorama?: (item: StorageItem) => void;
+  onSaveVoiceProfile?: (item: StorageItem) => void;
   onSelectStackAsset?: (assetId: string) => void;
 }
 
@@ -68,6 +69,7 @@ const ResultBoardNode = memo(function ResultBoardNode({
   onMeasureAspectRatio,
   onOpenFullscreen,
   onOpenPanorama,
+  onSaveVoiceProfile,
   onSelectStackAsset,
 }: ResultBoardNodeProps) {
   const fallbackItem = useMemo(() => resultNodeToStorageItem(node, boardId), [boardId, node]);
@@ -138,6 +140,16 @@ const ResultBoardNode = memo(function ResultBoardNode({
             title="截取当前帧"
           >
             <ImageDown className="h-3.5 w-3.5" />
+          </button>
+        )}
+        {item.type === "audio" && onSaveVoiceProfile && (
+          <button
+            type="button"
+            onClick={() => onSaveVoiceProfile?.(item)}
+            className="imagine-board-asset-action nodrag text-cyan-200 hover:border-cyan-500/40 hover:bg-cyan-600 hover:text-white"
+            title="保存为克隆音色"
+          >
+            <Mic2 className="h-3.5 w-3.5" />
           </button>
         )}
         <button

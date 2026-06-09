@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from "react";
 import { AudioLines, Pencil, RefreshCw, Sparkles, Trash2 } from "lucide-react";
-import AudioWaveformPreview from "@/components/audio/AudioWaveformPreview";
+import VoiceProfilePreviewPlayer from "@/components/audio/VoiceProfilePreviewPlayer";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
 import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
 import type { ModelOptionGroup } from "@/components/creation/ModelSelectCombobox";
@@ -30,7 +30,7 @@ import { getAssetMetasByIds, hydrateAssets } from "@/lib/db";
 import { getAudioModelCapabilities, parseProviderModel, type AudioModelCapabilities, type AudioOperationMode } from "@/lib/providers/model-catalog";
 import {
   VOICE_PROFILES_CHANGED_EVENT,
-  VOICE_PROFILE_TAG_OPTIONS,
+  VOICE_PROFILE_TAG_GROUPS,
   deleteVoiceProfile,
   getVisibleVoiceProfilesForAudioModel,
   isBuiltInVoiceProfileId,
@@ -500,7 +500,7 @@ export default function AudioGenerationPanel({
       )}
 
       {showVoiceProfileLibrary && (
-        <div className="rounded-md border border-cyan-400/15 bg-cyan-500/8 p-3">
+        <div className="rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-3 text-[var(--iw-text)]">
           <div className="mb-2 flex items-center justify-between gap-2">
             <label className="imagine-section-label">音色库</label>
             <div className="flex items-center gap-1.5">
@@ -508,7 +508,7 @@ export default function AudioGenerationPanel({
                 <button
                   type="button"
                   onClick={openNewVoiceProfileEditor}
-                  className="flex h-7 items-center gap-1 rounded-md border border-cyan-400/20 px-2 text-[10px] font-semibold text-cyan-100 transition hover:bg-cyan-500/10"
+                  className="flex h-7 items-center gap-1 rounded-md border border-cyan-400/25 bg-cyan-500/8 px-2 text-[10px] font-semibold text-[var(--iw-text)] transition hover:bg-cyan-500/12"
                 >
                   保存
                 </button>
@@ -518,7 +518,7 @@ export default function AudioGenerationPanel({
                   <button
                     type="button"
                     onClick={() => openEditVoiceProfileEditor(selectedVoiceProfile)}
-                    className="flex h-7 items-center gap-1 rounded-md border border-cyan-400/20 px-2 text-[10px] font-semibold text-cyan-100 transition hover:bg-cyan-500/10"
+                    className="flex h-7 items-center gap-1 rounded-md border border-cyan-400/25 bg-cyan-500/8 px-2 text-[10px] font-semibold text-[var(--iw-text)] transition hover:bg-cyan-500/12"
                   >
                     <Pencil className="h-3 w-3" />
                     编辑
@@ -526,7 +526,7 @@ export default function AudioGenerationPanel({
                   <button
                     type="button"
                     onClick={() => void handleDeleteVoiceProfile()}
-                    className="flex h-7 items-center gap-1 rounded-md border border-red-400/20 px-2 text-[10px] font-semibold text-red-200 transition hover:bg-red-500/10"
+                    className="flex h-7 items-center gap-1 rounded-md border border-red-400/30 bg-red-500/8 px-2 text-[10px] font-semibold text-red-600 transition hover:bg-red-500/12"
                   >
                     <Trash2 className="h-3 w-3" />
                     删除
@@ -559,17 +559,15 @@ export default function AudioGenerationPanel({
               ))}
             </select>
             {selectedCloneVoiceProfile && (
-              <div className="rounded-md border border-cyan-400/10 bg-slate-950/20 p-2 text-[11px] text-cyan-100/80">
+              <div className="rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)] p-2 text-[11px] text-[var(--iw-muted)]">
                 <div className="mb-1 flex items-center justify-between gap-2">
                   <span>参考音频已由音色库提供</span>
                   <span>{selectedCloneVoiceProfile.referenceAudioAssetIds.length} 个源</span>
                 </div>
                 {voiceProfilePreviewUrl ? (
-                  <div className="h-24 overflow-hidden rounded-lg">
-                    <AudioWaveformPreview src={voiceProfilePreviewUrl} size="compact" tone="media" />
-                  </div>
+                  <VoiceProfilePreviewPlayer src={voiceProfilePreviewUrl} />
                 ) : (
-                  <p className="text-cyan-100/55">源音频不可预览或已缺失</p>
+                  <p className="text-[var(--iw-muted)]">源音频不可预览或已缺失</p>
                 )}
               </div>
             )}
@@ -588,20 +586,27 @@ export default function AudioGenerationPanel({
                   className="imagine-input min-h-16 resize-y rounded-md px-3 py-2 text-xs"
                   maxLength={180}
                 />
-                <div className="flex flex-wrap gap-1.5">
-                  {VOICE_PROFILE_TAG_OPTIONS.map(tag => (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => toggleVoiceProfileTag(tag)}
-                      className={`rounded-md border px-2 py-1 text-[10px] font-semibold transition ${
-                        voiceProfileTags.includes(tag)
-                          ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100"
-                          : "border-cyan-400/15 bg-slate-950/20 text-cyan-100/70 hover:text-cyan-50"
-                      }`}
-                    >
-                      {tag}
-                    </button>
+                <div className="grid gap-2">
+                  {VOICE_PROFILE_TAG_GROUPS.map(group => (
+                    <div key={group.label} className="grid gap-1.5">
+                      <span className="text-[10px] font-semibold text-[var(--iw-muted)]">{group.label}</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {group.tags.map(tag => (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => toggleVoiceProfileTag(tag)}
+                            className={`rounded-md border px-2 py-1 text-[10px] font-semibold transition ${
+                              voiceProfileTags.includes(tag)
+                                ? "border-cyan-400/45 bg-cyan-500/12 text-[var(--iw-text)]"
+                                : "border-[var(--iw-border)] bg-[var(--iw-panel)] text-[var(--iw-muted)] hover:text-[var(--iw-text)]"
+                            }`}
+                          >
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   ))}
                 </div>
                 <div className="grid grid-cols-2 gap-2">
@@ -624,29 +629,29 @@ export default function AudioGenerationPanel({
             )}
           </div>
           {selectedVoiceProfile && (selectedVoiceProfile.description || selectedVoiceProfile.tags.length > 0) && (
-            <div className="mt-2 rounded-md border border-cyan-400/10 bg-slate-950/20 p-2 text-[11px] text-cyan-100/85">
+            <div className="mt-2 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)] p-2 text-[11px] text-[var(--iw-muted)]">
               {selectedVoiceProfile.description && <p className="line-clamp-2">{selectedVoiceProfile.description}</p>}
               {selectedVoiceProfile.tags.length > 0 && (
                 <div className="mt-1 flex flex-wrap gap-1">
                   {selectedVoiceProfile.tags.map(tag => (
-                    <span key={tag} className="rounded border border-cyan-400/15 px-1.5 py-0.5 text-[10px] text-cyan-100/75">{tag}</span>
+                    <span key={tag} className="rounded border border-[var(--iw-border)] px-1.5 py-0.5 text-[10px] text-[var(--iw-muted)]">{tag}</span>
                   ))}
                 </div>
               )}
             </div>
           )}
           {needsCloneConsent && (
-            <label className="mt-2 flex items-start gap-2 text-[11px] leading-5 text-cyan-100">
+            <label className="mt-2 flex items-start gap-2 text-[11px] leading-5 text-[var(--iw-text)]">
               <input
                 type="checkbox"
                 checked={voiceCloneConsentAccepted}
                 onChange={event => onVoiceCloneConsentChange(event.target.checked)}
-                className="mt-1 h-3.5 w-3.5 rounded border-cyan-400/30 bg-slate-950 text-cyan-500 focus:ring-cyan-400/30"
+                className="mt-1 h-3.5 w-3.5 rounded border-[var(--iw-border)] bg-[var(--iw-panel)] text-cyan-500 focus:ring-cyan-400/30"
               />
               我确认拥有参考音频的使用权，并允许用于本次音色克隆。
             </label>
           )}
-          {voiceProfileMessage && <p className="mt-2 text-[11px] text-cyan-100">{voiceProfileMessage}</p>}
+          {voiceProfileMessage && <p className="mt-2 text-[11px] text-[var(--iw-text)]">{voiceProfileMessage}</p>}
         </div>
       )}
 

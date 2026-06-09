@@ -34,29 +34,14 @@ export type VoiceProfileInput = Omit<VoiceProfile, "createdAt" | "updatedAt"> & 
 
 const BUILT_IN_PROFILE_TIMESTAMP = "2026-06-07T00:00:00.000Z";
 
-export const VOICE_PROFILE_TAG_OPTIONS = [
-  "男声",
-  "女声",
-  "中性",
-  "儿童",
-  "青年",
-  "中年",
-  "老人",
-  "广告",
-  "自然",
-  "纪录",
-  "综艺",
-  "新闻",
-  "旁白",
-  "播客",
-  "角色",
-  "清亮",
-  "磁性",
-  "沙哑",
-  "甜美",
-  "沉稳",
-  "活泼",
+export const VOICE_PROFILE_TAG_GROUPS = [
+  { label: "性别", tags: ["男声", "女声", "中性"] },
+  { label: "年龄", tags: ["儿童", "青年", "中年", "老人"] },
+  { label: "场景", tags: ["广告", "自然", "纪录", "综艺", "新闻", "旁白", "播客", "角色"] },
+  { label: "质感", tags: ["清亮", "磁性", "沙哑", "甜美", "沉稳", "活泼"] },
 ] as const;
+
+export const VOICE_PROFILE_TAG_OPTIONS = VOICE_PROFILE_TAG_GROUPS.flatMap(group => group.tags);
 
 export interface SaveClonedVoiceProfileInput {
   name: string;
