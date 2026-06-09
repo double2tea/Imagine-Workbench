@@ -758,14 +758,10 @@ export default function Home() {
   const videoModelGroups = getProviderModelGroups(videoModelOptions, providerKeys, customProviders);
   const audioModelGroups = getProviderModelGroups(audioModelOptions, providerKeys, customProviders);
   const chatModelGroups = getProviderModelGroups(chatModelOptions, providerKeys, customProviders);
-  const availableImageEditModels = useMemo(
-    () => imageModelGroups.flatMap(group => group.options.map(option => option.value)),
-    [imageModelGroups],
-  );
   const {
     featureModels: imageEditFeatureModels,
     selectFeatureModel: selectImageEditFeatureModel,
-  } = useImageEditFeatureModels(availableImageEditModels);
+  } = useImageEditFeatureModels();
   const handleSelectImageModel = (model: string) => {
     const capabilities = getImageModelCapabilities(model);
     const nextAspectRatio = capabilities.aspectRatios[0]?.value ?? "1:1";

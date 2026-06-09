@@ -111,6 +111,10 @@ const OPERATION_COPY: Record<ImageEditFeature, { title: string; hint: string; pr
   },
 };
 
+function defaultOutpaintMargins() {
+  return { left: 0, right: 0, top: 0, bottom: 0 };
+}
+
 function getCropPresetRatio(presetId: CropPresetId, canvasSize: CanvasSize): AspectRatio | null {
   if (presetId === "original") return { width: canvasSize.width, height: canvasSize.height };
 
@@ -197,7 +201,7 @@ export default function CanvasMaskEditor({
   const [isDrawing, setIsDrawing] = useState(false);
   const [editorMode, setEditorMode] = useState<EditorMode>("mask");
   const [editPrompt, setEditPrompt] = useState(initialPrompt);
-  const [outpaintMargins, setOutpaintMargins] = useState({ left: 0, right: 0, top: 0, bottom: 0 });
+  const [outpaintMargins, setOutpaintMargins] = useState(defaultOutpaintMargins);
   const [brushSize, setBrushSize] = useState(24);
   const [hasDrawn, setHasDrawn] = useState(false);
   const [hasLocalEdits, setHasLocalEdits] = useState(false);
@@ -248,6 +252,7 @@ export default function CanvasMaskEditor({
   useEffect(() => {
     if (!isOpen) return;
     setEditPrompt(initialPrompt);
+    setOutpaintMargins(defaultOutpaintMargins());
     if (operation === "outpaint") {
       setEditorMode("outpaint");
     } else if (operation === "erase") {
@@ -437,6 +442,7 @@ export default function CanvasMaskEditor({
     setCropRect(null);
     setCropPresetId("free");
     setCropCursor("crosshair");
+    setOutpaintMargins(defaultOutpaintMargins());
     setHasLocalEdits(false);
   };
 

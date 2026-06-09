@@ -3953,14 +3953,10 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const videoModelGroups = getProviderModelGroups(videoModelOptions, providerKeys, customProviders);
   const audioModelGroups = getProviderModelGroups(audioModelOptions, providerKeys, customProviders);
   const chatModelGroups = getProviderModelGroups(chatModelOptions, providerKeys, customProviders);
-  const availableImageEditModels = useMemo(
-    () => imageModelGroups.flatMap(group => group.options.map(option => option.value)),
-    [imageModelGroups],
-  );
   const {
     featureModels: imageEditFeatureModels,
     selectFeatureModel: selectImageEditFeatureModel,
-  } = useImageEditFeatureModels(availableImageEditModels);
+  } = useImageEditFeatureModels();
   const resolveBoardQuickEditSource = (nodeId: string) => {
     const node = boardController.board.nodes.find(item => item.id === nodeId);
     if (!node || (node.kind !== "asset" && node.kind !== "result") || node.asset.type !== "image") return null;

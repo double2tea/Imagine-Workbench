@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { DEFAULT_IMAGE_MODEL } from "@/lib/providers/model-catalog";
-
 export type ImageEditFeature = "redraw" | "erase" | "outpaint" | "cutout";
 
 export type ImageEditFeatureModels = Record<ImageEditFeature, string>;
@@ -54,38 +52,20 @@ function writeFeatureModels(value: ImageEditFeatureModels): void {
   }
 }
 
-function normalizeUnavailableDefaults(
-  value: ImageEditFeatureModels,
-  availableImageModels: readonly string[],
-): ImageEditFeatureModels {
-  if (availableImageModels.length === 0) return value;
-  const available = new Set(availableImageModels);
-  const fallback = available.has(DEFAULT_IMAGE_EDIT_FEATURE_MODELS.redraw)
-    ? DEFAULT_IMAGE_EDIT_FEATURE_MODELS.redraw
-    : available.has(DEFAULT_IMAGE_MODEL)
-      ? DEFAULT_IMAGE_MODEL
-      : availableImageModels[0];
-
-  return {
-    redraw: available.has(value.redraw) ? value.redraw : fallback,
-    erase: available.has(value.erase) ? value.erase : fallback,
-    outpaint: available.has(value.outpaint) ? value.outpaint : fallback,
-    cutout: available.has(value.cutout) ? value.cutout : fallback,
-  };
+function imageEditFeatureModelsEqual(left: ImageEditFeatureModels, right: ImageEditFeatureModels): boolean {
+  return IMAGE_EDIT_FEATURES.every(feature => left[feature.key] === right[feature.key]);
 }
 
-export function useImageEditFeatureModels(availableImageModels: readonly string[]) {
+export function useImageEditFeatureModels() {
   const [featureModels, setFeatureModels] = useState<ImageEditFeatureModels>(DEFAULT_IMAGE_EDIT_FEATURE_MODELS);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const restored = readStoredFeatureModels(localStorage.getItem(STORAGE_KEY));
-      const normalized = normalizeUnavailableDefaults(restored, availableImageModels);
-      setFeatureModels(normalized);
-      writeFeatureModels(normalized);
+      setFeatureModels(prev => imageEditFeatureModelsEqual(prev, restored) ? prev : restored);
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [availableImageModels]);
+  }, []);
 
   const selectFeatureModel = useCallback((feature: ImageEditFeature, model: string) => {
     setFeatureModels(prev => {
