@@ -19,6 +19,7 @@ export interface BoardNodeCallbacks {
   onMoveReferenceGroupItem: (nodeId: string, assetId: string, direction: "up" | "down") => void;
   onMoveGenerateReferenceEdge: (nodeId: string, sourceEdgeId: string, targetEdgeId: string) => void;
   onMaterializeGenerateResult: (nodeId: string, assetId: string) => void;
+  onRemoveGenerateReferenceEdge: (edgeId: string) => void;
   onRemoveReferenceGroupItem: (nodeId: string, assetId: string) => void;
   onSendAgent: (nodeId: string) => void;
   onSendAssetToAgent: (nodeId: string) => void;

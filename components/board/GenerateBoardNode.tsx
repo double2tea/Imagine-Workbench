@@ -18,6 +18,7 @@ import {
 import { AUDIO_MODE_LABELS, audioOperationFormatOptions, audioOperationRequiresTextInput } from "@/lib/audio-operation-rules";
 import { getAudioModelCapabilities, getVideoModelCapabilities } from "@/lib/providers/model-catalog";
 import { selectVideoReferenceTypesForMode } from "@/lib/video-reference-selection";
+import { compactBoardModelLabel } from "@/lib/board/provenance";
 
 type GenerateNode = BoardImageGenerateNode | BoardVideoGenerateNode | BoardAudioOperationNode;
 const variantCountOptions: BoardGenerateVariantCount[] = [1, 2, 4];
@@ -27,6 +28,7 @@ export interface BoardGenerateReferencePreview {
   role?: string;
   sourceEdgeId?: string;
   sourceNodeId?: string;
+  sourceTitle?: string;
   type?: ReferenceImageRef["type"];
   url: string;
 }
@@ -67,6 +69,7 @@ type GenerateStatusLineTone = "complete" | "failed" | "idle" | "processing";
 
 interface BoardResultStackProps {
   activeAssetId?: string;
+  hasResultConnection?: boolean;
   onMaterializeResult?: (assetId: string) => void;
   onOpenResult?: (item: StorageItem) => void;
   onSelectResult: (assetId: string) => void;
@@ -75,65 +78,83 @@ interface BoardResultStackProps {
 
 export function BoardResultStack({
   activeAssetId,
+  hasResultConnection = false,
   onMaterializeResult,
   onOpenResult,
   onSelectResult,
   resultItems,
 }: BoardResultStackProps) {
   if (resultItems.length === 0) return null;
+  const activeIndex = Math.max(0, resultItems.findIndex(item => item.id === activeAssetId));
+  const activeItem = resultItems[activeIndex] ?? resultItems[0];
+  const activePosition = activeIndex + 1;
   const stopPointer = (event: ReactPointerEvent<HTMLButtonElement>): void => {
     event.stopPropagation();
   };
   return (
-    <div className="nodrag flex min-h-10 min-w-0 items-center gap-1 overflow-x-auto rounded-md border border-emerald-400/20 bg-emerald-500/5 p-1">
-      {resultItems.map((item, index) => {
-        const isActive = item.id === activeAssetId;
-        return (
-          <div key={item.id} className="relative h-8 w-8 shrink-0">
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                onSelectResult(item.id);
-              }}
-              onDoubleClick={(event) => {
-                event.stopPropagation();
-                onOpenResult?.(item);
-              }}
-              onPointerDown={stopPointer}
-              className={`h-full w-full overflow-hidden rounded border transition ${
-                isActive ? "border-emerald-300 ring-2 ring-emerald-400/25" : "border-[var(--iw-border)] opacity-75 hover:opacity-100"
-              }`}
-              title={`结果 ${index + 1}`}
-            >
-              {item.type === "transcript" ? (
-                <div className="flex h-full w-full items-center justify-center bg-cyan-950/35">
-                  <FileText className="h-4 w-4 text-cyan-200" />
-                </div>
-              ) : (
-                <MediaReferenceThumbnail reference={{ type: item.type, url: item.url }} alt="" className="h-full w-full" />
-              )}
-              <span className="absolute bottom-0 right-0 rounded-tl bg-black/60 px-1 text-[8px] font-semibold text-white">
-                {index + 1}
-              </span>
-            </button>
-            {onMaterializeResult ? (
+    <div className="nodrag min-w-0 rounded-md border border-emerald-400/20 bg-emerald-500/5 p-1">
+      <div className="mb-1 flex min-w-0 items-center justify-between gap-2 px-1">
+        <span className="truncate text-[10px] font-semibold text-emerald-100" title={compactBoardModelLabel(activeItem.model)}>
+          {activeItem.type} · {activePosition}/{resultItems.length} · {compactBoardModelLabel(activeItem.model)}
+        </span>
+        <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[9px] font-semibold ${
+          hasResultConnection
+            ? "border-emerald-300/30 bg-emerald-500/15 text-emerald-100"
+            : "border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)]"
+        }`}>
+          {hasResultConnection ? "已上板" : "未上板"}
+        </span>
+      </div>
+      <div className="flex min-h-10 min-w-0 items-center gap-1 overflow-x-auto">
+        {resultItems.map((item, index) => {
+          const isActive = item.id === activeItem.id;
+          return (
+            <div key={item.id} className="relative h-8 w-8 shrink-0">
               <button
                 type="button"
                 onClick={(event) => {
                   event.stopPropagation();
-                  onMaterializeResult(item.id);
+                  onSelectResult(item.id);
+                }}
+                onDoubleClick={(event) => {
+                  event.stopPropagation();
+                  onOpenResult?.(item);
                 }}
                 onPointerDown={stopPointer}
-                className="absolute right-0 top-0 flex h-4 w-4 items-center justify-center rounded-bl rounded-tr border-b border-l border-emerald-200/60 bg-emerald-500 text-white shadow transition hover:bg-emerald-400"
-                title="放到画板"
+                className={`h-full w-full overflow-hidden rounded border transition ${
+                  isActive ? "border-emerald-300 ring-2 ring-emerald-400/25" : "border-[var(--iw-border)] opacity-75 hover:opacity-100"
+                }`}
+                title={`结果 ${index + 1} · ${compactBoardModelLabel(item.model)}`}
               >
-                <Plus className="h-2.5 w-2.5" />
+                {item.type === "transcript" ? (
+                  <div className="flex h-full w-full items-center justify-center bg-cyan-950/35">
+                    <FileText className="h-4 w-4 text-cyan-200" />
+                  </div>
+                ) : (
+                  <MediaReferenceThumbnail reference={{ type: item.type, url: item.url }} alt="" className="h-full w-full" />
+                )}
+                <span className="absolute bottom-0 right-0 rounded-tl bg-black/60 px-1 text-[8px] font-semibold text-white">
+                  {index + 1}
+                </span>
               </button>
-            ) : null}
-          </div>
-        );
-      })}
+              {onMaterializeResult ? (
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onMaterializeResult(item.id);
+                  }}
+                  onPointerDown={stopPointer}
+                  className="absolute right-0 top-0 flex h-4 w-4 items-center justify-center rounded-bl rounded-tr border-b border-l border-emerald-200/60 bg-emerald-500 text-white shadow transition hover:bg-emerald-400"
+                  title="放到画板"
+                >
+                  <Plus className="h-2.5 w-2.5" />
+                </button>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -315,7 +336,11 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
   };
   const handleSlashCommand = (command: PromptTemplateSlashCommand | null): void => {
     slashCommandRef.current = command;
-    if (command) templatePickerRef.current?.open(command.search);
+    if (command) {
+      templatePickerRef.current?.open(command.search);
+    } else {
+      templatePickerRef.current?.close();
+    }
   };
   const stopBoardControlPointer = (event: ReactPointerEvent<HTMLButtonElement>): void => {
     event.stopPropagation();
@@ -381,6 +406,7 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
       )}
       <BoardResultStack
         activeAssetId={activeResultAssetId}
+        hasResultConnection={hasResultConnection}
         onMaterializeResult={onMaterializeResult}
         onOpenResult={onOpenResult}
         onSelectResult={onSelectResult}

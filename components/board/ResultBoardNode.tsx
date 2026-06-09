@@ -6,6 +6,7 @@ import PreviewImage from "@/components/PreviewImage";
 import useBoardAudioItem from "@/components/board/useBoardAudioItem";
 import useSelectedBoardVideoItem from "@/components/board/useSelectedBoardVideoItem";
 import type { BoardResultNode } from "@/lib/board";
+import { compactBoardModelLabel } from "@/lib/board/provenance";
 import { buildStorageItem, type StorageItem } from "@/lib/db";
 import type { CapturedVideoFrame } from "@/lib/video-frame";
 
@@ -124,6 +125,12 @@ const ResultBoardNode = memo(function ResultBoardNode({
           {stackItems.length}
         </div>
       )}
+      <div
+        className="pointer-events-none absolute bottom-2 left-2 z-30 max-w-[calc(100%-1rem)] rounded-md bg-slate-950/72 px-2 py-1 text-[10px] font-semibold text-white/90 opacity-0 shadow-lg backdrop-blur transition-opacity duration-200 group-hover/board-video:opacity-100"
+        title={compactBoardModelLabel(item.model)}
+      >
+        <span className="block truncate">{item.type} · {compactBoardModelLabel(item.model)}</span>
+      </div>
       {item.type === "image" ? (
         <PreviewImage
           src={item.url}

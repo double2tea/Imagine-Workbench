@@ -8,7 +8,7 @@ export const BOARD_MEDIA_FILE_ACCEPT = "image/*,video/*,audio/*";
 /** Quick-insert menu item kind (not a board node type). */
 export const BOARD_QUICK_INSERT_IMPORT_KIND = "import-media";
 
-export const BOARD_QUICK_INSERT_MENU_SIZE = { width: 176, height: 312 } as const;
+export const BOARD_QUICK_INSERT_MENU_SIZE = { width: 224, height: 472 } as const;
 export const BOARD_NODE_CONTEXT_MENU_SIZE = { width: 200, height: 240 } as const;
 
 export function isTextEntryTarget(target: EventTarget | null): boolean {

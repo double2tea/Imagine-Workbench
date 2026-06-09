@@ -29,6 +29,8 @@ export type BoardInsertKind =
   | "agent"
   | "note";
 
+export type BoardInsertGroupLabel = "开始" | "生成" | "组织";
+
 export interface BoardInsertCatalogItem {
   icon: LucideIcon;
   iconClassName: string;
@@ -105,13 +107,35 @@ export const BOARD_INSERT_CATALOG: BoardInsertCatalogItem[] = [
   },
 ];
 
+export const BOARD_INSERT_GROUP_LABELS: readonly BoardInsertGroupLabel[] = ["开始", "生成", "组织"];
+
+export function boardInsertGroupLabel(kind: BoardInsertKind): BoardInsertGroupLabel {
+  switch (kind) {
+    case "prompt":
+    case "reference-group":
+      return "开始";
+    case "image-generate":
+    case "video-generate":
+    case "audio-operation":
+    case "runninghub-app":
+      return "生成";
+    case "agent":
+    case "note":
+      return "组织";
+  }
+}
+
+export function isBoardInsertKind(value: string): value is BoardInsertKind {
+  return BOARD_INSERT_CATALOG.some(item => item.kind === value);
+}
+
 const LAST_INSERT_KEY = "imagine_board_last_insert";
 
 export function readLastBoardInsertKind(): BoardInsertKind {
   if (typeof window === "undefined") return "prompt";
   const stored = window.localStorage.getItem(LAST_INSERT_KEY);
-  return BOARD_INSERT_CATALOG.some(item => item.kind === stored)
-    ? (stored as BoardInsertKind)
+  return stored && isBoardInsertKind(stored)
+    ? stored
     : "prompt";
 }
 

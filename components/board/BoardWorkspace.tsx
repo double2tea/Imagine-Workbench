@@ -302,6 +302,7 @@ function sameGenerateInputSummary(
       reference.role === other.role &&
       reference.sourceEdgeId === other.sourceEdgeId &&
       reference.sourceNodeId === other.sourceNodeId &&
+      reference.sourceTitle === other.sourceTitle &&
       reference.type === other.type &&
       reference.url === other.url
     );
@@ -725,6 +726,7 @@ function generateInputSummaryForNode(
           role: "general" as const,
           sourceEdgeId: edge.id,
           sourceNodeId: sourceNode.id,
+          sourceTitle: sourceNode.title,
           type: sourceNode.asset.type,
           url: sourceNode.asset.url,
         }];
@@ -735,6 +737,7 @@ function generateInputSummaryForNode(
           role: reference.role,
           sourceEdgeId: edge.id,
           sourceNodeId: sourceNode.id,
+          sourceTitle: sourceNode.title,
           type: reference.type,
           url: reference.url,
         }));
@@ -1329,6 +1332,7 @@ export default function BoardWorkspace({
     onMaterializeGenerateResult: materializeGenerateResult,
     onMoveGenerateReferenceEdge: moveGenerateReferenceEdge,
     onMoveReferenceGroupItem: moveReferenceGroupItem,
+    onRemoveGenerateReferenceEdge: deleteEdge,
     onRemoveReferenceGroupItem: removeReferenceGroupItem,
     onSendAgent: onSendAgentNode,
     onSendAssetToAgent,
@@ -1367,7 +1371,7 @@ export default function BoardWorkspace({
     onCancelGenerateNode, onCaptureVideoFrame, trashAndDeleteNode, onDownloadAsset, onEditAssetImage,
     onExecuteGenerateNode, onFetchRunningHubAppSchema, focusReferenceSourceNode, onOpenFullscreen,
     onOpenPanorama, materializeGenerateResult, moveGenerateReferenceEdge, moveReferenceGroupItem,
-    removeReferenceGroupItem, onSendAgentNode, onSendAssetToAgent, connectSelectedBoardPromptReference,
+    deleteEdge, removeReferenceGroupItem, onSendAgentNode, onSendAssetToAgent, connectSelectedBoardPromptReference,
     updateReferenceGroupItemRole, updateAgentInstruction, updateGenerateNode, measureAssetAspectRatio,
     updateNodeTitle, updateRunningHubAppNode, updateNoteBody, updatePromptNode,
     board.nodes, board.edges, boardPromptReferenceGraphIndex, galleryItemById, onConnectionError,

@@ -24,6 +24,8 @@ import { useAlert } from "@/components/confirm/ConfirmProvider";
 import { BOARD_CONNECTION_HELP } from "@/lib/workspace-messages";
 import {
   BOARD_INSERT_CATALOG,
+  BOARD_INSERT_GROUP_LABELS,
+  boardInsertGroupLabel,
   readLastBoardInsertKind,
   writeLastBoardInsertKind,
   type BoardInsertKind,
@@ -84,7 +86,7 @@ const iconBtn =
 const HEADER_MENU_GAP = 8;
 const HEADER_MENU_VIEWPORT_MARGIN = 12;
 const BOARD_MENU_ESTIMATED_HEIGHT = 380;
-const INSERT_MENU_ESTIMATED_HEIGHT = 360;
+const INSERT_MENU_ESTIMATED_HEIGHT = 420;
 const OVERFLOW_MENU_ESTIMATED_HEIGHT = 280;
 
 function resolveHeaderMenuPortalRoot(): HTMLElement {
@@ -399,7 +401,7 @@ export default function BoardToolbar({
                 }
                 setIsBoardMenuOpen(false);
                 setIsOverflowOpen(false);
-                openAnchoredMenu(insertMenuButtonRef, 200, INSERT_MENU_ESTIMATED_HEIGHT, setInsertMenuPosition, () => setIsInsertMenuOpen(true));
+                openAnchoredMenu(insertMenuButtonRef, 224, INSERT_MENU_ESTIMATED_HEIGHT, setInsertMenuPosition, () => setIsInsertMenuOpen(true));
               }}
               className={`${iconBtn} !w-8 !min-w-8 !rounded-none !border-0 border-l border-l-[var(--iw-border)]`}
               data-accent="amber"
@@ -411,22 +413,29 @@ export default function BoardToolbar({
             isInsertMenuOpen,
             insertMenuPanelRef,
             insertMenuPosition,
-            "imagine-board-header-menu fixed z-[60] w-44 p-1.5",
-            BOARD_INSERT_CATALOG.map(item => (
-                <button
-                  key={item.kind}
-                  type="button"
-                  onClick={() => handleInsert(item.kind)}
-                  className="imagine-board-header-insert-row"
-                >
-                  <span
-                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border ${item.iconSurfaceClassName}`}
-                  >
-                    <BoardInsertIcon kind={item.kind} icon={item.icon} iconClassName={item.iconClassName} />
-                  </span>
-                  <span className="text-xs font-semibold">{item.label}</span>
-                </button>
-              )),
+            "imagine-board-header-menu fixed z-[60] w-56 p-1.5",
+            <div className="grid gap-2">
+              {BOARD_INSERT_GROUP_LABELS.map(groupLabel => (
+                <div key={groupLabel} className="grid gap-1">
+                  <span className="px-1 text-[10px] font-semibold text-[var(--iw-faint)]">{groupLabel}</span>
+                  {BOARD_INSERT_CATALOG.filter(item => boardInsertGroupLabel(item.kind) === groupLabel).map(item => (
+                    <button
+                      key={item.kind}
+                      type="button"
+                      onClick={() => handleInsert(item.kind)}
+                      className="imagine-board-header-insert-row"
+                    >
+                      <span
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border ${item.iconSurfaceClassName}`}
+                      >
+                        <BoardInsertIcon kind={item.kind} icon={item.icon} iconClassName={item.iconClassName} />
+                      </span>
+                      <span className="text-xs font-semibold">{item.label}</span>
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>,
           )}
         </div>
 

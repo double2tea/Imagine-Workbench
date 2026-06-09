@@ -2,7 +2,7 @@
 
 import { memo, useEffect, useMemo, useState } from "react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
-import { AudioLines, ImagePlus, Layers, Music, Video, Workflow } from "lucide-react";
+import { AudioLines, ImagePlus, Layers, Music, Video, Workflow, X } from "lucide-react";
 import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
 import MediaReferenceThumbnail from "@/components/reference/MediaReferenceThumbnail";
 import type {
@@ -119,30 +119,35 @@ function GenerateReferenceShelf({
   nodeId,
   onFocusReferenceSource,
   onMoveReference,
+  onRemoveReference,
   references,
 }: {
   nodeId: string;
   onFocusReferenceSource: (nodeId: string) => void;
   onMoveReference: (nodeId: string, sourceEdgeId: string, targetEdgeId: string) => void;
+  onRemoveReference: (sourceEdgeId: string) => void;
   references: BoardGenerateInputSummary["referencePreviews"];
 }) {
   if (references.length === 0) return null;
+  const visibleReferences = references.slice(0, 6);
+  const edgeUseCounts = new Map<string, number>();
+  for (const reference of visibleReferences) {
+    if (!reference.sourceEdgeId) continue;
+    edgeUseCounts.set(reference.sourceEdgeId, (edgeUseCounts.get(reference.sourceEdgeId) ?? 0) + 1);
+  }
   return (
     <div className="nodrag nopan absolute -top-12 left-0 z-40 flex max-w-full gap-1 overflow-hidden rounded-lg border border-blue-400/20 bg-slate-950/88 p-1 shadow-xl backdrop-blur">
-      {references.slice(0, 6).map((reference, index) => {
-        const canReorder = typeof reference.sourceEdgeId === "string";
+      {visibleReferences.map((reference, index) => {
+        const canManageEdge = typeof reference.sourceEdgeId === "string" && edgeUseCounts.get(reference.sourceEdgeId) === 1;
+        const canReorder = canManageEdge;
+        const sourceLabel = reference.sourceTitle ?? "来源节点";
+        const roleLabel = reference.role === "start" ? "首帧" : reference.role === "end" ? "尾帧" : "参考";
         return (
-          <button
+          <div
             key={`${reference.id}:${reference.url}:${index}`}
-            type="button"
             draggable={canReorder}
-            disabled={!reference.sourceNodeId}
             onPointerDown={(event) => {
               event.stopPropagation();
-            }}
-            onClick={(event) => {
-              event.stopPropagation();
-              if (reference.sourceNodeId) onFocusReferenceSource(reference.sourceNodeId);
             }}
             onDragStart={(event) => {
               if (!reference.sourceEdgeId) return;
@@ -168,16 +173,44 @@ function GenerateReferenceShelf({
             onDragEnd={(event) => {
               event.stopPropagation();
             }}
-            className={`relative h-9 w-9 shrink-0 overflow-hidden rounded-md border border-white/15 bg-slate-900 ${
+            className={`group/reference relative h-9 w-9 shrink-0 overflow-hidden rounded-md border border-white/15 bg-slate-900 ${
               canReorder ? "cursor-grab active:cursor-grabbing" : ""
             }`}
-            title={reference.role ? `参考 ${index + 1} · ${reference.role} · 跳转来源` : `参考 ${index + 1} · 跳转来源`}
+            title={`${roleLabel} ${index + 1} · ${sourceLabel}`}
           >
-            <MediaReferenceThumbnail reference={reference} alt="" className="h-full w-full" />
-            <span className="absolute bottom-0 right-0 rounded-tl bg-black/65 px-1 text-[8px] font-semibold text-white">
+            <button
+              type="button"
+              disabled={!reference.sourceNodeId}
+              onClick={(event) => {
+                event.stopPropagation();
+                if (reference.sourceNodeId) onFocusReferenceSource(reference.sourceNodeId);
+              }}
+              className="h-full w-full"
+              title={`${sourceLabel} · 跳转来源`}
+            >
+              <MediaReferenceThumbnail reference={reference} alt="" className="h-full w-full" />
+            </button>
+            <span className="pointer-events-none absolute bottom-0 left-0 rounded-tr bg-black/65 px-1 text-[8px] font-semibold text-white">
+              {roleLabel}
+            </span>
+            <span className="pointer-events-none absolute bottom-0 right-0 rounded-tl bg-black/65 px-1 text-[8px] font-semibold text-white">
               {index + 1}
             </span>
-          </button>
+            {canManageEdge ? (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (reference.sourceEdgeId) onRemoveReference(reference.sourceEdgeId);
+                }}
+                onPointerDown={(event) => event.stopPropagation()}
+                className="absolute right-0 top-0 flex h-4 w-4 items-center justify-center rounded-bl border-b border-l border-white/25 bg-red-500/90 text-white opacity-0 transition hover:bg-red-400 focus-visible:opacity-100 group-hover/reference:opacity-100"
+                title="移除这条参考连线"
+              >
+                <X className="h-2.5 w-2.5" />
+              </button>
+            ) : null}
+          </div>
         );
       })}
       {references.length > 6 ? (
@@ -326,6 +359,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
           references={data.generateInputSummary?.referencePreviews ?? []}
           onFocusReferenceSource={c.onFocusReferenceSource}
           onMoveReference={c.onMoveGenerateReferenceEdge}
+          onRemoveReference={c.onRemoveGenerateReferenceEdge}
         />
       ) : null}
 
