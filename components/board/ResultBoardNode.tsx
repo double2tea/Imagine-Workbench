@@ -170,7 +170,7 @@ const ResultBoardNode = memo(function ResultBoardNode({
         </button>
       </div>
       {hasStackSwitcher && (
-        <div className="board-media-stack-badge pointer-events-none absolute right-2 top-2 z-30 rounded-md bg-slate-950/80 px-2 py-1 text-xs font-semibold text-white opacity-0 shadow-lg backdrop-blur transition-opacity duration-200 group-hover/board-video:opacity-100">
+        <div className="board-media-stack-badge pointer-events-none absolute right-2 top-2 z-30 rounded-md bg-slate-950/45 px-2 py-1 text-xs font-semibold text-white/90 opacity-80 shadow-lg backdrop-blur transition-opacity duration-200 group-hover/board-video:opacity-100">
           {stackItems.length}
         </div>
       )}
@@ -227,7 +227,7 @@ const ResultBoardNode = memo(function ResultBoardNode({
         <LightweightMediaPreview type="audio" />
       )}
       {hasStackSwitcher && (
-        <div className="board-media-stack-switcher absolute bottom-3 left-1/2 z-30 flex -translate-x-1/2 gap-2 opacity-0 transition-opacity duration-200 group-hover/board-video:opacity-100">
+        <div className="board-media-stack-switcher nodrag absolute -bottom-8 left-1/2 z-40 flex -translate-x-1/2 gap-2 rounded-full border border-white/10 bg-slate-950/72 px-3 py-2 opacity-0 shadow-xl backdrop-blur transition-opacity duration-200 group-hover/board-video:opacity-100">
           {stackItems.map((stackItem, index) => {
             const isActive = stackItem.id === node.activeAssetId;
             return (
