@@ -47,7 +47,11 @@ const PromptBoardNode = memo(function PromptBoardNode({ node, onChange, onSelect
 
   const handleSlashCommand = (command: PromptTemplateSlashCommand | null): void => {
     slashCommandRef.current = command;
-    if (command) templatePickerRef.current?.open(command.search);
+    if (command) {
+      templatePickerRef.current?.open(command.search);
+    } else {
+      templatePickerRef.current?.close();
+    }
   };
 
   return (

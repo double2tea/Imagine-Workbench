@@ -150,7 +150,11 @@ export default function VideoGenerationPanel({
     onPromptChange(value);
     const command = detectPromptTemplateSlashCommand(value, caret);
     setSlashCommand(command);
-    if (command) templatePickerRef.current?.open(command.search);
+    if (command) {
+      templatePickerRef.current?.open(command.search);
+    } else {
+      templatePickerRef.current?.close();
+    }
   };
 
   return (
