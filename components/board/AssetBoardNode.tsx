@@ -226,7 +226,7 @@ const AssetBoardNode = memo(function AssetBoardNode({
       </div>
       {node.asset.type === "image" ? (
         <PreviewImage
-          src={node.asset.url}
+          src={item.url}
           alt={node.title}
           draggable={false}
           className="board-media-preview h-full w-full select-none object-cover"

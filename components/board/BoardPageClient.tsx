@@ -58,6 +58,7 @@ import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
 import {
   buildStorageItem,
   clearAllDB,
+  saveToDB,
   type StorageItem,
 } from "@/lib/db";
 import {
@@ -1676,11 +1677,10 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       },
       { boardId: resolvedBoardId },
     );
-    const savedItem = await saveItemOrWarn(item, pushWorkspaceNotice);
-    if (!savedItem) return null;
-    setItems(prev => [savedItem, ...prev]);
+    await saveToDB(item);
+    setItems(prev => [item, ...prev]);
     const nodeId = boardController.addAssetNode({
-      asset: storageItemToBoardAssetReference(savedItem),
+      asset: storageItemToBoardAssetReference(item),
       title: `${sourceTitle} ${label}`,
       position: {
         x: sourcePosition.x + sourceSize.width + 40,
@@ -1690,7 +1690,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     boardController.selectNode(nodeId);
     boardController.selectEdge(null);
     pushWorkspaceNotice("info", `${label}已开始，结果会在当前节点更新`);
-    return { item: savedItem, nodeId };
+    return { item, nodeId };
   }
 
   async function completeBoardQuickEditAsset(
@@ -1725,10 +1725,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       },
       { boardId: resolvedBoardId },
     );
-    const savedItem = await saveItemOrWarn(nextItem, pushWorkspaceNotice);
-    if (!savedItem) return;
-    setItems(prev => prev.map(current => current.id === savedItem.id ? savedItem : current));
-    boardController.updateAssetNodeAsset(nodeId, storageItemToBoardAssetReference(savedItem));
+    await saveToDB(nextItem);
+    setItems(prev => prev.map(current => current.id === nextItem.id ? nextItem : current));
+    boardController.updateAssetNodeAsset(nodeId, storageItemToBoardAssetReference(nextItem));
   }
 
   async function runBoardImageQuickEdit(
