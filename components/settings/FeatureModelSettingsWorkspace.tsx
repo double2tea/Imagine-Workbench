@@ -30,7 +30,7 @@ function flattenImageModelOptions(groups: ModelGroup[]): ModelOption[] {
 }
 
 function modelLabel(option: ModelOption): string {
-  return option.label === option.value ? option.value : `${option.label} · ${option.value}`;
+  return option.label;
 }
 
 export function FeatureModelSettingsWorkspace({

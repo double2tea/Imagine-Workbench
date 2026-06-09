@@ -1079,7 +1079,7 @@ async function editOpenAiCompatibleImage(
   form.set("model", input.model);
   form.set("prompt", input.prompt);
   form.set("n", "1");
-  form.set("size", provider === "grok2api" ? "1024x1024" : input.imageResolution);
+  form.set("size", openAiEditImageSize(provider, input.imageResolution));
   form.set("response_format", "b64_json");
   if (input.imageQuality) {
     form.set("quality", normalizeOpenAiImageQuality(input.imageQuality));
@@ -1107,7 +1107,7 @@ async function editOpenAiCompatibleImageWithOperation(
   form.set("model", input.model);
   form.set("prompt", buildImageEditPrompt(input));
   form.set("n", "1");
-  form.set("size", provider === "grok2api" ? "1024x1024" : input.imageResolution);
+  form.set("size", openAiEditImageSize(provider, input.imageResolution));
   form.set("response_format", "b64_json");
   if (input.imageQuality) {
     form.set("quality", normalizeOpenAiImageQuality(input.imageQuality));
@@ -1125,6 +1125,11 @@ async function editOpenAiCompatibleImageWithOperation(
   const imageUrl = readOpenAiImageUrl(response);
   if (imageUrl) return { imageUrl, source: input.model };
   throw new Error("Image edit response did not include b64_json or url");
+}
+
+function openAiEditImageSize(provider: AiProvider, imageResolution: string): string {
+  if (provider === "grok2api" || imageResolution === "auto") return "1024x1024";
+  return imageResolution;
 }
 
 function normalizeOpenAiImageQuality(value: string): string {

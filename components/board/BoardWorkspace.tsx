@@ -844,9 +844,6 @@ function batchConnectionToTarget(
     if (target.kind === "reference-group" && outputPort.portKind === "asset") {
       return { portId: BOARD_PORT_IDS.assetIn, portKind: "asset" as const };
     }
-    if (target.kind === "multi-grid" && outputPort.portKind === "asset") {
-      return { portId: BOARD_PORT_IDS.assetIn, portKind: "asset" as const };
-    }
     if (target.kind === "agent" && outputPort.portKind === "asset") {
       return { portId: BOARD_PORT_IDS.agentContextIn, portKind: "agent" as const };
     }
@@ -1585,6 +1582,25 @@ export default function BoardWorkspace({
   }, [board.nodes]);
 
   const handleConnect = useCallback<OnConnect>((connection) => {
+    const rawRefs = connectionPortRefs(connection);
+    const rawTargetNode = rawRefs ? board.nodes.find(node => node.id === rawRefs.to.nodeId) : undefined;
+    if (rawTargetNode?.kind === "multi-grid") {
+      try {
+        const references = rawRefs ? multiGridImageReferences(board.nodes, rawRefs.from, selectedNodeIds) : [];
+        if (references.length === 0) {
+          onConnectionError("多宫格只支持图片资产");
+          return;
+        }
+        references.forEach(reference => addAssetToMultiGrid(rawTargetNode.id, reference));
+        selectNode(rawTargetNode.id);
+        selectEdge(null);
+        updateSelectedNodeIds([rawTargetNode.id]);
+      } catch (error) {
+        onConnectionError(error instanceof Error ? error.message : "连接失败");
+      }
+      return;
+    }
+
     const refs = readValidConnectionRefs(connection);
     if (!refs) {
       onConnectionError("端口类型不兼容：图片可连参考/Agent，Prompt 可连生成，生成结果可连资产。");
@@ -1674,6 +1690,25 @@ export default function BoardWorkspace({
   }, [openNodeContextMenu]);
 
   const handleReconnect = useCallback<OnReconnect<BoardFlowEdge>>((oldEdge, newConnection) => {
+    const rawRefs = connectionPortRefs(newConnection);
+    const rawTargetNode = rawRefs ? board.nodes.find(node => node.id === rawRefs.to.nodeId) : undefined;
+    if (rawTargetNode?.kind === "multi-grid") {
+      try {
+        const references = rawRefs ? multiGridImageReferences(board.nodes, rawRefs.from, [rawRefs.from.nodeId]) : [];
+        if (references.length === 0) {
+          onConnectionError("多宫格只支持图片资产");
+          return;
+        }
+        references.forEach(reference => addAssetToMultiGrid(rawTargetNode.id, reference));
+        deleteEdge(oldEdge.id);
+        selectNode(rawTargetNode.id);
+        selectEdge(null);
+      } catch (error) {
+        onConnectionError(error instanceof Error ? error.message : "重连失败");
+      }
+      return;
+    }
+
     const refs = readValidConnectionRefs(newConnection);
     if (!refs) {
       onConnectionError("端口类型不兼容：图片可连参考/Agent，Prompt 可连生成，生成结果可连资产。");

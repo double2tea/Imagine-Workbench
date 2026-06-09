@@ -334,16 +334,6 @@ export function resolveBoardConnectionKind(nodes: BoardNode[], from: BoardPortRe
   }
 
   if (
-    (source.node.kind === "asset" || source.node.kind === "result") &&
-    source.node.asset.type === "image" &&
-    target.node.kind === "multi-grid" &&
-    source.port.id === BOARD_PORT_IDS.assetOut &&
-    target.port.id === BOARD_PORT_IDS.assetIn
-  ) {
-    return "reference";
-  }
-
-  if (
     isExecutableNode(source.node) &&
     (target.node.kind === "asset" || target.node.kind === "result") &&
     source.port.id === BOARD_PORT_IDS.resultOut &&

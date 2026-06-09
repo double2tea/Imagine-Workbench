@@ -249,6 +249,7 @@ export function ConnectionSettingsWorkspace({
               value={customProviderName}
               onChange={event => setCustomProviderName(event.target.value)}
               placeholder="名称"
+              aria-label="自定义服务商名称"
               className="imagine-input h-9 text-xs"
             />
             <input
@@ -256,6 +257,7 @@ export function ConnectionSettingsWorkspace({
               value={customProviderBaseUrl}
               onChange={event => setCustomProviderBaseUrl(event.target.value)}
               placeholder="https://api.example.com"
+              aria-label="自定义服务商 Base URL"
               className="imagine-input h-9 font-mono text-xs"
             />
             <button
