@@ -10,7 +10,7 @@ import type { StorageItem } from "@/lib/db";
 
 const PAGE_SIZE = 36;
 
-type AssetFilter = "all" | "image" | "video" | "audio" | "active";
+type AssetFilter = "all" | "image" | "video" | "audio";
 
 interface BoardSideAssetListProps {
   canvasAssetIds: ReadonlySet<string>;
@@ -114,9 +114,6 @@ export default function BoardSideAssetList({
     if (filter === "image") return mediaItems.filter(item => item.type === "image");
     if (filter === "video") return mediaItems.filter(item => item.type === "video");
     if (filter === "audio") return mediaItems.filter(item => item.type === "audio");
-    if (filter === "active") {
-      return mediaItems.filter(item => item.status === "pending" || item.status === "processing");
-    }
     return mediaItems;
   }, [filter, mediaItems]);
 
@@ -127,7 +124,6 @@ export default function BoardSideAssetList({
     { id: "image", label: "图片" },
     { id: "video", label: "视频" },
     { id: "audio", label: "音频" },
-    { id: "active", label: "进行中" },
   ];
 
   if (loading) {

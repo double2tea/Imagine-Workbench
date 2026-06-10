@@ -6,12 +6,14 @@ import { ChevronLeft, ChevronRight, PanelRight } from "lucide-react";
 const BOARD_SIDE_COLLAPSED_KEY = "imagine_board_side_collapsed";
 const BOARD_SIDE_TAB_KEY = "imagine_board_side_tab";
 
-export type BoardSidePanelTab = "inspector" | "assets";
+export type BoardSidePanelTab = "inspector" | "tasks" | "assets";
 
 interface BoardSidePanelProps {
   assetsPanel: ReactNode;
   inspectorPanel: ReactNode;
   revealKey?: string | null;
+  taskBadgeCount?: number;
+  tasksPanel: ReactNode;
 }
 
 function readCollapsedPreference(): boolean {
@@ -22,10 +24,11 @@ function readCollapsedPreference(): boolean {
 function readTabPreference(): BoardSidePanelTab {
   if (typeof window === "undefined") return "inspector";
   const stored = window.localStorage.getItem(BOARD_SIDE_TAB_KEY);
-  return stored === "assets" ? "assets" : "inspector";
+  if (stored === "tasks" || stored === "assets") return stored;
+  return "inspector";
 }
 
-export default function BoardSidePanel({ assetsPanel, inspectorPanel, revealKey }: BoardSidePanelProps) {
+export default function BoardSidePanel({ assetsPanel, inspectorPanel, revealKey, taskBadgeCount = 0, tasksPanel }: BoardSidePanelProps) {
   const [collapsedPreference, setCollapsedPreference] = useState(false);
   const [activeTab, setActiveTab] = useState<BoardSidePanelTab>("inspector");
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -55,7 +58,7 @@ export default function BoardSidePanel({ assetsPanel, inspectorPanel, revealKey 
   };
 
   const tabBar = (
-    <div className="imagine-board-side-tabs shrink-0 grid grid-cols-2 gap-1 p-2">
+    <div className="imagine-board-side-tabs shrink-0 grid grid-cols-3 gap-1 p-2">
       <button
         type="button"
         data-active={activeTab === "inspector"}
@@ -63,6 +66,14 @@ export default function BoardSidePanel({ assetsPanel, inspectorPanel, revealKey 
         onClick={() => selectTab("inspector")}
       >
         检查器
+      </button>
+      <button
+        type="button"
+        data-active={activeTab === "tasks"}
+        className="imagine-board-side-tab px-2"
+        onClick={() => selectTab("tasks")}
+      >
+        任务{taskBadgeCount > 0 ? ` ${taskBadgeCount}` : ""}
       </button>
       <button
         type="button"
@@ -79,7 +90,7 @@ export default function BoardSidePanel({ assetsPanel, inspectorPanel, revealKey 
     <div className="imagine-board-side-panel-body flex min-h-0 min-w-0 flex-1 flex-col">
       {tabBar}
       <div className="imagine-board-side-panel-scroll min-h-0 flex-1 overflow-y-auto">
-        {activeTab === "inspector" ? inspectorPanel : assetsPanel}
+        {activeTab === "inspector" ? inspectorPanel : activeTab === "tasks" ? tasksPanel : assetsPanel}
       </div>
     </div>
   );

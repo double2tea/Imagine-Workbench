@@ -23,6 +23,7 @@ import PanoramaOverlay from "@/components/panorama/PanoramaOverlay";
 import BoardInspector from "@/components/board/BoardInspector";
 import BoardSidePanel from "@/components/board/BoardSidePanel";
 import BoardSideAssetList from "@/components/board/BoardSideAssetList";
+import BoardTaskQueuePanel from "@/components/board/BoardTaskQueuePanel";
 import BoardWorkspace from "@/components/board/BoardWorkspace";
 import SettingsModal from "@/components/settings/SettingsModal";
 import WorkspaceNotices, { type WorkspaceNotice } from "@/components/workbench/WorkspaceNotices";
@@ -3971,6 +3972,15 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     void cancelBoardGenerationNode(nodeId);
   }, [cancelBoardGenerationNode]);
 
+  const handleCancelBoardTask = useCallback((task: GenerationTask) => {
+    const nodeId = task.source.boardNodeId;
+    if (!nodeId) {
+      pushWorkspaceNotice("error", "任务缺少来源节点，无法从画板取消");
+      return;
+    }
+    void cancelBoardGenerationNode(nodeId);
+  }, [cancelBoardGenerationNode, pushWorkspaceNotice]);
+
   const handleBoardConnectionError = useCallback((message: string) => {
     pushWorkspaceNotice("error", message);
   }, [pushWorkspaceNotice]);
@@ -3993,6 +4003,10 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
   const selectedBoardNode = boardController.board.nodes.find(node => node.id === boardController.selectedNodeId);
   const selectedBoardEdge = boardController.board.edges.find(edge => edge.id === boardController.selectedEdgeId);
+  const boardTaskBadgeCount = useMemo(
+    () => generationTasks.filter(task => task.status === "pending" || task.status === "processing" || task.status === "failed").length,
+    [generationTasks],
+  );
   const selectedIncomingEdges = selectedBoardNode
     ? boardController.board.edges.filter(edge => edge.to.nodeId === selectedBoardNode.id)
     : [];
@@ -4179,6 +4193,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       >
         <BoardSidePanel
           revealKey={boardController.selectedNodeId ?? boardController.selectedEdgeId}
+          taskBadgeCount={boardTaskBadgeCount}
           inspectorPanel={(
             <BoardInspector
               audioModelGroups={audioModelGroups}
@@ -4221,6 +4236,15 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
               items={items}
               loading={boardAssetsLoading}
               onAddToBoard={addAssetToBoard}
+            />
+          )}
+          tasksPanel={(
+            <BoardTaskQueuePanel
+              cancelingTaskIds={cancelingBoardItemIds}
+              nodes={boardController.board.nodes}
+              tasks={generationTasks}
+              onCancelTask={handleCancelBoardTask}
+              onFocusNode={requestFocusNode}
             />
           )}
         />
