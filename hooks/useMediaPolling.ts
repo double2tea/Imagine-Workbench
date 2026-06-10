@@ -95,6 +95,21 @@ function isTaskLocallyCanceled(
   return locallyCanceledItemIdsRef.current.has(task.id);
 }
 
+async function stopIfTaskLocallyCanceled(
+  task: GenerationTask,
+  locallyCanceledItemIdsRef: MutableRefObject<Set<string>>,
+  pushWorkspaceNotice: (type: NoticeType, message: string) => void,
+  setGenerationTasks: Dispatch<SetStateAction<GenerationTask[]>>,
+): Promise<boolean> {
+  if (!isTaskLocallyCanceled(task, locallyCanceledItemIdsRef)) return false;
+  const canceledTask = await updateTaskOrWarn(task.id, {
+    status: "canceled",
+    progress: 100,
+  }, pushWorkspaceNotice);
+  if (canceledTask) setGenerationTasks(current => upsertGenerationTask(current, canceledTask));
+  return true;
+}
+
 function makeClientId(prefix: string): string {
   return `${prefix}_${Date.now()}`;
 }
@@ -123,11 +138,13 @@ export function useMediaPolling({
         if (task.status === "pending") {
           if (!isProcessingTimedOut(task)) continue;
           const timeoutMessage = "任务超过 2 小时仍未进入远端队列，已停止等待。";
+          if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
           const failedTask = await updateTaskOrWarn(task.id, {
             status: "failed",
             progress: 100,
             errorMessage: timeoutMessage,
           }, pushWorkspaceNotice);
+          if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
           delete pollingFailuresRef.current[task.id];
           if (failedTask) setGenerationTasks(current => upsertGenerationTask(current, failedTask));
           pushWorkspaceNotice("error", timeoutMessage);
@@ -137,11 +154,13 @@ export function useMediaPolling({
         if (!task.operationName) {
           if (!isProcessingTimedOut(task)) continue;
           const timeoutMessage = "任务超过 2 小时仍缺少远端任务 ID，已停止等待。";
+          if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
           const failedTask = await updateTaskOrWarn(task.id, {
             status: "failed",
             progress: 100,
             errorMessage: timeoutMessage,
           }, pushWorkspaceNotice);
+          if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
           delete pollingFailuresRef.current[task.id];
           if (failedTask) setGenerationTasks(current => upsertGenerationTask(current, failedTask));
           pushWorkspaceNotice("error", timeoutMessage);
@@ -149,7 +168,7 @@ export function useMediaPolling({
         }
 
         if (task.operationName) {
-          if (isTaskLocallyCanceled(task, locallyCanceledItemIdsRef)) continue;
+          if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
           try {
             const headers = buildProviderHeaders(task.operationName);
 
@@ -169,14 +188,16 @@ export function useMediaPolling({
             }
             const statusRecord = statusData as Record<string, unknown>;
             pollingFailuresRef.current[task.id] = 0;
-            if (isTaskLocallyCanceled(task, locallyCanceledItemIdsRef)) continue;
+            if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
 
             if (statusRecord.done === true && statusRecord.status === "failed") {
+              if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
               const failedTask = await updateTaskOrWarn(task.id, {
                 status: "failed",
                 progress: 100,
                 errorMessage: getStringField(statusData, "errorMessage") ?? "异步任务失败",
               }, pushWorkspaceNotice);
+              if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
               delete pollingFailuresRef.current[task.id];
               if (failedTask) {
                 setGenerationTasks(current => upsertGenerationTask(current, failedTask));
@@ -206,13 +227,15 @@ export function useMediaPolling({
 
               if (dlRes.ok) {
                 const blob = await dlRes.blob();
-                if (isTaskLocallyCanceled(task, locallyCanceledItemIdsRef)) continue;
+                if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
+                const completedUrl = await blobToDataUrl(blob);
+                if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
                 const completedAssetId = makeClientId(completedAssetIdPrefix(mediaType));
                 const completedItem = buildStorageItem(
                   {
                     id: completedAssetId,
                     type: mediaType,
-                    url: await blobToDataUrl(blob),
+                    url: completedUrl,
                     prompt: task.prompt,
                     model: task.model,
                     aspectRatio: task.request?.aspectRatio ?? (mediaType === "audio" ? "audio" : "auto"),
@@ -225,26 +248,32 @@ export function useMediaPolling({
                   },
                   { boardId: task.source.boardId },
                 );
+                if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
                 const savedCompletedItem = await saveItemOrWarn(completedItem, pushWorkspaceNotice);
+                if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
                 if (!savedCompletedItem) {
+                  if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
                   const failedTask = await updateTaskOrWarn(task.id, {
                     status: "failed",
                     progress: 100,
                     errorMessage: "结果资产本地存储失败",
                   }, pushWorkspaceNotice);
+                  if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
                   delete pollingFailuresRef.current[task.id];
                   if (failedTask) setGenerationTasks(current => upsertGenerationTask(current, failedTask));
                   continue;
                 }
-                completedItems.push(savedCompletedItem);
+                if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
                 const completedTask = await updateTaskOrWarn(task.id, {
                   activeResultAssetId: completedAssetId,
                   resultAssetIds: [completedAssetId],
                   status: "complete",
                   progress: 100,
                 }, pushWorkspaceNotice);
+                if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
                 delete pollingFailuresRef.current[task.id];
                 if (completedTask) {
+                  completedItems.push(savedCompletedItem);
                   setGenerationTasks(current => upsertGenerationTask(current, completedTask));
                 }
               } else {
@@ -253,11 +282,13 @@ export function useMediaPolling({
             } else {
               if (isProcessingTimedOut(task)) {
                 const timeoutMessage = "任务超过 2 小时仍未完成，已停止自动轮询。";
+                if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
                 const failedTask = await updateTaskOrWarn(task.id, {
                   status: "failed",
                   progress: 100,
                   errorMessage: timeoutMessage,
                 }, pushWorkspaceNotice);
+                if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
                 delete pollingFailuresRef.current[task.id];
                 if (failedTask) setGenerationTasks(current => upsertGenerationTask(current, failedTask));
                 pushWorkspaceNotice("error", timeoutMessage);
@@ -266,27 +297,30 @@ export function useMediaPolling({
 
               const nextProgress = typeof statusRecord.progress === "number" ? statusRecord.progress : task.progress;
               if (task.progress !== nextProgress) {
-                if (isTaskLocallyCanceled(task, locallyCanceledItemIdsRef)) continue;
+                if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
                 const progressTask = await updateTaskOrWarn(task.id, {
                   progress: nextProgress,
                   errorMessage: undefined,
                 }, pushWorkspaceNotice);
+                if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
                 if (progressTask) setGenerationTasks(current => upsertGenerationTask(current, progressTask));
               }
             }
           } catch (error) {
-            if (isTaskLocallyCanceled(task, locallyCanceledItemIdsRef)) continue;
+            if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
             const previousFailures = pollingFailuresRef.current[task.id] ?? 0;
             const nextFailures = previousFailures + 1;
             pollingFailuresRef.current[task.id] = nextFailures;
             console.error(`Polling failed for ${task.id}:`, error);
 
             if (nextFailures >= 3) {
+              if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
               const waitingTask = await updateTaskOrWarn(task.id, {
                 status: "failed",
                 progress: 100,
                 errorMessage: toErrorMessage(error, "任务轮询失败"),
               }, pushWorkspaceNotice);
+              if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
               delete pollingFailuresRef.current[task.id];
               if (waitingTask) {
                 setGenerationTasks(current => upsertGenerationTask(current, waitingTask));

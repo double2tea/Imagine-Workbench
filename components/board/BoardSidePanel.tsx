@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight, PanelRight } from "lucide-react";
 
 const BOARD_SIDE_COLLAPSED_KEY = "imagine_board_side_collapsed";
@@ -32,6 +32,7 @@ export default function BoardSidePanel({ assetsPanel, inspectorPanel, revealKey,
   const [collapsedPreference, setCollapsedPreference] = useState(false);
   const [activeTab, setActiveTab] = useState<BoardSidePanelTab>("inspector");
   const [mobileOpen, setMobileOpen] = useState(false);
+  const previousRevealKeyRef = useRef<string | null>(null);
   const collapsed = collapsedPreference && !revealKey;
 
   useEffect(() => {
@@ -40,10 +41,14 @@ export default function BoardSidePanel({ assetsPanel, inspectorPanel, revealKey,
   }, []);
 
   useEffect(() => {
-    if (!revealKey) return;
-    if (activeTab === "tasks") return;
-    setActiveTab("inspector");
-  }, [activeTab, revealKey]);
+    if (!revealKey) {
+      previousRevealKeyRef.current = null;
+      return;
+    }
+    if (previousRevealKeyRef.current === revealKey) return;
+    previousRevealKeyRef.current = revealKey;
+    setActiveTab(current => current === "tasks" ? current : "inspector");
+  }, [revealKey]);
 
   const selectTab = (tab: BoardSidePanelTab) => {
     setActiveTab(tab);
