@@ -23,7 +23,9 @@ import uuid
 
 
 DEFAULT_OUTPUT_DIR = Path("~/Movies/Imagine Resolve Bridge").expanduser()
+DEFAULT_CACHE_DIR = Path("~/Library/Caches/Imagine Workbench/Resolve Bridge").expanduser()
 DEFAULT_JOB_PATH = DEFAULT_OUTPUT_DIR / "job.json"
+DEFAULT_RENDER_TIMEOUT_SECONDS = 1800
 
 
 @dataclass(frozen=True)
@@ -44,11 +46,13 @@ class BridgeRoutes:
 class BridgeConfig:
     base_url: str
     output_dir: Path
+    cache_dir: Path
     routes: BridgeRoutes
     gateway_api_key: str | None = None
     provider_api_key: str | None = None
     provider_base_url: str | None = None
     provider_label: str | None = None
+    render_timeout_seconds: int = DEFAULT_RENDER_TIMEOUT_SECONDS
 
 
 class WorkbenchHttpClient:
@@ -182,6 +186,58 @@ class ResolveController:
             raise RuntimeError(f"Current Resolve source file does not exist: {path}")
         return path
 
+    def render_current_clip(self, output_path: Path, timeout_seconds: int) -> Path:
+        item = self._current_video_item()
+        return self._render_range(output_path, frame_number(item.GetStart(False), "current clip start"), frame_number(item.GetEnd(False), "current clip end"), timeout_seconds)
+
+    def render_timeline_inout(self, output_path: Path, purpose: str, timeout_seconds: int) -> Path:
+        timeline = self._timeline()
+        marks = timeline.GetMarkInOut()
+        if not isinstance(marks, dict):
+            raise RuntimeError("Resolve timeline has no mark in/out range")
+        mark = marks.get("audio" if purpose == "audio" else "video") or marks.get("video") or marks.get("audio")
+        if not isinstance(mark, dict):
+            raise RuntimeError("Resolve timeline has no mark in/out range")
+        return self._render_range(output_path, frame_number(mark.get("in"), "timeline mark in"), frame_number(mark.get("out"), "timeline mark out"), timeout_seconds)
+
+    def _render_range(self, output_path: Path, mark_in: int, mark_out: int, timeout_seconds: int) -> Path:
+        if mark_out <= mark_in:
+            raise RuntimeError("Resolve render range must have MarkOut greater than MarkIn")
+        project = self._project()
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        if output_path.exists():
+            output_path.unlink()
+        if not project.SetCurrentRenderFormatAndCodec("mp4", "H.264"):
+            raise RuntimeError("Resolve failed to configure MP4/H.264 rendering")
+        if not project.SetRenderSettings({
+            "SelectAllFrames": False,
+            "MarkIn": mark_in,
+            "MarkOut": mark_out,
+            "TargetDir": str(output_path.parent),
+            "CustomName": output_path.stem,
+            "ExportVideo": True,
+            "ExportAudio": True,
+            "VideoQuality": "Medium",
+            "NetworkOptimization": True,
+        }):
+            raise RuntimeError("Resolve failed to set render range settings")
+        job_id = project.AddRenderJob()
+        if not isinstance(job_id, str) or not job_id:
+            raise RuntimeError("Resolve failed to add render job")
+        if not project.StartRendering([job_id], False):
+            raise RuntimeError("Resolve failed to start render job")
+        deadline = time() + timeout_seconds
+        while project.IsRenderingInProgress():
+            if time() >= deadline:
+                project.StopRendering()
+                raise RuntimeError("Timed out waiting for Resolve reference render")
+            sleep(1)
+        rendered = find_rendered_file(output_path)
+        if rendered is None:
+            status = project.GetRenderJobStatus(job_id)
+            raise RuntimeError(f"Resolve render finished without output file: {status}")
+        return rendered
+
     def import_media(self, paths: list[Path], append_to_timeline: bool = False) -> None:
         media_pool = self._project().GetMediaPool()
         imported = media_pool.ImportMedia([str(path) for path in paths])
@@ -202,13 +258,17 @@ class ResolveController:
         }
 
     def _current_video_item(self) -> Any:
-        timeline = self._project().GetCurrentTimeline()
-        if timeline is None:
-            raise RuntimeError("No active Resolve timeline")
+        timeline = self._timeline()
         item = timeline.GetCurrentVideoItem()
         if item is None:
             raise RuntimeError("No current video item at the Resolve playhead")
         return item
+
+    def _timeline(self) -> Any:
+        timeline = self._project().GetCurrentTimeline()
+        if timeline is None:
+            raise RuntimeError("No active Resolve timeline")
+        return timeline
 
     def _project(self) -> Any:
         project_manager = self.resolve.GetProjectManager()
@@ -224,6 +284,7 @@ class ImagineResolveBridge:
         self.client = WorkbenchHttpClient(config)
         self.resolve = resolve
         self.config.output_dir.mkdir(parents=True, exist_ok=True)
+        self.config.cache_dir.mkdir(parents=True, exist_ok=True)
 
     def capabilities(self) -> dict[str, Any]:
         return self.client.get_json("/api/resolve/capabilities")
@@ -233,6 +294,7 @@ class ImagineResolveBridge:
             "backend": self.capabilities(),
             "resolve": self.resolve.summary() if self.resolve else None,
             "outputDir": str(self.config.output_dir),
+            "cacheDir": str(self.config.cache_dir),
         }
         return result
 
@@ -323,12 +385,22 @@ class ImagineResolveBridge:
     def export_current_frame(self, output_name: str) -> Path:
         if self.resolve is None:
             raise RuntimeError("Current-frame export requires a Resolve connection")
-        return self.resolve.export_current_frame(self.config.output_dir / f"{safe_stem(output_name)}.png")
+        return self.resolve.export_current_frame(self.config.cache_dir / f"{safe_stem(output_name)}.png")
 
     def current_clip_source_path(self) -> Path:
         if self.resolve is None:
             raise RuntimeError("current-clip-source requires a Resolve connection")
         return self.resolve.current_clip_source_path()
+
+    def render_current_clip(self, output_name: str) -> Path:
+        if self.resolve is None:
+            raise RuntimeError("current-clip-render requires a Resolve connection")
+        return self.resolve.render_current_clip(self.config.cache_dir / f"{safe_stem(output_name)}.mp4", self.config.render_timeout_seconds)
+
+    def render_timeline_inout(self, output_name: str, purpose: str) -> Path:
+        if self.resolve is None:
+            raise RuntimeError("timeline-inout-render requires a Resolve connection")
+        return self.resolve.render_timeline_inout(self.config.cache_dir / f"{safe_stem(output_name)}.mp4", purpose, self.config.render_timeout_seconds)
 
     def import_outputs(self, paths: list[Path], append_to_timeline: bool) -> None:
         if self.resolve is None:
@@ -365,7 +437,9 @@ def build_config(args: argparse.Namespace) -> BridgeConfig:
         provider_base_url=args.provider_base_url or os.environ.get("IMAGINE_PROVIDER_BASE_URL"),
         provider_label=args.provider_label or os.environ.get("IMAGINE_PROVIDER_LABEL"),
         output_dir=Path(args.output_dir or os.environ.get("IMAGINE_RESOLVE_OUTPUT_DIR", str(DEFAULT_OUTPUT_DIR))).expanduser(),
+        cache_dir=Path(args.cache_dir or os.environ.get("IMAGINE_RESOLVE_CACHE_DIR", str(DEFAULT_CACHE_DIR))).expanduser(),
         routes=BridgeRoutes(),
+        render_timeout_seconds=int(args.render_timeout_seconds or os.environ.get("IMAGINE_RESOLVE_RENDER_TIMEOUT_SECONDS", str(DEFAULT_RENDER_TIMEOUT_SECONDS))),
     )
 
 
@@ -379,9 +453,15 @@ def connect_resolve_if_needed(args: argparse.Namespace, internal_resolve: Any | 
         needs_resolve = True
     if getattr(args, "audio", None) == "current-clip-source":
         needs_resolve = True
+    if getattr(args, "audio", None) in {"current-clip-render", "timeline-inout-render"}:
+        needs_resolve = True
     if "current-frame" in getattr(args, "reference", []):
         needs_resolve = True
     if "current-clip-source" in getattr(args, "reference", []):
+        needs_resolve = True
+    if "current-clip-render" in getattr(args, "reference", []):
+        needs_resolve = True
+    if "timeline-inout-render" in getattr(args, "reference", []):
         needs_resolve = True
     if needs_resolve:
         return ResolveController.connect()
@@ -441,11 +521,13 @@ def run_in_resolve() -> list[Path]:
 
 def job_to_argv(job: dict[str, Any]) -> list[str]:
     operation = require_job_text(job, "operation")
-    argv = [operation]
+    global_argv: list[str] = []
+    operation_argv: list[str] = [operation]
     option_map = {
         "apiKey": "--api-key",
         "appendToTimeline": "--append-to-timeline",
         "baseUrl": "--base-url",
+        "cacheDir": "--cache-dir",
         "image": "--image",
         "imageOperation": "--image-operation",
         "importToResolve": "--import-to-resolve",
@@ -459,24 +541,38 @@ def job_to_argv(job: dict[str, Any]) -> list[str]:
         "providerApiKey": "--provider-api-key",
         "providerBaseUrl": "--provider-base-url",
         "providerLabel": "--provider-label",
+        "renderTimeoutSeconds": "--render-timeout-seconds",
         "text": "--text",
         "voice": "--voice",
         "audio": "--audio",
+    }
+    global_flags = {
+        "--api-key",
+        "--append-to-timeline",
+        "--base-url",
+        "--cache-dir",
+        "--import-to-resolve",
+        "--output-dir",
+        "--provider-api-key",
+        "--provider-base-url",
+        "--provider-label",
+        "--render-timeout-seconds",
     }
     for key, flag in option_map.items():
         if key not in job:
             continue
         value = job[key]
+        target = global_argv if flag in global_flags else operation_argv
         if isinstance(value, bool):
             if value:
-                argv.append(flag)
+                target.append(flag)
             continue
-        argv.extend([flag, str(value)])
+        target.extend([flag, str(value)])
     references = job.get("reference")
     if isinstance(references, list):
         for item in references:
-            argv.extend(["--reference", str(item)])
-    return argv
+            operation_argv.extend(["--reference", str(item)])
+    return [*global_argv, *operation_argv]
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -487,6 +583,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--provider-base-url", default=None)
     parser.add_argument("--provider-label", default=None)
     parser.add_argument("--output-dir", default=None)
+    parser.add_argument("--cache-dir", default=None)
+    parser.add_argument("--render-timeout-seconds", type=int, default=None)
     parser.add_argument("--connect-resolve", action="store_true")
     parser.add_argument("--import-to-resolve", action="store_true")
     parser.add_argument("--append-to-timeline", action="store_true")
@@ -510,7 +608,7 @@ def build_parser() -> argparse.ArgumentParser:
     video = subparsers.add_parser("generate-video")
     video.add_argument("--prompt", required=True)
     video.add_argument("--model", required=True)
-    video.add_argument("--reference", action="append", default=[], help="Path, current-frame, or current-clip-source")
+    video.add_argument("--reference", action="append", default=[], help="Path, current-frame, current-clip-source, current-clip-render, or timeline-inout-render")
     video.add_argument("--poll-seconds", type=int, default=600)
     video.add_argument("--output-name", default=None)
 
@@ -522,7 +620,7 @@ def build_parser() -> argparse.ArgumentParser:
     tts.add_argument("--output-name", default=None)
 
     transcribe = subparsers.add_parser("transcribe")
-    transcribe.add_argument("--audio", required=True, help="Path to audio file, or current-clip-source")
+    transcribe.add_argument("--audio", required=True, help="Path to audio file, current-clip-source, current-clip-render, or timeline-inout-render")
     transcribe.add_argument("--model", required=True)
     transcribe.add_argument("--language", default=None)
     transcribe.add_argument("--output-name", default=None)
@@ -534,6 +632,14 @@ def resolve_media_input(bridge: ImagineResolveBridge, value: str, output_name: s
         return bridge.export_current_frame(output_name)
     if value == "current-clip-source":
         return bridge.current_clip_source_path()
+    if value == "current-clip-render":
+        if purpose == "image":
+            raise RuntimeError("current-clip-render cannot be used as an image input")
+        return bridge.render_current_clip(output_name)
+    if value == "timeline-inout-render":
+        if purpose == "image":
+            raise RuntimeError("timeline-inout-render cannot be used as an image input")
+        return bridge.render_timeline_inout(output_name, purpose)
     path = Path(value).expanduser()
     if not path.is_file():
         raise RuntimeError(f"{purpose} file does not exist: {path}")
@@ -586,6 +692,21 @@ def file_to_data_uri(path: Path) -> str:
     content_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
     data = base64.b64encode(path.read_bytes()).decode("ascii")
     return f"data:{content_type};base64,{data}"
+
+
+def frame_number(value: Any, name: str) -> int:
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        raise RuntimeError(f"Resolve did not expose a numeric {name}")
+    return int(value)
+
+
+def find_rendered_file(expected_path: Path) -> Path | None:
+    if expected_path.is_file():
+        return expected_path
+    candidates = [path for path in expected_path.parent.glob(f"{expected_path.stem}.*") if path.is_file()]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda path: path.stat().st_mtime)
 
 
 def extension_for_content_type(content_type: str, default_extension: str) -> str:

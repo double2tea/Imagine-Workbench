@@ -11,7 +11,7 @@ from pathlib import Path
 from threading import Thread
 from typing import Any
 
-from imagine_resolve_bridge import BridgeConfig, BridgeRoutes, ImagineResolveBridge, ResolveController, run_cli
+from imagine_resolve_bridge import BridgeConfig, BridgeRoutes, ImagineResolveBridge, ResolveController, job_to_argv, run_cli
 from install_resolve_bridge import install, uninstall
 
 
@@ -106,6 +106,7 @@ class ImagineResolveBridgeTests(unittest.TestCase):
         self.bridge = ImagineResolveBridge(BridgeConfig(
             base_url=self.server.url,
             output_dir=Path(self.tmp.name),
+            cache_dir=Path(self.tmp.name) / "cache",
             routes=BridgeRoutes(),
             gateway_api_key="gateway",
             provider_api_key="provider",
@@ -205,6 +206,58 @@ class ImagineResolveBridgeTests(unittest.TestCase):
         body = json.loads(self.server.requests[-3]["body"].decode("utf-8"))
         self.assertEqual(body["referenceMedia"][0]["type"], "video")
 
+    def test_current_clip_render_can_feed_video_reference_from_cache(self) -> None:
+        cache_dir = Path(self.tmp.name) / "render-cache"
+
+        outputs = run_cli([
+            "--base-url", self.server.url,
+            "--output-dir", self.tmp.name,
+            "--cache-dir", str(cache_dir),
+            "generate-video",
+            "--reference", "current-clip-render",
+            "--model", "mock:video",
+            "--prompt", "shot",
+            "--output-name", "video_from_render",
+        ], FakeResolve(Path(self.tmp.name) / "source.mp4"))
+
+        self.assertEqual(outputs[0].read_bytes(), b"video")
+        self.assertTrue((cache_dir / "video_from_render_reference_1.mp4").is_file())
+        body = json.loads(self.server.requests[-3]["body"].decode("utf-8"))
+        self.assertEqual(body["referenceMedia"][0]["type"], "video")
+        self.assertIn("cmVuZGVyZWQ6MjA6NDA=", body["referenceMedia"][0]["dataUri"])
+
+    def test_timeline_inout_render_can_feed_transcription_from_cache(self) -> None:
+        cache_dir = Path(self.tmp.name) / "render-cache"
+
+        outputs = run_cli([
+            "--base-url", self.server.url,
+            "--output-dir", self.tmp.name,
+            "--cache-dir", str(cache_dir),
+            "transcribe",
+            "--audio", "timeline-inout-render",
+            "--model", "mimo:mimo-v2.5-asr",
+            "--output-name", "timeline_subtitle",
+        ], FakeResolve(Path(self.tmp.name) / "source.mp4"))
+
+        self.assertEqual(outputs[0], Path(self.tmp.name) / "timeline_subtitle.txt")
+        self.assertTrue((cache_dir / "timeline_subtitle.mp4").is_file())
+        self.assertIn(b"rendered:100:130", self.server.requests[-1]["body"])
+
+    def test_job_to_argv_keeps_global_options_before_operation(self) -> None:
+        argv = job_to_argv({
+            "operation": "generate-video",
+            "baseUrl": self.server.url,
+            "cacheDir": str(Path(self.tmp.name) / "cache"),
+            "outputDir": self.tmp.name,
+            "model": "mock:video",
+            "prompt": "shot",
+            "reference": ["timeline-inout-render"],
+        })
+
+        self.assertLess(argv.index("--base-url"), argv.index("generate-video"))
+        self.assertLess(argv.index("--cache-dir"), argv.index("generate-video"))
+        self.assertGreater(argv.index("--reference"), argv.index("generate-video"))
+
     def test_install_and_uninstall_helper_copies_bridge_files(self) -> None:
         source_dir = Path(self.tmp.name) / "source"
         target_dir = Path(self.tmp.name) / "target"
@@ -245,6 +298,8 @@ class FakeProjectManager:
 class FakeProject:
     def __init__(self, source_path: Path) -> None:
         self.source_path = source_path
+        self.render_settings: dict[str, Any] = {}
+        self.rendering = False
 
     def GetName(self) -> str:
         return "Project"
@@ -259,6 +314,33 @@ class FakeProject:
     def GetMediaPool(self) -> "FakeMediaPool":
         return FakeMediaPool()
 
+    def SetCurrentRenderFormatAndCodec(self, render_format: str, codec: str) -> bool:
+        return render_format == "mp4" and codec == "H.264"
+
+    def SetRenderSettings(self, settings: dict[str, Any]) -> bool:
+        self.render_settings = settings
+        return True
+
+    def AddRenderJob(self) -> str:
+        return "job_1"
+
+    def StartRendering(self, job_ids: list[str], interactive: bool) -> bool:
+        target_dir = Path(str(self.render_settings["TargetDir"]))
+        target_dir.mkdir(parents=True, exist_ok=True)
+        output = target_dir / f"{self.render_settings['CustomName']}.mp4"
+        output.write_bytes(f"rendered:{self.render_settings['MarkIn']}:{self.render_settings['MarkOut']}".encode("utf-8"))
+        self.rendering = False
+        return job_ids == ["job_1"] and interactive is False
+
+    def IsRenderingInProgress(self) -> bool:
+        return self.rendering
+
+    def StopRendering(self) -> None:
+        self.rendering = False
+
+    def GetRenderJobStatus(self, job_id: str) -> dict[str, str]:
+        return {"JobStatus": "Complete" if job_id == "job_1" else "Unknown"}
+
 
 class FakeTimeline:
     def __init__(self, source_path: Path) -> None:
@@ -270,6 +352,9 @@ class FakeTimeline:
     def GetCurrentVideoItem(self) -> "FakeTimelineItem":
         return FakeTimelineItem(self.source_path)
 
+    def GetMarkInOut(self) -> dict[str, dict[str, int]]:
+        return {"video": {"in": 100, "out": 130}, "audio": {"in": 100, "out": 130}}
+
 
 class FakeTimelineItem:
     def __init__(self, source_path: Path) -> None:
@@ -277,6 +362,12 @@ class FakeTimelineItem:
 
     def GetMediaPoolItem(self) -> "FakeMediaPoolItem":
         return FakeMediaPoolItem(self.source_path)
+
+    def GetStart(self, subframe_precision: bool) -> int:
+        return 20
+
+    def GetEnd(self, subframe_precision: bool) -> int:
+        return 40
 
 
 class FakeMediaPoolItem:

@@ -140,6 +140,18 @@ Override with:
 --output-dir /path/to/output
 ```
 
+Reference captures and rendered reference clips default to:
+
+```text
+~/Library/Caches/Imagine Workbench/Resolve Bridge
+```
+
+Override with:
+
+```bash
+--cache-dir /path/to/cache
+```
+
 ## External Resolve API Control
 
 To import results into the running Resolve project from the terminal, enable Resolve scripting and pass `--import-to-resolve`.
@@ -198,6 +210,28 @@ python3 scripts/resolve/imagine_resolve_bridge.py \
   --reference current-frame
 ```
 
+Use the rendered timeline range of the current playhead video item as a video reference:
+
+```bash
+python3 scripts/resolve/imagine_resolve_bridge.py \
+  --base-url http://localhost:3000 \
+  generate-video \
+  --model 12ai:veo_3_1-fast \
+  --prompt "extend this exact edited moment into a product beauty shot" \
+  --reference current-clip-render
+```
+
+Use the current timeline In/Out range as a video reference:
+
+```bash
+python3 scripts/resolve/imagine_resolve_bridge.py \
+  --base-url http://localhost:3000 \
+  generate-video \
+  --model 12ai:veo_3_1-fast \
+  --prompt "use this selected timeline range as the motion and style reference" \
+  --reference timeline-inout-render
+```
+
 Transcribe the source media for the current playhead video item when the source file is a supported audio upload:
 
 ```bash
@@ -209,7 +243,28 @@ python3 scripts/resolve/imagine_resolve_bridge.py \
   --language auto
 ```
 
+Transcribe the current timeline In/Out range:
+
+```bash
+python3 scripts/resolve/imagine_resolve_bridge.py \
+  --base-url http://localhost:3000 \
+  transcribe \
+  --model mimo:mimo-v2.5-asr \
+  --audio timeline-inout-render \
+  --language auto
+```
+
 Resolve scripting cannot reliably read arbitrary selected clips through the public API. The bridge uses the current timeline item at the playhead via `GetCurrentVideoItem()`.
+
+Rendered reference tokens use Resolve's render queue APIs:
+
+- `TimelineItem.GetStart(False)` and `TimelineItem.GetEnd(False)` for `current-clip-render`.
+- `Timeline.GetMarkInOut()` for `timeline-inout-render`.
+- `Project.SetCurrentRenderFormatAndCodec("mp4", "H.264")`.
+- `Project.SetRenderSettings({ MarkIn, MarkOut, TargetDir, CustomName, ExportVideo, ExportAudio })`.
+- `Project.AddRenderJob()`, `Project.StartRendering(...)`, and `Project.IsRenderingInProgress()`.
+
+The rendered reference files are cache inputs for model calls. Generated AI outputs remain in the persistent output directory.
 
 ## In-Resolve Usage
 
@@ -278,6 +333,8 @@ IMAGINE_PROVIDER_API_KEY
 IMAGINE_PROVIDER_BASE_URL
 IMAGINE_PROVIDER_LABEL
 IMAGINE_RESOLVE_OUTPUT_DIR
+IMAGINE_RESOLVE_CACHE_DIR
+IMAGINE_RESOLVE_RENDER_TIMEOUT_SECONDS
 ```
 
 ## Verification
