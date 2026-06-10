@@ -162,6 +162,16 @@ class ImagineResolveBridgeTests(unittest.TestCase):
         self.assertEqual(result["resolve"]["project"], "Project")
         self.assertEqual(result["resolve"]["timeline"], "Timeline")
 
+    def test_doctor_cli_does_not_require_output_name(self) -> None:
+        outputs = run_cli([
+            "--base-url", self.server.url,
+            "--output-dir", self.tmp.name,
+            "doctor",
+        ])
+
+        self.assertEqual(outputs, [])
+        self.assertEqual(self.server.requests[-1]["path"], "/api/resolve/capabilities")
+
     def test_current_frame_input_exports_from_resolve_for_image_edit(self) -> None:
         resolve = FakeResolve(Path(self.tmp.name) / "source.mp4")
         outputs = run_cli([

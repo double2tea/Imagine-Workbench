@@ -401,13 +401,13 @@ def run_cli(argv: list[str] | None = None, internal_resolve: Any | None = None) 
 
 
 def execute_args(bridge: ImagineResolveBridge, args: argparse.Namespace) -> list[Path]:
-    output_name = args.output_name or f"imagine_{args.operation}_{int(time())}"
     if args.operation == "capabilities":
         print(json.dumps(bridge.capabilities(), ensure_ascii=False, indent=2))
         return []
     if args.operation == "doctor":
         print(json.dumps(bridge.doctor(), ensure_ascii=False, indent=2))
         return []
+    output_name = args.output_name or f"imagine_{args.operation}_{int(time())}"
     if args.operation == "generate-image":
         return [bridge.generate_image(args.prompt, args.model, output_name)]
     if args.operation == "edit-image":
