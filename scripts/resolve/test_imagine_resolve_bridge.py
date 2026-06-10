@@ -12,8 +12,8 @@ from pathlib import Path
 from threading import Thread
 from typing import Any
 
-from imagine_resolve_bridge import BridgeConfig, BridgeRoutes, DEFAULT_MODELS, ImagineResolveBridge, ResolveController, job_to_argv, main, panel_config_for_operation, panel_values_to_job, run_cli, run_in_resolve
-from install_resolve_bridge import install, uninstall
+from imagine_resolve_bridge import BridgeConfig, BridgeRoutes, DEFAULT_MODELS, ImagineResolveBridge, ResolveController, job_to_argv, main, panel_config_for_operation, panel_values_to_job, run_cli, run_in_resolve, run_job
+from install_resolve_bridge import install, install_workflow_plugin, uninstall, uninstall_workflow_plugin
 
 
 class MockServer:
@@ -233,6 +233,21 @@ class ImagineResolveBridgeTests(unittest.TestCase):
         self.assertEqual(outputs[0].read_bytes(), b"image")
         self.assertTrue((Path(self.tmp.name) / "cache" / "internal_frame.png").is_file())
 
+    def test_run_job_uses_default_model_when_job_omits_model(self) -> None:
+        job_path = Path(self.tmp.name) / "default-model-job.json"
+        job_path.write_text(json.dumps({
+            "operation": "generate-image",
+            "baseUrl": self.server.url,
+            "outputDir": self.tmp.name,
+            "prompt": "image without explicit model",
+            "outputName": "default_model_image",
+        }), encoding="utf-8")
+
+        job_outputs = run_job(job_path)
+        self.assertEqual(job_outputs[0].read_bytes(), b"image")
+        body = json.loads(self.server.requests[-1]["body"].decode("utf-8"))
+        self.assertEqual(body["model"], DEFAULT_MODELS["generate-image"])
+
     def test_current_frame_input_exports_from_resolve_for_image_edit(self) -> None:
         resolve = FakeResolve(Path(self.tmp.name) / "source.mp4")
         outputs = run_cli([
@@ -402,6 +417,25 @@ class ImagineResolveBridgeTests(unittest.TestCase):
         uninstall(target_dir)
         self.assertFalse((target_dir / "ImagineWorkbenchResolve.py").exists())
         self.assertFalse((target_dir / "imagine_resolve_bridge.py").exists())
+
+    def test_install_and_uninstall_workflow_plugin(self) -> None:
+        source_dir = Path(self.tmp.name) / "source"
+        plugin_dir = source_dir / "workflow-integration" / "com.imagine.workbench.resolve"
+        target_dir = Path(self.tmp.name) / "workflow-target"
+        plugin_dir.mkdir(parents=True)
+        for name in ("manifest.xml", "main.js", "index.html"):
+            (plugin_dir / name).write_text(name, encoding="utf-8")
+        for name in ("ImagineWorkbenchResolve.py", "imagine_resolve_bridge.py"):
+            (source_dir / name).write_text(name, encoding="utf-8")
+
+        install_workflow_plugin(target_dir, source_dir)
+        installed = target_dir / "com.imagine.workbench.resolve"
+        self.assertTrue((installed / "manifest.xml").is_file())
+        self.assertTrue((installed / "bridge" / "ImagineWorkbenchResolve.py").is_file())
+        self.assertTrue((installed / "bridge" / "imagine_resolve_bridge.py").is_file())
+
+        uninstall_workflow_plugin(target_dir)
+        self.assertFalse(installed.exists())
 
 
 class FakeResolve:

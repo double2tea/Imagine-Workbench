@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install or remove the Imagine Workbench Resolve script entry."""
+"""Install or remove Imagine Workbench Resolve integration entries."""
 
 from __future__ import annotations
 
@@ -11,6 +11,10 @@ from pathlib import Path
 DEFAULT_RESOLVE_SCRIPT_DIR = Path(
     "~/Library/Application Support/Blackmagic Design/DaVinci Resolve/Fusion/Scripts/Utility"
 ).expanduser()
+DEFAULT_RESOLVE_WORKFLOW_DIR = Path(
+    "~/Library/Application Support/Blackmagic Design/DaVinci Resolve/Workflow Integration Plugins"
+).expanduser()
+WORKFLOW_PLUGIN_NAME = "com.imagine.workbench.resolve"
 
 BRIDGE_FILES = [
     "ImagineWorkbenchResolve.py",
@@ -36,10 +40,37 @@ def uninstall(target_dir: Path) -> None:
             print(f"removed {target}")
 
 
+def install_workflow_plugin(target_dir: Path, source_dir: Path) -> None:
+    plugin_source = source_dir / "workflow-integration" / WORKFLOW_PLUGIN_NAME
+    if not plugin_source.is_dir():
+        raise RuntimeError(f"Missing workflow plugin source directory: {plugin_source}")
+    plugin_target = target_dir / WORKFLOW_PLUGIN_NAME
+    if plugin_target.exists():
+        shutil.rmtree(plugin_target)
+    shutil.copytree(plugin_source, plugin_target)
+    bridge_target = plugin_target / "bridge"
+    bridge_target.mkdir(parents=True, exist_ok=True)
+    for name in BRIDGE_FILES:
+        source = source_dir / name
+        if not source.is_file():
+            raise RuntimeError(f"Missing bridge source file: {source}")
+        shutil.copy2(source, bridge_target / name)
+    print(f"installed {plugin_target}")
+
+
+def uninstall_workflow_plugin(target_dir: Path) -> None:
+    plugin_target = target_dir / WORKFLOW_PLUGIN_NAME
+    if plugin_target.exists():
+        shutil.rmtree(plugin_target)
+        print(f"removed {plugin_target}")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Install Imagine Workbench Resolve bridge scripts")
     parser.add_argument("action", choices=["install", "uninstall"])
+    parser.add_argument("--kind", choices=["scripts", "workflow", "all"], default="all")
     parser.add_argument("--target-dir", default=str(DEFAULT_RESOLVE_SCRIPT_DIR))
+    parser.add_argument("--workflow-target-dir", default=str(DEFAULT_RESOLVE_WORKFLOW_DIR))
     parser.add_argument("--source-dir", default=str(Path(__file__).resolve().parent))
     return parser
 
@@ -47,11 +78,18 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = build_parser().parse_args()
     target_dir = Path(args.target_dir).expanduser()
+    workflow_target_dir = Path(args.workflow_target_dir).expanduser()
     source_dir = Path(args.source_dir).expanduser()
     if args.action == "install":
-        install(target_dir, source_dir)
+        if args.kind in {"scripts", "all"}:
+            install(target_dir, source_dir)
+        if args.kind in {"workflow", "all"}:
+            install_workflow_plugin(workflow_target_dir, source_dir)
     else:
-        uninstall(target_dir)
+        if args.kind in {"scripts", "all"}:
+            uninstall(target_dir)
+        if args.kind in {"workflow", "all"}:
+            uninstall_workflow_plugin(workflow_target_dir)
 
 
 if __name__ == "__main__":

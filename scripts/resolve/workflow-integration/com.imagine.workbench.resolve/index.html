@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Imagine Workbench</title>
+    <link rel="stylesheet" href="./css/app.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="mark">iw</div>
+          <div>
+            <div class="brand-title">Imagine Workbench</div>
+            <div class="brand-subtitle">DaVinci Resolve</div>
+          </div>
+        </div>
+        <button class="ghost-button" id="doctorButton" type="button">连接检查</button>
+      </header>
+
+      <nav class="tabs" aria-label="功能分类">
+        <button class="tab active" type="button" data-tab="image">Image</button>
+        <button class="tab" type="button" data-tab="video">Video</button>
+        <button class="tab" type="button" data-tab="audio">Audio</button>
+        <button class="tab" type="button" data-tab="apps">Apps</button>
+      </nav>
+
+      <section class="section-head">
+        <h1>Apps</h1>
+        <p>选择下一步要创建或处理的内容</p>
+      </section>
+
+      <section class="app-grid" id="operationGrid" aria-label="功能"></section>
+
+      <section class="prompt-panel">
+        <label class="field-label" for="promptInput" id="promptLabel">提示词</label>
+        <textarea id="promptInput" placeholder="描述生成或编辑需求"></textarea>
+
+        <div class="source-block" id="sourceBlock">
+          <div class="field-label">参考源</div>
+          <div class="pill-row" id="sourcePills"></div>
+        </div>
+
+        <div class="option-grid">
+          <label class="field">
+            <span>工作台地址</span>
+            <input id="baseUrlInput" type="text" value="http://localhost:3000" />
+          </label>
+          <label class="field">
+            <span>输出名称</span>
+            <input id="outputNameInput" type="text" placeholder="可选" />
+          </label>
+          <label class="field" id="imageOperationField">
+            <span>图片操作</span>
+            <select id="imageOperationInput">
+              <option value="redraw">重绘</option>
+              <option value="erase">擦除</option>
+              <option value="outpaint">扩图</option>
+              <option value="cutout">抠图</option>
+            </select>
+          </label>
+          <label class="field" id="pollSecondsField">
+            <span>轮询秒数</span>
+            <input id="pollSecondsInput" type="number" min="30" max="3600" step="30" value="600" />
+          </label>
+          <label class="field" id="languageField">
+            <span>语言</span>
+            <input id="languageInput" type="text" value="auto" />
+          </label>
+        </div>
+
+        <div class="runbar">
+          <button class="small-button" id="saveButton" type="button">保存任务</button>
+          <button class="small-button" id="openOutputButton" type="button">打开输出目录</button>
+          <label class="check">
+            <input id="importInput" type="checkbox" checked />
+            <span>导入结果</span>
+          </label>
+          <label class="check">
+            <input id="appendInput" type="checkbox" />
+            <span>追加到时间线</span>
+          </label>
+          <button class="run-button" id="runButton" type="button">运行</button>
+        </div>
+      </section>
+
+      <section class="status" id="statusOutput">准备就绪</section>
+    </main>
+    <script src="./js/app.js"></script>
+  </body>
+</html>

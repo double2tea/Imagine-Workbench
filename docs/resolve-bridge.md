@@ -17,6 +17,7 @@ LUT creation is not part of this bridge task.
 scripts/resolve/imagine_resolve_bridge.py   Shared external + in-Resolve bridge
 scripts/resolve/ImagineWorkbenchResolve.py  Resolve Workspace -> Scripts entry
 scripts/resolve/install_resolve_bridge.py   macOS install/uninstall helper
+scripts/resolve/workflow-integration/       Modern Workflow Integrations panel shell
 scripts/resolve/job.example.json            In-Resolve job example
 ```
 
@@ -30,28 +31,47 @@ This returns the operations and routes expected by the bridge. It is descriptive
 
 ## Install Into Resolve
 
-Install the script entry into the macOS user Resolve Scripts folder:
+Install both the script entry and the Workflow Integration panel into the macOS user Resolve folders:
 
 ```bash
 python3 scripts/resolve/install_resolve_bridge.py install
 ```
 
-Remove it:
+Remove both:
 
 ```bash
 python3 scripts/resolve/install_resolve_bridge.py uninstall
 ```
 
-Default target:
+Install only the lightweight Scripts entry:
+
+```bash
+python3 scripts/resolve/install_resolve_bridge.py install --kind scripts
+```
+
+Install only the modern Workflow Integration panel:
+
+```bash
+python3 scripts/resolve/install_resolve_bridge.py install --kind workflow
+```
+
+Default script target:
 
 ```text
 ~/Library/Application Support/Blackmagic Design/DaVinci Resolve/Fusion/Scripts/Utility
+```
+
+Default Workflow Integration target:
+
+```text
+~/Library/Application Support/Blackmagic Design/DaVinci Resolve/Workflow Integration Plugins
 ```
 
 Override the target when testing:
 
 ```bash
 python3 scripts/resolve/install_resolve_bridge.py install --target-dir /tmp/ResolveScripts
+python3 scripts/resolve/install_resolve_bridge.py install --kind workflow --workflow-target-dir /tmp/ResolveWorkflowPlugins
 ```
 
 ## Smoke Test
@@ -314,6 +334,27 @@ The panel writes the selected operation to:
 That job file remains available for automation or manual editing. If Resolve also shows `imagine_resolve_bridge` in the Scripts menu, running it directly opens the same panel when no CLI arguments are provided.
 
 The saved job file still includes the default `model` used for execution. Edit that field only for advanced testing or automation.
+
+## Workflow Integration Panel
+
+The installer also adds a modern web-style panel:
+
+```text
+Workspace -> Workflow Integrations -> Imagine Workbench
+```
+
+This panel is the product UI direction inspired by modern plugin panels: dark cards, tabs, a bottom prompt area, and no visible model IDs. It writes the same job file and launches the same Python bridge implementation from the installed plugin bundle.
+
+The first version supports:
+
+- Image generation
+- Image edit from Resolve reference sources
+- Video generation from current frame, current clip render, current clip source, or timeline In/Out render
+- TTS
+- Subtitle/ASR
+- Connection check
+
+If `Workflow Integrations` is not available in the Resolve build you are using, keep using the Scripts entry above. The Scripts entry remains the debugging and compatibility path.
 
 To use a different job file, set:
 

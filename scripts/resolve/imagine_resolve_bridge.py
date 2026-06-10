@@ -623,7 +623,7 @@ def run_job(job_path: Path, internal_resolve: Any | None = None) -> list[Path]:
     job = json.loads(job_path.expanduser().read_text(encoding="utf-8"))
     if not isinstance(job, dict):
         raise RuntimeError("Resolve bridge job JSON must be an object")
-    argv = job_to_argv(job)
+    argv = job_to_argv(normalize_job(job))
     return run_cli(argv, internal_resolve)
 
 
@@ -679,6 +679,14 @@ def panel_values_to_job(values: dict[str, Any]) -> dict[str, Any]:
     if append_to_timeline:
         job["appendToTimeline"] = True
     return job
+
+
+def normalize_job(job: dict[str, Any]) -> dict[str, Any]:
+    operation = require_job_text(job, "operation")
+    normalized = dict(job)
+    if operation in DEFAULT_MODELS and not str(normalized.get("model", "")).strip():
+        normalized["model"] = DEFAULT_MODELS[operation]
+    return normalized
 
 
 def panel_config_for_operation(operation: str) -> dict[str, Any]:
