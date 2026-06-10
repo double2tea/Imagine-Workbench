@@ -545,7 +545,7 @@
     if (state.resolve) {
       return state.resolve;
     }
-    var workflowIntegration = require(path.join(__dirname, "..", "WorkflowIntegration.node"));
+    var workflowIntegration = require(path.join(__dirname, "WorkflowIntegration.node"));
     var initialized = await workflowIntegration.Initialize(PLUGIN_ID);
     if (!initialized) {
       throw new Error("无法初始化 Resolve Workflow Integration");
