@@ -1595,6 +1595,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
           ...existingResultNode,
           asset: input.asset,
           activeAssetId: input.resultAssetId,
+          resultStackKey,
           resultAssetIds: input.resultAssetIds,
           updatedAt,
         }

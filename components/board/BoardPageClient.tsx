@@ -2913,15 +2913,6 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
     setCancelingBoardItemIds(prev => [...prev, task.id]);
     try {
-      const controller = generationAbortControllersRef.current[task.id];
-      if (controller) {
-        locallyCanceledItemIdsRef.current.add(task.id);
-        controller.abort();
-      }
-      if (!canCancelRemote) {
-        locallyCanceledItemIdsRef.current.add(task.id);
-      }
-
       if (canCancelRemote && operationName) {
         const response = await fetch("/api/gemini/cancel-media", {
           method: "POST",
@@ -2932,6 +2923,12 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           throw new Error(await readFetchError(response, "任务取消失败"));
         }
       }
+
+      const controller = generationAbortControllersRef.current[task.id];
+      if (controller) {
+        controller.abort();
+      }
+      locallyCanceledItemIdsRef.current.add(task.id);
 
       const canceledTask = await cancelGenerationTask(task.id);
       setGenerationTasks(prev => prev.map(current => current.id === canceledTask.id ? canceledTask : current));
@@ -3993,6 +3990,24 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     void cancelBoardGenerationTask(task);
   }, [cancelBoardGenerationTask]);
 
+  const handleFocusBoardTaskResult = useCallback((task: GenerationTask) => {
+    const sourceNodeId = task.source.boardNodeId;
+    if (!sourceNodeId) {
+      pushWorkspaceNotice("error", "任务缺少来源节点，无法定位结果");
+      return;
+    }
+    const resultNode = findResultNodeForSource(boardController.board.nodes, sourceNodeId);
+    if (!resultNode) {
+      pushWorkspaceNotice("error", "未找到任务对应的结果节点");
+      return;
+    }
+    const resultAssetId = task.activeResultAssetId ?? task.resultAssetIds.at(-1);
+    if (resultAssetId && resultNode.resultAssetIds.includes(resultAssetId)) {
+      boardController.updateResultNodeAsset(resultNode.id, resultAssetId);
+    }
+    requestFocusNode(resultNode.id);
+  }, [boardController, pushWorkspaceNotice, requestFocusNode]);
+
   const handleBoardConnectionError = useCallback((message: string) => {
     pushWorkspaceNotice("error", message);
   }, [pushWorkspaceNotice]);
@@ -4256,6 +4271,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
               nodes={boardController.board.nodes}
               tasks={generationTasks}
               onCancelTask={handleCancelBoardTask}
+              onFocusTaskResult={handleFocusBoardTaskResult}
               onFocusNode={requestFocusNode}
             />
           )}

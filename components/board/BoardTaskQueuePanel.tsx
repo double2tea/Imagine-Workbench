@@ -9,6 +9,7 @@ interface BoardTaskQueuePanelProps {
   cancelingTaskIds?: readonly string[];
   nodes: BoardNode[];
   onCancelTask: (task: GenerationTask) => void;
+  onFocusTaskResult: (task: GenerationTask) => void;
   onFocusNode: (nodeId: string) => void;
   tasks: GenerationTask[];
 }
@@ -64,12 +65,14 @@ function TaskRow({
   canceling,
   nodes,
   onCancelTask,
+  onFocusTaskResult,
   onFocusNode,
   task,
 }: {
   canceling: boolean;
   nodes: BoardNode[];
   onCancelTask: (task: GenerationTask) => void;
+  onFocusTaskResult: (task: GenerationTask) => void;
   onFocusNode: (nodeId: string) => void;
   task: GenerationTask;
 }) {
@@ -77,6 +80,8 @@ function TaskRow({
     ? nodes.find(node => node.id === task.source.boardNodeId)
     : undefined;
   const resultNode = sourceNode ? findResultNodeForSource(nodes, sourceNode.id) : undefined;
+  const resultAssetId = task.activeResultAssetId ?? task.resultAssetIds.at(-1);
+  const canFocusTaskResult = Boolean(resultNode && resultAssetId && resultNode.resultAssetIds.includes(resultAssetId));
   const canCancel = task.status === "pending" || task.status === "processing";
   const progress = task.status === "complete" || task.status === "canceled" ? 100 : task.progress;
 
@@ -124,18 +129,18 @@ function TaskRow({
           }}
         >
           <LocateFixed className="h-3 w-3" />
-          源节点
+          定位源
         </button>
         <button
           type="button"
-          disabled={!resultNode}
+          disabled={!canFocusTaskResult}
           className={actionButtonClassName}
           onClick={() => {
-            if (resultNode) onFocusNode(resultNode.id);
+            if (canFocusTaskResult) onFocusTaskResult(task);
           }}
         >
           <CheckCircle2 className="h-3 w-3" />
-          结果节点
+          查看结果
         </button>
         {canCancel ? (
           <button
@@ -157,6 +162,7 @@ function TaskSection({
   cancelingTaskIds,
   nodes,
   onCancelTask,
+  onFocusTaskResult,
   onFocusNode,
   tasks,
   title,
@@ -164,6 +170,7 @@ function TaskSection({
   cancelingTaskIds: readonly string[];
   nodes: BoardNode[];
   onCancelTask: (task: GenerationTask) => void;
+  onFocusTaskResult: (task: GenerationTask) => void;
   onFocusNode: (nodeId: string) => void;
   tasks: GenerationTask[];
   title: string;
@@ -181,6 +188,7 @@ function TaskSection({
           canceling={cancelingTaskIds.includes(task.id)}
           nodes={nodes}
           onCancelTask={onCancelTask}
+          onFocusTaskResult={onFocusTaskResult}
           onFocusNode={onFocusNode}
           task={task}
         />
@@ -193,6 +201,7 @@ export default function BoardTaskQueuePanel({
   cancelingTaskIds = [],
   nodes,
   onCancelTask,
+  onFocusTaskResult,
   onFocusNode,
   tasks,
 }: BoardTaskQueuePanelProps) {
@@ -221,13 +230,14 @@ export default function BoardTaskQueuePanel({
           失败 {failedTasks.length}
         </span>
         <span className="rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5 text-center text-[10px] font-semibold text-[var(--iw-muted)]">
-          待处理 {badgeCount}
+          需关注 {badgeCount}
         </span>
       </div>
       <TaskSection
         cancelingTaskIds={cancelingTaskIds}
         nodes={nodes}
         onCancelTask={onCancelTask}
+        onFocusTaskResult={onFocusTaskResult}
         onFocusNode={onFocusNode}
         tasks={activeTasks}
         title="运行中"
@@ -236,6 +246,7 @@ export default function BoardTaskQueuePanel({
         cancelingTaskIds={cancelingTaskIds}
         nodes={nodes}
         onCancelTask={onCancelTask}
+        onFocusTaskResult={onFocusTaskResult}
         onFocusNode={onFocusNode}
         tasks={failedTasks}
         title="需要处理"
@@ -244,6 +255,7 @@ export default function BoardTaskQueuePanel({
         cancelingTaskIds={cancelingTaskIds}
         nodes={nodes}
         onCancelTask={onCancelTask}
+        onFocusTaskResult={onFocusTaskResult}
         onFocusNode={onFocusNode}
         tasks={recentTasks}
         title="最近完成"
