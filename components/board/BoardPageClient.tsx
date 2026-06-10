@@ -122,7 +122,6 @@ import {
   type BoardSummary,
   type BoardVideoGenerateNode,
   type BoardVideoReferenceMode,
-  assetCompareReferenceUrl,
   analyzeRunningHubBindings,
   hasRunningHubBindingIdentity,
   parseRunningHubBindingsFromJsonText,
@@ -1178,6 +1177,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const [voiceProfileSourceItem, setVoiceProfileSourceItem] = useState<StorageItem | null>(null);
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
   const focusNodeSeqRef = useRef(0);
+  const originalAssetPromoteIdsRef = useRef<Set<string>>(new Set());
   const [focusNodeRequest, setFocusNodeRequest] = useState<{ nodeId: string; seq: number } | null>(null);
   const [preserveTasksRevealKey, setPreserveTasksRevealKey] = useState<string | null>(null);
   const requestFocusNode = useCallback((nodeId: string) => {
@@ -1439,6 +1439,24 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     }
     return { ...storedItem, url: originalUrl };
   }, [items]);
+  const promoteItemToOriginal = useCallback((item: StorageItem): void => {
+    if (item.status !== "complete") return;
+    if (originalAssetPromoteIdsRef.current.has(item.id)) return;
+    originalAssetPromoteIdsRef.current.add(item.id);
+    void resolveOriginalStorageItem(item).then(
+      originalItem => {
+        setItems(prev => prev.map(current =>
+          current.id === originalItem.id && current.url !== originalItem.url
+            ? { ...current, url: originalItem.url }
+            : current,
+        ));
+      },
+      error => {
+        originalAssetPromoteIdsRef.current.delete(item.id);
+        console.error("Original board asset promotion failed:", error);
+      },
+    );
+  }, [resolveOriginalStorageItem, setItems]);
   const handleOpenFullscreen = useCallback((item: StorageItem | null) => {
     if (!item) {
       setFullscreenItem(null);
@@ -1467,6 +1485,12 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         link.remove();
       },
       error => pushWorkspaceNotice("error", toErrorMessage(error, "原始媒体下载失败")),
+    );
+  }, [pushWorkspaceNotice, resolveOriginalStorageItem]);
+  const handleSaveVoiceProfileSource = useCallback((item: StorageItem) => {
+    void resolveOriginalStorageItem(item).then(
+      setVoiceProfileSourceItem,
+      error => pushWorkspaceNotice("error", toErrorMessage(error, "原始音频读取失败")),
     );
   }, [pushWorkspaceNotice, resolveOriginalStorageItem]);
   const resolveOriginalReferences = useCallback(async (references: ReferenceImageRef[]): Promise<ReferenceImageRef[]> => {
@@ -4104,9 +4128,26 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     [boardController.board.nodes],
   );
   const highlightAssetId = selectedBoardNode?.kind === "asset" ? selectedBoardNode.asset.assetId : undefined;
-  const selectedAssetCompareUrl = selectedBoardNode?.kind === "asset" && selectedBoardNode.asset.type === "image"
-    ? assetCompareReferenceUrl(selectedBoardNode.id, boardController.board.nodes, boardController.board.edges)
-    : null;
+  const selectedAssetCompareReference = useMemo(() => {
+    if (selectedBoardNode?.kind !== "asset" || selectedBoardNode.asset.type !== "image") return null;
+    const resultEdge = boardController.board.edges.find(edge =>
+      edge.to.nodeId === selectedBoardNode.id && edge.from.portId === "result-out"
+    );
+    if (!resultEdge) return null;
+    return generateReferenceCandidates(boardController.board.nodes, boardController.board.edges, resultEdge.from.nodeId)[0] ?? null;
+  }, [boardController.board.edges, boardController.board.nodes, selectedBoardNode]);
+  useEffect(() => {
+    for (const nodeId of selectedNodeIds) {
+      const node = boardController.board.nodes.find(candidate => candidate.id === nodeId);
+      const assetId = node?.kind === "asset"
+        ? node.asset.assetId
+        : node?.kind === "result"
+          ? node.activeAssetId
+          : undefined;
+      const item = assetId ? items.find(candidate => candidate.id === assetId) : undefined;
+      if (item) promoteItemToOriginal(item);
+    }
+  }, [boardController.board.nodes, items, promoteItemToOriginal, selectedNodeIds]);
   const imageModelGroups = getProviderModelGroups(imageModelOptions, providerKeys, customProviders);
   const videoModelGroups = getProviderModelGroups(videoModelOptions, providerKeys, customProviders);
   const audioModelGroups = getProviderModelGroups(audioModelOptions, providerKeys, customProviders);
@@ -4256,7 +4297,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onImportBoardFiles={handleImportBoardFiles}
         onOpenFullscreen={handleOpenFullscreen}
         onOpenPanorama={handleOpenPanorama}
-        onSaveVoiceProfile={setVoiceProfileSourceItem}
+        onPromoteOriginalAsset={promoteItemToOriginal}
+        onResolveOriginalAsset={resolveOriginalStorageItem}
+        onSaveVoiceProfile={handleSaveVoiceProfileSource}
         onOpenSettings={handleOpenSettings}
         onRenameBoard={renameBoardPage}
         onSelectBoard={handleSelectBoard}
@@ -4281,11 +4324,18 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
               outgoingCount={selectedOutgoingEdges.length}
               selectedNodeCount={selectedNodeIds.length}
               videoModelGroups={videoModelGroups}
-              onCompareAsset={selectedAssetCompareUrl && selectedBoardNode?.kind === "asset"
-                ? () => setAssetCompareRequest({
-                  originalUrl: selectedAssetCompareUrl,
-                  resultUrl: selectedBoardNode.asset.url,
-                })
+              onCompareAsset={selectedAssetCompareReference && selectedBoardNode?.kind === "asset"
+                ? () => {
+                  const item = items.find(candidate => candidate.id === selectedBoardNode.asset.assetId);
+                  if (!item) return;
+                  void Promise.all([resolveOriginalReferences([selectedAssetCompareReference]), resolveOriginalStorageItem(item)]).then(
+                    ([references, originalItem]) => setAssetCompareRequest({
+                      originalUrl: references[0]?.url ?? selectedAssetCompareReference.url,
+                      resultUrl: originalItem.url,
+                    }),
+                    error => pushWorkspaceNotice("error", toErrorMessage(error, "原始媒体读取失败")),
+                  );
+                }
                 : undefined}
               onDeleteEdge={boardController.deleteEdge}
               onEditAssetImage={selectedBoardNode?.kind === "asset"
@@ -4421,7 +4471,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           handleCaptureVideoFrame(boardController.selectedNodeId ?? "", item, frame)
         }
         onSavePanoramaScreenshots={handleSavePanoramaScreenshots}
-        onSaveVoiceProfile={setVoiceProfileSourceItem}
+        onSaveVoiceProfile={handleSaveVoiceProfileSource}
         onClose={() => setFullscreenItem(null)}
         onSelectItem={handleOpenFullscreen}
       />

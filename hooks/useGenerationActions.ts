@@ -2,11 +2,13 @@ import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import { isRunningHubWorkflowAudioTarget } from "@/lib/audio-generation-routing";
 import { API_ROUTES } from "@/lib/api/routes";
+import { resolveAssetOriginalUrl } from "@/lib/assets/resolve-url";
 import { saveItemWithPreview } from "@/lib/assets/previews";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 import { readImageGenerationPayload } from "@/lib/client-image-response";
 import {
   buildStorageItem,
+  getAssetMeta,
   getAssetMetasByIds,
   hydrateAssets,
   saveToDB,
@@ -136,6 +138,20 @@ function mergeReferences(
     merged.set(reference.id, reference);
   }
   return Array.from(merged.values());
+}
+
+async function resolveOriginalReference(reference: ReferenceImageRef): Promise<ReferenceImageRef> {
+  const meta = await getAssetMeta(reference.id);
+  if (!meta) return reference;
+  const originalUrl = await resolveAssetOriginalUrl(meta);
+  if (!originalUrl.trim()) {
+    throw new Error("找不到参考媒体原图");
+  }
+  return { ...reference, url: originalUrl };
+}
+
+async function resolveOriginalReferences(references: ReferenceImageRef[]): Promise<ReferenceImageRef[]> {
+  return Promise.all(references.map(resolveOriginalReference));
 }
 
 function isAbortError(error: unknown): boolean {
@@ -328,8 +344,16 @@ export function useGenerationActions({
 
   const generateManualImage = async (overrides: GenerationOverrides = {}) => {
     const activePrompt = overrides.prompt ?? prompt;
-    const activeReferenceImage = overrides.referenceImage ?? referenceImage;
-    const activeReferenceImages = overrides.referenceImages ?? referenceImages;
+    const selectedReferenceImage = overrides.referenceImage ?? referenceImage;
+    const selectedReferenceImages = overrides.referenceImages ?? referenceImages;
+    let activeReferenceImages: ReferenceImageRef[];
+    try {
+      activeReferenceImages = await resolveOriginalReferences(selectedReferenceImages);
+    } catch (error) {
+      pushWorkspaceNotice("error", toErrorMessage(error, "参考媒体读取失败"));
+      return false;
+    }
+    const activeReferenceImage = activeReferenceImages[0]?.url ?? selectedReferenceImage;
     const requestModel = overrides.model ?? activeImageModel;
     const requestImageResolution = overrides.imageResolution ?? activeImageResolution;
     const requestImageQuality = overrides.imageQuality ?? activeImageQuality;
@@ -510,8 +534,16 @@ export function useGenerationActions({
 
   const generateManualVideo = async (overrides: GenerationOverrides = {}) => {
     const activePrompt = overrides.prompt ?? prompt;
-    const activeReferenceImage = overrides.referenceImage ?? referenceImage;
-    const activeReferenceImages = overrides.referenceImages ?? referenceImages;
+    const selectedReferenceImage = overrides.referenceImage ?? referenceImage;
+    const selectedReferenceImages = overrides.referenceImages ?? referenceImages;
+    let activeReferenceImages: ReferenceImageRef[];
+    try {
+      activeReferenceImages = await resolveOriginalReferences(selectedReferenceImages);
+    } catch (error) {
+      pushWorkspaceNotice("error", toErrorMessage(error, "参考媒体读取失败"));
+      return false;
+    }
+    const activeReferenceImage = activeReferenceImages[0]?.url ?? selectedReferenceImage;
     const requestModel = overrides.model ?? selectedVideoModel;
     const requestSize = overrides.size ?? activeVideoSize;
     const requestVideoDuration = overrides.videoDuration ?? activeVideoDuration;
@@ -644,8 +676,16 @@ export function useGenerationActions({
 
   const generateManualAudio = async (overrides: GenerationOverrides = {}) => {
     const activePrompt = overrides.prompt ?? prompt;
-    const activeReferenceImage = overrides.referenceImage ?? referenceImage;
-    const activeReferenceImages = overrides.referenceImages ?? referenceImages;
+    const selectedReferenceImage = overrides.referenceImage ?? referenceImage;
+    const selectedReferenceImages = overrides.referenceImages ?? referenceImages;
+    let activeReferenceImages: ReferenceImageRef[];
+    try {
+      activeReferenceImages = await resolveOriginalReferences(selectedReferenceImages);
+    } catch (error) {
+      pushWorkspaceNotice("error", toErrorMessage(error, "参考媒体读取失败"));
+      return false;
+    }
+    const activeReferenceImage = activeReferenceImages[0]?.url ?? selectedReferenceImage;
     const requestModel = overrides.model?.trim();
 
     if (!requestModel) {

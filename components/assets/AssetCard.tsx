@@ -22,7 +22,7 @@ import {
   Video as VideoIcon,
   X,
 } from "lucide-react";
-import { useRef, useState, type DragEvent } from "react";
+import { useEffect, useRef, useState, type DragEvent } from "react";
 import AudioWaveformPreview from "@/components/audio/AudioWaveformPreview";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
 import PreviewImage from "@/components/PreviewImage";
@@ -52,6 +52,7 @@ interface AssetCardProps {
   onImageQuickEdit: (item: StorageItem, operation: ImageEditFeature) => void;
   onOpenFullscreen: (item: StorageItem) => void;
   onOpenPanorama: (item: StorageItem) => void;
+  onPromoteOriginal: (item: StorageItem) => void;
   onOpenReferencePreview: (item: StorageItem, index: number) => void;
   onRetry: (item: StorageItem) => void;
   onReuseTask: (item: StorageItem) => void;
@@ -148,6 +149,7 @@ export default function AssetCard({
   onImageQuickEdit,
   onOpenFullscreen,
   onOpenPanorama,
+  onPromoteOriginal,
   onOpenReferencePreview,
   onRetry,
   onReuseTask,
@@ -161,6 +163,7 @@ export default function AssetCard({
   const [isQuickEditMenuOpen, setIsQuickEditMenuOpen] = useState(false);
   const [frameMenuPlacement, setFrameMenuPlacement] = useState<FrameMenuPlacement | null>(null);
   const captureVideoFrameRef = useRef<VideoFrameCaptureRequest | null>(null);
+  const hoverPromoteTimerRef = useRef<number | null>(null);
   const provider = tryParseProviderModel(item.model, selectedProvider)?.provider ?? selectedProvider;
   const providerLabel = providerLabelsByKey?.[provider] ?? getProviderMeta(provider).label;
   const isDraggableReference = item.status === "complete" && item.type !== "transcript";
@@ -190,6 +193,27 @@ export default function AssetCard({
     void captureVideoFrameRef.current?.(mode);
   };
 
+  const clearHoverPromoteTimer = () => {
+    if (hoverPromoteTimerRef.current === null) return;
+    window.clearTimeout(hoverPromoteTimerRef.current);
+    hoverPromoteTimerRef.current = null;
+  };
+
+  const scheduleHoverPromote = () => {
+    if (item.status !== "complete") return;
+    clearHoverPromoteTimer();
+    hoverPromoteTimerRef.current = window.setTimeout(() => {
+      hoverPromoteTimerRef.current = null;
+      onPromoteOriginal(item);
+    }, 650);
+  };
+
+  useEffect(() => {
+    if (selected && item.status === "complete") onPromoteOriginal(item);
+  }, [item, onPromoteOriginal, selected]);
+
+  useEffect(() => clearHoverPromoteTimer, []);
+
   return (
     <div
       draggable={isDraggableReference}
@@ -197,6 +221,8 @@ export default function AssetCard({
       data-status={item.status}
       data-type={item.type}
       onDragStart={handleDragStart}
+      onMouseEnter={scheduleHoverPromote}
+      onMouseLeave={clearHoverPromoteTimer}
       className={`imagine-asset-card relative flex h-full flex-col overflow-hidden rounded-[10px] group border bg-slate-900 shadow-xl transition-all duration-300 ${
         selected ? "border-blue-500 ring-2 ring-blue-500/20" : "border-slate-850 hover:border-slate-750"
       }`}

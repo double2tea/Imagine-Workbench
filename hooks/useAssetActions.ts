@@ -18,6 +18,7 @@ import { mediaReferenceFileExtension, mediaReferenceMimeFromDataUri } from "@/li
 import { createPanoramaScreenshotStorageItem, type PanoramaScreenshot } from "@/lib/panorama/capture";
 import { tryParseProviderModel, type AiProvider } from "@/lib/providers/model-catalog";
 import type { RunningHubTaskNodeBinding } from "@/lib/providers/types";
+import { resolveAssetOriginalUrl } from "@/lib/assets/resolve-url";
 import { getReferenceImagePayloadError, getReferenceMediaPayloadError, prepareReferenceImageUrlForRequest, prepareReferenceMediaUrlForRequest } from "@/lib/reference-images";
 import { createVideoFrameStorageItem, getVideoFrameCaptureLabel, type CapturedVideoFrame } from "@/lib/video-frame";
 
@@ -88,6 +89,15 @@ function assetDownloadExtension(item: StorageItem): string {
 
 function assetDownloadMimeType(item: StorageItem): string {
   return mediaReferenceMimeFromDataUri(item.url) ?? defaultDownloadMimeType(item.type);
+}
+
+async function resolveOriginalStorageItem(item: StorageItem, items: StorageItem[]): Promise<StorageItem> {
+  const storedItem = items.find(entry => entry.id === item.id) ?? item;
+  const originalUrl = await resolveAssetOriginalUrl(storedItem);
+  if (!originalUrl.trim()) {
+    throw new Error("找不到原始媒体");
+  }
+  return { ...storedItem, url: originalUrl };
 }
 
 function readVideoGenerationPayload(data: unknown): { imageUrl: string | null; operationName: string | null } {
@@ -426,25 +436,25 @@ export function useAssetActions({
   };
 
   const handleDownloadItem = async (item: StorageItem) => {
-    const extension = assetDownloadExtension(item);
-    const fileName = `imagine_${item.id}.${extension}`;
-
     try {
+      const originalItem = await resolveOriginalStorageItem(item, items);
+      const extension = assetDownloadExtension(originalItem);
+      const fileName = `imagine_${originalItem.id}.${extension}`;
       let blob: Blob;
-      if (item.url && item.url.startsWith("data:")) {
-        const parts = item.url.split(";base64,");
+      if (originalItem.url && originalItem.url.startsWith("data:")) {
+        const parts = originalItem.url.split(";base64,");
         if (parts.length === 2) {
           const byteChars = atob(parts[1]);
           const bytes = new Uint8Array(byteChars.length);
           for (let index = 0; index < byteChars.length; index += 1) {
             bytes[index] = byteChars.charCodeAt(index);
           }
-          blob = new Blob([bytes], { type: assetDownloadMimeType(item) });
+          blob = new Blob([bytes], { type: assetDownloadMimeType(originalItem) });
         } else {
           throw new Error("Invalid data URI");
         }
       } else {
-        const fileRes = await fetch(item.url);
+        const fileRes = await fetch(originalItem.url);
         if (!fileRes.ok) throw new Error(`Fetch failed: HTTP ${fileRes.status}`);
         blob = await fileRes.blob();
       }
@@ -526,23 +536,24 @@ export function useAssetActions({
       });
 
       try {
-        if (item.url && item.url.startsWith("data:")) {
-          const parts = item.url.split(";base64,");
+        const originalItem = await resolveOriginalStorageItem(item, items);
+        if (originalItem.url && originalItem.url.startsWith("data:")) {
+          const parts = originalItem.url.split(";base64,");
           if (parts.length === 2) {
             zip.file(fileName, parts[1], { base64: true });
           }
-        } else if (item.url) {
-          const fileRes = await fetch(item.url);
+        } else if (originalItem.url) {
+          const fileRes = await fetch(originalItem.url);
           if (fileRes.ok) {
             const blob = await fileRes.blob();
             zip.file(fileName, blob);
           } else {
-            zip.file(`link_fallback_${item.id}.txt`, item.url);
+            zip.file(`link_fallback_${item.id}.txt`, originalItem.url);
           }
         }
       } catch (error) {
         console.error(`Error adding file ${item.id} to zip:`, error);
-        zip.file(`error_log_${item.id}.txt`, `Failed to fetch from: ${item.url}\nError: ${error}`);
+        zip.file(`error_log_${item.id}.txt`, `Failed to add original media for: ${item.id}\nError: ${error}`);
       }
     }));
 

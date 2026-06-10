@@ -50,6 +50,7 @@ interface AssetGalleryWorkspaceProps {
   onImageQuickEdit: (item: StorageItem, operation: ImageEditFeature) => void;
   onOpenFullscreen: (item: StorageItem) => void;
   onOpenPanorama: (item: StorageItem) => void;
+  onPromoteOriginal: (item: StorageItem) => void;
   onResetCompare: () => void;
   onRetryItem: (item: StorageItem) => void;
   onReuseTask: (item: StorageItem) => void;
@@ -113,6 +114,7 @@ export default function AssetGalleryWorkspace({
   onImageQuickEdit,
   onOpenFullscreen,
   onOpenPanorama,
+  onPromoteOriginal,
   onResetCompare,
   onRetryItem,
   onReuseTask,
@@ -339,6 +341,7 @@ export default function AssetGalleryWorkspace({
                           onLaunchMaskEditor={onLaunchMaskEditor}
                           onOpenFullscreen={onOpenFullscreen}
                           onOpenPanorama={onOpenPanorama}
+                          onPromoteOriginal={onPromoteOriginal}
                           onOpenReferencePreview={(previewItem, index) => setReferencePreview({ itemId: previewItem.id, index })}
                           onRetry={onRetryItem}
                           onReuseTask={onReuseTask}

@@ -53,6 +53,7 @@ import BoardEmptyHint from "@/components/board/BoardEmptyHint";
 import BoardToolbar from "@/components/board/BoardToolbar";
 import BoardAssetCompareOverlay from "@/components/board/BoardAssetCompareOverlay";
 import type { WorkspaceNoticeType } from "@/components/workbench/WorkspaceNotices";
+import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import { ensureHydratedStorageItem } from "@/lib/assets/ensure-hydrated";
 import type { StorageItem } from "@/lib/db";
 import {
@@ -128,6 +129,8 @@ interface BoardWorkspaceProps {
   onOpenSettings: () => void;
   onOpenFullscreen: (item: StorageItem) => void;
   onOpenPanorama: (item: StorageItem) => void;
+  onPromoteOriginalAsset: (item: StorageItem) => void;
+  onResolveOriginalAsset: (item: StorageItem) => Promise<StorageItem>;
   onSaveVoiceProfile: (item: StorageItem) => void;
   onRenameBoard: () => void;
   onSelectBoard: (boardId: string) => void;
@@ -987,6 +990,8 @@ export default function BoardWorkspace({
   onOpenSettings,
   onOpenFullscreen,
   onOpenPanorama,
+  onPromoteOriginalAsset,
+  onResolveOriginalAsset,
   onSaveVoiceProfile,
   onRenameBoard,
   onSelectBoard,
@@ -1005,6 +1010,7 @@ export default function BoardWorkspace({
   const mediaImportInputRef = useRef<HTMLInputElement>(null);
   const pendingImportPointRef = useRef<BoardPoint | null>(null);
   const copiedNodeRef = useRef<CopiedBoardNode | null>(null);
+  const hoverPromoteTimerRef = useRef<number | null>(null);
   const isNodeDragActiveRef = useRef(false);
   const pendingDragPositionByIdRef = useRef<Map<string, BoardPoint>>(new Map());
   const selectionRef = useRef<BoardSelectionSnapshot>({ edgeId: null, nodeId: null, nodeIds: [] });
@@ -1127,6 +1133,25 @@ export default function BoardWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reference fingerprint gates complete/url changes; task fingerprint gates pending/processing progress
     [galleryReferenceFingerprint, galleryTaskFingerprint],
   );
+
+  const promotableItemForNode = useCallback((node: BoardNodeModel): StorageItem | null => {
+    if (node.kind === "asset") return galleryItemById.get(node.asset.assetId) ?? null;
+    if (node.kind === "result") return galleryItemById.get(node.activeAssetId) ?? null;
+    return null;
+  }, [galleryItemById]);
+
+  const assetCompareReferenceForNode = useCallback((assetNodeId: string): ReferenceImageRef | null => {
+    const resultEdge = (boardPromptReferenceGraphIndex.incomingEdgesByTargetNode.get(assetNodeId) ?? [])
+      .find(edge => edge.from.portId === "result-out");
+    if (!resultEdge) return null;
+    return boardPromptReferenceGraphIndex.referenceCandidatesByGenerateNode.get(resultEdge.from.nodeId)?.[0] ?? null;
+  }, [boardPromptReferenceGraphIndex]);
+
+  const resolveCompareReferenceUrl = useCallback(async (reference: ReferenceImageRef): Promise<string> => {
+    const item = galleryItemById.get(reference.id);
+    if (!item) return reference.url;
+    return (await onResolveOriginalAsset(item)).url;
+  }, [galleryItemById, onResolveOriginalAsset]);
 
   const measureAssetAspectRatio = useCallback((nodeId: string, aspectRatio: number): void => {
     if (!Number.isFinite(aspectRatio) || aspectRatio <= 0) return;
@@ -1351,9 +1376,14 @@ export default function BoardWorkspace({
     onOpenAssetCompare: (nodeId: string) => {
       const assetNode = board.nodes.find(item => item.id === nodeId);
       if (assetNode?.kind !== "asset" || assetNode.asset.type !== "image") return;
-      const originalUrl = assetCompareReferenceUrl(nodeId, board.nodes, board.edges, boardPromptReferenceGraphIndex);
-      if (!originalUrl) return;
-      setAssetCompare({ originalUrl, resultUrl: assetNode.asset.url });
+      const compareReference = assetCompareReferenceForNode(nodeId);
+      if (!compareReference) return;
+      const item = promotableItemForNode(assetNode);
+      if (!item) return;
+      void Promise.all([resolveCompareReferenceUrl(compareReference), onResolveOriginalAsset(item)]).then(
+        ([originalUrl, originalItem]) => setAssetCompare({ originalUrl, resultUrl: originalItem.url }),
+        error => onWorkspaceNotice("error", error instanceof Error ? error.message : "原始媒体读取失败"),
+      );
     },
     onSelectAssetStackResult: (nodeId: string, assetId: string) => {
       const item = galleryItemById.get(assetId);
@@ -1371,8 +1401,8 @@ export default function BoardWorkspace({
     updateReferenceGroupItemRole, updateAgentInstruction, updateGenerateNode, updateMultiGridNode,
     updateMultiGridItemTransform, onExportMultiGrid, measureAssetAspectRatio,
     updateNodeTitle, updateRunningHubAppNode, updateNoteBody, updatePromptNode,
-    board.nodes, board.edges, boardPromptReferenceGraphIndex, galleryItemById, onConnectionError,
-    updateResultNodeAsset,
+    assetCompareReferenceForNode, board.nodes, board.edges, boardPromptReferenceGraphIndex, galleryItemById, onConnectionError,
+    onResolveOriginalAsset, onWorkspaceNotice, promotableItemForNode, resolveCompareReferenceUrl, updateResultNodeAsset,
   ]);
 
   const generateTaskByNodeId = useMemo(() => {
@@ -1634,6 +1664,28 @@ export default function BoardWorkspace({
   const handleNodeClick = useCallback<NodeMouseHandler<BoardFlowNode>>(() => {
     closeOverlayMenus();
   }, [closeOverlayMenus]);
+
+  const clearHoverPromoteTimer = useCallback((): void => {
+    if (hoverPromoteTimerRef.current === null) return;
+    window.clearTimeout(hoverPromoteTimerRef.current);
+    hoverPromoteTimerRef.current = null;
+  }, []);
+
+  const handleNodeMouseEnter = useCallback<NodeMouseHandler<BoardFlowNode>>((_event, node) => {
+    const item = promotableItemForNode(node.data.node);
+    if (!item || item.status !== "complete") return;
+    clearHoverPromoteTimer();
+    hoverPromoteTimerRef.current = window.setTimeout(() => {
+      hoverPromoteTimerRef.current = null;
+      onPromoteOriginalAsset(item);
+    }, 650);
+  }, [clearHoverPromoteTimer, onPromoteOriginalAsset, promotableItemForNode]);
+
+  const handleNodeMouseLeave = useCallback<NodeMouseHandler<BoardFlowNode>>(() => {
+    clearHoverPromoteTimer();
+  }, [clearHoverPromoteTimer]);
+
+  useEffect(() => clearHoverPromoteTimer, [clearHoverPromoteTimer]);
 
   const openNodeContextMenu = useCallback((nodeId: string, clientX: number, clientY: number): void => {
     closeOverlayMenus();
@@ -2631,6 +2683,8 @@ export default function BoardWorkspace({
             onNodeContextMenu={handleNodeContextMenu}
             onNodeDragStart={handleNodeDragStart}
             onNodeDragStop={handleNodeDragStop}
+            onNodeMouseEnter={handleNodeMouseEnter}
+            onNodeMouseLeave={handleNodeMouseLeave}
             onNodesChange={handleNodesChange}
             onNodesDelete={handleNodesDelete}
             onPaneClick={handlePaneClick}
@@ -2677,11 +2731,12 @@ export default function BoardWorkspace({
           {nodeContextMenu ? (() => {
             const node = board.nodes.find(item => item.id === nodeContextMenu.nodeId);
             if (!node) return null;
-            const compareReferenceUrl = node.kind === "asset" && node.asset.type === "image"
-              ? assetCompareReferenceUrl(node.id, board.nodes, board.edges)
+            const compareReference = node.kind === "asset" && node.asset.type === "image"
+              ? assetCompareReferenceForNode(node.id)
               : null;
-            const copyableImageUrl = (node.kind === "asset" || node.kind === "result") && node.asset.type === "image"
-              ? node.asset.url
+            const mediaItem = promotableItemForNode(node);
+            const copyableImageItem = mediaItem && (node.kind === "asset" || node.kind === "result") && node.asset.type === "image"
+              ? mediaItem
               : null;
             const selectedBatchConnectionCount = selectedNodeIds.filter(nodeId => {
               const selectedNode = board.nodes.find(item => item.id === nodeId);
@@ -2701,15 +2756,21 @@ export default function BoardWorkspace({
               onCreateReferenceGroup: node.kind === "asset" && node.asset.type === "image"
                 ? () => createReferenceGroupFromSelected(node.id)
                 : undefined,
-              onCompare: compareReferenceUrl && node.kind === "asset"
+              onCompare: compareReference && node.kind === "asset"
                 ? () => {
-                  setAssetCompare({ originalUrl: compareReferenceUrl, resultUrl: node.asset.url });
+                  if (!mediaItem) return;
+                  void Promise.all([resolveCompareReferenceUrl(compareReference), onResolveOriginalAsset(mediaItem)]).then(
+                    ([originalUrl, originalItem]) => setAssetCompare({ originalUrl, resultUrl: originalItem.url }),
+                    error => onWorkspaceNotice("error", error instanceof Error ? error.message : "原始媒体读取失败"),
+                  );
                   closeOverlayMenus();
                 }
                 : undefined,
-              onCopyImage: copyableImageUrl
+              onCopyImage: copyableImageItem
                 ? () => {
-                  void copyImageUrlToClipboard(copyableImageUrl).then(
+                  void onResolveOriginalAsset(copyableImageItem).then(
+                    originalItem => copyImageUrlToClipboard(originalItem.url),
+                  ).then(
                     () => onWorkspaceNotice("success", "图片已复制到剪贴板"),
                     error => onWorkspaceNotice("error", error instanceof Error ? error.message : "复制图片失败"),
                   );

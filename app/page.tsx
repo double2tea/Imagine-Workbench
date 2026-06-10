@@ -43,6 +43,7 @@ import { useClipboardImageImport } from "@/hooks/useClipboardImageImport";
 import { useGenerationActions } from "@/hooks/useGenerationActions";
 import { useGenerationTaskStore } from "@/hooks/useGenerationTaskStore";
 import { useMediaPolling } from "@/hooks/useMediaPolling";
+import { resolveAssetOriginalUrl } from "@/lib/assets/resolve-url";
 import { audioOperationFormatOptions, audioOperationRequiresStylePrompt, audioOperationRequiresTextInput } from "@/lib/audio-operation-rules";
 import {
   cancelGenerationTask,
@@ -240,12 +241,6 @@ export default function Home() {
   const [agentPortalHost, setAgentPortalHost] = useState<HTMLElement | null>(null);
   const confirmAction = useConfirm();
 
-  const applyAsVideoReference = (asset: StorageItem) => {
-    setReferenceImage(asset.url);
-    setReferenceImages([{ id: asset.id, url: asset.url, role: "start" }]);
-    setTraditionalSubTab("video");
-  };
-
   const workspaceGalleryItems = useMemo(() => {
     const taskItems = generationTasks
       .filter(task => !task.source.boardId)
@@ -324,6 +319,7 @@ export default function Home() {
   const pollingFailuresRef = useRef<Record<string, number>>({});
   const generationAbortControllersRef = useRef<Record<string, AbortController>>({});
   const locallyCanceledItemIdsRef = useRef<Set<string>>(new Set());
+  const originalAssetPromoteIdsRef = useRef<Set<string>>(new Set());
   const workspaceNoticeSequenceRef = useRef(0);
   const isAgentDockSuppressed = showSettings || isMaskOpen || fullscreenItem !== null || panoramaItem !== null || voiceProfileSourceItem !== null;
 
@@ -336,6 +332,61 @@ export default function Home() {
     const id = `${makeClientId("notice")}_${workspaceNoticeSequenceRef.current}`;
     setWorkspaceNotices(prev => [{ id, type, message }, ...prev].slice(0, 4));
   }, [setWorkspaceNotices]);
+
+  const resolveOriginalStorageItem = useCallback(async (item: StorageItem): Promise<StorageItem> => {
+    const storedItem = items.find(entry => entry.id === item.id) ?? item;
+    const originalUrl = await resolveAssetOriginalUrl(storedItem);
+    if (!originalUrl.trim()) {
+      throw new Error("找不到原始媒体");
+    }
+    return { ...storedItem, url: originalUrl };
+  }, [items]);
+
+  const openOriginalItem = useCallback((
+    item: StorageItem,
+    action: (originalItem: StorageItem) => void,
+    errorMessage: string,
+  ): void => {
+    void resolveOriginalStorageItem(item).then(
+      action,
+      error => pushWorkspaceNotice("error", toErrorMessage(error, errorMessage)),
+    );
+  }, [pushWorkspaceNotice, resolveOriginalStorageItem]);
+
+  const handleOpenFullscreen = useCallback((item: StorageItem | null): void => {
+    if (!item) {
+      setFullscreenItem(null);
+      return;
+    }
+    openOriginalItem(item, setFullscreenItem, "原始媒体读取失败");
+  }, [openOriginalItem]);
+
+  const handleOpenPanorama = useCallback((item: StorageItem): void => {
+    openOriginalItem(item, setPanoramaItem, "原始图片读取失败");
+  }, [openOriginalItem]);
+
+  const handleSaveVoiceProfileSource = useCallback((item: StorageItem): void => {
+    openOriginalItem(item, setVoiceProfileSourceItem, "原始音频读取失败");
+  }, [openOriginalItem]);
+
+  const promoteItemToOriginal = useCallback((item: StorageItem): void => {
+    if (item.status !== "complete") return;
+    if (originalAssetPromoteIdsRef.current.has(item.id)) return;
+    originalAssetPromoteIdsRef.current.add(item.id);
+    void resolveOriginalStorageItem(item).then(
+      originalItem => {
+        setItems(prev => prev.map(current =>
+          current.id === originalItem.id && current.url !== originalItem.url
+            ? { ...current, url: originalItem.url }
+            : current,
+        ));
+      },
+      error => {
+        originalAssetPromoteIdsRef.current.delete(item.id);
+        console.error("Original asset promotion failed:", error);
+      },
+    );
+  }, [resolveOriginalStorageItem, setItems]);
 
   const {
     addCustomProvider,
@@ -470,6 +521,23 @@ export default function Home() {
     setAgentInput,
     setPrompt,
   });
+
+  const applyAsVideoReference = useCallback((asset: StorageItem): void => {
+    openOriginalItem(asset, originalAsset => {
+      setReferenceImage(originalAsset.url);
+      setReferenceImages([{ id: originalAsset.id, url: originalAsset.url, role: "start" }]);
+      setTraditionalSubTab("video");
+    }, "原始媒体读取失败");
+  }, [openOriginalItem, setReferenceImage, setReferenceImages]);
+
+  const handleUseAgentReference = useCallback((asset: StorageItem): void => {
+    openOriginalItem(asset, originalAsset => {
+      setAgentReferenceId(originalAsset.id);
+      setAgentReferenceUrl(originalAsset.url);
+      setAgentReferences([{ id: originalAsset.id, url: originalAsset.url }]);
+      setIsAgentDockOpen(true);
+    }, "原始媒体读取失败");
+  }, [openOriginalItem, setAgentReferenceId, setAgentReferenceUrl, setAgentReferences]);
   const audioReferenceImages = referenceImages.filter(reference =>
     audioCapabilities.referenceMediaTypes.includes(getMediaReferenceType(reference)),
   );
@@ -1094,11 +1162,13 @@ export default function Home() {
 
   const handleImageQuickEdit = (item: StorageItem, operation: ImageEditFeature) => {
     if (item.type !== "image") return;
-    if (operation === "cutout") {
-      void runImageQuickEdit(item, operation, item.url, undefined, undefined, "", "auto");
-      return;
-    }
-    launchMaskEditor(item.url, item.id, "creative", operation, item);
+    openOriginalItem(item, originalItem => {
+      if (operation === "cutout") {
+        void runImageQuickEdit(originalItem, operation, originalItem.url, undefined, undefined, "", "auto");
+        return;
+      }
+      launchMaskEditor(originalItem.url, originalItem.id, "creative", operation, originalItem);
+    }, `${IMAGE_EDIT_LABELS[operation]}原图读取失败`);
   };
 
   // Launch mask editor layout dialog
@@ -1115,6 +1185,17 @@ export default function Home() {
     setMaskEditOperation(operation);
     setMaskEditSourceItem(sourceItem ?? null);
     setIsMaskOpen(true);
+  };
+
+  const launchAssetMaskEditor = (_imageUrl: string, id: string): void => {
+    const item = items.find(entry => entry.id === id);
+    if (!item) {
+      pushWorkspaceNotice("error", "找不到原始媒体");
+      return;
+    }
+    openOriginalItem(item, originalItem => {
+      launchMaskEditor(originalItem.url, originalItem.id);
+    }, "原始图片读取失败");
   };
 
   const saveMaskOutput = async (output: CanvasMaskEditorOutput) => {
@@ -1219,7 +1300,10 @@ export default function Home() {
         search={atDropdown.search}
         onSelect={(item) => {
           if (item.type === "transcript") return;
-          handleSelectAtItem(item.url, item.id, type, item.type);
+          const itemType = item.type;
+          openOriginalItem(item, originalItem => {
+            handleSelectAtItem(originalItem.url, originalItem.id, type, itemType);
+          }, "原始媒体读取失败");
         }}
       />
     );
@@ -1451,16 +1535,17 @@ export default function Home() {
       onDownloadItem={handleDownloadItem}
       onExportMetadata={exportMetadataJson}
       onImageQuickEdit={handleImageQuickEdit}
-      onLaunchMaskEditor={launchMaskEditor}
-      onOpenFullscreen={setFullscreenItem}
-      onOpenPanorama={setPanoramaItem}
+      onLaunchMaskEditor={launchAssetMaskEditor}
+      onOpenFullscreen={handleOpenFullscreen}
+      onOpenPanorama={handleOpenPanorama}
+      onPromoteOriginal={promoteItemToOriginal}
       onResetCompare={() => {
         setIsCompareMode(false);
         setCompareItemIds([]);
       }}
       onRetryItem={retryGalleryItem}
       onReuseTask={reuseTaskInComposer}
-      onSaveVoiceProfile={setVoiceProfileSourceItem}
+      onSaveVoiceProfile={handleSaveVoiceProfileSource}
       onSetAssetDateEnd={setAssetDateEnd}
       onSetAssetDatePreset={setAssetDatePreset}
       onSetAssetDateStart={setAssetDateStart}
@@ -1477,12 +1562,7 @@ export default function Home() {
       onSetSearchQuery={setSearchQuery}
       onToggleCompare={toggleCompare}
       onToggleSelect={toggleSelectItem}
-      onUseAgentReference={(asset) => {
-        setAgentReferenceId(asset.id);
-        setAgentReferenceUrl(asset.url);
-        setAgentReferences([{ id: asset.id, url: asset.url }]);
-        setIsAgentDockOpen(true);
-      }}
+      onUseAgentReference={handleUseAgentReference}
       visibleItemsStep={isDesktopLayout ? 48 : 18}
       formatModelLabel={formatStoredModelLabel}
       providerLabelsByKey={providerLabelsByKey}
@@ -1820,9 +1900,9 @@ export default function Home() {
         items={filteredItems.filter(item => item.status === "complete")}
         onCaptureVideoFrame={handleCaptureVideoFrame}
         onSavePanoramaScreenshots={handleSavePanoramaScreenshots}
-        onSaveVoiceProfile={setVoiceProfileSourceItem}
+        onSaveVoiceProfile={handleSaveVoiceProfileSource}
         onClose={() => setFullscreenItem(null)}
-        onSelectItem={setFullscreenItem}
+        onSelectItem={handleOpenFullscreen}
       />
 
       {panoramaItem && (
