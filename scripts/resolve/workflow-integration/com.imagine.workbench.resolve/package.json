@@ -1,0 +1,10 @@
+{
+  "name": "imagine-workbench-resolve",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Imagine Workbench Workflow Integration for DaVinci Resolve",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  }
+}

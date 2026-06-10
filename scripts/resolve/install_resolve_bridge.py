@@ -12,8 +12,8 @@ DEFAULT_RESOLVE_SCRIPT_DIR = Path(
     "~/Library/Application Support/Blackmagic Design/DaVinci Resolve/Fusion/Scripts/Utility"
 ).expanduser()
 DEFAULT_RESOLVE_WORKFLOW_DIR = Path(
-    "~/Library/Application Support/Blackmagic Design/DaVinci Resolve/Workflow Integration Plugins"
-).expanduser()
+    "/Library/Application Support/Blackmagic Design/DaVinci Resolve/Workflow Integration Plugins"
+)
 DEFAULT_WORKFLOW_NODE_SOURCE = Path(
     "/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Workflow Integrations/Examples/SamplePlugin/WorkflowIntegration.node"
 )

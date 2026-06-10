@@ -33,7 +33,7 @@ This returns the operations and routes expected by the bridge. It is descriptive
 
 ## Install Into Resolve
 
-Install the Workflow Integration panel into the macOS user Resolve folder:
+Install the Workflow Integration panel into Resolve's macOS Workflow Integration folder:
 
 ```bash
 python3 scripts/resolve/install_resolve_bridge.py install
@@ -66,7 +66,7 @@ Default script target:
 Default Workflow Integration target:
 
 ```text
-~/Library/Application Support/Blackmagic Design/DaVinci Resolve/Workflow Integration Plugins
+/Library/Application Support/Blackmagic Design/DaVinci Resolve/Workflow Integration Plugins
 ```
 
 The installer copies Resolve's official `WorkflowIntegration.node` from the Developer examples folder into the plugin bundle. Override it when testing:
