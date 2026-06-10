@@ -161,6 +161,22 @@
   var statusOutput = document.getElementById("statusOutput");
   var runButton = document.getElementById("runButton");
   var previewOutputButton = document.getElementById("previewOutputButton");
+  var maskEditorModal = document.getElementById("maskEditorModal");
+  var maskEditorTitle = document.getElementById("maskEditorTitle");
+  var maskEditorHint = document.getElementById("maskEditorHint");
+  var maskEditorCanvas = document.getElementById("maskEditorCanvas");
+  var maskCanvasContext = maskEditorCanvas.getContext("2d");
+  var brushSizeInput = document.getElementById("brushSizeInput");
+  var brushSizeField = document.getElementById("brushSizeField");
+  var outpaintFields = document.getElementById("outpaintFields");
+  var outpaintLeftInput = document.getElementById("outpaintLeftInput");
+  var outpaintRightInput = document.getElementById("outpaintRightInput");
+  var outpaintTopInput = document.getElementById("outpaintTopInput");
+  var outpaintBottomInput = document.getElementById("outpaintBottomInput");
+  var maskClearButton = document.getElementById("maskClearButton");
+  var maskApplyButton = document.getElementById("maskApplyButton");
+  var maskCancelButton = document.getElementById("maskCancelButton");
+  var maskEditorState = null;
 
   function setStatus(message) {
     statusOutput.textContent = message;
@@ -355,9 +371,10 @@
       return [imagePath];
     }
     if (job.operation === "edit-image") {
-      requireText(job.prompt, "提示词");
+      requireImageEditPrompt(job);
       var editSource = await resolveMediaInput(job.image, outputStem(job) + "_image", "image");
-      var editedPath = await editImage(job, model, editSource);
+      var maskResult = await prepareImageEditMask(job, editSource);
+      var editedPath = await editImage(job, model, maskResult.imagePath, maskResult.maskPath);
       await importOutputs(job, [editedPath]);
       return [editedPath];
     }
@@ -382,6 +399,298 @@
       return transcribe(job, model, audioSource);
     }
     throw new Error("不支持的功能：" + job.operation);
+  }
+
+  async function prepareImageEditMask(job, imagePath) {
+    var operation = job.imageOperation || "redraw";
+    if (operation === "cutout") {
+      return { imagePath: imagePath, maskPath: "" };
+    }
+    setStatus("请绘制遮罩\n" + describeJob(job));
+    return openMaskEditor(imagePath, operation, outputStem(job));
+  }
+
+  function requireImageEditPrompt(job) {
+    var operation = job.imageOperation || "redraw";
+    if (operation === "redraw" || operation === "outpaint") {
+      requireText(job.prompt, "提示词");
+    }
+  }
+
+  function openMaskEditor(imagePath, operation, outputName) {
+    return new Promise(function (resolve, reject) {
+      loadLocalImage(imagePath).then(function (image) {
+        var maskCanvas = document.createElement("canvas");
+        maskCanvas.width = image.naturalWidth || image.width;
+        maskCanvas.height = image.naturalHeight || image.height;
+        var maskContext = maskCanvas.getContext("2d");
+        maskContext.fillStyle = "black";
+        maskContext.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
+        maskEditorState = {
+          image: image,
+          imagePath: imagePath,
+          maskCanvas: maskCanvas,
+          maskContext: maskContext,
+          operation: operation,
+          outputName: outputName,
+          drawing: false,
+          hasMask: false,
+          lastPoint: null,
+          resolve: resolve,
+          reject: reject
+        };
+        maskEditorTitle.textContent = imageEditOperationLabel(operation);
+        maskEditorHint.textContent = imageEditHint(operation);
+        brushSizeField.classList.toggle("hidden", operation === "outpaint");
+        outpaintFields.classList.toggle("hidden", operation !== "outpaint");
+        maskEditorModal.classList.remove("hidden");
+        drawMaskEditor();
+        updateMaskApplyState();
+      }).catch(reject);
+    });
+  }
+
+  function loadLocalImage(filePath) {
+    return new Promise(function (resolve, reject) {
+      var image = new Image();
+      image.onload = function () { resolve(image); };
+      image.onerror = function () { reject(new Error("遮罩编辑器无法读取图片：" + filePath)); };
+      image.src = fileUrl(filePath);
+    });
+  }
+
+  function drawMaskEditor() {
+    if (!maskEditorState) {
+      return;
+    }
+    if (maskEditorState.operation === "outpaint") {
+      drawOutpaintEditor();
+      return;
+    }
+    var image = maskEditorState.image;
+    var size = fitSize(image.naturalWidth || image.width, image.naturalHeight || image.height, 960, 560);
+    maskEditorCanvas.width = size.width;
+    maskEditorCanvas.height = size.height;
+    maskCanvasContext.clearRect(0, 0, size.width, size.height);
+    maskCanvasContext.drawImage(image, 0, 0, size.width, size.height);
+    drawMaskOverlay(size.width, size.height);
+    maskCanvasContext.strokeStyle = "rgba(255,255,255,0.16)";
+    maskCanvasContext.strokeRect(0.5, 0.5, size.width - 1, size.height - 1);
+  }
+
+  function drawMaskOverlay(width, height) {
+    var overlay = document.createElement("canvas");
+    overlay.width = width;
+    overlay.height = height;
+    var overlayContext = overlay.getContext("2d");
+    overlayContext.drawImage(maskEditorState.maskCanvas, 0, 0, width, height);
+    var pixels = overlayContext.getImageData(0, 0, width, height);
+    for (var index = 0; index < pixels.data.length; index += 4) {
+      var visible = pixels.data[index] + pixels.data[index + 1] + pixels.data[index + 2] > 24;
+      pixels.data[index] = 255;
+      pixels.data[index + 1] = 80;
+      pixels.data[index + 2] = 70;
+      pixels.data[index + 3] = visible ? 128 : 0;
+    }
+    overlayContext.putImageData(pixels, 0, 0);
+    maskCanvasContext.drawImage(overlay, 0, 0);
+  }
+
+  function drawOutpaintEditor() {
+    var image = maskEditorState.image;
+    var margins = readOutpaintMargins();
+    var sourceWidth = image.naturalWidth || image.width;
+    var sourceHeight = image.naturalHeight || image.height;
+    var outputWidth = sourceWidth + margins.left + margins.right;
+    var outputHeight = sourceHeight + margins.top + margins.bottom;
+    var size = fitSize(outputWidth, outputHeight, 960, 560);
+    var scale = Math.min(size.width / outputWidth, size.height / outputHeight);
+    maskEditorCanvas.width = Math.max(1, Math.round(outputWidth * scale));
+    maskEditorCanvas.height = Math.max(1, Math.round(outputHeight * scale));
+    maskCanvasContext.fillStyle = "#07080a";
+    maskCanvasContext.fillRect(0, 0, maskEditorCanvas.width, maskEditorCanvas.height);
+    maskCanvasContext.fillStyle = "rgba(183,255,23,0.14)";
+    maskCanvasContext.fillRect(0, 0, maskEditorCanvas.width, maskEditorCanvas.height);
+    maskCanvasContext.drawImage(
+      image,
+      margins.left * scale,
+      margins.top * scale,
+      sourceWidth * scale,
+      sourceHeight * scale
+    );
+    maskCanvasContext.strokeStyle = "rgba(183,255,23,0.78)";
+    maskCanvasContext.lineWidth = 2;
+    maskCanvasContext.strokeRect(1, 1, maskEditorCanvas.width - 2, maskEditorCanvas.height - 2);
+    maskCanvasContext.strokeStyle = "rgba(255,255,255,0.42)";
+    maskCanvasContext.strokeRect(
+      margins.left * scale,
+      margins.top * scale,
+      sourceWidth * scale,
+      sourceHeight * scale
+    );
+  }
+
+  function drawMaskStroke(point) {
+    if (!maskEditorState || maskEditorState.operation === "outpaint") {
+      return;
+    }
+    var scaleX = maskEditorState.maskCanvas.width / maskEditorCanvas.width;
+    var scaleY = maskEditorState.maskCanvas.height / maskEditorCanvas.height;
+    var current = { x: point.x * scaleX, y: point.y * scaleY };
+    var previous = maskEditorState.lastPoint || current;
+    maskEditorState.maskContext.strokeStyle = "white";
+    maskEditorState.maskContext.lineCap = "round";
+    maskEditorState.maskContext.lineJoin = "round";
+    maskEditorState.maskContext.lineWidth = Number(brushSizeInput.value || 32) * ((scaleX + scaleY) / 2);
+    maskEditorState.maskContext.beginPath();
+    maskEditorState.maskContext.moveTo(previous.x, previous.y);
+    maskEditorState.maskContext.lineTo(current.x, current.y);
+    maskEditorState.maskContext.stroke();
+    maskEditorState.lastPoint = current;
+    maskEditorState.hasMask = true;
+    drawMaskEditor();
+    updateMaskApplyState();
+  }
+
+  function applyMaskEditor() {
+    if (!maskEditorState) {
+      return;
+    }
+    var result = maskEditorState.operation === "outpaint"
+      ? writeOutpaintMaskResult(maskEditorState)
+      : writeBrushMaskResult(maskEditorState);
+    var resolve = maskEditorState.resolve;
+    closeMaskEditor();
+    resolve(result);
+  }
+
+  function writeBrushMaskResult(editor) {
+    var maskPath = path.join(cacheDir, safeStem(editor.outputName) + "_mask.png");
+    fs.mkdirSync(path.dirname(maskPath), { recursive: true });
+    writeCanvasPng(maskPath, editor.maskCanvas);
+    return { imagePath: editor.imagePath, maskPath: maskPath };
+  }
+
+  function writeOutpaintMaskResult(editor) {
+    var margins = readOutpaintMargins();
+    var sourceWidth = editor.image.naturalWidth || editor.image.width;
+    var sourceHeight = editor.image.naturalHeight || editor.image.height;
+    var outputWidth = sourceWidth + margins.left + margins.right;
+    var outputHeight = sourceHeight + margins.top + margins.bottom;
+    var baseCanvas = document.createElement("canvas");
+    var maskCanvas = document.createElement("canvas");
+    baseCanvas.width = outputWidth;
+    baseCanvas.height = outputHeight;
+    maskCanvas.width = outputWidth;
+    maskCanvas.height = outputHeight;
+    var baseContext = baseCanvas.getContext("2d");
+    var maskContext = maskCanvas.getContext("2d");
+    baseContext.clearRect(0, 0, outputWidth, outputHeight);
+    baseContext.drawImage(editor.image, margins.left, margins.top, sourceWidth, sourceHeight);
+    maskContext.fillStyle = "white";
+    maskContext.fillRect(0, 0, outputWidth, outputHeight);
+    maskContext.fillStyle = "black";
+    maskContext.fillRect(margins.left, margins.top, sourceWidth, sourceHeight);
+    var imagePath = path.join(cacheDir, safeStem(editor.outputName) + "_outpaint_base.png");
+    var maskPath = path.join(cacheDir, safeStem(editor.outputName) + "_outpaint_mask.png");
+    fs.mkdirSync(path.dirname(imagePath), { recursive: true });
+    writeCanvasPng(imagePath, baseCanvas);
+    writeCanvasPng(maskPath, maskCanvas);
+    return { imagePath: imagePath, maskPath: maskPath };
+  }
+
+  function closeMaskEditor() {
+    maskEditorModal.classList.add("hidden");
+    maskEditorState = null;
+    maskApplyButton.disabled = true;
+  }
+
+  function cancelMaskEditor() {
+    if (!maskEditorState) {
+      return;
+    }
+    var reject = maskEditorState.reject;
+    closeMaskEditor();
+    reject(new Error("已取消遮罩编辑"));
+  }
+
+  function clearMaskEditor() {
+    if (!maskEditorState) {
+      return;
+    }
+    maskEditorState.maskContext.fillStyle = "black";
+    maskEditorState.maskContext.fillRect(0, 0, maskEditorState.maskCanvas.width, maskEditorState.maskCanvas.height);
+    maskEditorState.hasMask = false;
+    maskEditorState.lastPoint = null;
+    drawMaskEditor();
+    updateMaskApplyState();
+  }
+
+  function updateMaskApplyState() {
+    if (!maskEditorState) {
+      maskApplyButton.disabled = true;
+      return;
+    }
+    if (maskEditorState.operation === "outpaint") {
+      var margins = readOutpaintMargins();
+      maskApplyButton.disabled = margins.left + margins.right + margins.top + margins.bottom <= 0;
+      return;
+    }
+    maskApplyButton.disabled = !maskEditorState.hasMask;
+  }
+
+  function readOutpaintMargins() {
+    return {
+      left: clampNumber(outpaintLeftInput.value, 0, 1200),
+      right: clampNumber(outpaintRightInput.value, 0, 1200),
+      top: clampNumber(outpaintTopInput.value, 0, 1200),
+      bottom: clampNumber(outpaintBottomInput.value, 0, 1200)
+    };
+  }
+
+  function fitSize(width, height, maxWidth, maxHeight) {
+    var scale = Math.min(maxWidth / width, maxHeight / height, 1);
+    return {
+      width: Math.max(1, Math.round(width * scale)),
+      height: Math.max(1, Math.round(height * scale))
+    };
+  }
+
+  function canvasPoint(event) {
+    var rect = maskEditorCanvas.getBoundingClientRect();
+    return {
+      x: (event.clientX - rect.left) * (maskEditorCanvas.width / rect.width),
+      y: (event.clientY - rect.top) * (maskEditorCanvas.height / rect.height)
+    };
+  }
+
+  function writeCanvasPng(filePath, canvas) {
+    var base64 = canvas.toDataURL("image/png").split(",")[1] || "";
+    fs.writeFileSync(filePath, Buffer.from(base64, "base64"));
+  }
+
+  function fileUrl(filePath) {
+    return "file://" + encodeURI(filePath).replace(/#/g, "%23");
+  }
+
+  function clampNumber(value, min, max) {
+    var number = Number(value);
+    if (!Number.isFinite(number)) {
+      return min;
+    }
+    return Math.max(min, Math.min(max, Math.round(number)));
+  }
+
+  function imageEditOperationLabel(operation) {
+    if (operation === "erase") return "擦除遮罩";
+    if (operation === "outpaint") return "扩图遮罩";
+    return "重绘遮罩";
+  }
+
+  function imageEditHint(operation) {
+    if (operation === "erase") return "涂白要移除的区域，然后应用遮罩。";
+    if (operation === "outpaint") return "设置要扩展的四边像素，新区域会自动作为白色遮罩。";
+    return "涂白要重绘的区域，然后应用遮罩。";
   }
 
   async function loadSharedCredentialsForJob(job) {
@@ -450,14 +759,18 @@
     return writeOutput(outputStem(job), ".png", imageBytes);
   }
 
-  async function editImage(job, model, imagePath) {
-    var response = await postMultipartJson(job.baseUrl, "/v1/images/edits", [
+  async function editImage(job, model, imagePath, maskPath) {
+    var parts = [
       { name: "model", value: model },
       { name: "prompt", value: job.prompt },
       { name: "operation", value: job.imageOperation || "redraw" },
       { name: "response_format", value: "b64_json" },
       { name: "image", filePath: imagePath }
-    ]);
+    ];
+    if (maskPath) {
+      parts.push({ name: "mask", filePath: maskPath });
+    }
+    var response = await postMultipartJson(job.baseUrl, "/v1/images/edits", parts);
     var imageBytes = openAiB64Bytes(response, "image");
     return writeOutput(outputStem(job), ".png", imageBytes);
   }
@@ -1112,6 +1425,59 @@
       shell.openPath(state.lastOutputs[0]);
     }
   });
+
+  maskEditorCanvas.addEventListener("pointerdown", function (event) {
+    if (!maskEditorState || maskEditorState.operation === "outpaint") {
+      return;
+    }
+    event.preventDefault();
+    maskEditorState.drawing = true;
+    maskEditorState.lastPoint = null;
+    maskEditorCanvas.setPointerCapture(event.pointerId);
+    drawMaskStroke(canvasPoint(event));
+  });
+
+  maskEditorCanvas.addEventListener("pointermove", function (event) {
+    if (!maskEditorState || !maskEditorState.drawing) {
+      return;
+    }
+    event.preventDefault();
+    drawMaskStroke(canvasPoint(event));
+  });
+
+  maskEditorCanvas.addEventListener("pointerup", function (event) {
+    if (!maskEditorState) {
+      return;
+    }
+    maskEditorState.drawing = false;
+    maskEditorState.lastPoint = null;
+    if (maskEditorCanvas.hasPointerCapture(event.pointerId)) {
+      maskEditorCanvas.releasePointerCapture(event.pointerId);
+    }
+  });
+
+  maskEditorCanvas.addEventListener("pointercancel", function () {
+    if (!maskEditorState) {
+      return;
+    }
+    maskEditorState.drawing = false;
+    maskEditorState.lastPoint = null;
+  });
+
+  brushSizeInput.addEventListener("input", function () {
+    drawMaskEditor();
+  });
+
+  [outpaintLeftInput, outpaintRightInput, outpaintTopInput, outpaintBottomInput].forEach(function (input) {
+    input.addEventListener("input", function () {
+      drawMaskEditor();
+      updateMaskApplyState();
+    });
+  });
+
+  maskClearButton.addEventListener("click", clearMaskEditor);
+  maskApplyButton.addEventListener("click", applyMaskEditor);
+  maskCancelButton.addEventListener("click", cancelMaskEditor);
 
   restoreSettings();
   setupTabs();

@@ -2,7 +2,7 @@
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http: https:" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' file: data:; connect-src 'self' http: https:" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Imagine Workbench</title>
     <link rel="stylesheet" href="./css/app.css" />
@@ -114,6 +114,47 @@
       </section>
 
       <section class="status" id="statusOutput">准备就绪</section>
+
+      <section class="mask-editor hidden" id="maskEditorModal" aria-label="遮罩编辑器">
+        <div class="mask-editor-panel">
+          <div class="mask-editor-head">
+            <div>
+              <h2 id="maskEditorTitle">遮罩编辑</h2>
+              <p id="maskEditorHint">涂白需要处理的区域</p>
+            </div>
+            <button class="small-button" id="maskCancelButton" type="button">取消</button>
+          </div>
+          <canvas id="maskEditorCanvas" width="960" height="540"></canvas>
+          <div class="mask-toolbar">
+            <label class="field" id="brushSizeField">
+              <span>画笔</span>
+              <input id="brushSizeInput" type="range" min="6" max="120" value="32" />
+            </label>
+            <div class="outpaint-grid hidden" id="outpaintFields">
+              <label class="field">
+                <span>左</span>
+                <input id="outpaintLeftInput" type="number" min="0" max="1200" step="16" value="0" />
+              </label>
+              <label class="field">
+                <span>右</span>
+                <input id="outpaintRightInput" type="number" min="0" max="1200" step="16" value="256" />
+              </label>
+              <label class="field">
+                <span>上</span>
+                <input id="outpaintTopInput" type="number" min="0" max="1200" step="16" value="0" />
+              </label>
+              <label class="field">
+                <span>下</span>
+                <input id="outpaintBottomInput" type="number" min="0" max="1200" step="16" value="0" />
+              </label>
+            </div>
+            <div class="mask-actions">
+              <button class="small-button" id="maskClearButton" type="button">清空</button>
+              <button class="small-button primary" id="maskApplyButton" type="button" disabled>应用遮罩</button>
+            </div>
+          </div>
+        </div>
+      </section>
     </main>
     <script src="./js/app.js"></script>
   </body>

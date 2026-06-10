@@ -450,6 +450,89 @@ select:focus {
   font-size: 12px;
 }
 
+.mask-editor {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  background: rgba(5, 6, 8, 0.82);
+  backdrop-filter: blur(18px);
+}
+
+.mask-editor-panel {
+  display: grid;
+  grid-template-rows: auto minmax(220px, 1fr) auto;
+  gap: 10px;
+  width: min(100%, 920px);
+  max-height: calc(100vh - 24px);
+  border: 1px solid var(--line-strong);
+  border-radius: 18px;
+  background: rgba(16, 17, 20, 0.96);
+  padding: 12px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+}
+
+.mask-editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mask-editor-head h2 {
+  margin: 0;
+  font-size: 16px;
+  letter-spacing: 0;
+}
+
+.mask-editor-head p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+#maskEditorCanvas {
+  width: 100%;
+  min-height: 220px;
+  max-height: 62vh;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #08090b;
+  cursor: crosshair;
+}
+
+.mask-toolbar {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.mask-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.small-button.primary {
+  border-color: rgba(183, 255, 23, 0.48);
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.small-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.outpaint-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(54px, 1fr));
+  gap: 8px;
+}
+
 .hidden {
   display: none;
 }
@@ -475,5 +558,10 @@ select:focus {
 
   .run-button {
     width: 100%;
+  }
+
+  .mask-toolbar,
+  .outpaint-grid {
+    grid-template-columns: 1fr;
   }
 }
