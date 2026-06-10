@@ -502,20 +502,31 @@ export default function CanvasMaskEditor({
     if (!canvas || !img || !cropRect || !isUsableCrop(cropRect)) return;
 
     const crop = clampRectToBounds(cropRect, canvasSize);
+    const sourceWidth = img.naturalWidth || img.width;
+    const sourceHeight = img.naturalHeight || img.height;
+    const sourceCrop = {
+      x: (crop.x / canvas.width) * sourceWidth,
+      y: (crop.y / canvas.height) * sourceHeight,
+      width: (crop.width / canvas.width) * sourceWidth,
+      height: (crop.height / canvas.height) * sourceHeight,
+    };
+    const nextNaturalSize = {
+      width: Math.max(1, Math.round(sourceCrop.width)),
+      height: Math.max(1, Math.round(sourceCrop.height)),
+    };
+
     const nextBaseCanvas = document.createElement("canvas");
-    nextBaseCanvas.width = Math.round(crop.width);
-    nextBaseCanvas.height = Math.round(crop.height);
+    nextBaseCanvas.width = nextNaturalSize.width;
+    nextBaseCanvas.height = nextNaturalSize.height;
     const nextBaseCtx = nextBaseCanvas.getContext("2d");
     if (!nextBaseCtx) return;
 
-    const sourceWidth = img.naturalWidth || img.width;
-    const sourceHeight = img.naturalHeight || img.height;
     nextBaseCtx.drawImage(
       img,
-      (crop.x / canvas.width) * sourceWidth,
-      (crop.y / canvas.height) * sourceHeight,
-      (crop.width / canvas.width) * sourceWidth,
-      (crop.height / canvas.height) * sourceHeight,
+      sourceCrop.x,
+      sourceCrop.y,
+      sourceCrop.width,
+      sourceCrop.height,
       0,
       0,
       nextBaseCanvas.width,
@@ -531,11 +542,23 @@ export default function CanvasMaskEditor({
 
     const hasCroppedMask = canvasHasVisiblePixels(nextMaskCanvas);
     pendingMaskDataUrlRef.current = hasCroppedMask ? nextMaskCanvas.toDataURL("image/png") : null;
+    const bounds = {
+      width: Math.min(window.innerWidth - 64, 720),
+      height: Math.min(window.innerHeight - 280, 560),
+    };
+    const nextCanvasSize = scaleToFitSize(nextNaturalSize, bounds);
+    const textScaleX = crop.width > 0 ? nextCanvasSize.width / crop.width : 1;
+    const textScaleY = crop.height > 0 ? nextCanvasSize.height / crop.height : 1;
     setHasDrawn(hasCroppedMask);
     setTextItems(prev =>
       prev
         .filter(item => item.x >= crop.x && item.x <= crop.x + crop.width && item.y >= crop.y && item.y <= crop.y + crop.height)
-        .map(item => ({ ...item, x: item.x - crop.x, y: item.y - crop.y })),
+        .map(item => ({
+          ...item,
+          x: (item.x - crop.x) * textScaleX,
+          y: (item.y - crop.y) * textScaleY,
+          size: item.size * Math.min(textScaleX, textScaleY),
+        })),
     );
     setCropRect(null);
     setHasLocalEdits(true);

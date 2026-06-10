@@ -1123,6 +1123,9 @@ async function editOpenAiCompatibleImageWithOperation(
   } else if (input.mask && provider === "grok2api") {
     form.append("image[]", dataUriToBlob(input.mask.dataUri), "mask.png");
   }
+  if (input.guide) {
+    form.append(provider === "grok2api" ? "image[]" : "image", dataUriToBlob(input.guide.dataUri), "guide.png");
+  }
 
   const response = await postForm<OpenAiImageResponse>(openAiCompatibleUrl(config.baseUrl, "/v1/images/edits"), config, form);
   const imageUrl = readOpenAiImageUrl(response);

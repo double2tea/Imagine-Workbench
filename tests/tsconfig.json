@@ -26,6 +26,7 @@
     "./client-fetch-error.test.ts",
     "./custom-providers.test.ts",
     "./generation-tasks.test.ts",
+    "./image-provider.test.ts",
     "./model-catalog.test.ts",
     "./mimo-provider.test.ts",
     "./modelscope-provider.test.ts",
