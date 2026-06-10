@@ -12,7 +12,7 @@ from pathlib import Path
 from threading import Thread
 from typing import Any
 
-from imagine_resolve_bridge import BridgeConfig, BridgeRoutes, ImagineResolveBridge, ResolveController, job_to_argv, main, panel_config_for_operation, panel_values_to_job, run_cli, run_in_resolve
+from imagine_resolve_bridge import BridgeConfig, BridgeRoutes, DEFAULT_MODELS, ImagineResolveBridge, ResolveController, job_to_argv, main, panel_config_for_operation, panel_values_to_job, run_cli, run_in_resolve
 from install_resolve_bridge import install, uninstall
 
 
@@ -322,7 +322,6 @@ class ImagineResolveBridgeTests(unittest.TestCase):
         job = panel_values_to_job({
             "operation": "generate-video",
             "baseUrl": self.server.url,
-            "model": "mock:video",
             "prompt": "extend this shot",
             "source": "timeline-inout-render",
             "outputName": "shot_extension",
@@ -331,21 +330,48 @@ class ImagineResolveBridgeTests(unittest.TestCase):
         })
 
         self.assertEqual(job["reference"], ["timeline-inout-render"])
+        self.assertEqual(job["model"], DEFAULT_MODELS["generate-video"])
         self.assertEqual(job["prompt"], "extend this shot")
         self.assertEqual(job["outputName"], "shot_extension")
         self.assertTrue(job["importToResolve"])
         self.assertTrue(job["appendToTimeline"])
 
+    def test_panel_values_accept_chinese_labels(self) -> None:
+        job = panel_values_to_job({
+            "operation": "生成视频",
+            "baseUrl": self.server.url,
+            "prompt": "延展这个镜头",
+            "source": "时间线入出点片段",
+            "imageOperation": "重绘",
+        })
+
+        self.assertEqual(job["operation"], "generate-video")
+        self.assertEqual(job["model"], DEFAULT_MODELS["generate-video"])
+        self.assertEqual(job["reference"], ["timeline-inout-render"])
+
+    def test_panel_values_accept_chinese_image_operation(self) -> None:
+        job = panel_values_to_job({
+            "operation": "编辑图片",
+            "baseUrl": self.server.url,
+            "prompt": "擦掉杂物",
+            "source": "当前帧",
+            "imageOperation": "擦除",
+        })
+
+        self.assertEqual(job["operation"], "edit-image")
+        self.assertEqual(job["image"], "current-frame")
+        self.assertEqual(job["imageOperation"], "erase")
+
     def test_panel_values_build_transcribe_job(self) -> None:
         job = panel_values_to_job({
             "operation": "transcribe",
             "baseUrl": self.server.url,
-            "model": "mimo:mimo-v2.5-asr",
             "source": "current-clip-render",
             "language": "auto",
         })
 
         self.assertEqual(job["audio"], "current-clip-render")
+        self.assertEqual(job["model"], DEFAULT_MODELS["transcribe"])
         self.assertEqual(job["language"], "auto")
         self.assertNotIn("prompt", job)
 

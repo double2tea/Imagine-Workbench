@@ -5,7 +5,8 @@ Imagine Resolve Bridge lets DaVinci Resolve call Imagine Workbench for image gen
 The bridge is a dedicated Imagine Workbench plugin:
 
 - `--base-url` may point to local, LAN, or deployed Imagine Workbench instances.
-- Model/provider behavior stays in Workbench, not in Resolve Python.
+- The in-Resolve panel does not expose model IDs. Each operation uses a built-in default model, while advanced CLI/job automation can still override `model`.
+- Provider behavior stays in Workbench, not in Resolve Python.
 - Resolve handles current frame/source media capture and Media Pool import.
 
 LUT creation is not part of this bridge task.
@@ -287,22 +288,22 @@ Open the panel from Resolve:
 Workspace -> Scripts -> Utility -> ImagineWorkbenchResolve
 ```
 
-The panel lets you choose an operation, model, Resolve source, prompt/text, output name, and whether to import or append the result. Operation changes update the available fields automatically:
+The panel is Chinese-first and lets you choose a function, Resolve source, prompt/text, output name, and whether to import or append the result. It intentionally does not ask editors to type model IDs. Operation changes update the available fields automatically:
 
-- `generate-video`: shows Resolve source choices and `Poll Seconds`.
-- `edit-image`: shows image source choices and `Image Operation`.
-- `generate-image`: hides source controls.
-- `transcribe`: shows source and language controls, hides prompt.
-- `tts`: treats the prompt box as narration text.
-- `doctor`: hides model/source/prompt execution fields.
+- `生成视频`: shows Resolve source choices and `轮询秒数`.
+- `编辑图片`: shows image source choices and `图片操作`.
+- `生成图片`: hides source controls.
+- `生成字幕/转写`: shows source and language controls, hides prompt.
+- `生成配音`: treats the prompt box as narration text.
+- `连接检查`: hides source/prompt execution fields.
 
 Common panel choices:
 
-- Generate video from the current timeline In/Out range: `Operation = generate-video`, `Source = timeline-inout-render`, then enter a prompt and click `Run`.
-- Generate video from the current playhead clip range: `Operation = generate-video`, `Source = current-clip-render`.
-- Edit the current frame: `Operation = edit-image`, `Source = current-frame`.
-- Transcribe the current In/Out range: `Operation = transcribe`, `Source = timeline-inout-render`.
-- Check connectivity: click `Doctor`.
+- Generate video from the current timeline In/Out range: `功能 = 生成视频`, `参考源 = 时间线入出点片段`, then enter a prompt and click `运行`.
+- Generate video from the current playhead clip range: `功能 = 生成视频`, `参考源 = 当前片段渲染`.
+- Edit the current frame: `功能 = 编辑图片`, `参考源 = 当前帧`.
+- Transcribe the current In/Out range: `功能 = 生成字幕/转写`, `参考源 = 时间线入出点片段`.
+- Check connectivity: click `连接检查`.
 
 The panel writes the selected operation to:
 
@@ -311,6 +312,8 @@ The panel writes the selected operation to:
 ```
 
 That job file remains available for automation or manual editing. If Resolve also shows `imagine_resolve_bridge` in the Scripts menu, running it directly opens the same panel when no CLI arguments are provided.
+
+The saved job file still includes the default `model` used for execution. Edit that field only for advanced testing or automation.
 
 To use a different job file, set:
 

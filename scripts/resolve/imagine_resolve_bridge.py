@@ -41,8 +41,8 @@ DEFAULT_MODELS = {
 PANEL_OPERATION_CONFIG = {
     "generate-video": {
         "sources": ["timeline-inout-render", "current-clip-render", "current-frame", "current-clip-source"],
-        "promptLabel": "Prompt",
-        "promptPlaceholder": "Describe the generated video or continuation.",
+        "promptLabel": "提示词",
+        "promptPlaceholder": "描述要生成的视频，或如何延展当前素材。",
         "needsPrompt": True,
         "needsSource": True,
         "needsModel": True,
@@ -54,8 +54,8 @@ PANEL_OPERATION_CONFIG = {
     },
     "edit-image": {
         "sources": ["current-frame", "current-clip-source"],
-        "promptLabel": "Prompt",
-        "promptPlaceholder": "Describe the image edit.",
+        "promptLabel": "提示词",
+        "promptPlaceholder": "描述要如何修改当前帧或图片。",
         "needsPrompt": True,
         "needsSource": True,
         "needsModel": True,
@@ -67,8 +67,8 @@ PANEL_OPERATION_CONFIG = {
     },
     "generate-image": {
         "sources": [],
-        "promptLabel": "Prompt",
-        "promptPlaceholder": "Describe the generated image.",
+        "promptLabel": "提示词",
+        "promptPlaceholder": "描述要生成的画面。",
         "needsPrompt": True,
         "needsSource": False,
         "needsModel": True,
@@ -80,8 +80,8 @@ PANEL_OPERATION_CONFIG = {
     },
     "transcribe": {
         "sources": ["timeline-inout-render", "current-clip-render", "current-clip-source"],
-        "promptLabel": "No prompt needed",
-        "promptPlaceholder": "Transcribe uses the selected source.",
+        "promptLabel": "无需提示词",
+        "promptPlaceholder": "转写会使用所选参考源。",
         "needsPrompt": False,
         "needsSource": True,
         "needsModel": True,
@@ -93,8 +93,8 @@ PANEL_OPERATION_CONFIG = {
     },
     "tts": {
         "sources": [],
-        "promptLabel": "Text",
-        "promptPlaceholder": "Enter narration text.",
+        "promptLabel": "配音文本",
+        "promptPlaceholder": "输入要生成的旁白或配音文本。",
         "needsPrompt": True,
         "needsSource": False,
         "needsModel": True,
@@ -106,8 +106,8 @@ PANEL_OPERATION_CONFIG = {
     },
     "doctor": {
         "sources": [],
-        "promptLabel": "No prompt needed",
-        "promptPlaceholder": "Doctor checks Workbench and Resolve connectivity.",
+        "promptLabel": "无需提示词",
+        "promptPlaceholder": "连接检查会验证 Workbench 和 Resolve 状态。",
         "needsPrompt": False,
         "needsSource": False,
         "needsModel": False,
@@ -118,6 +118,29 @@ PANEL_OPERATION_CONFIG = {
         "canAppend": False,
     },
 }
+PANEL_OPERATION_LABELS = {
+    "generate-video": "生成视频",
+    "edit-image": "编辑图片",
+    "generate-image": "生成图片",
+    "transcribe": "生成字幕/转写",
+    "tts": "生成配音",
+    "doctor": "连接检查",
+}
+PANEL_SOURCE_LABELS = {
+    "timeline-inout-render": "时间线入出点片段",
+    "current-clip-render": "当前片段渲染",
+    "current-frame": "当前帧",
+    "current-clip-source": "当前片段源文件",
+}
+PANEL_IMAGE_OPERATION_LABELS = {
+    "redraw": "重绘",
+    "erase": "擦除",
+    "outpaint": "扩图",
+    "cutout": "抠图",
+}
+PANEL_OPERATION_IDS = {label: operation for operation, label in PANEL_OPERATION_LABELS.items()}
+PANEL_SOURCE_IDS = {label: source for source, label in PANEL_SOURCE_LABELS.items()}
+PANEL_IMAGE_OPERATION_IDS = {label: operation for operation, label in PANEL_IMAGE_OPERATION_LABELS.items()}
 
 
 @dataclass(frozen=True)
@@ -617,11 +640,13 @@ def write_default_job(job_path: Path) -> None:
 
 
 def panel_values_to_job(values: dict[str, Any]) -> dict[str, Any]:
-    operation = require_text(str(values.get("operation", "")), "operation")
+    operation_value = require_text(str(values.get("operation", "")), "operation")
+    operation = PANEL_OPERATION_IDS.get(operation_value, operation_value)
     base_url = require_text(str(values.get("baseUrl", "")), "baseUrl")
     model = str(values.get("model", "")).strip() or DEFAULT_MODELS.get(operation, "")
     prompt = str(values.get("prompt", "")).strip()
-    source = str(values.get("source", "")).strip()
+    source_value = str(values.get("source", "")).strip()
+    source = PANEL_SOURCE_IDS.get(source_value, source_value)
     output_name = str(values.get("outputName", "")).strip()
     language = str(values.get("language", "")).strip()
     import_to_resolve = bool(values.get("importToResolve"))
@@ -638,7 +663,8 @@ def panel_values_to_job(values: dict[str, Any]) -> dict[str, Any]:
         job["text"] = require_text(prompt, "text")
     if operation == "edit-image":
         job["image"] = require_text(source, "image")
-        job["imageOperation"] = str(values.get("imageOperation", "redraw"))
+        image_operation_value = str(values.get("imageOperation", "redraw"))
+        job["imageOperation"] = PANEL_IMAGE_OPERATION_IDS.get(image_operation_value, image_operation_value)
     if operation == "generate-video":
         job["reference"] = [require_text(source, "reference")]
         job["pollSeconds"] = int(values.get("pollSeconds") or 600)
@@ -926,65 +952,60 @@ def show_resolve_panel(internal_resolve: Any | None = None) -> list[Path]:
 
     win = dispatcher.AddWindow({
         "ID": window_id,
-        "WindowTitle": "Imagine Workbench",
+        "WindowTitle": "Imagine Workbench 达芬奇助手",
         "Geometry": [220, 220, 660, 640],
     }, ui.VGroup({"Spacing": 8}, [
-        ui.Label({"Text": "<b>Imagine Workbench Resolve Bridge</b>", "Weight": 0}),
+        ui.Label({"Text": "<b>Imagine Workbench 达芬奇助手</b>", "Weight": 0}),
         ui.HGroup({"Weight": 0}, [
-            ui.Label({"Text": "Operation", "Weight": 0.25}),
+            ui.Label({"Text": "功能", "Weight": 0.25}),
             ui.ComboBox({"ID": "operation", "Weight": 0.75}),
         ]),
         ui.HGroup({"ID": "baseUrlRow", "Weight": 0}, [
-            ui.Label({"Text": "Workbench URL", "Weight": 0.25}),
+            ui.Label({"Text": "工作台地址", "Weight": 0.25}),
             ui.LineEdit({"ID": "baseUrl", "Text": "http://localhost:3000", "Weight": 0.75}),
         ]),
-        ui.HGroup({"Weight": 0}, [
-            ui.Label({"Text": "Model", "Weight": 0.25}),
-            ui.LineEdit({"ID": "model", "Text": DEFAULT_MODELS["generate-video"], "Weight": 0.75}),
-        ]),
         ui.HGroup({"ID": "sourceRow", "Weight": 0}, [
-            ui.Label({"Text": "Source", "Weight": 0.25}),
+            ui.Label({"Text": "参考源", "Weight": 0.25}),
             ui.ComboBox({"ID": "source", "Editable": True, "Weight": 0.75}),
         ]),
         ui.HGroup({"ID": "advancedRow", "Weight": 0}, [
-            ui.Label({"ID": "imageOperationLabel", "Text": "Image Operation", "Weight": 0.25}),
+            ui.Label({"ID": "imageOperationLabel", "Text": "图片操作", "Weight": 0.25}),
             ui.ComboBox({"ID": "imageOperation", "Weight": 0.25}),
-            ui.Label({"ID": "pollSecondsLabel", "Text": "Poll Seconds", "Weight": 0.2}),
+            ui.Label({"ID": "pollSecondsLabel", "Text": "轮询秒数", "Weight": 0.2}),
             ui.SpinBox({"ID": "pollSeconds", "Minimum": 30, "Maximum": 3600, "Value": 600, "SingleStep": 30, "Weight": 0.3}),
         ]),
-        ui.Label({"ID": "promptLabel", "Text": "Prompt", "Weight": 0}),
-        ui.TextEdit({"ID": "prompt", "PlaceholderText": "Describe the image/video edit, or enter TTS text.", "Weight": 1}),
+        ui.Label({"ID": "promptLabel", "Text": "提示词", "Weight": 0}),
+        ui.TextEdit({"ID": "prompt", "PlaceholderText": "描述生成/编辑需求，或输入配音文本。", "Weight": 1}),
         ui.HGroup({"Weight": 0}, [
-            ui.Label({"Text": "Output Name", "Weight": 0.25}),
-            ui.LineEdit({"ID": "outputName", "PlaceholderText": "optional", "Weight": 0.75}),
+            ui.Label({"Text": "输出名称", "Weight": 0.25}),
+            ui.LineEdit({"ID": "outputName", "PlaceholderText": "可选", "Weight": 0.75}),
         ]),
         ui.HGroup({"Weight": 0}, [
-            ui.CheckBox({"ID": "importToResolve", "Text": "Import result", "Checked": True}),
-            ui.CheckBox({"ID": "appendToTimeline", "Text": "Append to timeline"}),
-            ui.Label({"ID": "languageLabel", "Text": "Language", "Weight": 0.12}),
+            ui.CheckBox({"ID": "importToResolve", "Text": "导入结果", "Checked": True}),
+            ui.CheckBox({"ID": "appendToTimeline", "Text": "追加到时间线"}),
+            ui.Label({"ID": "languageLabel", "Text": "语言", "Weight": 0.12}),
             ui.LineEdit({"ID": "language", "Text": "auto", "Weight": 0.22}),
         ]),
         ui.TextEdit({"ID": "status", "ReadOnly": True, "Weight": 0.55}),
         ui.HGroup({"Weight": 0}, [
-            ui.Button({"ID": "doctor", "Text": "Doctor"}),
-            ui.Button({"ID": "save", "Text": "Save Job"}),
-            ui.Button({"ID": "run", "Text": "Run"}),
-            ui.Button({"ID": "close", "Text": "Close"}),
+            ui.Button({"ID": "doctor", "Text": "连接检查"}),
+            ui.Button({"ID": "save", "Text": "保存任务"}),
+            ui.Button({"ID": "run", "Text": "运行"}),
+            ui.Button({"ID": "close", "Text": "关闭"}),
         ]),
     ]))
 
     items = win.GetItems()
-    items["operation"].AddItems(list(PANEL_OPERATION_CONFIG.keys()))
+    items["operation"].AddItems([PANEL_OPERATION_LABELS[operation] for operation in PANEL_OPERATION_CONFIG])
     items["operation"].CurrentIndex = 0
-    items["imageOperation"].AddItems(["redraw", "erase", "outpaint", "cutout"])
-    items["status"].PlainText = f"Job file: {DEFAULT_JOB_PATH}\nOutputs: {DEFAULT_OUTPUT_DIR}\nCache: {DEFAULT_CACHE_DIR}"
+    items["imageOperation"].AddItems([PANEL_IMAGE_OPERATION_LABELS[operation] for operation in PANEL_IMAGE_OPERATION_LABELS])
+    items["status"].PlainText = f"任务文件：{DEFAULT_JOB_PATH}\n输出目录：{DEFAULT_OUTPUT_DIR}\n缓存目录：{DEFAULT_CACHE_DIR}"
 
     def values_for(operation: str | None = None) -> dict[str, Any]:
-        selected_operation = operation or items["operation"].CurrentText
+        selected_operation = operation or PANEL_OPERATION_IDS.get(items["operation"].CurrentText, items["operation"].CurrentText)
         return {
             "operation": selected_operation,
             "baseUrl": items["baseUrl"].Text,
-            "model": items["model"].Text,
             "source": items["source"].CurrentText,
             "prompt": items["prompt"].PlainText,
             "outputName": items["outputName"].Text,
@@ -1004,6 +1025,23 @@ def show_resolve_panel(internal_resolve: Any | None = None) -> list[Path]:
     def set_status(message: str) -> None:
         items["status"].PlainText = message
 
+    def describe_job(job: dict[str, Any]) -> str:
+        operation = str(job.get("operation", ""))
+        lines = [f"功能：{PANEL_OPERATION_LABELS.get(operation, operation)}"]
+        source = job.get("reference") or job.get("image") or job.get("audio")
+        if isinstance(source, list) and source:
+            lines.append(f"参考源：{PANEL_SOURCE_LABELS.get(str(source[0]), str(source[0]))}")
+        elif isinstance(source, str) and source:
+            lines.append(f"参考源：{PANEL_SOURCE_LABELS.get(source, source)}")
+        output_name = job.get("outputName")
+        if isinstance(output_name, str) and output_name:
+            lines.append(f"输出名称：{output_name}")
+        if job.get("importToResolve") is True:
+            lines.append("完成后导入 Resolve")
+        if job.get("appendToTimeline") is True:
+            lines.append("完成后追加到时间线")
+        return "\n".join(lines)
+
     def on_close(ev: Any) -> None:
         dispatcher.ExitLoop()
 
@@ -1016,16 +1054,13 @@ def show_resolve_panel(internal_resolve: Any | None = None) -> list[Path]:
             items[element_id].Enabled = enabled
 
     def apply_operation_config(operation: str) -> None:
+        operation = PANEL_OPERATION_IDS.get(operation, operation)
         config = panel_config_for_operation(operation)
-        current_model = items["model"].Text
-        if current_model in set(DEFAULT_MODELS.values()) or not current_model.strip():
-            items["model"].Text = DEFAULT_MODELS.get(operation, "")
         items["source"].Clear()
         sources = config["sources"]
         if sources:
-            items["source"].AddItems(sources)
+            items["source"].AddItems([PANEL_SOURCE_LABELS[source] for source in sources])
             items["source"].CurrentIndex = 0
-        set_enabled("model", bool(config["needsModel"]))
         set_enabled("source", bool(config["needsSource"]))
         set_enabled("prompt", bool(config["needsPrompt"]))
         items["promptLabel"].Text = str(config["promptLabel"])
@@ -1054,25 +1089,25 @@ def show_resolve_panel(internal_resolve: Any | None = None) -> list[Path]:
         try:
             write_panel_job("doctor")
             result = run_job(DEFAULT_JOB_PATH, internal_resolve)
-            set_status("Doctor passed.\n" + "\n".join(str(path) for path in result))
+            set_status("连接检查通过。\n" + "\n".join(str(path) for path in result))
         except Exception as error:
-            set_status(f"Doctor failed:\n{error}")
+            set_status(f"连接检查失败：\n{error}")
 
     def on_save(ev: Any) -> None:
         try:
             job = write_panel_job()
-            set_status("Saved job:\n" + json.dumps(job, ensure_ascii=False, indent=2))
+            set_status("已保存任务：\n" + describe_job(job))
         except Exception as error:
-            set_status(f"Save failed:\n{error}")
+            set_status(f"保存失败：\n{error}")
 
     def on_run(ev: Any) -> None:
         try:
             job = write_panel_job()
-            set_status("Running:\n" + json.dumps(job, ensure_ascii=False, indent=2))
+            set_status("运行中：\n" + describe_job(job))
             outputs = run_job(DEFAULT_JOB_PATH, internal_resolve)
-            set_status("Done:\n" + "\n".join(str(path) for path in outputs))
+            set_status("已完成：\n" + "\n".join(str(path) for path in outputs))
         except Exception as error:
-            set_status(f"Run failed:\n{error}")
+            set_status(f"运行失败：\n{error}")
 
     win.On[window_id].Close = on_close
     win.On["close"].Clicked = on_close
