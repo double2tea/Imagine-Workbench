@@ -360,6 +360,10 @@ select:focus {
   margin-top: 10px;
 }
 
+.remember-check {
+  margin-top: 10px;
+}
+
 .runbar {
   display: grid;
   grid-template-columns: auto auto 1fr auto;

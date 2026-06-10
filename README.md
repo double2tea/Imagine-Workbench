@@ -243,6 +243,7 @@ DaVinci Resolve integration starts with [DaVinci Resolve Bridge](docs/resolve-br
 - `GET /v1/models?provider=<key>&kind=chat|all`: OpenAI-compatible model list response with provider-prefixed model IDs.
 - `GET /api/model-vision-support?model=<id>`: OpenRouter vision hint for Agent dock (`supportsVision`, `source`).
 - `GET /api/models?provider=<key>&kind=all|chat|image|video|audio`: loads provider model options dynamically from `/v1/models`.
+- `GET/POST /api/resolve/provider-credentials`: localhost-only Resolve plugin credential sharing. The settings UI writes Provider keys to `~/Library/Application Support/Imagine Workbench/resolve-provider-credentials.json`, and the DaVinci Workflow plugin can read them when pointed at a local Workbench server.
 
 Provider-specific generation aliases have been removed. Workbench-specific media workflows use `/api/media/*`; OpenAI-compatible external clients should use the supported `/v1/*` subset. RunningHub schema lookup remains provider-specific at `POST /api/runninghub/ai-app-schema` because it is configuration metadata, not media generation. RunningHub can generate audio through AI App / Workflow targets, but those targets are not generic audio-operation models.
 
@@ -258,6 +259,7 @@ app/
   api/chat/completions/route.ts    Provider-neutral chat completions proxy
   api/prompts/optimize/route.ts    Prompt optimization API
   api/resolve/capabilities         Resolve bridge operation metadata
+  api/resolve/provider-credentials Local Resolve plugin credential sharing
   api/agent/respond/route.ts       Agent response API
   api/runninghub/ai-app-schema     RunningHub AI App schema lookup
   api/models/route.ts              Provider model listing

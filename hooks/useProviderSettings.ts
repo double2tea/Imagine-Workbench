@@ -20,6 +20,7 @@ import {
 } from "@/lib/providers/model-catalog";
 import { getProviderMeta, isKnownProvider, isProviderKey, PROVIDER_KEYS, type CustomProviderDefinition } from "@/lib/providers/registry";
 import type { ProviderCredentials } from "@/lib/providers/types";
+import { API_ROUTES } from "@/lib/api/routes";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 
 type ModelCategory = "chat" | "image" | "video" | "audio";
@@ -116,6 +117,41 @@ function hasChatModel(value: string, options: Record<AiProvider, ModelOption[]>,
   return providerKeys.some(provider => (options[provider] ?? []).some(option => option.value === value));
 }
 
+async function syncResolveProviderCredential(
+  provider: AiProvider,
+  credentials: ProviderCredentials,
+  providerLabel?: string,
+): Promise<void> {
+  const res = await fetch(API_ROUTES.resolve.providerCredentials, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      provider,
+      apiKey: credentials.apiKey,
+      baseUrl: credentials.baseUrl,
+      providerLabel,
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(await readFetchError(res, "Resolve 插件共享配置同步失败"));
+  }
+}
+
+function syncStoredResolveCredentials(
+  credentials: Record<AiProvider, ProviderCredentials>,
+  providerKeys: readonly AiProvider[],
+  getLabel: (provider: AiProvider) => string,
+  pushWorkspaceNotice: (type: NoticeType, message: string) => void,
+): void {
+  for (const provider of providerKeys) {
+    const item = credentials[provider];
+    if (!item?.apiKey && !item?.baseUrl) continue;
+    void syncResolveProviderCredential(provider, item, getLabel(provider)).catch(error => {
+      pushWorkspaceNotice("error", toErrorMessage(error, "Resolve 插件共享配置同步失败"));
+    });
+  }
+}
+
 export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettingsParams) {
   const [customProviders, setCustomProviders] = useState<CustomProviderDefinition[]>([]);
   const providerKeys = useMemo(
@@ -173,19 +209,26 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
   const handleSaveCredential = useCallback((provider: AiProvider, field: keyof ProviderCredentials, value: string) => {
     setProviderCredentials(prev => {
       const current = prev[provider] ?? { apiKey: "", baseUrl: "" };
-      const next = { ...prev, [provider]: { ...current, [field]: value.trim() } };
+      const nextCredentials = { ...current, [field]: value.trim() };
+      const next = { ...prev, [provider]: nextCredentials };
       try { localStorage.setItem("imagine_provider_credentials", JSON.stringify(next)); } catch { /* storage unavailable */ }
+      void syncResolveProviderCredential(provider, nextCredentials, getProviderLabel(provider)).catch(error => {
+        pushWorkspaceNotice("error", toErrorMessage(error, "Resolve 插件共享配置同步失败"));
+      });
       return next;
     });
-  }, [setProviderCredentials]);
+  }, [getProviderLabel, pushWorkspaceNotice, setProviderCredentials]);
 
   const clearProviderCredentials = useCallback((provider: AiProvider) => {
     setProviderCredentials(prev => {
       const next = { ...prev, [provider]: { apiKey: "", baseUrl: "" } };
       try { localStorage.setItem("imagine_provider_credentials", JSON.stringify(next)); } catch { /* storage unavailable */ }
+      void syncResolveProviderCredential(provider, next[provider]).catch(error => {
+        pushWorkspaceNotice("error", toErrorMessage(error, "Resolve 插件共享配置同步失败"));
+      });
       return next;
     });
-  }, [setProviderCredentials]);
+  }, [pushWorkspaceNotice, setProviderCredentials]);
 
   const handleSelectProvider = (provider: AiProvider) => {
     setSelectedProvider(provider);
@@ -216,6 +259,9 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
     setProviderCredentials(prev => {
       const next = { ...prev, [key]: { apiKey: "", baseUrl: cleanBaseUrl } };
       try { localStorage.setItem("imagine_provider_credentials", JSON.stringify(next)); } catch { /* storage unavailable */ }
+      void syncResolveProviderCredential(key, next[key], cleanLabel).catch(error => {
+        pushWorkspaceNotice("error", toErrorMessage(error, "Resolve 插件共享配置同步失败"));
+      });
       return next;
     });
     setChatModelOptions(prev => ({ ...prev, [key]: [] }));
@@ -246,6 +292,9 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
       const next = { ...prev };
       delete next[provider];
       try { localStorage.setItem("imagine_provider_credentials", JSON.stringify(next)); } catch { /* storage unavailable */ }
+      void syncResolveProviderCredential(provider, { apiKey: "", baseUrl: "" }).catch(error => {
+        pushWorkspaceNotice("error", toErrorMessage(error, "Resolve 插件共享配置同步失败"));
+      });
       return next;
     });
     if (selectedChatProvider === provider) {
@@ -429,6 +478,12 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
             if (typeof parsed[provider]?.baseUrl === "string") merged[provider].baseUrl = parsed[provider].baseUrl;
           }
           setProviderCredentials(merged);
+          syncStoredResolveCredentials(
+            merged,
+            restoredProviderKeys,
+            provider => restoredCustomProviders.find(item => item.key === provider)?.label ?? getProviderMeta(provider).label,
+            pushWorkspaceNotice,
+          );
         } catch { /* ignore corrupt data */ }
       } else {
         const defaults = defaultProviderCredentials(restoredProviderKeys);
@@ -450,6 +505,12 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
           localStorage.removeItem("imagine_grok2api_base_url");
           localStorage.removeItem("imagine_custom_api_base_url");
           try { localStorage.setItem("imagine_provider_credentials", JSON.stringify(migrated)); } catch { /* storage unavailable */ }
+          syncStoredResolveCredentials(
+            migrated,
+            restoredProviderKeys,
+            provider => restoredCustomProviders.find(item => item.key === provider)?.label ?? getProviderMeta(provider).label,
+            pushWorkspaceNotice,
+          );
         } else {
           setProviderCredentials(defaults);
         }
@@ -499,7 +560,7 @@ export function useProviderSettings({ pushWorkspaceNotice }: UseProviderSettings
     }, 0);
 
     return () => clearTimeout(restoreSettings);
-  }, [setAudioModelOptions, setChatModelOptions, setImageModelOptions, setProviderCredentials, setSelectedChatModel, setSelectedProvider, setVideoModelOptions]);
+  }, [pushWorkspaceNotice, setAudioModelOptions, setChatModelOptions, setImageModelOptions, setProviderCredentials, setSelectedChatModel, setSelectedProvider, setVideoModelOptions]);
 
   return {
     addFetchedModels,

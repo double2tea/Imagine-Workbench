@@ -22,6 +22,7 @@ export const API_ROUTES = {
   },
   resolve: {
     capabilities: "/api/resolve/capabilities",
+    providerCredentials: "/api/resolve/provider-credentials",
   },
   v1: {
     audioSpeech: "/v1/audio/speech",

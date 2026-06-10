@@ -127,7 +127,8 @@
     source: "",
     running: false,
     activeOperation: "",
-    resolve: null
+    resolve: null,
+    sharedCredentials: {}
   };
 
   var outputDir = hasNode ? path.join(os.homedir(), "Movies", "Imagine Resolve Bridge") : "";
@@ -145,6 +146,7 @@
   var outputNameInput = document.getElementById("outputNameInput");
   var twelveApiKeyInput = document.getElementById("twelveApiKeyInput");
   var mimoApiKeyInput = document.getElementById("mimoApiKeyInput");
+  var rememberKeysInput = document.getElementById("rememberKeysInput");
   var providerBaseUrlInput = document.getElementById("providerBaseUrlInput");
   var providerLabelInput = document.getElementById("providerLabelInput");
   var imageOperationField = document.getElementById("imageOperationField");
@@ -167,8 +169,14 @@
     localStorage.setItem("imagine.resolve.providerBaseUrl", providerBaseUrlInput.value);
     localStorage.setItem("imagine.resolve.providerLabel", providerLabelInput.value);
     localStorage.removeItem("imagine.resolve.providerApiKey");
-    localStorage.removeItem("imagine.resolve.twelveApiKey");
-    localStorage.removeItem("imagine.resolve.mimoApiKey");
+    localStorage.setItem("imagine.resolve.rememberProviderKeys", rememberKeysInput.checked ? "1" : "");
+    if (rememberKeysInput.checked) {
+      localStorage.setItem("imagine.resolve.twelveApiKey", twelveApiKeyInput.value);
+      localStorage.setItem("imagine.resolve.mimoApiKey", mimoApiKeyInput.value);
+    } else {
+      localStorage.removeItem("imagine.resolve.twelveApiKey");
+      localStorage.removeItem("imagine.resolve.mimoApiKey");
+    }
   }
 
   function restoreSettings() {
@@ -176,8 +184,9 @@
     if (baseUrl) {
       baseUrlInput.value = baseUrl;
     }
-    twelveApiKeyInput.value = "";
-    mimoApiKeyInput.value = "";
+    rememberKeysInput.checked = localStorage.getItem("imagine.resolve.rememberProviderKeys") === "1";
+    twelveApiKeyInput.value = rememberKeysInput.checked ? (localStorage.getItem("imagine.resolve.twelveApiKey") || "") : "";
+    mimoApiKeyInput.value = rememberKeysInput.checked ? (localStorage.getItem("imagine.resolve.mimoApiKey") || "") : "";
     providerBaseUrlInput.value = localStorage.getItem("imagine.resolve.providerBaseUrl") || "";
     providerLabelInput.value = localStorage.getItem("imagine.resolve.providerLabel") || "";
   }
@@ -312,6 +321,7 @@
     runButton.disabled = true;
     setStatus("运行中\n" + describeJob(job));
     try {
+      await loadSharedCredentialsForJob(job);
       var result = await executeJob(job);
       saveJob(job);
       setStatus("已完成\n" + describeJob(job) + "\n\n" + result.join("\n"));
@@ -363,6 +373,31 @@
       return transcribe(job, model, audioSource);
     }
     throw new Error("不支持的功能：" + job.operation);
+  }
+
+  async function loadSharedCredentialsForJob(job) {
+    if (!shouldLoadSharedCredentials(job)) {
+      return;
+    }
+    var response = await fetchUrl(job.baseUrl, "/api/resolve/provider-credentials", {
+      method: "GET",
+      headers: { Accept: "application/json" }
+    });
+    var payload = await readJsonResponse(response, "/api/resolve/provider-credentials");
+    state.sharedCredentials = payload.credentials || {};
+  }
+
+  function shouldLoadSharedCredentials(job) {
+    if (!providerForOperation(job.operation)) {
+      return false;
+    }
+    if (!isLocalWorkbenchUrl(job.baseUrl)) {
+      return false;
+    }
+    if (inputProviderApiKeyForOperation(job.operation) || process.env.IMAGINE_PROVIDER_API_KEY) {
+      return false;
+    }
+    return true;
   }
 
   async function modelForOperation(baseUrl, operation) {
@@ -777,7 +812,7 @@
     if (message.indexOf("API key is required") !== -1) {
       return [
         "供应商 API Key 缺失。",
-        "请在“供应商连接”里填写 12AI Key 或 MiMo Key，或在 Workbench 服务端配置环境变量。",
+        "请在 Workbench 设置中保存 Provider Key，或在“供应商连接”里临时填写 12AI Key / MiMo Key。",
         "原始错误：" + message
       ].join("\n");
     }
@@ -790,14 +825,19 @@
 
   function requestHeaders(extra) {
     var headers = Object.assign({ Accept: "*/*" }, extra || {});
+    var shared = sharedCredentialForOperation(state.activeOperation || state.operation);
     addHeader(headers, "Authorization", process.env.IMAGINE_WORKBENCH_API_KEY ? "Bearer " + process.env.IMAGINE_WORKBENCH_API_KEY : "");
     addHeader(headers, "x-ai-api-key", providerApiKeyForOperation(state.activeOperation || state.operation) || process.env.IMAGINE_PROVIDER_API_KEY);
-    addHeader(headers, "x-ai-base-url", inputValue(providerBaseUrlInput) || process.env.IMAGINE_PROVIDER_BASE_URL);
-    addHeader(headers, "x-ai-provider-label", inputValue(providerLabelInput) || process.env.IMAGINE_PROVIDER_LABEL);
+    addHeader(headers, "x-ai-base-url", inputValue(providerBaseUrlInput) || shared.baseUrl || process.env.IMAGINE_PROVIDER_BASE_URL);
+    addHeader(headers, "x-ai-provider-label", inputValue(providerLabelInput) || shared.providerLabel || process.env.IMAGINE_PROVIDER_LABEL);
     return headers;
   }
 
   function providerApiKeyForOperation(operation) {
+    return inputProviderApiKeyForOperation(operation) || sharedCredentialForOperation(operation).apiKey || "";
+  }
+
+  function inputProviderApiKeyForOperation(operation) {
     if (operation === "tts" || operation === "transcribe") {
       return inputValue(mimoApiKeyInput);
     }
@@ -805,6 +845,33 @@
       return inputValue(twelveApiKeyInput);
     }
     return "";
+  }
+
+  function sharedCredentialForOperation(operation) {
+    var provider = providerForOperation(operation);
+    if (!provider || !state.sharedCredentials || !state.sharedCredentials[provider]) {
+      return {};
+    }
+    return state.sharedCredentials[provider];
+  }
+
+  function providerForOperation(operation) {
+    if (operation === "tts" || operation === "transcribe") {
+      return "mimo";
+    }
+    if (operation === "generate-image" || operation === "edit-image" || operation === "generate-video") {
+      return "12ai";
+    }
+    return "";
+  }
+
+  function isLocalWorkbenchUrl(value) {
+    try {
+      var parsed = new URL(value);
+      return parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1" || parsed.hostname === "::1";
+    } catch {
+      return false;
+    }
   }
 
   function inputValue(input) {
