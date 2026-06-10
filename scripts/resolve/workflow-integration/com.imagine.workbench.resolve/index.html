@@ -11,13 +11,13 @@
     <main class="shell">
       <header class="topbar">
         <div class="brand">
-          <div class="mark">iw</div>
+          <div class="mark">IW</div>
           <div>
             <div class="brand-title">Imagine Workbench</div>
-            <div class="brand-subtitle">DaVinci Resolve</div>
+            <div class="brand-subtitle">Resolve Workflow Panel</div>
           </div>
         </div>
-        <button class="ghost-button" id="doctorButton" type="button">连接检查</button>
+        <button class="ghost-button" id="doctorButton" type="button"><span class="button-dot"></span>连接检查</button>
       </header>
 
       <nav class="tabs" aria-label="功能分类">
@@ -35,7 +35,12 @@
       <section class="app-grid" id="operationGrid" aria-label="功能"></section>
 
       <section class="prompt-panel">
-        <label class="field-label" for="promptInput" id="promptLabel">提示词</label>
+        <div class="composer-head">
+          <div>
+            <div class="composer-title">创作指令</div>
+            <label class="field-label" for="promptInput" id="promptLabel">提示词</label>
+          </div>
+        </div>
         <textarea id="promptInput" placeholder="描述生成或编辑需求"></textarea>
 
         <div class="source-block" id="sourceBlock">
