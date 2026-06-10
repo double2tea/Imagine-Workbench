@@ -2894,21 +2894,14 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     onActionValidationError: message => pushWorkspaceNotice("error", message),
   });
 
-  const cancelBoardGenerationNode = useCallback(async (nodeId: string): Promise<void> => {
-    const sourceNode = findExecutableNodeById(boardController.board.nodes, nodeId);
-    const task = sourceNode ? activeSourceTaskForNode(generationTasks, sourceNode) : undefined;
-    if (!sourceNode || !task) {
-      const update = {
-        errorMessage: "未找到可取消的关联任务",
-        status: "failed",
-      } as const;
-      if (sourceNode?.kind === "runninghub-app") {
-        boardController.updateRunningHubAppNode(nodeId, update);
-      } else {
-        boardController.updateGenerateNode(nodeId, update);
-      }
+  const cancelBoardGenerationTask = useCallback(async (task: GenerationTask): Promise<void> => {
+    const nodeId = task.source.boardNodeId;
+    const sourceNode = nodeId ? findExecutableNodeById(boardController.board.nodes, nodeId) : undefined;
+    if (!nodeId || !sourceNode) {
+      pushWorkspaceNotice("error", "任务缺少来源节点，无法从画板取消");
       return;
     }
+    if (task.status !== "pending" && task.status !== "processing") return;
 
     const operationName = task.operationName;
     if (cancelingBoardItemIds.includes(task.id)) return;
@@ -2943,14 +2936,19 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       const canceledTask = await cancelGenerationTask(task.id);
       setGenerationTasks(prev => prev.map(current => current.id === canceledTask.id ? canceledTask : current));
       delete pollingFailuresRef.current[task.id];
-      const update = {
-        errorMessage: canCancelRemote ? "远端生成任务已取消" : "任务已从本地取消",
-        status: "failed",
-      } as const;
-      if (sourceNode.kind === "runninghub-app") {
-        boardController.updateRunningHubAppNode(nodeId, update);
-      } else {
-        boardController.updateGenerateNode(nodeId, update);
+      if (isSourceStackTask(task, sourceNode)) {
+        const nextTasks = generationTasks.map(current => current.id === canceledTask.id ? canceledTask : current);
+        const nextStatus = nextSourceNodeStatus(items, nextTasks, sourceNode, "failed");
+        const cancellationMessage = canCancelRemote ? "远端生成任务已取消" : "任务已从本地取消";
+        const update = {
+          errorMessage: nextStatus === "failed" ? cancellationMessage : undefined,
+          status: nextStatus,
+        } as const;
+        if (sourceNode.kind === "runninghub-app") {
+          boardController.updateRunningHubAppNode(nodeId, update);
+        } else {
+          boardController.updateGenerateNode(nodeId, update);
+        }
       }
       pushWorkspaceNotice("success", canCancelRemote ? "视频生成任务已取消" : "任务已从本地取消");
     } catch (error) {
@@ -2965,11 +2963,30 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     confirmAction,
     generationAbortControllersRef,
     generationTasks,
+    items,
     locallyCanceledItemIdsRef,
     pollingFailuresRef,
     pushWorkspaceNotice,
     setGenerationTasks,
   ]);
+
+  const cancelBoardGenerationNode = useCallback(async (nodeId: string): Promise<void> => {
+    const sourceNode = findExecutableNodeById(boardController.board.nodes, nodeId);
+    const task = sourceNode ? activeSourceTaskForNode(generationTasks, sourceNode) : undefined;
+    if (!sourceNode || !task) {
+      const update = {
+        errorMessage: "未找到可取消的关联任务",
+        status: "failed",
+      } as const;
+      if (sourceNode?.kind === "runninghub-app") {
+        boardController.updateRunningHubAppNode(nodeId, update);
+      } else {
+        boardController.updateGenerateNode(nodeId, update);
+      }
+      return;
+    }
+    await cancelBoardGenerationTask(task);
+  }, [boardController, cancelBoardGenerationTask, generationTasks]);
 
   const addAssetToBoard = useCallback((asset: StorageItem, position?: BoardPoint): string => {
     const assetNodeId = boardController.addAssetNode({
@@ -3973,13 +3990,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   }, [cancelBoardGenerationNode]);
 
   const handleCancelBoardTask = useCallback((task: GenerationTask) => {
-    const nodeId = task.source.boardNodeId;
-    if (!nodeId) {
-      pushWorkspaceNotice("error", "任务缺少来源节点，无法从画板取消");
-      return;
-    }
-    void cancelBoardGenerationNode(nodeId);
-  }, [cancelBoardGenerationNode, pushWorkspaceNotice]);
+    void cancelBoardGenerationTask(task);
+  }, [cancelBoardGenerationTask]);
 
   const handleBoardConnectionError = useCallback((message: string) => {
     pushWorkspaceNotice("error", message);

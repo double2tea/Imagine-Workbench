@@ -135,7 +135,7 @@ function TaskRow({
           }}
         >
           <CheckCircle2 className="h-3 w-3" />
-          结果
+          结果节点
         </button>
         {canCancel ? (
           <button
