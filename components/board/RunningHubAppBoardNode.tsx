@@ -229,9 +229,7 @@ function statusLabel(status: BoardRunningHubAppNode["status"]): string {
 }
 
 function resultStatusLabel(hasResultConnection: boolean, resultCount: number): string {
-  if (resultCount > 1) return `${resultCount} 个结果`;
-  if (resultCount > 0 && hasResultConnection) return "结果已连接";
-  if (resultCount > 0) return "已生成";
+  if (resultCount > 0) return hasResultConnection ? `${resultCount} 个已上板` : `${resultCount} 个`;
   return "未生成";
 }
 

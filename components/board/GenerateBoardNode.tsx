@@ -82,9 +82,7 @@ function contextToneClass(tone: GenerateContextTone): string {
 }
 
 function resultContext(hasResultConnection: boolean, resultCount: number): { title: string; tone: GenerateContextTone } {
-  if (resultCount > 1) return { title: `${resultCount} 个结果`, tone: hasResultConnection ? "result" : "ok" };
-  if (resultCount > 0 && hasResultConnection) return { title: "已连接", tone: "result" };
-  if (resultCount > 0) return { title: "已生成", tone: "ok" };
+  if (resultCount > 0) return { title: hasResultConnection ? `${resultCount} 个已上板` : `${resultCount} 个`, tone: hasResultConnection ? "result" : "ok" };
   return { title: "未生成", tone: "neutral" };
 }
 
@@ -212,6 +210,9 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
   const statusLabel = taskSummary
     ? `${taskSummary.status === "pending" ? "排队" : "处理中"} ${taskSummary.progress}% / ${paramSummary}`
     : `${statusText(node)} / ${paramSummary}`;
+  const compactStatusLabel = taskSummary
+    ? `${taskSummary.status === "pending" ? "排队" : "处理中"} ${taskSummary.progress}% · x${node.variantCount}`
+    : `${statusText(node)} · x${node.variantCount}`;
   const handleApplyPromptTemplate = (template: PromptTemplate, mode: PromptTemplateApplyMode): void => {
     const textarea = promptTextareaRef.current;
     const currentPrompt = textarea?.getValue() ?? node.prompt;
@@ -278,7 +279,6 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
             className={`imagine-generate-context-chip flex min-w-0 flex-1 items-center justify-center gap-1 rounded px-1.5 py-1 ${contextToneClass(item.tone)}`}
             title={item.tooltip}
           >
-            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-current opacity-70" />
             <span className="truncate text-[10px] font-semibold">{item.label} · {item.title}</span>
           </span>
         ))}
@@ -304,8 +304,12 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
         </div>
       )}
       <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
-        <span className={`imagine-status-chip truncate text-[10px] font-mono ${node.status === "failed" ? "text-red-300" : "text-[var(--iw-muted)]"}`} data-status={node.status}>
-          {node.errorMessage ?? statusLabel}
+        <span
+          className={`imagine-status-chip truncate text-[10px] font-mono ${node.status === "failed" ? "text-red-300" : "text-[var(--iw-muted)]"}`}
+          data-status={node.status}
+          title={node.errorMessage ?? statusLabel}
+        >
+          {node.errorMessage ?? compactStatusLabel}
         </span>
         <div className="nodrag flex h-8 overflow-hidden rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)]" title="变体数量">
           {variantCountOptions.map(count => (
