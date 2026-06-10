@@ -3,7 +3,10 @@
   var fs = hasNode ? require("fs") : null;
   var os = hasNode ? require("os") : null;
   var path = hasNode ? require("path") : null;
-  var shell = hasNode ? require("electron").shell : null;
+  var electron = hasNode ? require("electron") : null;
+  var shell = electron ? electron.shell : null;
+  var net = electron ? electron.net : null;
+  var ipcRenderer = electron ? electron.ipcRenderer : null;
 
   var PLUGIN_ID = "com.imagine.workbench.resolve";
   var DEFAULT_MODELS = {
@@ -139,6 +142,9 @@
   var sourcePills = document.getElementById("sourcePills");
   var baseUrlInput = document.getElementById("baseUrlInput");
   var outputNameInput = document.getElementById("outputNameInput");
+  var providerApiKeyInput = document.getElementById("providerApiKeyInput");
+  var providerBaseUrlInput = document.getElementById("providerBaseUrlInput");
+  var providerLabelInput = document.getElementById("providerLabelInput");
   var imageOperationField = document.getElementById("imageOperationField");
   var imageOperationInput = document.getElementById("imageOperationInput");
   var pollSecondsField = document.getElementById("pollSecondsField");
@@ -156,6 +162,9 @@
 
   function persistSettings() {
     localStorage.setItem("imagine.resolve.baseUrl", baseUrlInput.value);
+    localStorage.setItem("imagine.resolve.providerApiKey", providerApiKeyInput.value);
+    localStorage.setItem("imagine.resolve.providerBaseUrl", providerBaseUrlInput.value);
+    localStorage.setItem("imagine.resolve.providerLabel", providerLabelInput.value);
   }
 
   function restoreSettings() {
@@ -163,6 +172,9 @@
     if (baseUrl) {
       baseUrlInput.value = baseUrl;
     }
+    providerApiKeyInput.value = localStorage.getItem("imagine.resolve.providerApiKey") || "";
+    providerBaseUrlInput.value = localStorage.getItem("imagine.resolve.providerBaseUrl") || "";
+    providerLabelInput.value = localStorage.getItem("imagine.resolve.providerLabel") || "";
   }
 
   function visibleOperations() {
@@ -298,7 +310,7 @@
       saveJob(job);
       setStatus("已完成\n" + describeJob(job) + "\n\n" + result.join("\n"));
     } catch (error) {
-      setStatus("运行失败\n" + error.message);
+      setStatus("运行失败\n" + explainError(error, job));
     } finally {
       state.running = false;
       runButton.disabled = false;
@@ -383,13 +395,13 @@
   }
 
   async function editImage(job, model, imagePath) {
-    var form = new FormData();
-    form.append("model", model);
-    form.append("prompt", job.prompt);
-    form.append("operation", job.imageOperation || "redraw");
-    form.append("response_format", "b64_json");
-    form.append("image", fileBlob(imagePath), path.basename(imagePath));
-    var response = await postFormJson(job.baseUrl, "/v1/images/edits", form);
+    var response = await postMultipartJson(job.baseUrl, "/v1/images/edits", [
+      { name: "model", value: model },
+      { name: "prompt", value: job.prompt },
+      { name: "operation", value: job.imageOperation || "redraw" },
+      { name: "response_format", value: "b64_json" },
+      { name: "image", filePath: imagePath }
+    ]);
     var imageBytes = openAiB64Bytes(response, "image");
     return writeOutput(outputStem(job), ".png", imageBytes);
   }
@@ -421,14 +433,15 @@
   }
 
   async function transcribe(job, model, audioPath) {
-    var form = new FormData();
-    form.append("model", model);
-    form.append("response_format", "json");
+    var parts = [
+      { name: "model", value: model },
+      { name: "response_format", value: "json" }
+    ];
     if (job.language) {
-      form.append("language", job.language);
+      parts.push({ name: "language", value: job.language });
     }
-    form.append("file", fileBlob(audioPath), path.basename(audioPath));
-    var response = await postFormJson(job.baseUrl, "/v1/audio/transcriptions", form);
+    parts.push({ name: "file", filePath: audioPath });
+    var response = await postMultipartJson(job.baseUrl, "/v1/audio/transcriptions", parts);
     if (!response.text) {
       throw new Error("转写响应缺少 text");
     }
@@ -651,11 +664,12 @@
     return readJsonResponse(response, routePath);
   }
 
-  async function postFormJson(baseUrl, routePath, form) {
+  async function postMultipartJson(baseUrl, routePath, parts) {
+    var multipart = multipartBody(parts);
     var response = await fetchUrl(baseUrl, routePath, {
       method: "POST",
-      headers: requestHeaders(),
-      body: form
+      headers: requestHeaders({ "Content-Type": "multipart/form-data; boundary=" + multipart.boundary }),
+      body: multipart.body
     });
     return readJsonResponse(response, routePath);
   }
@@ -688,26 +702,93 @@
   }
 
   function fetchUrl(baseUrl, routePath, options) {
-    return fetch(baseUrl.replace(/\/+$/, "") + "/" + routePath.replace(/^\/+/, ""), options);
+    var url = baseUrl.replace(/\/+$/, "") + "/" + routePath.replace(/^\/+/, "");
+    if (ipcRenderer && typeof ipcRenderer.invoke === "function") {
+      return electronFetch(url, options);
+    }
+    if (net && typeof net.fetch === "function") {
+      return net.fetch(url, options);
+    }
+    return fetch(url, options);
+  }
+
+  async function electronFetch(url, options) {
+    var payload = await ipcRenderer.invoke("imagine-http", {
+      url: url,
+      method: options.method || "GET",
+      headers: options.headers || {},
+      bodyBase64: bodyBase64(options.body)
+    });
+    var bytes = Buffer.from(payload.bodyBase64 || "", "base64");
+    return {
+      ok: payload.ok,
+      status: payload.status,
+      headers: {
+        get: function (name) {
+          return payload.headers[String(name).toLowerCase()] || "";
+        }
+      },
+      text: function () {
+        return Promise.resolve(bytes.toString("utf8"));
+      },
+      json: function () {
+        return Promise.resolve(JSON.parse(bytes.toString("utf8")));
+      },
+      arrayBuffer: function () {
+        return Promise.resolve(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+      }
+    };
+  }
+
+  function bodyBase64(body) {
+    if (!body) {
+      return "";
+    }
+    if (typeof body === "string") {
+      return Buffer.from(body, "utf8").toString("base64");
+    }
+    if (Buffer.isBuffer(body)) {
+      return body.toString("base64");
+    }
+    throw new Error("插件网络层不支持此请求体");
+  }
+
+  function explainError(error, job) {
+    var message = error && error.message ? error.message : String(error);
+    if (message === "Failed to fetch") {
+      return [
+        "无法连接 Workbench：" + job.baseUrl,
+        "请确认 Workbench 正在运行，且地址可以从 Resolve 插件访问。",
+        "原始错误：" + message
+      ].join("\n");
+    }
+    if (message.indexOf("API key is required") !== -1) {
+      return [
+        "供应商 API Key 缺失。",
+        "请在“供应商连接”里填写当前默认模型对应的 API Key，或在 Workbench 服务端配置环境变量。",
+        "原始错误：" + message
+      ].join("\n");
+    }
+    return message;
   }
 
   function requestHeaders(extra) {
     var headers = Object.assign({ Accept: "*/*" }, extra || {});
     addHeader(headers, "Authorization", process.env.IMAGINE_WORKBENCH_API_KEY ? "Bearer " + process.env.IMAGINE_WORKBENCH_API_KEY : "");
-    addHeader(headers, "x-ai-api-key", process.env.IMAGINE_PROVIDER_API_KEY);
-    addHeader(headers, "x-ai-base-url", process.env.IMAGINE_PROVIDER_BASE_URL);
-    addHeader(headers, "x-ai-provider-label", process.env.IMAGINE_PROVIDER_LABEL);
+    addHeader(headers, "x-ai-api-key", inputValue(providerApiKeyInput) || process.env.IMAGINE_PROVIDER_API_KEY);
+    addHeader(headers, "x-ai-base-url", inputValue(providerBaseUrlInput) || process.env.IMAGINE_PROVIDER_BASE_URL);
+    addHeader(headers, "x-ai-provider-label", inputValue(providerLabelInput) || process.env.IMAGINE_PROVIDER_LABEL);
     return headers;
+  }
+
+  function inputValue(input) {
+    return input && input.value ? input.value.trim() : "";
   }
 
   function addHeader(headers, name, value) {
     if (value) {
       headers[name] = value;
     }
-  }
-
-  function fileBlob(filePath) {
-    return new Blob([fs.readFileSync(filePath)], { type: contentTypeForPath(filePath) });
   }
 
   function openAiB64Bytes(response, kind) {
@@ -739,6 +820,34 @@
     if (ext === ".mp3") return "audio/mpeg";
     if (ext === ".wav") return "audio/wav";
     return "application/octet-stream";
+  }
+
+  function multipartBody(parts) {
+    var boundary = "----ImagineResolve" + Date.now().toString(36);
+    var chunks = [];
+    parts.forEach(function (part) {
+      chunks.push(Buffer.from("--" + boundary + "\r\n", "utf8"));
+      if (part.filePath) {
+        chunks.push(Buffer.from(
+          'Content-Disposition: form-data; name="' + part.name + '"; filename="' + path.basename(part.filePath) + '"\r\n' +
+          "Content-Type: " + contentTypeForPath(part.filePath) + "\r\n\r\n",
+          "utf8"
+        ));
+        chunks.push(fs.readFileSync(part.filePath));
+        chunks.push(Buffer.from("\r\n", "utf8"));
+      } else {
+        chunks.push(Buffer.from(
+          'Content-Disposition: form-data; name="' + part.name + '"\r\n\r\n' +
+          String(part.value) + "\r\n",
+          "utf8"
+        ));
+      }
+    });
+    chunks.push(Buffer.from("--" + boundary + "--\r\n", "utf8"));
+    return {
+      boundary: boundary,
+      body: Buffer.concat(chunks)
+    };
   }
 
   function extensionForContentType(contentType, fallback) {

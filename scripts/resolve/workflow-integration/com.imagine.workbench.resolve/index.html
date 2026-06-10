@@ -2,7 +2,7 @@
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http: https:" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Imagine Workbench</title>
     <link rel="stylesheet" href="./css/app.css" />
@@ -70,6 +70,24 @@
             <input id="languageInput" type="text" value="auto" />
           </label>
         </div>
+
+        <details class="advanced">
+          <summary>供应商连接</summary>
+          <div class="option-grid">
+            <label class="field">
+              <span>API Key</span>
+              <input id="providerApiKeyInput" type="password" placeholder="未配置环境变量时填写" />
+            </label>
+            <label class="field">
+              <span>Base URL</span>
+              <input id="providerBaseUrlInput" type="text" placeholder="可选" />
+            </label>
+            <label class="field">
+              <span>供应商标签</span>
+              <input id="providerLabelInput" type="text" placeholder="可选" />
+            </label>
+          </div>
+        </details>
 
         <div class="runbar">
           <button class="small-button" id="saveButton" type="button">保存任务</button>

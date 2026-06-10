@@ -338,6 +338,28 @@ select:focus {
   padding: 0 10px;
 }
 
+.advanced {
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.advanced summary {
+  width: max-content;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.advanced[open] summary {
+  color: var(--text);
+}
+
+.advanced .option-grid {
+  margin-top: 10px;
+}
+
 .runbar {
   display: grid;
   grid-template-columns: auto auto 1fr auto;
