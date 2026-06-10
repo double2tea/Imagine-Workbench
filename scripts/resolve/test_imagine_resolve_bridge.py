@@ -12,7 +12,7 @@ from pathlib import Path
 from threading import Thread
 from typing import Any
 
-from imagine_resolve_bridge import BridgeConfig, BridgeRoutes, ImagineResolveBridge, ResolveController, job_to_argv, run_cli, run_in_resolve
+from imagine_resolve_bridge import BridgeConfig, BridgeRoutes, ImagineResolveBridge, ResolveController, job_to_argv, main, run_cli, run_in_resolve
 from install_resolve_bridge import install, uninstall
 
 
@@ -188,6 +188,25 @@ class ImagineResolveBridgeTests(unittest.TestCase):
 
         self.assertEqual(outputs, [])
         self.assertEqual(json.loads(job_path.read_text(encoding="utf-8"))["operation"], "doctor")
+
+    def test_no_arg_main_runs_in_resolve_job(self) -> None:
+        job_path = Path(self.tmp.name) / "direct-script-job.json"
+        job_path.write_text(json.dumps({
+            "operation": "doctor",
+            "baseUrl": self.server.url,
+        }), encoding="utf-8")
+        previous = os.environ.get("IMAGINE_RESOLVE_JOB")
+        os.environ["IMAGINE_RESOLVE_JOB"] = str(job_path)
+        try:
+            outputs = main([])
+        finally:
+            if previous is None:
+                os.environ.pop("IMAGINE_RESOLVE_JOB", None)
+            else:
+                os.environ["IMAGINE_RESOLVE_JOB"] = previous
+
+        self.assertEqual(outputs, [])
+        self.assertEqual(self.server.requests[-1]["path"], "/api/resolve/capabilities")
 
     def test_run_in_resolve_uses_internal_resolve_for_current_frame(self) -> None:
         job_path = Path(self.tmp.name) / "current-frame-job.json"

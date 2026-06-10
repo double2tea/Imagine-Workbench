@@ -12,6 +12,7 @@ import base64
 import json
 import mimetypes
 import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from time import sleep, time
@@ -769,5 +770,19 @@ def require_job_text(job: dict[str, Any], key: str) -> str:
     return value
 
 
+def current_resolve_app() -> Any | None:
+    try:
+        return bmd.scriptapp("Resolve")  # type: ignore[name-defined]
+    except NameError:
+        return None
+
+
+def main(argv: list[str] | None = None) -> list[Path]:
+    effective_argv = sys.argv[1:] if argv is None else argv
+    if not effective_argv:
+        return run_in_resolve(current_resolve_app())
+    return run_cli(effective_argv)
+
+
 if __name__ == "__main__":
-    run_cli()
+    main()

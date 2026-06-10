@@ -306,6 +306,8 @@ Then run:
 Workspace -> Scripts -> Utility -> ImagineWorkbenchResolve
 ```
 
+If Resolve also shows `imagine_resolve_bridge` in the Scripts menu, running it directly executes the same job file when no CLI arguments are provided.
+
 To use a different job file, set:
 
 ```bash
