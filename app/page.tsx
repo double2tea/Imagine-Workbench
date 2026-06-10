@@ -375,6 +375,7 @@ export default function Home() {
     originalAssetPromoteIdsRef.current.add(item.id);
     void resolveOriginalStorageItem(item).then(
       originalItem => {
+        originalAssetPromoteIdsRef.current.delete(item.id);
         setItems(prev => prev.map(current =>
           current.id === originalItem.id && current.url !== originalItem.url
             ? { ...current, url: originalItem.url }

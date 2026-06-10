@@ -436,8 +436,16 @@ export function useAssetActions({
   };
 
   const handleDownloadItem = async (item: StorageItem) => {
+    let originalItem: StorageItem;
     try {
-      const originalItem = await resolveOriginalStorageItem(item, items);
+      originalItem = await resolveOriginalStorageItem(item, items);
+    } catch (error) {
+      console.error("Download item failed to resolve original:", error);
+      alert("下载失败，无法读取原始媒体。");
+      return;
+    }
+
+    try {
       const extension = assetDownloadExtension(originalItem);
       const fileName = `imagine_${originalItem.id}.${extension}`;
       let blob: Blob;

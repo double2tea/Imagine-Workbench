@@ -151,7 +151,23 @@ async function resolveOriginalReference(reference: ReferenceImageRef): Promise<R
 }
 
 async function resolveOriginalReferences(references: ReferenceImageRef[]): Promise<ReferenceImageRef[]> {
-  return Promise.all(references.map(resolveOriginalReference));
+  const results = await Promise.allSettled(references.map(resolveOriginalReference));
+  const successful: ReferenceImageRef[] = [];
+  const failedIds: string[] = [];
+  results.forEach((result, index) => {
+    if (result.status === "fulfilled") {
+      successful.push(result.value);
+    } else {
+      failedIds.push(references[index].id);
+    }
+  });
+  if (failedIds.length > 0 && failedIds.length < references.length) {
+    console.warn(`部分参考媒体解析失败: ${failedIds.join(", ")}`);
+  }
+  if (successful.length === 0 && failedIds.length > 0) {
+    throw new Error("所有参考媒体解析失败");
+  }
+  return successful;
 }
 
 function isAbortError(error: unknown): boolean {
