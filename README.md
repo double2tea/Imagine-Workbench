@@ -56,6 +56,10 @@ TWELVE_AI_API_KEY="sk_your_12ai_key"
 TWELVE_AI_BASE_URL="https://cdn.12ai.org"
 TWELVE_AI_VIDEO_BASE_URL="https://new.12ai.org"
 
+# Optional: protect plugin-facing /v1/* routes.
+# If set, callers must send Authorization: Bearer <OPENAI_COMPAT_API_KEY>.
+# OPENAI_COMPAT_API_KEY="local_gateway_key"
+
 GROK2API_API_KEY="your_grok2api_key"
 GROK2API_BASE_URL="http://localhost:8000"
 
@@ -209,6 +213,8 @@ Supported insertion surfaces:
 Users can open the picker with the template button or type `/` in supported prompt text areas. Selecting "插入" replaces the active slash command token when one is present; selecting "替换" replaces the full prompt. Image prompts also apply a template's negative prompt when provided.
 
 ## App Routes
+
+External callers should start with [OpenAI-compatible API](docs/openai-compatible-api.md). The `/v1/*` routes are a documented subset for plugins and scripts; richer Workbench media workflows stay under `/api/media/*`.
 
 - `GET /`: main workstation.
 - `GET /board`: standalone canvas operation surface for assets, notes, generation, and Agent interaction.

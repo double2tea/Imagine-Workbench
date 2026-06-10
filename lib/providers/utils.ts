@@ -21,9 +21,18 @@ export function optionalText(value: unknown): string | undefined {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
 }
 
-export function resolveProviderConfig(req: Request, provider: AiProvider): ProviderConfig {
+export interface ResolveProviderConfigOptions {
+  ignoredBearerToken?: string;
+}
+
+export function resolveProviderConfig(
+  req: Request,
+  provider: AiProvider,
+  options: ResolveProviderConfigOptions = {},
+): ProviderConfig {
   const headerKey = trimCredential(req.headers.get("x-ai-api-key") ?? "");
-  const bearerKey = trimCredential(readBearerToken(req.headers.get("authorization")) ?? "");
+  const rawBearerKey = readBearerToken(req.headers.get("authorization"));
+  const bearerKey = rawBearerKey && rawBearerKey !== options.ignoredBearerToken ? trimCredential(rawBearerKey) : "";
   const headerBaseUrl = trimCredential(req.headers.get("x-ai-base-url") ?? "");
   const providerLabel = optionalText(req.headers.get("x-ai-provider-label"));
   const envKey = trimCredential(resolveProviderApiKey(provider));

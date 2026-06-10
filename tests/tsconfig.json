@@ -45,6 +45,7 @@
     "../lib/api/audio-errors.ts",
     "../lib/api/chat-completions.ts",
     "../lib/api/errors.ts",
+    "../lib/api/openai-auth.ts",
     "../lib/api/openai-models.ts",
     "../lib/api/openai-media.ts",
     "../lib/api/routes.ts",

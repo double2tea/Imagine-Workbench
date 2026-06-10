@@ -41,6 +41,94 @@ test("OpenAI-compatible image generations maps JSON to provider image adapter", 
   }
 });
 
+test("OpenAI-compatible image generations separates gateway auth from provider auth", async () => {
+  const originalGatewayKey = process.env.OPENAI_COMPAT_API_KEY;
+  process.env.OPENAI_COMPAT_API_KEY = "gateway_key";
+  const mock = withFetchMock(async (url, init) => {
+    assert.equal(url, "https://newapi.example.test/v1/images/generations");
+    assert.equal(readHeader(init?.headers, "Authorization"), "Bearer image_key");
+    return jsonResponse({ data: [{ b64_json: "aW1hZ2U=" }] });
+  });
+
+  try {
+    const response = await postOpenAiImageGenerations(jsonRequest("/v1/images/generations", {
+      model: "newapi:image-model",
+      prompt: "a small studio product photo",
+    }, {
+      Authorization: "Bearer gateway_key",
+      "x-ai-api-key": "image_key",
+      "x-ai-base-url": "https://newapi.example.test/v1",
+    }));
+
+    assert.equal(response.status, 200);
+    assert.equal(mock.calls.count, 1);
+  } finally {
+    restoreEnv("OPENAI_COMPAT_API_KEY", originalGatewayKey);
+    mock.restore();
+  }
+});
+
+test("OpenAI-compatible image generations rejects missing gateway auth when configured", async () => {
+  const originalGatewayKey = process.env.OPENAI_COMPAT_API_KEY;
+  process.env.OPENAI_COMPAT_API_KEY = "gateway_key";
+  const mock = withFetchMock(async () => {
+    throw new Error("Gateway auth failure must be rejected before fetch");
+  });
+
+  try {
+    const response = await postOpenAiImageGenerations(jsonRequest("/v1/images/generations", {
+      model: "newapi:image-model",
+      prompt: "cat",
+    }, {
+      "x-ai-api-key": "image_key",
+      "x-ai-base-url": "https://newapi.example.test/v1",
+    }));
+
+    assert.equal(response.status, 401);
+    assert.match(await response.text(), /gateway API key/);
+    assert.equal(mock.calls.count, 0);
+  } finally {
+    restoreEnv("OPENAI_COMPAT_API_KEY", originalGatewayKey);
+    mock.restore();
+  }
+});
+
+test("OpenAI-compatible image generations checks gateway auth before parsing JSON", async () => {
+  const originalGatewayKey = process.env.OPENAI_COMPAT_API_KEY;
+  process.env.OPENAI_COMPAT_API_KEY = "gateway_key";
+
+  try {
+    const response = await postOpenAiImageGenerations(new Request("http://local.test/v1/images/generations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    }));
+
+    assert.equal(response.status, 401);
+    assert.match(await response.text(), /gateway API key/);
+  } finally {
+    restoreEnv("OPENAI_COMPAT_API_KEY", originalGatewayKey);
+  }
+});
+
+test("OpenAI-compatible image edits checks gateway auth before parsing multipart bodies", async () => {
+  const originalGatewayKey = process.env.OPENAI_COMPAT_API_KEY;
+  process.env.OPENAI_COMPAT_API_KEY = "gateway_key";
+
+  try {
+    const response = await postOpenAiImageEdits(new Request("http://local.test/v1/images/edits", {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: "not multipart",
+    }));
+
+    assert.equal(response.status, 401);
+    assert.match(await response.text(), /gateway API key/);
+  } finally {
+    restoreEnv("OPENAI_COMPAT_API_KEY", originalGatewayKey);
+  }
+});
+
 test("OpenAI-compatible image generations rejects impossible multi-image requests", async () => {
   const response = await postOpenAiImageGenerations(jsonRequest("/v1/images/generations", {
     model: "newapi:image-model",
@@ -217,6 +305,24 @@ test("OpenAI-compatible audio transcriptions accepts multipart audio upload", as
   }
 });
 
+test("OpenAI-compatible audio transcriptions checks gateway auth before parsing multipart bodies", async () => {
+  const originalGatewayKey = process.env.OPENAI_COMPAT_API_KEY;
+  process.env.OPENAI_COMPAT_API_KEY = "gateway_key";
+
+  try {
+    const response = await postOpenAiAudioTranscriptions(new Request("http://local.test/v1/audio/transcriptions", {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: "not multipart",
+    }));
+
+    assert.equal(response.status, 401);
+    assert.match(await response.text(), /gateway API key/);
+  } finally {
+    restoreEnv("OPENAI_COMPAT_API_KEY", originalGatewayKey);
+  }
+});
+
 test("OpenAI-compatible audio transcriptions rejects unsupported languages", async () => {
   const form = new FormData();
   form.set("model", "mimo-v2.5-asr");
@@ -297,6 +403,14 @@ function jsonResponse(body: unknown): Response {
 
 function readHeader(headers: HeadersInit | undefined, name: string): string | undefined {
   return new Headers(headers).get(name) ?? undefined;
+}
+
+function restoreEnv(name: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[name];
+  } else {
+    process.env[name] = value;
+  }
 }
 
 function withFetchMock(handler: typeof fetch): { calls: { count: number }; restore: () => void } {

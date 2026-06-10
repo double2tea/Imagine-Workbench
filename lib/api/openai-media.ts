@@ -7,6 +7,7 @@ import type { ImageEditOperation, MimoAsrLanguage } from "../providers/types";
 import { optionalText, parseDataUri, resolveProviderConfig } from "../providers/utils";
 import { audioOperationApiError } from "./audio-errors";
 import { apiErrorResponse, badRequest, requireApiText } from "./errors";
+import { assertOpenAiCompatibleGatewayAccess } from "./openai-auth";
 
 const IMAGE_EDIT_OPERATIONS = new Set<ImageEditOperation>(["redraw", "erase", "outpaint", "cutout"]);
 const TRANSCRIPTION_LANGUAGES = new Set<MimoAsrLanguage>(["auto", "zh", "en"]);
@@ -36,6 +37,7 @@ type SpeechFormat = "wav" | "pcm16";
 
 export async function postOpenAiImageGenerations(req: Request): Promise<Response> {
   try {
+    const gatewayKey = assertOpenAiCompatibleGatewayAccess(req);
     const body = imageGenerationSchema.parse(await req.json());
     if (body.n !== undefined && body.n !== 1) {
       throw badRequest("/v1/images/generations supports n=1 only", "unsupported_image_count");
@@ -43,7 +45,7 @@ export async function postOpenAiImageGenerations(req: Request): Promise<Response
 
     const parsed = parseProviderModel(body.model, "12ai");
     assertImmediateOpenAiImageTarget(parsed.provider, parsed.async, "/v1/images/generations");
-    const config = resolveProviderConfig(req, parsed.provider);
+    const config = resolveProviderConfig(req, parsed.provider, { ignoredBearerToken: gatewayKey });
     const imageResolution = body.size ?? "1024x1024";
     const result = await generateImage(config, {
       prompt: body.prompt,
@@ -73,6 +75,7 @@ export async function postOpenAiImageGenerations(req: Request): Promise<Response
 
 export async function postOpenAiImageEdits(req: Request): Promise<Response> {
   try {
+    const gatewayKey = assertOpenAiCompatibleGatewayAccess(req);
     const form = await req.formData();
     assertAllowedFormFields(form, IMAGE_EDIT_FORM_FIELDS);
     const modelValue = readFormText(form, "model");
@@ -86,7 +89,7 @@ export async function postOpenAiImageEdits(req: Request): Promise<Response> {
 
     const parsed = parseProviderModel(modelValue, "12ai");
     assertImmediateOpenAiImageTarget(parsed.provider, parsed.async, "/v1/images/edits");
-    const config = resolveProviderConfig(req, parsed.provider);
+    const config = resolveProviderConfig(req, parsed.provider, { ignoredBearerToken: gatewayKey });
     const image = await readRequiredFileDataUri(form, "image", "image/png");
     const mask = await readOptionalFileDataUri(form, "mask", "image/png");
     const imageResolution = readOptionalFormText(form, "size") ?? "1024x1024";
@@ -112,6 +115,7 @@ export async function postOpenAiImageEdits(req: Request): Promise<Response> {
 
 export async function postOpenAiAudioSpeech(req: Request): Promise<Response> {
   try {
+    const gatewayKey = assertOpenAiCompatibleGatewayAccess(req);
     const body = speechSchema.parse(await req.json());
     const parsed = parseProviderModel(body.model, "mimo");
     if (isRunningHubWorkflowAudioTarget(body.model)) {
@@ -121,7 +125,7 @@ export async function postOpenAiAudioSpeech(req: Request): Promise<Response> {
       );
     }
 
-    const config = resolveProviderConfig(req, parsed.provider);
+    const config = resolveProviderConfig(req, parsed.provider, { ignoredBearerToken: gatewayKey });
     const result = await generateAudioOperation(config, {
       mode: "tts",
       prompt: body.input,
@@ -148,6 +152,7 @@ export async function postOpenAiAudioSpeech(req: Request): Promise<Response> {
 
 export async function postOpenAiAudioTranscriptions(req: Request): Promise<Response> {
   try {
+    const gatewayKey = assertOpenAiCompatibleGatewayAccess(req);
     const form = await req.formData();
     assertAllowedFormFields(form, TRANSCRIPTION_FORM_FIELDS);
     const modelValue = readFormText(form, "model");
@@ -163,7 +168,7 @@ export async function postOpenAiAudioTranscriptions(req: Request): Promise<Respo
       throw badRequest("/v1/audio/transcriptions supports response_format=json only", "unsupported_transcription_format");
     }
 
-    const config = resolveProviderConfig(req, parsed.provider);
+    const config = resolveProviderConfig(req, parsed.provider, { ignoredBearerToken: gatewayKey });
     const audio = await readRequiredFileDataUri(form, "file", "audio/mpeg");
     const result = await generateAudioOperation(config, {
       mode: "asr",

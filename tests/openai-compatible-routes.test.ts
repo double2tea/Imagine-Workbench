@@ -25,3 +25,47 @@ test("OpenAI-compatible model list validates provider keys", async () => {
   assert.equal(response.status, 400);
   assert.match(await response.text(), /provider must be a valid provider key/);
 });
+
+test("OpenAI-compatible model list separates gateway auth from provider auth", async () => {
+  const originalGatewayKey = process.env.OPENAI_COMPAT_API_KEY;
+  process.env.OPENAI_COMPAT_API_KEY = "gateway_key";
+
+  try {
+    const response = await listOpenAiModels(new Request("http://local.test/v1/models?provider=mimo&kind=chat", {
+      headers: {
+        Authorization: "Bearer gateway_key",
+        "x-ai-api-key": "mimo_key",
+      },
+    }));
+
+    assert.equal(response.status, 200);
+    const body = await response.json() as { data?: Array<{ id?: unknown }> };
+    assert.ok(body.data?.some(model => model.id === "mimo:mimo-v2.5"));
+  } finally {
+    restoreEnv("OPENAI_COMPAT_API_KEY", originalGatewayKey);
+  }
+});
+
+test("OpenAI-compatible model list rejects missing gateway auth when configured", async () => {
+  const originalGatewayKey = process.env.OPENAI_COMPAT_API_KEY;
+  process.env.OPENAI_COMPAT_API_KEY = "gateway_key";
+
+  try {
+    const response = await listOpenAiModels(new Request("http://local.test/v1/models?provider=mimo&kind=chat", {
+      headers: { "x-ai-api-key": "mimo_key" },
+    }));
+
+    assert.equal(response.status, 401);
+    assert.match(await response.text(), /gateway API key/);
+  } finally {
+    restoreEnv("OPENAI_COMPAT_API_KEY", originalGatewayKey);
+  }
+});
+
+function restoreEnv(name: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[name];
+  } else {
+    process.env[name] = value;
+  }
+}

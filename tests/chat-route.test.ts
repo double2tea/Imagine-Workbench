@@ -56,14 +56,115 @@ test("chat completions proxies RunningHub chat requests through LLM host", async
   }
 });
 
+test("v1 chat completions treats Authorization as gateway auth when configured", async () => {
+  const originalGatewayKey = process.env.OPENAI_COMPAT_API_KEY;
+  process.env.OPENAI_COMPAT_API_KEY = "gateway_key";
+  const mock = withFetchMock(async (url, init) => {
+    assert.equal(url, "https://newapi.example.test/v1/chat/completions");
+    assert.equal(readHeader(init?.headers, "Authorization"), "Bearer provider_key");
+    assert.deepEqual(JSON.parse(String(init?.body)), {
+      model: "chat-model",
+      messages: [{ role: "user", content: "hello" }],
+    });
+    return jsonResponse({ choices: [{ message: { content: "ok" } }] });
+  });
+
+  try {
+    const response = await POST(jsonRequest({
+      model: "newapi:chat-model",
+      messages: [{ role: "user", content: "hello" }],
+    }, {
+      Authorization: "Bearer gateway_key",
+      "x-ai-api-key": "provider_key",
+      "x-ai-base-url": "https://newapi.example.test/v1",
+    }, "/v1/chat/completions"));
+
+    assert.equal(response.status, 200);
+    assert.equal(mock.calls.count, 1);
+    assert.deepEqual(await response.json(), { choices: [{ message: { content: "ok" } }] });
+  } finally {
+    restoreEnv("OPENAI_COMPAT_API_KEY", originalGatewayKey);
+    mock.restore();
+  }
+});
+
+test("v1 chat completions rejects missing gateway auth when configured", async () => {
+  const originalGatewayKey = process.env.OPENAI_COMPAT_API_KEY;
+  process.env.OPENAI_COMPAT_API_KEY = "gateway_key";
+  const mock = withFetchMock(async () => {
+    throw new Error("Gateway auth failure must be rejected before fetch");
+  });
+
+  try {
+    const response = await POST(jsonRequest({
+      model: "newapi:chat-model",
+      messages: [{ role: "user", content: "hello" }],
+    }, {
+      "x-ai-api-key": "provider_key",
+      "x-ai-base-url": "https://newapi.example.test/v1",
+    }, "/v1/chat/completions"));
+
+    assert.equal(response.status, 401);
+    assert.match(await response.text(), /gateway API key/);
+    assert.equal(mock.calls.count, 0);
+  } finally {
+    restoreEnv("OPENAI_COMPAT_API_KEY", originalGatewayKey);
+    mock.restore();
+  }
+});
+
+test("v1 chat completions checks gateway auth before parsing JSON", async () => {
+  const originalGatewayKey = process.env.OPENAI_COMPAT_API_KEY;
+  process.env.OPENAI_COMPAT_API_KEY = "gateway_key";
+
+  try {
+    const response = await POST(new Request("http://local.test/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    }));
+
+    assert.equal(response.status, 401);
+    assert.match(await response.text(), /gateway API key/);
+  } finally {
+    restoreEnv("OPENAI_COMPAT_API_KEY", originalGatewayKey);
+  }
+});
+
+test("provider-neutral app chat route does not require v1 gateway auth", async () => {
+  const originalGatewayKey = process.env.OPENAI_COMPAT_API_KEY;
+  process.env.OPENAI_COMPAT_API_KEY = "gateway_key";
+  const mock = withFetchMock(async (url, init) => {
+    assert.equal(url, "https://newapi.example.test/v1/chat/completions");
+    assert.equal(readHeader(init?.headers, "Authorization"), "Bearer provider_key");
+    return jsonResponse({ choices: [{ message: { content: "ok" } }] });
+  });
+
+  try {
+    const response = await POST(jsonRequest({
+      model: "newapi:chat-model",
+      messages: [{ role: "user", content: "hello" }],
+    }, {
+      "x-ai-api-key": "provider_key",
+      "x-ai-base-url": "https://newapi.example.test/v1",
+    }));
+
+    assert.equal(response.status, 200);
+    assert.equal(mock.calls.count, 1);
+  } finally {
+    restoreEnv("OPENAI_COMPAT_API_KEY", originalGatewayKey);
+    mock.restore();
+  }
+});
+
 test("chat completions rejects invalid request bodies", async () => {
   const response = await POST(jsonRequest({ model: "mimo:mimo-v2.5", messages: [] }));
   assert.equal(response.status, 400);
   assert.match(await response.text(), /messages/);
 });
 
-function jsonRequest(body: unknown, headers: Record<string, string> = {}): Request {
-  return new Request("http://local.test/api/chat/completions", {
+function jsonRequest(body: unknown, headers: Record<string, string> = {}, pathname = "/api/chat/completions"): Request {
+  return new Request(`http://local.test${pathname}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...headers },
     body: JSON.stringify(body),
@@ -79,6 +180,14 @@ function jsonResponse(body: unknown): Response {
 
 function readHeader(headers: HeadersInit | undefined, name: string): string | undefined {
   return new Headers(headers).get(name) ?? undefined;
+}
+
+function restoreEnv(name: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[name];
+  } else {
+    process.env[name] = value;
+  }
 }
 
 function withFetchMock(handler: typeof fetch): { calls: { count: number }; restore: () => void } {

@@ -5,6 +5,7 @@ import { parseProviderModel } from "../providers/model-catalog";
 import { isProviderKey } from "../providers/registry";
 import { listProviderModels, type ModelKindFilter } from "../providers/models";
 import { resolveProviderConfig } from "../providers/utils";
+import { assertOpenAiCompatibleGatewayAccess } from "./openai-auth";
 
 interface OpenAiModel {
   id: string;
@@ -17,7 +18,8 @@ export async function GET(req: Request) {
   try {
     const provider = readProvider(req);
     const kind = readKind(req);
-    const config = resolveProviderConfig(req, provider);
+    const gatewayKey = assertOpenAiCompatibleGatewayAccess(req);
+    const config = resolveProviderConfig(req, provider, { ignoredBearerToken: gatewayKey });
     const models = await listProviderModels(config, kind);
     return NextResponse.json({
       object: "list",
