@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { ApiError } from "../lib/api/errors";
 import {
   buildRunningHubStandardBody,
   getRunningHubStandardEndpoint,
@@ -992,8 +993,8 @@ test("runninghub task creation surfaces standard model access errors before task
 
   try {
     await assert.rejects(
-      () =>
-        generateRunningHubMedia(
+      async () => {
+        await generateRunningHubMedia(
           runningHubConfig,
           {
             prompt: "enterprise only",
@@ -1003,8 +1004,51 @@ test("runninghub task creation surfaces standard model access errors before task
             referenceImages: [],
           },
           "image",
-        ),
-      /Access Denied: Standard Model API is restricted to Enterprise-Shared API Keys only.*errorCode 1014/,
+        );
+      },
+      (error: unknown) => {
+        assert.ok(error instanceof ApiError);
+        assert.equal(error.status, 403);
+        assert.equal(error.code, "runninghub_enterprise_key_required");
+        assert.match(error.message, /Access Denied: Standard Model API is restricted to Enterprise-Shared API Keys only.*RunningHub code 1014/);
+        return true;
+      },
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("runninghub provider errors map rate limits to typed API errors", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (): Promise<Response> => Response.json({
+    code: 1003,
+    msg: "请求过于频繁，请稍后再试",
+    data: null,
+  });
+
+  try {
+    await assert.rejects(
+      async () => {
+        await generateRunningHubMedia(
+          runningHubConfig,
+          {
+            prompt: "rate limited",
+            model: "api:/openapi/v2/seedream-v5-lite/text-to-image",
+            aspectRatio: "1:1",
+            imageResolution: "1024x1024",
+            referenceImages: [],
+          },
+          "image",
+        );
+      },
+      (error: unknown) => {
+        assert.ok(error instanceof ApiError);
+        assert.equal(error.status, 429);
+        assert.equal(error.code, "runninghub_rate_limited");
+        assert.match(error.message, /RunningHub code 1003/);
+        return true;
+      },
     );
   } finally {
     globalThis.fetch = originalFetch;

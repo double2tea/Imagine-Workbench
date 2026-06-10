@@ -1684,5 +1684,8 @@ function runningHubVirtualCapability(model: string, kind?: ModelKind): ProviderM
       sizes: RUNNINGHUB_IMAGE_SIZES,
     });
   }
+  if (resolvedKind === "audio") {
+    throw new Error("RunningHub audio is supported through AI App / Workflow targets, not generic audio model capabilities");
+  }
   throw new Error(`RunningHub does not support ${resolvedKind} models`);
 }

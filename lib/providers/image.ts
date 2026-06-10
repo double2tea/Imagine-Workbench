@@ -1,4 +1,5 @@
 import type { AiProvider } from "./model-catalog";
+import { ApiError } from "../api/errors";
 import { isKnownProvider } from "./registry";
 import {
   buildRunningHubStandardBody,
@@ -932,11 +933,116 @@ function assertRunningHubOk(
   const errorCode = response.errorCode?.trim();
   const errorMessage = response.errorMessage?.trim();
   if (errorCode && errorCode !== "0") {
-    throw new Error(errorMessage ? `${errorMessage} (errorCode ${errorCode})` : `${fallback} with errorCode ${errorCode}`);
+    throw runningHubApiError(errorCode, errorMessage, fallback);
   }
-  if (errorMessage) throw new Error(errorMessage);
+  if (errorMessage) throw runningHubApiError(undefined, errorMessage, fallback);
   if (response.code === undefined || response.code === 0 || response.code === 200) return;
-  throw new Error(response.msg ?? response.message ?? `${fallback} with code ${response.code}`);
+  throw runningHubApiError(String(response.code), response.msg ?? response.message, fallback);
+}
+
+function runningHubApiError(providerCode: string | undefined, providerMessage: string | undefined, fallback: string): ApiError {
+  const message = runningHubErrorMessage(providerCode, providerMessage, fallback);
+  return new ApiError(
+    runningHubHttpStatus(providerCode),
+    runningHubErrorCode(providerCode),
+    message,
+    providerCode ? { provider: "runninghub", providerCode } : { provider: "runninghub" },
+  );
+}
+
+function runningHubErrorMessage(providerCode: string | undefined, providerMessage: string | undefined, fallback: string): string {
+  const message = providerMessage?.trim() || fallback;
+  return providerCode ? `${message} (RunningHub code ${providerCode})` : message;
+}
+
+function runningHubHttpStatus(providerCode: string | undefined): number {
+  switch (providerCode) {
+    case "301":
+    case "433":
+    case "803":
+    case "810":
+    case "1007":
+    case "1101":
+    case "1501":
+    case "1505":
+      return 400;
+    case "801":
+    case "802":
+    case "811":
+    case "1002":
+    case "1601":
+      return 401;
+    case "1014":
+      return 403;
+    case "416":
+    case "812":
+      return 402;
+    case "380":
+    case "423":
+    case "807":
+    case "901":
+    case "1004":
+      return 404;
+    case "421":
+    case "1003":
+      return 429;
+    case "415":
+    case "435":
+    case "436":
+    case "813":
+    case "1010":
+    case "1011":
+    case "1504":
+      return 503;
+    default:
+      return 502;
+  }
+}
+
+function runningHubErrorCode(providerCode: string | undefined): string {
+  switch (providerCode) {
+    case "301":
+    case "1007":
+      return "runninghub_invalid_request";
+    case "433":
+    case "803":
+    case "810":
+    case "1101":
+      return "runninghub_workflow_invalid";
+    case "1501":
+    case "1505":
+      return "runninghub_content_rejected";
+    case "801":
+    case "802":
+    case "811":
+    case "1002":
+    case "1601":
+      return "runninghub_auth_failed";
+    case "1014":
+      return "runninghub_enterprise_key_required";
+    case "416":
+    case "812":
+      return "runninghub_insufficient_funds";
+    case "380":
+    case "423":
+    case "807":
+    case "901":
+    case "1004":
+      return "runninghub_not_found";
+    case "421":
+    case "1003":
+      return "runninghub_rate_limited";
+    case "415":
+    case "435":
+    case "436":
+    case "813":
+    case "1010":
+    case "1011":
+    case "1504":
+      return "runninghub_temporarily_unavailable";
+    default:
+      return "runninghub_provider_error";
+  }
 }
 
 async function generate12AiGeminiImage(config: ProviderConfig, input: GenerateImageInput): Promise<GenerateImageResult> {

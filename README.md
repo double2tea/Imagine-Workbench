@@ -156,7 +156,7 @@ Current adapters:
 - Agnes AI: OpenAI-compatible chat, image, video, and model listing
 - ModelScope image: API-Inference `/v1/images/generations` with async polling via `/v1/tasks/{task_id}`
 - RunningHub LLM chat/model list: OpenAI-compatible `/v1/chat/completions` and `/v1/models` via `https://llm.runninghub.cn`
-- RunningHub image/video: configured Standard Model API endpoints (`api:/openapi/v2/...`) are polled through `/openapi/v2/query`; AI App / Workflow virtual models are polled through `/task/openapi/outputs`
+- RunningHub image/video/audio workflows: configured Standard Model API endpoints (`api:/openapi/v2/...`) are polled through `/openapi/v2/query`; AI App / Workflow virtual models, including audio AI Apps, are polled through `/task/openapi/outputs`
 
 ModelScope public REST video generation is not enabled by default because the public official docs verified for this implementation do not expose one stable unified REST video endpoint. Use a deployed OpenAI-compatible service or RunningHub for video.
 
@@ -214,7 +214,7 @@ Users can open the picker with the template button or type `/` in supported prom
 
 ## App Routes
 
-External callers should start with [OpenAI-compatible API](docs/openai-compatible-api.md). The `/v1/*` routes are a documented subset for plugins and scripts; richer Workbench media workflows stay under `/api/media/*`.
+External callers should start with [OpenAI-compatible API](docs/openai-compatible-api.md). The `/v1/*` routes are a documented subset for plugins and scripts; richer Workbench media workflows stay under `/api/media/*`. RunningHub-specific async tasks, AI Apps, workflows, uploads, and audio AI App targets are documented in [RunningHub API](docs/runninghub-api.md).
 
 - `GET /`: main workstation.
 - `GET /board`: standalone canvas operation surface for assets, notes, generation, and Agent interaction.
@@ -223,7 +223,7 @@ External callers should start with [OpenAI-compatible API](docs/openai-compatibl
 - `POST /api/media/generate-image`: image generation and image editing.
 - `POST /api/media/generate-video`: video generation.
 - `POST /api/media/generate-audio`: generic audio operations such as TTS, voice design, voice clone, and ASR.
-- `POST /api/media/generate-audio-workflow`: provider workflow / AI App audio execution for targets with node bindings.
+- `POST /api/media/generate-audio-workflow`: RunningHub workflow / AI App audio execution for targets with node bindings, including `runninghub:ai-app-audio:<webappId>` and `runninghub:workflow-audio:<workflowId>`.
 - `POST /api/media/reference-image`: server-side localization path for supported remote image result URLs before they are reused as references.
 - `POST /api/media/status`: polls async image/video/audio operations.
 - `POST /api/media/image-download`: proxies completed async image downloads.
@@ -242,7 +242,7 @@ External callers should start with [OpenAI-compatible API](docs/openai-compatibl
 - `GET /api/model-vision-support?model=<id>`: OpenRouter vision hint for Agent dock (`supportsVision`, `source`).
 - `GET /api/models?provider=<key>&kind=all|chat|image|video|audio`: loads provider model options dynamically from `/v1/models`.
 
-Provider-specific generation aliases have been removed. Workbench-specific media workflows use `/api/media/*`; OpenAI-compatible external clients should use the supported `/v1/*` subset. RunningHub schema lookup remains provider-specific at `POST /api/runninghub/ai-app-schema` because it is configuration metadata, not media generation.
+Provider-specific generation aliases have been removed. Workbench-specific media workflows use `/api/media/*`; OpenAI-compatible external clients should use the supported `/v1/*` subset. RunningHub schema lookup remains provider-specific at `POST /api/runninghub/ai-app-schema` because it is configuration metadata, not media generation. RunningHub can generate audio through AI App / Workflow targets, but those targets are not generic audio-operation models.
 
 ## Project Layout
 

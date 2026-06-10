@@ -83,7 +83,8 @@ Video reference image API/provider boundaries accept `data:image/*` base64 data 
 
 - ModelScope image generation uses API-Inference (`/v1/images/generations`) and async task polling (`/v1/tasks/{task_id}`). Do not assume every ModelScope endpoint is OpenAI-compatible; SwingDeploy deployments may be OpenAI-compatible, but the public API-Inference image path is provider-specific.
 - ModelScope public REST video generation is not enabled unless a stable official REST endpoint is explicitly identified.
-- RunningHub support treats Standard Model API endpoints and AI App / Workflow IDs as virtual model IDs, such as `runninghub:api:/openapi/v2/...`, `runninghub:ai-app-image:<webappId>`, and `runninghub:workflow-video:<workflowId>`.
+- RunningHub support treats Standard Model API endpoints and AI App / Workflow IDs as virtual model IDs, such as `runninghub:api:/openapi/v2/...`, `runninghub:ai-app-image:<webappId>`, `runninghub:workflow-video:<workflowId>`, and audio workflow targets like `runninghub:ai-app-audio:<webappId>` / `runninghub:workflow-audio:<workflowId>`.
+- RunningHub may produce audio through AI Apps and workflows, but these are workflow execution targets. Keep them on `/api/media/generate-audio-workflow`; do not expose them as generic audio-operation models.
 - Do not add ComfyUI editing, workflow JSON visual editing, or local ComfyUI backend management. RunningHub workflows are provider-side execution targets only.
 
 ## Board Surface

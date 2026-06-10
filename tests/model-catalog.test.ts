@@ -434,7 +434,7 @@ test("modelscope exposes current chat and image presets", () => {
 
 test("runninghub exposes concrete standard model capabilities", () => {
   assert.equal(getProviderMeta("runninghub").supportsChat, true);
-  assert.equal(getProviderMeta("runninghub").supportsAudio, false);
+  assert.equal(getProviderMeta("runninghub").supportsAudio, true);
   assert.equal(CHAT_MODEL_OPTIONS["runninghub"].some(option => option.value === "runninghub:qwen/qwen3.7-max"), true);
   assert.equal(IMAGE_MODEL_OPTIONS["runninghub"][0]?.value, "runninghub:api:/openapi/v2/seedream-v5-lite/text-to-image");
   assert.equal(VIDEO_MODEL_OPTIONS["runninghub"][0]?.value, "runninghub:api:/openapi/v2/minimax/hailuo-02/standard");
@@ -584,7 +584,7 @@ test("runninghub exposes concrete standard model capabilities", () => {
   assert.deepEqual(youchuan.sizes.map(option => option.value), ["auto"]);
   assert.throws(
     () => getModelCapability("runninghub:ai-app-audio:2061323800511344642", "audio"),
-    /RunningHub does not support audio models/,
+    /RunningHub audio is supported through AI App \/ Workflow targets/,
   );
 });
 
