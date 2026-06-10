@@ -66,8 +66,9 @@ const SAVED_TARGETS_STORAGE_KEY = "imagine_runninghub_saved_targets";
 const inputClass = "nodrag nowheel h-8 min-w-0 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)] px-2 text-[10px] text-[var(--iw-text)] outline-none focus:border-emerald-400/60";
 const labelClass = "text-[10px] font-medium text-[var(--iw-faint)]";
 const softPanelClass = "min-h-0 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)]";
-const chipClass = "inline-flex h-6 min-w-0 items-center gap-1 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)] px-2 text-[10px] text-[var(--iw-muted)]";
+const chipClass = "imagine-generate-context-chip inline-flex h-6 min-w-0 items-center gap-1 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)] px-2 text-[10px] text-[var(--iw-muted)]";
 const iconButtonClass = "nodrag flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)] text-[var(--iw-muted)] transition hover:border-emerald-400/50 hover:text-emerald-100";
+const warningChipToneClass = "border-amber-400/20 bg-amber-500/10 text-amber-100";
 
 const sourceOptions: Array<{ value: BoardRunningHubBindingSource; label: string }> = [
   { value: "prompt", label: "Prompt" },
@@ -226,6 +227,13 @@ function statusLabel(status: BoardRunningHubAppNode["status"]): string {
   if (status === "complete") return "已完成";
   if (status === "failed") return "失败";
   return "待运行";
+}
+
+function statusTone(status: BoardRunningHubAppNode["status"]): string {
+  if (status === "processing") return "processing";
+  if (status === "complete") return "ok";
+  if (status === "failed") return "failed";
+  return "neutral";
 }
 
 function resultStatusLabel(hasResultConnection: boolean, resultCount: number): string {
@@ -500,12 +508,12 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
           />
 
           <div className="grid grid-cols-3 gap-1.5">
-            <span className={chipClass}>{statusLabel(node.status)}</span>
-            <span className={`${chipClass} ${isReady ? "text-emerald-200" : "text-amber-200"}`}>
+            <span className={chipClass} data-tone={statusTone(node.status)}>{statusLabel(node.status)}</span>
+            <span className={`${chipClass} ${isReady ? "" : warningChipToneClass}`} data-tone={isReady ? "ok" : "warning"}>
               {isReady ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
               {!hasTarget ? "缺少目标" : isReady ? "可运行" : `${readiness.missingCount} 缺少`}
             </span>
-            <span className={`${chipClass} ${resultItems.length > 0 ? "text-emerald-200" : ""}`}>
+            <span className={chipClass} data-tone={resultItems.length > 0 ? hasResultConnection ? "result" : "ok" : "neutral"}>
               {resultStatusLabel(hasResultConnection, resultItems.length)}
             </span>
           </div>
@@ -569,7 +577,7 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
                             className="nodrag nowheel h-7 min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1 text-[11px] font-semibold text-[var(--iw-text)] outline-none focus:border-emerald-400/40"
                             placeholder={bindingTitle(binding)}
                           />
-                          {binding.required && <span className="shrink-0 rounded border border-amber-400/25 px-1 text-[9px] text-amber-200">必填</span>}
+                          {binding.required && <span className="imagine-required-chip shrink-0 rounded border border-amber-400/25 bg-amber-500/10 px-1 text-[9px] text-amber-100">必填</span>}
                         </div>
                       </div>
                       <select

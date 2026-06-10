@@ -3242,6 +3242,15 @@ html[data-imagine-theme="light"] .imagine-generate-context-chip[data-tone="faile
   color: #b42318 !important;
 }
 
+html[data-imagine-theme="light"] .imagine-generate-context-chip[data-tone="warning"],
+.imagine-workbench-shell.imagine-theme-light .imagine-generate-context-chip[data-tone="warning"],
+html[data-imagine-theme="light"] .imagine-required-chip,
+.imagine-workbench-shell.imagine-theme-light .imagine-required-chip {
+  background: #fffaeb !important;
+  border-color: rgba(181, 71, 8, 0.24) !important;
+  color: #b54708 !important;
+}
+
 .imagine-workbench-shell.imagine-theme-light .imagine-board-controls,
 .imagine-workbench-shell.imagine-theme-light .imagine-board-minimap {
   background: rgba(255, 255, 255, 0.95) !important;
