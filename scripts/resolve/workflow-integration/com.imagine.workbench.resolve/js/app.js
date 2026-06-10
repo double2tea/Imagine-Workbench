@@ -128,7 +128,8 @@
     running: false,
     activeOperation: "",
     resolve: null,
-    sharedCredentials: {}
+    sharedCredentials: {},
+    lastOutputs: []
   };
 
   var outputDir = hasNode ? path.join(os.homedir(), "Movies", "Imagine Resolve Bridge") : "";
@@ -159,6 +160,7 @@
   var appendInput = document.getElementById("appendInput");
   var statusOutput = document.getElementById("statusOutput");
   var runButton = document.getElementById("runButton");
+  var previewOutputButton = document.getElementById("previewOutputButton");
 
   function setStatus(message) {
     statusOutput.textContent = message;
@@ -318,12 +320,14 @@
     var job = buildJob(operationOverride);
     state.running = true;
     state.activeOperation = job.operation;
+    setLastOutputs([]);
     runButton.disabled = true;
     setStatus("运行中\n" + describeJob(job));
     try {
       await loadSharedCredentialsForJob(job);
       var result = await executeJob(job);
       saveJob(job);
+      setLastOutputs(result);
       setStatus("已完成\n" + describeJob(job) + "\n\n" + result.join("\n"));
     } catch (error) {
       setStatus("运行失败\n" + explainError(error, job));
@@ -332,6 +336,11 @@
       state.activeOperation = "";
       runButton.disabled = false;
     }
+  }
+
+  function setLastOutputs(paths) {
+    state.lastOutputs = paths || [];
+    previewOutputButton.disabled = state.lastOutputs.length === 0;
   }
 
   async function executeJob(job) {
@@ -462,7 +471,8 @@
     if (!result.operationName) {
       throw new Error("视频生成响应缺少 operationName");
     }
-    await waitForOperation(job.baseUrl, result.operationName, model, Number(job.pollSeconds || 600));
+    await waitForOperation(job, result.operationName, model, Number(job.pollSeconds || 600));
+    setStatus("生成完成，正在下载视频\n" + describeJob(job));
     var video = await postJsonBytes(job.baseUrl, "/api/media/video-download", {
       operationName: result.operationName,
       model: model
@@ -498,14 +508,15 @@
     return [txtPath, srtPath];
   }
 
-  async function waitForOperation(baseUrl, operationName, model, pollSeconds) {
+  async function waitForOperation(job, operationName, model, pollSeconds) {
     var deadline = Date.now() + pollSeconds * 1000;
     while (Date.now() < deadline) {
-      var status = await postJson(baseUrl, "/api/media/status", {
+      var status = await postJson(job.baseUrl, "/api/media/status", {
         operationName: operationName,
         model: model
       });
-      if (status.done === true) {
+      setStatus("生成中\n" + describeJob(job) + "\n\n" + formatOperationStatus(status));
+      if (status.done === true || isCompleteOperationStatus(status.status)) {
         if (status.errorMessage) {
           throw new Error(String(status.errorMessage));
         }
@@ -514,6 +525,23 @@
       await delay(2000);
     }
     throw new Error("等待生成超时：" + operationName);
+  }
+
+  function formatOperationStatus(status) {
+    var progress = Number(status.progress);
+    var lines = ["状态：" + (status.status || "processing")];
+    if (Number.isFinite(progress)) {
+      lines.push("进度：" + Math.max(0, Math.min(100, Math.round(progress))) + "%");
+    }
+    if (status.url) {
+      lines.push("后端结果已就绪");
+    }
+    return lines.join("\n");
+  }
+
+  function isCompleteOperationStatus(status) {
+    var value = String(status || "").toLowerCase();
+    return ["complete", "completed", "succeeded", "success"].indexOf(value) !== -1;
   }
 
   async function resolveMediaInput(value, outputName, purpose) {
@@ -684,6 +712,7 @@
     if (job.importToResolve !== true) {
       return;
     }
+    setStatus("结果已保存，正在导入达芬奇\n" + describeJob(job) + "\n\n" + paths.join("\n"));
     var resolve = await getResolve();
     var project = await currentProject(resolve);
     var mediaPool = await project.GetMediaPool();
@@ -1078,8 +1107,15 @@
     }
   });
 
+  previewOutputButton.addEventListener("click", function () {
+    if (shell && state.lastOutputs.length > 0) {
+      shell.openPath(state.lastOutputs[0]);
+    }
+  });
+
   restoreSettings();
   setupTabs();
+  setLastOutputs([]);
   selectOperation(state.operation);
   if (!hasNode) {
     setStatus("浏览器预览模式：界面可查看，运行需从 Resolve Workflow Integrations 打开。");
