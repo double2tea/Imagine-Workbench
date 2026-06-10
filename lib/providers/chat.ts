@@ -33,13 +33,13 @@ export async function createChatCompletionText(
   temperature: number,
   options: ChatCompletionOptions = {},
 ): Promise<string> {
-  const response = await postJson<ChatCompletionResponse>(chatCompletionsUrl(config), config, {
+  const response = await postJson<ChatCompletionResponse>(providerChatCompletionsUrl(config), config, {
     model,
     messages,
     temperature,
     stream: false,
     ...(options.responseFormat ? { response_format: options.responseFormat } : {}),
-    ...runningHubChatDefaults(config),
+    ...providerChatRequestDefaults(config),
   });
 
   const content = response.choices?.[0]?.message?.content;
@@ -65,7 +65,7 @@ export async function createChatCompletionWithTools(
   temperature: number,
   options: ChatCompletionOptions = {},
 ): Promise<ChatCompletionWithToolsResponse> {
-  return postJson<ChatCompletionWithToolsResponse>(chatCompletionsUrl(config), config, {
+  return postJson<ChatCompletionWithToolsResponse>(providerChatCompletionsUrl(config), config, {
     model,
     messages,
     tools,
@@ -73,16 +73,16 @@ export async function createChatCompletionWithTools(
     temperature,
     stream: false,
     ...(options.responseFormat ? { response_format: options.responseFormat } : {}),
-    ...runningHubChatDefaults(config),
+    ...providerChatRequestDefaults(config),
   });
 }
 
-function chatCompletionsUrl(config: ProviderConfig): string {
+export function providerChatCompletionsUrl(config: ProviderConfig): string {
   const baseUrl = config.provider === "runninghub" ? runningHubLlmBaseUrl(config.baseUrl) : config.baseUrl;
   return openAiCompatibleUrl(baseUrl, "/v1/chat/completions");
 }
 
-function runningHubChatDefaults(config: ProviderConfig): Record<string, unknown> {
+export function providerChatRequestDefaults(config: ProviderConfig): Record<string, unknown> {
   return config.provider === "runninghub" ? { reasoning_effort: "none" } : {};
 }
 

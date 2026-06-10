@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { getExecutableAction, getPendingAgentAction, type ChatMessage } from "@/components/agent/AgentDock";
+import { API_ROUTES } from "@/lib/api/routes";
 import type { AgentGenerationParams, AgentToolAction } from "@/lib/agent-actions";
 import {
   isCustomImageResolutionValue,
@@ -429,7 +430,7 @@ export function useAgentController({
           content: message.content,
         }));
 
-      const response = await fetch("/api/gemini/agent", {
+      const response = await fetch(API_ROUTES.agent.respond, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
         body: JSON.stringify({

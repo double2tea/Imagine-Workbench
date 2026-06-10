@@ -77,7 +77,7 @@ Never hardcode provider strings (`"12ai"`, `"grok2api"`, `"xstx"`) in enumeratio
 
 Keep API routes thin: parse body, resolve provider config, call provider adapter, return response.
 
-Video reference image API/provider boundaries accept `data:image/*` base64 data URIs only. Generated remote image results must be downloaded by the image route before client storage, and board references should resolve the latest asset-store URL by asset ID before submission. Legacy remote provider image URLs may only be localized through the narrow `/api/gemini/reference-image` route.
+Video reference image API/provider boundaries accept `data:image/*` base64 data URIs only. Generated remote image results must be downloaded by the image route before client storage, and board references should resolve the latest asset-store URL by asset ID before submission. Remote provider image URLs may only be localized through the narrow `/api/media/reference-image` route.
 
 ### ModelScope and RunningHub
 

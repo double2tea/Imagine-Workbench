@@ -23,13 +23,14 @@ export function optionalText(value: unknown): string | undefined {
 
 export function resolveProviderConfig(req: Request, provider: AiProvider): ProviderConfig {
   const headerKey = trimCredential(req.headers.get("x-ai-api-key") ?? "");
+  const bearerKey = trimCredential(readBearerToken(req.headers.get("authorization")) ?? "");
   const headerBaseUrl = trimCredential(req.headers.get("x-ai-base-url") ?? "");
   const providerLabel = optionalText(req.headers.get("x-ai-provider-label"));
   const envKey = trimCredential(resolveProviderApiKey(provider));
   const configuredBaseUrl = headerBaseUrl || trimCredential(resolveProviderBaseUrl(provider));
   const videoBaseUrl = resolveProviderVideoBaseUrl(provider) || configuredBaseUrl;
 
-  const apiKey = headerKey || envKey;
+  const apiKey = headerKey || bearerKey || envKey;
   if (!isKnownProvider(provider) && !apiKey) {
     throw new Error(`${providerLabel ?? provider} API key is required.`);
   }
@@ -167,6 +168,13 @@ function trimTrailingSlash(value: string): string {
 
 function trimCredential(value: string): string {
   return value.trim();
+}
+
+function readBearerToken(value: string | null): string | undefined {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  if (!trimmed.toLowerCase().startsWith("bearer ")) return undefined;
+  return trimmed.slice(7).trim() || undefined;
 }
 
 function isMimoTokenPlanKey(apiKey: string): boolean {

@@ -78,6 +78,7 @@ import {
 import { getProviderMeta, type CustomProviderDefinition } from "@/lib/providers/registry";
 import { saveClonedVoiceProfileFromAsset } from "@/lib/voice-profiles";
 import { getMediaReferenceType, mediaReferenceLabel, mediaReferenceTypeFromMime } from "@/lib/media-references";
+import { API_ROUTES } from "@/lib/api/routes";
 import {
   REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES,
   compressReferenceImageDataUrl,
@@ -665,7 +666,7 @@ export default function Home() {
         locallyCanceledItemIdsRef.current.add(task.id);
       }
       if (task.canCancelRemote && task.operationName) {
-        const res = await fetch("/api/gemini/cancel-media", {
+        const res = await fetch(API_ROUTES.media.cancel, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...buildProviderHeaders(task.operationName) },
           body: JSON.stringify({ operationName: task.operationName }),
@@ -994,7 +995,7 @@ export default function Home() {
 
   }, [pushWorkspaceNotice]);
 
-  // Optimize prompt inside text area utilizing Gemini client model
+  // Optimize prompt inside text area using the selected chat model.
   const optimizeActivePrompt = async (promptOverride?: string) => {
     const promptToOptimize = promptOverride ?? prompt;
     if (!promptToOptimize.trim()) return;
@@ -1002,7 +1003,7 @@ export default function Home() {
     try {
       const headers = buildProviderHeaders(selectedChatModel);
 
-      const res = await fetch("/api/gemini/optimize", {
+      const res = await fetch(API_ROUTES.prompts.optimize, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
         body: JSON.stringify({ prompt: promptToOptimize, model: selectedChatModel }),

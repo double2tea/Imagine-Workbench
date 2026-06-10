@@ -262,6 +262,72 @@ test("mimo ASR sends input audio and reads transcript text", async () => {
   }
 });
 
+test("mimo ASR rejects audio formats outside the documented wav and mp3 set", async () => {
+  const originalFetch = globalThis.fetch;
+  let fetchCount = 0;
+  globalThis.fetch = async (): Promise<Response> => {
+    fetchCount += 1;
+    throw new Error("Unsupported ASR audio must be rejected before fetch");
+  };
+
+  try {
+    await assert.rejects(
+      () => generateMimoAsr(mimoConfig, {
+        audio: "data:audio/ogg;base64,audio_payload",
+        language: "zh",
+      }),
+      /wav or mp3/,
+    );
+    assert.equal(fetchCount, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("mimo ASR rejects malformed audio data URIs before fetch", async () => {
+  const originalFetch = globalThis.fetch;
+  let fetchCount = 0;
+  globalThis.fetch = async (): Promise<Response> => {
+    fetchCount += 1;
+    throw new Error("Malformed ASR audio must be rejected before fetch");
+  };
+
+  try {
+    await assert.rejects(
+      () => generateMimoAsr(mimoConfig, {
+        audio: "data:audio/wav;base64",
+        language: "zh",
+      }),
+      /base64 data URI/,
+    );
+    assert.equal(fetchCount, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("mimo ASR rejects base64 audio payloads above the documented 10MB limit", async () => {
+  const originalFetch = globalThis.fetch;
+  let fetchCount = 0;
+  globalThis.fetch = async (): Promise<Response> => {
+    fetchCount += 1;
+    throw new Error("Oversized ASR audio must be rejected before fetch");
+  };
+
+  try {
+    await assert.rejects(
+      () => generateMimoAsr(mimoConfig, {
+        audio: `data:audio/wav;base64,${"a".repeat(10 * 1024 * 1024 + 1)}`,
+        language: "zh",
+      }),
+      /exceeds 10MB/,
+    );
+    assert.equal(fetchCount, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("mimo audio operation routes voice design to direct adapter", async () => {
   const originalFetch = globalThis.fetch;
   const bodies: unknown[] = [];

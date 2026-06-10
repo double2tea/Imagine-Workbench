@@ -95,22 +95,36 @@ async function stopChild(child) {
   });
 }
 
+async function assertRemovedPostRoute(baseUrl, path) {
+  const res = await fetch(`${baseUrl}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{}",
+  });
+  assert.equal(res.status, 404, `${path} should be removed`);
+}
+
 const mock = startMimoMock();
 const mockPort = await listen(mock.server);
 const nextPort = await getAvailablePort();
 const next = startNext(nextPort);
 const baseUrl = `http://127.0.0.1:${nextPort}`;
+const generateAudioUrl = `${baseUrl}/api/media/generate-audio`;
 
 try {
   await waitForOk(`${baseUrl}/`, next.getOutput);
   const boardRes = await fetch(`${baseUrl}/board`);
   assert.equal(boardRes.ok, true, "Board surface should respond");
+  await assertRemovedPostRoute(baseUrl, "/api/audio/generate");
+  await assertRemovedPostRoute(baseUrl, "/api/gemini/generate-audio");
+  await assertRemovedPostRoute(baseUrl, "/api/mimo/generate-tts");
+  await assertRemovedPostRoute(baseUrl, "/api/runninghub/generate-audio");
 
-  const cloneWithoutConsentRes = await fetch(`${baseUrl}/api/audio/generate`, {
+  const cloneWithoutConsentRes = await fetch(generateAudioUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "runninghub:ai-app-audio:test-app",
+      model: "mimo:mimo-v2.5-tts-voiceclone",
       mode: "voice_clone",
       prompt: "Clone this voice without consent.",
       referenceMedia: [],
@@ -119,7 +133,21 @@ try {
   assert.equal(cloneWithoutConsentRes.status, 400);
   assert.match(await cloneWithoutConsentRes.text(), /音色克隆需要先确认参考音频授权/);
 
-  const unresolvedVoiceProfileRes = await fetch(`${baseUrl}/api/audio/generate`, {
+  const cloneWithoutReferenceRes = await fetch(generateAudioUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-ai-api-key": "mimo_e2e_key" },
+    body: JSON.stringify({
+      model: "mimo:mimo-v2.5-tts-voiceclone",
+      mode: "voice_clone",
+      prompt: "Clone this voice with consent but no audio reference.",
+      voiceCloneConsentAccepted: true,
+      referenceMedia: [],
+    }),
+  });
+  assert.equal(cloneWithoutReferenceRes.status, 400);
+  assert.match(await cloneWithoutReferenceRes.text(), /requires exactly one audio reference/);
+
+  const unresolvedVoiceProfileRes = await fetch(generateAudioUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -132,7 +160,18 @@ try {
   assert.equal(unresolvedVoiceProfileRes.status, 400);
   assert.match(await unresolvedVoiceProfileRes.text(), /Voice profile IDs must be resolved/);
 
-  const audioRes = await fetch(`${baseUrl}/api/audio/generate`, {
+  const invalidWorkflowAudioRes = await fetch(`${baseUrl}/api/media/generate-audio-workflow`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "runninghub:api:/openapi/v2/example/audio-model",
+      prompt: "This is not a workflow audio target.",
+    }),
+  });
+  assert.equal(invalidWorkflowAudioRes.status, 400);
+  assert.match(await invalidWorkflowAudioRes.text(), /requires runninghub:ai-app-audio/);
+
+  const audioRes = await fetch(generateAudioUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

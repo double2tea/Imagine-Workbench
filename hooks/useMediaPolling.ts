@@ -1,4 +1,5 @@
 import { useEffect, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
+import { API_ROUTES } from "@/lib/api/routes";
 import { saveItemWithPreview } from "@/lib/assets/previews";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 import { buildStorageItem, deleteFromDB, type GenerationRequestSnapshot, type StorageItem } from "@/lib/db";
@@ -185,7 +186,7 @@ export function useMediaPolling({
           try {
             const headers = buildProviderHeaders(task.operationName);
 
-            const res = await fetch("/api/gemini/video-status", {
+            const res = await fetch(API_ROUTES.media.status, {
               method: "POST",
               headers: { "Content-Type": "application/json", ...headers },
               body: JSON.stringify({ operationName: task.operationName, model: task.model }),
@@ -227,10 +228,10 @@ export function useMediaPolling({
                   : "video";
               const downloadEndpoint =
                 mediaType === "image"
-                  ? "/api/gemini/image-download"
+                  ? API_ROUTES.media.imageDownload
                   : mediaType === "audio"
-                    ? "/api/gemini/audio-download"
-                    : "/api/gemini/video-download";
+                    ? API_ROUTES.media.audioDownload
+                    : API_ROUTES.media.videoDownload;
 
               const dlRes = await fetch(downloadEndpoint, {
                 method: "POST",

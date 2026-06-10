@@ -2,6 +2,7 @@ import type { Dispatch, MouseEvent, MutableRefObject, SetStateAction } from "rea
 import JSZip from "jszip";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
 import type { CompareViewType } from "@/components/assets/ComparePanel";
+import { API_ROUTES } from "@/lib/api/routes";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 import { readImageGenerationPayload } from "@/lib/client-image-response";
 import {
@@ -263,7 +264,7 @@ export function useAssetActions({
       }
 
       if (canCancelRemote) {
-        const res = await fetch("/api/gemini/cancel-media", {
+        const res = await fetch(API_ROUTES.media.cancel, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...buildProviderHeaders(operationName) },
           body: JSON.stringify({ operationName }),
@@ -364,7 +365,7 @@ export function useAssetActions({
       if (retryPayloadError) throw new Error(retryPayloadError);
 
       const headers = buildProviderHeaders(retryRequestBody.model);
-      const endpoint = item.type === "image" ? "/api/gemini/generate-image" : "/api/gemini/generate-video";
+      const endpoint = item.type === "image" ? API_ROUTES.media.generateImage : API_ROUTES.media.generateVideo;
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },

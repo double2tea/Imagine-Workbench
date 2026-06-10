@@ -132,7 +132,7 @@ New providers are added through a centralized registry — no scattered if-else 
 }
 ```
 
-Then add model capabilities to `MODEL_CAPABILITIES` in `lib/providers/model-catalog.ts`. If the provider needs custom generation logic (non-OpenAI-compatible endpoints), add adapter branches in `lib/providers/image.ts` or `lib/providers/video.ts`. OpenAI-compatible chat, image, and model-listing endpoints work with zero additional adapter code.
+Then add model capabilities to `MODEL_CAPABILITIES` in `lib/providers/model-catalog.ts`. If the provider needs custom generation logic (non-OpenAI-compatible endpoints), add adapter branches in `lib/providers/image.ts`, `lib/providers/video.ts`, or `lib/providers/audio.ts`. OpenAI-compatible chat, model-listing, and immediate single-image endpoints work with zero additional adapter code.
 
 The `AiProvider` type, `PROVIDER_KEYS`, settings UI cards, localStorage persistence, env var resolution, and model dropdown groups are all derived automatically from the registry.
 
@@ -140,9 +140,12 @@ Current adapters:
 
 - Chat: `/v1/chat/completions` (OpenAI-compatible)
 - Model list: `/v1/models` (OpenAI-compatible)
+- External image generation: `/v1/images/generations` for immediate single-image providers only
+- External image editing: `/v1/images/edits` for multipart single-image edits mapped to Workbench edit operations
+- External audio speech/transcription: `/v1/audio/speech` and `/v1/audio/transcriptions` for direct MiMo-compatible TTS/ASR
 - 12AI Gemini image: `/v1beta/models/{model}:generateContent`
 - 12AI GPT Image 2: `/v1/images/generations`, `/v1/images/edits`
-- 12AI async image: `/v1/images/async/generations`
+- 12AI async image: `/v1/task/submit`, polled through `/v1/task/{task_id}`
 - 12AI Veo: `/v1/videos`
 - grok2api image/video/chat: OpenAI-compatible endpoints plus `/v1/videos`
 - 星途 (xstx): OpenAI-compatible chat, image, and model listing
@@ -211,16 +214,29 @@ Users can open the picker with the template button or type `/` in supported prom
 - `GET /board`: standalone canvas operation surface for assets, notes, generation, and Agent interaction.
 - `GET /board/[boardId]`: opens a specific persisted board document.
 - `POST /api/board/import-image`: imports a `data:image/*` base64 data URI into the local asset store for board workflows.
-- `POST /api/gemini/generate-image`: image generation and image editing.
-- `POST /api/gemini/generate-video`: video generation.
-- `POST /api/gemini/reference-image`: server-side localization path for supported legacy remote image result URLs before they are reused as references.
-- `POST /api/gemini/video-status`: polls async image/video operations.
-- `POST /api/gemini/image-download`: proxies completed async image downloads.
-- `POST /api/gemini/video-download`: proxies completed video downloads.
-- `POST /api/gemini/optimize`: expands a visual prompt through the selected chat model.
-- `POST /api/gemini/agent`: Agent Mode response and recommended action.
+- `POST /api/media/generate-image`: image generation and image editing.
+- `POST /api/media/generate-video`: video generation.
+- `POST /api/media/generate-audio`: generic audio operations such as TTS, voice design, voice clone, and ASR.
+- `POST /api/media/generate-audio-workflow`: provider workflow / AI App audio execution for targets with node bindings.
+- `POST /api/media/reference-image`: server-side localization path for supported remote image result URLs before they are reused as references.
+- `POST /api/media/status`: polls async image/video/audio operations.
+- `POST /api/media/image-download`: proxies completed async image downloads.
+- `POST /api/media/video-download`: proxies completed video downloads.
+- `POST /api/media/audio-download`: proxies completed async audio downloads.
+- `POST /api/media/cancel`: cancels supported remote media operations.
+- `POST /api/chat/completions`: provider-neutral OpenAI-compatible chat completions proxy. Use provider-prefixed model IDs such as `mimo:mimo-v2.5` or `runninghub:qwen/qwen3.7-max`.
+- `POST /api/prompts/optimize`: expands a visual prompt through the selected chat model.
+- `POST /api/agent/respond`: Agent Mode response and recommended action.
+- `POST /v1/chat/completions`: OpenAI-compatible chat completions gateway for plugin/external callers.
+- `POST /v1/images/generations`: OpenAI-compatible immediate single-image generation. Supports `n=1`; async/workflow image models should use `/api/media/generate-image`.
+- `POST /v1/images/edits`: OpenAI-compatible multipart image editing. Defaults to Workbench redraw semantics and accepts explicit `operation=redraw|erase|outpaint|cutout`.
+- `POST /v1/audio/speech`: OpenAI-compatible text-to-speech for direct MiMo-compatible TTS models.
+- `POST /v1/audio/transcriptions`: OpenAI-compatible multipart ASR for direct MiMo-compatible ASR models. Supports `language=auto|zh|en` and JSON output.
+- `GET /v1/models?provider=<key>&kind=chat|all`: OpenAI-compatible model list response with provider-prefixed model IDs.
 - `GET /api/model-vision-support?model=<id>`: OpenRouter vision hint for Agent dock (`supportsVision`, `source`).
-- `GET /api/models?provider=<key>&kind=all|chat|image|video`: loads provider model options dynamically from `/v1/models`.
+- `GET /api/models?provider=<key>&kind=all|chat|image|video|audio`: loads provider model options dynamically from `/v1/models`.
+
+Provider-specific generation aliases have been removed. Workbench-specific media workflows use `/api/media/*`; OpenAI-compatible external clients should use the supported `/v1/*` subset. RunningHub schema lookup remains provider-specific at `POST /api/runninghub/ai-app-schema` because it is configuration metadata, not media generation.
 
 ## Project Layout
 
@@ -230,8 +246,16 @@ app/
   board/page.tsx                   Standalone board operation shell
   board/[boardId]/page.tsx         Specific board route
   api/board/import-image/route.ts   Board image import API
-  api/gemini/*                     Generation, agent, status, download APIs
+  api/media/*                      Provider-neutral media generation, status, download APIs
+  api/chat/completions/route.ts    Provider-neutral chat completions proxy
+  api/prompts/optimize/route.ts    Prompt optimization API
+  api/agent/respond/route.ts       Agent response API
+  api/runninghub/ai-app-schema     RunningHub AI App schema lookup
   api/models/route.ts              Provider model listing
+  v1/chat/completions/route.ts     OpenAI-compatible chat gateway
+  v1/images/*                      OpenAI-compatible immediate image gateway
+  v1/audio/*                       OpenAI-compatible direct audio gateway
+  v1/models/route.ts               OpenAI-compatible model listing
 components/
   agent/                           Agent dock, AgentIdentityMark wrapper, chat messages
   assets/                          Gallery cards, compare panel, toolbar, fullscreen preview

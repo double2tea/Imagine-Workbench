@@ -61,6 +61,14 @@ test("resolveProviderConfig routes MiMo keys by prefix", () => {
   assert.equal(tokenPlanSgpConfig.baseUrl, "https://token-plan-sgp.xiaomimimo.com/v1");
 });
 
+test("resolveProviderConfig accepts OpenAI-compatible bearer auth", () => {
+  const config = resolveProviderConfig(
+    new Request("https://local.test", { headers: { Authorization: " Bearer bearer_key " } }),
+    "mimo",
+  );
+  assert.equal(config.apiKey, "bearer_key");
+});
+
 test("openAiCompatibleUrl supports root and v1 base URLs", () => {
   assert.equal(
     openAiCompatibleUrl("https://api.xiaomimimo.com", "/v1/chat/completions"),

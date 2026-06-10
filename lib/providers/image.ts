@@ -38,7 +38,8 @@ interface AsyncImageStatusResponse {
   status?: string;
   progress?: number;
   data?: Array<{ url?: string }>;
-  error?: { message?: string };
+  outputs?: string[];
+  error?: { message?: string } | string;
 }
 
 interface ModelScopeImageCreateResponse {
@@ -179,7 +180,7 @@ interface RunningHubTaskReferenceUpload {
 }
 
 const RUNNINGHUB_TASK_OUTPUT_PREFIX = "task-output:";
-const ASYNC_IMAGE_SUCCESS_STATUSES = new Set(["complete", "completed", "partial_complete", "succeeded", "success"]);
+const ASYNC_IMAGE_SUCCESS_STATUSES = new Set(["complete", "completed", "partial_complete", "partial_completed", "succeeded", "success"]);
 const ASYNC_IMAGE_FAILED_STATUSES = new Set(["failed", "failure", "canceled", "cancelled", "expired"]);
 const MODELSCOPE_IMAGE_SUCCESS_STATUSES = new Set(["succeed", "success", "succeeded", "completed"]);
 const MODELSCOPE_IMAGE_FAILED_STATUSES = new Set(["failed", "fail", "error", "canceled", "cancelled", "timeout", "revoked"]);
@@ -372,14 +373,12 @@ export async function getAsyncImageStatus(config: ProviderConfig, taskId: string
     return getRunningHubMediaStatus(config, "image", taskId);
   }
 
-  const response = await getJson<AsyncImageStatusResponse>(
-    `${config.baseUrl}/v1/images/async/generations/${encodeURIComponent(taskId)}`,
-    config,
-  );
+  const taskPath: `/v1/task/${string}` = `/v1/task/${encodeURIComponent(taskId)}`;
+  const response = await getJson<AsyncImageStatusResponse>(openAiCompatibleUrl(config.baseUrl, taskPath), config);
   const status = response.status?.toLowerCase() ?? "pending";
 
   if (ASYNC_IMAGE_SUCCESS_STATUSES.has(status)) {
-    const url = response.data?.find(item => typeof item.url === "string")?.url;
+    const url = read12AiAsyncImageUrl(response);
     if (!url) throw new Error("Async image task completed without an image URL");
     return {
       done: true,
@@ -396,7 +395,7 @@ export async function getAsyncImageStatus(config: ProviderConfig, taskId: string
       mediaType: "image",
       progress: 100,
       status: "failed",
-      errorMessage: response.error?.message ?? "Async image task failed",
+      errorMessage: read12AiAsyncImageError(response) ?? "Async image task failed",
     };
   }
 
@@ -406,6 +405,19 @@ export async function getAsyncImageStatus(config: ProviderConfig, taskId: string
     progress: response.progress ?? 50,
     status,
   };
+}
+
+function read12AiAsyncImageUrl(response: AsyncImageStatusResponse): string | undefined {
+  return response.outputs?.find(output => typeof output === "string" && output.length > 0) ??
+    response.data?.find(item => typeof item.url === "string" && item.url.length > 0)?.url;
+}
+
+function read12AiAsyncImageError(response: AsyncImageStatusResponse): string | undefined {
+  if (typeof response.error === "string" && response.error.trim().length > 0) return response.error;
+  if (isRecord(response.error) && typeof response.error.message === "string" && response.error.message.trim().length > 0) {
+    return response.error.message;
+  }
+  return undefined;
 }
 
 async function generateModelScopeImage(config: ProviderConfig, input: GenerateImageInput): Promise<GenerateImageResult> {
@@ -987,29 +999,45 @@ async function generate12AiGeminiImage(config: ProviderConfig, input: GenerateIm
 }
 
 async function generate12AiAsyncImage(config: ProviderConfig, input: GenerateImageInput): Promise<GenerateImageResult> {
-  const body: Record<string, unknown> =
-    input.model === "gpt-image-2"
-      ? {
-          model: input.model,
-          prompt: input.prompt,
-          n: 1,
-          size: input.imageResolution,
-          quality: input.imageQuality,
-        }
-      : {
-          model: input.model,
-          prompt: input.prompt,
-          n: 1,
-          size: input.aspectRatio,
-          quality: input.imageResolution,
-          images: input.referenceImages.map(reference => reference.dataUri),
-        };
-  const response = await postJson<AsyncImageCreateResponse>(`${config.baseUrl}/v1/images/async/generations`, config, body);
+  const response = await postJson<AsyncImageCreateResponse>(
+    openAiCompatibleUrl(config.baseUrl, "/v1/task/submit"),
+    config,
+    build12AiAsyncImageTaskBody(input),
+  );
 
   if (!response.id) throw new Error("Async image response did not include a task id");
   return {
     operationName: mediaOperationName("12ai", "image", response.id),
     source: input.model,
+  };
+}
+
+function build12AiAsyncImageTaskBody(input: GenerateImageInput): Record<string, unknown> {
+  return {
+    model: input.model,
+    input: input.model === "gpt-image-2" ? build12AiGptAsyncImageInput(input) : build12AiGeminiAsyncImageInput(input),
+  };
+}
+
+function build12AiGptAsyncImageInput(input: GenerateImageInput): Record<string, unknown> {
+  const images = input.referenceImages.map(reference => reference.dataUri);
+  return {
+    prompt: input.prompt,
+    n: 1,
+    ...(images.length > 0 ? { images } : {}),
+    ...(input.imageResolution ? { size: input.imageResolution } : {}),
+    ...(input.imageQuality ? { quality: input.imageQuality } : {}),
+  };
+}
+
+function build12AiGeminiAsyncImageInput(input: GenerateImageInput): Record<string, unknown> {
+  const images = input.referenceImages.map(reference => reference.dataUri);
+  return {
+    prompt: input.prompt,
+    n: 1,
+    ...(images.length > 0 ? { images } : {}),
+    ...(input.aspectRatio && input.aspectRatio !== "auto" ? { aspect_ratio: input.aspectRatio } : {}),
+    ...(input.imageResolution ? { image_size: input.imageResolution } : {}),
   };
 }
 

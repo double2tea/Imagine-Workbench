@@ -1,5 +1,7 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
+import { isRunningHubWorkflowAudioTarget } from "@/lib/audio-generation-routing";
+import { API_ROUTES } from "@/lib/api/routes";
 import { saveItemWithPreview } from "@/lib/assets/previews";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 import { readImageGenerationPayload } from "@/lib/client-image-response";
@@ -105,13 +107,10 @@ function getStringField(value: unknown, field: string): string | null {
   return typeof fieldValue === "string" && fieldValue.trim() ? fieldValue : null;
 }
 
-function isRunningHubAudioRequest(model: string, runningHubNodeInfoList?: RunningHubTaskNodeBinding[]): boolean {
-  const parsed = parseProviderModel(model, "12ai");
-  return parsed.provider === "runninghub" || (runningHubNodeInfoList?.length ?? 0) > 0;
-}
-
 function audioGenerationEndpoint(model: string, runningHubNodeInfoList?: RunningHubTaskNodeBinding[]): string {
-  return isRunningHubAudioRequest(model, runningHubNodeInfoList) ? "/api/runninghub/generate-audio" : "/api/audio/generate";
+  return isRunningHubWorkflowAudioTarget(model, runningHubNodeInfoList)
+    ? API_ROUTES.media.generateAudioWorkflow
+    : API_ROUTES.media.generateAudio;
 }
 
 async function readVoiceProfileReferences(assetIds: string[]): Promise<ReferenceImageRef[]> {
@@ -419,7 +418,7 @@ export function useGenerationActions({
     try {
       const headers = buildProviderHeaders(overrides.model ?? selectedModel);
 
-      const res = await fetch("/api/gemini/generate-image", {
+      const res = await fetch(API_ROUTES.media.generateImage, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
         signal: controller.signal,
@@ -584,7 +583,7 @@ export function useGenerationActions({
 
     try {
       const headers = buildProviderHeaders(requestModel);
-      const res = await fetch("/api/gemini/generate-video", {
+      const res = await fetch(API_ROUTES.media.generateVideo, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
         signal: controller.signal,
@@ -653,8 +652,8 @@ export function useGenerationActions({
       pushWorkspaceNotice("error", "音频生成需要明确音频模型");
       return false;
     }
-    const isRunningHubAudio = isRunningHubAudioRequest(requestModel, overrides.runningHubNodeInfoList);
-    const audioCapabilities = isRunningHubAudio ? null : getAudioModelCapabilities(requestModel);
+    const isRunningHubWorkflowAudio = isRunningHubWorkflowAudioTarget(requestModel, overrides.runningHubNodeInfoList);
+    const audioCapabilities = isRunningHubWorkflowAudio ? null : getAudioModelCapabilities(requestModel);
     const audioMode = overrides.audioMode ?? audioCapabilities?.defaultMode;
     if (!activePrompt.trim() && audioMode !== undefined && audioOperationRequiresTextInput(audioMode) && overrides.allowEmptyPrompt !== true) return false;
     let profileStylePrompt: string | undefined;

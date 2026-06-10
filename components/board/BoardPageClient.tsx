@@ -161,6 +161,7 @@ import {
   type WorkspaceCleanupKind,
 } from "@/lib/data-management";
 import { CLEAR_WORKSPACE_ASSETS_MESSAGE } from "@/lib/workspace-messages";
+import { API_ROUTES } from "@/lib/api/routes";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 import { readImageGenerationPayload } from "@/lib/client-image-response";
 
@@ -1639,7 +1640,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     if (!promptToOptimize.trim()) return;
     setIsOptimizing(true);
     try {
-      const res = await fetch("/api/gemini/optimize", {
+      const res = await fetch(API_ROUTES.prompts.optimize, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...buildProviderHeaders(selectedChatModel) },
         body: JSON.stringify({ prompt: promptToOptimize, model: selectedChatModel }),
@@ -2923,7 +2924,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     setCancelingBoardItemIds(prev => [...prev, task.id]);
     try {
       if (canCancelRemote && operationName) {
-        const response = await fetch("/api/gemini/cancel-media", {
+        const response = await fetch(API_ROUTES.media.cancel, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...buildProviderHeaders(operationName) },
           body: JSON.stringify({ operationName }),

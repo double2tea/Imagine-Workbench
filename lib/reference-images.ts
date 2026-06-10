@@ -1,3 +1,5 @@
+import { API_ROUTES } from "./api/routes";
+
 export const REFERENCE_IMAGE_MAX_EDGE = 2048;
 export const REFERENCE_IMAGE_OUTPUT_TYPE = "image/webp";
 export const REFERENCE_IMAGE_OUTPUT_QUALITY = 0.85;
@@ -129,7 +131,7 @@ export async function prepareReferenceMediaUrlForRequest(url: string): Promise<s
 async function fetchReferenceImageUrl(url: string): Promise<Response> {
   if (url.startsWith("blob:")) return fetch(url);
   if (url.startsWith("http://") || url.startsWith("https://")) {
-    return fetch("/api/gemini/reference-image", {
+    return fetch(API_ROUTES.media.referenceImage, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url }),
