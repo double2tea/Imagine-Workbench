@@ -215,7 +215,7 @@ Users can open the picker with the template button or type `/` in supported prom
 ## App Routes
 
 External callers should start with [OpenAI-compatible API](docs/openai-compatible-api.md). The `/v1/*` routes are a documented subset for plugins and scripts; richer Workbench media workflows stay under `/api/media/*`. RunningHub-specific async tasks, AI Apps, workflows, uploads, and audio AI App targets are documented in [RunningHub API](docs/runninghub-api.md).
-DaVinci Resolve integration starts with [DaVinci Resolve Bridge](docs/resolve-bridge.md). The bridge can run from a terminal against the Resolve scripting API or inside Resolve through `Workspace → Scripts`, while keeping the backend endpoint and route map configurable.
+DaVinci Resolve integration starts with [DaVinci Resolve Bridge](docs/resolve-bridge.md). The bridge can run from a terminal against the Resolve scripting API or inside Resolve through `Workspace → Scripts`, using a local, LAN, or deployed Imagine Workbench endpoint.
 
 - `GET /`: main workstation.
 - `GET /board`: standalone canvas operation surface for assets, notes, generation, and Agent interaction.

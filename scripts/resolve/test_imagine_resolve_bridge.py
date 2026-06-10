@@ -11,7 +11,8 @@ from pathlib import Path
 from threading import Thread
 from typing import Any
 
-from imagine_resolve_bridge import BridgeConfig, BridgeRoutes, ImagineResolveBridge
+from imagine_resolve_bridge import BridgeConfig, BridgeRoutes, ImagineResolveBridge, ResolveController, run_cli
+from install_resolve_bridge import install, uninstall
 
 
 class MockServer:
@@ -56,6 +57,9 @@ class MockServer:
                     "body": body,
                 })
                 if self.path == "/v1/images/generations":
+                    self._json({"data": [{"b64_json": base64.b64encode(b"image").decode("ascii")}]})
+                    return
+                if self.path == "/v1/images/edits":
                     self._json({"data": [{"b64_json": base64.b64encode(b"image").decode("ascii")}]})
                     return
                 if self.path == "/v1/audio/speech":
@@ -148,6 +152,139 @@ class ImagineResolveBridgeTests(unittest.TestCase):
             "/api/media/status",
             "/api/media/video-download",
         ])
+
+    def test_doctor_reports_backend_and_resolve_summary(self) -> None:
+        bridge = ImagineResolveBridge(self.bridge.config, ResolveController(FakeResolve(Path(self.tmp.name) / "source.mp4")))
+
+        result = bridge.doctor()
+
+        self.assertEqual(result["backend"]["name"], "imagine-resolve-bridge")
+        self.assertEqual(result["resolve"]["project"], "Project")
+        self.assertEqual(result["resolve"]["timeline"], "Timeline")
+
+    def test_current_frame_input_exports_from_resolve_for_image_edit(self) -> None:
+        resolve = FakeResolve(Path(self.tmp.name) / "source.mp4")
+        outputs = run_cli([
+            "--base-url", self.server.url,
+            "--output-dir", self.tmp.name,
+            "edit-image",
+            "--image", "current-frame",
+            "--model", "mock:image",
+            "--prompt", "edit",
+            "--output-name", "edited",
+        ], resolve)
+
+        self.assertEqual(outputs[0].read_bytes(), b"image")
+        self.assertTrue((Path(self.tmp.name) / "edited.png").is_file())
+
+    def test_current_clip_source_can_feed_video_reference(self) -> None:
+        source = Path(self.tmp.name) / "source.mp4"
+        source.write_bytes(b"video-source")
+
+        outputs = run_cli([
+            "--base-url", self.server.url,
+            "--output-dir", self.tmp.name,
+            "generate-video",
+            "--reference", "current-clip-source",
+            "--model", "mock:video",
+            "--prompt", "shot",
+            "--output-name", "video_from_clip",
+        ], FakeResolve(source))
+
+        self.assertEqual(outputs[0].read_bytes(), b"video")
+        body = json.loads(self.server.requests[-3]["body"].decode("utf-8"))
+        self.assertEqual(body["referenceMedia"][0]["type"], "video")
+
+    def test_install_and_uninstall_helper_copies_bridge_files(self) -> None:
+        source_dir = Path(self.tmp.name) / "source"
+        target_dir = Path(self.tmp.name) / "target"
+        source_dir.mkdir()
+        for name in ("ImagineWorkbenchResolve.py", "imagine_resolve_bridge.py"):
+            (source_dir / name).write_text(name, encoding="utf-8")
+
+        install(target_dir, source_dir)
+        self.assertTrue((target_dir / "ImagineWorkbenchResolve.py").is_file())
+        self.assertTrue((target_dir / "imagine_resolve_bridge.py").is_file())
+
+        uninstall(target_dir)
+        self.assertFalse((target_dir / "ImagineWorkbenchResolve.py").exists())
+        self.assertFalse((target_dir / "imagine_resolve_bridge.py").exists())
+
+
+class FakeResolve:
+    def __init__(self, source_path: Path) -> None:
+        self.source_path = source_path
+        if not self.source_path.exists():
+            self.source_path.write_bytes(b"source")
+
+    def GetProjectManager(self) -> "FakeProjectManager":
+        return FakeProjectManager(self.source_path)
+
+    def GetCurrentPage(self) -> str:
+        return "edit"
+
+
+class FakeProjectManager:
+    def __init__(self, source_path: Path) -> None:
+        self.source_path = source_path
+
+    def GetCurrentProject(self) -> "FakeProject":
+        return FakeProject(self.source_path)
+
+
+class FakeProject:
+    def __init__(self, source_path: Path) -> None:
+        self.source_path = source_path
+
+    def GetName(self) -> str:
+        return "Project"
+
+    def GetCurrentTimeline(self) -> "FakeTimeline":
+        return FakeTimeline(self.source_path)
+
+    def ExportCurrentFrameAsStill(self, path: str) -> bool:
+        Path(path).write_bytes(b"frame")
+        return True
+
+    def GetMediaPool(self) -> "FakeMediaPool":
+        return FakeMediaPool()
+
+
+class FakeTimeline:
+    def __init__(self, source_path: Path) -> None:
+        self.source_path = source_path
+
+    def GetName(self) -> str:
+        return "Timeline"
+
+    def GetCurrentVideoItem(self) -> "FakeTimelineItem":
+        return FakeTimelineItem(self.source_path)
+
+
+class FakeTimelineItem:
+    def __init__(self, source_path: Path) -> None:
+        self.source_path = source_path
+
+    def GetMediaPoolItem(self) -> "FakeMediaPoolItem":
+        return FakeMediaPoolItem(self.source_path)
+
+
+class FakeMediaPoolItem:
+    def __init__(self, source_path: Path) -> None:
+        self.source_path = source_path
+
+    def GetClipProperty(self, key: str) -> str:
+        if key != "File Path":
+            return ""
+        return str(self.source_path)
+
+
+class FakeMediaPool:
+    def ImportMedia(self, paths: list[str]) -> list[str]:
+        return paths
+
+    def AppendToTimeline(self, items: list[str]) -> bool:
+        return len(items) > 0
 
 
 if __name__ == "__main__":

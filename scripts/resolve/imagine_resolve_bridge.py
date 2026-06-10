@@ -169,6 +169,19 @@ class ResolveController:
             raise RuntimeError("Resolve failed to export the current frame")
         return output_path
 
+    def current_clip_source_path(self) -> Path:
+        item = self._current_video_item()
+        media_pool_item = item.GetMediaPoolItem()
+        if media_pool_item is None:
+            raise RuntimeError("Current Resolve timeline item has no media pool item")
+        file_path = media_pool_item.GetClipProperty("File Path")
+        if not isinstance(file_path, str) or not file_path:
+            raise RuntimeError("Current Resolve timeline item did not expose a source file path")
+        path = Path(file_path).expanduser()
+        if not path.is_file():
+            raise RuntimeError(f"Current Resolve source file does not exist: {path}")
+        return path
+
     def import_media(self, paths: list[Path], append_to_timeline: bool = False) -> None:
         media_pool = self._project().GetMediaPool()
         imported = media_pool.ImportMedia([str(path) for path in paths])
@@ -176,6 +189,26 @@ class ResolveController:
             raise RuntimeError("Resolve failed to import generated media")
         if append_to_timeline and not media_pool.AppendToTimeline(imported):
             raise RuntimeError("Resolve failed to append generated media to the timeline")
+
+    def summary(self) -> dict[str, Any]:
+        project = self._project()
+        timeline = project.GetCurrentTimeline()
+        if timeline is None:
+            raise RuntimeError("No active Resolve timeline")
+        return {
+            "project": project.GetName(),
+            "timeline": timeline.GetName(),
+            "currentPage": self.resolve.GetCurrentPage(),
+        }
+
+    def _current_video_item(self) -> Any:
+        timeline = self._project().GetCurrentTimeline()
+        if timeline is None:
+            raise RuntimeError("No active Resolve timeline")
+        item = timeline.GetCurrentVideoItem()
+        if item is None:
+            raise RuntimeError("No current video item at the Resolve playhead")
+        return item
 
     def _project(self) -> Any:
         project_manager = self.resolve.GetProjectManager()
@@ -194,6 +227,14 @@ class ImagineResolveBridge:
 
     def capabilities(self) -> dict[str, Any]:
         return self.client.get_json("/api/resolve/capabilities")
+
+    def doctor(self) -> dict[str, Any]:
+        result = {
+            "backend": self.capabilities(),
+            "resolve": self.resolve.summary() if self.resolve else None,
+            "outputDir": str(self.config.output_dir),
+        }
+        return result
 
     def generate_image(self, prompt: str, model: str, output_name: str) -> Path:
         require_text(prompt, "prompt")
@@ -284,6 +325,11 @@ class ImagineResolveBridge:
             raise RuntimeError("Current-frame export requires a Resolve connection")
         return self.resolve.export_current_frame(self.config.output_dir / f"{safe_stem(output_name)}.png")
 
+    def current_clip_source_path(self) -> Path:
+        if self.resolve is None:
+            raise RuntimeError("current-clip-source requires a Resolve connection")
+        return self.resolve.current_clip_source_path()
+
     def import_outputs(self, paths: list[Path], append_to_timeline: bool) -> None:
         if self.resolve is None:
             raise RuntimeError("Resolve import requested but no Resolve connection is available")
@@ -319,26 +365,25 @@ def build_config(args: argparse.Namespace) -> BridgeConfig:
         provider_base_url=args.provider_base_url or os.environ.get("IMAGINE_PROVIDER_BASE_URL"),
         provider_label=args.provider_label or os.environ.get("IMAGINE_PROVIDER_LABEL"),
         output_dir=Path(args.output_dir or os.environ.get("IMAGINE_RESOLVE_OUTPUT_DIR", str(DEFAULT_OUTPUT_DIR))).expanduser(),
-        routes=load_routes(Path(args.routes_file).expanduser()) if args.routes_file else BridgeRoutes(),
+        routes=BridgeRoutes(),
     )
-
-
-def load_routes(path: Path) -> BridgeRoutes:
-    data = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(data, dict):
-        raise RuntimeError("routes JSON must be an object")
-    valid_keys = BridgeRoutes.__dataclass_fields__.keys()
-    unknown = sorted(key for key in data if key not in valid_keys)
-    if unknown:
-        raise RuntimeError(f"Unknown route keys: {', '.join(unknown)}")
-    values = {key: value for key, value in data.items() if isinstance(value, str) and value.strip()}
-    return BridgeRoutes(**values)
 
 
 def connect_resolve_if_needed(args: argparse.Namespace, internal_resolve: Any | None = None) -> ResolveController | None:
     if internal_resolve is not None:
         return ResolveController(internal_resolve)
-    if args.connect_resolve or args.import_to_resolve or args.image == "current-frame":
+    needs_resolve = args.connect_resolve or args.import_to_resolve
+    if getattr(args, "image", None) == "current-frame":
+        needs_resolve = True
+    if getattr(args, "image", None) == "current-clip-source":
+        needs_resolve = True
+    if getattr(args, "audio", None) == "current-clip-source":
+        needs_resolve = True
+    if "current-frame" in getattr(args, "reference", []):
+        needs_resolve = True
+    if "current-clip-source" in getattr(args, "reference", []):
+        needs_resolve = True
+    if needs_resolve:
         return ResolveController.connect()
     return None
 
@@ -360,18 +405,21 @@ def execute_args(bridge: ImagineResolveBridge, args: argparse.Namespace) -> list
     if args.operation == "capabilities":
         print(json.dumps(bridge.capabilities(), ensure_ascii=False, indent=2))
         return []
+    if args.operation == "doctor":
+        print(json.dumps(bridge.doctor(), ensure_ascii=False, indent=2))
+        return []
     if args.operation == "generate-image":
         return [bridge.generate_image(args.prompt, args.model, output_name)]
     if args.operation == "edit-image":
-        image_path = bridge.export_current_frame(output_name) if args.image == "current-frame" else Path(args.image).expanduser()
+        image_path = resolve_media_input(bridge, args.image, output_name, "image")
         return [bridge.edit_image(image_path, args.prompt, args.model, args.image_operation, output_name)]
     if args.operation == "generate-video":
-        references = [Path(item).expanduser() for item in args.reference]
+        references = [resolve_media_input(bridge, item, f"{output_name}_reference_{index + 1}", "reference") for index, item in enumerate(args.reference)]
         return [bridge.generate_video(args.prompt, args.model, output_name, references, args.poll_seconds)]
     if args.operation == "tts":
         return [bridge.tts(args.text, args.model, output_name, args.voice, args.instructions)]
     if args.operation == "transcribe":
-        txt, srt = bridge.transcribe(Path(args.audio).expanduser(), args.model, output_name, args.language)
+        txt, srt = bridge.transcribe(resolve_media_input(bridge, args.audio, output_name, "audio"), args.model, output_name, args.language)
         return [txt, srt]
     raise RuntimeError(f"Unsupported operation: {args.operation}")
 
@@ -411,7 +459,6 @@ def job_to_argv(job: dict[str, Any]) -> list[str]:
         "providerApiKey": "--provider-api-key",
         "providerBaseUrl": "--provider-base-url",
         "providerLabel": "--provider-label",
-        "routesFile": "--routes-file",
         "text": "--text",
         "voice": "--voice",
         "audio": "--audio",
@@ -440,13 +487,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--provider-base-url", default=None)
     parser.add_argument("--provider-label", default=None)
     parser.add_argument("--output-dir", default=None)
-    parser.add_argument("--routes-file", default=None)
     parser.add_argument("--connect-resolve", action="store_true")
     parser.add_argument("--import-to-resolve", action="store_true")
     parser.add_argument("--append-to-timeline", action="store_true")
 
     subparsers = parser.add_subparsers(dest="operation", required=True)
     subparsers.add_parser("capabilities")
+    subparsers.add_parser("doctor")
 
     image = subparsers.add_parser("generate-image")
     image.add_argument("--prompt", required=True)
@@ -454,7 +501,7 @@ def build_parser() -> argparse.ArgumentParser:
     image.add_argument("--output-name", default=None)
 
     edit = subparsers.add_parser("edit-image")
-    edit.add_argument("--image", required=True, help="Path to image file, or current-frame")
+    edit.add_argument("--image", required=True, help="Path to image file, current-frame, or current-clip-source")
     edit.add_argument("--prompt", required=True)
     edit.add_argument("--model", required=True)
     edit.add_argument("--image-operation", default="redraw", choices=["redraw", "erase", "outpaint", "cutout"])
@@ -463,7 +510,7 @@ def build_parser() -> argparse.ArgumentParser:
     video = subparsers.add_parser("generate-video")
     video.add_argument("--prompt", required=True)
     video.add_argument("--model", required=True)
-    video.add_argument("--reference", action="append", default=[])
+    video.add_argument("--reference", action="append", default=[], help="Path, current-frame, or current-clip-source")
     video.add_argument("--poll-seconds", type=int, default=600)
     video.add_argument("--output-name", default=None)
 
@@ -475,11 +522,22 @@ def build_parser() -> argparse.ArgumentParser:
     tts.add_argument("--output-name", default=None)
 
     transcribe = subparsers.add_parser("transcribe")
-    transcribe.add_argument("--audio", required=True)
+    transcribe.add_argument("--audio", required=True, help="Path to audio file, or current-clip-source")
     transcribe.add_argument("--model", required=True)
     transcribe.add_argument("--language", default=None)
     transcribe.add_argument("--output-name", default=None)
     return parser
+
+
+def resolve_media_input(bridge: ImagineResolveBridge, value: str, output_name: str, purpose: str) -> Path:
+    if value == "current-frame":
+        return bridge.export_current_frame(output_name)
+    if value == "current-clip-source":
+        return bridge.current_clip_source_path()
+    path = Path(value).expanduser()
+    if not path.is_file():
+        raise RuntimeError(f"{purpose} file does not exist: {path}")
+    return path
 
 
 def encode_multipart(boundary: str, fields: dict[str, str], files: dict[str, Path]) -> bytes:

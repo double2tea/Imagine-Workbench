@@ -1,13 +1,12 @@
 # DaVinci Resolve Bridge
 
-Imagine Resolve Bridge lets DaVinci Resolve call an Imagine Workbench-compatible media backend for image generation/editing, video generation, TTS, and transcription/subtitle preparation.
+Imagine Resolve Bridge lets DaVinci Resolve call Imagine Workbench for image generation/editing, video generation, TTS, and transcription/subtitle preparation.
 
-The bridge is intentionally loose-coupled:
+The bridge is a dedicated Imagine Workbench plugin:
 
-- Workbench is the default backend, not a hard dependency.
-- `--base-url` can point to local, LAN, deployed, or compatible gateway endpoints.
-- `--routes-file` can remap route paths without editing the script.
-- Provider keys/base URLs can be forwarded through headers when the backend supports them.
+- `--base-url` may point to local, LAN, or deployed Imagine Workbench instances.
+- Model/provider behavior stays in Workbench, not in Resolve Python.
+- Resolve handles current frame/source media capture and Media Pool import.
 
 LUT creation is not part of this bridge task.
 
@@ -16,8 +15,8 @@ LUT creation is not part of this bridge task.
 ```text
 scripts/resolve/imagine_resolve_bridge.py   Shared external + in-Resolve bridge
 scripts/resolve/ImagineWorkbenchResolve.py  Resolve Workspace -> Scripts entry
+scripts/resolve/install_resolve_bridge.py   macOS install/uninstall helper
 scripts/resolve/job.example.json            In-Resolve job example
-scripts/resolve/routes.example.json         Route override example
 ```
 
 ## Backend Capability Endpoint
@@ -27,6 +26,51 @@ curl http://localhost:3000/api/resolve/capabilities
 ```
 
 This returns the operations and routes expected by the bridge. It is descriptive only; model/provider execution still happens through existing Workbench routes.
+
+## Install Into Resolve
+
+Install the script entry into the macOS user Resolve Scripts folder:
+
+```bash
+python3 scripts/resolve/install_resolve_bridge.py install
+```
+
+Remove it:
+
+```bash
+python3 scripts/resolve/install_resolve_bridge.py uninstall
+```
+
+Default target:
+
+```text
+~/Library/Application Support/Blackmagic Design/DaVinci Resolve/Fusion/Scripts/Utility
+```
+
+Override the target when testing:
+
+```bash
+python3 scripts/resolve/install_resolve_bridge.py install --target-dir /tmp/ResolveScripts
+```
+
+## Smoke Test
+
+Check backend connectivity without Resolve:
+
+```bash
+python3 scripts/resolve/imagine_resolve_bridge.py \
+  --base-url http://localhost:3000 \
+  doctor
+```
+
+Check backend and running Resolve scripting connectivity:
+
+```bash
+python3 scripts/resolve/imagine_resolve_bridge.py \
+  --base-url http://localhost:3000 \
+  --connect-resolve \
+  doctor
+```
 
 ## External CLI Usage
 
@@ -131,9 +175,45 @@ python3 scripts/resolve/imagine_resolve_bridge.py \
   --prompt "remove small dust marks and keep the product unchanged"
 ```
 
+Use the source media for the current playhead video item as a video reference:
+
+```bash
+python3 scripts/resolve/imagine_resolve_bridge.py \
+  --base-url http://localhost:3000 \
+  --import-to-resolve \
+  generate-video \
+  --model 12ai:veo_3_1-fast \
+  --prompt "create a stylized continuation from this clip" \
+  --reference current-clip-source
+```
+
+Use the current Resolve frame as a video reference:
+
+```bash
+python3 scripts/resolve/imagine_resolve_bridge.py \
+  --base-url http://localhost:3000 \
+  generate-video \
+  --model 12ai:veo_3_1-fast \
+  --prompt "animate this frame with a gentle camera push" \
+  --reference current-frame
+```
+
+Transcribe the source media for the current playhead video item when the source file is a supported audio upload:
+
+```bash
+python3 scripts/resolve/imagine_resolve_bridge.py \
+  --base-url http://localhost:3000 \
+  transcribe \
+  --model mimo:mimo-v2.5-asr \
+  --audio current-clip-source \
+  --language auto
+```
+
+Resolve scripting cannot reliably read arbitrary selected clips through the public API. The bridge uses the current timeline item at the playhead via `GetCurrentVideoItem()`.
+
 ## In-Resolve Usage
 
-Copy or symlink these two files into a Resolve Scripts folder:
+Run the installer above, or copy these two files into a Resolve Scripts folder:
 
 ```text
 scripts/resolve/ImagineWorkbenchResolve.py
@@ -177,9 +257,9 @@ To use a different job file, set:
 export IMAGINE_RESOLVE_JOB="/path/to/job.json"
 ```
 
-## Endpoint Replacement
+## Dedicated Workbench Endpoint
 
-Use these options for deployed or compatible backends:
+Use these options for local, LAN, or deployed Imagine Workbench instances:
 
 ```bash
 --base-url https://your-workbench.example.com
@@ -199,14 +279,6 @@ IMAGINE_PROVIDER_BASE_URL
 IMAGINE_PROVIDER_LABEL
 IMAGINE_RESOLVE_OUTPUT_DIR
 ```
-
-Route paths can be remapped with:
-
-```bash
---routes-file scripts/resolve/routes.example.json
-```
-
-The route JSON may override any key from `BridgeRoutes` in `imagine_resolve_bridge.py`.
 
 ## Verification
 
