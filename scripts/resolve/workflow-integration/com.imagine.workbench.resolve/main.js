@@ -3,10 +3,10 @@ const path = require("path");
 
 function createWindow() {
   const win = new BrowserWindow({
-    width: 760,
-    height: 860,
-    minWidth: 560,
-    minHeight: 720,
+    width: 520,
+    height: 760,
+    minWidth: 420,
+    minHeight: 620,
     title: "Imagine Workbench",
     backgroundColor: "#111214",
     webPreferences: {

@@ -1,15 +1,17 @@
 :root {
   color-scheme: dark;
-  --bg: #111214;
-  --panel: rgba(37, 39, 43, 0.86);
-  --panel-strong: rgba(49, 52, 57, 0.94);
-  --panel-soft: rgba(255, 255, 255, 0.055);
-  --line: rgba(255, 255, 255, 0.09);
-  --text: #f3f4f6;
-  --muted: #9aa0aa;
-  --faint: #6f7680;
-  --accent: #c7ff1a;
-  --accent-text: #111214;
+  --bg: #0d0e10;
+  --surface: rgba(20, 21, 24, 0.92);
+  --surface-2: rgba(31, 33, 37, 0.9);
+  --surface-3: rgba(41, 43, 48, 0.92);
+  --line: rgba(255, 255, 255, 0.1);
+  --line-strong: rgba(255, 255, 255, 0.16);
+  --text: #f5f6f8;
+  --muted: #a3a7b1;
+  --faint: #70757f;
+  --accent: #b7ff17;
+  --accent-soft: rgba(183, 255, 23, 0.16);
+  --accent-text: #101204;
   --danger: #ff6b6b;
 }
 
@@ -17,15 +19,21 @@
   box-sizing: border-box;
 }
 
+html {
+  background: var(--bg);
+}
+
 body {
   margin: 0;
   min-height: 100vh;
+  overflow-x: hidden;
   background:
-    radial-gradient(circle at 16% 6%, rgba(255, 92, 122, 0.24), transparent 30%),
-    radial-gradient(circle at 84% 14%, rgba(199, 255, 26, 0.1), transparent 26%),
-    linear-gradient(145deg, #0c0d0f, #16181b 48%, #101113);
+    radial-gradient(circle at 0% 8%, rgba(116, 35, 54, 0.36), transparent 30%),
+    radial-gradient(circle at 100% 12%, rgba(91, 121, 46, 0.18), transparent 28%),
+    linear-gradient(160deg, #101113 0%, #0c0d0f 55%, #131517 100%);
   color: var(--text);
   font: 14px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+  letter-spacing: 0;
 }
 
 button,
@@ -39,36 +47,40 @@ button {
   cursor: pointer;
 }
 
+button:active {
+  transform: translateY(1px);
+}
+
 .shell {
-  width: min(100vw, 760px);
+  width: min(100vw, 520px);
   min-height: 100vh;
   margin: 0 auto;
-  padding: 18px;
+  padding: 14px;
 }
 
 .topbar,
 .prompt-panel,
 .status {
   border: 1px solid var(--line);
-  background: rgba(20, 21, 24, 0.82);
-  box-shadow: 0 20px 80px rgba(0, 0, 0, 0.34);
-  backdrop-filter: blur(18px);
+  background: rgba(13, 14, 16, 0.82);
+  box-shadow: 0 18px 70px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(18px) saturate(130%);
 }
 
 .topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  min-height: 68px;
-  padding: 14px 16px;
+  gap: 12px;
+  min-height: 58px;
+  padding: 10px;
   border-radius: 18px;
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
 }
 
@@ -77,20 +89,23 @@ button {
   place-items: center;
   width: 34px;
   height: 34px;
-  border-radius: 10px;
+  flex: 0 0 auto;
+  border-radius: 12px;
   background: var(--accent);
   color: var(--accent-text);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 900;
   letter-spacing: 0;
   text-transform: uppercase;
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.28);
 }
 
 .brand-title {
   color: var(--text);
   font-size: 15px;
-  font-weight: 750;
+  font-weight: 760;
   letter-spacing: 0;
+  white-space: nowrap;
 }
 
 .brand-subtitle {
@@ -100,69 +115,83 @@ button {
 
 .ghost-button,
 .small-button {
-  min-height: 36px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
+  min-height: 34px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
   background: rgba(255, 255, 255, 0.06);
   color: var(--text);
   padding: 0 12px;
+  font-weight: 700;
+}
+
+.ghost-button:hover,
+.small-button:hover,
+.pill:hover {
+  border-color: rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.09);
 }
 
 .tabs {
-  display: flex;
-  width: max-content;
-  max-width: 100%;
-  gap: 3px;
-  margin: 18px auto 16px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  width: min(100%, 350px);
+  margin: 14px auto 18px;
   padding: 4px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.075);
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .tab {
-  min-width: 88px;
-  min-height: 36px;
+  min-width: 0;
+  min-height: 34px;
   border: 0;
   border-radius: 999px;
   background: transparent;
   color: var(--muted);
-  padding: 0 16px;
-  font-weight: 700;
+  padding: 0 10px;
+  font-weight: 760;
 }
 
 .tab.active {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.14);
   color: var(--text);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .section-head {
-  margin: 0 6px 14px;
+  margin: 0 2px 12px;
 }
 
 .section-head h1 {
   margin: 0;
-  font-size: 24px;
+  font-size: 22px;
+  line-height: 1.12;
   letter-spacing: 0;
 }
 
 .section-head p {
-  margin: 2px 0 0;
+  margin: 3px 0 0;
   color: var(--muted);
+  font-size: 13px;
 }
 
 .app-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 8px;
 }
 
 .app-card {
   display: grid;
-  min-height: 112px;
-  padding: 17px;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  min-height: 82px;
+  padding: 12px;
   border: 1px solid transparent;
-  border-radius: 18px;
-  background: var(--panel);
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(35, 37, 42, 0.96), rgba(26, 28, 32, 0.96));
   color: var(--text);
   text-align: left;
   transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
@@ -170,48 +199,58 @@ button {
 
 .app-card:hover {
   transform: translateY(-1px);
-  background: var(--panel-strong);
+  background: linear-gradient(145deg, rgba(45, 48, 54, 0.98), rgba(31, 34, 38, 0.98));
 }
 
 .app-card.active {
-  border-color: rgba(199, 255, 26, 0.6);
-  background: linear-gradient(145deg, rgba(199, 255, 26, 0.16), rgba(54, 57, 62, 0.95));
+  border-color: rgba(183, 255, 23, 0.72);
+  background:
+    linear-gradient(145deg, rgba(183, 255, 23, 0.16), rgba(44, 49, 37, 0.88)),
+    var(--surface-2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .card-icon {
   display: grid;
   place-items: center;
+  grid-row: 1 / span 2;
   width: 28px;
   height: 28px;
-  margin-bottom: 10px;
-  border-radius: 8px;
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.08);
   color: var(--text);
-  font-size: 15px;
-  font-weight: 800;
+  font-size: 13px;
+  font-weight: 850;
 }
 
 .card-title {
-  font-size: 17px;
-  font-weight: 760;
+  grid-column: 2;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 780;
   letter-spacing: 0;
 }
 
 .card-subtitle {
-  margin-top: 3px;
+  grid-column: 2;
+  min-width: 0;
+  margin-top: 2px;
   color: var(--muted);
   font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .prompt-panel {
-  margin-top: 14px;
-  padding: 16px;
+  margin-top: 12px;
+  padding: 14px;
   border-radius: 18px;
 }
 
 .field-label {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 7px;
   color: var(--muted);
   font-size: 12px;
   font-weight: 760;
@@ -219,44 +258,56 @@ button {
 
 textarea {
   width: 100%;
-  min-height: 108px;
+  min-height: 96px;
   resize: vertical;
-  border: 1px solid var(--line);
-  border-radius: 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
   outline: 0;
   background: rgba(255, 255, 255, 0.055);
   color: var(--text);
   padding: 12px;
+  line-height: 1.48;
+}
+
+textarea:disabled {
+  color: var(--faint);
+}
+
+textarea::placeholder,
+input::placeholder {
+  color: var(--faint);
 }
 
 textarea:focus,
 input:focus,
 select:focus {
-  border-color: rgba(199, 255, 26, 0.58);
+  border-color: rgba(183, 255, 23, 0.62);
+  box-shadow: 0 0 0 3px rgba(183, 255, 23, 0.08);
 }
 
 .source-block {
-  margin-top: 14px;
+  margin-top: 12px;
 }
 
 .pill-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 7px;
 }
 
 .pill {
-  min-height: 34px;
-  border: 1px solid var(--line);
+  min-height: 31px;
+  border: 1px solid var(--line-strong);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.055);
   color: var(--muted);
-  padding: 0 12px;
+  padding: 0 11px;
+  font-weight: 700;
 }
 
 .pill.active {
-  border-color: rgba(199, 255, 26, 0.54);
-  background: rgba(199, 255, 26, 0.14);
+  border-color: rgba(183, 255, 23, 0.62);
+  background: var(--accent-soft);
   color: var(--text);
 }
 
@@ -264,7 +315,7 @@ select:focus {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
-  margin-top: 14px;
+  margin-top: 12px;
 }
 
 .field {
@@ -278,43 +329,79 @@ select:focus {
 .field input,
 .field select {
   width: 100%;
-  min-height: 38px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
+  min-height: 36px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
   outline: 0;
-  background: rgba(255, 255, 255, 0.055);
+  background: rgba(255, 255, 255, 0.06);
   color: var(--text);
   padding: 0 10px;
 }
 
 .runbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  grid-template-areas:
+    "save open spacer run"
+    "import append append run";
   align-items: center;
-  gap: 10px;
+  gap: 9px;
   margin-top: 14px;
-  flex-wrap: wrap;
+}
+
+#saveButton {
+  grid-area: save;
+}
+
+#openOutputButton {
+  grid-area: open;
+}
+
+.import-check {
+  grid-area: import;
+}
+
+.append-check {
+  grid-area: append;
+}
+
+.run-button {
+  grid-area: run;
 }
 
 .check {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
+  min-height: 30px;
   color: var(--muted);
   font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.check input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
 }
 
 .run-button {
   display: grid;
   place-items: center;
-  min-width: 46px;
-  height: 46px;
-  margin-left: auto;
+  min-width: 78px;
+  height: 42px;
   border: 0;
-  border-radius: 50%;
+  border-radius: 999px;
   background: var(--accent);
   color: var(--accent-text);
-  font-size: 22px;
+  font-size: 17px;
   font-weight: 900;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.22), 0 8px 28px rgba(183, 255, 23, 0.18);
+}
+
+.run-button:hover {
+  filter: brightness(1.03);
 }
 
 .run-button:disabled {
@@ -323,36 +410,40 @@ select:focus {
 }
 
 .status {
-  min-height: 92px;
-  margin-top: 14px;
-  padding: 13px 14px;
-  border-radius: 14px;
+  min-height: 76px;
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 16px;
   color: var(--muted);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  font-size: 12px;
 }
 
 .hidden {
   display: none;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 460px) {
   .shell {
-    padding: 12px;
+    padding: 10px;
+  }
+
+  .topbar {
+    align-items: flex-start;
+  }
+
+  .brand-title {
+    white-space: normal;
   }
 
   .app-grid,
-  .option-grid {
+  .option-grid,
+  .runbar {
     grid-template-columns: 1fr;
   }
 
-  .tabs {
+  .run-button {
     width: 100%;
-  }
-
-  .tab {
-    min-width: 0;
-    flex: 1;
-    padding: 0 10px;
   }
 }

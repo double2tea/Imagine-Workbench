@@ -21,15 +21,15 @@
       </header>
 
       <nav class="tabs" aria-label="功能分类">
-        <button class="tab active" type="button" data-tab="image">Image</button>
-        <button class="tab" type="button" data-tab="video">Video</button>
-        <button class="tab" type="button" data-tab="audio">Audio</button>
-        <button class="tab" type="button" data-tab="apps">Apps</button>
+        <button class="tab active" type="button" data-tab="image">图像</button>
+        <button class="tab" type="button" data-tab="video">视频</button>
+        <button class="tab" type="button" data-tab="audio">音频</button>
+        <button class="tab" type="button" data-tab="apps">全部</button>
       </nav>
 
       <section class="section-head">
-        <h1>Apps</h1>
-        <p>选择下一步要创建或处理的内容</p>
+        <h1 id="sectionTitle">图像</h1>
+        <p id="sectionSubtitle">生成或编辑当前画面</p>
       </section>
 
       <section class="app-grid" id="operationGrid" aria-label="功能"></section>
@@ -74,11 +74,11 @@
         <div class="runbar">
           <button class="small-button" id="saveButton" type="button">保存任务</button>
           <button class="small-button" id="openOutputButton" type="button">打开输出目录</button>
-          <label class="check">
+          <label class="check import-check">
             <input id="importInput" type="checkbox" checked />
             <span>导入结果</span>
           </label>
-          <label class="check">
+          <label class="check append-check">
             <input id="appendInput" type="checkbox" />
             <span>追加到时间线</span>
           </label>

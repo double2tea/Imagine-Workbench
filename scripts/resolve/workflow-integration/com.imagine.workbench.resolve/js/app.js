@@ -24,9 +24,9 @@
   var operationConfigs = {
     "generate-image": {
       tab: "image",
-      title: "Image generation",
+      title: "图像生成",
       subtitle: "生成高质量图片",
-      icon: "I",
+      icon: "图",
       promptLabel: "提示词",
       placeholder: "描述要生成的画面",
       sources: [],
@@ -35,9 +35,9 @@
     },
     "edit-image": {
       tab: "image",
-      title: "Image edit",
+      title: "图像编辑",
       subtitle: "基于当前帧或图片重绘",
-      icon: "E",
+      icon: "改",
       promptLabel: "提示词",
       placeholder: "描述要如何修改当前帧或图片",
       sources: ["current-frame", "current-clip-source"],
@@ -47,9 +47,9 @@
     },
     "generate-video": {
       tab: "video",
-      title: "Video generation",
+      title: "视频生成",
       subtitle: "生成或延展视频片段",
-      icon: "V",
+      icon: "影",
       promptLabel: "提示词",
       placeholder: "描述要生成的视频，或如何延展当前素材",
       sources: ["timeline-inout-render", "current-clip-render", "current-frame", "current-clip-source"],
@@ -59,9 +59,9 @@
     },
     "transcribe": {
       tab: "audio",
-      title: "Subtitle / ASR",
+      title: "字幕转写",
       subtitle: "从音频或视频生成字幕",
-      icon: "S",
+      icon: "字",
       promptLabel: "无需提示词",
       placeholder: "转写会使用所选参考源",
       sources: ["timeline-inout-render", "current-clip-render", "current-clip-source"],
@@ -71,9 +71,9 @@
     },
     "tts": {
       tab: "audio",
-      title: "Text to speech",
+      title: "文本配音",
       subtitle: "生成临时配音",
-      icon: "T",
+      icon: "声",
       promptLabel: "配音文本",
       placeholder: "输入要生成的旁白或配音文本",
       sources: [],
@@ -82,9 +82,9 @@
     },
     "doctor": {
       tab: "apps",
-      title: "Connection check",
+      title: "连接检查",
       subtitle: "检查 Workbench 与 Resolve 状态",
-      icon: "D",
+      icon: "检",
       promptLabel: "无需提示词",
       placeholder: "连接检查会验证 Workbench 与 Resolve 状态",
       sources: [],
@@ -98,6 +98,24 @@
     "current-clip-render": "当前片段渲染",
     "current-frame": "当前帧",
     "current-clip-source": "当前片段源文件"
+  };
+  var tabLabels = {
+    image: {
+      title: "图像",
+      subtitle: "生成图片，或基于当前帧快速重绘"
+    },
+    video: {
+      title: "视频",
+      subtitle: "用提示词和参考片段生成新镜头"
+    },
+    audio: {
+      title: "音频",
+      subtitle: "生成配音，转写音频或视频字幕"
+    },
+    apps: {
+      title: "全部工具",
+      subtitle: "选择下一步要创建或处理的内容"
+    }
   };
 
   var state = {
@@ -113,6 +131,8 @@
   var jobPath = hasNode ? path.join(outputDir, "job.json") : "";
 
   var grid = document.getElementById("operationGrid");
+  var sectionTitle = document.getElementById("sectionTitle");
+  var sectionSubtitle = document.getElementById("sectionSubtitle");
   var promptInput = document.getElementById("promptInput");
   var promptLabel = document.getElementById("promptLabel");
   var sourceBlock = document.getElementById("sourceBlock");
@@ -156,6 +176,9 @@
   }
 
   function renderOperations() {
+    var tabCopy = tabLabels[state.tab];
+    sectionTitle.textContent = tabCopy.title;
+    sectionSubtitle.textContent = tabCopy.subtitle;
     grid.innerHTML = "";
     visibleOperations().forEach(function (operation) {
       var config = operationConfigs[operation];
