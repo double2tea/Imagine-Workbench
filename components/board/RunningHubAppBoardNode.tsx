@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { memo, useEffect, useState } from "react";
 import BoardPromptTextarea from "@/components/board/BoardPromptTextarea";
-import { BoardResultStack, type BoardGenerateInputSummary } from "@/components/board/GenerateBoardNode";
+import type { BoardGenerateInputSummary } from "@/components/board/GenerateBoardNode";
 import type { StorageItem } from "@/lib/db";
 import type {
   BoardAssetType,
@@ -44,15 +44,10 @@ interface RunningHubAppBoardNodeProps {
   node: BoardRunningHubAppNode;
   onExecute: () => void;
   onFetchAppSchema: (webappId: string) => Promise<BoardRunningHubAppSchemaResult>;
-  onMaterializeResult?: (assetId: string) => void;
-  onOpenResult?: (item: StorageItem) => void;
-  onSaveVoiceProfile?: (item: StorageItem) => void;
-  onSelectResult: (assetId: string) => void;
   onSelectReference?: (reference: BoardPromptReference, index: number) => void;
   onUpdate: (input: BoardRunningHubAppNodeUpdate) => void;
   references: BoardPromptReference[];
   resultItems: StorageItem[];
-  activeResultAssetId?: string;
 }
 
 interface RunningHubSavedTarget {
@@ -246,15 +241,10 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
   node,
   onExecute,
   onFetchAppSchema,
-  onMaterializeResult,
-  onOpenResult,
-  onSaveVoiceProfile,
-  onSelectResult,
   onSelectReference,
   onUpdate,
   references,
   resultItems,
-  activeResultAssetId,
 }: RunningHubAppBoardNodeProps) {
   const [importText, setImportText] = useState("");
   const [importError, setImportError] = useState<string | null>(null);
@@ -521,15 +511,6 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
               {resultStatusLabel(hasResultConnection, resultItems.length)}
             </span>
           </div>
-
-          <BoardResultStack
-            activeAssetId={activeResultAssetId}
-            onMaterializeResult={onMaterializeResult}
-            onOpenResult={onOpenResult}
-            onSaveVoiceProfile={onSaveVoiceProfile}
-            onSelectResult={onSelectResult}
-            resultItems={resultItems}
-          />
 
           {isImportOpen && (
             <div className={`${softPanelClass} nodrag w-full min-w-0 p-2`}>

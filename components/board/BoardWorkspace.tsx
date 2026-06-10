@@ -99,7 +99,7 @@ import {
 import { BoardNodeCallbacksContext, type BoardNodeCallbacks } from "@/lib/board/callbacks";
 import { BOARD_PORT_IDS, isValidBoardConnection as isValidBoardPortConnection } from "@/lib/board/ports";
 import { BOARD_INSERT_CATALOG, type BoardInsertKind } from "@/lib/board/insert-catalog";
-import { findResultNodeForSource, resultNodeDefaultPosition } from "@/lib/board/utils";
+import { findResultNodeForSource } from "@/lib/board/utils";
 import { findAvailableBoardNodePosition } from "@/lib/board/placement";
 import type { GenerationTask } from "@/lib/generation-tasks";
 import { DEFAULT_AUDIO_MODEL, DEFAULT_VIDEO_MODEL } from "@/lib/providers/model-catalog";
@@ -328,7 +328,6 @@ function sameFlowNodeDataModel(left: BoardFlowNode["data"], right: BoardFlowNode
   return (
     sameBoardNodeRenderModel(left.node, right.node) &&
     left.hasResultConnection === right.hasResultConnection &&
-    left.activeResultAssetId === right.activeResultAssetId &&
     left.compareReferenceUrl === right.compareReferenceUrl &&
     sameGenerateInputSummary(left.generateInputSummary, right.generateInputSummary) &&
     sameGenerateTaskSummary(left.generateTaskSummary, right.generateTaskSummary) &&
@@ -1247,41 +1246,6 @@ export default function BoardWorkspace({
     connectPorts(from, to);
   }, [board.edges, board.nodes, connectPorts]);
 
-  const materializeGenerateResult = useCallback((nodeId: string, assetId: string): void => {
-    const sourceNode = board.nodes.find(node => node.id === nodeId);
-    if (!isResultSourceNode(sourceNode)) return;
-    const item = galleryItems.find(entry => entry.id === assetId);
-    if (!item || item.status !== "complete") {
-      onConnectionError("找不到生成结果资产");
-      return;
-    }
-    const resultNode = findResultNodeForSource(board.nodes, sourceNode.id);
-    if (resultNode) {
-      updateResultNodeAsset(resultNode.id, assetId);
-      selectNode(resultNode.id);
-      selectEdge(null);
-      return;
-    }
-    const from: BoardPortRef = {
-      nodeId: sourceNode.id,
-      portId: BOARD_PORT_IDS.resultOut,
-      portKind: "result",
-    };
-    const resultNodeId = addResultNodeWithConnection(
-      {
-        sourceNodeId: sourceNode.id,
-        resultStackKey: sourceNode.resultStackKey ?? "",
-        activeAssetId: assetId,
-        resultAssetIds: [assetId],
-        asset: storageItemToBoardAsset(item),
-        position: resultNodeDefaultPosition(sourceNode),
-      },
-      from,
-    );
-    selectNode(resultNodeId);
-    selectEdge(null);
-  }, [addResultNodeWithConnection, board.nodes, galleryItems, onConnectionError, selectEdge, selectNode, updateResultNodeAsset]);
-
   const flowNodeDataById = useMemo(() => {
     const dataById = new Map<string, BoardFlowNode["data"]>();
     const resultNodeBySourceId = new Map<string, BoardNodeModel & { kind: "result" }>();
@@ -1326,7 +1290,6 @@ export default function BoardWorkspace({
         boardId: board.id,
         generateInputSummary: generateInputSummaryForNode(node, boardPromptReferenceGraphIndex),
         hasResultConnection: connectedResultNode !== undefined,
-        activeResultAssetId: connectedResultNode?.activeAssetId,
         assetStackItems,
         node,
         resultItems: connectedResultNode
@@ -1364,7 +1327,6 @@ export default function BoardWorkspace({
     onOpenFullscreen,
     onOpenPanorama,
     onSaveVoiceProfile,
-    onMaterializeGenerateResult: materializeGenerateResult,
     onMoveGenerateReferenceEdge: moveGenerateReferenceEdge,
     onMoveReferenceGroupItem: moveReferenceGroupItem,
     onRemoveGenerateReferenceEdge: deleteEdge,
@@ -1398,17 +1360,10 @@ export default function BoardWorkspace({
       }
       updateResultNodeAsset(nodeId, assetId);
     },
-    onSelectGenerateResult: (nodeId: string, assetId: string) => {
-      const item = galleryItemById.get(assetId);
-      const connectedResultNode = findResultNodeForSource(board.nodes, nodeId);
-      if (item?.status === "complete" && connectedResultNode) {
-        updateResultNodeAsset(connectedResultNode.id, assetId);
-      }
-    },
   }), [
     onCancelGenerateNode, onCaptureVideoFrame, trashAndDeleteNode, onDownloadAsset, onEditAssetImage, onImageQuickEdit,
     onExecuteGenerateNode, onFetchRunningHubAppSchema, focusReferenceSourceNode, onOpenFullscreen,
-    onOpenPanorama, onSaveVoiceProfile, materializeGenerateResult, moveGenerateReferenceEdge, moveReferenceGroupItem,
+    onOpenPanorama, onSaveVoiceProfile, moveGenerateReferenceEdge, moveReferenceGroupItem,
     deleteEdge, removeReferenceGroupItem, onSendAgentNode, onSendAssetToAgent, connectSelectedBoardPromptReference,
     updateReferenceGroupItemRole, updateAgentInstruction, updateGenerateNode, updateMultiGridNode,
     updateMultiGridItemTransform, onExportMultiGrid, measureAssetAspectRatio,
@@ -1492,7 +1447,6 @@ export default function BoardWorkspace({
           existing.promptReferences === cachedData.promptReferences &&
           existing.generateInputSummary === cachedData.generateInputSummary &&
           existing.hasResultConnection === cachedData.hasResultConnection &&
-          existing.activeResultAssetId === cachedData.activeResultAssetId &&
           existing.resultItems === cachedData.resultItems &&
           existing.assetStackItems === cachedData.assetStackItems &&
           existing.compareReferenceUrl === cachedData.compareReferenceUrl &&

@@ -33,7 +33,6 @@ export interface BoardFlowNodeData extends Record<string, unknown> {
   hasResultConnection?: boolean;
   node: BoardNodeModel;
   promptReferences: BoardPromptReference[];
-  activeResultAssetId?: string;
   assetStackItems: StorageItem[];
   resultItems: StorageItem[];
 }
@@ -488,15 +487,10 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             node={node}
             references={data.generateReferences}
             resultItems={data.resultItems}
-            activeResultAssetId={data.activeResultAssetId}
             showReferencePreviews={false}
             taskSummary={data.generateTaskSummary}
             onCancel={() => c.onCancelGenerate(node.id)}
             onExecute={() => c.onExecuteGenerate(node.id)}
-            onMaterializeResult={assetId => c.onMaterializeGenerateResult(node.id, assetId)}
-            onOpenResult={c.onOpenFullscreen}
-            onSaveVoiceProfile={c.onSaveVoiceProfile}
-            onSelectResult={assetId => c.onSelectGenerateResult(node.id, assetId)}
             onSelectReference={reference => c.onSelectPromptReference(node.id, reference)}
             onUpdate={input => c.onUpdateGenerate(node.id, input)}
           />
@@ -509,14 +503,9 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             references={data.generateReferences}
             onExecute={() => c.onExecuteGenerate(node.id)}
             onFetchAppSchema={c.onFetchRunningHubAppSchema}
-            onMaterializeResult={assetId => c.onMaterializeGenerateResult(node.id, assetId)}
-            onOpenResult={c.onOpenFullscreen}
-            onSaveVoiceProfile={c.onSaveVoiceProfile}
-            onSelectResult={assetId => c.onSelectGenerateResult(node.id, assetId)}
             onSelectReference={reference => c.onSelectPromptReference(node.id, reference)}
             onUpdate={input => c.onUpdateRunningHubApp(node.id, input)}
             resultItems={data.resultItems}
-            activeResultAssetId={data.activeResultAssetId}
           />
         )}
         {node.kind === "agent" && (

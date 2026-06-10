@@ -1,5 +1,5 @@
 import { memo, useMemo, useRef, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { AudioLines, FileText, ImagePlus, Loader2, Mic2, Play, Plus, Video, X } from "lucide-react";
+import { AudioLines, ImagePlus, Loader2, Play, Video, X } from "lucide-react";
 import ModelPriceBadge from "@/components/creation/ModelPriceBadge";
 import BoardPromptTextarea, { type BoardPromptTextareaHandle } from "@/components/board/BoardPromptTextarea";
 import MediaReferenceThumbnail from "@/components/reference/MediaReferenceThumbnail";
@@ -18,7 +18,6 @@ import {
 import { AUDIO_MODE_LABELS, audioOperationFormatOptions, audioOperationRequiresTextInput } from "@/lib/audio-operation-rules";
 import { getAudioModelCapabilities, getVideoModelCapabilities } from "@/lib/providers/model-catalog";
 import { selectVideoReferenceTypesForMode } from "@/lib/video-reference-selection";
-import { compactBoardModelLabel } from "@/lib/board/provenance";
 
 type GenerateNode = BoardImageGenerateNode | BoardVideoGenerateNode | BoardAudioOperationNode;
 const variantCountOptions: BoardGenerateVariantCount[] = [1, 2, 4];
@@ -54,127 +53,14 @@ interface GenerateBoardNodeProps {
   taskSummary?: BoardGenerateTaskSummary;
   onCancel?: () => void;
   onExecute: () => void;
-  onMaterializeResult?: (assetId: string) => void;
-  onOpenResult?: (item: StorageItem) => void;
-  onSaveVoiceProfile?: (item: StorageItem) => void;
-  onSelectResult: (assetId: string) => void;
   onSelectReference?: (reference: BoardPromptReference, index: number) => void;
   onUpdate: (input: BoardGenerateNodeUpdate) => void;
   references: BoardPromptReference[];
   resultItems: StorageItem[];
-  activeResultAssetId?: string;
 }
 
 type GenerateContextTone = "failed" | "neutral" | "ok" | "processing" | "prompt" | "reference" | "result";
 type GenerateStatusLineTone = "complete" | "failed" | "idle" | "processing";
-
-interface BoardResultStackProps {
-  activeAssetId?: string;
-  hasResultConnection?: boolean;
-  onMaterializeResult?: (assetId: string) => void;
-  onOpenResult?: (item: StorageItem) => void;
-  onSaveVoiceProfile?: (item: StorageItem) => void;
-  onSelectResult: (assetId: string) => void;
-  resultItems: StorageItem[];
-}
-
-export function BoardResultStack({
-  activeAssetId,
-  hasResultConnection = false,
-  onMaterializeResult,
-  onOpenResult,
-  onSaveVoiceProfile,
-  onSelectResult,
-  resultItems,
-}: BoardResultStackProps) {
-  if (resultItems.length === 0) return null;
-  const activeIndex = Math.max(0, resultItems.findIndex(item => item.id === activeAssetId));
-  const activeItem = resultItems[activeIndex] ?? resultItems[0];
-  const activePosition = activeIndex + 1;
-  const stopPointer = (event: ReactPointerEvent<HTMLButtonElement>): void => {
-    event.stopPropagation();
-  };
-  return (
-    <div className="nodrag min-w-0 rounded-md border border-emerald-400/20 bg-emerald-500/5 p-1">
-      <div className="mb-1 flex min-w-0 items-center justify-between gap-2 px-1">
-        <span className="truncate text-[10px] font-semibold text-emerald-100" title={compactBoardModelLabel(activeItem.model)}>
-          {activeItem.type} · {activePosition}/{resultItems.length} · {compactBoardModelLabel(activeItem.model)}
-        </span>
-        <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[9px] font-semibold ${
-          hasResultConnection
-            ? "border-emerald-300/30 bg-emerald-500/15 text-emerald-100"
-            : "border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)]"
-        }`}>
-          {hasResultConnection ? "已上板" : "未上板"}
-        </span>
-      </div>
-      <div className="flex min-h-10 min-w-0 items-center gap-1 overflow-x-auto">
-        {resultItems.map((item, index) => {
-          const isActive = item.id === activeItem.id;
-          return (
-            <div key={item.id} className="relative h-8 w-8 shrink-0">
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onSelectResult(item.id);
-                }}
-                onDoubleClick={(event) => {
-                  event.stopPropagation();
-                  onOpenResult?.(item);
-                }}
-                onPointerDown={stopPointer}
-                className={`h-full w-full overflow-hidden rounded border transition ${
-                  isActive ? "border-emerald-300 ring-2 ring-emerald-400/25" : "border-[var(--iw-border)] opacity-75 hover:opacity-100"
-                }`}
-                title={`结果 ${index + 1} · ${compactBoardModelLabel(item.model)}`}
-              >
-                {item.type === "transcript" ? (
-                  <div className="flex h-full w-full items-center justify-center bg-cyan-950/35">
-                    <FileText className="h-4 w-4 text-cyan-200" />
-                  </div>
-                ) : (
-                  <MediaReferenceThumbnail reference={{ type: item.type, url: item.url }} alt="" className="h-full w-full" />
-                )}
-                <span className="absolute bottom-0 right-0 rounded-tl bg-black/60 px-1 text-[8px] font-semibold text-white">
-                  {index + 1}
-                </span>
-              </button>
-              {onMaterializeResult ? (
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onMaterializeResult(item.id);
-                  }}
-                  onPointerDown={stopPointer}
-                  className="absolute right-0 top-0 flex h-4 w-4 items-center justify-center rounded-bl rounded-tr border-b border-l border-emerald-200/60 bg-emerald-500 text-white shadow transition hover:bg-emerald-400"
-                  title="放到画板"
-                >
-                  <Plus className="h-2.5 w-2.5" />
-                </button>
-              ) : null}
-              {item.type === "audio" && onSaveVoiceProfile ? (
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onSaveVoiceProfile(item);
-                  }}
-                  onPointerDown={stopPointer}
-                  className="absolute bottom-0 left-0 flex h-4 w-4 items-center justify-center rounded-br rounded-tl border-r border-t border-cyan-200/60 bg-cyan-600 text-white shadow transition hover:bg-cyan-500"
-                  title="保存为克隆音色"
-                >
-                  <Mic2 className="h-2.5 w-2.5" />
-                </button>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 function statusText(node: GenerateNode): string {
   if (node.status === "processing") return "处理中";
@@ -240,15 +126,10 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
   node,
   onCancel,
   onExecute,
-  onMaterializeResult,
-  onOpenResult,
-  onSaveVoiceProfile,
   onSelectReference,
-  onSelectResult,
   onUpdate,
   references,
   resultItems,
-  activeResultAssetId,
   showReferencePreviews = true,
   taskSummary,
 }: GenerateBoardNodeProps) {
@@ -422,15 +303,6 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
           </div>
         </div>
       )}
-      <BoardResultStack
-        activeAssetId={activeResultAssetId}
-        hasResultConnection={hasResultConnection}
-        onMaterializeResult={onMaterializeResult}
-        onOpenResult={onOpenResult}
-        onSaveVoiceProfile={onSaveVoiceProfile}
-        onSelectResult={onSelectResult}
-        resultItems={resultItems}
-      />
       <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
         <span className={`imagine-status-chip truncate text-[10px] font-mono ${node.status === "failed" ? "text-red-300" : "text-[var(--iw-muted)]"}`} data-status={node.status}>
           {node.errorMessage ?? statusLabel}

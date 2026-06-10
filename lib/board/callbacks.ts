@@ -28,14 +28,12 @@ export interface BoardNodeCallbacks {
   onFocusReferenceSource: (nodeId: string) => void;
   onMoveReferenceGroupItem: (nodeId: string, assetId: string, direction: "up" | "down") => void;
   onMoveGenerateReferenceEdge: (nodeId: string, sourceEdgeId: string, targetEdgeId: string) => void;
-  onMaterializeGenerateResult: (nodeId: string, assetId: string) => void;
   onRemoveGenerateReferenceEdge: (edgeId: string) => void;
   onRemoveReferenceGroupItem: (nodeId: string, assetId: string) => void;
   onSendAgent: (nodeId: string) => void;
   onSendAssetToAgent: (nodeId: string) => void;
   onSelectPromptReference: (nodeId: string, reference: BoardPromptReference) => void;
   onSelectAssetStackResult: (nodeId: string, assetId: string) => void;
-  onSelectGenerateResult: (nodeId: string, assetId: string) => void;
   onUpdateReferenceGroupItemRole: (nodeId: string, assetId: string, role: BoardReferenceRole) => void;
   onUpdateAgent: (nodeId: string, instruction: string) => void;
   onUpdateGenerate: (nodeId: string, input: BoardGenerateNodeUpdate) => void;
