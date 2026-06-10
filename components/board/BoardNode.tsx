@@ -30,6 +30,7 @@ export interface BoardFlowNodeData extends Record<string, unknown> {
   generateInputSummary?: BoardGenerateInputSummary;
   generateReferences: BoardPromptReference[];
   generateTaskSummary?: BoardGenerateTaskSummary;
+  connectedResultNodeId?: string;
   hasResultConnection?: boolean;
   node: BoardNodeModel;
   promptReferences: BoardPromptReference[];
@@ -226,6 +227,8 @@ function GenerateReferenceShelf({
 function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
   const c = useBoardNodeCallbacks();
   const { node } = data;
+  const connectedResultNodeId = data.connectedResultNodeId;
+  const focusConnectedResultNode = connectedResultNodeId ? () => c.onFocusNode(connectedResultNodeId) : undefined;
   const isMediaNode = node.kind === "asset" || node.kind === "result";
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [draftTitle, setDraftTitle] = useState(node.title);
@@ -491,6 +494,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             taskSummary={data.generateTaskSummary}
             onCancel={() => c.onCancelGenerate(node.id)}
             onExecute={() => c.onExecuteGenerate(node.id)}
+            onFocusResultNode={focusConnectedResultNode}
             onSelectReference={reference => c.onSelectPromptReference(node.id, reference)}
             onUpdate={input => c.onUpdateGenerate(node.id, input)}
           />
@@ -503,6 +507,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             references={data.generateReferences}
             onExecute={() => c.onExecuteGenerate(node.id)}
             onFetchAppSchema={c.onFetchRunningHubAppSchema}
+            onFocusResultNode={focusConnectedResultNode}
             onSelectReference={reference => c.onSelectPromptReference(node.id, reference)}
             onUpdate={input => c.onUpdateRunningHubApp(node.id, input)}
             resultItems={data.resultItems}

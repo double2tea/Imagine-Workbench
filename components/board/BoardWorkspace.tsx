@@ -327,6 +327,7 @@ function sameGenerateTaskSummary(
 function sameFlowNodeDataModel(left: BoardFlowNode["data"], right: BoardFlowNode["data"]): boolean {
   return (
     sameBoardNodeRenderModel(left.node, right.node) &&
+    left.connectedResultNodeId === right.connectedResultNodeId &&
     left.hasResultConnection === right.hasResultConnection &&
     left.compareReferenceUrl === right.compareReferenceUrl &&
     sameGenerateInputSummary(left.generateInputSummary, right.generateInputSummary) &&
@@ -1288,6 +1289,7 @@ export default function BoardWorkspace({
           : [];
       dataById.set(node.id, {
         boardId: board.id,
+        connectedResultNodeId: connectedResultNode?.id,
         generateInputSummary: generateInputSummaryForNode(node, boardPromptReferenceGraphIndex),
         hasResultConnection: connectedResultNode !== undefined,
         assetStackItems,
@@ -1323,6 +1325,7 @@ export default function BoardWorkspace({
     onImageQuickEdit,
     onExecuteGenerate: onExecuteGenerateNode,
     onFetchRunningHubAppSchema,
+    onFocusNode: focusReferenceSourceNode,
     onFocusReferenceSource: focusReferenceSourceNode,
     onOpenFullscreen,
     onOpenPanorama,
@@ -1446,6 +1449,7 @@ export default function BoardWorkspace({
           existing.generateReferences === cachedData.generateReferences &&
           existing.promptReferences === cachedData.promptReferences &&
           existing.generateInputSummary === cachedData.generateInputSummary &&
+          existing.connectedResultNodeId === cachedData.connectedResultNodeId &&
           existing.hasResultConnection === cachedData.hasResultConnection &&
           existing.resultItems === cachedData.resultItems &&
           existing.assetStackItems === cachedData.assetStackItems &&

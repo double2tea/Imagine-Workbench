@@ -13,7 +13,7 @@ import {
   Settings2,
   Trash2,
 } from "lucide-react";
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useState, type PointerEvent as ReactPointerEvent } from "react";
 import BoardPromptTextarea from "@/components/board/BoardPromptTextarea";
 import type { BoardGenerateInputSummary } from "@/components/board/GenerateBoardNode";
 import type { StorageItem } from "@/lib/db";
@@ -44,6 +44,7 @@ interface RunningHubAppBoardNodeProps {
   node: BoardRunningHubAppNode;
   onExecute: () => void;
   onFetchAppSchema: (webappId: string) => Promise<BoardRunningHubAppSchemaResult>;
+  onFocusResultNode?: () => void;
   onSelectReference?: (reference: BoardPromptReference, index: number) => void;
   onUpdate: (input: BoardRunningHubAppNodeUpdate) => void;
   references: BoardPromptReference[];
@@ -247,6 +248,7 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
   node,
   onExecute,
   onFetchAppSchema,
+  onFocusResultNode,
   onSelectReference,
   onUpdate,
   references,
@@ -266,6 +268,12 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
     ? `${readiness.enabledCount}/${node.bindings.length} 字段`
     : "未读取字段";
   const currentSavedTarget = savedTargets.find(target => target.id === savedTargetId(node.targetType, node.targetId));
+  const resultTone = resultItems.length > 0 ? hasResultConnection ? "result" : "ok" : "neutral";
+  const resultLabel = resultStatusLabel(hasResultConnection, resultItems.length);
+  const focusResultNode = hasResultConnection ? onFocusResultNode : undefined;
+  const stopBoardControlPointer = (event: ReactPointerEvent<HTMLButtonElement>): void => {
+    event.stopPropagation();
+  };
 
   useEffect(() => {
     setSavedTargets(readSavedTargets());
@@ -513,9 +521,25 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
               {isReady ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
               {!hasTarget ? "缺少目标" : isReady ? "可运行" : `${readiness.missingCount} 缺少`}
             </span>
-            <span className={chipClass} data-tone={resultItems.length > 0 ? hasResultConnection ? "result" : "ok" : "neutral"}>
-              {resultStatusLabel(hasResultConnection, resultItems.length)}
-            </span>
+            {focusResultNode ? (
+              <button
+                type="button"
+                className={`${chipClass} nodrag cursor-pointer transition hover:border-emerald-400/40 hover:bg-emerald-500/15`}
+                data-tone={resultTone}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  focusResultNode();
+                }}
+                onPointerDown={stopBoardControlPointer}
+                title="定位结果节点"
+              >
+                {resultLabel}
+              </button>
+            ) : (
+              <span className={chipClass} data-tone={resultTone}>
+                {resultLabel}
+              </span>
+            )}
           </div>
 
           {isImportOpen && (

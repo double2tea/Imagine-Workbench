@@ -15,15 +15,17 @@ export interface BoardMediaActionGroup {
 
 interface BoardMediaActionBarProps {
   groups: BoardMediaActionGroup[];
+  visible?: boolean;
 }
 
-export default function BoardMediaActionBar({ groups }: BoardMediaActionBarProps) {
+export default function BoardMediaActionBar({ groups, visible = false }: BoardMediaActionBarProps) {
   const visibleGroups = groups.filter(group => group.actions.length > 0);
   if (visibleGroups.length === 0) return null;
+  const visibilityClass = visible ? "opacity-100" : "opacity-0 hover:opacity-100 group-hover/board-video:opacity-100";
 
   return (
     <div
-      className="board-media-controls board-media-top-actions nodrag nopan absolute -top-10 right-0 z-40 flex max-w-full items-center gap-1 opacity-0 transition-opacity duration-200 hover:opacity-100 group-hover/board-video:opacity-100"
+      className={`board-media-controls board-media-top-actions nodrag nopan absolute -top-10 right-0 z-40 flex max-w-full items-center gap-1 transition-opacity duration-200 ${visibilityClass}`}
       onPointerDown={event => event.stopPropagation()}
     >
       {visibleGroups.map(group => (

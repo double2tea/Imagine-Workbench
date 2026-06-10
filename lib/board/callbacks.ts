@@ -25,6 +25,7 @@ export interface BoardNodeCallbacks {
   onImageQuickEdit: (nodeId: string, operation: ImageEditFeature) => void;
   onExecuteGenerate: (nodeId: string) => void;
   onFetchRunningHubAppSchema: (webappId: string) => Promise<BoardRunningHubAppSchemaResult>;
+  onFocusNode: (nodeId: string) => void;
   onFocusReferenceSource: (nodeId: string) => void;
   onMoveReferenceGroupItem: (nodeId: string, assetId: string, direction: "up" | "down") => void;
   onMoveGenerateReferenceEdge: (nodeId: string, sourceEdgeId: string, targetEdgeId: string) => void;

@@ -53,6 +53,7 @@ interface GenerateBoardNodeProps {
   taskSummary?: BoardGenerateTaskSummary;
   onCancel?: () => void;
   onExecute: () => void;
+  onFocusResultNode?: () => void;
   onSelectReference?: (reference: BoardPromptReference, index: number) => void;
   onUpdate: (input: BoardGenerateNodeUpdate) => void;
   references: BoardPromptReference[];
@@ -60,6 +61,14 @@ interface GenerateBoardNodeProps {
 }
 
 type GenerateContextTone = "failed" | "neutral" | "ok" | "processing" | "prompt" | "reference" | "result";
+type GenerateContextItem = {
+  key: string;
+  label: string;
+  onClick?: () => void;
+  title: string;
+  tone: GenerateContextTone;
+  tooltip?: string;
+};
 type GenerateStatusLineTone = "complete" | "failed" | "idle" | "processing";
 
 function statusText(node: GenerateNode): string {
@@ -124,6 +133,7 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
   node,
   onCancel,
   onExecute,
+  onFocusResultNode,
   onSelectReference,
   onUpdate,
   references,
@@ -177,7 +187,7 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
   const referenceContext = referenceCount > 0
     ? { title: `${referenceCount} 个`, tone: "reference" as const }
     : { title: "无", tone: "neutral" as const };
-  const contextItems: Array<{ key: string; label: string; title: string; tone: GenerateContextTone; tooltip?: string }> = [
+  const contextItems: GenerateContextItem[] = [
     {
       key: "prompt",
       label: promptContextLabel,
@@ -188,7 +198,13 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
         : promptPreview !== null ? `来自 ${promptSourceTitle ?? "Prompt 节点"}` : "使用节点内提示词",
     },
     { key: "references", label: "参考", title: referenceContext.title, tone: referenceContext.tone },
-    { key: "result", label: "结果", title: result.title, tone: result.tone },
+    {
+      key: "result",
+      label: "结果",
+      title: result.title,
+      tone: result.tone,
+      ...(hasResultConnection && onFocusResultNode ? { onClick: onFocusResultNode, tooltip: "定位结果节点" } : {}),
+    },
     {
       key: "run",
       label: "运行",
@@ -272,16 +288,35 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
         />
       </div>
       <div className="flex min-w-0 items-center gap-1 overflow-hidden rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-1">
-        {contextItems.map(item => (
-          <span
-            key={item.key}
-            data-tone={item.tone}
-            className={`imagine-generate-context-chip flex min-w-0 flex-1 items-center justify-center gap-1 rounded px-1.5 py-1 ${contextToneClass(item.tone)}`}
-            title={item.tooltip}
-          >
-            <span className="truncate text-[10px] font-semibold">{item.label} · {item.title}</span>
-          </span>
-        ))}
+        {contextItems.map(item => {
+          const className = `imagine-generate-context-chip flex min-w-0 flex-1 items-center justify-center gap-1 rounded px-1.5 py-1 ${contextToneClass(item.tone)}`;
+          const content = <span className="truncate text-[10px] font-semibold">{item.label} · {item.title}</span>;
+          return item.onClick ? (
+            <button
+              key={item.key}
+              type="button"
+              data-tone={item.tone}
+              className={`${className} nodrag cursor-pointer transition hover:border-emerald-400/40 hover:bg-emerald-500/15`}
+              title={item.tooltip}
+              onClick={(event) => {
+                event.stopPropagation();
+                item.onClick?.();
+              }}
+              onPointerDown={stopBoardControlPointer}
+            >
+              {content}
+            </button>
+          ) : (
+            <span
+              key={item.key}
+              data-tone={item.tone}
+              className={className}
+              title={item.tooltip}
+            >
+              {content}
+            </span>
+          );
+        })}
       </div>
       {showReferencePreviews && referencePreviews.length > 0 && (
         <div className="flex min-h-6 min-w-0 items-center gap-1.5">
