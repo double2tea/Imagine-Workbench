@@ -29,7 +29,7 @@
       tab: "image",
       title: "图像生成",
       subtitle: "生成高质量图片",
-      icon: "图",
+      icon: "image",
       promptLabel: "提示词",
       placeholder: "描述要生成的画面",
       sources: [],
@@ -40,7 +40,7 @@
       tab: "image",
       title: "图像编辑",
       subtitle: "基于当前帧或图片重绘",
-      icon: "改",
+      icon: "edit",
       promptLabel: "提示词",
       placeholder: "描述要如何修改当前帧或图片",
       sources: ["current-frame", "current-clip-source"],
@@ -52,7 +52,7 @@
       tab: "video",
       title: "视频生成",
       subtitle: "生成或延展视频片段",
-      icon: "影",
+      icon: "video",
       promptLabel: "提示词",
       placeholder: "描述要生成的视频，或如何延展当前素材",
       sources: ["timeline-inout-render", "current-clip-render", "current-frame", "current-clip-source"],
@@ -64,7 +64,7 @@
       tab: "audio",
       title: "字幕转写",
       subtitle: "从音频或视频生成字幕",
-      icon: "字",
+      icon: "caption",
       promptLabel: "无需提示词",
       placeholder: "转写会使用所选参考源",
       sources: ["timeline-inout-render", "current-clip-render", "current-clip-source"],
@@ -76,7 +76,7 @@
       tab: "audio",
       title: "文本配音",
       subtitle: "生成临时配音",
-      icon: "声",
+      icon: "voice",
       promptLabel: "配音文本",
       placeholder: "输入要生成的旁白或配音文本",
       sources: [],
@@ -87,7 +87,7 @@
       tab: "apps",
       title: "连接检查",
       subtitle: "检查 Workbench 与 Resolve 状态",
-      icon: "检",
+      icon: "status",
       promptLabel: "无需提示词",
       placeholder: "连接检查会验证 Workbench 与 Resolve 状态",
       sources: [],
@@ -104,19 +104,19 @@
   };
   var tabLabels = {
     image: {
-      title: "图像",
+      title: "工具",
       subtitle: "生成图片，或基于当前帧快速重绘"
     },
     video: {
-      title: "视频",
+      title: "工具",
       subtitle: "用提示词和参考片段生成新镜头"
     },
     audio: {
-      title: "音频",
+      title: "工具",
       subtitle: "生成配音，转写音频或视频字幕"
     },
     apps: {
-      title: "全部工具",
+      title: "工具",
       subtitle: "选择下一步要创建或处理的内容"
     }
   };
@@ -233,12 +233,25 @@
       var button = document.createElement("button");
       button.type = "button";
       button.className = "app-card" + (operation === state.operation ? " active" : "");
-      button.innerHTML = '<div class="card-icon">' + config.icon + '</div><div class="card-title">' + config.title + '</div><div class="card-subtitle">' + config.subtitle + "</div>";
+      button.innerHTML = '<div class="card-icon">' + operationIcon(config.icon) + '</div><div class="card-title">' + config.title + '</div><div class="card-subtitle">' + config.subtitle + "</div>";
       button.addEventListener("click", function () {
         selectOperation(operation);
       });
       grid.appendChild(button);
     });
+  }
+
+  function operationIcon(name) {
+    var attrs = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
+    var icons = {
+      image: '<svg ' + attrs + '><rect x="3.5" y="4" width="17" height="16" rx="2.5"></rect><circle cx="8.5" cy="9" r="1.5"></circle><path d="m4 17 5.2-5.2a1.6 1.6 0 0 1 2.25 0L16 16.4"></path><path d="m14 14.5 1.4-1.4a1.6 1.6 0 0 1 2.25 0L20.5 16"></path></svg>',
+      edit: '<svg ' + attrs + '><path d="m13.5 5.5 5 5"></path><path d="M4.5 19.5 6 14l9.7-9.7a2.1 2.1 0 0 1 3 3L9 17z"></path><path d="m8.5 16 2.8 2.8"></path><path d="M15 15.5h5"></path><path d="M17.5 13v5"></path></svg>',
+      video: '<svg ' + attrs + '><rect x="3.5" y="6" width="13" height="12" rx="2"></rect><path d="m16.5 10 4-2.3v8.6l-4-2.3z"></path><path d="M7.5 3.8 9 6"></path><path d="M13.5 3.8 12 6"></path></svg>',
+      caption: '<svg ' + attrs + '><rect x="4" y="5" width="16" height="14" rx="2.5"></rect><path d="M8 10h8"></path><path d="M8 14h4.8"></path></svg>',
+      voice: '<svg ' + attrs + '><path d="M4 13v-2"></path><path d="M8 17V7"></path><path d="M12 20V4"></path><path d="M16 17V7"></path><path d="M20 13v-2"></path></svg>',
+      status: '<svg ' + attrs + '><path d="M8.5 12a3.5 3.5 0 0 1 7 0"></path><path d="M6 15.5a7 7 0 0 1 12 0"></path><path d="M12 12l3-3"></path><path d="M12 19.5a7.5 7.5 0 1 0-7.5-7.5"></path></svg>'
+    };
+    return icons[name] || "";
   }
 
   function renderSources(config) {
