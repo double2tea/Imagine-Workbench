@@ -373,19 +373,20 @@
     if (job.operation === "doctor") {
       return doctor(job);
     }
+    if (job.operation === "edit-image") {
+      requireImageEditPrompt(job);
+      var maskResult = await prepareImageEditMask(job);
+      var editModel = await modelForOperation(job.baseUrl, job.operation);
+      var editedPath = await editImage(job, editModel, maskResult.imagePath, maskResult.maskPath);
+      await importOutputs(job, [editedPath]);
+      return [editedPath];
+    }
     var model = await modelForOperation(job.baseUrl, job.operation);
     if (job.operation === "generate-image") {
       requireText(job.prompt, "提示词");
       var imagePath = await generateImage(job, model);
       await importOutputs(job, [imagePath]);
       return [imagePath];
-    }
-    if (job.operation === "edit-image") {
-      requireImageEditPrompt(job);
-      var maskResult = await prepareImageEditMask(job);
-      var editedPath = await editImage(job, model, maskResult.imagePath, maskResult.maskPath);
-      await importOutputs(job, [editedPath]);
-      return [editedPath];
     }
     if (job.operation === "generate-video") {
       requireText(job.prompt, "提示词");
@@ -417,7 +418,7 @@
       return { imagePath: imagePath, maskPath: "" };
     }
     if (preparedMaskMatches(job)) {
-      setStatus("使用已准备遮罩\n" + describeJob(job));
+      setStatus("使用已准备遮罩\n" + describeJob(job) + "\n" + preparedMaskSourceLine(state.preparedMask));
       return state.preparedMask.result;
     }
     throw new Error(maskRequiredMessage(operation));
@@ -449,9 +450,10 @@
       state.preparedMask = {
         source: job.image,
         operation: operation,
+        sourcePath: editSource,
         result: result
       };
-      setStatus("遮罩已准备，可点击运行\n" + describeJob(job));
+      setStatus("遮罩已准备，可点击运行\n" + describeJob(job) + "\n" + preparedMaskSourceLine(state.preparedMask));
     } catch (error) {
       setStatus("遮罩准备失败\n" + explainError(error, job));
     } finally {
@@ -469,14 +471,18 @@
     if (prepared.source !== job.image || prepared.operation !== (job.imageOperation || "redraw")) {
       return false;
     }
-    if (!prepared.result || !prepared.result.maskPath) {
+    if (!prepared.sourcePath || !prepared.result || !prepared.result.maskPath) {
       return false;
     }
-    return fs.existsSync(prepared.result.imagePath) && fs.existsSync(prepared.result.maskPath);
+    return fs.existsSync(prepared.sourcePath) && fs.existsSync(prepared.result.imagePath) && fs.existsSync(prepared.result.maskPath);
   }
 
   function maskRequiredMessage(operation) {
     return imageEditOperationLabel(operation) + "需要先点击“打开遮罩编辑器”，应用遮罩后再运行。";
+  }
+
+  function preparedMaskSourceLine(prepared) {
+    return "缓存源：" + path.basename(prepared.sourcePath);
   }
 
   function clearPreparedMask() {
@@ -496,9 +502,11 @@
     var operation = imageOperationInput.value || "redraw";
     maskPrepareButton.disabled = state.running;
     if (state.preparedMask && state.preparedMask.source === state.source && state.preparedMask.operation === operation) {
-      maskPrepareHint.textContent = "遮罩已准备，可直接运行";
+      maskPrepareButton.textContent = "重新准备遮罩";
+      maskPrepareHint.textContent = "遮罩已准备，将使用缓存源：" + path.basename(state.preparedMask.sourcePath);
       return;
     }
+    maskPrepareButton.textContent = "打开遮罩编辑器";
     maskPrepareHint.textContent = imageEditHint(operation);
   }
 
