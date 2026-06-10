@@ -281,13 +281,13 @@ macOS user Scripts folder:
 ~/Library/Application Support/Blackmagic Design/DaVinci Resolve/Fusion/Scripts/Utility
 ```
 
-Create a job file:
+The first menu run creates a safe starter job if none exists:
 
 ```text
 ~/Movies/Imagine Resolve Bridge/job.json
 ```
 
-Example job:
+The starter job runs `doctor` against `http://localhost:3000`. Edit that file for the operation you want. Example job:
 
 ```json
 {

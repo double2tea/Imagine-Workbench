@@ -26,6 +26,10 @@ DEFAULT_OUTPUT_DIR = Path("~/Movies/Imagine Resolve Bridge").expanduser()
 DEFAULT_CACHE_DIR = Path("~/Library/Caches/Imagine Workbench/Resolve Bridge").expanduser()
 DEFAULT_JOB_PATH = DEFAULT_OUTPUT_DIR / "job.json"
 DEFAULT_RENDER_TIMEOUT_SECONDS = 1800
+DEFAULT_IN_RESOLVE_JOB = {
+    "operation": "doctor",
+    "baseUrl": "http://localhost:3000",
+}
 
 
 @dataclass(frozen=True)
@@ -512,11 +516,16 @@ def run_job(job_path: Path, internal_resolve: Any | None = None) -> list[Path]:
     return run_cli(argv, internal_resolve)
 
 
-def run_in_resolve() -> list[Path]:
+def run_in_resolve(internal_resolve: Any | None = None) -> list[Path]:
     job_path = Path(os.environ.get("IMAGINE_RESOLVE_JOB", str(DEFAULT_JOB_PATH))).expanduser()
     if not job_path.is_file():
-        raise RuntimeError(f"Resolve job file not found: {job_path}")
-    return run_job(job_path)
+        write_default_job(job_path)
+    return run_job(job_path, internal_resolve)
+
+
+def write_default_job(job_path: Path) -> None:
+    job_path.parent.mkdir(parents=True, exist_ok=True)
+    job_path.write_text(json.dumps(DEFAULT_IN_RESOLVE_JOB, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def job_to_argv(job: dict[str, Any]) -> list[str]:
