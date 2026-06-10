@@ -287,7 +287,14 @@ Open the panel from Resolve:
 Workspace -> Scripts -> Utility -> ImagineWorkbenchResolve
 ```
 
-The panel lets you choose an operation, model, Resolve source, prompt/text, output name, and whether to import or append the result.
+The panel lets you choose an operation, model, Resolve source, prompt/text, output name, and whether to import or append the result. Operation changes update the available fields automatically:
+
+- `generate-video`: shows Resolve source choices and `Poll Seconds`.
+- `edit-image`: shows image source choices and `Image Operation`.
+- `generate-image`: hides source controls.
+- `transcribe`: shows source and language controls, hides prompt.
+- `tts`: treats the prompt box as narration text.
+- `doctor`: hides model/source/prompt execution fields.
 
 Common panel choices:
 

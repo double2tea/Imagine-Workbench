@@ -38,6 +38,86 @@ DEFAULT_MODELS = {
     "tts": "mimo:mimo-v2.5-tts",
     "transcribe": "mimo:mimo-v2.5-asr",
 }
+PANEL_OPERATION_CONFIG = {
+    "generate-video": {
+        "sources": ["timeline-inout-render", "current-clip-render", "current-frame", "current-clip-source"],
+        "promptLabel": "Prompt",
+        "promptPlaceholder": "Describe the generated video or continuation.",
+        "needsPrompt": True,
+        "needsSource": True,
+        "needsModel": True,
+        "showImageOperation": False,
+        "showPollSeconds": True,
+        "showLanguage": False,
+        "canImport": True,
+        "canAppend": True,
+    },
+    "edit-image": {
+        "sources": ["current-frame", "current-clip-source"],
+        "promptLabel": "Prompt",
+        "promptPlaceholder": "Describe the image edit.",
+        "needsPrompt": True,
+        "needsSource": True,
+        "needsModel": True,
+        "showImageOperation": True,
+        "showPollSeconds": False,
+        "showLanguage": False,
+        "canImport": True,
+        "canAppend": False,
+    },
+    "generate-image": {
+        "sources": [],
+        "promptLabel": "Prompt",
+        "promptPlaceholder": "Describe the generated image.",
+        "needsPrompt": True,
+        "needsSource": False,
+        "needsModel": True,
+        "showImageOperation": False,
+        "showPollSeconds": False,
+        "showLanguage": False,
+        "canImport": True,
+        "canAppend": False,
+    },
+    "transcribe": {
+        "sources": ["timeline-inout-render", "current-clip-render", "current-clip-source"],
+        "promptLabel": "No prompt needed",
+        "promptPlaceholder": "Transcribe uses the selected source.",
+        "needsPrompt": False,
+        "needsSource": True,
+        "needsModel": True,
+        "showImageOperation": False,
+        "showPollSeconds": False,
+        "showLanguage": True,
+        "canImport": False,
+        "canAppend": False,
+    },
+    "tts": {
+        "sources": [],
+        "promptLabel": "Text",
+        "promptPlaceholder": "Enter narration text.",
+        "needsPrompt": True,
+        "needsSource": False,
+        "needsModel": True,
+        "showImageOperation": False,
+        "showPollSeconds": False,
+        "showLanguage": False,
+        "canImport": True,
+        "canAppend": False,
+    },
+    "doctor": {
+        "sources": [],
+        "promptLabel": "No prompt needed",
+        "promptPlaceholder": "Doctor checks Workbench and Resolve connectivity.",
+        "needsPrompt": False,
+        "needsSource": False,
+        "needsModel": False,
+        "showImageOperation": False,
+        "showPollSeconds": False,
+        "showLanguage": False,
+        "canImport": False,
+        "canAppend": False,
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -575,6 +655,13 @@ def panel_values_to_job(values: dict[str, Any]) -> dict[str, Any]:
     return job
 
 
+def panel_config_for_operation(operation: str) -> dict[str, Any]:
+    config = PANEL_OPERATION_CONFIG.get(operation)
+    if not isinstance(config, dict):
+        raise RuntimeError(f"Unsupported panel operation: {operation}")
+    return config
+
+
 def job_to_argv(job: dict[str, Any]) -> list[str]:
     operation = require_job_text(job, "operation")
     global_argv: list[str] = []
@@ -840,22 +927,32 @@ def show_resolve_panel(internal_resolve: Any | None = None) -> list[Path]:
     win = dispatcher.AddWindow({
         "ID": window_id,
         "WindowTitle": "Imagine Workbench",
-        "Geometry": [220, 220, 620, 560],
+        "Geometry": [220, 220, 660, 640],
     }, ui.VGroup({"Spacing": 8}, [
         ui.Label({"Text": "<b>Imagine Workbench Resolve Bridge</b>", "Weight": 0}),
         ui.HGroup({"Weight": 0}, [
             ui.Label({"Text": "Operation", "Weight": 0.25}),
             ui.ComboBox({"ID": "operation", "Weight": 0.75}),
         ]),
+        ui.HGroup({"ID": "baseUrlRow", "Weight": 0}, [
+            ui.Label({"Text": "Workbench URL", "Weight": 0.25}),
+            ui.LineEdit({"ID": "baseUrl", "Text": "http://localhost:3000", "Weight": 0.75}),
+        ]),
         ui.HGroup({"Weight": 0}, [
             ui.Label({"Text": "Model", "Weight": 0.25}),
             ui.LineEdit({"ID": "model", "Text": DEFAULT_MODELS["generate-video"], "Weight": 0.75}),
         ]),
-        ui.HGroup({"Weight": 0}, [
+        ui.HGroup({"ID": "sourceRow", "Weight": 0}, [
             ui.Label({"Text": "Source", "Weight": 0.25}),
-            ui.ComboBox({"ID": "source", "Weight": 0.75}),
+            ui.ComboBox({"ID": "source", "Editable": True, "Weight": 0.75}),
         ]),
-        ui.Label({"Text": "Prompt / Text", "Weight": 0}),
+        ui.HGroup({"ID": "advancedRow", "Weight": 0}, [
+            ui.Label({"ID": "imageOperationLabel", "Text": "Image Operation", "Weight": 0.25}),
+            ui.ComboBox({"ID": "imageOperation", "Weight": 0.25}),
+            ui.Label({"ID": "pollSecondsLabel", "Text": "Poll Seconds", "Weight": 0.2}),
+            ui.SpinBox({"ID": "pollSeconds", "Minimum": 30, "Maximum": 3600, "Value": 600, "SingleStep": 30, "Weight": 0.3}),
+        ]),
+        ui.Label({"ID": "promptLabel", "Text": "Prompt", "Weight": 0}),
         ui.TextEdit({"ID": "prompt", "PlaceholderText": "Describe the image/video edit, or enter TTS text.", "Weight": 1}),
         ui.HGroup({"Weight": 0}, [
             ui.Label({"Text": "Output Name", "Weight": 0.25}),
@@ -864,7 +961,7 @@ def show_resolve_panel(internal_resolve: Any | None = None) -> list[Path]:
         ui.HGroup({"Weight": 0}, [
             ui.CheckBox({"ID": "importToResolve", "Text": "Import result", "Checked": True}),
             ui.CheckBox({"ID": "appendToTimeline", "Text": "Append to timeline"}),
-            ui.Label({"Text": "Language", "Weight": 0.12}),
+            ui.Label({"ID": "languageLabel", "Text": "Language", "Weight": 0.12}),
             ui.LineEdit({"ID": "language", "Text": "auto", "Weight": 0.22}),
         ]),
         ui.TextEdit({"ID": "status", "ReadOnly": True, "Weight": 0.55}),
@@ -877,20 +974,23 @@ def show_resolve_panel(internal_resolve: Any | None = None) -> list[Path]:
     ]))
 
     items = win.GetItems()
-    items["operation"].AddItems(["generate-video", "edit-image", "generate-image", "transcribe", "tts", "doctor"])
-    items["source"].AddItems(["current-frame", "current-clip-render", "timeline-inout-render", "current-clip-source"])
+    items["operation"].AddItems(list(PANEL_OPERATION_CONFIG.keys()))
+    items["operation"].CurrentIndex = 0
+    items["imageOperation"].AddItems(["redraw", "erase", "outpaint", "cutout"])
     items["status"].PlainText = f"Job file: {DEFAULT_JOB_PATH}\nOutputs: {DEFAULT_OUTPUT_DIR}\nCache: {DEFAULT_CACHE_DIR}"
 
     def values_for(operation: str | None = None) -> dict[str, Any]:
         selected_operation = operation or items["operation"].CurrentText
         return {
             "operation": selected_operation,
-            "baseUrl": "http://localhost:3000",
+            "baseUrl": items["baseUrl"].Text,
             "model": items["model"].Text,
             "source": items["source"].CurrentText,
             "prompt": items["prompt"].PlainText,
             "outputName": items["outputName"].Text,
             "language": items["language"].Text,
+            "imageOperation": items["imageOperation"].CurrentText,
+            "pollSeconds": items["pollSeconds"].Value,
             "importToResolve": items["importToResolve"].Checked,
             "appendToTimeline": items["appendToTimeline"].Checked,
         }
@@ -907,10 +1007,48 @@ def show_resolve_panel(internal_resolve: Any | None = None) -> list[Path]:
     def on_close(ev: Any) -> None:
         dispatcher.ExitLoop()
 
-    def on_operation_changed(ev: Any) -> None:
-        operation = items["operation"].CurrentText
-        if items["model"].Text in set(DEFAULT_MODELS.values()) or not items["model"].Text.strip():
+    def set_visible(element_id: str, visible: bool) -> None:
+        if element_id in items:
+            items[element_id].Hidden = not visible
+
+    def set_enabled(element_id: str, enabled: bool) -> None:
+        if element_id in items:
+            items[element_id].Enabled = enabled
+
+    def apply_operation_config(operation: str) -> None:
+        config = panel_config_for_operation(operation)
+        current_model = items["model"].Text
+        if current_model in set(DEFAULT_MODELS.values()) or not current_model.strip():
             items["model"].Text = DEFAULT_MODELS.get(operation, "")
+        items["source"].Clear()
+        sources = config["sources"]
+        if sources:
+            items["source"].AddItems(sources)
+            items["source"].CurrentIndex = 0
+        set_enabled("model", bool(config["needsModel"]))
+        set_enabled("source", bool(config["needsSource"]))
+        set_enabled("prompt", bool(config["needsPrompt"]))
+        items["promptLabel"].Text = str(config["promptLabel"])
+        items["prompt"].PlaceholderText = str(config["promptPlaceholder"])
+        set_visible("sourceRow", bool(config["needsSource"]))
+        set_visible("imageOperationLabel", bool(config["showImageOperation"]))
+        set_visible("imageOperation", bool(config["showImageOperation"]))
+        set_visible("pollSecondsLabel", bool(config["showPollSeconds"]))
+        set_visible("pollSeconds", bool(config["showPollSeconds"]))
+        set_visible("languageLabel", bool(config["showLanguage"]))
+        set_visible("language", bool(config["showLanguage"]))
+        set_enabled("importToResolve", bool(config["canImport"]))
+        set_enabled("appendToTimeline", bool(config["canAppend"]))
+        if not config["canImport"]:
+            items["importToResolve"].Checked = False
+        elif operation in {"generate-image", "edit-image", "generate-video", "tts"}:
+            items["importToResolve"].Checked = True
+        if not config["canAppend"]:
+            items["appendToTimeline"].Checked = False
+        win.RecalcLayout()
+
+    def on_operation_changed(ev: Any) -> None:
+        apply_operation_config(items["operation"].CurrentText)
 
     def on_doctor(ev: Any) -> None:
         try:
@@ -942,6 +1080,7 @@ def show_resolve_panel(internal_resolve: Any | None = None) -> list[Path]:
     win.On["doctor"].Clicked = on_doctor
     win.On["save"].Clicked = on_save
     win.On["run"].Clicked = on_run
+    apply_operation_config(items["operation"].CurrentText)
     win.Show()
     dispatcher.RunLoop()
     return []

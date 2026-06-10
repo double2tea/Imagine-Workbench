@@ -12,7 +12,7 @@ from pathlib import Path
 from threading import Thread
 from typing import Any
 
-from imagine_resolve_bridge import BridgeConfig, BridgeRoutes, ImagineResolveBridge, ResolveController, job_to_argv, main, panel_values_to_job, run_cli, run_in_resolve
+from imagine_resolve_bridge import BridgeConfig, BridgeRoutes, ImagineResolveBridge, ResolveController, job_to_argv, main, panel_config_for_operation, panel_values_to_job, run_cli, run_in_resolve
 from install_resolve_bridge import install, uninstall
 
 
@@ -348,6 +348,19 @@ class ImagineResolveBridgeTests(unittest.TestCase):
         self.assertEqual(job["audio"], "current-clip-render")
         self.assertEqual(job["language"], "auto")
         self.assertNotIn("prompt", job)
+
+    def test_panel_config_is_operation_specific(self) -> None:
+        video = panel_config_for_operation("generate-video")
+        transcribe = panel_config_for_operation("transcribe")
+        doctor = panel_config_for_operation("doctor")
+
+        self.assertIn("timeline-inout-render", video["sources"])
+        self.assertTrue(video["showPollSeconds"])
+        self.assertFalse(video["showLanguage"])
+        self.assertTrue(transcribe["showLanguage"])
+        self.assertFalse(transcribe["needsPrompt"])
+        self.assertFalse(doctor["needsModel"])
+        self.assertFalse(doctor["needsSource"])
 
     def test_install_and_uninstall_helper_copies_bridge_files(self) -> None:
         source_dir = Path(self.tmp.name) / "source"
