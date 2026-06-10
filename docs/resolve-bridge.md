@@ -2,23 +2,25 @@
 
 Imagine Resolve Bridge lets DaVinci Resolve call Imagine Workbench for image generation/editing, video generation, TTS, and transcription/subtitle preparation.
 
-The bridge is a dedicated Imagine Workbench plugin:
+The Resolve plugin runtime is the Workflow Integration panel:
 
 - `--base-url` may point to local, LAN, or deployed Imagine Workbench instances.
-- The in-Resolve panel does not expose model IDs. Each operation uses a built-in default model, while advanced CLI/job automation can still override `model`.
-- Provider behavior stays in Workbench, not in Resolve Python.
+- The plugin panel does not expose model IDs. Each operation uses Workbench capability defaults.
+- Provider behavior stays in Workbench, not in Resolve plugin code.
 - Resolve handles current frame/source media capture and Media Pool import.
+
+The Python bridge remains only as an optional external CLI/debugging tool. It is not installed or used by the Workflow Integration plugin.
 
 LUT creation is not part of this bridge task.
 
 ## Files
 
 ```text
-scripts/resolve/imagine_resolve_bridge.py   Shared external + in-Resolve bridge
-scripts/resolve/ImagineWorkbenchResolve.py  Resolve Workspace -> Scripts entry
+scripts/resolve/imagine_resolve_bridge.py   Optional external CLI/debugging bridge
+scripts/resolve/ImagineWorkbenchResolve.py  Legacy Resolve Workspace -> Scripts entry
 scripts/resolve/install_resolve_bridge.py   macOS install/uninstall helper
-scripts/resolve/workflow-integration/       Modern Workflow Integrations panel shell
-scripts/resolve/job.example.json            In-Resolve job example
+scripts/resolve/workflow-integration/       Workflow Integration plugin runtime
+scripts/resolve/job.example.json            External CLI/job example
 ```
 
 ## Backend Capability Endpoint
@@ -31,28 +33,28 @@ This returns the operations and routes expected by the bridge. It is descriptive
 
 ## Install Into Resolve
 
-Install both the script entry and the Workflow Integration panel into the macOS user Resolve folders:
+Install the Workflow Integration panel into the macOS user Resolve folder:
 
 ```bash
 python3 scripts/resolve/install_resolve_bridge.py install
 ```
 
-Remove both:
+Remove it:
 
 ```bash
 python3 scripts/resolve/install_resolve_bridge.py uninstall
 ```
 
-Install only the lightweight Scripts entry:
+Install the legacy Scripts entry only when you explicitly need Python-side debugging inside Resolve:
 
 ```bash
 python3 scripts/resolve/install_resolve_bridge.py install --kind scripts
 ```
 
-Install only the modern Workflow Integration panel:
+Install both Workflow and legacy Scripts entries:
 
 ```bash
-python3 scripts/resolve/install_resolve_bridge.py install --kind workflow
+python3 scripts/resolve/install_resolve_bridge.py install --kind all
 ```
 
 Default script target:
@@ -65,6 +67,12 @@ Default Workflow Integration target:
 
 ```text
 ~/Library/Application Support/Blackmagic Design/DaVinci Resolve/Workflow Integration Plugins
+```
+
+The installer copies Resolve's official `WorkflowIntegration.node` from the Developer examples folder into the plugin bundle. Override it when testing:
+
+```bash
+python3 scripts/resolve/install_resolve_bridge.py install --workflow-node-source /path/to/WorkflowIntegration.node
 ```
 
 Override the target when testing:
@@ -287,9 +295,9 @@ Rendered reference tokens use Resolve's render queue APIs:
 
 The rendered reference files are cache inputs for model calls. Generated AI outputs remain in the persistent output directory.
 
-## In-Resolve Usage
+## Legacy Scripts Entry
 
-Run the installer above, or copy these two files into a Resolve Scripts folder:
+The legacy Python/UIManager Scripts entry is kept only for debugging. Install it with `--kind scripts`, or copy these two files into a Resolve Scripts folder:
 
 ```text
 scripts/resolve/ImagineWorkbenchResolve.py
@@ -308,7 +316,7 @@ Open the panel from Resolve:
 Workspace -> Scripts -> Utility -> ImagineWorkbenchResolve
 ```
 
-The panel is Chinese-first and lets you choose a function, Resolve source, prompt/text, output name, and whether to import or append the result. It intentionally does not ask editors to type model IDs. Operation changes update the available fields automatically:
+The legacy panel is Chinese-first and lets you choose a function, Resolve source, prompt/text, output name, and whether to import or append the result. It intentionally does not ask editors to type model IDs. Operation changes update the available fields automatically:
 
 - `生成视频`: shows Resolve source choices and `轮询秒数`.
 - `编辑图片`: shows image source choices and `图片操作`.
@@ -331,7 +339,7 @@ The panel writes the selected operation to:
 ~/Movies/Imagine Resolve Bridge/job.json
 ```
 
-That job file remains available for automation or manual editing. If Resolve also shows `imagine_resolve_bridge` in the Scripts menu, running it directly opens the same panel when no CLI arguments are provided.
+That job file remains available for automation or manual editing. If Resolve also shows `imagine_resolve_bridge` in the Scripts menu, running it directly opens the same legacy panel when no CLI arguments are provided.
 
 The saved job file still includes the default `model` used for execution. Edit that field only for advanced testing or automation.
 
@@ -343,7 +351,7 @@ The installer also adds a modern web-style panel:
 Workspace -> Workflow Integrations -> Imagine Workbench
 ```
 
-This panel is the product UI direction inspired by modern plugin panels: dark cards, tabs, a bottom prompt area, and no visible model IDs. It writes the same job file and launches the same Python bridge implementation from the installed plugin bundle.
+This panel is the product UI direction inspired by modern plugin panels: dark cards, tabs, a bottom prompt area, and no visible model IDs. It directly calls Imagine Workbench HTTP routes and talks to Resolve through `WorkflowIntegration.node`; it does not spawn or bundle the Python bridge.
 
 The first version supports:
 
@@ -354,7 +362,7 @@ The first version supports:
 - Subtitle/ASR
 - Connection check
 
-If `Workflow Integrations` is not available in the Resolve build you are using, keep using the Scripts entry above. The Scripts entry remains the debugging and compatibility path.
+If `Workflow Integrations` is not available in the Resolve build you are using, use the legacy Scripts entry only as a debugging/compatibility path.
 
 To use a different job file, set:
 

@@ -422,17 +422,20 @@ class ImagineResolveBridgeTests(unittest.TestCase):
         source_dir = Path(self.tmp.name) / "source"
         plugin_dir = source_dir / "workflow-integration" / "com.imagine.workbench.resolve"
         target_dir = Path(self.tmp.name) / "workflow-target"
+        workflow_node = Path(self.tmp.name) / "WorkflowIntegration.node"
         plugin_dir.mkdir(parents=True)
+        workflow_node.write_bytes(b"node")
         for name in ("manifest.xml", "main.js", "index.html"):
             (plugin_dir / name).write_text(name, encoding="utf-8")
         for name in ("ImagineWorkbenchResolve.py", "imagine_resolve_bridge.py"):
             (source_dir / name).write_text(name, encoding="utf-8")
 
-        install_workflow_plugin(target_dir, source_dir)
+        install_workflow_plugin(target_dir, source_dir, workflow_node)
         installed = target_dir / "com.imagine.workbench.resolve"
         self.assertTrue((installed / "manifest.xml").is_file())
-        self.assertTrue((installed / "bridge" / "ImagineWorkbenchResolve.py").is_file())
-        self.assertTrue((installed / "bridge" / "imagine_resolve_bridge.py").is_file())
+        self.assertEqual((installed / "WorkflowIntegration.node").read_bytes(), b"node")
+        self.assertFalse((installed / "bridge" / "ImagineWorkbenchResolve.py").exists())
+        self.assertFalse((installed / "bridge" / "imagine_resolve_bridge.py").exists())
 
         uninstall_workflow_plugin(target_dir)
         self.assertFalse(installed.exists())

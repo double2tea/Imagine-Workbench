@@ -1,1 +1,10 @@
-com.imagine.workbench.resolve Imagine Workbench 1.0 ./main.js
+<?xml version="1.0" encoding="UTF-8"?>
+<BlackmagicDesign>
+    <Plugin>
+        <Id>com.imagine.workbench.resolve</Id>
+        <Name>Imagine Workbench</Name>
+        <Version>1.0</Version>
+        <Description>Imagine Workbench Workflow Integration for DaVinci Resolve</Description>
+        <FilePath>main.js</FilePath>
+    </Plugin>
+</BlackmagicDesign>
