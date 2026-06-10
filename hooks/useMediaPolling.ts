@@ -1,7 +1,7 @@
 import { useEffect, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import { saveItemWithPreview } from "@/lib/assets/previews";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
-import { buildStorageItem, type GenerationRequestSnapshot, type StorageItem } from "@/lib/db";
+import { buildStorageItem, deleteFromDB, type GenerationRequestSnapshot, type StorageItem } from "@/lib/db";
 import { updateGenerationTask, type GenerationTask, type GenerationTaskUpdate } from "@/lib/generation-tasks";
 
 type NoticeType = "error" | "info" | "success";
@@ -40,6 +40,19 @@ async function saveItemOrWarn(
     console.error("IndexedDB Save Failed:", error);
     pushWorkspaceNotice("error", `本地存储失败，刷新后可能丢失：${message}`);
     return null;
+  }
+}
+
+async function deleteItemOrWarn(
+  itemId: string,
+  pushWorkspaceNotice: (type: NoticeType, message: string) => void,
+): Promise<void> {
+  try {
+    await deleteFromDB(itemId);
+  } catch (error) {
+    const message = toErrorMessage(error, "IndexedDB 删除失败");
+    console.error("IndexedDB Delete Failed:", error);
+    pushWorkspaceNotice("error", `已取消任务，但本地结果清理失败：${message}`);
   }
 }
 
@@ -250,7 +263,10 @@ export function useMediaPolling({
                 );
                 if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
                 const savedCompletedItem = await saveItemOrWarn(completedItem, pushWorkspaceNotice);
-                if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
+                if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) {
+                  if (savedCompletedItem) await deleteItemOrWarn(savedCompletedItem.id, pushWorkspaceNotice);
+                  continue;
+                }
                 if (!savedCompletedItem) {
                   if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
                   const failedTask = await updateTaskOrWarn(task.id, {

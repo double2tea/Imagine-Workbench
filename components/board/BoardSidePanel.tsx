@@ -11,6 +11,8 @@ export type BoardSidePanelTab = "inspector" | "tasks" | "assets";
 interface BoardSidePanelProps {
   assetsPanel: ReactNode;
   inspectorPanel: ReactNode;
+  preserveTasksRevealKey?: string | null;
+  onPreserveTasksRevealConsumed?: () => void;
   revealKey?: string | null;
   taskBadgeCount?: number;
   tasksPanel: ReactNode;
@@ -28,7 +30,15 @@ function readTabPreference(): BoardSidePanelTab {
   return "inspector";
 }
 
-export default function BoardSidePanel({ assetsPanel, inspectorPanel, revealKey, taskBadgeCount = 0, tasksPanel }: BoardSidePanelProps) {
+export default function BoardSidePanel({
+  assetsPanel,
+  inspectorPanel,
+  preserveTasksRevealKey,
+  onPreserveTasksRevealConsumed,
+  revealKey,
+  taskBadgeCount = 0,
+  tasksPanel,
+}: BoardSidePanelProps) {
   const [collapsedPreference, setCollapsedPreference] = useState(false);
   const [activeTab, setActiveTab] = useState<BoardSidePanelTab>("inspector");
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -47,8 +57,10 @@ export default function BoardSidePanel({ assetsPanel, inspectorPanel, revealKey,
     }
     if (previousRevealKeyRef.current === revealKey) return;
     previousRevealKeyRef.current = revealKey;
-    setActiveTab(current => current === "tasks" ? current : "inspector");
-  }, [revealKey]);
+    const preserveTasksTab = preserveTasksRevealKey === revealKey;
+    setActiveTab(current => preserveTasksTab && current === "tasks" ? current : "inspector");
+    if (preserveTasksRevealKey) onPreserveTasksRevealConsumed?.();
+  }, [onPreserveTasksRevealConsumed, preserveTasksRevealKey, revealKey]);
 
   const selectTab = (tab: BoardSidePanelTab) => {
     setActiveTab(tab);

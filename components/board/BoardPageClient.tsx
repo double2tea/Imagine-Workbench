@@ -1178,9 +1178,17 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
   const focusNodeSeqRef = useRef(0);
   const [focusNodeRequest, setFocusNodeRequest] = useState<{ nodeId: string; seq: number } | null>(null);
+  const [preserveTasksRevealKey, setPreserveTasksRevealKey] = useState<string | null>(null);
   const requestFocusNode = useCallback((nodeId: string) => {
     focusNodeSeqRef.current += 1;
     setFocusNodeRequest({ nodeId, seq: focusNodeSeqRef.current });
+  }, []);
+  const requestTaskQueueFocusNode = useCallback((nodeId: string) => {
+    setPreserveTasksRevealKey(nodeId);
+    requestFocusNode(nodeId);
+  }, [requestFocusNode]);
+  const clearPreserveTasksRevealKey = useCallback(() => {
+    setPreserveTasksRevealKey(null);
   }, []);
   const [assetCompareRequest, setAssetCompareRequest] = useState<{ originalUrl: string; resultUrl: string } | null>(null);
   const [cancelingBoardItemIds, setCancelingBoardItemIds] = useState<string[]>([]);
@@ -4012,15 +4020,15 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     }
     if (resultAssetId && resultNode.resultAssetIds.includes(resultAssetId)) {
       boardController.updateResultNodeAsset(resultNode.id, resultAssetId);
-      requestFocusNode(resultNode.id);
+      requestTaskQueueFocusNode(resultNode.id);
       return;
     }
     if (resultItem) {
       handleOpenFullscreen(resultItem);
       return;
     }
-    requestFocusNode(resultNode.id);
-  }, [boardController, handleOpenFullscreen, items, pushWorkspaceNotice, requestFocusNode]);
+    requestTaskQueueFocusNode(resultNode.id);
+  }, [boardController, handleOpenFullscreen, items, pushWorkspaceNotice, requestTaskQueueFocusNode]);
 
   const handleRerunBoardTaskSource = useCallback((task: GenerationTask) => {
     const sourceNodeId = task.source.boardNodeId;
@@ -4255,6 +4263,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onSendAgentNode={handleSendAgentNode}
       >
         <BoardSidePanel
+          preserveTasksRevealKey={preserveTasksRevealKey}
+          onPreserveTasksRevealConsumed={clearPreserveTasksRevealKey}
           revealKey={boardController.selectedNodeId ?? boardController.selectedEdgeId}
           taskBadgeCount={boardTaskBadgeCount}
           inspectorPanel={(
@@ -4310,7 +4320,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
               onCancelTask={handleCancelBoardTask}
               onDismissTask={handleDismissBoardTask}
               onFocusTaskResult={handleFocusBoardTaskResult}
-              onFocusNode={requestFocusNode}
+              onFocusNode={requestTaskQueueFocusNode}
               onRerunTaskSource={handleRerunBoardTaskSource}
             />
           )}
