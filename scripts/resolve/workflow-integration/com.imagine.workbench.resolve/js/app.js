@@ -129,6 +129,7 @@
     activeOperation: "",
     resolve: null,
     sharedCredentials: {},
+    preparedMask: null,
     lastOutputs: []
   };
 
@@ -152,6 +153,9 @@
   var providerLabelInput = document.getElementById("providerLabelInput");
   var imageOperationField = document.getElementById("imageOperationField");
   var imageOperationInput = document.getElementById("imageOperationInput");
+  var maskPrepareBlock = document.getElementById("maskPrepareBlock");
+  var maskPrepareButton = document.getElementById("maskPrepareButton");
+  var maskPrepareHint = document.getElementById("maskPrepareHint");
   var pollSecondsField = document.getElementById("pollSecondsField");
   var pollSecondsInput = document.getElementById("pollSecondsInput");
   var languageField = document.getElementById("languageField");
@@ -242,10 +246,12 @@
     sourceBlock.classList.toggle("hidden", config.sources.length === 0);
     if (config.sources.length === 0) {
       state.source = "";
+      clearPreparedMask();
       return;
     }
     if (config.sources.indexOf(state.source) === -1) {
       state.source = config.sources[0];
+      clearPreparedMask();
     }
     config.sources.forEach(function (source) {
       var button = document.createElement("button");
@@ -254,6 +260,7 @@
       button.textContent = sourceLabels[source] || source;
       button.addEventListener("click", function () {
         state.source = source;
+        clearPreparedMask();
         renderSources(config);
       });
       sourcePills.appendChild(button);
@@ -275,8 +282,10 @@
     if (config.canAppend !== true) {
       appendInput.checked = false;
     }
+    clearPreparedMask();
     renderSources(config);
     renderOperations();
+    updateMaskPrepareUi();
   }
 
   function buildJob(operationOverride) {
@@ -351,6 +360,7 @@
       state.running = false;
       state.activeOperation = "";
       runButton.disabled = false;
+      updateMaskPrepareUi();
     }
   }
 
@@ -406,8 +416,96 @@
     if (operation === "cutout") {
       return { imagePath: imagePath, maskPath: "" };
     }
+    if (preparedMaskMatches(job, imagePath)) {
+      setStatus("使用已准备遮罩\n" + describeJob(job));
+      return state.preparedMask.result;
+    }
     setStatus("请绘制遮罩\n" + describeJob(job));
-    return openMaskEditor(imagePath, operation, outputStem(job));
+    var result = await openMaskEditor(imagePath, operation, outputStem(job));
+    state.preparedMask = {
+      source: job.image,
+      operation: operation,
+      inputPath: imagePath,
+      result: result
+    };
+    updateMaskPrepareUi();
+    return result;
+  }
+
+  async function prepareMaskFromButton() {
+    if (!hasNode) {
+      setStatus("浏览器预览模式不能准备遮罩。请从 Resolve Workflow Integrations 打开。");
+      return;
+    }
+    if (state.running) {
+      return;
+    }
+    var job = buildJob();
+    if (job.operation !== "edit-image") {
+      return;
+    }
+    var operation = job.imageOperation || "redraw";
+    if (operation === "cutout") {
+      return;
+    }
+    state.running = true;
+    runButton.disabled = true;
+    maskPrepareButton.disabled = true;
+    setStatus("正在准备遮罩源\n" + describeJob(job));
+    try {
+      var editSource = await resolveMediaInput(job.image, outputStem(job) + "_image", "image");
+      var result = await openMaskEditor(editSource, operation, outputStem(job));
+      state.preparedMask = {
+        source: job.image,
+        operation: operation,
+        inputPath: editSource,
+        result: result
+      };
+      setStatus("遮罩已准备，可点击运行\n" + describeJob(job));
+    } catch (error) {
+      setStatus("遮罩准备失败\n" + explainError(error, job));
+    } finally {
+      state.running = false;
+      runButton.disabled = false;
+      updateMaskPrepareUi();
+    }
+  }
+
+  function preparedMaskMatches(job, imagePath) {
+    var prepared = state.preparedMask;
+    if (!prepared) {
+      return false;
+    }
+    if (prepared.source !== job.image || prepared.operation !== (job.imageOperation || "redraw")) {
+      return false;
+    }
+    if (prepared.inputPath !== imagePath || !prepared.result || !prepared.result.maskPath) {
+      return false;
+    }
+    return fs.existsSync(prepared.result.imagePath) && fs.existsSync(prepared.result.maskPath);
+  }
+
+  function clearPreparedMask() {
+    state.preparedMask = null;
+    updateMaskPrepareUi();
+  }
+
+  function updateMaskPrepareUi() {
+    if (!maskPrepareBlock) {
+      return;
+    }
+    var visible = state.operation === "edit-image" && (imageOperationInput.value || "redraw") !== "cutout";
+    maskPrepareBlock.classList.toggle("hidden", !visible);
+    if (!visible) {
+      return;
+    }
+    var operation = imageOperationInput.value || "redraw";
+    maskPrepareButton.disabled = state.running;
+    if (state.preparedMask && state.preparedMask.source === state.source && state.preparedMask.operation === operation) {
+      maskPrepareHint.textContent = "遮罩已准备，可直接运行";
+      return;
+    }
+    maskPrepareHint.textContent = imageEditHint(operation);
   }
 
   function requireImageEditPrompt(job) {
@@ -1412,6 +1510,12 @@
   runButton.addEventListener("click", function () {
     runJob();
   });
+
+  imageOperationInput.addEventListener("change", function () {
+    clearPreparedMask();
+  });
+
+  maskPrepareButton.addEventListener("click", prepareMaskFromButton);
 
   document.getElementById("openOutputButton").addEventListener("click", function () {
     if (shell) {

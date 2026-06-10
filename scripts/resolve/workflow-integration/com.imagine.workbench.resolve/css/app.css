@@ -311,6 +311,24 @@ select:focus {
   color: var(--text);
 }
 
+.mask-prepare {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid rgba(183, 255, 23, 0.26);
+  border-radius: 14px;
+  background: rgba(183, 255, 23, 0.08);
+}
+
+.mask-prepare p {
+  margin: -3px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .option-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -561,7 +579,13 @@ select:focus {
   }
 
   .mask-toolbar,
+  .mask-prepare,
   .outpaint-grid {
     grid-template-columns: 1fr;
+  }
+
+  .mask-prepare {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
