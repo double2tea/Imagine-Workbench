@@ -12,7 +12,7 @@ from pathlib import Path
 from threading import Thread
 from typing import Any
 
-from imagine_resolve_bridge import BridgeConfig, BridgeRoutes, ImagineResolveBridge, ResolveController, job_to_argv, main, run_cli, run_in_resolve
+from imagine_resolve_bridge import BridgeConfig, BridgeRoutes, ImagineResolveBridge, ResolveController, job_to_argv, main, panel_values_to_job, run_cli, run_in_resolve
 from install_resolve_bridge import install, uninstall
 
 
@@ -317,6 +317,37 @@ class ImagineResolveBridgeTests(unittest.TestCase):
         self.assertLess(argv.index("--base-url"), argv.index("generate-video"))
         self.assertLess(argv.index("--cache-dir"), argv.index("generate-video"))
         self.assertGreater(argv.index("--reference"), argv.index("generate-video"))
+
+    def test_panel_values_build_generate_video_job(self) -> None:
+        job = panel_values_to_job({
+            "operation": "generate-video",
+            "baseUrl": self.server.url,
+            "model": "mock:video",
+            "prompt": "extend this shot",
+            "source": "timeline-inout-render",
+            "outputName": "shot_extension",
+            "importToResolve": True,
+            "appendToTimeline": True,
+        })
+
+        self.assertEqual(job["reference"], ["timeline-inout-render"])
+        self.assertEqual(job["prompt"], "extend this shot")
+        self.assertEqual(job["outputName"], "shot_extension")
+        self.assertTrue(job["importToResolve"])
+        self.assertTrue(job["appendToTimeline"])
+
+    def test_panel_values_build_transcribe_job(self) -> None:
+        job = panel_values_to_job({
+            "operation": "transcribe",
+            "baseUrl": self.server.url,
+            "model": "mimo:mimo-v2.5-asr",
+            "source": "current-clip-render",
+            "language": "auto",
+        })
+
+        self.assertEqual(job["audio"], "current-clip-render")
+        self.assertEqual(job["language"], "auto")
+        self.assertNotIn("prompt", job)
 
     def test_install_and_uninstall_helper_copies_bridge_files(self) -> None:
         source_dir = Path(self.tmp.name) / "source"

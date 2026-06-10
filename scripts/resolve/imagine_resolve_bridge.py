@@ -31,6 +31,13 @@ DEFAULT_IN_RESOLVE_JOB = {
     "operation": "doctor",
     "baseUrl": "http://localhost:3000",
 }
+DEFAULT_MODELS = {
+    "generate-image": "12ai:gemini-3.1-flash-image-preview",
+    "edit-image": "12ai:gemini-3.1-flash-image-preview",
+    "generate-video": "12ai:veo_3_1-fast",
+    "tts": "mimo:mimo-v2.5-tts",
+    "transcribe": "mimo:mimo-v2.5-asr",
+}
 
 
 @dataclass(frozen=True)
@@ -529,6 +536,45 @@ def write_default_job(job_path: Path) -> None:
     job_path.write_text(json.dumps(DEFAULT_IN_RESOLVE_JOB, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def panel_values_to_job(values: dict[str, Any]) -> dict[str, Any]:
+    operation = require_text(str(values.get("operation", "")), "operation")
+    base_url = require_text(str(values.get("baseUrl", "")), "baseUrl")
+    model = str(values.get("model", "")).strip() or DEFAULT_MODELS.get(operation, "")
+    prompt = str(values.get("prompt", "")).strip()
+    source = str(values.get("source", "")).strip()
+    output_name = str(values.get("outputName", "")).strip()
+    language = str(values.get("language", "")).strip()
+    import_to_resolve = bool(values.get("importToResolve"))
+    append_to_timeline = bool(values.get("appendToTimeline"))
+    job: dict[str, Any] = {
+        "operation": operation,
+        "baseUrl": base_url,
+    }
+    if operation in {"generate-image", "edit-image", "generate-video", "tts", "transcribe"}:
+        job["model"] = require_text(model, "model")
+    if operation in {"generate-image", "edit-image", "generate-video"}:
+        job["prompt"] = require_text(prompt, "prompt")
+    if operation == "tts":
+        job["text"] = require_text(prompt, "text")
+    if operation == "edit-image":
+        job["image"] = require_text(source, "image")
+        job["imageOperation"] = str(values.get("imageOperation", "redraw"))
+    if operation == "generate-video":
+        job["reference"] = [require_text(source, "reference")]
+        job["pollSeconds"] = int(values.get("pollSeconds") or 600)
+    if operation == "transcribe":
+        job["audio"] = require_text(source, "audio")
+        if language:
+            job["language"] = language
+    if output_name:
+        job["outputName"] = output_name
+    if import_to_resolve:
+        job["importToResolve"] = True
+    if append_to_timeline:
+        job["appendToTimeline"] = True
+    return job
+
+
 def job_to_argv(job: dict[str, Any]) -> list[str]:
     operation = require_job_text(job, "operation")
     global_argv: list[str] = []
@@ -777,10 +823,137 @@ def current_resolve_app() -> Any | None:
         return None
 
 
+def show_resolve_panel(internal_resolve: Any | None = None) -> list[Path]:
+    try:
+        ui = fusion.UIManager  # type: ignore[name-defined]
+        dispatcher = bmd.UIDispatcher(ui)  # type: ignore[name-defined]
+    except NameError:
+        return run_in_resolve(internal_resolve)
+
+    window_id = "imagine.workbench.resolve.bridge"
+    existing = ui.FindWindow(window_id)
+    if existing:
+        existing.Show()
+        existing.Raise()
+        return []
+
+    win = dispatcher.AddWindow({
+        "ID": window_id,
+        "WindowTitle": "Imagine Workbench",
+        "Geometry": [220, 220, 620, 560],
+    }, ui.VGroup({"Spacing": 8}, [
+        ui.Label({"Text": "<b>Imagine Workbench Resolve Bridge</b>", "Weight": 0}),
+        ui.HGroup({"Weight": 0}, [
+            ui.Label({"Text": "Operation", "Weight": 0.25}),
+            ui.ComboBox({"ID": "operation", "Weight": 0.75}),
+        ]),
+        ui.HGroup({"Weight": 0}, [
+            ui.Label({"Text": "Model", "Weight": 0.25}),
+            ui.LineEdit({"ID": "model", "Text": DEFAULT_MODELS["generate-video"], "Weight": 0.75}),
+        ]),
+        ui.HGroup({"Weight": 0}, [
+            ui.Label({"Text": "Source", "Weight": 0.25}),
+            ui.ComboBox({"ID": "source", "Weight": 0.75}),
+        ]),
+        ui.Label({"Text": "Prompt / Text", "Weight": 0}),
+        ui.TextEdit({"ID": "prompt", "PlaceholderText": "Describe the image/video edit, or enter TTS text.", "Weight": 1}),
+        ui.HGroup({"Weight": 0}, [
+            ui.Label({"Text": "Output Name", "Weight": 0.25}),
+            ui.LineEdit({"ID": "outputName", "PlaceholderText": "optional", "Weight": 0.75}),
+        ]),
+        ui.HGroup({"Weight": 0}, [
+            ui.CheckBox({"ID": "importToResolve", "Text": "Import result", "Checked": True}),
+            ui.CheckBox({"ID": "appendToTimeline", "Text": "Append to timeline"}),
+            ui.Label({"Text": "Language", "Weight": 0.12}),
+            ui.LineEdit({"ID": "language", "Text": "auto", "Weight": 0.22}),
+        ]),
+        ui.TextEdit({"ID": "status", "ReadOnly": True, "Weight": 0.55}),
+        ui.HGroup({"Weight": 0}, [
+            ui.Button({"ID": "doctor", "Text": "Doctor"}),
+            ui.Button({"ID": "save", "Text": "Save Job"}),
+            ui.Button({"ID": "run", "Text": "Run"}),
+            ui.Button({"ID": "close", "Text": "Close"}),
+        ]),
+    ]))
+
+    items = win.GetItems()
+    items["operation"].AddItems(["generate-video", "edit-image", "generate-image", "transcribe", "tts", "doctor"])
+    items["source"].AddItems(["current-frame", "current-clip-render", "timeline-inout-render", "current-clip-source"])
+    items["status"].PlainText = f"Job file: {DEFAULT_JOB_PATH}\nOutputs: {DEFAULT_OUTPUT_DIR}\nCache: {DEFAULT_CACHE_DIR}"
+
+    def values_for(operation: str | None = None) -> dict[str, Any]:
+        selected_operation = operation or items["operation"].CurrentText
+        return {
+            "operation": selected_operation,
+            "baseUrl": "http://localhost:3000",
+            "model": items["model"].Text,
+            "source": items["source"].CurrentText,
+            "prompt": items["prompt"].PlainText,
+            "outputName": items["outputName"].Text,
+            "language": items["language"].Text,
+            "importToResolve": items["importToResolve"].Checked,
+            "appendToTimeline": items["appendToTimeline"].Checked,
+        }
+
+    def write_panel_job(operation: str | None = None) -> dict[str, Any]:
+        job = panel_values_to_job(values_for(operation))
+        DEFAULT_JOB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        DEFAULT_JOB_PATH.write_text(json.dumps(job, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        return job
+
+    def set_status(message: str) -> None:
+        items["status"].PlainText = message
+
+    def on_close(ev: Any) -> None:
+        dispatcher.ExitLoop()
+
+    def on_operation_changed(ev: Any) -> None:
+        operation = items["operation"].CurrentText
+        if items["model"].Text in set(DEFAULT_MODELS.values()) or not items["model"].Text.strip():
+            items["model"].Text = DEFAULT_MODELS.get(operation, "")
+
+    def on_doctor(ev: Any) -> None:
+        try:
+            write_panel_job("doctor")
+            result = run_job(DEFAULT_JOB_PATH, internal_resolve)
+            set_status("Doctor passed.\n" + "\n".join(str(path) for path in result))
+        except Exception as error:
+            set_status(f"Doctor failed:\n{error}")
+
+    def on_save(ev: Any) -> None:
+        try:
+            job = write_panel_job()
+            set_status("Saved job:\n" + json.dumps(job, ensure_ascii=False, indent=2))
+        except Exception as error:
+            set_status(f"Save failed:\n{error}")
+
+    def on_run(ev: Any) -> None:
+        try:
+            job = write_panel_job()
+            set_status("Running:\n" + json.dumps(job, ensure_ascii=False, indent=2))
+            outputs = run_job(DEFAULT_JOB_PATH, internal_resolve)
+            set_status("Done:\n" + "\n".join(str(path) for path in outputs))
+        except Exception as error:
+            set_status(f"Run failed:\n{error}")
+
+    win.On[window_id].Close = on_close
+    win.On["close"].Clicked = on_close
+    win.On["operation"].CurrentTextChanged = on_operation_changed
+    win.On["doctor"].Clicked = on_doctor
+    win.On["save"].Clicked = on_save
+    win.On["run"].Clicked = on_run
+    win.Show()
+    dispatcher.RunLoop()
+    return []
+
+
 def main(argv: list[str] | None = None) -> list[Path]:
     effective_argv = sys.argv[1:] if argv is None else argv
     if not effective_argv:
-        return run_in_resolve(current_resolve_app())
+        resolve = current_resolve_app()
+        if resolve is not None:
+            return show_resolve_panel(resolve)
+        return run_in_resolve(None)
     return run_cli(effective_argv)
 
 

@@ -281,32 +281,29 @@ macOS user Scripts folder:
 ~/Library/Application Support/Blackmagic Design/DaVinci Resolve/Fusion/Scripts/Utility
 ```
 
-The first menu run creates a safe starter job if none exists:
-
-```text
-~/Movies/Imagine Resolve Bridge/job.json
-```
-
-The starter job runs `doctor` against `http://localhost:3000`. Edit that file for the operation you want. Example job:
-
-```json
-{
-  "operation": "generate-image",
-  "baseUrl": "http://localhost:3000",
-  "model": "12ai:gemini-3.1-flash-image-preview",
-  "prompt": "cinematic product shot on a clean tabletop",
-  "outputName": "resolve_generated_image",
-  "importToResolve": true
-}
-```
-
-Then run:
+Open the panel from Resolve:
 
 ```text
 Workspace -> Scripts -> Utility -> ImagineWorkbenchResolve
 ```
 
-If Resolve also shows `imagine_resolve_bridge` in the Scripts menu, running it directly executes the same job file when no CLI arguments are provided.
+The panel lets you choose an operation, model, Resolve source, prompt/text, output name, and whether to import or append the result.
+
+Common panel choices:
+
+- Generate video from the current timeline In/Out range: `Operation = generate-video`, `Source = timeline-inout-render`, then enter a prompt and click `Run`.
+- Generate video from the current playhead clip range: `Operation = generate-video`, `Source = current-clip-render`.
+- Edit the current frame: `Operation = edit-image`, `Source = current-frame`.
+- Transcribe the current In/Out range: `Operation = transcribe`, `Source = timeline-inout-render`.
+- Check connectivity: click `Doctor`.
+
+The panel writes the selected operation to:
+
+```text
+~/Movies/Imagine Resolve Bridge/job.json
+```
+
+That job file remains available for automation or manual editing. If Resolve also shows `imagine_resolve_bridge` in the Scripts menu, running it directly opens the same panel when no CLI arguments are provided.
 
 To use a different job file, set:
 
