@@ -20,6 +20,9 @@ export const API_ROUTES = {
   prompts: {
     optimize: "/api/prompts/optimize",
   },
+  resolve: {
+    capabilities: "/api/resolve/capabilities",
+  },
   v1: {
     audioSpeech: "/v1/audio/speech",
     audioTranscriptions: "/v1/audio/transcriptions",

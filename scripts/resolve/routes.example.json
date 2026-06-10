@@ -1,0 +1,12 @@
+{
+  "image_generations": "/v1/images/generations",
+  "image_edits": "/v1/images/edits",
+  "generate_video": "/api/media/generate-video",
+  "generate_audio": "/api/media/generate-audio",
+  "status": "/api/media/status",
+  "image_download": "/api/media/image-download",
+  "video_download": "/api/media/video-download",
+  "audio_download": "/api/media/audio-download",
+  "audio_speech": "/v1/audio/speech",
+  "audio_transcriptions": "/v1/audio/transcriptions"
+}

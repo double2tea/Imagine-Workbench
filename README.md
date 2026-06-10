@@ -215,6 +215,7 @@ Users can open the picker with the template button or type `/` in supported prom
 ## App Routes
 
 External callers should start with [OpenAI-compatible API](docs/openai-compatible-api.md). The `/v1/*` routes are a documented subset for plugins and scripts; richer Workbench media workflows stay under `/api/media/*`. RunningHub-specific async tasks, AI Apps, workflows, uploads, and audio AI App targets are documented in [RunningHub API](docs/runninghub-api.md).
+DaVinci Resolve integration starts with [DaVinci Resolve Bridge](docs/resolve-bridge.md). The bridge can run from a terminal against the Resolve scripting API or inside Resolve through `Workspace → Scripts`, while keeping the backend endpoint and route map configurable.
 
 - `GET /`: main workstation.
 - `GET /board`: standalone canvas operation surface for assets, notes, generation, and Agent interaction.
@@ -232,6 +233,7 @@ External callers should start with [OpenAI-compatible API](docs/openai-compatibl
 - `POST /api/media/cancel`: cancels supported remote media operations.
 - `POST /api/chat/completions`: provider-neutral OpenAI-compatible chat completions proxy. Use provider-prefixed model IDs such as `mimo:mimo-v2.5` or `runninghub:qwen/qwen3.7-max`.
 - `POST /api/prompts/optimize`: expands a visual prompt through the selected chat model.
+- `GET /api/resolve/capabilities`: describes the image, video, and audio operations available to external or in-Resolve bridge clients.
 - `POST /api/agent/respond`: Agent Mode response and recommended action.
 - `POST /v1/chat/completions`: OpenAI-compatible chat completions gateway for plugin/external callers.
 - `POST /v1/images/generations`: OpenAI-compatible immediate single-image generation. Supports `n=1`; async/workflow image models should use `/api/media/generate-image`.
@@ -255,6 +257,7 @@ app/
   api/media/*                      Provider-neutral media generation, status, download APIs
   api/chat/completions/route.ts    Provider-neutral chat completions proxy
   api/prompts/optimize/route.ts    Prompt optimization API
+  api/resolve/capabilities         Resolve bridge operation metadata
   api/agent/respond/route.ts       Agent response API
   api/runninghub/ai-app-schema     RunningHub AI App schema lookup
   api/models/route.ts              Provider model listing
