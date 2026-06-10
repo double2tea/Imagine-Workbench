@@ -1928,6 +1928,14 @@ html[data-imagine-theme="light"] .imagine-root-body {
   transform: scale(0.96);
 }
 
+.board-media-top-actions {
+  pointer-events: auto;
+}
+
+.board-media-action-group {
+  pointer-events: auto;
+}
+
 .imagine-workspace-activity-bar {
   margin-bottom: 12px;
 }
