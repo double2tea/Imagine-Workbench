@@ -9,18 +9,11 @@ The Resolve plugin runtime is the Workflow Integration panel:
 - Provider behavior stays in Workbench, not in Resolve plugin code.
 - Resolve handles current frame/source media capture and Media Pool import.
 
-The Python bridge remains only as an optional external CLI/debugging tool. It is not installed or used by the Workflow Integration plugin.
-
-LUT creation is not part of this bridge task.
-
 ## Files
 
 ```text
-scripts/resolve/imagine_resolve_bridge.py   Optional external CLI/debugging bridge
-scripts/resolve/ImagineWorkbenchResolve.py  Legacy Resolve Workspace -> Scripts entry
 scripts/resolve/install_resolve_bridge.py   macOS install/uninstall helper
 scripts/resolve/workflow-integration/       Workflow Integration plugin runtime
-scripts/resolve/job.example.json            External CLI/job example
 ```
 
 ## Backend Capability Endpoint
@@ -45,24 +38,6 @@ Remove it:
 python3 scripts/resolve/install_resolve_bridge.py uninstall
 ```
 
-Install the legacy Scripts entry only when you explicitly need Python-side debugging inside Resolve:
-
-```bash
-python3 scripts/resolve/install_resolve_bridge.py install --kind scripts
-```
-
-Install both Workflow and legacy Scripts entries:
-
-```bash
-python3 scripts/resolve/install_resolve_bridge.py install --kind all
-```
-
-Default script target:
-
-```text
-~/Library/Application Support/Blackmagic Design/DaVinci Resolve/Fusion/Scripts/Utility
-```
-
 Default Workflow Integration target:
 
 ```text
@@ -78,295 +53,33 @@ python3 scripts/resolve/install_resolve_bridge.py install --workflow-node-source
 Override the target when testing:
 
 ```bash
-python3 scripts/resolve/install_resolve_bridge.py install --target-dir /tmp/ResolveScripts
-python3 scripts/resolve/install_resolve_bridge.py install --kind workflow --workflow-target-dir /tmp/ResolveWorkflowPlugins
+python3 scripts/resolve/install_resolve_bridge.py install --workflow-target-dir /tmp/ResolveWorkflowPlugins
 ```
 
 After reinstalling, close and reopen the Imagine Workbench Workflow Integration window in Resolve. If Resolve keeps showing an older UI, fully restart Resolve.
 
 The Workflow panel calls Workbench through a validated Electron main-process network layer so local and deployed Workbench endpoints can be used from Resolve. If the Workbench server does not have provider environment variables such as `TWELVE_AI_API_KEY` or `MIMO_API_KEY`, expand `供应商连接` in the panel and enter the matching provider key there. The panel sends it through the existing `x-ai-api-key` header. Provider keys are session-only in the panel and are not persisted by the plugin.
 
-## Smoke Test
-
-Check backend connectivity without Resolve:
-
-```bash
-python3 scripts/resolve/imagine_resolve_bridge.py \
-  --base-url http://localhost:3000 \
-  doctor
-```
-
-Check backend and running Resolve scripting connectivity:
-
-```bash
-python3 scripts/resolve/imagine_resolve_bridge.py \
-  --base-url http://localhost:3000 \
-  --connect-resolve \
-  doctor
-```
-
-## External CLI Usage
-
-Run these from the project root or from any folder with the script path adjusted.
-
-```bash
-python3 scripts/resolve/imagine_resolve_bridge.py \
-  --base-url http://localhost:3000 \
-  generate-image \
-  --model 12ai:gemini-3.1-flash-image-preview \
-  --prompt "cinematic product shot on a clean tabletop"
-```
-
-Generate an edited image from a local still:
-
-```bash
-python3 scripts/resolve/imagine_resolve_bridge.py \
-  --base-url http://localhost:3000 \
-  edit-image \
-  --image /path/to/frame.png \
-  --model xstx:gpt-image-2 \
-  --prompt "replace the background with a premium studio set"
-```
-
-Generate video and poll until the result downloads:
-
-```bash
-python3 scripts/resolve/imagine_resolve_bridge.py \
-  --base-url http://localhost:3000 \
-  generate-video \
-  --model 12ai:veo_3_1-fast \
-  --prompt "slow dolly-in on the product, soft rim light" \
-  --reference /path/to/reference.png
-```
-
-Generate TTS:
-
-```bash
-python3 scripts/resolve/imagine_resolve_bridge.py \
-  --base-url http://localhost:3000 \
-  tts \
-  --model mimo:mimo-v2.5-tts \
-  --text "This is a temporary narrator read." \
-  --voice Chloe
-```
-
-Transcribe audio and create `.txt` plus `.srt` files:
-
-```bash
-python3 scripts/resolve/imagine_resolve_bridge.py \
-  --base-url http://localhost:3000 \
-  transcribe \
-  --model mimo:mimo-v2.5-asr \
-  --audio /path/to/dialog.wav \
-  --language auto
-```
-
-Outputs default to:
-
-```text
-~/Movies/Imagine Resolve Bridge
-```
-
-Override with:
-
-```bash
---output-dir /path/to/output
-```
-
-Reference captures and rendered reference clips default to:
-
-```text
-~/Library/Caches/Imagine Workbench/Resolve Bridge
-```
-
-Override with:
-
-```bash
---cache-dir /path/to/cache
-```
-
-## External Resolve API Control
-
-To import results into the running Resolve project from the terminal, enable Resolve scripting and pass `--import-to-resolve`.
-
-Resolve scripting environment variables on macOS usually look like:
-
-```bash
-export RESOLVE_SCRIPT_API="/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting"
-export RESOLVE_SCRIPT_LIB="/Applications/DaVinci Resolve/DaVinci Resolve.app/Contents/Libraries/Fusion/fusionscript.so"
-export PYTHONPATH="$PYTHONPATH:$RESOLVE_SCRIPT_API/Modules/"
-```
-
-Example:
-
-```bash
-python3 scripts/resolve/imagine_resolve_bridge.py \
-  --base-url http://localhost:3000 \
-  --import-to-resolve \
-  generate-image \
-  --model 12ai:gemini-3.1-flash-image-preview \
-  --prompt "cinematic insert shot of a jade bracelet"
-```
-
-Use the current Resolve frame as the image edit source:
-
-```bash
-python3 scripts/resolve/imagine_resolve_bridge.py \
-  --base-url http://localhost:3000 \
-  --import-to-resolve \
-  edit-image \
-  --image current-frame \
-  --model xstx:gpt-image-2 \
-  --prompt "remove small dust marks and keep the product unchanged"
-```
-
-Use the source media for the current playhead video item as a video reference:
-
-```bash
-python3 scripts/resolve/imagine_resolve_bridge.py \
-  --base-url http://localhost:3000 \
-  --import-to-resolve \
-  generate-video \
-  --model 12ai:veo_3_1-fast \
-  --prompt "create a stylized continuation from this clip" \
-  --reference current-clip-source
-```
-
-Use the current Resolve frame as a video reference:
-
-```bash
-python3 scripts/resolve/imagine_resolve_bridge.py \
-  --base-url http://localhost:3000 \
-  generate-video \
-  --model 12ai:veo_3_1-fast \
-  --prompt "animate this frame with a gentle camera push" \
-  --reference current-frame
-```
-
-Use the rendered timeline range of the current playhead video item as a video reference:
-
-```bash
-python3 scripts/resolve/imagine_resolve_bridge.py \
-  --base-url http://localhost:3000 \
-  generate-video \
-  --model 12ai:veo_3_1-fast \
-  --prompt "extend this exact edited moment into a product beauty shot" \
-  --reference current-clip-render
-```
-
-Use the current timeline In/Out range as a video reference:
-
-```bash
-python3 scripts/resolve/imagine_resolve_bridge.py \
-  --base-url http://localhost:3000 \
-  generate-video \
-  --model 12ai:veo_3_1-fast \
-  --prompt "use this selected timeline range as the motion and style reference" \
-  --reference timeline-inout-render
-```
-
-Transcribe the source media for the current playhead video item when the source file is a supported audio upload:
-
-```bash
-python3 scripts/resolve/imagine_resolve_bridge.py \
-  --base-url http://localhost:3000 \
-  transcribe \
-  --model mimo:mimo-v2.5-asr \
-  --audio current-clip-source \
-  --language auto
-```
-
-Transcribe the current timeline In/Out range:
-
-```bash
-python3 scripts/resolve/imagine_resolve_bridge.py \
-  --base-url http://localhost:3000 \
-  transcribe \
-  --model mimo:mimo-v2.5-asr \
-  --audio timeline-inout-render \
-  --language auto
-```
-
-Resolve scripting cannot reliably read arbitrary selected clips through the public API. The bridge uses the current timeline item at the playhead via `GetCurrentVideoItem()`.
-
-Rendered reference tokens use Resolve's render queue APIs:
-
-- `TimelineItem.GetStart(False)` and `TimelineItem.GetEnd(False)` for `current-clip-render`.
-- `Timeline.GetMarkInOut()` for `timeline-inout-render`.
-- `Project.SetCurrentRenderFormatAndCodec("mp4", "H.264")`.
-- `Project.SetRenderSettings({ MarkIn, MarkOut, TargetDir, CustomName, ExportVideo, ExportAudio })`.
-- `Project.AddRenderJob()`, `Project.StartRendering(...)`, and `Project.IsRenderingInProgress()`.
-
-The rendered reference files are cache inputs for model calls. Generated AI outputs remain in the persistent output directory.
-
-## Legacy Scripts Entry
-
-The legacy Python/UIManager Scripts entry is kept only for debugging. Install it with `--kind scripts`, or copy these two files into a Resolve Scripts folder:
-
-```text
-scripts/resolve/ImagineWorkbenchResolve.py
-scripts/resolve/imagine_resolve_bridge.py
-```
-
-macOS user Scripts folder:
-
-```text
-~/Library/Application Support/Blackmagic Design/DaVinci Resolve/Fusion/Scripts/Utility
-```
-
-Open the panel from Resolve:
-
-```text
-Workspace -> Scripts -> Utility -> ImagineWorkbenchResolve
-```
-
-The legacy panel is Chinese-first and lets you choose a function, Resolve source, prompt/text, output name, and whether to import or append the result. It intentionally does not ask editors to type model IDs. Operation changes update the available fields automatically:
-
-- `生成视频`: shows Resolve source choices and `轮询秒数`.
-- `编辑图片`: shows image source choices and `图片操作`.
-- `生成图片`: hides source controls.
-- `生成字幕/转写`: shows source and language controls, hides prompt.
-- `生成配音`: treats the prompt box as narration text.
-- `连接检查`: hides source/prompt execution fields.
-
-Common panel choices:
-
-- Generate video from the current timeline In/Out range: `功能 = 生成视频`, `参考源 = 时间线入出点片段`, then enter a prompt and click `运行`.
-- Generate video from the current playhead clip range: `功能 = 生成视频`, `参考源 = 当前片段渲染`.
-- Edit the current frame: `功能 = 编辑图片`, `参考源 = 当前帧`.
-- Transcribe the current In/Out range: `功能 = 生成字幕/转写`, `参考源 = 时间线入出点片段`.
-- Check connectivity: click `连接检查`.
-
-The panel writes the selected operation to:
-
-```text
-~/Movies/Imagine Resolve Bridge/job.json
-```
-
-That job file remains available for automation or manual editing. If Resolve also shows `imagine_resolve_bridge` in the Scripts menu, running it directly opens the same legacy panel when no CLI arguments are provided.
-
-The saved job file still includes the default `model` used for execution. Edit that field only for advanced testing or automation.
-
 ## Workflow Integration Panel
 
-The installer also adds a modern web-style panel:
+Open the panel from Resolve:
 
 ```text
 Workspace -> Workflow Integrations -> Imagine Workbench
 ```
 
-This panel is the product UI direction inspired by modern plugin panels: dark cards, tabs, a bottom prompt area, and no visible model IDs. It directly calls Imagine Workbench HTTP routes and talks to Resolve through `WorkflowIntegration.node`; it does not spawn or bundle the Python bridge.
+This panel is the product UI direction inspired by modern plugin panels: dark cards, tabs, a bottom prompt area, and no visible model IDs. It directly calls Imagine Workbench HTTP routes and talks to Resolve through `WorkflowIntegration.node`.
 
-The first version supports:
+Supported operations:
 
 - Image generation
-- Image edit from Resolve reference sources
+- Image edit from Resolve reference sources (redraw, erase, outpaint, cutout)
 - Video generation from current frame, current clip render, current clip source, or timeline In/Out render
 - TTS
 - Subtitle/ASR
 - Connection check
 
-If `Workflow Integrations` is not available in the Resolve build you are using, use the legacy Scripts entry only as a debugging/compatibility path.
+If `Workflow Integrations` is not available in the Resolve build you are using, check the Blackmagic Design documentation for alternative installation paths.
 
 To use a different job file, set:
 
@@ -400,12 +113,6 @@ IMAGINE_RESOLVE_RENDER_TIMEOUT_SECONDS
 ```
 
 ## Verification
-
-Run the bridge unit tests without DaVinci Resolve:
-
-```bash
-python3 scripts/resolve/test_imagine_resolve_bridge.py
-```
 
 Run TypeScript route coverage through the provider test suite:
 
