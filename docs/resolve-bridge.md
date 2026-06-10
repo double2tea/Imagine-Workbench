@@ -84,7 +84,7 @@ python3 scripts/resolve/install_resolve_bridge.py install --kind workflow --work
 
 After reinstalling, close and reopen the Imagine Workbench Workflow Integration window in Resolve. If Resolve keeps showing an older UI, fully restart Resolve.
 
-The Workflow panel calls Workbench through Electron's main-process network layer so local and deployed Workbench endpoints can be used from Resolve. If the Workbench server does not have provider environment variables such as `TWELVE_AI_API_KEY`, expand `供应商连接` in the panel and enter the provider API key there. The panel sends it through the existing `x-ai-api-key` header.
+The Workflow panel calls Workbench through a validated Electron main-process network layer so local and deployed Workbench endpoints can be used from Resolve. If the Workbench server does not have provider environment variables such as `TWELVE_AI_API_KEY` or `MIMO_API_KEY`, expand `供应商连接` in the panel and enter the matching provider key there. The panel sends it through the existing `x-ai-api-key` header. Provider keys are session-only in the panel and are not persisted by the plugin.
 
 ## Smoke Test
 

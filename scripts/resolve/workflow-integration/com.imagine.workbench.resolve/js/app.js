@@ -126,6 +126,7 @@
     operation: "generate-image",
     source: "",
     running: false,
+    activeOperation: "",
     resolve: null
   };
 
@@ -142,7 +143,8 @@
   var sourcePills = document.getElementById("sourcePills");
   var baseUrlInput = document.getElementById("baseUrlInput");
   var outputNameInput = document.getElementById("outputNameInput");
-  var providerApiKeyInput = document.getElementById("providerApiKeyInput");
+  var twelveApiKeyInput = document.getElementById("twelveApiKeyInput");
+  var mimoApiKeyInput = document.getElementById("mimoApiKeyInput");
   var providerBaseUrlInput = document.getElementById("providerBaseUrlInput");
   var providerLabelInput = document.getElementById("providerLabelInput");
   var imageOperationField = document.getElementById("imageOperationField");
@@ -162,9 +164,11 @@
 
   function persistSettings() {
     localStorage.setItem("imagine.resolve.baseUrl", baseUrlInput.value);
-    localStorage.setItem("imagine.resolve.providerApiKey", providerApiKeyInput.value);
     localStorage.setItem("imagine.resolve.providerBaseUrl", providerBaseUrlInput.value);
     localStorage.setItem("imagine.resolve.providerLabel", providerLabelInput.value);
+    localStorage.removeItem("imagine.resolve.providerApiKey");
+    localStorage.removeItem("imagine.resolve.twelveApiKey");
+    localStorage.removeItem("imagine.resolve.mimoApiKey");
   }
 
   function restoreSettings() {
@@ -172,7 +176,8 @@
     if (baseUrl) {
       baseUrlInput.value = baseUrl;
     }
-    providerApiKeyInput.value = localStorage.getItem("imagine.resolve.providerApiKey") || "";
+    twelveApiKeyInput.value = "";
+    mimoApiKeyInput.value = "";
     providerBaseUrlInput.value = localStorage.getItem("imagine.resolve.providerBaseUrl") || "";
     providerLabelInput.value = localStorage.getItem("imagine.resolve.providerLabel") || "";
   }
@@ -303,6 +308,7 @@
     persistSettings();
     var job = buildJob(operationOverride);
     state.running = true;
+    state.activeOperation = job.operation;
     runButton.disabled = true;
     setStatus("运行中\n" + describeJob(job));
     try {
@@ -313,6 +319,7 @@
       setStatus("运行失败\n" + explainError(error, job));
     } finally {
       state.running = false;
+      state.activeOperation = "";
       runButton.disabled = false;
     }
   }
@@ -372,16 +379,21 @@
   }
 
   async function doctor(job) {
+    var lines = [];
     var capabilities = await getJson(job.baseUrl, "/api/resolve/capabilities");
-    var resolve = await getResolve();
-    var project = await currentProject(resolve);
-    var timeline = await currentTimeline(project);
-    return [
-      "Workbench：" + capabilities.name,
-      "Project：" + await project.GetName(),
-      "Timeline：" + await timeline.GetName(),
-      "Page：" + await resolve.GetCurrentPage()
-    ];
+    lines.push("Workbench：已连接 - " + capabilities.name);
+    try {
+      var resolve = await getResolve();
+      lines.push("Resolve：已连接");
+      var project = await currentProject(resolve);
+      lines.push("Project：" + await project.GetName());
+      var timeline = await currentTimeline(project);
+      lines.push("Timeline：" + await timeline.GetName());
+      lines.push("Page：" + await resolve.GetCurrentPage());
+    } catch (error) {
+      lines.push("Resolve：" + errorMessage(error));
+    }
+    return lines;
   }
 
   async function generateImage(job, model) {
@@ -754,7 +766,7 @@
   }
 
   function explainError(error, job) {
-    var message = error && error.message ? error.message : String(error);
+    var message = errorMessage(error);
     if (message === "Failed to fetch") {
       return [
         "无法连接 Workbench：" + job.baseUrl,
@@ -765,20 +777,34 @@
     if (message.indexOf("API key is required") !== -1) {
       return [
         "供应商 API Key 缺失。",
-        "请在“供应商连接”里填写当前默认模型对应的 API Key，或在 Workbench 服务端配置环境变量。",
+        "请在“供应商连接”里填写 12AI Key 或 MiMo Key，或在 Workbench 服务端配置环境变量。",
         "原始错误：" + message
       ].join("\n");
     }
     return message;
   }
 
+  function errorMessage(error) {
+    return error && error.message ? error.message : String(error);
+  }
+
   function requestHeaders(extra) {
     var headers = Object.assign({ Accept: "*/*" }, extra || {});
     addHeader(headers, "Authorization", process.env.IMAGINE_WORKBENCH_API_KEY ? "Bearer " + process.env.IMAGINE_WORKBENCH_API_KEY : "");
-    addHeader(headers, "x-ai-api-key", inputValue(providerApiKeyInput) || process.env.IMAGINE_PROVIDER_API_KEY);
+    addHeader(headers, "x-ai-api-key", providerApiKeyForOperation(state.activeOperation || state.operation) || process.env.IMAGINE_PROVIDER_API_KEY);
     addHeader(headers, "x-ai-base-url", inputValue(providerBaseUrlInput) || process.env.IMAGINE_PROVIDER_BASE_URL);
     addHeader(headers, "x-ai-provider-label", inputValue(providerLabelInput) || process.env.IMAGINE_PROVIDER_LABEL);
     return headers;
+  }
+
+  function providerApiKeyForOperation(operation) {
+    if (operation === "tts" || operation === "transcribe") {
+      return inputValue(mimoApiKeyInput);
+    }
+    if (operation === "generate-image" || operation === "edit-image" || operation === "generate-video") {
+      return inputValue(twelveApiKeyInput);
+    }
+    return "";
   }
 
   function inputValue(input) {
