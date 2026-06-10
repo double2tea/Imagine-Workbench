@@ -112,6 +112,7 @@ import {
   type BoardNode,
   type BoardPoint,
   type BoardPortRef,
+  type BoardSize,
   type BoardAssetReference,
   type BoardRunningHubAppNode,
   type BoardRunningHubAppNodeUpdate,
@@ -915,6 +916,19 @@ function storageItemToBoardAssetReference(item: StorageItem): BoardAssetReferenc
   return boardAssetReferenceFromStorageItem(item);
 }
 
+function quickEditNodeSize(sourceSize: BoardSize, operation: ImageEditFeature, outputSize?: BoardSize): BoardSize {
+  if (operation !== "outpaint" || !outputSize || outputSize.width <= 0 || outputSize.height <= 0) {
+    return sourceSize;
+  }
+  const aspectRatio = outputSize.width / outputSize.height;
+  const area = sourceSize.width * sourceSize.height;
+  const width = Math.max(1, Math.round(Math.sqrt(area * aspectRatio)));
+  return {
+    width,
+    height: Math.max(1, Math.round(width / aspectRatio)),
+  };
+}
+
 function hasTranscriptNoteForAsset(nodes: BoardDocument["nodes"], assetId: string): boolean {
   return nodes.some(node => node.kind === "note" && node.source?.assetId === assetId);
 }
@@ -1653,7 +1667,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     sourceNodeId: string,
     sourceTitle: string,
     sourcePosition: BoardPoint,
-    sourceSize: { width: number; height: number },
+    sourceSize: BoardSize,
+    outputSize: BoardSize,
     sourceItem: StorageItem,
     operation: ImageEditFeature,
     previewUrl: string,
@@ -1681,7 +1696,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     setItems(prev => [item, ...prev]);
     const nodeId = boardController.addAssetNode({
       asset: storageItemToBoardAssetReference(item),
-      size: sourceSize,
+      size: outputSize,
       title: `${sourceTitle} ${label}`,
       position: {
         x: sourcePosition.x + sourceSize.width + 40,
@@ -1735,13 +1750,15 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     sourceNodeId: string,
     sourceTitle: string,
     sourcePosition: BoardPoint,
-    sourceSize: { width: number; height: number },
+    sourceSize: BoardSize,
     sourceItem: StorageItem,
     operation: ImageEditFeature,
     editImageUrl: string,
     maskUrl: string | undefined,
     guideUrl: string | undefined,
     editPrompt: string,
+    editImageResolution: string,
+    outputSize?: BoardSize,
   ) {
     const label = IMAGE_EDIT_LABELS[operation];
     const model = imageEditFeatureModels[operation];
@@ -1750,6 +1767,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       sourceTitle,
       sourcePosition,
       sourceSize,
+      quickEditNodeSize(sourceSize, operation, outputSize),
       sourceItem,
       operation,
       editImageUrl,
@@ -1771,7 +1789,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           mask,
           guide,
           prompt: editPrompt,
-          imageResolution: "auto",
+          imageResolution: editImageResolution,
         }),
       });
       if (!response.ok) throw new Error(await readFetchError(response, `${label}失败`));
@@ -1807,6 +1825,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         output.maskBase64,
         output.mergedImageBase64,
         output.prompt,
+        output.imageResolution,
+        output.outputSize,
       );
       setIsMaskOpen(false);
       setMaskEditOperation(undefined);
@@ -4064,6 +4084,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             undefined,
             undefined,
             "",
+            "auto",
           );
           return;
         }
@@ -4317,6 +4338,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       {isMaskOpen && (
         <CanvasMaskEditor
           imageUrl={maskTargetUrl}
+          editModel={maskEditOperation ? imageEditFeatureModels[maskEditOperation] : undefined}
           isOpen={isMaskOpen}
           operation={maskEditOperation}
           onClose={() => {

@@ -28,30 +28,41 @@ import {
   type CropResizeHandle,
 } from "@/lib/canvas-editor";
 import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
+import { getImageResolutionOptions } from "@/lib/providers/model-catalog";
 
 export interface CanvasMaskEditorOutput {
   imageBase64: string;
+  imageResolution: string;
   maskBase64: string;
   mergedImageBase64: string;
   operation?: ImageEditFeature;
+  outputSize: CanvasSize;
   prompt: string;
 }
 
 interface CanvasMaskEditorProps {
   imageUrl: string;
+  editModel?: string;
   isOpen: boolean;
   operation?: ImageEditFeature;
+  initialImageResolution?: string;
   initialPrompt?: string;
   onClose: () => void;
   onSaveMask: (output: CanvasMaskEditorOutput) => void;
 }
 
 type EditorMode = "mask" | "erase" | "text" | "crop" | "outpaint";
+type OutpaintSide = "left" | "right" | "top" | "bottom";
 type CropPresetId = "free" | "original" | "1:1" | "4:5" | "3:4" | "4:3" | "16:9" | "9:16";
 type CropDragState =
   | { type: "create"; start: CanvasPoint }
   | { type: "move"; offsetX: number; offsetY: number }
   | { type: "resize"; handle: CropResizeHandle };
+type OutpaintDragState = {
+  margins: ReturnType<typeof defaultOutpaintMargins>;
+  side: OutpaintSide;
+  start: CanvasPoint;
+};
 
 interface CanvasPoint {
   x: number;
@@ -70,6 +81,8 @@ interface TextOverlay {
 const TEXT_COLORS = ["#ffffff", "#111827", "#f97316", "#38bdf8", "#facc15"] as const;
 const CROP_HANDLE_HIT_SIZE = 14;
 const CROP_MIN_SIZE = 16;
+const OUTPAINT_HANDLE_HIT_SIZE = 28;
+const OUTPAINT_MAX_MARGIN = 600;
 const CROP_PRESETS: Array<{ id: CropPresetId; label: string; ratio: AspectRatio | null }> = [
   { id: "free", label: "自由", ratio: null },
   { id: "original", label: "原图", ratio: null },
@@ -113,6 +126,39 @@ const OPERATION_COPY: Record<ImageEditFeature, { title: string; hint: string; pr
 
 function defaultOutpaintMargins() {
   return { left: 0, right: 0, top: 0, bottom: 0 };
+}
+
+function gcd(left: number, right: number): number {
+  let a = Math.abs(Math.round(left));
+  let b = Math.abs(Math.round(right));
+  while (b !== 0) {
+    const next = a % b;
+    a = b;
+    b = next;
+  }
+  return a || 1;
+}
+
+function aspectRatioFromSize(size: CanvasSize): string {
+  const divisor = gcd(size.width, size.height);
+  return `${Math.round(size.width / divisor)}:${Math.round(size.height / divisor)}`;
+}
+
+function clampOutpaintMargin(value: number): number {
+  return Math.max(0, Math.min(OUTPAINT_MAX_MARGIN, Math.round(value)));
+}
+
+function outpaintPreviewSize(canvasSize: CanvasSize, margins: ReturnType<typeof defaultOutpaintMargins>): CanvasSize {
+  return {
+    width: canvasSize.width + margins.left + margins.right,
+    height: canvasSize.height + margins.top + margins.bottom,
+  };
+}
+
+function getEditorResolutionOptions(model: string | undefined, aspectRatio: string): Array<{ value: string; label: string }> {
+  if (!model) return [{ value: "auto", label: "Auto" }];
+  const options = getImageResolutionOptions(model, aspectRatio).filter(option => option.value !== "custom");
+  return options.length > 0 ? options : [{ value: "auto", label: "Auto" }];
 }
 
 function getCropPresetRatio(presetId: CropPresetId, canvasSize: CanvasSize): AspectRatio | null {
@@ -159,6 +205,24 @@ function getCropCursor(handle: CropResizeHandle | null): string {
   return "crosshair";
 }
 
+function getOutpaintResizeSide(point: CanvasPoint, size: CanvasSize): OutpaintSide | null {
+  const distances: Array<{ side: OutpaintSide; value: number }> = [
+    { side: "left" as const, value: point.x },
+    { side: "right" as const, value: size.width - point.x },
+    { side: "top" as const, value: point.y },
+    { side: "bottom" as const, value: size.height - point.y },
+  ].filter(item => item.value >= 0 && item.value <= OUTPAINT_HANDLE_HIT_SIZE);
+
+  distances.sort((left, right) => left.value - right.value);
+  return distances[0]?.side ?? null;
+}
+
+function outpaintCursor(side: OutpaintSide | null): string {
+  if (side === "left" || side === "right") return "ew-resize";
+  if (side === "top" || side === "bottom") return "ns-resize";
+  return "default";
+}
+
 function drawTextOverlay(ctx: CanvasRenderingContext2D, item: TextOverlay): void {
   ctx.fillStyle = item.color;
   ctx.font = `700 ${item.size}px Inter, ui-sans-serif, system-ui, sans-serif`;
@@ -198,7 +262,9 @@ function canvasHasVisiblePixels(canvas: HTMLCanvasElement): boolean {
 }
 
 export default function CanvasMaskEditor({
+  editModel,
   imageUrl,
+  initialImageResolution = "auto",
   isOpen,
   operation,
   initialPrompt = "",
@@ -208,6 +274,7 @@ export default function CanvasMaskEditor({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const bgImgRef = useRef<HTMLImageElement | null>(null);
   const cropDragStateRef = useRef<CropDragState | null>(null);
+  const outpaintDragStateRef = useRef<OutpaintDragState | null>(null);
   const pendingMaskDataUrlRef = useRef<string | null>(null);
   const textIdRef = useRef(0);
 
@@ -228,7 +295,16 @@ export default function CanvasMaskEditor({
   const [cropRect, setCropRect] = useState<CanvasRect | null>(null);
   const [cropPresetId, setCropPresetId] = useState<CropPresetId>("free");
   const [cropCursor, setCropCursor] = useState("crosshair");
+  const [imageResolution, setImageResolution] = useState(initialImageResolution);
+  const [outpaintCursorValue, setOutpaintCursorValue] = useState("default");
 
+  const currentOutpaintPreviewSize = outpaintPreviewSize(canvasSize, outpaintMargins);
+  const editorStageSize = editorMode === "outpaint" ? currentOutpaintPreviewSize : canvasSize;
+  const resolutionAspectRatio = aspectRatioFromSize(operation === "outpaint" ? currentOutpaintPreviewSize : canvasSize);
+  const resolutionOptions = getEditorResolutionOptions(editModel, resolutionAspectRatio);
+  const selectedImageResolution = resolutionOptions.some(option => option.value === imageResolution)
+    ? imageResolution
+    : resolutionOptions[0]?.value ?? "auto";
   const hasOutpaintMargins = Object.values(outpaintMargins).some(value => value > 0);
   const operationNeedsPrompt = operation === "redraw" || operation === "outpaint";
   const canApply = operation === "outpaint"
@@ -266,6 +342,7 @@ export default function CanvasMaskEditor({
   useEffect(() => {
     if (!isOpen) return;
     setEditPrompt(initialPrompt);
+    setImageResolution(initialImageResolution);
     setOutpaintMargins(defaultOutpaintMargins());
     if (operation === "outpaint") {
       setEditorMode("outpaint");
@@ -274,7 +351,14 @@ export default function CanvasMaskEditor({
     } else {
       setEditorMode("mask");
     }
-  }, [initialPrompt, isOpen, operation]);
+  }, [initialImageResolution, initialPrompt, isOpen, operation]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!resolutionOptions.some(option => option.value === imageResolution)) {
+      setImageResolution(resolutionOptions[0]?.value ?? "auto");
+    }
+  }, [imageResolution, isOpen, resolutionOptions]);
 
   useEffect(() => {
     if (!imgLoaded || !canvasRef.current) return;
@@ -338,6 +422,15 @@ export default function CanvasMaskEditor({
       return;
     }
 
+    if (editorMode === "outpaint") {
+      const side = getOutpaintResizeSide(point, editorStageSize);
+      if (!side) return;
+      event.currentTarget.setPointerCapture(event.pointerId);
+      outpaintDragStateRef.current = { side, start: point, margins: outpaintMargins };
+      setOutpaintCursorValue(outpaintCursor(side));
+      return;
+    }
+
     if (editorMode === "crop") {
       event.currentTarget.setPointerCapture(event.pointerId);
       const resizeHandle = cropRect ? getCropResizeHandle(point, cropRect) : null;
@@ -376,6 +469,24 @@ export default function CanvasMaskEditor({
 
   const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const point = getCanvasPoint(event);
+
+    if (editorMode === "outpaint") {
+      const dragState = outpaintDragStateRef.current;
+      if (dragState) {
+        const dx = point.x - dragState.start.x;
+        const dy = point.y - dragState.start.y;
+        setOutpaintMargins({
+          ...dragState.margins,
+          left: dragState.side === "left" ? clampOutpaintMargin(dragState.margins.left - dx) : dragState.margins.left,
+          right: dragState.side === "right" ? clampOutpaintMargin(dragState.margins.right + dx) : dragState.margins.right,
+          top: dragState.side === "top" ? clampOutpaintMargin(dragState.margins.top - dy) : dragState.margins.top,
+          bottom: dragState.side === "bottom" ? clampOutpaintMargin(dragState.margins.bottom + dy) : dragState.margins.bottom,
+        });
+        return;
+      }
+      setOutpaintCursorValue(outpaintCursor(getOutpaintResizeSide(point, editorStageSize)));
+      return;
+    }
 
     if (editorMode === "crop" && cropDragStateRef.current) {
       const dragState = cropDragStateRef.current;
@@ -433,6 +544,11 @@ export default function CanvasMaskEditor({
       return;
     }
 
+    if (editorMode === "outpaint") {
+      outpaintDragStateRef.current = null;
+      return;
+    }
+
     if (canvasRef.current) {
       setHasDrawn(canvasHasVisiblePixels(canvasRef.current));
     }
@@ -457,6 +573,7 @@ export default function CanvasMaskEditor({
     setCropPresetId("free");
     setCropCursor("crosshair");
     setOutpaintMargins(defaultOutpaintMargins());
+    setOutpaintCursorValue("default");
     setHasLocalEdits(false);
   };
 
@@ -572,7 +689,7 @@ export default function CanvasMaskEditor({
     if (!canvas || !img) return;
 
     if (operation === "outpaint") {
-      applyOutpaint(img, canvas.width, canvas.height);
+      applyOutpaint(img, canvasSize.width, canvasSize.height);
       return;
     }
 
@@ -627,9 +744,11 @@ export default function CanvasMaskEditor({
 
     onSaveMask({
       imageBase64: baseCanvas.toDataURL("image/png"),
+      imageResolution: selectedImageResolution,
       maskBase64: maskCanvas.toDataURL("image/png"),
       mergedImageBase64: mergeCanvas.toDataURL("image/png"),
       operation,
+      outputSize: { width: sourceWidth, height: sourceHeight },
       prompt: editPrompt.trim(),
     });
     onClose();
@@ -671,19 +790,14 @@ export default function CanvasMaskEditor({
 
     onSaveMask({
       imageBase64: baseCanvas.toDataURL("image/png"),
+      imageResolution: selectedImageResolution,
       maskBase64: maskCanvas.toDataURL("image/png"),
       mergedImageBase64: baseCanvas.toDataURL("image/png"),
       operation,
+      outputSize: { width: nextWidth, height: nextHeight },
       prompt: editPrompt.trim(),
     });
     onClose();
-  };
-
-  const setOutpaintMargin = (side: keyof typeof outpaintMargins, value: number) => {
-    setOutpaintMargins(prev => ({
-      ...prev,
-      [side]: Math.max(0, Math.min(600, Math.round(value))),
-    }));
   };
 
   const renderModeButton = ({ mode, label, hint, icon }: { mode: EditorMode; label: string; hint: string; icon: React.ReactNode }) => (
@@ -736,24 +850,70 @@ export default function CanvasMaskEditor({
             <div
               className="relative shrink-0 select-none overflow-hidden rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] shadow-inner"
               style={{
-                width: canvasSize.width,
-                height: canvasSize.height,
-                backgroundImage: `url(${workingImageUrl})`,
+                width: editorStageSize.width,
+                height: editorStageSize.height,
+                backgroundImage: editorMode === "outpaint" ? undefined : `url(${workingImageUrl})`,
                 backgroundPosition: "center",
                 backgroundSize: "100% 100%",
               }}
             >
+              {editorMode === "outpaint" && (
+                <>
+                  <div
+                    className="pointer-events-none absolute z-0 bg-[var(--iw-bg)]/70"
+                    style={{
+                      left: outpaintMargins.left,
+                      top: outpaintMargins.top,
+                      width: canvasSize.width,
+                      height: canvasSize.height,
+                      backgroundImage: `url(${workingImageUrl})`,
+                      backgroundPosition: "center",
+                      backgroundSize: "100% 100%",
+                    }}
+                  />
+                  <div
+                    className="pointer-events-none absolute z-20 border border-blue-200/80 shadow-[0_0_0_9999px_rgba(59,130,246,0.10)]"
+                    style={{
+                      left: outpaintMargins.left,
+                      top: outpaintMargins.top,
+                      width: canvasSize.width,
+                      height: canvasSize.height,
+                    }}
+                  />
+                  {(["left", "right", "top", "bottom"] as const).map(side => (
+                    <span
+                      key={side}
+                      className="pointer-events-none absolute z-30 rounded-full border border-blue-200/80 bg-blue-500/80 shadow-lg shadow-blue-950/35"
+                      style={{
+                        height: side === "left" || side === "right" ? 44 : 10,
+                        width: side === "left" || side === "right" ? 10 : 44,
+                        left: side === "left" ? 4 : side === "right" ? editorStageSize.width - 14 : "50%",
+                        top: side === "top" ? 4 : side === "bottom" ? editorStageSize.height - 14 : "50%",
+                        transform: "translate(-50%, -50%)",
+                      }}
+                    />
+                  ))}
+                </>
+              )}
               <canvas
                 ref={canvasRef}
-                width={canvasSize.width}
-                height={canvasSize.height}
+                width={editorStageSize.width}
+                height={editorStageSize.height}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
                 onPointerUp={stopPointerAction}
                 onPointerCancel={stopPointerAction}
                 onPointerLeave={stopPointerAction}
                 className="absolute inset-0 z-10 touch-none"
-                style={{ cursor: editorMode === "text" ? "text" : editorMode === "crop" ? cropCursor : "crosshair" }}
+                style={{
+                  cursor: editorMode === "text"
+                    ? "text"
+                    : editorMode === "crop"
+                      ? cropCursor
+                      : editorMode === "outpaint"
+                        ? outpaintCursorValue
+                        : "crosshair",
+                }}
               />
 
               {textItems.map(item => (
@@ -828,6 +988,24 @@ export default function CanvasMaskEditor({
                 <span className="text-[10px] font-semibold tracking-widest text-[var(--iw-muted)]">参数</span>
                 <span className="truncate text-[10px] text-[var(--iw-muted)]">{activeMode.hint}</span>
               </div>
+
+              {operation && operation !== "cutout" && (
+                <div className="mb-2 flex min-h-10 flex-wrap items-center gap-2 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-bg)]/35 px-3 py-2">
+                  <label className="flex items-center gap-2 text-[10px] font-semibold text-[var(--iw-muted)]">
+                    <span>分辨率</span>
+                    <select
+                      value={selectedImageResolution}
+                      onChange={event => setImageResolution(event.target.value)}
+                      className="imagine-input h-8 w-28 text-xs"
+                      aria-label="图片编辑分辨率"
+                    >
+                      {resolutionOptions.map(option => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              )}
 
               {(editorMode === "mask" || editorMode === "erase") && (
                 <div className="flex min-h-10 flex-wrap items-center gap-2 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-bg)]/35 px-3 py-2">
@@ -956,21 +1134,21 @@ export default function CanvasMaskEditor({
               )}
 
               {editorMode === "outpaint" && (
-                <div className="grid min-h-10 grid-cols-2 gap-2 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-bg)]/35 px-3 py-2 sm:grid-cols-4">
+                <div className="flex min-h-10 flex-wrap items-center gap-2 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-bg)]/35 px-3 py-2">
                   {(["left", "right", "top", "bottom"] as const).map(side => (
-                    <label key={side} className="flex items-center gap-2 text-[10px] font-semibold text-[var(--iw-muted)]">
+                    <span key={side} className="rounded-md border border-[var(--iw-border)] bg-[var(--iw-bg)]/60 px-2.5 py-1.5 text-[10px] font-semibold text-[var(--iw-muted)]">
                       <span className="w-8">{side === "left" ? "左" : side === "right" ? "右" : side === "top" ? "上" : "下"}</span>
-                      <input
-                        type="number"
-                        min="0"
-                        max="600"
-                        value={outpaintMargins[side]}
-                        onChange={event => setOutpaintMargin(side, Number(event.target.value))}
-                        className="imagine-input h-8 min-w-0 font-mono text-xs"
-                        aria-label={`扩图${side}边距`}
-                      />
-                    </label>
+                      <span className="ml-2 font-mono">{outpaintMargins[side]}px</span>
+                    </span>
                   ))}
+                  <button
+                    type="button"
+                    onClick={() => setOutpaintMargins(defaultOutpaintMargins())}
+                    className="imagine-secondary-action h-8 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)] px-2.5 text-xs font-semibold text-[var(--iw-muted)] transition hover:bg-[var(--iw-panel-soft)] hover:text-[var(--iw-text)]"
+                    data-action="danger"
+                  >
+                    清扩图
+                  </button>
                 </div>
               )}
 

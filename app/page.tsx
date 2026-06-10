@@ -1058,6 +1058,7 @@ export default function Home() {
     maskUrl: string | undefined,
     guideUrl: string | undefined,
     editPrompt: string,
+    editImageResolution: string,
   ) => {
     const model = imageEditFeatureModels[operation];
     try {
@@ -1074,7 +1075,7 @@ export default function Home() {
           mask,
           guide,
           prompt: editPrompt,
-          imageResolution: "auto",
+          imageResolution: editImageResolution,
         }),
       });
       if (!response.ok) {
@@ -1093,7 +1094,7 @@ export default function Home() {
   const handleImageQuickEdit = (item: StorageItem, operation: ImageEditFeature) => {
     if (item.type !== "image") return;
     if (operation === "cutout") {
-      void runImageQuickEdit(item, operation, item.url, undefined, undefined, "");
+      void runImageQuickEdit(item, operation, item.url, undefined, undefined, "", "auto");
       return;
     }
     launchMaskEditor(item.url, item.id, "creative", operation, item);
@@ -1124,6 +1125,7 @@ export default function Home() {
         output.maskBase64,
         output.mergedImageBase64,
         output.prompt,
+        output.imageResolution,
       );
       setIsMaskOpen(false);
       setMaskEditOperation(undefined);
@@ -1840,6 +1842,7 @@ export default function Home() {
       {isMaskOpen && (
         <CanvasMaskEditor
           imageUrl={maskTargetUrl}
+          editModel={maskEditOperation ? imageEditFeatureModels[maskEditOperation] : undefined}
           isOpen={isMaskOpen}
           operation={maskEditOperation}
           onClose={() => {

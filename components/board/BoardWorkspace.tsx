@@ -1124,8 +1124,8 @@ export default function BoardWorkspace({
   );
   const galleryItemById = useMemo(
     () => new Map(galleryItems.map(item => [item.id, item])),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reference fingerprint gates complete/url changes used by result stacks
-    [galleryReferenceFingerprint],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reference fingerprint gates complete/url changes; task fingerprint gates pending/processing progress
+    [galleryReferenceFingerprint, galleryTaskFingerprint],
   );
 
   const measureAssetAspectRatio = useCallback((nodeId: string, aspectRatio: number): void => {
@@ -1347,6 +1347,7 @@ export default function BoardWorkspace({
     boardPromptReferenceGraphIndex,
     galleryReferenceFingerprint,
     galleryReferenceItems,
+    galleryTaskFingerprint,
     galleryItemById,
   ]);
 
