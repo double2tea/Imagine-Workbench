@@ -1,16 +1,20 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, Clock3, FileText, ImageIcon, Loader2, LocateFixed, Music, Square, Video, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock3, FileText, ImageIcon, Loader2, LocateFixed, Music, RotateCcw, Square, Trash2, Video, XCircle } from "lucide-react";
 import type { BoardNode } from "@/lib/board";
 import { findResultNodeForSource } from "@/lib/board/utils";
+import type { StorageItem } from "@/lib/db";
 import type { GenerationTask, GenerationTaskStatus } from "@/lib/generation-tasks";
 
 interface BoardTaskQueuePanelProps {
   cancelingTaskIds?: readonly string[];
+  items: StorageItem[];
   nodes: BoardNode[];
   onCancelTask: (task: GenerationTask) => void;
+  onDismissTask: (task: GenerationTask) => void;
   onFocusTaskResult: (task: GenerationTask) => void;
   onFocusNode: (nodeId: string) => void;
+  onRerunTaskSource: (task: GenerationTask) => void;
   tasks: GenerationTask[];
 }
 
@@ -63,17 +67,23 @@ function taskTitle(task: GenerationTask, sourceNode: BoardNode | undefined): str
 
 function TaskRow({
   canceling,
+  items,
   nodes,
   onCancelTask,
+  onDismissTask,
   onFocusTaskResult,
   onFocusNode,
+  onRerunTaskSource,
   task,
 }: {
   canceling: boolean;
+  items: StorageItem[];
   nodes: BoardNode[];
   onCancelTask: (task: GenerationTask) => void;
+  onDismissTask: (task: GenerationTask) => void;
   onFocusTaskResult: (task: GenerationTask) => void;
   onFocusNode: (nodeId: string) => void;
+  onRerunTaskSource: (task: GenerationTask) => void;
   task: GenerationTask;
 }) {
   const sourceNode = task.source.boardNodeId
@@ -81,8 +91,12 @@ function TaskRow({
     : undefined;
   const resultNode = sourceNode ? findResultNodeForSource(nodes, sourceNode.id) : undefined;
   const resultAssetId = task.activeResultAssetId ?? task.resultAssetIds.at(-1);
-  const canFocusTaskResult = Boolean(resultNode && resultAssetId && resultNode.resultAssetIds.includes(resultAssetId));
+  const resultItem = resultAssetId
+    ? items.find(item => item.id === resultAssetId && item.status === "complete")
+    : undefined;
+  const canFocusTaskResult = Boolean(resultAssetId && (resultItem || resultNode?.resultAssetIds.includes(resultAssetId)));
   const canCancel = task.status === "pending" || task.status === "processing";
+  const canHandleFailure = task.status === "failed";
   const progress = task.status === "complete" || task.status === "canceled" ? 100 : task.progress;
 
   return (
@@ -153,6 +167,27 @@ function TaskRow({
             取消
           </button>
         ) : null}
+        {canHandleFailure ? (
+          <>
+            <button
+              type="button"
+              disabled={!sourceNode}
+              className={actionButtonClassName}
+              onClick={() => onRerunTaskSource(task)}
+            >
+              <RotateCcw className="h-3 w-3" />
+              重跑源
+            </button>
+            <button
+              type="button"
+              className="nodrag flex h-7 items-center gap-1 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)] px-2 text-[10px] font-semibold text-[var(--iw-faint)] transition hover:border-red-400/35 hover:text-red-200"
+              onClick={() => onDismissTask(task)}
+            >
+              <Trash2 className="h-3 w-3" />
+              忽略
+            </button>
+          </>
+        ) : null}
       </div>
     </article>
   );
@@ -160,18 +195,24 @@ function TaskRow({
 
 function TaskSection({
   cancelingTaskIds,
+  items,
   nodes,
   onCancelTask,
+  onDismissTask,
   onFocusTaskResult,
   onFocusNode,
+  onRerunTaskSource,
   tasks,
   title,
 }: {
   cancelingTaskIds: readonly string[];
+  items: StorageItem[];
   nodes: BoardNode[];
   onCancelTask: (task: GenerationTask) => void;
+  onDismissTask: (task: GenerationTask) => void;
   onFocusTaskResult: (task: GenerationTask) => void;
   onFocusNode: (nodeId: string) => void;
+  onRerunTaskSource: (task: GenerationTask) => void;
   tasks: GenerationTask[];
   title: string;
 }) {
@@ -186,10 +227,13 @@ function TaskSection({
         <TaskRow
           key={task.id}
           canceling={cancelingTaskIds.includes(task.id)}
+          items={items}
           nodes={nodes}
           onCancelTask={onCancelTask}
+          onDismissTask={onDismissTask}
           onFocusTaskResult={onFocusTaskResult}
           onFocusNode={onFocusNode}
+          onRerunTaskSource={onRerunTaskSource}
           task={task}
         />
       ))}
@@ -199,10 +243,13 @@ function TaskSection({
 
 export default function BoardTaskQueuePanel({
   cancelingTaskIds = [],
+  items,
   nodes,
   onCancelTask,
+  onDismissTask,
   onFocusTaskResult,
   onFocusNode,
+  onRerunTaskSource,
   tasks,
 }: BoardTaskQueuePanelProps) {
   const activeTasks = tasks.filter(task => task.status === "pending" || task.status === "processing");
@@ -235,28 +282,37 @@ export default function BoardTaskQueuePanel({
       </div>
       <TaskSection
         cancelingTaskIds={cancelingTaskIds}
+        items={items}
         nodes={nodes}
         onCancelTask={onCancelTask}
+        onDismissTask={onDismissTask}
         onFocusTaskResult={onFocusTaskResult}
         onFocusNode={onFocusNode}
+        onRerunTaskSource={onRerunTaskSource}
         tasks={activeTasks}
         title="运行中"
       />
       <TaskSection
         cancelingTaskIds={cancelingTaskIds}
+        items={items}
         nodes={nodes}
         onCancelTask={onCancelTask}
+        onDismissTask={onDismissTask}
         onFocusTaskResult={onFocusTaskResult}
         onFocusNode={onFocusNode}
+        onRerunTaskSource={onRerunTaskSource}
         tasks={failedTasks}
         title="需要处理"
       />
       <TaskSection
         cancelingTaskIds={cancelingTaskIds}
+        items={items}
         nodes={nodes}
         onCancelTask={onCancelTask}
+        onDismissTask={onDismissTask}
         onFocusTaskResult={onFocusTaskResult}
         onFocusNode={onFocusNode}
+        onRerunTaskSource={onRerunTaskSource}
         tasks={recentTasks}
         title="最近完成"
       />

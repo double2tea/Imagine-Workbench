@@ -88,6 +88,13 @@ function completedAssetIdPrefix(mediaType: StorageItem["type"]): string {
   return "vid";
 }
 
+function isTaskLocallyCanceled(
+  task: GenerationTask,
+  locallyCanceledItemIdsRef: MutableRefObject<Set<string>>,
+): boolean {
+  return locallyCanceledItemIdsRef.current.has(task.id);
+}
+
 function makeClientId(prefix: string): string {
   return `${prefix}_${Date.now()}`;
 }
@@ -142,7 +149,7 @@ export function useMediaPolling({
         }
 
         if (task.operationName) {
-          if (locallyCanceledItemIdsRef.current.has(task.id)) continue;
+          if (isTaskLocallyCanceled(task, locallyCanceledItemIdsRef)) continue;
           try {
             const headers = buildProviderHeaders(task.operationName);
 
@@ -162,6 +169,7 @@ export function useMediaPolling({
             }
             const statusRecord = statusData as Record<string, unknown>;
             pollingFailuresRef.current[task.id] = 0;
+            if (isTaskLocallyCanceled(task, locallyCanceledItemIdsRef)) continue;
 
             if (statusRecord.done === true && statusRecord.status === "failed") {
               const failedTask = await updateTaskOrWarn(task.id, {
@@ -198,6 +206,7 @@ export function useMediaPolling({
 
               if (dlRes.ok) {
                 const blob = await dlRes.blob();
+                if (isTaskLocallyCanceled(task, locallyCanceledItemIdsRef)) continue;
                 const completedAssetId = makeClientId(completedAssetIdPrefix(mediaType));
                 const completedItem = buildStorageItem(
                   {
@@ -257,6 +266,7 @@ export function useMediaPolling({
 
               const nextProgress = typeof statusRecord.progress === "number" ? statusRecord.progress : task.progress;
               if (task.progress !== nextProgress) {
+                if (isTaskLocallyCanceled(task, locallyCanceledItemIdsRef)) continue;
                 const progressTask = await updateTaskOrWarn(task.id, {
                   progress: nextProgress,
                   errorMessage: undefined,
@@ -265,6 +275,7 @@ export function useMediaPolling({
               }
             }
           } catch (error) {
+            if (isTaskLocallyCanceled(task, locallyCanceledItemIdsRef)) continue;
             const previousFailures = pollingFailuresRef.current[task.id] ?? 0;
             const nextFailures = previousFailures + 1;
             pollingFailuresRef.current[task.id] = nextFailures;

@@ -41,8 +41,9 @@ export default function BoardSidePanel({ assetsPanel, inspectorPanel, revealKey,
 
   useEffect(() => {
     if (!revealKey) return;
+    if (activeTab === "tasks") return;
     setActiveTab("inspector");
-  }, [revealKey]);
+  }, [activeTab, revealKey]);
 
   const selectTab = (tab: BoardSidePanelTab) => {
     setActiveTab(tab);

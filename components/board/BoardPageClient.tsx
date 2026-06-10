@@ -64,6 +64,7 @@ import {
 } from "@/lib/db";
 import {
   cancelGenerationTask,
+  deleteGenerationTask,
   type GenerationTask,
 } from "@/lib/generation-tasks";
 import {
@@ -3996,17 +3997,52 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       pushWorkspaceNotice("error", "任务缺少来源节点，无法定位结果");
       return;
     }
+    const resultAssetId = task.activeResultAssetId ?? task.resultAssetIds.at(-1);
+    const resultItem = resultAssetId
+      ? items.find(item => item.id === resultAssetId && item.status === "complete")
+      : undefined;
     const resultNode = findResultNodeForSource(boardController.board.nodes, sourceNodeId);
+    if (!resultNode && resultItem) {
+      handleOpenFullscreen(resultItem);
+      return;
+    }
     if (!resultNode) {
       pushWorkspaceNotice("error", "未找到任务对应的结果节点");
       return;
     }
-    const resultAssetId = task.activeResultAssetId ?? task.resultAssetIds.at(-1);
     if (resultAssetId && resultNode.resultAssetIds.includes(resultAssetId)) {
       boardController.updateResultNodeAsset(resultNode.id, resultAssetId);
+      requestFocusNode(resultNode.id);
+      return;
+    }
+    if (resultItem) {
+      handleOpenFullscreen(resultItem);
+      return;
     }
     requestFocusNode(resultNode.id);
-  }, [boardController, pushWorkspaceNotice, requestFocusNode]);
+  }, [boardController, handleOpenFullscreen, items, pushWorkspaceNotice, requestFocusNode]);
+
+  const handleRerunBoardTaskSource = useCallback((task: GenerationTask) => {
+    const sourceNodeId = task.source.boardNodeId;
+    if (!sourceNodeId) {
+      pushWorkspaceNotice("error", "任务缺少来源节点，无法重跑");
+      return;
+    }
+    void handleExecuteGenerateNode(sourceNodeId);
+  }, [handleExecuteGenerateNode, pushWorkspaceNotice]);
+
+  const handleDismissBoardTask = useCallback((task: GenerationTask) => {
+    void (async () => {
+      if (!(await confirmAction({
+        message: "忽略这个失败任务吗？这只会从任务队列移除记录，不会删除已生成资产或画板节点。",
+        confirmLabel: "忽略",
+      }))) return;
+      await deleteGenerationTask(task.id);
+      setGenerationTasks(prev => prev.filter(current => current.id !== task.id));
+      delete pollingFailuresRef.current[task.id];
+      pushWorkspaceNotice("success", "已忽略任务记录");
+    })().catch(error => pushWorkspaceNotice("error", toErrorMessage(error, "任务忽略失败")));
+  }, [confirmAction, pollingFailuresRef, pushWorkspaceNotice, setGenerationTasks]);
 
   const handleBoardConnectionError = useCallback((message: string) => {
     pushWorkspaceNotice("error", message);
@@ -4268,11 +4304,14 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           tasksPanel={(
             <BoardTaskQueuePanel
               cancelingTaskIds={cancelingBoardItemIds}
+              items={items}
               nodes={boardController.board.nodes}
               tasks={generationTasks}
               onCancelTask={handleCancelBoardTask}
+              onDismissTask={handleDismissBoardTask}
               onFocusTaskResult={handleFocusBoardTaskResult}
               onFocusNode={requestFocusNode}
+              onRerunTaskSource={handleRerunBoardTaskSource}
             />
           )}
         />
