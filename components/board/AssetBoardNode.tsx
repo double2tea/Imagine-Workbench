@@ -198,20 +198,24 @@ const AssetBoardNode = memo(function AssetBoardNode({
               toneClassName: operationToneClassName(WORKBENCH_OPERATION_META.panorama.tone),
             }]
           : []),
-        {
-          id: "fullscreen",
-          icon: <WorkbenchOperationIcon operation="fullscreen" />,
-          onClick: () => onOpenFullscreen?.(item),
-          title: WORKBENCH_OPERATION_META.fullscreen.title,
-          toneClassName: operationToneClassName(WORKBENCH_OPERATION_META.fullscreen.tone),
-        },
-        {
-          id: "download",
-          icon: <WorkbenchOperationIcon operation="download" />,
-          onClick: () => onDownload?.(item),
-          title: WORKBENCH_OPERATION_META.download.title,
-          toneClassName: operationToneClassName(WORKBENCH_OPERATION_META.download.tone),
-        },
+        ...(isComplete
+          ? [
+              {
+                id: "fullscreen",
+                icon: <WorkbenchOperationIcon operation="fullscreen" />,
+                onClick: () => onOpenFullscreen?.(item),
+                title: WORKBENCH_OPERATION_META.fullscreen.title,
+                toneClassName: operationToneClassName(WORKBENCH_OPERATION_META.fullscreen.tone),
+              },
+              {
+                id: "download",
+                icon: <WorkbenchOperationIcon operation="download" />,
+                onClick: () => onDownload?.(item),
+                title: WORKBENCH_OPERATION_META.download.title,
+                toneClassName: operationToneClassName(WORKBENCH_OPERATION_META.download.tone),
+              },
+            ]
+          : []),
       ],
     },
   ];
