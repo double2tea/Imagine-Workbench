@@ -10,6 +10,7 @@
 
   var PLUGIN_ID = "com.imagine.workbench.resolve";
   var RESOLVE_BIN_ROOT = "Imagine Workbench";
+  var RESOLVE_LUT_ROOT = "ImagineWorkbench";
   var CACHE_MAX_AGE_MS = 72 * 60 * 60 * 1000;
   var DEFAULT_MODELS = {
     "generate-image": "12ai:gemini-3.1-flash-image-preview",
@@ -1199,19 +1200,55 @@
     }
     if (typeof project.RefreshLUTList === "function") {
       await project.RefreshLUTList();
+      await delay(500);
     }
-    var relativePath = relativeResolveLutPath(lutPath);
-    if (!(await item.SetLUT(1, relativePath)) && !(await item.SetLUT(1, lutPath))) {
-      throw new Error("Resolve 应用 LUT 失败：" + relativePath);
+    var lutPaths = resolveLutCandidates(lutPath);
+    var errors = [];
+    for (var index = 0; index < lutPaths.length; index += 1) {
+      try {
+        if (await item.SetLUT(1, lutPaths[index])) {
+          return;
+        }
+        errors.push(lutPaths[index] + " -> false");
+      } catch (error) {
+        errors.push(lutPaths[index] + " -> " + errorMessage(error));
+      }
     }
+    throw new Error("Resolve 应用 LUT 失败：\n" + errors.join("\n"));
   }
 
   function resolveUserLutPath(fileName) {
-    return path.join(os.homedir(), "Library", "Application Support", "Blackmagic Design", "DaVinci Resolve", "LUT", RESOLVE_BIN_ROOT, safeStem(path.basename(fileName, ".cube")) + ".cube");
+    return path.join(resolveUserLutRoot(), RESOLVE_LUT_ROOT, safeStem(path.basename(fileName, ".cube")) + ".cube");
   }
 
   function relativeResolveLutPath(lutPath) {
-    return RESOLVE_BIN_ROOT + "/" + path.basename(lutPath);
+    return path.relative(resolveUserLutRoot(), lutPath).split(path.sep).join("/");
+  }
+
+  function resolveUserLutRoot() {
+    return path.join(os.homedir(), "Library", "Application Support", "Blackmagic Design", "DaVinci Resolve", "LUT");
+  }
+
+  function resolveLutCandidates(lutPath) {
+    var relativePath = relativeResolveLutPath(lutPath);
+    var withoutExtension = relativePath.replace(/\.cube$/i, "");
+    var absoluteWithoutExtension = lutPath.replace(/\.cube$/i, "");
+    return uniqueStrings([relativePath, withoutExtension, lutPath, absoluteWithoutExtension]);
+  }
+
+  function uniqueStrings(values) {
+    var seen = {};
+    return values.filter(function (value) {
+      if (!value || seen[value]) {
+        return false;
+      }
+      seen[value] = true;
+      return true;
+    });
+  }
+
+  function errorMessage(error) {
+    return error && error.message ? error.message : String(error);
   }
 
   function lookPresetPath(preset) {
