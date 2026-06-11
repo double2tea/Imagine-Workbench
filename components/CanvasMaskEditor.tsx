@@ -89,6 +89,7 @@ interface TextOverlay {
 const TEXT_COLORS = ["#ffffff", "#111827", "#f97316", "#38bdf8", "#facc15"] as const;
 const CROP_HANDLE_HIT_SIZE = 14;
 const CROP_MIN_SIZE = 16;
+const EDITOR_CANVAS_MAX_SIZE: CanvasSize = { width: 760, height: 560 };
 const OUTPAINT_HANDLE_HIT_SIZE = 28;
 const OUTPAINT_MAX_MARGIN = 600;
 const CROP_PRESETS: Array<{ id: CropPresetId; label: string; ratio: AspectRatio | null }> = [
@@ -167,6 +168,15 @@ function getEditorResolutionOptions(model: string | undefined, aspectRatio: stri
   if (!model) return [{ value: "auto", label: "Auto" }];
   const options = getImageResolutionOptions(model, aspectRatio).filter(option => option.value !== "custom");
   return options.length > 0 ? options : [{ value: "auto", label: "Auto" }];
+}
+
+function getEditorCanvasBounds(): CanvasSize {
+  const compactLayout = window.innerWidth < 1024;
+
+  return {
+    width: Math.max(280, Math.min(EDITOR_CANVAS_MAX_SIZE.width, window.innerWidth - (compactLayout ? 56 : 460))),
+    height: Math.max(240, Math.min(EDITOR_CANVAS_MAX_SIZE.height, window.innerHeight - (compactLayout ? 360 : 220))),
+  };
 }
 
 function getCropPresetRatio(presetId: CropPresetId, canvasSize: CanvasSize): AspectRatio | null {
@@ -334,11 +344,7 @@ export default function CanvasMaskEditor({
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => {
-      const bounds = {
-        width: Math.min(window.innerWidth - 64, 720),
-        height: Math.min(window.innerHeight - 280, 560),
-      };
-      const nextSize = scaleToFitSize({ width: img.width, height: img.height }, bounds);
+      const nextSize = scaleToFitSize({ width: img.width, height: img.height }, getEditorCanvasBounds());
 
       bgImgRef.current = img;
       setCanvasSize(nextSize);
@@ -667,11 +673,7 @@ export default function CanvasMaskEditor({
 
     const hasCroppedMask = canvasHasVisiblePixels(nextMaskCanvas);
     pendingMaskDataUrlRef.current = hasCroppedMask ? nextMaskCanvas.toDataURL("image/png") : null;
-    const bounds = {
-      width: Math.min(window.innerWidth - 64, 720),
-      height: Math.min(window.innerHeight - 280, 560),
-    };
-    const nextCanvasSize = scaleToFitSize(nextNaturalSize, bounds);
+    const nextCanvasSize = scaleToFitSize(nextNaturalSize, getEditorCanvasBounds());
     const textScaleX = crop.width > 0 ? nextCanvasSize.width / crop.width : 1;
     const textScaleY = crop.height > 0 ? nextCanvasSize.height / crop.height : 1;
     setHasDrawn(hasCroppedMask);
@@ -822,9 +824,9 @@ export default function CanvasMaskEditor({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--iw-bg)]/85 p-4 backdrop-blur-md">
-      <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl border border-[var(--iw-border)] bg-[var(--iw-panel)] shadow-2xl">
-        <div className="flex items-center justify-between border-b border-[var(--iw-border)] px-4 py-3 sm:px-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--iw-bg)]/85 p-3 backdrop-blur-md sm:p-4">
+      <div className="flex h-[760px] w-[1180px] max-h-[calc(100dvh-32px)] max-w-[calc(100vw-32px)] flex-col overflow-hidden rounded-xl border border-[var(--iw-border)] bg-[var(--iw-panel)] shadow-2xl">
+        <div className="flex h-16 shrink-0 items-center justify-between border-b border-[var(--iw-border)] px-4 sm:px-5">
           <div className="min-w-0">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--iw-text)]">
               {operation ? (
@@ -848,23 +850,24 @@ export default function CanvasMaskEditor({
           </button>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-auto bg-[var(--iw-bg)]/40 p-4 sm:p-6">
-          {!imgLoaded ? (
-            <div className="flex flex-col items-center justify-center gap-2 text-[var(--iw-muted)]">
-              <RefreshCw className="h-8 w-8 animate-spin" />
-              <span className="text-sm">正在加载工作面板像素...</span>
-            </div>
-          ) : (
-            <div
-              className="relative shrink-0 select-none overflow-hidden rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] shadow-inner"
-              style={{
-                width: editorStageSize.width,
-                height: editorStageSize.height,
-                backgroundImage: editorMode === "outpaint" ? undefined : `url(${workingImageUrl})`,
-                backgroundPosition: "center",
-                backgroundSize: "100% 100%",
-              }}
-            >
+        <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1fr)_340px] lg:grid-rows-1">
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-auto bg-[var(--iw-bg)]/40 p-3 sm:p-4">
+            {!imgLoaded ? (
+              <div className="flex flex-col items-center justify-center gap-2 text-[var(--iw-muted)]">
+                <RefreshCw className="h-8 w-8 animate-spin" />
+                <span className="text-sm">正在加载工作面板像素...</span>
+              </div>
+            ) : (
+              <div
+                className="relative shrink-0 select-none overflow-hidden rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] shadow-inner"
+                style={{
+                  width: editorStageSize.width,
+                  height: editorStageSize.height,
+                  backgroundImage: editorMode === "outpaint" ? undefined : `url(${workingImageUrl})`,
+                  backgroundPosition: "center",
+                  backgroundSize: "100% 100%",
+                }}
+              >
               {editorMode === "outpaint" && (
                 <>
                   <div
@@ -978,21 +981,21 @@ export default function CanvasMaskEditor({
                   })}
                 </div>
               )}
-            </div>
-          )}
-        </div>
+              </div>
+            )}
+          </div>
 
-        <div className="border-t border-[var(--iw-border)] bg-[var(--iw-panel)]/60 px-4 py-3 sm:px-5">
-          <div className="grid gap-3 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-start">
+          <aside className="flex min-h-0 flex-col border-t border-[var(--iw-border)] bg-[var(--iw-panel)]/72 lg:border-l lg:border-t-0">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3 sm:p-4">
             <OperationSection label="工具">
-              <div className="flex flex-wrap items-center rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)]/80 p-0.5">
+              <div className={`grid gap-1 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)]/80 p-1 ${visibleModeOptions.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
                 {visibleModeOptions.map(option => renderModeButton(option))}
               </div>
             </OperationSection>
 
             <OperationSection label="参数">
-              <div className="mb-1.5 flex items-center justify-between gap-3">
-                <span className="truncate text-[10px] text-[var(--iw-muted)]">{activeMode.hint}</span>
+              <div className="mb-1.5 flex items-center justify-between gap-3 text-[10px] text-[var(--iw-muted)]">
+                <span className="min-w-0 truncate">{activeMode.hint}</span>
               </div>
 
               {operation && operation !== "cutout" && (
@@ -1096,22 +1099,19 @@ export default function CanvasMaskEditor({
 
               {editorMode === "crop" && (
                 <OperationControlGroup>
-                  <div className="flex h-8 max-w-full items-center gap-1 overflow-x-auto rounded-md border border-[var(--iw-border)] bg-[var(--iw-bg)]/60 px-1.5">
-                    {CROP_PRESETS.map(preset => (
-                      <button
-                        key={preset.id}
-                        type="button"
-                        onClick={() => selectCropPreset(preset.id)}
-                        className={`h-6 shrink-0 rounded px-2 font-mono text-[10px] font-semibold transition ${
-                          cropPresetId === preset.id
-                            ? "bg-blue-600 text-white"
-                            : "text-[var(--iw-muted)] hover:bg-[var(--iw-panel-soft)] hover:text-[var(--iw-text)]"
-                        }`}
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
-                  </div>
+                  <label className="flex items-center gap-2 text-[10px] font-semibold text-[var(--iw-muted)]">
+                    <span>比例</span>
+                    <select
+                      value={cropPresetId}
+                      onChange={event => selectCropPreset(event.target.value as CropPresetId)}
+                      className="imagine-input h-8 w-28 text-xs"
+                      aria-label="裁切比例"
+                    >
+                      {CROP_PRESETS.map(preset => (
+                        <option key={preset.id} value={preset.id}>{preset.label}</option>
+                      ))}
+                    </select>
+                  </label>
                   <span className="rounded-md border border-[var(--iw-border)] bg-[var(--iw-bg)]/60 px-2.5 py-1.5 font-mono text-[10px] text-[var(--iw-muted)]">
                     {cropSizeLabel}
                   </span>
@@ -1164,37 +1164,38 @@ export default function CanvasMaskEditor({
                     value={editPrompt}
                     onChange={event => setEditPrompt(event.target.value)}
                     placeholder={operationCopy?.promptPlaceholder}
-                    className="imagine-field-textarea min-h-16 resize-y text-xs"
+                    className="imagine-field-textarea h-24 resize-none text-xs"
                     aria-label={`${operationCopy?.title ?? "图片编辑"}提示词`}
                   />
                 </div>
               ) : null}
             </OperationSection>
 
-            <OperationSection label="操作">
-              <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                <OperationActionButton
-                  type="button"
-                  onClick={resetEditor}
-                  tone="neutral"
-                  data-action="danger"
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  重置
-                </OperationActionButton>
-                <OperationActionButton
-                  type="button"
-                  onClick={handleApply}
-                  disabled={!canApply}
-                  tone="success"
-                  variant="primary"
-                >
-                  <Check className="h-4 w-4" />
-                  应用编辑
-                </OperationActionButton>
-              </div>
-            </OperationSection>
-          </div>
+            </div>
+            <div className="grid shrink-0 grid-cols-[0.8fr_1.2fr] gap-2 border-t border-[var(--iw-border)] p-3">
+              <OperationActionButton
+                type="button"
+                onClick={resetEditor}
+                tone="neutral"
+                data-action="danger"
+                className="w-full"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                重置
+              </OperationActionButton>
+              <OperationActionButton
+                type="button"
+                onClick={handleApply}
+                disabled={!canApply}
+                tone="success"
+                variant="primary"
+                className="w-full"
+              >
+                <Check className="h-4 w-4" />
+                应用编辑
+              </OperationActionButton>
+            </div>
+          </aside>
         </div>
       </div>
     </div>
