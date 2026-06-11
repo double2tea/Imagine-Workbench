@@ -23,6 +23,7 @@ import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/as
 import PreviewImage from "@/components/PreviewImage";
 import { makeReferenceDropToken, REFERENCE_ASSET_MIME } from "@/components/reference/referenceDrag";
 import { getGenerationReferenceMedia, type StorageItem } from "@/lib/db";
+import { imageQuickEditProcessingTitleFromPrompt } from "@/lib/image-quick-edit-targets";
 import { mediaReferenceLabel } from "@/lib/media-references";
 import { formatDisplayedAspectRatio } from "@/lib/media-display";
 import { tryParseProviderModel, type AiProvider } from "@/lib/providers/model-catalog";
@@ -97,10 +98,12 @@ function formatCreatedAt(value: string): string {
 
 type FrameMenuPlacement = "hover" | "meta";
 
-function processingTitle(type: StorageItem["type"]): string {
-  if (type === "video") return "视频合成中";
-  if (type === "audio") return "音频处理中";
-  if (type === "transcript") return "音频转写中";
+function processingTitle(item: StorageItem): string {
+  const quickEditTitle = item.type === "image" ? imageQuickEditProcessingTitleFromPrompt(item.prompt) : null;
+  if (quickEditTitle) return quickEditTitle;
+  if (item.type === "video") return "视频合成中";
+  if (item.type === "audio") return "音频处理中";
+  if (item.type === "transcript") return "音频转写中";
   return "图像生成中";
 }
 
@@ -324,7 +327,7 @@ export default function AssetCard({
               <RefreshCw className="h-4 w-4 text-indigo-300 animate-spin" />
             </div>
             <p className="imagine-generation-stage-title">
-              {item.status === "pending" ? "任务已排队" : processingTitle(item.type)}
+              {item.status === "pending" ? "任务已排队" : processingTitle(item)}
             </p>
             <span className="imagine-generation-stage-meta">模型 {formatModelName(item.model)}</span>
             <div className="imagine-generation-progress" role="progressbar" aria-valuenow={item.progress} aria-valuemin={0} aria-valuemax={100}>

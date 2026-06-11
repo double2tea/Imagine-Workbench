@@ -63,6 +63,8 @@ import {
 import { useImageEditFeatureModels } from "@/hooks/useImageEditFeatureModels";
 import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
 import {
+  imageEditFeatureLabel,
+  imageQuickEditFallbackPrompt,
   resolveImageQuickEditTarget,
   submitImageQuickEdit,
 } from "@/lib/image-quick-edit-targets";
@@ -193,12 +195,6 @@ interface BoardMediaAnalysisResponse {
 }
 
 const LARGE_BOARD_DATA_URL_MIN_LENGTH = 120_000;
-const IMAGE_EDIT_LABELS: Record<ImageEditFeature, string> = {
-  redraw: "重绘",
-  erase: "擦除",
-  outpaint: "扩图",
-  cutout: "抠图",
-};
 
 function relatedQuickEditTaskIds(assetId: string): string[] {
   return [assetId, legacyGenerationTaskId(assetId)];
@@ -1805,13 +1801,13 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     model: string,
     editPrompt: string,
   ): Promise<{ item: StorageItem; nodeId: string } | null> {
-    const label = IMAGE_EDIT_LABELS[operation];
+    const label = imageEditFeatureLabel(operation);
     const item = buildStorageItem(
       {
         id: makeClientId("img_edit"),
         type: "image",
         url: previewUrl,
-        prompt: editPrompt || `${label}：${sourceItem.prompt || sourceItem.id}`,
+        prompt: editPrompt || imageQuickEditFallbackPrompt(operation, sourceItem.prompt || sourceItem.id),
         model,
         aspectRatio: "auto",
         createdAt: new Date().toISOString(),
@@ -1859,7 +1855,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     if (!savedItem) return;
     setItems(prev => prev.map(current => current.id === savedItem.id ? savedItem : current));
     boardController.updateAssetNodeAsset(nodeId, storageItemToBoardAssetReference(savedItem));
-    const label = IMAGE_EDIT_LABELS[operation];
+    const label = imageEditFeatureLabel(operation);
     pushWorkspaceNotice("success", `${label}完成，已保存为新画板资产`);
   }
 
@@ -1893,7 +1889,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     editImageResolution: string,
     outputSize?: BoardSize,
   ) {
-    const label = IMAGE_EDIT_LABELS[operation];
+    const label = imageEditFeatureLabel(operation);
     const target = resolveImageQuickEditTarget(operation, imageEditFeatureTargets[operation]);
     const pending = await createBoardQuickEditProcessingAsset(
       sourceNodeId,

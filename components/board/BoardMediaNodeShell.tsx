@@ -9,6 +9,7 @@ interface BoardMediaNodeShellProps {
   children: ReactNode;
   isSelected: boolean;
   onCancelProcessing?: () => void;
+  processingLabel?: string;
   onSelectStackAsset?: (assetId: string) => void;
   progress?: number;
   stackItems: ReadonlyArray<Pick<StorageItem, "id">>;
@@ -21,6 +22,7 @@ export default function BoardMediaNodeShell({
   children,
   isSelected,
   onCancelProcessing,
+  processingLabel = "编辑处理中",
   onSelectStackAsset,
   progress = 0,
   stackItems,
@@ -75,7 +77,7 @@ export default function BoardMediaNodeShell({
               <div className="flex items-center justify-between gap-3 text-[11px] font-semibold">
                 <span className="flex items-center gap-1.5">
                   {!isFailed && <Loader2 className="h-3 w-3 animate-spin" />}
-                  {isFailed ? "编辑失败" : status === "pending" ? "任务已排队" : "编辑处理中"}
+                  {isFailed ? "编辑失败" : status === "pending" ? "任务已排队" : processingLabel}
                 </span>
                 <span className="font-mono">{progress}%</span>
               </div>

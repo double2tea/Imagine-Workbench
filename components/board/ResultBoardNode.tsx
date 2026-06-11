@@ -9,6 +9,7 @@ import useBoardAudioItem from "@/components/board/useBoardAudioItem";
 import useSelectedBoardVideoItem from "@/components/board/useSelectedBoardVideoItem";
 import type { BoardResultNode } from "@/lib/board";
 import { buildStorageItem, type StorageItem } from "@/lib/db";
+import { imageQuickEditProcessingTitleFromPrompt } from "@/lib/image-quick-edit-targets";
 import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
 import type { CapturedVideoFrame } from "@/lib/video-frame";
 import {
@@ -184,6 +185,7 @@ const ResultBoardNode = memo(function ResultBoardNode({
       isSelected={isSelected}
       onSelectStackAsset={onSelectStackAsset}
       progress={item.progress}
+      processingLabel={imageQuickEditProcessingTitleFromPrompt(item.prompt) ?? undefined}
       stackItems={stackItems}
       status={item.status}
     >

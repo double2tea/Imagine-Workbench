@@ -23,7 +23,7 @@ import {
   WandSparkles,
   type LucideIcon,
 } from "lucide-react";
-import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
+import { imageEditFeatureLabel, type ImageEditFeature } from "@/lib/image-quick-edit-targets";
 
 export type OperationTone = "accent" | "neutral" | "danger" | "media" | "success";
 
@@ -39,25 +39,25 @@ export const IMAGE_EDIT_OPERATION_ORDER: readonly ImageEditFeature[] = ["redraw"
 export const IMAGE_EDIT_OPERATION_META: Record<ImageEditFeature, WorkbenchOperationMeta> = {
   redraw: {
     Icon: WandSparkles,
-    label: "重绘",
+    label: imageEditFeatureLabel("redraw"),
     title: "绘制蒙版并重绘局部",
     tone: "accent",
   },
   erase: {
     Icon: Eraser,
-    label: "擦除",
+    label: imageEditFeatureLabel("erase"),
     title: "绘制蒙版并擦除区域",
     tone: "accent",
   },
   outpaint: {
     Icon: Expand,
-    label: "扩图",
+    label: imageEditFeatureLabel("outpaint"),
     title: "扩展画面边界",
     tone: "accent",
   },
   cutout: {
     Icon: Scissors,
-    label: "抠图",
+    label: imageEditFeatureLabel("cutout"),
     title: "移除背景并保留主体",
     tone: "accent",
   },

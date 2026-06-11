@@ -65,6 +65,8 @@ import {
 import { useImageEditFeatureModels } from "@/hooks/useImageEditFeatureModels";
 import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
 import {
+  imageEditFeatureLabel,
+  imageQuickEditFallbackPrompt,
   resolveImageQuickEditTarget,
   submitImageQuickEdit,
 } from "@/lib/image-quick-edit-targets";
@@ -116,12 +118,6 @@ import { CLEAR_WORKSPACE_ASSETS_MESSAGE } from "@/lib/workspace-messages";
 
 type NoticeType = "error" | "info" | "success";
 type MaskDestination = "creative" | "agent";
-const IMAGE_EDIT_LABELS: Record<ImageEditFeature, string> = {
-  redraw: "重绘",
-  erase: "擦除",
-  outpaint: "扩图",
-  cutout: "抠图",
-};
 const DESKTOP_LAYOUT_QUERY = "(min-width: 1024px)";
 
 function subscribeDesktopLayout(onStoreChange: () => void): () => void {
@@ -1143,12 +1139,12 @@ export default function Home() {
     model: string,
     editPrompt: string,
   ): Promise<StorageItem | null> => {
-    const label = IMAGE_EDIT_LABELS[operation];
+    const label = imageEditFeatureLabel(operation);
     const item = buildStorageItem({
       id: makeClientId("img_edit"),
       type: "image",
       url: previewUrl,
-      prompt: editPrompt || `${label}：${sourceItem.prompt || sourceItem.id}`,
+      prompt: editPrompt || imageQuickEditFallbackPrompt(operation, sourceItem.prompt || sourceItem.id),
       model,
       aspectRatio: "auto",
       createdAt: new Date().toISOString(),
@@ -1174,7 +1170,7 @@ export default function Home() {
     operation: ImageEditFeature,
     imageUrl: string,
   ) => {
-    const label = IMAGE_EDIT_LABELS[operation];
+    const label = imageEditFeatureLabel(operation);
     const nextItem = buildStorageItem({
       ...item,
       url: imageUrl,
@@ -1245,7 +1241,7 @@ export default function Home() {
         clearLocallyCanceledQuickEdit(pendingTaskIds, locallyCanceledItemIdsRef.current);
         return;
       }
-      const message = toErrorMessage(error, `${IMAGE_EDIT_LABELS[operation]}失败`);
+      const message = toErrorMessage(error, `${imageEditFeatureLabel(operation)}失败`);
       try {
         await failImageQuickEditAsset(pending, message);
       } catch (storageError) {
@@ -1265,7 +1261,7 @@ export default function Home() {
         return;
       }
       launchMaskEditor(originalItem.url, originalItem.id, "creative", operation, originalItem);
-    }, `${IMAGE_EDIT_LABELS[operation]}原图读取失败`);
+    }, `${imageEditFeatureLabel(operation)}原图读取失败`);
   };
 
   // Launch mask editor layout dialog

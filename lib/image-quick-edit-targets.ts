@@ -37,6 +37,25 @@ export const IMAGE_EDIT_FEATURES: readonly ImageEditFeatureMeta[] = [
   { key: "cutout", label: "抠图", description: "移除背景并保留主体" },
 ];
 
+export function imageEditFeatureMeta(feature: ImageEditFeature): ImageEditFeatureMeta {
+  const meta = IMAGE_EDIT_FEATURES.find(item => item.key === feature);
+  if (!meta) throw new Error(`Unknown image edit feature: ${feature}`);
+  return meta;
+}
+
+export function imageEditFeatureLabel(feature: ImageEditFeature): string {
+  return imageEditFeatureMeta(feature).label;
+}
+
+export function imageQuickEditFallbackPrompt(feature: ImageEditFeature, sourcePromptOrId: string): string {
+  return `${imageEditFeatureLabel(feature)}：${sourcePromptOrId}`;
+}
+
+export function imageQuickEditProcessingTitleFromPrompt(prompt: string): string | null {
+  const feature = IMAGE_EDIT_FEATURES.find(item => prompt.startsWith(`${item.label}：`));
+  return feature ? `${feature.label}处理中` : null;
+}
+
 const NANO_BANANA_PRO_MODEL = "12ai:gemini-3-pro-image-preview";
 const GENERIC_TARGET_PREFIX = "model:";
 const RUNNINGHUB_CONTROL_IMAGE_APP_VALUE = formatProviderModel("runninghub", RUNNINGHUB_CONTROL_IMAGE_APP_MODEL);
