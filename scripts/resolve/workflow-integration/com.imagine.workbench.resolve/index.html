@@ -73,9 +73,12 @@
           <label class="field" id="modelField">
             <span>模型</span>
             <span class="model-row">
-              <input id="modelInput" type="text" list="modelOptions" placeholder="自动读取可用模型" />
+              <span class="model-picker">
+                <input id="modelInput" type="text" placeholder="自动读取可用模型" autocomplete="off" />
+                <button class="model-menu-button" id="modelMenuButton" type="button" aria-label="展开模型列表">⌄</button>
+                <span class="model-menu hidden" id="modelMenu"></span>
+              </span>
               <button class="small-button icon-button" id="modelRefreshButton" type="button" aria-label="刷新服务商和模型">刷新</button>
-              <datalist id="modelOptions"></datalist>
             </span>
           </label>
           <label class="field" id="imageOperationField">

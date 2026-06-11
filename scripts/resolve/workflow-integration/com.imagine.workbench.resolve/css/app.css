@@ -553,8 +553,87 @@ select:focus {
   gap: 6px;
 }
 
-.model-row input {
+.model-picker {
+  position: relative;
+  display: block;
   min-width: 0;
+}
+
+.model-picker input {
+  padding-right: 30px;
+}
+
+.model-menu-button {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-left: 1px solid var(--line);
+  border-radius: 0 9px 9px 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.model-menu-button:hover {
+  color: var(--accent);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.model-menu {
+  position: absolute;
+  z-index: 12;
+  top: calc(100% + 5px);
+  left: 0;
+  right: 0;
+  max-height: 178px;
+  overflow-y: auto;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), transparent 60%),
+    #111315;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.48);
+  padding: 4px;
+}
+
+.model-option {
+  display: grid;
+  width: 100%;
+  min-height: 32px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.model-option:hover,
+.model-option.active {
+  background: rgba(200, 255, 26, 0.1);
+}
+
+.model-option-value,
+.model-option-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-option-value {
+  font-size: 10.5px;
+  font-weight: 650;
+}
+
+.model-option-label {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 500;
 }
 
 .icon-button {

@@ -211,6 +211,7 @@
     importToResolve: false,
     appendToTimeline: false,
     modelRequestId: 0,
+    modelOptions: [],
     externalCommandPolling: false
   };
 
@@ -231,7 +232,8 @@
   var outputNameInput = document.getElementById("outputNameInput");
   var modelField = document.getElementById("modelField");
   var modelInput = document.getElementById("modelInput");
-  var modelOptions = document.getElementById("modelOptions");
+  var modelMenuButton = document.getElementById("modelMenuButton");
+  var modelMenu = document.getElementById("modelMenu");
   var modelRefreshButton = document.getElementById("modelRefreshButton");
   var twelveApiKeyInput = document.getElementById("twelveApiKeyInput");
   var mimoApiKeyInput = document.getElementById("mimoApiKeyInput");
@@ -393,15 +395,63 @@
 
   function renderModelOptions(operation, options) {
     var candidates = options || MODEL_OPTIONS[operation] || [];
-    modelOptions.innerHTML = "";
-    candidates.forEach(function (model) {
-      var option = document.createElement("option");
-      option.value = model.value;
-      if (model.label) {
-        option.label = model.label;
-      }
-      modelOptions.appendChild(option);
+    state.modelOptions = candidates.slice();
+    renderModelMenu(false);
+  }
+
+  function renderModelMenu(open, filterByInput) {
+    var query = filterByInput ? inputValue(modelInput).toLowerCase() : "";
+    var candidates = state.modelOptions.filter(function (model) {
+      if (!query) return true;
+      return model.value.toLowerCase().indexOf(query) !== -1 || String(model.label || "").toLowerCase().indexOf(query) !== -1;
     });
+    modelMenu.innerHTML = "";
+    candidates.forEach(function (model) {
+      var button = document.createElement("button");
+      var isActive = model.value === inputValue(modelInput);
+      button.type = "button";
+      button.className = "model-option" + (isActive ? " active" : "");
+      button.addEventListener("mousedown", function (event) {
+        event.preventDefault();
+      });
+      button.addEventListener("click", function () {
+        selectModelOption(model);
+      });
+      var value = document.createElement("span");
+      value.className = "model-option-value";
+      value.textContent = model.value;
+      button.appendChild(value);
+      if (model.label && model.label !== model.value) {
+        var label = document.createElement("span");
+        label.className = "model-option-label";
+        label.textContent = model.label;
+        button.appendChild(label);
+      }
+      modelMenu.appendChild(button);
+    });
+    modelMenu.classList.toggle("hidden", !open || candidates.length === 0);
+  }
+
+  function showModelMenu(filterByInput) {
+    renderModelMenu(true, filterByInput === true);
+  }
+
+  function hideModelMenu() {
+    modelMenu.classList.add("hidden");
+  }
+
+  function toggleModelMenu() {
+    if (modelMenu.classList.contains("hidden")) {
+      showModelMenu(false);
+      return;
+    }
+    hideModelMenu();
+  }
+
+  function selectModelOption(model) {
+    modelInput.value = model.value;
+    persistModelForOperation(state.operation);
+    hideModelMenu();
   }
 
   async function refreshModelOptions(operation, options) {
@@ -579,6 +629,7 @@
     promptInput.value = needsPrompt ? state.promptDraft : "";
     modelField.classList.toggle("hidden", !OPERATION_CAPABILITY_IDS[operation]);
     modelInput.value = selectedModelForOperation(operation);
+    hideModelMenu();
     renderModelOptions(operation);
     refreshModelOptions(operation);
     imageOperationField.classList.toggle("hidden", config.imageOperation !== true);
@@ -2406,10 +2457,31 @@
 
   modelInput.addEventListener("input", function () {
     persistModelForOperation(state.operation);
+    showModelMenu(true);
+  });
+
+  modelInput.addEventListener("focus", function () {
+    showModelMenu(false);
+  });
+
+  modelInput.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") {
+      hideModelMenu();
+    }
+  });
+
+  modelMenuButton.addEventListener("click", function () {
+    toggleModelMenu();
   });
 
   modelRefreshButton.addEventListener("click", function () {
     refreshCurrentModelOptions();
+  });
+
+  document.addEventListener("click", function (event) {
+    if (!modelField.contains(event.target)) {
+      hideModelMenu();
+    }
   });
 
   [baseUrlInput, twelveApiKeyInput, mimoApiKeyInput, providerBaseUrlInput, providerLabelInput].forEach(function (input) {
