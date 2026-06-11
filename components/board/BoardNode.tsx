@@ -430,6 +430,8 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             activeStackAssetId={node.asset.assetId}
             stackItems={data.assetStackItems}
             compareReferenceUrl={data.compareReferenceUrl}
+            onAnalyzeMedia={c.onAnalyzeBoardMedia}
+            onCancelProcessing={c.onCancelAssetTask}
             onCaptureVideoFrame={c.onCaptureVideoFrame}
             onCompare={c.onOpenAssetCompare ? () => c.onOpenAssetCompare?.(node.id) : undefined}
             onEditImage={c.onEditAssetImage}
@@ -449,6 +451,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             isSelected={selected === true}
             node={node}
             stackItems={data.assetStackItems}
+            onAnalyzeMedia={c.onAnalyzeBoardMedia}
             onCaptureVideoFrame={c.onCaptureVideoFrame}
             onImageQuickEdit={c.onImageQuickEdit}
             onDownload={c.onDownloadAsset}
@@ -463,7 +466,6 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
           <PromptBoardNode
             node={node}
             references={data.promptReferences}
-            onAnalyzeMedia={() => c.onAnalyzePromptMedia(node.id)}
             onChange={prompt => c.onUpdatePrompt(node.id, prompt)}
             onSelectReference={reference => c.onSelectPromptReference(node.id, reference)}
           />

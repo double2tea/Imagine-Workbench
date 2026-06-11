@@ -86,6 +86,10 @@ function sortedTasks(tasks: GenerationTask[]): GenerationTask[] {
   );
 }
 
+export function legacyGenerationTaskId(assetId: string): string {
+  return `legacy:${assetId}`;
+}
+
 export function generationTaskRequestSnapshot(
   request: GenerationRequestSnapshot | undefined,
 ): GenerationTaskRequestSnapshot | undefined {
@@ -118,7 +122,7 @@ export function createGenerationTask(input: CreateGenerationTaskInput): Generati
 export function legacyStorageItemToGenerationTask(item: StorageItem): GenerationTask | null {
   if (item.status === "complete") return null;
   return createGenerationTask({
-    id: `legacy:${item.id}`,
+    id: legacyGenerationTaskId(item.id),
     mediaType: item.type,
     prompt: item.prompt,
     model: item.model,

@@ -1,32 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
-export type ImageEditFeature = "redraw" | "erase" | "outpaint" | "cutout";
+import {
+  DEFAULT_IMAGE_EDIT_FEATURE_TARGETS,
+  IMAGE_EDIT_FEATURES,
+  isImageEditFeature,
+  normalizeImageQuickEditTargetId,
+  type ImageEditFeature,
+  type ImageEditFeatureTargets,
+} from "@/lib/image-quick-edit-targets";
 
-export type ImageEditFeatureModels = Record<ImageEditFeature, string>;
-
-export const IMAGE_EDIT_FEATURES: Array<{
-  key: ImageEditFeature;
-  label: string;
-  description: string;
-}> = [
-  { key: "redraw", label: "重绘", description: "遮罩区域按提示词重新生成" },
-  { key: "erase", label: "擦除", description: "遮罩区域移除并补全背景" },
-  { key: "outpaint", label: "扩图", description: "向画面外延展内容" },
-  { key: "cutout", label: "抠图", description: "移除背景并保留主体" },
-];
+export { IMAGE_EDIT_FEATURES, type ImageEditFeature };
+export type ImageEditFeatureModels = ImageEditFeatureTargets;
 
 const STORAGE_KEY = "imagine_image_edit_feature_models";
-const NANO_BANANA_PRO_MODEL = "12ai:gemini-3-pro-image-preview";
-
-export const DEFAULT_IMAGE_EDIT_FEATURE_MODELS: ImageEditFeatureModels = {
-  redraw: NANO_BANANA_PRO_MODEL,
-  erase: NANO_BANANA_PRO_MODEL,
-  outpaint: NANO_BANANA_PRO_MODEL,
-  cutout: NANO_BANANA_PRO_MODEL,
-};
-
-function isImageEditFeature(value: string): value is ImageEditFeature {
-  return IMAGE_EDIT_FEATURES.some(feature => feature.key === value);
-}
+export const DEFAULT_IMAGE_EDIT_FEATURE_MODELS: ImageEditFeatureModels = DEFAULT_IMAGE_EDIT_FEATURE_TARGETS;
 
 function readStoredFeatureModels(value: string | null): ImageEditFeatureModels {
   if (!value) return DEFAULT_IMAGE_EDIT_FEATURE_MODELS;
@@ -35,7 +21,7 @@ function readStoredFeatureModels(value: string | null): ImageEditFeatureModels {
     const next = { ...DEFAULT_IMAGE_EDIT_FEATURE_MODELS };
     for (const [key, model] of Object.entries(parsed)) {
       if (isImageEditFeature(key) && typeof model === "string" && model.trim()) {
-        next[key] = model;
+        next[key] = normalizeImageQuickEditTargetId(key, model);
       }
     }
     return next;
@@ -69,7 +55,7 @@ export function useImageEditFeatureModels() {
 
   const selectFeatureModel = useCallback((feature: ImageEditFeature, model: string) => {
     setFeatureModels(prev => {
-      const next = { ...prev, [feature]: model };
+      const next = { ...prev, [feature]: normalizeImageQuickEditTargetId(feature, model) };
       writeFeatureModels(next);
       return next;
     });

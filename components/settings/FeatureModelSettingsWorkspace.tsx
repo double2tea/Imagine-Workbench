@@ -2,6 +2,10 @@
 
 import { Sparkles } from "lucide-react";
 import { IMAGE_EDIT_FEATURES, type ImageEditFeature, type ImageEditFeatureModels } from "@/hooks/useImageEditFeatureModels";
+import {
+  getImageQuickEditTargetOptions,
+  resolveImageQuickEditTarget,
+} from "@/lib/image-quick-edit-targets";
 import type { AiProvider, ModelOption } from "@/lib/providers/model-catalog";
 
 interface ModelGroup {
@@ -29,10 +33,6 @@ function flattenImageModelOptions(groups: ModelGroup[]): ModelOption[] {
   return options;
 }
 
-function modelLabel(option: ModelOption): string {
-  return option.label;
-}
-
 export function FeatureModelSettingsWorkspace({
   featureModels,
   imageModelGroups,
@@ -56,7 +56,9 @@ export function FeatureModelSettingsWorkspace({
         <div className="grid grid-cols-1 gap-3">
           {IMAGE_EDIT_FEATURES.map(feature => {
             const value = featureModels[feature.key];
-            const hasCurrentOption = imageModelOptions.some(option => option.value === value);
+            const targetOptions = getImageQuickEditTargetOptions(feature.key, imageModelOptions);
+            const hasCurrentOption = targetOptions.some(option => option.id === value);
+            const currentTarget = resolveImageQuickEditTarget(feature.key, value);
             return (
               <div key={feature.key} className="grid gap-2 md:grid-cols-[minmax(0,180px)_1fr] md:items-center">
                 <div className="min-w-0">
@@ -69,10 +71,10 @@ export function FeatureModelSettingsWorkspace({
                   className="imagine-input h-9 min-w-0 text-xs"
                   aria-label={`${feature.label}默认模型`}
                 >
-                  {!hasCurrentOption ? <option value={value}>{value}</option> : null}
-                  {imageModelOptions.map(option => (
-                    <option key={option.value} value={option.value}>
-                      {modelLabel(option)}
+                  {!hasCurrentOption ? <option value={value}>{currentTarget.label}</option> : null}
+                  {targetOptions.map(option => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
                     </option>
                   ))}
                 </select>

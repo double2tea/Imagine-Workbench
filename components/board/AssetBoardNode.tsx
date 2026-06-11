@@ -1,4 +1,4 @@
-import { Compass, Download, Eraser, Expand, Frame, Loader2, Maximize2, Mic2, Music, ScanSearch, Scissors, Video, WandSparkles } from "lucide-react";
+import { Compass, Download, Eraser, Expand, Frame, Loader2, Maximize2, Mic2, Music, ScanSearch, Scissors, Sparkles, Video, WandSparkles, X } from "lucide-react";
 import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
 import { memo, useMemo, useRef } from "react";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
@@ -19,6 +19,8 @@ interface AssetBoardNodeProps {
   isSelected?: boolean;
   node: BoardAssetNode;
   onCaptureVideoFrame?: (nodeId: string, item: StorageItem, frame: CapturedVideoFrame) => void | Promise<void>;
+  onAnalyzeMedia?: (nodeId: string) => void | Promise<void>;
+  onCancelProcessing?: (nodeId: string) => void;
   onCompare?: () => void;
   onDownload?: (item: StorageItem) => void;
   onEditImage?: (nodeId: string) => void;
@@ -69,6 +71,8 @@ const AssetBoardNode = memo(function AssetBoardNode({
   compareReferenceUrl,
   isSelected = false,
   node,
+  onAnalyzeMedia,
+  onCancelProcessing,
   onCaptureVideoFrame,
   onCompare,
   onDownload,
@@ -113,6 +117,15 @@ const AssetBoardNode = memo(function AssetBoardNode({
               onClick: onCompare,
               title: "对比参考图",
               toneClassName: "text-blue-200 hover:border-blue-500/40 hover:bg-blue-600 hover:text-white",
+            }]
+          : []),
+        ...(isComplete && onAnalyzeMedia
+          ? [{
+              id: "analyze",
+              icon: <Sparkles className="h-3.5 w-3.5" />,
+              onClick: () => void onAnalyzeMedia(node.id),
+              title: "分析媒体",
+              toneClassName: "text-teal-200 hover:border-teal-500/40 hover:bg-teal-600 hover:text-white",
             }]
           : []),
         ...(node.asset.type === "image" && isComplete
@@ -285,6 +298,19 @@ const AssetBoardNode = memo(function AssetBoardNode({
                 style={{ width: `${item.progress}%` }}
               />
             </div>
+            {isProcessing && onCancelProcessing ? (
+              <button
+                type="button"
+                className="nodrag pointer-events-auto mt-2 inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/10 px-2 py-1 text-[10px] font-semibold text-white/85 transition hover:border-rose-300/50 hover:bg-rose-500/80 hover:text-white"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onCancelProcessing(node.id);
+                }}
+              >
+                <X className="h-3 w-3" />
+                取消任务
+              </button>
+            ) : null}
           </div>
         </div>
       )}
@@ -293,7 +319,9 @@ const AssetBoardNode = memo(function AssetBoardNode({
         <div
           className={[
             "board-media-stack-switcher nodrag absolute -bottom-8 left-1/2 z-40 flex -translate-x-1/2 gap-1.5 rounded-full border border-white/10 bg-slate-950/72 px-2.5 py-1.5 text-[10px] font-semibold text-white/90 shadow-xl backdrop-blur transition-opacity duration-200",
-            isSelected ? "opacity-100" : "opacity-0 group-hover/board-video:opacity-100",
+            isSelected
+              ? "pointer-events-auto opacity-100"
+              : "pointer-events-none opacity-0 group-hover/board-video:pointer-events-auto group-hover/board-video:opacity-100",
           ].join(" ")}
         >
           {stackItems.map((stackItem, index) => {

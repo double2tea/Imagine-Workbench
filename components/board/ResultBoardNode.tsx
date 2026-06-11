@@ -1,4 +1,4 @@
-import { Compass, Download, Eraser, Expand, Frame, Maximize2, Mic2, Music, Scissors, Video, WandSparkles } from "lucide-react";
+import { Compass, Download, Eraser, Expand, Frame, Maximize2, Mic2, Music, Scissors, Sparkles, Video, WandSparkles } from "lucide-react";
 import { memo, useMemo, useRef } from "react";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
 import BoardAudioWaveform from "@/components/board/BoardAudioWaveform";
@@ -16,6 +16,7 @@ interface ResultBoardNodeProps {
   isSelected?: boolean;
   node: BoardResultNode;
   stackItems: StorageItem[];
+  onAnalyzeMedia?: (nodeId: string) => void | Promise<void>;
   onCaptureVideoFrame?: (nodeId: string, item: StorageItem, frame: CapturedVideoFrame) => void | Promise<void>;
   onDownload?: (item: StorageItem) => void;
   onImageQuickEdit?: (nodeId: string, operation: ImageEditFeature) => void;
@@ -62,6 +63,7 @@ const ResultBoardNode = memo(function ResultBoardNode({
   boardId,
   isSelected = false,
   node,
+  onAnalyzeMedia,
   stackItems,
   onCaptureVideoFrame,
   onDownload,
@@ -123,6 +125,15 @@ const ResultBoardNode = memo(function ResultBoardNode({
     {
       id: "media",
       actions: [
+        ...(item.status === "complete" && onAnalyzeMedia
+          ? [{
+              id: "analyze",
+              icon: <Sparkles className="h-3.5 w-3.5" />,
+              onClick: () => void onAnalyzeMedia(node.id),
+              title: "分析媒体",
+              toneClassName: "text-teal-200 hover:border-teal-500/40 hover:bg-teal-600 hover:text-white",
+            }]
+          : []),
         ...(item.type === "video" && onCaptureVideoFrame && shouldRenderVideoPlayer
           ? [{
               id: "frame",
@@ -233,7 +244,9 @@ const ResultBoardNode = memo(function ResultBoardNode({
         <div
           className={[
             "board-media-stack-switcher nodrag absolute -bottom-8 left-1/2 z-40 flex -translate-x-1/2 gap-1.5 rounded-full border border-white/10 bg-slate-950/72 px-2.5 py-1.5 text-[10px] font-semibold text-white/90 shadow-xl backdrop-blur transition-opacity duration-200",
-            isSelected ? "opacity-100" : "opacity-0 group-hover/board-video:opacity-100",
+            isSelected
+              ? "pointer-events-auto opacity-100"
+              : "pointer-events-none opacity-0 group-hover/board-video:pointer-events-auto group-hover/board-video:opacity-100",
           ].join(" ")}
         >
           {stackItems.map((stackItem, index) => {

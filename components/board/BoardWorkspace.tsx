@@ -116,7 +116,8 @@ interface BoardWorkspaceProps {
   onCaptureVideoFrame: (nodeId: string, item: StorageItem, frame: CapturedVideoFrame) => void | Promise<void>;
   onConnectionError: (message: string) => void;
   onWorkspaceNotice: (type: WorkspaceNoticeType, message: string) => void;
-  onAnalyzePromptMedia: (nodeId: string) => void | Promise<void>;
+  onAnalyzeBoardMedia: (nodeId: string) => void | Promise<void>;
+  onCancelAssetTask: (nodeId: string) => void;
   onCancelGenerateNode: (nodeId: string) => void;
   onEditAssetImage: (nodeId: string) => void;
   onImageQuickEdit: (nodeId: string, operation: ImageEditFeature) => void;
@@ -232,6 +233,14 @@ interface BoardSelectionToolbarPlacement {
   top: number;
 }
 
+interface BoardElementSize {
+  height: number;
+  width: number;
+}
+
+const SELECTION_TOOLBAR_MARGIN = 12;
+const DEFAULT_SELECTION_TOOLBAR_SIZE: BoardElementSize = { width: 320, height: 56 };
+
 function sameStringList(left: string[], right: string[]): boolean {
   if (left.length !== right.length) return false;
   return left.every((value, index) => value === right[index]);
@@ -245,10 +254,60 @@ function sameBoardViewportModel(left: BoardViewport, right: BoardViewport): bool
   );
 }
 
-function selectedBoardNodeBounds(nodes: BoardNodeModel[], selectedNodeIds: string[]): BoardSelectionBounds | null {
+function sameBoardElementSize(left: BoardElementSize | null, right: BoardElementSize): boolean {
+  return Boolean(left && Math.abs(left.width - right.width) < 1 && Math.abs(left.height - right.height) < 1);
+}
+
+function roundedElementSize(rect: DOMRectReadOnly): BoardElementSize {
+  return { width: Math.round(rect.width), height: Math.round(rect.height) };
+}
+
+function flowNodeSize(node: BoardFlowNode): BoardSize {
+  return {
+    width: node.width ?? node.measured?.width ?? node.data.node.size.width,
+    height: node.height ?? node.measured?.height ?? node.data.node.size.height,
+  };
+}
+
+function flowNodeAbsolutePosition(
+  node: BoardFlowNode,
+  nodeById: Map<string, BoardFlowNode>,
+  cache: Map<string, BoardPoint>,
+  visiting: Set<string>,
+): BoardPoint {
+  const cachedPosition = cache.get(node.id);
+  if (cachedPosition) return cachedPosition;
+  if (!node.parentId || visiting.has(node.id)) {
+    cache.set(node.id, node.position);
+    return node.position;
+  }
+  const parent = nodeById.get(node.parentId);
+  if (!parent) {
+    cache.set(node.id, node.position);
+    return node.position;
+  }
+  visiting.add(node.id);
+  const parentPosition = flowNodeAbsolutePosition(parent, nodeById, cache, visiting);
+  visiting.delete(node.id);
+  const position = {
+    x: parentPosition.x + node.position.x,
+    y: parentPosition.y + node.position.y,
+  };
+  cache.set(node.id, position);
+  return position;
+}
+
+function selectedFlowNodeBounds(nodes: BoardFlowNode[], selectedNodeIds: string[]): BoardSelectionBounds | null {
   if (selectedNodeIds.length <= 1) return null;
   const selectedIdSet = new Set(selectedNodeIds);
-  const selectedNodes = boardNodesWithAbsolutePositions(nodes).filter(node => selectedIdSet.has(node.id));
+  const nodeById = new Map(nodes.map(node => [node.id, node]));
+  const positionCache = new Map<string, BoardPoint>();
+  const selectedNodes = nodes
+    .filter(node => selectedIdSet.has(node.id))
+    .map(node => ({
+      position: flowNodeAbsolutePosition(node, nodeById, positionCache, new Set()),
+      size: flowNodeSize(node),
+    }));
   if (selectedNodes.length === 0) return null;
   const minX = Math.min(...selectedNodes.map(node => node.position.x));
   const minY = Math.min(...selectedNodes.map(node => node.position.y));
@@ -265,15 +324,21 @@ function clampSelectionToolbarValue(value: number, min: number, max: number): nu
 function selectionToolbarPlacement(
   bounds: BoardSelectionBounds,
   viewport: BoardViewport,
-  hostRect: DOMRect | null,
+  hostSize: BoardElementSize | null,
+  toolbarSize: BoardElementSize | null,
 ): BoardSelectionToolbarPlacement {
   const rawLeft = (bounds.x + bounds.width / 2) * viewport.zoom + viewport.x;
   const rawTop = bounds.y * viewport.zoom + viewport.y - 14;
-  const minLeft = 184;
-  const maxLeft = (hostRect?.width ?? 0) - minLeft;
+  const measuredToolbarSize = toolbarSize ?? DEFAULT_SELECTION_TOOLBAR_SIZE;
+  if (!hostSize) return { left: rawLeft, top: rawTop };
+  const halfToolbarWidth = measuredToolbarSize.width / 2;
+  const minLeft = SELECTION_TOOLBAR_MARGIN + halfToolbarWidth;
+  const maxLeft = hostSize.width - SELECTION_TOOLBAR_MARGIN - halfToolbarWidth;
+  const minTop = SELECTION_TOOLBAR_MARGIN + measuredToolbarSize.height;
+  const maxTop = Math.max(minTop, hostSize.height - SELECTION_TOOLBAR_MARGIN);
   return {
-    left: hostRect ? clampSelectionToolbarValue(rawLeft, minLeft, maxLeft) : rawLeft,
-    top: Math.max(66, rawTop),
+    left: maxLeft >= minLeft ? clampSelectionToolbarValue(rawLeft, minLeft, maxLeft) : hostSize.width / 2,
+    top: clampSelectionToolbarValue(rawTop, minTop, maxTop),
   };
 }
 
@@ -1040,11 +1105,12 @@ export default function BoardWorkspace({
   galleryItems = [],
   generationTasks = [],
   onBack,
+  onCancelAssetTask,
   onCancelGenerateNode,
   onCaptureVideoFrame,
   onConnectionError,
   onWorkspaceNotice,
-  onAnalyzePromptMedia,
+  onAnalyzeBoardMedia,
   onEditAssetImage,
   onImageQuickEdit,
   onExecuteGenerateNode,
@@ -1076,6 +1142,8 @@ export default function BoardWorkspace({
   const isCoarsePointer = useCoarsePointer();
   const flowInstanceRef = useRef<ReactFlowInstance<BoardFlowNode, BoardFlowEdge> | null>(null);
   const flowHostRef = useRef<HTMLElement | null>(null);
+  const pendingMoveFrameRef = useRef<number | null>(null);
+  const pendingMoveViewportRef = useRef<BoardViewport | null>(null);
   const mediaImportInputRef = useRef<HTMLInputElement>(null);
   const pendingImportPointRef = useRef<BoardPoint | null>(null);
   const copiedNodeRef = useRef<CopiedBoardNode | null>(null);
@@ -1091,6 +1159,9 @@ export default function BoardWorkspace({
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
   const [trashedNodes, setTrashedNodes] = useState<BoardTrashEntry[]>([]);
   const [assetCompare, setAssetCompare] = useState<{ originalUrl: string; resultUrl: string } | null>(null);
+  const [flowHostSize, setFlowHostSize] = useState<BoardElementSize | null>(null);
+  const [selectionToolbarElement, setSelectionToolbarElement] = useState<HTMLDivElement | null>(null);
+  const [selectionToolbarSize, setSelectionToolbarSize] = useState<BoardElementSize | null>(null);
   const [flowReady, setFlowReady] = useState(false);
   const [isConnectionActive, setIsConnectionActive] = useState(false);
   const [isNodeDragActive, setIsNodeDragActive] = useState(false);
@@ -1179,15 +1250,74 @@ export default function BoardWorkspace({
   } = controller;
   const [flowViewport, setFlowViewport] = useState<BoardViewport>(board.viewport);
   const viewportRef = useRef<BoardViewport>(board.viewport);
+  const setFlowHostRef = useCallback((element: HTMLElement | null): void => {
+    flowHostRef.current = element;
+    if (!element) setFlowHostSize(null);
+  }, []);
+  const setSelectionToolbarRef = useCallback((element: HTMLDivElement | null): void => {
+    setSelectionToolbarElement(element);
+    if (!element) setSelectionToolbarSize(null);
+  }, []);
+  const updateFlowViewportState = useCallback((viewport: BoardViewport): void => {
+    setFlowViewport(current => sameBoardViewportModel(current, viewport) ? current : viewport);
+  }, []);
+  const scheduleFlowViewportState = useCallback((viewport: BoardViewport): void => {
+    pendingMoveViewportRef.current = viewport;
+    if (pendingMoveFrameRef.current !== null) return;
+    pendingMoveFrameRef.current = window.requestAnimationFrame(() => {
+      pendingMoveFrameRef.current = null;
+      const nextViewport = pendingMoveViewportRef.current;
+      pendingMoveViewportRef.current = null;
+      if (nextViewport) updateFlowViewportState(nextViewport);
+    });
+  }, [updateFlowViewportState]);
   useLayoutEffect(() => {
     viewportRef.current = board.viewport;
     selectionRef.current = { edgeId: selectedEdgeId, nodeId: selectedNodeId, nodeIds: selectedNodeIds };
   }, [board.viewport, selectedEdgeId, selectedNodeId, selectedNodeIds]);
   useEffect(() => {
-    const instanceViewport = flowInstanceRef.current?.getViewport();
-    const nextViewport = instanceViewport ?? board.viewport;
-    setFlowViewport(current => sameBoardViewportModel(current, nextViewport) ? current : nextViewport);
-  }, [board.viewport, flowReady]);
+    updateFlowViewportState(board.viewport);
+    const instance = flowInstanceRef.current;
+    if (!instance || !flowReady || sameBoardViewportModel(instance.getViewport(), board.viewport)) return;
+    void instance.setViewport(board.viewport, { duration: 0 });
+  }, [board.id, board.viewport, flowReady, updateFlowViewportState]);
+  useEffect(() => {
+    return () => {
+      if (pendingMoveFrameRef.current === null) return;
+      window.cancelAnimationFrame(pendingMoveFrameRef.current);
+    };
+  }, []);
+  useLayoutEffect(() => {
+    const element = flowHostRef.current;
+    if (!element) return;
+    setFlowHostSize(current => {
+      const next = roundedElementSize(element.getBoundingClientRect());
+      return sameBoardElementSize(current, next) ? current : next;
+    });
+    const observer = new ResizeObserver(entries => {
+      const entry = entries[0];
+      if (!entry) return;
+      const next = roundedElementSize(entry.contentRect);
+      setFlowHostSize(current => sameBoardElementSize(current, next) ? current : next);
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [flowReady]);
+  useLayoutEffect(() => {
+    if (!selectionToolbarElement) return;
+    setSelectionToolbarSize(current => {
+      const next = roundedElementSize(selectionToolbarElement.getBoundingClientRect());
+      return sameBoardElementSize(current, next) ? current : next;
+    });
+    const observer = new ResizeObserver(entries => {
+      const entry = entries[0];
+      if (!entry) return;
+      const next = roundedElementSize(entry.contentRect);
+      setSelectionToolbarSize(current => sameBoardElementSize(current, next) ? current : next);
+    });
+    observer.observe(selectionToolbarElement);
+    return () => observer.disconnect();
+  }, [selectionToolbarElement]);
 
   const boardGraphContentKey = useMemo(
     () => buildBoardGraphContentKey(board.nodes, board.edges),
@@ -1304,6 +1434,13 @@ export default function BoardWorkspace({
 
   const trashAndDeleteNode = useCallback((nodeId: string) => {
     const node = board.nodes.find(item => item.id === nodeId);
+    if (node?.kind === "asset") {
+      const item = galleryItemById.get(node.asset.assetId);
+      if (item && isActiveGenerateTask(item)) {
+        onCancelAssetTask(nodeId);
+        return;
+      }
+    }
     if (node) {
       const edges = board.edges.filter(edge => edge.from.nodeId === nodeId || edge.to.nodeId === nodeId);
       setTrashedNodes(current => [{ node: structuredClone(node), edges: structuredClone(edges) }, ...current].slice(0, BOARD_TRASH_LIMIT));
@@ -1313,7 +1450,7 @@ export default function BoardWorkspace({
       const next = current.filter(id => id !== nodeId);
       return sameStringList(current, next) ? current : next;
     });
-  }, [board.edges, board.nodes, deleteNode]);
+  }, [board.edges, board.nodes, deleteNode, galleryItemById, onCancelAssetTask]);
 
   const restoreTrashedNode = useCallback((index: number) => {
     const entry = trashedNodes[index];
@@ -1418,6 +1555,7 @@ export default function BoardWorkspace({
 
   const boardNodeCallbacks = useMemo<BoardNodeCallbacks>(() => ({
     onCaptureVideoFrame,
+    onCancelAssetTask,
     onCancelGenerate: onCancelGenerateNode,
     onDelete: trashAndDeleteNode,
     onDownloadAsset,
@@ -1427,7 +1565,7 @@ export default function BoardWorkspace({
     onFetchRunningHubAppSchema,
     onFocusNode: focusReferenceSourceNode,
     onFocusReferenceSource: focusReferenceSourceNode,
-    onAnalyzePromptMedia,
+    onAnalyzeBoardMedia,
     onOpenFullscreen,
     onOpenPanorama,
     onSaveVoiceProfile,
@@ -1470,8 +1608,8 @@ export default function BoardWorkspace({
       updateResultNodeAsset(nodeId, assetId);
     },
   }), [
-    onCancelGenerateNode, onCaptureVideoFrame, trashAndDeleteNode, onDownloadAsset, onEditAssetImage, onImageQuickEdit,
-    onExecuteGenerateNode, onFetchRunningHubAppSchema, focusReferenceSourceNode, onAnalyzePromptMedia, onOpenFullscreen,
+    onCancelAssetTask, onCancelGenerateNode, onCaptureVideoFrame, trashAndDeleteNode, onDownloadAsset, onEditAssetImage, onImageQuickEdit,
+    onExecuteGenerateNode, onFetchRunningHubAppSchema, focusReferenceSourceNode, onAnalyzeBoardMedia, onOpenFullscreen,
     onOpenPanorama, onSaveVoiceProfile, moveGenerateReferenceEdge, moveReferenceGroupItem,
     deleteEdge, removeReferenceGroupItem, onSendAgentNode, onSendAssetToAgent, connectSelectedBoardPromptReference,
     updateReferenceGroupItemRole, updateAgentInstruction, updateGenerateNode, updateMultiGridNode,
@@ -1879,15 +2017,20 @@ export default function BoardWorkspace({
   }, [onNodesChange, updateNodesPositions]);
 
   const handleMove = useCallback((_event: MouseEvent | TouchEvent | null, viewport: BoardViewport): void => {
-    setFlowViewport(current => sameBoardViewportModel(current, viewport) ? current : viewport);
-  }, []);
+    scheduleFlowViewportState(viewport);
+  }, [scheduleFlowViewportState]);
 
   const handleMoveEnd = useCallback((_event: MouseEvent | TouchEvent | null, viewport: BoardViewport): void => {
+    if (pendingMoveFrameRef.current !== null) {
+      window.cancelAnimationFrame(pendingMoveFrameRef.current);
+      pendingMoveFrameRef.current = null;
+      pendingMoveViewportRef.current = null;
+    }
+    updateFlowViewportState(viewport);
     if (sameBoardViewportModel(viewportRef.current, viewport)) return;
     viewportRef.current = viewport;
-    setFlowViewport(viewport);
     setViewport(viewport);
-  }, [setViewport]);
+  }, [setViewport, updateFlowViewportState]);
 
 
   const handleNodesDelete = useCallback<OnNodesDelete<BoardFlowNode>>(nodes => {
@@ -1909,9 +2052,9 @@ export default function BoardWorkspace({
 
   const handleFlowInit = useCallback((instance: ReactFlowInstance<BoardFlowNode, BoardFlowEdge>): void => {
     flowInstanceRef.current = instance;
-    setFlowViewport(instance.getViewport());
+    updateFlowViewportState(instance.getViewport());
     setFlowReady(true);
-  }, []);
+  }, [updateFlowViewportState]);
 
   const handlePaneClick = useCallback((): void => {
     flowHostRef.current?.focus();
@@ -2666,22 +2809,23 @@ export default function BoardWorkspace({
   ]);
 
   const selectedBounds = useMemo(
-    () => selectedBoardNodeBounds(board.nodes, selectedNodeIds),
-    [board.nodes, selectedNodeIds],
+    () => selectedFlowNodeBounds(reactFlowNodes, selectedNodeIds),
+    [reactFlowNodes, selectedNodeIds],
   );
   const selectedBatchToolbarStyle = useMemo<CSSProperties | null>(() => {
     if (!selectedBounds) return null;
     const placement = selectionToolbarPlacement(
       selectedBounds,
       flowViewport,
-      flowHostRef.current?.getBoundingClientRect() ?? null,
+      flowHostSize,
+      selectionToolbarSize,
     );
     return {
       left: placement.left,
       top: placement.top,
       transform: "translate(-50%, -100%)",
     };
-  }, [flowViewport, selectedBounds]);
+  }, [flowHostSize, flowViewport, selectedBounds, selectionToolbarSize]);
 
   return (
     <BoardMediaImportProvider openImport={openMediaImportPicker}>
@@ -2725,7 +2869,7 @@ export default function BoardWorkspace({
       />
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto]">
         <section
-          ref={flowHostRef}
+          ref={setFlowHostRef}
           tabIndex={-1}
           onContextMenu={handleCanvasContextMenu}
           onDoubleClick={handleFlowDoubleClick}
@@ -2809,7 +2953,7 @@ export default function BoardWorkspace({
           </BoardNodeCallbacksContext.Provider>
           {board.nodes.length === 0 && <BoardEmptyHint />}
           {selectedNodeIds.length > 1 && selectedDownloadableCount > 0 && onDownloadSelectedAssets && selectedBatchToolbarStyle ? (
-            <div className="pointer-events-none absolute z-40 max-w-[calc(100%-24px)]" style={selectedBatchToolbarStyle}>
+            <div ref={setSelectionToolbarRef} className="pointer-events-none absolute z-40 max-w-[calc(100%_-_24px)]" style={selectedBatchToolbarStyle}>
               <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-white/10 bg-[var(--iw-panel)] p-2 pl-5 text-[12px] font-semibold text-[var(--iw-text)] shadow-[0_18px_45px_rgba(15,23,42,0.22)] backdrop-blur-xl ring-1 ring-white/10">
                 <span className="whitespace-nowrap text-[var(--iw-muted)]">
                   已选 {selectedNodeIds.length} 个 · 可下载 {selectedDownloadableCount} 个

@@ -28,7 +28,7 @@ import BoardWorkspace from "@/components/board/BoardWorkspace";
 import SettingsModal from "@/components/settings/SettingsModal";
 import WorkspaceNotices, { type WorkspaceNotice } from "@/components/workbench/WorkspaceNotices";
 import type { AgentBoardContext, AgentBoardNodeSummary } from "@/lib/agent-context";
-import { getSendableAgentMediaReferences } from "@/lib/agent-chat-model";
+import { getSendableAgentMediaReferences, type AgentReferenceInputSupport } from "@/lib/agent-chat-model";
 
 import { useAgentController } from "@/hooks/useAgentController";
 import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
@@ -63,14 +63,19 @@ import {
 import { useImageEditFeatureModels } from "@/hooks/useImageEditFeatureModels";
 import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
 import {
+  resolveImageQuickEditTarget,
+  submitImageQuickEdit,
+} from "@/lib/image-quick-edit-targets";
+import {
   buildStorageItem,
   clearAllDB,
-  saveToDB,
+  deleteFromDB,
   type StorageItem,
 } from "@/lib/db";
 import {
   cancelGenerationTask,
   deleteGenerationTask,
+  legacyGenerationTaskId,
   type GenerationTask,
 } from "@/lib/generation-tasks";
 import {
@@ -99,6 +104,7 @@ import {
   compressReferenceImageDataUrl,
   compressReferenceImageFile,
   prepareReferenceImageUrlForRequest,
+  prepareReferenceMediaUrlForRequest,
 } from "@/lib/reference-images";
 import { transcriptFromDataUrl } from "@/lib/transcripts";
 import {
@@ -167,7 +173,6 @@ import {
 import { CLEAR_WORKSPACE_ASSETS_MESSAGE } from "@/lib/workspace-messages";
 import { API_ROUTES } from "@/lib/api/routes";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
-import { readImageGenerationPayload } from "@/lib/client-image-response";
 
 type NoticeType = "error" | "info" | "success";
 type MaskDestination = "creative" | "agent" | "board-asset";
@@ -182,7 +187,7 @@ type AgentBoardPatchAction = AgentToolAction & { type: "apply_board_patch" };
 type AgentImageToVideoAction = AgentToolAction & { type: "continue_image_to_video" };
 type BoardAgentActionResult = boolean | { handled: true; success: boolean };
 
-interface PromptMediaAnalysisResponse {
+interface BoardMediaAnalysisResponse {
   text?: string;
   thought?: string;
 }
@@ -195,10 +200,22 @@ const IMAGE_EDIT_LABELS: Record<ImageEditFeature, string> = {
   cutout: "抠图",
 };
 
-const PROMPT_MEDIA_ANALYSIS_INSTRUCTION =
-  "请分析我连接到当前 Prompt 节点的媒体素材，只输出中文结构化分析。必须严格使用以下小标题，并保持顺序：\n" +
+function relatedQuickEditTaskIds(assetId: string): string[] {
+  return [assetId, legacyGenerationTaskId(assetId)];
+}
+
+function hasLocallyCanceledQuickEdit(ids: string[], canceledIds: Set<string>): boolean {
+  return ids.some(id => canceledIds.has(id));
+}
+
+function clearLocallyCanceledQuickEdit(ids: string[], canceledIds: Set<string>): void {
+  for (const id of ids) canceledIds.delete(id);
+}
+
+const BOARD_MEDIA_ANALYSIS_INSTRUCTION =
+  "请分析这段媒体素材，只输出中文结构化分析。必须严格使用以下小标题，并保持顺序：\n" +
   "画面主体\n风格\n镜头\n光线\n色彩\n动作\n可生成提示词\n" +
-  "如果素材包含音频，请在相关小标题中概括声音内容、节奏、情绪或可转化为画面/视频提示词的信息。\n" +
+  "如果素材是音频或包含音频，请在相关小标题中概括声音内容、节奏、情绪或可转化为画面/视频提示词的信息；没有画面的项目写“无画面”。\n" +
   "不要返回 boardAction 或 recommendedAction；把可直接写入 Note 的分析正文放在 text 字段。";
 
 interface BoardPageProps {
@@ -214,6 +231,10 @@ function getStringField(value: unknown, field: string): string | null {
   const record = value as Record<string, unknown>;
   const fieldValue = record[field];
   return typeof fieldValue === "string" && fieldValue.trim() ? fieldValue : null;
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
 }
 
 function isUnknownRecord(value: unknown): value is Record<string, unknown> {
@@ -472,31 +493,22 @@ function boardNodeReferences(
   return [];
 }
 
-function uniqueBoardReferences(references: ReferenceImageRef[]): ReferenceImageRef[] {
-  const seen = new Set<string>();
-  const unique: ReferenceImageRef[] = [];
-  for (const reference of references) {
-    const key = `${reference.id}:${reference.url}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    unique.push(reference);
-  }
-  return unique;
+function readAgentInputSupportPayload(payload: unknown): AgentReferenceInputSupport | null {
+  if (typeof payload !== "object" || payload === null || !("inputSupport" in payload)) return null;
+  const inputSupport = payload.inputSupport;
+  if (typeof inputSupport !== "object" || inputSupport === null) return null;
+  return {
+    audio: "audio" in inputSupport && typeof inputSupport.audio === "boolean" ? inputSupport.audio : null,
+    image: "image" in inputSupport && typeof inputSupport.image === "boolean" ? inputSupport.image : null,
+    video: "video" in inputSupport && typeof inputSupport.video === "boolean" ? inputSupport.video : null,
+  };
 }
 
-function promptInputReferences(
-  nodeId: string,
-  nodes: BoardDocument["nodes"],
-  edges: BoardDocument["edges"],
-  items: StorageItem[],
-  resolveUrl: BoardReferenceUrlResolver,
-): ReferenceImageRef[] {
-  return uniqueBoardReferences(
-    edges
-      .filter(edge => edge.to.nodeId === nodeId && edge.to.portId === BOARD_PORT_IDS.assetIn)
-      .map(edge => nodes.find(node => node.id === edge.from.nodeId))
-      .flatMap(node => boardNodeReferences(node, nodes, items, resolveUrl)),
-  );
+async function prepareAgentAnalysisReferences(references: ReferenceImageRef[]): Promise<ReferenceImageRef[]> {
+  return Promise.all(references.map(async reference => {
+    if (getMediaReferenceType(reference) !== "audio") return reference;
+    return { ...reference, url: await prepareReferenceMediaUrlForRequest(reference.url) };
+  }));
 }
 
 function isGenerateBoardNode(node: BoardDocument["nodes"][number] | undefined): node is GenerateBoardNode {
@@ -1266,6 +1278,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const pollingFailuresRef = useRef<Record<string, number>>({});
   const generationAbortControllersRef = useRef<Record<string, AbortController>>({});
   const locallyCanceledItemIdsRef = useRef<Set<string>>(new Set());
+  const analyzingBoardMediaNodeIdsRef = useRef<Set<string>>(new Set());
   const workspaceNoticeSequenceRef = useRef(0);
   const confirmAction = useConfirm();
 
@@ -1809,10 +1822,11 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       },
       { boardId: resolvedBoardId },
     );
-    await saveToDB(item);
-    setItems(prev => [item, ...prev]);
+    const savedItem = await saveItemOrWarn(item, pushWorkspaceNotice);
+    if (!savedItem) return null;
+    setItems(prev => [savedItem, ...prev]);
     const nodeId = boardController.addAssetNode({
-      asset: storageItemToBoardAssetReference(item),
+      asset: storageItemToBoardAssetReference(savedItem),
       size: outputSize,
       title: `${sourceTitle} ${label}`,
       position: {
@@ -1823,7 +1837,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     boardController.selectNode(nodeId);
     boardController.selectEdge(null);
     pushWorkspaceNotice("info", `${label}已开始，结果会在当前节点更新`);
-    return { item, nodeId };
+    return { item: savedItem, nodeId };
   }
 
   async function completeBoardQuickEditAsset(
@@ -1849,18 +1863,20 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     pushWorkspaceNotice("success", `${label}完成，已保存为新画板资产`);
   }
 
-  async function failBoardQuickEditAsset(nodeId: string, item: StorageItem) {
+  async function failBoardQuickEditAsset(nodeId: string, item: StorageItem, errorMessage: string) {
     const nextItem = buildStorageItem(
       {
         ...item,
         status: "failed",
         progress: 100,
+        errorMessage,
       },
       { boardId: resolvedBoardId },
     );
-    await saveToDB(nextItem);
-    setItems(prev => prev.map(current => current.id === nextItem.id ? nextItem : current));
-    boardController.updateAssetNodeAsset(nodeId, storageItemToBoardAssetReference(nextItem));
+    const savedItem = await saveItemOrWarn(nextItem, pushWorkspaceNotice);
+    if (!savedItem) return;
+    setItems(prev => prev.map(current => current.id === savedItem.id ? savedItem : current));
+    boardController.updateAssetNodeAsset(nodeId, storageItemToBoardAssetReference(savedItem));
   }
 
   async function runBoardImageQuickEdit(
@@ -1878,7 +1894,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     outputSize?: BoardSize,
   ) {
     const label = IMAGE_EDIT_LABELS[operation];
-    const model = imageEditFeatureModels[operation];
+    const target = resolveImageQuickEditTarget(operation, imageEditFeatureTargets[operation]);
     const pending = await createBoardQuickEditProcessingAsset(
       sourceNodeId,
       sourceTitle,
@@ -1888,39 +1904,52 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       sourceItem,
       operation,
       editImageUrl,
-      model,
+      target.model,
       editPrompt,
     );
     if (!pending) return;
+    const pendingTaskIds = relatedQuickEditTaskIds(pending.item.id);
+    const controller = new AbortController();
+    for (const id of pendingTaskIds) generationAbortControllersRef.current[id] = controller;
     try {
       const image = await prepareReferenceImageUrlForRequest(editImageUrl);
       const mask = maskUrl ? await prepareReferenceImageUrlForRequest(maskUrl) : undefined;
       const guide = guideUrl ? await prepareReferenceImageUrlForRequest(guideUrl) : undefined;
-      const response = await fetch("/api/image/edit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...buildProviderHeaders(model) },
-        body: JSON.stringify({
-          operation,
-          model,
-          image,
-          mask,
-          guide,
-          prompt: editPrompt,
-          imageResolution: editImageResolution,
-        }),
+      if (hasLocallyCanceledQuickEdit(pendingTaskIds, locallyCanceledItemIdsRef.current)) {
+        clearLocallyCanceledQuickEdit(pendingTaskIds, locallyCanceledItemIdsRef.current);
+        return;
+      }
+      const imageUrl = await submitImageQuickEdit({
+        target,
+        operation,
+        image,
+        mask,
+        guide,
+        prompt: editPrompt,
+        imageResolution: editImageResolution,
+        buildProviderHeaders,
+        signal: controller.signal,
       });
-      if (!response.ok) throw new Error(await readFetchError(response, `${label}失败`));
-      const payload = await readImageGenerationPayload(response);
-      if (!payload.imageUrl) throw new Error("图片编辑接口没有返回图片");
+      if (hasLocallyCanceledQuickEdit(pendingTaskIds, locallyCanceledItemIdsRef.current)) {
+        clearLocallyCanceledQuickEdit(pendingTaskIds, locallyCanceledItemIdsRef.current);
+        return;
+      }
       await completeBoardQuickEditAsset(
         pending.nodeId,
         pending.item,
         operation,
-        payload.imageUrl,
+        imageUrl,
       );
     } catch (error) {
-      await failBoardQuickEditAsset(pending.nodeId, pending.item);
-      pushWorkspaceNotice("error", toErrorMessage(error, `${label}失败`));
+      if (hasLocallyCanceledQuickEdit(pendingTaskIds, locallyCanceledItemIdsRef.current) || isAbortError(error)) {
+        clearLocallyCanceledQuickEdit(pendingTaskIds, locallyCanceledItemIdsRef.current);
+        return;
+      }
+      const message = toErrorMessage(error, `${label}失败`);
+      await failBoardQuickEditAsset(pending.nodeId, pending.item, message);
+      pushWorkspaceNotice("error", message);
+    } finally {
+      for (const id of pendingTaskIds) delete generationAbortControllersRef.current[id];
     }
   }
 
@@ -2052,38 +2081,54 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     boardController.selectedNodeId,
   ]);
 
-  const handleAnalyzePromptMedia = useCallback(async (nodeId: string): Promise<void> => {
-    const promptNode = boardController.board.nodes.find(node => node.id === nodeId);
-    if (promptNode?.kind !== "prompt") {
-      pushWorkspaceNotice("error", "请选择 Prompt 节点");
+  const handleAnalyzeBoardMedia = useCallback(async (nodeId: string): Promise<void> => {
+    if (analyzingBoardMediaNodeIdsRef.current.has(nodeId)) {
+      pushWorkspaceNotice("info", "媒体分析正在进行");
+      return;
+    }
+    const sourceNode = boardController.board.nodes.find(node => node.id === nodeId);
+    if (!sourceNode || (sourceNode.kind !== "asset" && sourceNode.kind !== "result")) {
+      pushWorkspaceNotice("error", "请选择媒体节点");
       return;
     }
 
-    const previewReferences = promptInputReferences(
-      nodeId,
+    const previewReferences = boardNodeReferences(
+      sourceNode,
       boardController.board.nodes,
-      boardController.board.edges,
       items,
       resolveBoardReferenceUrl,
     );
     if (previewReferences.length === 0) {
-      pushWorkspaceNotice("error", "请先把媒体资产连到 Prompt 节点");
+      pushWorkspaceNotice("error", "当前媒体节点没有可分析资产");
       return;
     }
 
+    const mediaType = getMediaReferenceType(previewReferences[0]);
+    analyzingBoardMediaNodeIdsRef.current.add(nodeId);
     try {
-      const references = getSendableAgentMediaReferences(await resolveOriginalReferences(previewReferences));
-      if (references.length === 0) {
-        throw new Error("连入媒体当前无法发送给 Agent 分析");
+      pushWorkspaceNotice("info", `正在分析${mediaReferenceLabel(mediaType)}媒体`);
+      const supportResponse = await fetch(`/api/model-vision-support?model=${encodeURIComponent(selectedChatModel)}`);
+      if (supportResponse.ok) {
+        const inputSupport = readAgentInputSupportPayload(await supportResponse.json());
+        if (inputSupport?.[mediaType] === false) {
+          throw new Error(`当前 Agent 模型不支持${mediaReferenceLabel(mediaType)}分析`);
+        }
       }
-      const promptText = getBoardTextDraft(promptNode.id) ?? promptNode.prompt;
+
+      const references = getSendableAgentMediaReferences(
+        await prepareAgentAnalysisReferences(await resolveOriginalReferences(previewReferences)),
+      );
+      if (references.length === 0) {
+        throw new Error("当前媒体无法发送给 Agent 分析");
+      }
+
       const response = await fetch(API_ROUTES.agent.respond, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...buildProviderHeaders(selectedChatModel) },
         body: JSON.stringify({
           messages: [{
             role: "user",
-            content: `${PROMPT_MEDIA_ANALYSIS_INSTRUCTION}\n\n当前 Prompt 文本：${promptText || "（空）"}`,
+            content: BOARD_MEDIA_ANALYSIS_INSTRUCTION,
           }],
           surface: "board",
           boardContext: buildAgentBoardContext(),
@@ -2104,27 +2149,38 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       });
 
       if (!response.ok) {
-        throw new Error(await readFetchError(response, "Prompt 媒体分析失败"));
+        throw new Error(await readFetchError(response, "媒体分析失败"));
       }
 
-      const payload = await response.json() as PromptMediaAnalysisResponse;
+      const payload = await response.json() as BoardMediaAnalysisResponse;
       if (payload.thought === "Agent provider request failed.") {
-        throw new Error(payload.text || "Prompt 媒体分析失败");
+        throw new Error(payload.text || "媒体分析失败");
       }
       const body = payload.text?.trim();
-      if (!body) throw new Error("Prompt 媒体分析没有返回内容");
+      if (!body) throw new Error("媒体分析没有返回内容");
 
-      boardController.addNoteNode({
-        title: `${promptNode.title} 分析`,
+      boardController.addNoteNodeWithConnection({
+        title: `${sourceNode.title} 分析`,
         body,
-        position: {
-          x: promptNode.position.x + promptNode.size.width + 48,
-          y: promptNode.position.y,
+        source: {
+          assetId: references[0].id,
+          model: selectedChatModel,
+          sourceNodeId: sourceNode.id,
         },
+        position: {
+          x: sourceNode.position.x + sourceNode.size.width + 48,
+          y: sourceNode.position.y,
+        },
+      }, {
+        nodeId: sourceNode.id,
+        portId: BOARD_PORT_IDS.assetOut,
+        portKind: "asset",
       });
       pushWorkspaceNotice("success", "已生成媒体分析 Note");
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "Prompt 媒体分析失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, "媒体分析失败"));
+    } finally {
+      analyzingBoardMediaNodeIdsRef.current.delete(nodeId);
     }
   }, [
     boardController,
@@ -3093,6 +3149,47 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     setTraditionalSubTab: value => setMode(value),
     onActionValidationError: message => pushWorkspaceNotice("error", message),
   });
+
+  const cancelBoardAssetTaskNode = useCallback(async (nodeId: string): Promise<void> => {
+    const node = boardController.board.nodes.find(item => item.id === nodeId);
+    if (node?.kind !== "asset") {
+      pushWorkspaceNotice("error", "未找到可取消的图片编辑任务");
+      return;
+    }
+    const item = items.find(current => current.id === node.asset.assetId);
+    if (!item || (item.status !== "pending" && item.status !== "processing")) {
+      pushWorkspaceNotice("error", "未找到可取消的图片编辑任务");
+      return;
+    }
+    if (cancelingBoardItemIds.includes(item.id)) return;
+    if (!(await confirmAction({ message: "确定要取消这个图片编辑任务吗？", tone: "danger", confirmLabel: "取消任务" }))) return;
+
+    setCancelingBoardItemIds(prev => [...prev, item.id]);
+    try {
+      locallyCanceledItemIdsRef.current.add(item.id);
+      generationAbortControllersRef.current[item.id]?.abort();
+      await deleteFromDB(item.id);
+      delete generationAbortControllersRef.current[item.id];
+      delete pollingFailuresRef.current[item.id];
+      setItems(prev => prev.filter(current => current.id !== item.id));
+      boardController.deleteNode(nodeId);
+      pushWorkspaceNotice("success", "图片编辑任务已从本地取消");
+    } catch (error) {
+      pushWorkspaceNotice("error", toErrorMessage(error, "图片编辑任务取消失败"));
+    } finally {
+      setCancelingBoardItemIds(prev => prev.filter(id => id !== item.id));
+    }
+  }, [
+    boardController,
+    cancelingBoardItemIds,
+    confirmAction,
+    generationAbortControllersRef,
+    items,
+    locallyCanceledItemIdsRef,
+    pollingFailuresRef,
+    pushWorkspaceNotice,
+    setItems,
+  ]);
 
   const cancelBoardGenerationTask = useCallback(async (task: GenerationTask): Promise<void> => {
     const nodeId = task.source.boardNodeId;
@@ -4341,8 +4438,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const audioModelGroups = getProviderModelGroups(audioModelOptions, providerKeys, customProviders);
   const chatModelGroups = getProviderModelGroups(chatModelOptions, providerKeys, customProviders);
   const {
-    featureModels: imageEditFeatureModels,
-    selectFeatureModel: selectImageEditFeatureModel,
+    featureModels: imageEditFeatureTargets,
+    selectFeatureModel: selectImageEditFeatureTarget,
   } = useImageEditFeatureModels();
   const resolveBoardQuickEditSource = (nodeId: string) => {
     const node = boardController.board.nodes.find(item => item.id === nodeId);
@@ -4470,11 +4567,12 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onFocusNodeRequestHandled={() => setFocusNodeRequest(null)}
         onSelectedNodeIdsChange={setSelectedNodeIds}
         onBack={handleBackToWorkbench}
+        onCancelAssetTask={nodeId => void cancelBoardAssetTaskNode(nodeId)}
         onCancelGenerateNode={handleCancelGenerateNode}
         onCaptureVideoFrame={handleCaptureVideoFrame}
         onConnectionError={handleBoardConnectionError}
         onWorkspaceNotice={pushWorkspaceNotice}
-        onAnalyzePromptMedia={handleAnalyzePromptMedia}
+        onAnalyzeBoardMedia={handleAnalyzeBoardMedia}
         onCreateBoard={handleCreateBoard}
         onDeleteBoard={handleDeleteBoard}
         onDownloadAsset={handleDownloadAsset}
@@ -4630,7 +4728,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         resolveIntegrationEnabled={resolveIntegrationEnabled}
         selectedChatModel={selectedChatModel}
         selectedProvider={selectedProvider}
-        imageEditFeatureModels={imageEditFeatureModels}
+        imageEditFeatureModels={imageEditFeatureTargets}
         videoModelGroups={videoModelGroups}
         hasCurrentBoard
         onAddCustomProvider={addCustomProvider}
@@ -4651,7 +4749,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onResetBoards={handleDataResetBoards}
         onRunResolveCheck={() => void runResolveCheck()}
         onSaveCredential={handleSaveCredential}
-        onSelectImageEditFeatureModel={selectImageEditFeatureModel}
+        onSelectImageEditFeatureModel={selectImageEditFeatureTarget}
         onSelectChatModel={handleSelectChatModel}
         onSelectProvider={handleSelectProvider}
         onToggleResolveIntegration={setResolveIntegrationEnabled}
@@ -4686,7 +4784,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       {isMaskOpen && (
         <CanvasMaskEditor
           imageUrl={maskTargetUrl}
-          editModel={maskEditOperation ? imageEditFeatureModels[maskEditOperation] : undefined}
+          editModel={maskEditOperation ? resolveImageQuickEditTarget(maskEditOperation, imageEditFeatureTargets[maskEditOperation]).model : undefined}
           isOpen={isMaskOpen}
           operation={maskEditOperation}
           onClose={() => {

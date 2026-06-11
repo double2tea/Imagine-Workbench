@@ -49,6 +49,7 @@ import {
   cancelGenerationTask,
   deleteGenerationTask,
   generationTaskToGalleryItem,
+  legacyGenerationTaskId,
 } from "@/lib/generation-tasks";
 import {
   IMAGE_REFERENCE_LIMIT,
@@ -63,6 +64,10 @@ import {
 } from "@/hooks/useResolveIntegrationSettings";
 import { useImageEditFeatureModels } from "@/hooks/useImageEditFeatureModels";
 import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
+import {
+  resolveImageQuickEditTarget,
+  submitImageQuickEdit,
+} from "@/lib/image-quick-edit-targets";
 import {
   DEFAULT_AUDIO_MODEL,
   DEFAULT_IMAGE_MODEL,
@@ -107,7 +112,6 @@ import {
   type WorkspaceCleanupKind,
 } from "@/lib/data-management";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
-import { readImageGenerationPayload } from "@/lib/client-image-response";
 import { CLEAR_WORKSPACE_ASSETS_MESSAGE } from "@/lib/workspace-messages";
 
 type NoticeType = "error" | "info" | "success";
@@ -143,6 +147,22 @@ function getStringField(value: unknown, field: string): string | null {
   const record = value as Record<string, unknown>;
   const fieldValue = record[field];
   return typeof fieldValue === "string" && fieldValue.trim() ? fieldValue : null;
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+function relatedQuickEditTaskIds(assetId: string): string[] {
+  return [assetId, legacyGenerationTaskId(assetId)];
+}
+
+function hasLocallyCanceledQuickEdit(ids: string[], canceledIds: Set<string>): boolean {
+  return ids.some(id => canceledIds.has(id));
+}
+
+function clearLocallyCanceledQuickEdit(ids: string[], canceledIds: Set<string>): void {
+  for (const id of ids) canceledIds.delete(id);
 }
 
 function readFileAsDataUrl(file: File): Promise<string> {
@@ -858,8 +878,8 @@ export default function Home() {
     return labels;
   }, [customProviders]);
   const {
-    featureModels: imageEditFeatureModels,
-    selectFeatureModel: selectImageEditFeatureModel,
+    featureModels: imageEditFeatureTargets,
+    selectFeatureModel: selectImageEditFeatureTarget,
   } = useImageEditFeatureModels();
   const handleSelectImageModel = (model: string) => {
     const capabilities = getImageModelCapabilities(model);
@@ -1060,7 +1080,7 @@ export default function Home() {
   useEffect(() => {
     async function loadWorkspace() {
       try {
-        const metas = await listAllAssetMetas();
+        const metas = (await listAllAssetMetas()).filter(meta => meta.scope === "workspace" && !meta.boardId);
         setItems(metas.map(metaToPlaceholderItem));
         const firstBatch = metas.slice(0, 40);
         if (firstBatch.length > 0) {
@@ -1116,29 +1136,69 @@ export default function Home() {
     }
   };
 
-  const saveEditedImageAsset = async (
+  const createImageQuickEditProcessingAsset = async (
     sourceItem: StorageItem,
     operation: ImageEditFeature,
-    imageUrl: string,
+    previewUrl: string,
     model: string,
     editPrompt: string,
-  ) => {
+  ): Promise<StorageItem | null> => {
     const label = IMAGE_EDIT_LABELS[operation];
     const item = buildStorageItem({
       id: makeClientId("img_edit"),
       type: "image",
-      url: imageUrl,
+      url: previewUrl,
       prompt: editPrompt || `${label}：${sourceItem.prompt || sourceItem.id}`,
       model,
       aspectRatio: "auto",
       createdAt: new Date().toISOString(),
-      status: "complete",
-      progress: 100,
+      status: "processing",
+      progress: 15,
+      scope: "workspace",
+      boardId: "",
       maskOriginalId: sourceItem.id,
     });
-    await saveToDB(item);
+    try {
+      await saveToDB(item);
+    } catch (error) {
+      pushWorkspaceNotice("error", `本地存储失败，未开始${label}：${toErrorMessage(error, "IndexedDB 写入失败")}`);
+      return null;
+    }
     setItems(prev => [item, ...prev]);
+    pushWorkspaceNotice("info", `${label}已开始，结果会更新这张任务卡片`);
+    return item;
+  };
+
+  const completeImageQuickEditAsset = async (
+    item: StorageItem,
+    operation: ImageEditFeature,
+    imageUrl: string,
+  ) => {
+    const label = IMAGE_EDIT_LABELS[operation];
+    const nextItem = buildStorageItem({
+      ...item,
+      url: imageUrl,
+      status: "complete",
+      progress: 100,
+      errorMessage: undefined,
+    });
+    await saveToDB(nextItem);
+    setItems(prev => prev.map(current => current.id === nextItem.id ? nextItem : current));
     pushWorkspaceNotice("success", `${label}完成，已保存为新图片资产`);
+  };
+
+  const failImageQuickEditAsset = async (
+    item: StorageItem,
+    message: string,
+  ) => {
+    const nextItem = buildStorageItem({
+      ...item,
+      status: "failed",
+      progress: 100,
+      errorMessage: message,
+    });
+    await saveToDB(nextItem);
+    setItems(prev => prev.map(current => current.id === nextItem.id ? nextItem : current));
   };
 
   const runImageQuickEdit = async (
@@ -1150,34 +1210,50 @@ export default function Home() {
     editPrompt: string,
     editImageResolution: string,
   ) => {
-    const model = imageEditFeatureModels[operation];
+    const target = resolveImageQuickEditTarget(operation, imageEditFeatureTargets[operation]);
+    const pending = await createImageQuickEditProcessingAsset(sourceItem, operation, editImageUrl, target.model, editPrompt);
+    if (!pending) return;
+    const pendingTaskIds = relatedQuickEditTaskIds(pending.id);
+    const controller = new AbortController();
+    for (const id of pendingTaskIds) generationAbortControllersRef.current[id] = controller;
     try {
       const image = await prepareReferenceImageUrlForRequest(editImageUrl);
       const mask = maskUrl ? await prepareReferenceImageUrlForRequest(maskUrl) : undefined;
       const guide = guideUrl ? await prepareReferenceImageUrlForRequest(guideUrl) : undefined;
-      const response = await fetch("/api/image/edit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...buildProviderHeaders(model) },
-        body: JSON.stringify({
-          operation,
-          model,
-          image,
-          mask,
-          guide,
-          prompt: editPrompt,
-          imageResolution: editImageResolution,
-        }),
+      if (hasLocallyCanceledQuickEdit(pendingTaskIds, locallyCanceledItemIdsRef.current)) {
+        clearLocallyCanceledQuickEdit(pendingTaskIds, locallyCanceledItemIdsRef.current);
+        return;
+      }
+      const imageUrl = await submitImageQuickEdit({
+        target,
+        operation,
+        image,
+        mask,
+        guide,
+        prompt: editPrompt,
+        imageResolution: editImageResolution,
+        buildProviderHeaders,
+        signal: controller.signal,
       });
-      if (!response.ok) {
-        throw new Error(await readFetchError(response, `${IMAGE_EDIT_LABELS[operation]}失败`));
+      if (hasLocallyCanceledQuickEdit(pendingTaskIds, locallyCanceledItemIdsRef.current)) {
+        clearLocallyCanceledQuickEdit(pendingTaskIds, locallyCanceledItemIdsRef.current);
+        return;
       }
-      const payload = await readImageGenerationPayload(response);
-      if (!payload.imageUrl) {
-        throw new Error("图片编辑接口没有返回图片");
-      }
-      await saveEditedImageAsset(sourceItem, operation, payload.imageUrl, model, editPrompt);
+      await completeImageQuickEditAsset(pending, operation, imageUrl);
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, `${IMAGE_EDIT_LABELS[operation]}失败`));
+      if (hasLocallyCanceledQuickEdit(pendingTaskIds, locallyCanceledItemIdsRef.current) || isAbortError(error)) {
+        clearLocallyCanceledQuickEdit(pendingTaskIds, locallyCanceledItemIdsRef.current);
+        return;
+      }
+      const message = toErrorMessage(error, `${IMAGE_EDIT_LABELS[operation]}失败`);
+      try {
+        await failImageQuickEditAsset(pending, message);
+      } catch (storageError) {
+        pushWorkspaceNotice("error", `本地存储失败：${toErrorMessage(storageError, "IndexedDB 写入失败")}`);
+      }
+      pushWorkspaceNotice("error", message);
+    } finally {
+      for (const id of pendingTaskIds) delete generationAbortControllersRef.current[id];
     }
   };
 
@@ -1390,7 +1466,7 @@ export default function Home() {
   };
 
   const reloadAssetsFromDB = useCallback(async () => {
-    const metas = await listAllAssetMetas();
+    const metas = (await listAllAssetMetas()).filter(meta => meta.scope === "workspace" && !meta.boardId);
     setItems(metas.map(metaToPlaceholderItem));
     void hydrateAssets(metas.slice(0, 80)).then(hydrated =>
       setItems(current => mergeStorageItems(current, hydrated)),
@@ -1899,7 +1975,7 @@ export default function Home() {
         resolveIntegrationEnabled={resolveIntegrationEnabled}
         selectedChatModel={selectedChatModel}
         selectedProvider={selectedProvider}
-        imageEditFeatureModels={imageEditFeatureModels}
+        imageEditFeatureModels={imageEditFeatureTargets}
         videoModelGroups={videoModelGroups}
         onAddCustomProvider={addCustomProvider}
         onCleanupAssets={handleDataCleanupAssets}
@@ -1918,7 +1994,7 @@ export default function Home() {
         onAddManualModels={addManualModels}
         onSaveCredential={handleSaveCredential}
         onSelectChatModel={handleSelectChatModel}
-        onSelectImageEditFeatureModel={selectImageEditFeatureModel}
+        onSelectImageEditFeatureModel={selectImageEditFeatureTarget}
         onSelectProvider={handleSelectProvider}
         onToggleResolveIntegration={setResolveIntegrationEnabled}
         onDeleteCustomProvider={deleteCustomProvider}
@@ -1954,7 +2030,7 @@ export default function Home() {
       {isMaskOpen && (
         <CanvasMaskEditor
           imageUrl={maskTargetUrl}
-          editModel={maskEditOperation ? imageEditFeatureModels[maskEditOperation] : undefined}
+          editModel={maskEditOperation ? resolveImageQuickEditTarget(maskEditOperation, imageEditFeatureTargets[maskEditOperation]).model : undefined}
           isOpen={isMaskOpen}
           operation={maskEditOperation}
           onClose={() => {
