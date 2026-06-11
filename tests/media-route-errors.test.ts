@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import Module from "node:module";
 import path from "node:path";
-import test from "node:test";
+import test, { after } from "node:test";
 
 test("media download routes return request errors for missing operation names", async () => {
   registerCompiledPathAlias();
@@ -67,6 +67,11 @@ type ResolveFilename = (
 ) => string;
 
 let aliasRegistered = false;
+let restoreCompiledPathAlias: (() => void) | undefined;
+
+after(() => {
+  restoreCompiledPathAlias?.();
+});
 
 function registerCompiledPathAlias(): void {
   if (aliasRegistered) return;
@@ -83,5 +88,10 @@ function registerCompiledPathAlias(): void {
       return path.join(compiledRoot, `${request.slice(2)}.js`);
     }
     return originalResolveFilename(request, parent, isMain, options);
+  };
+  restoreCompiledPathAlias = () => {
+    moduleWithResolver._resolveFilename = originalResolveFilename;
+    aliasRegistered = false;
+    restoreCompiledPathAlias = undefined;
   };
 }
