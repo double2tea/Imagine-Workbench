@@ -463,6 +463,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
           <PromptBoardNode
             node={node}
             references={data.promptReferences}
+            onAnalyzeMedia={() => c.onAnalyzePromptMedia(node.id)}
             onChange={prompt => c.onUpdatePrompt(node.id, prompt)}
             onSelectReference={reference => c.onSelectPromptReference(node.id, reference)}
           />

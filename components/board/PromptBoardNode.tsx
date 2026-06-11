@@ -1,4 +1,5 @@
-import { memo, useRef } from "react";
+import { memo, useRef, useState } from "react";
+import { Sparkles } from "lucide-react";
 import BoardPromptTextarea, { type BoardPromptTextareaHandle } from "@/components/board/BoardPromptTextarea";
 import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
 import type { BoardPromptNode } from "@/lib/board";
@@ -13,15 +14,17 @@ import {
 
 interface PromptBoardNodeProps {
   node: BoardPromptNode;
+  onAnalyzeMedia?: () => void | Promise<void>;
   onChange: (prompt: string) => void;
   onSelectReference?: (reference: BoardPromptReference, index: number) => void;
   references: BoardPromptReference[];
 }
 
-const PromptBoardNode = memo(function PromptBoardNode({ node, onChange, onSelectReference, references }: PromptBoardNodeProps) {
+const PromptBoardNode = memo(function PromptBoardNode({ node, onAnalyzeMedia, onChange, onSelectReference, references }: PromptBoardNodeProps) {
   const textareaRef = useRef<BoardPromptTextareaHandle | null>(null);
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
   const slashCommandRef = useRef<PromptTemplateSlashCommand | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const handleApplyPromptTemplate = (template: PromptTemplate, mode: PromptTemplateApplyMode): void => {
     const textarea = textareaRef.current;
@@ -54,6 +57,31 @@ const PromptBoardNode = memo(function PromptBoardNode({ node, onChange, onSelect
     }
   };
 
+  const handleAnalyzeMedia = async (): Promise<void> => {
+    if (!onAnalyzeMedia || isAnalyzing) return;
+    setIsAnalyzing(true);
+    try {
+      await onAnalyzeMedia();
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const headerRight = (
+    <div className="flex items-center gap-1">
+      <button
+        type="button"
+        onClick={() => void handleAnalyzeMedia()}
+        disabled={!onAnalyzeMedia || isAnalyzing}
+        className="imagine-header-button flex !h-7 !w-7 items-center justify-center !rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)] text-teal-200 shadow-sm transition hover:bg-[var(--iw-panel-soft)] disabled:cursor-not-allowed disabled:opacity-45"
+        title="分析连入媒体为 Note"
+      >
+        <Sparkles className={`h-3.5 w-3.5 ${isAnalyzing ? "animate-pulse" : ""}`} />
+      </button>
+      <PromptTemplatePicker ref={templatePickerRef} accent="teal" compact onApply={handleApplyPromptTemplate} />
+    </div>
+  );
+
   return (
     <BoardPromptTextarea
       ref={textareaRef}
@@ -63,9 +91,9 @@ const PromptBoardNode = memo(function PromptBoardNode({ node, onChange, onSelect
       onSelectReference={onSelectReference}
       onSlashCommand={handleSlashCommand}
       references={references}
-      headerRight={<PromptTemplatePicker ref={templatePickerRef} accent="teal" compact onApply={handleApplyPromptTemplate} />}
+      headerRight={headerRight}
       className="nodrag nowheel nopan h-full w-full resize-none overflow-y-auto overscroll-contain imagine-board-input !p-3 !pr-20 text-xs leading-5 outline-none placeholder:text-[var(--iw-faint)]"
-      placeholder="写提示词，输入 @ 引用参考图"
+      placeholder="写提示词，输入 @ 引用媒体"
     />
   );
 });

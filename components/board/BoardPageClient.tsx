@@ -28,6 +28,7 @@ import BoardWorkspace from "@/components/board/BoardWorkspace";
 import SettingsModal from "@/components/settings/SettingsModal";
 import WorkspaceNotices, { type WorkspaceNotice } from "@/components/workbench/WorkspaceNotices";
 import type { AgentBoardContext, AgentBoardNodeSummary } from "@/lib/agent-context";
+import { getSendableAgentMediaReferences } from "@/lib/agent-chat-model";
 
 import { useAgentController } from "@/hooks/useAgentController";
 import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
@@ -177,6 +178,11 @@ type AgentBoardPatchAction = AgentToolAction & { type: "apply_board_patch" };
 type AgentImageToVideoAction = AgentToolAction & { type: "continue_image_to_video" };
 type BoardAgentActionResult = boolean | { handled: true; success: boolean };
 
+interface PromptMediaAnalysisResponse {
+  text?: string;
+  thought?: string;
+}
+
 const LARGE_BOARD_DATA_URL_MIN_LENGTH = 120_000;
 const IMAGE_EDIT_LABELS: Record<ImageEditFeature, string> = {
   redraw: "重绘",
@@ -184,6 +190,12 @@ const IMAGE_EDIT_LABELS: Record<ImageEditFeature, string> = {
   outpaint: "扩图",
   cutout: "抠图",
 };
+
+const PROMPT_MEDIA_ANALYSIS_INSTRUCTION =
+  "请分析我连接到当前 Prompt 节点的媒体素材，只输出中文结构化分析。必须严格使用以下小标题，并保持顺序：\n" +
+  "画面主体\n风格\n镜头\n光线\n色彩\n动作\n可生成提示词\n" +
+  "如果素材包含音频，请在相关小标题中概括声音内容、节奏、情绪或可转化为画面/视频提示词的信息。\n" +
+  "不要返回 boardAction 或 recommendedAction；把可直接写入 Note 的分析正文放在 text 字段。";
 
 interface BoardPageProps {
   boardId?: string;
@@ -454,6 +466,33 @@ function boardNodeReferences(
     return item && isMediaStorageItem(item) ? [{ id: item.id, type: item.type, url: resolveUrl(item.id, item.url), role: "general" }] : [];
   }
   return [];
+}
+
+function uniqueBoardReferences(references: ReferenceImageRef[]): ReferenceImageRef[] {
+  const seen = new Set<string>();
+  const unique: ReferenceImageRef[] = [];
+  for (const reference of references) {
+    const key = `${reference.id}:${reference.url}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(reference);
+  }
+  return unique;
+}
+
+function promptInputReferences(
+  nodeId: string,
+  nodes: BoardDocument["nodes"],
+  edges: BoardDocument["edges"],
+  items: StorageItem[],
+  resolveUrl: BoardReferenceUrlResolver,
+): ReferenceImageRef[] {
+  return uniqueBoardReferences(
+    edges
+      .filter(edge => edge.to.nodeId === nodeId && edge.to.portId === BOARD_PORT_IDS.assetIn)
+      .map(edge => nodes.find(node => node.id === edge.from.nodeId))
+      .flatMap(node => boardNodeReferences(node, nodes, items, resolveUrl)),
+  );
 }
 
 function isGenerateBoardNode(node: BoardDocument["nodes"][number] | undefined): node is GenerateBoardNode {
@@ -1528,6 +1567,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       return { ...reference, url: originalUrl };
     }));
   }, [items]);
+
   void handleImageUpload;
   void handleReferenceDropAsset;
   void handleReferenceDropFiles;
@@ -1993,6 +2033,90 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     boardController.board.title,
     boardController.selectedEdgeId,
     boardController.selectedNodeId,
+  ]);
+
+  const handleAnalyzePromptMedia = useCallback(async (nodeId: string): Promise<void> => {
+    const promptNode = boardController.board.nodes.find(node => node.id === nodeId);
+    if (promptNode?.kind !== "prompt") {
+      pushWorkspaceNotice("error", "请选择 Prompt 节点");
+      return;
+    }
+
+    const previewReferences = promptInputReferences(
+      nodeId,
+      boardController.board.nodes,
+      boardController.board.edges,
+      items,
+      resolveBoardReferenceUrl,
+    );
+    if (previewReferences.length === 0) {
+      pushWorkspaceNotice("error", "请先把媒体资产连到 Prompt 节点");
+      return;
+    }
+
+    try {
+      const references = getSendableAgentMediaReferences(await resolveOriginalReferences(previewReferences));
+      if (references.length === 0) {
+        throw new Error("连入媒体当前无法发送给 Agent 分析");
+      }
+      const promptText = getBoardTextDraft(promptNode.id) ?? promptNode.prompt;
+      const response = await fetch(API_ROUTES.agent.respond, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...buildProviderHeaders(selectedChatModel) },
+        body: JSON.stringify({
+          messages: [{
+            role: "user",
+            content: `${PROMPT_MEDIA_ANALYSIS_INSTRUCTION}\n\n当前 Prompt 文本：${promptText || "（空）"}`,
+          }],
+          surface: "board",
+          boardContext: buildAgentBoardContext(),
+          gallerySummary: items.map(item => ({
+            id: item.id,
+            type: item.type,
+            prompt: item.prompt,
+            aspectRatio: item.aspectRatio,
+          })),
+          agentReferences: references.map(reference => ({
+            id: reference.id,
+            type: getMediaReferenceType(reference),
+            url: reference.url,
+          })),
+          agentReferenceId: references[0]?.id,
+          model: selectedChatModel,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await readFetchError(response, "Prompt 媒体分析失败"));
+      }
+
+      const payload = await response.json() as PromptMediaAnalysisResponse;
+      if (payload.thought === "Agent provider request failed.") {
+        throw new Error(payload.text || "Prompt 媒体分析失败");
+      }
+      const body = payload.text?.trim();
+      if (!body) throw new Error("Prompt 媒体分析没有返回内容");
+
+      boardController.addNoteNode({
+        title: `${promptNode.title} 分析`,
+        body,
+        position: {
+          x: promptNode.position.x + promptNode.size.width + 48,
+          y: promptNode.position.y,
+        },
+      });
+      pushWorkspaceNotice("success", "已生成媒体分析 Note");
+    } catch (error) {
+      pushWorkspaceNotice("error", toErrorMessage(error, "Prompt 媒体分析失败"));
+    }
+  }, [
+    boardController,
+    buildAgentBoardContext,
+    buildProviderHeaders,
+    items,
+    pushWorkspaceNotice,
+    resolveOriginalReferences,
+    selectedChatModel,
   ]);
 
   const executeBoardAgentToolAction = useCallback(async ({
@@ -4333,6 +4457,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onCaptureVideoFrame={handleCaptureVideoFrame}
         onConnectionError={handleBoardConnectionError}
         onWorkspaceNotice={pushWorkspaceNotice}
+        onAnalyzePromptMedia={handleAnalyzePromptMedia}
         onCreateBoard={handleCreateBoard}
         onDeleteBoard={handleDeleteBoard}
         onDownloadAsset={handleDownloadAsset}

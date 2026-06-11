@@ -116,6 +116,7 @@ interface BoardWorkspaceProps {
   onCaptureVideoFrame: (nodeId: string, item: StorageItem, frame: CapturedVideoFrame) => void | Promise<void>;
   onConnectionError: (message: string) => void;
   onWorkspaceNotice: (type: WorkspaceNoticeType, message: string) => void;
+  onAnalyzePromptMedia: (nodeId: string) => void | Promise<void>;
   onCancelGenerateNode: (nodeId: string) => void;
   onEditAssetImage: (nodeId: string) => void;
   onImageQuickEdit: (nodeId: string, operation: ImageEditFeature) => void;
@@ -265,6 +266,22 @@ function sameReferenceList(
       reference.type === other.type &&
       reference.url === other.url
     );
+  });
+}
+
+function isMediaReferenceItem(item: StorageItem | undefined): item is StorageItem & { type: "image" | "video" | "audio" } {
+  return item !== undefined && item.status === "complete" && (item.type === "image" || item.type === "video" || item.type === "audio");
+}
+
+function resolveBoardPromptReferenceUrls(
+  references: BoardPromptReference[],
+  galleryItemById: ReadonlyMap<string, StorageItem>,
+): BoardPromptReference[] {
+  return references.map(reference => {
+    const item = galleryItemById.get(reference.id);
+    if (!isMediaReferenceItem(item)) return reference;
+    if (reference.type === item.type && reference.url === item.url) return reference;
+    return { ...reference, type: item.type, url: item.url };
   });
 }
 
@@ -852,6 +869,9 @@ function batchConnectionToTarget(
     if (target.kind === "agent" && outputPort.portKind === "asset") {
       return { portId: BOARD_PORT_IDS.agentContextIn, portKind: "agent" as const };
     }
+    if (target.kind === "prompt" && outputPort.portKind === "asset") {
+      return { portId: BOARD_PORT_IDS.assetIn, portKind: "asset" as const };
+    }
     if (target.kind === "image-generate" || target.kind === "video-generate" || target.kind === "audio-operation" || target.kind === "runninghub-app") {
       return outputPort.portKind === "prompt"
         ? { portId: BOARD_PORT_IDS.promptIn, portKind: "prompt" as const }
@@ -980,6 +1000,7 @@ export default function BoardWorkspace({
   onCaptureVideoFrame,
   onConnectionError,
   onWorkspaceNotice,
+  onAnalyzePromptMedia,
   onEditAssetImage,
   onImageQuickEdit,
   onExecuteGenerateNode,
@@ -1288,21 +1309,21 @@ export default function BoardWorkspace({
     const promptRefsByNodeId = new Map<string, BoardPromptReference[]>();
     for (const node of board.nodes) {
       if (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation" || node.kind === "runninghub-app") {
-        generateRefsByNodeId.set(node.id, buildBoardPromptReferences({
+        generateRefsByNodeId.set(node.id, resolveBoardPromptReferenceUrls(buildBoardPromptReferences({
           nodes: board.nodes,
           edges: board.edges,
           focus: { kind: "generate", nodeId: node.id },
           galleryItems: galleryReferenceItems,
           index: boardPromptReferenceGraphIndex,
-        }));
+        }), galleryItemById));
       } else if (node.kind === "prompt") {
-        promptRefsByNodeId.set(node.id, buildBoardPromptReferences({
+        promptRefsByNodeId.set(node.id, resolveBoardPromptReferenceUrls(buildBoardPromptReferences({
           nodes: board.nodes,
           edges: board.edges,
           focus: { kind: "prompt", nodeId: node.id },
           galleryItems: galleryReferenceItems,
           index: boardPromptReferenceGraphIndex,
-        }));
+        }), galleryItemById));
       }
     }
 
@@ -1356,6 +1377,7 @@ export default function BoardWorkspace({
     onFetchRunningHubAppSchema,
     onFocusNode: focusReferenceSourceNode,
     onFocusReferenceSource: focusReferenceSourceNode,
+    onAnalyzePromptMedia,
     onOpenFullscreen,
     onOpenPanorama,
     onSaveVoiceProfile,
@@ -1399,7 +1421,7 @@ export default function BoardWorkspace({
     },
   }), [
     onCancelGenerateNode, onCaptureVideoFrame, trashAndDeleteNode, onDownloadAsset, onEditAssetImage, onImageQuickEdit,
-    onExecuteGenerateNode, onFetchRunningHubAppSchema, focusReferenceSourceNode, onOpenFullscreen,
+    onExecuteGenerateNode, onFetchRunningHubAppSchema, focusReferenceSourceNode, onAnalyzePromptMedia, onOpenFullscreen,
     onOpenPanorama, onSaveVoiceProfile, moveGenerateReferenceEdge, moveReferenceGroupItem,
     deleteEdge, removeReferenceGroupItem, onSendAgentNode, onSendAssetToAgent, connectSelectedBoardPromptReference,
     updateReferenceGroupItemRole, updateAgentInstruction, updateGenerateNode, updateMultiGridNode,
@@ -1596,7 +1618,7 @@ export default function BoardWorkspace({
 
     const refs = readValidConnectionRefs(connection);
     if (!refs) {
-      onConnectionError("端口类型不兼容：图片可连参考/Agent，Prompt 可连生成，生成结果可连资产。");
+      onConnectionError("端口类型不兼容：媒体可连 Prompt、参考/Agent，Prompt 可连生成，生成结果可连资产。");
       return;
     }
     try {
@@ -1726,7 +1748,7 @@ export default function BoardWorkspace({
 
     const refs = readValidConnectionRefs(newConnection);
     if (!refs) {
-      onConnectionError("端口类型不兼容：图片可连参考/Agent，Prompt 可连生成，生成结果可连资产。");
+      onConnectionError("端口类型不兼容：媒体可连 Prompt、参考/Agent，Prompt 可连生成，生成结果可连资产。");
       return;
     }
     try {
