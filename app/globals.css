@@ -67,6 +67,11 @@ html,
   --iw-radius-md: 10px;
   --iw-radius-lg: 12px;
   --iw-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --iw-motion-fast: 120ms;
+  --iw-motion-base: 160ms;
+  --iw-motion-surface: 220ms;
+  --iw-motion-panel: 260ms;
+  --iw-motion-ease: var(--iw-ease-out);
   --iw-gap: 12px;
   --iw-gap-lg: 16px;
   --iw-control-h: 36px;
@@ -333,6 +338,88 @@ html::-webkit-scrollbar-thumb:hover {
   }
 }
 
+@keyframes imagine-surface-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes imagine-panel-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.975);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes imagine-media-reveal {
+  from {
+    opacity: 0.72;
+    transform: scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.imagine-motion-interactive {
+  transition:
+    background-color var(--iw-motion-base) var(--iw-motion-ease),
+    border-color var(--iw-motion-base) var(--iw-motion-ease),
+    color var(--iw-motion-base) var(--iw-motion-ease),
+    box-shadow var(--iw-motion-base) var(--iw-motion-ease),
+    transform var(--iw-motion-base) var(--iw-motion-ease);
+}
+
+.imagine-motion-surface-reveal,
+.imagine-motion-panel-reveal,
+.imagine-motion-media-reveal {
+  backface-visibility: hidden;
+  will-change: opacity, transform;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .imagine-motion-surface-reveal {
+    animation: imagine-surface-reveal var(--iw-motion-surface) var(--iw-motion-ease) both;
+    transform-origin: top center;
+  }
+
+  .imagine-motion-panel-reveal {
+    animation: imagine-panel-reveal var(--iw-motion-panel) var(--iw-motion-ease) both;
+    transform-origin: center;
+  }
+
+  .imagine-motion-media-reveal {
+    animation: imagine-media-reveal var(--iw-motion-surface) var(--iw-motion-ease) both;
+    transform-origin: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .imagine-motion-surface-reveal,
+  .imagine-motion-panel-reveal,
+  .imagine-motion-media-reveal {
+    animation: none !important;
+    transform: none !important;
+  }
+
+  .imagine-motion-interactive {
+    transition-duration: 1ms !important;
+  }
+}
+
 .imagine-section-label {
   display: inline-flex;
   align-items: center;
@@ -420,6 +507,12 @@ html::-webkit-scrollbar-thumb:hover {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .imagine-inline-disclosure[open] .imagine-inline-disclosure-panel {
+    animation: imagine-surface-reveal var(--iw-motion-surface) var(--iw-motion-ease) both;
+  }
 }
 
 .imagine-surface-panel {
@@ -732,9 +825,9 @@ html::-webkit-scrollbar-thumb:hover {
   font-weight: 700;
   color: var(--iw-muted);
   transition:
-    background-color 160ms var(--iw-ease-out),
-    color 160ms var(--iw-ease-out),
-    transform 160ms var(--iw-ease-out);
+    background-color var(--iw-motion-base) var(--iw-motion-ease),
+    color var(--iw-motion-base) var(--iw-motion-ease),
+    transform var(--iw-motion-base) var(--iw-motion-ease);
 }
 
 .imagine-operation-segment:hover {
@@ -764,10 +857,14 @@ html::-webkit-scrollbar-thumb:hover {
   font-size: 12px;
   font-weight: 700;
   transition:
-    background-color 160ms var(--iw-ease-out),
-    border-color 160ms var(--iw-ease-out),
-    color 160ms var(--iw-ease-out),
-    transform 160ms var(--iw-ease-out);
+    background-color var(--iw-motion-base) var(--iw-motion-ease),
+    border-color var(--iw-motion-base) var(--iw-motion-ease),
+    color var(--iw-motion-base) var(--iw-motion-ease),
+    transform var(--iw-motion-base) var(--iw-motion-ease);
+}
+
+.imagine-operation-action[data-size="compact"] {
+  min-height: 0;
 }
 
 .imagine-operation-action--primary:not(:disabled) {
@@ -2181,12 +2278,18 @@ html[data-imagine-theme="light"] .imagine-root-body {
   font-weight: 700;
   justify-content: center;
   padding: 2px 6px;
+  transition:
+    background-color var(--iw-motion-base) var(--iw-motion-ease),
+    border-color var(--iw-motion-base) var(--iw-motion-ease),
+    color var(--iw-motion-base) var(--iw-motion-ease),
+    box-shadow var(--iw-motion-base) var(--iw-motion-ease);
 }
 
 .imagine-board-status-badge[data-tone="processing"] {
   border-color: rgba(56, 189, 248, 0.25);
   background: rgba(14, 165, 233, 0.1);
   color: #e0f2fe;
+  box-shadow: 0 0 18px rgba(56, 189, 248, 0.08);
 }
 
 .imagine-board-status-badge[data-tone="pending"] {
@@ -2224,6 +2327,7 @@ html[data-imagine-theme="light"] .imagine-root-body {
   height: 100%;
   border-radius: 999px;
   background: #38bdf8;
+  transition: width 320ms var(--iw-motion-ease), background-color var(--iw-motion-base) var(--iw-motion-ease);
 }
 
 .imagine-board-task-progress-fill[data-tone="complete"] {
@@ -2446,6 +2550,12 @@ html[data-imagine-theme="light"] .imagine-root-body {
   flex-direction: column;
   gap: 12px;
   padding: 12px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .imagine-panel-disclosure[open] .imagine-panel-disclosure-body {
+    animation: imagine-surface-reveal var(--iw-motion-surface) var(--iw-motion-ease) both;
+  }
 }
 
 .imagine-creation-sidebar {
@@ -3268,6 +3378,43 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
   -webkit-user-drag: none;
 }
 
+@media (prefers-reduced-motion: no-preference) {
+  .react-flow__node:not(.dragging) .board-media-preview {
+    animation: imagine-media-reveal var(--iw-motion-surface) var(--iw-motion-ease) both;
+  }
+}
+
+.board-media-processing-overlay {
+  background:
+    radial-gradient(circle at 50% 35%, rgba(125, 211, 252, 0.18), transparent 42%),
+    rgba(2, 6, 23, 0.48);
+}
+
+.board-media-processing-card {
+  box-shadow:
+    0 16px 38px rgba(2, 6, 23, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.board-media-processing-progress-fill {
+  transition: width 320ms var(--iw-motion-ease), background-color var(--iw-motion-base) var(--iw-motion-ease);
+}
+
+.board-media-controls,
+.board-media-stack-switcher {
+  transform: translateY(4px);
+  transition:
+    opacity var(--iw-motion-surface) var(--iw-motion-ease),
+    transform var(--iw-motion-surface) var(--iw-motion-ease);
+}
+
+.board-media-node:hover .board-media-controls,
+.board-media-node:focus-within .board-media-controls,
+.board-media-node:hover .board-media-stack-switcher,
+.board-media-node:focus-within .board-media-stack-switcher {
+  transform: translateY(0);
+}
+
 .imagine-workbench-shell .board-media-meta,
 .imagine-workbench-shell .board-media-stack-switcher,
 .imagine-workbench-shell.imagine-theme-light .board-media-meta,
@@ -3306,9 +3453,12 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 
 .board-canvas.is-node-dragging .board-node-shell,
 .board-canvas.is-node-dragging .board-node-handle,
+.board-canvas.is-node-dragging .board-media-controls,
+.board-canvas.is-node-dragging .board-media-stack-switcher,
 .board-canvas.is-node-dragging .imagine-mark {
   filter: none !important;
   transition: none !important;
+  transform: none !important;
 }
 
 .board-canvas.is-node-dragging .board-node-shell * {
@@ -4088,14 +4238,36 @@ html[data-imagine-theme="light"] .imagine-required-chip,
   border-radius: 9px !important;
 }
 
+.imagine-card-actions-shell {
+  transform: translateY(6px) scale(0.985);
+  transition:
+    opacity var(--iw-motion-surface) var(--iw-motion-ease),
+    transform var(--iw-motion-surface) var(--iw-motion-ease);
+}
+
+.imagine-asset-card:hover .imagine-card-actions-shell,
+.imagine-card-actions-shell:focus-within {
+  transform: translateY(0) scale(1);
+}
+
 .imagine-asset-hover-scrim {
   background: rgba(2, 6, 23, 0.2) !important;
+  transition: opacity var(--iw-motion-surface) var(--iw-motion-ease) !important;
 }
 
 .imagine-card-action {
   min-height: 28px;
   border-radius: 7px !important;
   box-shadow: none !important;
+  transition:
+    background-color var(--iw-motion-base) var(--iw-motion-ease),
+    border-color var(--iw-motion-base) var(--iw-motion-ease),
+    color var(--iw-motion-base) var(--iw-motion-ease),
+    transform var(--iw-motion-fast) var(--iw-motion-ease) !important;
+}
+
+.imagine-card-action:not(:disabled):active {
+  transform: scale(0.97);
 }
 
 .imagine-audio-waveform-media {
