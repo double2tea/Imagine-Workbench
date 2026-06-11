@@ -1,4 +1,4 @@
-import { Music, Video } from "lucide-react";
+import { Image as ImageIcon, Music, Video } from "lucide-react";
 import { memo, useMemo, useRef } from "react";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
 import BoardAudioWaveform from "@/components/board/BoardAudioWaveform";
@@ -55,11 +55,11 @@ function resultNodeToStorageItem(node: BoardResultNode, boardId: string): Storag
   );
 }
 
-function LightweightMediaPreview({ type }: { type: "audio" | "video" }) {
-  const Icon = type === "audio" ? Music : Video;
+function LightweightMediaPreview({ type }: { type: "audio" | "image" | "video" }) {
+  const Icon = type === "audio" ? Music : type === "image" ? ImageIcon : Video;
   return (
     <div
-      aria-label={type === "audio" ? "音频结果" : "视频结果"}
+      aria-label={type === "audio" ? "音频结果" : type === "image" ? "图片结果" : "视频结果"}
       className="board-media-preview flex h-full w-full items-center justify-center bg-[var(--iw-panel-soft)] text-[var(--iw-muted)]"
       role="img"
     >
@@ -230,10 +230,10 @@ const ResultBoardNode = memo(function ResultBoardNode({
         />
       ) : playableAudioItem ? (
         <BoardAudioWaveform src={playableAudioItem.url} interactive={isSelected} />
-      ) : item.type === "audio" || item.type === "video" ? (
+      ) : item.type === "audio" || item.type === "image" || item.type === "video" ? (
         <LightweightMediaPreview type={item.type} />
       ) : (
-        <LightweightMediaPreview type="audio" />
+        null
       )}
     </BoardMediaNodeShell>
   );

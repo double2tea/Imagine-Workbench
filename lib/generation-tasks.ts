@@ -149,9 +149,10 @@ export function legacyStorageItemsToGenerationTasks(items: StorageItem[]): Gener
 }
 
 export function generationTaskToGalleryItem(task: GenerationTask): StorageItem | null {
-  if (task.status !== "pending" && task.status !== "processing" && task.status !== "failed") {
+  if (task.status !== "pending" && task.status !== "processing" && task.status !== "failed" && task.status !== "canceled") {
     return null;
   }
+  const status: StorageItem["status"] = task.status === "canceled" ? "failed" : task.status;
   return {
     id: task.id,
     type: task.mediaType,
@@ -160,12 +161,12 @@ export function generationTaskToGalleryItem(task: GenerationTask): StorageItem |
     model: task.model,
     aspectRatio: task.request?.aspectRatio ?? (task.mediaType === "audio" ? "audio" : task.mediaType === "transcript" ? "transcript" : "auto"),
     createdAt: task.createdAt,
-    status: task.status,
+    status,
     progress: task.progress,
     scope: task.source.boardId ? "board" : "workspace",
     boardId: task.source.boardId ?? "",
     operationName: task.operationName,
-    errorMessage: task.errorMessage,
+    errorMessage: task.errorMessage ?? (task.status === "canceled" ? "任务已取消" : undefined),
     generationRequest: task.request,
     sourceBoardNodeId: task.source.boardNodeId,
     sourceBoardResultStackKey: task.source.resultStackKey,
