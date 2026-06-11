@@ -86,35 +86,35 @@ html,
 
 html[data-imagine-theme="light"],
 .imagine-workbench-shell.imagine-theme-light {
-  --iw-bg: #eef3f8;
-  --iw-header: rgba(255, 255, 255, 0.9);
-  --iw-panel: rgba(255, 255, 255, 0.92);
+  --iw-bg: #f1f5f9;
+  --iw-header: rgba(255, 255, 255, 0.94);
+  --iw-panel: rgba(255, 255, 255, 0.98);
   --iw-panel-solid: #ffffff;
-  --iw-panel-soft: #f8fafc;
-  --iw-border: rgba(15, 23, 42, 0.11);
-  --iw-text: #172033;
-  --iw-muted: #667085;
-  --iw-faint: #98a2b3;
-  --iw-card-shadow: 0 18px 48px rgba(15, 23, 42, 0.08);
-  --iw-board-canvas-bg: #e9eff6;
+  --iw-panel-soft: #f3f6fa;
+  --iw-border: rgba(15, 23, 42, 0.17);
+  --iw-text: #111827;
+  --iw-muted: #475467;
+  --iw-faint: #667085;
+  --iw-card-shadow: 0 18px 48px rgba(15, 23, 42, 0.1);
+  --iw-board-canvas-bg: #e7edf5;
   --iw-board-node-bg: #ffffff;
-  --iw-board-node-header-bg: #f8fafc;
-  --iw-board-border: rgba(15, 23, 42, 0.12);
+  --iw-board-node-header-bg: #f3f6fa;
+  --iw-board-border: rgba(15, 23, 42, 0.17);
   --iw-board-edge-prompt: #14b8a6;
   --iw-board-edge-reference: #3b82f6;
   --iw-board-edge-agent-context: #8b5cf6;
   --iw-board-edge-result: #10b981;
-  --iw-board-accent-amber: #d97706;
-  --iw-board-handle: #64748b;
+  --iw-board-accent-amber: #b45309;
+  --iw-board-handle: #475467;
   --iw-board-minimap-node: #1e40af;
-  --iw-board-minimap-mask: rgba(241, 245, 249, 0.75);
-  --iw-accent: #2563eb;
+  --iw-board-minimap-mask: rgba(226, 232, 240, 0.82);
+  --iw-accent: #1d4ed8;
   --iw-accent-strong: #1d4ed8;
-  --iw-accent-soft: rgba(37, 99, 235, 0.1);
-  --iw-accent-glow: rgba(37, 99, 235, 0.16);
-  --iw-surface-raised: rgba(255, 255, 255, 0.98);
+  --iw-accent-soft: rgba(29, 78, 216, 0.13);
+  --iw-accent-glow: rgba(29, 78, 216, 0.18);
+  --iw-surface-raised: #ffffff;
   background:
-    linear-gradient(180deg, #eef3f8 0%, #f8fafc 44%, #edf3f8 100%) !important;
+    linear-gradient(180deg, #f1f5f9 0%, #f8fafc 44%, #eef4f9 100%) !important;
   color-scheme: light;
 }
 
@@ -1522,8 +1522,8 @@ html[data-imagine-theme="light"] .imagine-settings-overlay {
 }
 
 .imagine-settings-tab[data-active="true"] {
-  color: #fbbf24;
-  border-bottom-color: #fbbf24;
+  color: var(--iw-board-accent-amber);
+  border-bottom-color: var(--iw-board-accent-amber);
 }
 
 .imagine-settings-card {
@@ -2881,9 +2881,9 @@ html[data-imagine-theme="light"] .imagine-root-body {
 }
 
 .imagine-workbench-shell.imagine-theme-light .imagine-settings-panel {
-  background: #ffffff !important;
-  border-color: rgba(15, 23, 42, 0.1) !important;
-  color: #1e2937;
+  background: var(--iw-panel-solid) !important;
+  border-color: var(--iw-border) !important;
+  color: var(--iw-text);
 }
 
 .imagine-workbench-shell.imagine-theme-light [class*="bg-amber-500/16"] {
@@ -4489,21 +4489,21 @@ html[data-imagine-theme="light"] .imagine-card-action[data-active="true"]:hover 
 }
 
 .imagine-workbench-shell.imagine-theme-light .imagine-settings-provider-button[data-active="true"] {
-  background: #fff3d7 !important;
-  color: #92400e !important;
-  box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.22);
+  background: color-mix(in srgb, var(--iw-board-accent-amber) 12%, #ffffff) !important;
+  color: color-mix(in srgb, var(--iw-board-accent-amber) 78%, var(--iw-text)) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--iw-board-accent-amber) 24%, transparent);
 }
 
 .imagine-workbench-shell.imagine-theme-light .imagine-settings-save-button {
-  background: #ffffff !important;
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  color: #344054 !important;
+  background: var(--iw-panel-solid) !important;
+  border: 1px solid var(--iw-border);
+  color: var(--iw-muted) !important;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
 
 .imagine-workbench-shell.imagine-theme-light .imagine-settings-save-button:hover {
-  background: #f8fafc !important;
-  color: #172033 !important;
+  background: var(--iw-panel-soft) !important;
+  color: var(--iw-text) !important;
 }
 
 .imagine-theme-light .imagine-meta-chip {
