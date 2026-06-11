@@ -240,7 +240,7 @@ DaVinci Resolve integration starts with [DaVinci Resolve Bridge](docs/resolve-br
 - `POST /v1/images/edits`: OpenAI-compatible multipart image editing. Defaults to Workbench redraw semantics, accepts explicit `operation=redraw|erase|outpaint|cutout`, and supports multi-image `image[]` references.
 - `POST /v1/audio/speech`: OpenAI-compatible text-to-speech for direct MiMo-compatible TTS models.
 - `POST /v1/audio/transcriptions`: OpenAI-compatible multipart ASR for direct MiMo-compatible ASR models. Supports `language=auto|zh|en` and JSON output.
-- `GET /v1/models?provider=<key>&kind=chat|all`: OpenAI-compatible model list response with provider-prefixed model IDs.
+- `GET /v1/models?provider=all|<key>&kind=chat|image|video|audio|all`: OpenAI-compatible model list response with provider-prefixed model IDs. Defaults to the Workbench-known catalog across registered providers.
 - `GET /api/model-vision-support?model=<id>`: OpenRouter vision hint for Agent dock (`supportsVision`, `source`).
 - `GET /api/models?provider=<key>&kind=all|chat|image|video|audio`: loads provider model options dynamically from `/v1/models`.
 - `GET/POST /api/resolve/provider-credentials`: localhost-only Resolve plugin credential sharing. The settings UI writes Provider keys to `~/Library/Application Support/Imagine Workbench/resolve-provider-credentials.json`, and the DaVinci Workflow plugin can read them when pointed at a local Workbench server.

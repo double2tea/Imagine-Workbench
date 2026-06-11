@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { apiErrorResponse, requireApiText } from "@/lib/api/errors";
 import { getImageModelCapabilities, getImageResolutionOptions, parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
 import { generateImage } from "@/lib/providers/image";
 import { readRunningHubNodeInfoList } from "@/lib/providers/runninghub-node-info";
-import { dataUriToBlob, optionalText, requireText, resolveProviderConfig } from "@/lib/providers/utils";
+import { dataUriToBlob, optionalText, resolveProviderConfig } from "@/lib/providers/utils";
 import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, getReferenceImagePayloadError } from "@/lib/reference-images";
 
 export const runtime = "edge";
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
     validateReferenceCount(modelValue, referenceImages.length);
 
     const result = await generateImage(config, {
-      prompt: runningHubNodeInfoList ? optionalText(body.prompt) ?? "" : requireText(body.prompt, "Prompt"),
+      prompt: runningHubNodeInfoList ? optionalText(body.prompt) ?? "" : requireApiText(body.prompt, "Prompt"),
       model: parsed.model,
       aspectRatio,
       imageResolution,
@@ -74,8 +75,9 @@ export async function POST(req: NextRequest) {
     if (err instanceof ImageRequestValidationError || err instanceof ProviderModelParseError) {
       return NextResponse.json({ error: message }, { status: 400 });
     }
-    console.error("Image generation route error:", err);
-    return NextResponse.json({ error: message }, { status: 500 });
+    const response = apiErrorResponse(err, "Failed to generate image");
+    if (response.status >= 500) console.error("Image generation route error:", err);
+    return NextResponse.json(response.body, { status: response.status });
   }
 }
 

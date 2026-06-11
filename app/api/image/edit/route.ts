@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { apiErrorResponse, badRequest, requireApiText } from "@/lib/api/errors";
 import { editImage } from "@/lib/providers/image";
 import { parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
-import { dataUriToBlob, optionalText, requireText, resolveProviderConfig } from "@/lib/providers/utils";
+import { dataUriToBlob, optionalText, resolveProviderConfig } from "@/lib/providers/utils";
 import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, getReferenceImagePayloadError } from "@/lib/reference-images";
 import type { ImageEditOperation } from "@/lib/providers/types";
 
@@ -29,8 +30,8 @@ export async function POST(req: NextRequest) {
 
     const body = (await req.json()) as EditImageBody;
     const operation = readOperation(body.operation);
-    const modelValue = requireText(body.model, "model");
-    const image = requireText(body.image, "image");
+    const modelValue = requireApiText(body.model, "model");
+    const image = requireApiText(body.image, "image");
     const mask = optionalText(body.mask);
     const guide = optionalText(body.guide);
     const prompt = optionalText(body.prompt);
@@ -40,6 +41,12 @@ export async function POST(req: NextRequest) {
     if (payloadError) return NextResponse.json({ error: payloadError }, { status: 413 });
 
     const parsed = parseProviderModel(modelValue, "12ai");
+    if (parsed.provider === "runninghub") {
+      throw badRequest(
+        "RunningHub quick image edits require /api/media/generate-image with an image-to-image Standard Model, AI App, or workflow target",
+        "unsupported_image_edit_provider",
+      );
+    }
     const config = resolveProviderConfig(req, parsed.provider);
     const result = await editImage(config, {
       operation,
@@ -72,8 +79,9 @@ export async function POST(req: NextRequest) {
     if (error instanceof ImageEditRequestValidationError || error instanceof ProviderModelParseError) {
       return NextResponse.json({ error: message }, { status: 400 });
     }
-    console.error("Image edit route error:", error);
-    return NextResponse.json({ error: message }, { status: 500 });
+    const response = apiErrorResponse(error, "Failed to edit image");
+    if (response.status >= 500) console.error("Image edit route error:", error);
+    return NextResponse.json(response.body, { status: response.status });
   }
 }
 

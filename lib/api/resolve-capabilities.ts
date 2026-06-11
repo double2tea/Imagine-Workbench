@@ -25,8 +25,17 @@ export interface ResolveBridgeOperationContract {
   resultKind: ResolveBridgeResultKind;
   requiresPrompt: boolean;
   acceptsReferenceMedia: boolean;
+  mediaInput?: ResolveBridgeMediaInputContract;
   async: boolean;
   clientModes: ResolveBridgeClientMode[];
+}
+
+export interface ResolveBridgeMediaInputContract {
+  sourceField?: string;
+  referencesField?: string;
+  firstReferenceRole?: "source_image" | "reference_media";
+  additionalReferenceRole?: "visual_reference" | "reference_media";
+  supportsMask?: boolean;
 }
 
 export interface ResolveBridgeCapabilities {
@@ -72,6 +81,13 @@ export function getResolveBridgeCapabilities(): ResolveBridgeCapabilities {
         resultKind: "image",
         requiresPrompt: true,
         acceptsReferenceMedia: true,
+        mediaInput: {
+          sourceField: "image",
+          referencesField: "image[]",
+          firstReferenceRole: "source_image",
+          additionalReferenceRole: "visual_reference",
+          supportsMask: true,
+        },
         async: false,
         clientModes: CLIENT_MODES,
       },

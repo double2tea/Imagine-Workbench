@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { apiErrorResponse, badRequest, requireApiText } from "@/lib/api/errors";
 import { downloadImage } from "@/lib/providers/image";
-import { parseMediaOperationName, requireText, resolveProviderConfig } from "@/lib/providers/utils";
+import { parseMediaOperationName, resolveProviderConfig } from "@/lib/providers/utils";
 
 export const runtime = "edge";
 
@@ -11,16 +12,24 @@ interface DownloadBody {
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as DownloadBody;
-    const operation = parseMediaOperationName(requireText(body.operationName, "operationName"));
+    const operation = parseDownloadOperationName(requireApiText(body.operationName, "operationName"));
     if (operation.mediaType !== "image") {
-      return NextResponse.json({ error: "Only image operations can be downloaded" }, { status: 400 });
+      throw badRequest("Only image operations can be downloaded", "invalid_media_type");
     }
 
     const config = resolveProviderConfig(req, operation.provider);
     return await downloadImage(config, operation.id);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to download image file";
-    console.error("Image proxy download failed:", err);
-    return NextResponse.json({ error: message }, { status: 500 });
+    const response = apiErrorResponse(err, "Failed to download image file");
+    if (response.status >= 500) console.error("Image proxy download failed:", err);
+    return NextResponse.json(response.body, { status: response.status });
+  }
+}
+
+function parseDownloadOperationName(operationName: string): ReturnType<typeof parseMediaOperationName> {
+  try {
+    return parseMediaOperationName(operationName);
+  } catch {
+    throw badRequest("Unsupported media operation name", "invalid_operation_name");
   }
 }

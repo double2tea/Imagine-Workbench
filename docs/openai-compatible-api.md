@@ -53,13 +53,15 @@ Returns an OpenAI-shaped model list.
 
 Query parameters:
 
-- `provider`: provider key, defaults to `12ai`
+- `provider`: `all` or a provider key; defaults to `all`
 - `kind`: `chat`, `image`, `video`, `audio`, or `all`; defaults to `chat`
+
+When `provider` is omitted or set to `all`, the route returns the Workbench-known provider/model catalog across currently registered providers. Use `provider=<key>` when you want that provider's dedicated dynamic model listing behavior.
 
 Example:
 
 ```bash
-curl "http://localhost:3000/v1/models?provider=mimo&kind=audio" \
+curl "http://localhost:3000/v1/models?kind=all" \
   -H "Authorization: Bearer $OPENAI_COMPAT_API_KEY"
 ```
 

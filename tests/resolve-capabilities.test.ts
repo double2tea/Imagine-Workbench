@@ -21,6 +21,12 @@ test("Resolve bridge capabilities describe supported operations without provider
     operation.async === true
   ));
   assert.ok(capabilities.operations.some(operation =>
+    operation.id === "edit_image" &&
+    operation.mediaInput?.sourceField === "image" &&
+    operation.mediaInput.referencesField === "image[]" &&
+    operation.mediaInput.supportsMask === true
+  ));
+  assert.ok(capabilities.operations.some(operation =>
     operation.id === "transcribe" &&
     operation.resultKind === "transcript" &&
     operation.requiresPrompt === false

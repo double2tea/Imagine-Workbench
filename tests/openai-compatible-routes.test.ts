@@ -20,10 +20,32 @@ test("OpenAI-compatible model list returns provider-prefixed model ids", async (
   )));
 });
 
+test("OpenAI-compatible model list defaults to all known Workbench provider models", async () => {
+  const response = await listOpenAiModels(new Request("http://local.test/v1/models?kind=all"));
+
+  assert.equal(response.status, 200);
+  const body = await response.json() as {
+    object?: unknown;
+    data?: Array<{ id?: unknown; owned_by?: unknown }>;
+  };
+  assert.equal(body.object, "list");
+  assert.ok(body.data?.some(model => model.id === "12ai:gemini-3.1-flash-image-preview"));
+  assert.ok(body.data?.some(model => model.id === "mimo:mimo-v2.5-tts"));
+  assert.ok(body.data?.some(model => model.id === "runninghub:ai-app-image:<webappId>"));
+});
+
+test("OpenAI-compatible model list accepts provider=all explicitly", async () => {
+  const response = await listOpenAiModels(new Request("http://local.test/v1/models?provider=all&kind=audio"));
+
+  assert.equal(response.status, 200);
+  const body = await response.json() as { data?: Array<{ id?: unknown; owned_by?: unknown }> };
+  assert.ok(body.data?.some(model => model.id === "mimo:mimo-v2.5-asr" && model.owned_by === "mimo"));
+});
+
 test("OpenAI-compatible model list validates provider keys", async () => {
   const response = await listOpenAiModels(new Request("http://local.test/v1/models?provider=bad provider"));
   assert.equal(response.status, 400);
-  assert.match(await response.text(), /provider must be a valid provider key/);
+  assert.match(await response.text(), /provider must be all or a valid provider key/);
 });
 
 test("OpenAI-compatible model list separates gateway auth from provider auth", async () => {

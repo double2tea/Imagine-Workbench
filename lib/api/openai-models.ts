@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { apiErrorResponse, badRequest } from "./errors";
 import type { AiProvider } from "../providers/model-catalog";
 import { parseProviderModel } from "../providers/model-catalog";
-import { isProviderKey } from "../providers/registry";
-import { listProviderModels, type ModelKindFilter } from "../providers/models";
+import { isProviderKey, PROVIDER_KEYS } from "../providers/registry";
+import { listProviderModels, listStaticProviderModels, type ModelKindFilter } from "../providers/models";
 import { resolveProviderConfig } from "../providers/utils";
 import { assertOpenAiCompatibleGatewayAccess } from "./openai-auth";
 
@@ -19,15 +19,16 @@ export async function GET(req: Request) {
     const provider = readProvider(req);
     const kind = readKind(req);
     const gatewayKey = assertOpenAiCompatibleGatewayAccess(req);
-    const config = resolveProviderConfig(req, provider, { ignoredBearerToken: gatewayKey });
-    const models = await listProviderModels(config, kind);
+    const models = provider === "all"
+      ? listAllKnownProviderModels(kind)
+      : await listSingleProviderModels(req, provider, kind, gatewayKey);
     return NextResponse.json({
       object: "list",
       data: models.map(model => ({
         id: model.value,
         object: "model",
         created: 0,
-        owned_by: readModelProvider(model.value) ?? provider,
+        owned_by: readModelProvider(model.value) ?? "workbench",
       } satisfies OpenAiModel)),
     });
   } catch (err) {
@@ -36,12 +37,12 @@ export async function GET(req: Request) {
   }
 }
 
-function readProvider(req: Request): AiProvider {
+function readProvider(req: Request): AiProvider | "all" {
   const url = new URL(req.url);
   const raw = url.searchParams.get("provider") ?? req.headers.get("x-ai-provider");
-  if (!raw) return "12ai";
+  if (!raw || raw === "all") return "all";
   if (isProviderKey(raw)) return raw;
-  throw badRequest("provider must be a valid provider key", "invalid_provider");
+  throw badRequest("provider must be all or a valid provider key", "invalid_provider");
 }
 
 function readKind(req: Request): ModelKindFilter {
@@ -58,4 +59,18 @@ function readModelProvider(model: string): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+async function listSingleProviderModels(
+  req: Request,
+  provider: AiProvider,
+  kind: ModelKindFilter,
+  gatewayKey: string | undefined,
+) {
+  const config = resolveProviderConfig(req, provider, { ignoredBearerToken: gatewayKey });
+  return listProviderModels(config, kind);
+}
+
+function listAllKnownProviderModels(kind: ModelKindFilter) {
+  return PROVIDER_KEYS.flatMap(provider => listStaticProviderModels(provider, kind));
 }

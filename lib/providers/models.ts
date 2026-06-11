@@ -22,10 +22,10 @@ export async function listProviderModels(config: ProviderConfig, kind: ModelKind
     return listModelScopeModels(config, kind);
   }
   if (config.provider === "agnes") {
-    return staticProviderModels(config.provider, kind);
+    return listStaticProviderModels(config.provider, kind);
   }
   if (config.provider === "mimo") {
-    return staticProviderModels(config.provider, kind);
+    return listStaticProviderModels(config.provider, kind);
   }
 
   const response = await getJson<OpenAiModelsResponse>(openAiCompatibleUrl(config.baseUrl, "/v1/models"), config);
@@ -51,7 +51,7 @@ async function listModelScopeModels(config: ProviderConfig, kind: ModelKindFilte
         ? response.models
         : [];
   const options = rawModels.flatMap(item => readModelId(item, config.provider, kind, providerLabel(config)));
-  return dedupeOptions(options.length > 0 ? options : staticProviderModels(config.provider, kind));
+  return dedupeOptions(options.length > 0 ? options : listStaticProviderModels(config.provider, kind));
 }
 
 async function listRunningHubModels(config: ProviderConfig, kind: ModelKindFilter): Promise<ModelOption[]> {
@@ -61,10 +61,10 @@ async function listRunningHubModels(config: ProviderConfig, kind: ModelKindFilte
   if (kind === "all") {
     return dedupeOptions([
       ...(await listRunningHubChatModels(config)),
-      ...staticProviderModels(config.provider, kind),
+      ...listStaticProviderModels(config.provider, kind),
     ]);
   }
-  return staticProviderModels(config.provider, kind);
+  return listStaticProviderModels(config.provider, kind);
 }
 
 async function listRunningHubChatModels(config: ProviderConfig): Promise<ModelOption[]> {
@@ -79,7 +79,7 @@ async function listRunningHubChatModels(config: ProviderConfig): Promise<ModelOp
   return dedupeOptions(options);
 }
 
-function staticProviderModels(provider: AiProvider, kind: ModelKindFilter): ModelOption[] {
+export function listStaticProviderModels(provider: AiProvider, kind: ModelKindFilter): ModelOption[] {
   if (provider === "runninghub") return runningHubStaticModels(kind);
   if (provider === "modelscope") return modelScopeStaticModels(kind);
 

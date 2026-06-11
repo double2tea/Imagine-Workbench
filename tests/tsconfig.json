@@ -24,6 +24,7 @@
     "./openrouter-capabilities.test.ts",
     "./openai-media-routes.test.ts",
     "./openai-compatible-routes.test.ts",
+    "./media-route-errors.test.ts",
     "./pricing.test.ts",
     "./resolve-capabilities.test.ts",
     "./board-graph-content-key.test.ts",
