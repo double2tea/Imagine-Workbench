@@ -111,7 +111,7 @@ const PromptTemplatePicker = forwardRef<PromptTemplatePickerHandle, PromptTempla
   const panel = isOpen && position
     ? createPortal(
       <div
-        className="fixed z-[120] flex max-h-[min(27.5rem,calc(100vh-1rem))] w-[min(26.25rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-lg border border-[var(--iw-border)] bg-[var(--iw-surface-raised)] shadow-[0_22px_60px_rgba(15,23,42,0.28)] backdrop-blur-xl"
+        className="imagine-motion-surface-reveal fixed z-[120] flex max-h-[min(27.5rem,calc(100vh-1rem))] w-[min(26.25rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-lg border border-[var(--iw-border)] bg-[var(--iw-surface-raised)] shadow-[0_22px_60px_rgba(15,23,42,0.28)] backdrop-blur-xl"
         style={{ left: position.left, top: position.top }}
       >
         <div className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-[var(--iw-border)] px-3">
@@ -122,7 +122,7 @@ const PromptTemplatePicker = forwardRef<PromptTemplatePickerHandle, PromptTempla
           <button
             type="button"
             onClick={() => setIsOpen(false)}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-transparent text-[var(--iw-muted)] hover:border-[var(--iw-border)] hover:bg-[var(--iw-panel-soft)] hover:text-[var(--iw-text)]"
+              className="imagine-motion-interactive flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-transparent text-[var(--iw-muted)] hover:border-[var(--iw-border)] hover:bg-[var(--iw-panel-soft)] hover:text-[var(--iw-text)]"
             aria-label="关闭提示词模板库"
           >
             <X className="h-3.5 w-3.5" />
@@ -145,7 +145,7 @@ const PromptTemplatePicker = forwardRef<PromptTemplatePickerHandle, PromptTempla
               type="button"
               onClick={() => setCategoryId("all")}
               data-active={categoryId === "all"}
-              className="h-7 shrink-0 rounded-md border border-transparent px-2.5 text-[11px] font-semibold text-[var(--iw-muted)] transition hover:bg-[var(--iw-panel-soft)] data-[active=true]:border-blue-400/25 data-[active=true]:bg-blue-500/12 data-[active=true]:text-blue-500"
+              className="imagine-motion-interactive h-7 shrink-0 rounded-md border border-transparent px-2.5 text-[11px] font-semibold text-[var(--iw-muted)] hover:bg-[var(--iw-panel-soft)] data-[active=true]:border-blue-400/25 data-[active=true]:bg-blue-500/12 data-[active=true]:text-blue-500"
             >
               全部
             </button>
@@ -155,7 +155,7 @@ const PromptTemplatePicker = forwardRef<PromptTemplatePickerHandle, PromptTempla
                 type="button"
                 onClick={() => setCategoryId(category.id)}
                 data-active={categoryId === category.id}
-                className="h-7 shrink-0 rounded-md border border-transparent px-2.5 text-[11px] font-semibold text-[var(--iw-muted)] transition hover:bg-[var(--iw-panel-soft)] data-[active=true]:border-blue-400/25 data-[active=true]:bg-blue-500/12 data-[active=true]:text-blue-500"
+                className="imagine-motion-interactive h-7 shrink-0 rounded-md border border-transparent px-2.5 text-[11px] font-semibold text-[var(--iw-muted)] hover:bg-[var(--iw-panel-soft)] data-[active=true]:border-blue-400/25 data-[active=true]:bg-blue-500/12 data-[active=true]:text-blue-500"
               >
                 {category.label}
               </button>
@@ -170,7 +170,7 @@ const PromptTemplatePicker = forwardRef<PromptTemplatePickerHandle, PromptTempla
                   type="button"
                   onClick={() => setSelectedId(template.id)}
                   data-active={selectedTemplate?.id === template.id}
-                  className="w-full rounded-md px-2 py-1.5 text-left transition hover:bg-[var(--iw-panel)] data-[active=true]:bg-blue-500/12"
+                  className="imagine-motion-interactive w-full rounded-md px-2 py-1.5 text-left hover:bg-[var(--iw-panel)] data-[active=true]:bg-blue-500/12"
                 >
                   <span className="block truncate text-[11px] font-semibold text-[var(--iw-text)]">{template.title}</span>
                   <span className="mt-0.5 block truncate text-[9px] text-[var(--iw-muted)]">{template.scene}</span>
@@ -210,7 +210,7 @@ const PromptTemplatePicker = forwardRef<PromptTemplatePickerHandle, PromptTempla
               type="button"
               onClick={() => applyTemplate("insert")}
               disabled={!selectedTemplate}
-              className="flex h-8 items-center gap-1.5 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-3 text-[11px] font-semibold text-[var(--iw-text)] hover:bg-[var(--iw-panel)] disabled:text-[var(--iw-faint)]"
+              className="imagine-motion-interactive flex h-8 items-center gap-1.5 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-3 text-[11px] font-semibold text-[var(--iw-text)] hover:bg-[var(--iw-panel)] disabled:text-[var(--iw-faint)]"
             >
               <CornerDownLeft className="h-3.5 w-3.5" />
               插入
@@ -219,7 +219,7 @@ const PromptTemplatePicker = forwardRef<PromptTemplatePickerHandle, PromptTempla
               type="button"
               onClick={() => applyTemplate("replace")}
               disabled={!selectedTemplate}
-              className="flex h-8 items-center gap-1.5 rounded-md bg-blue-600 px-3 text-[11px] font-semibold text-white hover:bg-blue-500 disabled:bg-[var(--iw-panel-soft)] disabled:text-[var(--iw-faint)]"
+              className="imagine-motion-interactive flex h-8 items-center gap-1.5 rounded-md bg-blue-600 px-3 text-[11px] font-semibold text-white hover:bg-blue-500 disabled:bg-[var(--iw-panel-soft)] disabled:text-[var(--iw-faint)]"
             >
               <WandSparkles className="h-3.5 w-3.5" />
               替换
