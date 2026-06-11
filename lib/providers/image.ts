@@ -8,7 +8,7 @@ import {
   resolveRunningHubStandardModelForReferenceMedia,
   validateRunningHubStandardReferenceCount,
 } from "./runninghub";
-import type { EditImageInput, GenerateImageInput, GenerateImageResult, MediaStatusResult, ProviderConfig, ProviderMediaType, ReferenceMedia, RunningHubTaskNodeBinding } from "./types";
+import type { EditImageInput, GenerateImageInput, GenerateImageResult, MediaStatusResult, ProviderConfig, ProviderMediaType, ReferenceImage, ReferenceMedia, RunningHubTaskNodeBinding } from "./types";
 import { mediaReferenceFileExtension, mediaReferenceLabel, mediaReferenceTypeFromMime } from "../media-references";
 import {
   dataUriToBlob,
@@ -254,36 +254,42 @@ function editInputToGenerateInput(input: EditImageInput): GenerateImageInput {
     aspectRatio: "auto",
     imageResolution: input.imageResolution,
     imageQuality: input.imageQuality,
-    referenceImages: [input.image, ...(input.mask ? [input.mask] : []), ...(input.guide ? [input.guide] : [])],
+    referenceImages: [input.image, ...(input.mask ? [input.mask] : []), ...editInputGuides(input)],
     async: false,
   };
 }
 
 function buildImageEditPrompt(input: EditImageInput): string {
   const userPrompt = input.prompt?.trim();
+  const maskText = input.mask
+    ? "The second input image is a black and white mask only; it is not a style or content reference."
+    : "No mask image is provided.";
+  const guideText = editInputGuides(input).length > 0
+    ? "Additional input images are visual references for content, style, or composition."
+    : "No additional visual reference images are provided.";
   if (input.operation === "redraw") {
     return [
       "The first input image is the source image to edit.",
-      "The second input image, when provided, is a black and white mask only; it is not a style or content reference.",
-      "The third input image, when provided, is the same source with a red overlay showing the exact edit region.",
-      "Change only the white masked region and preserve the rest of the image.",
+      maskText,
+      guideText,
+      input.mask ? "Change only the white masked region and preserve the rest of the image." : "Edit the source image according to the instruction while preserving its identity and composition.",
       userPrompt ? `Edit instruction: ${userPrompt}` : "Edit instruction: redraw the masked area naturally.",
     ].join("\n");
   }
   if (input.operation === "erase") {
     return [
       "The first input image is the source image to edit.",
-      "The second input image, when provided, is a black and white mask only; it is not a style or content reference.",
-      "The third input image, when provided, is the same source with a red overlay showing the exact erase region.",
-      "Remove the white masked object or area and reconstruct the background naturally.",
+      maskText,
+      guideText,
+      input.mask ? "Remove the white masked object or area and reconstruct the background naturally." : "Remove the object or area described by the instruction and reconstruct the background naturally.",
       "Preserve the unmasked image exactly as much as possible.",
     ].join("\n");
   }
   if (input.operation === "outpaint") {
     return [
       "The first input image is the expanded source canvas to outpaint.",
-      "The second input image, when provided, is a black and white mask only; white areas are the new canvas space to fill.",
-      "The third input image, when provided, is the same canvas with a red overlay showing the expansion/edit region.",
+      input.mask ? "The second input image is a black and white mask only; white areas are the new canvas space to fill." : "No mask image is provided.",
+      guideText,
       "Extend the scene naturally with matching perspective, lighting, texture, and camera style.",
       userPrompt ? `Outpaint instruction: ${userPrompt}` : "Outpaint instruction: continue the image beyond its original frame.",
     ].join("\n");
@@ -293,6 +299,10 @@ function buildImageEditPrompt(input: EditImageInput): string {
     "Return a clean cutout-style result with a transparent or plain neutral background if transparency is unavailable.",
     userPrompt ? `Subject guidance: ${userPrompt}` : "",
   ].filter(Boolean).join("\n");
+}
+
+function editInputGuides(input: EditImageInput): ReferenceImage[] {
+  return [...(input.guide ? [input.guide] : []), ...(input.guides ?? [])];
 }
 
 export async function downloadRunningHubMedia(
@@ -1250,21 +1260,27 @@ async function editOpenAiCompatibleImageWithOperation(
     form.set("quality", normalizeOpenAiImageQuality(input.imageQuality));
   }
 
+  const imageFieldName = openAiEditImageFieldName(provider, editInputGuides(input).length);
   const imageBlob = dataUriToBlob(input.image.dataUri);
-  form.append(provider === "grok2api" ? "image[]" : "image", imageBlob, "image.png");
+  form.append(imageFieldName, imageBlob, "image.png");
   if (input.mask && provider !== "grok2api") {
     form.append("mask", dataUriToBlob(input.mask.dataUri), "mask.png");
   } else if (input.mask && provider === "grok2api") {
     form.append("image[]", dataUriToBlob(input.mask.dataUri), "mask.png");
   }
-  if (input.guide) {
-    form.append(provider === "grok2api" ? "image[]" : "image", dataUriToBlob(input.guide.dataUri), "guide.png");
-  }
+  editInputGuides(input).forEach((guide, index) => {
+    form.append(imageFieldName, dataUriToBlob(guide.dataUri), `reference_${index + 1}.png`);
+  });
 
   const response = await postForm<OpenAiImageResponse>(openAiCompatibleUrl(config.baseUrl, "/v1/images/edits"), config, form);
   const imageUrl = readOpenAiImageUrl(response);
   if (imageUrl) return { imageUrl, source: input.model };
   throw new Error("Image edit response did not include b64_json or url");
+}
+
+function openAiEditImageFieldName(provider: AiProvider, guideCount: number): "image" | "image[]" {
+  if (provider === "grok2api" || guideCount > 0) return "image[]";
+  return "image";
 }
 
 function openAiEditImageSize(provider: AiProvider, imageResolution: string): string {

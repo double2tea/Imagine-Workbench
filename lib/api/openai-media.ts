@@ -29,7 +29,7 @@ const speechSchema = z.object({
   voice: z.string().trim().min(1).optional(),
 }).strict();
 
-const IMAGE_EDIT_FORM_FIELDS = new Set(["image", "mask", "model", "n", "operation", "prompt", "quality", "response_format", "size"]);
+const IMAGE_EDIT_FORM_FIELDS = new Set(["image", "image[]", "mask", "model", "n", "operation", "prompt", "quality", "response_format", "size"]);
 const TRANSCRIPTION_FORM_FIELDS = new Set(["file", "language", "model", "prompt", "response_format"]);
 
 type ImageResponseFormat = "url" | "b64_json";
@@ -90,15 +90,16 @@ export async function postOpenAiImageEdits(req: Request): Promise<Response> {
     const parsed = parseProviderModel(modelValue, "12ai");
     assertImmediateOpenAiImageTarget(parsed.provider, parsed.async, "/v1/images/edits");
     const config = resolveProviderConfig(req, parsed.provider, { ignoredBearerToken: gatewayKey });
-    const image = await readRequiredFileDataUri(form, "image", "image/png");
+    const images = await readRequiredImageEditDataUris(form);
     const mask = await readOptionalFileDataUri(form, "mask", "image/png");
     const imageResolution = readOptionalFormText(form, "size") ?? "1024x1024";
     const result = await editImage(config, {
       operation,
       prompt,
       model: parsed.model,
-      image: { dataUri: image },
+      image: { dataUri: images[0] },
       ...(mask ? { mask: { dataUri: mask } } : {}),
+      ...(images.length > 1 ? { guides: images.slice(1).map(dataUri => ({ dataUri })) } : {}),
       imageResolution,
       imageQuality: readOptionalFormText(form, "quality"),
     });
@@ -311,6 +312,12 @@ async function readOptionalFileDataUri(form: FormData, fieldName: string, fallba
   if (values.length === 0) return undefined;
   if (values.length !== 1) throw badRequest(`${fieldName} must contain exactly one file`, "invalid_file_count");
   return formValueToDataUri(values[0], fieldName, fallbackMimeType);
+}
+
+async function readRequiredImageEditDataUris(form: FormData): Promise<string[]> {
+  const values = [...form.getAll("image"), ...form.getAll("image[]")];
+  if (values.length === 0) throw badRequest("image must contain at least one file", "missing_required_field");
+  return Promise.all(values.map((value, index) => formValueToDataUri(value, `image[${index}]`, "image/png")));
 }
 
 async function formValueToDataUri(value: FormDataEntryValue, fieldName: string, fallbackMimeType: string): Promise<string> {

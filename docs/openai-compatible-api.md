@@ -96,7 +96,7 @@ Multipart image edit mapped to Workbench edit operations.
 Supported fields:
 
 - `model`
-- `image`
+- `image` or `image[]`; the first image is the source image and later images are visual references
 - `mask`
 - `prompt`
 - `operation`: `redraw`, `erase`, `outpaint`, or `cutout`; defaults to `redraw`
@@ -105,7 +105,7 @@ Supported fields:
 - `quality`
 - `response_format`: `b64_json` or `url`
 
-This is an OpenAI-shaped facade over Workbench edit semantics, not a complete clone of every OpenAI image edit feature.
+This is an OpenAI-shaped facade over Workbench edit semantics, not a complete clone of every OpenAI image edit feature. Multi-image requests are forwarded as OpenAI-style `image[]` uploads to immediate OpenAI-compatible image edit providers.
 
 ### `POST /v1/audio/speech`
 

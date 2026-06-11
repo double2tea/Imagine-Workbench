@@ -62,6 +62,7 @@ export interface EditImageInput {
   image: ReferenceImage;
   mask?: ReferenceImage;
   guide?: ReferenceImage;
+  guides?: ReferenceImage[];
   imageResolution: string;
   imageQuality?: string;
 }

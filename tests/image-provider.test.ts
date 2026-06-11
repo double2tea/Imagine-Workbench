@@ -188,9 +188,9 @@ test("OpenAI-compatible image edit includes guide image when provided", async ()
 
     assert.equal(result.imageUrl, "data:image/png;base64,aW1hZ2U=");
     assert.deepEqual(uploadedFiles, [
-      { field: "image", name: "image.png" },
+      { field: "image[]", name: "image.png" },
       { field: "mask", name: "mask.png" },
-      { field: "image", name: "guide.png" },
+      { field: "image[]", name: "reference_1.png" },
     ]);
   } finally {
     globalThis.fetch = originalFetch;

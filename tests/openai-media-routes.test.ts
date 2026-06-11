@@ -214,6 +214,41 @@ test("OpenAI-compatible image edits accepts multipart image upload", async () =>
   }
 });
 
+test("OpenAI-compatible image edits accepts OpenAI-style multiple image uploads", async () => {
+  const mock = withFetchMock(async (url, init) => {
+    assert.equal(url, "https://newapi.example.test/v1/images/edits");
+    assert.ok(init?.body instanceof FormData);
+    const form = init.body;
+    const images = form.getAll("image[]");
+    assert.equal(images.length, 3);
+    assert.ok(images.every(value => value instanceof Blob));
+    assert.equal(form.get("image"), null);
+    assert.match(String(form.get("prompt")), /Additional input images are visual references/);
+    return jsonResponse({ data: [{ b64_json: "bXVsdGk=" }] });
+  });
+
+  try {
+    const form = new FormData();
+    form.set("model", "newapi:image-edit-model");
+    form.set("prompt", "combine the references");
+    form.append("image[]", new Blob(["source image"], { type: "image/png" }), "source.png");
+    form.append("image[]", new Blob(["reference one"], { type: "image/png" }), "reference-one.png");
+    form.append("image[]", new Blob(["reference two"], { type: "image/png" }), "reference-two.png");
+
+    const response = await postOpenAiImageEdits(formRequest("/v1/images/edits", form, {
+      "x-ai-api-key": "image_key",
+      "x-ai-base-url": "https://newapi.example.test/v1",
+    }));
+    const body = await response.json() as { data?: Array<{ b64_json?: string }> };
+
+    assert.equal(response.status, 200);
+    assert.equal(mock.calls.count, 1);
+    assert.equal(body.data?.[0]?.b64_json, "bXVsdGk=");
+  } finally {
+    mock.restore();
+  }
+});
+
 test("OpenAI-compatible image edits rejects async image targets before provider submission", async () => {
   const mock = withFetchMock(async () => {
     throw new Error("async image edit target must be rejected before fetch");

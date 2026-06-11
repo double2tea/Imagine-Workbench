@@ -145,7 +145,7 @@ Current adapters:
 - Chat: `/v1/chat/completions` (OpenAI-compatible)
 - Model list: `/v1/models` (OpenAI-compatible)
 - External image generation: `/v1/images/generations` for immediate single-image providers only
-- External image editing: `/v1/images/edits` for multipart single-image edits mapped to Workbench edit operations
+- External image editing: `/v1/images/edits` for multipart image edits and OpenAI-style multi-image references mapped to Workbench edit operations
 - External audio speech/transcription: `/v1/audio/speech` and `/v1/audio/transcriptions` for direct MiMo-compatible TTS/ASR
 - 12AI Gemini image: `/v1beta/models/{model}:generateContent`
 - 12AI GPT Image 2: `/v1/images/generations`, `/v1/images/edits`
@@ -237,7 +237,7 @@ DaVinci Resolve integration starts with [DaVinci Resolve Bridge](docs/resolve-br
 - `POST /api/agent/respond`: Agent Mode response and recommended action.
 - `POST /v1/chat/completions`: OpenAI-compatible chat completions gateway for plugin/external callers.
 - `POST /v1/images/generations`: OpenAI-compatible immediate single-image generation. Supports `n=1`; async/workflow image models should use `/api/media/generate-image`.
-- `POST /v1/images/edits`: OpenAI-compatible multipart image editing. Defaults to Workbench redraw semantics and accepts explicit `operation=redraw|erase|outpaint|cutout`.
+- `POST /v1/images/edits`: OpenAI-compatible multipart image editing. Defaults to Workbench redraw semantics, accepts explicit `operation=redraw|erase|outpaint|cutout`, and supports multi-image `image[]` references.
 - `POST /v1/audio/speech`: OpenAI-compatible text-to-speech for direct MiMo-compatible TTS models.
 - `POST /v1/audio/transcriptions`: OpenAI-compatible multipart ASR for direct MiMo-compatible ASR models. Supports `language=auto|zh|en` and JSON output.
 - `GET /v1/models?provider=<key>&kind=chat|all`: OpenAI-compatible model list response with provider-prefixed model IDs.
