@@ -223,6 +223,9 @@ interface BoardSelectionSnapshot {
   nodeIds: string[];
 }
 
+type BoardReferenceFlowData = Pick<BoardFlowNode["data"], "generateInputSummary" | "generateReferences" | "promptReferences">;
+type BoardMediaFlowData = Pick<BoardFlowNode["data"], "assetStackItems" | "compareReferenceUrl" | "connectedResultNodeId" | "hasResultConnection" | "resultItems">;
+
 interface MultiGridCellDropTarget {
   cellIndex: number;
   rect: DOMRect;
@@ -230,6 +233,7 @@ interface MultiGridCellDropTarget {
 }
 
 const SELECTION_TOOLBAR_GAP = 44;
+const EMPTY_STORAGE_ITEMS: StorageItem[] = [];
 
 function sameStringList(left: string[], right: string[]): boolean {
   if (left.length !== right.length) return false;
@@ -267,6 +271,8 @@ function sameReferenceList(
   left: BoardFlowNode["data"]["generateReferences"],
   right: BoardFlowNode["data"]["generateReferences"],
 ): boolean {
+  if (left === right) return true;
+  if (!left || !right) return false;
   if (left.length !== right.length) return false;
   return left.every((reference, index) => {
     const other = right[index];
@@ -296,7 +302,27 @@ function resolveBoardPromptReferenceUrls(
   });
 }
 
-function sameResultItemList(left: StorageItem[], right: StorageItem[]): boolean {
+function completeStorageItemsForAssetIds(
+  assetIds: string[],
+  galleryItemById: ReadonlyMap<string, StorageItem>,
+): StorageItem[] {
+  const items = assetIds
+    .map(id => galleryItemById.get(id))
+    .filter((item): item is StorageItem => item !== undefined && item.status === "complete");
+  return items.length > 0 ? items : EMPTY_STORAGE_ITEMS;
+}
+
+function storageItemStackForAssetId(
+  assetId: string,
+  galleryItemById: ReadonlyMap<string, StorageItem>,
+): StorageItem[] {
+  const item = galleryItemById.get(assetId);
+  return item ? [item] : EMPTY_STORAGE_ITEMS;
+}
+
+function sameResultItemList(left: StorageItem[] | undefined, right: StorageItem[] | undefined): boolean {
+  if (left === right) return true;
+  if (!left || !right) return false;
   if (left.length !== right.length) return false;
   return left.every((item, index) => {
     const other = right[index];
@@ -1345,74 +1371,86 @@ export default function BoardWorkspace({
     connectPorts(from, to);
   }, [board.edges, board.nodes, connectPorts]);
 
-  const flowNodeDataById = useMemo(() => {
-    const dataById = new Map<string, BoardFlowNode["data"]>();
+  const resultNodeBySourceId = useMemo(() => {
     const resultNodeBySourceId = new Map<string, BoardNodeModel & { kind: "result" }>();
     for (const node of board.nodes) {
       if (node.kind === "result") resultNodeBySourceId.set(node.sourceNodeId, node);
     }
+    return resultNodeBySourceId;
+    // board.nodes read inside; graph content key gates source/result stack changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boardGraphContentKey]);
 
-    // Pre-compute references for all prompt/generate nodes in one pass through the graph index
-    const generateRefsByNodeId = new Map<string, BoardPromptReference[]>();
-    const promptRefsByNodeId = new Map<string, BoardPromptReference[]>();
+  const referenceFlowDataByNodeId = useMemo(() => {
+    const dataById = new Map<string, BoardReferenceFlowData>();
     for (const node of board.nodes) {
       if (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation" || node.kind === "runninghub-app") {
-        generateRefsByNodeId.set(node.id, resolveBoardPromptReferenceUrls(buildBoardPromptReferences({
-          nodes: board.nodes,
-          edges: board.edges,
-          focus: { kind: "generate", nodeId: node.id },
-          galleryItems: galleryReferenceItems,
-          index: boardPromptReferenceGraphIndex,
-        }), galleryItemById));
+        dataById.set(node.id, {
+          generateInputSummary: generateInputSummaryForNode(node, boardPromptReferenceGraphIndex),
+          generateReferences: resolveBoardPromptReferenceUrls(buildBoardPromptReferences({
+            nodes: board.nodes,
+            edges: board.edges,
+            focus: { kind: "generate", nodeId: node.id },
+            galleryItems: galleryReferenceItems,
+            index: boardPromptReferenceGraphIndex,
+          }), galleryItemById),
+        });
       } else if (node.kind === "prompt") {
-        promptRefsByNodeId.set(node.id, resolveBoardPromptReferenceUrls(buildBoardPromptReferences({
-          nodes: board.nodes,
-          edges: board.edges,
-          focus: { kind: "prompt", nodeId: node.id },
-          galleryItems: galleryReferenceItems,
-          index: boardPromptReferenceGraphIndex,
-        }), galleryItemById));
+        dataById.set(node.id, {
+          promptReferences: resolveBoardPromptReferenceUrls(buildBoardPromptReferences({
+            nodes: board.nodes,
+            edges: board.edges,
+            focus: { kind: "prompt", nodeId: node.id },
+            galleryItems: galleryReferenceItems,
+            index: boardPromptReferenceGraphIndex,
+          }), galleryItemById),
+        });
       }
     }
+    return dataById;
+    // board.nodes/edges read inside; graph content + gallery reference fingerprints gate rebuilds
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boardGraphContentKey, boardPromptReferenceGraphIndex, galleryReferenceFingerprint, galleryReferenceItems, galleryItemById]);
 
+  const mediaFlowDataByNodeId = useMemo(() => {
+    const dataById = new Map<string, BoardMediaFlowData>();
     for (const node of board.nodes) {
       const connectedResultNode = node.kind === "result" ? node : resultNodeBySourceId.get(node.id);
-      const resultAssetIds = node.kind === "result"
-        ? node.resultAssetIds
-        : connectedResultNode?.resultAssetIds;
-      const assetStackItems = node.kind === "asset"
-        ? [galleryItemById.get(node.asset.assetId)].filter((item): item is StorageItem => item !== undefined)
-        : resultAssetIds
-          ? resultAssetIds.map(id => galleryItemById.get(id)).filter((item): item is StorageItem => item !== undefined && item.status === "complete")
-          : [];
+      const data: BoardMediaFlowData = {};
+      if (node.kind === "asset") {
+        data.assetStackItems = storageItemStackForAssetId(node.asset.assetId, galleryItemById);
+        data.compareReferenceUrl = node.asset.type === "image"
+          ? assetCompareReferenceUrl(node.id, board.nodes, board.edges, boardPromptReferenceGraphIndex)
+          : null;
+      } else if (node.kind === "result") {
+        data.assetStackItems = completeStorageItemsForAssetIds(node.resultAssetIds, galleryItemById);
+      }
+      if (connectedResultNode) {
+        data.connectedResultNodeId = connectedResultNode.id;
+        data.hasResultConnection = true;
+        data.resultItems = completeStorageItemsForAssetIds(connectedResultNode.resultAssetIds, galleryItemById);
+      }
+      if (Object.keys(data).length > 0) dataById.set(node.id, data);
+    }
+    return dataById;
+    // board.nodes/edges read inside; graph content + gallery item fingerprints gate result/media display data
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boardGraphContentKey, boardPromptReferenceGraphIndex, galleryReferenceFingerprint, galleryTaskFingerprint, galleryItemById, resultNodeBySourceId]);
+
+  const flowNodeDataById = useMemo(() => {
+    const dataById = new Map<string, BoardFlowNode["data"]>();
+    for (const node of board.nodes) {
       dataById.set(node.id, {
         boardId: board.id,
-        connectedResultNodeId: connectedResultNode?.id,
-        generateInputSummary: generateInputSummaryForNode(node, boardPromptReferenceGraphIndex),
-        hasResultConnection: connectedResultNode !== undefined,
-        assetStackItems,
         node,
-        resultItems: connectedResultNode
-          ? connectedResultNode.resultAssetIds.map(id => galleryItemById.get(id)).filter((item): item is StorageItem => item !== undefined && item.status === "complete")
-          : [],
-        generateReferences: generateRefsByNodeId.get(node.id) ?? [],
-        promptReferences: promptRefsByNodeId.get(node.id) ?? [],
-        compareReferenceUrl:
-          node.kind === "asset" && node.asset.type === "image"
-            ? assetCompareReferenceUrl(node.id, board.nodes, board.edges, boardPromptReferenceGraphIndex)
-            : null,
+        ...referenceFlowDataByNodeId.get(node.id),
+        ...mediaFlowDataByNodeId.get(node.id),
       });
     }
     return dataById;
+    // board.nodes read inside; graph content gates data shape, geometry is merged in flowNodes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    boardGraphContentKey,
-    boardPromptReferenceGraphIndex,
-    galleryReferenceFingerprint,
-    galleryReferenceItems,
-    galleryTaskFingerprint,
-    galleryItemById,
-  ]);
+  }, [board.id, boardGraphContentKey, referenceFlowDataByNodeId, mediaFlowDataByNodeId]);
 
   const boardNodeCallbacks = useMemo<BoardNodeCallbacks>(() => ({
     onCaptureVideoFrame,

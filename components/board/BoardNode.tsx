@@ -28,19 +28,22 @@ export interface BoardFlowNodeData extends Record<string, unknown> {
   boardId: string;
   compareReferenceUrl?: string | null;
   generateInputSummary?: BoardGenerateInputSummary;
-  generateReferences: BoardPromptReference[];
+  generateReferences?: BoardPromptReference[];
   generateTaskSummary?: BoardGenerateTaskSummary;
   connectedResultNodeId?: string;
   hasResultConnection?: boolean;
   node: BoardNodeModel;
-  promptReferences: BoardPromptReference[];
-  assetStackItems: StorageItem[];
-  resultItems: StorageItem[];
+  promptReferences?: BoardPromptReference[];
+  assetStackItems?: StorageItem[];
+  resultItems?: StorageItem[];
 }
 
 export type BoardFlowNode = Node<BoardFlowNodeData, "board">;
 
 type BoardHandleZone = "edge" | "segment";
+
+const EMPTY_BOARD_PROMPT_REFERENCES: BoardPromptReference[] = [];
+const EMPTY_STORAGE_ITEMS: StorageItem[] = [];
 
 interface BoardHandleProps {
   id: string;
@@ -430,7 +433,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             isSelected={selected === true}
             node={node}
             activeStackAssetId={node.asset.assetId}
-            stackItems={data.assetStackItems}
+            stackItems={data.assetStackItems ?? EMPTY_STORAGE_ITEMS}
             compareReferenceUrl={data.compareReferenceUrl}
             onAnalyzeMedia={c.onAnalyzeBoardMedia}
             onCancelProcessing={c.onCancelAssetTask}
@@ -452,7 +455,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             boardId={data.boardId}
             isSelected={selected === true}
             node={node}
-            stackItems={data.assetStackItems}
+            stackItems={data.assetStackItems ?? EMPTY_STORAGE_ITEMS}
             onAnalyzeMedia={c.onAnalyzeBoardMedia}
             onCaptureVideoFrame={c.onCaptureVideoFrame}
             onImageQuickEdit={c.onImageQuickEdit}
@@ -467,7 +470,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
         {node.kind === "prompt" && (
           <PromptBoardNode
             node={node}
-            references={data.promptReferences}
+            references={data.promptReferences ?? EMPTY_BOARD_PROMPT_REFERENCES}
             onChange={prompt => c.onUpdatePrompt(node.id, prompt)}
             onSelectReference={reference => c.onSelectPromptReference(node.id, reference)}
           />
@@ -494,8 +497,8 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             hasResultConnection={data.hasResultConnection}
             inputSummary={data.generateInputSummary}
             node={node}
-            references={data.generateReferences}
-            resultItems={data.resultItems}
+            references={data.generateReferences ?? EMPTY_BOARD_PROMPT_REFERENCES}
+            resultItems={data.resultItems ?? EMPTY_STORAGE_ITEMS}
             showReferencePreviews={false}
             taskSummary={data.generateTaskSummary}
             onCancel={() => c.onCancelGenerate(node.id)}
@@ -510,13 +513,13 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             hasResultConnection={data.hasResultConnection}
             inputSummary={data.generateInputSummary}
             node={node}
-            references={data.generateReferences}
+            references={data.generateReferences ?? EMPTY_BOARD_PROMPT_REFERENCES}
             onExecute={() => c.onExecuteGenerate(node.id)}
             onFetchAppSchema={c.onFetchRunningHubAppSchema}
             onFocusResultNode={focusConnectedResultNode}
             onSelectReference={reference => c.onSelectPromptReference(node.id, reference)}
             onUpdate={input => c.onUpdateRunningHubApp(node.id, input)}
-            resultItems={data.resultItems}
+            resultItems={data.resultItems ?? EMPTY_STORAGE_ITEMS}
           />
         )}
         {node.kind === "agent" && (
