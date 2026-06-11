@@ -3427,7 +3427,8 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 }
 
 .board-media-node:hover .board-media-stack-switcher,
-.board-media-node:focus-within .board-media-stack-switcher {
+.board-media-node:focus-within .board-media-stack-switcher,
+.board-media-stack-switcher[data-visible="true"] {
   transform: translate(-50%, 0);
 }
 
@@ -3469,21 +3470,22 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 
 .board-canvas.is-node-dragging .board-node-shell,
 .board-canvas.is-node-dragging .board-media-controls,
-.board-canvas.is-node-dragging .board-media-stack-switcher,
 .board-canvas.is-node-dragging .imagine-mark {
   filter: none !important;
   transition: none !important;
   transform: none !important;
 }
 
+.board-canvas.is-node-dragging .board-media-stack-switcher {
+  filter: none !important;
+  transition: none !important;
+  transform: translate(-50%, 0) !important;
+}
+
 .board-canvas.is-node-dragging .board-node-handle {
   filter: none !important;
   transition: none !important;
   transform: var(--board-handle-translate) scale(var(--board-handle-scale)) !important;
-}
-
-.board-canvas.is-node-dragging .board-media-stack-switcher {
-  transform: translate(-50%, 0) !important;
 }
 
 .board-canvas.is-node-dragging .board-node-shell * {

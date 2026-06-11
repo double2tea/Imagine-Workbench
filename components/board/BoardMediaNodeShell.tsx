@@ -104,6 +104,7 @@ export default function BoardMediaNodeShell({
       </div>
       {hasStackSwitcher && (
         <div
+          data-visible={isSelected ? "true" : "false"}
           className={[
             "board-media-stack-switcher nodrag absolute -bottom-8 left-1/2 z-40 flex gap-1.5 rounded-full border border-white/10 bg-slate-950/72 px-2.5 py-1.5 text-[10px] font-semibold text-white/90 shadow-xl backdrop-blur transition-opacity duration-200",
             isSelected
