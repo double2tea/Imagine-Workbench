@@ -20,6 +20,15 @@
     "tts": "mimo:mimo-v2.5-tts",
     "transcribe": "mimo:mimo-v2.5-asr"
   };
+  var MODEL_OPTIONS = {
+    "generate-image": [DEFAULT_MODELS["generate-image"]],
+    "image-to-image": [DEFAULT_MODELS["image-to-image"]],
+    "edit-image": [DEFAULT_MODELS["edit-image"]],
+    "ai-lut": [DEFAULT_MODELS["ai-lut"]],
+    "generate-video": [DEFAULT_MODELS["generate-video"]],
+    "tts": [DEFAULT_MODELS.tts],
+    "transcribe": [DEFAULT_MODELS.transcribe]
+  };
   var OPERATION_CAPABILITY_IDS = {
     "generate-image": "generate_image",
     "image-to-image": "edit_image",
@@ -205,6 +214,9 @@
   var lookPresetGrid = document.getElementById("lookPresetGrid");
   var baseUrlInput = document.getElementById("baseUrlInput");
   var outputNameInput = document.getElementById("outputNameInput");
+  var modelField = document.getElementById("modelField");
+  var modelInput = document.getElementById("modelInput");
+  var modelOptions = document.getElementById("modelOptions");
   var twelveApiKeyInput = document.getElementById("twelveApiKeyInput");
   var mimoApiKeyInput = document.getElementById("mimoApiKeyInput");
   var rememberKeysInput = document.getElementById("rememberKeysInput");
@@ -251,6 +263,7 @@
     localStorage.setItem("imagine.resolve.providerBaseUrl", providerBaseUrlInput.value);
     localStorage.setItem("imagine.resolve.providerLabel", providerLabelInput.value);
     localStorage.removeItem("imagine.resolve.providerApiKey");
+    persistModelForOperation(state.operation);
     localStorage.setItem("imagine.resolve.rememberProviderKeys", rememberKeysInput.checked ? "1" : "");
     if (rememberKeysInput.checked) {
       localStorage.setItem("imagine.resolve.twelveApiKey", twelveApiKeyInput.value);
@@ -362,6 +375,36 @@
     });
   }
 
+  function renderModelOptions(operation) {
+    modelOptions.innerHTML = "";
+    (MODEL_OPTIONS[operation] || []).forEach(function (model) {
+      var option = document.createElement("option");
+      option.value = model;
+      modelOptions.appendChild(option);
+    });
+  }
+
+  function selectedModelForOperation(operation) {
+    return localStorage.getItem(modelStorageKey(operation)) || DEFAULT_MODELS[operation] || "";
+  }
+
+  function persistModelForOperation(operation) {
+    if (!OPERATION_CAPABILITY_IDS[operation]) {
+      return;
+    }
+    var value = inputValue(modelInput);
+    var defaultModel = DEFAULT_MODELS[operation] || "";
+    if (!value || value === defaultModel) {
+      localStorage.removeItem(modelStorageKey(operation));
+      return;
+    }
+    localStorage.setItem(modelStorageKey(operation), value);
+  }
+
+  function modelStorageKey(operation) {
+    return "imagine.resolve.model." + operation;
+  }
+
   function selectOperation(operation) {
     state.operation = operation;
     var config = operationConfigs[operation];
@@ -370,6 +413,9 @@
     promptInput.placeholder = config.placeholder;
     promptInput.disabled = !needsPrompt;
     promptInput.value = needsPrompt ? state.promptDraft : "";
+    modelField.classList.toggle("hidden", !OPERATION_CAPABILITY_IDS[operation]);
+    modelInput.value = selectedModelForOperation(operation);
+    renderModelOptions(operation);
     imageOperationField.classList.toggle("hidden", config.imageOperation !== true);
     pollSecondsField.classList.toggle("hidden", config.pollSeconds !== true);
     languageField.classList.toggle("hidden", config.language !== true);
@@ -416,6 +462,9 @@
     }
     if (outputNameInput.value.trim()) {
       job.outputName = outputNameInput.value.trim();
+    }
+    if (OPERATION_CAPABILITY_IDS[operation] && inputValue(modelInput)) {
+      job.model = inputValue(modelInput);
     }
     if (importInput.checked && config.canImport === true) {
       job.importToResolve = true;
@@ -504,17 +553,17 @@
       return doctor(job);
     }
     if (job.operation === "ai-lut") {
-      var lutModel = await modelForOperation(job.baseUrl, job.operation);
+      var lutModel = await modelForOperation(job.baseUrl, job.operation, job.model);
       return applyAiLut(job, lutModel);
     }
     if (job.operation === "edit-image" || job.operation === "image-to-image") {
       requireImageEditPrompt(job);
       var maskResult = await prepareImageEditMask(job);
-      var editModel = await modelForOperation(job.baseUrl, job.operation);
+      var editModel = await modelForOperation(job.baseUrl, job.operation, job.model);
       var editedPath = await editImage(job, editModel, maskResult.imagePath, maskResult.maskPath);
       return [editedPath];
     }
-    var model = await modelForOperation(job.baseUrl, job.operation);
+    var model = await modelForOperation(job.baseUrl, job.operation, job.model);
     if (job.operation === "generate-image") {
       requireText(job.prompt, "提示词");
       var imagePath = await generateImage(job, model);
@@ -952,7 +1001,10 @@
     return true;
   }
 
-  async function modelForOperation(baseUrl, operation) {
+  async function modelForOperation(baseUrl, operation, explicitModel) {
+    if (explicitModel) {
+      return explicitModel;
+    }
     var fallback = DEFAULT_MODELS[operation];
     var capabilityId = OPERATION_CAPABILITY_IDS[operation];
     if (!capabilityId) {
@@ -2041,6 +2093,10 @@
     if (!promptInput.disabled) {
       state.promptDraft = promptInput.value;
     }
+  });
+
+  modelInput.addEventListener("input", function () {
+    persistModelForOperation(state.operation);
   });
 
   importInput.addEventListener("change", function () {
