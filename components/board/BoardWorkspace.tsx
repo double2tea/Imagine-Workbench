@@ -1,7 +1,7 @@
 "use client";
 
 import { Download, Upload } from "lucide-react";
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ChangeEvent, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import {
   BaseEdge,
   Background,
@@ -220,6 +220,18 @@ interface BoardSelectionSnapshot {
   nodeIds: string[];
 }
 
+interface BoardSelectionBounds {
+  height: number;
+  width: number;
+  x: number;
+  y: number;
+}
+
+interface BoardSelectionToolbarPlacement {
+  left: number;
+  top: number;
+}
+
 function sameStringList(left: string[], right: string[]): boolean {
   if (left.length !== right.length) return false;
   return left.every((value, index) => value === right[index]);
@@ -231,6 +243,38 @@ function sameBoardViewportModel(left: BoardViewport, right: BoardViewport): bool
     Math.abs(left.y - right.y) < BOARD_VIEWPORT_POSITION_EPSILON &&
     Math.abs(left.zoom - right.zoom) < BOARD_VIEWPORT_ZOOM_EPSILON
   );
+}
+
+function selectedBoardNodeBounds(nodes: BoardNodeModel[], selectedNodeIds: string[]): BoardSelectionBounds | null {
+  if (selectedNodeIds.length <= 1) return null;
+  const selectedIdSet = new Set(selectedNodeIds);
+  const selectedNodes = boardNodesWithAbsolutePositions(nodes).filter(node => selectedIdSet.has(node.id));
+  if (selectedNodes.length === 0) return null;
+  const minX = Math.min(...selectedNodes.map(node => node.position.x));
+  const minY = Math.min(...selectedNodes.map(node => node.position.y));
+  const maxX = Math.max(...selectedNodes.map(node => node.position.x + node.size.width));
+  const maxY = Math.max(...selectedNodes.map(node => node.position.y + node.size.height));
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+
+function clampSelectionToolbarValue(value: number, min: number, max: number): number {
+  if (max < min) return value;
+  return Math.min(Math.max(value, min), max);
+}
+
+function selectionToolbarPlacement(
+  bounds: BoardSelectionBounds,
+  viewport: BoardViewport,
+  hostRect: DOMRect | null,
+): BoardSelectionToolbarPlacement {
+  const rawLeft = (bounds.x + bounds.width / 2) * viewport.zoom + viewport.x;
+  const rawTop = bounds.y * viewport.zoom + viewport.y - 14;
+  const minLeft = 184;
+  const maxLeft = (hostRect?.width ?? 0) - minLeft;
+  return {
+    left: hostRect ? clampSelectionToolbarValue(rawLeft, minLeft, maxLeft) : rawLeft,
+    top: Math.max(66, rawTop),
+  };
 }
 
 function sameBoardSelectionSnapshot(left: BoardSelectionSnapshot, right: BoardSelectionSnapshot): boolean {
@@ -1133,11 +1177,17 @@ export default function BoardWorkspace({
     updateNoteBody,
     updatePromptNode,
   } = controller;
+  const [flowViewport, setFlowViewport] = useState<BoardViewport>(board.viewport);
   const viewportRef = useRef<BoardViewport>(board.viewport);
   useLayoutEffect(() => {
     viewportRef.current = board.viewport;
     selectionRef.current = { edgeId: selectedEdgeId, nodeId: selectedNodeId, nodeIds: selectedNodeIds };
   }, [board.viewport, selectedEdgeId, selectedNodeId, selectedNodeIds]);
+  useEffect(() => {
+    const instanceViewport = flowInstanceRef.current?.getViewport();
+    const nextViewport = instanceViewport ?? board.viewport;
+    setFlowViewport(current => sameBoardViewportModel(current, nextViewport) ? current : nextViewport);
+  }, [board.viewport, flowReady]);
 
   const boardGraphContentKey = useMemo(
     () => buildBoardGraphContentKey(board.nodes, board.edges),
@@ -1828,9 +1878,14 @@ export default function BoardWorkspace({
     updateNodesPositions(settledPositions);
   }, [onNodesChange, updateNodesPositions]);
 
+  const handleMove = useCallback((_event: MouseEvent | TouchEvent | null, viewport: BoardViewport): void => {
+    setFlowViewport(current => sameBoardViewportModel(current, viewport) ? current : viewport);
+  }, []);
+
   const handleMoveEnd = useCallback((_event: MouseEvent | TouchEvent | null, viewport: BoardViewport): void => {
     if (sameBoardViewportModel(viewportRef.current, viewport)) return;
     viewportRef.current = viewport;
+    setFlowViewport(viewport);
     setViewport(viewport);
   }, [setViewport]);
 
@@ -1854,6 +1909,7 @@ export default function BoardWorkspace({
 
   const handleFlowInit = useCallback((instance: ReactFlowInstance<BoardFlowNode, BoardFlowEdge>): void => {
     flowInstanceRef.current = instance;
+    setFlowViewport(instance.getViewport());
     setFlowReady(true);
   }, []);
 
@@ -2609,6 +2665,24 @@ export default function BoardWorkspace({
     undo,
   ]);
 
+  const selectedBounds = useMemo(
+    () => selectedBoardNodeBounds(board.nodes, selectedNodeIds),
+    [board.nodes, selectedNodeIds],
+  );
+  const selectedBatchToolbarStyle = useMemo<CSSProperties | null>(() => {
+    if (!selectedBounds) return null;
+    const placement = selectionToolbarPlacement(
+      selectedBounds,
+      flowViewport,
+      flowHostRef.current?.getBoundingClientRect() ?? null,
+    );
+    return {
+      left: placement.left,
+      top: placement.top,
+      transform: "translate(-50%, -100%)",
+    };
+  }, [flowViewport, selectedBounds]);
+
   return (
     <BoardMediaImportProvider openImport={openMediaImportPicker}>
     <main className="imagine-workbench-shell imagine-theme-dark flex h-screen min-h-0 flex-col bg-[var(--iw-bg)] text-[var(--iw-text)]">
@@ -2704,6 +2778,7 @@ export default function BoardWorkspace({
             onEdgeDoubleClick={handleEdgeDoubleClick}
             onEdgesDelete={handleEdgesDelete}
             onInit={handleFlowInit}
+            onMove={handleMove}
             onMoveEnd={handleMoveEnd}
             onNodeClick={handleNodeClick}
             onNodeContextMenu={handleNodeContextMenu}
@@ -2733,19 +2808,19 @@ export default function BoardWorkspace({
           </ReactFlow>
           </BoardNodeCallbacksContext.Provider>
           {board.nodes.length === 0 && <BoardEmptyHint />}
-          {selectedNodeIds.length > 1 && selectedDownloadableCount > 0 && onDownloadSelectedAssets ? (
-            <div className="pointer-events-none absolute left-1/2 top-4 z-40 -translate-x-1/2">
-              <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-[var(--iw-border)] bg-[var(--iw-panel)] px-3 py-2 text-[11px] font-semibold text-[var(--iw-text)] shadow-lg backdrop-blur-md">
+          {selectedNodeIds.length > 1 && selectedDownloadableCount > 0 && onDownloadSelectedAssets && selectedBatchToolbarStyle ? (
+            <div className="pointer-events-none absolute z-40 max-w-[calc(100%-24px)]" style={selectedBatchToolbarStyle}>
+              <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-white/10 bg-[var(--iw-panel)] p-2 pl-5 text-[12px] font-semibold text-[var(--iw-text)] shadow-[0_18px_45px_rgba(15,23,42,0.22)] backdrop-blur-xl ring-1 ring-white/10">
                 <span className="whitespace-nowrap text-[var(--iw-muted)]">
                   已选 {selectedNodeIds.length} 个 · 可下载 {selectedDownloadableCount} 个
                 </span>
                 <button
                   type="button"
                   onClick={onDownloadSelectedAssets}
-                  className="imagine-primary-action flex h-8 items-center gap-1.5 rounded-full px-3 text-[11px] font-semibold"
+                  className="imagine-primary-action flex h-10 items-center gap-2 rounded-full px-4 text-[12px] font-semibold shadow-sm"
                   title="下载所选媒体为 ZIP"
                 >
-                  <Download className="h-3.5 w-3.5" />
+                  <Download className="h-4 w-4" />
                   批量下载
                 </button>
               </div>
