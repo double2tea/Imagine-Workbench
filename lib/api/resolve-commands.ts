@@ -17,6 +17,8 @@ export interface ResolveExternalCommand {
 
 const commands = new Map<string, ResolveExternalCommand>();
 let commandSequence = 0;
+const ACTIVE_COMMAND_TTL_MS = 90 * 1000;
+const COMPLETED_COMMAND_TTL_MS = 5 * 60 * 1000;
 
 export function assertLocalResolveCommandRequest(req: Request): void {
   const hostname = new URL(req.url).hostname;
@@ -26,6 +28,7 @@ export function assertLocalResolveCommandRequest(req: Request): void {
 }
 
 export function createResolveCommand(input: unknown): ResolveExternalCommand {
+  pruneResolveCommands();
   const record = requireRecord(input);
   const kind = record.kind;
   if (kind !== "doctor") {
@@ -45,10 +48,12 @@ export function createResolveCommand(input: unknown): ResolveExternalCommand {
 }
 
 export function getResolveCommand(id: string): ResolveExternalCommand | null {
+  pruneResolveCommands();
   return commands.get(id) ?? null;
 }
 
 export function claimNextResolveCommand(): ResolveExternalCommand | null {
+  pruneResolveCommands();
   const command = [...commands.values()].find(item => item.status === "pending") ?? null;
   if (!command) return null;
   const now = new Date().toISOString();
@@ -63,6 +68,7 @@ export function claimNextResolveCommand(): ResolveExternalCommand | null {
 }
 
 export function finishResolveCommand(input: unknown): ResolveExternalCommand {
+  pruneResolveCommands();
   const record = requireRecord(input);
   const id = requireString(record.id, "id");
   const status = record.status;
@@ -89,6 +95,16 @@ export function finishResolveCommand(input: unknown): ResolveExternalCommand {
 export function resetResolveCommandsForTest(): void {
   commands.clear();
   commandSequence = 0;
+}
+
+export function pruneResolveCommands(nowMs = Date.now()): void {
+  for (const [id, command] of commands) {
+    const basis = command.completedAt ?? command.claimedAt ?? command.createdAt;
+    const ttl = command.completedAt ? COMPLETED_COMMAND_TTL_MS : ACTIVE_COMMAND_TTL_MS;
+    if (Date.parse(basis) + ttl < nowMs) {
+      commands.delete(id);
+    }
+  }
 }
 
 function requireRecord(value: unknown): Record<string, unknown> {

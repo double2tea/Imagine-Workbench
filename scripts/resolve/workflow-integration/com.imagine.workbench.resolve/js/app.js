@@ -734,12 +734,20 @@
     setStatus("外部前端命令：连接检查\n运行中");
     try {
       var result = (await doctor(job)).join("\n");
-      await finishExternalResolveCommand(command.id, "complete", result, "");
-      setStatus("外部前端命令已完成\n" + result);
+      try {
+        await finishExternalResolveCommand(command.id, "complete", result, "");
+        setStatus("外部前端命令已完成\n" + result);
+      } catch (writebackError) {
+        setStatus("外部前端命令已完成，但无法回写前端状态\n" + result + "\n\n回写错误：\n" + explainError(writebackError, job));
+      }
     } catch (error) {
       var message = explainError(error, job);
-      await finishExternalResolveCommand(command.id, "error", "", message);
-      setStatus("外部前端命令失败\n" + message);
+      try {
+        await finishExternalResolveCommand(command.id, "error", "", message);
+        setStatus("外部前端命令失败\n" + message);
+      } catch (writebackError) {
+        setStatus("外部前端命令失败，且无法回写前端状态\n" + message + "\n\n回写错误：\n" + explainError(writebackError, job));
+      }
     } finally {
       state.running = false;
       runButton.disabled = false;
