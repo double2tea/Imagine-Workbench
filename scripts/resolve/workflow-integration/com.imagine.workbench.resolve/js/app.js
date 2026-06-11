@@ -1016,21 +1016,21 @@
     var stem = outputStem(job);
     setStatus("正在导出当前帧\n" + describeJob(job));
     var sourcePath = await exportCurrentFrame(stem + "_source");
-    var presetPath = path.join(__dirname, preset.image);
+    var presetPath = lookPresetPath(preset);
     if (!fs.existsSync(presetPath)) {
       throw new Error("风格预设图片不存在：" + presetPath);
     }
 
     setStatus("正在生成风格参考帧\n" + describeJob(job) + "\n\n" + preset.title);
-    var styledPath = await generateStyledLookFrame(job, model, preset, sourcePath, presetPath);
+    var styledPath = await generateStyledLookFrame(job, model, preset, sourcePath, presetPath, stem);
     setStatus("正在拟合 LUT\n" + describeJob(job) + "\n\n" + styledPath);
-    var lutPath = await writeLookLut(job, preset, sourcePath, styledPath);
+    var lutPath = await writeLookLut(job, preset, sourcePath, styledPath, stem);
     setStatus("正在应用到当前片段\n" + describeJob(job) + "\n\n" + lutPath);
     await applyLutToCurrentClip(lutPath);
     return [styledPath, lutPath];
   }
 
-  async function generateStyledLookFrame(job, model, preset, sourcePath, presetPath) {
+  async function generateStyledLookFrame(job, model, preset, sourcePath, presetPath, stem) {
     var prompt = aiLutPrompt(preset, job.prompt);
     var response = await postMultipartJson(job.baseUrl, "/v1/images/edits", [
       { name: "model", value: model },
@@ -1040,7 +1040,7 @@
       { name: "image", filePath: sourcePath },
       { name: "image", filePath: presetPath }
     ]);
-    return writeOutputInFolder("Images", outputStem(job) + "_styled", ".png", openAiB64Bytes(response, "image"));
+    return writeOutputInFolder("Images", stem + "_styled", ".png", openAiB64Bytes(response, "image"));
   }
 
   function aiLutPrompt(preset, extraPrompt) {
@@ -1055,11 +1055,11 @@
     ].filter(Boolean).join("\n");
   }
 
-  async function writeLookLut(job, preset, sourcePath, styledPath) {
+  async function writeLookLut(job, preset, sourcePath, styledPath, stem) {
     var stats = await imageTransferStats(sourcePath, styledPath);
     var lutText = cubeLutText(safeStem(preset.id), stats, 17);
-    var outputLutPath = writeOutputInFolder("LUTs", outputStem(job) + "_" + preset.id, ".cube", Buffer.from(lutText, "utf8"));
-    var resolveLutPath = resolveUserLutPath(outputStem(job) + "_" + preset.id + ".cube");
+    var outputLutPath = writeOutputInFolder("LUTs", stem + "_" + preset.id, ".cube", Buffer.from(lutText, "utf8"));
+    var resolveLutPath = resolveUserLutPath(stem + "_" + preset.id + ".cube");
     fs.mkdirSync(path.dirname(resolveLutPath), { recursive: true });
     fs.copyFileSync(outputLutPath, resolveLutPath);
     return resolveLutPath;
@@ -1142,15 +1142,14 @@
     var resolve = await getResolve();
     var project = await currentProject(resolve);
     var item = await currentVideoItem();
-    var graph = await item.GetNodeGraph();
-    if (!graph || typeof graph.SetLUT !== "function") {
-      throw new Error("Resolve 当前片段没有可用的调色节点图");
+    if (typeof item.SetLUT !== "function") {
+      throw new Error("Resolve 当前片段不支持脚本应用 LUT");
     }
     if (typeof project.RefreshLUTList === "function") {
       await project.RefreshLUTList();
     }
     var relativePath = relativeResolveLutPath(lutPath);
-    if (!(await graph.SetLUT(1, relativePath)) && !(await graph.SetLUT(1, lutPath))) {
+    if (!(await item.SetLUT(1, relativePath)) && !(await item.SetLUT(1, lutPath))) {
       throw new Error("Resolve 应用 LUT 失败：" + relativePath);
     }
   }
@@ -1161,6 +1160,10 @@
 
   function relativeResolveLutPath(lutPath) {
     return RESOLVE_BIN_ROOT + "/" + path.basename(lutPath);
+  }
+
+  function lookPresetPath(preset) {
+    return path.join(__dirname, preset.image);
   }
 
   function lookPreset(id) {
