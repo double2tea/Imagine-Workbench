@@ -405,6 +405,71 @@ select:focus {
   margin-top: 12px;
 }
 
+.look-preset-block {
+  margin-top: 12px;
+}
+
+.look-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.look-preset-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(24, 27, 30, 0.72);
+  color: var(--text);
+  padding: 0;
+  text-align: left;
+  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.look-preset-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(32, 36, 40, 0.84);
+}
+
+.look-preset-card.active {
+  border-color: var(--accent-line);
+  box-shadow: inset 0 0 0 1px rgba(200, 255, 26, 0.14);
+}
+
+.look-preset-card img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: #08090a;
+}
+
+.look-preset-meta {
+  padding: 7px 8px 8px;
+}
+
+.look-preset-title {
+  display: block;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 10.5px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.look-preset-desc {
+  display: block;
+  overflow: hidden;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .pill-row {
   display: flex;
   flex-wrap: wrap;

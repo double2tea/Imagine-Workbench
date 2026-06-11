@@ -15,6 +15,7 @@
     "generate-image": "12ai:gemini-3.1-flash-image-preview",
     "image-to-image": "12ai:gemini-3.1-flash-image-preview",
     "edit-image": "12ai:gemini-3.1-flash-image-preview",
+    "ai-lut": "12ai:gemini-3.1-flash-image-preview",
     "generate-video": "12ai:omni_flash-10s",
     "tts": "mimo:mimo-v2.5-tts",
     "transcribe": "mimo:mimo-v2.5-asr"
@@ -23,10 +24,33 @@
     "generate-image": "generate_image",
     "image-to-image": "edit_image",
     "edit-image": "edit_image",
+    "ai-lut": "edit_image",
     "generate-video": "generate_video",
     "tts": "tts",
     "transcribe": "transcribe"
   };
+
+  var LOOK_PRESETS = [
+    { id: "neutral-rec709", title: "Neutral Rec709", desc: "中性基准", image: "assets/look-presets/01-neutral-rec709.jpg", prompt: "balanced neutral Rec709 color, clean natural contrast, accurate white balance" },
+    { id: "kodak-warm-film", title: "Kodak Warm", desc: "暖调胶片", image: "assets/look-presets/02-kodak-warm-film.jpg", prompt: "warm film print, golden highlights, lifted blacks, creamy skin tones, restrained saturation" },
+    { id: "cool-steel", title: "Cool Steel", desc: "冷峻蓝灰", image: "assets/look-presets/03-cool-steel.jpg", prompt: "cool steel-blue shadows, neutral highlights, crisp modern contrast, slightly desaturated color" },
+    { id: "teal-orange", title: "Teal Orange", desc: "商业青橙", image: "assets/look-presets/04-teal-orange.jpg", prompt: "teal cyan shadows, warm orange skin and lights, punchy midtone contrast, glossy highlights" },
+    { id: "neon-night", title: "Neon Night", desc: "霓虹夜景", image: "assets/look-presets/05-neon-night.jpg", prompt: "magenta and cyan neon ambience, deep blue shadows, saturated wet pavement reflections" },
+    { id: "bleach-bypass", title: "Bleach Bypass", desc: "漂白旁路", image: "assets/look-presets/06-bleach-bypass.jpg", prompt: "low saturation, silver highlights, dense black shadows, gritty high contrast" },
+    { id: "soft-pastel-film", title: "Soft Pastel", desc: "柔和粉彩", image: "assets/look-presets/07-soft-pastel-film.jpg", prompt: "soft pastel palette, lifted shadows, gentle low contrast, peach skin tones, airy highlights" },
+    { id: "clean-commercial", title: "Clean Commercial", desc: "商业清透", image: "assets/look-presets/08-clean-commercial.jpg", prompt: "bright clean commercial grade, pure whites, accurate skin tones, polished clarity" },
+    { id: "vintage-fade", title: "Vintage Fade", desc: "复古褪色", image: "assets/look-presets/09-vintage-fade.jpg", prompt: "faded print, warm brown shadows, muted reds, yellowed highlights, soft contrast" },
+    { id: "japanese-high-key", title: "Japanese High Key", desc: "日系高调", image: "assets/look-presets/10-japanese-high-key.jpg", prompt: "high-key airy lifestyle grade, bright soft highlights, delicate cyan shadows, minimal saturation" },
+    { id: "forest-noir", title: "Forest Noir", desc: "墨绿暗调", image: "assets/look-presets/11-forest-noir.jpg", prompt: "deep emerald shadows, olive greens, subdued skin, low-key moody contrast" },
+    { id: "cyberpunk-neon-noir", title: "Cyberpunk Noir", desc: "赛博霓虹", image: "assets/look-presets/12-cyberpunk-neon-noir.jpg", prompt: "cyberpunk noir palette, electric cyan shadows, hot magenta reflections, deep black contrast" },
+    { id: "desert-sci-fi-gold", title: "Sci-Fi Gold", desc: "科幻暖金", image: "assets/look-presets/13-desert-sci-fi-gold.jpg", prompt: "epic science-fiction gold grade, amber highlights, ochre midtones, low blue shadows" },
+    { id: "precision-symmetry-cinema", title: "Precision Cinema", desc: "精准冷调", image: "assets/look-presets/14-precision-symmetry-cinema.jpg", prompt: "formal auteur cinema palette, clean whites, controlled reds, cool neutral shadows" },
+    { id: "meditative-green-long-take", title: "Meditative Green", desc: "沉思绿调", image: "assets/look-presets/15-meditative-green-long-take.jpg", prompt: "contemplative art-cinema palette, moss green shadows, muted earth tones, milky highlights" },
+    { id: "classic-bw-suspense", title: "B&W Suspense", desc: "黑白悬疑", image: "assets/look-presets/16-classic-bw-suspense.jpg", prompt: "black and white suspense cinema, silver halation, deep shadows, luminous face highlights" },
+    { id: "romantic-hong-kong-neon", title: "HK Neon Romance", desc: "港风浪漫", image: "assets/look-presets/17-romantic-hong-kong-neon.jpg", prompt: "1990s Hong Kong romantic cinema mood, saturated reds and greens, soft halation, tungsten and cyan mix" },
+    { id: "epic-low-key-gold", title: "Epic Gold", desc: "史诗暗金", image: "assets/look-presets/18-epic-low-key-gold.jpg", prompt: "historical epic cinema palette, low-key amber highlights, deep brown shadows, chiaroscuro contrast" },
+    { id: "dreamlike-italian-color", title: "Italian Dream", desc: "意式梦幻", image: "assets/look-presets/19-dreamlike-italian-color.jpg", prompt: "dreamlike classic Italian cinema palette, warm yellows, soft cyan shadows, expressive reds, gentle bloom" }
+  ];
 
   var operationConfigs = {
     "generate-image": {
@@ -61,6 +85,18 @@
       sources: ["current-frame", "current-clip-source"],
       imageOperation: true,
       canImport: true,
+      canAppend: false
+    },
+    "ai-lut": {
+      tab: "image",
+      title: "AI LUT",
+      subtitle: "一键匹配电影色调",
+      icon: "lut",
+      promptLabel: "色彩指令",
+      placeholder: "可选：补充这次套用的色彩倾向",
+      sources: [],
+      lookPresets: true,
+      canImport: false,
       canAppend: false
     },
     "generate-video": {
@@ -145,11 +181,12 @@
     resolve: null,
     sharedCredentials: {},
     preparedMask: null,
+    lookPresetId: "kodak-warm-film",
     lastOutputs: [],
     lastOutputJob: null,
     lastImportDone: false,
     promptDraft: "",
-    importToResolve: true,
+    importToResolve: false,
     appendToTimeline: false
   };
 
@@ -164,6 +201,8 @@
   var promptLabel = document.getElementById("promptLabel");
   var sourceBlock = document.getElementById("sourceBlock");
   var sourcePills = document.getElementById("sourcePills");
+  var lookPresetBlock = document.getElementById("lookPresetBlock");
+  var lookPresetGrid = document.getElementById("lookPresetGrid");
   var baseUrlInput = document.getElementById("baseUrlInput");
   var outputNameInput = document.getElementById("outputNameInput");
   var twelveApiKeyInput = document.getElementById("twelveApiKeyInput");
@@ -269,6 +308,7 @@
       edit: '<svg ' + attrs + '><path d="m13.5 5.5 5 5"></path><path d="M4.5 19.5 6 14l9.7-9.7a2.1 2.1 0 0 1 3 3L9 17z"></path><path d="m8.5 16 2.8 2.8"></path><path d="M15 15.5h5"></path><path d="M17.5 13v5"></path></svg>',
       video: '<svg ' + attrs + '><rect x="3.5" y="6" width="13" height="12" rx="2"></rect><path d="m16.5 10 4-2.3v8.6l-4-2.3z"></path><path d="M7.5 3.8 9 6"></path><path d="M13.5 3.8 12 6"></path></svg>',
       reference: '<svg ' + attrs + '><rect x="4" y="5" width="10" height="10" rx="2"></rect><path d="M8 19h8a4 4 0 0 0 4-4V7"></path><path d="m7.5 12 1.5-1.5a1 1 0 0 1 1.4 0L14 14"></path><path d="M17 4v5"></path><path d="M14.5 6.5h5"></path></svg>',
+      lut: '<svg ' + attrs + '><path d="M4 5.5h16"></path><path d="M4 12h16"></path><path d="M4 18.5h16"></path><circle cx="8" cy="5.5" r="2"></circle><circle cx="15" cy="12" r="2"></circle><circle cx="10.5" cy="18.5" r="2"></circle></svg>',
       caption: '<svg ' + attrs + '><rect x="4" y="5" width="16" height="14" rx="2.5"></rect><path d="M8 10h8"></path><path d="M8 14h4.8"></path></svg>',
       voice: '<svg ' + attrs + '><path d="M4 13v-2"></path><path d="M8 17V7"></path><path d="M12 20V4"></path><path d="M16 17V7"></path><path d="M20 13v-2"></path></svg>',
       status: '<svg ' + attrs + '><path d="M8.5 12a3.5 3.5 0 0 1 7 0"></path><path d="M6 15.5a7 7 0 0 1 12 0"></path><path d="M12 12l3-3"></path><path d="M12 19.5a7.5 7.5 0 1 0-7.5-7.5"></path></svg>'
@@ -302,6 +342,26 @@
     });
   }
 
+  function renderLookPresets(config) {
+    lookPresetGrid.innerHTML = "";
+    lookPresetBlock.classList.toggle("hidden", config.lookPresets !== true);
+    if (config.lookPresets !== true) {
+      return;
+    }
+    LOOK_PRESETS.forEach(function (preset) {
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "look-preset-card" + (preset.id === state.lookPresetId ? " active" : "");
+      button.innerHTML = '<img src="' + preset.image + '" alt="' + preset.title + '">' +
+        '<span class="look-preset-meta"><span class="look-preset-title">' + preset.title + '</span><span class="look-preset-desc">' + preset.desc + '</span></span>';
+      button.addEventListener("click", function () {
+        state.lookPresetId = preset.id;
+        renderLookPresets(config);
+      });
+      lookPresetGrid.appendChild(button);
+    });
+  }
+
   function selectOperation(operation) {
     state.operation = operation;
     var config = operationConfigs[operation];
@@ -319,6 +379,7 @@
     appendInput.checked = config.canAppend === true && state.appendToTimeline;
     clearPreparedMask();
     renderSources(config);
+    renderLookPresets(config);
     renderOperations();
     updateMaskPrepareUi();
   }
@@ -341,6 +402,9 @@
     }
     if (operation === "edit-image") {
       job.imageOperation = imageOperationInput.value;
+    }
+    if (operation === "ai-lut") {
+      job.stylePresetId = state.lookPresetId;
     }
     if (operation === "generate-video") {
       job.reference = [state.source];
@@ -392,9 +456,23 @@
     try {
       await loadSharedCredentialsForJob(job);
       var result = await executeJob(job);
-      saveJob(job);
       if (!keepLastOutputs) {
-        setLastOutputs(result, job, job.importToResolve === true);
+        setLastOutputs(result, job, false);
+      }
+      saveJob(job);
+      if (!keepLastOutputs && job.importToResolve === true) {
+        try {
+          await importSavedOutputs(job, result, job.appendToTimeline === true);
+          state.lastImportDone = true;
+          updateImportResultButton();
+          setStatus("已完成并导入达芬奇\n" + describeJob(job) + "\n\n" + result.join("\n"));
+          return;
+        } catch (importError) {
+          state.lastImportDone = false;
+          updateImportResultButton();
+          setStatus("已生成，但导入达芬奇失败\n" + explainError(importError, job) + "\n\n已保存：\n" + result.join("\n"));
+          return;
+        }
       }
       setStatus("已完成\n" + describeJob(job) + "\n\n" + result.join("\n"));
     } catch (error) {
@@ -425,19 +503,21 @@
     if (job.operation === "doctor") {
       return doctor(job);
     }
+    if (job.operation === "ai-lut") {
+      var lutModel = await modelForOperation(job.baseUrl, job.operation);
+      return applyAiLut(job, lutModel);
+    }
     if (job.operation === "edit-image" || job.operation === "image-to-image") {
       requireImageEditPrompt(job);
       var maskResult = await prepareImageEditMask(job);
       var editModel = await modelForOperation(job.baseUrl, job.operation);
       var editedPath = await editImage(job, editModel, maskResult.imagePath, maskResult.maskPath);
-      await importOutputs(job, [editedPath]);
       return [editedPath];
     }
     var model = await modelForOperation(job.baseUrl, job.operation);
     if (job.operation === "generate-image") {
       requireText(job.prompt, "提示词");
       var imagePath = await generateImage(job, model);
-      await importOutputs(job, [imagePath]);
       return [imagePath];
     }
     if (job.operation === "generate-video") {
@@ -447,13 +527,11 @@
         references.push(await resolveMediaInput(job.reference[index], outputStem(job) + "_reference_" + (index + 1), "reference"));
       }
       var videoPath = await generateVideo(job, model, references);
-      await importOutputs(job, [videoPath]);
       return [videoPath];
     }
     if (job.operation === "tts") {
       requireText(job.text, "配音文本");
       var audioPath = await textToSpeech(job, model);
-      await importOutputs(job, [audioPath]);
       return [audioPath];
     }
     if (job.operation === "transcribe") {
@@ -933,6 +1011,164 @@
     return writeOutput(job, ".png", imageBytes);
   }
 
+  async function applyAiLut(job, model) {
+    var preset = lookPreset(job.stylePresetId);
+    var stem = outputStem(job);
+    setStatus("正在导出当前帧\n" + describeJob(job));
+    var sourcePath = await exportCurrentFrame(stem + "_source");
+    var presetPath = path.join(__dirname, preset.image);
+    if (!fs.existsSync(presetPath)) {
+      throw new Error("风格预设图片不存在：" + presetPath);
+    }
+
+    setStatus("正在生成风格参考帧\n" + describeJob(job) + "\n\n" + preset.title);
+    var styledPath = await generateStyledLookFrame(job, model, preset, sourcePath, presetPath);
+    setStatus("正在拟合 LUT\n" + describeJob(job) + "\n\n" + styledPath);
+    var lutPath = await writeLookLut(job, preset, sourcePath, styledPath);
+    setStatus("正在应用到当前片段\n" + describeJob(job) + "\n\n" + lutPath);
+    await applyLutToCurrentClip(lutPath);
+    return [styledPath, lutPath];
+  }
+
+  async function generateStyledLookFrame(job, model, preset, sourcePath, presetPath) {
+    var prompt = aiLutPrompt(preset, job.prompt);
+    var response = await postMultipartJson(job.baseUrl, "/v1/images/edits", [
+      { name: "model", value: model },
+      { name: "operation", value: "redraw" },
+      { name: "prompt", value: prompt },
+      { name: "response_format", value: "b64_json" },
+      { name: "image", filePath: sourcePath },
+      { name: "image", filePath: presetPath }
+    ]);
+    return writeOutputInFolder("Images", outputStem(job) + "_styled", ".png", openAiB64Bytes(response, "image"));
+  }
+
+  function aiLutPrompt(preset, extraPrompt) {
+    return [
+      "The first input image is the source frame to preserve.",
+      "The second input image is only a color grading and tone reference.",
+      "Apply the reference look to the source frame.",
+      "Change only color, tone, contrast, saturation, highlight rolloff, shadow color, and cinematic mood.",
+      "Preserve all content, composition, identity, geometry, clothing, objects, text-free image structure, and realism exactly.",
+      "Target look: " + preset.prompt + ".",
+      extraPrompt ? "Additional color instruction: " + extraPrompt : ""
+    ].filter(Boolean).join("\n");
+  }
+
+  async function writeLookLut(job, preset, sourcePath, styledPath) {
+    var stats = await imageTransferStats(sourcePath, styledPath);
+    var lutText = cubeLutText(safeStem(preset.id), stats, 17);
+    var outputLutPath = writeOutputInFolder("LUTs", outputStem(job) + "_" + preset.id, ".cube", Buffer.from(lutText, "utf8"));
+    var resolveLutPath = resolveUserLutPath(outputStem(job) + "_" + preset.id + ".cube");
+    fs.mkdirSync(path.dirname(resolveLutPath), { recursive: true });
+    fs.copyFileSync(outputLutPath, resolveLutPath);
+    return resolveLutPath;
+  }
+
+  async function imageTransferStats(sourcePath, styledPath) {
+    var source = await sampledImageStats(sourcePath);
+    var styled = await sampledImageStats(styledPath);
+    return {
+      sourceMean: source.mean,
+      sourceStd: source.std,
+      styledMean: styled.mean,
+      styledStd: styled.std
+    };
+  }
+
+  async function sampledImageStats(filePath) {
+    var image = await loadLocalImage(filePath);
+    var canvas = document.createElement("canvas");
+    canvas.width = 256;
+    canvas.height = 144;
+    var context = canvas.getContext("2d");
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    var data = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    var sum = [0, 0, 0];
+    var sumSq = [0, 0, 0];
+    var count = data.length / 4;
+    for (var index = 0; index < data.length; index += 4) {
+      for (var channel = 0; channel < 3; channel += 1) {
+        var value = data[index + channel] / 255;
+        sum[channel] += value;
+        sumSq[channel] += value * value;
+      }
+    }
+    var mean = sum.map(function (value) { return value / count; });
+    var std = sumSq.map(function (value, channel) {
+      return Math.sqrt(Math.max(value / count - mean[channel] * mean[channel], 0.0001));
+    });
+    return { mean: mean, std: std };
+  }
+
+  function cubeLutText(title, stats, size) {
+    var lines = [
+      'TITLE "' + title + '"',
+      "LUT_3D_SIZE " + size,
+      "LUT_3D_INPUT_RANGE 0.0 1.0"
+    ];
+    for (var blueIndex = 0; blueIndex < size; blueIndex += 1) {
+      for (var greenIndex = 0; greenIndex < size; greenIndex += 1) {
+        for (var redIndex = 0; redIndex < size; redIndex += 1) {
+          var input = [
+            redIndex / (size - 1),
+            greenIndex / (size - 1),
+            blueIndex / (size - 1)
+          ];
+          var output = transferColor(input, stats);
+          lines.push(output.map(formatCubeNumber).join(" "));
+        }
+      }
+    }
+    return lines.join("\n") + "\n";
+  }
+
+  function transferColor(input, stats) {
+    return input.map(function (value, channel) {
+      var normalized = (value - stats.sourceMean[channel]) / stats.sourceStd[channel];
+      return clamp01(normalized * stats.styledStd[channel] + stats.styledMean[channel]);
+    });
+  }
+
+  function formatCubeNumber(value) {
+    return value.toFixed(6);
+  }
+
+  function clamp01(value) {
+    return Math.max(0, Math.min(1, value));
+  }
+
+  async function applyLutToCurrentClip(lutPath) {
+    var resolve = await getResolve();
+    var project = await currentProject(resolve);
+    var item = await currentVideoItem();
+    var graph = await item.GetNodeGraph();
+    if (!graph || typeof graph.SetLUT !== "function") {
+      throw new Error("Resolve 当前片段没有可用的调色节点图");
+    }
+    if (typeof project.RefreshLUTList === "function") {
+      await project.RefreshLUTList();
+    }
+    var relativePath = relativeResolveLutPath(lutPath);
+    if (!(await graph.SetLUT(1, relativePath)) && !(await graph.SetLUT(1, lutPath))) {
+      throw new Error("Resolve 应用 LUT 失败：" + relativePath);
+    }
+  }
+
+  function resolveUserLutPath(fileName) {
+    return path.join(os.homedir(), "Library", "Application Support", "Blackmagic Design", "DaVinci Resolve", "LUT", RESOLVE_BIN_ROOT, safeStem(path.basename(fileName, ".cube")) + ".cube");
+  }
+
+  function relativeResolveLutPath(lutPath) {
+    return RESOLVE_BIN_ROOT + "/" + path.basename(lutPath);
+  }
+
+  function lookPreset(id) {
+    var match = LOOK_PRESETS.find(function (preset) { return preset.id === id; });
+    if (match) return match;
+    throw new Error("未知风格预设：" + id);
+  }
+
   async function generateVideo(job, model, referencePaths) {
     var result = await postJson(job.baseUrl, "/api/media/generate-video", {
       model: model,
@@ -1292,13 +1528,6 @@
     return ".mp4";
   }
 
-  async function importOutputs(job, paths) {
-    if (job.importToResolve !== true) {
-      return;
-    }
-    await importSavedOutputs(job, paths, job.appendToTimeline === true);
-  }
-
   async function importSavedOutputs(job, paths, appendToTimeline) {
     setStatus("结果已保存，正在导入达芬奇\n" + describeJob(job) + "\n\n" + paths.join("\n"));
     var resolve = await getResolve();
@@ -1504,7 +1733,7 @@
     if (operation === "tts" || operation === "transcribe") {
       return inputValue(mimoApiKeyInput);
     }
-    if (operation === "generate-image" || operation === "image-to-image" || operation === "edit-image" || operation === "generate-video") {
+    if (operation === "generate-image" || operation === "image-to-image" || operation === "edit-image" || operation === "ai-lut" || operation === "generate-video") {
       return inputValue(twelveApiKeyInput);
     }
     return "";
@@ -1522,7 +1751,7 @@
     if (operation === "tts" || operation === "transcribe") {
       return "mimo";
     }
-    if (operation === "generate-image" || operation === "image-to-image" || operation === "edit-image" || operation === "generate-video") {
+    if (operation === "generate-image" || operation === "image-to-image" || operation === "edit-image" || operation === "ai-lut" || operation === "generate-video") {
       return "12ai";
     }
     return "";
@@ -1640,6 +1869,14 @@
     return outputPath;
   }
 
+  function writeOutputInFolder(folder, stem, extension, bytes) {
+    var dir = path.join(outputDir, folder);
+    fs.mkdirSync(dir, { recursive: true });
+    var outputPath = path.join(dir, safeStem(stem) + extension);
+    fs.writeFileSync(outputPath, bytes);
+    return outputPath;
+  }
+
   function outputFilePath(job, extension) {
     var dir = path.join(outputDir, outputCategory(job).folder);
     fs.mkdirSync(dir, { recursive: true });
@@ -1647,6 +1884,9 @@
   }
 
   function outputCategory(job) {
+    if (job.operation === "ai-lut") {
+      return { folder: "LUTs" };
+    }
     if (job.operation === "generate-video") {
       return { folder: "Videos" };
     }
@@ -1700,7 +1940,10 @@
     var removed = 0;
     fs.readdirSync(dir).forEach(function (name) {
       var filePath = path.join(dir, name);
-      var stat = fs.statSync(filePath);
+      var stat = fs.lstatSync(filePath);
+      if (stat.isSymbolicLink()) {
+        return;
+      }
       if (stat.isDirectory()) {
         removed += cleanupOldFilesInDirectory(filePath, cutoff);
         if (fs.readdirSync(filePath).length === 0 && stat.mtimeMs < cutoff) {
@@ -1742,6 +1985,9 @@
     }
     if (job.audio) {
       lines.push("参考源：" + (sourceLabels[job.audio] || job.audio));
+    }
+    if (job.stylePresetId) {
+      lines.push("风格：" + lookPreset(job.stylePresetId).title);
     }
     if (job.outputName) {
       lines.push("输出名称：" + job.outputName);
