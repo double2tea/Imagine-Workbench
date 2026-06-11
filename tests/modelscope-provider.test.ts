@@ -66,6 +66,7 @@ test("modelscope status polling accepts documented SUCCEED output_images respons
       progress: 100,
       status: "succeed",
       url: "https://example.test/result.png",
+      urls: ["https://example.test/result.png"],
     });
     assert.equal(requestHeaders!.get("Authorization"), "Bearer ms_test_key");
     assert.equal(requestHeaders!.get("X-ModelScope-Task-Type"), "image_generation");

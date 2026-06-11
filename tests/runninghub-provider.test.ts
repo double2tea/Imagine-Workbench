@@ -662,7 +662,10 @@ test("runninghub ai app tasks use task output polling endpoint", async () => {
       return Response.json({
         code: 0,
         msg: "success",
-        data: [{ fileUrl: "https://runninghub.example/output.png", fileType: "png" }],
+        data: [
+          { fileUrl: "https://runninghub.example/output-a.png", fileType: "png" },
+          { fileUrl: "https://runninghub.example/output-b.png", fileType: "png" },
+        ],
       });
     }
     return Response.json({ code: 999, msg: "unexpected endpoint" }, { status: 500 });
@@ -688,7 +691,11 @@ test("runninghub ai app tasks use task output polling endpoint", async () => {
       mediaType: "image",
       progress: 100,
       status: "success",
-      url: "https://runninghub.example/output.png",
+      url: "https://runninghub.example/output-a.png",
+      urls: [
+        "https://runninghub.example/output-a.png",
+        "https://runninghub.example/output-b.png",
+      ],
     });
     assert.equal(calls[0]?.url, "https://www.runninghub.cn/task/openapi/ai-app/run");
     assert.deepEqual(calls[0]?.body, {
@@ -1021,6 +1028,7 @@ test("runninghub polling selects output url by requested media type", async () =
       progress: 100,
       status: "success",
       url: "https://runninghub.example/output.mp4",
+      urls: ["https://runninghub.example/output.mp4"],
     });
   } finally {
     globalThis.fetch = originalFetch;
@@ -1047,6 +1055,7 @@ test("runninghub polling selects audio output url by requested media type", asyn
       progress: 100,
       status: "success",
       url: "https://runninghub.example/output.wav",
+      urls: ["https://runninghub.example/output.wav"],
     });
   } finally {
     globalThis.fetch = originalFetch;
@@ -1061,17 +1070,20 @@ test("runninghub audio download preserves upstream audio extension", async () =>
       return Response.json({
         code: 0,
         msg: "success",
-        data: [{ fileUrl: "https://runninghub.example/output.wav", fileType: "wav" }],
+        data: [
+          { fileUrl: "https://runninghub.example/output-a.wav", fileType: "wav" },
+          { fileUrl: "https://runninghub.example/output-b.wav", fileType: "wav" },
+        ],
       });
     }
-    if (url === "https://runninghub.example/output.wav") {
-      return new Response("audio-data", { headers: { "Content-Type": "audio/wav" } });
+    if (url === "https://runninghub.example/output-b.wav") {
+      return new Response("audio-data-b", { headers: { "Content-Type": "audio/wav" } });
     }
     return Response.json({ code: 999, msg: "unexpected endpoint" }, { status: 500 });
   };
 
   try {
-    const response = await downloadRunningHubMedia(runningHubConfig, "audio", "task-output:audio_123");
+    const response = await downloadRunningHubMedia(runningHubConfig, "audio", "task-output:audio_123", 1);
     assert.equal(response.headers.get("Content-Type"), "audio/wav");
     assert.match(response.headers.get("Content-Disposition") ?? "", /^inline; filename="audio_\d+\.wav"$/);
   } finally {
@@ -1095,6 +1107,7 @@ test("runninghub audio status uses task output polling", async () => {
       progress: 100,
       status: "success",
       url: "https://runninghub.example/output.mp3",
+      urls: ["https://runninghub.example/output.mp3"],
     });
   } finally {
     globalThis.fetch = originalFetch;
@@ -1226,6 +1239,7 @@ test("runninghub standard tasks keep v2 query polling endpoint", async () => {
       progress: 100,
       status: "success",
       url: "https://runninghub.example/output.mp4",
+      urls: ["https://runninghub.example/output.mp4"],
     });
     assert.equal(calls[0]?.url, "https://www.runninghub.cn/openapi/v2/query");
     assert.deepEqual(calls[0]?.body, { taskId: "standard_123" });

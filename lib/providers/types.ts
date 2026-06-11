@@ -69,6 +69,7 @@ export interface EditImageInput {
 
 export interface GenerateImageResult {
   imageUrl?: string;
+  imageUrls?: string[];
   operationName?: string;
   source: string;
 }
@@ -179,6 +180,7 @@ export interface MediaStatusResult {
   progress: number;
   status: string;
   url?: string;
+  urls?: string[];
   errorMessage?: string;
 }
 

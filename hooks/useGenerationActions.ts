@@ -470,7 +470,7 @@ export function useGenerationActions({
       });
 
       if (res.ok) {
-        const { operationName, imageUrl } = await readImageGenerationPayload(res);
+        const { operationName, imageUrl, imageUrls } = await readImageGenerationPayload(res);
         if (operationName) {
           const processingTask = await updateTaskOrWarn(taskId, {
             operationName,
@@ -482,30 +482,35 @@ export function useGenerationActions({
           return true;
         }
 
-        if (!imageUrl) {
+        const outputUrls = imageUrls.length > 0 ? imageUrls : imageUrl ? [imageUrl] : [];
+        if (outputUrls.length === 0) {
           throw new Error("图片接口返回缺少 imageUrl 或 operationName");
         }
-        const completedAssetId = makeClientId("img");
-        const completedItem = buildStorageItem(
-          {
-            id: completedAssetId,
-            type: "image",
-            url: imageUrl,
-            prompt: activePrompt,
-            model: requestModel,
-            aspectRatio: displayedImageSize,
-            createdAt,
-            status: "complete",
-            progress: 100,
-            generationRequest,
-            sourceBoardNodeId: overrides.boardNodeId,
-            sourceBoardResultStackKey: overrides.boardResultStackKey,
-          },
-          { boardId: resolveScopeBoardId(overrides) },
-        );
+        const savedCompletedItems: StorageItem[] = [];
+        for (const [index, outputUrl] of outputUrls.entries()) {
+          const completedAssetId = makeClientId(`img_${index}`);
+          const completedItem = buildStorageItem(
+            {
+              id: completedAssetId,
+              type: "image",
+              url: outputUrl,
+              prompt: activePrompt,
+              model: requestModel,
+              aspectRatio: displayedImageSize,
+              createdAt,
+              status: "complete",
+              progress: 100,
+              generationRequest,
+              sourceBoardNodeId: overrides.boardNodeId,
+              sourceBoardResultStackKey: overrides.boardResultStackKey,
+            },
+            { boardId: resolveScopeBoardId(overrides) },
+          );
+          const savedCompletedItem = await saveItemOrWarn(completedItem, pushWorkspaceNotice);
+          if (savedCompletedItem) savedCompletedItems.push(savedCompletedItem);
+        }
 
-        const savedCompletedItem = await saveItemOrWarn(completedItem, pushWorkspaceNotice);
-        if (!savedCompletedItem) {
+        if (savedCompletedItems.length === 0) {
           const failedTask = await updateTaskOrWarn(taskId, {
             status: "failed",
             progress: 100,
@@ -514,10 +519,11 @@ export function useGenerationActions({
           if (failedTask) recordGenerationTask(failedTask);
           return true;
         }
-        setItems(prev => [savedCompletedItem, ...prev]);
+        setItems(prev => [...savedCompletedItems, ...prev]);
+        const resultAssetIds = savedCompletedItems.map(item => item.id);
         const completeTask = await updateTaskOrWarn(taskId, {
-          activeResultAssetId: completedAssetId,
-          resultAssetIds: [completedAssetId],
+          activeResultAssetId: resultAssetIds[0],
+          resultAssetIds,
           status: "complete",
           progress: 100,
         }, pushWorkspaceNotice);

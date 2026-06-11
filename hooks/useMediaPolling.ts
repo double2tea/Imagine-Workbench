@@ -25,6 +25,18 @@ function getStringField(value: unknown, field: string): string | null {
   return typeof fieldValue === "string" && fieldValue.trim() ? fieldValue : null;
 }
 
+function getStringArrayField(value: unknown, field: string): string[] {
+  if (typeof value !== "object" || value === null || !(field in value)) return [];
+  const record = value as Record<string, unknown>;
+  const fieldValue = record[field];
+  if (!Array.isArray(fieldValue)) return [];
+  return fieldValue.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+}
+
+function statusOutputCount(statusData: unknown): number {
+  return Math.max(1, getStringArrayField(statusData, "urls").length);
+}
+
 function isProcessingTimedOut(task: GenerationTask): boolean {
   const createdAt = Date.parse(task.createdAt);
   return Number.isFinite(createdAt) && Date.now() - createdAt > PROCESSING_TIMEOUT_MS;
@@ -233,18 +245,30 @@ export function useMediaPolling({
                     ? API_ROUTES.media.audioDownload
                     : API_ROUTES.media.videoDownload;
 
-              const dlRes = await fetch(downloadEndpoint, {
-                method: "POST",
-                headers: { "Content-Type": "application/json", ...headers },
-                body: JSON.stringify({ operationName: task.operationName, model: task.model }),
-              });
+              const completedItemsToSave: StorageItem[] = [];
+              let wasCanceled = false;
+              for (let outputIndex = 0; outputIndex < statusOutputCount(statusData); outputIndex += 1) {
+                const dlRes = await fetch(downloadEndpoint, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", ...headers },
+                  body: JSON.stringify({ operationName: task.operationName, model: task.model, outputIndex }),
+                });
 
-              if (dlRes.ok) {
+                if (!dlRes.ok) {
+                  throw new Error(await readFetchError(dlRes, "结果下载失败"));
+                }
+
                 const blob = await dlRes.blob();
-                if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
+                if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) {
+                  wasCanceled = true;
+                  break;
+                }
                 const completedUrl = await blobToDataUrl(blob);
-                if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
-                const completedAssetId = makeClientId(completedAssetIdPrefix(mediaType));
+                if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) {
+                  wasCanceled = true;
+                  break;
+                }
+                const completedAssetId = makeClientId(`${completedAssetIdPrefix(mediaType)}_${outputIndex}`);
                 const completedItem = buildStorageItem(
                   {
                     id: completedAssetId,
@@ -262,39 +286,48 @@ export function useMediaPolling({
                   },
                   { boardId: task.source.boardId },
                 );
-                if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
-                const savedCompletedItem = await saveItemOrWarn(completedItem, pushWorkspaceNotice);
                 if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) {
-                  if (savedCompletedItem) await deleteItemOrWarn(savedCompletedItem.id, pushWorkspaceNotice);
-                  continue;
+                  wasCanceled = true;
+                  break;
                 }
-                if (!savedCompletedItem) {
-                  if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
-                  const failedTask = await updateTaskOrWarn(task.id, {
-                    status: "failed",
-                    progress: 100,
-                    errorMessage: "结果资产本地存储失败",
-                  }, pushWorkspaceNotice);
-                  if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
-                  delete pollingFailuresRef.current[task.id];
-                  if (failedTask) setGenerationTasks(current => upsertGenerationTask(current, failedTask));
-                  continue;
-                }
-                if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
-                const completedTask = await updateTaskOrWarn(task.id, {
-                  activeResultAssetId: completedAssetId,
-                  resultAssetIds: [completedAssetId],
-                  status: "complete",
+                completedItemsToSave.push(completedItem);
+              }
+
+              if (wasCanceled) continue;
+              const savedCompletedItems: StorageItem[] = [];
+              for (const completedItem of completedItemsToSave) {
+                const savedCompletedItem = await saveItemOrWarn(completedItem, pushWorkspaceNotice);
+                if (savedCompletedItem) savedCompletedItems.push(savedCompletedItem);
+              }
+              if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) {
+                for (const savedItem of savedCompletedItems) await deleteItemOrWarn(savedItem.id, pushWorkspaceNotice);
+                continue;
+              }
+              if (savedCompletedItems.length === 0) {
+                const failedTask = await updateTaskOrWarn(task.id, {
+                  status: "failed",
                   progress: 100,
+                  errorMessage: "结果资产本地存储失败",
                 }, pushWorkspaceNotice);
-                if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
                 delete pollingFailuresRef.current[task.id];
-                if (completedTask) {
-                  completedItems.push(savedCompletedItem);
-                  setGenerationTasks(current => upsertGenerationTask(current, completedTask));
-                }
-              } else {
-                throw new Error(await readFetchError(dlRes, "结果下载失败"));
+                if (failedTask) setGenerationTasks(current => upsertGenerationTask(current, failedTask));
+                continue;
+              }
+              const resultAssetIds = savedCompletedItems.map(item => item.id);
+              const completedTask = await updateTaskOrWarn(task.id, {
+                activeResultAssetId: resultAssetIds[0],
+                resultAssetIds,
+                status: "complete",
+                progress: 100,
+              }, pushWorkspaceNotice);
+              if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) {
+                for (const savedItem of savedCompletedItems) await deleteItemOrWarn(savedItem.id, pushWorkspaceNotice);
+                continue;
+              }
+              delete pollingFailuresRef.current[task.id];
+              if (completedTask) {
+                completedItems.push(...savedCompletedItems);
+                setGenerationTasks(current => upsertGenerationTask(current, completedTask));
               }
             } else {
               if (isProcessingTimedOut(task)) {

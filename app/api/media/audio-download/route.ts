@@ -7,6 +7,7 @@ export const runtime = "edge";
 
 interface DownloadBody {
   operationName?: unknown;
+  outputIndex?: unknown;
 }
 
 export async function POST(req: NextRequest) {
@@ -18,12 +19,20 @@ export async function POST(req: NextRequest) {
     }
 
     const config = resolveProviderConfig(req, operation.provider);
-    return await downloadAudio(config, operation.id);
+    return await downloadAudio(config, operation.id, optionalOutputIndex(body.outputIndex));
   } catch (err) {
     const response = apiErrorResponse(err, "Failed to download audio file");
     if (response.status >= 500) console.error("Audio proxy download failed:", err);
     return NextResponse.json(response.body, { status: response.status });
   }
+}
+
+function optionalOutputIndex(value: unknown): number {
+  if (value === undefined || value === null) return 0;
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0) {
+    throw badRequest("outputIndex must be a non-negative integer", "invalid_output_index");
+  }
+  return value;
 }
 
 function parseDownloadOperationName(operationName: string): ReturnType<typeof parseMediaOperationName> {

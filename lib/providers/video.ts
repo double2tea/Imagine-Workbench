@@ -168,11 +168,12 @@ export async function getVideoStatus(config: ProviderConfig, taskId: string, mod
   };
 }
 
-export async function downloadVideo(config: ProviderConfig, taskId: string, model?: string): Promise<Response> {
+export async function downloadVideo(config: ProviderConfig, taskId: string, model?: string, outputIndex = 0): Promise<Response> {
   if (config.provider === "runninghub") {
     const result = await getRunningHubMediaStatus(config, "video", taskId);
-    if (!result.url) throw new Error("Video task is complete but did not expose a video URL");
-    return downloadVideoUrl(config, config.baseUrl, result.url);
+    const url = result.urls?.[outputIndex] ?? (outputIndex === 0 ? result.url : undefined);
+    if (!url) throw new Error(`Video task is complete but did not expose video #${outputIndex + 1}`);
+    return downloadVideoUrl(config, config.baseUrl, url);
   }
 
   const task = parseVideoTaskId(config, taskId, model);

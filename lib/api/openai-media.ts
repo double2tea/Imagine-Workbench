@@ -65,11 +65,12 @@ export async function postOpenAiImageGenerations(req: Request): Promise<Response
         "unsupported_async_image_model",
       );
     }
-    if (!result.imageUrl) {
+    const imageUrls = result.imageUrls ?? (result.imageUrl ? [result.imageUrl] : []);
+    if (imageUrls.length === 0) {
       throw badRequest("Image response did not include image data", "missing_image_result");
     }
 
-    return Response.json(await openAiImageResponse(result.imageUrl, body.response_format ?? "b64_json"));
+    return Response.json(await openAiImageResponse(imageUrls, body.response_format ?? "b64_json"));
   } catch (error) {
     return openAiMediaErrorResponse(error, "Failed to generate image");
   }
@@ -108,11 +109,12 @@ export async function postOpenAiImageEdits(req: Request): Promise<Response> {
       imageQuality: readOptionalFormText(form, "quality"),
     });
 
-    if (!result.imageUrl) {
+    const imageUrls = result.imageUrls ?? (result.imageUrl ? [result.imageUrl] : []);
+    if (imageUrls.length === 0) {
       throw badRequest("Image edit response did not include image data", "missing_image_result");
     }
 
-    return Response.json(await openAiImageResponse(result.imageUrl, readImageResponseFormat(form.get("response_format"))));
+    return Response.json(await openAiImageResponse(imageUrls, readImageResponseFormat(form.get("response_format"))));
   } catch (error) {
     return openAiMediaErrorResponse(error, "Failed to edit image");
   }
@@ -210,20 +212,20 @@ function openAiAudioErrorResponse(error: unknown, fallbackMessage: string): Resp
   return openAiMediaErrorResponse(audioOperationApiError(error) ?? error, fallbackMessage);
 }
 
-async function openAiImageResponse(imageUrl: string, responseFormat: ImageResponseFormat): Promise<{
+async function openAiImageResponse(imageUrls: string[], responseFormat: ImageResponseFormat): Promise<{
   created: number;
   data: Array<{ b64_json: string } | { url: string }>;
 }> {
   if (responseFormat === "url") {
     return {
       created: Math.floor(Date.now() / 1000),
-      data: [{ url: imageUrl }],
+      data: imageUrls.map(imageUrl => ({ url: imageUrl })),
     };
   }
 
   return {
     created: Math.floor(Date.now() / 1000),
-    data: [{ b64_json: await imageUrlToBase64(imageUrl) }],
+    data: await Promise.all(imageUrls.map(async imageUrl => ({ b64_json: await imageUrlToBase64(imageUrl) }))),
   };
 }
 

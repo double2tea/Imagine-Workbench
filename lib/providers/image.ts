@@ -231,11 +231,12 @@ export async function editImage(config: ProviderConfig, input: EditImageInput): 
   return generate12AiGeminiImage(config, editInputToGenerateInput(input));
 }
 
-export async function downloadImage(config: ProviderConfig, taskId: string): Promise<Response> {
+export async function downloadImage(config: ProviderConfig, taskId: string, outputIndex = 0): Promise<Response> {
   const status = await getAsyncImageStatus(config, taskId);
-  if (!status.url) throw new Error("Image task is complete but did not expose an image URL");
+  const url = readStatusUrlAt(status, outputIndex);
+  if (!url) throw new Error(`Image task is complete but did not expose image #${outputIndex + 1}`);
 
-  const res = await fetch(status.url);
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`Failed to download image: HTTP ${res.status}`);
 
   return new Response(res.body, {
@@ -309,20 +310,27 @@ export async function downloadRunningHubMedia(
   config: ProviderConfig,
   mediaType: ProviderMediaType,
   taskId: string,
+  outputIndex = 0,
 ): Promise<Response> {
   const status = await getRunningHubMediaStatus(config, mediaType, taskId);
-  if (!status.url) throw new Error(`RunningHub ${mediaType} task is complete but did not expose a result URL`);
+  const url = readStatusUrlAt(status, outputIndex);
+  if (!url) throw new Error(`RunningHub ${mediaType} task is complete but did not expose result #${outputIndex + 1}`);
 
-  const res = await fetch(status.url);
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`Failed to download RunningHub ${mediaType}: HTTP ${res.status}`);
 
   return new Response(res.body, {
     headers: {
       "Content-Type": runningHubDownloadContentType(res, mediaType),
-      "Content-Disposition": `inline; filename="${mediaType}_${Date.now()}.${runningHubDownloadExtension(res, status.url, mediaType)}"`,
+      "Content-Disposition": `inline; filename="${mediaType}_${Date.now()}.${runningHubDownloadExtension(res, url, mediaType)}"`,
       "Cache-Control": "public, max-age=31536000",
     },
   });
+}
+
+function readStatusUrlAt(status: MediaStatusResult, outputIndex: number): string | undefined {
+  if (!Number.isInteger(outputIndex) || outputIndex < 0) throw new Error("outputIndex must be a non-negative integer");
+  return status.urls?.[outputIndex] ?? (outputIndex === 0 ? status.url : undefined);
 }
 
 function runningHubDownloadContentType(res: Response, mediaType: ProviderMediaType): string {
@@ -389,14 +397,15 @@ export async function getAsyncImageStatus(config: ProviderConfig, taskId: string
   const status = response.status?.toLowerCase() ?? "pending";
 
   if (ASYNC_IMAGE_SUCCESS_STATUSES.has(status)) {
-    const url = read12AiAsyncImageUrl(response);
-    if (!url) throw new Error("Async image task completed without an image URL");
+    const urls = read12AiAsyncImageUrls(response);
+    if (urls.length === 0) throw new Error("Async image task completed without an image URL");
     return {
       done: true,
       mediaType: "image",
       progress: 100,
       status,
-      url,
+      url: urls[0],
+      urls,
     };
   }
 
@@ -418,9 +427,11 @@ export async function getAsyncImageStatus(config: ProviderConfig, taskId: string
   };
 }
 
-function read12AiAsyncImageUrl(response: AsyncImageStatusResponse): string | undefined {
-  return response.outputs?.find(output => typeof output === "string" && output.length > 0) ??
-    response.data?.find(item => typeof item.url === "string" && item.url.length > 0)?.url;
+function read12AiAsyncImageUrls(response: AsyncImageStatusResponse): string[] {
+  return dedupeUrls([
+    ...(response.outputs ?? []),
+    ...(response.data ?? []).map(item => item.url),
+  ]);
 }
 
 function read12AiAsyncImageError(response: AsyncImageStatusResponse): string | undefined {
@@ -454,8 +465,8 @@ async function generateModelScopeImage(config: ProviderConfig, input: GenerateIm
     };
   }
 
-  const imageUrl = readModelScopeImageUrl(json);
-  if (imageUrl) return { imageUrl, source: input.model };
+  const imageUrls = readModelScopeImageUrls(json);
+  if (imageUrls.length > 0) return { imageUrl: imageUrls[0], imageUrls, source: input.model };
   throw new Error("ModelScope image response did not include task_id or image URL");
 }
 
@@ -473,9 +484,9 @@ async function getModelScopeImageStatus(config: ProviderConfig, taskId: string):
 
   const status = (json.task_status ?? json.status ?? "PENDING").toLowerCase();
   if (MODELSCOPE_IMAGE_SUCCESS_STATUSES.has(status)) {
-    const url = readModelScopeImageUrl(json);
-    if (!url) throw new Error("ModelScope image task completed without an image URL");
-    return { done: true, mediaType: "image", progress: 100, status, url };
+    const urls = readModelScopeImageUrls(json);
+    if (urls.length === 0) throw new Error("ModelScope image task completed without an image URL");
+    return { done: true, mediaType: "image", progress: 100, status, url: urls[0], urls };
   }
   if (MODELSCOPE_IMAGE_FAILED_STATUSES.has(status)) {
     return {
@@ -563,9 +574,9 @@ export async function getRunningHubMediaStatus(
   const data = response.data ?? response;
   const status = data.status?.toLowerCase() ?? "running";
   if (status === "succeeded" || status === "success" || status === "completed") {
-    const url = readRunningHubOutputUrl(data.results ?? [], mediaType);
-    if (!url) throw new Error("RunningHub task completed without a result URL");
-    return { done: true, mediaType, progress: 100, status, url };
+    const urls = readRunningHubOutputUrls(data.results ?? [], mediaType);
+    if (urls.length === 0) throw new Error("RunningHub task completed without a result URL");
+    return { done: true, mediaType, progress: 100, status, url: urls[0], urls };
   }
   if (status === "failed" || status === "failure" || status === "canceled") {
     return {
@@ -618,9 +629,9 @@ async function getRunningHubTaskOutputStatus(
   if (results.length === 0) {
     return { done: false, mediaType, progress: 50, status: response.msg ?? "running" };
   }
-  const url = readRunningHubOutputUrl(results, mediaType);
-  if (!url) throw new Error("RunningHub task completed without a result URL");
-  return { done: true, mediaType, progress: 100, status: "success", url };
+  const urls = readRunningHubOutputUrls(results, mediaType);
+  if (urls.length === 0) throw new Error("RunningHub task completed without a result URL");
+  return { done: true, mediaType, progress: 100, status: "success", url: urls[0], urls };
 }
 
 function isRunningHubFailedOutput(value: RunningHubTaskOutputsResponse["data"]): value is { failedReason?: unknown } {
@@ -631,9 +642,10 @@ function readFailedReason(reason: unknown): string {
   return typeof reason === "string" && reason.trim() ? reason : "RunningHub task failed";
 }
 
-function readRunningHubOutputUrl(results: RunningHubMediaOutput[], mediaType: ProviderMediaType): string | undefined {
-  return results.find(result => isRunningHubOutputMediaType(result, mediaType))?.url
-    ?? results.find(result => isRunningHubOutputMediaType(result, mediaType))?.fileUrl;
+function readRunningHubOutputUrls(results: RunningHubMediaOutput[], mediaType: ProviderMediaType): string[] {
+  return dedupeUrls(results
+    .filter(result => isRunningHubOutputMediaType(result, mediaType))
+    .flatMap(result => [result.url, result.fileUrl]));
 }
 
 function isRunningHubOutputMediaType(result: RunningHubMediaOutput, mediaType: ProviderMediaType): boolean {
@@ -666,16 +678,13 @@ function buildModelScopeImageBody(input: GenerateImageInput): Record<string, unk
   return body;
 }
 
-function readModelScopeImageUrl(response: ModelScopeImageCreateResponse): string | undefined {
-  const direct = response.images?.find(item => typeof item.url === "string")?.url ?? response.output_images?.[0];
-  if (direct) return direct;
-  const outputImage = response.output?.images?.find((item): item is string | { url?: string } => {
-    if (typeof item === "string") return item.length > 0;
-    return typeof item.url === "string" && item.url.length > 0;
-  });
-  if (typeof outputImage === "string") return outputImage;
-  if (outputImage?.url) return outputImage.url;
-  return response.output?.output_images?.[0];
+function readModelScopeImageUrls(response: ModelScopeImageCreateResponse): string[] {
+  return dedupeUrls([
+    ...(response.images ?? []).map(item => item.url),
+    ...(response.output_images ?? []),
+    ...(response.output?.images ?? []).map(item => typeof item === "string" ? item : item.url),
+    ...(response.output?.output_images ?? []),
+  ]);
 }
 
 async function buildRunningHubRequest(
@@ -1169,8 +1178,8 @@ async function generateAgnesImage(config: ProviderConfig, input: GenerateImageIn
     },
   });
 
-  const imageUrl = readOpenAiImageUrl(response);
-  if (imageUrl) return { imageUrl, source: input.model };
+  const imageUrls = readOpenAiImageUrls(response);
+  if (imageUrls.length > 0) return { imageUrl: imageUrls[0], imageUrls, source: input.model };
   throw new Error("Agnes image response did not include b64_json or url");
 }
 
@@ -1184,15 +1193,17 @@ async function generateOpenAiCompatibleImage(
       ? await editOpenAiCompatibleImage(config, input, provider)
       : await createOpenAiCompatibleImage(config, input);
 
-  const imageUrl = readOpenAiImageUrl(response);
-  if (imageUrl) return { imageUrl, source: input.model };
+  const imageUrls = readOpenAiImageUrls(response);
+  if (imageUrls.length > 0) return { imageUrl: imageUrls[0], imageUrls, source: input.model };
   throw new Error("Image response did not include b64_json or url");
 }
 
-function readOpenAiImageUrl(response: OpenAiImageResponse): string | undefined {
-  const first = response.data?.[0];
-  if (first?.b64_json) return `data:image/png;base64,${first.b64_json}`;
-  return first?.url ?? response.image_url ?? response.url;
+function readOpenAiImageUrls(response: OpenAiImageResponse): string[] {
+  return dedupeUrls([
+    ...(response.data ?? []).map(item => item.b64_json ? `data:image/png;base64,${item.b64_json}` : item.url),
+    response.image_url,
+    response.url,
+  ]);
 }
 
 async function createOpenAiCompatibleImage(
@@ -1273,9 +1284,21 @@ async function editOpenAiCompatibleImageWithOperation(
   });
 
   const response = await postForm<OpenAiImageResponse>(openAiCompatibleUrl(config.baseUrl, "/v1/images/edits"), config, form);
-  const imageUrl = readOpenAiImageUrl(response);
-  if (imageUrl) return { imageUrl, source: input.model };
+  const imageUrls = readOpenAiImageUrls(response);
+  if (imageUrls.length > 0) return { imageUrl: imageUrls[0], imageUrls, source: input.model };
   throw new Error("Image edit response did not include b64_json or url");
+}
+
+function dedupeUrls(values: Array<string | undefined>): string[] {
+  const urls: string[] = [];
+  const seen = new Set<string>();
+  for (const value of values) {
+    const url = value?.trim();
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    urls.push(url);
+  }
+  return urls;
 }
 
 function openAiEditImageFieldName(provider: AiProvider, guideCount: number): "image" | "image[]" {

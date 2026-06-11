@@ -108,6 +108,7 @@ test("12AI async image status polling reads task outputs", async () => {
       progress: 100,
       status: "completed",
       url: "https://img.12ai.org/images/task_123_0.png",
+      urls: ["https://img.12ai.org/images/task_123_0.png"],
     });
   } finally {
     globalThis.fetch = originalFetch;
@@ -143,9 +144,49 @@ test("12AI async image tasks accept base URLs that already include v1", async ()
 
     assert.equal(result.operationName, "12ai:image:task_v1");
     assert.equal(status.url, "https://img.12ai.org/images/task_v1_0.png");
+    assert.deepEqual(status.urls, ["https://img.12ai.org/images/task_v1_0.png"]);
     assert.deepEqual(requestUrls, [
       "https://cdn.12ai.org/v1/task/submit",
       "https://cdn.12ai.org/v1/task/task_v1",
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("OpenAI-compatible image generation preserves multiple data results", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (): Promise<Response> => new Response(JSON.stringify({
+    data: [
+      { b64_json: "Zmlyc3Q=" },
+      { b64_json: "c2Vjb25k" },
+    ],
+  }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+
+  const config: ProviderConfig = {
+    provider: "custom-provider",
+    apiKey: "test-key",
+    baseUrl: "https://provider.test",
+    videoBaseUrl: "https://provider.test",
+  };
+
+  try {
+    const result = await generateImage(config, {
+      prompt: "two images",
+      model: "image-model",
+      aspectRatio: "1:1",
+      imageResolution: "1024x1024",
+      referenceImages: [],
+      async: false,
+    });
+
+    assert.equal(result.imageUrl, "data:image/png;base64,Zmlyc3Q=");
+    assert.deepEqual(result.imageUrls, [
+      "data:image/png;base64,Zmlyc3Q=",
+      "data:image/png;base64,c2Vjb25k",
     ]);
   } finally {
     globalThis.fetch = originalFetch;

@@ -62,8 +62,12 @@ export async function POST(req: NextRequest) {
       runningHubNodeInfoList: runningHubNodeInfo.nodeInfoList,
     });
 
-    if (result.imageUrl?.startsWith("data:")) {
-      const blob = dataUriToBlob(result.imageUrl);
+    const imageUrls = result.imageUrls ?? (result.imageUrl ? [result.imageUrl] : []);
+    if (imageUrls.length > 1) return imageUrlsJsonResponse(imageUrls, result.source);
+    const imageUrl = imageUrls[0];
+
+    if (imageUrl?.startsWith("data:")) {
+      const blob = dataUriToBlob(imageUrl);
       return new Response(blob, {
         headers: {
           "Content-Type": blob.type || "image/png",
@@ -72,8 +76,8 @@ export async function POST(req: NextRequest) {
         },
       });
     }
-    if (result.imageUrl?.startsWith("http://") || result.imageUrl?.startsWith("https://")) {
-      return imageUrlResponse(result.imageUrl, result.source);
+    if (imageUrl?.startsWith("http://") || imageUrl?.startsWith("https://")) {
+      return imageUrlResponse(imageUrl, result.source);
     }
 
     return NextResponse.json(result);
@@ -106,6 +110,44 @@ async function imageUrlResponse(imageUrl: string, source: string): Promise<Respo
       "x-image-source": source,
     },
   });
+}
+
+async function imageUrlsJsonResponse(imageUrls: string[], source: string): Promise<Response> {
+  const localizedImageUrls = await Promise.all(imageUrls.map(localizeImageResultUrl));
+  return NextResponse.json({
+    imageUrl: localizedImageUrls[0],
+    imageUrls: localizedImageUrls,
+    source,
+  });
+}
+
+async function localizeImageResultUrl(imageUrl: string): Promise<string> {
+  if (imageUrl.startsWith("data:")) return imageUrl;
+  if (!imageUrl.startsWith("http://") && !imageUrl.startsWith("https://")) {
+    throw new Error("图片结果 URL 格式不支持");
+  }
+
+  const response = await fetch(assertPublicHttpUrl(imageUrl, "unsafe_image_result_url"));
+  if (!response.ok) {
+    throw new Error(`图片结果下载失败：HTTP ${response.status}`);
+  }
+
+  const contentType = response.headers.get("Content-Type") ?? "image/png";
+  if (!contentType.startsWith("image/")) {
+    throw new Error("图片结果不是图片响应");
+  }
+
+  return `data:${contentType};base64,${arrayBufferToBase64(await response.arrayBuffer())}`;
+}
+
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
+  }
+  return btoa(binary);
 }
 
 function resolveImageResolution(modelValue: string, aspectRatio: string, imageResolution: string | undefined): string {

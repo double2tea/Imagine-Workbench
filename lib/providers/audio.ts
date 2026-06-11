@@ -153,9 +153,9 @@ export async function getAudioStatus(config: ProviderConfig, taskId: string): Pr
   return getRunningHubMediaStatus(config, "audio", taskId);
 }
 
-export async function downloadAudio(config: ProviderConfig, taskId: string): Promise<Response> {
+export async function downloadAudio(config: ProviderConfig, taskId: string, outputIndex = 0): Promise<Response> {
   if (config.provider !== "runninghub") {
     throw new Error(`${config.provider} audio download is not supported yet`);
   }
-  return downloadRunningHubMedia(config, "audio", taskId);
+  return downloadRunningHubMedia(config, "audio", taskId, outputIndex);
 }
