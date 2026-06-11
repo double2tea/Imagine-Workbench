@@ -86,7 +86,10 @@ function isOpenAiCompatibleModel(model: ModelOption, kind: ModelKindFilter): boo
 function readOpenAiCompatibleModelKind(model: string): ModelKind | undefined {
   try {
     const parsed = parseProviderModel(model, "12ai");
-    if (parsed.async || parsed.provider === "modelscope") return undefined;
+    if (parsed.async) return undefined;
+    if (parsed.provider === "modelscope") {
+      return readCapabilityKind(model, ["chat"]);
+    }
     if (parsed.provider === "runninghub") {
       return readCapabilityKind(model, ["chat"]);
     }

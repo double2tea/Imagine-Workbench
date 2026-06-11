@@ -3,7 +3,12 @@ import { ApiError } from "./errors";
 const BLOCKED_HOSTNAMES = new Set(["0.0.0.0", "localhost"]);
 
 export function assertPublicHttpUrl(value: string, code = "unsafe_remote_url"): URL {
-  const url = new URL(value);
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new ApiError(502, code, "Provider result URL must be a valid URL");
+  }
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new ApiError(502, code, "Provider result URL must use http or https");
   }
@@ -33,23 +38,56 @@ function isBlockedIpv4(hostname: string): boolean {
   if (!octets.every(Number.isInteger)) return false;
   if (!octets.every(octet => octet >= 0 && octet <= 255)) return false;
 
-  const [first, second] = octets;
+  const [first, second, third] = octets;
   return (
     first === 0 ||
     first === 10 ||
     first === 127 ||
+    (first === 100 && second >= 64 && second <= 127) ||
     (first === 169 && second === 254) ||
     (first === 172 && second >= 16 && second <= 31) ||
-    (first === 192 && second === 168)
+    (first === 192 && second === 0) ||
+    (first === 192 && second === 88 && third === 99) ||
+    (first === 192 && second === 168) ||
+    (first === 198 && (second === 18 || second === 19)) ||
+    (first === 198 && second === 51 && third === 100) ||
+    (first === 203 && second === 0 && third === 113) ||
+    first >= 224
   );
 }
 
 function isBlockedIpv6(hostname: string): boolean {
+  const mappedIpv4 = readIpv4MappedIpv6(hostname);
+  if (mappedIpv4) return isBlockedIpv4(mappedIpv4);
+
   return (
     hostname === "::1" ||
     hostname === "::" ||
+    hostname.startsWith("64:ff9b:") ||
     hostname.startsWith("fc") ||
     hostname.startsWith("fd") ||
-    hostname.startsWith("fe80:")
+    hostname.startsWith("fe80:") ||
+    hostname.startsWith("ff") ||
+    hostname === "2001:db8::" ||
+    hostname.startsWith("2001:db8:")
   );
+}
+
+function readIpv4MappedIpv6(hostname: string): string | undefined {
+  const prefix = "::ffff:";
+  if (!hostname.startsWith(prefix)) return undefined;
+
+  const suffix = hostname.slice(prefix.length);
+  if (suffix.includes(".")) return suffix;
+
+  const parts = suffix.split(":");
+  if (parts.length !== 2) return undefined;
+
+  const high = Number.parseInt(parts[0], 16);
+  const low = Number.parseInt(parts[1], 16);
+  if (!Number.isInteger(high) || !Number.isInteger(low) || high < 0 || high > 0xffff || low < 0 || low > 0xffff) {
+    return undefined;
+  }
+
+  return `${high >> 8}.${high & 0xff}.${low >> 8}.${low & 0xff}`;
 }

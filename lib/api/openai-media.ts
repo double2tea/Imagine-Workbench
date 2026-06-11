@@ -9,7 +9,7 @@ import { audioOperationApiError } from "./audio-errors";
 import { ApiError, apiErrorResponse, badRequest, requireApiText } from "./errors";
 import { assertOpenAiCompatibleGatewayAccess } from "./openai-auth";
 import { assertPublicHttpUrl } from "./url-safety";
-import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES } from "../reference-images";
+import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, dataUriByteSize } from "../reference-images";
 
 const IMAGE_EDIT_OPERATIONS = new Set<ImageEditOperation>(["redraw", "erase", "outpaint", "cutout"]);
 const TRANSCRIPTION_LANGUAGES = new Set<MimoAsrLanguage>(["auto", "zh", "en"]);
@@ -80,6 +80,7 @@ export async function postOpenAiImageEdits(req: Request): Promise<Response> {
     const gatewayKey = assertOpenAiCompatibleGatewayAccess(req);
     assertRequestBodySize(req, "Image edit request body is too large");
     const form = await req.formData();
+    assertFormPayloadSize(form, "Image edit request body is too large");
     assertAllowedFormFields(form, IMAGE_EDIT_FORM_FIELDS);
     const modelValue = readFormText(form, "model");
     const operation = readImageEditOperation(form.get("operation"));
@@ -159,6 +160,7 @@ export async function postOpenAiAudioTranscriptions(req: Request): Promise<Respo
     const gatewayKey = assertOpenAiCompatibleGatewayAccess(req);
     assertRequestBodySize(req, "Audio transcription request body is too large");
     const form = await req.formData();
+    assertFormPayloadSize(form, "Audio transcription request body is too large");
     assertAllowedFormFields(form, TRANSCRIPTION_FORM_FIELDS);
     const modelValue = readFormText(form, "model");
     const parsed = parseProviderModel(modelValue, "mimo");
@@ -233,7 +235,9 @@ async function imageUrlToBase64(imageUrl: string): Promise<string> {
   if (!response.ok) throw new Error(`Image result download failed with HTTP ${response.status}`);
   const contentType = response.headers.get("Content-Type") ?? "";
   if (!contentType.startsWith("image/")) throw new Error("Image result URL did not return an image");
-  return arrayBufferToBase64(await response.arrayBuffer());
+  const contentLength = readContentLength(response.headers);
+  if (contentLength !== undefined) assertProviderImageResultSize(contentLength);
+  return arrayBufferToBase64(await responseArrayBufferWithLimit(response, REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES));
 }
 
 function readImageResponseFormat(value: FormDataEntryValue | null): ImageResponseFormat {
@@ -324,13 +328,27 @@ async function readRequiredImageEditDataUris(form: FormData): Promise<string[]> 
 
 async function formValueToDataUri(value: FormDataEntryValue, fieldName: string, fallbackMimeType: string): Promise<string> {
   if (typeof value === "string") {
-    if (value.startsWith("data:")) return value;
+    if (value.startsWith("data:")) {
+      assertDataUriSize(value, `${fieldName} is too large`);
+      return value;
+    }
     throw badRequest(`${fieldName} must be a file or base64 data URI`, "invalid_file");
   }
   const mimeType = value.type || fallbackMimeType;
   const buffer = await value.arrayBuffer();
   assertFileSize(buffer.byteLength, `${fieldName} is too large`);
   return `data:${mimeType};base64,${arrayBufferToBase64(buffer)}`;
+}
+
+function assertFormPayloadSize(form: FormData, message: string): void {
+  let totalBytes = 0;
+
+  for (const value of form.values()) {
+    totalBytes += typeof value === "string" ? new TextEncoder().encode(value).byteLength : value.size;
+    if (totalBytes > REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES) {
+      throw new ApiError(413, "payload_too_large", message);
+    }
+  }
 }
 
 function assertRequestBodySize(req: Request, message: string): void {
@@ -343,10 +361,61 @@ function assertRequestBodySize(req: Request, message: string): void {
   }
 }
 
+function assertDataUriSize(dataUri: string, message: string): void {
+  const bytes = dataUriByteSize(dataUri);
+  if (bytes === null) throw badRequest("file must be a base64 data URI", "invalid_file");
+  assertFileSize(bytes, message);
+}
+
 function assertFileSize(bytes: number, message: string): void {
   if (bytes > REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES) {
     throw new ApiError(413, "payload_too_large", message);
   }
+}
+
+function assertProviderImageResultSize(bytes: number): void {
+  if (bytes > REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES) {
+    throw new ApiError(502, "provider_result_too_large", "Provider image result is too large");
+  }
+}
+
+function readContentLength(headers: Headers): number | undefined {
+  const value = headers.get("content-length");
+  if (!value) return undefined;
+
+  const bytes = Number(value);
+  return Number.isFinite(bytes) && bytes >= 0 ? bytes : undefined;
+}
+
+async function responseArrayBufferWithLimit(response: Response, maxBytes: number): Promise<ArrayBuffer> {
+  if (!response.body) {
+    const buffer = await response.arrayBuffer();
+    assertProviderImageResultSize(buffer.byteLength);
+    return buffer;
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    totalBytes += value.byteLength;
+    if (totalBytes > maxBytes) {
+      await reader.cancel();
+      assertProviderImageResultSize(totalBytes);
+    }
+    chunks.push(value);
+  }
+
+  const combined = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    combined.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return combined.buffer;
 }
 
 function imageSizeAspectRatio(size: string): string {

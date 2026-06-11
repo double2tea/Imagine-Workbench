@@ -7,6 +7,7 @@ import {
   postOpenAiImageEdits,
   postOpenAiImageGenerations,
 } from "../lib/api/openai-media";
+import { assertPublicHttpUrl } from "../lib/api/url-safety";
 import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES } from "../lib/reference-images";
 
 test("OpenAI-compatible image generations maps JSON to provider image adapter", async () => {
@@ -204,6 +205,43 @@ test("OpenAI-compatible image generations blocks private provider result URLs wh
   }
 });
 
+test("OpenAI-compatible image generations blocks IPv4-mapped IPv6 provider result URLs", async () => {
+  assert.throws(
+    () => assertPublicHttpUrl("http://[::ffff:127.0.0.1]/private.png", "unsafe_image_result_url"),
+    /local or private network/,
+  );
+});
+
+test("OpenAI-compatible image generations rejects oversized provider image downloads", async () => {
+  const mock = withFetchMock(async input => {
+    if (String(input).includes("/v1/images/generations")) {
+      return jsonResponse({ data: [{ url: "https://cdn.example.test/huge.png" }] });
+    }
+
+    return new Response(oversizedImageStream(), {
+      headers: {
+        "Content-Type": "image/png",
+      },
+    });
+  });
+
+  try {
+    const response = await postOpenAiImageGenerations(jsonRequest("/v1/images/generations", {
+      model: "newapi:image-model",
+      prompt: "cat",
+    }, {
+      "x-ai-api-key": "image_key",
+      "x-ai-base-url": "https://newapi.example.test/v1",
+    }));
+
+    assert.equal(response.status, 502);
+    assert.match(await response.text(), /too large/);
+    assert.equal(mock.calls.count, 2);
+  } finally {
+    mock.restore();
+  }
+});
+
 test("OpenAI-compatible image edits rejects oversized multipart bodies before parsing files", async () => {
   const response = await postOpenAiImageEdits(new Request("http://local.test/v1/images/edits", {
     method: "POST",
@@ -216,6 +254,30 @@ test("OpenAI-compatible image edits rejects oversized multipart bodies before pa
 
   assert.equal(response.status, 413);
   assert.match(await response.text(), /too large/);
+});
+
+test("OpenAI-compatible image edits rejects oversized data URI form fields without content length", async () => {
+  const mock = withFetchMock(async () => {
+    throw new Error("Oversized data URI must be rejected before provider submission");
+  });
+
+  try {
+    const form = new FormData();
+    form.set("model", "newapi:image-edit-model");
+    form.set("prompt", "make it blue");
+    form.set("image", makeDataUri(REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES + 1));
+
+    const response = await postOpenAiImageEdits(formRequest("/v1/images/edits", form, {
+      "x-ai-api-key": "image_key",
+      "x-ai-base-url": "https://newapi.example.test/v1",
+    }));
+
+    assert.equal(response.status, 413);
+    assert.match(await response.text(), /too large/);
+    assert.equal(mock.calls.count, 0);
+  } finally {
+    mock.restore();
+  }
 });
 
 test("OpenAI-compatible image edits accepts multipart image upload", async () => {
@@ -480,6 +542,28 @@ function formRequest(pathname: string, form: FormData, headers: Record<string, s
     method: "POST",
     headers,
     body: form,
+  });
+}
+
+function makeDataUri(bytes: number): string {
+  return `data:image/png;base64,${Buffer.alloc(bytes).toString("base64")}`;
+}
+
+function oversizedImageStream(): ReadableStream<Uint8Array> {
+  let remainingBytes = REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES + 1;
+  const chunk = new Uint8Array(1024 * 1024);
+
+  return new ReadableStream<Uint8Array>({
+    pull(controller) {
+      if (remainingBytes <= 0) {
+        controller.close();
+        return;
+      }
+
+      const nextSize = Math.min(chunk.byteLength, remainingBytes);
+      controller.enqueue(chunk.subarray(0, nextSize));
+      remainingBytes -= nextSize;
+    },
   });
 }
 

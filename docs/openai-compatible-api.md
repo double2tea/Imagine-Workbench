@@ -56,7 +56,7 @@ Query parameters:
 - `provider`: `all` or a provider key; defaults to `all`
 - `kind`: `chat`, `image`, `video`, `audio`, or `all`; defaults to `chat`
 
-When `provider` is omitted or set to `all`, the route returns the Workbench-known models that are directly callable through the documented `/v1/*` facade: chat, immediate image, and direct audio models. It excludes video, async image, ModelScope API-Inference image, RunningHub Standard Model API media, AI App, and Workflow targets. Use `provider=<key>` when you want that provider's dedicated dynamic model listing behavior. Use `/api/models` for the richer Workbench catalog used by the app UI.
+When `provider` is omitted or set to `all`, the route returns the Workbench-known models that are directly callable through the documented `/v1/*` facade: chat, immediate image, and direct audio models. It includes ModelScope chat models, and excludes video, async image, ModelScope API-Inference image, RunningHub Standard Model API media, AI App, and Workflow targets. Use `provider=<key>` when you want that provider's dedicated dynamic model listing behavior. Use `/api/models` for the richer Workbench catalog used by the app UI.
 
 Example:
 
@@ -91,7 +91,7 @@ Supported fields:
 
 Async and workflow image targets are rejected here. Use `/api/media/generate-image` plus `/api/media/status` for those.
 
-When `response_format` is `b64_json`, provider result URLs are downloaded server-side and local/private network targets are rejected.
+When `response_format` is `b64_json`, provider result URLs are downloaded server-side. Local/private network targets and image responses above 24MB are rejected.
 
 ### `POST /v1/images/edits`
 
@@ -111,7 +111,7 @@ Supported fields:
 
 This is an OpenAI-shaped facade over Workbench edit semantics, not a complete clone of every OpenAI image edit feature. Multi-image requests are forwarded as OpenAI-style `image[]` uploads to immediate OpenAI-compatible image edit providers.
 
-Multipart image edit payloads are capped at 24MB before provider calls.
+Multipart image edit payloads, including string data URI fields, are capped at 24MB before provider calls.
 
 ### `POST /v1/audio/speech`
 
@@ -141,7 +141,7 @@ Multipart fields:
 
 MiMo ASR input must be `wav` or `mp3`, and the base64 payload sent upstream must be at or below 10MB.
 
-Multipart transcription payloads are capped at 24MB before provider calls.
+Multipart transcription payloads, including string data URI fields, are capped at 24MB before provider calls.
 
 ## Workbench Media Routes
 

@@ -30,11 +30,13 @@ test("OpenAI-compatible model list defaults to v1-callable provider models", asy
   };
   assert.equal(body.object, "list");
   assert.ok(body.data?.some(model => model.id === "12ai:gemini-3.1-flash-image-preview"));
+  assert.ok(body.data?.some(model => model.id === "modelscope:Qwen/Qwen3-235B-A22B"));
   assert.ok(body.data?.some(model => model.id === "mimo:mimo-v2.5-tts"));
   assert.ok(body.data?.some(model => model.id === "runninghub:qwen/qwen3.7-max"));
   assert.equal(body.data?.some(model => model.id === "12ai:veo_3_1-fast"), false);
   assert.equal(body.data?.some(model => typeof model.id === "string" && model.id.startsWith("12ai-async:")), false);
-  assert.equal(body.data?.some(model => typeof model.id === "string" && model.id.startsWith("modelscope:")), false);
+  assert.equal(body.data?.some(model => model.id === "modelscope:Qwen/Qwen-Image"), false);
+  assert.equal(body.data?.some(model => model.id === "modelscope:Qwen/Qwen-Image-Edit"), false);
   assert.equal(body.data?.some(model => typeof model.id === "string" && model.id.startsWith("runninghub:ai-app-")), false);
   assert.equal(body.data?.some(model => typeof model.id === "string" && model.id.startsWith("runninghub:api:/openapi/v2/")), false);
   assert.equal(body.data?.some(model => typeof model.id === "string" && model.id.includes("<webappId>")), false);
