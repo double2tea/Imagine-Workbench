@@ -5,6 +5,7 @@ const ALLOWED_HTTP_METHODS = new Set(["GET", "POST"]);
 const ALLOWED_HTTP_PATHS = new Set([
   "/api/resolve/capabilities",
   "/api/resolve/provider-credentials",
+  "/api/models",
   "/v1/images/generations",
   "/v1/images/edits",
   "/api/media/generate-video",

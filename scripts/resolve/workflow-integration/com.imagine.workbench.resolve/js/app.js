@@ -22,13 +22,22 @@
     "transcribe": "mimo:mimo-v2.5-asr"
   };
   var MODEL_OPTIONS = {
-    "generate-image": [DEFAULT_MODELS["generate-image"]],
-    "image-to-image": [DEFAULT_MODELS["image-to-image"]],
-    "edit-image": [DEFAULT_MODELS["edit-image"]],
-    "ai-lut": [DEFAULT_MODELS["ai-lut"]],
-    "generate-video": [DEFAULT_MODELS["generate-video"]],
-    "tts": [DEFAULT_MODELS.tts],
-    "transcribe": [DEFAULT_MODELS.transcribe]
+    "generate-image": [{ value: DEFAULT_MODELS["generate-image"], label: "默认图像模型" }],
+    "image-to-image": [{ value: DEFAULT_MODELS["image-to-image"], label: "默认图生图模型" }],
+    "edit-image": [{ value: DEFAULT_MODELS["edit-image"], label: "默认图像编辑模型" }],
+    "ai-lut": [{ value: DEFAULT_MODELS["ai-lut"], label: "默认 AI LUT 模型" }],
+    "generate-video": [{ value: DEFAULT_MODELS["generate-video"], label: "默认视频模型" }],
+    "tts": [{ value: DEFAULT_MODELS.tts, label: "默认 TTS 模型" }],
+    "transcribe": [{ value: DEFAULT_MODELS.transcribe, label: "默认 ASR 模型" }]
+  };
+  var OPERATION_MODEL_QUERIES = {
+    "generate-image": { provider: "12ai", kind: "image" },
+    "image-to-image": { provider: "12ai", kind: "image" },
+    "edit-image": { provider: "12ai", kind: "image" },
+    "ai-lut": { provider: "12ai", kind: "image" },
+    "generate-video": { provider: "12ai", kind: "video" },
+    "tts": { provider: "mimo", kind: "audio", filter: "tts" },
+    "transcribe": { provider: "mimo", kind: "audio", filter: "asr" }
   };
   var OPERATION_CAPABILITY_IDS = {
     "generate-image": "generate_image",
@@ -197,7 +206,8 @@
     lastImportDone: false,
     promptDraft: "",
     importToResolve: false,
-    appendToTimeline: false
+    appendToTimeline: false,
+    modelRequestId: 0
   };
 
   var outputDir = hasNode ? path.join(os.homedir(), "Movies", "Imagine Resolve Bridge") : "";
@@ -376,12 +386,58 @@
     });
   }
 
-  function renderModelOptions(operation) {
+  function renderModelOptions(operation, options) {
+    var candidates = options || MODEL_OPTIONS[operation] || [];
     modelOptions.innerHTML = "";
-    (MODEL_OPTIONS[operation] || []).forEach(function (model) {
+    candidates.forEach(function (model) {
       var option = document.createElement("option");
-      option.value = model;
+      option.value = model.value;
+      if (model.label) {
+        option.label = model.label;
+      }
       modelOptions.appendChild(option);
+    });
+  }
+
+  async function refreshModelOptions(operation) {
+    var requestId = state.modelRequestId + 1;
+    var query = OPERATION_MODEL_QUERIES[operation];
+    state.modelRequestId = requestId;
+    renderModelOptions(operation);
+    if (!query) {
+      return;
+    }
+    try {
+      await loadSharedCredentialsForJob({ operation: operation, baseUrl: baseUrlInput.value.trim() });
+      var route = "/api/models?provider=" + encodeURIComponent(query.provider) + "&kind=" + encodeURIComponent(query.kind);
+      var payload = await getJsonForOperation(baseUrlInput.value.trim(), route, operation);
+      if (state.modelRequestId !== requestId || state.operation !== operation) {
+        return;
+      }
+      var models = filterModelOptions(payload.models, query.filter);
+      renderModelOptions(operation, models.length > 0 ? models : undefined);
+    } catch {
+      if (state.modelRequestId === requestId && state.operation === operation) {
+        renderModelOptions(operation);
+      }
+    }
+  }
+
+  function filterModelOptions(models, filter) {
+    if (!Array.isArray(models)) {
+      return [];
+    }
+    return models.flatMap(function (model) {
+      if (!model || typeof model.value !== "string") {
+        return [];
+      }
+      if (filter && model.value.toLowerCase().indexOf(filter) === -1) {
+        return [];
+      }
+      return [{
+        value: model.value,
+        label: typeof model.label === "string" && model.label ? model.label : model.value
+      }];
     });
   }
 
@@ -417,6 +473,7 @@
     modelField.classList.toggle("hidden", !OPERATION_CAPABILITY_IDS[operation]);
     modelInput.value = selectedModelForOperation(operation);
     renderModelOptions(operation);
+    refreshModelOptions(operation);
     imageOperationField.classList.toggle("hidden", config.imageOperation !== true);
     pollSecondsField.classList.toggle("hidden", config.pollSeconds !== true);
     languageField.classList.toggle("hidden", config.language !== true);
@@ -1678,6 +1735,11 @@
     return readJsonResponse(response, routePath);
   }
 
+  async function getJsonForOperation(baseUrl, routePath, operation) {
+    var response = await fetchUrl(baseUrl, routePath, { method: "GET", headers: requestHeadersForOperation(operation) });
+    return readJsonResponse(response, routePath);
+  }
+
   async function postJson(baseUrl, routePath, payload) {
     var headers = requestHeaders({ "Content-Type": "application/json" });
     var response = await fetchUrl(baseUrl, routePath, {
@@ -1808,10 +1870,14 @@
   }
 
   function requestHeaders(extra) {
+    return requestHeadersForOperation(state.activeOperation || state.operation, extra);
+  }
+
+  function requestHeadersForOperation(operation, extra) {
     var headers = Object.assign({ Accept: "*/*" }, extra || {});
-    var shared = sharedCredentialForOperation(state.activeOperation || state.operation);
+    var shared = sharedCredentialForOperation(operation);
     addHeader(headers, "Authorization", process.env.IMAGINE_WORKBENCH_API_KEY ? "Bearer " + process.env.IMAGINE_WORKBENCH_API_KEY : "");
-    addHeader(headers, "x-ai-api-key", providerApiKeyForOperation(state.activeOperation || state.operation) || process.env.IMAGINE_PROVIDER_API_KEY);
+    addHeader(headers, "x-ai-api-key", providerApiKeyForOperation(operation) || process.env.IMAGINE_PROVIDER_API_KEY);
     addHeader(headers, "x-ai-base-url", inputValue(providerBaseUrlInput) || shared.baseUrl || process.env.IMAGINE_PROVIDER_BASE_URL);
     addHeader(headers, "x-ai-provider-label", inputValue(providerLabelInput) || shared.providerLabel || process.env.IMAGINE_PROVIDER_LABEL);
     return headers;
@@ -2134,6 +2200,12 @@
 
   modelInput.addEventListener("input", function () {
     persistModelForOperation(state.operation);
+  });
+
+  [baseUrlInput, twelveApiKeyInput, mimoApiKeyInput, providerBaseUrlInput, providerLabelInput].forEach(function (input) {
+    input.addEventListener("change", function () {
+      refreshModelOptions(state.operation);
+    });
   });
 
   importInput.addEventListener("change", function () {
