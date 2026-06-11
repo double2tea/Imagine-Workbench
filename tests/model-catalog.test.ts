@@ -462,7 +462,9 @@ test("runninghub exposes concrete standard model capabilities", () => {
     "video",
   );
   const omniFlash = getModelCapability("runninghub:api:/openapi/v2/gemini-omni-flash/text-to-video", "video");
+  const videoX = getModelCapability("runninghub:api:/openapi/v2/rhart-video-g/text-to-video", "video");
   const veo = getModelCapability("runninghub:api:/openapi/v2/rhart-video-v3.1-fast-official/text-to-video", "video");
+  const videoXI2vHidden = "runninghub:api:/openapi/v2/rhart-video-g/image-to-video";
   const veoStartEndHidden = "runninghub:api:/openapi/v2/rhart-video-v3.1-fast/start-end-to-video";
   const gptImage = getModelCapability("runninghub:api:/openapi/v2/rhart-image-g-2-official/text-to-image", "image");
   const gptImageChannel = getModelCapability("runninghub:api:/openapi/v2/rhart-image-g-2/text-to-image", "image");
@@ -510,6 +512,40 @@ test("runninghub exposes concrete standard model capabilities", () => {
   assert.deepEqual(omniFlash.sizes.map(option => option.value), ["auto", "16:9", "9:16"]);
   assert.deepEqual(omniFlash.resolutions.map(option => option.value), ["720p", "1080p", "4k"]);
   assert.deepEqual(omniFlash.referenceMediaTypes, ["image", "video"]);
+  assert.equal(VIDEO_MODEL_OPTIONS["runninghub"].some(option => option.value === "runninghub:api:/openapi/v2/rhart-video-g/text-to-video"), true);
+  assert.equal(VIDEO_MODEL_OPTIONS["runninghub"].some(option => option.value === videoXI2vHidden), false);
+  assert.equal(videoX.videoReferenceMode, "reference");
+  assert.deepEqual(videoX.videoReferenceModes, ["reference"]);
+  assert.deepEqual(videoX.sizes.map(option => option.value), ["2:3", "3:2", "1:1", "16:9", "9:16"]);
+  assert.deepEqual(videoX.resolutions.map(option => option.value), ["720p", "480p"]);
+  assert.deepEqual(videoX.durations.map(option => option.value), [
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "21",
+    "22",
+    "23",
+    "24",
+    "25",
+    "26",
+    "27",
+    "28",
+    "29",
+    "30",
+  ]);
+  assert.equal(videoX.maxReferenceImages, 7);
   assert.equal(veo.videoReferenceMode, "reference");
   assert.deepEqual(veo.videoReferenceModes, ["reference", "firstLast"]);
   assert.deepEqual(veo.sizes.map(option => option.value), ["auto", "16:9", "9:16"]);

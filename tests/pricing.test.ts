@@ -43,6 +43,10 @@ test("getModelPrice returns known RunningHub price", () => {
     getModelPrice("runninghub", "runninghub:api:/openapi/v2/gemini-omni-flash/text-to-video"),
     { price: 1.95, unit: "次" },
   );
+  assert.deepEqual(
+    getModelPrice("runninghub", "runninghub:api:/openapi/v2/rhart-video-g/text-to-video"),
+    { price: 0.04, unit: "秒" },
+  );
 });
 
 test("getModelPrice returns null for unknown model and provider", () => {
@@ -54,6 +58,10 @@ test("calculateModelPrice multiplies per-second prices by duration", () => {
   assert.deepEqual(
     calculateModelPrice("runninghub", "runninghub:api:/openapi/v2/rhart-video-v3.1-lite-official/text-to-video", { duration: "6" }),
     { price: 0.32, unit: "秒", totalPrice: 1.92, isCalculated: true, detail: "¥0.32/秒 × 6s" },
+  );
+  assert.deepEqual(
+    calculateModelPrice("runninghub", "runninghub:api:/openapi/v2/rhart-video-g/text-to-video", { duration: "30" }),
+    { price: 0.04, unit: "秒", totalPrice: 1.2, isCalculated: true, detail: "¥0.04/秒 × 30s" },
   );
 });
 
@@ -86,6 +94,14 @@ test("calculateModelPrice routes RunningHub video references to the billed model
       videoReferenceMode: "none",
     }),
     { price: 2.35, unit: "次", totalPrice: 2.35, isCalculated: false },
+  );
+  assert.deepEqual(
+    calculateModelPrice("runninghub", "runninghub:api:/openapi/v2/rhart-video-g/text-to-video", {
+      duration: "12",
+      referenceTypes: ["image", "image"],
+      videoReferenceMode: "reference",
+    }),
+    { price: 0.04, unit: "秒", totalPrice: 0.48, isCalculated: true, detail: "¥0.04/秒 × 12s" },
   );
 });
 

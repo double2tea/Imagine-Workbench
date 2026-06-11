@@ -331,6 +331,52 @@ test("runninghub omni flash video models map resolution duration and references"
   );
 });
 
+test("runninghub videox 1.5 channel video models map documented fields", () => {
+  const textVideo = getRunningHubStandardModel("api:/openapi/v2/rhart-video-g/text-to-video", "video");
+  const imageVideo = getRunningHubStandardModel("api:/openapi/v2/rhart-video-g/image-to-video", "video");
+  assert.ok(textVideo);
+  assert.ok(imageVideo);
+  assert.equal(resolveRunningHubStandardModelForReferences(textVideo, 1).model, imageVideo.model);
+  assert.equal(resolveRunningHubStandardModelForReferences(textVideo, 7).model, imageVideo.model);
+
+  assert.deepEqual(
+    buildRunningHubStandardBody(textVideo, {
+      prompt: "a glass deer running through neon rain",
+      aspectRatio: "2:3",
+      resolutionName: "720p",
+      durationSeconds: "6",
+      referenceImages: [],
+    }),
+    {
+      prompt: "a glass deer running through neon rain",
+      resolution: "720p",
+      duration: 6,
+      aspectRatio: "2:3",
+    },
+  );
+
+  assert.deepEqual(
+    buildRunningHubStandardBody(imageVideo, {
+      prompt: "animate these frames with subtle camera drift",
+      aspectRatio: "9:16",
+      resolutionName: "480p",
+      durationSeconds: "30",
+      referenceImages: [
+        { dataUri: "data:image/png;base64,a" },
+        { dataUri: "data:image/png;base64,b" },
+      ],
+      referenceUrls: ["https://runninghub.example/a.png", "https://runninghub.example/b.png"],
+    }),
+    {
+      prompt: "animate these frames with subtle camera drift",
+      resolution: "480p",
+      duration: 30,
+      aspectRatio: "9:16",
+      imageUrls: ["https://runninghub.example/a.png", "https://runninghub.example/b.png"],
+    },
+  );
+});
+
 test("runninghub veo 3.1 and gpt image 2 variants map documented fields", () => {
   const veo = getRunningHubStandardModel("api:/openapi/v2/rhart-video-v3.1-fast-official/text-to-video", "video");
   const gptImage = getRunningHubStandardModel("api:/openapi/v2/rhart-image-g-2-official/text-to-image", "image");

@@ -9,6 +9,34 @@ const SEEDANCE_15_RESOLUTIONS = ["480p", "720p", "1080p"] as const;
 const SEEDANCE_15_FAST_RESOLUTIONS = ["720p", "1080p"] as const;
 const SEEDANCE_20_FAST_RESOLUTIONS = ["480p", "720p", "1080p", "2k", "4k"] as const;
 const SEEDANCE_20_GLOBAL_RESOLUTIONS = ["480p", "720p", "native1080p", "1080p", "2k", "4k"] as const;
+const VIDEOX_15_DURATIONS = [
+  "6",
+  "7",
+  "8",
+  "9",
+  "10",
+  "11",
+  "12",
+  "13",
+  "14",
+  "15",
+  "16",
+  "17",
+  "18",
+  "19",
+  "20",
+  "21",
+  "22",
+  "23",
+  "24",
+  "25",
+  "26",
+  "27",
+  "28",
+  "29",
+  "30",
+] as const;
+const VIDEOX_15_RESOLUTIONS = ["720p", "480p"] as const;
 const VEO_31_DURATIONS = ["4", "6", "8"] as const;
 const VEO_31_CHANNEL_DURATIONS = ["8"] as const;
 const VEO_31_4K_RESOLUTIONS = ["720p", "1080p", "4k"] as const;
@@ -765,11 +793,52 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
         resolution: "8k",
         aspectRatioFallback: "3:4",
         referenceField: "imageUrls",
-      },
     },
-    {
-      model: "api:/openapi/v2/rhart-video-v3.1-fast/text-to-video",
-      label: "RunningHub Veo 3.1 Fast Channel Auto",
+  },
+  {
+    model: "api:/openapi/v2/rhart-video-g/text-to-video",
+    label: "RunningHub VideoX 1.5 Channel Auto",
+    kind: "video",
+    supportsReferences: true,
+    minReferenceImages: 0,
+    maxReferenceImages: 7,
+    videoReferenceMode: "reference",
+    durationOptions: VIDEOX_15_DURATIONS,
+    resolutionOptions: VIDEOX_15_RESOLUTIONS,
+    referenceRoutes: {
+      imageToVideo: "api:/openapi/v2/rhart-video-g/image-to-video",
+      reference: "api:/openapi/v2/rhart-video-g/image-to-video",
+    },
+    request: {
+      type: "aspect-resolution-video",
+      endpoint: "/openapi/v2/rhart-video-g/text-to-video",
+      durations: VIDEOX_15_DURATIONS,
+      aspectField: "aspectRatio",
+      durationValueType: "number",
+    },
+  },
+  {
+    model: "api:/openapi/v2/rhart-video-g/image-to-video",
+    label: "RunningHub VideoX 1.5 I2V Channel Low Price",
+    kind: "video",
+    listed: false,
+    supportsReferences: true,
+    minReferenceImages: 1,
+    maxReferenceImages: 7,
+    durationOptions: VIDEOX_15_DURATIONS,
+    resolutionOptions: VIDEOX_15_RESOLUTIONS,
+    request: {
+      type: "image-reference-video",
+      endpoint: "/openapi/v2/rhart-video-g/image-to-video",
+      durations: VIDEOX_15_DURATIONS,
+      referenceField: "imageUrls",
+      aspectField: "aspectRatio",
+      durationValueType: "number",
+    },
+  },
+  {
+    model: "api:/openapi/v2/rhart-video-v3.1-fast/text-to-video",
+    label: "RunningHub Veo 3.1 Fast Channel Auto",
     kind: "video",
     supportsReferences: true,
     minReferenceImages: 0,

@@ -342,6 +342,14 @@ const VEO_31_VIDEO_SIZES: ParameterOption[] = [
   { value: "9:16", label: "9:16 Vertical" },
 ];
 
+const RUNNINGHUB_VIDEOX_15_SIZES: ParameterOption[] = [
+  { value: "2:3", label: "2:3 Portrait" },
+  { value: "3:2", label: "3:2 Landscape" },
+  { value: "1:1", label: "1:1 Square" },
+  { value: "16:9", label: "16:9 Cinema" },
+  { value: "9:16", label: "9:16 Vertical" },
+];
+
 const VEO_31_VIDEO_RESOLUTIONS: ParameterOption[] = [
   { value: "720p", label: "720p" },
   { value: "1080p", label: "1080p" },
@@ -1595,6 +1603,13 @@ function runningHubVideoParameterProfile(
       durations: optionList(model.durationOptions),
       resolutions: optionList(model.resolutionOptions) ?? OMNI_FLASH_VIDEO_RESOLUTIONS,
       sizes: TWELVE_AI_OMNI_VIDEO_SIZES,
+    };
+  }
+  if (lower.includes("rhart-video-g/")) {
+    return {
+      durations: optionList(model.durationOptions),
+      resolutions: optionList(model.resolutionOptions),
+      sizes: RUNNINGHUB_VIDEOX_15_SIZES,
     };
   }
   if (lower.includes("rhart-video-v3.1")) {

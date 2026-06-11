@@ -92,6 +92,10 @@ const RUNNINGHUB_PRICES: ProviderPriceEntry[] = [
   { pathMatch: "gemini-omni-flash/image-to-video", price: 1.95, unit: "次" },
   { pathMatch: "gemini-omni-flash/video-edit", price: 1.95, unit: "次" },
 
+  // --- VideoX 1.5 Channel ---
+  { pathMatch: "rhart-video-g/text-to-video", price: 0.04, unit: "秒" },
+  { pathMatch: "rhart-video-g/image-to-video", price: 0.04, unit: "秒" },
+
   // --- Veo 3.1 Fast Official ---
   { pathMatch: "rhart-video-v3.1-fast-official/reference-to-video", price: 4.03, unit: "次" },
   { pathMatch: "rhart-video-v3.1-fast-official/text-to-video", price: 2.35, unit: "次" },
