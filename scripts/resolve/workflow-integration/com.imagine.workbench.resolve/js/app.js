@@ -200,6 +200,7 @@
     activeModel: "",
     resolve: null,
     sharedCredentials: {},
+    resolveCapabilities: null,
     preparedMask: null,
     lookPresetId: "kodak-warm-film",
     lastOutputs: [],
@@ -401,40 +402,50 @@
     });
   }
 
-  async function refreshModelOptions(operation) {
+  async function refreshModelOptions(operation, options) {
     var requestId = state.modelRequestId + 1;
     var query = OPERATION_MODEL_QUERIES[operation];
+    var strict = options && options.strict === true;
     state.modelRequestId = requestId;
     renderModelOptions(operation);
     if (!query) {
       return 0;
     }
     try {
-      await loadSharedCredentialsForJob({ operation: operation, baseUrl: baseUrlInput.value.trim() });
+      var refreshJob = { operation: operation, baseUrl: baseUrlInput.value.trim() };
+      await loadResolveCapabilitiesForJob(refreshJob);
+      await loadSharedCredentialsForJob(refreshJob);
       var providers = modelProvidersForOperation(operation);
       var models = [];
+      var failures = [];
       for (var index = 0; index < providers.length; index += 1) {
         var provider = providers[index];
         var route = "/api/models?provider=" + encodeURIComponent(provider) + "&kind=" + encodeURIComponent(query.kind);
         try {
           var payload = await getJsonForProvider(baseUrlInput.value.trim(), route, provider);
           models = models.concat(filterModelOptions(payload.models, query.filter));
-        } catch {
-          // One unavailable provider should not hide models from other configured providers.
+        } catch (error) {
+          failures.push(provider + "：" + errorMessage(error));
         }
       }
       if (state.modelRequestId !== requestId || state.operation !== operation) {
         return 0;
       }
       var uniqueModels = dedupeModelOptions(models);
+      if (uniqueModels.length === 0) {
+        throw new Error(modelRefreshFailureMessage(providers, failures));
+      }
       if (!localStorage.getItem(modelStorageKey(operation)) && uniqueModels.length > 0 && inputValue(modelInput) === (DEFAULT_MODELS[operation] || "")) {
         modelInput.value = uniqueModels[0].value;
       }
       renderModelOptions(operation, uniqueModels.length > 0 ? uniqueModels : undefined);
       return uniqueModels.length;
-    } catch {
+    } catch (error) {
       if (state.modelRequestId === requestId && state.operation === operation) {
         renderModelOptions(operation);
+      }
+      if (strict) {
+        throw error;
       }
       return 0;
     }
@@ -447,7 +458,7 @@
     modelRefreshButton.disabled = true;
     setStatus("正在刷新服务商和模型...");
     try {
-      var count = await refreshModelOptions(state.operation);
+      var count = await refreshModelOptions(state.operation, { strict: true });
       setStatus("模型列表已刷新\n可用模型：" + count);
     } catch (error) {
       setStatus("刷新模型失败\n" + explainError(error, { baseUrl: baseUrlInput.value.trim() }));
@@ -457,15 +468,53 @@
   }
 
   function modelProvidersForOperation(operation) {
-    var providers = Object.keys(state.sharedCredentials || {}).filter(function (provider) {
+    var query = OPERATION_MODEL_QUERIES[operation];
+    var providers = configuredCapabilityProviders(query ? query.kind : "");
+    Object.keys(state.sharedCredentials || {}).forEach(function (provider) {
       var credentials = state.sharedCredentials[provider];
-      return credentials && (credentials.apiKey || credentials.baseUrl);
+      if (credentials && (credentials.apiKey || credentials.baseUrl) && providers.indexOf(provider) === -1) {
+        providers.push(provider);
+      }
     });
     var defaultProvider = providerForOperation(operation);
     if (defaultProvider && providers.indexOf(defaultProvider) === -1) {
       providers.push(defaultProvider);
     }
     return providers;
+  }
+
+  function configuredCapabilityProviders(kind) {
+    var capabilities = state.resolveCapabilities;
+    if (!capabilities || !Array.isArray(capabilities.providers)) {
+      return [];
+    }
+    return capabilities.providers.flatMap(function (provider) {
+      if (!provider || provider.configured !== true || typeof provider.key !== "string") {
+        return [];
+      }
+      if (!providerSupportsModelKind(provider, kind)) {
+        return [];
+      }
+      return [provider.key];
+    });
+  }
+
+  function providerSupportsModelKind(provider, kind) {
+    if (kind === "image") return provider.supportsImage === true;
+    if (kind === "video") return provider.supportsVideo === true;
+    if (kind === "audio") return provider.supportsAudio === true;
+    if (kind === "chat") return provider.supportsChat === true;
+    return true;
+  }
+
+  function modelRefreshFailureMessage(providers, failures) {
+    if (providers.length === 0) {
+      return "没有可查询的模型服务商。请先在 Workbench 设置中配置 Provider，或填写当前功能的默认服务 Key。";
+    }
+    if (failures.length > 0) {
+      return "没有获取到可用模型。\n" + failures.join("\n");
+    }
+    return "没有获取到可用模型。请确认当前功能对应的 Provider 已配置可用模型。";
   }
 
   function filterModelOptions(models, filter) {
@@ -1097,6 +1146,7 @@
 
   async function loadSharedCredentialsForJob(job) {
     if (!shouldLoadSharedCredentials(job)) {
+      state.sharedCredentials = {};
       return;
     }
     var response = await fetchUrl(job.baseUrl, "/api/resolve/provider-credentials", {
@@ -1105,6 +1155,16 @@
     });
     var payload = await readJsonResponse(response, "/api/resolve/provider-credentials");
     state.sharedCredentials = payload.credentials || {};
+  }
+
+  async function loadResolveCapabilitiesForJob(job) {
+    var response = await fetchUrl(job.baseUrl, "/api/resolve/capabilities", {
+      method: "GET",
+      headers: workbenchHeaders({ Accept: "application/json" })
+    });
+    var payload = await readJsonResponse(response, "/api/resolve/capabilities");
+    state.resolveCapabilities = payload;
+    return payload;
   }
 
   function shouldLoadSharedCredentials(job) {
@@ -1929,14 +1989,24 @@
     return requestHeadersForProvider(provider, extra);
   }
 
-  function requestHeadersForProvider(provider, extra) {
+  function workbenchHeaders(extra) {
     var headers = Object.assign({ Accept: "*/*" }, extra || {});
-    var shared = sharedCredentialForProvider(provider);
     addHeader(headers, "Authorization", process.env.IMAGINE_WORKBENCH_API_KEY ? "Bearer " + process.env.IMAGINE_WORKBENCH_API_KEY : "");
-    addHeader(headers, "x-ai-api-key", providerApiKeyForProvider(provider) || process.env.IMAGINE_PROVIDER_API_KEY);
-    addHeader(headers, "x-ai-base-url", inputValue(providerBaseUrlInput) || shared.baseUrl || process.env.IMAGINE_PROVIDER_BASE_URL);
-    addHeader(headers, "x-ai-provider-label", inputValue(providerLabelInput) || shared.providerLabel || process.env.IMAGINE_PROVIDER_LABEL);
     return headers;
+  }
+
+  function requestHeadersForProvider(provider, extra) {
+    var headers = workbenchHeaders(extra);
+    var shared = sharedCredentialForProvider(provider);
+    var allowManualOverride = provider === manualProviderOverrideTarget();
+    addHeader(headers, "x-ai-api-key", providerApiKeyForProvider(provider) || process.env.IMAGINE_PROVIDER_API_KEY);
+    addHeader(headers, "x-ai-base-url", (allowManualOverride ? inputValue(providerBaseUrlInput) : "") || shared.baseUrl || (allowManualOverride ? process.env.IMAGINE_PROVIDER_BASE_URL : ""));
+    addHeader(headers, "x-ai-provider-label", (allowManualOverride ? inputValue(providerLabelInput) : "") || shared.providerLabel || (allowManualOverride ? process.env.IMAGINE_PROVIDER_LABEL : ""));
+    return headers;
+  }
+
+  function manualProviderOverrideTarget() {
+    return providerForOperation(state.activeOperation || state.operation);
   }
 
   function providerApiKeyForProvider(provider) {

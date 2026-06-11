@@ -1,4 +1,5 @@
 import { DEFAULT_AUDIO_MODEL, DEFAULT_IMAGE_MODEL, DEFAULT_VIDEO_MODEL } from "../providers/model-catalog";
+import { PROVIDER_REGISTRY, resolveProviderApiKey } from "../providers/registry";
 
 export type ResolveBridgeClientMode = "external" | "in_resolve";
 export type ResolveBridgeHttpMethod = "GET" | "POST";
@@ -43,6 +44,7 @@ export interface ResolveBridgeCapabilities {
   version: 1;
   clientModes: ResolveBridgeClientMode[];
   operations: ResolveBridgeOperationContract[];
+  providers: ResolveBridgeProviderContract[];
   routes: {
     status: string;
     downloads: {
@@ -53,6 +55,16 @@ export interface ResolveBridgeCapabilities {
   };
 }
 
+export interface ResolveBridgeProviderContract {
+  key: string;
+  label: string;
+  configured: boolean;
+  supportsImage: boolean;
+  supportsVideo: boolean;
+  supportsAudio: boolean;
+  supportsChat: boolean;
+}
+
 const CLIENT_MODES: ResolveBridgeClientMode[] = ["external", "in_resolve"];
 
 export function getResolveBridgeCapabilities(): ResolveBridgeCapabilities {
@@ -60,6 +72,15 @@ export function getResolveBridgeCapabilities(): ResolveBridgeCapabilities {
     name: "imagine-resolve-bridge",
     version: 1,
     clientModes: CLIENT_MODES,
+    providers: PROVIDER_REGISTRY.map(provider => ({
+      key: provider.key,
+      label: provider.label,
+      configured: resolveProviderApiKey(provider.key).length > 0,
+      supportsImage: provider.supportsImage,
+      supportsVideo: provider.supportsVideo,
+      supportsAudio: provider.supportsAudio,
+      supportsChat: provider.supportsChat,
+    })),
     operations: [
       {
         id: "generate_image",
