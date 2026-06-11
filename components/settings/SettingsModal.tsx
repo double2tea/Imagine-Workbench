@@ -162,12 +162,14 @@ export default function SettingsModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
+          transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
           className="imagine-settings-overlay fixed inset-0 z-50 flex items-stretch justify-end p-0 sm:items-center sm:justify-center sm:p-4"
         >
           <motion.div
-            initial={{ scale: 0.95 }}
-            animate={{ scale: 1 }}
-            exit={{ scale: 0.95 }}
+            initial={{ opacity: 0, scale: 0.965, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.965, y: 10 }}
+            transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
             className="imagine-settings-panel flex w-full flex-col overflow-hidden sm:rounded-2xl"
           >
             <div className="imagine-settings-header flex shrink-0 items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
@@ -187,7 +189,7 @@ export default function SettingsModal({
                   type="button"
                   onClick={() => setTab(item.key)}
                   data-active={tab === item.key ? "true" : "false"}
-                  className="imagine-settings-tab"
+                  className="imagine-settings-tab imagine-motion-interactive"
                 >
                   {item.label}
                 </button>

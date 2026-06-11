@@ -1,5 +1,5 @@
 import { Check, Compass, Copy, FileText, Film, Mic2, Music, X } from "lucide-react";
-import { AnimatePresence } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import AudioWaveformPreview from "@/components/audio/AudioWaveformPreview";
 import VideoFrameMenu from "@/components/assets/VideoFrameMenu";
@@ -61,15 +61,28 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
   return (
     <AnimatePresence>
       {item && (
-        <div className="fixed inset-0 z-50 flex bg-slate-950/95 p-2 backdrop-blur-md sm:p-4">
+        <motion.div
+          key="fullscreen-preview"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+          className="fixed inset-0 z-50 flex bg-slate-950/95 p-2 backdrop-blur-md sm:p-4"
+        >
           <button
             onClick={onClose}
-            className="absolute right-4 top-4 z-10 rounded-lg border border-slate-800 bg-slate-900/90 p-2 text-slate-400 transition hover:text-white sm:right-6 sm:top-6"
+            className="imagine-motion-interactive absolute right-4 top-4 z-10 rounded-lg border border-slate-800 bg-slate-900/90 p-2 text-slate-400 hover:text-white sm:right-6 sm:top-6"
             aria-label="关闭全屏预览"
           >
             <X className="h-6 w-6" />
           </button>
-          <div className="flex h-full min-h-0 w-full flex-col items-center justify-center gap-3">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.985, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.985, y: 8 }}
+            transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+            className="flex h-full min-h-0 w-full flex-col items-center justify-center gap-3"
+          >
             <div className="flex min-h-0 w-full flex-1 items-center justify-center">
               {item.type === "image" ? (
                 <PreviewImage
@@ -123,7 +136,7 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
               )}
             </div>
             {showPreviewStrip && (
-              <div className="no-scrollbar flex w-full max-w-6xl shrink-0 gap-2 overflow-x-auto rounded-lg border border-slate-800 bg-slate-950/78 px-3 py-2 shadow-xl backdrop-blur">
+              <div className="imagine-motion-surface-reveal no-scrollbar flex w-full max-w-6xl shrink-0 gap-2 overflow-x-auto rounded-lg border border-slate-800 bg-slate-950/78 px-3 py-2 shadow-xl backdrop-blur">
                 {previewItems.map(previewItem => {
                   const isActive = previewItem.id === item.id;
                   return (
@@ -131,7 +144,7 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
                       key={previewItem.id}
                       type="button"
                       onClick={() => onSelectItem?.(previewItem)}
-                      className={`relative h-14 w-20 shrink-0 overflow-hidden rounded-md border bg-slate-900 transition ${
+                      className={`imagine-motion-interactive relative h-14 w-20 shrink-0 overflow-hidden rounded-md border bg-slate-900 ${
                         isActive ? "border-cyan-300 ring-2 ring-cyan-400/35" : "border-slate-700 hover:border-slate-500"
                       }`}
                       aria-label={`切换到 ${previewItem.prompt || previewItem.id}`}
@@ -156,7 +169,7 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
                 })}
               </div>
             )}
-            <div className="flex w-full max-w-6xl shrink-0 flex-col gap-2 rounded-lg border border-slate-800 bg-slate-950/88 px-3 py-2 text-slate-300 shadow-xl backdrop-blur sm:flex-row sm:items-center sm:justify-between">
+            <div className="imagine-motion-surface-reveal flex w-full max-w-6xl shrink-0 flex-col gap-2 rounded-lg border border-slate-800 bg-slate-950/88 px-3 py-2 text-slate-300 shadow-xl backdrop-blur sm:flex-row sm:items-center sm:justify-between">
               <p className="line-clamp-2 min-w-0 flex-1 text-xs italic leading-5 text-slate-200">
                 &ldquo;{item.prompt}&rdquo;
               </p>
@@ -168,7 +181,7 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
                   <button
                     type="button"
                     onClick={() => setPanoramaItem(item)}
-                    className="imagine-panorama-action inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition"
+                    className="imagine-panorama-action imagine-motion-interactive inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium"
                     title="360 查看"
                   >
                     <Compass className="h-3.5 w-3.5" />
@@ -179,7 +192,7 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
                   <button
                     type="button"
                     onClick={() => onSaveVoiceProfile(item)}
-                    className="inline-flex h-8 items-center gap-1.5 rounded-md border border-cyan-400/25 bg-cyan-500/10 px-2.5 text-xs font-medium text-cyan-100 transition hover:border-cyan-300/45 hover:bg-cyan-500/20 hover:text-white"
+                    className="imagine-motion-interactive inline-flex h-8 items-center gap-1.5 rounded-md border border-cyan-400/25 bg-cyan-500/10 px-2.5 text-xs font-medium text-cyan-100 hover:border-cyan-300/45 hover:bg-cyan-500/20 hover:text-white"
                     title="保存为克隆音色"
                   >
                     <Mic2 className="h-3.5 w-3.5" />
@@ -188,7 +201,7 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
                 )}
                 <button
                   onClick={() => copyPrompt(item.id, item.prompt)}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-700 bg-slate-900 px-2.5 text-xs font-medium text-slate-200 transition hover:border-slate-500 hover:text-white"
+                  className="imagine-motion-interactive inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-700 bg-slate-900 px-2.5 text-xs font-medium text-slate-200 hover:border-slate-500 hover:text-white"
                   title="复制 prompt"
                 >
                   {copyStatus === "copied" ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
@@ -196,7 +209,7 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
                 </button>
               </div>
             </div>
-          </div>
+          </motion.div>
           {panoramaItem && (
             <PanoramaOverlay
               item={panoramaItem}
@@ -204,7 +217,7 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
               onSaveScreenshots={onSavePanoramaScreenshots}
             />
           )}
-        </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );

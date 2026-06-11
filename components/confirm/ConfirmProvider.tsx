@@ -119,6 +119,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
             className="imagine-confirm-overlay fixed inset-0 z-[120] flex items-center justify-center p-4 backdrop-blur-sm"
             onClick={() => close(isAlert)}
           >
@@ -131,6 +132,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
               initial={{ scale: 0.96, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.96, opacity: 0 }}
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
               className="imagine-confirm-dialog w-full max-w-md rounded-xl border p-4"
               onClick={event => event.stopPropagation()}
             >
