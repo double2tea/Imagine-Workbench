@@ -1999,7 +1999,7 @@
     var headers = workbenchHeaders(extra);
     var shared = sharedCredentialForProvider(provider);
     var allowManualOverride = provider === manualProviderOverrideTarget();
-    addHeader(headers, "x-ai-api-key", providerApiKeyForProvider(provider) || process.env.IMAGINE_PROVIDER_API_KEY);
+    addHeader(headers, "x-ai-api-key", providerApiKeyForProvider(provider) || (allowManualOverride ? process.env.IMAGINE_PROVIDER_API_KEY : ""));
     addHeader(headers, "x-ai-base-url", (allowManualOverride ? inputValue(providerBaseUrlInput) : "") || shared.baseUrl || (allowManualOverride ? process.env.IMAGINE_PROVIDER_BASE_URL : ""));
     addHeader(headers, "x-ai-provider-label", (allowManualOverride ? inputValue(providerLabelInput) : "") || shared.providerLabel || (allowManualOverride ? process.env.IMAGINE_PROVIDER_LABEL : ""));
     return headers;
