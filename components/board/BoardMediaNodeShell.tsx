@@ -105,7 +105,7 @@ export default function BoardMediaNodeShell({
       {hasStackSwitcher && (
         <div
           className={[
-            "board-media-stack-switcher nodrag absolute -bottom-8 left-1/2 z-40 flex -translate-x-1/2 gap-1.5 rounded-full border border-white/10 bg-slate-950/72 px-2.5 py-1.5 text-[10px] font-semibold text-white/90 shadow-xl backdrop-blur transition-opacity duration-200",
+            "board-media-stack-switcher nodrag absolute -bottom-8 left-1/2 z-40 flex gap-1.5 rounded-full border border-white/10 bg-slate-950/72 px-2.5 py-1.5 text-[10px] font-semibold text-white/90 shadow-xl backdrop-blur transition-opacity duration-200",
             isSelected
               ? "pointer-events-auto opacity-100"
               : "pointer-events-none opacity-0 group-hover/board-video:pointer-events-auto group-hover/board-video:opacity-100",

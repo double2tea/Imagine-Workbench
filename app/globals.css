@@ -3225,12 +3225,12 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
   min-height: calc(100% - 2.25rem);
 }
 
-.board-connection-zone-edge.react-flow__handle-left {
+.board-node-handle.board-connection-zone-edge.react-flow__handle-left {
   --board-handle-translate: translate(-58%, -50%);
   left: 0 !important;
 }
 
-.board-connection-zone-edge.react-flow__handle-right {
+.board-node-handle.board-connection-zone-edge.react-flow__handle-right {
   --board-handle-translate: translate(58%, -50%);
   right: 0 !important;
 }
@@ -3240,12 +3240,12 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
   min-height: 56px;
 }
 
-.board-connection-zone-segment.react-flow__handle-left {
+.board-node-handle.board-connection-zone-segment.react-flow__handle-left {
   --board-handle-translate: translate(-58%, -50%);
   left: 0 !important;
 }
 
-.board-connection-zone-segment.react-flow__handle-right {
+.board-node-handle.board-connection-zone-segment.react-flow__handle-right {
   --board-handle-translate: translate(58%, -50%);
   right: 0 !important;
 }

@@ -87,6 +87,7 @@ const ResultBoardNode = memo(function ResultBoardNode({
     () => stackItems.find(stackItem => stackItem.id === node.activeAssetId) ?? fallbackItem,
     [fallbackItem, node.activeAssetId, stackItems],
   );
+  const isComplete = item.status === "complete";
   const isImagePreviewUrl = item.url.startsWith("data:image/");
   const audioItem = useBoardAudioItem(item);
   const playableAudioItem = audioItem ?? (item.type === "audio" && item.url.trim() ? item : null);
@@ -96,7 +97,7 @@ const ResultBoardNode = memo(function ResultBoardNode({
   const actionGroups: BoardMediaActionGroup[] = [
     {
       id: "edit",
-      actions: item.type === "image"
+      actions: item.type === "image" && isComplete
         ? IMAGE_EDIT_OPERATION_ORDER.map(operation => {
             const meta = imageEditOperationMeta(operation);
             const Icon = meta.Icon;
@@ -122,7 +123,7 @@ const ResultBoardNode = memo(function ResultBoardNode({
               toneClassName: operationToneClassName(WORKBENCH_OPERATION_META.analyze.tone),
             }]
           : []),
-        ...(item.type === "video" && onCaptureVideoFrame && shouldRenderVideoPlayer
+        ...(item.type === "video" && isComplete && onCaptureVideoFrame && shouldRenderVideoPlayer
           ? [{
               id: "frame",
               icon: <WorkbenchOperationIcon operation="frame" />,
@@ -131,7 +132,7 @@ const ResultBoardNode = memo(function ResultBoardNode({
               toneClassName: operationToneClassName(WORKBENCH_OPERATION_META.frame.tone),
             }]
           : []),
-        ...(item.type === "audio" && onSaveVoiceProfile
+        ...(item.type === "audio" && isComplete && onSaveVoiceProfile
           ? [{
               id: "voice",
               icon: <WorkbenchOperationIcon operation="voice" />,
@@ -145,7 +146,7 @@ const ResultBoardNode = memo(function ResultBoardNode({
     {
       id: "view",
       actions: [
-        ...(item.type === "image"
+        ...(item.type === "image" && isComplete
           ? [{
               id: "panorama",
               icon: <WorkbenchOperationIcon operation="panorama" />,
@@ -154,20 +155,24 @@ const ResultBoardNode = memo(function ResultBoardNode({
               toneClassName: operationToneClassName(WORKBENCH_OPERATION_META.panorama.tone),
             }]
           : []),
-        {
-          id: "fullscreen",
-          icon: <WorkbenchOperationIcon operation="fullscreen" />,
-          onClick: () => onOpenFullscreen?.(item),
-          title: WORKBENCH_OPERATION_META.fullscreen.title,
-          toneClassName: operationToneClassName(WORKBENCH_OPERATION_META.fullscreen.tone),
-        },
-        {
-          id: "download",
-          icon: <WorkbenchOperationIcon operation="download" />,
-          onClick: () => onDownload?.(item),
-          title: WORKBENCH_OPERATION_META.download.title,
-          toneClassName: operationToneClassName(WORKBENCH_OPERATION_META.download.tone),
-        },
+        ...(isComplete
+          ? [
+              {
+                id: "fullscreen",
+                icon: <WorkbenchOperationIcon operation="fullscreen" />,
+                onClick: () => onOpenFullscreen?.(item),
+                title: WORKBENCH_OPERATION_META.fullscreen.title,
+                toneClassName: operationToneClassName(WORKBENCH_OPERATION_META.fullscreen.tone),
+              },
+              {
+                id: "download",
+                icon: <WorkbenchOperationIcon operation="download" />,
+                onClick: () => onDownload?.(item),
+                title: WORKBENCH_OPERATION_META.download.title,
+                toneClassName: operationToneClassName(WORKBENCH_OPERATION_META.download.tone),
+              },
+            ]
+          : []),
       ],
     },
   ];
@@ -178,7 +183,9 @@ const ResultBoardNode = memo(function ResultBoardNode({
       activeStackAssetId={node.activeAssetId}
       isSelected={isSelected}
       onSelectStackAsset={onSelectStackAsset}
+      progress={item.progress}
       stackItems={stackItems}
+      status={item.status}
     >
       {item.type === "image" ? (
         <PreviewImage
