@@ -29,6 +29,34 @@ test("media download routes return request errors for wrong media operation type
   assert.match(await response.text(), /Only image operations/);
 });
 
+test("media download routes reject invalid output indexes", async () => {
+  registerCompiledPathAlias();
+  const { POST: postImageDownload } = await import("../app/api/media/image-download/route");
+  const { POST: postAudioDownload } = await import("../app/api/media/audio-download/route");
+  const { POST: postVideoDownload } = await import("../app/api/media/video-download/route");
+  const headers = { Authorization: "Bearer rh_key" };
+
+  const imageResponse = await postImageDownload(jsonRequest({
+    operationName: "runninghub:image:task-output:img_123",
+    outputIndex: -1,
+  }, headers) as Parameters<typeof postImageDownload>[0]);
+  const audioResponse = await postAudioDownload(jsonRequest({
+    operationName: "runninghub:audio:task-output:aud_123",
+    outputIndex: 1.5,
+  }, headers) as Parameters<typeof postAudioDownload>[0]);
+  const videoResponse = await postVideoDownload(jsonRequest({
+    operationName: "runninghub:video:task-output:vid_123",
+    outputIndex: "1",
+  }, headers) as Parameters<typeof postVideoDownload>[0]);
+
+  assert.equal(imageResponse.status, 400);
+  assert.equal(audioResponse.status, 400);
+  assert.equal(videoResponse.status, 400);
+  assert.match(await imageResponse.text(), /invalid_output_index/);
+  assert.match(await audioResponse.text(), /invalid_output_index/);
+  assert.match(await videoResponse.text(), /invalid_output_index/);
+});
+
 test("native image generation route preserves RunningHub structured provider errors", async () => {
   registerCompiledPathAlias();
   const { POST: postGenerateImage } = await import("../app/api/media/generate-image/route");

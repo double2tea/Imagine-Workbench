@@ -8,6 +8,7 @@ import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 import { readImageGenerationPayload } from "@/lib/client-image-response";
 import {
   buildStorageItem,
+  deleteFromDB,
   getAssetMeta,
   getAssetMetasByIds,
   hydrateAssets,
@@ -186,6 +187,19 @@ async function saveItemOrWarn(
     console.error("IndexedDB Save Failed:", error);
     pushWorkspaceNotice("error", `本地存储失败，刷新后可能丢失：${message}`);
     return null;
+  }
+}
+
+async function deleteItemOrWarn(
+  itemId: string,
+  pushWorkspaceNotice: (type: NoticeType, message: string) => void,
+): Promise<void> {
+  try {
+    await deleteFromDB(itemId);
+  } catch (error) {
+    const message = toErrorMessage(error, "IndexedDB 删除失败");
+    console.error("IndexedDB Delete Failed:", error);
+    pushWorkspaceNotice("error", `本地结果清理失败：${message}`);
   }
 }
 
@@ -510,7 +524,8 @@ export function useGenerationActions({
           if (savedCompletedItem) savedCompletedItems.push(savedCompletedItem);
         }
 
-        if (savedCompletedItems.length === 0) {
+        if (savedCompletedItems.length !== outputUrls.length) {
+          for (const item of savedCompletedItems) await deleteItemOrWarn(item.id, pushWorkspaceNotice);
           const failedTask = await updateTaskOrWarn(taskId, {
             status: "failed",
             progress: 100,

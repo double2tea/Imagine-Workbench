@@ -65,7 +65,7 @@ async function deleteItemOrWarn(
   } catch (error) {
     const message = toErrorMessage(error, "IndexedDB 删除失败");
     console.error("IndexedDB Delete Failed:", error);
-    pushWorkspaceNotice("error", `已取消任务，但本地结果清理失败：${message}`);
+    pushWorkspaceNotice("error", `本地结果清理失败：${message}`);
   }
 }
 
@@ -303,7 +303,8 @@ export function useMediaPolling({
                 for (const savedItem of savedCompletedItems) await deleteItemOrWarn(savedItem.id, pushWorkspaceNotice);
                 continue;
               }
-              if (savedCompletedItems.length === 0) {
+              if (savedCompletedItems.length !== completedItemsToSave.length) {
+                for (const savedItem of savedCompletedItems) await deleteItemOrWarn(savedItem.id, pushWorkspaceNotice);
                 const failedTask = await updateTaskOrWarn(task.id, {
                   status: "failed",
                   progress: 100,
