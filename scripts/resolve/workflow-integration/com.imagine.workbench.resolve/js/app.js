@@ -31,13 +31,13 @@
     "transcribe": [{ value: DEFAULT_MODELS.transcribe, label: "默认 ASR 模型" }]
   };
   var OPERATION_MODEL_QUERIES = {
-    "generate-image": { provider: "12ai", kind: "image" },
-    "image-to-image": { provider: "12ai", kind: "image" },
-    "edit-image": { provider: "12ai", kind: "image" },
-    "ai-lut": { provider: "12ai", kind: "image" },
-    "generate-video": { provider: "12ai", kind: "video" },
-    "tts": { provider: "mimo", kind: "audio", filter: "tts" },
-    "transcribe": { provider: "mimo", kind: "audio", filter: "asr" }
+    "generate-image": { kind: "image" },
+    "image-to-image": { kind: "image" },
+    "edit-image": { kind: "image" },
+    "ai-lut": { kind: "image" },
+    "generate-video": { kind: "video" },
+    "tts": { kind: "audio", filter: "tts" },
+    "transcribe": { kind: "audio", filter: "asr" }
   };
   var OPERATION_CAPABILITY_IDS = {
     "generate-image": "generate_image",
@@ -197,6 +197,7 @@
     source: "",
     running: false,
     activeOperation: "",
+    activeModel: "",
     resolve: null,
     sharedCredentials: {},
     preparedMask: null,
@@ -409,18 +410,43 @@
     }
     try {
       await loadSharedCredentialsForJob({ operation: operation, baseUrl: baseUrlInput.value.trim() });
-      var route = "/api/models?provider=" + encodeURIComponent(query.provider) + "&kind=" + encodeURIComponent(query.kind);
-      var payload = await getJsonForOperation(baseUrlInput.value.trim(), route, operation);
+      var providers = modelProvidersForOperation(operation);
+      var models = [];
+      for (var index = 0; index < providers.length; index += 1) {
+        var provider = providers[index];
+        var route = "/api/models?provider=" + encodeURIComponent(provider) + "&kind=" + encodeURIComponent(query.kind);
+        try {
+          var payload = await getJsonForProvider(baseUrlInput.value.trim(), route, provider);
+          models = models.concat(filterModelOptions(payload.models, query.filter));
+        } catch {
+          // One unavailable provider should not hide models from other configured providers.
+        }
+      }
       if (state.modelRequestId !== requestId || state.operation !== operation) {
         return;
       }
-      var models = filterModelOptions(payload.models, query.filter);
-      renderModelOptions(operation, models.length > 0 ? models : undefined);
+      var uniqueModels = dedupeModelOptions(models);
+      if (!localStorage.getItem(modelStorageKey(operation)) && uniqueModels.length > 0 && inputValue(modelInput) === (DEFAULT_MODELS[operation] || "")) {
+        modelInput.value = uniqueModels[0].value;
+      }
+      renderModelOptions(operation, uniqueModels.length > 0 ? uniqueModels : undefined);
     } catch {
       if (state.modelRequestId === requestId && state.operation === operation) {
         renderModelOptions(operation);
       }
     }
+  }
+
+  function modelProvidersForOperation(operation) {
+    var providers = Object.keys(state.sharedCredentials || {}).filter(function (provider) {
+      var credentials = state.sharedCredentials[provider];
+      return credentials && (credentials.apiKey || credentials.baseUrl);
+    });
+    var defaultProvider = providerForOperation(operation);
+    if (defaultProvider && providers.indexOf(defaultProvider) === -1) {
+      providers.push(defaultProvider);
+    }
+    return providers;
   }
 
   function filterModelOptions(models, filter) {
@@ -438,6 +464,17 @@
         value: model.value,
         label: typeof model.label === "string" && model.label ? model.label : model.value
       }];
+    });
+  }
+
+  function dedupeModelOptions(models) {
+    var seen = {};
+    return models.filter(function (model) {
+      if (seen[model.value]) {
+        return false;
+      }
+      seen[model.value] = true;
+      return true;
     });
   }
 
@@ -553,6 +590,7 @@
     var job = buildJob(operationOverride);
     state.running = true;
     state.activeOperation = job.operation;
+    state.activeModel = job.model || "";
     var keepLastOutputs = job.operation === "doctor";
     if (!keepLastOutputs) {
       setLastOutputs([]);
@@ -587,6 +625,7 @@
     } finally {
       state.running = false;
       state.activeOperation = "";
+      state.activeModel = "";
       runButton.disabled = false;
       updateImportResultButton();
       updateMaskPrepareUi();
@@ -612,16 +651,19 @@
     }
     if (job.operation === "ai-lut") {
       var lutModel = await modelForOperation(job.baseUrl, job.operation, job.model);
+      state.activeModel = lutModel;
       return applyAiLut(job, lutModel);
     }
     if (job.operation === "edit-image" || job.operation === "image-to-image") {
       requireImageEditPrompt(job);
       var maskResult = await prepareImageEditMask(job);
       var editModel = await modelForOperation(job.baseUrl, job.operation, job.model);
+      state.activeModel = editModel;
       var editedPath = await editImage(job, editModel, maskResult.imagePath, maskResult.maskPath);
       return [editedPath];
     }
     var model = await modelForOperation(job.baseUrl, job.operation, job.model);
+    state.activeModel = model;
     if (job.operation === "generate-image") {
       requireText(job.prompt, "提示词");
       var imagePath = await generateImage(job, model);
@@ -1047,13 +1089,7 @@
   }
 
   function shouldLoadSharedCredentials(job) {
-    if (!providerForOperation(job.operation)) {
-      return false;
-    }
     if (!isLocalWorkbenchUrl(job.baseUrl)) {
-      return false;
-    }
-    if (inputProviderApiKeyForOperation(job.operation) || process.env.IMAGINE_PROVIDER_API_KEY) {
       return false;
     }
     return true;
@@ -1735,8 +1771,8 @@
     return readJsonResponse(response, routePath);
   }
 
-  async function getJsonForOperation(baseUrl, routePath, operation) {
-    var response = await fetchUrl(baseUrl, routePath, { method: "GET", headers: requestHeadersForOperation(operation) });
+  async function getJsonForProvider(baseUrl, routePath, provider) {
+    var response = await fetchUrl(baseUrl, routePath, { method: "GET", headers: requestHeadersForProvider(provider) });
     return readJsonResponse(response, routePath);
   }
 
@@ -1851,7 +1887,7 @@
     if (message.indexOf("API key is required") !== -1) {
       return [
         "供应商 API Key 缺失。",
-        "请在 Workbench 设置中保存 Provider Key，或在“供应商连接”里临时填写 12AI Key / MiMo Key。",
+        "请在 Workbench 设置中保存对应 Provider Key，或在“供应商连接”里临时填写快捷 Key。",
         "原始错误：" + message
       ].join("\n");
     }
@@ -1870,35 +1906,35 @@
   }
 
   function requestHeaders(extra) {
-    return requestHeadersForOperation(state.activeOperation || state.operation, extra);
+    var provider = providerForModel(state.activeModel) || providerForModel(inputValue(modelInput)) || providerForOperation(state.activeOperation || state.operation);
+    return requestHeadersForProvider(provider, extra);
   }
 
-  function requestHeadersForOperation(operation, extra) {
+  function requestHeadersForProvider(provider, extra) {
     var headers = Object.assign({ Accept: "*/*" }, extra || {});
-    var shared = sharedCredentialForOperation(operation);
+    var shared = sharedCredentialForProvider(provider);
     addHeader(headers, "Authorization", process.env.IMAGINE_WORKBENCH_API_KEY ? "Bearer " + process.env.IMAGINE_WORKBENCH_API_KEY : "");
-    addHeader(headers, "x-ai-api-key", providerApiKeyForOperation(operation) || process.env.IMAGINE_PROVIDER_API_KEY);
+    addHeader(headers, "x-ai-api-key", providerApiKeyForProvider(provider) || process.env.IMAGINE_PROVIDER_API_KEY);
     addHeader(headers, "x-ai-base-url", inputValue(providerBaseUrlInput) || shared.baseUrl || process.env.IMAGINE_PROVIDER_BASE_URL);
     addHeader(headers, "x-ai-provider-label", inputValue(providerLabelInput) || shared.providerLabel || process.env.IMAGINE_PROVIDER_LABEL);
     return headers;
   }
 
-  function providerApiKeyForOperation(operation) {
-    return inputProviderApiKeyForOperation(operation) || sharedCredentialForOperation(operation).apiKey || "";
+  function providerApiKeyForProvider(provider) {
+    return inputProviderApiKeyForProvider(provider) || sharedCredentialForProvider(provider).apiKey || "";
   }
 
-  function inputProviderApiKeyForOperation(operation) {
-    if (operation === "tts" || operation === "transcribe") {
+  function inputProviderApiKeyForProvider(provider) {
+    if (provider === "mimo") {
       return inputValue(mimoApiKeyInput);
     }
-    if (operation === "generate-image" || operation === "image-to-image" || operation === "edit-image" || operation === "ai-lut" || operation === "generate-video") {
+    if (provider === "12ai") {
       return inputValue(twelveApiKeyInput);
     }
     return "";
   }
 
-  function sharedCredentialForOperation(operation) {
-    var provider = providerForOperation(operation);
+  function sharedCredentialForProvider(provider) {
     if (!provider || !state.sharedCredentials || !state.sharedCredentials[provider]) {
       return {};
     }
@@ -1906,13 +1942,15 @@
   }
 
   function providerForOperation(operation) {
-    if (operation === "tts" || operation === "transcribe") {
-      return "mimo";
+    return providerForModel(DEFAULT_MODELS[operation] || "");
+  }
+
+  function providerForModel(model) {
+    var separator = model.indexOf(":");
+    if (separator <= 0) {
+      return "";
     }
-    if (operation === "generate-image" || operation === "image-to-image" || operation === "edit-image" || operation === "ai-lut" || operation === "generate-video") {
-      return "12ai";
-    }
-    return "";
+    return model.slice(0, separator).replace(/-async$/, "");
   }
 
   function isLocalWorkbenchUrl(value) {
