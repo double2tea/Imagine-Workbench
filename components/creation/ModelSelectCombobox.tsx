@@ -69,7 +69,7 @@ export default function ModelSelectCombobox({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-[calc(100%+0.375rem)] z-50 w-full overflow-hidden rounded-lg border border-[var(--iw-border)] bg-[var(--iw-surface-raised)] shadow-2xl">
+        <div className="imagine-motion-surface-reveal absolute left-0 top-[calc(100%+0.375rem)] z-50 w-full overflow-hidden rounded-lg border border-[var(--iw-border)] bg-[var(--iw-surface-raised)] shadow-2xl">
           <label className="flex h-9 items-center gap-2 border-b border-[var(--iw-border)] px-3 text-[var(--iw-muted)]">
             <Search className="h-3.5 w-3.5 shrink-0" />
             <input
@@ -102,7 +102,7 @@ export default function ModelSelectCombobox({
                         setOpen(false);
                         setQuery("");
                       }}
-                      className="flex min-h-8 w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-[11px] text-[var(--iw-text)] transition-colors hover:bg-[var(--iw-panel-soft)]"
+                      className="imagine-motion-interactive flex min-h-8 w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-[11px] text-[var(--iw-text)] hover:bg-[var(--iw-panel-soft)]"
                     >
                       <span className="min-w-0 truncate font-mono">{option.label}</span>
                       {option.value === value && <Check className="h-3.5 w-3.5 shrink-0 text-[var(--iw-accent)]" />}

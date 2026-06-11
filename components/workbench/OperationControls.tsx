@@ -178,7 +178,7 @@ export function OperationActionButton({
     <button
       {...props}
       data-size={size}
-      className={`imagine-operation-action imagine-operation-action--${variant} ${operationToneClassName(tone)} ${className}`}
+      className={`imagine-operation-action imagine-motion-interactive imagine-operation-action--${variant} ${operationToneClassName(tone)} ${className}`}
     >
       {children}
     </button>
@@ -214,7 +214,7 @@ export function WorkbenchActionButton({
       disabled={action.disabled}
       data-active={action.active}
       onClick={action.onClick}
-      className={workbenchCardActionClassName(action.tone ?? "neutral", className)}
+      className={workbenchCardActionClassName(action.tone ?? "neutral", `imagine-motion-interactive ${className}`)}
       title={action.title}
       aria-label={action.ariaLabel ?? action.title}
     >
@@ -260,7 +260,7 @@ export function WorkbenchPopoverMenu({
 
   return (
     <div
-      className={`absolute bottom-full ${align === "right" ? "right-0" : "left-0"} ${surfaceClassName} mb-1 grid min-w-24 gap-1 rounded-lg border p-1 text-xs shadow-xl ${className}`}
+      className={`imagine-motion-surface-reveal absolute bottom-full ${align === "right" ? "right-0" : "left-0"} ${surfaceClassName} mb-1 grid min-w-24 gap-1 rounded-lg border p-1 text-xs shadow-xl ${className}`}
     >
       {children}
     </div>
@@ -288,7 +288,7 @@ export function WorkbenchPopoverMenuItem({
     <button
       type="button"
       onClick={onClick}
-      className={`flex h-8 items-center gap-2 rounded-md px-2 text-left transition ${itemClassName}`}
+      className={`imagine-motion-interactive flex h-8 items-center gap-2 rounded-md px-2 text-left ${itemClassName}`}
       title={title}
     >
       <span className={`inline-flex h-3.5 w-3.5 items-center justify-center ${iconClassName}`}>{icon}</span>
