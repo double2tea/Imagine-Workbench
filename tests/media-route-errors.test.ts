@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import Module from "node:module";
 import path from "node:path";
 import test, { after } from "node:test";
+import { RUNNINGHUB_CONTROL_IMAGE_APP_MODEL } from "../lib/providers/runninghub";
 
 test("media download routes return request errors for missing operation names", async () => {
   registerCompiledPathAlias();
@@ -46,6 +47,65 @@ test("native image generation route preserves RunningHub structured provider err
 
     assert.equal(response.status, 403);
     assert.match(await response.text(), /runninghub_enterprise_key_required/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("native image generation route does not let empty nodeInfoList bypass prompt validation", async () => {
+  registerCompiledPathAlias();
+  const { POST: postGenerateImage } = await import("../app/api/media/generate-image/route");
+
+  const response = await postGenerateImage(jsonRequest({
+    model: "12ai:gemini-3.1-flash-image-preview",
+    imageResolution: "1K",
+    runningHubNodeInfoList: [],
+  }, { Authorization: "Bearer test_key" }) as Parameters<typeof postGenerateImage>[0]);
+
+  assert.equal(response.status, 400);
+  assert.match(await response.text(), /Prompt is required/);
+});
+
+test("native image generation route injects registered RunningHub app bindings", async () => {
+  registerCompiledPathAlias();
+  const { POST: postGenerateImage } = await import("../app/api/media/generate-image/route");
+  const originalFetch = globalThis.fetch;
+  const calls: Array<{ url: string; body: unknown }> = [];
+  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const url = input.toString();
+    if (url.endsWith("/openapi/v2/media/upload/binary")) {
+      calls.push({ url, body: init?.body instanceof FormData ? "form-data" : init?.body });
+      return Response.json({
+        code: 0,
+        message: "success",
+        data: {
+          download_url: "https://runninghub.example/uploaded.png",
+          fileName: "api/uploaded.png",
+        },
+      });
+    }
+    calls.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+    if (url.endsWith("/task/openapi/ai-app/run")) {
+      return Response.json({ code: 0, msg: "success", data: { taskId: "route_control", taskStatus: "RUNNING" } });
+    }
+    return Response.json({ code: 999, msg: "unexpected endpoint" }, { status: 500 });
+  };
+
+  try {
+    const response = await postGenerateImage(jsonRequest({
+      model: `runninghub:${RUNNINGHUB_CONTROL_IMAGE_APP_MODEL}`,
+      imageResolution: "auto",
+      referenceImages: ["data:image/png;base64,AA=="],
+    }, { Authorization: "Bearer rh_key" }) as Parameters<typeof postGenerateImage>[0]);
+
+    assert.equal(response.status, 200);
+    assert.match(await response.text(), /runninghub:image:task-output:route_control/);
+    assert.equal(calls[0]?.url, "https://www.runninghub.cn/openapi/v2/media/upload/binary");
+    assert.deepEqual(calls[1]?.body, {
+      apiKey: "rh_key",
+      webappId: "1961345119528140802",
+      nodeInfoList: [{ nodeId: "252", fieldName: "image", fieldValue: "api/uploaded.png" }],
+    });
   } finally {
     globalThis.fetch = originalFetch;
   }

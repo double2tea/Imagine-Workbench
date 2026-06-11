@@ -7,9 +7,59 @@ import type {
 import { getRunningHubAppPreset } from "./runninghub";
 import { optionalText } from "./utils";
 
+export type RunningHubNodeInfoListSource = "explicit" | "preset" | "none";
+
+export interface RunningHubResolvedNodeInfoList {
+  nodeInfoList: RunningHubTaskNodeBinding[] | undefined;
+  promptRequired: boolean | undefined;
+  source: RunningHubNodeInfoListSource;
+}
+
 export function readRunningHubNodeInfoList(value: unknown): RunningHubTaskNodeBinding[] | undefined {
   if (!Array.isArray(value)) return undefined;
   return value.map(readRunningHubNodeInfoBinding).filter((binding): binding is RunningHubTaskNodeBinding => binding !== null);
+}
+
+export function resolveRunningHubNodeInfoListForModel(
+  model: string,
+  explicitNodeInfoList: RunningHubTaskNodeBinding[] | undefined,
+): RunningHubResolvedNodeInfoList {
+  const preset = getRunningHubAppPreset(model);
+  if (explicitNodeInfoList !== undefined && explicitNodeInfoList.length > 0) {
+    return {
+      nodeInfoList: explicitNodeInfoList.map(binding => ({ ...binding })),
+      promptRequired: preset?.promptRequired,
+      source: "explicit",
+    };
+  }
+  if (preset) {
+    return {
+      nodeInfoList: preset.nodeInfoList.map(binding => ({ ...binding })),
+      promptRequired: preset.promptRequired,
+      source: "preset",
+    };
+  }
+  if (explicitNodeInfoList !== undefined) {
+    return {
+      nodeInfoList: [],
+      promptRequired: undefined,
+      source: "explicit",
+    };
+  }
+  return {
+    nodeInfoList: undefined,
+    promptRequired: undefined,
+    source: "none",
+  };
+}
+
+export function runningHubResolvedNodeInfoAllowsEmptyPrompt(
+  model: string,
+  mediaKind: "image" | "video" | "audio",
+  resolution: RunningHubResolvedNodeInfoList,
+): boolean {
+  if (resolution.promptRequired !== undefined) return !resolution.promptRequired;
+  return resolution.source === "explicit" && isRunningHubTaskTarget(model, mediaKind);
 }
 
 export function hasRunningHubPresetNodeInfoList(model: string): boolean {
@@ -70,4 +120,9 @@ function readBindingDelivery(value: unknown): RunningHubTaskBindingDelivery {
 function readReferenceIndex(value: unknown): number | undefined {
   if (typeof value !== "number" || !Number.isInteger(value) || value < 0) return undefined;
   return value;
+}
+
+function isRunningHubTaskTarget(model: string, mediaKind: "image" | "video" | "audio"): boolean {
+  const normalizedModel = model.startsWith("runninghub:") ? model.slice("runninghub:".length) : model;
+  return normalizedModel.startsWith(`ai-app-${mediaKind}:`) || normalizedModel.startsWith(`workflow-${mediaKind}:`);
 }

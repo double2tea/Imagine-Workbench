@@ -47,7 +47,7 @@ const VEO_31_4K_RESOLUTIONS = ["720p", "1080p", "4k"] as const;
 const VEO_31_HD_RESOLUTIONS = ["720p", "1080p"] as const;
 
 export type RunningHubStandardModelKind = "image" | "video";
-export type RunningHubAppPresetKind = "image" | "video" | "audio";
+export type RunningHubAppPresetKind = "image" | "video";
 
 export interface RunningHubAppPreset {
   model: string;
@@ -135,11 +135,6 @@ export function getRunningHubAppPreset(model: string): RunningHubAppPreset | und
 
 export function hasRunningHubAppPreset(model: string): boolean {
   return getRunningHubAppPreset(model) !== undefined;
-}
-
-export function runningHubAppPresetAllowsEmptyPrompt(model: string): boolean {
-  const preset = getRunningHubAppPreset(model);
-  return preset !== undefined && !preset.promptRequired;
 }
 
 function normalizeRunningHubModel(model: string): string {

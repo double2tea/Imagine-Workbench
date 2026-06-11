@@ -10,7 +10,11 @@ import {
   resolveRunningHubStandardModelForReferenceMedia,
   resolveRunningHubStandardModelForReferences,
 } from "../lib/providers/runninghub";
-import { runningHubPresetNodeInfoList } from "../lib/providers/runninghub-node-info";
+import {
+  resolveRunningHubNodeInfoListForModel,
+  runningHubPresetNodeInfoList,
+  runningHubResolvedNodeInfoAllowsEmptyPrompt,
+} from "../lib/providers/runninghub-node-info";
 import { parseRunningHubBindingsFromJsonText } from "../lib/board/runninghub-bindings";
 import { ChatJsonParseError, createChatCompletionText, createChatCompletionWithTools, parseJsonObjectText } from "../lib/providers/chat";
 import { generateAudio, getAudioStatus } from "../lib/providers/audio";
@@ -848,6 +852,21 @@ test("runninghub control image app preset submits uploaded file name", async () 
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("runninghub app preset prompt policy is derived from resolution source", () => {
+  const presetResolution = resolveRunningHubNodeInfoListForModel(RUNNINGHUB_CONTROL_IMAGE_APP_MODEL, undefined);
+  assert.equal(presetResolution.source, "preset");
+  assert.equal(presetResolution.promptRequired, false);
+  assert.equal(runningHubResolvedNodeInfoAllowsEmptyPrompt(RUNNINGHUB_CONTROL_IMAGE_APP_MODEL, "image", presetResolution), true);
+
+  const explicitTaskResolution = resolveRunningHubNodeInfoListForModel("ai-app-image:custom", []);
+  assert.equal(explicitTaskResolution.source, "explicit");
+  assert.equal(runningHubResolvedNodeInfoAllowsEmptyPrompt("ai-app-image:custom", "image", explicitTaskResolution), true);
+
+  const explicitNonTaskResolution = resolveRunningHubNodeInfoListForModel("api:/openapi/v2/example/text-to-image", []);
+  assert.equal(explicitNonTaskResolution.source, "explicit");
+  assert.equal(runningHubResolvedNodeInfoAllowsEmptyPrompt("api:/openapi/v2/example/text-to-image", "image", explicitNonTaskResolution), false);
 });
 
 test("runninghub ai app schema reads official apiCallDemo curl nodeInfoList", async () => {

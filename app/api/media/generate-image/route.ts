@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { apiErrorResponse, requireApiText } from "@/lib/api/errors";
 import { getImageModelCapabilities, getImageResolutionOptions, parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
 import { generateImage } from "@/lib/providers/image";
-import { readRunningHubNodeInfoList, runningHubPresetNodeInfoList } from "@/lib/providers/runninghub-node-info";
-import { runningHubAppPresetAllowsEmptyPrompt } from "@/lib/providers/runninghub";
+import {
+  readRunningHubNodeInfoList,
+  resolveRunningHubNodeInfoListForModel,
+  runningHubResolvedNodeInfoAllowsEmptyPrompt,
+} from "@/lib/providers/runninghub-node-info";
 import { dataUriToBlob, optionalText, resolveProviderConfig } from "@/lib/providers/utils";
 import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, getReferenceImagePayloadError } from "@/lib/reference-images";
 
@@ -39,15 +42,12 @@ export async function POST(req: NextRequest) {
     const imageQuality = resolveImageQuality(modelValue, optionalText(body.imageQuality));
     const referenceImages = readReferenceImages(body.referenceImages, body.referenceImage);
     const explicitRunningHubNodeInfoList = readRunningHubNodeInfoList(body.runningHubNodeInfoList);
-    const runningHubNodeInfoList =
-      explicitRunningHubNodeInfoList && explicitRunningHubNodeInfoList.length > 0
-        ? explicitRunningHubNodeInfoList
-        : runningHubPresetNodeInfoList(parsed.model);
+    const runningHubNodeInfo = resolveRunningHubNodeInfoListForModel(parsed.model, explicitRunningHubNodeInfoList);
     const payloadError = getReferenceImagePayloadError(referenceImages);
     if (payloadError) return NextResponse.json({ error: payloadError }, { status: 413 });
     validateReferenceCount(modelValue, referenceImages.length);
 
-    const allowsEmptyPrompt = runningHubAppPresetAllowsEmptyPrompt(parsed.model) || runningHubNodeInfoList.length > 0;
+    const allowsEmptyPrompt = runningHubResolvedNodeInfoAllowsEmptyPrompt(parsed.model, "image", runningHubNodeInfo);
     const result = await generateImage(config, {
       prompt: allowsEmptyPrompt ? optionalText(body.prompt) ?? "" : requireApiText(body.prompt, "Prompt"),
       model: parsed.model,
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
       referenceImages: referenceImages.map(dataUri => ({ dataUri })),
       async: parsed.async,
       runningHubAccessPassword: optionalText(body.runningHubAccessPassword),
-      runningHubNodeInfoList,
+      runningHubNodeInfoList: runningHubNodeInfo.nodeInfoList,
     });
 
     if (result.imageUrl?.startsWith("data:")) {

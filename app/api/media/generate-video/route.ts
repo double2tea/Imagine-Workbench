@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { apiErrorResponse, badRequest, requireApiText } from "@/lib/api/errors";
 import { getVideoModelCapabilities, parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
 import { generateVideo } from "@/lib/providers/video";
-import { readRunningHubNodeInfoList } from "@/lib/providers/runninghub-node-info";
+import {
+  readRunningHubNodeInfoList,
+  resolveRunningHubNodeInfoListForModel,
+  runningHubResolvedNodeInfoAllowsEmptyPrompt,
+} from "@/lib/providers/runninghub-node-info";
 import { optionalText, resolveProviderConfig } from "@/lib/providers/utils";
 import { mediaReferenceLabel, mediaReferenceTypeFromBase64DataUri, type MediaReferenceType } from "@/lib/media-references";
 import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, getReferenceMediaPayloadError } from "@/lib/reference-images";
@@ -37,15 +41,17 @@ export async function POST(req: NextRequest) {
     const config = resolveProviderConfig(req, parsed.provider);
     const capability = getVideoModelCapabilities(modelValue);
     const referenceMedia = readReferenceMedia(body.referenceMedia, body.images, body.image, body.lastFrame);
-    const runningHubNodeInfoList = readRunningHubNodeInfoList(body.runningHubNodeInfoList);
+    const explicitRunningHubNodeInfoList = readRunningHubNodeInfoList(body.runningHubNodeInfoList);
+    const runningHubNodeInfo = resolveRunningHubNodeInfoListForModel(parsed.model, explicitRunningHubNodeInfoList);
     const formatError = getReferenceMediaFormatError(referenceMedia, capability.referenceMediaTypes);
     if (formatError) return NextResponse.json({ error: formatError }, { status: 400 });
     const payloadError = getReferenceMediaPayloadError(referenceMedia.map(reference => reference.dataUri));
     if (payloadError) return NextResponse.json({ error: payloadError }, { status: 413 });
     validateReferenceCount(referenceMedia.length, capability.minReferenceImages, capability.maxReferenceImages);
 
+    const allowsEmptyPrompt = runningHubResolvedNodeInfoAllowsEmptyPrompt(parsed.model, "video", runningHubNodeInfo);
     const result = await generateVideo(config, {
-      prompt: runningHubNodeInfoList ? optionalText(body.prompt) ?? "" : requireApiText(body.prompt, "Prompt"),
+      prompt: allowsEmptyPrompt ? optionalText(body.prompt) ?? "" : requireApiText(body.prompt, "Prompt"),
       model: parsed.model,
       aspectRatio: optionalText(body.aspectRatio) ?? "16:9",
       durationSeconds: optionalText(body.durationSeconds),
@@ -54,7 +60,7 @@ export async function POST(req: NextRequest) {
       resolutionName: optionalText(body.resolutionName),
       referenceMedia,
       runningHubAccessPassword: optionalText(body.runningHubAccessPassword),
-      runningHubNodeInfoList,
+      runningHubNodeInfoList: runningHubNodeInfo.nodeInfoList,
     });
 
     return NextResponse.json(result);
