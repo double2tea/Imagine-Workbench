@@ -2383,6 +2383,7 @@ html[data-imagine-theme="light"] .imagine-root-body {
 
 .board-media-top-actions {
   pointer-events: auto;
+  row-gap: 6px;
 }
 
 .board-media-action-group {
@@ -3415,10 +3416,40 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 }
 
 .board-media-stack-switcher {
+  border: 1px solid color-mix(in srgb, var(--iw-border) 74%, transparent);
+  background: color-mix(in srgb, var(--iw-surface-raised) 92%, transparent);
+  color: var(--iw-muted);
+  box-shadow:
+    0 16px 42px color-mix(in srgb, var(--iw-bg) 34%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--iw-text) 10%, transparent);
   transform: translate(-50%, 4px);
   transition:
     opacity var(--iw-motion-surface) var(--iw-motion-ease),
     transform var(--iw-motion-surface) var(--iw-motion-ease);
+}
+
+.board-media-stack-option {
+  border: 1px solid transparent;
+  background: color-mix(in srgb, var(--iw-muted) 18%, transparent);
+  color: var(--iw-muted);
+  transition:
+    background-color var(--iw-motion-base) var(--iw-motion-ease),
+    border-color var(--iw-motion-base) var(--iw-motion-ease),
+    color var(--iw-motion-base) var(--iw-motion-ease),
+    transform var(--iw-motion-base) var(--iw-motion-ease);
+}
+
+.board-media-stack-option:hover {
+  border-color: color-mix(in srgb, var(--iw-accent) 28%, var(--iw-border));
+  background: var(--iw-accent-soft);
+  color: var(--iw-text);
+}
+
+.board-media-stack-option[data-active="true"] {
+  border-color: color-mix(in srgb, var(--iw-text) 24%, transparent);
+  background: var(--iw-text);
+  color: var(--iw-bg);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--iw-bg) 18%, transparent);
 }
 
 .board-media-node:hover .board-media-controls,
@@ -3433,9 +3464,7 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 }
 
 .imagine-workbench-shell .board-media-meta,
-.imagine-workbench-shell .board-media-stack-switcher,
-.imagine-workbench-shell.imagine-theme-light .board-media-meta,
-.imagine-workbench-shell.imagine-theme-light .board-media-stack-switcher {
+.imagine-workbench-shell.imagine-theme-light .board-media-meta {
   background: rgba(15, 23, 42, 0.72) !important;
   border-color: rgba(255, 255, 255, 0.12) !important;
   color: rgba(255, 255, 255, 0.92) !important;

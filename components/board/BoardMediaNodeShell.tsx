@@ -108,7 +108,7 @@ export default function BoardMediaNodeShell({
         <div
           data-visible={isSelected ? "true" : "false"}
           className={[
-            "board-media-stack-switcher nodrag absolute -bottom-8 left-1/2 z-40 flex gap-1.5 rounded-full border border-white/10 bg-slate-950/72 px-2.5 py-1.5 text-[10px] font-semibold text-white/90 shadow-xl backdrop-blur transition-opacity duration-200",
+            "board-media-stack-switcher nodrag absolute -bottom-8 left-1/2 z-40 flex gap-1.5 rounded-full px-2.5 py-1.5 text-[10px] font-semibold shadow-xl backdrop-blur transition-opacity duration-200",
             isSelected
               ? "pointer-events-auto opacity-100"
               : "pointer-events-none opacity-0 group-hover/board-video:pointer-events-auto group-hover/board-video:opacity-100",
@@ -120,10 +120,8 @@ export default function BoardMediaNodeShell({
               <button
                 key={stackItem.id}
                 type="button"
-                className={[
-                  "imagine-motion-interactive nodrag flex h-5 min-w-5 items-center justify-center rounded-full px-1",
-                  isActive ? "bg-white text-slate-950" : "bg-white/20 text-white/80 hover:bg-white/35 hover:text-white",
-                ].join(" ")}
+                data-active={isActive ? "true" : "false"}
+                className="board-media-stack-option imagine-motion-interactive nodrag flex h-5 min-w-5 items-center justify-center rounded-full px-1"
                 title={`版本 ${index + 1}`}
                 aria-label={`切换到版本 ${index + 1}`}
                 onClick={(event) => {
