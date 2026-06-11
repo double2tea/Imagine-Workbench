@@ -11,6 +11,7 @@ import { formatDisplayedAspectRatio } from "@/lib/media-display";
 import type { PanoramaScreenshot } from "@/lib/panorama/capture";
 import { transcriptFromDataUrl } from "@/lib/transcripts";
 import type { CapturedVideoFrame, VideoFrameCaptureMode } from "@/lib/video-frame";
+import { WORKBENCH_OVERLAY_TRANSITION, WORKBENCH_PANEL_TRANSITION } from "@/lib/workbench-motion";
 
 interface FullscreenPreviewProps {
   item: StorageItem | null;
@@ -66,7 +67,7 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+          transition={WORKBENCH_OVERLAY_TRANSITION}
           className="fixed inset-0 z-50 flex bg-slate-950/95 p-2 backdrop-blur-md sm:p-4"
         >
           <button
@@ -80,7 +81,7 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
             initial={{ opacity: 0, scale: 0.985, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.985, y: 8 }}
-            transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+            transition={WORKBENCH_PANEL_TRANSITION}
             className="flex h-full min-h-0 w-full flex-col items-center justify-center gap-3"
           >
             <div className="flex min-h-0 w-full flex-1 items-center justify-center">

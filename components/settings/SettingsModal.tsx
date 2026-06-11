@@ -10,6 +10,7 @@ import type { ImageEditFeature, ImageEditFeatureModels } from "@/hooks/useImageE
 import type { ResolveCheckStatus } from "@/hooks/useResolveIntegrationSettings";
 import type { CustomProviderDefinition } from "@/lib/providers/registry";
 import type { ProviderCredentials } from "@/lib/providers/types";
+import { WORKBENCH_OVERLAY_TRANSITION, WORKBENCH_PANEL_TRANSITION } from "@/lib/workbench-motion";
 import {
   getWorkspaceDataSummary,
   type LocalStorageCleanupKind,
@@ -162,14 +163,14 @@ export default function SettingsModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+          transition={WORKBENCH_OVERLAY_TRANSITION}
           className="imagine-settings-overlay fixed inset-0 z-50 flex items-stretch justify-end p-0 sm:items-center sm:justify-center sm:p-4"
         >
           <motion.div
             initial={{ opacity: 0, scale: 0.965, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.965, y: 10 }}
-            transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+            transition={WORKBENCH_PANEL_TRANSITION}
             className="imagine-settings-panel flex w-full flex-col overflow-hidden sm:rounded-2xl"
           >
             <div className="imagine-settings-header flex shrink-0 items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
