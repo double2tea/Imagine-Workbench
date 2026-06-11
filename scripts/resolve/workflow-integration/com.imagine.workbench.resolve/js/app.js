@@ -12,7 +12,7 @@
   var DEFAULT_MODELS = {
     "generate-image": "12ai:gemini-3.1-flash-image-preview",
     "edit-image": "12ai:gemini-3.1-flash-image-preview",
-    "generate-video": "12ai:veo_3_1-fast",
+    "generate-video": "12ai:omni_flash-10s",
     "tts": "mimo:mimo-v2.5-tts",
     "transcribe": "mimo:mimo-v2.5-asr"
   };
@@ -981,7 +981,7 @@
       if (purpose === "image") {
         throw new Error("当前片段渲染不能作为图片输入");
       }
-      return renderCurrentClip(outputName);
+      return renderCurrentClip(outputName, purpose);
     }
     if (value === "timeline-inout-render") {
       if (purpose === "image") {
@@ -1064,12 +1064,13 @@
     return filePath;
   }
 
-  async function renderCurrentClip(outputName) {
+  async function renderCurrentClip(outputName, purpose) {
     var item = await currentVideoItem();
     return renderRange(
       outputName,
       frameNumber(await item.GetStart(false), "当前片段起点"),
-      frameNumber(await item.GetEnd(false), "当前片段终点")
+      frameNumber(await item.GetEnd(false), "当前片段终点"),
+      purpose
     );
   }
 
@@ -1082,34 +1083,35 @@
     if (!mark) {
       throw new Error("Resolve 时间线没有入出点范围");
     }
-    return renderRange(outputName, frameNumber(mark.in, "入点"), frameNumber(mark.out, "出点"));
+    return renderRange(outputName, frameNumber(mark.in, "入点"), frameNumber(mark.out, "出点"), purpose);
   }
 
-  async function renderRange(outputName, markIn, markOut) {
+  async function renderRange(outputName, markIn, markOut, purpose) {
     if (markOut <= markIn) {
       throw new Error("渲染范围终点必须大于起点");
     }
     var resolve = await getResolve();
     var project = await currentProject(resolve);
-    var outputPath = path.join(cacheDir, safeStem(outputName) + ".mp4");
+    var renderTarget = await selectRenderTarget(project, purpose || "reference");
+    var outputPath = path.join(cacheDir, safeStem(outputName) + renderTarget.extension);
     fs.mkdirSync(path.dirname(outputPath), { recursive: true });
     if (fs.existsSync(outputPath)) {
       fs.unlinkSync(outputPath);
     }
-    if (!(await project.SetCurrentRenderFormatAndCodec("mp4", "H.264"))) {
-      throw new Error("Resolve 配置 MP4/H.264 渲染失败");
-    }
-    if (!(await project.SetRenderSettings({
+    var renderSettings = {
       SelectAllFrames: false,
       MarkIn: markIn,
       MarkOut: markOut,
       TargetDir: path.dirname(outputPath),
       CustomName: path.basename(outputPath, path.extname(outputPath)),
-      ExportVideo: true,
-      ExportAudio: true,
-      VideoQuality: "Medium",
-      NetworkOptimization: true
-    }))) {
+      ExportVideo: renderTarget.exportVideo,
+      ExportAudio: true
+    };
+    if (renderTarget.exportVideo) {
+      renderSettings.VideoQuality = "Medium";
+      renderSettings.NetworkOptimization = true;
+    }
+    if (!(await project.SetRenderSettings(renderSettings))) {
       throw new Error("Resolve 设置渲染范围失败");
     }
     var jobId = await project.AddRenderJob();
@@ -1132,6 +1134,118 @@
       throw new Error("Resolve 渲染结束但未找到输出文件");
     }
     return rendered;
+  }
+
+  async function selectRenderTarget(project, purpose) {
+    if (purpose === "audio") {
+      return setFirstSupportedRenderCodec(project, [
+        { format: "wav", codec: "Linear PCM", extension: ".wav", exportVideo: false },
+        { format: "Wave", codec: "Linear PCM", extension: ".wav", exportVideo: false },
+        { format: "AIFF", codec: "Linear PCM", extension: ".aiff", exportVideo: false },
+        { format: "QuickTime", codec: "Linear PCM", extension: ".mov", exportVideo: false }
+      ], "音频参考源");
+    }
+    return setFirstSupportedRenderCodec(project, [
+      { format: "mp4", codec: "H.264", extension: ".mp4", exportVideo: true },
+      { format: "MP4", codec: "H.264", extension: ".mp4", exportVideo: true },
+      { format: "QuickTime", codec: "H.264", extension: ".mov", exportVideo: true },
+      { format: "mov", codec: "H.264", extension: ".mov", exportVideo: true },
+      { format: "QuickTime", codec: "Apple ProRes 422 LT", extension: ".mov", exportVideo: true },
+      { format: "QuickTime", codec: "Apple ProRes 422", extension: ".mov", exportVideo: true }
+    ], "视频参考源");
+  }
+
+  async function setFirstSupportedRenderCodec(project, preferredTargets, label) {
+    var targets = preferredTargets.concat(await discoveredRenderTargets(project, preferredTargets[0].exportVideo));
+    var tried = [];
+    for (var index = 0; index < targets.length; index += 1) {
+      var target = targets[index];
+      var key = target.format + "/" + target.codec;
+      if (tried.indexOf(key) !== -1) {
+        continue;
+      }
+      tried.push(key);
+      try {
+        if (await project.SetCurrentRenderFormatAndCodec(target.format, target.codec)) {
+          return target;
+        }
+      } catch {
+        // Resolve rejects unsupported combinations by throwing; continue with the next candidate.
+      }
+    }
+    throw new Error("Resolve 没有可用的" + label + "渲染格式。已尝试：" + tried.join(", "));
+  }
+
+  async function discoveredRenderTargets(project, exportVideo) {
+    if (typeof project.GetRenderFormats !== "function" || typeof project.GetRenderCodecs !== "function") {
+      return [];
+    }
+    var formats = await project.GetRenderFormats();
+    var targets = [];
+    var formatNames = Object.keys(formats || {});
+    for (var index = 0; index < formatNames.length; index += 1) {
+      var formatName = formatNames[index];
+      var formatValue = formats[formatName];
+      var candidates = [formatName, formatValue];
+      for (var candidateIndex = 0; candidateIndex < candidates.length; candidateIndex += 1) {
+        var format = candidates[candidateIndex];
+        if (!format || shouldSkipRenderFormat(format, exportVideo)) {
+          continue;
+        }
+        targets = targets.concat(await renderCodecTargets(project, String(format), exportVideo));
+      }
+    }
+    return targets;
+  }
+
+  async function renderCodecTargets(project, format, exportVideo) {
+    try {
+      var codecs = await project.GetRenderCodecs(format);
+      var targets = [];
+      Object.keys(codecs || {}).forEach(function (codecName) {
+        var codecValue = codecs[codecName];
+        [codecName, codecValue].forEach(function (codec) {
+          if (codec && codecLooksUsable(codec, exportVideo)) {
+            targets.push({
+              format: format,
+              codec: String(codec),
+              extension: renderExtension(format, exportVideo),
+              exportVideo: exportVideo
+            });
+          }
+        });
+      });
+      return targets;
+    } catch {
+      return [];
+    }
+  }
+
+  function shouldSkipRenderFormat(format, exportVideo) {
+    var lower = String(format).toLowerCase();
+    if (exportVideo) {
+      return lower.indexOf("audio") !== -1 || lower === "wav" || lower === "aiff";
+    }
+    return !(lower.indexOf("wav") !== -1 || lower.indexOf("wave") !== -1 || lower.indexOf("aiff") !== -1 || lower.indexOf("quicktime") !== -1 || lower === "mov");
+  }
+
+  function codecLooksUsable(codec, exportVideo) {
+    var lower = String(codec).toLowerCase();
+    if (exportVideo) {
+      return lower.indexOf("h.264") !== -1 || lower.indexOf("prores") !== -1 || lower.indexOf("dnxhr") !== -1;
+    }
+    return lower.indexOf("pcm") !== -1 || lower.indexOf("wav") !== -1 || lower.indexOf("audio") !== -1;
+  }
+
+  function renderExtension(format, exportVideo) {
+    var lower = String(format).toLowerCase();
+    if (!exportVideo) {
+      if (lower.indexOf("aiff") !== -1) return ".aiff";
+      if (lower.indexOf("quicktime") !== -1 || lower === "mov") return ".mov";
+      return ".wav";
+    }
+    if (lower.indexOf("quicktime") !== -1 || lower === "mov") return ".mov";
+    return ".mp4";
   }
 
   async function importOutputs(job, paths) {
@@ -1271,6 +1385,13 @@
         "原始错误：" + message
       ].join("\n");
     }
+    if (message.indexOf("provider_unavailable") !== -1 || message.indexOf("No available channel") !== -1) {
+      return [
+        "视频模型渠道当前不可用。",
+        "这不是 Resolve 插件安装失败；请稍后重试，或在 Workbench 后端/供应商账号中切换可用的视频模型渠道。",
+        "原始错误：" + message
+      ].join("\n");
+    }
     return message;
   }
 
@@ -1367,6 +1488,7 @@
     if (ext === ".mov") return "video/quicktime";
     if (ext === ".mp3") return "audio/mpeg";
     if (ext === ".wav") return "audio/wav";
+    if (ext === ".aiff" || ext === ".aif") return "audio/aiff";
     return "application/octet-stream";
   }
 
@@ -1377,7 +1499,7 @@
       chunks.push(Buffer.from("--" + boundary + "\r\n", "utf8"));
       if (part.filePath) {
         chunks.push(Buffer.from(
-          'Content-Disposition: form-data; name="' + part.name + '"; filename="' + path.basename(part.filePath) + '"\r\n' +
+          'Content-Disposition: form-data; name="' + part.name + '"; filename="' + multipartFilename(part) + '"\r\n' +
           "Content-Type: " + contentTypeForPath(part.filePath) + "\r\n\r\n",
           "utf8"
         ));
@@ -1396,6 +1518,11 @@
       boundary: boundary,
       body: Buffer.concat(chunks)
     };
+  }
+
+  function multipartFilename(part) {
+    var ext = path.extname(part.filePath || "").toLowerCase().replace(/[^a-z0-9.]/g, "");
+    return String(part.name || "file").replace(/[^A-Za-z0-9_-]/g, "_") + (ext || ".bin");
   }
 
   function extensionForContentType(contentType, fallback) {

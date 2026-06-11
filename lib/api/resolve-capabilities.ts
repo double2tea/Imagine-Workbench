@@ -1,4 +1,4 @@
-import { DEFAULT_AUDIO_MODEL, DEFAULT_IMAGE_MODEL, DEFAULT_VIDEO_MODEL } from "../providers/model-catalog";
+import { DEFAULT_AUDIO_MODEL, DEFAULT_IMAGE_MODEL } from "../providers/model-catalog";
 
 export type ResolveBridgeClientMode = "external" | "in_resolve";
 export type ResolveBridgeHttpMethod = "GET" | "POST";
@@ -45,6 +45,7 @@ export interface ResolveBridgeCapabilities {
 }
 
 const CLIENT_MODES: ResolveBridgeClientMode[] = ["external", "in_resolve"];
+const RESOLVE_DEFAULT_VIDEO_MODEL = "12ai:omni_flash-10s";
 
 export function getResolveBridgeCapabilities(): ResolveBridgeCapabilities {
   return {
@@ -78,7 +79,7 @@ export function getResolveBridgeCapabilities(): ResolveBridgeCapabilities {
         id: "generate_video",
         label: "Generate Video",
         route: { path: "/api/media/generate-video", method: "POST", contentType: "application/json" },
-        defaultModel: DEFAULT_VIDEO_MODEL,
+        defaultModel: RESOLVE_DEFAULT_VIDEO_MODEL,
         resultKind: "video",
         requiresPrompt: true,
         acceptsReferenceMedia: true,
