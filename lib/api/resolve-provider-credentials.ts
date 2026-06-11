@@ -1,8 +1,8 @@
 import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { badRequest } from "@/lib/api/errors";
-import { isProviderKey } from "@/lib/providers/registry";
+import { badRequest } from "./errors";
+import { isProviderKey } from "../providers/registry";
 
 export interface ResolveProviderCredentialEntry {
   apiKey: string;
@@ -34,11 +34,15 @@ export function assertLocalResolveCredentialRequest(req: Request): void {
 export async function readResolveProviderCredentials(): Promise<ResolveProviderCredentialStore> {
   try {
     const raw = await readFile(CREDENTIALS_PATH, "utf8");
-    return parseResolveProviderCredentialStore(JSON.parse(raw));
+    return parseResolveProviderCredentialsJson(raw);
   } catch (error) {
     if (isMissingFileError(error)) return {};
     throw error;
   }
+}
+
+export function parseResolveProviderCredentialsJson(raw: string): ResolveProviderCredentialStore {
+  return parseResolveProviderCredentialStore(parseFirstJsonValue(raw));
 }
 
 export async function writeResolveProviderCredential(provider: string, input: unknown): Promise<ResolveProviderCredentialStore> {
@@ -78,6 +82,48 @@ function parseResolveProviderCredentialEntry(value: unknown): ResolveProviderCre
   const baseUrl = readOptionalString(record.baseUrl);
   const providerLabel = readOptionalString(record.providerLabel);
   return providerLabel ? { apiKey, baseUrl, providerLabel } : { apiKey, baseUrl };
+}
+
+function parseFirstJsonValue(raw: string): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    const objectEnd = firstCompleteJsonObjectEnd(raw);
+    if (objectEnd === undefined) {
+      throw error;
+    }
+    return JSON.parse(raw.slice(0, objectEnd));
+  }
+}
+
+function firstCompleteJsonObjectEnd(raw: string): number | undefined {
+  const start = raw.search(/\S/);
+  if (start === -1 || raw[start] !== "{") return undefined;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < raw.length; index += 1) {
+    const char = raw[index];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+    if (char === "\"") {
+      inString = true;
+    } else if (char === "{") {
+      depth += 1;
+    } else if (char === "}") {
+      depth -= 1;
+      if (depth === 0) return index + 1;
+    }
+  }
+  return undefined;
 }
 
 function readOptionalString(value: unknown): string {
