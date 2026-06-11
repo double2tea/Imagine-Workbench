@@ -511,10 +511,10 @@ select:focus {
 
 .runbar {
   display: grid;
-  grid-template-columns: auto auto auto 1fr auto;
+  grid-template-columns: auto auto auto auto 1fr auto;
   grid-template-areas:
-    "save open preview spacer run"
-    "import append append append run";
+    "save open preview importResult spacer run"
+    "import append append append append run";
   align-items: center;
   gap: 8px;
   margin-top: 14px;
@@ -532,6 +532,10 @@ select:focus {
 
 #previewOutputButton {
   grid-area: preview;
+}
+
+#importResultButton {
+  grid-area: importResult;
 }
 
 .import-check {
@@ -793,6 +797,7 @@ select:focus {
       "save"
       "open"
       "preview"
+      "importResult"
       "import"
       "append"
       "run";

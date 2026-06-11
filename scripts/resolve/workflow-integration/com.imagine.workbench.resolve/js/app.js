@@ -9,6 +9,8 @@
   var ipcRenderer = electron ? electron.ipcRenderer : null;
 
   var PLUGIN_ID = "com.imagine.workbench.resolve";
+  var RESOLVE_BIN_ROOT = "Imagine Workbench";
+  var CACHE_MAX_AGE_MS = 72 * 60 * 60 * 1000;
   var DEFAULT_MODELS = {
     "generate-image": "12ai:gemini-3.1-flash-image-preview",
     "image-to-image": "12ai:gemini-3.1-flash-image-preview",
@@ -144,6 +146,8 @@
     sharedCredentials: {},
     preparedMask: null,
     lastOutputs: [],
+    lastOutputJob: null,
+    lastImportDone: false,
     promptDraft: "",
     importToResolve: true,
     appendToTimeline: false
@@ -181,6 +185,7 @@
   var statusOutput = document.getElementById("statusOutput");
   var runButton = document.getElementById("runButton");
   var previewOutputButton = document.getElementById("previewOutputButton");
+  var importResultButton = document.getElementById("importResultButton");
   var maskEditorModal = document.getElementById("maskEditorModal");
   var maskEditorTitle = document.getElementById("maskEditorTitle");
   var maskEditorHint = document.getElementById("maskEditorHint");
@@ -382,13 +387,14 @@
       setLastOutputs([]);
     }
     runButton.disabled = true;
+    importResultButton.disabled = true;
     setStatus("运行中\n" + describeJob(job));
     try {
       await loadSharedCredentialsForJob(job);
       var result = await executeJob(job);
       saveJob(job);
       if (!keepLastOutputs) {
-        setLastOutputs(result);
+        setLastOutputs(result, job, job.importToResolve === true);
       }
       setStatus("已完成\n" + describeJob(job) + "\n\n" + result.join("\n"));
     } catch (error) {
@@ -397,13 +403,22 @@
       state.running = false;
       state.activeOperation = "";
       runButton.disabled = false;
+      updateImportResultButton();
       updateMaskPrepareUi();
     }
   }
 
-  function setLastOutputs(paths) {
+  function setLastOutputs(paths, job, imported) {
     state.lastOutputs = paths || [];
+    state.lastOutputJob = job || null;
+    state.lastImportDone = imported === true;
     previewOutputButton.disabled = state.lastOutputs.length === 0;
+    updateImportResultButton();
+  }
+
+  function updateImportResultButton() {
+    var config = state.lastOutputJob ? operationConfigs[state.lastOutputJob.operation] : null;
+    importResultButton.disabled = state.lastOutputs.length === 0 || !config || config.canImport !== true || state.lastImportDone === true;
   }
 
   async function executeJob(job) {
@@ -897,7 +912,7 @@
       response_format: "b64_json"
     });
     var imageBytes = openAiB64Bytes(response, "image");
-    return writeOutput(outputStem(job), ".png", imageBytes);
+    return writeOutput(job, ".png", imageBytes);
   }
 
   async function editImage(job, model, imagePath, maskPath) {
@@ -915,7 +930,7 @@
     }
     var response = await postMultipartJson(job.baseUrl, "/v1/images/edits", parts);
     var imageBytes = openAiB64Bytes(response, "image");
-    return writeOutput(outputStem(job), ".png", imageBytes);
+    return writeOutput(job, ".png", imageBytes);
   }
 
   async function generateVideo(job, model, referencePaths) {
@@ -933,7 +948,7 @@
       operationName: result.operationName,
       model: model
     });
-    return writeOutput(outputStem(job), extensionForContentType(video.contentType, ".mp4"), video.bytes);
+    return writeOutput(job, extensionForContentType(video.contentType, ".mp4"), video.bytes);
   }
 
   async function textToSpeech(job, model) {
@@ -942,7 +957,7 @@
       input: job.text,
       response_format: "wav"
     });
-    return writeOutput(outputStem(job), extensionForContentType(audio.contentType, ".wav"), audio.bytes);
+    return writeOutput(job, extensionForContentType(audio.contentType, ".wav"), audio.bytes);
   }
 
   async function transcribe(job, model, audioPath) {
@@ -958,9 +973,8 @@
     if (!response.text) {
       throw new Error("转写响应缺少 text");
     }
-    var stem = outputStem(job);
-    var txtPath = writeOutputText(stem, ".txt", response.text);
-    var srtPath = writeOutputText(stem, ".srt", transcriptToSrt(response.text));
+    var txtPath = writeOutputText(job, ".txt", response.text);
+    var srtPath = writeOutputText(job, ".srt", transcriptToSrt(response.text));
     return [txtPath, srtPath];
   }
 
@@ -1282,17 +1296,60 @@
     if (job.importToResolve !== true) {
       return;
     }
+    await importSavedOutputs(job, paths, job.appendToTimeline === true);
+  }
+
+  async function importSavedOutputs(job, paths, appendToTimeline) {
     setStatus("结果已保存，正在导入达芬奇\n" + describeJob(job) + "\n\n" + paths.join("\n"));
     var resolve = await getResolve();
     var project = await currentProject(resolve);
     var mediaPool = await project.GetMediaPool();
-    var imported = await mediaPool.ImportMedia(paths);
+    var previousFolder = typeof mediaPool.GetCurrentFolder === "function" ? await mediaPool.GetCurrentFolder() : null;
+    var category = outputCategory(job);
+    var targetFolder = await ensureResolveOutputFolder(mediaPool, category.folder);
+    if (!(await mediaPool.SetCurrentFolder(targetFolder))) {
+      throw new Error("Resolve 切换导入 Bin 失败：" + RESOLVE_BIN_ROOT + "/" + category.folder);
+    }
+    var imported = null;
+    try {
+      imported = await mediaPool.ImportMedia(paths);
+    } finally {
+      if (previousFolder) {
+        await mediaPool.SetCurrentFolder(previousFolder);
+      }
+    }
     if (!imported || imported.length === 0) {
       throw new Error("Resolve 导入生成结果失败");
     }
-    if (job.appendToTimeline === true && !(await mediaPool.AppendToTimeline(imported))) {
+    if (appendToTimeline === true && !(await mediaPool.AppendToTimeline(imported))) {
       throw new Error("Resolve 追加到时间线失败");
     }
+  }
+
+  async function ensureResolveOutputFolder(mediaPool, categoryName) {
+    if (typeof mediaPool.GetRootFolder !== "function" || typeof mediaPool.AddSubFolder !== "function" || typeof mediaPool.SetCurrentFolder !== "function") {
+      throw new Error("Resolve Media Pool API 不支持分类导入");
+    }
+    var rootFolder = await mediaPool.GetRootFolder();
+    var workbenchFolder = await findOrCreateSubFolder(mediaPool, rootFolder, RESOLVE_BIN_ROOT);
+    return findOrCreateSubFolder(mediaPool, workbenchFolder, categoryName);
+  }
+
+  async function findOrCreateSubFolder(mediaPool, parentFolder, folderName) {
+    if (!parentFolder || typeof parentFolder.GetSubFolderList !== "function") {
+      throw new Error("Resolve Media Pool Folder API 不支持读取子 Bin");
+    }
+    var folders = await parentFolder.GetSubFolderList();
+    for (var index = 0; index < folders.length; index += 1) {
+      if (typeof folders[index].GetName === "function" && await folders[index].GetName() === folderName) {
+        return folders[index];
+      }
+    }
+    var created = await mediaPool.AddSubFolder(parentFolder, folderName);
+    if (!created) {
+      throw new Error("Resolve 创建 Bin 失败：" + folderName);
+    }
+    return created;
   }
 
   async function getJson(baseUrl, routePath) {
@@ -1571,18 +1628,35 @@
     return job.outputName || "imagine_" + job.operation + "_" + Math.floor(Date.now() / 1000);
   }
 
-  function writeOutput(stem, extension, bytes) {
-    fs.mkdirSync(outputDir, { recursive: true });
-    var outputPath = path.join(outputDir, safeStem(stem) + extension);
+  function writeOutput(job, extension, bytes) {
+    var outputPath = outputFilePath(job, extension);
     fs.writeFileSync(outputPath, bytes);
     return outputPath;
   }
 
-  function writeOutputText(stem, extension, text) {
-    fs.mkdirSync(outputDir, { recursive: true });
-    var outputPath = path.join(outputDir, safeStem(stem) + extension);
+  function writeOutputText(job, extension, text) {
+    var outputPath = outputFilePath(job, extension);
     fs.writeFileSync(outputPath, text, "utf8");
     return outputPath;
+  }
+
+  function outputFilePath(job, extension) {
+    var dir = path.join(outputDir, outputCategory(job).folder);
+    fs.mkdirSync(dir, { recursive: true });
+    return path.join(dir, safeStem(outputStem(job)) + extension);
+  }
+
+  function outputCategory(job) {
+    if (job.operation === "generate-video") {
+      return { folder: "Videos" };
+    }
+    if (job.operation === "tts") {
+      return { folder: "Audio" };
+    }
+    if (job.operation === "transcribe") {
+      return { folder: "Transcripts" };
+    }
+    return { folder: "Images" };
   }
 
   function safeStem(value) {
@@ -1613,6 +1687,33 @@
       .filter(function (file) { return fs.statSync(file).isFile(); })
       .sort(function (a, b) { return fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs; });
     return matches[0] || "";
+  }
+
+  function cleanupOldCacheFiles() {
+    if (!hasNode || !fs.existsSync(cacheDir)) {
+      return 0;
+    }
+    return cleanupOldFilesInDirectory(cacheDir, Date.now() - CACHE_MAX_AGE_MS);
+  }
+
+  function cleanupOldFilesInDirectory(dir, cutoff) {
+    var removed = 0;
+    fs.readdirSync(dir).forEach(function (name) {
+      var filePath = path.join(dir, name);
+      var stat = fs.statSync(filePath);
+      if (stat.isDirectory()) {
+        removed += cleanupOldFilesInDirectory(filePath, cutoff);
+        if (fs.readdirSync(filePath).length === 0 && stat.mtimeMs < cutoff) {
+          fs.rmdirSync(filePath);
+        }
+        return;
+      }
+      if (stat.isFile() && stat.mtimeMs < cutoff) {
+        fs.unlinkSync(filePath);
+        removed += 1;
+      }
+    });
+    return removed;
   }
 
   function transcriptToSrt(text) {
@@ -1716,6 +1817,32 @@
     }
   });
 
+  importResultButton.addEventListener("click", async function () {
+    if (state.running || state.lastOutputs.length === 0 || !state.lastOutputJob) {
+      return;
+    }
+    var config = operationConfigs[state.lastOutputJob.operation];
+    if (!config || config.canImport !== true) {
+      return;
+    }
+    state.running = true;
+    runButton.disabled = true;
+    importResultButton.disabled = true;
+    try {
+      await importSavedOutputs(state.lastOutputJob, state.lastOutputs, config.canAppend === true && appendInput.checked);
+      state.lastImportDone = true;
+      updateImportResultButton();
+      setStatus("已导入达芬奇\n" + describeJob(state.lastOutputJob) + "\n\n" + state.lastOutputs.join("\n"));
+    } catch (error) {
+      setStatus("导入失败\n" + explainError(error, state.lastOutputJob));
+    } finally {
+      state.running = false;
+      runButton.disabled = false;
+      updateImportResultButton();
+      updateMaskPrepareUi();
+    }
+  });
+
   maskEditorCanvas.addEventListener("pointerdown", function (event) {
     if (!maskEditorState || maskEditorState.operation === "outpaint") {
       return;
@@ -1773,7 +1900,16 @@
   setupTabs();
   setLastOutputs([]);
   selectOperation(state.operation);
-  if (!hasNode) {
+  if (hasNode) {
+    try {
+      var removedCacheFiles = cleanupOldCacheFiles();
+      if (removedCacheFiles > 0) {
+        setStatus("已自动清理临时缓存：" + removedCacheFiles + " 个文件\n缓存目录：" + cacheDir);
+      }
+    } catch (error) {
+      setStatus("临时缓存自动清理失败\n" + errorMessage(error));
+    }
+  } else {
     setStatus("浏览器预览模式：界面可查看，运行需从 Resolve Workflow Integrations 打开。");
   }
 })();
