@@ -3400,19 +3400,28 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
   transition: width 320ms var(--iw-motion-ease), background-color var(--iw-motion-base) var(--iw-motion-ease);
 }
 
-.board-media-controls,
-.board-media-stack-switcher {
+.board-media-controls {
   transform: translateY(4px);
   transition:
     opacity var(--iw-motion-surface) var(--iw-motion-ease),
     transform var(--iw-motion-surface) var(--iw-motion-ease);
 }
 
+.board-media-stack-switcher {
+  transform: translate(-50%, 4px);
+  transition:
+    opacity var(--iw-motion-surface) var(--iw-motion-ease),
+    transform var(--iw-motion-surface) var(--iw-motion-ease);
+}
+
 .board-media-node:hover .board-media-controls,
-.board-media-node:focus-within .board-media-controls,
+.board-media-node:focus-within .board-media-controls {
+  transform: translateY(0);
+}
+
 .board-media-node:hover .board-media-stack-switcher,
 .board-media-node:focus-within .board-media-stack-switcher {
-  transform: translateY(0);
+  transform: translate(-50%, 0);
 }
 
 .imagine-workbench-shell .board-media-meta,
@@ -3452,13 +3461,22 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 }
 
 .board-canvas.is-node-dragging .board-node-shell,
-.board-canvas.is-node-dragging .board-node-handle,
 .board-canvas.is-node-dragging .board-media-controls,
 .board-canvas.is-node-dragging .board-media-stack-switcher,
 .board-canvas.is-node-dragging .imagine-mark {
   filter: none !important;
   transition: none !important;
   transform: none !important;
+}
+
+.board-canvas.is-node-dragging .board-node-handle {
+  filter: none !important;
+  transition: none !important;
+  transform: var(--board-handle-translate) scale(var(--board-handle-scale)) !important;
+}
+
+.board-canvas.is-node-dragging .board-media-stack-switcher {
+  transform: translate(-50%, 0) !important;
 }
 
 .board-canvas.is-node-dragging .board-node-shell * {
