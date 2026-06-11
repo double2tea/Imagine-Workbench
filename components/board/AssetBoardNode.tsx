@@ -1,9 +1,10 @@
-import { Compass, Download, Eraser, Expand, Frame, Loader2, Maximize2, Mic2, Music, ScanSearch, Scissors, Sparkles, Video, WandSparkles, X } from "lucide-react";
+import { Music, Video } from "lucide-react";
 import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
 import { memo, useMemo, useRef } from "react";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
 import BoardAudioWaveform from "@/components/board/BoardAudioWaveform";
 import BoardMediaActionBar, { type BoardMediaActionGroup } from "@/components/board/BoardMediaActionBar";
+import BoardMediaNodeShell from "@/components/board/BoardMediaNodeShell";
 import PreviewImage from "@/components/PreviewImage";
 import useBoardAudioItem from "@/components/board/useBoardAudioItem";
 import useSelectedBoardVideoItem from "@/components/board/useSelectedBoardVideoItem";
@@ -11,6 +12,13 @@ import type { BoardAssetNode } from "@/lib/board";
 import { buildStorageItem, type StorageItem } from "@/lib/db";
 import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
 import type { CapturedVideoFrame } from "@/lib/video-frame";
+import {
+  IMAGE_EDIT_OPERATION_ORDER,
+  WORKBENCH_OPERATION_META,
+  WorkbenchOperationIcon,
+  imageEditOperationMeta,
+  operationToneClassName,
+} from "@/components/workbench/OperationControls";
 
 interface AssetBoardNodeProps {
   activeStackAssetId?: string;
@@ -91,11 +99,7 @@ const AssetBoardNode = memo(function AssetBoardNode({
     () => stackItems.find(stackItem => stackItem.id === node.asset.assetId) ?? fallbackItem,
     [fallbackItem, node.asset.assetId, node.asset.type, stackItems],
   );
-  const stackCount = stackItems.length;
-  const hasStackSwitcher = stackCount > 1;
   const isComplete = item.status === "complete";
-  const isProcessing = item.status === "pending" || item.status === "processing";
-  const isFailed = item.status === "failed";
   const shouldMeasureAspectRatio = !item.maskOriginalId;
   const voiceProfileSourceItem = node.asset.type === "audio"
     ? stackItems.find(stackItem => stackItem.id === node.asset.assetId && stackItem.type === "audio")
@@ -113,19 +117,19 @@ const AssetBoardNode = memo(function AssetBoardNode({
         ...(node.asset.type === "image" && isComplete && compareReferenceUrl && onCompare
           ? [{
               id: "compare",
-              icon: <ScanSearch className="h-3.5 w-3.5" />,
+              icon: <WorkbenchOperationIcon operation="compare" />,
               onClick: onCompare,
-              title: "对比参考图",
-              toneClassName: "text-blue-200 hover:border-blue-500/40 hover:bg-blue-600 hover:text-white",
+              title: WORKBENCH_OPERATION_META.compare.title,
+              toneClassName: operationToneClassName(WORKBENCH_OPERATION_META.compare.tone),
             }]
           : []),
         ...(isComplete && onAnalyzeMedia
           ? [{
               id: "analyze",
-              icon: <Sparkles className="h-3.5 w-3.5" />,
+              icon: <WorkbenchOperationIcon operation="analyze" />,
               onClick: () => void onAnalyzeMedia(node.id),
-              title: "分析媒体",
-              toneClassName: "text-teal-200 hover:border-teal-500/40 hover:bg-teal-600 hover:text-white",
+              title: WORKBENCH_OPERATION_META.analyze.title,
+              toneClassName: operationToneClassName(WORKBENCH_OPERATION_META.analyze.tone),
             }]
           : []),
         ...(node.asset.type === "image" && isComplete
@@ -134,25 +138,25 @@ const AssetBoardNode = memo(function AssetBoardNode({
               icon: <AgentIdentityMark variant="inline" />,
               onClick: () => onSendToAgent?.(node.id),
               title: "发送给 Agent",
-              toneClassName: "text-purple-200 hover:border-purple-500/40 hover:bg-purple-600 hover:text-white",
+              toneClassName: operationToneClassName(WORKBENCH_OPERATION_META.analyze.tone),
             }]
           : []),
         ...(node.asset.type === "video" && isComplete && onCaptureVideoFrame && shouldRenderVideoPlayer
           ? [{
               id: "frame",
-              icon: <Frame className="h-3.5 w-3.5" />,
+              icon: <WorkbenchOperationIcon operation="frame" />,
               onClick: () => void captureVideoFrameRef.current?.("current"),
-              title: "截取当前帧",
-              toneClassName: "text-cyan-200 hover:border-cyan-500/40 hover:bg-cyan-600 hover:text-white",
+              title: WORKBENCH_OPERATION_META.frame.title,
+              toneClassName: operationToneClassName(WORKBENCH_OPERATION_META.frame.tone),
             }]
           : []),
         ...(isComplete && voiceProfileSourceItem
           ? [{
               id: "voice",
-              icon: <Mic2 className="h-3.5 w-3.5" />,
+              icon: <WorkbenchOperationIcon operation="voice" />,
               onClick: () => onSaveVoiceProfile?.(voiceProfileSourceItem),
-              title: "保存为克隆音色",
-              toneClassName: "text-cyan-200 hover:border-cyan-500/40 hover:bg-cyan-600 hover:text-white",
+              title: WORKBENCH_OPERATION_META.voice.title,
+              toneClassName: operationToneClassName(WORKBENCH_OPERATION_META.voice.tone),
             }]
           : []),
       ],
@@ -163,39 +167,22 @@ const AssetBoardNode = memo(function AssetBoardNode({
         ? [
             {
               id: "mask-edit",
-              icon: <Frame className="h-3.5 w-3.5" />,
+              icon: <WorkbenchOperationIcon operation="localEdit" />,
               onClick: () => onEditImage?.(node.id),
-              title: "局部编辑",
-              toneClassName: "text-amber-200 hover:border-amber-500/40 hover:bg-amber-600 hover:text-white",
+              title: WORKBENCH_OPERATION_META.localEdit.title,
+              toneClassName: operationToneClassName(WORKBENCH_OPERATION_META.localEdit.tone),
             },
-            {
-              id: "redraw",
-              icon: <WandSparkles className="h-3.5 w-3.5" />,
-              onClick: () => onImageQuickEdit?.(node.id, "redraw"),
-              title: "重绘",
-              toneClassName: "text-sky-200 hover:border-sky-500/40 hover:bg-sky-600 hover:text-white",
-            },
-            {
-              id: "erase",
-              icon: <Eraser className="h-3.5 w-3.5" />,
-              onClick: () => onImageQuickEdit?.(node.id, "erase"),
-              title: "擦除",
-              toneClassName: "text-rose-200 hover:border-rose-500/40 hover:bg-rose-600 hover:text-white",
-            },
-            {
-              id: "outpaint",
-              icon: <Expand className="h-3.5 w-3.5" />,
-              onClick: () => onImageQuickEdit?.(node.id, "outpaint"),
-              title: "扩图",
-              toneClassName: "text-indigo-200 hover:border-indigo-500/40 hover:bg-indigo-600 hover:text-white",
-            },
-            {
-              id: "cutout",
-              icon: <Scissors className="h-3.5 w-3.5" />,
-              onClick: () => onImageQuickEdit?.(node.id, "cutout"),
-              title: "抠图",
-              toneClassName: "text-emerald-200 hover:border-emerald-500/40 hover:bg-emerald-600 hover:text-white",
-            },
+            ...IMAGE_EDIT_OPERATION_ORDER.map(operation => {
+              const meta = imageEditOperationMeta(operation);
+              const Icon = meta.Icon;
+              return {
+                id: operation,
+                icon: <Icon className="h-3.5 w-3.5" />,
+                onClick: () => onImageQuickEdit?.(node.id, operation),
+                title: meta.label,
+                toneClassName: operationToneClassName(meta.tone),
+              };
+            }),
           ]
         : [],
     },
@@ -205,39 +192,41 @@ const AssetBoardNode = memo(function AssetBoardNode({
         ...(node.asset.type === "image" && isComplete
           ? [{
               id: "panorama",
-              icon: <Compass className="h-3.5 w-3.5" />,
+              icon: <WorkbenchOperationIcon operation="panorama" />,
               onClick: () => onOpenPanorama?.(item),
-              title: "360 全景查看",
-              toneClassName: "imagine-panorama-action",
+              title: WORKBENCH_OPERATION_META.panorama.title,
+              toneClassName: operationToneClassName(WORKBENCH_OPERATION_META.panorama.tone),
             }]
           : []),
         {
           id: "fullscreen",
-          icon: <Maximize2 className="h-3.5 w-3.5" />,
+          icon: <WorkbenchOperationIcon operation="fullscreen" />,
           onClick: () => onOpenFullscreen?.(item),
-          title: "全屏预览",
-          toneClassName: "hover:bg-slate-700 hover:text-white",
+          title: WORKBENCH_OPERATION_META.fullscreen.title,
+          toneClassName: operationToneClassName(WORKBENCH_OPERATION_META.fullscreen.tone),
         },
         {
           id: "download",
-          icon: <Download className="h-3.5 w-3.5" />,
+          icon: <WorkbenchOperationIcon operation="download" />,
           onClick: () => onDownload?.(item),
-          title: "下载",
-          toneClassName: "hover:bg-slate-700 hover:text-white",
+          title: WORKBENCH_OPERATION_META.download.title,
+          toneClassName: operationToneClassName(WORKBENCH_OPERATION_META.download.tone),
         },
       ],
     },
   ];
 
   return (
-    <div className="board-media-node group/board-video relative h-full min-h-0 overflow-visible">
-      <BoardMediaActionBar groups={actionGroups} visible={isSelected} />
-      <div className="relative flex h-full min-h-0 items-center justify-center overflow-hidden bg-[var(--iw-panel-soft)]">
-      {hasStackSwitcher && (
-        <div className="board-media-stack-badge pointer-events-none absolute right-2 top-2 z-30 rounded-md bg-slate-950/45 px-2 py-1 text-xs font-semibold text-white/90 opacity-80 shadow-lg backdrop-blur transition-opacity duration-200 group-hover/board-video:opacity-100">
-          {stackCount}
-        </div>
-      )}
+    <BoardMediaNodeShell
+      actionBar={<BoardMediaActionBar groups={actionGroups} visible={isSelected} />}
+      activeStackAssetId={activeStackAssetId ?? node.asset.assetId}
+      isSelected={isSelected}
+      onCancelProcessing={onCancelProcessing ? () => onCancelProcessing(node.id) : undefined}
+      onSelectStackAsset={onSelectStackAsset}
+      progress={item.progress}
+      stackItems={stackItems}
+      status={item.status}
+    >
       {node.asset.type === "image" ? (
         <PreviewImage
           src={item.url}
@@ -282,72 +271,7 @@ const AssetBoardNode = memo(function AssetBoardNode({
       ) : (
         <LightweightMediaPreview type={node.asset.type} />
       )}
-      {(isProcessing || isFailed) && (
-        <div className="pointer-events-none absolute inset-0 z-40 flex flex-col justify-end bg-slate-950/45 p-3 text-white">
-          <div className="rounded-md border border-white/15 bg-slate-950/72 px-3 py-2 shadow-lg backdrop-blur">
-            <div className="flex items-center justify-between gap-3 text-[11px] font-semibold">
-              <span className="flex items-center gap-1.5">
-                {!isFailed && <Loader2 className="h-3 w-3 animate-spin" />}
-                {isFailed ? "编辑失败" : item.status === "pending" ? "任务已排队" : "编辑处理中"}
-              </span>
-              <span className="font-mono">{item.progress}%</span>
-            </div>
-            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/15">
-              <div
-                className={`h-full rounded-full ${isFailed ? "bg-rose-400" : "bg-sky-400"}`}
-                style={{ width: `${item.progress}%` }}
-              />
-            </div>
-            {isProcessing && onCancelProcessing ? (
-              <button
-                type="button"
-                className="nodrag pointer-events-auto mt-2 inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/10 px-2 py-1 text-[10px] font-semibold text-white/85 transition hover:border-rose-300/50 hover:bg-rose-500/80 hover:text-white"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onCancelProcessing(node.id);
-                }}
-              >
-                <X className="h-3 w-3" />
-                取消任务
-              </button>
-            ) : null}
-          </div>
-        </div>
-      )}
-      </div>
-      {hasStackSwitcher && (
-        <div
-          className={[
-            "board-media-stack-switcher nodrag absolute -bottom-8 left-1/2 z-40 flex -translate-x-1/2 gap-1.5 rounded-full border border-white/10 bg-slate-950/72 px-2.5 py-1.5 text-[10px] font-semibold text-white/90 shadow-xl backdrop-blur transition-opacity duration-200",
-            isSelected
-              ? "pointer-events-auto opacity-100"
-              : "pointer-events-none opacity-0 group-hover/board-video:pointer-events-auto group-hover/board-video:opacity-100",
-          ].join(" ")}
-        >
-          {stackItems.map((stackItem, index) => {
-            const isActive = stackItem.id === (activeStackAssetId ?? node.asset.assetId);
-            return (
-              <button
-                key={stackItem.id}
-                type="button"
-                className={[
-                  "nodrag flex h-5 min-w-5 items-center justify-center rounded-full px-1 transition",
-                  isActive ? "bg-white text-slate-950" : "bg-white/20 text-white/80 hover:bg-white/35 hover:text-white",
-                ].join(" ")}
-                title={`版本 ${index + 1}`}
-                aria-label={`切换到版本 ${index + 1}`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  if (!isActive) onSelectStackAsset?.(stackItem.id);
-                }}
-              >
-                {isSelected ? index + 1 : <span className="h-1.5 w-1.5 rounded-full bg-current" />}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
+    </BoardMediaNodeShell>
   );
 });
 

@@ -6,7 +6,6 @@ import {
   FileText,
   ImageDown,
   Image as ImageIcon,
-  Scissors,
   type LucideIcon,
   Maximize2,
   MoreHorizontal,
@@ -35,6 +34,12 @@ import { getProviderMeta } from "@/lib/providers/registry";
 import { transcriptFromDataUrl } from "@/lib/transcripts";
 import { getVideoFrameCaptureLabel, type CapturedVideoFrame, type VideoFrameCaptureMode } from "@/lib/video-frame";
 import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
+import {
+  IMAGE_EDIT_OPERATION_ORDER,
+  WORKBENCH_OPERATION_META,
+  imageEditOperationMeta,
+  operationToneClassName,
+} from "@/components/workbench/OperationControls";
 
 interface AssetCardProps {
   canceling: boolean;
@@ -95,19 +100,6 @@ const frameCaptureActions: Array<{
   { icon: SkipBack, mode: "first" },
   { icon: Clock3, mode: "current" },
   { icon: SkipForward, mode: "last" },
-];
-
-const quickEditActions: Array<{
-  icon: LucideIcon;
-  label: string;
-  operation: ImageEditFeature;
-  title: string;
-  tone: string;
-}> = [
-  { icon: Paintbrush, label: "重绘", operation: "redraw", title: "绘制蒙版并重绘局部", tone: "text-sky-300" },
-  { icon: X, label: "擦除", operation: "erase", title: "绘制蒙版并擦除区域", tone: "text-rose-300" },
-  { icon: ImageDown, label: "扩图", operation: "outpaint", title: "扩展画面边界", tone: "text-indigo-300" },
-  { icon: Scissors, label: "抠图", operation: "cutout", title: "移除背景并保留主体", tone: "text-emerald-300" },
 ];
 
 type FrameMenuPlacement = "hover" | "meta";
@@ -401,30 +393,16 @@ export default function AssetCard({
                       修改
                     </button>
                   )}
-                  {item.type === "image" && (
-                    <button type="button" onClick={() => runMobileAction(() => onImageQuickEdit(item, "redraw"))}>
-                      <Paintbrush className="h-3.5 w-3.5 text-sky-300" />
-                      重绘
-                    </button>
-                  )}
-                  {item.type === "image" && (
-                    <button type="button" onClick={() => runMobileAction(() => onImageQuickEdit(item, "erase"))}>
-                      <X className="h-3.5 w-3.5 text-rose-300" />
-                      擦除
-                    </button>
-                  )}
-                  {item.type === "image" && (
-                    <button type="button" onClick={() => runMobileAction(() => onImageQuickEdit(item, "outpaint"))}>
-                      <ImageDown className="h-3.5 w-3.5 text-indigo-300" />
-                      扩图
-                    </button>
-                  )}
-                  {item.type === "image" && (
-                    <button type="button" onClick={() => runMobileAction(() => onImageQuickEdit(item, "cutout"))}>
-                      <Scissors className="h-3.5 w-3.5 text-emerald-300" />
-                      抠图
-                    </button>
-                  )}
+                  {item.type === "image" && IMAGE_EDIT_OPERATION_ORDER.map(operation => {
+                    const meta = imageEditOperationMeta(operation);
+                    const Icon = meta.Icon;
+                    return (
+                      <button key={operation} type="button" onClick={() => runMobileAction(() => onImageQuickEdit(item, operation))}>
+                        <Icon className={`h-3.5 w-3.5 ${operationToneClassName(meta.tone)}`} />
+                        {meta.label}
+                      </button>
+                    );
+                  })}
                   <button type="button" onClick={() => runMobileAction(() => onDownload(item))}>
                     <Download className="h-3.5 w-3.5 text-emerald-300" />
                     下载
@@ -461,11 +439,11 @@ export default function AssetCard({
                     <button
                       type="button"
                       onClick={() => setFrameMenuPlacement(prev => prev === "hover" ? null : "hover")}
-                      className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-cyan-600 border border-white/5 rounded-md text-xs text-white transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
+                      className={`imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 border border-white/5 rounded-md text-xs transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer ${operationToneClassName(WORKBENCH_OPERATION_META.frame.tone)}`}
                       title="截取视频帧"
                       aria-label="截取视频帧"
                     >
-                      <ImageDown className="h-3 w-3 text-cyan-200 group-hover:text-white" />
+                      <ImageDown className="h-3 w-3" />
                       <span className="text-[9px] font-bold">截帧</span>
                     </button>
                     {frameMenuPlacement === "hover" && (
@@ -493,7 +471,7 @@ export default function AssetCard({
                   <button
                     type="button"
                     onClick={() => onOpenPanorama(item)}
-                    className="imagine-card-action imagine-panorama-action min-w-0 px-1.5 py-1 rounded-md border text-xs transition-all duration-[160ms] shadow-lg flex items-center justify-center cursor-pointer"
+                    className={`imagine-card-action min-w-0 px-1.5 py-1 rounded-md border text-xs transition-all duration-[160ms] shadow-lg flex items-center justify-center cursor-pointer ${operationToneClassName(WORKBENCH_OPERATION_META.panorama.tone)}`}
                     title="360 全景查看"
                     aria-label="360 全景查看"
                   >
@@ -505,11 +483,11 @@ export default function AssetCard({
                 {item.type === "image" && (
                   <button
                     onClick={() => onApplyVideoReference(item)}
-                    className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-purple-600 border border-white/5 rounded-md text-xs text-white transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
+                    className={`imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 border border-white/5 rounded-md text-xs transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer ${operationToneClassName(WORKBENCH_OPERATION_META.imageToVideo.tone)}`}
                     title="以此图首帧生图动态 Veo 航拍影片"
                     aria-label="以此图首帧生成视频"
                   >
-                    <VideoIcon className="h-3 w-3 text-purple-450 group-hover:text-white" />
+                    <VideoIcon className="h-3 w-3" />
                     <span className="text-[9px] font-bold">生视频</span>
                   </button>
                 )}
@@ -517,11 +495,11 @@ export default function AssetCard({
                 {item.type === "image" && (
                   <button
                     onClick={() => onUseAgentReference(item)}
-                    className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-blue-600 border border-white/5 rounded-md text-xs text-white transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
+                    className={`imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 border border-white/5 rounded-md text-xs transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer ${operationToneClassName(WORKBENCH_OPERATION_META.analyze.tone)}`}
                     title="引用该图片至 Agent 智能代理进行对话与局部修改"
                     aria-label="引用至 Agent"
                   >
-                    <Sparkles className="h-3 w-3 text-blue-400 group-hover:text-white animate-pulse" />
+                    <Sparkles className="h-3 w-3" />
                     <span className="text-[9px] font-bold">Agent</span>
                   </button>
                 )}
@@ -529,11 +507,11 @@ export default function AssetCard({
                 {item.type === "image" && (
                   <button
                     onClick={() => onLaunchMaskEditor(item.url, item.id)}
-                    className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-amber-600 border border-white/5 rounded-md text-xs text-white transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
+                    className={`imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 border border-white/5 rounded-md text-xs transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer ${operationToneClassName(WORKBENCH_OPERATION_META.localEdit.tone)}`}
                     title="对该图片局部进行笔刷遮罩修改 & 创意局部重绘"
                     aria-label="局部修改"
                   >
-                    <Paintbrush className="h-3 w-3 text-amber-500 group-hover:text-white" />
+                    <Paintbrush className="h-3 w-3" />
                     <span className="text-[9px] font-bold">修改</span>
                   </button>
                 )}
@@ -544,31 +522,32 @@ export default function AssetCard({
                       <button
                         type="button"
                         onClick={() => setIsQuickEditMenuOpen(prev => !prev)}
-                        className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-sky-600 border border-white/5 rounded-md text-xs text-white transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
+                        className={`imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 border border-white/5 rounded-md text-xs transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer ${operationToneClassName(WORKBENCH_OPERATION_META.brush.tone)}`}
                         title="图片快捷编辑"
                         aria-label="图片快捷编辑"
                         aria-expanded={isQuickEditMenuOpen}
                       >
-                        <Paintbrush className="h-3 w-3 text-sky-300 group-hover:text-white" />
+                        <Paintbrush className="h-3 w-3" />
                         <span className="text-[9px] font-bold">编辑</span>
                         <ChevronDown className={`h-3 w-3 transition ${isQuickEditMenuOpen ? "rotate-180" : ""}`} />
                       </button>
                       {isQuickEditMenuOpen && (
                         <div className="absolute bottom-full left-0 mb-1 grid min-w-24 gap-1 rounded-lg border border-white/12 bg-slate-950/94 p-1 text-xs text-slate-100 shadow-xl backdrop-blur">
-                          {quickEditActions.map(action => {
-                            const Icon = action.icon;
+                          {IMAGE_EDIT_OPERATION_ORDER.map(operation => {
+                            const action = imageEditOperationMeta(operation);
+                            const Icon = action.Icon;
                             return (
                               <button
-                                key={action.operation}
+                                key={operation}
                                 type="button"
                                 onClick={() => {
                                   setIsQuickEditMenuOpen(false);
-                                  onImageQuickEdit(item, action.operation);
+                                  onImageQuickEdit(item, operation);
                                 }}
                                 className="flex h-8 items-center gap-2 rounded-md px-2 text-left transition hover:bg-white/10"
                                 title={action.title}
                               >
-                                <Icon className={`h-3.5 w-3.5 ${action.tone}`} />
+                                <Icon className={`h-3.5 w-3.5 ${operationToneClassName(action.tone)}`} />
                                 <span className="whitespace-nowrap">{action.label}</span>
                               </button>
                             );
@@ -582,11 +561,11 @@ export default function AssetCard({
                 <button
                   type="button"
                   onClick={() => onReuseTask(item)}
-                  className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-cyan-600 border border-white/5 rounded-md text-xs text-white transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
+                  className={`imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 border border-white/5 rounded-md text-xs transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer ${operationToneClassName(WORKBENCH_OPERATION_META.reuse.tone)}`}
                   title="将此任务的提示词、模型、尺寸与参考图回填到左侧工作面板"
                   aria-label="复用任务参数"
                 >
-                  <SlidersHorizontal className="h-3 w-3 text-cyan-300 group-hover:text-white" />
+                  <SlidersHorizontal className="h-3 w-3" />
                   <span className="text-[9px] font-bold">复用</span>
                 </button>
 
@@ -594,22 +573,22 @@ export default function AssetCard({
                   <button
                     type="button"
                     onClick={() => onSaveVoiceProfile(item)}
-                    className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-cyan-600 border border-white/5 rounded-md text-xs text-white transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
+                    className={`imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 border border-white/5 rounded-md text-xs transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer ${operationToneClassName(WORKBENCH_OPERATION_META.voice.tone)}`}
                     title="保存为可复用克隆音色"
                     aria-label="保存为克隆音色"
                   >
-                    <Mic2 className="h-3 w-3 text-cyan-300 group-hover:text-white" />
+                    <Mic2 className="h-3 w-3" />
                     <span className="text-[9px] font-bold">音色</span>
                   </button>
                 )}
 
                 <button
                   onClick={() => onDownload(item)}
-                  className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-emerald-600 border border-white/5 rounded-md text-xs text-white transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer"
+                  className={`imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 border border-white/5 rounded-md text-xs transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer ${operationToneClassName(WORKBENCH_OPERATION_META.download.tone)}`}
                   title="下载该文件到本地"
                   aria-label="下载文件"
                 >
-                  <Download className="h-3 w-3 text-emerald-400 group-hover:text-white" />
+                  <Download className="h-3 w-3" />
                   <span className="text-[9px] font-bold">下载</span>
                 </button>
 
@@ -619,32 +598,32 @@ export default function AssetCard({
                     className={`imagine-card-action min-w-0 px-1.5 py-1 rounded-md border transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer ${
                       inCompare
                         ? "bg-blue-600 border-blue-500 text-white"
-                        : "bg-slate-900/90 border-white/5 text-slate-300 hover:text-white hover:bg-slate-800"
+                        : `bg-slate-900/90 border-white/5 ${operationToneClassName(WORKBENCH_OPERATION_META.compare.tone)}`
                     }`}
                     title="加入左右侧滑块对比面板"
                     aria-label={inCompare ? "从对比面板移除" : "加入对比面板"}
                   >
-                    <RefreshCw className="h-3 w-3 text-blue-400" />
+                    <RefreshCw className="h-3 w-3" />
                     <span className="text-[9px] font-bold">对比</span>
                   </button>
                 )}
 
                 <button
                   onClick={() => onOpenFullscreen(item)}
-                  className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-slate-800 border border-white/5 rounded-md text-xs text-white transition-all duration-[160ms] shadow-lg flex items-center justify-center cursor-pointer"
+                  className={`imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 border border-white/5 rounded-md text-xs transition-all duration-[160ms] shadow-lg flex items-center justify-center cursor-pointer ${operationToneClassName(WORKBENCH_OPERATION_META.fullscreen.tone)}`}
                   title="全屏大画幅细节放大"
                   aria-label="全屏预览"
                 >
-                  <Maximize2 className="h-3 w-3 text-slate-300" />
+                  <Maximize2 className="h-3 w-3" />
                 </button>
 
                 <button
                   onClick={() => onDelete(item)}
-                  className="imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 hover:bg-red-600 border border-white/5 rounded-md text-xs text-white transition-all duration-[160ms] shadow-lg flex items-center justify-center cursor-pointer"
+                  className={`imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 border border-white/5 rounded-md text-xs transition-all duration-[160ms] shadow-lg flex items-center justify-center cursor-pointer ${operationToneClassName(WORKBENCH_OPERATION_META.delete.tone)}`}
                   title="移除此项"
                   aria-label="删除资产"
                 >
-                  <Trash2 className="h-3 w-3 text-red-300" />
+                  <Trash2 className="h-3 w-3" />
                 </button>
               </div>
             </div>

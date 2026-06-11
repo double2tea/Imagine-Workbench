@@ -2,11 +2,12 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent,
 import { AudioLines, Pencil, RefreshCw, Sparkles, Trash2 } from "lucide-react";
 import VoiceProfilePreviewPlayer from "@/components/audio/VoiceProfilePreviewPlayer";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
+import CreatorGenerateButton from "@/components/creation/CreatorGenerateButton";
+import PromptComposerSurface from "@/components/creation/PromptComposerSurface";
 import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
 import type { ModelOptionGroup } from "@/components/creation/ModelSelectCombobox";
 import ReferenceImagePicker, { type ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
-import PromptReferenceInlineOverlay, { resolvePromptReferenceThumbnails } from "@/components/reference/PromptReferenceThumbnailStrip";
-import { type DraggedReferenceAsset, hasDraggedReferenceAsset } from "@/components/reference/referenceDrag";
+import { type DraggedReferenceAsset } from "@/components/reference/referenceDrag";
 import {
   ASR_LANGUAGE_OPTIONS,
   audioOperationRequiresTextInput,
@@ -114,7 +115,6 @@ export default function AudioGenerationPanel({
   const confirmAction = useConfirm();
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
   const [slashCommand, setSlashCommand] = useState<PromptTemplateSlashCommand | null>(null);
-  const [isDragOver, setIsDragOver] = useState(false);
   const [voiceProfiles, setVoiceProfiles] = useState<VoiceProfile[]>([]);
   const [voiceProfileName, setVoiceProfileName] = useState("");
   const [voiceProfileDescription, setVoiceProfileDescription] = useState("");
@@ -130,7 +130,6 @@ export default function AudioGenerationPanel({
   const selectedFunctionValue = audioFunctionValue(selectedModel, mode);
   const referenceLimit = capabilities.maxReferenceMedia;
   const acceptedMediaTypes = capabilities.referenceMediaTypes;
-  const promptReferenceThumbnails = resolvePromptReferenceThumbnails(prompt, referenceImages, acceptedMediaTypes);
   const visibleVoiceProfiles = useMemo(
     () => getVisibleVoiceProfilesForAudioModel(selectedModel, mode, voiceProfiles),
     [mode, selectedModel, voiceProfiles],
@@ -354,13 +353,10 @@ export default function AudioGenerationPanel({
 
   return (
     <div className="flex flex-col gap-3.5 animate-fade-in">
-      <div>
-        <div className="mb-2 flex items-center justify-between">
-          <label className="flex items-center gap-1.5 imagine-section-label">
-            <AudioLines className="h-3.5 w-3.5 text-amber-600" />
-            音频创作
-          </label>
-          <div className="flex items-center gap-2">
+      <PromptComposerSurface
+        acceptedMediaTypes={acceptedMediaTypes}
+        actions={
+          <>
             <PromptTemplatePicker ref={templatePickerRef} accent="teal" compact onApply={handleApplyPromptTemplate} />
             <button
               onClick={onOptimizePrompt}
@@ -375,58 +371,18 @@ export default function AudioGenerationPanel({
               <span className="sm:hidden">润色</span>
               <span className="hidden sm:inline">优化音频提示</span>
             </button>
-          </div>
-        </div>
-
-        <div className={`imagine-field-shell relative p-3 transition-all duration-200 ${
-          isDragOver ? "border-[var(--iw-text)] ring-2 ring-[var(--iw-border)]" : ""
-        }`}>
-          {atDropdownNode}
-          <div className="relative">
-            <textarea
-              value={prompt}
-              onChange={(event) => handlePromptChange(event.target.value, event.target.selectionStart)}
-              onDragEnter={(event) => {
-                if (!hasDraggedReferenceAsset(event.dataTransfer)) return;
-                event.preventDefault();
-                setIsDragOver(true);
-              }}
-              onDragOver={(event) => {
-                if (!hasDraggedReferenceAsset(event.dataTransfer)) return;
-                event.dataTransfer.dropEffect = "copy";
-                event.preventDefault();
-              }}
-              onDragLeave={(event) => {
-                const relatedTarget = event.relatedTarget;
-                if (!(relatedTarget instanceof Node) || !event.currentTarget.contains(relatedTarget)) {
-                  setIsDragOver(false);
-                }
-              }}
-              onDrop={(event) => {
-                setIsDragOver(false);
-                onPromptDropAsset(event);
-              }}
-              placeholder={promptPlaceholder}
-              className={`imagine-field-textarea relative z-10 h-24 text-sm leading-6 caret-[var(--iw-text)] transition-all duration-200 ${
-                isDragOver ? "scale-[1.01]" : ""
-              } ${
-                promptReferenceThumbnails.length > 0 ? "!text-transparent" : ""
-              }`}
-            />
-            <PromptReferenceInlineOverlay
-              acceptedMediaTypes={acceptedMediaTypes}
-              prompt={prompt}
-              references={referenceImages}
-              className="text-sm leading-6"
-            />
-          </div>
-          <div className="imagine-field-shell-footer mt-2 flex items-center justify-between pt-2">
-            <span className="hidden sm:inline">拖入资产到此处插入 @媒体N | 参考媒体按模型能力启用</span>
-            <span className="sm:hidden">@ 可引用作品</span>
-            <span>{prompt.length} 字符</span>
-          </div>
-        </div>
-      </div>
+          </>
+        }
+        atDropdownNode={atDropdownNode}
+        desktopHint="拖入资产到此处插入 @媒体N | 参考媒体按模型能力启用"
+        icon={<AudioLines className="h-3.5 w-3.5 text-amber-600" />}
+        label="音频创作"
+        onChange={handlePromptChange}
+        onDropAsset={onPromptDropAsset}
+        placeholder={promptPlaceholder}
+        prompt={prompt}
+        references={referenceImages}
+      />
 
       <div className="grid grid-cols-1 gap-3">
         <div>
@@ -656,15 +612,14 @@ export default function AudioGenerationPanel({
       )}
 
       {showGenerateButton && (
-        <button
-          type="button"
-          onClick={onGenerate}
+        <CreatorGenerateButton
+          mode="audio"
           disabled={isSubmitting || !hasRequiredInput || (needsCloneConsent && !voiceCloneConsentAccepted)}
-          className="imagine-primary-action flex w-full items-center justify-center gap-2 rounded-lg bg-amber-600 py-3 text-xs font-bold text-white transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isSubmitting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <AudioLines className="h-4 w-4" />}
-          {isSubmitting ? `提交中 (${submitCount})，可继续排队` : mode === "asr" ? "转写音频" : "生成音频"}
-        </button>
+          isSubmitting={isSubmitting}
+          label={mode === "asr" ? "转写音频" : "生成音频"}
+          submitCount={submitCount}
+          onGenerate={onGenerate}
+        />
       )}
     </div>
   );

@@ -37,7 +37,7 @@ export default function BoardMediaActionBar({ groups, visible = false }: BoardMe
               key={action.id}
               type="button"
               onClick={action.onClick}
-              className={`imagine-board-asset-action nodrag ${action.toneClassName ?? ""}`}
+              className={`imagine-floating-card-action imagine-board-asset-action nodrag ${action.toneClassName ?? ""}`}
               title={action.title}
               aria-label={action.title}
             >

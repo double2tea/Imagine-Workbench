@@ -1,0 +1,101 @@
+import { useState, type DragEvent, type ReactNode } from "react";
+import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
+import PromptReferenceInlineOverlay, {
+  resolvePromptReferenceThumbnails,
+} from "@/components/reference/PromptReferenceThumbnailStrip";
+import { hasDraggedReferenceAsset } from "@/components/reference/referenceDrag";
+import type { MediaReferenceType } from "@/lib/media-references";
+
+interface PromptComposerSurfaceProps {
+  acceptedMediaTypes: ReadonlyArray<MediaReferenceType>;
+  actions: ReactNode;
+  atDropdownNode: ReactNode;
+  desktopHint: string;
+  icon: ReactNode;
+  label: string;
+  mobileHint?: string;
+  onChange: (value: string, caret: number) => void;
+  onDropAsset: (event: DragEvent<HTMLTextAreaElement>) => void;
+  placeholder: string;
+  prompt: string;
+  references: ReadonlyArray<ReferenceImageRef>;
+}
+
+export default function PromptComposerSurface({
+  acceptedMediaTypes,
+  actions,
+  atDropdownNode,
+  desktopHint,
+  icon,
+  label,
+  mobileHint = "@ 可引用作品",
+  onChange,
+  onDropAsset,
+  placeholder,
+  prompt,
+  references,
+}: PromptComposerSurfaceProps) {
+  const [isDragOver, setIsDragOver] = useState(false);
+  const referenceThumbnails = resolvePromptReferenceThumbnails(prompt, references, acceptedMediaTypes);
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between">
+        <label className="flex items-center gap-1.5 imagine-section-label">
+          {icon}
+          {label}
+        </label>
+        <div className="flex items-center gap-2">{actions}</div>
+      </div>
+
+      <div
+        className={`imagine-field-shell relative p-3 transition-all duration-200 ${
+          isDragOver ? "border-[var(--iw-accent)]/40 ring-2 ring-[var(--iw-accent)]/30" : ""
+        }`}
+      >
+        {atDropdownNode}
+        <div className="relative">
+          <textarea
+            value={prompt}
+            onChange={(event) => onChange(event.target.value, event.target.selectionStart)}
+            onDragEnter={(event) => {
+              if (!hasDraggedReferenceAsset(event.dataTransfer)) return;
+              event.preventDefault();
+              setIsDragOver(true);
+            }}
+            onDragOver={(event) => {
+              if (!hasDraggedReferenceAsset(event.dataTransfer)) return;
+              event.dataTransfer.dropEffect = "copy";
+              event.preventDefault();
+            }}
+            onDragLeave={(event) => {
+              const relatedTarget = event.relatedTarget;
+              if (!(relatedTarget instanceof Node) || !event.currentTarget.contains(relatedTarget)) {
+                setIsDragOver(false);
+              }
+            }}
+            onDrop={(event) => {
+              setIsDragOver(false);
+              onDropAsset(event);
+            }}
+            placeholder={placeholder}
+            className={`imagine-field-textarea relative z-10 h-24 text-sm leading-6 caret-[var(--iw-text)] transition-all duration-200 ${
+              isDragOver ? "scale-[1.01]" : ""
+            } ${referenceThumbnails.length > 0 ? "!text-transparent" : ""}`}
+          />
+          <PromptReferenceInlineOverlay
+            acceptedMediaTypes={acceptedMediaTypes}
+            prompt={prompt}
+            references={references}
+            className="text-sm leading-6"
+          />
+        </div>
+        <div className="imagine-field-shell-footer mt-2 flex items-center justify-between pt-2">
+          <span className="hidden sm:inline">{desktopHint}</span>
+          <span className="sm:hidden">{mobileHint}</span>
+          <span>{prompt.length} 字符</span>
+        </div>
+      </div>
+    </div>
+  );
+}

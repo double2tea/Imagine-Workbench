@@ -5,6 +5,7 @@ import {
   Check,
   Crop,
   Eraser,
+  Expand,
   Paintbrush,
   RefreshCw,
   RotateCcw,
@@ -29,6 +30,13 @@ import {
 } from "@/lib/canvas-editor";
 import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
 import { getImageResolutionOptions } from "@/lib/providers/model-catalog";
+import {
+  ImageEditOperationIcon,
+  OperationActionButton,
+  OperationControlGroup,
+  OperationSection,
+  OperationSegmentButton,
+} from "@/components/workbench/OperationControls";
 
 export interface CanvasMaskEditorOutput {
   imageBase64: string;
@@ -98,7 +106,7 @@ const EDITOR_MODE_OPTIONS: Array<{ mode: EditorMode; label: string; hint: string
   { mode: "erase", label: "橡皮", hint: "擦除已绘制遮罩", icon: <Eraser className="h-3.5 w-3.5" /> },
   { mode: "text", label: "文字", hint: "点击画布放置文字", icon: <Type className="h-3.5 w-3.5" /> },
   { mode: "crop", label: "裁切", hint: "拖动选框或把手调整构图", icon: <Crop className="h-3.5 w-3.5" /> },
-  { mode: "outpaint", label: "扩图", hint: "设置四周扩展像素", icon: <Crop className="h-3.5 w-3.5" /> },
+  { mode: "outpaint", label: "扩图", hint: "设置四周扩展像素", icon: <Expand className="h-3.5 w-3.5" /> },
 ];
 
 const OPERATION_COPY: Record<ImageEditFeature, { title: string; hint: string; promptPlaceholder: string }> = {
@@ -801,20 +809,16 @@ export default function CanvasMaskEditor({
   };
 
   const renderModeButton = ({ mode, label, hint, icon }: { mode: EditorMode; label: string; hint: string; icon: React.ReactNode }) => (
-    <button
+    <OperationSegmentButton
       key={mode}
       type="button"
       onClick={() => setEditorMode(mode)}
-      className={`imagine-secondary-action flex h-9 min-w-16 items-center justify-center gap-1.5 rounded-md px-2.5 text-[11px] font-semibold transition ${
-        editorMode === mode
-          ? "bg-blue-600 text-white shadow-sm shadow-blue-950/40"
-          : "text-[var(--iw-muted)] hover:bg-[var(--iw-panel-soft)] hover:text-[var(--iw-text)]"
-      }`}
+      active={editorMode === mode}
       title={hint}
     >
       {icon}
       {label}
-    </button>
+    </OperationSegmentButton>
   );
 
   return (
@@ -823,7 +827,11 @@ export default function CanvasMaskEditor({
         <div className="flex items-center justify-between border-b border-[var(--iw-border)] px-4 py-3 sm:px-5">
           <div className="min-w-0">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--iw-text)]">
-              <Paintbrush className="h-4 w-4 text-blue-300" />
+              {operation ? (
+                <ImageEditOperationIcon operation={operation} className="h-4 w-4 text-[var(--iw-accent)]" />
+              ) : (
+                <Paintbrush className="h-4 w-4 text-[var(--iw-accent)]" />
+              )}
               {operationCopy ? operationCopy.title : "图片编辑器"}
             </h3>
             <p className="mt-1 text-xs text-[var(--iw-muted)]">
@@ -976,21 +984,19 @@ export default function CanvasMaskEditor({
 
         <div className="border-t border-[var(--iw-border)] bg-[var(--iw-panel)]/60 px-4 py-3 sm:px-5">
           <div className="grid gap-3 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-start">
-            <div className="min-w-0">
-              <span className="mb-1.5 block text-[10px] font-semibold tracking-widest text-[var(--iw-muted)]">工具</span>
+            <OperationSection label="工具">
               <div className="flex flex-wrap items-center rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)]/80 p-0.5">
                 {visibleModeOptions.map(option => renderModeButton(option))}
               </div>
-            </div>
+            </OperationSection>
 
-            <div className="min-w-0">
+            <OperationSection label="参数">
               <div className="mb-1.5 flex items-center justify-between gap-3">
-                <span className="text-[10px] font-semibold tracking-widest text-[var(--iw-muted)]">参数</span>
                 <span className="truncate text-[10px] text-[var(--iw-muted)]">{activeMode.hint}</span>
               </div>
 
               {operation && operation !== "cutout" && (
-                <div className="mb-2 flex min-h-10 flex-wrap items-center gap-2 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-bg)]/35 px-3 py-2">
+                <OperationControlGroup className="mb-2">
                   <label className="flex items-center gap-2 text-[10px] font-semibold text-[var(--iw-muted)]">
                     <span>分辨率</span>
                     <select
@@ -1004,11 +1010,11 @@ export default function CanvasMaskEditor({
                       ))}
                     </select>
                   </label>
-                </div>
+                </OperationControlGroup>
               )}
 
               {(editorMode === "mask" || editorMode === "erase") && (
-                <div className="flex min-h-10 flex-wrap items-center gap-2 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-bg)]/35 px-3 py-2">
+                <OperationControlGroup>
                   <div className="flex items-center gap-2 text-xs text-[var(--iw-text)]">
                     <Sliders className="h-3.5 w-3.5 text-[var(--iw-muted)]" />
                     <span className="w-11 font-mono">{brushSize}px</span>
@@ -1025,7 +1031,7 @@ export default function CanvasMaskEditor({
                   <button
                     type="button"
                     onClick={invertMask}
-                    className="imagine-secondary-action h-8 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)] px-2.5 text-xs font-semibold text-[var(--iw-text)] transition hover:bg-[var(--iw-panel-soft)]"
+                    className="imagine-secondary-action h-8 rounded-md border border-[var(--iw-border)] px-2.5 text-xs font-semibold"
                     title="反选遮罩区域"
                   >
                     反选
@@ -1033,17 +1039,17 @@ export default function CanvasMaskEditor({
                   <button
                     type="button"
                     onClick={clearMask}
-                    className="imagine-secondary-action flex h-8 items-center gap-1.5 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)] px-2.5 text-xs font-semibold text-[var(--iw-muted)] transition hover:bg-[var(--iw-panel-soft)] hover:text-[var(--iw-text)]"
+                    className="imagine-secondary-action flex h-8 items-center gap-1.5 rounded-md border border-[var(--iw-border)] px-2.5 text-xs font-semibold"
                     data-action="danger"
                   >
                     <Eraser className="h-3.5 w-3.5" />
                     清蒙版
                   </button>
-                </div>
+                </OperationControlGroup>
               )}
 
               {editorMode === "text" && (
-                <div className="flex min-h-10 flex-wrap items-center gap-2 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-bg)]/35 px-3 py-2">
+                <OperationControlGroup>
                   <input
                     type="text"
                     value={textValue}
@@ -1080,16 +1086,16 @@ export default function CanvasMaskEditor({
                   <button
                     type="button"
                     onClick={clearText}
-                    className="imagine-secondary-action h-8 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)] px-2.5 text-xs font-semibold text-[var(--iw-muted)] transition hover:bg-[var(--iw-panel-soft)] hover:text-[var(--iw-text)]"
+                    className="imagine-secondary-action h-8 rounded-md border border-[var(--iw-border)] px-2.5 text-xs font-semibold"
                     data-action="danger"
                   >
                     清文字
                   </button>
-                </div>
+                </OperationControlGroup>
               )}
 
               {editorMode === "crop" && (
-                <div className="flex min-h-10 flex-wrap items-center gap-2 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-bg)]/35 px-3 py-2">
+                <OperationControlGroup>
                   <div className="flex h-8 max-w-full items-center gap-1 overflow-x-auto rounded-md border border-[var(--iw-border)] bg-[var(--iw-bg)]/60 px-1.5">
                     {CROP_PRESETS.map(preset => (
                       <button
@@ -1125,16 +1131,16 @@ export default function CanvasMaskEditor({
                   <button
                     type="button"
                     onClick={() => setCropRect(null)}
-                    className="imagine-secondary-action h-8 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)]/45 px-3 text-xs font-semibold text-[var(--iw-muted)] transition hover:text-[var(--iw-text)]"
+                    className="imagine-secondary-action h-8 rounded-md border border-[var(--iw-border)] px-3 text-xs font-semibold"
                     data-action="danger"
                   >
                     清选区
                   </button>
-                </div>
+                </OperationControlGroup>
               )}
 
               {editorMode === "outpaint" && (
-                <div className="flex min-h-10 flex-wrap items-center gap-2 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-bg)]/35 px-3 py-2">
+                <OperationControlGroup>
                   {(["left", "right", "top", "bottom"] as const).map(side => (
                     <span key={side} className="rounded-md border border-[var(--iw-border)] bg-[var(--iw-bg)]/60 px-2.5 py-1.5 text-[10px] font-semibold text-[var(--iw-muted)]">
                       <span className="w-8">{side === "left" ? "左" : side === "right" ? "右" : side === "top" ? "上" : "下"}</span>
@@ -1144,12 +1150,12 @@ export default function CanvasMaskEditor({
                   <button
                     type="button"
                     onClick={() => setOutpaintMargins(defaultOutpaintMargins())}
-                    className="imagine-secondary-action h-8 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)] px-2.5 text-xs font-semibold text-[var(--iw-muted)] transition hover:bg-[var(--iw-panel-soft)] hover:text-[var(--iw-text)]"
+                    className="imagine-secondary-action h-8 rounded-md border border-[var(--iw-border)] px-2.5 text-xs font-semibold"
                     data-action="danger"
                   >
                     清扩图
                   </button>
-                </div>
+                </OperationControlGroup>
               )}
 
               {operation && operation !== "cutout" ? (
@@ -1163,35 +1169,31 @@ export default function CanvasMaskEditor({
                   />
                 </div>
               ) : null}
-            </div>
+            </OperationSection>
 
-            <div className="min-w-0">
-              <span className="mb-1.5 block text-[10px] font-semibold tracking-widest text-[var(--iw-muted)]">操作</span>
+            <OperationSection label="操作">
               <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                <button
+                <OperationActionButton
                   type="button"
                   onClick={resetEditor}
-                  className="imagine-secondary-action flex h-10 items-center gap-1.5 rounded-lg border border-[var(--iw-border)] px-3 text-xs font-semibold text-[var(--iw-muted)] transition hover:bg-[var(--iw-panel-soft)] hover:text-[var(--iw-text)]"
+                  tone="neutral"
                   data-action="danger"
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
                   重置
-                </button>
-                <button
+                </OperationActionButton>
+                <OperationActionButton
                   type="button"
                   onClick={handleApply}
                   disabled={!canApply}
-                  className={`imagine-primary-action flex h-10 items-center gap-1.5 rounded-lg px-4 text-xs font-semibold text-white transition ${
-                    canApply
-                      ? "bg-blue-600 shadow-md shadow-blue-950/30 hover:bg-blue-500"
-                      : "cursor-not-allowed border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)]"
-                  }`}
+                  tone="success"
+                  variant="primary"
                 >
                   <Check className="h-4 w-4" />
                   应用编辑
-                </button>
+                </OperationActionButton>
               </div>
-            </div>
+            </OperationSection>
           </div>
         </div>
       </div>

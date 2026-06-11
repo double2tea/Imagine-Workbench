@@ -1,11 +1,11 @@
 import { useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from "react";
 import { RefreshCw, Sparkles, Video as VideoIcon } from "lucide-react";
 import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
+import CreatorGenerateButton from "@/components/creation/CreatorGenerateButton";
 import ModelSelectCombobox, { type ModelOptionGroup } from "@/components/creation/ModelSelectCombobox";
-import ModelPriceBadge from "@/components/creation/ModelPriceBadge";
+import PromptComposerSurface from "@/components/creation/PromptComposerSurface";
 import ReferenceImagePicker, { type ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
-import PromptReferenceInlineOverlay, { resolvePromptReferenceThumbnails } from "@/components/reference/PromptReferenceThumbnailStrip";
-import { type DraggedReferenceAsset, hasDraggedReferenceAsset } from "@/components/reference/referenceDrag";
+import { type DraggedReferenceAsset } from "@/components/reference/referenceDrag";
 import {
   applyPromptTemplateText,
   detectPromptTemplateSlashCommand,
@@ -108,7 +108,6 @@ export default function VideoGenerationPanel({
 }: VideoGenerationPanelProps) {
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
   const [slashCommand, setSlashCommand] = useState<PromptTemplateSlashCommand | null>(null);
-  const [isDragOver, setIsDragOver] = useState(false);
   const acceptedReferenceText = capabilities.referenceMediaTypes.includes("audio")
     ? "图片 / 视频 / 音频"
     : capabilities.referenceMediaTypes.includes("video")
@@ -129,7 +128,6 @@ export default function VideoGenerationPanel({
     reference: "全能参考",
     firstLast: "首尾帧 / 关键帧",
   };
-  const promptReferenceThumbnails = resolvePromptReferenceThumbnails(prompt, referenceImages, capabilities.referenceMediaTypes);
   const generateDisabled = promptRequired && !prompt.trim();
   const priceReferenceTypes = selectVideoReferenceTypesForMode(
     referenceImages,
@@ -162,13 +160,10 @@ export default function VideoGenerationPanel({
 
   return (
     <div className="flex flex-col gap-3.5 animate-fade-in">
-      <div>
-        <div className="flex items-center justify-between mb-1.5">
-          <label className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--iw-muted)]">
-            <VideoIcon className="h-3.5 w-3.5 text-violet-300" />
-            视频场景运动描述
-          </label>
-          <div className="flex items-center gap-2">
+      <PromptComposerSurface
+        acceptedMediaTypes={capabilities.referenceMediaTypes}
+        actions={
+          <>
             <PromptTemplatePicker ref={templatePickerRef} accent="violet" compact onApply={handleApplyPromptTemplate} />
             <button
               onClick={onOptimizePrompt}
@@ -187,58 +182,18 @@ export default function VideoGenerationPanel({
               <span className="sm:hidden">润色</span>
               <span className="hidden sm:inline">提示词动态润色</span>
             </button>
-          </div>
-        </div>
-
-        <div className={`imagine-field-shell relative p-3 transition-all duration-200 ${
-          isDragOver ? "border-blue-400/40 ring-2 ring-blue-400/40" : ""
-        }`}>
-          {atDropdownNode}
-          <div className="relative">
-            <textarea
-              value={prompt}
-              onChange={(event) => handlePromptChange(event.target.value, event.target.selectionStart)}
-              onDragEnter={(event) => {
-                if (!hasDraggedReferenceAsset(event.dataTransfer)) return;
-                event.preventDefault();
-                setIsDragOver(true);
-              }}
-              onDragOver={(event) => {
-                if (!hasDraggedReferenceAsset(event.dataTransfer)) return;
-                event.dataTransfer.dropEffect = "copy";
-                event.preventDefault();
-              }}
-              onDragLeave={(event) => {
-                const relatedTarget = event.relatedTarget;
-                if (!(relatedTarget instanceof Node) || !event.currentTarget.contains(relatedTarget)) {
-                  setIsDragOver(false);
-                }
-              }}
-              onDrop={(event) => {
-                setIsDragOver(false);
-                onPromptDropAsset(event);
-              }}
-              placeholder={promptPlaceholder}
-              className={`imagine-field-textarea relative z-10 h-24 text-sm leading-6 caret-[var(--iw-text)] transition-all duration-200 ${
-                isDragOver ? "scale-[1.01]" : ""
-              } ${
-                promptReferenceThumbnails.length > 0 ? "!text-transparent" : ""
-              }`}
-            />
-            <PromptReferenceInlineOverlay
-              acceptedMediaTypes={capabilities.referenceMediaTypes}
-              prompt={prompt}
-              references={referenceImages}
-              className="text-sm leading-6"
-            />
-          </div>
-          <div className="imagine-field-shell-footer mt-2 flex items-center justify-between pt-2">
-            <span className="hidden sm:inline">拖入资产到此处插入 @媒体N | 拖入下方只作为参考图</span>
-            <span className="sm:hidden">@ 可引用作品</span>
-            <span>{prompt.length} 字符</span>
-          </div>
-        </div>
-      </div>
+          </>
+        }
+        atDropdownNode={atDropdownNode}
+        desktopHint="拖入资产到此处插入 @媒体N | 拖入下方只作为参考图"
+        icon={<VideoIcon className="h-3.5 w-3.5 text-violet-300" />}
+        label="视频场景运动描述"
+        onChange={handlePromptChange}
+        onDropAsset={onPromptDropAsset}
+        placeholder={promptPlaceholder}
+        prompt={prompt}
+        references={referenceImages}
+      />
 
       <div className="grid grid-cols-1 gap-3">
         <div>
@@ -358,33 +313,19 @@ export default function VideoGenerationPanel({
       />
 
       {showGenerateButton && (
-        <button
-          type="button"
-          onClick={onGenerate}
+        <CreatorGenerateButton
+          mode="video"
           disabled={generateDisabled}
-          className={`imagine-primary-action mt-1 flex w-full items-center justify-center gap-2 rounded-lg py-3 text-xs font-bold transition duration-[160ms] ${
-            generateDisabled
-              ? "cursor-not-allowed opacity-60"
-              : "cursor-pointer bg-violet-600 text-white shadow-lg shadow-violet-950/30 hover:bg-violet-500 active:scale-[0.98]"
-          }`}
-        >
-          {isSubmitting ? (
-            <RefreshCw className="h-4 w-4 shrink-0 animate-spin text-white" />
-          ) : (
-            <VideoIcon className="h-4 w-4 shrink-0 text-white" />
-          )}
-          <span className="truncate">{isSubmitting ? `提交中 (${submitCount})，可继续排队` : "生成视频"}</span>
-          {!isSubmitting && (
-            <ModelPriceBadge
-              provider={selectedModel.split(":")[0]}
-              modelId={selectedModel}
-              duration={selectedDuration}
-              referenceTypes={priceReferenceTypes}
-              videoReferenceMode={selectedReferenceMode}
-              videoResolution={selectedResolution}
-            />
-          )}
-        </button>
+          isSubmitting={isSubmitting}
+          priceProvider={selectedModel.split(":")[0]}
+          priceModelId={selectedModel}
+          priceDuration={selectedDuration}
+          priceReferenceTypes={priceReferenceTypes}
+          priceVideoReferenceMode={selectedReferenceMode}
+          priceVideoResolution={selectedResolution}
+          submitCount={submitCount}
+          onGenerate={onGenerate}
+        />
       )}
     </div>
   );

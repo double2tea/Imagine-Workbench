@@ -1,8 +1,9 @@
-import { Compass, Download, Eraser, Expand, Frame, Maximize2, Mic2, Music, Scissors, Sparkles, Video, WandSparkles } from "lucide-react";
+import { Music, Video } from "lucide-react";
 import { memo, useMemo, useRef } from "react";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
 import BoardAudioWaveform from "@/components/board/BoardAudioWaveform";
 import BoardMediaActionBar, { type BoardMediaActionGroup } from "@/components/board/BoardMediaActionBar";
+import BoardMediaNodeShell from "@/components/board/BoardMediaNodeShell";
 import PreviewImage from "@/components/PreviewImage";
 import useBoardAudioItem from "@/components/board/useBoardAudioItem";
 import useSelectedBoardVideoItem from "@/components/board/useSelectedBoardVideoItem";
@@ -10,6 +11,13 @@ import type { BoardResultNode } from "@/lib/board";
 import { buildStorageItem, type StorageItem } from "@/lib/db";
 import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
 import type { CapturedVideoFrame } from "@/lib/video-frame";
+import {
+  IMAGE_EDIT_OPERATION_ORDER,
+  WORKBENCH_OPERATION_META,
+  WorkbenchOperationIcon,
+  imageEditOperationMeta,
+  operationToneClassName,
+} from "@/components/workbench/OperationControls";
 
 interface ResultBoardNodeProps {
   boardId: string;
@@ -79,7 +87,6 @@ const ResultBoardNode = memo(function ResultBoardNode({
     () => stackItems.find(stackItem => stackItem.id === node.activeAssetId) ?? fallbackItem,
     [fallbackItem, node.activeAssetId, stackItems],
   );
-  const hasStackSwitcher = stackItems.length > 1;
   const isImagePreviewUrl = item.url.startsWith("data:image/");
   const audioItem = useBoardAudioItem(item);
   const playableAudioItem = audioItem ?? (item.type === "audio" && item.url.trim() ? item : null);
@@ -90,36 +97,17 @@ const ResultBoardNode = memo(function ResultBoardNode({
     {
       id: "edit",
       actions: item.type === "image"
-        ? [
-            {
-              id: "redraw",
-              icon: <WandSparkles className="h-3.5 w-3.5" />,
-              onClick: () => onImageQuickEdit?.(node.id, "redraw"),
-              title: "重绘",
-              toneClassName: "text-sky-200 hover:border-sky-500/40 hover:bg-sky-600 hover:text-white",
-            },
-            {
-              id: "erase",
-              icon: <Eraser className="h-3.5 w-3.5" />,
-              onClick: () => onImageQuickEdit?.(node.id, "erase"),
-              title: "擦除",
-              toneClassName: "text-rose-200 hover:border-rose-500/40 hover:bg-rose-600 hover:text-white",
-            },
-            {
-              id: "outpaint",
-              icon: <Expand className="h-3.5 w-3.5" />,
-              onClick: () => onImageQuickEdit?.(node.id, "outpaint"),
-              title: "扩图",
-              toneClassName: "text-indigo-200 hover:border-indigo-500/40 hover:bg-indigo-600 hover:text-white",
-            },
-            {
-              id: "cutout",
-              icon: <Scissors className="h-3.5 w-3.5" />,
-              onClick: () => onImageQuickEdit?.(node.id, "cutout"),
-              title: "抠图",
-              toneClassName: "text-emerald-200 hover:border-emerald-500/40 hover:bg-emerald-600 hover:text-white",
-            },
-          ]
+        ? IMAGE_EDIT_OPERATION_ORDER.map(operation => {
+            const meta = imageEditOperationMeta(operation);
+            const Icon = meta.Icon;
+            return {
+              id: operation,
+              icon: <Icon className="h-3.5 w-3.5" />,
+              onClick: () => onImageQuickEdit?.(node.id, operation),
+              title: meta.label,
+              toneClassName: operationToneClassName(meta.tone),
+            };
+          })
         : [],
     },
     {
@@ -128,28 +116,28 @@ const ResultBoardNode = memo(function ResultBoardNode({
         ...(item.status === "complete" && onAnalyzeMedia
           ? [{
               id: "analyze",
-              icon: <Sparkles className="h-3.5 w-3.5" />,
+              icon: <WorkbenchOperationIcon operation="analyze" />,
               onClick: () => void onAnalyzeMedia(node.id),
-              title: "分析媒体",
-              toneClassName: "text-teal-200 hover:border-teal-500/40 hover:bg-teal-600 hover:text-white",
+              title: WORKBENCH_OPERATION_META.analyze.title,
+              toneClassName: operationToneClassName(WORKBENCH_OPERATION_META.analyze.tone),
             }]
           : []),
         ...(item.type === "video" && onCaptureVideoFrame && shouldRenderVideoPlayer
           ? [{
               id: "frame",
-              icon: <Frame className="h-3.5 w-3.5" />,
+              icon: <WorkbenchOperationIcon operation="frame" />,
               onClick: () => void captureVideoFrameRef.current?.("current"),
-              title: "截取当前帧",
-              toneClassName: "text-cyan-200 hover:border-cyan-500/40 hover:bg-cyan-600 hover:text-white",
+              title: WORKBENCH_OPERATION_META.frame.title,
+              toneClassName: operationToneClassName(WORKBENCH_OPERATION_META.frame.tone),
             }]
           : []),
         ...(item.type === "audio" && onSaveVoiceProfile
           ? [{
               id: "voice",
-              icon: <Mic2 className="h-3.5 w-3.5" />,
+              icon: <WorkbenchOperationIcon operation="voice" />,
               onClick: () => onSaveVoiceProfile?.(item),
-              title: "保存为克隆音色",
-              toneClassName: "text-cyan-200 hover:border-cyan-500/40 hover:bg-cyan-600 hover:text-white",
+              title: WORKBENCH_OPERATION_META.voice.title,
+              toneClassName: operationToneClassName(WORKBENCH_OPERATION_META.voice.tone),
             }]
           : []),
       ],
@@ -160,39 +148,38 @@ const ResultBoardNode = memo(function ResultBoardNode({
         ...(item.type === "image"
           ? [{
               id: "panorama",
-              icon: <Compass className="h-3.5 w-3.5" />,
+              icon: <WorkbenchOperationIcon operation="panorama" />,
               onClick: () => onOpenPanorama?.(item),
-              title: "360 全景查看",
-              toneClassName: "imagine-panorama-action",
+              title: WORKBENCH_OPERATION_META.panorama.title,
+              toneClassName: operationToneClassName(WORKBENCH_OPERATION_META.panorama.tone),
             }]
           : []),
         {
           id: "fullscreen",
-          icon: <Maximize2 className="h-3.5 w-3.5" />,
+          icon: <WorkbenchOperationIcon operation="fullscreen" />,
           onClick: () => onOpenFullscreen?.(item),
-          title: "全屏预览",
-          toneClassName: "hover:bg-slate-700 hover:text-white",
+          title: WORKBENCH_OPERATION_META.fullscreen.title,
+          toneClassName: operationToneClassName(WORKBENCH_OPERATION_META.fullscreen.tone),
         },
         {
           id: "download",
-          icon: <Download className="h-3.5 w-3.5" />,
+          icon: <WorkbenchOperationIcon operation="download" />,
           onClick: () => onDownload?.(item),
-          title: "下载",
-          toneClassName: "hover:bg-slate-700 hover:text-white",
+          title: WORKBENCH_OPERATION_META.download.title,
+          toneClassName: operationToneClassName(WORKBENCH_OPERATION_META.download.tone),
         },
       ],
     },
   ];
 
   return (
-    <div className="board-media-node group/board-video relative h-full min-h-0 overflow-visible">
-      <BoardMediaActionBar groups={actionGroups} visible={isSelected} />
-      <div className="relative flex h-full min-h-0 items-center justify-center overflow-hidden bg-[var(--iw-panel-soft)]">
-        {hasStackSwitcher && (
-          <div className="board-media-stack-badge pointer-events-none absolute right-2 top-2 z-30 rounded-md bg-slate-950/45 px-2 py-1 text-xs font-semibold text-white/90 opacity-80 shadow-lg backdrop-blur transition-opacity duration-200 group-hover/board-video:opacity-100">
-            {stackItems.length}
-          </div>
-        )}
+    <BoardMediaNodeShell
+      actionBar={<BoardMediaActionBar groups={actionGroups} visible={isSelected} />}
+      activeStackAssetId={node.activeAssetId}
+      isSelected={isSelected}
+      onSelectStackAsset={onSelectStackAsset}
+      stackItems={stackItems}
+    >
       {item.type === "image" ? (
         <PreviewImage
           src={item.url}
@@ -239,40 +226,7 @@ const ResultBoardNode = memo(function ResultBoardNode({
       ) : (
         <LightweightMediaPreview type="audio" />
       )}
-      </div>
-      {hasStackSwitcher && (
-        <div
-          className={[
-            "board-media-stack-switcher nodrag absolute -bottom-8 left-1/2 z-40 flex -translate-x-1/2 gap-1.5 rounded-full border border-white/10 bg-slate-950/72 px-2.5 py-1.5 text-[10px] font-semibold text-white/90 shadow-xl backdrop-blur transition-opacity duration-200",
-            isSelected
-              ? "pointer-events-auto opacity-100"
-              : "pointer-events-none opacity-0 group-hover/board-video:pointer-events-auto group-hover/board-video:opacity-100",
-          ].join(" ")}
-        >
-          {stackItems.map((stackItem, index) => {
-            const isActive = stackItem.id === node.activeAssetId;
-            return (
-              <button
-                key={stackItem.id}
-                type="button"
-                className={[
-                  "nodrag flex h-5 min-w-5 items-center justify-center rounded-full px-1 transition",
-                  isActive ? "bg-white text-slate-950" : "bg-white/20 text-white/80 hover:bg-white/35 hover:text-white",
-                ].join(" ")}
-                title={`版本 ${index + 1}`}
-                aria-label={`切换到版本 ${index + 1}`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  if (!isActive) onSelectStackAsset?.(stackItem.id);
-                }}
-              >
-                {isSelected ? index + 1 : <span className="h-1.5 w-1.5 rounded-full bg-current" />}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
+    </BoardMediaNodeShell>
   );
 });
 

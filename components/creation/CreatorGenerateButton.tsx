@@ -17,6 +17,7 @@ interface CreatorGenerateButtonProps {
   priceVideoReferenceMode?: "reference" | "firstLast" | "none";
   priceVideoResolution?: string;
   submitCount: number;
+  label?: string;
   onGenerate: () => void;
 }
 
@@ -34,12 +35,13 @@ export default function CreatorGenerateButton({
   priceVideoReferenceMode,
   priceVideoResolution,
   submitCount,
+  label,
   onGenerate,
 }: CreatorGenerateButtonProps) {
   const isImage = mode === "image";
   const isAudio = mode === "audio";
   const showPrice = !isSubmitting && priceProvider && priceModelId;
-  const label = isImage ? "生成图片" : isAudio ? "生成音频" : "生成视频";
+  const defaultLabel = isImage ? "生成图片" : isAudio ? "生成音频" : "生成视频";
   const submittingLabel = `提交中 (${submitCount})，可继续排队`;
 
   return (
@@ -67,7 +69,7 @@ export default function CreatorGenerateButton({
       ) : (
         <VideoIcon className="h-4 w-4 text-white" />
       )}
-      {isSubmitting ? submittingLabel : label}
+      <span className="truncate">{isSubmitting ? submittingLabel : (label ?? defaultLabel)}</span>
       {showPrice && (
         <ModelPriceBadge
           provider={priceProvider!}
