@@ -1,6 +1,6 @@
 "use client";
 
-import { Upload } from "lucide-react";
+import { Download, Upload } from "lucide-react";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import {
   BaseEdge,
@@ -125,6 +125,7 @@ interface BoardWorkspaceProps {
   onCreateBoard: () => void;
   onDeleteBoard: () => void;
   onDownloadAsset: (item: StorageItem) => void;
+  onDownloadSelectedAssets?: () => void;
   onExportMultiGrid: (nodeId: string) => void | Promise<void>;
   onOpenSettings: () => void;
   onOpenFullscreen: (item: StorageItem) => void;
@@ -141,6 +142,7 @@ interface BoardWorkspaceProps {
   onAssetCompareRequestHandled?: () => void;
   onFocusNodeRequestHandled?: () => void;
   onSelectedNodeIdsChange?: (nodeIds: string[]) => void;
+  selectedDownloadableCount?: number;
 }
 
 type BoardFlowEdge = Edge<{ kind: BoardEdgeKind; processing?: boolean }, "smoothstep">;
@@ -986,6 +988,7 @@ export default function BoardWorkspace({
   onCreateBoard,
   onDeleteBoard,
   onDownloadAsset,
+  onDownloadSelectedAssets,
   onExportMultiGrid,
   onOpenSettings,
   onOpenFullscreen,
@@ -1002,6 +1005,7 @@ export default function BoardWorkspace({
   onAssetCompareRequestHandled,
   onFocusNodeRequestHandled,
   onSelectedNodeIdsChange,
+  selectedDownloadableCount = 0,
 }: BoardWorkspaceProps) {
   const themeMode = useThemeModeSnapshot();
   const isCoarsePointer = useCoarsePointer();
@@ -2707,6 +2711,24 @@ export default function BoardWorkspace({
           </ReactFlow>
           </BoardNodeCallbacksContext.Provider>
           {board.nodes.length === 0 && <BoardEmptyHint />}
+          {selectedNodeIds.length > 1 && selectedDownloadableCount > 0 && onDownloadSelectedAssets ? (
+            <div className="pointer-events-none absolute left-1/2 top-4 z-40 -translate-x-1/2">
+              <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-[var(--iw-border)] bg-[var(--iw-panel)] px-3 py-2 text-[11px] font-semibold text-[var(--iw-text)] shadow-lg backdrop-blur-md">
+                <span className="whitespace-nowrap text-[var(--iw-muted)]">
+                  已选 {selectedNodeIds.length} 个 · 可下载 {selectedDownloadableCount} 个
+                </span>
+                <button
+                  type="button"
+                  onClick={onDownloadSelectedAssets}
+                  className="imagine-primary-action flex h-8 items-center gap-1.5 rounded-full px-3 text-[11px] font-semibold"
+                  title="下载所选媒体为 ZIP"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  批量下载
+                </button>
+              </div>
+            </div>
+          ) : null}
           {quickInsertMenu ? (
             <BoardQuickInsertMenu
               clientX={quickInsertMenu.clientX}

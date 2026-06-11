@@ -1,8 +1,8 @@
 import type { Dispatch, MouseEvent, MutableRefObject, SetStateAction } from "react";
-import JSZip from "jszip";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
 import type { CompareViewType } from "@/components/assets/ComparePanel";
 import { API_ROUTES } from "@/lib/api/routes";
+import { downloadStorageItemsZip, storageItemDownloadExtension, storageItemDownloadMimeType } from "@/lib/assets/download-zip";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 import { readImageGenerationPayload } from "@/lib/client-image-response";
 import {
@@ -14,7 +14,6 @@ import {
 } from "@/lib/db";
 import { createWorkspaceSafetySnapshot } from "@/lib/data-management";
 import type { MediaReferenceRole, MediaReferenceType } from "@/lib/media-references";
-import { mediaReferenceFileExtension, mediaReferenceMimeFromDataUri } from "@/lib/media-references";
 import { createPanoramaScreenshotStorageItem, type PanoramaScreenshot } from "@/lib/panorama/capture";
 import { tryParseProviderModel, type AiProvider } from "@/lib/providers/model-catalog";
 import type { RunningHubTaskNodeBinding } from "@/lib/providers/types";
@@ -73,22 +72,6 @@ function getStringField(value: unknown, field: string): string | null {
   const record = value as Record<string, unknown>;
   const fieldValue = record[field];
   return typeof fieldValue === "string" && fieldValue.trim() ? fieldValue : null;
-}
-
-function defaultDownloadMimeType(type: StorageItem["type"]): string {
-  if (type === "image") return "image/png";
-  if (type === "video") return "video/mp4";
-  if (type === "transcript") return "text/plain;charset=utf-8";
-  return "audio/mpeg";
-}
-
-function assetDownloadExtension(item: StorageItem): string {
-  if (item.type === "transcript") return "txt";
-  return mediaReferenceFileExtension(mediaReferenceMimeFromDataUri(item.url), item.type);
-}
-
-function assetDownloadMimeType(item: StorageItem): string {
-  return mediaReferenceMimeFromDataUri(item.url) ?? defaultDownloadMimeType(item.type);
 }
 
 async function resolveOriginalStorageItem(item: StorageItem, items: StorageItem[]): Promise<StorageItem> {
@@ -446,7 +429,7 @@ export function useAssetActions({
     }
 
     try {
-      const extension = assetDownloadExtension(originalItem);
+      const extension = storageItemDownloadExtension(originalItem);
       const fileName = `imagine_${originalItem.id}.${extension}`;
       let blob: Blob;
       if (originalItem.url && originalItem.url.startsWith("data:")) {
@@ -457,7 +440,7 @@ export function useAssetActions({
           for (let index = 0; index < byteChars.length; index += 1) {
             bytes[index] = byteChars.charCodeAt(index);
           }
-          blob = new Blob([bytes], { type: assetDownloadMimeType(originalItem) });
+          blob = new Blob([bytes], { type: storageItemDownloadMimeType(originalItem) });
         } else {
           throw new Error("Invalid data URI");
         }
@@ -517,66 +500,12 @@ export function useAssetActions({
   const handleBatchDownloadZip = async () => {
     if (selectedItemIds.length === 0) return;
     const itemsToExport = items.filter(item => selectedItemIds.includes(item.id));
-
-    const zip = new JSZip();
-    const metadataList: Array<{
-      id: string;
-      fileName: string;
-      type: StorageItem["type"];
-      prompt: string;
-      model: string;
-      aspectRatio: string;
-      createdAt: string;
-    }> = [];
-
-    await Promise.all(itemsToExport.map(async (item) => {
-      const extension = assetDownloadExtension(item);
-      const fileName = `creation_${item.id}.${extension}`;
-
-      metadataList.push({
-        id: item.id,
-        fileName,
-        type: item.type,
-        prompt: item.prompt,
-        model: item.model,
-        aspectRatio: item.aspectRatio,
-        createdAt: item.createdAt,
-      });
-
-      try {
-        const originalItem = await resolveOriginalStorageItem(item, items);
-        if (originalItem.url && originalItem.url.startsWith("data:")) {
-          const parts = originalItem.url.split(";base64,");
-          if (parts.length === 2) {
-            zip.file(fileName, parts[1], { base64: true });
-          }
-        } else if (originalItem.url) {
-          const fileRes = await fetch(originalItem.url);
-          if (fileRes.ok) {
-            const blob = await fileRes.blob();
-            zip.file(fileName, blob);
-          } else {
-            zip.file(`link_fallback_${item.id}.txt`, originalItem.url);
-          }
-        }
-      } catch (error) {
-        console.error(`Error adding file ${item.id} to zip:`, error);
-        zip.file(`error_log_${item.id}.txt`, `Failed to add original media for: ${item.id}\nError: ${error}`);
-      }
-    }));
-
-    zip.file("workspace_metadata.json", JSON.stringify(metadataList, null, 2));
-
-    const content = await zip.generateAsync({ type: "blob" });
-    const url = URL.createObjectURL(content);
-
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `${makeClientId("Imagine_Workbench_Export")}.zip`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
-    URL.revokeObjectURL(url);
+    await downloadStorageItemsZip({
+      archiveName: makeClientId("Imagine_Workbench_Export"),
+      fileNamePrefix: "creation",
+      items: itemsToExport,
+      resolveOriginalItem: item => resolveOriginalStorageItem(item, items),
+    });
   };
 
   const toggleCompare = (id: string) => {

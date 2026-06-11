@@ -33,6 +33,7 @@ import { useAgentController } from "@/hooks/useAgentController";
 import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
 import { useBoardAssetStore } from "@/hooks/useBoardAssetStore";
 import { collectPlacedBoardAssetIdsFromNodes } from "@/lib/assets/board-scope";
+import { downloadStorageItemsZip, storageItemDownloadExtension } from "@/lib/assets/download-zip";
 import { saveItemWithPreview } from "@/lib/assets/previews";
 import { resolveAssetOriginalUrl } from "@/lib/assets/resolve-url";
 import { estimateBoardNoteSize, estimateBoardPromptSize } from "@/lib/board/text-node-size";
@@ -130,9 +131,7 @@ import {
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import {
   getMediaReferenceType,
-  mediaReferenceFileExtension,
   mediaReferenceLabel,
-  mediaReferenceMimeFromDataUri,
   mediaReferenceTypeFromMime,
   type MediaReferenceType,
 } from "@/lib/media-references";
@@ -370,11 +369,6 @@ function isMediaStorageItem(item: StorageItem): item is StorageItem & { type: Me
   return item.type === "image" || item.type === "video" || item.type === "audio";
 }
 
-function boardAssetDownloadExtension(item: StorageItem): string {
-  if (item.type === "transcript") return "txt";
-  return mediaReferenceFileExtension(mediaReferenceMimeFromDataUri(item.url), item.type);
-}
-
 function boardAssetReferenceFromStorageItem(item: StorageItem): BoardAssetReference {
   if (!isMediaStorageItem(item)) {
     throw new Error("Transcript items cannot be placed as board media assets");
@@ -386,6 +380,36 @@ function boardAssetReferenceFromStorageItem(item: StorageItem): BoardAssetRefere
     prompt: item.prompt,
     model: item.model,
   };
+}
+
+function downloadableBoardNodeStorageItem(
+  node: BoardNode | undefined,
+  items: StorageItem[],
+  boardId: string,
+): StorageItem | null {
+  if (!node || (node.kind !== "asset" && node.kind !== "result")) return null;
+
+  const assetId = node.kind === "result" ? node.activeAssetId : node.asset.assetId;
+  const storedItem = items.find(item => item.id === assetId && item.status === "complete");
+  if (storedItem) return storedItem;
+  if (assetId !== node.asset.assetId) return null;
+
+  return buildStorageItem(
+    {
+      id: node.asset.assetId,
+      type: node.asset.type,
+      url: node.asset.url,
+      prompt: node.asset.prompt,
+      model: node.asset.model,
+      aspectRatio: "auto",
+      createdAt: node.createdAt,
+      status: "complete",
+      progress: 100,
+      sourceBoardNodeId: node.id,
+      ...(node.kind === "result" ? { sourceBoardResultStackKey: node.resultStackKey } : {}),
+    },
+    { boardId },
+  );
 }
 
 function activeBoardReference(
@@ -1478,7 +1502,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     void resolveOriginalStorageItem(item).then(
       originalItem => {
         const link = document.createElement("a");
-        const extension = boardAssetDownloadExtension(originalItem);
+        const extension = storageItemDownloadExtension(originalItem);
         link.href = originalItem.url;
         link.download = `${originalItem.id}.${extension}`;
         document.body.appendChild(link);
@@ -4153,6 +4177,24 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       if (item) promoteItemToOriginal(item);
     }
   }, [boardController.board.nodes, items, promoteItemToOriginal, selectedNodeIds]);
+  const selectedDownloadableBoardItems = useMemo(() => {
+    const itemById = new Map<string, StorageItem>();
+    for (const nodeId of selectedNodeIds) {
+      const node = boardController.board.nodes.find(candidate => candidate.id === nodeId);
+      const item = downloadableBoardNodeStorageItem(node, items, resolvedBoardId);
+      if (item) itemById.set(item.id, item);
+    }
+    return Array.from(itemById.values());
+  }, [boardController.board.nodes, items, resolvedBoardId, selectedNodeIds]);
+  const handleDownloadSelectedBoardAssets = useCallback(() => {
+    if (selectedDownloadableBoardItems.length === 0) return;
+    void downloadStorageItemsZip({
+      archiveName: makeClientId("Imagine_Board_Export"),
+      fileNamePrefix: "board_creation",
+      items: selectedDownloadableBoardItems,
+      resolveOriginalItem: resolveOriginalStorageItem,
+    }).catch(error => pushWorkspaceNotice("error", toErrorMessage(error, "批量下载失败")));
+  }, [pushWorkspaceNotice, resolveOriginalStorageItem, selectedDownloadableBoardItems]);
   const imageModelGroups = getProviderModelGroups(imageModelOptions, providerKeys, customProviders);
   const videoModelGroups = getProviderModelGroups(videoModelOptions, providerKeys, customProviders);
   const audioModelGroups = getProviderModelGroups(audioModelOptions, providerKeys, customProviders);
@@ -4294,6 +4336,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onCreateBoard={handleCreateBoard}
         onDeleteBoard={handleDeleteBoard}
         onDownloadAsset={handleDownloadAsset}
+        onDownloadSelectedAssets={handleDownloadSelectedBoardAssets}
         onEditAssetImage={editBoardAssetImage}
         onImageQuickEdit={handleBoardImageQuickEdit}
         onExecuteGenerateNode={handleExecuteGenerateNode}
@@ -4310,6 +4353,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onSelectBoard={handleSelectBoard}
         onSendAssetToAgent={useBoardAssetForAgent}
         onSendAgentNode={handleSendAgentNode}
+        selectedDownloadableCount={selectedDownloadableBoardItems.length}
       >
         <BoardSidePanel
           preserveTasksRevealKey={preserveTasksRevealKey}
