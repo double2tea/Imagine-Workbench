@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit",
     "check": "pnpm run lint && pnpm run typecheck",
     "test:e2e:audio": "node scripts/e2e-audio-workflow.mjs",
-    "pages:build": "rm -rf .next .vercel/output && ENABLE_EXPERIMENTAL_COREPACK=1 pnpm dlx @cloudflare/next-on-pages@1",
+    "pages:build": "node scripts/build-cloudflare-pages.mjs",
     "pages:preview": "pnpm run pages:build && pnpm dlx wrangler pages dev .vercel/output/static",
     "pages:deploy": "pnpm run pages:build && pnpm dlx wrangler pages deploy .vercel/output/static --project-name=imagine-workbench --commit-dirty=true",
     "test:providers": "tsc -p tests/tsconfig.json && node --test .tmp/provider-tests/tests/*.test.js",
