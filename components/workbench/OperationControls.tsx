@@ -164,17 +164,20 @@ export function OperationSegmentButton({
 export function OperationActionButton({
   children,
   className = "",
+  size = "default",
   tone = "neutral",
   variant = "secondary",
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   children: ReactNode;
+  size?: "default" | "compact";
   tone?: OperationTone;
   variant?: "primary" | "secondary";
 }) {
   return (
     <button
       {...props}
+      data-size={size}
       className={`imagine-operation-action imagine-operation-action--${variant} ${operationToneClassName(tone)} ${className}`}
     >
       {children}
@@ -194,6 +197,10 @@ export interface WorkbenchActionDescriptor {
   tone?: OperationTone;
 }
 
+export function workbenchCardActionClassName(tone: OperationTone = "neutral", className = ""): string {
+  return `imagine-card-action min-w-0 cursor-pointer gap-0.5 px-1.5 py-1 text-xs ${operationToneClassName(tone)} ${className}`;
+}
+
 export function WorkbenchActionButton({
   action,
   className = "",
@@ -207,7 +214,7 @@ export function WorkbenchActionButton({
       disabled={action.disabled}
       data-active={action.active}
       onClick={action.onClick}
-      className={`imagine-card-action min-w-0 cursor-pointer gap-0.5 px-1.5 py-1 text-xs ${operationToneClassName(action.tone ?? "neutral")} ${className}`}
+      className={workbenchCardActionClassName(action.tone ?? "neutral", className)}
       title={action.title}
       aria-label={action.ariaLabel ?? action.title}
     >
@@ -231,5 +238,61 @@ export function WorkbenchActionStrip({
       {actions?.map(action => <WorkbenchActionButton key={action.id} action={action} />)}
       {children}
     </div>
+  );
+}
+
+export type WorkbenchPopoverSurface = "floating" | "panel";
+
+export function WorkbenchPopoverMenu({
+  align = "left",
+  children,
+  className = "",
+  surface = "floating",
+}: {
+  align?: "left" | "right";
+  children: ReactNode;
+  className?: string;
+  surface?: WorkbenchPopoverSurface;
+}) {
+  const surfaceClassName = surface === "panel"
+    ? "border-[var(--iw-border)] bg-[var(--iw-panel)] text-[var(--iw-text)]"
+    : "border-white/12 bg-slate-950/94 text-slate-100 backdrop-blur";
+
+  return (
+    <div
+      className={`absolute bottom-full ${align === "right" ? "right-0" : "left-0"} ${surfaceClassName} mb-1 grid min-w-24 gap-1 rounded-lg border p-1 text-xs shadow-xl ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function WorkbenchPopoverMenuItem({
+  children,
+  icon,
+  iconClassName = "",
+  onClick,
+  surface = "floating",
+  title,
+}: {
+  children: ReactNode;
+  icon: ReactNode;
+  iconClassName?: string;
+  onClick: () => void;
+  surface?: WorkbenchPopoverSurface;
+  title?: string;
+}) {
+  const itemClassName = surface === "panel" ? "hover:bg-[var(--iw-panel-soft)]" : "hover:bg-white/10";
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex h-8 items-center gap-2 rounded-md px-2 text-left transition ${itemClassName}`}
+      title={title}
+    >
+      <span className={`inline-flex h-3.5 w-3.5 items-center justify-center ${iconClassName}`}>{icon}</span>
+      <span className="whitespace-nowrap">{children}</span>
+    </button>
   );
 }

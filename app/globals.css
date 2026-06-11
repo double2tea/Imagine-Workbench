@@ -853,6 +853,12 @@ html::-webkit-scrollbar-thumb:hover {
   color: #ffffff !important;
 }
 
+.imagine-card-action[data-active="true"] {
+  border-color: #3b82f6 !important;
+  background: #2563eb !important;
+  color: #ffffff !important;
+}
+
 .imagine-generation-stage {
   position: absolute;
   inset: 0;
@@ -3915,6 +3921,11 @@ html[data-imagine-theme="light"] .imagine-required-chip,
   border-radius: 10px !important;
 }
 
+.imagine-primary-action[data-size="compact"],
+.imagine-secondary-action[data-size="compact"] {
+  min-height: 0;
+}
+
 .imagine-theme-light .imagine-primary-action:not(:disabled) {
   background: linear-gradient(180deg, var(--iw-accent), var(--iw-accent-strong)) !important;
   box-shadow: 0 14px 30px var(--iw-accent-glow) !important;
@@ -4251,6 +4262,18 @@ html[data-imagine-theme="light"] .imagine-card-actions.imagine-floating-card-act
   background: rgba(255, 255, 255, 0.62) !important;
   border-color: rgba(100, 116, 139, 0.24) !important;
   color: #0f172a !important;
+}
+
+.imagine-workbench-shell.imagine-theme-light .imagine-card-action[data-active="true"],
+.imagine-workbench-shell.imagine-theme-light .imagine-card-action[data-active="true"]:hover,
+html.imagine-theme-light .imagine-card-action[data-active="true"],
+html.imagine-theme-light .imagine-card-action[data-active="true"]:hover,
+html[data-imagine-theme="light"] .imagine-card-action[data-active="true"],
+html[data-imagine-theme="light"] .imagine-card-action[data-active="true"]:hover {
+  background: #2563eb !important;
+  background-image: none !important;
+  border-color: #3b82f6 !important;
+  color: #ffffff !important;
 }
 
 .imagine-workbench-shell.imagine-theme-light .imagine-panorama-action {

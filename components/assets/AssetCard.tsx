@@ -33,9 +33,14 @@ import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
 import {
   IMAGE_EDIT_OPERATION_ORDER,
   WORKBENCH_OPERATION_META,
+  WorkbenchActionButton,
+  WorkbenchPopoverMenu,
+  WorkbenchPopoverMenuItem,
+  type WorkbenchActionDescriptor,
   WorkbenchActionStrip,
   imageEditOperationMeta,
   operationToneClassName,
+  workbenchCardActionClassName,
 } from "@/components/workbench/OperationControls";
 
 interface AssetCardProps {
@@ -194,6 +199,110 @@ export default function AssetCard({
 
   useEffect(() => clearHoverPromoteTimer, []);
 
+  const imageHoverActions: WorkbenchActionDescriptor[] = item.type === "image"
+    ? [
+        {
+          icon: <Compass className="h-3 w-3" />,
+          id: "panorama",
+          label: "360",
+          onClick: () => onOpenPanorama(item),
+          title: WORKBENCH_OPERATION_META.panorama.title,
+          tone: WORKBENCH_OPERATION_META.panorama.tone,
+        },
+        {
+          ariaLabel: "以此图首帧生成视频",
+          icon: <VideoIcon className="h-3 w-3" />,
+          id: "image-to-video",
+          label: WORKBENCH_OPERATION_META.imageToVideo.label,
+          onClick: () => onApplyVideoReference(item),
+          title: "以此图首帧生图动态 Veo 航拍影片",
+          tone: WORKBENCH_OPERATION_META.imageToVideo.tone,
+        },
+        {
+          ariaLabel: "引用至 Agent",
+          icon: <Sparkles className="h-3 w-3" />,
+          id: "agent-reference",
+          label: "Agent",
+          onClick: () => onUseAgentReference(item),
+          title: "引用该图片至 Agent 智能代理进行对话与局部修改",
+          tone: WORKBENCH_OPERATION_META.analyze.tone,
+        },
+        {
+          ariaLabel: "局部修改",
+          icon: <Paintbrush className="h-3 w-3" />,
+          id: "local-edit",
+          label: "修改",
+          onClick: () => onLaunchMaskEditor(item.url, item.id),
+          title: "对该图片局部进行笔刷遮罩修改 & 创意局部重绘",
+          tone: WORKBENCH_OPERATION_META.localEdit.tone,
+        },
+      ]
+    : [];
+
+  const sharedHoverActions: WorkbenchActionDescriptor[] = [
+    {
+      ariaLabel: "复用任务参数",
+      icon: <SlidersHorizontal className="h-3 w-3" />,
+      id: "reuse",
+      label: WORKBENCH_OPERATION_META.reuse.label,
+      onClick: () => onReuseTask(item),
+      title: "将此任务的提示词、模型、尺寸与参考图回填到左侧工作面板",
+      tone: WORKBENCH_OPERATION_META.reuse.tone,
+    },
+    ...(item.type === "audio" && item.status === "complete"
+      ? [
+          {
+            ariaLabel: "保存为克隆音色",
+            icon: <Mic2 className="h-3 w-3" />,
+            id: "voice-profile",
+            label: WORKBENCH_OPERATION_META.voice.label,
+            onClick: () => onSaveVoiceProfile(item),
+            title: WORKBENCH_OPERATION_META.voice.title,
+            tone: WORKBENCH_OPERATION_META.voice.tone,
+          },
+        ]
+      : []),
+    {
+      ariaLabel: "下载文件",
+      icon: <Download className="h-3 w-3" />,
+      id: "download",
+      label: WORKBENCH_OPERATION_META.download.label,
+      onClick: () => onDownload(item),
+      title: "下载该文件到本地",
+      tone: WORKBENCH_OPERATION_META.download.tone,
+    },
+    ...(item.type !== "transcript"
+      ? [
+          {
+            active: inCompare,
+            ariaLabel: inCompare ? "从对比面板移除" : "加入对比面板",
+            icon: <RefreshCw className="h-3 w-3" />,
+            id: "compare",
+            label: WORKBENCH_OPERATION_META.compare.label,
+            onClick: () => onToggleCompare(item.id),
+            title: "加入左右侧滑块对比面板",
+            tone: WORKBENCH_OPERATION_META.compare.tone,
+          },
+        ]
+      : []),
+    {
+      ariaLabel: "全屏预览",
+      icon: <Maximize2 className="h-3 w-3" />,
+      id: "fullscreen",
+      onClick: () => onOpenFullscreen(item),
+      title: "全屏大画幅细节放大",
+      tone: WORKBENCH_OPERATION_META.fullscreen.tone,
+    },
+    {
+      ariaLabel: "删除资产",
+      icon: <Trash2 className="h-3 w-3" />,
+      id: "delete",
+      onClick: () => onDelete(item),
+      title: "移除此项",
+      tone: WORKBENCH_OPERATION_META.delete.tone,
+    },
+  ];
+
   return (
     <div
       draggable={isDraggableReference}
@@ -247,7 +356,8 @@ export default function AssetCard({
               <button
                 type="button"
                 onClick={() => onRetry(item)}
-                className="imagine-primary-action flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-semibold !min-h-0"
+                data-size="compact"
+                className="imagine-primary-action flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-semibold"
               >
                 <RefreshCw className="h-3 w-3" />
                 重试
@@ -255,7 +365,8 @@ export default function AssetCard({
               <button
                 type="button"
                 onClick={() => onReuseTask(item)}
-                className="imagine-secondary-action flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-semibold !min-h-0"
+                data-size="compact"
+                className="imagine-secondary-action flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-semibold"
               >
                 <SlidersHorizontal className="h-3 w-3" />
                 复用参数
@@ -424,171 +535,55 @@ export default function AssetCard({
               <WorkbenchActionStrip>
                 {item.type === "video" && (
                   <VideoFrameMenu
-                    buttonClassName={`imagine-card-action min-w-0 cursor-pointer gap-0.5 px-1.5 py-1 text-xs ${operationToneClassName(WORKBENCH_OPERATION_META.frame.tone)}`}
+                    buttonClassName={workbenchCardActionClassName(WORKBENCH_OPERATION_META.frame.tone)}
                     isOpen={frameMenuPlacement === "hover"}
                     onSelect={captureVideoFrame}
                     onToggle={() => setFrameMenuPlacement(prev => prev === "hover" ? null : "hover")}
                   />
                 )}
 
-                {item.type === "image" && (
-                  <button
-                    type="button"
-                    onClick={() => onOpenPanorama(item)}
-                    className={`imagine-card-action min-w-0 px-1.5 py-1 rounded-md border text-xs transition-all duration-[160ms] shadow-lg flex items-center justify-center cursor-pointer ${operationToneClassName(WORKBENCH_OPERATION_META.panorama.tone)}`}
-                    title="360 全景查看"
-                    aria-label="360 全景查看"
-                  >
-                    <Compass className="h-3 w-3" />
-                    <span className="text-[9px] font-bold">360</span>
-                  </button>
-                )}
+                {imageHoverActions.map(action => <WorkbenchActionButton key={action.id} action={action} />)}
 
                 {item.type === "image" && (
-                  <button
-                    onClick={() => onApplyVideoReference(item)}
-                    className={`imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 border border-white/5 rounded-md text-xs transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer ${operationToneClassName(WORKBENCH_OPERATION_META.imageToVideo.tone)}`}
-                    title="以此图首帧生图动态 Veo 航拍影片"
-                    aria-label="以此图首帧生成视频"
-                  >
-                    <VideoIcon className="h-3 w-3" />
-                    <span className="text-[9px] font-bold">生视频</span>
-                  </button>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsQuickEditMenuOpen(prev => !prev)}
+                      className={workbenchCardActionClassName(WORKBENCH_OPERATION_META.brush.tone)}
+                      title="图片快捷编辑"
+                      aria-label="图片快捷编辑"
+                      aria-expanded={isQuickEditMenuOpen}
+                    >
+                      <Paintbrush className="h-3 w-3" />
+                      <span className="text-[9px] font-bold">编辑</span>
+                      <ChevronDown className={`h-3 w-3 transition ${isQuickEditMenuOpen ? "rotate-180" : ""}`} />
+                    </button>
+                    {isQuickEditMenuOpen && (
+                      <WorkbenchPopoverMenu>
+                        {IMAGE_EDIT_OPERATION_ORDER.map(operation => {
+                          const action = imageEditOperationMeta(operation);
+                          const Icon = action.Icon;
+                          return (
+                            <WorkbenchPopoverMenuItem
+                              key={operation}
+                              onClick={() => {
+                                setIsQuickEditMenuOpen(false);
+                                onImageQuickEdit(item, operation);
+                              }}
+                              icon={<Icon className="h-3.5 w-3.5" />}
+                              iconClassName={operationToneClassName(action.tone)}
+                              title={action.title}
+                            >
+                              {action.label}
+                            </WorkbenchPopoverMenuItem>
+                          );
+                        })}
+                      </WorkbenchPopoverMenu>
+                    )}
+                  </div>
                 )}
 
-                {item.type === "image" && (
-                  <button
-                    onClick={() => onUseAgentReference(item)}
-                    className={`imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 border border-white/5 rounded-md text-xs transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer ${operationToneClassName(WORKBENCH_OPERATION_META.analyze.tone)}`}
-                    title="引用该图片至 Agent 智能代理进行对话与局部修改"
-                    aria-label="引用至 Agent"
-                  >
-                    <Sparkles className="h-3 w-3" />
-                    <span className="text-[9px] font-bold">Agent</span>
-                  </button>
-                )}
-
-                {item.type === "image" && (
-                  <button
-                    onClick={() => onLaunchMaskEditor(item.url, item.id)}
-                    className={`imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 border border-white/5 rounded-md text-xs transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer ${operationToneClassName(WORKBENCH_OPERATION_META.localEdit.tone)}`}
-                    title="对该图片局部进行笔刷遮罩修改 & 创意局部重绘"
-                    aria-label="局部修改"
-                  >
-                    <Paintbrush className="h-3 w-3" />
-                    <span className="text-[9px] font-bold">修改</span>
-                  </button>
-                )}
-
-                {item.type === "image" && (
-                  <>
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => setIsQuickEditMenuOpen(prev => !prev)}
-                        className={`imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 border border-white/5 rounded-md text-xs transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer ${operationToneClassName(WORKBENCH_OPERATION_META.brush.tone)}`}
-                        title="图片快捷编辑"
-                        aria-label="图片快捷编辑"
-                        aria-expanded={isQuickEditMenuOpen}
-                      >
-                        <Paintbrush className="h-3 w-3" />
-                        <span className="text-[9px] font-bold">编辑</span>
-                        <ChevronDown className={`h-3 w-3 transition ${isQuickEditMenuOpen ? "rotate-180" : ""}`} />
-                      </button>
-                      {isQuickEditMenuOpen && (
-                        <div className="absolute bottom-full left-0 mb-1 grid min-w-24 gap-1 rounded-lg border border-white/12 bg-slate-950/94 p-1 text-xs text-slate-100 shadow-xl backdrop-blur">
-                          {IMAGE_EDIT_OPERATION_ORDER.map(operation => {
-                            const action = imageEditOperationMeta(operation);
-                            const Icon = action.Icon;
-                            return (
-                              <button
-                                key={operation}
-                                type="button"
-                                onClick={() => {
-                                  setIsQuickEditMenuOpen(false);
-                                  onImageQuickEdit(item, operation);
-                                }}
-                                className="flex h-8 items-center gap-2 rounded-md px-2 text-left transition hover:bg-white/10"
-                                title={action.title}
-                              >
-                                <Icon className={`h-3.5 w-3.5 ${operationToneClassName(action.tone)}`} />
-                                <span className="whitespace-nowrap">{action.label}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => onReuseTask(item)}
-                  className={`imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 border border-white/5 rounded-md text-xs transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer ${operationToneClassName(WORKBENCH_OPERATION_META.reuse.tone)}`}
-                  title="将此任务的提示词、模型、尺寸与参考图回填到左侧工作面板"
-                  aria-label="复用任务参数"
-                >
-                  <SlidersHorizontal className="h-3 w-3" />
-                  <span className="text-[9px] font-bold">复用</span>
-                </button>
-
-                {item.type === "audio" && item.status === "complete" && (
-                  <button
-                    type="button"
-                    onClick={() => onSaveVoiceProfile(item)}
-                    className={`imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 border border-white/5 rounded-md text-xs transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer ${operationToneClassName(WORKBENCH_OPERATION_META.voice.tone)}`}
-                    title="保存为可复用克隆音色"
-                    aria-label="保存为克隆音色"
-                  >
-                    <Mic2 className="h-3 w-3" />
-                    <span className="text-[9px] font-bold">音色</span>
-                  </button>
-                )}
-
-                <button
-                  onClick={() => onDownload(item)}
-                  className={`imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 border border-white/5 rounded-md text-xs transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer ${operationToneClassName(WORKBENCH_OPERATION_META.download.tone)}`}
-                  title="下载该文件到本地"
-                  aria-label="下载文件"
-                >
-                  <Download className="h-3 w-3" />
-                  <span className="text-[9px] font-bold">下载</span>
-                </button>
-
-                {item.type !== "transcript" && (
-                  <button
-                    onClick={() => onToggleCompare(item.id)}
-                    className={`imagine-card-action min-w-0 px-1.5 py-1 rounded-md border transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer ${
-                      inCompare
-                        ? "bg-blue-600 border-blue-500 text-white"
-                        : `bg-slate-900/90 border-white/5 ${operationToneClassName(WORKBENCH_OPERATION_META.compare.tone)}`
-                    }`}
-                    title="加入左右侧滑块对比面板"
-                    aria-label={inCompare ? "从对比面板移除" : "加入对比面板"}
-                  >
-                    <RefreshCw className="h-3 w-3" />
-                    <span className="text-[9px] font-bold">对比</span>
-                  </button>
-                )}
-
-                <button
-                  onClick={() => onOpenFullscreen(item)}
-                  className={`imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 border border-white/5 rounded-md text-xs transition-all duration-[160ms] shadow-lg flex items-center justify-center cursor-pointer ${operationToneClassName(WORKBENCH_OPERATION_META.fullscreen.tone)}`}
-                  title="全屏大画幅细节放大"
-                  aria-label="全屏预览"
-                >
-                  <Maximize2 className="h-3 w-3" />
-                </button>
-
-                <button
-                  onClick={() => onDelete(item)}
-                  className={`imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 border border-white/5 rounded-md text-xs transition-all duration-[160ms] shadow-lg flex items-center justify-center cursor-pointer ${operationToneClassName(WORKBENCH_OPERATION_META.delete.tone)}`}
-                  title="移除此项"
-                  aria-label="删除资产"
-                >
-                  <Trash2 className="h-3 w-3" />
-                </button>
+                {sharedHoverActions.map(action => <WorkbenchActionButton key={action.id} action={action} />)}
               </WorkbenchActionStrip>
             </div>
           </div>
@@ -655,7 +650,7 @@ export default function AssetCard({
               {item.type === "video" && (
                 <VideoFrameMenu
                   align="right"
-                  buttonClassName="imagine-card-action min-w-0 cursor-pointer p-1 text-slate-500 hover:text-cyan-300"
+                  buttonClassName={workbenchCardActionClassName(WORKBENCH_OPERATION_META.frame.tone, "p-1 text-slate-500 hover:text-cyan-300")}
                   isOpen={frameMenuPlacement === "meta"}
                   onSelect={captureVideoFrame}
                   onToggle={() => setFrameMenuPlacement(prev => prev === "meta" ? null : "meta")}
