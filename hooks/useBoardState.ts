@@ -261,6 +261,7 @@ function cloneBoardNodeForDuplicate(source: BoardNode, position: BoardPoint): Bo
         kind: "multi-grid",
         aspectRatio: source.aspectRatio,
         gridSize: source.gridSize,
+        isCollapsed: source.isCollapsed,
         items: structuredClone(source.items),
         selectedItemId: source.selectedItemId,
       };
@@ -680,6 +681,7 @@ function normalizeBoardNode(node: unknown, index: number): BoardNode | null {
       kind: "multi-grid",
       aspectRatio: isBoardMultiGridAspectRatio(rawAspectRatio) ? rawAspectRatio : DEFAULT_BOARD_MULTI_GRID_ASPECT_RATIO,
       gridSize,
+      isCollapsed: node.isCollapsed === true,
       items: Array.isArray(node.items) ? normalizeMultiGridItems(node.items, gridSize) : [],
       selectedItemId: readOptionalString(node.selectedItemId),
     };
@@ -2516,10 +2518,12 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
           if (node.id !== nodeId || node.kind !== "multi-grid") return node;
           const gridSize = input.gridSize ?? node.gridSize;
           const items = normalizeBoardMultiGridItems(input.items ?? node.items, gridSize);
+          const isCollapsed = "isCollapsed" in input ? input.isCollapsed === true : node.isCollapsed === true;
           const nextNode: BoardMultiGridNode = {
             ...node,
             aspectRatio: input.aspectRatio ?? node.aspectRatio,
             gridSize,
+            isCollapsed,
             items,
             selectedItemId: "selectedItemId" in input ? input.selectedItemId : node.selectedItemId,
             updatedAt,
@@ -2527,6 +2531,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
           if (
             nextNode.aspectRatio === node.aspectRatio &&
             nextNode.gridSize === node.gridSize &&
+            nextNode.isCollapsed === (node.isCollapsed === true) &&
             nextNode.selectedItemId === node.selectedItemId &&
             JSON.stringify(nextNode.items) === JSON.stringify(node.items)
           ) {

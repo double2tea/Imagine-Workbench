@@ -81,6 +81,7 @@ function serializeNodeContent(node: BoardNode): string {
         node.title,
         node.aspectRatio,
         node.gridSize,
+        node.isCollapsed === true ? "collapsed" : "expanded",
         node.selectedItemId ?? "",
         node.items.map(serializeMultiGridItem).join(","),
       ].join("|");

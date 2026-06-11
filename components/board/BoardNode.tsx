@@ -25,6 +25,7 @@ import { BOARD_PORT_IDS, getBoardNodePortDefinitions } from "@/lib/board/ports";
 import { useBoardNodeCallbacks } from "@/lib/board/callbacks";
 
 export interface BoardFlowNodeData extends Record<string, unknown> {
+  activeMultiGridDropCellIndex?: number;
   boardId: string;
   compareReferenceUrl?: string | null;
   generateInputSummary?: BoardGenerateInputSummary;
@@ -238,7 +239,9 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
   );
 
   useEffect(() => {
-    if (!isEditingTitle) setDraftTitle(node.title);
+    if (!isEditingTitle) {
+      setDraftTitle(currentTitle => currentTitle === node.title ? currentTitle : node.title);
+    }
   }, [isEditingTitle, node.title]);
 
   const commitTitleEdit = () => {
@@ -480,8 +483,10 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
         )}
         {node.kind === "multi-grid" && (
           <MultiGridBoardNode
+            activeDropCellIndex={typeof data.activeMultiGridDropCellIndex === "number" ? data.activeMultiGridDropCellIndex : undefined}
             node={node}
             onExport={() => c.onExportMultiGrid(node.id)}
+            onResize={size => c.onUpdateNodeSize(node.id, size)}
             onUpdate={input => c.onUpdateMultiGrid(node.id, input)}
             onUpdateItemTransform={(assetId, transform) => c.onUpdateMultiGridItemTransform(node.id, assetId, transform)}
           />

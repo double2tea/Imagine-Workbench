@@ -3335,6 +3335,73 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
   pointer-events: none !important;
 }
 
+@keyframes multi-grid-drop-cell-pulse {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 0 0 2px rgba(52, 211, 153, 0.82),
+      0 0 12px rgba(16, 185, 129, 0.24);
+  }
+
+  50% {
+    box-shadow:
+      inset 0 0 0 3px rgba(110, 231, 183, 1),
+      0 0 28px rgba(16, 185, 129, 0.48);
+  }
+}
+
+.board-canvas.is-node-dragging .react-flow__node.dragging .board-node-shell[data-kind="asset"],
+.board-canvas.is-node-dragging .react-flow__node.dragging .board-node-shell[data-kind="result"] {
+  opacity: 0.58;
+}
+
+.multi-grid-drop-cell-active,
+.board-canvas.is-node-dragging .multi-grid-drop-cell-active {
+  animation: multi-grid-drop-cell-pulse 1.05s ease-in-out infinite !important;
+  background:
+    radial-gradient(circle at center, rgba(110, 231, 183, 0.28), rgba(16, 185, 129, 0.16) 44%, rgba(16, 185, 129, 0.08)) !important;
+  outline: 3px solid rgba(110, 231, 183, 0.96) !important;
+  outline-offset: -3px;
+}
+
+.multi-grid-drop-cell-active::after {
+  border: 2px solid rgba(209, 250, 229, 0.92);
+  content: "";
+  inset: 7px;
+  pointer-events: none;
+  position: absolute;
+}
+
+.multi-grid-drop-cell-active::before {
+  background: rgba(209, 250, 229, 0.98);
+  border-radius: 999px;
+  box-shadow:
+    0 0 0 8px rgba(16, 185, 129, 0.22),
+    0 0 24px rgba(110, 231, 183, 0.62);
+  content: "";
+  height: 10px;
+  left: 50%;
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 10px;
+  z-index: 2;
+}
+
+.multi-grid-drop-cell-overlay {
+  animation: multi-grid-drop-cell-pulse 1.05s ease-in-out infinite;
+  background: rgba(16, 185, 129, 0.18);
+  border: 3px solid rgba(110, 231, 183, 0.98);
+  box-shadow:
+    inset 0 0 0 1px rgba(236, 253, 245, 0.82),
+    0 0 0 1px rgba(16, 185, 129, 0.36),
+    0 0 34px rgba(16, 185, 129, 0.52);
+  pointer-events: none;
+  position: fixed;
+  z-index: 80;
+}
+
 .board-quick-insert-menu {
   backdrop-filter: blur(18px);
   background:

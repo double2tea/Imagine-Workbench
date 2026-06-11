@@ -53,6 +53,18 @@ function BoardSideAssetRow({
         if (item.status !== "complete" || adding || alreadyOnCanvas) return;
         event.dataTransfer.setData(IMAGINE_BOARD_ASSET_DRAG_TYPE, item.id);
         event.dataTransfer.effectAllowed = "copy";
+        const dragImage = event.currentTarget.cloneNode(true);
+        if (dragImage instanceof HTMLElement) {
+          dragImage.style.left = "-1000px";
+          dragImage.style.opacity = "0.46";
+          dragImage.style.pointerEvents = "none";
+          dragImage.style.position = "fixed";
+          dragImage.style.top = "-1000px";
+          dragImage.style.width = `${event.currentTarget.offsetWidth}px`;
+          document.body.appendChild(dragImage);
+          event.dataTransfer.setDragImage(dragImage, 32, 32);
+          window.setTimeout(() => dragImage.remove(), 0);
+        }
       }}
       onClick={() => void handleAdd()}
       data-highlighted={highlighted}

@@ -5,6 +5,7 @@ import type {
   BoardGenerateNodeUpdate,
   BoardMultiGridItem,
   BoardMultiGridNodeUpdate,
+  BoardSize,
   BoardReferenceRole,
   BoardRunningHubAppNodeUpdate,
   BoardRunningHubAppSchemaResult,
@@ -42,6 +43,7 @@ export interface BoardNodeCallbacks {
   onUpdateGenerate: (nodeId: string, input: BoardGenerateNodeUpdate) => void;
   onUpdateMultiGrid: (nodeId: string, input: BoardMultiGridNodeUpdate) => void;
   onUpdateMultiGridItemTransform: (nodeId: string, assetId: string, transform: Partial<Pick<BoardMultiGridItem, "offsetX" | "offsetY" | "scale">>) => void;
+  onUpdateNodeSize: (nodeId: string, size: BoardSize) => void;
   onExportMultiGrid: (nodeId: string) => void | Promise<void>;
   onMeasureAssetAspectRatio: (nodeId: string, aspectRatio: number) => void;
   onUpdateNodeTitle: (nodeId: string, title: string) => void;

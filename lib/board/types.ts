@@ -117,6 +117,7 @@ export interface BoardMultiGridNode extends BoardNodeBase {
   kind: "multi-grid";
   aspectRatio: BoardMultiGridAspectRatio;
   gridSize: BoardMultiGridSize;
+  isCollapsed?: boolean;
   items: BoardMultiGridItem[];
   selectedItemId?: string;
 }
@@ -264,6 +265,7 @@ export type BoardResultSourceNode = BoardImageGenerateNode | BoardVideoGenerateN
 export type BoardMultiGridNodeUpdate = Partial<{
   aspectRatio: BoardMultiGridAspectRatio;
   gridSize: BoardMultiGridSize;
+  isCollapsed: boolean;
   items: BoardMultiGridItem[];
   selectedItemId: string | undefined;
 }>;

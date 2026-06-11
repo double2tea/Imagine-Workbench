@@ -10,10 +10,12 @@ import {
   ConnectionLineType,
   ConnectionMode,
   Controls,
-  EdgeLabelRenderer,
+  EdgeToolbar,
   MarkerType,
   MiniMap,
+  NodeToolbar,
   PanOnScrollMode,
+  Position,
   ReactFlow,
   SelectionMode,
   getSmoothStepPath,
@@ -221,25 +223,13 @@ interface BoardSelectionSnapshot {
   nodeIds: string[];
 }
 
-interface BoardSelectionBounds {
-  height: number;
-  width: number;
-  x: number;
-  y: number;
+interface MultiGridCellDropTarget {
+  cellIndex: number;
+  rect: DOMRect;
+  nodeId: string;
 }
 
-interface BoardSelectionToolbarPlacement {
-  left: number;
-  top: number;
-}
-
-interface BoardElementSize {
-  height: number;
-  width: number;
-}
-
-const SELECTION_TOOLBAR_MARGIN = 12;
-const DEFAULT_SELECTION_TOOLBAR_SIZE: BoardElementSize = { width: 320, height: 56 };
+const SELECTION_TOOLBAR_GAP = 44;
 
 function sameStringList(left: string[], right: string[]): boolean {
   if (left.length !== right.length) return false;
@@ -252,94 +242,6 @@ function sameBoardViewportModel(left: BoardViewport, right: BoardViewport): bool
     Math.abs(left.y - right.y) < BOARD_VIEWPORT_POSITION_EPSILON &&
     Math.abs(left.zoom - right.zoom) < BOARD_VIEWPORT_ZOOM_EPSILON
   );
-}
-
-function sameBoardElementSize(left: BoardElementSize | null, right: BoardElementSize): boolean {
-  return Boolean(left && Math.abs(left.width - right.width) < 1 && Math.abs(left.height - right.height) < 1);
-}
-
-function roundedElementSize(rect: DOMRectReadOnly): BoardElementSize {
-  return { width: Math.round(rect.width), height: Math.round(rect.height) };
-}
-
-function flowNodeSize(node: BoardFlowNode): BoardSize {
-  return {
-    width: node.width ?? node.measured?.width ?? node.data.node.size.width,
-    height: node.height ?? node.measured?.height ?? node.data.node.size.height,
-  };
-}
-
-function flowNodeAbsolutePosition(
-  node: BoardFlowNode,
-  nodeById: Map<string, BoardFlowNode>,
-  cache: Map<string, BoardPoint>,
-  visiting: Set<string>,
-): BoardPoint {
-  const cachedPosition = cache.get(node.id);
-  if (cachedPosition) return cachedPosition;
-  if (!node.parentId || visiting.has(node.id)) {
-    cache.set(node.id, node.position);
-    return node.position;
-  }
-  const parent = nodeById.get(node.parentId);
-  if (!parent) {
-    cache.set(node.id, node.position);
-    return node.position;
-  }
-  visiting.add(node.id);
-  const parentPosition = flowNodeAbsolutePosition(parent, nodeById, cache, visiting);
-  visiting.delete(node.id);
-  const position = {
-    x: parentPosition.x + node.position.x,
-    y: parentPosition.y + node.position.y,
-  };
-  cache.set(node.id, position);
-  return position;
-}
-
-function selectedFlowNodeBounds(nodes: BoardFlowNode[], selectedNodeIds: string[]): BoardSelectionBounds | null {
-  if (selectedNodeIds.length <= 1) return null;
-  const selectedIdSet = new Set(selectedNodeIds);
-  const nodeById = new Map(nodes.map(node => [node.id, node]));
-  const positionCache = new Map<string, BoardPoint>();
-  const selectedNodes = nodes
-    .filter(node => selectedIdSet.has(node.id))
-    .map(node => ({
-      position: flowNodeAbsolutePosition(node, nodeById, positionCache, new Set()),
-      size: flowNodeSize(node),
-    }));
-  if (selectedNodes.length === 0) return null;
-  const minX = Math.min(...selectedNodes.map(node => node.position.x));
-  const minY = Math.min(...selectedNodes.map(node => node.position.y));
-  const maxX = Math.max(...selectedNodes.map(node => node.position.x + node.size.width));
-  const maxY = Math.max(...selectedNodes.map(node => node.position.y + node.size.height));
-  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
-}
-
-function clampSelectionToolbarValue(value: number, min: number, max: number): number {
-  if (max < min) return value;
-  return Math.min(Math.max(value, min), max);
-}
-
-function selectionToolbarPlacement(
-  bounds: BoardSelectionBounds,
-  viewport: BoardViewport,
-  hostSize: BoardElementSize | null,
-  toolbarSize: BoardElementSize | null,
-): BoardSelectionToolbarPlacement {
-  const rawLeft = (bounds.x + bounds.width / 2) * viewport.zoom + viewport.x;
-  const rawTop = bounds.y * viewport.zoom + viewport.y - 14;
-  const measuredToolbarSize = toolbarSize ?? DEFAULT_SELECTION_TOOLBAR_SIZE;
-  if (!hostSize) return { left: rawLeft, top: rawTop };
-  const halfToolbarWidth = measuredToolbarSize.width / 2;
-  const minLeft = SELECTION_TOOLBAR_MARGIN + halfToolbarWidth;
-  const maxLeft = hostSize.width - SELECTION_TOOLBAR_MARGIN - halfToolbarWidth;
-  const minTop = SELECTION_TOOLBAR_MARGIN + measuredToolbarSize.height;
-  const maxTop = Math.max(minTop, hostSize.height - SELECTION_TOOLBAR_MARGIN);
-  return {
-    left: maxLeft >= minLeft ? clampSelectionToolbarValue(rawLeft, minLeft, maxLeft) : hostSize.width / 2,
-    top: clampSelectionToolbarValue(rawTop, minTop, maxTop),
-  };
 }
 
 function sameBoardSelectionSnapshot(left: BoardSelectionSnapshot, right: BoardSelectionSnapshot): boolean {
@@ -459,6 +361,7 @@ function sameFlowNodeDataModel(left: BoardFlowNode["data"], right: BoardFlowNode
   return (
     sameBoardNodeRenderModel(left.node, right.node) &&
     left.connectedResultNodeId === right.connectedResultNodeId &&
+    left.activeMultiGridDropCellIndex === right.activeMultiGridDropCellIndex &&
     left.hasResultConnection === right.hasResultConnection &&
     left.compareReferenceUrl === right.compareReferenceUrl &&
     sameGenerateInputSummary(left.generateInputSummary, right.generateInputSummary) &&
@@ -605,33 +508,24 @@ const BoardEdgeComponent = memo(function BoardEdgeComponent({
         className={`imagine-board-edge-path imagine-board-edge-path-${kind}`}
       />
       {showLabel ? (
-        <EdgeLabelRenderer>
-          <div
-            className="nodrag nopan flex items-center gap-1"
-            style={{
-              pointerEvents: "all",
-              position: "absolute",
-              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-            }}
-          >
-            {processing ? (
-              <span className="rounded-full border border-blue-400/30 bg-blue-500/15 px-2 py-0.5 text-[9px] font-semibold text-blue-200">
-                生成中
-              </span>
-            ) : null}
-            {selected ? (
-              <button
-                type="button"
-                aria-label="删除连接"
-                title="删除连接"
-                onClick={() => void deleteElements({ edges: [{ id }] })}
-                className="flex h-6 w-6 items-center justify-center rounded-full border border-[var(--iw-border)] bg-[var(--iw-panel)] text-[var(--iw-muted)] shadow-lg transition hover:border-red-400/40 hover:bg-red-500 hover:text-white"
-              >
-                <span className="text-sm leading-none">×</span>
-              </button>
-            ) : null}
-          </div>
-        </EdgeLabelRenderer>
+        <EdgeToolbar edgeId={id} x={labelX} y={labelY} isVisible className="nodrag nopan flex items-center gap-1">
+          {processing ? (
+            <span className="rounded-full border border-blue-400/30 bg-blue-500/15 px-2 py-0.5 text-[9px] font-semibold text-blue-200">
+              生成中
+            </span>
+          ) : null}
+          {selected ? (
+            <button
+              type="button"
+              aria-label="删除连接"
+              title="删除连接"
+              onClick={() => void deleteElements({ edges: [{ id }] })}
+              className="flex h-6 w-6 items-center justify-center rounded-full border border-[var(--iw-border)] bg-[var(--iw-panel)] text-[var(--iw-muted)] shadow-lg transition hover:border-red-400/40 hover:bg-red-500 hover:text-white"
+            >
+              <span className="text-sm leading-none">×</span>
+            </button>
+          ) : null}
+        </EdgeToolbar>
       ) : null}
     </>
   );
@@ -1084,6 +978,39 @@ function boardNodeAtPoint(
   return null;
 }
 
+function multiGridCellDropTargetFromClient(
+  nodes: BoardNodeModel[],
+  clientX: number,
+  clientY: number,
+): MultiGridCellDropTarget | null {
+  let target: MultiGridCellDropTarget | null = null;
+  document.querySelectorAll<HTMLElement>("[data-multi-grid-id][data-multi-grid-cell-index]").forEach(cell => {
+    const rect = cell.getBoundingClientRect();
+    if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) return;
+    const nodeId = cell.dataset.multiGridId;
+    if (!nodeId) return;
+    const node = nodes.find(item => item.id === nodeId);
+    if (node?.kind !== "multi-grid") return;
+    const cellIndex = Number(cell.dataset.multiGridCellIndex);
+    if (Number.isInteger(cellIndex)) target = { cellIndex, nodeId, rect };
+  });
+  return target;
+}
+
+function sameMultiGridCellDropTarget(
+  left: MultiGridCellDropTarget | null,
+  right: MultiGridCellDropTarget | null,
+): boolean {
+  return (
+    left?.nodeId === right?.nodeId &&
+    left?.cellIndex === right?.cellIndex &&
+    left?.rect.left === right?.rect.left &&
+    left?.rect.top === right?.rect.top &&
+    left?.rect.width === right?.rect.width &&
+    left?.rect.height === right?.rect.height
+  );
+}
+
 function batchConnectionsFromSourceToTarget(
   nodes: BoardNodeModel[],
   sourceNodeId: string,
@@ -1142,8 +1069,6 @@ export default function BoardWorkspace({
   const isCoarsePointer = useCoarsePointer();
   const flowInstanceRef = useRef<ReactFlowInstance<BoardFlowNode, BoardFlowEdge> | null>(null);
   const flowHostRef = useRef<HTMLElement | null>(null);
-  const pendingMoveFrameRef = useRef<number | null>(null);
-  const pendingMoveViewportRef = useRef<BoardViewport | null>(null);
   const mediaImportInputRef = useRef<HTMLInputElement>(null);
   const pendingImportPointRef = useRef<BoardPoint | null>(null);
   const copiedNodeRef = useRef<CopiedBoardNode | null>(null);
@@ -1159,12 +1084,10 @@ export default function BoardWorkspace({
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
   const [trashedNodes, setTrashedNodes] = useState<BoardTrashEntry[]>([]);
   const [assetCompare, setAssetCompare] = useState<{ originalUrl: string; resultUrl: string } | null>(null);
-  const [flowHostSize, setFlowHostSize] = useState<BoardElementSize | null>(null);
-  const [selectionToolbarElement, setSelectionToolbarElement] = useState<HTMLDivElement | null>(null);
-  const [selectionToolbarSize, setSelectionToolbarSize] = useState<BoardElementSize | null>(null);
   const [flowReady, setFlowReady] = useState(false);
   const [isConnectionActive, setIsConnectionActive] = useState(false);
   const [isNodeDragActive, setIsNodeDragActive] = useState(false);
+  const [activeMultiGridDropTarget, setActiveMultiGridDropTarget] = useState<MultiGridCellDropTarget | null>(null);
   const updateSelectedNodeIds = useCallback((nextIds: string[]): void => {
     setSelectedNodeIds(currentIds => {
       if (sameStringList(currentIds, nextIds)) return currentIds;
@@ -1248,77 +1171,19 @@ export default function BoardWorkspace({
     updateNoteBody,
     updatePromptNode,
   } = controller;
-  const [flowViewport, setFlowViewport] = useState<BoardViewport>(board.viewport);
   const viewportRef = useRef<BoardViewport>(board.viewport);
   const setFlowHostRef = useCallback((element: HTMLElement | null): void => {
     flowHostRef.current = element;
-    if (!element) setFlowHostSize(null);
   }, []);
-  const setSelectionToolbarRef = useCallback((element: HTMLDivElement | null): void => {
-    setSelectionToolbarElement(element);
-    if (!element) setSelectionToolbarSize(null);
-  }, []);
-  const updateFlowViewportState = useCallback((viewport: BoardViewport): void => {
-    setFlowViewport(current => sameBoardViewportModel(current, viewport) ? current : viewport);
-  }, []);
-  const scheduleFlowViewportState = useCallback((viewport: BoardViewport): void => {
-    pendingMoveViewportRef.current = viewport;
-    if (pendingMoveFrameRef.current !== null) return;
-    pendingMoveFrameRef.current = window.requestAnimationFrame(() => {
-      pendingMoveFrameRef.current = null;
-      const nextViewport = pendingMoveViewportRef.current;
-      pendingMoveViewportRef.current = null;
-      if (nextViewport) updateFlowViewportState(nextViewport);
-    });
-  }, [updateFlowViewportState]);
   useLayoutEffect(() => {
     viewportRef.current = board.viewport;
     selectionRef.current = { edgeId: selectedEdgeId, nodeId: selectedNodeId, nodeIds: selectedNodeIds };
   }, [board.viewport, selectedEdgeId, selectedNodeId, selectedNodeIds]);
   useEffect(() => {
-    updateFlowViewportState(board.viewport);
     const instance = flowInstanceRef.current;
     if (!instance || !flowReady || sameBoardViewportModel(instance.getViewport(), board.viewport)) return;
     void instance.setViewport(board.viewport, { duration: 0 });
-  }, [board.id, board.viewport, flowReady, updateFlowViewportState]);
-  useEffect(() => {
-    return () => {
-      if (pendingMoveFrameRef.current === null) return;
-      window.cancelAnimationFrame(pendingMoveFrameRef.current);
-    };
-  }, []);
-  useLayoutEffect(() => {
-    const element = flowHostRef.current;
-    if (!element) return;
-    setFlowHostSize(current => {
-      const next = roundedElementSize(element.getBoundingClientRect());
-      return sameBoardElementSize(current, next) ? current : next;
-    });
-    const observer = new ResizeObserver(entries => {
-      const entry = entries[0];
-      if (!entry) return;
-      const next = roundedElementSize(entry.contentRect);
-      setFlowHostSize(current => sameBoardElementSize(current, next) ? current : next);
-    });
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [flowReady]);
-  useLayoutEffect(() => {
-    if (!selectionToolbarElement) return;
-    setSelectionToolbarSize(current => {
-      const next = roundedElementSize(selectionToolbarElement.getBoundingClientRect());
-      return sameBoardElementSize(current, next) ? current : next;
-    });
-    const observer = new ResizeObserver(entries => {
-      const entry = entries[0];
-      if (!entry) return;
-      const next = roundedElementSize(entry.contentRect);
-      setSelectionToolbarSize(current => sameBoardElementSize(current, next) ? current : next);
-    });
-    observer.observe(selectionToolbarElement);
-    return () => observer.disconnect();
-  }, [selectionToolbarElement]);
-
+  }, [board.id, board.viewport, flowReady]);
   const boardGraphContentKey = useMemo(
     () => buildBoardGraphContentKey(board.nodes, board.edges),
     [board.nodes, board.edges],
@@ -1525,6 +1390,7 @@ export default function BoardWorkspace({
           ? resultAssetIds.map(id => galleryItemById.get(id)).filter((item): item is StorageItem => item !== undefined && item.status === "complete")
           : [];
       dataById.set(node.id, {
+        activeMultiGridDropCellIndex: activeMultiGridDropTarget?.nodeId === node.id ? activeMultiGridDropTarget.cellIndex : undefined,
         boardId: board.id,
         connectedResultNodeId: connectedResultNode?.id,
         generateInputSummary: generateInputSummaryForNode(node, boardPromptReferenceGraphIndex),
@@ -1546,6 +1412,7 @@ export default function BoardWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     boardGraphContentKey,
+    activeMultiGridDropTarget,
     boardPromptReferenceGraphIndex,
     galleryReferenceFingerprint,
     galleryReferenceItems,
@@ -1581,6 +1448,7 @@ export default function BoardWorkspace({
     onUpdateGenerate: updateGenerateNode,
     onUpdateMultiGrid: updateMultiGridNode,
     onUpdateMultiGridItemTransform: updateMultiGridItemTransform,
+    onUpdateNodeSize: updateNodeSize,
     onExportMultiGrid,
     onMeasureAssetAspectRatio: measureAssetAspectRatio,
     onUpdateNodeTitle: updateNodeTitle,
@@ -1614,6 +1482,7 @@ export default function BoardWorkspace({
     deleteEdge, removeReferenceGroupItem, onSendAgentNode, onSendAssetToAgent, connectSelectedBoardPromptReference,
     updateReferenceGroupItemRole, updateAgentInstruction, updateGenerateNode, updateMultiGridNode,
     updateMultiGridItemTransform, onExportMultiGrid, measureAssetAspectRatio,
+    updateNodeSize,
     updateNodeTitle, updateRunningHubAppNode, updateNoteBody, updatePromptNode,
     assetCompareReferenceForNode, board.nodes, board.edges, boardPromptReferenceGraphIndex, galleryItemById, onConnectionError,
     onResolveOriginalAsset, onWorkspaceNotice, promotableItemForNode, resolveCompareReferenceUrl, updateResultNodeAsset,
@@ -1689,6 +1558,7 @@ export default function BoardWorkspace({
         if (
           existing &&
           existing.node === node &&
+          existing.activeMultiGridDropCellIndex === cachedData.activeMultiGridDropCellIndex &&
           existing.generateTaskSummary === taskSummary &&
           existing.generateReferences === cachedData.generateReferences &&
           existing.promptReferences === cachedData.promptReferences &&
@@ -1726,6 +1596,34 @@ export default function BoardWorkspace({
   );
   const [reactFlowNodes, setReactFlowNodes, onNodesChange] = useNodesState<BoardFlowNode>([]);
   const reactFlowNodesRef = useRef<BoardFlowNode[]>(reactFlowNodes);
+  const patchReactFlowMultiGridDropTarget = useCallback((target: MultiGridCellDropTarget | null): void => {
+    setReactFlowNodes(currentNodes => {
+      let changed = false;
+      const nextNodes = currentNodes.map(flowNode => {
+        const activeCellIndex = target?.nodeId === flowNode.id ? target.cellIndex : undefined;
+        if (flowNode.data.activeMultiGridDropCellIndex === activeCellIndex) return flowNode;
+        changed = true;
+        return {
+          ...flowNode,
+          data: {
+            ...flowNode.data,
+            activeMultiGridDropCellIndex: activeCellIndex,
+          },
+        };
+      });
+      return changed ? nextNodes : currentNodes;
+    });
+  }, [setReactFlowNodes]);
+  const clearActiveMultiGridDropTarget = useCallback((): void => {
+    setActiveMultiGridDropTarget(null);
+    patchReactFlowMultiGridDropTarget(null);
+  }, [patchReactFlowMultiGridDropTarget]);
+  const updateActiveMultiGridDropTarget = useCallback((clientX: number, clientY: number): MultiGridCellDropTarget | null => {
+    const target = multiGridCellDropTargetFromClient(board.nodes, clientX, clientY);
+    setActiveMultiGridDropTarget(current => sameMultiGridCellDropTarget(current, target) ? current : target);
+    patchReactFlowMultiGridDropTarget(target);
+    return target;
+  }, [board.nodes, patchReactFlowMultiGridDropTarget]);
   useLayoutEffect(() => {
     reactFlowNodesRef.current = reactFlowNodes;
   }, [reactFlowNodes]);
@@ -1789,7 +1687,7 @@ export default function BoardWorkspace({
     const rawTargetNode = rawRefs ? board.nodes.find(node => node.id === rawRefs.to.nodeId) : undefined;
     if (rawTargetNode?.kind === "multi-grid") {
       try {
-        const references = rawRefs ? multiGridImageReferences(board.nodes, rawRefs.from, selectedNodeIds) : [];
+        const references = rawRefs ? multiGridImageReferences(board.nodes, rawRefs.from, [rawRefs.from.nodeId]) : [];
         if (references.length === 0) {
           onConnectionError("多宫格只支持图片资产");
           return;
@@ -1816,7 +1714,7 @@ export default function BoardWorkspace({
         return;
       }
       if (targetNode?.kind === "multi-grid") {
-        const references = multiGridImageReferences(board.nodes, refs.from, selectedNodeIds);
+        const references = multiGridImageReferences(board.nodes, refs.from, [refs.from.nodeId]);
         if (references.length === 0) {
           onConnectionError("多宫格只支持图片资产");
           return;
@@ -1983,11 +1881,39 @@ export default function BoardWorkspace({
     pendingDragPositionByIdRef.current.clear();
   }, []);
 
-  const handleNodeDragStop = useCallback<OnNodeDrag<BoardFlowNode>>((_event, node, nodes) => {
+  const handleNodeDrag = useCallback<OnNodeDrag<BoardFlowNode>>((event, node) => {
+    const source = node.data.node;
+    if ((source.kind !== "asset" && source.kind !== "result") || source.asset.type !== "image") {
+      clearActiveMultiGridDropTarget();
+      return;
+    }
+    updateActiveMultiGridDropTarget(event.clientX, event.clientY);
+  }, [clearActiveMultiGridDropTarget, updateActiveMultiGridDropTarget]);
+
+  const handleNodeDragStop = useCallback<OnNodeDrag<BoardFlowNode>>((event, node, nodes) => {
     isNodeDragActiveRef.current = false;
     setIsNodeDragActive(false);
+    clearActiveMultiGridDropTarget();
     const positionById = new Map(pendingDragPositionByIdRef.current);
     const draggedNodes = nodes.length > 0 ? nodes : [node];
+    const source = node.data.node;
+    const dropTarget = draggedNodes.length === 1
+      ? multiGridCellDropTargetFromClient(board.nodes, event.clientX, event.clientY)
+      : null;
+    if (
+      dropTarget &&
+      source.id !== dropTarget.nodeId &&
+      (source.kind === "asset" || source.kind === "result") &&
+      source.asset.type === "image"
+    ) {
+      pendingDragPositionByIdRef.current.clear();
+      addAssetToMultiGrid(dropTarget.nodeId, source.asset, dropTarget.cellIndex);
+      selectNode(dropTarget.nodeId);
+      selectEdge(null);
+      updateSelectedNodeIds([dropTarget.nodeId]);
+      skipPositionSyncRef.current = false;
+      return;
+    }
     for (const draggedNode of draggedNodes) {
       positionById.set(draggedNode.id, draggedNode.position);
     }
@@ -1996,7 +1922,7 @@ export default function BoardWorkspace({
     updateNodesPositions(Array.from(positionById, ([nodeId, position]) => ({ nodeId, position })));
     endUndoGesture();
     skipPositionSyncRef.current = false;
-  }, [beginUndoGesture, endUndoGesture, updateNodesPositions]);
+  }, [addAssetToMultiGrid, beginUndoGesture, board.nodes, clearActiveMultiGridDropTarget, endUndoGesture, selectEdge, selectNode, updateNodesPositions, updateSelectedNodeIds]);
 
   const skipPositionSyncRef = useRef(false);
   const handleNodesChange = useCallback<OnNodesChange<BoardFlowNode>>((changes) => {
@@ -2016,21 +1942,11 @@ export default function BoardWorkspace({
     updateNodesPositions(settledPositions);
   }, [onNodesChange, updateNodesPositions]);
 
-  const handleMove = useCallback((_event: MouseEvent | TouchEvent | null, viewport: BoardViewport): void => {
-    scheduleFlowViewportState(viewport);
-  }, [scheduleFlowViewportState]);
-
   const handleMoveEnd = useCallback((_event: MouseEvent | TouchEvent | null, viewport: BoardViewport): void => {
-    if (pendingMoveFrameRef.current !== null) {
-      window.cancelAnimationFrame(pendingMoveFrameRef.current);
-      pendingMoveFrameRef.current = null;
-      pendingMoveViewportRef.current = null;
-    }
-    updateFlowViewportState(viewport);
     if (sameBoardViewportModel(viewportRef.current, viewport)) return;
     viewportRef.current = viewport;
     setViewport(viewport);
-  }, [setViewport, updateFlowViewportState]);
+  }, [setViewport]);
 
 
   const handleNodesDelete = useCallback<OnNodesDelete<BoardFlowNode>>(nodes => {
@@ -2052,9 +1968,8 @@ export default function BoardWorkspace({
 
   const handleFlowInit = useCallback((instance: ReactFlowInstance<BoardFlowNode, BoardFlowEdge>): void => {
     flowInstanceRef.current = instance;
-    updateFlowViewportState(instance.getViewport());
     setFlowReady(true);
-  }, [updateFlowViewportState]);
+  }, []);
 
   const handlePaneClick = useCallback((): void => {
     flowHostRef.current?.focus();
@@ -2500,12 +2415,17 @@ export default function BoardWorkspace({
       if (targetNode.kind === "multi-grid") {
         if (!sourceKind) return;
         const from: BoardPortRef = { nodeId: sourceNodeId, portId: sourceHandleId, portKind: sourceKind };
-        const references = multiGridImageReferences(board.nodes, from, selectedNodeIds);
+        const references = multiGridImageReferences(board.nodes, from, [sourceNodeId]);
         if (references.length === 0) {
           onConnectionError("多宫格只支持图片资产");
           return;
         }
-        references.forEach(reference => addAssetToMultiGrid(targetNode.id, reference));
+        const dropTarget = multiGridCellDropTargetFromClient(board.nodes, clientPoint.x, clientPoint.y);
+        references.forEach(reference => addAssetToMultiGrid(
+          targetNode.id,
+          reference,
+          dropTarget?.nodeId === targetNode.id ? dropTarget.cellIndex : undefined,
+        ));
         selectNode(targetNode.id);
         selectEdge(null);
         updateSelectedNodeIds([targetNode.id]);
@@ -2598,7 +2518,7 @@ export default function BoardWorkspace({
       selectEdge(null);
       return;
     }
-  }, [addAssetToMultiGrid, addResultNodeWithConnection, board.nodes, centeredNodePosition, connectPorts, connectPortsBatch, flowPositionFromClient, onConnectionError, selectEdge, selectedNodeIds, selectNode, updateSelectedNodeIds]);
+  }, [addAssetToMultiGrid, addResultNodeWithConnection, board.nodes, centeredNodePosition, connectPortsBatch, flowPositionFromClient, onConnectionError, selectEdge, selectedNodeIds, selectNode, updateSelectedNodeIds]);
 
   const openQuickInsertMenu = useCallback((event: ReactMouseEvent | MouseEvent): void => {
     event.preventDefault();
@@ -2686,14 +2606,25 @@ export default function BoardWorkspace({
   const handleBoardDrop = useCallback((event: ReactDragEvent<HTMLElement>): void => {
     const point = flowPositionFromClient(event.clientX, event.clientY);
     const assetId = event.dataTransfer.getData(IMAGINE_BOARD_ASSET_DRAG_TYPE);
+    const dropTarget = multiGridCellDropTargetFromClient(board.nodes, event.clientX, event.clientY);
+    clearActiveMultiGridDropTarget();
     if (assetId) {
       const item = galleryItems.find(entry => entry.id === assetId);
       if (item && item.status === "complete") {
         event.preventDefault();
         void ensureHydratedStorageItem(item).then(hydrated => {
+          const asset = storageItemToBoardAsset(hydrated);
+          if (dropTarget && asset.type === "image") {
+            addAssetToMultiGrid(dropTarget.nodeId, asset, dropTarget.cellIndex);
+            selectNode(dropTarget.nodeId);
+            selectEdge(null);
+            updateSelectedNodeIds([dropTarget.nodeId]);
+            closeOverlayMenus();
+            return;
+          }
           addAssetNode({
             position: centeredNodePosition(point, DEFAULT_ASSET_NODE_SIZE),
-            asset: storageItemToBoardAsset(hydrated),
+            asset,
           });
           closeOverlayMenus();
         });
@@ -2712,7 +2643,7 @@ export default function BoardWorkspace({
     if (urls.length === 0) return;
     event.preventDefault();
     importImageUrlsAtPoint(urls, point);
-  }, [addAssetNode, centeredNodePosition, closeOverlayMenus, flowPositionFromClient, galleryItems, importFilesAtPoint, importImageUrlsAtPoint]);
+  }, [addAssetNode, addAssetToMultiGrid, board.nodes, centeredNodePosition, clearActiveMultiGridDropTarget, closeOverlayMenus, flowPositionFromClient, galleryItems, importFilesAtPoint, importImageUrlsAtPoint, selectEdge, selectNode, updateSelectedNodeIds]);
 
   const handleBoardDragOver = useCallback((event: ReactDragEvent<HTMLElement>): void => {
     if (
@@ -2724,7 +2655,18 @@ export default function BoardWorkspace({
     }
     event.preventDefault();
     event.dataTransfer.dropEffect = "copy";
-  }, []);
+    if (event.dataTransfer.types.includes(IMAGINE_BOARD_ASSET_DRAG_TYPE)) {
+      updateActiveMultiGridDropTarget(event.clientX, event.clientY);
+      return;
+    }
+    clearActiveMultiGridDropTarget();
+  }, [clearActiveMultiGridDropTarget, updateActiveMultiGridDropTarget]);
+
+  const handleBoardDragLeave = useCallback((event: ReactDragEvent<HTMLElement>): void => {
+    const nextTarget = event.relatedTarget;
+    if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) return;
+    clearActiveMultiGridDropTarget();
+  }, [clearActiveMultiGridDropTarget]);
 
   useEffect(() => {
     const handlePaste = (event: ClipboardEvent): void => {
@@ -2808,24 +2750,15 @@ export default function BoardWorkspace({
     undo,
   ]);
 
-  const selectedBounds = useMemo(
-    () => selectedFlowNodeBounds(reactFlowNodes, selectedNodeIds),
-    [reactFlowNodes, selectedNodeIds],
-  );
-  const selectedBatchToolbarStyle = useMemo<CSSProperties | null>(() => {
-    if (!selectedBounds) return null;
-    const placement = selectionToolbarPlacement(
-      selectedBounds,
-      flowViewport,
-      flowHostSize,
-      selectionToolbarSize,
-    );
+  const multiGridDropOverlayStyle = useMemo<CSSProperties | undefined>(() => {
+    if (!activeMultiGridDropTarget) return undefined;
     return {
-      left: placement.left,
-      top: placement.top,
-      transform: "translate(-50%, -100%)",
+      height: activeMultiGridDropTarget.rect.height,
+      left: activeMultiGridDropTarget.rect.left,
+      top: activeMultiGridDropTarget.rect.top,
+      width: activeMultiGridDropTarget.rect.width,
     };
-  }, [flowHostSize, flowViewport, selectedBounds, selectionToolbarSize]);
+  }, [activeMultiGridDropTarget]);
 
   return (
     <BoardMediaImportProvider openImport={openMediaImportPicker}>
@@ -2873,6 +2806,7 @@ export default function BoardWorkspace({
           tabIndex={-1}
           onContextMenu={handleCanvasContextMenu}
           onDoubleClick={handleFlowDoubleClick}
+          onDragLeave={handleBoardDragLeave}
           onDragOver={handleBoardDragOver}
           onDrop={handleBoardDrop}
           className={`board-canvas relative min-h-0 bg-[var(--iw-board-canvas-bg)]${isNodeDragActive ? " is-node-dragging" : ""}${isConnectionActive ? " is-connecting" : ""}`}
@@ -2922,10 +2856,10 @@ export default function BoardWorkspace({
             onEdgeDoubleClick={handleEdgeDoubleClick}
             onEdgesDelete={handleEdgesDelete}
             onInit={handleFlowInit}
-            onMove={handleMove}
             onMoveEnd={handleMoveEnd}
             onNodeClick={handleNodeClick}
             onNodeContextMenu={handleNodeContextMenu}
+            onNodeDrag={handleNodeDrag}
             onNodeDragStart={handleNodeDragStart}
             onNodeDragStop={handleNodeDragStop}
             onNodeMouseEnter={handleNodeMouseEnter}
@@ -2949,27 +2883,42 @@ export default function BoardWorkspace({
                 zoomable
               />
             )}
+            {selectedNodeIds.length > 1 && selectedDownloadableCount > 0 && onDownloadSelectedAssets ? (
+              <NodeToolbar
+                nodeId={selectedNodeIds}
+                isVisible
+                position={Position.Top}
+                offset={SELECTION_TOOLBAR_GAP}
+                align="center"
+                className="pointer-events-none z-40 max-w-[calc(100vw_-_24px)]"
+                style={{ contain: "layout paint style" }}
+              >
+                <div className="pointer-events-auto flex h-10 w-[260px] shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-slate-950/88 px-2.5 text-[11px] font-semibold text-slate-100 shadow-[0_10px_24px_rgba(2,6,23,0.28)] backdrop-blur-md ring-1 ring-white/5">
+                  <span className="min-w-0 flex-1 truncate px-1 text-slate-300">
+                    已选 {selectedNodeIds.length} 个 · 可下载 {selectedDownloadableCount} 个
+                  </span>
+                  <button
+                    type="button"
+                    onClick={onDownloadSelectedAssets}
+                    className="flex h-7 w-[86px] shrink-0 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/10 text-[11px] font-semibold text-slate-100 transition hover:border-blue-300/40 hover:bg-blue-500/20 hover:text-white"
+                    title="下载所选媒体为 ZIP"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    批量下载
+                  </button>
+                </div>
+              </NodeToolbar>
+            ) : null}
           </ReactFlow>
           </BoardNodeCallbacksContext.Provider>
+          {multiGridDropOverlayStyle && (
+            <div
+              aria-hidden="true"
+              className="multi-grid-drop-cell-overlay"
+              style={multiGridDropOverlayStyle}
+            />
+          )}
           {board.nodes.length === 0 && <BoardEmptyHint />}
-          {selectedNodeIds.length > 1 && selectedDownloadableCount > 0 && onDownloadSelectedAssets && selectedBatchToolbarStyle ? (
-            <div ref={setSelectionToolbarRef} className="pointer-events-none absolute z-40 max-w-[calc(100%_-_24px)]" style={selectedBatchToolbarStyle}>
-              <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-white/10 bg-[var(--iw-panel)] p-2 pl-5 text-[12px] font-semibold text-[var(--iw-text)] shadow-[0_18px_45px_rgba(15,23,42,0.22)] backdrop-blur-xl ring-1 ring-white/10">
-                <span className="whitespace-nowrap text-[var(--iw-muted)]">
-                  已选 {selectedNodeIds.length} 个 · 可下载 {selectedDownloadableCount} 个
-                </span>
-                <button
-                  type="button"
-                  onClick={onDownloadSelectedAssets}
-                  className="imagine-primary-action flex h-10 items-center gap-2 rounded-full px-4 text-[12px] font-semibold shadow-sm"
-                  title="下载所选媒体为 ZIP"
-                >
-                  <Download className="h-4 w-4" />
-                  批量下载
-                </button>
-              </div>
-            </div>
-          ) : null}
           {quickInsertMenu ? (
             <BoardQuickInsertMenu
               clientX={quickInsertMenu.clientX}
