@@ -22,6 +22,7 @@ export const API_ROUTES = {
   },
   resolve: {
     capabilities: "/api/resolve/capabilities",
+    commands: "/api/resolve/commands",
     providerCredentials: "/api/resolve/provider-credentials",
   },
   v1: {

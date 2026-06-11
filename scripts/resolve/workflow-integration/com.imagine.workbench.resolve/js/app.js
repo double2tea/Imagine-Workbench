@@ -12,6 +12,7 @@
   var RESOLVE_BIN_ROOT = "Imagine Workbench";
   var RESOLVE_LUT_ROOT = "ImagineWorkbench";
   var CACHE_MAX_AGE_MS = 72 * 60 * 60 * 1000;
+  var EXTERNAL_COMMAND_POLL_MS = 2000;
   var DEFAULT_MODELS = {
     "generate-image": "12ai:gemini-3.1-flash-image-preview",
     "image-to-image": "12ai:gemini-3.1-flash-image-preview",
@@ -209,7 +210,8 @@
     promptDraft: "",
     importToResolve: false,
     appendToTimeline: false,
-    modelRequestId: 0
+    modelRequestId: 0,
+    externalCommandPolling: false
   };
 
   var outputDir = hasNode ? path.join(os.homedir(), "Movies", "Imagine Resolve Bridge") : "";
@@ -694,6 +696,52 @@
       state.running = false;
       state.activeOperation = "";
       state.activeModel = "";
+      runButton.disabled = false;
+      updateImportResultButton();
+      updateMaskPrepareUi();
+    }
+  }
+
+  async function pollExternalResolveCommand() {
+    if (!hasNode || state.externalCommandPolling || state.running || maskEditorState) {
+      return;
+    }
+    state.externalCommandPolling = true;
+    try {
+      var payload = await getWorkbenchJson(baseUrlInput.value.trim(), "/api/resolve/commands?claim=1");
+      if (payload.command) {
+        await executeExternalResolveCommand(payload.command);
+      }
+    } catch {
+      // The external control bridge is optional; the panel UI should keep working when Workbench is closed.
+    } finally {
+      state.externalCommandPolling = false;
+    }
+  }
+
+  async function executeExternalResolveCommand(command) {
+    if (!command || typeof command.id !== "string") {
+      return;
+    }
+    if (command.kind !== "doctor") {
+      await finishExternalResolveCommand(command.id, "error", "", "不支持的外部命令");
+      return;
+    }
+    var job = { operation: "doctor", baseUrl: baseUrlInput.value.trim() };
+    state.running = true;
+    runButton.disabled = true;
+    importResultButton.disabled = true;
+    setStatus("外部前端命令：连接检查\n运行中");
+    try {
+      var result = (await doctor(job)).join("\n");
+      await finishExternalResolveCommand(command.id, "complete", result, "");
+      setStatus("外部前端命令已完成\n" + result);
+    } catch (error) {
+      var message = explainError(error, job);
+      await finishExternalResolveCommand(command.id, "error", "", message);
+      setStatus("外部前端命令失败\n" + message);
+    } finally {
+      state.running = false;
       runButton.disabled = false;
       updateImportResultButton();
       updateMaskPrepareUi();
@@ -1855,6 +1903,20 @@
     return readJsonResponse(response, routePath);
   }
 
+  async function getWorkbenchJson(baseUrl, routePath) {
+    var response = await fetchUrl(baseUrl, routePath, { method: "GET", headers: workbenchHeaders({ Accept: "application/json" }) });
+    return readJsonResponse(response, routePath);
+  }
+
+  async function postWorkbenchJson(baseUrl, routePath, payload) {
+    var response = await fetchUrl(baseUrl, routePath, {
+      method: "POST",
+      headers: workbenchHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify(payload)
+    });
+    return readJsonResponse(response, routePath);
+  }
+
   async function postJson(baseUrl, routePath, payload) {
     var headers = requestHeaders({ "Content-Type": "application/json" });
     var response = await fetchUrl(baseUrl, routePath, {
@@ -1863,6 +1925,15 @@
       body: JSON.stringify(payload)
     });
     return readJsonResponse(response, routePath);
+  }
+
+  function finishExternalResolveCommand(id, status, result, error) {
+    return postWorkbenchJson(baseUrlInput.value.trim(), "/api/resolve/commands", {
+      id: id,
+      status: status,
+      result: result,
+      error: error
+    });
   }
 
   async function postMultipartJson(baseUrl, routePath, parts) {
@@ -2454,6 +2525,7 @@
     } catch (error) {
       setStatus("临时缓存自动清理失败\n" + errorMessage(error));
     }
+    setInterval(pollExternalResolveCommand, EXTERNAL_COMMAND_POLL_MS);
   } else {
     setStatus("浏览器预览模式：界面可查看，运行需从 Resolve Workflow Integrations 打开。");
   }

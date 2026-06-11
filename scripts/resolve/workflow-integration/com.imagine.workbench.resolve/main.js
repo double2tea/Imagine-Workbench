@@ -4,6 +4,7 @@ const path = require("path");
 const ALLOWED_HTTP_METHODS = new Set(["GET", "POST"]);
 const ALLOWED_HTTP_PATHS = new Set([
   "/api/resolve/capabilities",
+  "/api/resolve/commands",
   "/api/resolve/provider-credentials",
   "/api/models",
   "/v1/images/generations",

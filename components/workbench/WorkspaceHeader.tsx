@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Grid2X2, Moon, Settings, Sun, Trash2 } from "lucide-react";
+import { Grid2X2, Moon, Plug, Settings, Sun, Trash2 } from "lucide-react";
 import ImagineMark from "@/components/brand/ImagineMark";
 import { useThemeMode, type ThemeMode } from "@/lib/theme-mode";
 
@@ -10,9 +10,16 @@ export type { ThemeMode };
 interface WorkspaceHeaderProps {
   onClearProject: () => void;
   onOpenSettings: () => void;
+  onRunResolveCheck: () => void;
+  resolveCheckStatus: "idle" | "running";
 }
 
-export default function WorkspaceHeader({ onClearProject, onOpenSettings }: WorkspaceHeaderProps) {
+export default function WorkspaceHeader({
+  onClearProject,
+  onOpenSettings,
+  onRunResolveCheck,
+  resolveCheckStatus,
+}: WorkspaceHeaderProps) {
   const { themeMode, toggleThemeMode } = useThemeMode();
 
   return (
@@ -38,6 +45,17 @@ export default function WorkspaceHeader({ onClearProject, onOpenSettings }: Work
           <Grid2X2 className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">画板</span>
         </Link>
+
+        <button
+          type="button"
+          onClick={onRunResolveCheck}
+          disabled={resolveCheckStatus === "running"}
+          className="imagine-header-button flex h-9 items-center gap-1.5 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)] px-3 text-xs font-semibold text-[var(--iw-text)] transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+          title="通过 Resolve 插件执行连接检查"
+        >
+          <Plug className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">{resolveCheckStatus === "running" ? "等待达芬奇" : "达芬奇"}</span>
+        </button>
 
         <button
           onClick={onOpenSettings}
