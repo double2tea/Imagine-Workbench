@@ -1,5 +1,5 @@
-import type { ChangeEvent, CSSProperties, FormEvent, PointerEvent as ReactPointerEvent, ReactNode, Ref } from "react";
-import { forwardRef, useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { ChangeEvent, CSSProperties, FormEvent, PointerEvent as ReactPointerEvent, MutableRefObject, ReactNode, Ref } from "react";
+import { forwardRef, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Check, ChevronRight, FileAudio, ImagePlus, Paintbrush, RefreshCw, Send, X } from "lucide-react";
 import { motion } from "motion/react";
 import PreviewImage from "@/components/PreviewImage";
@@ -17,6 +17,7 @@ import type { AgentBoardAction, AgentToolAction, AgentWorkbenchAction } from "@/
 import type { AiProvider, ModelOption } from "@/lib/providers/model-catalog";
 import { getMediaReferenceType, mediaReferenceLabel, type MediaReferenceType } from "@/lib/media-references";
 import { applyThemeClassesToDom, resolveThemeMode } from "@/lib/theme-mode";
+import { gsap, prefersReducedWorkbenchMotion, useGSAP, WORKBENCH_GSAP_EASE } from "@/lib/workbench-gsap";
 
 export interface ChatMessage {
   id: string;
@@ -178,6 +179,16 @@ const AGENT_ORB_POSITION_STORAGE_KEY = "imagine_agent_orb_position";
 const AGENT_ORB_SIZE = 108;
 const AGENT_ORB_MARGIN = 12;
 const AGENT_ORB_DRAG_THRESHOLD = 4;
+
+function assignRef<T>(ref: Ref<T> | undefined, value: T | null): void {
+  if (typeof ref === "function") {
+    ref(value);
+    return;
+  }
+  if (ref) {
+    (ref as MutableRefObject<T | null>).current = value;
+  }
+}
 
 const ACTION_LABELS: Record<AgentToolAction["type"], string> = {
   none: "无操作",
@@ -542,8 +553,13 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
   } | null>(null);
   const [orbPosition, setOrbPosition] = useState<AgentOrbPosition | null>(null);
   const [isOrbDragging, setIsOrbDragging] = useState(false);
+  const dockRef = useRef<HTMLElement | null>(null);
   const orbDragRef = useRef<AgentOrbDragState | null>(null);
   const suppressOrbClickRef = useRef(false);
+  const setDockRef = useCallback((element: HTMLElement | null): void => {
+    dockRef.current = element;
+    assignRef(ref, element);
+  }, [ref]);
 
   useEffect(() => {
     if (!hasSendableAgentReferences || !selectedChatModel.trim()) {
@@ -636,6 +652,26 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
     isIdleOrb && isOrbDragging ? "is-dragging" : "",
   ].filter(Boolean).join(" ");
 
+  useGSAP(() => {
+    const root = dockRef.current;
+    if (!root || !isOpen || isIdleOrb || prefersReducedWorkbenchMotion()) return;
+
+    gsap.timeline({ defaults: { ease: WORKBENCH_GSAP_EASE } })
+      .fromTo(root, { scale: 0.985, y: 8 }, { scale: 1, y: 0, duration: 0.28 }, 0)
+      .fromTo(
+        ".imagine-agent-motion-item",
+        { opacity: 0, y: 8 },
+        { opacity: 1, stagger: 0.045, y: 0, duration: 0.24 },
+        0.04,
+      )
+      .fromTo(
+        ".imagine-agent-bubble-assistant, .imagine-agent-bubble-user, .imagine-agent-loading",
+        { opacity: 0, y: 6 },
+        { opacity: 1, stagger: 0.025, y: 0, duration: 0.22 },
+        0.12,
+      );
+  }, { dependencies: [isIdleOrb, isOpen], scope: dockRef });
+
   const updateOrbDragPosition = (clientX: number, clientY: number, pointerId: number) => {
     const drag = orbDragRef.current;
     if (!drag || drag.pointerId !== pointerId) return;
@@ -720,7 +756,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
 
   return (
     <section
-      ref={ref}
+      ref={setDockRef}
       className={`${dockShellClass}${dockStateClass ? ` ${dockStateClass}` : ""}`}
       style={isIdleOrb ? idleOrbStyle : !isIdleOrb && isOverContent ? { opacity: 0.84 } : undefined}
     >
@@ -738,7 +774,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
         </button>
       ) : (
         <>
-      <div className={`${isOpen ? "mb-2.5" : "mb-1.5"} flex flex-wrap items-center gap-2`}>
+      <div className={`imagine-agent-motion-item ${isOpen ? "mb-2.5" : "mb-1.5"} flex flex-wrap items-center gap-2`}>
         <button
           type="button"
           onClick={onToggleOpen}
@@ -782,7 +818,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
       </div>
 
       <div
-        className={`imagine-agent-message-stream max-h-[min(46vh,440px)] pr-1 ${isOpen ? "is-open" : ""}`}
+        className={`imagine-agent-motion-item imagine-agent-message-stream max-h-[min(46vh,440px)] pr-1 ${isOpen ? "is-open" : ""}`}
         aria-hidden={!isOpen}
       >
         <div className="imagine-agent-message-stream-inner max-h-[min(46vh,440px)] overflow-y-auto flex flex-col gap-3 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
@@ -821,7 +857,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
         </div>
       </div>
 
-      <div className={`${isOpen ? "imagine-agent-dock-input-divider pt-3 mt-2" : ""} flex flex-col gap-3`}>
+      <div className={`imagine-agent-motion-item ${isOpen ? "imagine-agent-dock-input-divider pt-3 mt-2" : ""} flex flex-col gap-3`}>
         {hasVisibleAgentReference && (
           <div className="imagine-agent-reference-strip flex items-center justify-between gap-3 p-2 animate-fade-in mb-1">
             <div className="flex items-center gap-2.5 min-w-0">

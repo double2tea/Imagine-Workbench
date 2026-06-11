@@ -18,6 +18,7 @@ import {
 import { AUDIO_MODE_LABELS, audioOperationFormatOptions, audioOperationRequiresTextInput } from "@/lib/audio-operation-rules";
 import { getAudioModelCapabilities, getVideoModelCapabilities } from "@/lib/providers/model-catalog";
 import { selectVideoReferenceTypesForMode } from "@/lib/video-reference-selection";
+import { gsap, prefersReducedWorkbenchMotion, useGSAP, WORKBENCH_GSAP_EASE } from "@/lib/workbench-gsap";
 
 type GenerateNode = BoardImageGenerateNode | BoardVideoGenerateNode | BoardAudioOperationNode;
 const variantCountOptions: BoardGenerateVariantCount[] = [1, 2, 4];
@@ -141,6 +142,8 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
   showReferencePreviews = true,
   taskSummary,
 }: GenerateBoardNodeProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const previousLineToneRef = useRef<GenerateStatusLineTone | null>(null);
   const promptTextareaRef = useRef<BoardPromptTextareaHandle | null>(null);
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
   const slashCommandRef = useRef<PromptTemplateSlashCommand | null>(null);
@@ -229,6 +232,58 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
   const compactStatusLabel = taskSummary
     ? `${taskSummary.status === "pending" ? "排队" : "处理中"} ${taskSummary.progress}% · x${node.variantCount}`
     : `${statusText(node)} · x${node.variantCount}`;
+
+  useGSAP(() => {
+    const previousLineTone = previousLineToneRef.current;
+    previousLineToneRef.current = lineTone;
+    if (prefersReducedWorkbenchMotion() || previousLineTone === null || previousLineTone === lineTone) return;
+
+    if (lineTone === "processing") {
+      gsap.timeline({ defaults: { duration: 0.24, ease: WORKBENCH_GSAP_EASE } })
+        .fromTo(
+          ".imagine-generate-context-chip",
+          { opacity: 0.72, y: 4 },
+          { opacity: 1, stagger: 0.025, y: 0 },
+          0,
+        )
+        .fromTo(
+          ".imagine-generate-run-action",
+          { scale: 0.96 },
+          { scale: 1 },
+          0,
+        )
+        .fromTo(
+          ".imagine-generate-status-track",
+          { boxShadow: "0 0 0 rgba(59,130,246,0)" },
+          { boxShadow: "0 0 18px rgba(59,130,246,0.22)", duration: 0.28 },
+          0.02,
+        );
+      return;
+    }
+
+    if (lineTone === "complete" || lineTone === "failed") {
+      const color = lineTone === "complete" ? "52,211,153" : "248,113,113";
+      gsap.timeline({ defaults: { ease: WORKBENCH_GSAP_EASE } })
+        .fromTo(
+          ".imagine-status-chip",
+          { scale: 0.98 },
+          { scale: 1, duration: 0.18 },
+          0,
+        )
+        .fromTo(
+          ".imagine-generate-status-track",
+          { boxShadow: `0 0 0 rgba(${color},0)` },
+          {
+            boxShadow: `0 0 22px rgba(${color},0.3)`,
+            duration: 0.18,
+            repeat: 1,
+            yoyo: true,
+          },
+          0,
+        );
+    }
+  }, { dependencies: [lineTone], scope: containerRef });
+
   const handleApplyPromptTemplate = (template: PromptTemplate, mode: PromptTemplateApplyMode): void => {
     const textarea = promptTextareaRef.current;
     const currentPrompt = textarea?.getValue() ?? node.prompt;
@@ -267,7 +322,7 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
     onUpdate({ variantCount: count });
   };
   return (
-    <div className="flex h-full min-h-0 flex-col gap-2 overflow-hidden p-3">
+    <div ref={containerRef} className="flex h-full min-h-0 flex-col gap-2 overflow-hidden p-3">
       <div className="relative min-h-0 flex-1 overflow-hidden rounded-md">
         <BoardPromptTextarea
           ref={promptTextareaRef}
@@ -346,7 +401,7 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
         >
           {node.errorMessage ?? compactStatusLabel}
         </span>
-        <div className="nodrag flex h-8 overflow-hidden rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)]" title="变体数量">
+        <div className="imagine-generate-variant-group nodrag flex h-8 overflow-hidden rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)]" title="变体数量">
           {variantCountOptions.map(count => (
             <button
               key={count}
@@ -368,7 +423,7 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
           <button
             type="button"
             onClick={onCancel}
-            className="nodrag flex h-8 items-center justify-center gap-1.5 rounded-md border border-red-400/25 bg-red-500/10 px-3 text-xs font-semibold text-red-300 transition hover:bg-red-500/15"
+            className="imagine-generate-run-action nodrag flex h-8 items-center justify-center gap-1.5 rounded-md border border-red-400/25 bg-red-500/10 px-3 text-xs font-semibold text-red-300 transition hover:bg-red-500/15"
             title="取消关联生成任务"
           >
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -379,7 +434,7 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
             type="button"
             onClick={onExecute}
             disabled={isProcessing}
-            className="nodrag flex h-8 items-center justify-center gap-1.5 rounded-md bg-blue-600 px-3 text-xs font-semibold text-white transition hover:bg-blue-500 disabled:bg-[var(--iw-panel-soft)] disabled:text-[var(--iw-faint)]"
+            className="imagine-generate-run-action nodrag flex h-8 items-center justify-center gap-1.5 rounded-md bg-blue-600 px-3 text-xs font-semibold text-white transition hover:bg-blue-500 disabled:bg-[var(--iw-panel-soft)] disabled:text-[var(--iw-faint)]"
           >
             {node.kind === "image-generate" ? (
               <ImagePlus className="h-3.5 w-3.5" />
@@ -405,9 +460,9 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
           </button>
         )}
       </div>
-      <div className="h-1 overflow-hidden rounded-full bg-[var(--iw-panel-soft)]" title={`状态：${run.title}`}>
+      <div className="imagine-generate-status-track h-1 overflow-hidden rounded-full bg-[var(--iw-panel-soft)]" title={`状态：${run.title}`}>
         <div
-          className={`h-full rounded-full transition-[width] ${statusLineClass(lineTone)}`}
+          className={`imagine-generate-status-fill h-full rounded-full transition-[width] ${statusLineClass(lineTone)}`}
           data-state={lineTone}
           style={{ width: statusLineWidth(lineTone, taskSummary) }}
         />

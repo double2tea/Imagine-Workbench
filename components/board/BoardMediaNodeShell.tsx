@@ -1,6 +1,7 @@
 import { Loader2, X } from "lucide-react";
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import type { StorageItem } from "@/lib/db";
+import { gsap, prefersReducedWorkbenchMotion, useGSAP, WORKBENCH_GSAP_EASE } from "@/lib/workbench-gsap";
 
 interface BoardMediaNodeShellProps {
   actionBar: ReactNode;
@@ -25,14 +26,43 @@ export default function BoardMediaNodeShell({
   stackItems,
   status,
 }: BoardMediaNodeShellProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const previousStatusRef = useRef<StorageItem["status"] | undefined>(undefined);
   const hasStackSwitcher = stackItems.length > 1;
   const isProcessing = status === "pending" || status === "processing";
   const isFailed = status === "failed";
 
+  useGSAP(() => {
+    const previousStatus = previousStatusRef.current;
+    previousStatusRef.current = status;
+    if (
+      prefersReducedWorkbenchMotion() ||
+      status !== "complete" ||
+      (previousStatus !== "pending" && previousStatus !== "processing")
+    ) {
+      return;
+    }
+
+    gsap.timeline({ defaults: { ease: WORKBENCH_GSAP_EASE } })
+      .fromTo(
+        ".board-media-commit-surface",
+        { filter: "saturate(0.86) brightness(0.92)", scale: 0.985 },
+        { filter: "saturate(1) brightness(1)", scale: 1, duration: 0.36 },
+        0,
+      )
+      .fromTo(
+        ".board-media-commit-flash",
+        { opacity: 0 },
+        { opacity: 0.72, duration: 0.14, repeat: 1, yoyo: true },
+        0,
+      );
+  }, { dependencies: [status], scope: containerRef });
+
   return (
-    <div className="board-media-node group/board-video relative h-full min-h-0 overflow-visible">
+    <div ref={containerRef} className="board-media-node group/board-video relative h-full min-h-0 overflow-visible">
       {actionBar}
-      <div className="imagine-motion-media-reveal relative flex h-full min-h-0 items-center justify-center overflow-hidden bg-[var(--iw-panel-soft)]">
+      <div className="board-media-commit-surface imagine-motion-media-reveal relative flex h-full min-h-0 items-center justify-center overflow-hidden bg-[var(--iw-panel-soft)]">
+        <span className="board-media-commit-flash pointer-events-none absolute inset-0 z-30 opacity-0" />
         {hasStackSwitcher && (
           <div className="board-media-stack-badge pointer-events-none absolute right-2 top-2 z-30 rounded-md bg-slate-950/45 px-2 py-1 text-xs font-semibold text-white/90 opacity-80 shadow-lg backdrop-blur transition-opacity duration-200 group-hover/board-video:opacity-100">
             {stackItems.length}

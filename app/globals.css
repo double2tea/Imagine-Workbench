@@ -3400,6 +3400,13 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
   transition: width 320ms var(--iw-motion-ease), background-color var(--iw-motion-base) var(--iw-motion-ease);
 }
 
+.board-media-commit-flash {
+  background:
+    radial-gradient(circle at 50% 48%, rgba(187, 247, 208, 0.26), transparent 38%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent);
+  mix-blend-mode: screen;
+}
+
 .board-media-controls {
   transform: translateY(4px);
   transition:
