@@ -7,6 +7,7 @@ import DataManagementWorkspace from "@/components/settings/DataManagementWorkspa
 import { FeatureModelSettingsWorkspace } from "@/components/settings/FeatureModelSettingsWorkspace";
 import type { ProviderTestState } from "@/components/settings/provider-settings-types";
 import type { ImageEditFeature, ImageEditFeatureModels } from "@/hooks/useImageEditFeatureModels";
+import type { ResolveCheckStatus } from "@/hooks/useResolveIntegrationSettings";
 import type { CustomProviderDefinition } from "@/lib/providers/registry";
 import type { ProviderCredentials } from "@/lib/providers/types";
 import {
@@ -39,6 +40,9 @@ interface SettingsModalProps {
   providerCredentials: Record<AiProvider, ProviderCredentials>;
   providerKeys: AiProvider[];
   providerTest: ProviderTestState;
+  resolveCheckStatus?: ResolveCheckStatus;
+  resolveIntegrationAvailable?: boolean;
+  resolveIntegrationEnabled?: boolean;
   selectedChatModel: string;
   selectedProvider: AiProvider;
   imageEditFeatureModels: ImageEditFeatureModels;
@@ -58,12 +62,14 @@ interface SettingsModalProps {
   onImportWorkspace: (file: File, includeCredentials: boolean) => Promise<void>;
   onRepairAssetSources: () => Promise<void>;
   onResetBoards: () => Promise<void>;
+  onRunResolveCheck?: () => void;
   onAddFetchedModels: (category: ModelCategory, values: string[]) => void;
   onAddManualModels: (category: ModelCategory, value: string) => void;
   onSaveCredential: (provider: AiProvider, field: keyof ProviderCredentials, value: string) => void;
   onSelectChatModel: (value: string) => void;
   onSelectImageEditFeatureModel: (feature: ImageEditFeature, model: string) => void;
   onSelectProvider: (value: AiProvider) => void;
+  onToggleResolveIntegration?: (enabled: boolean) => void;
   onDeleteCustomProvider: (provider: AiProvider) => void;
   refreshProviderModels: () => void;
   testProviderConnection: (provider: AiProvider) => void;
@@ -93,6 +99,9 @@ export default function SettingsModal({
   providerCredentials,
   providerKeys,
   providerTest,
+  resolveCheckStatus = "idle",
+  resolveIntegrationAvailable = false,
+  resolveIntegrationEnabled = false,
   selectedChatModel,
   selectedProvider,
   imageEditFeatureModels,
@@ -112,12 +121,14 @@ export default function SettingsModal({
   onImportWorkspace,
   onRepairAssetSources,
   onResetBoards,
+  onRunResolveCheck,
   onAddFetchedModels,
   onAddManualModels,
   onSaveCredential,
   onSelectChatModel,
   onSelectImageEditFeatureModel,
   onSelectProvider,
+  onToggleResolveIntegration,
   onDeleteCustomProvider,
   refreshProviderModels,
   testProviderConnection,
@@ -196,6 +207,9 @@ export default function SettingsModal({
                   providerCredentials={providerCredentials}
                   providerKeys={providerKeys}
                   providerTest={providerTest}
+                  resolveCheckStatus={resolveCheckStatus}
+                  resolveIntegrationAvailable={resolveIntegrationAvailable}
+                  resolveIntegrationEnabled={resolveIntegrationEnabled}
                   selectedChatModel={selectedChatModel}
                   selectedProvider={selectedProvider}
                   videoModelGroups={videoModelGroups}
@@ -207,8 +221,10 @@ export default function SettingsModal({
                   onSelectChatModel={onSelectChatModel}
                   onSelectProvider={onSelectProvider}
                   onDeleteCustomProvider={onDeleteCustomProvider}
+                  onRunResolveCheck={onRunResolveCheck}
                   refreshProviderModels={refreshProviderModels}
                   testProviderConnection={testProviderConnection}
+                  onToggleResolveIntegration={onToggleResolveIntegration}
                 />
               )}
 

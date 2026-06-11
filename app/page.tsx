@@ -57,6 +57,10 @@ import {
   type AtDropdownTarget,
 } from "@/hooks/useReferenceState";
 import { useProviderSettings } from "@/hooks/useProviderSettings";
+import {
+  useResolveConnectionCheck,
+  useResolveIntegrationSettings,
+} from "@/hooks/useResolveIntegrationSettings";
 import { useImageEditFeatureModels } from "@/hooks/useImageEditFeatureModels";
 import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
 import {
@@ -107,15 +111,7 @@ import { readImageGenerationPayload } from "@/lib/client-image-response";
 import { CLEAR_WORKSPACE_ASSETS_MESSAGE } from "@/lib/workspace-messages";
 
 type NoticeType = "error" | "info" | "success";
-type ResolveCheckStatus = "idle" | "running";
-type ResolveCommandStatus = "pending" | "running" | "complete" | "error";
 type MaskDestination = "creative" | "agent";
-interface ResolveCommandPayload {
-  id: string;
-  status: ResolveCommandStatus;
-  result?: string;
-  error?: string;
-}
 const IMAGE_EDIT_LABELS: Record<ImageEditFeature, string> = {
   redraw: "重绘",
   erase: "擦除",
@@ -142,37 +138,11 @@ function makeClientId(prefix: string): string {
   return `${prefix}_${Date.now()}`;
 }
 
-function delay(ms: number): Promise<void> {
-  return new Promise(resolve => window.setTimeout(resolve, ms));
-}
-
 function getStringField(value: unknown, field: string): string | null {
   if (typeof value !== "object" || value === null || !(field in value)) return null;
   const record = value as Record<string, unknown>;
   const fieldValue = record[field];
   return typeof fieldValue === "string" && fieldValue.trim() ? fieldValue : null;
-}
-
-function readResolveCommandPayload(value: unknown): ResolveCommandPayload {
-  if (typeof value !== "object" || value === null || !("command" in value)) {
-    throw new Error("Resolve 命令响应格式无效");
-  }
-  const command = (value as Record<string, unknown>).command;
-  const id = getStringField(command, "id");
-  const status = getStringField(command, "status");
-  if (!id || !isResolveCommandStatus(status)) {
-    throw new Error("Resolve 命令状态格式无效");
-  }
-  return {
-    id,
-    status,
-    result: getStringField(command, "result") ?? undefined,
-    error: getStringField(command, "error") ?? undefined,
-  };
-}
-
-function isResolveCommandStatus(value: string | null): value is ResolveCommandStatus {
-  return value === "pending" || value === "running" || value === "complete" || value === "error";
 }
 
 function readFileAsDataUrl(file: File): Promise<string> {
@@ -334,7 +304,6 @@ export default function Home() {
   const [videoSubmitCount, setVideoSubmitCount] = useState(0);
   const [audioSubmitCount, setAudioSubmitCount] = useState(0);
   const [workspaceNotices, setWorkspaceNotices] = useState<WorkspaceNotice[]>([]);
-  const [resolveCheckStatus, setResolveCheckStatus] = useState<ResolveCheckStatus>("idle");
 
   // Interactive Mask Editor State
   const [isMaskOpen, setIsMaskOpen] = useState(false);
@@ -369,42 +338,15 @@ export default function Home() {
     setWorkspaceNotices(prev => [{ id, type, message }, ...prev].slice(0, 4));
   }, [setWorkspaceNotices]);
 
-  const handleRunResolveCheck = useCallback(async () => {
-    if (resolveCheckStatus === "running") return;
-    setResolveCheckStatus("running");
-    try {
-      const createResponse = await fetch(API_ROUTES.resolve.commands, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind: "doctor" }),
-      });
-      if (!createResponse.ok) {
-        throw new Error(await readFetchError(createResponse, "Resolve 命令创建失败"));
-      }
-      const created = readResolveCommandPayload(await createResponse.json() as unknown);
-      pushWorkspaceNotice("info", "已发送达芬奇连接检查，请保持 Resolve 插件窗口打开");
-      for (let attempt = 0; attempt < 60; attempt += 1) {
-        await delay(1000);
-        const statusResponse = await fetch(`${API_ROUTES.resolve.commands}?id=${encodeURIComponent(created.id)}`);
-        if (!statusResponse.ok) {
-          throw new Error(await readFetchError(statusResponse, "Resolve 命令状态读取失败"));
-        }
-        const current = readResolveCommandPayload(await statusResponse.json() as unknown);
-        if (current.status === "complete") {
-          pushWorkspaceNotice("success", current.result ?? "达芬奇连接检查完成");
-          return;
-        }
-        if (current.status === "error") {
-          throw new Error(current.error ?? "达芬奇连接检查失败");
-        }
-      }
-      throw new Error("等待 Resolve 插件响应超时，请确认 Workflow Integration 插件窗口已打开");
-    } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "达芬奇连接检查失败"));
-    } finally {
-      setResolveCheckStatus("idle");
-    }
-  }, [pushWorkspaceNotice, resolveCheckStatus]);
+  const {
+    resolveIntegrationAvailable,
+    resolveIntegrationEnabled,
+    setResolveIntegrationEnabled,
+  } = useResolveIntegrationSettings();
+  const { resolveCheckStatus, runResolveCheck } = useResolveConnectionCheck({
+    enabled: resolveIntegrationEnabled,
+    pushWorkspaceNotice,
+  });
 
   const resolveOriginalStorageItem = useCallback(async (item: StorageItem): Promise<StorageItem> => {
     const storedItem = items.find(entry => entry.id === item.id) ?? item;
@@ -487,7 +429,10 @@ export default function Home() {
     selectedProvider,
     testProviderConnection,
     videoModelOptions,
-  } = useProviderSettings({ pushWorkspaceNotice });
+  } = useProviderSettings({
+    isResolveIntegrationEnabled: resolveIntegrationEnabled,
+    pushWorkspaceNotice,
+  });
 
   useEffect(() => {
     if (!modelProviderIsAvailable(selectedModel, selectedProvider, providerKeys)) {
@@ -1805,8 +1750,9 @@ export default function Home() {
       <WorkspaceHeader
         onClearProject={handleClearProject}
         onOpenSettings={() => setShowSettings(prev => !prev)}
-        onRunResolveCheck={handleRunResolveCheck}
+        onRunResolveCheck={() => void runResolveCheck()}
         resolveCheckStatus={resolveCheckStatus}
+        showResolveCheck={resolveIntegrationEnabled}
       />
 
       {/* Main Multi-panel Layout grid */}
@@ -1948,6 +1894,9 @@ export default function Home() {
         providerCredentials={providerCredentials}
         providerKeys={providerKeys}
         providerTest={providerTest}
+        resolveCheckStatus={resolveCheckStatus}
+        resolveIntegrationAvailable={resolveIntegrationAvailable}
+        resolveIntegrationEnabled={resolveIntegrationEnabled}
         selectedChatModel={selectedChatModel}
         selectedProvider={selectedProvider}
         imageEditFeatureModels={imageEditFeatureModels}
@@ -1964,12 +1913,14 @@ export default function Home() {
         onImportWorkspace={handleDataImportWorkspace}
         onRepairAssetSources={handleDataRepairAssetSources}
         onResetBoards={handleDataResetBoards}
+        onRunResolveCheck={() => void runResolveCheck()}
         onAddFetchedModels={addFetchedModels}
         onAddManualModels={addManualModels}
         onSaveCredential={handleSaveCredential}
         onSelectChatModel={handleSelectChatModel}
         onSelectImageEditFeatureModel={selectImageEditFeatureModel}
         onSelectProvider={handleSelectProvider}
+        onToggleResolveIntegration={setResolveIntegrationEnabled}
         onDeleteCustomProvider={deleteCustomProvider}
         refreshProviderModels={refreshProviderModels}
         testProviderConnection={testProviderConnection}

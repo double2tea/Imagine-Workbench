@@ -12,6 +12,7 @@ interface WorkspaceHeaderProps {
   onOpenSettings: () => void;
   onRunResolveCheck: () => void;
   resolveCheckStatus: "idle" | "running";
+  showResolveCheck: boolean;
 }
 
 export default function WorkspaceHeader({
@@ -19,6 +20,7 @@ export default function WorkspaceHeader({
   onOpenSettings,
   onRunResolveCheck,
   resolveCheckStatus,
+  showResolveCheck,
 }: WorkspaceHeaderProps) {
   const { themeMode, toggleThemeMode } = useThemeMode();
 
@@ -46,16 +48,18 @@ export default function WorkspaceHeader({
           <span className="hidden sm:inline">画板</span>
         </Link>
 
-        <button
-          type="button"
-          onClick={onRunResolveCheck}
-          disabled={resolveCheckStatus === "running"}
-          className="imagine-header-button flex h-9 items-center gap-1.5 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)] px-3 text-xs font-semibold text-[var(--iw-text)] transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
-          title="通过 Resolve 插件执行连接检查"
-        >
-          <Plug className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">{resolveCheckStatus === "running" ? "等待达芬奇" : "达芬奇"}</span>
-        </button>
+        {showResolveCheck ? (
+          <button
+            type="button"
+            onClick={onRunResolveCheck}
+            disabled={resolveCheckStatus === "running"}
+            className="imagine-header-button flex h-9 items-center gap-1.5 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)] px-3 text-xs font-semibold text-[var(--iw-text)] transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+            title="通过 Resolve 插件执行连接检查"
+          >
+            <Plug className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">{resolveCheckStatus === "running" ? "等待达芬奇" : "达芬奇"}</span>
+          </button>
+        ) : null}
 
         <button
           onClick={onOpenSettings}

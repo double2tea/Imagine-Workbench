@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { Check, CheckCircle2, ListPlus, Plus, RefreshCw, Search, Trash2, X, XCircle } from "lucide-react";
+import { Check, CheckCircle2, ListPlus, Plug, Plus, RefreshCw, Search, Trash2, X, XCircle } from "lucide-react";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
 import { ProviderCredentialCard } from "@/components/settings/ProviderCredentialCard";
 import type { ProviderTestState } from "@/components/settings/provider-settings-types";
 import { providerClearLabel, providerEndpointInfo } from "@/components/settings/provider-settings-utils";
+import type { ResolveCheckStatus } from "@/hooks/useResolveIntegrationSettings";
 import type { AiProvider, ModelOption } from "@/lib/providers/model-catalog";
 
 import { getProviderMeta, isKnownProvider, type CustomProviderDefinition, type ProviderMeta } from "@/lib/providers/registry";
@@ -46,6 +47,9 @@ export interface ConnectionSettingsWorkspaceProps {
   providerCredentials: Record<AiProvider, ProviderCredentials>;
   providerKeys: AiProvider[];
   providerTest: ProviderTestState;
+  resolveCheckStatus: ResolveCheckStatus;
+  resolveIntegrationAvailable: boolean;
+  resolveIntegrationEnabled: boolean;
   selectedChatModel: string;
   selectedProvider: AiProvider;
   videoModelGroups: ModelGroup[];
@@ -53,9 +57,11 @@ export interface ConnectionSettingsWorkspaceProps {
   onAddFetchedModels: (category: ModelCategory, values: string[]) => void;
   onAddManualModels: (category: ModelCategory, value: string) => void;
   onClearCredentials: (provider: AiProvider) => void;
+  onRunResolveCheck?: () => void;
   onSaveCredential: (provider: AiProvider, field: keyof ProviderCredentials, value: string) => void;
   onSelectChatModel: (value: string) => void;
   onSelectProvider: (value: AiProvider) => void;
+  onToggleResolveIntegration?: (enabled: boolean) => void;
   onDeleteCustomProvider: (provider: AiProvider) => void;
   refreshProviderModels: () => void;
   testProviderConnection: (provider: AiProvider) => void;
@@ -72,6 +78,9 @@ export function ConnectionSettingsWorkspace({
   providerCredentials,
   providerKeys,
   providerTest,
+  resolveCheckStatus,
+  resolveIntegrationAvailable,
+  resolveIntegrationEnabled,
   selectedChatModel,
   selectedProvider,
   videoModelGroups,
@@ -79,9 +88,11 @@ export function ConnectionSettingsWorkspace({
   onAddFetchedModels,
   onAddManualModels,
   onClearCredentials,
+  onRunResolveCheck,
   onSaveCredential,
   onSelectChatModel,
   onSelectProvider,
+  onToggleResolveIntegration,
   onDeleteCustomProvider,
   refreshProviderModels,
   testProviderConnection,
@@ -268,6 +279,42 @@ export function ConnectionSettingsWorkspace({
             >
               <Plus className="h-3.5 w-3.5" />
               添加
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {resolveIntegrationAvailable && onToggleResolveIntegration ? (
+        <div className="imagine-settings-section">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="imagine-settings-section-title flex items-center gap-2">
+                <Plug className="h-3.5 w-3.5 text-emerald-300" />
+                本地 DaVinci Resolve
+              </div>
+              <p className="mt-1 text-[10px] leading-relaxed text-[var(--iw-faint)]">
+                开启后显示工作台连接入口，并同步已保存的服务商凭据给本机 Resolve 插件。
+              </p>
+            </div>
+            <label className="flex shrink-0 cursor-pointer items-center gap-2 text-[11px] font-semibold text-[var(--iw-muted)]">
+              <input
+                type="checkbox"
+                checked={resolveIntegrationEnabled}
+                onChange={event => onToggleResolveIntegration(event.target.checked)}
+                className="h-3.5 w-3.5 cursor-pointer accent-emerald-500"
+              />
+              启用
+            </label>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={onRunResolveCheck}
+              disabled={!resolveIntegrationEnabled || !onRunResolveCheck || resolveCheckStatus === "running"}
+              className="imagine-settings-toolbar-btn h-8"
+            >
+              <Plug className="h-3.5 w-3.5" />
+              {resolveCheckStatus === "running" ? "等待达芬奇" : "连接检查"}
             </button>
           </div>
         </div>

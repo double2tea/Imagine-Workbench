@@ -56,6 +56,10 @@ import {
   useReferenceState,
 } from "@/hooks/useReferenceState";
 import { useProviderSettings } from "@/hooks/useProviderSettings";
+import {
+  useResolveConnectionCheck,
+  useResolveIntegrationSettings,
+} from "@/hooks/useResolveIntegrationSettings";
 import { useImageEditFeatureModels } from "@/hooks/useImageEditFeatureModels";
 import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
 import {
@@ -1276,6 +1280,16 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     window.setTimeout(() => dismissWorkspaceNotice(id), 8000);
   }, [dismissWorkspaceNotice]);
 
+  const {
+    resolveIntegrationAvailable,
+    resolveIntegrationEnabled,
+    setResolveIntegrationEnabled,
+  } = useResolveIntegrationSettings();
+  const { resolveCheckStatus, runResolveCheck } = useResolveConnectionCheck({
+    enabled: resolveIntegrationEnabled,
+    pushWorkspaceNotice,
+  });
+
   useEffect(() => {
     let isActive = true;
     void listBoardSummariesFromDB()
@@ -1373,7 +1387,10 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     selectedProvider,
     testProviderConnection,
     videoModelOptions,
-  } = useProviderSettings({ pushWorkspaceNotice });
+  } = useProviderSettings({
+    isResolveIntegrationEnabled: resolveIntegrationEnabled,
+    pushWorkspaceNotice,
+  });
 
   useEffect(() => {
     if (!modelProviderIsAvailable(selectedModel, selectedProvider, providerKeys)) {
@@ -4608,6 +4625,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         providerCredentials={providerCredentials}
         providerKeys={providerKeys}
         providerTest={providerTest}
+        resolveCheckStatus={resolveCheckStatus}
+        resolveIntegrationAvailable={resolveIntegrationAvailable}
+        resolveIntegrationEnabled={resolveIntegrationEnabled}
         selectedChatModel={selectedChatModel}
         selectedProvider={selectedProvider}
         imageEditFeatureModels={imageEditFeatureModels}
@@ -4629,10 +4649,12 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onImportWorkspace={handleDataImportWorkspace}
         onRepairAssetSources={handleDataRepairAssetSources}
         onResetBoards={handleDataResetBoards}
+        onRunResolveCheck={() => void runResolveCheck()}
         onSaveCredential={handleSaveCredential}
         onSelectImageEditFeatureModel={selectImageEditFeatureModel}
         onSelectChatModel={handleSelectChatModel}
         onSelectProvider={handleSelectProvider}
+        onToggleResolveIntegration={setResolveIntegrationEnabled}
         onDeleteCustomProvider={deleteCustomProvider}
         refreshProviderModels={refreshProviderModels}
         testProviderConnection={testProviderConnection}

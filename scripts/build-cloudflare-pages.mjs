@@ -46,6 +46,7 @@ try {
   const exitCode = await run("pnpm", ["dlx", "@cloudflare/next-on-pages@1"], {
     ...process.env,
     ENABLE_EXPERIMENTAL_COREPACK: "1",
+    VERCEL: "0",
   });
   process.exitCode = exitCode;
 } finally {
