@@ -361,7 +361,6 @@ function sameFlowNodeDataModel(left: BoardFlowNode["data"], right: BoardFlowNode
   return (
     sameBoardNodeRenderModel(left.node, right.node) &&
     left.connectedResultNodeId === right.connectedResultNodeId &&
-    left.activeMultiGridDropCellIndex === right.activeMultiGridDropCellIndex &&
     left.hasResultConnection === right.hasResultConnection &&
     left.compareReferenceUrl === right.compareReferenceUrl &&
     sameGenerateInputSummary(left.generateInputSummary, right.generateInputSummary) &&
@@ -983,18 +982,15 @@ function multiGridCellDropTargetFromClient(
   clientX: number,
   clientY: number,
 ): MultiGridCellDropTarget | null {
-  let target: MultiGridCellDropTarget | null = null;
-  document.querySelectorAll<HTMLElement>("[data-multi-grid-id][data-multi-grid-cell-index]").forEach(cell => {
-    const rect = cell.getBoundingClientRect();
-    if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) return;
-    const nodeId = cell.dataset.multiGridId;
-    if (!nodeId) return;
-    const node = nodes.find(item => item.id === nodeId);
-    if (node?.kind !== "multi-grid") return;
-    const cellIndex = Number(cell.dataset.multiGridCellIndex);
-    if (Number.isInteger(cellIndex)) target = { cellIndex, nodeId, rect };
-  });
-  return target;
+  const element = document.elementFromPoint(clientX, clientY);
+  const cell = element?.closest<HTMLElement>("[data-multi-grid-id][data-multi-grid-cell-index]");
+  const nodeId = cell?.dataset.multiGridId;
+  if (!cell || !nodeId) return null;
+  const node = nodes.find(item => item.id === nodeId);
+  if (node?.kind !== "multi-grid") return null;
+  const cellIndex = Number(cell.dataset.multiGridCellIndex);
+  if (!Number.isInteger(cellIndex)) return null;
+  return { cellIndex, nodeId, rect: cell.getBoundingClientRect() };
 }
 
 function sameMultiGridCellDropTarget(
@@ -1390,7 +1386,6 @@ export default function BoardWorkspace({
           ? resultAssetIds.map(id => galleryItemById.get(id)).filter((item): item is StorageItem => item !== undefined && item.status === "complete")
           : [];
       dataById.set(node.id, {
-        activeMultiGridDropCellIndex: activeMultiGridDropTarget?.nodeId === node.id ? activeMultiGridDropTarget.cellIndex : undefined,
         boardId: board.id,
         connectedResultNodeId: connectedResultNode?.id,
         generateInputSummary: generateInputSummaryForNode(node, boardPromptReferenceGraphIndex),
@@ -1412,7 +1407,6 @@ export default function BoardWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     boardGraphContentKey,
-    activeMultiGridDropTarget,
     boardPromptReferenceGraphIndex,
     galleryReferenceFingerprint,
     galleryReferenceItems,
@@ -1558,7 +1552,6 @@ export default function BoardWorkspace({
         if (
           existing &&
           existing.node === node &&
-          existing.activeMultiGridDropCellIndex === cachedData.activeMultiGridDropCellIndex &&
           existing.generateTaskSummary === taskSummary &&
           existing.generateReferences === cachedData.generateReferences &&
           existing.promptReferences === cachedData.promptReferences &&
@@ -1596,34 +1589,14 @@ export default function BoardWorkspace({
   );
   const [reactFlowNodes, setReactFlowNodes, onNodesChange] = useNodesState<BoardFlowNode>([]);
   const reactFlowNodesRef = useRef<BoardFlowNode[]>(reactFlowNodes);
-  const patchReactFlowMultiGridDropTarget = useCallback((target: MultiGridCellDropTarget | null): void => {
-    setReactFlowNodes(currentNodes => {
-      let changed = false;
-      const nextNodes = currentNodes.map(flowNode => {
-        const activeCellIndex = target?.nodeId === flowNode.id ? target.cellIndex : undefined;
-        if (flowNode.data.activeMultiGridDropCellIndex === activeCellIndex) return flowNode;
-        changed = true;
-        return {
-          ...flowNode,
-          data: {
-            ...flowNode.data,
-            activeMultiGridDropCellIndex: activeCellIndex,
-          },
-        };
-      });
-      return changed ? nextNodes : currentNodes;
-    });
-  }, [setReactFlowNodes]);
   const clearActiveMultiGridDropTarget = useCallback((): void => {
     setActiveMultiGridDropTarget(null);
-    patchReactFlowMultiGridDropTarget(null);
-  }, [patchReactFlowMultiGridDropTarget]);
+  }, []);
   const updateActiveMultiGridDropTarget = useCallback((clientX: number, clientY: number): MultiGridCellDropTarget | null => {
     const target = multiGridCellDropTargetFromClient(board.nodes, clientX, clientY);
     setActiveMultiGridDropTarget(current => sameMultiGridCellDropTarget(current, target) ? current : target);
-    patchReactFlowMultiGridDropTarget(target);
     return target;
-  }, [board.nodes, patchReactFlowMultiGridDropTarget]);
+  }, [board.nodes]);
   useLayoutEffect(() => {
     reactFlowNodesRef.current = reactFlowNodes;
   }, [reactFlowNodes]);

@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
+import { memo, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
 import { Download, Eraser, Maximize2, Minimize2, Minus, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
 import type { BoardMultiGridAspectRatio, BoardMultiGridItem, BoardMultiGridNode, BoardMultiGridSize, BoardSize } from "@/lib/board";
 import { DEFAULT_MULTI_GRID_NODE_SIZE } from "@/lib/board/defaults";
@@ -14,7 +14,6 @@ import {
 } from "@/lib/board/multi-grid";
 
 interface MultiGridBoardNodeProps {
-  activeDropCellIndex?: number;
   node: BoardMultiGridNode;
   onExport: () => void | Promise<void>;
   onResize: (size: BoardSize) => void;
@@ -120,7 +119,6 @@ function cellIndexFromPoint(clientX: number, clientY: number, nodeId: string): n
 }
 
 const MultiGridBoardNode = memo(function MultiGridBoardNode({
-  activeDropCellIndex,
   node,
   onExport,
   onResize,
@@ -141,13 +139,37 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
   const [dragPreview, setDragPreview] = useState<DragPreview | null>(null);
   const [isEditingLayout, setIsEditingLayout] = useState(false);
   const [sortDrag, setSortDrag] = useState<SortDrag | null>(null);
+  const dragPreviewFrameRef = useRef<number | null>(null);
+  const pendingDragPreviewRef = useRef<DragPreview | null>(null);
+
+  const cancelScheduledDragPreview = (): void => {
+    if (dragPreviewFrameRef.current !== null) {
+      window.cancelAnimationFrame(dragPreviewFrameRef.current);
+      dragPreviewFrameRef.current = null;
+    }
+    pendingDragPreviewRef.current = null;
+  };
+
+  const scheduleDragPreview = (preview: DragPreview): void => {
+    pendingDragPreviewRef.current = preview;
+    if (dragPreviewFrameRef.current !== null) return;
+    dragPreviewFrameRef.current = window.requestAnimationFrame(() => {
+      dragPreviewFrameRef.current = null;
+      const nextPreview = pendingDragPreviewRef.current;
+      pendingDragPreviewRef.current = null;
+      if (nextPreview) setDragPreview(nextPreview);
+    });
+  };
 
   useEffect(() => {
+    cancelScheduledDragPreview();
     setActiveDrag(null);
     setDragPreview(null);
     setIsEditingLayout(false);
     setSortDrag(null);
   }, [node.id]);
+
+  useEffect(() => cancelScheduledDragPreview, []);
 
   useEffect(() => {
     const liveAssetIds = new Set(node.items.map(item => item.assetId));
@@ -178,6 +200,7 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
     onUpdate({ selectedItemId: item.assetId });
+    cancelScheduledDragPreview();
     setActiveDrag({
       assetId: item.assetId,
       height: Math.max(1, rect.height),
@@ -208,7 +231,7 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
     if (!activeDrag || activeDrag.pointerId !== event.pointerId) return;
     event.preventDefault();
     event.stopPropagation();
-    setDragPreview(dragPreviewForEvent(event, activeDrag));
+    scheduleDragPreview(dragPreviewForEvent(event, activeDrag));
   };
 
   const endItemDrag = (event: ReactPointerEvent<HTMLDivElement>): void => {
@@ -223,6 +246,7 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
+    cancelScheduledDragPreview();
     setActiveDrag(null);
     setDragPreview(null);
   };
@@ -407,7 +431,6 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
         >
           {Array.from({ length: visibleCellCount }, (_, cellIndex) => {
             const item = itemByCellIndex.get(cellIndex);
-            const isDropActive = activeDropCellIndex === cellIndex;
             const isSelected = item?.assetId === node.selectedItemId;
             const isSortDragItem = Boolean(item && sortDrag?.assetId === item.assetId);
             const displayItem = item && dragPreview?.assetId === item.assetId
@@ -447,26 +470,11 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
                   "nodrag nopan group/cell relative min-h-0 overflow-hidden border border-[var(--iw-border)] bg-[var(--iw-panel)] outline-none transition",
                   item ? isEditingLayout ? "cursor-move" : "cursor-grab active:cursor-grabbing" : "cursor-default",
                   item ? "" : "bg-[linear-gradient(135deg,rgba(16,185,129,0.08),rgba(255,255,255,0.02))] hover:border-emerald-300/50 hover:bg-emerald-400/10",
-                  isDropActive ? "multi-grid-drop-cell-active z-20 border-emerald-200 bg-emerald-400/25" : "",
-                  isSortDragItem && !isDropActive ? "opacity-70" : "",
+                  isSortDragItem ? "opacity-70" : "",
                   isSelected ? "z-10 ring-2 ring-emerald-400" : "",
                 ].join(" ")}
-                style={isDropActive ? {
-                  background: "radial-gradient(circle at center, rgba(110, 231, 183, 0.34), rgba(16, 185, 129, 0.18) 54%, rgba(16, 185, 129, 0.1))",
-                  boxShadow: "inset 0 0 0 4px rgba(167, 243, 208, 0.98), 0 0 34px rgba(16, 185, 129, 0.58)",
-                  outline: "4px solid rgba(110, 231, 183, 0.98)",
-                  outlineOffset: "-4px",
-                } : undefined}
                 title={item ? item.prompt || item.model : "拖入图片"}
               >
-                {isDropActive && (
-                  <span
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-2 z-30 border-2 border-emerald-100/90 bg-emerald-300/10 shadow-[0_0_30px_rgba(16,185,129,0.62)]"
-                  >
-                    <span className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-50 shadow-[0_0_0_10px_rgba(16,185,129,0.24),0_0_28px_rgba(110,231,183,0.72)]" />
-                  </span>
-                )}
                 {item ? (
                   (() => {
                     const renderedItem = displayItem ?? item;

@@ -25,7 +25,6 @@ import { BOARD_PORT_IDS, getBoardNodePortDefinitions } from "@/lib/board/ports";
 import { useBoardNodeCallbacks } from "@/lib/board/callbacks";
 
 export interface BoardFlowNodeData extends Record<string, unknown> {
-  activeMultiGridDropCellIndex?: number;
   boardId: string;
   compareReferenceUrl?: string | null;
   generateInputSummary?: BoardGenerateInputSummary;
@@ -483,7 +482,6 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
         )}
         {node.kind === "multi-grid" && (
           <MultiGridBoardNode
-            activeDropCellIndex={typeof data.activeMultiGridDropCellIndex === "number" ? data.activeMultiGridDropCellIndex : undefined}
             node={node}
             onExport={() => c.onExportMultiGrid(node.id)}
             onResize={size => c.onUpdateNodeSize(node.id, size)}
