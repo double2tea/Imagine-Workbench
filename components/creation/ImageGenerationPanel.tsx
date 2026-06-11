@@ -31,6 +31,7 @@ interface ImageGenerationPanelProps {
   modelGroups: ModelOptionGroup[];
   negativePrompt: string;
   prompt: string;
+  promptRequired: boolean;
   referenceImages: ReferenceImageRef[];
   selectedAspectRatio: string;
   selectedModel: string;
@@ -69,6 +70,7 @@ export default function ImageGenerationPanel({
   modelGroups,
   negativePrompt,
   prompt,
+  promptRequired,
   referenceImages,
   selectedAspectRatio,
   selectedModel,
@@ -107,6 +109,7 @@ export default function ImageGenerationPanel({
     ? `${Math.min(referenceImages.length, imageReferenceLimit)}/${imageReferenceLimit}`
     : String(referenceImages.length);
   const promptReferenceThumbnails = resolvePromptReferenceThumbnails(prompt, referenceImages, capabilities.referenceMediaTypes);
+  const generateDisabled = promptRequired && !prompt.trim();
 
   const handleApplyPromptTemplate = (template: PromptTemplate, mode: PromptTemplateApplyMode): void => {
     if (slashCommand && mode === "insert") {
@@ -389,9 +392,9 @@ export default function ImageGenerationPanel({
         <button
           type="button"
           onClick={onGenerate}
-          disabled={!prompt.trim()}
+          disabled={generateDisabled}
           className={`imagine-primary-action mt-1 flex w-full items-center justify-center gap-2 rounded-lg py-3 text-xs font-bold transition duration-[160ms] ${
-            !prompt.trim()
+            generateDisabled
               ? "cursor-not-allowed opacity-45"
               : "cursor-pointer bg-blue-600 text-white shadow-lg shadow-blue-950/30 hover:bg-blue-500 active:scale-[0.98]"
           }`}

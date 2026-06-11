@@ -77,6 +77,7 @@ import {
   type VideoReferenceMode,
 } from "@/lib/providers/model-catalog";
 import { getProviderMeta, type CustomProviderDefinition } from "@/lib/providers/registry";
+import { runningHubAppPresetRequiresPrompt } from "@/lib/providers/runninghub";
 import { saveClonedVoiceProfileFromAsset } from "@/lib/voice-profiles";
 import { getMediaReferenceType, mediaReferenceLabel, mediaReferenceTypeFromMime } from "@/lib/media-references";
 import { API_ROUTES } from "@/lib/api/routes";
@@ -548,10 +549,12 @@ export default function Home() {
   const selectedVoiceProfileProvidesCloneReference = activeAudioMode === "voice_clone" && selectedVoiceProfileId.trim().length > 0;
   const hasRequiredAudioReferences = activeAudioReferenceCount >= audioCapabilities.minReferenceMedia || selectedVoiceProfileProvidesCloneReference;
   const needsManualVoiceCloneConsent = activeAudioMode === "voice_clone" && !selectedVoiceProfileProvidesCloneReference;
+  const imagePromptRequired = runningHubAppPresetRequiresPrompt(selectedModel);
+  const videoPromptRequired = runningHubAppPresetRequiresPrompt(selectedVideoModel);
   const isCreatorGenerateDisabled =
     traditionalSubTab === "audio"
       ? (audioTextInputRequired && !prompt.trim()) || (audioStylePromptRequired && !audioStylePrompt.trim()) || !hasRequiredAudioReferences || (needsManualVoiceCloneConsent && !voiceCloneConsentAccepted)
-      : !prompt.trim();
+      : (traditionalSubTab === "image" ? imagePromptRequired : videoPromptRequired) && !prompt.trim();
 
   const canUseBackgroundImageGeneration =
     canUseAsyncImageGeneration &&
@@ -1633,6 +1636,7 @@ export default function Home() {
         modelGroups={imageModelGroups}
         negativePrompt={negativePrompt}
         prompt={prompt}
+        promptRequired={imagePromptRequired}
         referenceImages={referenceImages}
         selectedAspectRatio={aspectRatio}
         selectedModel={selectedModel}
@@ -1673,6 +1677,7 @@ export default function Home() {
         presetOptions={videoCapabilities.presets}
         prompt={prompt}
         promptPlaceholder={videoPromptPlaceholder}
+        promptRequired={videoPromptRequired}
         referenceHelp={videoReferenceHelp}
         referenceImages={referenceImages}
         referenceLabel={videoReferenceLabel}

@@ -31,7 +31,7 @@ import { audioOperationMissingReferenceMessage, audioOperationRequiresTextInput,
 import { getMediaReferenceType, mediaReferenceLabel } from "@/lib/media-references";
 import { getAudioModelCapabilities, getImageModelCapabilities, getVideoModelCapabilities, parseProviderModel, type AudioOperationMode, type VideoReferenceMode } from "@/lib/providers/model-catalog";
 import { getProviderMeta } from "@/lib/providers/registry";
-import { getRunningHubAppPreset } from "@/lib/providers/runninghub";
+import { runningHubAppPresetRequiresPrompt } from "@/lib/providers/runninghub";
 import { getReferenceImagePayloadError, getReferenceMediaPayloadError, prepareReferenceImageUrlForRequest, prepareReferenceMediaUrlForRequest } from "@/lib/reference-images";
 import { transcriptPreview, transcriptToDataUrl } from "@/lib/transcripts";
 import { selectVideoReferencesForMode } from "@/lib/video-reference-selection";
@@ -382,7 +382,7 @@ export function useGenerationActions({
         ? customImageSizeAspectRatio(requestImageResolution) ?? (overrides.size ?? activeImageAspectRatio)
         : overrides.size ?? activeImageAspectRatio;
 
-    if (!activePrompt.trim() && overrides.allowEmptyPrompt !== true && getRunningHubAppPreset(requestModel)?.promptRequired !== false) return false;
+    if (!activePrompt.trim() && overrides.allowEmptyPrompt !== true && runningHubAppPresetRequiresPrompt(requestModel)) return false;
     if (requestIsCustomImageResolution) {
       const sizeError = validateCustomImageSize(requestImageResolution);
       if (sizeError) {
@@ -569,7 +569,7 @@ export function useGenerationActions({
     const requestVideoResolution = overrides.videoResolution ?? activeVideoResolution;
     const requestVideoCapabilities = getVideoModelCapabilities(requestModel);
 
-    if (!activePrompt.trim() && overrides.allowEmptyPrompt !== true) return false;
+    if (!activePrompt.trim() && overrides.allowEmptyPrompt !== true && runningHubAppPresetRequiresPrompt(requestModel)) return false;
     const videoReferences = selectVideoReferencesForMode(
       activeReferenceImages,
       activeReferenceImage,

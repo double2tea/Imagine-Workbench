@@ -28,6 +28,7 @@ interface VideoGenerationPanelProps {
   presetOptions: ParameterOption[];
   prompt: string;
   promptPlaceholder: string;
+  promptRequired: boolean;
   referenceHelp: string;
   referenceImages: ReferenceImageRef[];
   referenceLabel: string;
@@ -72,6 +73,7 @@ export default function VideoGenerationPanel({
   presetOptions,
   prompt,
   promptPlaceholder,
+  promptRequired,
   referenceHelp,
   referenceImages,
   referenceLabel,
@@ -128,6 +130,7 @@ export default function VideoGenerationPanel({
     firstLast: "首尾帧 / 关键帧",
   };
   const promptReferenceThumbnails = resolvePromptReferenceThumbnails(prompt, referenceImages, capabilities.referenceMediaTypes);
+  const generateDisabled = promptRequired && !prompt.trim();
   const priceReferenceTypes = selectVideoReferenceTypesForMode(
     referenceImages,
     null,
@@ -358,9 +361,9 @@ export default function VideoGenerationPanel({
         <button
           type="button"
           onClick={onGenerate}
-          disabled={!prompt.trim()}
+          disabled={generateDisabled}
           className={`imagine-primary-action mt-1 flex w-full items-center justify-center gap-2 rounded-lg py-3 text-xs font-bold transition duration-[160ms] ${
-            !prompt.trim()
+            generateDisabled
               ? "cursor-not-allowed opacity-60"
               : "cursor-pointer bg-violet-600 text-white shadow-lg shadow-violet-950/30 hover:bg-violet-500 active:scale-[0.98]"
           }`}

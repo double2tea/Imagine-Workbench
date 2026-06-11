@@ -137,6 +137,10 @@ export function hasRunningHubAppPreset(model: string): boolean {
   return getRunningHubAppPreset(model) !== undefined;
 }
 
+export function runningHubAppPresetRequiresPrompt(model: string): boolean {
+  return getRunningHubAppPreset(model)?.promptRequired !== false;
+}
+
 function normalizeRunningHubModel(model: string): string {
   return model.startsWith(RUNNINGHUB_PROVIDER_PREFIX)
     ? model.slice(RUNNINGHUB_PROVIDER_PREFIX.length)

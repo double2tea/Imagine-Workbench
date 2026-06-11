@@ -7,6 +7,7 @@ import {
   buildRunningHubStandardBody,
   getRunningHubStandardEndpoint,
   getRunningHubStandardModel,
+  runningHubAppPresetRequiresPrompt,
   resolveRunningHubStandardModelForReferenceMedia,
   resolveRunningHubStandardModelForReferences,
 } from "../lib/providers/runninghub";
@@ -855,6 +856,9 @@ test("runninghub control image app preset submits uploaded file name", async () 
 });
 
 test("runninghub app preset prompt policy is derived from resolution source", () => {
+  assert.equal(runningHubAppPresetRequiresPrompt(`runninghub:${RUNNINGHUB_CONTROL_IMAGE_APP_MODEL}`), false);
+  assert.equal(runningHubAppPresetRequiresPrompt("runninghub:api:/openapi/v2/example/text-to-image"), true);
+
   const presetResolution = resolveRunningHubNodeInfoListForModel(RUNNINGHUB_CONTROL_IMAGE_APP_MODEL, undefined);
   assert.equal(presetResolution.source, "preset");
   assert.equal(presetResolution.promptRequired, false);
