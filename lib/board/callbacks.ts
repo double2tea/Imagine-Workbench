@@ -14,6 +14,7 @@ import type { CapturedVideoFrame } from "@/lib/video-frame";
 
 export interface BoardNodeCallbacks {
   onDelete: (nodeId: string) => void;
+  onCancelAssetTask: (nodeId: string) => void;
   onCancelGenerate: (nodeId: string) => void;
   onOpenAssetCompare?: (nodeId: string) => void;
   onDownloadAsset: (item: StorageItem) => void;
@@ -27,7 +28,7 @@ export interface BoardNodeCallbacks {
   onFetchRunningHubAppSchema: (webappId: string) => Promise<BoardRunningHubAppSchemaResult>;
   onFocusNode: (nodeId: string) => void;
   onFocusReferenceSource: (nodeId: string) => void;
-  onAnalyzePromptMedia: (nodeId: string) => void | Promise<void>;
+  onAnalyzeBoardMedia: (nodeId: string) => void | Promise<void>;
   onMoveReferenceGroupItem: (nodeId: string, assetId: string, direction: "up" | "down") => void;
   onMoveGenerateReferenceEdge: (nodeId: string, sourceEdgeId: string, targetEdgeId: string) => void;
   onRemoveGenerateReferenceEdge: (edgeId: string) => void;

@@ -2911,7 +2911,7 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 }
 
 .board-media-node {
-  contain: paint;
+  contain: layout;
 }
 
 .board-media-preview {

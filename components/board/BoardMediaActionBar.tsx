@@ -21,7 +21,9 @@ interface BoardMediaActionBarProps {
 export default function BoardMediaActionBar({ groups, visible = false }: BoardMediaActionBarProps) {
   const visibleGroups = groups.filter(group => group.actions.length > 0);
   if (visibleGroups.length === 0) return null;
-  const visibilityClass = visible ? "opacity-100" : "opacity-0 hover:opacity-100 group-hover/board-video:opacity-100";
+  const visibilityClass = visible
+    ? "pointer-events-auto opacity-100"
+    : "pointer-events-none opacity-0 group-hover/board-video:pointer-events-auto group-hover/board-video:opacity-100";
 
   return (
     <div
