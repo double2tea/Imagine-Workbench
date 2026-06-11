@@ -45,8 +45,8 @@ export const DEFAULT_GROUP_NODE_SIZE: BoardSize = {
 };
 
 export const DEFAULT_MULTI_GRID_NODE_SIZE: BoardSize = {
-  width: 720,
-  height: 520,
+  width: 900,
+  height: 680,
 };
 
 export const DEFAULT_GENERATE_NODE_SIZE: BoardSize = {

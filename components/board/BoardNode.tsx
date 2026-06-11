@@ -356,7 +356,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
       data-selected={selected ? "true" : "false"}
       style={{ height: node.size.height, width: node.size.width }}
     >
-      {ports.map(handleForPort)}
+      {node.kind !== "multi-grid" && ports.map(handleForPort)}
       {selected && (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation" || node.kind === "runninghub-app") ? (
         <GenerateReferenceShelf
           nodeId={node.id}

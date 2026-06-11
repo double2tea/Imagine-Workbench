@@ -1,7 +1,7 @@
 "use client";
 
-import { memo, useState } from "react";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Download, Plus, RotateCcw, ZoomIn, ZoomOut } from "lucide-react";
+import { memo, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
+import { Download, Minus, Plus, RotateCcw, Trash2 } from "lucide-react";
 import type { BoardMultiGridAspectRatio, BoardMultiGridItem, BoardMultiGridNode, BoardMultiGridSize } from "@/lib/board";
 import {
   BOARD_MULTI_GRID_ASPECT_RATIOS,
@@ -46,7 +46,33 @@ function restoreItemToFirstEmptyCell(node: BoardMultiGridNode, item: BoardMultiG
   );
 }
 
-const iconButtonClassName = "flex h-6 w-6 items-center justify-center rounded-md border border-[var(--iw-border)] text-[var(--iw-muted)] transition hover:border-emerald-400/50 hover:text-emerald-200";
+interface ActiveCellDrag {
+  assetId: string;
+  height: number;
+  offsetX: number;
+  offsetY: number;
+  pointerId: number;
+  startX: number;
+  startY: number;
+  width: number;
+}
+
+const cellToolButtonClassName = "flex h-7 w-7 items-center justify-center rounded-md border border-white/15 bg-black/55 text-white shadow-sm backdrop-blur transition hover:border-emerald-300/60 hover:bg-black/75";
+const zoomStep = 0.1;
+
+function stashItem(node: BoardMultiGridNode, assetId: string): BoardMultiGridItem[] {
+  return normalizeBoardMultiGridItems(
+    node.items.map(item => item.assetId === assetId ? { ...item, cellIndex: undefined } : item),
+    node.gridSize,
+  );
+}
+
+function removeItem(node: BoardMultiGridNode, assetId: string): BoardMultiGridItem[] {
+  return normalizeBoardMultiGridItems(
+    node.items.filter(item => item.assetId !== assetId),
+    node.gridSize,
+  );
+}
 
 const MultiGridBoardNode = memo(function MultiGridBoardNode({
   node,
@@ -64,11 +90,60 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
   const stashedItems = node.items.filter(item => typeof item.cellIndex !== "number");
   const ratioValue = aspectRatioNumber(node.aspectRatio);
   const [imageAspectRatioByAssetId, setImageAspectRatioByAssetId] = useState<ReadonlyMap<string, number>>(() => new Map());
+  const [activeDrag, setActiveDrag] = useState<ActiveCellDrag | null>(null);
+
+  const beginItemDrag = (event: ReactPointerEvent<HTMLDivElement>, item: BoardMultiGridItem): void => {
+    if (event.button !== 0) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    onUpdate({ selectedItemId: item.assetId });
+    setActiveDrag({
+      assetId: item.assetId,
+      height: Math.max(1, rect.height),
+      offsetX: item.offsetX,
+      offsetY: item.offsetY,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      width: Math.max(1, rect.width),
+    });
+  };
+
+  const moveItemDrag = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    if (!activeDrag || activeDrag.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onUpdateItemTransform(activeDrag.assetId, {
+      offsetX: activeDrag.offsetX + ((event.clientX - activeDrag.startX) / activeDrag.width) * 100,
+      offsetY: activeDrag.offsetY + ((event.clientY - activeDrag.startY) / activeDrag.height) * 100,
+    });
+  };
+
+  const endItemDrag = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    if (!activeDrag || activeDrag.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setActiveDrag(null);
+  };
+
+  const zoomItem = (item: BoardMultiGridItem, delta: number): void => {
+    onUpdateItemTransform(item.assetId, { scale: item.scale + delta });
+  };
+
+  const handleItemWheel = (event: ReactWheelEvent<HTMLDivElement>, item: BoardMultiGridItem): void => {
+    event.preventDefault();
+    event.stopPropagation();
+    onUpdate({ selectedItemId: item.assetId });
+    zoomItem(item, event.deltaY < 0 ? zoomStep : -zoomStep);
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--iw-panel)]">
       <div className="nodrag flex h-10 shrink-0 items-center gap-1.5 border-b border-[var(--iw-border)] px-2">
         <select
+          name={`multi-grid-aspect-${node.id}`}
           value={node.aspectRatio}
           onChange={event => onUpdate({ aspectRatio: event.target.value as BoardMultiGridAspectRatio })}
           className="h-7 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 text-[11px] font-semibold text-[var(--iw-text)] outline-none"
@@ -79,6 +154,7 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
           ))}
         </select>
         <select
+          name={`multi-grid-size-${node.id}`}
           value={node.gridSize}
           onChange={event => onUpdate({ gridSize: Number(event.target.value) as BoardMultiGridSize })}
           className="h-7 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 text-[11px] font-semibold text-[var(--iw-text)] outline-none"
@@ -101,7 +177,7 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
         </button>
       </div>
 
-      <div className="min-h-0 flex-1 p-2">
+      <div className="min-h-0 flex-1 p-3">
         <div
           className="mx-auto grid max-h-full max-w-full overflow-hidden rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)]"
           style={{
@@ -116,15 +192,28 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
             const item = itemByCellIndex.get(cellIndex);
             const isSelected = item?.assetId === node.selectedItemId;
             return (
-              <button
+              <div
                 key={cellIndex}
-                type="button"
+                role="button"
+                tabIndex={0}
                 onClick={(event) => {
                   event.stopPropagation();
                   onUpdate({ selectedItemId: item?.assetId });
                 }}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter" && event.key !== " ") return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onUpdate({ selectedItemId: item?.assetId });
+                }}
+                onPointerDown={item ? event => beginItemDrag(event, item) : event => event.stopPropagation()}
+                onPointerMove={moveItemDrag}
+                onPointerUp={endItemDrag}
+                onPointerCancel={endItemDrag}
+                onWheel={item ? event => handleItemWheel(event, item) : event => event.stopPropagation()}
                 className={[
-                  "nodrag relative min-h-0 overflow-hidden border border-[var(--iw-border)] bg-[var(--iw-panel)]",
+                  "nodrag nopan nowheel group/cell relative min-h-0 overflow-hidden border border-[var(--iw-border)] bg-[var(--iw-panel)] outline-none",
+                  item ? "cursor-grab active:cursor-grabbing" : "cursor-default",
                   isSelected ? "z-10 ring-2 ring-emerald-400" : "",
                 ].join(" ")}
                 title={item ? item.prompt || item.model : "空格"}
@@ -164,43 +253,90 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
                   })()
                 ) : (
                   <span className="flex h-full w-full items-center justify-center text-[var(--iw-muted)]/55">
-                    <Plus className="h-4 w-4" />
+                    <Plus className="h-5 w-5" />
                   </span>
                 )}
-              </button>
+                {item ? (
+                  <div
+                    className={[
+                      "pointer-events-none absolute inset-0 flex items-start justify-end p-2 opacity-0 transition",
+                      isSelected ? "opacity-100" : "group-hover/cell:opacity-100 group-focus/cell:opacity-100",
+                    ].join(" ")}
+                  >
+                    <div className="pointer-events-auto flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          zoomItem(item, -zoomStep);
+                        }}
+                        onPointerDown={event => event.stopPropagation()}
+                        className={cellToolButtonClassName}
+                        title="缩小"
+                      >
+                        <Minus className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          zoomItem(item, zoomStep);
+                        }}
+                        onPointerDown={event => event.stopPropagation()}
+                        className={cellToolButtonClassName}
+                        title="放大"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onUpdateItemTransform(item.assetId, { offsetX: 0, offsetY: 0, scale: 1 });
+                        }}
+                        onPointerDown={event => event.stopPropagation()}
+                        className={cellToolButtonClassName}
+                        title="复位"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onUpdate({ items: stashItem(node, item.assetId), selectedItemId: undefined });
+                        }}
+                        onPointerDown={event => event.stopPropagation()}
+                        className={cellToolButtonClassName}
+                        title="暂存"
+                      >
+                        <Download className="h-3.5 w-3.5 rotate-180" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onUpdate({ items: removeItem(node, item.assetId), selectedItemId: undefined });
+                        }}
+                        onPointerDown={event => event.stopPropagation()}
+                        className="flex h-7 w-7 items-center justify-center rounded-md border border-red-300/30 bg-red-500/75 text-white shadow-sm backdrop-blur transition hover:border-red-200 hover:bg-red-500"
+                        title="移除"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             );
           })}
         </div>
       </div>
 
-      <div className="nodrag flex min-h-[34px] shrink-0 items-center gap-1 border-t border-[var(--iw-border)] px-2 py-1">
-        {selectedItem ? (
-          <>
-            <button type="button" className={iconButtonClassName} title="左移" onClick={() => onUpdateItemTransform(selectedItem.assetId, { offsetX: selectedItem.offsetX - 5 })}>
-              <ArrowLeft className="h-3.5 w-3.5" />
-            </button>
-            <button type="button" className={iconButtonClassName} title="右移" onClick={() => onUpdateItemTransform(selectedItem.assetId, { offsetX: selectedItem.offsetX + 5 })}>
-              <ArrowRight className="h-3.5 w-3.5" />
-            </button>
-            <button type="button" className={iconButtonClassName} title="上移" onClick={() => onUpdateItemTransform(selectedItem.assetId, { offsetY: selectedItem.offsetY - 5 })}>
-              <ArrowUp className="h-3.5 w-3.5" />
-            </button>
-            <button type="button" className={iconButtonClassName} title="下移" onClick={() => onUpdateItemTransform(selectedItem.assetId, { offsetY: selectedItem.offsetY + 5 })}>
-              <ArrowDown className="h-3.5 w-3.5" />
-            </button>
-            <button type="button" className={iconButtonClassName} title="缩小" onClick={() => onUpdateItemTransform(selectedItem.assetId, { scale: selectedItem.scale - 0.1 })}>
-              <ZoomOut className="h-3.5 w-3.5" />
-            </button>
-            <button type="button" className={iconButtonClassName} title="放大" onClick={() => onUpdateItemTransform(selectedItem.assetId, { scale: selectedItem.scale + 0.1 })}>
-              <ZoomIn className="h-3.5 w-3.5" />
-            </button>
-            <button type="button" className={iconButtonClassName} title="复位" onClick={() => onUpdateItemTransform(selectedItem.assetId, { offsetX: 0, offsetY: 0, scale: 1 })}>
-              <RotateCcw className="h-3.5 w-3.5" />
-            </button>
-          </>
-        ) : (
-          <span className="text-[10px] font-semibold text-[var(--iw-muted)]">连接图片后可微调裁切</span>
-        )}
+      <div className="nodrag flex min-h-[34px] shrink-0 items-center gap-2 border-t border-[var(--iw-border)] px-2 py-1">
+        <span className="truncate text-[10px] font-semibold text-[var(--iw-muted)]">
+          {selectedItem ? selectedItem.prompt || selectedItem.model : `${node.items.length} 张图片`}
+        </span>
         {stashedItems.length > 0 ? (
           <button
             type="button"
