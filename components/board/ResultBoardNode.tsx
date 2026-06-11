@@ -189,7 +189,7 @@ const ResultBoardNode = memo(function ResultBoardNode({
       stackItems={stackItems}
       status={item.status}
     >
-      {item.type === "image" ? (
+      {item.type === "image" && item.url.trim() ? (
         <PreviewImage
           src={item.url}
           alt={node.title}

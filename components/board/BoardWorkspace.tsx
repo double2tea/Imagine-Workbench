@@ -74,6 +74,7 @@ import {
 } from "@/lib/board/prompt-references";
 import { useThemeModeSnapshot } from "@/lib/theme-mode";
 import type { CapturedVideoFrame } from "@/lib/video-frame";
+import { generationTaskToGalleryItem } from "@/lib/generation-tasks";
 import {
   BOARD_SNAP_GRID,
   DEFAULT_AUDIO_ASSET_NODE_SIZE,
@@ -302,13 +303,13 @@ function resolveBoardPromptReferenceUrls(
   });
 }
 
-function completeStorageItemsForAssetIds(
+function storageItemsForAssetIds(
   assetIds: string[],
   galleryItemById: ReadonlyMap<string, StorageItem>,
 ): StorageItem[] {
   const items = assetIds
     .map(id => galleryItemById.get(id))
-    .filter((item): item is StorageItem => item !== undefined && item.status === "complete");
+    .filter((item): item is StorageItem => item !== undefined);
   return items.length > 0 ? items : EMPTY_STORAGE_ITEMS;
 }
 
@@ -1221,9 +1222,14 @@ export default function BoardWorkspace({
     [board.nodes],
   );
   const galleryItemById = useMemo(
-    () => new Map(galleryItems.map(item => [item.id, item])),
+    () => {
+      const taskItems = generationTasks
+        .map(generationTaskToGalleryItem)
+        .filter((item): item is StorageItem => item !== null);
+      return new Map([...galleryItems, ...taskItems].map(item => [item.id, item]));
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reference fingerprint gates complete/url changes; task fingerprint gates pending/processing progress
-    [galleryReferenceFingerprint, galleryTaskFingerprint],
+    [galleryReferenceFingerprint, galleryTaskFingerprint, generationTasks],
   );
 
   const promotableItemForNode = useCallback((node: BoardNodeModel): StorageItem | null => {
@@ -1423,12 +1429,12 @@ export default function BoardWorkspace({
           ? assetCompareReferenceUrl(node.id, board.nodes, board.edges, boardPromptReferenceGraphIndex)
           : null;
       } else if (node.kind === "result") {
-        data.assetStackItems = completeStorageItemsForAssetIds(node.resultAssetIds, galleryItemById);
+        data.assetStackItems = storageItemsForAssetIds(node.resultAssetIds, galleryItemById);
       }
       if (connectedResultNode) {
         data.connectedResultNodeId = connectedResultNode.id;
         data.hasResultConnection = true;
-        data.resultItems = completeStorageItemsForAssetIds(connectedResultNode.resultAssetIds, galleryItemById);
+        data.resultItems = storageItemsForAssetIds(connectedResultNode.resultAssetIds, galleryItemById);
       }
       if (Object.keys(data).length > 0) dataById.set(node.id, data);
     }

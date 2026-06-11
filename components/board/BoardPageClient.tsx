@@ -77,6 +77,7 @@ import {
 import {
   cancelGenerationTask,
   deleteGenerationTask,
+  generationTaskToGalleryItem,
   legacyGenerationTaskId,
   type GenerationTask,
 } from "@/lib/generation-tasks";
@@ -1654,7 +1655,13 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     if (boardController.saveStatus === "loading") return;
     if (boardAssetsLoading) return;
     if (!isBoardAssetScopeLoaded) return;
-    const availableAssetIds = new Set(items.map(item => item.id));
+    const availableAssetIds = new Set([
+      ...items.map(item => item.id),
+      ...generationTasks
+        .map(generationTaskToGalleryItem)
+        .filter((item): item is StorageItem => item !== null)
+        .map(item => item.id),
+    ]);
     for (const node of boardController.board.nodes) {
       if (isGenerateBoardNode(node)) {
         const update = pruneUnavailableGenerateResultAssets(node, availableAssetIds);
@@ -1665,7 +1672,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         if (update) boardController.updateRunningHubAppNode(node.id, update);
       }
     }
-  }, [boardAssetsLoading, boardController, isBoardAssetScopeLoaded, items]);
+  }, [boardAssetsLoading, boardController, generationTasks, isBoardAssetScopeLoaded, items]);
 
   useMediaPolling({
     buildProviderHeaders,
@@ -1821,15 +1828,18 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     const savedItem = await saveItemOrWarn(item, pushWorkspaceNotice);
     if (!savedItem) return null;
     setItems(prev => [savedItem, ...prev]);
-    const nodeId = boardController.addAssetNode({
-      asset: storageItemToBoardAssetReference(savedItem),
-      size: outputSize,
-      title: `${sourceTitle} ${label}`,
-      position: {
-        x: sourcePosition.x + sourceSize.width + 40,
-        y: sourcePosition.y,
+    const nodeId = boardController.addAssetNodeWithConnection(
+      {
+        asset: storageItemToBoardAssetReference(savedItem),
+        size: outputSize,
+        title: `${sourceTitle} ${label}`,
+        position: {
+          x: sourcePosition.x + sourceSize.width + 40,
+          y: sourcePosition.y,
+        },
       },
-    });
+      { nodeId: sourceNodeId, portId: BOARD_PORT_IDS.assetOut, portKind: "asset" },
+    );
     boardController.selectNode(nodeId);
     boardController.selectEdge(null);
     pushWorkspaceNotice("info", `${label}已开始，结果会在当前节点更新`);
@@ -3896,6 +3906,17 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         if (item.status === "pending" || item.status === "processing") {
           const sourceNode = findExecutableNodeById(boardController.board.nodes, sourceBoardNodeId);
           if (sourceNode && !isSourceStackItem(item, sourceNode)) continue;
+          if (sourceNode && item.type !== "transcript") {
+            boardController.completeGenerationResult(
+              sourceBoardNodeId,
+              {
+                asset: storageItemToBoardAssetReference(item),
+                resultAssetId: item.id,
+                resultAssetIds: appendResultAssetId(sourceNode, item.id),
+                status: "processing",
+              },
+            );
+          }
           if (sourceNode && (sourceNode.status !== "processing" || sourceNode.errorMessage)) {
             const update = {
               errorMessage: undefined,
@@ -3970,6 +3991,18 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         if (!isSourceStackItem(item, sourceNode)) continue;
         handledBoardItems.add(item.id);
         const nextStatus = nextSourceNodeStatus(items, generationTasks, sourceNode, item.status);
+        if (item.type !== "transcript") {
+          boardController.completeGenerationResult(
+            sourceBoardNodeId,
+            {
+              asset: storageItemToBoardAssetReference(item),
+              errorMessage: item.errorMessage ?? "生成失败",
+              resultAssetId: item.id,
+              resultAssetIds: appendResultAssetId(sourceNode, item.id),
+              status: nextStatus,
+            },
+          );
+        }
         const update = {
           errorMessage: nextStatus === "failed" ? item.errorMessage ?? "生成失败" : undefined,
           status: nextStatus,
@@ -3997,6 +4030,18 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       if (!isSourceStackTask(task, sourceNode)) continue;
 
       if (task.status === "pending" || task.status === "processing") {
+        const taskItem = generationTaskToGalleryItem(task);
+        if (taskItem && taskItem.type !== "transcript") {
+          boardController.completeGenerationResult(
+            sourceBoardNodeId,
+            {
+              asset: storageItemToBoardAssetReference(taskItem),
+              resultAssetId: taskItem.id,
+              resultAssetIds: appendResultAssetId(sourceNode, taskItem.id),
+              status: "processing",
+            },
+          );
+        }
         if (sourceNode.status !== "processing" || sourceNode.errorMessage) {
           const update = {
             errorMessage: undefined,
@@ -4015,12 +4060,25 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       if (task.status !== "failed" && task.status !== "canceled") continue;
 
       handledBoardTasks.add(task.id);
+      const taskItem = generationTaskToGalleryItem(task);
       const nextStatus: BoardGenerationStatus =
         hasActiveSourceItems(items, sourceNode) || hasActiveSourceTasks(generationTasks, sourceNode)
           ? "processing"
           : items.some(item => isSourceStackItem(item, sourceNode) && item.status === "complete")
             ? "complete"
             : "failed";
+      if (taskItem && taskItem.type !== "transcript") {
+        boardController.completeGenerationResult(
+          sourceBoardNodeId,
+          {
+            asset: storageItemToBoardAssetReference(taskItem),
+            errorMessage: task.errorMessage ?? (task.status === "canceled" ? "任务已取消" : "生成失败"),
+            resultAssetId: taskItem.id,
+            resultAssetIds: appendResultAssetId(sourceNode, taskItem.id),
+            status: nextStatus,
+          },
+        );
+      }
       const update = {
         errorMessage: nextStatus === "failed" ? task.errorMessage ?? (task.status === "canceled" ? "任务已取消" : "生成失败") : undefined,
         status: nextStatus,
