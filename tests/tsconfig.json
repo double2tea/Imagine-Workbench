@@ -2,6 +2,7 @@
   "extends": "../tsconfig.json",
   "compilerOptions": {
     "allowJs": false,
+    "jsx": "react-jsx",
     "module": "CommonJS",
     "moduleResolution": "node",
     "noEmit": false,
@@ -38,6 +39,7 @@
     "./mimo-provider.test.ts",
     "./modelscope-provider.test.ts",
     "./runninghub-provider.test.ts",
+    "./runninghub-prompt-gating-ui.test.ts",
     "./provider-utils.test.ts",
     "./reference-images.test.ts",
     "../lib/canvas-editor.ts",

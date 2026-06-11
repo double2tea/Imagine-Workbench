@@ -66,6 +66,19 @@ test("native image generation route does not let empty nodeInfoList bypass promp
   assert.match(await response.text(), /Prompt is required/);
 });
 
+test("native video generation route does not let empty nodeInfoList bypass prompt validation", async () => {
+  registerCompiledPathAlias();
+  const { POST: postGenerateVideo } = await import("../app/api/media/generate-video/route");
+
+  const response = await postGenerateVideo(jsonRequest({
+    model: "12ai:veo_3_1-fast",
+    runningHubNodeInfoList: [],
+  }, { Authorization: "Bearer test_key" }) as Parameters<typeof postGenerateVideo>[0]);
+
+  assert.equal(response.status, 400);
+  assert.match(await response.text(), /Prompt is required/);
+});
+
 test("native image generation route injects registered RunningHub app bindings", async () => {
   registerCompiledPathAlias();
   const { POST: postGenerateImage } = await import("../app/api/media/generate-image/route");
