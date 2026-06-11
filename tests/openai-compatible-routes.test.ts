@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { GET as listOpenAiModels } from "../lib/api/openai-models";
+import { RUNNINGHUB_CONTROL_IMAGE_APP_MODEL } from "../lib/providers/runninghub";
 
 test("OpenAI-compatible model list returns provider-prefixed model ids", async () => {
   const response = await listOpenAiModels(new Request("http://local.test/v1/models?provider=mimo&kind=chat", {
@@ -31,7 +32,9 @@ test("OpenAI-compatible model list defaults to all known Workbench provider mode
   assert.equal(body.object, "list");
   assert.ok(body.data?.some(model => model.id === "12ai:gemini-3.1-flash-image-preview"));
   assert.ok(body.data?.some(model => model.id === "mimo:mimo-v2.5-tts"));
-  assert.ok(body.data?.some(model => model.id === "runninghub:ai-app-image:<webappId>"));
+  assert.ok(body.data?.some(model => model.id === `runninghub:${RUNNINGHUB_CONTROL_IMAGE_APP_MODEL}`));
+  assert.equal(body.data?.some(model => typeof model.id === "string" && model.id.includes("<webappId>")), false);
+  assert.equal(body.data?.some(model => typeof model.id === "string" && model.id.includes("<workflowId>")), false);
 });
 
 test("OpenAI-compatible model list accepts provider=all explicitly", async () => {

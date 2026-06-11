@@ -2,8 +2,7 @@ export type { AiProvider } from "./registry";
 import type { AiProvider } from "./registry";
 import { PROVIDER_KEYS, isProviderKey } from "./registry";
 import {
-  RUNNINGHUB_CONTROL_IMAGE_APP_LABEL,
-  RUNNINGHUB_CONTROL_IMAGE_APP_MODEL,
+  RUNNINGHUB_APP_PRESETS,
   RUNNINGHUB_DEFAULT_LLM_MODEL,
   RUNNINGHUB_STANDARD_MODELS,
   type RunningHubStandardModel,
@@ -1105,59 +1104,40 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
       referenceMediaTypes: model.referenceMediaTypes ? [...model.referenceMediaTypes] : undefined,
     });
   }),
-  imageCapability({
-    value: formatProviderModel("runninghub", RUNNINGHUB_CONTROL_IMAGE_APP_MODEL),
-    label: RUNNINGHUB_CONTROL_IMAGE_APP_LABEL,
-    provider: "runninghub",
-    model: RUNNINGHUB_CONTROL_IMAGE_APP_MODEL,
-    supportsAsync: false,
-    supportsReferences: true,
-    sizes: RUNNINGHUB_IMAGE_SIZES,
-    maxReferenceImages: 1,
-    minReferenceImages: 1,
-    referenceMediaTypes: ["image"],
-  }),
-  imageCapability({
-    value: "runninghub:ai-app-image:<webappId>",
-    label: "RunningHub AI App Image",
-    provider: "runninghub",
-    model: "ai-app-image:<webappId>",
-    supportsAsync: false,
-    supportsReferences: true,
-    sizes: RUNNINGHUB_IMAGE_SIZES,
-  }),
-  imageCapability({
-    value: "runninghub:workflow-image:<workflowId>",
-    label: "RunningHub Workflow Image",
-    provider: "runninghub",
-    model: "workflow-image:<workflowId>",
-    supportsAsync: false,
-    supportsReferences: true,
-    sizes: RUNNINGHUB_IMAGE_SIZES,
-  }),
-  videoCapability({
-    value: "runninghub:ai-app-video:<webappId>",
-    label: "RunningHub AI App Video",
-    provider: "runninghub",
-    model: "ai-app-video:<webappId>",
-    supportsReferences: true,
-    sizes: RUNNINGHUB_VIDEO_SIZES,
-    videoReferenceMode: "reference",
-    maxReferenceImages: 9,
-    minReferenceImages: 0,
-    referenceMediaTypes: ["image", "video", "audio"],
-  }),
-  videoCapability({
-    value: "runninghub:workflow-video:<workflowId>",
-    label: "RunningHub Workflow Video",
-    provider: "runninghub",
-    model: "workflow-video:<workflowId>",
-    supportsReferences: true,
-    sizes: RUNNINGHUB_VIDEO_SIZES,
-    videoReferenceMode: "reference",
-    maxReferenceImages: 9,
-    minReferenceImages: 0,
-    referenceMediaTypes: ["image", "video", "audio"],
+  ...RUNNINGHUB_APP_PRESETS.flatMap(preset => {
+    if (preset.kind === "image") {
+      return [
+        imageCapability({
+          value: formatProviderModel("runninghub", preset.model),
+          label: preset.label,
+          provider: "runninghub",
+          model: preset.model,
+          supportsAsync: false,
+          supportsReferences: preset.supportsReferences,
+          sizes: RUNNINGHUB_IMAGE_SIZES,
+          maxReferenceImages: preset.maxReferenceImages,
+          minReferenceImages: preset.minReferenceImages,
+          referenceMediaTypes: [...preset.referenceMediaTypes],
+        }),
+      ];
+    }
+    if (preset.kind === "video") {
+      return [
+        videoCapability({
+          value: formatProviderModel("runninghub", preset.model),
+          label: preset.label,
+          provider: "runninghub",
+          model: preset.model,
+          supportsReferences: preset.supportsReferences,
+          sizes: RUNNINGHUB_VIDEO_SIZES,
+          videoReferenceMode: preset.supportsReferences ? "reference" : "none",
+          maxReferenceImages: preset.maxReferenceImages,
+          minReferenceImages: preset.minReferenceImages,
+          referenceMediaTypes: [...preset.referenceMediaTypes],
+        }),
+      ];
+    }
+    return [];
   }),
 ];
 

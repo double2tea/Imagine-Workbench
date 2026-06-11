@@ -1,8 +1,7 @@
 import { formatProviderModel, getModelCapabilities, isAgentCompatibleModelId, type AiProvider, type ModelOption } from "./model-catalog";
 import { getProviderMeta } from "./registry";
 import {
-  RUNNINGHUB_CONTROL_IMAGE_APP_LABEL,
-  RUNNINGHUB_CONTROL_IMAGE_APP_MODEL,
+  RUNNINGHUB_APP_PRESETS,
   RUNNINGHUB_DEFAULT_LLM_MODEL,
   RUNNINGHUB_STANDARD_MODELS,
   runningHubLlmBaseUrl,
@@ -118,21 +117,16 @@ function runningHubStaticModels(kind: ModelKindFilter): ModelOption[] {
       value: formatProviderModel("runninghub", model.model),
       label: model.label,
     }));
-  const virtualModels = [
-    {
-      value: formatProviderModel("runninghub", RUNNINGHUB_CONTROL_IMAGE_APP_MODEL),
-      label: RUNNINGHUB_CONTROL_IMAGE_APP_LABEL,
-      kind: "image",
-    },
-    { value: "runninghub:ai-app-image:<webappId>", label: "RunningHub AI App Image", kind: "image" },
-    { value: "runninghub:ai-app-video:<webappId>", label: "RunningHub AI App Video", kind: "video" },
-    { value: "runninghub:workflow-image:<workflowId>", label: "RunningHub Workflow Image", kind: "image" },
-    { value: "runninghub:workflow-video:<workflowId>", label: "RunningHub Workflow Video", kind: "video" },
-  ].filter(model => kind === "all" || model.kind === kind);
+  const appPresetModels = RUNNINGHUB_APP_PRESETS
+    .filter(model => kind === "all" || model.kind === kind)
+    .map(model => ({
+      value: formatProviderModel("runninghub", model.model),
+      label: model.label,
+    }));
   return [
     ...(kind === "all" ? chatModels.map(model => ({ value: model.value, label: model.label })) : []),
     ...standardModels,
-    ...virtualModels.map(model => ({ value: model.value, label: model.label })),
+    ...appPresetModels,
   ];
 }
 

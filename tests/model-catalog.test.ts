@@ -105,6 +105,7 @@ test("runninghub control image app exposes one required image reference", () => 
   assert.ok(
     IMAGE_MODEL_OPTIONS.runninghub.some(option => option.value === modelValue && option.label === RUNNINGHUB_CONTROL_IMAGE_APP_LABEL),
   );
+  assert.equal(IMAGE_MODEL_OPTIONS.runninghub.some(option => option.value.includes("<webappId>")), false);
   assert.equal(capabilities.minReferenceImages, 1);
   assert.equal(capabilities.maxReferenceImages, 1);
   assert.deepEqual(capabilities.referenceMediaTypes, ["image"]);

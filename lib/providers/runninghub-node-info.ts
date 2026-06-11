@@ -4,10 +4,8 @@ import type {
   RunningHubTaskBindingValueType,
   RunningHubTaskNodeBinding,
 } from "./types";
-import { RUNNINGHUB_CONTROL_IMAGE_APP_MODEL } from "./runninghub";
+import { getRunningHubAppPreset } from "./runninghub";
 import { optionalText } from "./utils";
-
-const RUNNINGHUB_PROVIDER_PREFIX = "runninghub:";
 
 export function readRunningHubNodeInfoList(value: unknown): RunningHubTaskNodeBinding[] | undefined {
   if (!Array.isArray(value)) return undefined;
@@ -15,24 +13,12 @@ export function readRunningHubNodeInfoList(value: unknown): RunningHubTaskNodeBi
 }
 
 export function hasRunningHubPresetNodeInfoList(model: string): boolean {
-  return normalizedRunningHubModel(model) === RUNNINGHUB_CONTROL_IMAGE_APP_MODEL;
+  return runningHubPresetNodeInfoList(model).length > 0;
 }
 
 export function runningHubPresetNodeInfoList(model: string): RunningHubTaskNodeBinding[] {
-  if (!hasRunningHubPresetNodeInfoList(model)) return [];
-  return [
-    {
-      nodeId: "252",
-      fieldName: "image",
-      label: "Control image",
-      source: "reference",
-      valueType: "image",
-      required: true,
-      referenceIndex: 0,
-      referenceType: "image",
-      deliveryMode: "fileName",
-    },
-  ];
+  const preset = getRunningHubAppPreset(model);
+  return preset ? preset.nodeInfoList.map(binding => ({ ...binding })) : [];
 }
 
 function readRunningHubNodeInfoBinding(value: unknown): RunningHubTaskNodeBinding | null {
@@ -84,10 +70,4 @@ function readBindingDelivery(value: unknown): RunningHubTaskBindingDelivery {
 function readReferenceIndex(value: unknown): number | undefined {
   if (typeof value !== "number" || !Number.isInteger(value) || value < 0) return undefined;
   return value;
-}
-
-function normalizedRunningHubModel(model: string): string {
-  return model.startsWith(RUNNINGHUB_PROVIDER_PREFIX)
-    ? model.slice(RUNNINGHUB_PROVIDER_PREFIX.length)
-    : model;
 }

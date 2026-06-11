@@ -1,9 +1,11 @@
 import type { MediaReferenceType } from "@/lib/media-references";
+import type { RunningHubTaskNodeBinding } from "./types";
 
 export const RUNNINGHUB_LLM_BASE_URL = "https://llm.runninghub.cn";
 export const RUNNINGHUB_DEFAULT_LLM_MODEL = "qwen/qwen3.7-max";
 export const RUNNINGHUB_CONTROL_IMAGE_APP_MODEL = "ai-app-image:1961345119528140802";
 export const RUNNINGHUB_CONTROL_IMAGE_APP_LABEL = "RunningHub Control Image AI App";
+const RUNNINGHUB_PROVIDER_PREFIX = "runninghub:";
 const RUNNINGHUB_STANDARD_BASE_URLS = new Set(["https://www.runninghub.cn", "https://www.runninghub.ai"]);
 const SEEDANCE_15_DURATIONS = ["4", "5", "6", "7", "8", "9", "10", "11", "12"] as const;
 const SEEDANCE_20_DURATIONS = ["-1", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"] as const;
@@ -45,6 +47,19 @@ const VEO_31_4K_RESOLUTIONS = ["720p", "1080p", "4k"] as const;
 const VEO_31_HD_RESOLUTIONS = ["720p", "1080p"] as const;
 
 export type RunningHubStandardModelKind = "image" | "video";
+export type RunningHubAppPresetKind = "image" | "video" | "audio";
+
+export interface RunningHubAppPreset {
+  model: string;
+  label: string;
+  kind: RunningHubAppPresetKind;
+  promptRequired: boolean;
+  supportsReferences: boolean;
+  minReferenceImages: number;
+  maxReferenceImages: number;
+  referenceMediaTypes: readonly MediaReferenceType[];
+  nodeInfoList: readonly RunningHubTaskNodeBinding[];
+}
 
 export interface RunningHubStandardModel {
   model: string;
@@ -86,6 +101,52 @@ export interface RunningHubStandardRequestInput {
 }
 
 export type RunningHubReferenceMode = "reference" | "firstLast";
+
+export const RUNNINGHUB_APP_PRESETS: readonly RunningHubAppPreset[] = [
+  {
+    model: RUNNINGHUB_CONTROL_IMAGE_APP_MODEL,
+    label: RUNNINGHUB_CONTROL_IMAGE_APP_LABEL,
+    kind: "image",
+    promptRequired: false,
+    supportsReferences: true,
+    minReferenceImages: 1,
+    maxReferenceImages: 1,
+    referenceMediaTypes: ["image"],
+    nodeInfoList: [
+      {
+        nodeId: "252",
+        fieldName: "image",
+        label: "Control image",
+        source: "reference",
+        valueType: "image",
+        required: true,
+        referenceIndex: 0,
+        referenceType: "image",
+        deliveryMode: "fileName",
+      },
+    ],
+  },
+];
+
+export function getRunningHubAppPreset(model: string): RunningHubAppPreset | undefined {
+  const normalized = normalizeRunningHubModel(model);
+  return RUNNINGHUB_APP_PRESETS.find(preset => preset.model === normalized);
+}
+
+export function hasRunningHubAppPreset(model: string): boolean {
+  return getRunningHubAppPreset(model) !== undefined;
+}
+
+export function runningHubAppPresetAllowsEmptyPrompt(model: string): boolean {
+  const preset = getRunningHubAppPreset(model);
+  return preset !== undefined && !preset.promptRequired;
+}
+
+function normalizeRunningHubModel(model: string): string {
+  return model.startsWith(RUNNINGHUB_PROVIDER_PREFIX)
+    ? model.slice(RUNNINGHUB_PROVIDER_PREFIX.length)
+    : model;
+}
 
 type RunningHubStandardRequest =
   | {

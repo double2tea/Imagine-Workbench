@@ -31,7 +31,7 @@ import { audioOperationMissingReferenceMessage, audioOperationRequiresTextInput,
 import { getMediaReferenceType, mediaReferenceLabel } from "@/lib/media-references";
 import { getAudioModelCapabilities, getImageModelCapabilities, getVideoModelCapabilities, parseProviderModel, type AudioOperationMode, type VideoReferenceMode } from "@/lib/providers/model-catalog";
 import { getProviderMeta } from "@/lib/providers/registry";
-import { hasRunningHubPresetNodeInfoList } from "@/lib/providers/runninghub-node-info";
+import { runningHubAppPresetAllowsEmptyPrompt } from "@/lib/providers/runninghub";
 import { getReferenceImagePayloadError, getReferenceMediaPayloadError, prepareReferenceImageUrlForRequest, prepareReferenceMediaUrlForRequest } from "@/lib/reference-images";
 import { transcriptPreview, transcriptToDataUrl } from "@/lib/transcripts";
 import { selectVideoReferencesForMode } from "@/lib/video-reference-selection";
@@ -382,7 +382,7 @@ export function useGenerationActions({
         ? customImageSizeAspectRatio(requestImageResolution) ?? (overrides.size ?? activeImageAspectRatio)
         : overrides.size ?? activeImageAspectRatio;
 
-    if (!activePrompt.trim() && overrides.allowEmptyPrompt !== true && !hasRunningHubPresetNodeInfoList(requestModel)) return false;
+    if (!activePrompt.trim() && overrides.allowEmptyPrompt !== true && !runningHubAppPresetAllowsEmptyPrompt(requestModel)) return false;
     if (requestIsCustomImageResolution) {
       const sizeError = validateCustomImageSize(requestImageResolution);
       if (sizeError) {
