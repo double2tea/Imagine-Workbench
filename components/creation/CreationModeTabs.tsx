@@ -8,47 +8,26 @@ interface CreationModeTabsProps {
 }
 
 export default function CreationModeTabs({ value, onChange }: CreationModeTabsProps) {
+  const tabs: Array<{ Icon: typeof ImageIcon; label: string; value: CreationMode }> = [
+    { Icon: ImageIcon, label: "智能绘图", value: "image" },
+    { Icon: VideoIcon, label: "视频合成", value: "video" },
+    { Icon: AudioLines, label: "音频创作", value: "audio" },
+  ];
+
   return (
     <div className="imagine-tabbar flex min-w-0 rounded-lg border border-slate-800 bg-slate-950/60 p-1">
-      <button
-        type="button"
-        onClick={() => onChange("image")}
-        data-active={value === "image"}
-        className={`imagine-tab-button flex min-w-0 flex-1 items-center justify-center gap-2 rounded-md py-2 text-xs font-semibold transition-all duration-200 select-none cursor-pointer ${
-          value === "image"
-            ? "bg-blue-500/14 text-blue-200"
-            : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
-        }`}
-      >
-        <ImageIcon className="h-3.5 w-3.5 shrink-0" />
-        <span className="truncate">智能绘图</span>
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange("video")}
-        data-active={value === "video"}
-        className={`imagine-tab-button flex min-w-0 flex-1 items-center justify-center gap-2 rounded-md py-2 text-xs font-semibold transition-all duration-200 select-none cursor-pointer ${
-          value === "video"
-            ? "bg-violet-500/14 text-violet-200"
-            : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
-        }`}
-      >
-        <VideoIcon className="h-3.5 w-3.5 shrink-0" />
-        <span className="truncate">视频合成</span>
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange("audio")}
-        data-active={value === "audio"}
-        className={`imagine-tab-button flex min-w-0 flex-1 items-center justify-center gap-2 rounded-md py-2 text-xs font-semibold transition-all duration-200 select-none cursor-pointer ${
-          value === "audio"
-            ? "bg-cyan-500/14 text-cyan-200"
-            : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
-        }`}
-      >
-        <AudioLines className="h-3.5 w-3.5 shrink-0" />
-        <span className="truncate">音频创作</span>
-      </button>
+      {tabs.map(({ Icon, label, value: tabValue }) => (
+        <button
+          key={tabValue}
+          type="button"
+          onClick={() => onChange(tabValue)}
+          data-active={value === tabValue}
+          className="imagine-tab-button flex min-w-0 flex-1 cursor-pointer select-none items-center justify-center gap-2 rounded-md py-2 text-xs font-semibold text-slate-400 transition-all duration-200 hover:bg-slate-900 hover:text-slate-200"
+        >
+          <Icon className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">{label}</span>
+        </button>
+      ))}
     </div>
   );
 }

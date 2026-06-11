@@ -181,3 +181,55 @@ export function OperationActionButton({
     </button>
   );
 }
+
+export interface WorkbenchActionDescriptor {
+  active?: boolean;
+  ariaLabel?: string;
+  disabled?: boolean;
+  icon: ReactNode;
+  id: string;
+  label?: string;
+  onClick: () => void;
+  title: string;
+  tone?: OperationTone;
+}
+
+export function WorkbenchActionButton({
+  action,
+  className = "",
+}: {
+  action: WorkbenchActionDescriptor;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={action.disabled}
+      data-active={action.active}
+      onClick={action.onClick}
+      className={`imagine-card-action min-w-0 cursor-pointer gap-0.5 px-1.5 py-1 text-xs ${operationToneClassName(action.tone ?? "neutral")} ${className}`}
+      title={action.title}
+      aria-label={action.ariaLabel ?? action.title}
+    >
+      {action.icon}
+      {action.label ? <span className="text-[9px] font-bold">{action.label}</span> : null}
+    </button>
+  );
+}
+
+export function WorkbenchActionStrip({
+  actions,
+  children,
+  className = "",
+}: {
+  actions?: WorkbenchActionDescriptor[];
+  children?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`imagine-card-actions imagine-floating-card-actions flex flex-wrap items-center justify-center gap-1 rounded-xl border border-transparent bg-transparent p-1 shadow-none ${className}`}>
+      {actions?.map(action => <WorkbenchActionButton key={action.id} action={action} />)}
+      {children}
+    </div>
+  );
+}

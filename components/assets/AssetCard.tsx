@@ -1,12 +1,9 @@
 import {
   ChevronDown,
-  Clock3,
   Compass,
   Download,
   FileText,
-  ImageDown,
   Image as ImageIcon,
-  type LucideIcon,
   Maximize2,
   MoreHorizontal,
   Mic2,
@@ -15,14 +12,13 @@ import {
   RefreshCw,
   SlidersHorizontal,
   Sparkles,
-  SkipBack,
-  SkipForward,
   Trash2,
   Video as VideoIcon,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState, type DragEvent } from "react";
 import AudioWaveformPreview from "@/components/audio/AudioWaveformPreview";
+import VideoFrameMenu from "@/components/assets/VideoFrameMenu";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
 import PreviewImage from "@/components/PreviewImage";
 import { makeReferenceDropToken, REFERENCE_ASSET_MIME } from "@/components/reference/referenceDrag";
@@ -32,11 +28,12 @@ import { formatDisplayedAspectRatio } from "@/lib/media-display";
 import { tryParseProviderModel, type AiProvider } from "@/lib/providers/model-catalog";
 import { getProviderMeta } from "@/lib/providers/registry";
 import { transcriptFromDataUrl } from "@/lib/transcripts";
-import { getVideoFrameCaptureLabel, type CapturedVideoFrame, type VideoFrameCaptureMode } from "@/lib/video-frame";
+import type { CapturedVideoFrame, VideoFrameCaptureMode } from "@/lib/video-frame";
 import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
 import {
   IMAGE_EDIT_OPERATION_ORDER,
   WORKBENCH_OPERATION_META,
+  WorkbenchActionStrip,
   imageEditOperationMeta,
   operationToneClassName,
 } from "@/components/workbench/OperationControls";
@@ -92,15 +89,6 @@ function formatCreatedAt(value: string): string {
   const minute = String(date.getMinutes()).padStart(2, "0");
   return `${year}-${month}-${day} ${hour}:${minute}`;
 }
-
-const frameCaptureActions: Array<{
-  icon: LucideIcon;
-  mode: VideoFrameCaptureMode;
-}> = [
-  { icon: SkipBack, mode: "first" },
-  { icon: Clock3, mode: "current" },
-  { icon: SkipForward, mode: "last" },
-];
 
 type FrameMenuPlacement = "hover" | "meta";
 
@@ -433,38 +421,14 @@ export default function AssetCard({
             <div className={`imagine-card-actions-shell absolute inset-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-30 pointer-events-none group-hover:pointer-events-auto ${
               item.type === "video" ? "bottom-[2.85rem]" : item.type === "audio" ? "bottom-16" : "bottom-3"
             }`}>
-              <div className="imagine-card-actions imagine-floating-card-actions flex flex-wrap items-center justify-center gap-1 rounded-xl border border-transparent bg-transparent p-1 shadow-none">
+              <WorkbenchActionStrip>
                 {item.type === "video" && (
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setFrameMenuPlacement(prev => prev === "hover" ? null : "hover")}
-                      className={`imagine-card-action min-w-0 px-1.5 py-1 bg-slate-900/90 border border-white/5 rounded-md text-xs transition-all duration-[160ms] shadow-lg flex items-center justify-center gap-0.5 cursor-pointer ${operationToneClassName(WORKBENCH_OPERATION_META.frame.tone)}`}
-                      title="截取视频帧"
-                      aria-label="截取视频帧"
-                    >
-                      <ImageDown className="h-3 w-3" />
-                      <span className="text-[9px] font-bold">截帧</span>
-                    </button>
-                    {frameMenuPlacement === "hover" && (
-                      <div className="absolute bottom-full left-0 mb-1 grid min-w-24 gap-1 rounded-lg border border-white/12 bg-slate-950/94 p-1 text-xs text-slate-100 shadow-xl backdrop-blur">
-                        {frameCaptureActions.map(action => {
-                          const Icon = action.icon;
-                          return (
-                            <button
-                              key={action.mode}
-                              type="button"
-                              onClick={() => captureVideoFrame(action.mode)}
-                              className="flex h-8 items-center gap-2 rounded-md px-2 text-left transition hover:bg-white/10"
-                            >
-                              <Icon className="h-3.5 w-3.5 text-cyan-200" />
-                              <span className="whitespace-nowrap">{getVideoFrameCaptureLabel(action.mode)}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
+                  <VideoFrameMenu
+                    buttonClassName={`imagine-card-action min-w-0 cursor-pointer gap-0.5 px-1.5 py-1 text-xs ${operationToneClassName(WORKBENCH_OPERATION_META.frame.tone)}`}
+                    isOpen={frameMenuPlacement === "hover"}
+                    onSelect={captureVideoFrame}
+                    onToggle={() => setFrameMenuPlacement(prev => prev === "hover" ? null : "hover")}
+                  />
                 )}
 
                 {item.type === "image" && (
@@ -625,7 +589,7 @@ export default function AssetCard({
                 >
                   <Trash2 className="h-3 w-3" />
                 </button>
-              </div>
+              </WorkbenchActionStrip>
             </div>
           </div>
         )}
@@ -689,34 +653,13 @@ export default function AssetCard({
 
             <div className="flex items-center gap-1.5">
               {item.type === "video" && (
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setFrameMenuPlacement(prev => prev === "meta" ? null : "meta")}
-                    className="text-slate-500 hover:text-cyan-300 p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer"
-                    title="截取视频帧"
-                  >
-                    <ImageDown className="h-3.5 w-3.5" />
-                  </button>
-                  {frameMenuPlacement === "meta" && (
-                    <div className="absolute bottom-full right-0 mb-1 grid min-w-24 gap-1 rounded-lg border border-slate-200 bg-white p-1 text-xs text-slate-700 shadow-xl">
-                      {frameCaptureActions.map(action => {
-                        const Icon = action.icon;
-                        return (
-                          <button
-                            key={action.mode}
-                            type="button"
-                            onClick={() => captureVideoFrame(action.mode)}
-                            className="flex h-8 items-center gap-2 rounded-md px-2 text-left transition hover:bg-slate-100"
-                          >
-                            <Icon className="h-3.5 w-3.5 text-cyan-500" />
-                            <span className="whitespace-nowrap">{getVideoFrameCaptureLabel(action.mode)}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                <VideoFrameMenu
+                  align="right"
+                  buttonClassName="imagine-card-action min-w-0 cursor-pointer p-1 text-slate-500 hover:text-cyan-300"
+                  isOpen={frameMenuPlacement === "meta"}
+                  onSelect={captureVideoFrame}
+                  onToggle={() => setFrameMenuPlacement(prev => prev === "meta" ? null : "meta")}
+                />
               )}
 
               <button

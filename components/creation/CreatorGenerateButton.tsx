@@ -50,14 +50,9 @@ export default function CreatorGenerateButton({
       onClick={onGenerate}
       disabled={disabled}
       data-mode={mode}
-      className={`imagine-primary-action imagine-creator-generate-btn flex w-full items-center justify-center gap-2 rounded-lg py-3 text-xs font-bold transition duration-200 ${
-        disabled
-          ? "cursor-not-allowed opacity-60"
-          : isImage
-            ? "bg-blue-600 text-white hover:bg-blue-500 active:scale-[0.98] shadow-lg shadow-blue-950/30 cursor-pointer"
-            : isAudio
-              ? "bg-cyan-600 text-white hover:bg-cyan-500 active:scale-[0.98] shadow-lg shadow-cyan-950/30 cursor-pointer"
-              : "bg-violet-600 text-white hover:bg-violet-500 active:scale-[0.98] shadow-lg shadow-violet-950/30 cursor-pointer"
+      data-tone="accent"
+      className={`imagine-primary-action imagine-creator-generate-btn flex w-full items-center justify-center gap-2 rounded-lg py-3 text-xs font-bold text-white transition duration-200 ${
+        disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer active:scale-[0.98]"
       }`}
     >
       {isSubmitting ? (

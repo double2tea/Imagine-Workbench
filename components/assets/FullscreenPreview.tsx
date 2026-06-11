@@ -1,7 +1,8 @@
-import { Check, Clock3, Compass, Copy, FileText, Film, ImageDown, Mic2, Music, type LucideIcon, SkipBack, SkipForward, X } from "lucide-react";
+import { Check, Compass, Copy, FileText, Film, Mic2, Music, X } from "lucide-react";
 import { AnimatePresence } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import AudioWaveformPreview from "@/components/audio/AudioWaveformPreview";
+import VideoFrameMenu from "@/components/assets/VideoFrameMenu";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
 import PanoramaOverlay from "@/components/panorama/PanoramaOverlay";
 import PreviewImage from "@/components/PreviewImage";
@@ -9,7 +10,7 @@ import type { StorageItem } from "@/lib/db";
 import { formatDisplayedAspectRatio } from "@/lib/media-display";
 import type { PanoramaScreenshot } from "@/lib/panorama/capture";
 import { transcriptFromDataUrl } from "@/lib/transcripts";
-import { getVideoFrameCaptureLabel, type CapturedVideoFrame, type VideoFrameCaptureMode } from "@/lib/video-frame";
+import type { CapturedVideoFrame, VideoFrameCaptureMode } from "@/lib/video-frame";
 
 interface FullscreenPreviewProps {
   item: StorageItem | null;
@@ -23,15 +24,6 @@ interface FullscreenPreviewProps {
 
 type CopyStatus = "idle" | "copied" | "failed";
 type CopyResult = { itemId: string; status: Exclude<CopyStatus, "idle"> } | null;
-
-const frameCaptureActions: Array<{
-  icon: LucideIcon;
-  mode: VideoFrameCaptureMode;
-}> = [
-  { icon: SkipBack, mode: "first" },
-  { icon: Clock3, mode: "current" },
-  { icon: SkipForward, mode: "last" },
-];
 
 export default function FullscreenPreview({ item, items = [], onCaptureVideoFrame, onSavePanoramaScreenshots, onSaveVoiceProfile, onClose, onSelectItem }: FullscreenPreviewProps) {
   const [copyResult, setCopyResult] = useState<CopyResult>(null);
@@ -97,33 +89,14 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
                     }}
                   />
                   <div className="absolute bottom-[3.85rem] right-4 z-30 opacity-0 transition-opacity duration-[160ms] group-hover/fullscreen-video:opacity-100 sm:right-6">
-                    <button
-                      type="button"
-                      onClick={() => setIsFrameMenuOpen(prev => !prev)}
-                      className="flex h-9 items-center justify-center gap-1.5 rounded-md border border-white/15 bg-slate-950/86 px-2.5 text-cyan-100 shadow-lg backdrop-blur transition hover:bg-cyan-600 hover:text-white"
-                      title="截取视频帧"
-                    >
-                      <ImageDown className="h-4.5 w-4.5" />
-                      <span className="text-xs font-semibold">截帧</span>
-                    </button>
-                    {isFrameMenuOpen && (
-                      <div className="absolute bottom-full right-0 mb-1 grid min-w-24 gap-1 rounded-lg border border-white/12 bg-slate-950/94 p-1 text-xs text-slate-100 shadow-xl backdrop-blur">
-                        {frameCaptureActions.map(action => {
-                          const Icon = action.icon;
-                          return (
-                            <button
-                              key={action.mode}
-                              type="button"
-                              onClick={() => captureVideoFrame(action.mode)}
-                              className="flex h-8 items-center gap-2 rounded-md px-2 text-left transition hover:bg-white/10"
-                            >
-                              <Icon className="h-3.5 w-3.5 text-cyan-200" />
-                              <span className="whitespace-nowrap">{getVideoFrameCaptureLabel(action.mode)}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
+                    <VideoFrameMenu
+                      align="right"
+                      buttonClassName="flex h-9 items-center justify-center gap-1.5 rounded-md border border-white/15 bg-slate-950/86 px-2.5 text-cyan-100 shadow-lg backdrop-blur transition hover:bg-cyan-600 hover:text-white"
+                      isOpen={isFrameMenuOpen}
+                      onSelect={captureVideoFrame}
+                      onToggle={() => setIsFrameMenuOpen(prev => !prev)}
+                      variant="full"
+                    />
                   </div>
                 </div>
               ) : item.type === "audio" ? (

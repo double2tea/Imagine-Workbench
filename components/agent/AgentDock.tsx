@@ -413,7 +413,8 @@ function AgentMessage({
                   onClick={() => {
                     onExecuteAction(message.id, pendingAction);
                   }}
-                  className="imagine-primary-action flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-1.5 px-3 rounded-lg text-[10px] flex items-center justify-center gap-1 shadow-md hover:shadow-[0_0_15px_rgba(37,99,235,0.3)] cursor-pointer transition"
+                  data-tone="accent"
+                  className="imagine-primary-action flex flex-1 cursor-pointer items-center justify-center gap-1 rounded-lg px-3 py-1.5 text-[10px] font-bold text-white transition"
                 >
                   <Check className="h-3 w-3" />
                   执行
@@ -902,12 +903,11 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
               <button
                 type="submit"
                 disabled={isLoading || !input.trim()}
-                  className={`absolute right-2 flex items-center justify-center rounded-lg px-3 py-1.5 font-bold text-white transition ${
-                    isLoading || !input.trim()
-                      ? "cursor-not-allowed bg-[var(--iw-panel-soft)] text-[var(--iw-faint)]"
-                    : "cursor-pointer bg-blue-600 shadow-md shadow-blue-500/10 hover:bg-blue-500 active:scale-95"
-                  }`}
-                >
+                data-tone="accent"
+                className={`imagine-primary-action absolute right-2 flex items-center justify-center rounded-lg px-3 py-1.5 font-bold text-white transition ${
+                  isLoading || !input.trim() ? "cursor-not-allowed" : "cursor-pointer active:scale-95"
+                }`}
+              >
                 <Send className="h-3 w-3" />
               </button>
             </form>

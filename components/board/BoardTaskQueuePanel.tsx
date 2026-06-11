@@ -1,10 +1,11 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, Clock3, FileText, ImageIcon, Loader2, LocateFixed, Music, RotateCcw, Square, Trash2, Video, XCircle } from "lucide-react";
+import { CheckCircle2, FileText, ImageIcon, Loader2, LocateFixed, Music, RotateCcw, Square, Trash2, Video } from "lucide-react";
+import { BoardStatusBadge, BoardStatusIcon, BoardTaskActionButton, BoardTaskProgressBar } from "@/components/board/BoardStatusPrimitives";
 import type { BoardNode } from "@/lib/board";
 import { findResultNodeForSource } from "@/lib/board/utils";
 import type { StorageItem } from "@/lib/db";
-import type { GenerationTask, GenerationTaskStatus } from "@/lib/generation-tasks";
+import type { GenerationTask } from "@/lib/generation-tasks";
 
 interface BoardTaskQueuePanelProps {
   cancelingTaskIds?: readonly string[];
@@ -19,44 +20,12 @@ interface BoardTaskQueuePanelProps {
 }
 
 const iconClassName = "h-3.5 w-3.5";
-const actionButtonClassName = "nodrag flex h-7 items-center gap-1 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)] px-2 text-[10px] font-semibold text-[var(--iw-muted)] transition hover:border-blue-400/45 hover:text-[var(--iw-text)] disabled:cursor-not-allowed disabled:opacity-45";
 
 function mediaIcon(task: GenerationTask) {
   if (task.mediaType === "image") return <ImageIcon className={`${iconClassName} text-blue-300`} />;
   if (task.mediaType === "video") return <Video className={`${iconClassName} text-violet-300`} />;
   if (task.mediaType === "audio") return <Music className={`${iconClassName} text-cyan-300`} />;
   return <FileText className={`${iconClassName} text-teal-300`} />;
-}
-
-function statusIcon(status: GenerationTaskStatus) {
-  if (status === "processing") return <Loader2 className={`${iconClassName} animate-spin text-sky-300`} />;
-  if (status === "pending") return <Clock3 className={`${iconClassName} text-amber-300`} />;
-  if (status === "failed") return <AlertTriangle className={`${iconClassName} text-red-300`} />;
-  if (status === "canceled") return <XCircle className={`${iconClassName} text-[var(--iw-faint)]`} />;
-  return <CheckCircle2 className={`${iconClassName} text-emerald-300`} />;
-}
-
-function statusLabel(status: GenerationTaskStatus): string {
-  if (status === "processing") return "处理中";
-  if (status === "pending") return "排队";
-  if (status === "failed") return "失败";
-  if (status === "canceled") return "已取消";
-  return "完成";
-}
-
-function statusToneClass(status: GenerationTaskStatus): string {
-  if (status === "processing") return "border-sky-400/25 bg-sky-500/10 text-sky-100";
-  if (status === "pending") return "border-amber-400/25 bg-amber-500/10 text-amber-100";
-  if (status === "failed") return "border-red-400/25 bg-red-500/10 text-red-200";
-  if (status === "canceled") return "border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-faint)]";
-  return "border-emerald-400/25 bg-emerald-500/10 text-emerald-100";
-}
-
-function progressClass(status: GenerationTaskStatus): string {
-  if (status === "failed") return "bg-red-400";
-  if (status === "complete") return "bg-emerald-400";
-  if (status === "canceled") return "bg-[var(--iw-faint)]";
-  return "bg-sky-400";
 }
 
 function taskTitle(task: GenerationTask, sourceNode: BoardNode | undefined): string {
@@ -108,7 +77,7 @@ function TaskRow({
           </span>
           <div className="min-w-0">
             <div className="flex min-w-0 items-center gap-1.5">
-              {statusIcon(task.status)}
+              <BoardStatusIcon status={task.status} />
               <h3 className="truncate text-xs font-semibold text-[var(--iw-text)]" title={taskTitle(task, sourceNode)}>
                 {taskTitle(task, sourceNode)}
               </h3>
@@ -118,13 +87,11 @@ function TaskRow({
             </p>
           </div>
         </div>
-        <span className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold ${statusToneClass(task.status)}`}>
-          {statusLabel(task.status)}
-        </span>
+        <BoardStatusBadge status={task.status} />
       </div>
 
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--iw-panel)]">
-        <div className={`h-full rounded-full ${progressClass(task.status)}`} style={{ width: `${progress}%` }} />
+      <div className="mt-2">
+        <BoardTaskProgressBar progress={progress} status={task.status} />
       </div>
 
       {task.errorMessage ? (
@@ -134,58 +101,60 @@ function TaskRow({
       ) : null}
 
       <div className="mt-2 flex flex-wrap gap-1.5">
-        <button
+        <BoardTaskActionButton
           type="button"
           disabled={!sourceNode}
-          className={actionButtonClassName}
+          className="nodrag"
           onClick={() => {
             if (sourceNode) onFocusNode(sourceNode.id);
           }}
         >
           <LocateFixed className="h-3 w-3" />
           定位源
-        </button>
-        <button
+        </BoardTaskActionButton>
+        <BoardTaskActionButton
           type="button"
           disabled={!canFocusTaskResult}
-          className={actionButtonClassName}
+          className="nodrag"
           onClick={() => {
             if (canFocusTaskResult) onFocusTaskResult(task);
           }}
         >
           <CheckCircle2 className="h-3 w-3" />
           查看结果
-        </button>
+        </BoardTaskActionButton>
         {canCancel ? (
-          <button
+          <BoardTaskActionButton
             type="button"
             disabled={!sourceNode || canceling}
-            className="nodrag flex h-7 items-center gap-1 rounded-md border border-red-400/25 bg-red-500/10 px-2 text-[10px] font-semibold text-red-200 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-45"
+            className="nodrag"
             onClick={() => onCancelTask(task)}
+            tone="danger"
           >
             {canceling ? <Loader2 className="h-3 w-3 animate-spin" /> : <Square className="h-3 w-3" />}
             取消
-          </button>
+          </BoardTaskActionButton>
         ) : null}
         {canHandleFailure ? (
           <>
-            <button
+            <BoardTaskActionButton
               type="button"
               disabled={!sourceNode}
-              className={actionButtonClassName}
+              className="nodrag"
               onClick={() => onRerunTaskSource(task)}
             >
               <RotateCcw className="h-3 w-3" />
               重跑源
-            </button>
-            <button
+            </BoardTaskActionButton>
+            <BoardTaskActionButton
               type="button"
-              className="nodrag flex h-7 items-center gap-1 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)] px-2 text-[10px] font-semibold text-[var(--iw-faint)] transition hover:border-red-400/35 hover:text-red-200"
+              className="nodrag"
               onClick={() => onDismissTask(task)}
+              tone="danger"
             >
               <Trash2 className="h-3 w-3" />
               忽略
-            </button>
+            </BoardTaskActionButton>
           </>
         ) : null}
       </div>
@@ -270,15 +239,15 @@ export default function BoardTaskQueuePanel({
   return (
     <div className="flex flex-col gap-3 px-3 pb-3 pt-1">
       <div className="grid grid-cols-3 gap-1.5">
-        <span className="rounded-lg border border-sky-400/20 bg-sky-500/10 px-2 py-1.5 text-center text-[10px] font-semibold text-sky-100">
+        <BoardStatusBadge status="processing" className="justify-center rounded-lg py-1.5 text-center">
           运行 {activeTasks.length}
-        </span>
-        <span className="rounded-lg border border-red-400/20 bg-red-500/10 px-2 py-1.5 text-center text-[10px] font-semibold text-red-200">
+        </BoardStatusBadge>
+        <BoardStatusBadge status="failed" className="justify-center rounded-lg py-1.5 text-center">
           失败 {failedTasks.length}
-        </span>
-        <span className="rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5 text-center text-[10px] font-semibold text-[var(--iw-muted)]">
+        </BoardStatusBadge>
+        <BoardStatusBadge status="pending" className="justify-center rounded-lg py-1.5 text-center">
           需关注 {badgeCount}
-        </span>
+        </BoardStatusBadge>
       </div>
       <TaskSection
         cancelingTaskIds={cancelingTaskIds}

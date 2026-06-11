@@ -565,7 +565,7 @@ function ImageGenerateInspector({
         <summary className="imagine-panel-disclosure-summary">高级参数</summary>
         {advancedFields}
       </details>
-      <button type="button" onClick={() => onExecuteGenerate(node.id)} disabled={isProcessing} className={`imagine-primary-action flex !h-9 min-h-0 w-full items-center justify-center gap-2 !rounded-lg text-xs font-semibold transition ${isProcessing ? "bg-[var(--iw-panel-soft)] text-[var(--iw-faint)]" : "bg-blue-600 text-white hover:bg-blue-500"}`}>
+      <button type="button" onClick={() => onExecuteGenerate(node.id)} disabled={isProcessing} data-tone="accent" className="imagine-primary-action flex !h-9 min-h-0 w-full items-center justify-center gap-2 !rounded-lg text-xs font-semibold text-white transition">
         {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
         执行图片节点
         {!isProcessing && (
@@ -700,7 +700,7 @@ function VideoGenerateInspector({
         <summary className="imagine-panel-disclosure-summary">高级参数</summary>
         {advancedFields}
       </details>
-      <button type="button" onClick={() => onExecuteGenerate(node.id)} disabled={isProcessing} className={`imagine-primary-action flex !h-9 min-h-0 w-full items-center justify-center gap-2 !rounded-lg text-xs font-semibold transition ${isProcessing ? "bg-[var(--iw-panel-soft)] text-[var(--iw-faint)]" : "bg-blue-600 text-white hover:bg-blue-500"}`}>
+      <button type="button" onClick={() => onExecuteGenerate(node.id)} disabled={isProcessing} data-tone="accent" className="imagine-primary-action flex !h-9 min-h-0 w-full items-center justify-center gap-2 !rounded-lg text-xs font-semibold text-white transition">
         {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
         执行视频节点
         {!isProcessing && (
@@ -942,7 +942,7 @@ function AudioOperationInspector({
         <summary className="imagine-panel-disclosure-summary">高级参数</summary>
         {advancedFields}
       </details>
-      <button type="button" onClick={() => onExecuteGenerate(node.id)} disabled={isProcessing} className={`imagine-primary-action flex !h-9 min-h-0 w-full items-center justify-center gap-2 !rounded-lg text-xs font-semibold transition ${isProcessing ? "bg-[var(--iw-panel-soft)] text-[var(--iw-faint)]" : "bg-blue-600 text-white hover:bg-blue-500"}`}>
+      <button type="button" onClick={() => onExecuteGenerate(node.id)} disabled={isProcessing} data-tone="accent" className="imagine-primary-action flex !h-9 min-h-0 w-full items-center justify-center gap-2 !rounded-lg text-xs font-semibold text-white transition">
         {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
         执行音频节点
         {!isProcessing && <ModelPriceBadge provider={node.model.split(":")[0]} modelId={node.model} />}
@@ -996,7 +996,7 @@ function RunningHubAppInspector({
           </InspectorField>
         </div>
       </details>
-      <button type="button" onClick={() => onExecuteGenerate(node.id)} disabled={isProcessing} className={`imagine-primary-action flex !h-9 min-h-0 w-full items-center justify-center gap-2 !rounded-lg text-xs font-semibold transition ${isProcessing ? "bg-[var(--iw-panel-soft)] text-[var(--iw-faint)]" : "bg-emerald-600 text-white hover:bg-emerald-500"}`}>
+      <button type="button" onClick={() => onExecuteGenerate(node.id)} disabled={isProcessing} data-tone="success" className="imagine-primary-action flex !h-9 min-h-0 w-full items-center justify-center gap-2 !rounded-lg text-xs font-semibold text-white transition">
         {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
         执行 RunningHub 应用
       </button>
