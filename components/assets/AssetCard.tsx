@@ -659,6 +659,7 @@ export default function AssetCard({
                   isOpen={frameMenuPlacement === "meta"}
                   onSelect={captureVideoFrame}
                   onToggle={() => setFrameMenuPlacement(prev => prev === "meta" ? null : "meta")}
+                  surface="panel"
                 />
               )}
 

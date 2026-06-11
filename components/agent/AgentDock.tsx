@@ -414,7 +414,7 @@ function AgentMessage({
                     onExecuteAction(message.id, pendingAction);
                   }}
                   data-tone="accent"
-                  className="imagine-primary-action flex flex-1 cursor-pointer items-center justify-center gap-1 rounded-lg px-3 py-1.5 text-[10px] font-bold text-white transition"
+                  className="imagine-primary-action flex !min-h-0 flex-1 cursor-pointer items-center justify-center gap-1 rounded-lg px-3 py-1.5 text-[10px] font-bold text-white transition"
                 >
                   <Check className="h-3 w-3" />
                   执行
@@ -904,7 +904,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
                 type="submit"
                 disabled={isLoading || !input.trim()}
                 data-tone="accent"
-                className={`imagine-primary-action absolute right-2 flex items-center justify-center rounded-lg px-3 py-1.5 font-bold text-white transition ${
+                className={`imagine-primary-action absolute right-2 flex !min-h-0 items-center justify-center rounded-lg px-3 py-1.5 font-bold text-white transition ${
                   isLoading || !input.trim() ? "cursor-not-allowed" : "cursor-pointer active:scale-95"
                 }`}
               >
