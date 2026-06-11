@@ -11,6 +11,7 @@
   var PLUGIN_ID = "com.imagine.workbench.resolve";
   var DEFAULT_MODELS = {
     "generate-image": "12ai:gemini-3.1-flash-image-preview",
+    "image-to-image": "12ai:gemini-3.1-flash-image-preview",
     "edit-image": "12ai:gemini-3.1-flash-image-preview",
     "generate-video": "12ai:omni_flash-10s",
     "tts": "mimo:mimo-v2.5-tts",
@@ -18,6 +19,7 @@
   };
   var OPERATION_CAPABILITY_IDS = {
     "generate-image": "generate_image",
+    "image-to-image": "edit_image",
     "edit-image": "edit_image",
     "generate-video": "generate_video",
     "tts": "tts",
@@ -33,6 +35,17 @@
       promptLabel: "提示词",
       placeholder: "描述要生成的画面",
       sources: [],
+      canImport: true,
+      canAppend: false
+    },
+    "image-to-image": {
+      tab: "image",
+      title: "图生图",
+      subtitle: "参考当前帧整体生成",
+      icon: "reference",
+      promptLabel: "提示词",
+      placeholder: "描述要基于参考图生成的新画面或风格",
+      sources: ["current-frame", "current-clip-source"],
       canImport: true,
       canAppend: false
     },
@@ -105,7 +118,7 @@
   var tabLabels = {
     image: {
       title: "工具",
-      subtitle: "生成图片，或基于当前帧快速重绘"
+      subtitle: "生成图片、图生图，或基于当前帧局部编辑"
     },
     video: {
       title: "工具",
@@ -247,6 +260,7 @@
       image: '<svg ' + attrs + '><rect x="3.5" y="4" width="17" height="16" rx="2.5"></rect><circle cx="8.5" cy="9" r="1.5"></circle><path d="m4 17 5.2-5.2a1.6 1.6 0 0 1 2.25 0L16 16.4"></path><path d="m14 14.5 1.4-1.4a1.6 1.6 0 0 1 2.25 0L20.5 16"></path></svg>',
       edit: '<svg ' + attrs + '><path d="m13.5 5.5 5 5"></path><path d="M4.5 19.5 6 14l9.7-9.7a2.1 2.1 0 0 1 3 3L9 17z"></path><path d="m8.5 16 2.8 2.8"></path><path d="M15 15.5h5"></path><path d="M17.5 13v5"></path></svg>',
       video: '<svg ' + attrs + '><rect x="3.5" y="6" width="13" height="12" rx="2"></rect><path d="m16.5 10 4-2.3v8.6l-4-2.3z"></path><path d="M7.5 3.8 9 6"></path><path d="M13.5 3.8 12 6"></path></svg>',
+      reference: '<svg ' + attrs + '><rect x="4" y="5" width="10" height="10" rx="2"></rect><path d="M8 19h8a4 4 0 0 0 4-4V7"></path><path d="m7.5 12 1.5-1.5a1 1 0 0 1 1.4 0L14 14"></path><path d="M17 4v5"></path><path d="M14.5 6.5h5"></path></svg>',
       caption: '<svg ' + attrs + '><rect x="4" y="5" width="16" height="14" rx="2.5"></rect><path d="M8 10h8"></path><path d="M8 14h4.8"></path></svg>',
       voice: '<svg ' + attrs + '><path d="M4 13v-2"></path><path d="M8 17V7"></path><path d="M12 20V4"></path><path d="M16 17V7"></path><path d="M20 13v-2"></path></svg>',
       status: '<svg ' + attrs + '><path d="M8.5 12a3.5 3.5 0 0 1 7 0"></path><path d="M6 15.5a7 7 0 0 1 12 0"></path><path d="M12 12l3-3"></path><path d="M12 19.5a7.5 7.5 0 1 0-7.5-7.5"></path></svg>'
@@ -314,8 +328,10 @@
     } else if (config.promptLabel !== "无需提示词") {
       job.prompt = prompt;
     }
-    if (operation === "edit-image") {
+    if (operation === "edit-image" || operation === "image-to-image") {
       job.image = state.source;
+    }
+    if (operation === "edit-image") {
       job.imageOperation = imageOperationInput.value;
     }
     if (operation === "generate-video") {
@@ -386,7 +402,7 @@
     if (job.operation === "doctor") {
       return doctor(job);
     }
-    if (job.operation === "edit-image") {
+    if (job.operation === "edit-image" || job.operation === "image-to-image") {
       requireImageEditPrompt(job);
       var maskResult = await prepareImageEditMask(job);
       var editModel = await modelForOperation(job.baseUrl, job.operation);
@@ -425,6 +441,10 @@
   }
 
   async function prepareImageEditMask(job) {
+    if (job.operation === "image-to-image") {
+      var referencePath = await resolveMediaInput(job.image, outputStem(job) + "_image", "image");
+      return { imagePath: referencePath, maskPath: "" };
+    }
     var operation = job.imageOperation || "redraw";
     if (operation === "cutout") {
       var imagePath = await resolveMediaInput(job.image, outputStem(job) + "_image", "image");
@@ -1417,7 +1437,7 @@
     if (operation === "tts" || operation === "transcribe") {
       return inputValue(mimoApiKeyInput);
     }
-    if (operation === "generate-image" || operation === "edit-image" || operation === "generate-video") {
+    if (operation === "generate-image" || operation === "image-to-image" || operation === "edit-image" || operation === "generate-video") {
       return inputValue(twelveApiKeyInput);
     }
     return "";
@@ -1435,7 +1455,7 @@
     if (operation === "tts" || operation === "transcribe") {
       return "mimo";
     }
-    if (operation === "generate-image" || operation === "edit-image" || operation === "generate-video") {
+    if (operation === "generate-image" || operation === "image-to-image" || operation === "edit-image" || operation === "generate-video") {
       return "12ai";
     }
     return "";
