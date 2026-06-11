@@ -1,7 +1,13 @@
 export type { AiProvider } from "./registry";
 import type { AiProvider } from "./registry";
 import { PROVIDER_KEYS, isProviderKey } from "./registry";
-import { RUNNINGHUB_DEFAULT_LLM_MODEL, RUNNINGHUB_STANDARD_MODELS, type RunningHubStandardModel } from "./runninghub";
+import {
+  RUNNINGHUB_CONTROL_IMAGE_APP_LABEL,
+  RUNNINGHUB_CONTROL_IMAGE_APP_MODEL,
+  RUNNINGHUB_DEFAULT_LLM_MODEL,
+  RUNNINGHUB_STANDARD_MODELS,
+  type RunningHubStandardModel,
+} from "./runninghub";
 import type { MediaReferenceType } from "@/lib/media-references";
 
 export interface ModelOption {
@@ -1098,6 +1104,18 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
       minReferenceImages: model.minReferenceImages,
       referenceMediaTypes: model.referenceMediaTypes ? [...model.referenceMediaTypes] : undefined,
     });
+  }),
+  imageCapability({
+    value: formatProviderModel("runninghub", RUNNINGHUB_CONTROL_IMAGE_APP_MODEL),
+    label: RUNNINGHUB_CONTROL_IMAGE_APP_LABEL,
+    provider: "runninghub",
+    model: RUNNINGHUB_CONTROL_IMAGE_APP_MODEL,
+    supportsAsync: false,
+    supportsReferences: true,
+    sizes: RUNNINGHUB_IMAGE_SIZES,
+    maxReferenceImages: 1,
+    minReferenceImages: 1,
+    referenceMediaTypes: ["image"],
   }),
   imageCapability({
     value: "runninghub:ai-app-image:<webappId>",

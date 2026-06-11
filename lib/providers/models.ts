@@ -1,6 +1,12 @@
 import { formatProviderModel, getModelCapabilities, isAgentCompatibleModelId, type AiProvider, type ModelOption } from "./model-catalog";
 import { getProviderMeta } from "./registry";
-import { RUNNINGHUB_DEFAULT_LLM_MODEL, RUNNINGHUB_STANDARD_MODELS, runningHubLlmBaseUrl } from "./runninghub";
+import {
+  RUNNINGHUB_CONTROL_IMAGE_APP_LABEL,
+  RUNNINGHUB_CONTROL_IMAGE_APP_MODEL,
+  RUNNINGHUB_DEFAULT_LLM_MODEL,
+  RUNNINGHUB_STANDARD_MODELS,
+  runningHubLlmBaseUrl,
+} from "./runninghub";
 import type { ProviderConfig } from "./types";
 import { getJson, isRecord, openAiCompatibleUrl } from "./utils";
 
@@ -113,6 +119,11 @@ function runningHubStaticModels(kind: ModelKindFilter): ModelOption[] {
       label: model.label,
     }));
   const virtualModels = [
+    {
+      value: formatProviderModel("runninghub", RUNNINGHUB_CONTROL_IMAGE_APP_MODEL),
+      label: RUNNINGHUB_CONTROL_IMAGE_APP_LABEL,
+      kind: "image",
+    },
     { value: "runninghub:ai-app-image:<webappId>", label: "RunningHub AI App Image", kind: "image" },
     { value: "runninghub:ai-app-video:<webappId>", label: "RunningHub AI App Video", kind: "video" },
     { value: "runninghub:workflow-image:<workflowId>", label: "RunningHub Workflow Image", kind: "image" },

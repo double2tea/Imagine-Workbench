@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { apiErrorResponse, requireApiText } from "@/lib/api/errors";
 import { getImageModelCapabilities, getImageResolutionOptions, parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
 import { generateImage } from "@/lib/providers/image";
-import { readRunningHubNodeInfoList } from "@/lib/providers/runninghub-node-info";
+import { readRunningHubNodeInfoList, runningHubPresetNodeInfoList } from "@/lib/providers/runninghub-node-info";
 import { dataUriToBlob, optionalText, resolveProviderConfig } from "@/lib/providers/utils";
 import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, getReferenceImagePayloadError } from "@/lib/reference-images";
 
@@ -37,13 +37,18 @@ export async function POST(req: NextRequest) {
     const imageResolution = resolveImageResolution(modelValue, aspectRatio, requestImageResolution);
     const imageQuality = resolveImageQuality(modelValue, optionalText(body.imageQuality));
     const referenceImages = readReferenceImages(body.referenceImages, body.referenceImage);
-    const runningHubNodeInfoList = readRunningHubNodeInfoList(body.runningHubNodeInfoList);
+    const explicitRunningHubNodeInfoList = readRunningHubNodeInfoList(body.runningHubNodeInfoList);
+    const runningHubNodeInfoList =
+      explicitRunningHubNodeInfoList && explicitRunningHubNodeInfoList.length > 0
+        ? explicitRunningHubNodeInfoList
+        : runningHubPresetNodeInfoList(parsed.model);
     const payloadError = getReferenceImagePayloadError(referenceImages);
     if (payloadError) return NextResponse.json({ error: payloadError }, { status: 413 });
     validateReferenceCount(modelValue, referenceImages.length);
 
+    const allowsEmptyPrompt = isRunningHubTaskImageModel(parsed.model) || runningHubNodeInfoList.length > 0;
     const result = await generateImage(config, {
-      prompt: runningHubNodeInfoList ? optionalText(body.prompt) ?? "" : requireApiText(body.prompt, "Prompt"),
+      prompt: allowsEmptyPrompt ? optionalText(body.prompt) ?? "" : requireApiText(body.prompt, "Prompt"),
       model: parsed.model,
       aspectRatio,
       imageResolution,
@@ -168,6 +173,10 @@ function greatestCommonDivisor(a: number, b: number): number {
     right = next;
   }
   return left;
+}
+
+function isRunningHubTaskImageModel(model: string): boolean {
+  return model.startsWith("ai-app-image:") || model.startsWith("workflow-image:");
 }
 
 function getRequestBodySizeError(req: NextRequest): string | null {

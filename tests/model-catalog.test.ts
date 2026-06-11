@@ -27,6 +27,10 @@ import {
 } from "../lib/board/ports";
 import type { BoardNode } from "../lib/board/types";
 import { getProviderMeta } from "../lib/providers/registry";
+import {
+  RUNNINGHUB_CONTROL_IMAGE_APP_LABEL,
+  RUNNINGHUB_CONTROL_IMAGE_APP_MODEL,
+} from "../lib/providers/runninghub";
 
 test("parseProviderModel reads provider prefixes", () => {
   assert.deepEqual(parseProviderModel("12ai-async:gemini-3.1-flash-image-preview", "12ai"), {
@@ -92,6 +96,18 @@ test("reference-capable image models expose a usable reference limit", () => {
   assert.equal(capabilities.referenceMediaTypes.includes("image"), true);
   assert.equal(capabilities.minReferenceImages, 0);
   assert.equal(capabilities.maxReferenceImages >= 2, true);
+});
+
+test("runninghub control image app exposes one required image reference", () => {
+  const modelValue = `runninghub:${RUNNINGHUB_CONTROL_IMAGE_APP_MODEL}`;
+  const capabilities = getImageModelCapabilities(modelValue);
+
+  assert.ok(
+    IMAGE_MODEL_OPTIONS.runninghub.some(option => option.value === modelValue && option.label === RUNNINGHUB_CONTROL_IMAGE_APP_LABEL),
+  );
+  assert.equal(capabilities.minReferenceImages, 1);
+  assert.equal(capabilities.maxReferenceImages, 1);
+  assert.deepEqual(capabilities.referenceMediaTypes, ["image"]);
 });
 
 test("unknown model capability fails fast", () => {

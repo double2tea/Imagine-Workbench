@@ -2,6 +2,8 @@ import type { MediaReferenceType } from "@/lib/media-references";
 
 export const RUNNINGHUB_LLM_BASE_URL = "https://llm.runninghub.cn";
 export const RUNNINGHUB_DEFAULT_LLM_MODEL = "qwen/qwen3.7-max";
+export const RUNNINGHUB_CONTROL_IMAGE_APP_MODEL = "ai-app-image:1961345119528140802";
+export const RUNNINGHUB_CONTROL_IMAGE_APP_LABEL = "RunningHub Control Image AI App";
 const RUNNINGHUB_STANDARD_BASE_URLS = new Set(["https://www.runninghub.cn", "https://www.runninghub.ai"]);
 const SEEDANCE_15_DURATIONS = ["4", "5", "6", "7", "8", "9", "10", "11", "12"] as const;
 const SEEDANCE_20_DURATIONS = ["-1", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"] as const;

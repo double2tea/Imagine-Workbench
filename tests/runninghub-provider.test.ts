@@ -3,12 +3,14 @@ import test from "node:test";
 
 import { ApiError } from "../lib/api/errors";
 import {
+  RUNNINGHUB_CONTROL_IMAGE_APP_MODEL,
   buildRunningHubStandardBody,
   getRunningHubStandardEndpoint,
   getRunningHubStandardModel,
   resolveRunningHubStandardModelForReferenceMedia,
   resolveRunningHubStandardModelForReferences,
 } from "../lib/providers/runninghub";
+import { runningHubPresetNodeInfoList } from "../lib/providers/runninghub-node-info";
 import { parseRunningHubBindingsFromJsonText } from "../lib/board/runninghub-bindings";
 import { ChatJsonParseError, createChatCompletionText, createChatCompletionWithTools, parseJsonObjectText } from "../lib/providers/chat";
 import { generateAudio, getAudioStatus } from "../lib/providers/audio";
@@ -792,6 +794,56 @@ test("runninghub ai app tasks map custom nodeInfoList bindings", async () => {
         { nodeId: "3", fieldName: "seed", fieldValue: 12345 },
         { nodeId: "4", fieldName: "randomSeed", fieldValue: nodeInfoList[3]?.fieldValue },
       ],
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("runninghub control image app preset submits uploaded file name", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: Array<{ url: string; body: unknown }> = [];
+  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const url = input.toString();
+    if (url.endsWith("/openapi/v2/media/upload/binary")) {
+      calls.push({ url, body: init?.body instanceof FormData ? "form-data" : init?.body });
+      return Response.json({
+        code: 0,
+        message: "success",
+        data: {
+          download_url: "https://runninghub.example/uploaded.png",
+          fileName: "api/uploaded.png",
+        },
+      });
+    }
+    calls.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+    if (url.endsWith("/task/openapi/ai-app/run")) {
+      return Response.json({ code: 0, msg: "success", data: { taskId: "task_control", taskStatus: "RUNNING" } });
+    }
+    return Response.json({ code: 999, msg: "unexpected endpoint" }, { status: 500 });
+  };
+
+  try {
+    const created = await generateRunningHubMedia(
+      runningHubConfig,
+      {
+        prompt: "",
+        model: RUNNINGHUB_CONTROL_IMAGE_APP_MODEL,
+        aspectRatio: "auto",
+        imageResolution: "auto",
+        referenceImages: [{ dataUri: "data:image/png;base64,AA==" }],
+        runningHubNodeInfoList: runningHubPresetNodeInfoList(RUNNINGHUB_CONTROL_IMAGE_APP_MODEL),
+      },
+      "image",
+    );
+
+    assert.equal(created.operationName, "runninghub:image:task-output:task_control");
+    assert.equal(calls[0]?.url, "https://www.runninghub.cn/openapi/v2/media/upload/binary");
+    assert.equal(calls[1]?.url, "https://www.runninghub.cn/task/openapi/ai-app/run");
+    assert.deepEqual(calls[1]?.body, {
+      apiKey: "rh_test_key",
+      webappId: "1961345119528140802",
+      nodeInfoList: [{ nodeId: "252", fieldName: "image", fieldValue: "api/uploaded.png" }],
     });
   } finally {
     globalThis.fetch = originalFetch;

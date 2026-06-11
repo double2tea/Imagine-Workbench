@@ -85,6 +85,7 @@ import {
   type VideoReferenceMode,
 } from "@/lib/providers/model-catalog";
 import { getProviderMeta, type CustomProviderDefinition } from "@/lib/providers/registry";
+import { hasRunningHubPresetNodeInfoList } from "@/lib/providers/runninghub-node-info";
 import { saveClonedVoiceProfileFromAsset } from "@/lib/voice-profiles";
 import type { RunningHubTaskNodeBinding } from "@/lib/providers/types";
 import {
@@ -3394,7 +3395,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       const nextPrompt = nodePrompt.trim();
       const audioCapabilities = node.kind === "audio-operation" ? getAudioModelCapabilities(node.model) : null;
       const requiresTextInput = node.kind !== "audio-operation" || audioOperationRequiresTextInput(node.audioMode);
-      if (!nextPrompt && requiresTextInput) {
+      const allowsEmptyPrompt = node.kind === "image-generate" && hasRunningHubPresetNodeInfoList(node.model);
+      if (!nextPrompt && requiresTextInput && !allowsEmptyPrompt) {
         boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: "生成节点需要提示词输入" });
         pushWorkspaceNotice("error", "生成节点需要提示词输入");
         return;
@@ -3481,6 +3483,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
               referenceImages: references,
               size: node.aspectRatio,
               thinkingLevel: node.thinkingLevel,
+              allowEmptyPrompt: allowsEmptyPrompt,
             });
             if (!didStart) break;
             didStartAny = true;
