@@ -37,6 +37,7 @@ interface ResultBoardNodeProps {
 }
 
 function resultNodeToStorageItem(node: BoardResultNode, boardId: string): StorageItem {
+  const hasUrl = node.asset.url.trim().length > 0;
   return buildStorageItem(
     {
       id: node.asset.assetId,
@@ -46,8 +47,9 @@ function resultNodeToStorageItem(node: BoardResultNode, boardId: string): Storag
       model: node.asset.model,
       aspectRatio: "auto",
       createdAt: node.createdAt,
-      status: "complete",
-      progress: 100,
+      status: hasUrl ? "complete" : "failed",
+      progress: hasUrl ? 100 : 0,
+      errorMessage: hasUrl ? undefined : "结果记录已不可用",
       sourceBoardNodeId: node.id,
       sourceBoardResultStackKey: node.resultStackKey,
     },
@@ -188,6 +190,7 @@ const ResultBoardNode = memo(function ResultBoardNode({
       processingLabel={imageQuickEditProcessingTitleFromPrompt(item.prompt) ?? undefined}
       stackItems={stackItems}
       status={item.status}
+      statusLabel={item.errorMessage ?? (item.status === "failed" ? "生成失败" : undefined)}
     >
       {item.type === "image" && item.url.trim() ? (
         <PreviewImage

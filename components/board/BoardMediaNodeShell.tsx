@@ -14,6 +14,7 @@ interface BoardMediaNodeShellProps {
   progress?: number;
   stackItems: ReadonlyArray<Pick<StorageItem, "id">>;
   status?: StorageItem["status"];
+  statusLabel?: string;
 }
 
 function clampProgress(progress: number): number {
@@ -31,6 +32,7 @@ export default function BoardMediaNodeShell({
   progress = 0,
   stackItems,
   status,
+  statusLabel,
 }: BoardMediaNodeShellProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const previousStatusRef = useRef<StorageItem["status"] | undefined>(undefined);
@@ -39,7 +41,7 @@ export default function BoardMediaNodeShell({
   const isFailed = status === "failed";
   const progressValue = clampProgress(progress);
   const statusTitle = isFailed
-    ? "编辑失败"
+    ? statusLabel ?? "任务失败"
     : status === "pending"
       ? "任务已排队"
       : `${processingLabel} ${progressValue}%`;

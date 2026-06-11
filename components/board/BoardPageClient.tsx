@@ -1057,6 +1057,22 @@ function activeSourceTaskForNode(tasks: GenerationTask[], sourceNode: Executable
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0];
 }
 
+function activeProcessingSourceStackItems(
+  items: StorageItem[],
+  tasks: GenerationTask[],
+  sourceNode: ExecutableBoardNode,
+): StorageItem[] {
+  const activeItems = items
+    .filter(item => item.type !== "transcript" && isSourceStackItem(item, sourceNode) && (item.status === "pending" || item.status === "processing"));
+  const activeTaskItems = tasks
+    .filter(task => isSourceStackTask(task, sourceNode) && (task.status === "pending" || task.status === "processing"))
+    .map(generationTaskToGalleryItem)
+    .filter((item): item is StorageItem => item !== null && item.type !== "transcript");
+  const sortedItems = [...activeItems, ...activeTaskItems]
+    .sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime());
+  return sortedItems.filter((item, index) => sortedItems.findIndex(candidate => candidate.id === item.id) === index);
+}
+
 function resultStackKeyForConfig({
   edges,
   kind,
@@ -1182,6 +1198,42 @@ function sourceStackResultAssetIds(items: StorageItem[], sourceNode: ExecutableB
     .sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime())
     .map(item => item.id);
   return completedIds.includes(activeAssetId) ? completedIds : appendResultAssetId(sourceNode, activeAssetId);
+}
+
+function latestCompleteSourceStackItem(items: StorageItem[], sourceNode: ExecutableBoardNode): StorageItem | undefined {
+  return items
+    .filter(item => item.type !== "transcript" && isSourceStackItem(item, sourceNode) && item.status === "complete")
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0];
+}
+
+function appendUniqueResultAssetId(assetIds: string[], assetId: string): string[] {
+  return assetIds.includes(assetId) ? assetIds : [...assetIds, assetId];
+}
+
+function terminalResultUpdate(
+  items: StorageItem[],
+  tasks: GenerationTask[],
+  sourceNode: ExecutableBoardNode,
+  terminalItem: StorageItem,
+  status: BoardGenerationStatus,
+  errorMessage: string,
+) {
+  const activeCompleteItem = status === "complete" ? latestCompleteSourceStackItem(items, sourceNode) : undefined;
+  const activeProcessingItems = status === "processing" ? activeProcessingSourceStackItems(items, tasks, sourceNode) : [];
+  const activeItem = activeCompleteItem ?? activeProcessingItems[activeProcessingItems.length - 1] ?? terminalItem;
+  const activeProcessingIds = activeProcessingItems.map(item => item.id);
+  const resultAssetIds = activeCompleteItem
+    ? appendUniqueResultAssetId(sourceStackResultAssetIds(items, sourceNode, activeCompleteItem.id), terminalItem.id)
+    : activeProcessingIds.length > 0
+      ? appendUniqueResultAssetId(activeProcessingIds, terminalItem.id)
+    : appendResultAssetId(sourceNode, terminalItem.id);
+  return {
+    asset: storageItemToBoardAssetReference(activeItem),
+    errorMessage: status === "failed" ? errorMessage : undefined,
+    resultAssetId: activeItem.id,
+    resultAssetIds,
+    status,
+  };
 }
 
 function boardRoute(id: string): string {
@@ -3907,12 +3959,14 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           const sourceNode = findExecutableNodeById(boardController.board.nodes, sourceBoardNodeId);
           if (sourceNode && !isSourceStackItem(item, sourceNode)) continue;
           if (sourceNode && item.type !== "transcript") {
+            const activeItems = activeProcessingSourceStackItems(items, generationTasks, sourceNode);
+            const activeItem = activeItems[activeItems.length - 1] ?? item;
             boardController.completeGenerationResult(
               sourceBoardNodeId,
               {
-                asset: storageItemToBoardAssetReference(item),
-                resultAssetId: item.id,
-                resultAssetIds: appendResultAssetId(sourceNode, item.id),
+                asset: storageItemToBoardAssetReference(activeItem),
+                resultAssetId: activeItem.id,
+                resultAssetIds: activeItems.length > 0 ? activeItems.map(active => active.id) : appendResultAssetId(sourceNode, item.id),
                 status: "processing",
               },
             );
@@ -3994,13 +4048,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         if (item.type !== "transcript") {
           boardController.completeGenerationResult(
             sourceBoardNodeId,
-            {
-              asset: storageItemToBoardAssetReference(item),
-              errorMessage: item.errorMessage ?? "生成失败",
-              resultAssetId: item.id,
-              resultAssetIds: appendResultAssetId(sourceNode, item.id),
-              status: nextStatus,
-            },
+            terminalResultUpdate(items, generationTasks, sourceNode, item, nextStatus, item.errorMessage ?? "生成失败"),
           );
         }
         const update = {
@@ -4032,12 +4080,14 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       if (task.status === "pending" || task.status === "processing") {
         const taskItem = generationTaskToGalleryItem(task);
         if (taskItem && taskItem.type !== "transcript") {
+          const activeItems = activeProcessingSourceStackItems(items, generationTasks, sourceNode);
+          const activeItem = activeItems[activeItems.length - 1] ?? taskItem;
           boardController.completeGenerationResult(
             sourceBoardNodeId,
             {
-              asset: storageItemToBoardAssetReference(taskItem),
-              resultAssetId: taskItem.id,
-              resultAssetIds: appendResultAssetId(sourceNode, taskItem.id),
+              asset: storageItemToBoardAssetReference(activeItem),
+              resultAssetId: activeItem.id,
+              resultAssetIds: activeItems.length > 0 ? activeItems.map(active => active.id) : appendResultAssetId(sourceNode, taskItem.id),
               status: "processing",
             },
           );
@@ -4070,13 +4120,14 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       if (taskItem && taskItem.type !== "transcript") {
         boardController.completeGenerationResult(
           sourceBoardNodeId,
-          {
-            asset: storageItemToBoardAssetReference(taskItem),
-            errorMessage: task.errorMessage ?? (task.status === "canceled" ? "任务已取消" : "生成失败"),
-            resultAssetId: taskItem.id,
-            resultAssetIds: appendResultAssetId(sourceNode, taskItem.id),
-            status: nextStatus,
-          },
+          terminalResultUpdate(
+            items,
+            generationTasks,
+            sourceNode,
+            taskItem,
+            nextStatus,
+            task.errorMessage ?? (task.status === "canceled" ? "任务已取消" : "生成失败"),
+          ),
         );
       }
       const update = {

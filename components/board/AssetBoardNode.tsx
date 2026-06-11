@@ -232,6 +232,7 @@ const AssetBoardNode = memo(function AssetBoardNode({
       processingLabel={imageQuickEditProcessingTitleFromPrompt(item.prompt) ?? undefined}
       stackItems={stackItems}
       status={item.status}
+      statusLabel={item.errorMessage ?? (item.status === "failed" ? "编辑失败" : undefined)}
     >
       {node.asset.type === "image" ? (
         <PreviewImage

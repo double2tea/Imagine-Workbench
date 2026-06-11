@@ -1294,6 +1294,14 @@ function sameIdList(left: string[] | undefined, right: string[]): boolean {
   return current.length === right.length && current.every((value, index) => value === right[index]);
 }
 
+function mergeIdLists(left: string[] | undefined, right: string[]): string[] {
+  const merged: string[] = [];
+  for (const id of [...(left ?? []), ...right]) {
+    if (id.trim() && !merged.includes(id)) merged.push(id);
+  }
+  return merged;
+}
+
 function sameGenerateUpdate(node: BoardImageGenerateNode | BoardVideoGenerateNode | BoardAudioOperationNode, input: BoardGenerateNodeUpdate): boolean {
   if ("errorMessage" in input && node.errorMessage !== input.errorMessage) return false;
   if ("model" in input && node.model !== input.model) return false;
@@ -1606,20 +1614,22 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       const existingResultEdge = existingResultNode
         ? findMatchingEdge(currentBoard.edges, from, { nodeId: existingResultNode.id, portId: BOARD_PORT_IDS.assetIn, portKind: "asset" })
         : undefined;
+      const currentResultAssetIds = sourceNode.resultAssetIds ?? (sourceNode.resultAssetId ? [sourceNode.resultAssetId] : []);
+      const resultAssetIds = mergeIdLists(currentResultAssetIds, input.resultAssetIds);
       const sourceAlreadyCurrent =
         sourceNode.status === input.status &&
         sourceNode.resultAssetId === input.resultAssetId &&
-        sameIdList(sourceNode.resultAssetIds, input.resultAssetIds) &&
+        sameIdList(sourceNode.resultAssetIds, resultAssetIds) &&
         (input.errorMessage === undefined || sourceNode.errorMessage === input.errorMessage);
       const resultAlreadyCurrent = existingResultNode !== undefined &&
         existingResultNode.activeAssetId === input.resultAssetId &&
         existingResultNode.resultStackKey === resultStackKey &&
-        sameIdList(existingResultNode.resultAssetIds, input.resultAssetIds) &&
+        sameIdList(existingResultNode.resultAssetIds, resultAssetIds) &&
         sameBoardAssetReference(existingResultNode.asset, input.asset);
       if (sourceAlreadyCurrent && resultAlreadyCurrent && existingResultEdge) return currentBoard;
 
       let nextNodes = currentBoard.nodes.map(node =>
-        node.id === sourceNodeId ? { ...node, ...input, updatedAt } : node,
+        node.id === sourceNodeId ? { ...node, ...input, resultAssetIds, updatedAt } : node,
       );
       let nextEdges = currentBoard.edges;
 
@@ -1629,7 +1639,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
           asset: input.asset,
           activeAssetId: input.resultAssetId,
           resultStackKey,
-          resultAssetIds: input.resultAssetIds,
+          resultAssetIds,
           updatedAt,
         }
         : createResultBoardNode(
@@ -1637,7 +1647,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
             sourceNodeId,
             resultStackKey,
             activeAssetId: input.resultAssetId,
-            resultAssetIds: input.resultAssetIds,
+            resultAssetIds,
             asset: input.asset,
             position: resultNodeDefaultPosition(sourceNode),
           },
