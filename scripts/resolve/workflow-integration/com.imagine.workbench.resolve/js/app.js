@@ -229,6 +229,7 @@
   var modelField = document.getElementById("modelField");
   var modelInput = document.getElementById("modelInput");
   var modelOptions = document.getElementById("modelOptions");
+  var modelRefreshButton = document.getElementById("modelRefreshButton");
   var twelveApiKeyInput = document.getElementById("twelveApiKeyInput");
   var mimoApiKeyInput = document.getElementById("mimoApiKeyInput");
   var rememberKeysInput = document.getElementById("rememberKeysInput");
@@ -406,7 +407,7 @@
     state.modelRequestId = requestId;
     renderModelOptions(operation);
     if (!query) {
-      return;
+      return 0;
     }
     try {
       await loadSharedCredentialsForJob({ operation: operation, baseUrl: baseUrlInput.value.trim() });
@@ -423,17 +424,35 @@
         }
       }
       if (state.modelRequestId !== requestId || state.operation !== operation) {
-        return;
+        return 0;
       }
       var uniqueModels = dedupeModelOptions(models);
       if (!localStorage.getItem(modelStorageKey(operation)) && uniqueModels.length > 0 && inputValue(modelInput) === (DEFAULT_MODELS[operation] || "")) {
         modelInput.value = uniqueModels[0].value;
       }
       renderModelOptions(operation, uniqueModels.length > 0 ? uniqueModels : undefined);
+      return uniqueModels.length;
     } catch {
       if (state.modelRequestId === requestId && state.operation === operation) {
         renderModelOptions(operation);
       }
+      return 0;
+    }
+  }
+
+  async function refreshCurrentModelOptions() {
+    if (state.running) {
+      return;
+    }
+    modelRefreshButton.disabled = true;
+    setStatus("正在刷新服务商和模型...");
+    try {
+      var count = await refreshModelOptions(state.operation);
+      setStatus("模型列表已刷新\n可用模型：" + count);
+    } catch (error) {
+      setStatus("刷新模型失败\n" + explainError(error, { baseUrl: baseUrlInput.value.trim() }));
+    } finally {
+      modelRefreshButton.disabled = false;
     }
   }
 
@@ -2238,6 +2257,10 @@
 
   modelInput.addEventListener("input", function () {
     persistModelForOperation(state.operation);
+  });
+
+  modelRefreshButton.addEventListener("click", function () {
+    refreshCurrentModelOptions();
   });
 
   [baseUrlInput, twelveApiKeyInput, mimoApiKeyInput, providerBaseUrlInput, providerLabelInput].forEach(function (input) {

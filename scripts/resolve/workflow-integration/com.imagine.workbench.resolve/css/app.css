@@ -547,6 +547,21 @@ select:focus {
     var(--field);
 }
 
+.model-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+}
+
+.model-row input {
+  min-width: 0;
+}
+
+.icon-button {
+  min-height: 30px;
+  padding: 0 10px;
+}
+
 .advanced {
   margin-top: 12px;
   border-top: 1px solid var(--line);
