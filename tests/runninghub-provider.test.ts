@@ -609,10 +609,34 @@ test("runninghub youchuan image models map version-specific defaults", () => {
   assert.deepEqual(
     buildRunningHubStandardBody(v81, {
       prompt: "coffee poster",
+      aspectRatio: "16:9",
+      imageQuality: "4",
       referenceImages: [],
     }),
     {
       prompt: "coffee poster",
+      aspectRatio: "16:9",
+      chaos: 0,
+      quality: "4",
+      stylize: 0,
+      raw: false,
+      iw: 1,
+      sw: 100,
+      sv: 6,
+      hd: false,
+    },
+  );
+
+  assert.deepEqual(
+    buildRunningHubStandardBody(v81, {
+      prompt: "coffee poster with reference",
+      aspectRatio: "auto",
+      referenceImages: [{ dataUri: "data:image/png;base64,abc" }],
+      referenceUrls: ["https://runninghub.example/reference.png"],
+    }),
+    {
+      prompt: "coffee poster with reference",
+      imageUrl: "https://runninghub.example/reference.png",
       chaos: 0,
       quality: "1",
       stylize: 0,

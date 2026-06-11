@@ -302,6 +302,21 @@ const RUNNINGHUB_GEMINI_IMAGE_RESOLUTIONS: ParameterOption[] = [
   { value: "4k", label: "4K" },
 ];
 
+const RUNNINGHUB_YOUCHUAN_V81_IMAGE_RATIOS: ParameterOption[] = [
+  { value: "1:1", label: "1:1 Square" },
+  { value: "4:3", label: "4:3 Landscape" },
+  { value: "3:2", label: "3:2 Landscape" },
+  { value: "16:9", label: "16:9 Cinema" },
+  { value: "3:4", label: "3:4 Portrait" },
+  { value: "2:3", label: "2:3 Portrait" },
+  { value: "9:16", label: "9:16 Vertical" },
+];
+
+const RUNNINGHUB_YOUCHUAN_V81_QUALITY_OPTIONS: ParameterOption[] = [
+  { value: "1", label: "Quality 1" },
+  { value: "4", label: "Quality 4" },
+];
+
 const RUNNINGHUB_GEMINI_ULTRA_IMAGE_RESOLUTIONS: ParameterOption[] = [
   { value: "4k", label: "4K" },
   { value: "8k", label: "8K" },
@@ -1563,6 +1578,13 @@ function runningHubImageParameterProfile(
     return {
       aspectRatios: RUNNINGHUB_GEMINI_PRO_IMAGE_RATIOS,
       sizes: lower.includes("ultra") ? RUNNINGHUB_GEMINI_ULTRA_IMAGE_RESOLUTIONS : RUNNINGHUB_GEMINI_IMAGE_RESOLUTIONS,
+    };
+  }
+  if (lower.includes("youchuan/text-to-image-v81")) {
+    return {
+      aspectRatios: RUNNINGHUB_YOUCHUAN_V81_IMAGE_RATIOS,
+      qualityLevels: RUNNINGHUB_YOUCHUAN_V81_QUALITY_OPTIONS,
+      sizes: AUTO_IMAGE_SIZES,
     };
   }
   if (

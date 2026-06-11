@@ -632,8 +632,10 @@ test("runninghub exposes concrete standard model capabilities", () => {
   );
   assert.equal(IMAGE_MODEL_OPTIONS["runninghub"].some(option => option.value === "runninghub:api:/openapi/v2/seedream-v5-lite/image-to-image"), false);
   assert.equal(VIDEO_MODEL_OPTIONS["runninghub"].some(option => option.value === "runninghub:api:/openapi/v2/gemini-omni-flash/image-to-video"), false);
-  assert.equal(youchuan.supportsReferences, false);
-  assert.deepEqual(youchuan.aspectRatios.map(option => option.value), ["auto"]);
+  assert.equal(youchuan.supportsReferences, true);
+  assert.equal(youchuan.maxReferenceImages, 1);
+  assert.deepEqual(youchuan.aspectRatios.map(option => option.value), ["1:1", "4:3", "3:2", "16:9", "3:4", "2:3", "9:16"]);
+  assert.deepEqual(youchuan.qualityLevels.map(option => option.value), ["1", "4"]);
   assert.deepEqual(youchuan.sizes.map(option => option.value), ["auto"]);
   assert.throws(
     () => getModelCapability("runninghub:ai-app-audio:2061323800511344642", "audio"),

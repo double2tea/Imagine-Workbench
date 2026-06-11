@@ -215,6 +215,9 @@ type RunningHubStandardRequest =
       type: "youchuan-image";
       endpoint: string;
       extra: Record<string, unknown>;
+      aspectField?: "aspectRatio";
+      qualityField?: "quality";
+      referenceField?: "imageUrl";
     };
 
 export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
@@ -1296,12 +1299,15 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     model: "api:/openapi/v2/youchuan/text-to-image-v81",
     label: "RunningHub Youchuan V8.1 Text-to-Image",
     kind: "image",
-    supportsReferences: false,
+    supportsReferences: true,
     minReferenceImages: 0,
-    maxReferenceImages: 0,
+    maxReferenceImages: 1,
     request: {
       type: "youchuan-image",
       endpoint: "/openapi/v2/youchuan/text-to-image-v81",
+      aspectField: "aspectRatio",
+      qualityField: "quality",
+      referenceField: "imageUrl",
       extra: {
         chaos: 0,
         quality: "1",
@@ -1507,7 +1513,16 @@ export function buildRunningHubStandardBody(
     case "youchuan-image": {
       return {
         prompt: input.prompt,
+        ...(model.request.aspectField && input.aspectRatio && input.aspectRatio !== "auto"
+          ? { [model.request.aspectField]: input.aspectRatio }
+          : {}),
+        ...(model.request.referenceField && referenceMediaUrls.imageUrls[0]
+          ? { [model.request.referenceField]: referenceMediaUrls.imageUrls[0] }
+          : {}),
         ...model.request.extra,
+        ...(model.request.qualityField && input.imageQuality && input.imageQuality !== "auto"
+          ? { [model.request.qualityField]: input.imageQuality }
+          : {}),
       };
     }
   }
