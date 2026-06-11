@@ -3370,7 +3370,7 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 }
 
 .board-media-node {
-  contain: layout;
+  contain: none;
 }
 
 .board-media-preview {
