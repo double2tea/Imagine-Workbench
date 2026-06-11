@@ -143,7 +143,10 @@
     resolve: null,
     sharedCredentials: {},
     preparedMask: null,
-    lastOutputs: []
+    lastOutputs: [],
+    promptDraft: "",
+    importToResolve: true,
+    appendToTimeline: false
   };
 
   var outputDir = hasNode ? path.join(os.homedir(), "Movies", "Imagine Resolve Bridge") : "";
@@ -297,18 +300,18 @@
   function selectOperation(operation) {
     state.operation = operation;
     var config = operationConfigs[operation];
+    var needsPrompt = config.promptLabel !== "无需提示词";
     promptLabel.textContent = config.promptLabel;
     promptInput.placeholder = config.placeholder;
-    promptInput.disabled = config.promptLabel === "无需提示词";
+    promptInput.disabled = !needsPrompt;
+    promptInput.value = needsPrompt ? state.promptDraft : "";
     imageOperationField.classList.toggle("hidden", config.imageOperation !== true);
     pollSecondsField.classList.toggle("hidden", config.pollSeconds !== true);
     languageField.classList.toggle("hidden", config.language !== true);
     importInput.disabled = config.canImport !== true;
     appendInput.disabled = config.canAppend !== true;
-    importInput.checked = config.canImport === true;
-    if (config.canAppend !== true) {
-      appendInput.checked = false;
-    }
+    importInput.checked = config.canImport === true && state.importToResolve;
+    appendInput.checked = config.canAppend === true && state.appendToTimeline;
     clearPreparedMask();
     renderSources(config);
     renderOperations();
@@ -374,14 +377,19 @@
     var job = buildJob(operationOverride);
     state.running = true;
     state.activeOperation = job.operation;
-    setLastOutputs([]);
+    var keepLastOutputs = job.operation === "doctor";
+    if (!keepLastOutputs) {
+      setLastOutputs([]);
+    }
     runButton.disabled = true;
     setStatus("运行中\n" + describeJob(job));
     try {
       await loadSharedCredentialsForJob(job);
       var result = await executeJob(job);
       saveJob(job);
-      setLastOutputs(result);
+      if (!keepLastOutputs) {
+        setLastOutputs(result);
+      }
       setStatus("已完成\n" + describeJob(job) + "\n\n" + result.join("\n"));
     } catch (error) {
       setStatus("运行失败\n" + explainError(error, job));
@@ -895,11 +903,13 @@
   async function editImage(job, model, imagePath, maskPath) {
     var parts = [
       { name: "model", value: model },
-      { name: "prompt", value: job.prompt },
       { name: "operation", value: job.imageOperation || "redraw" },
       { name: "response_format", value: "b64_json" },
       { name: "image", filePath: imagePath }
     ];
+    if (job.prompt) {
+      parts.push({ name: "prompt", value: job.prompt });
+    }
     if (maskPath) {
       parts.push({ name: "mask", filePath: maskPath });
     }
@@ -1675,6 +1685,20 @@
 
   imageOperationInput.addEventListener("change", function () {
     clearPreparedMask();
+  });
+
+  promptInput.addEventListener("input", function () {
+    if (!promptInput.disabled) {
+      state.promptDraft = promptInput.value;
+    }
+  });
+
+  importInput.addEventListener("change", function () {
+    state.importToResolve = importInput.checked;
+  });
+
+  appendInput.addEventListener("change", function () {
+    state.appendToTimeline = appendInput.checked;
   });
 
   maskPrepareButton.addEventListener("click", prepareMaskFromButton);
