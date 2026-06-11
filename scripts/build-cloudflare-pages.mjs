@@ -7,6 +7,7 @@ const localOnlyRoutes = [
   "app/api/resolve/commands",
   "app/api/resolve/provider-credentials",
 ];
+const movedRoutes = [];
 
 function disabledRoutePath(routePath) {
   return path.join(disabledRoutesDir, routePath.replaceAll("/", "__"));
@@ -25,11 +26,13 @@ async function moveRoutesOut() {
   await mkdir(disabledRoutesDir, { recursive: true });
   for (const routePath of localOnlyRoutes) {
     await rename(routePath, disabledRoutePath(routePath));
+    movedRoutes.push(routePath);
   }
 }
 
 async function restoreRoutes() {
-  for (const routePath of localOnlyRoutes) {
+  for (let index = movedRoutes.length - 1; index >= 0; index -= 1) {
+    const routePath = movedRoutes[index];
     await rename(disabledRoutePath(routePath), routePath);
   }
   await rm(disabledRoutesDir, { force: true, recursive: true });
@@ -37,9 +40,9 @@ async function restoreRoutes() {
 
 await rm(".next", { force: true, recursive: true });
 await rm(path.join(".vercel", "output"), { force: true, recursive: true });
-await moveRoutesOut();
 
 try {
+  await moveRoutesOut();
   const exitCode = await run("pnpm", ["dlx", "@cloudflare/next-on-pages@1"], {
     ...process.env,
     ENABLE_EXPERIMENTAL_COREPACK: "1",
