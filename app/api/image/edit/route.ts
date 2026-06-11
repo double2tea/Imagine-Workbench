@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { apiErrorResponse, badRequest, requireApiText } from "@/lib/api/errors";
+import { ApiError, apiErrorResponse, badRequest, requireApiText } from "@/lib/api/errors";
+import { assertPublicHttpUrl } from "@/lib/api/url-safety";
 import { editImage } from "@/lib/providers/image";
 import { parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
 import { dataUriToBlob, optionalText, resolveProviderConfig } from "@/lib/providers/utils";
@@ -80,13 +81,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: message }, { status: 400 });
     }
     const response = apiErrorResponse(error, "Failed to edit image");
-    if (response.status >= 500) console.error("Image edit route error:", error);
+    if (response.status >= 500 && !(error instanceof ApiError)) console.error("Image edit route error:", error);
     return NextResponse.json(response.body, { status: response.status });
   }
 }
 
 async function imageUrlResponse(imageUrl: string, source: string): Promise<Response> {
-  const response = await fetch(imageUrl);
+  const response = await fetch(assertPublicHttpUrl(imageUrl, "unsafe_image_result_url"));
   if (!response.ok) {
     throw new Error(`图片编辑结果下载失败：HTTP ${response.status}`);
   }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiErrorResponse, badRequest, requireApiText } from "@/lib/api/errors";
-import { getVideoModelCapabilities, parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
+import { DEFAULT_VIDEO_MODEL, getVideoModelCapabilities, parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
 import { generateVideo } from "@/lib/providers/video";
 import {
   readRunningHubNodeInfoList,
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     if (bodySizeError) return NextResponse.json({ error: bodySizeError }, { status: 413 });
 
     const body = (await req.json()) as GenerateVideoBody;
-    const modelValue = optionalText(body.model) ?? "12ai:veo_3_1-fast";
+    const modelValue = optionalText(body.model) ?? DEFAULT_VIDEO_MODEL;
     const parsed = parseProviderModel(modelValue, "12ai");
     const config = resolveProviderConfig(req, parsed.provider);
     const capability = getVideoModelCapabilities(modelValue);

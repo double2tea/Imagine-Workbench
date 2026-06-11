@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { GET as listOpenAiModels } from "../lib/api/openai-models";
-import { RUNNINGHUB_CONTROL_IMAGE_APP_MODEL } from "../lib/providers/runninghub";
 
 test("OpenAI-compatible model list returns provider-prefixed model ids", async () => {
   const response = await listOpenAiModels(new Request("http://local.test/v1/models?provider=mimo&kind=chat", {
@@ -21,7 +20,7 @@ test("OpenAI-compatible model list returns provider-prefixed model ids", async (
   )));
 });
 
-test("OpenAI-compatible model list defaults to all known Workbench provider models", async () => {
+test("OpenAI-compatible model list defaults to v1-callable provider models", async () => {
   const response = await listOpenAiModels(new Request("http://local.test/v1/models?kind=all"));
 
   assert.equal(response.status, 200);
@@ -32,9 +31,22 @@ test("OpenAI-compatible model list defaults to all known Workbench provider mode
   assert.equal(body.object, "list");
   assert.ok(body.data?.some(model => model.id === "12ai:gemini-3.1-flash-image-preview"));
   assert.ok(body.data?.some(model => model.id === "mimo:mimo-v2.5-tts"));
-  assert.ok(body.data?.some(model => model.id === `runninghub:${RUNNINGHUB_CONTROL_IMAGE_APP_MODEL}`));
+  assert.ok(body.data?.some(model => model.id === "runninghub:qwen/qwen3.7-max"));
+  assert.equal(body.data?.some(model => model.id === "12ai:veo_3_1-fast"), false);
+  assert.equal(body.data?.some(model => typeof model.id === "string" && model.id.startsWith("12ai-async:")), false);
+  assert.equal(body.data?.some(model => typeof model.id === "string" && model.id.startsWith("modelscope:")), false);
+  assert.equal(body.data?.some(model => typeof model.id === "string" && model.id.startsWith("runninghub:ai-app-")), false);
+  assert.equal(body.data?.some(model => typeof model.id === "string" && model.id.startsWith("runninghub:api:/openapi/v2/")), false);
   assert.equal(body.data?.some(model => typeof model.id === "string" && model.id.includes("<webappId>")), false);
   assert.equal(body.data?.some(model => typeof model.id === "string" && model.id.includes("<workflowId>")), false);
+});
+
+test("OpenAI-compatible model list does not advertise unsupported v1 video models", async () => {
+  const response = await listOpenAiModels(new Request("http://local.test/v1/models?provider=all&kind=video"));
+
+  assert.equal(response.status, 200);
+  const body = await response.json() as { data?: Array<{ id?: unknown }> };
+  assert.deepEqual(body.data, []);
 });
 
 test("OpenAI-compatible model list accepts provider=all explicitly", async () => {

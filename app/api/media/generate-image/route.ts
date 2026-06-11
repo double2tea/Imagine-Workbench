@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { apiErrorResponse, requireApiText } from "@/lib/api/errors";
-import { getImageModelCapabilities, getImageResolutionOptions, parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
+import { ApiError, apiErrorResponse, requireApiText } from "@/lib/api/errors";
+import { assertPublicHttpUrl } from "@/lib/api/url-safety";
+import { DEFAULT_IMAGE_MODEL, getImageModelCapabilities, getImageResolutionOptions, parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
 import { generateImage } from "@/lib/providers/image";
 import {
   readRunningHubNodeInfoList,
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
     if (bodySizeError) return NextResponse.json({ error: bodySizeError }, { status: 413 });
 
     const body = (await req.json()) as GenerateImageBody;
-    const modelValue = optionalText(body.model) ?? "12ai:gemini-3.1-flash-image-preview";
+    const modelValue = optionalText(body.model) ?? DEFAULT_IMAGE_MODEL;
     const parsed = parseProviderModel(modelValue, "12ai");
     const config = resolveProviderConfig(req, parsed.provider);
     const requestImageResolution = optionalText(body.imageResolution);
@@ -82,13 +83,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: message }, { status: 400 });
     }
     const response = apiErrorResponse(err, "Failed to generate image");
-    if (response.status >= 500) console.error("Image generation route error:", err);
+    if (response.status >= 500 && !(err instanceof ApiError)) console.error("Image generation route error:", err);
     return NextResponse.json(response.body, { status: response.status });
   }
 }
 
 async function imageUrlResponse(imageUrl: string, source: string): Promise<Response> {
-  const response = await fetch(imageUrl);
+  const response = await fetch(assertPublicHttpUrl(imageUrl, "unsafe_image_result_url"));
   if (!response.ok) {
     throw new Error(`图片结果下载失败：HTTP ${response.status}`);
   }

@@ -6,8 +6,10 @@ import { parseProviderModel, ProviderModelParseError, type AiProvider } from "..
 import type { ImageEditOperation, MimoAsrLanguage } from "../providers/types";
 import { optionalText, parseDataUri, resolveProviderConfig } from "../providers/utils";
 import { audioOperationApiError } from "./audio-errors";
-import { apiErrorResponse, badRequest, requireApiText } from "./errors";
+import { ApiError, apiErrorResponse, badRequest, requireApiText } from "./errors";
 import { assertOpenAiCompatibleGatewayAccess } from "./openai-auth";
+import { assertPublicHttpUrl } from "./url-safety";
+import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES } from "../reference-images";
 
 const IMAGE_EDIT_OPERATIONS = new Set<ImageEditOperation>(["redraw", "erase", "outpaint", "cutout"]);
 const TRANSCRIPTION_LANGUAGES = new Set<MimoAsrLanguage>(["auto", "zh", "en"]);
@@ -76,6 +78,7 @@ export async function postOpenAiImageGenerations(req: Request): Promise<Response
 export async function postOpenAiImageEdits(req: Request): Promise<Response> {
   try {
     const gatewayKey = assertOpenAiCompatibleGatewayAccess(req);
+    assertRequestBodySize(req, "Image edit request body is too large");
     const form = await req.formData();
     assertAllowedFormFields(form, IMAGE_EDIT_FORM_FIELDS);
     const modelValue = readFormText(form, "model");
@@ -154,6 +157,7 @@ export async function postOpenAiAudioSpeech(req: Request): Promise<Response> {
 export async function postOpenAiAudioTranscriptions(req: Request): Promise<Response> {
   try {
     const gatewayKey = assertOpenAiCompatibleGatewayAccess(req);
+    assertRequestBodySize(req, "Audio transcription request body is too large");
     const form = await req.formData();
     assertAllowedFormFields(form, TRANSCRIPTION_FORM_FIELDS);
     const modelValue = readFormText(form, "model");
@@ -196,7 +200,7 @@ function openAiMediaErrorResponse(error: unknown, fallbackMessage: string): Resp
     return Response.json({ error: error.message, code: "invalid_provider_model" }, { status: 400 });
   }
   const response = apiErrorResponse(error, fallbackMessage);
-  if (response.status >= 500) console.error("OpenAI-compatible media route error:", error);
+  if (response.status >= 500 && !(error instanceof ApiError)) console.error("OpenAI-compatible media route error:", error);
   return Response.json(response.body, { status: response.status });
 }
 
@@ -223,11 +227,9 @@ async function openAiImageResponse(imageUrl: string, responseFormat: ImageRespon
 
 async function imageUrlToBase64(imageUrl: string): Promise<string> {
   if (imageUrl.startsWith("data:")) return parseDataUri(imageUrl).base64;
-  if (!imageUrl.startsWith("http://") && !imageUrl.startsWith("https://")) {
-    throw badRequest("Image result is not a supported URL", "unsupported_image_url");
-  }
+  const url = assertPublicHttpUrl(imageUrl, "unsafe_image_result_url");
 
-  const response = await fetch(imageUrl);
+  const response = await fetch(url);
   if (!response.ok) throw new Error(`Image result download failed with HTTP ${response.status}`);
   const contentType = response.headers.get("Content-Type") ?? "";
   if (!contentType.startsWith("image/")) throw new Error("Image result URL did not return an image");
@@ -326,7 +328,25 @@ async function formValueToDataUri(value: FormDataEntryValue, fieldName: string, 
     throw badRequest(`${fieldName} must be a file or base64 data URI`, "invalid_file");
   }
   const mimeType = value.type || fallbackMimeType;
-  return `data:${mimeType};base64,${arrayBufferToBase64(await value.arrayBuffer())}`;
+  const buffer = await value.arrayBuffer();
+  assertFileSize(buffer.byteLength, `${fieldName} is too large`);
+  return `data:${mimeType};base64,${arrayBufferToBase64(buffer)}`;
+}
+
+function assertRequestBodySize(req: Request, message: string): void {
+  const contentLength = req.headers.get("content-length");
+  if (!contentLength) return;
+
+  const bytes = Number(contentLength);
+  if (Number.isFinite(bytes) && bytes > REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES) {
+    throw new ApiError(413, "payload_too_large", message);
+  }
+}
+
+function assertFileSize(bytes: number, message: string): void {
+  if (bytes > REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES) {
+    throw new ApiError(413, "payload_too_large", message);
+  }
 }
 
 function imageSizeAspectRatio(size: string): string {

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { apiErrorResponse, badRequest } from "./errors";
-import type { AiProvider } from "../providers/model-catalog";
-import { parseProviderModel } from "../providers/model-catalog";
+import type { AiProvider, ModelKind, ModelOption } from "../providers/model-catalog";
+import { getModelCapability, parseProviderModel, ProviderModelParseError } from "../providers/model-catalog";
 import { isProviderKey, PROVIDER_KEYS } from "../providers/registry";
 import { listProviderModels, listStaticProviderModels, type ModelKindFilter } from "../providers/models";
 import { resolveProviderConfig } from "../providers/utils";
@@ -72,5 +72,41 @@ async function listSingleProviderModels(
 }
 
 function listAllKnownProviderModels(kind: ModelKindFilter) {
-  return PROVIDER_KEYS.flatMap(provider => listStaticProviderModels(provider, kind));
+  return PROVIDER_KEYS
+    .flatMap(provider => listStaticProviderModels(provider, kind))
+    .filter(model => isOpenAiCompatibleModel(model, kind));
+}
+
+function isOpenAiCompatibleModel(model: ModelOption, kind: ModelKindFilter): boolean {
+  const modelKind = readOpenAiCompatibleModelKind(model.value);
+  if (!modelKind) return false;
+  return kind === "all" || kind === modelKind;
+}
+
+function readOpenAiCompatibleModelKind(model: string): ModelKind | undefined {
+  try {
+    const parsed = parseProviderModel(model, "12ai");
+    if (parsed.async || parsed.provider === "modelscope") return undefined;
+    if (parsed.provider === "runninghub") {
+      return readCapabilityKind(model, ["chat"]);
+    }
+
+    return readCapabilityKind(model, ["chat", "image", "audio"]);
+  } catch (error) {
+    if (error instanceof ProviderModelParseError) return undefined;
+    throw error;
+  }
+}
+
+function readCapabilityKind(model: string, kinds: readonly ModelKind[]): ModelKind | undefined {
+  for (const kind of kinds) {
+    try {
+      const capability = getModelCapability(model, kind);
+      if (capability.kind === kind) return kind;
+    } catch (error) {
+      if (error instanceof Error) continue;
+      throw error;
+    }
+  }
+  return undefined;
 }

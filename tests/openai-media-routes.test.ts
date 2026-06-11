@@ -7,6 +7,7 @@ import {
   postOpenAiImageEdits,
   postOpenAiImageGenerations,
 } from "../lib/api/openai-media";
+import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES } from "../lib/reference-images";
 
 test("OpenAI-compatible image generations maps JSON to provider image adapter", async () => {
   const mock = withFetchMock(async (url, init) => {
@@ -179,6 +180,42 @@ test("OpenAI-compatible image generations rejects workflow providers before prov
   } finally {
     mock.restore();
   }
+});
+
+test("OpenAI-compatible image generations blocks private provider result URLs when converting to base64", async () => {
+  const mock = withFetchMock(async () => {
+    return jsonResponse({ data: [{ url: "http://127.0.0.1/private.png" }] });
+  });
+
+  try {
+    const response = await postOpenAiImageGenerations(jsonRequest("/v1/images/generations", {
+      model: "newapi:image-model",
+      prompt: "cat",
+    }, {
+      "x-ai-api-key": "image_key",
+      "x-ai-base-url": "https://newapi.example.test/v1",
+    }));
+
+    assert.equal(response.status, 502);
+    assert.match(await response.text(), /local or private network/);
+    assert.equal(mock.calls.count, 1);
+  } finally {
+    mock.restore();
+  }
+});
+
+test("OpenAI-compatible image edits rejects oversized multipart bodies before parsing files", async () => {
+  const response = await postOpenAiImageEdits(new Request("http://local.test/v1/images/edits", {
+    method: "POST",
+    headers: {
+      "Content-Type": "text/plain",
+      "Content-Length": String(REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES + 1),
+    },
+    body: "not multipart",
+  }));
+
+  assert.equal(response.status, 413);
+  assert.match(await response.text(), /too large/);
 });
 
 test("OpenAI-compatible image edits accepts multipart image upload", async () => {
@@ -356,6 +393,20 @@ test("OpenAI-compatible audio transcriptions checks gateway auth before parsing 
   } finally {
     restoreEnv("OPENAI_COMPAT_API_KEY", originalGatewayKey);
   }
+});
+
+test("OpenAI-compatible audio transcriptions rejects oversized multipart bodies before parsing files", async () => {
+  const response = await postOpenAiAudioTranscriptions(new Request("http://local.test/v1/audio/transcriptions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "text/plain",
+      "Content-Length": String(REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES + 1),
+    },
+    body: "not multipart",
+  }));
+
+  assert.equal(response.status, 413);
+  assert.match(await response.text(), /too large/);
 });
 
 test("OpenAI-compatible audio transcriptions rejects unsupported languages", async () => {
