@@ -7,14 +7,15 @@ import { useEffect, useState, type ReactNode } from "react";
 import {
   Crosshair,
   Loader2,
-  Maximize2,
-  Paintbrush,
   Play,
   Send,
   Settings,
-  SlidersHorizontal,
   Trash2,
 } from "lucide-react";
+import {
+  WORKBENCH_OPERATION_META,
+  WorkbenchOperationIcon,
+} from "@/components/workbench/OperationControls";
 import { getAssetMetasByIds, hydrateAssets, type StorageItem } from "@/lib/db";
 import {
   ASR_LANGUAGE_OPTIONS,
@@ -1109,16 +1110,16 @@ export default function BoardInspector({
           {node.kind === "asset" && (
             <InspectorSection title="媒体动作">
               <div className="grid grid-cols-3 gap-2">
-                <button type="button" onClick={() => onOpenFullscreen(items.find(item => item.id === node.asset.assetId) ?? null)} className={secondaryButtonClass} title="全屏">
-                  <Maximize2 className="h-3.5 w-3.5" />
+                <button type="button" onClick={() => onOpenFullscreen(items.find(item => item.id === node.asset.assetId) ?? null)} className={secondaryButtonClass} title={WORKBENCH_OPERATION_META.fullscreen.title}>
+                  <WorkbenchOperationIcon operation="fullscreen" />
                 </button>
                 {node.asset.type === "image" && onEditAssetImage ? (
-                  <button type="button" onClick={onEditAssetImage} className={secondaryButtonClass} title="编辑图片">
-                    <Paintbrush className="h-3.5 w-3.5" />
+                  <button type="button" onClick={onEditAssetImage} className={secondaryButtonClass} title={WORKBENCH_OPERATION_META.localEdit.title}>
+                    <WorkbenchOperationIcon operation="localEdit" />
                   </button>
                 ) : (
                   <span className={`${secondaryButtonClass} cursor-not-allowed opacity-40`} title="仅图片可编辑">
-                    <Paintbrush className="h-3.5 w-3.5" />
+                    <WorkbenchOperationIcon operation="localEdit" />
                   </span>
                 )}
                 <button type="button" onClick={onSendAssetToAgent} className={secondaryButtonClass} title="发送到 Agent">
@@ -1127,7 +1128,7 @@ export default function BoardInspector({
               </div>
               {node.asset.type === "image" && onCompareAsset ? (
                 <button type="button" onClick={onCompareAsset} className={`${secondaryButtonClass} w-full gap-2 text-xs font-semibold`}>
-                  <SlidersHorizontal className="h-3.5 w-3.5" />
+                  <WorkbenchOperationIcon operation="compare" />
                   对比参考
                 </button>
               ) : null}

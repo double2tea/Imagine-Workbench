@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
-import { Download, Eraser, Maximize2, Minimize2, Minus, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Archive, Download, Eraser, Maximize2, Minimize2, Minus, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
 import type { BoardMultiGridAspectRatio, BoardMultiGridItem, BoardMultiGridNode, BoardMultiGridSize, BoardSize } from "@/lib/board";
 import { DEFAULT_MULTI_GRID_NODE_SIZE } from "@/lib/board/defaults";
 import {
@@ -575,7 +575,7 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
                         title="暂存"
                         aria-label="暂存多宫格图片"
                       >
-                        <Download className="h-3 w-3 rotate-180" />
+                        <Archive className="h-3 w-3" />
                       </button>
                       <button
                         type="button"

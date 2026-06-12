@@ -1,22 +1,16 @@
 import {
   CheckSquare,
   ChevronDown,
-  Compass,
-  Download,
   FileText,
   Image as ImageIcon,
-  Maximize2,
   MoreHorizontal,
-  Mic2,
   Music,
   RefreshCw,
-  SlidersHorizontal,
   Sparkles,
   Square,
-  Trash2,
-  Video as VideoIcon,
   X,
 } from "lucide-react";
+import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
 import { useEffect, useRef, useState, type DragEvent, type MouseEvent, type PointerEvent } from "react";
 import AudioWaveformPreview from "@/components/audio/AudioWaveformPreview";
 import VideoFrameMenu from "@/components/assets/VideoFrameMenu";
@@ -36,6 +30,7 @@ import {
   IMAGE_EDIT_OPERATION_ORDER,
   WORKBENCH_OPERATION_META,
   WorkbenchActionButton,
+  WorkbenchOperationIcon,
   WorkbenchPopoverMenu,
   WorkbenchPopoverMenuItem,
   type WorkbenchActionDescriptor,
@@ -201,7 +196,7 @@ export default function AssetCard({
   const imageHoverActions: WorkbenchActionDescriptor[] = item.type === "image"
     ? [
         {
-          icon: <Compass className="h-3 w-3" />,
+          icon: <WorkbenchOperationIcon operation="panorama" className="h-3 w-3" />,
           id: "panorama",
           label: "360",
           onClick: () => onOpenPanorama(item),
@@ -210,7 +205,7 @@ export default function AssetCard({
         },
         {
           ariaLabel: "以此图首帧生成视频",
-          icon: <VideoIcon className="h-3 w-3" />,
+          icon: <WorkbenchOperationIcon operation="imageToVideo" className="h-3 w-3" />,
           id: "image-to-video",
           label: WORKBENCH_OPERATION_META.imageToVideo.label,
           onClick: () => onApplyVideoReference(item),
@@ -219,7 +214,7 @@ export default function AssetCard({
         },
         {
           ariaLabel: "引用至 Agent",
-          icon: <Sparkles className="h-3 w-3" />,
+          icon: <AgentIdentityMark variant="inline" />,
           id: "agent-reference",
           label: "Agent",
           onClick: () => onUseAgentReference(item),
@@ -232,7 +227,7 @@ export default function AssetCard({
   const sharedHoverActions: WorkbenchActionDescriptor[] = [
     {
       ariaLabel: "复用任务参数",
-      icon: <SlidersHorizontal className="h-3 w-3" />,
+      icon: <WorkbenchOperationIcon operation="reuse" className="h-3 w-3" />,
       id: "reuse",
       label: WORKBENCH_OPERATION_META.reuse.label,
       onClick: () => onReuseTask(item),
@@ -243,7 +238,7 @@ export default function AssetCard({
       ? [
           {
             ariaLabel: "保存为克隆音色",
-            icon: <Mic2 className="h-3 w-3" />,
+            icon: <WorkbenchOperationIcon operation="voice" className="h-3 w-3" />,
             id: "voice-profile",
             label: WORKBENCH_OPERATION_META.voice.label,
             onClick: () => onSaveVoiceProfile(item),
@@ -254,7 +249,7 @@ export default function AssetCard({
       : []),
     {
       ariaLabel: "下载文件",
-      icon: <Download className="h-3 w-3" />,
+      icon: <WorkbenchOperationIcon operation="download" className="h-3 w-3" />,
       id: "download",
       label: WORKBENCH_OPERATION_META.download.label,
       onClick: () => onDownload(item),
@@ -263,7 +258,7 @@ export default function AssetCard({
     },
     {
       ariaLabel: "全屏预览",
-      icon: <Maximize2 className="h-3 w-3" />,
+      icon: <WorkbenchOperationIcon operation="fullscreen" className="h-3 w-3" />,
       id: "fullscreen",
       onClick: () => onOpenFullscreen(item),
       title: "全屏大画幅细节放大",
@@ -274,7 +269,7 @@ export default function AssetCard({
           {
             active: inCompare,
             ariaLabel: inCompare ? "从对比面板移除" : "加入对比面板",
-            icon: <RefreshCw className="h-3 w-3" />,
+            icon: <WorkbenchOperationIcon operation="compare" className="h-3 w-3" />,
             id: "compare",
             label: WORKBENCH_OPERATION_META.compare.label,
             onClick: () => onToggleCompare(item.id),
@@ -285,7 +280,7 @@ export default function AssetCard({
       : []),
     {
       ariaLabel: "删除资产",
-      icon: <Trash2 className="h-3 w-3" />,
+      icon: <WorkbenchOperationIcon operation="delete" className="h-3 w-3" />,
       id: "delete",
       onClick: () => onDelete(item),
       title: "移除此项",
@@ -480,7 +475,7 @@ export default function AssetCard({
                 data-size="compact"
                 className="imagine-secondary-action flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-semibold"
               >
-                <SlidersHorizontal className="h-3 w-3" />
+                <WorkbenchOperationIcon operation="reuse" className="h-3 w-3" />
                 复用参数
               </button>
             </div>
@@ -552,19 +547,19 @@ export default function AssetCard({
                   </button>
                   {item.type === "image" && (
                     <button type="button" onClick={() => runMobileAction(() => onApplyVideoReference(item))}>
-                      <VideoIcon className="imagine-tone-icon h-3.5 w-3.5" data-tone="violet" />
+                      <WorkbenchOperationIcon operation="imageToVideo" className="imagine-tone-icon h-3.5 w-3.5" />
                       生视频
                     </button>
                   )}
                   {item.type === "image" && (
                     <button type="button" onClick={() => runMobileAction(() => onUseAgentReference(item))}>
-                      <Sparkles className="imagine-tone-icon h-3.5 w-3.5" data-tone="accent" />
+                      <AgentIdentityMark variant="inline" />
                       Agent
                     </button>
                   )}
                   {item.type === "image" && (
                     <button type="button" onClick={() => runMobileAction(() => onOpenPanorama(item))}>
-                      <Compass className="imagine-tone-icon h-3.5 w-3.5" data-tone="info" />
+                      <WorkbenchOperationIcon operation="panorama" className="imagine-tone-icon h-3.5 w-3.5" />
                       全景
                     </button>
                   )}
@@ -579,25 +574,25 @@ export default function AssetCard({
                     );
                   })}
                   <button type="button" onClick={() => runMobileAction(() => onDownload(item))}>
-                    <Download className="imagine-tone-icon h-3.5 w-3.5" data-tone="success" />
+                    <WorkbenchOperationIcon operation="download" className="imagine-tone-icon h-3.5 w-3.5" />
                     下载
                   </button>
                   <button type="button" onClick={() => runMobileAction(() => onReuseTask(item))}>
-                    <SlidersHorizontal className="imagine-tone-icon h-3.5 w-3.5" data-tone="info" />
+                    <WorkbenchOperationIcon operation="reuse" className="imagine-tone-icon h-3.5 w-3.5" />
                     复用
                   </button>
                   {item.type !== "transcript" && (
                     <button type="button" onClick={() => runMobileAction(() => onToggleCompare(item.id))}>
-                      <RefreshCw className="imagine-tone-icon h-3.5 w-3.5" data-tone="accent" />
+                      <WorkbenchOperationIcon operation="compare" className="imagine-tone-icon h-3.5 w-3.5" />
                       {inCompare ? "取消对比" : "对比"}
                     </button>
                   )}
                   <button type="button" onClick={() => runMobileAction(() => onOpenFullscreen(item))}>
-                    <Maximize2 className="h-3.5 w-3.5 text-slate-300" />
+                    <WorkbenchOperationIcon operation="fullscreen" className="h-3.5 w-3.5 text-slate-300" />
                     放大
                   </button>
                   <button type="button" onClick={() => runMobileAction(() => onDelete(item))}>
-                    <Trash2 className="imagine-tone-icon h-3.5 w-3.5" data-tone="danger" />
+                    <WorkbenchOperationIcon operation="delete" className="imagine-tone-icon h-3.5 w-3.5" />
                     删除
                   </button>
                 </div>

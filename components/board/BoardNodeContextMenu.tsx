@@ -7,14 +7,12 @@ import {
   Copy,
   GitBranchPlus,
   Images,
-  Mic2,
-  Pencil,
   Play,
-  ScanSearch,
   Trash2,
   Ungroup,
   type LucideIcon,
 } from "lucide-react";
+import { WORKBENCH_OPERATION_META } from "@/components/workbench/OperationControls";
 import { BOARD_NODE_CONTEXT_MENU_SIZE, clampFloatingMenuPosition } from "@/lib/board/interaction";
 import type { BoardNode } from "@/lib/board";
 
@@ -46,16 +44,16 @@ const actionGroupLabels: Record<BoardNodeContextMenuGroup, string> = {
 const actionIcons: Record<string, LucideIcon> = {
   agent: Bot,
   "agent-send": Bot,
-  compare: ScanSearch,
+  compare: WORKBENCH_OPERATION_META.compare.Icon,
   "connect-selected": GitBranchPlus,
   "copy-image": Clipboard,
   "create-reference-group": Images,
   delete: Trash2,
   duplicate: Copy,
-  edit: Pencil,
+  edit: WORKBENCH_OPERATION_META.localEdit.Icon,
   execute: Play,
   "group-selected": Images,
-  "save-voice-profile": Mic2,
+  "save-voice-profile": WORKBENCH_OPERATION_META.voice.Icon,
   ungroup: Ungroup,
 };
 
@@ -96,7 +94,7 @@ export function buildBoardNodeContextMenuActions(input: {
   }
   if (input.node.kind === "asset" && input.node.asset.type === "image") {
     if (input.onCompare) actions.push({ id: "compare", label: "对比参考", onSelect: input.onCompare });
-    if (input.onEditImage) actions.push({ id: "edit", label: "编辑图片", onSelect: input.onEditImage });
+    if (input.onEditImage) actions.push({ id: "edit", label: WORKBENCH_OPERATION_META.localEdit.label, onSelect: input.onEditImage });
   }
   if (input.node.kind === "asset") {
     if (input.node.asset.type === "audio" && input.onSaveVoiceProfile) {

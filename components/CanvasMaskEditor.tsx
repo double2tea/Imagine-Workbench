@@ -5,12 +5,12 @@ import {
   Check,
   Crop,
   Eraser,
-  Expand,
   Paintbrush,
   RefreshCw,
   RotateCcw,
   ScanSearch,
   Sliders,
+  SquareDashed,
   Type,
   X,
 } from "lucide-react";
@@ -110,7 +110,7 @@ const EDITOR_MODE_OPTIONS: Array<{ mode: CanvasEditorMode; label: string; hint: 
   { mode: "compare", label: "对比", hint: "左右对比原图与当前编辑状态", icon: <ScanSearch className="h-3.5 w-3.5" /> },
   { mode: "text", label: "文字", hint: "点击画布放置文字", icon: <Type className="h-3.5 w-3.5" /> },
   { mode: "crop", label: "裁切", hint: "拖动选框或把手调整构图", icon: <Crop className="h-3.5 w-3.5" /> },
-  { mode: "outpaint", label: "扩图", hint: "设置四周扩展像素", icon: <Expand className="h-3.5 w-3.5" /> },
+  { mode: "outpaint", label: "扩图", hint: "设置四周扩展像素", icon: <SquareDashed className="h-3.5 w-3.5" /> },
 ];
 
 const OPERATION_COPY: Record<ImageEditFeature, { title: string; hint: string; promptPlaceholder: string }> = {
