@@ -67,6 +67,7 @@ import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
 import {
   imageEditFeatureLabel,
   imageQuickEditFallbackPrompt,
+  type ImageQuickEditTarget,
   resolveImageQuickEditTarget,
   submitImageQuickEdit,
 } from "@/lib/image-quick-edit-targets";
@@ -118,6 +119,19 @@ import { CLEAR_WORKSPACE_ASSETS_MESSAGE } from "@/lib/workspace-messages";
 
 type NoticeType = "error" | "info" | "success";
 type MaskDestination = "creative" | "agent";
+
+interface WorkspaceImageQuickEditJob {
+  controller: AbortController;
+  editImageResolution: string;
+  editImageUrl: string;
+  editPrompt: string;
+  guideUrl: string | undefined;
+  maskUrl: string | undefined;
+  operation: ImageEditFeature;
+  pending: StorageItem;
+  pendingTaskIds: string[];
+  target: ImageQuickEditTarget;
+}
 const DESKTOP_LAYOUT_QUERY = "(min-width: 1024px)";
 
 function useDesktopLayout(): boolean | null {
@@ -1146,7 +1160,7 @@ export default function Home() {
     setItems(prev => prev.map(current => current.id === nextItem.id ? nextItem : current));
   };
 
-  const runImageQuickEdit = async (
+  const startImageQuickEdit = async (
     sourceItem: StorageItem,
     operation: ImageEditFeature,
     editImageUrl: string,
@@ -1157,10 +1171,37 @@ export default function Home() {
   ) => {
     const target = resolveImageQuickEditTarget(operation, imageEditFeatureTargets[operation]);
     const pending = await createImageQuickEditProcessingAsset(sourceItem, operation, editImageUrl, target.model, editPrompt);
-    if (!pending) return;
+    if (!pending) return null;
     const pendingTaskIds = relatedQuickEditTaskIds(pending.id);
     const controller = new AbortController();
     for (const id of pendingTaskIds) generationAbortControllersRef.current[id] = controller;
+    return {
+      controller,
+      editImageResolution,
+      editImageUrl,
+      editPrompt,
+      guideUrl,
+      maskUrl,
+      operation,
+      pending,
+      pendingTaskIds,
+      target,
+    };
+  };
+
+  const finishImageQuickEdit = async (job: WorkspaceImageQuickEditJob) => {
+    const {
+      controller,
+      editImageResolution,
+      editImageUrl,
+      editPrompt,
+      guideUrl,
+      maskUrl,
+      operation,
+      pending,
+      pendingTaskIds,
+      target,
+    } = job;
     try {
       const image = await prepareReferenceImageUrlForRequest(editImageUrl);
       const mask = maskUrl ? await prepareReferenceImageUrlForRequest(maskUrl) : undefined;
@@ -1200,6 +1241,20 @@ export default function Home() {
     } finally {
       for (const id of pendingTaskIds) delete generationAbortControllersRef.current[id];
     }
+  };
+
+  const runImageQuickEdit = async (
+    sourceItem: StorageItem,
+    operation: ImageEditFeature,
+    editImageUrl: string,
+    maskUrl: string | undefined,
+    guideUrl: string | undefined,
+    editPrompt: string,
+    editImageResolution: string,
+  ) => {
+    const job = await startImageQuickEdit(sourceItem, operation, editImageUrl, maskUrl, guideUrl, editPrompt, editImageResolution);
+    if (!job) return;
+    await finishImageQuickEdit(job);
   };
 
   const handleImageQuickEdit = (item: StorageItem, operation: ImageEditFeature) => {
@@ -1245,7 +1300,7 @@ export default function Home() {
 
   const saveMaskOutput = async (output: CanvasMaskEditorOutput) => {
     if (output.operation && maskEditSourceItem) {
-      void runImageQuickEdit(
+      const job = await startImageQuickEdit(
         maskEditSourceItem,
         output.operation,
         output.imageBase64,
@@ -1254,11 +1309,13 @@ export default function Home() {
         output.prompt,
         output.imageResolution,
       );
+      if (!job) return;
       setIsMaskOpen(false);
       setMaskEditOperation(undefined);
       setMaskEditSourceItem(null);
       setMaskTargetUrl("");
       setMaskTargetId("");
+      void finishImageQuickEdit(job);
       return;
     }
 

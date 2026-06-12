@@ -65,6 +65,7 @@ import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
 import {
   imageEditFeatureLabel,
   imageQuickEditFallbackPrompt,
+  type ImageQuickEditTarget,
   resolveImageQuickEditTarget,
   submitImageQuickEdit,
 } from "@/lib/image-quick-edit-targets";
@@ -190,6 +191,20 @@ type AgentBoardUpdateAction = AgentToolAction & { type: "update_board_node" };
 type AgentBoardPatchAction = AgentToolAction & { type: "apply_board_patch" };
 type AgentImageToVideoAction = AgentToolAction & { type: "continue_image_to_video" };
 type BoardAgentActionResult = boolean | { handled: true; success: boolean };
+
+interface BoardImageQuickEditJob {
+  controller: AbortController;
+  editImageResolution: string;
+  editImageUrl: string;
+  editPrompt: string;
+  guideUrl: string | undefined;
+  maskUrl: string | undefined;
+  operation: ImageEditFeature;
+  pendingItem: StorageItem;
+  pendingNodeId: string;
+  pendingTaskIds: string[];
+  target: ImageQuickEditTarget;
+}
 
 interface BoardMediaAnalysisResponse {
   text?: string;
@@ -2000,7 +2015,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     boardController.updateAssetNodeAsset(nodeId, storageItemToBoardAssetReference(savedItem));
   }
 
-  async function runBoardImageQuickEdit(
+  async function startBoardImageQuickEdit(
     sourceNodeId: string,
     sourceTitle: string,
     sourcePosition: BoardPoint,
@@ -2014,7 +2029,6 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     editImageResolution: string,
     outputSize?: BoardSize,
   ) {
-    const label = imageEditFeatureLabel(operation);
     const target = resolveImageQuickEditTarget(operation, imageEditFeatureTargets[operation]);
     const pending = await createBoardQuickEditProcessingAsset(
       sourceNodeId,
@@ -2028,10 +2042,40 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       target.model,
       editPrompt,
     );
-    if (!pending) return;
+    if (!pending) return null;
     const pendingTaskIds = relatedQuickEditTaskIds(pending.item.id);
     const controller = new AbortController();
     for (const id of pendingTaskIds) generationAbortControllersRef.current[id] = controller;
+    return {
+      controller,
+      editImageResolution,
+      editImageUrl,
+      editPrompt,
+      guideUrl,
+      maskUrl,
+      operation,
+      pendingItem: pending.item,
+      pendingNodeId: pending.nodeId,
+      pendingTaskIds,
+      target,
+    };
+  }
+
+  async function finishBoardImageQuickEdit(job: BoardImageQuickEditJob) {
+    const {
+      controller,
+      editImageResolution,
+      editImageUrl,
+      editPrompt,
+      guideUrl,
+      maskUrl,
+      operation,
+      pendingItem,
+      pendingNodeId,
+      pendingTaskIds,
+      target,
+    } = job;
+    const label = imageEditFeatureLabel(operation);
     try {
       const image = await prepareReferenceImageUrlForRequest(editImageUrl);
       const mask = maskUrl ? await prepareReferenceImageUrlForRequest(maskUrl) : undefined;
@@ -2056,8 +2100,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         return;
       }
       await completeBoardQuickEditAsset(
-        pending.nodeId,
-        pending.item,
+        pendingNodeId,
+        pendingItem,
         operation,
         imageUrl,
       );
@@ -2067,11 +2111,43 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         return;
       }
       const message = toErrorMessage(error, `${label}失败`);
-      await failBoardQuickEditAsset(pending.nodeId, pending.item, message);
+      await failBoardQuickEditAsset(pendingNodeId, pendingItem, message);
       pushWorkspaceNotice("error", message);
     } finally {
       for (const id of pendingTaskIds) delete generationAbortControllersRef.current[id];
     }
+  }
+
+  async function runBoardImageQuickEdit(
+    sourceNodeId: string,
+    sourceTitle: string,
+    sourcePosition: BoardPoint,
+    sourceSize: BoardSize,
+    sourceItem: StorageItem,
+    operation: ImageEditFeature,
+    editImageUrl: string,
+    maskUrl: string | undefined,
+    guideUrl: string | undefined,
+    editPrompt: string,
+    editImageResolution: string,
+    outputSize?: BoardSize,
+  ) {
+    const job = await startBoardImageQuickEdit(
+      sourceNodeId,
+      sourceTitle,
+      sourcePosition,
+      sourceSize,
+      sourceItem,
+      operation,
+      editImageUrl,
+      maskUrl,
+      guideUrl,
+      editPrompt,
+      editImageResolution,
+      outputSize,
+    );
+    if (!job) return;
+    await finishBoardImageQuickEdit(job);
   }
 
   const saveMaskOutput = async (output: CanvasMaskEditorOutput) => {
@@ -2081,7 +2157,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         pushWorkspaceNotice("error", "未找到要编辑的图片节点");
         return;
       }
-      void runBoardImageQuickEdit(
+      const job = await startBoardImageQuickEdit(
         sourceNode.id,
         sourceNode.title,
         sourceNode.position,
@@ -2095,10 +2171,12 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         output.imageResolution,
         output.outputSize,
       );
+      if (!job) return;
       setIsMaskOpen(false);
       setMaskEditOperation(undefined);
       setMaskEditSourceItem(null);
       setMaskSourceNodeId(null);
+      void finishBoardImageQuickEdit(job);
       return;
     }
 
