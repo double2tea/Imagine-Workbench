@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from "react";
-import { AudioLines, Pencil, RefreshCw, Sparkles, Trash2 } from "lucide-react";
+import { AudioLines, Pencil, Trash2 } from "lucide-react";
 import VoiceProfilePreviewPlayer from "@/components/audio/VoiceProfilePreviewPlayer";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
 import CreatorGenerateButton from "@/components/creation/CreatorGenerateButton";
 import PromptComposerSurface from "@/components/creation/PromptComposerSurface";
-import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
+import PromptComposerToolbarActions from "@/components/creation/PromptComposerToolbarActions";
+import { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
 import type { ModelOptionGroup } from "@/components/creation/ModelSelectCombobox";
 import ReferenceImagePicker, { type ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import { type DraggedReferenceAsset } from "@/components/reference/referenceDrag";
@@ -356,25 +357,20 @@ export default function AudioGenerationPanel({
       <PromptComposerSurface
         acceptedMediaTypes={acceptedMediaTypes}
         actions={
-          <>
-            <PromptTemplatePicker ref={templatePickerRef} accent="teal" compact onApply={handleApplyPromptTemplate} />
-            <button
-              onClick={onOptimizePrompt}
-              disabled={isOptimizing || !prompt.trim()}
-              className={`imagine-secondary-action flex h-7 items-center gap-1 rounded-md border px-2.5 text-[11px] font-semibold transition ${
-                isOptimizing || !prompt.trim()
-                  ? "cursor-not-allowed opacity-50"
-                  : "cursor-pointer border-amber-500/25 bg-amber-500/10 text-amber-700 hover:bg-amber-500/15"
-              }`}
-            >
-              {isOptimizing ? <RefreshCw className="h-3 w-3 animate-spin text-amber-600" /> : <Sparkles className="h-3 w-3 text-amber-600" />}
-              <span className="sm:hidden">润色</span>
-              <span className="hidden sm:inline">优化音频提示</span>
-            </button>
-          </>
+          <PromptComposerToolbarActions
+            ref={templatePickerRef}
+            accent="teal"
+            isOptimizing={isOptimizing}
+            optimizeDisabled={isOptimizing || !prompt.trim()}
+            optimizeLabel="润色"
+            onApplyTemplate={handleApplyPromptTemplate}
+            onOptimize={onOptimizePrompt}
+          />
         }
         atDropdownNode={atDropdownNode}
         desktopHint="拖入资产到此处插入 @媒体N | 参考媒体按模型能力启用"
+        headerAccent="amber"
+        headerVariant="toolbar"
         icon={<AudioLines className="h-3.5 w-3.5 text-amber-600" />}
         label="音频创作"
         onChange={handlePromptChange}
