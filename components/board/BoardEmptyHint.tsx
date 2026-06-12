@@ -1,9 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Bot, FileText, ImagePlus, Layers3, MousePointerClick, Upload, type LucideIcon } from "lucide-react";
 
 const BOARD_HANDLES_HINT_KEY = "imagine_board_handles_hint_seen";
-const START_ACTIONS = ["导入媒体", "添加提示", "创建生成节点", "整理参考组", "写笔记", "交给 Agent"] as const;
+
+interface StartAction {
+  description: string;
+  icon: LucideIcon;
+  label: string;
+}
+
+const START_ACTIONS: readonly StartAction[] = [
+  { icon: Upload, label: "导入媒体", description: "顶栏或拖入" },
+  { icon: MousePointerClick, label: "双击空白", description: "快速插入" },
+  { icon: ImagePlus, label: "生成节点", description: "图像/视频/音频" },
+  { icon: Layers3, label: "参考整理", description: "分组与连线" },
+  { icon: FileText, label: "提示笔记", description: "沉淀想法" },
+  { icon: Bot, label: "交给 Agent", description: "继续编排" },
+] as const;
 
 function readHandlesHintSeen(): boolean {
   if (typeof window === "undefined") return true;
@@ -33,14 +48,21 @@ export default function BoardEmptyHint() {
           顶栏导入、拖入文件、粘贴媒体，或双击空白处插入节点。
         </p>
         <div className="mt-4 grid grid-cols-2 gap-1.5 text-left">
-          {START_ACTIONS.map(action => (
+          {START_ACTIONS.map(action => {
+            const Icon = action.icon;
+            return (
             <span
-              key={action}
-              className="rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5 text-[11px] font-semibold text-[var(--iw-text)]"
+              key={action.label}
+              className="board-empty-start-step rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5 text-[11px] font-semibold text-[var(--iw-text)]"
             >
-              {action}
+              <Icon className="h-3.5 w-3.5 text-[var(--iw-muted)]" />
+              <span className="min-w-0">
+                <span className="block truncate">{action.label}</span>
+                <span className="block truncate text-[10px] font-medium text-[var(--iw-faint)]">{action.description}</span>
+              </span>
             </span>
-          ))}
+            );
+          })}
         </div>
         {!handlesHintSeen && (
           <p className="mt-3 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-3 py-2 text-[11px] leading-5 text-[var(--iw-muted)]">

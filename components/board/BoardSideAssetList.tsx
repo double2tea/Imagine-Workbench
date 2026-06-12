@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Music, Upload, Video } from "lucide-react";
+import { CheckCircle2, ImageIcon, Music, PlusCircle, Upload, Video } from "lucide-react";
 import { useBoardMediaImport } from "@/components/board/BoardMediaImportContext";
 import PreviewImage from "@/components/PreviewImage";
 import { ensureHydratedStorageItem } from "@/lib/assets/ensure-hydrated";
@@ -11,6 +11,20 @@ import type { StorageItem } from "@/lib/db";
 const PAGE_SIZE = 36;
 
 type AssetFilter = "all" | "image" | "video" | "audio";
+type BoardSideMediaType = Extract<StorageItem["type"], "image" | "video" | "audio">;
+
+const mediaTypeLabels: Record<BoardSideMediaType, string> = {
+  audio: "音频",
+  image: "图片",
+  video: "视频",
+};
+
+const storageStatusLabels: Record<StorageItem["status"], string> = {
+  complete: "可放入",
+  failed: "失败",
+  pending: "排队中",
+  processing: "生成中",
+};
 
 interface BoardSideAssetListProps {
   canvasAssetIds: ReadonlySet<string>;
@@ -32,6 +46,10 @@ function BoardSideAssetRow({
   onAddToBoard: (item: StorageItem) => void;
 }) {
   const [adding, setAdding] = useState(false);
+  const typeLabel = item.type === "audio" || item.type === "image" || item.type === "video"
+    ? mediaTypeLabels[item.type]
+    : item.type;
+  const statusLabel = alreadyOnCanvas ? "已在画布" : storageStatusLabels[item.status];
 
   const handleAdd = async () => {
     if (adding || alreadyOnCanvas) return;
@@ -67,26 +85,39 @@ function BoardSideAssetRow({
         }
       }}
       onClick={() => void handleAdd()}
+      data-on-canvas={alreadyOnCanvas}
       data-highlighted={highlighted}
-      className={`imagine-asset-card grid grid-cols-[54px_1fr] gap-2 !rounded-lg border p-2 text-left transition ${
+      data-status={item.status}
+      className={`board-side-asset-row imagine-asset-card grid grid-cols-[54px_1fr] gap-2 !rounded-lg border p-2 text-left transition ${
         highlighted
           ? "border-[var(--iw-board-accent-amber)] bg-[var(--iw-panel)]"
           : "border-[var(--iw-border)] bg-[var(--iw-panel-soft)]"
       } ${alreadyOnCanvas ? "cursor-default opacity-60" : "hover:border-[var(--iw-board-accent-amber)] hover:bg-[var(--iw-panel)]"}`}
     >
-      <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg bg-[var(--iw-panel)]">
+      <div className="board-side-asset-preview flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg bg-[var(--iw-panel)]">
         {item.type === "image" && item.status === "complete" ? (
           <PreviewImage src={item.url} alt="" draggable={false} className="h-full w-full select-none object-cover" />
         ) : item.type === "audio" ? (
           <Music className="h-4 w-4 text-[var(--iw-faint)]" />
+        ) : item.type === "image" ? (
+          <ImageIcon className="h-4 w-4 text-[var(--iw-faint)]" />
         ) : (
           <Video className="h-4 w-4 text-[var(--iw-faint)]" />
         )}
       </div>
-      <span className="min-w-0">
+      <span className="flex min-w-0 flex-col gap-1">
         <span className="block truncate text-xs font-semibold text-[var(--iw-text)]">{item.prompt || item.model}</span>
-        <span className="imagine-status-chip block truncate font-mono text-[10px]" data-status={item.status}>
-          {alreadyOnCanvas ? "已在画布" : item.status}
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="board-side-asset-type shrink-0 rounded-md border border-[var(--iw-border)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--iw-muted)]">
+            {typeLabel}
+          </span>
+          <span className="imagine-status-chip block truncate font-mono text-[10px]" data-status={item.status}>
+            {statusLabel}
+          </span>
+        </span>
+        <span className="flex items-center gap-1 text-[10px] font-medium text-[var(--iw-faint)]">
+          {alreadyOnCanvas ? <CheckCircle2 className="h-3 w-3" /> : <PlusCircle className="h-3 w-3" />}
+          <span className="truncate">{alreadyOnCanvas ? "画布中已有实例" : item.model}</span>
         </span>
       </span>
     </button>

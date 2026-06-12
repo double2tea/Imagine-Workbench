@@ -21,6 +21,13 @@ interface BoardTaskQueuePanelProps {
 
 const iconClassName = "h-3.5 w-3.5";
 
+const mediaTypeLabels: Record<GenerationTask["mediaType"], string> = {
+  audio: "音频",
+  image: "图片",
+  transcript: "文本",
+  video: "视频",
+};
+
 function mediaIcon(task: GenerationTask) {
   if (task.mediaType === "image") return <ImageIcon className={`${iconClassName} text-blue-300`} />;
   if (task.mediaType === "video") return <Video className={`${iconClassName} text-violet-300`} />;
@@ -67,9 +74,10 @@ function TaskRow({
   const canCancel = task.status === "pending" || task.status === "processing";
   const canHandleFailure = task.status === "failed";
   const progress = task.status === "complete" || task.status === "canceled" ? 100 : task.progress;
+  const title = taskTitle(task, sourceNode);
 
   return (
-    <article className="rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-2">
+    <article className="board-task-row rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-2" data-status={task.status}>
       <div className="flex min-w-0 items-start justify-between gap-2">
         <div className="flex min-w-0 items-start gap-2">
           <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)]">
@@ -78,13 +86,18 @@ function TaskRow({
           <div className="min-w-0">
             <div className="flex min-w-0 items-center gap-1.5">
               <BoardStatusIcon status={task.status} />
-              <h3 className="truncate text-xs font-semibold text-[var(--iw-text)]" title={taskTitle(task, sourceNode)}>
-                {taskTitle(task, sourceNode)}
+              <h3 className="truncate text-xs font-semibold text-[var(--iw-text)]" title={title}>
+                {title}
               </h3>
             </div>
-            <p className="mt-0.5 truncate font-mono text-[10px] text-[var(--iw-faint)]" title={task.model}>
-              {task.model}
-            </p>
+            <div className="mt-1 flex min-w-0 items-center gap-1.5">
+              <span className="board-task-meta-pill shrink-0 rounded-md border border-[var(--iw-border)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--iw-muted)]">
+                {mediaTypeLabels[task.mediaType]}
+              </span>
+              <span className="truncate font-mono text-[10px] text-[var(--iw-faint)]" title={task.model}>
+                {task.model}
+              </span>
+            </div>
           </div>
         </div>
         <BoardStatusBadge status={task.status} />

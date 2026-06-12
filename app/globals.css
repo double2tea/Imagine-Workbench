@@ -323,6 +323,11 @@ html::-webkit-scrollbar-thumb:hover {
 .board-edge-toolbar {
   border-radius: 999px;
   filter: drop-shadow(0 12px 22px color-mix(in srgb, var(--iw-bg) 28%, transparent));
+  pointer-events: none;
+}
+
+.board-edge-toolbar button {
+  pointer-events: auto;
 }
 
 .board-edge-kind-pill,
@@ -352,6 +357,28 @@ html::-webkit-scrollbar-thumb:hover {
 .board-edge-processing-pill {
   border-color: color-mix(in srgb, var(--iw-board-edge-result) 34%, var(--iw-border));
   color: var(--iw-board-edge-result);
+}
+
+.board-quick-insert-group {
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.board-quick-insert-group[data-group="开始"] {
+  background: color-mix(in srgb, var(--iw-board-accent-amber) 7%, transparent);
+}
+
+.board-quick-insert-group-label {
+  letter-spacing: 0.01em;
+}
+
+.board-quick-insert-item {
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 5%, transparent);
+}
+
+.board-quick-insert-item:hover {
+  border-color: color-mix(in srgb, var(--iw-board-accent-amber) 36%, var(--iw-border));
+  background: color-mix(in srgb, var(--iw-board-accent-amber) 8%, var(--iw-panel));
 }
 
 .imagine-board-progress-step {
@@ -2034,6 +2061,18 @@ html[data-imagine-theme="light"] .imagine-settings-overlay {
   box-shadow: var(--iw-card-shadow);
 }
 
+.board-empty-start-step {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  min-height: 42px;
+}
+
+.board-empty-start-step svg {
+  color: var(--iw-muted);
+}
+
 .imagine-root-body {
   background: #07080b;
   color: #e5e7eb;
@@ -2446,6 +2485,32 @@ html[data-imagine-theme="light"] .imagine-root-body {
 .imagine-board-task-action:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+.board-task-row {
+  transition:
+    border-color 160ms var(--iw-ease-out),
+    background-color 160ms var(--iw-ease-out),
+    transform 160ms var(--iw-ease-out);
+}
+
+.board-task-row:hover {
+  border-color: color-mix(in srgb, var(--iw-accent) 24%, var(--iw-border));
+  background: color-mix(in srgb, var(--iw-panel) 74%, var(--iw-panel-soft));
+}
+
+.board-task-row[data-status="processing"],
+.board-task-row[data-status="pending"] {
+  border-color: color-mix(in srgb, #38bdf8 22%, var(--iw-border));
+}
+
+.board-task-row[data-status="failed"] {
+  border-color: rgba(248, 113, 113, 0.28);
+  background: color-mix(in srgb, rgba(239, 68, 68, 0.12) 50%, var(--iw-panel-soft));
+}
+
+.board-task-meta-pill {
+  background: color-mix(in srgb, var(--iw-panel) 78%, transparent);
 }
 
 .board-media-top-actions {
@@ -4542,6 +4607,32 @@ html[data-imagine-theme="light"] .imagine-required-chip,
 .imagine-asset-type-badge {
   border-radius: 6px !important;
   letter-spacing: 0.02em !important;
+}
+
+.board-side-asset-row {
+  contain-intrinsic-size: 68px;
+}
+
+.board-side-asset-row:hover {
+  transform: translateY(-1px);
+}
+
+.board-side-asset-row[data-on-canvas="true"] {
+  border-style: dashed;
+}
+
+.board-side-asset-row[data-highlighted="true"] {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--iw-board-accent-amber) 22%, transparent),
+    0 10px 22px color-mix(in srgb, var(--iw-board-accent-amber) 8%, transparent);
+}
+
+.board-side-asset-preview {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--iw-border) 70%, transparent);
+}
+
+.board-side-asset-type {
+  background: color-mix(in srgb, var(--iw-panel) 82%, transparent);
 }
 
 .imagine-asset-card {
