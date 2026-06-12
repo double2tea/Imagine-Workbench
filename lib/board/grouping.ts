@@ -3,12 +3,25 @@ import type { BoardNode, BoardPoint, BoardSize } from "@/lib/board/types";
 export const BOARD_GROUP_PADDING_X = 48;
 export const BOARD_GROUP_PADDING_TOP = 72;
 export const BOARD_GROUP_PADDING_BOTTOM = 48;
+const BOARD_MEDIA_NODE_VISUAL_OUTSET = {
+  top: 36,
+  right: 16,
+  bottom: 42,
+  left: 16,
+} as const;
 
 interface BoardNodeRect {
   height: number;
   width: number;
   x: number;
   y: number;
+}
+
+interface BoardNodeVisualOutset {
+  bottom: number;
+  left: number;
+  right: number;
+  top: number;
 }
 
 export interface BoardGroupLayout {
@@ -24,8 +37,20 @@ export interface BoardNodeMoveParentResolution {
   position: BoardPoint;
 }
 
+const EMPTY_VISUAL_OUTSET: BoardNodeVisualOutset = {
+  bottom: 0,
+  left: 0,
+  right: 0,
+  top: 0,
+};
+
 function nodeById(nodes: BoardNode[]): Map<string, BoardNode> {
   return new Map(nodes.map(node => [node.id, node]));
+}
+
+function visualOutsetForNode(node: BoardNode): BoardNodeVisualOutset {
+  if (node.kind === "asset" || node.kind === "result") return BOARD_MEDIA_NODE_VISUAL_OUTSET;
+  return EMPTY_VISUAL_OUTSET;
 }
 
 function absolutePositionForNode(nodesById: Map<string, BoardNode>, node: BoardNode): BoardPoint | null {
@@ -64,11 +89,22 @@ export function boardNodesWithAbsolutePositions(nodes: BoardNode[]): BoardNode[]
 function rectForNode(nodesById: Map<string, BoardNode>, node: BoardNode): BoardNodeRect | null {
   const position = absolutePositionForNode(nodesById, node);
   if (!position) return null;
+  const outset = visualOutsetForNode(node);
   return {
-    x: position.x,
-    y: position.y,
-    width: node.size.width,
-    height: node.size.height,
+    x: position.x - outset.left,
+    y: position.y - outset.top,
+    width: node.size.width + outset.left + outset.right,
+    height: node.size.height + outset.top + outset.bottom,
+  };
+}
+
+function relativeRectForNode(node: BoardNode): BoardNodeRect {
+  const outset = visualOutsetForNode(node);
+  return {
+    x: node.position.x - outset.left,
+    y: node.position.y - outset.top,
+    width: node.size.width + outset.left + outset.right,
+    height: node.size.height + outset.top + outset.bottom,
   };
 }
 
@@ -180,6 +216,39 @@ export function createBoardGroupLayout(nodes: BoardNode[], nodeIds: string[]): B
     childPositions,
     parentId,
     position,
+    size: {
+      width: bounds.width + BOARD_GROUP_PADDING_X * 2,
+      height: bounds.height + BOARD_GROUP_PADDING_TOP + BOARD_GROUP_PADDING_BOTTOM,
+    },
+  };
+}
+
+export function fitBoardGroupLayoutToChildren(nodes: BoardNode[], groupId: string): BoardGroupLayout | null {
+  const group = nodes.find(node => node.id === groupId);
+  if (group?.kind !== "group") return null;
+  const children = nodes.filter(node => node.parentId === group.id);
+  if (children.length === 0) return null;
+  const bounds = boundsForRects(children.map(relativeRectForNode));
+  if (!bounds) return null;
+  const offset = {
+    x: bounds.x - BOARD_GROUP_PADDING_X,
+    y: bounds.y - BOARD_GROUP_PADDING_TOP,
+  };
+  const childPositions = new Map<string, BoardPoint>();
+  for (const child of children) {
+    childPositions.set(child.id, {
+      x: child.position.x - offset.x,
+      y: child.position.y - offset.y,
+    });
+  }
+  return {
+    childNodeIds: children.map(child => child.id),
+    childPositions,
+    parentId: group.parentId,
+    position: {
+      x: group.position.x + offset.x,
+      y: group.position.y + offset.y,
+    },
     size: {
       width: bounds.width + BOARD_GROUP_PADDING_X * 2,
       height: bounds.height + BOARD_GROUP_PADDING_TOP + BOARD_GROUP_PADDING_BOTTOM,

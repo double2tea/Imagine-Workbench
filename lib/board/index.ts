@@ -40,6 +40,7 @@ export {
   boardNodesWithAbsolutePositions,
   childPositionAfterUngroup,
   createBoardGroupLayout,
+  fitBoardGroupLayoutToChildren,
   resolveMovedBoardNodeParent,
   resolveMovedBoardNodeParents,
   sortBoardNodesForReactFlow,

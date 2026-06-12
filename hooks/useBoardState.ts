@@ -68,6 +68,7 @@ import {
   boardNodesWithAbsolutePositions,
   childPositionAfterUngroup,
   createBoardGroupLayout,
+  fitBoardGroupLayoutToChildren,
   resolveMovedBoardNodeParents,
 } from "@/lib/board";
 import {
@@ -397,7 +398,7 @@ function normalizeBoardNodes(nodes: unknown[]): BoardNode[] {
     normalizedNodes.push(normalizedNode);
   });
 
-  return normalizeBoardNodeParents(normalizedNodes);
+  return fitBoardGroupLayoutsToChildren(normalizeBoardNodeParents(normalizedNodes), nowIso());
 }
 
 function nodeHasValidParent(node: BoardNode, nodesById: Map<string, BoardNode>): boolean {
@@ -511,6 +512,72 @@ function minimumBoardSize(size: BoardSize, minimum: BoardSize): BoardSize {
     width: Math.max(minimum.width, size.width),
     height: Math.max(minimum.height, size.height),
   };
+}
+
+function sameBoardPointValue(left: BoardPoint, right: BoardPoint): boolean {
+  return left.x === right.x && left.y === right.y;
+}
+
+function sameBoardSizeValue(left: BoardSize, right: BoardSize): boolean {
+  return left.width === right.width && left.height === right.height;
+}
+
+function fitAncestorGroupsAfterNodeResize(nodes: BoardNode[], nodeId: string, updatedAt: string): BoardNode[] {
+  let nextNodes = nodes;
+  let currentNodeId = nodeId;
+  const visitedGroupIds = new Set<string>();
+
+  while (true) {
+    const currentNode = nextNodes.find(node => node.id === currentNodeId);
+    const groupId = currentNode?.parentId;
+    if (!groupId || visitedGroupIds.has(groupId)) return nextNodes;
+    visitedGroupIds.add(groupId);
+    nextNodes = applyBoardGroupLayoutToChildren(nextNodes, groupId, updatedAt).nodes;
+    currentNodeId = groupId;
+  }
+}
+
+function applyBoardGroupLayoutToChildren(
+  nodes: BoardNode[],
+  groupId: string,
+  updatedAt: string,
+): { changed: boolean; nodes: BoardNode[] } {
+  const layout = fitBoardGroupLayoutToChildren(nodes, groupId);
+  if (!layout) return { changed: false, nodes };
+  let changed = false;
+  const nextNodes = nodes.map(node => {
+    if (node.id === groupId && node.kind === "group") {
+      if (
+        node.parentId === layout.parentId &&
+        sameBoardPointValue(node.position, layout.position) &&
+        sameBoardSizeValue(node.size, layout.size)
+      ) {
+        return node;
+      }
+      changed = true;
+      return { ...node, parentId: layout.parentId, position: layout.position, size: layout.size, updatedAt };
+    }
+    const position = layout.childPositions.get(node.id);
+    if (!position || sameBoardPointValue(node.position, position)) return node;
+    changed = true;
+    return { ...node, position, updatedAt };
+  });
+  return { changed, nodes: changed ? nextNodes : nodes };
+}
+
+function fitBoardGroupLayoutsToChildren(nodes: BoardNode[], updatedAt: string): BoardNode[] {
+  const groupIds = nodes.flatMap(node => node.kind === "group" ? [node.id] : []);
+  let nextNodes = nodes;
+  for (let iteration = 0; iteration < groupIds.length; iteration += 1) {
+    let didChange = false;
+    for (const groupId of groupIds) {
+      const result = applyBoardGroupLayoutToChildren(nextNodes, groupId, updatedAt);
+      nextNodes = result.nodes;
+      didChange = didChange || result.changed;
+    }
+    if (!didChange) return nextNodes;
+  }
+  return nextNodes;
 }
 
 function readFiniteNumber(value: unknown, fallback: number): number {
@@ -2456,10 +2523,17 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
   const updateNodeSize = useCallback((nodeId: string, size: BoardSize) => {
     const updatedAt = nowIso();
     mutateBoard(
-      currentBoard => touchBoard(
-        currentBoard,
-        currentBoard.nodes.map(node => (node.id === nodeId ? { ...node, size, updatedAt } : node)),
-      ),
+      currentBoard => {
+        let didResize = false;
+        const resizedNodes = currentBoard.nodes.map(node => {
+          if (node.id !== nodeId) return node;
+          if (sameBoardSizeValue(node.size, size)) return node;
+          didResize = true;
+          return { ...node, size, updatedAt };
+        });
+        if (!didResize) return currentBoard;
+        return touchBoard(currentBoard, fitAncestorGroupsAfterNodeResize(resizedNodes, nodeId, updatedAt));
+      },
       { skipUndo: true },
     );
   }, [mutateBoard]);
