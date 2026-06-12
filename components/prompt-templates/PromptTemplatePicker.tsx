@@ -11,9 +11,12 @@ import {
   type PromptTemplateCategoryId,
 } from "@/lib/prompt-templates";
 
+export type PromptTemplatePickerAccent = "blue" | "teal" | "violet";
+
 interface PromptTemplatePickerProps {
-  accent?: "blue" | "teal" | "violet";
+  accent?: PromptTemplatePickerAccent;
   compact?: boolean;
+  triggerVariant?: "accent" | "toolbar";
   onApply: (template: PromptTemplate, mode: PromptTemplateApplyMode) => void;
 }
 
@@ -22,11 +25,14 @@ export interface PromptTemplatePickerHandle {
   open: (search?: string) => void;
 }
 
-const accentClass: Record<NonNullable<PromptTemplatePickerProps["accent"]>, string> = {
+const accentClass: Record<PromptTemplatePickerAccent, string> = {
   blue: "border-blue-400/25 bg-blue-500/12 text-blue-200 hover:bg-blue-500/18",
   teal: "border-teal-400/25 bg-teal-500/12 text-teal-200 hover:bg-teal-500/18",
   violet: "border-violet-400/25 bg-violet-500/12 text-violet-200 hover:bg-violet-500/18",
 };
+
+const toolbarClass =
+  "imagine-motion-interactive flex h-7 items-center gap-1 rounded-md border border-transparent bg-transparent px-2.5 text-[11px] font-semibold text-[var(--iw-muted)] transition hover:bg-[var(--iw-panel-soft)] hover:text-[var(--iw-text)]";
 
 const panelWidth = 420;
 const panelGap = 8;
@@ -47,7 +53,7 @@ function getPanelPosition(anchor: HTMLButtonElement): { left: number; top: numbe
 }
 
 const PromptTemplatePicker = forwardRef<PromptTemplatePickerHandle, PromptTemplatePickerProps>(function PromptTemplatePicker(
-  { accent = "blue", compact = false, onApply },
+  { accent = "blue", compact = false, triggerVariant = "accent", onApply },
   forwardedRef,
 ) {
   const buttonRef = useRef<HTMLButtonElement | null>(null);
@@ -243,7 +249,11 @@ const PromptTemplatePicker = forwardRef<PromptTemplatePickerHandle, PromptTempla
           }
           openPicker();
         }}
-        className={`imagine-secondary-action flex h-7 items-center gap-1 rounded-md border px-2.5 text-[11px] font-semibold transition ${accentClass[accent]}`}
+        className={
+          triggerVariant === "toolbar"
+            ? toolbarClass
+            : `imagine-secondary-action flex h-7 items-center gap-1 rounded-md border px-2.5 text-[11px] font-semibold transition ${accentClass[accent]}`
+        }
       >
         <BookOpenText className="h-3 w-3" />
         <span>{compact ? "模板" : "提示词模板"}</span>

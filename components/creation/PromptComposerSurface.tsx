@@ -11,6 +11,8 @@ interface PromptComposerSurfaceProps {
   actions: ReactNode;
   atDropdownNode: ReactNode;
   desktopHint: string;
+  headerAccent?: "blue" | "teal" | "violet" | "amber";
+  headerVariant?: "plain" | "toolbar";
   icon: ReactNode;
   label: string;
   mobileHint?: string;
@@ -26,6 +28,8 @@ export default function PromptComposerSurface({
   actions,
   atDropdownNode,
   desktopHint,
+  headerAccent = "blue",
+  headerVariant = "plain",
   icon,
   label,
   mobileHint = "@ 可引用作品",
@@ -37,16 +41,36 @@ export default function PromptComposerSurface({
 }: PromptComposerSurfaceProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const referenceThumbnails = resolvePromptReferenceThumbnails(prompt, references, acceptedMediaTypes);
+  const iconClassName = {
+    amber: "border-amber-500/20 bg-amber-500/10 text-amber-500",
+    blue: "border-blue-500/20 bg-blue-500/10 text-blue-300",
+    teal: "border-teal-500/20 bg-teal-500/10 text-teal-300",
+    violet: "border-violet-500/20 bg-violet-500/10 text-violet-300",
+  }[headerAccent];
 
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between">
-        <label className="flex items-center gap-1.5 imagine-section-label">
-          {icon}
-          {label}
-        </label>
-        <div className="flex items-center gap-2">{actions}</div>
-      </div>
+      {headerVariant === "toolbar" ? (
+        <div className="mb-2 flex min-h-10 items-center justify-between gap-2 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5">
+          <label className="flex min-w-0 items-center gap-2">
+            <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border ${iconClassName}`}>
+              {icon}
+            </span>
+            <span className="truncate text-xs font-semibold text-[var(--iw-text)]">{label}</span>
+          </label>
+          <div className="flex shrink-0 items-center rounded-md border border-[var(--iw-border)] bg-[var(--iw-surface-raised)] p-0.5">
+            {actions}
+          </div>
+        </div>
+      ) : (
+        <div className="mb-2 flex items-center justify-between">
+          <label className="flex items-center gap-1.5 imagine-section-label">
+            {icon}
+            {label}
+          </label>
+          <div className="flex items-center gap-2">{actions}</div>
+        </div>
+      )}
 
       <div
         className={`imagine-field-shell relative p-3 transition-all duration-200 ${

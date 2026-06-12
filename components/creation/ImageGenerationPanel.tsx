@@ -1,9 +1,10 @@
 import { useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from "react";
-import { RefreshCw, Sparkles } from "lucide-react";
-import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
+import { Sparkles } from "lucide-react";
+import { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
 import CreatorGenerateButton from "@/components/creation/CreatorGenerateButton";
 import ModelSelectCombobox, { type ModelOptionGroup } from "@/components/creation/ModelSelectCombobox";
 import PromptComposerSurface from "@/components/creation/PromptComposerSurface";
+import PromptComposerToolbarActions from "@/components/creation/PromptComposerToolbarActions";
 import ReferenceImagePicker, { type ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import { type DraggedReferenceAsset } from "@/components/reference/referenceDrag";
 import {
@@ -138,30 +139,21 @@ export default function ImageGenerationPanel({
       <PromptComposerSurface
         acceptedMediaTypes={capabilities.referenceMediaTypes}
         actions={
-          <>
-            <PromptTemplatePicker ref={templatePickerRef} compact onApply={handleApplyPromptTemplate} />
-            <button
-              onClick={onOptimizePrompt}
-              disabled={isOptimizing || !prompt.trim()}
-              className={`imagine-secondary-action flex h-7 items-center gap-1 rounded-md border px-2.5 text-[11px] font-semibold transition ${
-                isOptimizing || !prompt.trim()
-                  ? "cursor-not-allowed opacity-50"
-                  : "cursor-pointer border-blue-400/25 bg-blue-500/12 text-blue-200 hover:bg-blue-500/18"
-              }`}
-            >
-              {isOptimizing ? (
-                <RefreshCw className="h-3 w-3 animate-spin text-blue-400" />
-              ) : (
-                <Sparkles className="h-3 w-3 text-blue-300" />
-              )}
-              <span className="sm:hidden">优化</span>
-              <span className="hidden sm:inline">优化提示词</span>
-            </button>
-          </>
+          <PromptComposerToolbarActions
+            ref={templatePickerRef}
+            accent="blue"
+            isOptimizing={isOptimizing}
+            optimizeDisabled={isOptimizing || !prompt.trim()}
+            optimizeLabel="优化"
+            onApplyTemplate={handleApplyPromptTemplate}
+            onOptimize={onOptimizePrompt}
+          />
         }
         atDropdownNode={atDropdownNode}
         desktopHint="拖入资产到此处插入 @媒体N | 拖入下方只作为参考图"
-        icon={<Sparkles className="h-3.5 w-3.5 text-blue-300" />}
+        headerAccent="blue"
+        headerVariant="toolbar"
+        icon={<Sparkles className="h-3.5 w-3.5" />}
         label="提示词"
         onChange={handlePromptChange}
         onDropAsset={onPromptDropAsset}
