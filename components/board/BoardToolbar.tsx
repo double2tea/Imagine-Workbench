@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState, type ReactNode, type ReactPortal, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import {
-  ArrowLeft,
   Check,
   ChevronDown,
+  Grid2X2,
   Layers,
   Magnet,
   MoreHorizontal,
@@ -22,18 +22,9 @@ import {
 } from "lucide-react";
 import { useAlert } from "@/components/confirm/ConfirmProvider";
 import { BOARD_CONNECTION_HELP } from "@/lib/workspace-messages";
-import {
-  BOARD_INSERT_CATALOG,
-  BOARD_INSERT_GROUP_LABELS,
-  boardInsertGroupLabel,
-  readLastBoardInsertKind,
-  writeLastBoardInsertKind,
-  type BoardInsertKind,
-} from "@/lib/board/insert-catalog";
 import type { BoardSaveStatus } from "@/hooks/useBoardState";
 import { useThemeMode } from "@/lib/theme-mode";
 import type { BoardSummary } from "@/lib/board";
-import BoardInsertIcon from "@/components/board/BoardInsertIcon";
 import WorkspaceTopBarBrand from "@/components/workbench/WorkspaceTopBarBrand";
 import WorkspaceTopBar, {
   workspaceTopBarButtonClass,
@@ -57,7 +48,6 @@ interface BoardToolbarProps {
   onClear: () => void;
   onCreateBoard: () => void;
   onDeleteBoard: () => void;
-  onInsert: (kind: BoardInsertKind) => void;
   onImportMedia: () => void;
   onOpenSettings: () => void;
   onRenameBoard: () => void;
@@ -89,7 +79,6 @@ const iconBtn = workspaceTopBarIconButtonClass;
 const HEADER_MENU_GAP = 8;
 const HEADER_MENU_VIEWPORT_MARGIN = 12;
 const BOARD_MENU_ESTIMATED_HEIGHT = 380;
-const INSERT_MENU_ESTIMATED_HEIGHT = 420;
 const OVERFLOW_MENU_ESTIMATED_HEIGHT = 280;
 
 function resolveHeaderMenuPortalRoot(): HTMLElement {
@@ -137,7 +126,6 @@ export default function BoardToolbar({
   onClear,
   onCreateBoard,
   onDeleteBoard,
-  onInsert,
   onImportMedia,
   onOpenSettings,
   onRenameBoard,
@@ -152,24 +140,16 @@ export default function BoardToolbar({
   const { themeMode, toggleThemeMode } = useThemeMode();
   const showAlert = useAlert();
   const [isBoardMenuOpen, setIsBoardMenuOpen] = useState(false);
-  const [isInsertMenuOpen, setIsInsertMenuOpen] = useState(false);
   const [isOverflowOpen, setIsOverflowOpen] = useState(false);
-  const [lastInsertKind, setLastInsertKind] = useState<BoardInsertKind>("prompt");
   const [boardMenuPosition, setBoardMenuPosition] = useState({ left: 16, top: 56 });
-  const [insertMenuPosition, setInsertMenuPosition] = useState({ left: 16, top: 56 });
   const [overflowMenuPosition, setOverflowMenuPosition] = useState({ left: 16, top: 56 });
 
   const boardMenuButtonRef = useRef<HTMLButtonElement>(null);
-  const insertMenuButtonRef = useRef<HTMLButtonElement>(null);
   const overflowButtonRef = useRef<HTMLButtonElement>(null);
   const boardMenuPanelRef = useRef<HTMLDivElement>(null);
-  const insertMenuPanelRef = useRef<HTMLDivElement>(null);
   const overflowMenuPanelRef = useRef<HTMLDivElement>(null);
 
   const saveMeta = saveStatusMeta(saveStatus, saveError);
-  const lastInsertItem =
-    BOARD_INSERT_CATALOG.find(item => item.kind === lastInsertKind) ?? BOARD_INSERT_CATALOG[0];
-
 
   const visibleBoardSummaries = boardSummaries.some(board => board.id === boardId)
     ? boardSummaries
@@ -185,11 +165,7 @@ export default function BoardToolbar({
       ];
 
   useEffect(() => {
-    setLastInsertKind(readLastBoardInsertKind());
-  }, []);
-
-  useEffect(() => {
-    if (!isBoardMenuOpen && !isInsertMenuOpen && !isOverflowOpen) return;
+    if (!isBoardMenuOpen && !isOverflowOpen) return;
 
     function isWithinMenuTrigger(
       buttonRef: RefObject<HTMLButtonElement | null>,
@@ -208,9 +184,6 @@ export default function BoardToolbar({
       if (!isWithinMenuTrigger(boardMenuButtonRef, boardMenuPanelRef, target)) {
         setIsBoardMenuOpen(false);
       }
-      if (!isWithinMenuTrigger(insertMenuButtonRef, insertMenuPanelRef, target)) {
-        setIsInsertMenuOpen(false);
-      }
       if (!isWithinMenuTrigger(overflowButtonRef, overflowMenuPanelRef, target)) {
         setIsOverflowOpen(false);
       }
@@ -219,7 +192,6 @@ export default function BoardToolbar({
     function closeOnEscape(event: KeyboardEvent): void {
       if (event.key !== "Escape") return;
       setIsBoardMenuOpen(false);
-      setIsInsertMenuOpen(false);
       setIsOverflowOpen(false);
     }
 
@@ -229,7 +201,7 @@ export default function BoardToolbar({
       document.removeEventListener("pointerdown", closeOnPointerDown);
       document.removeEventListener("keydown", closeOnEscape);
     };
-  }, [isBoardMenuOpen, isInsertMenuOpen, isOverflowOpen]);
+  }, [isBoardMenuOpen, isOverflowOpen]);
 
   function openAnchoredMenu(
     buttonRef: RefObject<HTMLButtonElement | null>,
@@ -256,21 +228,10 @@ export default function BoardToolbar({
     open();
   }
 
-  function handleInsert(kind: BoardInsertKind): void {
-    writeLastBoardInsertKind(kind);
-    setLastInsertKind(kind);
-    setIsInsertMenuOpen(false);
-    onInsert(kind);
-  }
-
   return (
     <WorkspaceTopBar
       start={
         <div className="contents">
-          <button type="button" onClick={onBack} className={iconBtn} data-accent="amber" title="返回工作台">
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-
           <WorkspaceTopBarBrand compact showBadge={false} />
 
           <span className="hidden h-7 w-px shrink-0 bg-[var(--iw-border)] md:block" aria-hidden="true" />
@@ -284,7 +245,6 @@ export default function BoardToolbar({
                 setIsBoardMenuOpen(false);
                 return;
               }
-              setIsInsertMenuOpen(false);
               setIsOverflowOpen(false);
               openAnchoredMenu(boardMenuButtonRef, 320, BOARD_MENU_ESTIMATED_HEIGHT, setBoardMenuPosition, () => setIsBoardMenuOpen(true));
             }}
@@ -381,86 +341,6 @@ export default function BoardToolbar({
       }
       center={
         <div className="contents">
-          <div className="relative flex min-w-0 items-center">
-          <div className="imagine-board-header-insert-group flex shrink-0 overflow-hidden rounded-lg border border-[var(--iw-border)]">
-            <button
-              type="button"
-              onClick={() => handleInsert(lastInsertKind)}
-              className={`${headerBtn} !rounded-none !border-0 shrink-0`}
-              data-accent="amber"
-              title={`插入${lastInsertItem.label}节点`}
-            >
-              <BoardInsertIcon
-                kind={lastInsertItem.kind}
-                icon={lastInsertItem.icon}
-                iconClassName={lastInsertItem.iconClassName}
-              />
-              <span className="hidden sm:inline">插入{lastInsertItem.label}</span>
-              <span className="sm:hidden">插入</span>
-            </button>
-            <button
-              ref={insertMenuButtonRef}
-              type="button"
-              aria-expanded={isInsertMenuOpen}
-              aria-label="更多节点类型"
-              onClick={() => {
-                if (isInsertMenuOpen) {
-                  setIsInsertMenuOpen(false);
-                  return;
-                }
-                setIsBoardMenuOpen(false);
-                setIsOverflowOpen(false);
-                openAnchoredMenu(insertMenuButtonRef, 224, INSERT_MENU_ESTIMATED_HEIGHT, setInsertMenuPosition, () => setIsInsertMenuOpen(true));
-              }}
-              className={`${iconBtn} !w-8 !min-w-8 !rounded-none !border-0 border-l border-l-[var(--iw-border)]`}
-              data-accent="amber"
-            >
-              <ChevronDown className="h-3.5 w-3.5" />
-            </button>
-          </div>
-          {renderAnchoredHeaderMenu(
-            isInsertMenuOpen,
-            insertMenuPanelRef,
-            insertMenuPosition,
-            "imagine-board-header-menu fixed z-[60] w-60 p-1.5",
-            <div className="grid gap-2">
-              {BOARD_INSERT_GROUP_LABELS.map(groupLabel => {
-                const groupItems = BOARD_INSERT_CATALOG.filter(item => boardInsertGroupLabel(item.kind) === groupLabel);
-                return (
-                  <div key={groupLabel} className="board-toolbar-insert-group grid gap-1" data-group={groupLabel}>
-                    <span className="board-toolbar-menu-label flex items-center justify-between px-1 text-[10px] font-semibold text-[var(--iw-faint)]">
-                      <span>{groupLabel}</span>
-                      <span className="font-mono">{groupItems.length}</span>
-                    </span>
-                    {groupItems.map(item => (
-                      <button
-                        key={item.kind}
-                        type="button"
-                        onClick={() => handleInsert(item.kind)}
-                        className="imagine-board-header-insert-row"
-                        data-active={item.kind === lastInsertKind}
-                      >
-                        <span
-                          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border ${item.iconSurfaceClassName}`}
-                        >
-                          <BoardInsertIcon kind={item.kind} icon={item.icon} iconClassName={item.iconClassName} />
-                        </span>
-                        <span className="min-w-0 text-xs font-semibold">
-                          <span className="block truncate">{item.label}</span>
-                          {item.kind === lastInsertKind ? (
-                            <span className="block text-[10px] font-medium text-[var(--iw-board-accent-amber)]">上次使用</span>
-                          ) : null}
-                        </span>
-                        {item.kind === lastInsertKind ? <Check className="ml-auto h-3.5 w-3.5 shrink-0 text-[var(--iw-board-accent-amber)]" /> : null}
-                      </button>
-                    ))}
-                  </div>
-                );
-              })}
-            </div>,
-          )}
-          </div>
-
           <button
             type="button"
             onClick={onImportMedia}
@@ -495,6 +375,16 @@ export default function BoardToolbar({
       }
       end={
         <div className="contents">
+          <button
+            type="button"
+            onClick={onBack}
+            className={`${headerBtn} shrink-0`}
+            title="返回工作台"
+          >
+            <Grid2X2 className="h-3.5 w-3.5" />
+            <span className="hidden md:inline">工作台</span>
+          </button>
+
           {trashedCount > 0 && onRestoreTrash ? (
             <button
               type="button"
@@ -517,7 +407,6 @@ export default function BoardToolbar({
                 return;
               }
               setIsBoardMenuOpen(false);
-              setIsInsertMenuOpen(false);
               openAnchoredMenu(overflowButtonRef, 220, OVERFLOW_MENU_ESTIMATED_HEIGHT, setOverflowMenuPosition, () => setIsOverflowOpen(true));
             }}
             className={iconBtn}

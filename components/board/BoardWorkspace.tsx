@@ -2654,14 +2654,6 @@ export default function BoardWorkspace({
     openQuickInsertMenu(event);
   }, [openQuickInsertMenu]);
 
-  const insertFromToolbar = useCallback((kind: BoardInsertKind) => {
-    const item = BOARD_INSERT_CATALOG.find(current => current.kind === kind);
-    if (!item) return;
-    const position = visibleCenterPosition(item.size);
-    if (!position) return;
-    addQuickNode(kind, position);
-  }, [addQuickNode, visibleCenterPosition]);
-
   const importFilesAtPoint = useCallback((files: File[], point: BoardPoint): void => {
     if (files.length === 0) return;
     void onImportBoardFiles(files, centeredNodePosition(point, DEFAULT_ASSET_NODE_SIZE));
@@ -2879,7 +2871,6 @@ export default function BoardWorkspace({
         trashedCount={trashedNodes.length}
         onRedo={redo}
         onRestoreTrash={trashedNodes.length > 0 ? () => restoreTrashedNode(0) : undefined}
-        onInsert={insertFromToolbar}
         onUndo={undo}
         onBack={onBack}
         onClear={clearBoard}
