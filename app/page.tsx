@@ -416,11 +416,15 @@ export default function Home() {
     void resolveOriginalStorageItem(item).then(
       originalItem => {
         originalAssetPromoteIdsRef.current.delete(item.id);
-        setItems(prev => prev.map(current =>
-          current.id === originalItem.id && current.url !== originalItem.url
-            ? { ...current, url: originalItem.url }
-            : current,
-        ));
+        setItems(prev => {
+          const target = prev.find(current => current.id === originalItem.id);
+          if (!target || target.url === originalItem.url) return prev;
+          return prev.map(current =>
+            current.id === originalItem.id
+              ? { ...current, url: originalItem.url }
+              : current,
+          );
+        });
       },
       error => {
         originalAssetPromoteIdsRef.current.delete(item.id);

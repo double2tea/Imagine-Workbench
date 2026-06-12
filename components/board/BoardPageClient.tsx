@@ -1688,11 +1688,16 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     originalAssetPromoteIdsRef.current.add(item.id);
     void resolveOriginalStorageItem(item).then(
       originalItem => {
-        setItems(prev => prev.map(current =>
-          current.id === originalItem.id && current.url !== originalItem.url
-            ? { ...current, url: originalItem.url }
-            : current,
-        ));
+        originalAssetPromoteIdsRef.current.delete(item.id);
+        setItems(prev => {
+          const target = prev.find(current => current.id === originalItem.id);
+          if (!target || target.url === originalItem.url) return prev;
+          return prev.map(current =>
+            current.id === originalItem.id
+              ? { ...current, url: originalItem.url }
+              : current,
+          );
+        });
       },
       error => {
         originalAssetPromoteIdsRef.current.delete(item.id);
@@ -4861,7 +4866,6 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onImportBoardFiles={handleImportBoardFiles}
         onOpenFullscreen={handleOpenFullscreen}
         onOpenPanorama={handleOpenPanorama}
-        onPromoteOriginalAsset={promoteItemToOriginal}
         onResolveOriginalAsset={resolveOriginalStorageItem}
         onSaveVoiceProfile={handleSaveVoiceProfileSource}
         onOpenSettings={handleOpenSettings}

@@ -135,7 +135,6 @@ interface BoardWorkspaceProps {
   onOpenSettings: () => void;
   onOpenFullscreen: (item: StorageItem) => void;
   onOpenPanorama: (item: StorageItem) => void;
-  onPromoteOriginalAsset: (item: StorageItem) => void;
   onResolveOriginalAsset: (item: StorageItem) => Promise<StorageItem>;
   onSaveVoiceProfile: (item: StorageItem) => void;
   onRenameBoard: () => void;
@@ -1087,7 +1086,6 @@ export default function BoardWorkspace({
   onOpenSettings,
   onOpenFullscreen,
   onOpenPanorama,
-  onPromoteOriginalAsset,
   onResolveOriginalAsset,
   onSaveVoiceProfile,
   onRenameBoard,
@@ -1108,7 +1106,6 @@ export default function BoardWorkspace({
   const mediaImportInputRef = useRef<HTMLInputElement>(null);
   const pendingImportPointRef = useRef<BoardPoint | null>(null);
   const copiedNodeRef = useRef<CopiedBoardNode | null>(null);
-  const hoverPromoteTimerRef = useRef<number | null>(null);
   const isNodeDragActiveRef = useRef(false);
   const multiGridDropFrameRef = useRef<number | null>(null);
   const pendingMultiGridDropPointRef = useRef<{ clientX: number; clientY: number } | null>(null);
@@ -1831,29 +1828,6 @@ export default function BoardWorkspace({
     closeOverlayMenus();
   }, [closeOverlayMenus]);
 
-  const clearHoverPromoteTimer = useCallback((): void => {
-    if (hoverPromoteTimerRef.current === null) return;
-    window.clearTimeout(hoverPromoteTimerRef.current);
-    hoverPromoteTimerRef.current = null;
-  }, []);
-
-  const handleNodeMouseEnter = useCallback<NodeMouseHandler<BoardFlowNode>>((_event, node) => {
-    if (isNodeDragActiveRef.current) return;
-    const item = promotableItemForNode(node.data.node);
-    if (!item || item.status !== "complete") return;
-    clearHoverPromoteTimer();
-    hoverPromoteTimerRef.current = window.setTimeout(() => {
-      hoverPromoteTimerRef.current = null;
-      onPromoteOriginalAsset(item);
-    }, 650);
-  }, [clearHoverPromoteTimer, onPromoteOriginalAsset, promotableItemForNode]);
-
-  const handleNodeMouseLeave = useCallback<NodeMouseHandler<BoardFlowNode>>(() => {
-    clearHoverPromoteTimer();
-  }, [clearHoverPromoteTimer]);
-
-  useEffect(() => clearHoverPromoteTimer, [clearHoverPromoteTimer]);
-
   const openNodeContextMenu = useCallback((nodeId: string, clientX: number, clientY: number): void => {
     closeOverlayMenus();
     setNodeContextMenu({ nodeId, clientX, clientY });
@@ -1933,9 +1907,8 @@ export default function BoardWorkspace({
   const handleNodeDragStart = useCallback<OnNodeDrag<BoardFlowNode>>(() => {
     isNodeDragActiveRef.current = true;
     setIsNodeDragActive(true);
-    clearHoverPromoteTimer();
     pendingDragPositionByIdRef.current.clear();
-  }, [clearHoverPromoteTimer]);
+  }, []);
 
   const handleNodeDrag = useCallback<OnNodeDrag<BoardFlowNode>>((event, node) => {
     const source = node.data.node;
@@ -2946,8 +2919,6 @@ export default function BoardWorkspace({
             onNodeDrag={handleNodeDrag}
             onNodeDragStart={handleNodeDragStart}
             onNodeDragStop={handleNodeDragStop}
-            onNodeMouseEnter={handleNodeMouseEnter}
-            onNodeMouseLeave={handleNodeMouseLeave}
             onNodesChange={handleNodesChange}
             onNodesDelete={handleNodesDelete}
             onPaneClick={handlePaneClick}
