@@ -85,6 +85,8 @@ const inputClass = "imagine-board-input h-9 w-full !rounded-lg px-2 text-xs outl
 const monoInputClass = `${inputClass} font-mono`;
 const secondaryButtonClass = "imagine-secondary-action flex h-8 items-center justify-center !rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)] transition hover:bg-[var(--iw-panel)] hover:text-[var(--iw-text)]";
 const infoChipClass = "imagine-meta-chip rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5 text-[10px] font-mono text-[var(--iw-muted)]";
+const inspectorSectionClass = "board-inspector-section rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)]/70 p-2";
+const inspectorSummaryClass = "board-inspector-summary rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)]/80 p-2";
 
 const edgeKindLabels: Record<BoardEdge["kind"], string> = {
   "agent-context": "Agent 上下文",
@@ -369,6 +371,15 @@ function InspectorFocusButton({ nodeId, onFocusNode }: { nodeId: string; onFocus
   );
 }
 
+function InspectorSection({ children, title }: { children: ReactNode; title: string }) {
+  return (
+    <section className={inspectorSectionClass}>
+      <h3 className="mb-2 text-[10px] font-semibold uppercase text-[var(--iw-faint)]">{title}</h3>
+      {children}
+    </section>
+  );
+}
+
 function EdgeInspector({
   edge,
   nodes,
@@ -380,8 +391,11 @@ function EdgeInspector({
 }) {
   return (
     <div className="space-y-3">
-      <p className={infoChipClass}>类型 · {edgeKindLabels[edge.kind]}</p>
-      <div className="space-y-2 text-[11px] leading-5 text-[var(--iw-muted)]">
+      <div className={inspectorSummaryClass}>
+        <p className={infoChipClass}>类型 · {edgeKindLabels[edge.kind]}</p>
+      </div>
+      <InspectorSection title="端点">
+        <div className="space-y-2 text-[11px] leading-5 text-[var(--iw-muted)]">
         <p>
           <span className="font-semibold text-[var(--iw-faint)]">从 </span>
           {describePortEndpoint(nodes, edge.from)}
@@ -391,6 +405,7 @@ function EdgeInspector({
           {describePortEndpoint(nodes, edge.to)}
         </p>
       </div>
+      </InspectorSection>
       <button
         type="button"
         onClick={() => onDeleteEdge(edge.id)}
@@ -558,10 +573,12 @@ function ImageGenerateInspector({
 
   return (
     <div className="space-y-3">
-      <p className={infoChipClass}>{generateParamSummary(node)}</p>
-      <p className="text-[10px] leading-5 text-[var(--iw-faint)]">主执行在画布节点；此处可细调模型参数。</p>
+      <div className={inspectorSummaryClass}>
+        <p className={infoChipClass}>{generateParamSummary(node)}</p>
+        <p className="mt-1 text-[10px] leading-5 text-[var(--iw-faint)]">执行入口在画布节点；参数收纳在下方。</p>
+      </div>
       <InspectorFocusButton nodeId={node.id} onFocusNode={onFocusNode} />
-      <details className="imagine-panel-disclosure" open>
+      <details className="imagine-panel-disclosure">
         <summary className="imagine-panel-disclosure-summary">高级参数</summary>
         {advancedFields}
       </details>
@@ -693,10 +710,12 @@ function VideoGenerateInspector({
 
   return (
     <div className="space-y-3">
-      <p className={infoChipClass}>{generateParamSummary(node)}</p>
-      <p className="text-[10px] leading-5 text-[var(--iw-faint)]">主执行在画布节点；此处可细调模型参数。</p>
+      <div className={inspectorSummaryClass}>
+        <p className={infoChipClass}>{generateParamSummary(node)}</p>
+        <p className="mt-1 text-[10px] leading-5 text-[var(--iw-faint)]">执行入口在画布节点；参数收纳在下方。</p>
+      </div>
       <InspectorFocusButton nodeId={node.id} onFocusNode={onFocusNode} />
-      <details className="imagine-panel-disclosure" open>
+      <details className="imagine-panel-disclosure">
         <summary className="imagine-panel-disclosure-summary">高级参数</summary>
         {advancedFields}
       </details>
@@ -935,10 +954,12 @@ function AudioOperationInspector({
 
   return (
     <div className="space-y-3">
-      <p className={infoChipClass}>{generateParamSummary(node)}</p>
-      <p className="text-[10px] leading-5 text-[var(--iw-faint)]">主执行在画布节点；此处可细调音频参数。</p>
+      <div className={inspectorSummaryClass}>
+        <p className={infoChipClass}>{generateParamSummary(node)}</p>
+        <p className="mt-1 text-[10px] leading-5 text-[var(--iw-faint)]">执行入口在画布节点；参数收纳在下方。</p>
+      </div>
       <InspectorFocusButton nodeId={node.id} onFocusNode={onFocusNode} />
-      <details className="imagine-panel-disclosure" open>
+      <details className="imagine-panel-disclosure">
         <summary className="imagine-panel-disclosure-summary">高级参数</summary>
         {advancedFields}
       </details>
@@ -966,11 +987,13 @@ function RunningHubAppInspector({
   const outputLabel = node.outputType === "audio" ? "音频" : node.outputType === "video" ? "视频" : "图片";
   return (
     <div className="space-y-3">
-      <p className={infoChipClass}>
-        {node.targetType === "workflow" ? "Workflow" : "AI App"} / {outputLabel} / {node.bindings.length} 参数
-      </p>
+      <div className={inspectorSummaryClass}>
+        <p className={infoChipClass}>
+          {node.targetType === "workflow" ? "Workflow" : "AI App"} / {outputLabel} / {node.bindings.length} 参数
+        </p>
+      </div>
       <InspectorFocusButton nodeId={node.id} onFocusNode={onFocusNode} />
-      <details className="imagine-panel-disclosure" open>
+      <details className="imagine-panel-disclosure">
         <summary className="imagine-panel-disclosure-summary">RunningHub 目标</summary>
         <div className="imagine-panel-disclosure-body">
           <div className="grid grid-cols-2 gap-2">
@@ -1065,19 +1088,21 @@ export default function BoardInspector({
         <EdgeInspector edge={edge} nodes={nodes} onDeleteEdge={onDeleteEdge} />
       ) : node ? (
         <div className="space-y-3">
-          <InspectorField title="节点名称">
-            <input
-              value={node.title}
-              onChange={event => onUpdateNodeTitle(node.id, event.target.value)}
-              className={inputClass}
-            />
-          </InspectorField>
-          <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-[var(--iw-muted)]">
-            <div className="imagine-meta-chip rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5">输入 {incomingCount}</div>
-            <div className="imagine-meta-chip rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5">输出 {outgoingCount}</div>
-          </div>
+          <InspectorSection title="基础">
+            <InspectorField title="节点名称">
+              <input
+                value={node.title}
+                onChange={event => onUpdateNodeTitle(node.id, event.target.value)}
+                className={inputClass}
+              />
+            </InspectorField>
+            <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] font-mono text-[var(--iw-muted)]">
+              <div className="imagine-meta-chip rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5">输入 {incomingCount}</div>
+              <div className="imagine-meta-chip rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5">输出 {outgoingCount}</div>
+            </div>
+          </InspectorSection>
           {node.kind === "asset" && (
-            <div className="space-y-2">
+            <InspectorSection title="媒体动作">
               <div className="grid grid-cols-3 gap-2">
                 <button type="button" onClick={() => onOpenFullscreen(items.find(item => item.id === node.asset.assetId) ?? null)} className={secondaryButtonClass} title="全屏">
                   <Maximize2 className="h-3.5 w-3.5" />
@@ -1105,7 +1130,7 @@ export default function BoardInspector({
                 同步到传统参考槽
               </button>
               <InspectorFocusButton nodeId={node.id} onFocusNode={onFocusNode} />
-            </div>
+            </InspectorSection>
           )}
           {node.kind === "prompt" && <PromptNodeSummary node={node} onFocusNode={onFocusNode} />}
           {node.kind === "agent" && <AgentNodeSummary node={node} onFocusNode={onFocusNode} />}

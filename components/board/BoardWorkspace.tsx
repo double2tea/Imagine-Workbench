@@ -495,6 +495,13 @@ function boardIntendedSelectionSnapshot(
   return { edgeId: null, nodeId: nodeIds[0] ?? null, nodeIds };
 }
 
+const boardEdgeKindLabels: Record<BoardEdgeKind, string> = {
+  "agent-context": "Agent",
+  prompt: "Prompt",
+  reference: "Reference",
+  result: "Result",
+};
+
 const BoardEdgeComponent = memo(function BoardEdgeComponent({
   data,
   id,
@@ -534,9 +541,14 @@ const BoardEdgeComponent = memo(function BoardEdgeComponent({
         className={`imagine-board-edge-path imagine-board-edge-path-${kind}`}
       />
       {showLabel ? (
-        <EdgeToolbar edgeId={id} x={labelX} y={labelY} isVisible className="nodrag nopan flex items-center gap-1">
+        <EdgeToolbar edgeId={id} x={labelX} y={labelY} isVisible className={`board-edge-toolbar board-edge-toolbar-${kind} nodrag nopan flex items-center gap-1`}>
+          {selected ? (
+            <span className="board-edge-kind-pill rounded-full border px-2 py-0.5 text-[9px] font-semibold">
+              {boardEdgeKindLabels[kind]}
+            </span>
+          ) : null}
           {processing ? (
-            <span className="rounded-full border border-blue-400/30 bg-blue-500/15 px-2 py-0.5 text-[9px] font-semibold text-blue-200">
+            <span className="board-edge-processing-pill rounded-full border px-2 py-0.5 text-[9px] font-semibold">
               生成中
             </span>
           ) : null}

@@ -178,13 +178,13 @@ html::-webkit-scrollbar-thumb:hover {
 
 .board-group-node-shell {
   overflow: visible;
-  border: 1.5px solid rgba(52, 211, 153, 0.72);
+  border: 1px solid color-mix(in srgb, var(--iw-board-edge-result) 42%, var(--iw-border));
   background:
-    linear-gradient(180deg, rgba(16, 185, 129, 0.11), rgba(16, 185, 129, 0.055));
+    linear-gradient(180deg, color-mix(in srgb, var(--iw-panel-soft) 72%, transparent), color-mix(in srgb, var(--iw-board-edge-result) 8%, transparent));
   box-shadow:
-    0 0 0 1px rgba(6, 78, 59, 0.42),
-    0 16px 42px rgba(0, 0, 0, 0.18),
-    inset 0 0 0 1px rgba(167, 243, 208, 0.12);
+    0 0 0 1px color-mix(in srgb, var(--iw-board-edge-result) 16%, transparent),
+    0 16px 42px color-mix(in srgb, var(--iw-bg) 18%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--iw-text) 6%, transparent);
 }
 
 .board-group-node-shell::before {
@@ -192,17 +192,17 @@ html::-webkit-scrollbar-thumb:hover {
   position: absolute;
   inset: 8px;
   pointer-events: none;
-  border: 1px dashed rgba(110, 231, 183, 0.28);
+  border: 1px dashed color-mix(in srgb, var(--iw-board-edge-result) 24%, transparent);
   border-radius: 6px;
 }
 
 .board-group-node-shell[data-selected="true"] {
-  border-color: rgba(251, 191, 36, 0.95);
+  border-color: color-mix(in srgb, var(--iw-board-accent-amber) 74%, var(--iw-border));
   box-shadow:
     0 0 0 2px rgba(245, 158, 11, 0.24),
-    0 0 0 1px rgba(52, 211, 153, 0.48),
-    0 18px 48px rgba(0, 0, 0, 0.22),
-    inset 0 0 0 1px rgba(254, 243, 199, 0.18);
+    0 0 0 1px color-mix(in srgb, var(--iw-board-edge-result) 22%, transparent),
+    0 18px 48px color-mix(in srgb, var(--iw-bg) 22%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--iw-board-accent-amber) 14%, transparent);
 }
 
 .board-group-node-title,
@@ -282,6 +282,76 @@ html::-webkit-scrollbar-thumb:hover {
 
 .imagine-board-edge {
   /* hook for future per-kind refinements */
+}
+
+.board-canvas .react-flow__edge.imagine-board-edge-prompt {
+  color: var(--iw-board-edge-prompt);
+}
+
+.board-canvas .react-flow__edge.imagine-board-edge-reference {
+  color: var(--iw-board-edge-reference);
+}
+
+.board-canvas .react-flow__edge.imagine-board-edge-agent-context {
+  color: var(--iw-board-edge-agent-context);
+}
+
+.board-canvas .react-flow__edge.imagine-board-edge-result {
+  color: var(--iw-board-edge-result);
+}
+
+.board-canvas .react-flow__edge-path,
+.board-canvas .react-flow__connection-path {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.board-canvas .react-flow__edge.imagine-board-edge .react-flow__edge-path {
+  opacity: 0.74;
+  transition:
+    opacity var(--iw-motion-base) var(--iw-motion-ease),
+    stroke-width var(--iw-motion-base) var(--iw-motion-ease),
+    filter var(--iw-motion-base) var(--iw-motion-ease);
+}
+
+.board-canvas .react-flow__edge.imagine-board-edge:hover .react-flow__edge-path,
+.board-canvas .react-flow__edge.selected.imagine-board-edge .react-flow__edge-path {
+  opacity: 1;
+  filter: drop-shadow(0 0 8px color-mix(in srgb, currentColor 24%, transparent));
+}
+
+.board-edge-toolbar {
+  border-radius: 999px;
+  filter: drop-shadow(0 12px 22px color-mix(in srgb, var(--iw-bg) 28%, transparent));
+}
+
+.board-edge-kind-pill,
+.board-edge-processing-pill {
+  border-color: color-mix(in srgb, var(--iw-border) 62%, transparent);
+  background: color-mix(in srgb, var(--iw-panel-solid) 88%, transparent);
+  color: var(--iw-text);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--iw-text) 8%, transparent);
+}
+
+.board-edge-toolbar-prompt .board-edge-kind-pill {
+  border-color: color-mix(in srgb, var(--iw-board-edge-prompt) 34%, var(--iw-border));
+  color: var(--iw-board-edge-prompt);
+}
+
+.board-edge-toolbar-reference .board-edge-kind-pill {
+  border-color: color-mix(in srgb, var(--iw-board-edge-reference) 34%, var(--iw-border));
+  color: var(--iw-board-edge-reference);
+}
+
+.board-edge-toolbar-agent-context .board-edge-kind-pill {
+  border-color: color-mix(in srgb, var(--iw-board-edge-agent-context) 34%, var(--iw-border));
+  color: var(--iw-board-edge-agent-context);
+}
+
+.board-edge-toolbar-result .board-edge-kind-pill,
+.board-edge-processing-pill {
+  border-color: color-mix(in srgb, var(--iw-board-edge-result) 34%, var(--iw-border));
+  color: var(--iw-board-edge-result);
 }
 
 .imagine-board-progress-step {
@@ -3893,24 +3963,24 @@ html[data-imagine-theme="light"] .board-media-stack-switcher {
 }
 
 .imagine-workbench-shell.imagine-theme-light .board-group-node-shell {
-  border-color: rgba(5, 150, 105, 0.7);
+  border-color: color-mix(in srgb, var(--iw-board-edge-result) 34%, var(--iw-border));
   background:
-    linear-gradient(180deg, rgba(16, 185, 129, 0.14), rgba(16, 185, 129, 0.075));
+    linear-gradient(180deg, color-mix(in srgb, #ffffff 86%, var(--iw-board-edge-result)), color-mix(in srgb, var(--iw-panel-soft) 88%, var(--iw-board-edge-result)));
   box-shadow:
-    0 0 0 1px rgba(4, 120, 87, 0.14),
+    0 0 0 1px color-mix(in srgb, var(--iw-board-edge-result) 12%, transparent),
     0 14px 34px rgba(15, 23, 42, 0.08),
     inset 0 0 0 1px rgba(255, 255, 255, 0.72);
 }
 
 .imagine-workbench-shell.imagine-theme-light .board-group-node-shell::before {
-  border-color: rgba(5, 150, 105, 0.32);
+  border-color: color-mix(in srgb, var(--iw-board-edge-result) 26%, transparent);
 }
 
 .imagine-workbench-shell.imagine-theme-light .board-group-node-shell[data-selected="true"] {
-  border-color: rgba(217, 119, 6, 0.9);
+  border-color: color-mix(in srgb, var(--iw-board-accent-amber) 72%, var(--iw-border));
   box-shadow:
     0 0 0 2px rgba(217, 119, 6, 0.22),
-    0 0 0 1px rgba(5, 150, 105, 0.24),
+    0 0 0 1px color-mix(in srgb, var(--iw-board-edge-result) 18%, transparent),
     0 14px 34px rgba(15, 23, 42, 0.1),
     inset 0 0 0 1px rgba(255, 255, 255, 0.82);
 }
@@ -4661,6 +4731,18 @@ html[data-imagine-theme="light"] .imagine-required-chip,
   line-height: 1.35;
 }
 
+.board-inspector-section {
+  background: color-mix(in srgb, var(--iw-panel-soft) 70%, transparent) !important;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--iw-text) 5%, transparent);
+}
+
+.board-inspector-summary {
+  background: color-mix(in srgb, var(--iw-panel) 82%, transparent) !important;
+  box-shadow:
+    0 8px 18px color-mix(in srgb, var(--iw-bg) 12%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--iw-text) 6%, transparent);
+}
+
 .imagine-theme-light .imagine-asset-card {
   background: #ffffff !important;
   border-color: rgba(15, 23, 42, 0.11) !important;
@@ -4872,6 +4954,18 @@ html[data-imagine-theme="light"] .imagine-asset-controlbar {
 .imagine-theme-light .imagine-meta-chip {
   background: #f6f8fb !important;
   color: #667085 !important;
+}
+
+.imagine-theme-light .board-inspector-section {
+  background: color-mix(in srgb, #ffffff 72%, var(--iw-panel-soft)) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.imagine-theme-light .board-inspector-summary {
+  background: #ffffff !important;
+  box-shadow:
+    0 8px 18px rgba(15, 23, 42, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.84);
 }
 
 .imagine-theme-light .imagine-asset-card[data-status="complete"] .imagine-status-chip {
