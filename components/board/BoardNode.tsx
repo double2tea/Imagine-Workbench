@@ -376,7 +376,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
         className={[
           "flex items-center",
           isMediaNode
-            ? "pointer-events-none absolute -top-7 left-0 z-30 h-5 max-w-full gap-1 board-asset-node-chrome"
+            ? "pointer-events-none absolute -top-5 left-1 z-30 h-5 max-w-[calc(100%-0.5rem)] gap-1 board-asset-node-chrome"
             : "h-9 gap-2 rounded-t-lg px-3 imagine-board-node-header",
         ].join(" ")}
       >

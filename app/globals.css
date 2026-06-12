@@ -3583,14 +3583,14 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 .board-node-handle.board-node-handle-asset:is(:hover, .connectionindicator, .connectingfrom, .connectingto),
 .board-node-shell:is(:hover, :focus-within) .board-node-handle-asset.board-connection-zone-edge,
 .board-node-shell:is(:hover, :focus-within) .board-node-handle-asset.board-connection-zone-segment {
-  background: color-mix(in srgb, #60a5fa 8%, transparent) !important;
-  border-color: color-mix(in srgb, #60a5fa 22%, transparent) !important;
+  background: color-mix(in srgb, var(--iw-accent) 7%, transparent) !important;
+  border-color: color-mix(in srgb, var(--iw-accent) 20%, transparent) !important;
 }
 
 .board-node-handle.board-node-handle-result:is(:hover, .connectionindicator, .connectingfrom, .connectingto),
 .board-node-shell:is(:hover, :focus-within) .board-node-handle-result.board-connection-zone-edge {
-  background: color-mix(in srgb, #34d399 8%, transparent) !important;
-  border-color: color-mix(in srgb, #34d399 22%, transparent) !important;
+  background: color-mix(in srgb, var(--iw-accent) 7%, transparent) !important;
+  border-color: color-mix(in srgb, var(--iw-accent) 20%, transparent) !important;
 }
 
 .board-node-handle.board-node-handle-agent:is(:hover, .connectionindicator, .connectingfrom, .connectingto),
@@ -3606,8 +3606,8 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 .board-node-handle.connectingfrom {
   animation: none;
   box-shadow:
-    0 0 0 4px rgba(96, 165, 250, 0.18),
-    0 0 20px rgba(96, 165, 250, 0.4) !important;
+    0 0 0 4px color-mix(in srgb, var(--iw-accent) 18%, transparent),
+    0 0 20px color-mix(in srgb, var(--iw-accent) 38%, transparent) !important;
 }
 
 .board-canvas.is-connecting .board-node-handle.connectionindicator:not(.connectingfrom) {
@@ -3644,7 +3644,7 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 .board-media-node {
   contain: none;
   --board-media-frame-border: color-mix(in srgb, var(--iw-border) 82%, transparent);
-  --board-media-frame-glow: color-mix(in srgb, var(--iw-accent) 14%, transparent);
+  --board-media-frame-glow: color-mix(in srgb, var(--iw-accent) 10%, transparent);
   --board-media-frame-shadow: color-mix(in srgb, var(--iw-bg) 34%, transparent);
 }
 
@@ -3676,16 +3676,16 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 .board-media-commit-surface::after {
   opacity: 0;
   box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--iw-accent) 56%, transparent),
-    0 0 0 4px var(--board-media-frame-glow);
+    inset 0 0 0 1px color-mix(in srgb, var(--iw-accent) 42%, transparent),
+    0 0 0 3px var(--board-media-frame-glow);
   transition: opacity var(--iw-motion-surface) var(--iw-motion-ease);
 }
 
 .board-media-node:is(:hover, :focus-within) .board-media-commit-surface,
 .board-media-node[data-selected="true"] .board-media-commit-surface {
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--iw-accent) 38%, var(--iw-border)),
-    0 18px 44px color-mix(in srgb, var(--iw-bg) 40%, transparent);
+    0 0 0 1px color-mix(in srgb, var(--iw-accent) 32%, var(--iw-border)),
+    0 14px 34px color-mix(in srgb, var(--iw-bg) 34%, transparent);
 }
 
 .board-media-node:is(:hover, :focus-within) .board-media-commit-surface::after,
@@ -3707,9 +3707,43 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 .board-node-shell[data-kind="result"] .board-asset-node-chrome > h2 {
   min-height: 1.25rem;
   border-color: transparent !important;
-  background: color-mix(in srgb, var(--iw-panel-solid) 42%, transparent) !important;
+  background: color-mix(in srgb, var(--iw-panel-solid) 52%, transparent) !important;
   color: var(--iw-muted);
+  backdrop-filter: blur(10px);
   box-shadow: none;
+}
+
+.board-node-shell[data-kind="asset"] .board-connection-zone-edge,
+.board-node-shell[data-kind="result"] .board-connection-zone-edge {
+  min-width: 10px;
+}
+
+.board-node-shell[data-kind="asset"] .board-node-handle.board-connection-zone-edge.react-flow__handle-left,
+.board-node-shell[data-kind="result"] .board-node-handle.board-connection-zone-edge.react-flow__handle-left {
+  --board-handle-translate: translate(-44%, -50%);
+}
+
+.board-node-shell[data-kind="asset"] .board-node-handle.board-connection-zone-edge.react-flow__handle-right,
+.board-node-shell[data-kind="result"] .board-node-handle.board-connection-zone-edge.react-flow__handle-right {
+  --board-handle-translate: translate(44%, -50%);
+}
+
+.board-node-shell[data-kind="asset"]:is(:hover, :focus-within) .board-connection-zone-edge,
+.board-node-shell[data-kind="result"]:is(:hover, :focus-within) .board-connection-zone-edge,
+.board-node-shell[data-selected="true"][data-kind="asset"] .board-connection-zone-edge,
+.board-node-shell[data-selected="true"][data-kind="result"] .board-connection-zone-edge {
+  opacity: 0.14 !important;
+  background: color-mix(in srgb, var(--iw-accent) 7%, transparent) !important;
+  border-color: color-mix(in srgb, var(--iw-accent) 18%, transparent) !important;
+}
+
+.board-canvas.is-connecting .board-node-shell[data-kind="asset"] .board-node-handle.board-connection-zone-edge.connectionindicator,
+.board-canvas.is-connecting .board-node-shell[data-kind="result"] .board-node-handle.board-connection-zone-edge.connectionindicator,
+.board-node-shell[data-kind="asset"] .board-node-handle.connectingfrom,
+.board-node-shell[data-kind="result"] .board-node-handle.connectingfrom,
+.board-node-shell[data-kind="asset"] .board-node-handle.connectingto,
+.board-node-shell[data-kind="result"] .board-node-handle.connectingto {
+  opacity: 0.42 !important;
 }
 
 .board-node-shell[data-selected="true"][data-kind="asset"] .board-asset-node-chrome > h2,
@@ -3881,18 +3915,18 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 }
 
 .board-media-stack-switcher {
-  --board-media-stack-bg: color-mix(in srgb, var(--iw-panel-solid) 86%, var(--iw-bg));
-  --board-media-stack-border: color-mix(in srgb, var(--iw-border) 76%, transparent);
+  --board-media-stack-bg: color-mix(in srgb, var(--iw-panel-solid) 82%, transparent);
+  --board-media-stack-border: color-mix(in srgb, var(--iw-border) 72%, transparent);
   --board-media-stack-muted: var(--iw-muted);
-  --board-media-stack-option-bg: color-mix(in srgb, var(--iw-panel-soft) 68%, transparent);
-  --board-media-stack-option-active-bg: linear-gradient(180deg, var(--iw-accent), var(--iw-accent-strong));
-  --board-media-stack-option-active-text: #ffffff;
+  --board-media-stack-option-bg: transparent;
+  --board-media-stack-option-active-bg: color-mix(in srgb, var(--iw-accent) 88%, var(--iw-panel-solid));
+  --board-media-stack-option-active-text: var(--iw-bg);
 
   border: 1px solid var(--board-media-stack-border);
   background: var(--board-media-stack-bg);
   color: var(--board-media-stack-muted);
   box-shadow:
-    0 16px 42px color-mix(in srgb, var(--iw-bg) 34%, transparent),
+    0 10px 26px color-mix(in srgb, var(--iw-bg) 24%, transparent),
     inset 0 1px 0 color-mix(in srgb, var(--iw-text) 10%, transparent);
   transform: translate(-50%, 4px);
   transition:
@@ -3902,9 +3936,9 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 
 .imagine-workbench-shell.imagine-theme-light .board-media-stack-switcher,
 html[data-imagine-theme="light"] .board-media-stack-switcher {
-  --board-media-stack-bg: color-mix(in srgb, var(--iw-panel-solid) 94%, var(--iw-bg));
+  --board-media-stack-bg: color-mix(in srgb, var(--iw-panel-solid) 88%, transparent);
   --board-media-stack-border: color-mix(in srgb, var(--iw-border) 82%, transparent);
-  --board-media-stack-option-bg: color-mix(in srgb, var(--iw-panel-soft) 84%, transparent);
+  --board-media-stack-option-bg: transparent;
 }
 
 .board-media-stack-option {
@@ -3928,7 +3962,7 @@ html[data-imagine-theme="light"] .board-media-stack-switcher {
   border-color: color-mix(in srgb, var(--iw-accent) 48%, transparent);
   background: var(--board-media-stack-option-active-bg);
   color: var(--board-media-stack-option-active-text);
-  box-shadow: 0 8px 18px var(--iw-accent-glow);
+  box-shadow: none;
 }
 
 .board-media-node:hover .board-media-controls,
@@ -4998,15 +5032,22 @@ html[data-imagine-theme="light"] .imagine-required-chip,
 }
 
 .board-inspector-section {
-  background: color-mix(in srgb, var(--iw-panel-soft) 70%, transparent) !important;
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--iw-text) 5%, transparent);
+  border-color: color-mix(in srgb, var(--iw-border) 66%, transparent) !important;
+  background: color-mix(in srgb, var(--iw-panel-soft) 46%, transparent) !important;
+  box-shadow: none;
 }
 
 .board-inspector-summary {
-  background: color-mix(in srgb, var(--iw-panel) 82%, transparent) !important;
-  box-shadow:
-    0 8px 18px color-mix(in srgb, var(--iw-bg) 12%, transparent),
-    inset 0 1px 0 color-mix(in srgb, var(--iw-text) 6%, transparent);
+  border-color: color-mix(in srgb, var(--iw-border) 66%, transparent) !important;
+  background: color-mix(in srgb, var(--iw-panel) 58%, transparent) !important;
+  box-shadow: none;
+}
+
+.board-inspector-section .imagine-board-input,
+.board-inspector-section .imagine-secondary-action,
+.board-inspector-summary .imagine-meta-chip {
+  border-color: color-mix(in srgb, var(--iw-border) 72%, transparent) !important;
+  background: color-mix(in srgb, var(--iw-panel-soft) 54%, transparent) !important;
 }
 
 .imagine-theme-light .imagine-asset-card {
@@ -5223,15 +5264,13 @@ html[data-imagine-theme="light"] .imagine-asset-controlbar {
 }
 
 .imagine-theme-light .board-inspector-section {
-  background: color-mix(in srgb, #ffffff 72%, var(--iw-panel-soft)) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  background: color-mix(in srgb, #ffffff 58%, var(--iw-panel-soft)) !important;
+  box-shadow: none;
 }
 
 .imagine-theme-light .board-inspector-summary {
-  background: #ffffff !important;
-  box-shadow:
-    0 8px 18px rgba(15, 23, 42, 0.06),
-    inset 0 1px 0 rgba(255, 255, 255, 0.84);
+  background: color-mix(in srgb, #ffffff 70%, var(--iw-panel-soft)) !important;
+  box-shadow: none;
 }
 
 .imagine-theme-light .imagine-asset-card[data-status="complete"] .imagine-status-chip {

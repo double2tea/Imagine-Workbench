@@ -120,7 +120,7 @@ export default function BoardMediaNodeShell({
         <div
           data-visible={isSelected ? "true" : "false"}
           className={[
-            "board-media-stack-switcher nodrag absolute -bottom-8 left-1/2 z-40 flex gap-1.5 rounded-full px-2.5 py-1.5 text-[10px] font-semibold shadow-xl backdrop-blur transition-opacity duration-200",
+            "board-media-stack-switcher nodrag absolute -bottom-7 left-1/2 z-40 flex gap-1 rounded-full px-1.5 py-1 text-[10px] font-semibold shadow-md backdrop-blur transition-opacity duration-200",
             isSelected
               ? "pointer-events-auto opacity-100"
               : "pointer-events-none opacity-0 group-hover/board-video:pointer-events-auto group-hover/board-video:opacity-100",
