@@ -54,7 +54,7 @@ async function hydrateAssetPreviews(metas: StorageItemMeta[]): Promise<StorageIt
       if (meta.type === "transcript" && meta.hasBlob) {
         url = await resolveAssetOriginalUrl(meta);
       }
-      if (!url && meta.type === "video" && meta.hasBlob) {
+      if (!url && (meta.type === "image" || meta.type === "video") && meta.hasBlob) {
         url = await ensureAssetPreviewUrl(meta);
       }
       hydrated.push({ ...meta, url });

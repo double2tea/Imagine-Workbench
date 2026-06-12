@@ -42,6 +42,7 @@ export default function BoardMediaActionBar({ groups, visible = false }: BoardMe
       data-visible={visible ? "true" : "false"}
       className={`board-media-controls board-media-top-actions nodrag nopan absolute bottom-full left-1/2 right-auto z-40 mb-12 flex w-max max-w-none flex-nowrap items-center justify-center whitespace-nowrap [translate:-50%_0] transition-opacity duration-200 ${visibilityClass}`}
       onPointerDown={event => event.stopPropagation()}
+      onDoubleClick={event => event.stopPropagation()}
     >
       {visibleGroups.map(group => (
         <div

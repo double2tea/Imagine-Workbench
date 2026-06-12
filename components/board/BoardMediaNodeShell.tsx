@@ -8,6 +8,7 @@ interface BoardMediaNodeShellProps {
   activeStackAssetId: string;
   children: ReactNode;
   isSelected: boolean;
+  onDoubleClick?: () => void;
   onCancelProcessing?: () => void;
   processingLabel?: string;
   onSelectStackAsset?: (assetId: string) => void;
@@ -21,6 +22,7 @@ export default function BoardMediaNodeShell({
   activeStackAssetId,
   children,
   isSelected,
+  onDoubleClick,
   onCancelProcessing,
   processingLabel = "编辑处理中",
   onSelectStackAsset,
@@ -68,6 +70,7 @@ export default function BoardMediaNodeShell({
 
   return (
     <div
+      onDoubleClick={onDoubleClick}
       ref={containerRef}
       className="board-media-node group/board-video relative h-full min-h-0 overflow-visible"
       data-has-stack={hasStackSwitcher ? "true" : "false"}
@@ -125,6 +128,7 @@ export default function BoardMediaNodeShell({
               ? "pointer-events-auto opacity-100"
               : "pointer-events-none opacity-0 group-hover/board-video:pointer-events-auto group-hover/board-video:opacity-100",
           ].join(" ")}
+          onDoubleClick={event => event.stopPropagation()}
         >
           {stackItems.map((stackItem, index) => {
             const isActive = stackItem.id === activeStackAssetId;

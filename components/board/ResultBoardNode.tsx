@@ -181,21 +181,23 @@ const ResultBoardNode = memo(function ResultBoardNode({
   ];
 
   return (
-    <BoardMediaNodeShell
-      actionBar={<BoardMediaActionBar groups={actionGroups} visible={isSelected} />}
-      activeStackAssetId={node.activeAssetId}
-      isSelected={isSelected}
-      onSelectStackAsset={onSelectStackAsset}
-      processingLabel={imageQuickEditProcessingTitleFromPrompt(item.prompt) ?? undefined}
-      stackItems={stackItems}
-      status={item.status}
-      statusLabel={item.errorMessage ?? (item.status === "failed" ? "生成失败" : undefined)}
+      <BoardMediaNodeShell
+        actionBar={<BoardMediaActionBar groups={actionGroups} visible={isSelected} />}
+        activeStackAssetId={node.activeAssetId}
+        isSelected={isSelected}
+        onSelectStackAsset={onSelectStackAsset}
+        onDoubleClick={item.status === "complete" && onOpenFullscreen ? () => onOpenFullscreen(item) : undefined}
+        processingLabel={imageQuickEditProcessingTitleFromPrompt(item.prompt) ?? undefined}
+        stackItems={stackItems}
+        status={item.status}
+        statusLabel={item.errorMessage ?? (item.status === "failed" ? "生成失败" : undefined)}
     >
       {item.type === "image" && item.url.trim() ? (
         <PreviewImage
           src={item.url}
           alt={node.title}
           draggable={false}
+          loading="eager"
           className="board-media-preview h-full w-full select-none object-cover"
           onLoad={event => {
             const image = event.currentTarget;
@@ -228,6 +230,7 @@ const ResultBoardNode = memo(function ResultBoardNode({
           src={item.url}
           alt={node.title}
           draggable={false}
+          loading="eager"
           className="board-media-preview h-full w-full select-none object-cover"
         />
       ) : playableAudioItem ? (

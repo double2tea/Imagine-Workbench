@@ -1,4 +1,4 @@
-import { Music, Video } from "lucide-react";
+import { Image as ImageIcon, Music, Video } from "lucide-react";
 import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
 import { memo, useMemo, useRef } from "react";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
@@ -61,11 +61,11 @@ function boardAssetToStorageItem(node: BoardAssetNode, boardId: string): Storage
   );
 }
 
-function LightweightMediaPreview({ type }: { type: "audio" | "video" }) {
-  const Icon = type === "audio" ? Music : Video;
+function LightweightMediaPreview({ type }: { type: "audio" | "image" | "video" }) {
+  const Icon = type === "audio" ? Music : type === "image" ? ImageIcon : Video;
   return (
     <div
-      aria-label={type === "audio" ? "音频资产" : "视频资产"}
+      aria-label={type === "audio" ? "音频资产" : type === "image" ? "图片资产" : "视频资产"}
       className="board-media-preview flex h-full w-full items-center justify-center bg-[var(--iw-panel-soft)] text-[var(--iw-muted)]"
       role="img"
     >
@@ -222,22 +222,24 @@ const AssetBoardNode = memo(function AssetBoardNode({
   ];
 
   return (
-    <BoardMediaNodeShell
-      actionBar={<BoardMediaActionBar groups={actionGroups} visible={isSelected} />}
-      activeStackAssetId={activeStackAssetId ?? node.asset.assetId}
-      isSelected={isSelected}
-      onCancelProcessing={onCancelProcessing ? () => onCancelProcessing(node.id) : undefined}
-      onSelectStackAsset={onSelectStackAsset}
-      processingLabel={imageQuickEditProcessingTitleFromPrompt(item.prompt) ?? undefined}
-      stackItems={stackItems}
-      status={item.status}
-      statusLabel={item.errorMessage ?? (item.status === "failed" ? "编辑失败" : undefined)}
+      <BoardMediaNodeShell
+        actionBar={<BoardMediaActionBar groups={actionGroups} visible={isSelected} />}
+        activeStackAssetId={activeStackAssetId ?? node.asset.assetId}
+        isSelected={isSelected}
+        onCancelProcessing={onCancelProcessing ? () => onCancelProcessing(node.id) : undefined}
+        onDoubleClick={isComplete && onOpenFullscreen ? () => onOpenFullscreen(item) : undefined}
+        onSelectStackAsset={onSelectStackAsset}
+        processingLabel={imageQuickEditProcessingTitleFromPrompt(item.prompt) ?? undefined}
+        stackItems={stackItems}
+        status={item.status}
+        statusLabel={item.errorMessage ?? (item.status === "failed" ? "编辑失败" : undefined)}
     >
-      {node.asset.type === "image" ? (
+      {node.asset.type === "image" && item.url.trim() ? (
         <PreviewImage
           src={item.url}
           alt={node.title}
           draggable={false}
+          loading="eager"
           className="board-media-preview h-full w-full select-none object-cover"
           onLoad={event => {
             const image = event.currentTarget;
@@ -270,6 +272,7 @@ const AssetBoardNode = memo(function AssetBoardNode({
           src={item.url}
           alt={node.title}
           draggable={false}
+          loading="eager"
           className="board-media-preview h-full w-full select-none object-cover"
         />
       ) : playableAudioItem ? (
