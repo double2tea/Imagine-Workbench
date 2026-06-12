@@ -3368,6 +3368,79 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 
 .board-media-node {
   contain: none;
+  --board-media-frame-border: color-mix(in srgb, var(--iw-border) 82%, transparent);
+  --board-media-frame-glow: color-mix(in srgb, var(--iw-accent) 14%, transparent);
+  --board-media-frame-shadow: color-mix(in srgb, var(--iw-bg) 34%, transparent);
+}
+
+.board-media-commit-surface {
+  isolation: isolate;
+  border-radius: var(--iw-radius-lg);
+  box-shadow:
+    0 0 0 1px var(--board-media-frame-border),
+    0 14px 34px var(--board-media-frame-shadow);
+  transition:
+    box-shadow var(--iw-motion-surface) var(--iw-motion-ease),
+    transform var(--iw-motion-surface) var(--iw-motion-ease);
+}
+
+.board-media-commit-surface::before,
+.board-media-commit-surface::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  border-radius: inherit;
+}
+
+.board-media-commit-surface::before {
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--iw-text) 8%, transparent);
+}
+
+.board-media-commit-surface::after {
+  opacity: 0;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--iw-accent) 56%, transparent),
+    0 0 0 4px var(--board-media-frame-glow);
+  transition: opacity var(--iw-motion-surface) var(--iw-motion-ease);
+}
+
+.board-media-node:is(:hover, :focus-within) .board-media-commit-surface,
+.board-media-node[data-selected="true"] .board-media-commit-surface {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--iw-accent) 38%, var(--iw-border)),
+    0 18px 44px color-mix(in srgb, var(--iw-bg) 40%, transparent);
+}
+
+.board-media-node:is(:hover, :focus-within) .board-media-commit-surface::after,
+.board-media-node[data-selected="true"] .board-media-commit-surface::after {
+  opacity: 1;
+}
+
+.board-media-node[data-status="processing"] {
+  --board-media-frame-border: color-mix(in srgb, var(--iw-accent) 34%, var(--iw-border));
+  --board-media-frame-glow: color-mix(in srgb, var(--iw-accent) 20%, transparent);
+}
+
+.board-media-node[data-status="failed"] {
+  --board-media-frame-border: rgba(248, 113, 113, 0.42);
+  --board-media-frame-glow: rgba(248, 113, 113, 0.16);
+}
+
+.board-node-shell[data-kind="asset"] .board-asset-node-chrome > h2,
+.board-node-shell[data-kind="result"] .board-asset-node-chrome > h2 {
+  min-height: 2rem;
+  border-color: color-mix(in srgb, var(--iw-border) 70%, transparent) !important;
+  background: color-mix(in srgb, var(--iw-panel-solid) 86%, transparent) !important;
+  box-shadow:
+    0 10px 24px color-mix(in srgb, var(--iw-bg) 24%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--iw-text) 8%, transparent);
+}
+
+.board-node-shell[data-selected="true"][data-kind="asset"] .board-asset-node-chrome > h2,
+.board-node-shell[data-selected="true"][data-kind="result"] .board-asset-node-chrome > h2 {
+  border-color: color-mix(in srgb, var(--iw-accent) 38%, var(--iw-border)) !important;
 }
 
 .board-media-preview {
@@ -3410,6 +3483,17 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
   box-shadow:
     0 18px 42px color-mix(in srgb, var(--iw-accent) 10%, rgba(2, 6, 23, 0.26)),
     inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.board-media-node[data-status="failed"] .board-media-processing-visual {
+  background:
+    radial-gradient(ellipse at 50% 48%, rgba(248, 113, 113, 0.22), transparent 38%),
+    linear-gradient(180deg, color-mix(in srgb, var(--iw-panel-soft) 78%, transparent), rgba(127, 29, 29, 0.24));
+}
+
+.board-media-node[data-status="failed"] .board-media-processing-pill {
+  border-color: rgba(248, 113, 113, 0.38) !important;
+  background: color-mix(in srgb, var(--iw-panel) 72%, rgba(127, 29, 29, 0.18)) !important;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -3473,6 +3557,22 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
   transition:
     opacity var(--iw-motion-surface) var(--iw-motion-ease),
     transform var(--iw-motion-surface) var(--iw-motion-ease);
+}
+
+.board-media-action-group {
+  border-color: color-mix(in srgb, var(--iw-border) 62%, transparent) !important;
+  background: color-mix(in srgb, var(--iw-panel-solid) 82%, transparent) !important;
+  box-shadow:
+    0 12px 28px color-mix(in srgb, var(--iw-bg) 28%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--iw-text) 8%, transparent) !important;
+}
+
+.board-media-action-group[data-group="edit"] {
+  border-color: color-mix(in srgb, var(--iw-accent) 24%, var(--iw-border)) !important;
+}
+
+.board-media-action-group[data-group="view"] {
+  background: color-mix(in srgb, var(--iw-panel-solid) 74%, transparent) !important;
 }
 
 .board-media-stack-switcher {
@@ -3554,6 +3654,16 @@ html[data-imagine-theme="light"] .board-media-stack-switcher {
   background: rgba(15, 23, 42, 0.45) !important;
   border-color: rgba(255, 255, 255, 0.12) !important;
   color: rgba(255, 255, 255, 0.9) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 8px 20px rgba(2, 6, 23, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.board-media-node[data-selected="true"] .board-media-stack-badge,
+.board-media-node:hover .board-media-stack-badge,
+.board-media-node:focus-within .board-media-stack-badge {
+  opacity: 1;
 }
 
 .board-canvas.is-node-dragging .react-flow__edge-path,

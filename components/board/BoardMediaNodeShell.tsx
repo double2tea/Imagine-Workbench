@@ -33,6 +33,7 @@ export default function BoardMediaNodeShell({
   const hasStackSwitcher = stackItems.length > 1;
   const isProcessing = status === "pending" || status === "processing";
   const isFailed = status === "failed";
+  const visualStatus = isFailed ? "failed" : isProcessing ? "processing" : status === "complete" ? "complete" : "idle";
   const statusTitle = isFailed
     ? statusLabel ?? "任务失败"
     : status === "pending"
@@ -66,7 +67,13 @@ export default function BoardMediaNodeShell({
   }, { dependencies: [status], scope: containerRef });
 
   return (
-    <div ref={containerRef} className="board-media-node group/board-video relative h-full min-h-0 overflow-visible">
+    <div
+      ref={containerRef}
+      className="board-media-node group/board-video relative h-full min-h-0 overflow-visible"
+      data-has-stack={hasStackSwitcher ? "true" : "false"}
+      data-selected={isSelected ? "true" : "false"}
+      data-status={visualStatus}
+    >
       {actionBar}
       <div className="board-media-commit-surface imagine-motion-media-reveal relative flex h-full min-h-0 items-center justify-center overflow-hidden bg-[var(--iw-panel-soft)]">
         <span className="board-media-commit-flash pointer-events-none absolute inset-0 z-30 opacity-0" />

@@ -27,11 +27,16 @@ export default function BoardMediaActionBar({ groups, visible = false }: BoardMe
 
   return (
     <div
+      data-visible={visible ? "true" : "false"}
       className={`board-media-controls board-media-top-actions nodrag nopan absolute bottom-full left-[var(--board-media-title-chrome-width,13rem)] right-auto z-40 mb-2 flex w-max max-w-none flex-nowrap items-center justify-start gap-1.5 whitespace-nowrap transition-opacity duration-200 ${visibilityClass}`}
       onPointerDown={event => event.stopPropagation()}
     >
       {visibleGroups.map(group => (
-        <div key={group.id} className="board-media-action-group flex items-center gap-1 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)]/92 p-1 shadow-sm backdrop-blur">
+        <div
+          key={group.id}
+          className="board-media-action-group flex items-center gap-1 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)]/92 p-1 shadow-sm backdrop-blur"
+          data-group={group.id}
+        >
           {group.actions.map(action => (
             <button
               key={action.id}
