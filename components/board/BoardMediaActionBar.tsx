@@ -27,7 +27,7 @@ export default function BoardMediaActionBar({ groups, visible = false }: BoardMe
 
   return (
     <div
-      className={`board-media-controls board-media-top-actions nodrag nopan absolute bottom-full left-1/2 right-auto z-40 mb-5 flex w-max max-w-none flex-nowrap items-center justify-start gap-1.5 whitespace-nowrap transition-opacity duration-200 ${visibilityClass}`}
+      className={`board-media-controls board-media-top-actions nodrag nopan absolute bottom-full right-0 z-40 mb-5 flex w-max max-w-none flex-nowrap items-center justify-end gap-1.5 whitespace-nowrap transition-opacity duration-200 ${visibilityClass}`}
       onPointerDown={event => event.stopPropagation()}
     >
       {visibleGroups.map(group => (
