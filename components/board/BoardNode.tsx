@@ -376,7 +376,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
         className={[
           "flex items-center",
           isMediaNode
-            ? "pointer-events-none absolute -top-7 left-0 z-30 h-6 max-w-full gap-1.5 board-asset-node-chrome"
+            ? "pointer-events-none absolute -top-7 left-0 z-30 h-5 max-w-full gap-1 board-asset-node-chrome"
             : "h-9 gap-2 rounded-t-lg px-3 imagine-board-node-header",
         ].join(" ")}
       >
@@ -385,7 +385,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             autoFocus
             className={[
               "nodrag pointer-events-auto min-w-0 rounded-md border border-blue-400 bg-[var(--iw-panel)] font-semibold text-[var(--iw-text)] outline-none ring-2 ring-blue-500/20",
-              isMediaNode ? "h-6 w-40 px-1.5 text-[11px] shadow-sm" : "h-7 w-full px-2 text-xs",
+              isMediaNode ? "h-5 w-36 px-1.5 text-[10px]" : "h-7 w-full px-2 text-xs",
             ].join(" ")}
             value={draftTitle}
             onBlur={commitTitleEdit}
@@ -405,7 +405,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             className={[
               "nodrag pointer-events-auto flex min-w-0 items-center truncate font-semibold text-[var(--iw-text)]",
               isMediaNode
-                ? "gap-1 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)]/92 px-1.5 py-0.5 text-[11px] shadow-sm backdrop-blur [&>svg]:h-3 [&>svg]:w-3"
+                ? "gap-1 rounded px-1 py-0.5 text-[10px] font-medium text-[var(--iw-muted)] [&>svg]:h-3 [&>svg]:w-3"
                 : "gap-2 text-xs",
             ].join(" ")}
             title="双击重命名"

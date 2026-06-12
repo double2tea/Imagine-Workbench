@@ -2538,6 +2538,17 @@ html[data-imagine-theme="light"] .imagine-root-body {
 
 .board-media-top-actions {
   pointer-events: auto;
+  gap: 0;
+  padding: 5px;
+  border: 1px solid color-mix(in srgb, var(--iw-border) 76%, transparent);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--iw-text) 7%, transparent), transparent),
+    color-mix(in srgb, var(--iw-panel-solid) 88%, transparent);
+  box-shadow:
+    0 16px 36px color-mix(in srgb, var(--iw-bg) 34%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--iw-text) 10%, transparent);
+  backdrop-filter: blur(18px) saturate(1.22);
 }
 
 .board-media-action-group {
@@ -3694,17 +3705,16 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 
 .board-node-shell[data-kind="asset"] .board-asset-node-chrome > h2,
 .board-node-shell[data-kind="result"] .board-asset-node-chrome > h2 {
-  min-height: 1.5rem;
-  border-color: color-mix(in srgb, var(--iw-border) 70%, transparent) !important;
-  background: color-mix(in srgb, var(--iw-panel-solid) 86%, transparent) !important;
-  box-shadow:
-    0 10px 24px color-mix(in srgb, var(--iw-bg) 24%, transparent),
-    inset 0 1px 0 color-mix(in srgb, var(--iw-text) 8%, transparent);
+  min-height: 1.25rem;
+  border-color: transparent !important;
+  background: color-mix(in srgb, var(--iw-panel-solid) 42%, transparent) !important;
+  color: var(--iw-muted);
+  box-shadow: none;
 }
 
 .board-node-shell[data-selected="true"][data-kind="asset"] .board-asset-node-chrome > h2,
 .board-node-shell[data-selected="true"][data-kind="result"] .board-asset-node-chrome > h2 {
-  border-color: color-mix(in srgb, var(--iw-accent) 38%, var(--iw-border)) !important;
+  color: var(--iw-text);
 }
 
 .board-media-preview {
@@ -3824,37 +3834,50 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 }
 
 .board-media-action-group {
-  --board-media-group-accent: color-mix(in srgb, var(--iw-border) 68%, transparent);
-
-  border-color: color-mix(in srgb, var(--iw-border) 62%, transparent) !important;
-  background:
-    linear-gradient(90deg, var(--board-media-group-accent) 0 2px, transparent 2px),
-    color-mix(in srgb, var(--iw-panel-solid) 82%, transparent) !important;
-  box-shadow:
-    0 12px 28px color-mix(in srgb, var(--iw-bg) 28%, transparent),
-    inset 0 1px 0 color-mix(in srgb, var(--iw-text) 8%, transparent) !important;
+  position: relative;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
-.board-media-action-group[data-group="assist"] {
-  --board-media-group-accent: color-mix(in srgb, #38bdf8 46%, transparent);
+.board-media-action-group + .board-media-action-group {
+  margin-left: 5px;
+  padding-left: 10px;
 }
 
-.board-media-action-group[data-group="edit"] {
-  --board-media-group-accent: color-mix(in srgb, var(--iw-accent) 48%, transparent);
-
-  border-color: color-mix(in srgb, var(--iw-accent) 24%, var(--iw-border)) !important;
+.board-media-action-group + .board-media-action-group::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 6px;
+  bottom: 6px;
+  width: 1px;
+  background: color-mix(in srgb, var(--iw-border) 72%, transparent);
 }
 
-.board-media-action-group[data-group="media"] {
-  --board-media-group-accent: color-mix(in srgb, #2dd4bf 42%, transparent);
+.board-media-top-actions .board-media-dock-action {
+  height: 30px;
+  width: 30px;
+  border-color: transparent !important;
+  border-radius: 999px;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--iw-text);
+  backdrop-filter: none;
 }
 
-.board-media-action-group[data-group="view"] {
-  --board-media-group-accent: color-mix(in srgb, var(--iw-muted) 38%, transparent);
-
-  background:
-    linear-gradient(90deg, var(--board-media-group-accent) 0 2px, transparent 2px),
-    color-mix(in srgb, var(--iw-panel-solid) 74%, transparent) !important;
+.board-media-top-actions .board-media-dock-action:not(:disabled):hover,
+.board-media-top-actions .board-media-dock-action:is(
+  .imagine-operation-tone-accent,
+  .imagine-operation-tone-neutral,
+  .imagine-operation-tone-danger,
+  .imagine-operation-tone-media,
+  .imagine-operation-tone-success
+):not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--iw-accent) 28%, transparent) !important;
+  background: color-mix(in srgb, var(--iw-accent) 12%, var(--iw-panel-soft)) !important;
+  color: var(--iw-accent-strong) !important;
+  transform: translateY(-1px);
 }
 
 .board-media-stack-switcher {

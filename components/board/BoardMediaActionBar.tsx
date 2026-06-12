@@ -40,14 +40,14 @@ export default function BoardMediaActionBar({ groups, visible = false }: BoardMe
       data-action-count={actionCount}
       data-group-count={visibleGroups.length}
       data-visible={visible ? "true" : "false"}
-      className={`board-media-controls board-media-top-actions nodrag nopan absolute bottom-full left-1/2 right-auto z-40 mb-12 flex w-max max-w-none flex-nowrap items-center justify-center gap-1.5 whitespace-nowrap [translate:-50%_0] transition-opacity duration-200 ${visibilityClass}`}
+      className={`board-media-controls board-media-top-actions nodrag nopan absolute bottom-full left-1/2 right-auto z-40 mb-12 flex w-max max-w-none flex-nowrap items-center justify-center whitespace-nowrap [translate:-50%_0] transition-opacity duration-200 ${visibilityClass}`}
       onPointerDown={event => event.stopPropagation()}
     >
       {visibleGroups.map(group => (
         <div
           key={group.id}
           aria-label={BOARD_MEDIA_ACTION_GROUP_LABELS[group.id]}
-          className="board-media-action-group flex items-center gap-1 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)]/92 p-1 shadow-sm backdrop-blur"
+          className="board-media-action-group flex items-center gap-0.5 px-1"
           data-group={group.id}
           role="group"
         >
@@ -56,7 +56,7 @@ export default function BoardMediaActionBar({ groups, visible = false }: BoardMe
               key={action.id}
               type="button"
               onClick={action.onClick}
-              className={`imagine-floating-card-action imagine-board-asset-action nodrag ${action.toneClassName ?? ""}`}
+              className={`imagine-floating-card-action imagine-board-asset-action board-media-dock-action nodrag ${action.toneClassName ?? ""}`}
               title={action.title}
               aria-label={action.title}
             >
