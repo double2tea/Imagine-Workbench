@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronLeft, ChevronRight, Image as ImageIcon, Music, X } from "lucide-react";
-import { useEffect, useMemo, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 import AssetCard from "@/components/assets/AssetCard";
 import AssetSelectionBar from "@/components/assets/AssetSelectionBar";
 import AssetToolbar, { type AssetDatePreset, type AssetStatusFilter, type AssetTypeFilter } from "@/components/assets/AssetToolbar";
@@ -46,7 +46,6 @@ interface AssetGalleryWorkspaceProps {
   onDeleteItemsByStatus: (statuses: StorageItem["status"][]) => void;
   onDownloadItem: (item: StorageItem) => void;
   onExportMetadata: () => void;
-  onLaunchMaskEditor: (imageUrl: string, id: string) => void;
   onImageQuickEdit: (item: StorageItem, operation: ImageEditFeature) => void;
   onOpenFullscreen: (item: StorageItem) => void;
   onOpenPanorama: (item: StorageItem) => void;
@@ -65,7 +64,7 @@ interface AssetGalleryWorkspaceProps {
   onSetFilterType: (value: AssetTypeFilter) => void;
   onSetSearchQuery: (value: string) => void;
   onToggleCompare: (id: string) => void;
-  onToggleSelect: (id: string, event?: MouseEvent<HTMLButtonElement>) => void;
+  onToggleSelect: (id: string, event?: { shiftKey?: boolean }) => void;
   onUseAgentReference: (item: StorageItem) => void;
   visibleItemsStep?: number;
   formatModelLabel: (value: string, fallbackProvider: AiProvider) => string;
@@ -110,7 +109,6 @@ export default function AssetGalleryWorkspace({
   onDeleteItemsByStatus,
   onDownloadItem,
   onExportMetadata,
-  onLaunchMaskEditor,
   onImageQuickEdit,
   onOpenFullscreen,
   onOpenPanorama,
@@ -338,7 +336,6 @@ export default function AssetGalleryWorkspace({
                           onDelete={onDeleteItem}
                           onDownload={onDownloadItem}
                           onImageQuickEdit={onImageQuickEdit}
-                          onLaunchMaskEditor={onLaunchMaskEditor}
                           onOpenFullscreen={onOpenFullscreen}
                           onOpenPanorama={onOpenPanorama}
                           onPromoteOriginal={onPromoteOriginal}

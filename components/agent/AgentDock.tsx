@@ -56,7 +56,6 @@ interface AgentDockProps {
   input: string;
   isLoading: boolean;
   isOpen: boolean;
-  isOverContent: boolean;
   messages: ChatMessage[];
   selectedChatModel: string;
 
@@ -507,7 +506,6 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
     input,
     isLoading,
     isOpen,
-    isOverContent,
     messages,
     selectedChatModel,
 
@@ -648,7 +646,6 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
     ? "imagine-agent-dock imagine-agent-dock-idle-orb imagine-theme-dark pointer-events-none fixed bottom-12 right-4 z-40 flex h-[108px] w-[108px] sm:bottom-16 sm:right-10"
     : "imagine-agent-dock imagine-agent-dock-panel imagine-theme-dark pointer-events-auto fixed inset-x-4 bottom-12 z-50 mx-auto w-[calc(100vw-32px)] max-w-5xl rounded-lg p-3 sm:bottom-16 sm:w-[min(1040px,calc(100vw-40px))]";
   const dockStateClass = [
-    !isIdleOrb && isOverContent ? "imagine-agent-dock-over-content" : "",
     isIdleOrb && isOrbDragging ? "is-dragging" : "",
   ].filter(Boolean).join(" ");
 
@@ -758,7 +755,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
     <section
       ref={setDockRef}
       className={`${dockShellClass}${dockStateClass ? ` ${dockStateClass}` : ""}`}
-      style={isIdleOrb ? idleOrbStyle : !isIdleOrb && isOverContent ? { opacity: 0.84 } : undefined}
+      style={isIdleOrb ? idleOrbStyle : undefined}
     >
       {isIdleOrb ? (
         <button

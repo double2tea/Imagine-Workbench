@@ -1,4 +1,4 @@
-import type { ChangeEvent, DragEvent } from "react";
+import type { ChangeEvent, DragEvent, KeyboardEvent } from "react";
 import { CloudUpload, Layers, Music, X } from "lucide-react";
 import {
   type DraggedReferenceAsset,
@@ -23,6 +23,7 @@ interface ReferenceImagePickerProps {
   onClear: () => void;
   onDropAsset?: (asset: DraggedReferenceAsset) => void;
   onDropFiles?: (files: File[]) => void;
+  onReferenceEdit?: (reference: ReferenceImageRef) => void;
   onRemove: (id: string) => void;
   onRoleChange?: (id: string, role: ReferenceImageRef["role"]) => void;
   onUpload: (event: ChangeEvent<HTMLInputElement>) => void;
@@ -84,6 +85,7 @@ export default function ReferenceImagePicker({
   onClear,
   onDropAsset,
   onDropFiles,
+  onReferenceEdit,
   onRemove,
   onRoleChange,
   onUpload,
@@ -151,17 +153,33 @@ export default function ReferenceImagePicker({
             const isEnd = roleMode && reference.role === "end";
             const mediaType = getMediaReferenceType(reference);
             const token = getMediaReferencePromptToken(index, mediaType);
+            const canEditReference = !roleMode && mediaType === "image" && onReferenceEdit !== undefined;
+            const handleReferenceDoubleClick = () => {
+              if (!canEditReference) return;
+              onReferenceEdit(reference);
+            };
+            const handleReferenceKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+              if (!canEditReference || (event.key !== "Enter" && event.key !== " ")) return;
+              if (event.target !== event.currentTarget) return;
+              event.preventDefault();
+              onReferenceEdit(reference);
+            };
 
             return (
               <div
                 key={reference.id}
-                className={`imagine-reference-thumb relative aspect-square rounded-lg border overflow-hidden bg-cover bg-center group transition-all duration-300 ${
+                role={canEditReference ? "button" : undefined}
+                tabIndex={canEditReference ? 0 : undefined}
+                title={canEditReference ? "双击打开局部编辑、对比、裁切；键盘按 Enter 或 Space" : undefined}
+                onDoubleClick={handleReferenceDoubleClick}
+                onKeyDown={handleReferenceKeyDown}
+                className={`imagine-reference-thumb relative aspect-square rounded-lg border overflow-hidden bg-cover bg-center group transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 ${
                   isStart
                     ? "border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.25)]"
                     : isEnd
                     ? "border-amber-500/50 shadow-[0_0_10px_rgba(245,158,11,0.25)]"
                     : "border-white/10"
-                }`}
+                } ${canEditReference ? "cursor-pointer" : ""}`}
                 style={mediaType === "image" ? { backgroundImage: `url(${reference.url})` } : undefined}
               >
                 {mediaType === "video" && <video src={reference.url} muted className="h-full w-full object-cover" />}
@@ -173,7 +191,10 @@ export default function ReferenceImagePicker({
                 {/* intentional image-overlay for contrast on arbitrary generated thumbs; black + white + role colors (emerald/amber/red) ensure legibility independent of theme vars (see design + pr1 review) */}
                 <button
                   type="button"
-                  onClick={() => onRemove(reference.id)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onRemove(reference.id);
+                  }}
                   className="absolute top-1 right-1 bg-red-600/95 text-white rounded-md p-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition cursor-pointer hover:scale-105 z-10"
                   title="移除该图"
                 >
@@ -183,7 +204,10 @@ export default function ReferenceImagePicker({
                 {roleMode ? (
                   <button
                     type="button"
-                    onClick={() => onRoleChange?.(reference.id, getNextRole(reference))}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onRoleChange?.(reference.id, getNextRole(reference));
+                    }}
                     className={`absolute inset-x-0 bottom-0 py-1 text-[9px] font-sans font-bold text-center text-white backdrop-blur-subtle cursor-pointer transition-colors ${
                       isStart ? "bg-emerald-600/80" : isEnd ? "bg-amber-600/80" : "bg-black/60 hover:bg-black/80"
                     }`}

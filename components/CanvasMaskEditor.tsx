@@ -9,6 +9,7 @@ import {
   Paintbrush,
   RefreshCw,
   RotateCcw,
+  ScanSearch,
   Sliders,
   Type,
   X,
@@ -53,13 +54,14 @@ interface CanvasMaskEditorProps {
   editModel?: string;
   isOpen: boolean;
   operation?: ImageEditFeature;
+  initialMode?: CanvasEditorMode;
   initialImageResolution?: string;
   initialPrompt?: string;
   onClose: () => void;
   onSaveMask: (output: CanvasMaskEditorOutput) => void;
 }
 
-type EditorMode = "mask" | "erase" | "text" | "crop" | "outpaint";
+export type CanvasEditorMode = "mask" | "erase" | "text" | "crop" | "outpaint" | "compare";
 type OutpaintSide = "left" | "right" | "top" | "bottom";
 type CropPresetId = "free" | "original" | "1:1" | "4:5" | "3:4" | "4:3" | "16:9" | "9:16";
 type CropDragState =
@@ -102,9 +104,10 @@ const CROP_PRESETS: Array<{ id: CropPresetId; label: string; ratio: AspectRatio 
   { id: "16:9", label: "16:9", ratio: { width: 16, height: 9 } },
   { id: "9:16", label: "9:16", ratio: { width: 9, height: 16 } },
 ];
-const EDITOR_MODE_OPTIONS: Array<{ mode: EditorMode; label: string; hint: string; icon: React.ReactNode }> = [
+const EDITOR_MODE_OPTIONS: Array<{ mode: CanvasEditorMode; label: string; hint: string; icon: React.ReactNode }> = [
   { mode: "mask", label: "遮罩", hint: "标记需要重绘的区域", icon: <Paintbrush className="h-3.5 w-3.5" /> },
   { mode: "erase", label: "橡皮", hint: "擦除已绘制遮罩", icon: <Eraser className="h-3.5 w-3.5" /> },
+  { mode: "compare", label: "对比", hint: "左右对比原图与当前编辑状态", icon: <ScanSearch className="h-3.5 w-3.5" /> },
   { mode: "text", label: "文字", hint: "点击画布放置文字", icon: <Type className="h-3.5 w-3.5" /> },
   { mode: "crop", label: "裁切", hint: "拖动选框或把手调整构图", icon: <Crop className="h-3.5 w-3.5" /> },
   { mode: "outpaint", label: "扩图", hint: "设置四周扩展像素", icon: <Expand className="h-3.5 w-3.5" /> },
@@ -282,6 +285,7 @@ function canvasHasVisiblePixels(canvas: HTMLCanvasElement): boolean {
 export default function CanvasMaskEditor({
   editModel,
   imageUrl,
+  initialMode = "mask",
   initialImageResolution = "auto",
   isOpen,
   operation,
@@ -298,7 +302,7 @@ export default function CanvasMaskEditor({
 
   const [workingImageUrl, setWorkingImageUrl] = useState(imageUrl);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [editorMode, setEditorMode] = useState<EditorMode>("mask");
+  const [editorMode, setEditorMode] = useState<CanvasEditorMode>(initialMode);
   const [editPrompt, setEditPrompt] = useState(initialPrompt);
   const [outpaintMargins, setOutpaintMargins] = useState(defaultOutpaintMargins);
   const [brushSize, setBrushSize] = useState(24);
@@ -313,6 +317,7 @@ export default function CanvasMaskEditor({
   const [cropRect, setCropRect] = useState<CanvasRect | null>(null);
   const [cropPresetId, setCropPresetId] = useState<CropPresetId>("free");
   const [cropCursor, setCropCursor] = useState("crosshair");
+  const [compareCurrentUrl, setCompareCurrentUrl] = useState<string | null>(null);
   const [imageResolution, setImageResolution] = useState(initialImageResolution);
   const [outpaintCursorValue, setOutpaintCursorValue] = useState("default");
 
@@ -358,14 +363,15 @@ export default function CanvasMaskEditor({
     setEditPrompt(initialPrompt);
     setImageResolution(initialImageResolution);
     setOutpaintMargins(defaultOutpaintMargins());
+    setCompareCurrentUrl(null);
     if (operation === "outpaint") {
       setEditorMode("outpaint");
     } else if (operation === "erase") {
       setEditorMode("mask");
     } else {
-      setEditorMode("mask");
+      setEditorMode(initialMode);
     }
-  }, [initialImageResolution, initialPrompt, isOpen, operation]);
+  }, [initialImageResolution, initialMode, initialPrompt, isOpen, operation]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -425,11 +431,14 @@ export default function CanvasMaskEditor({
       },
     ]);
     setHasLocalEdits(true);
+    setCompareCurrentUrl(null);
   };
 
   const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     const point = getCanvasPoint(event);
+
+    if (editorMode === "compare") return;
 
     if (editorMode === "text") {
       addTextOverlay(point);
@@ -565,6 +574,7 @@ export default function CanvasMaskEditor({
 
     if (canvasRef.current) {
       setHasDrawn(canvasHasVisiblePixels(canvasRef.current));
+      setCompareCurrentUrl(null);
     }
     setIsDrawing(false);
   };
@@ -577,6 +587,7 @@ export default function CanvasMaskEditor({
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     setHasDrawn(false);
+    setCompareCurrentUrl(null);
   };
 
   const resetEditor = () => {
@@ -589,11 +600,13 @@ export default function CanvasMaskEditor({
     setOutpaintMargins(defaultOutpaintMargins());
     setOutpaintCursorValue("default");
     setHasLocalEdits(false);
+    setCompareCurrentUrl(null);
   };
 
   const clearText = () => {
     setTextItems([]);
     setHasLocalEdits(hasDrawn || workingImageUrl !== imageUrl);
+    setCompareCurrentUrl(null);
   };
 
   const selectCropPreset = (presetId: CropPresetId) => {
@@ -625,6 +638,24 @@ export default function CanvasMaskEditor({
     }
     ctx.putImageData(imgData, 0, 0);
     setHasDrawn(canvasHasVisiblePixels(canvas));
+    setCompareCurrentUrl(null);
+  };
+
+  const updateCompareCurrentPreview = () => {
+    const canvas = canvasRef.current;
+    const img = bgImgRef.current;
+    if (!canvas || !img) return;
+
+    const previewCanvas = document.createElement("canvas");
+    previewCanvas.width = canvas.width;
+    previewCanvas.height = canvas.height;
+    const previewCtx = previewCanvas.getContext("2d");
+    if (!previewCtx) return;
+
+    previewCtx.drawImage(img, 0, 0, previewCanvas.width, previewCanvas.height);
+    previewCtx.drawImage(canvas, 0, 0, previewCanvas.width, previewCanvas.height);
+    textItems.forEach(item => drawTextOverlay(previewCtx, item));
+    setCompareCurrentUrl(previewCanvas.toDataURL("image/png"));
   };
 
   const applyCrop = () => {
@@ -690,6 +721,7 @@ export default function CanvasMaskEditor({
     setCropRect(null);
     setHasLocalEdits(true);
     setImgLoaded(false);
+    setCompareCurrentUrl(null);
     setWorkingImageUrl(nextBaseCanvas.toDataURL("image/png"));
   };
 
@@ -810,11 +842,14 @@ export default function CanvasMaskEditor({
     onClose();
   };
 
-  const renderModeButton = ({ mode, label, hint, icon }: { mode: EditorMode; label: string; hint: string; icon: React.ReactNode }) => (
+  const renderModeButton = ({ mode, label, hint, icon }: { mode: CanvasEditorMode; label: string; hint: string; icon: React.ReactNode }) => (
     <OperationSegmentButton
       key={mode}
       type="button"
-      onClick={() => setEditorMode(mode)}
+      onClick={() => {
+        if (mode === "compare") updateCompareCurrentPreview();
+        setEditorMode(mode);
+      }}
       active={editorMode === mode}
       title={hint}
     >
@@ -863,7 +898,7 @@ export default function CanvasMaskEditor({
                 style={{
                   width: editorStageSize.width,
                   height: editorStageSize.height,
-                  backgroundImage: editorMode === "outpaint" ? undefined : `url(${workingImageUrl})`,
+                  backgroundImage: editorMode === "outpaint" || editorMode === "compare" ? undefined : `url(${workingImageUrl})`,
                   backgroundPosition: "center",
                   backgroundSize: "100% 100%",
                 }}
@@ -923,9 +958,29 @@ export default function CanvasMaskEditor({
                       ? cropCursor
                       : editorMode === "outpaint"
                         ? outpaintCursorValue
-                        : "crosshair",
+                        : editorMode === "compare"
+                          ? "default"
+                          : "crosshair",
                 }}
               />
+              {editorMode === "compare" && (
+                <div className="pointer-events-none absolute inset-0 z-40 grid grid-cols-2 overflow-hidden">
+                  {[
+                    { label: "原图", url: imageUrl },
+                    { label: "当前", url: compareCurrentUrl ?? workingImageUrl },
+                  ].map(item => (
+                    <div
+                      key={item.label}
+                      className="relative border-r border-[var(--iw-border)] bg-[var(--iw-bg)] bg-contain bg-center bg-no-repeat last:border-r-0"
+                      style={{ backgroundImage: `url(${item.url})` }}
+                    >
+                      <span className="absolute left-2 top-2 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)]/80 px-2 py-1 text-[10px] font-semibold text-[var(--iw-text)] shadow-sm backdrop-blur-md">
+                        {item.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {textItems.map(item => (
                 <span

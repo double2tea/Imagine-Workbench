@@ -4,7 +4,7 @@ import React, { useCallback, useMemo, useState, useEffect, useRef, useSyncExtern
 import { createPortal } from "react-dom";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
 import AgentDock from "@/components/agent/AgentDock";
-import CanvasMaskEditor, { type CanvasMaskEditorOutput } from "@/components/CanvasMaskEditor";
+import CanvasMaskEditor, { type CanvasEditorMode, type CanvasMaskEditorOutput } from "@/components/CanvasMaskEditor";
 import SaveVoiceProfileDialog, { type SaveVoiceProfileDialogInput } from "@/components/audio/SaveVoiceProfileDialog";
 import FloatingCompareButton from "@/components/assets/FloatingCompareButton";
 import FullscreenPreview from "@/components/assets/FullscreenPreview";
@@ -256,7 +256,6 @@ export default function Home() {
   const [traditionalSubTab, setTraditionalSubTab] = useState<CreationMode>("image");
   const [isAgentDockOpen, setIsAgentDockOpen] = useState(false);
   const [isAgentPortalReady, setIsAgentPortalReady] = useState(false);
-  const [isAgentDockOverContent, setIsAgentDockOverContent] = useState(false);
   const [mobileWorkbenchPanel, setMobileWorkbenchPanel] = useState<MobileWorkbenchPanel>("create");
   const workbenchShellRef = useRef<HTMLDivElement>(null);
   const [agentPortalHost, setAgentPortalHost] = useState<HTMLElement | null>(null);
@@ -327,6 +326,7 @@ export default function Home() {
   const [maskTargetId, setMaskTargetId] = useState("");
   const [maskDestination, setMaskDestination] = useState<MaskDestination>("creative");
   const [maskEditOperation, setMaskEditOperation] = useState<ImageEditFeature | undefined>();
+  const [maskInitialMode, setMaskInitialMode] = useState<CanvasEditorMode>("mask");
   const [maskEditSourceItem, setMaskEditSourceItem] = useState<StorageItem | null>(null);
 
   // Fullscreen Preview Overlay State
@@ -335,8 +335,6 @@ export default function Home() {
   const [voiceProfileSourceItem, setVoiceProfileSourceItem] = useState<StorageItem | null>(null);
 
   // References
-  const agentDockRef = useRef<HTMLElement | null>(null);
-  const dockOverlapFrameRef = useRef<number | null>(null);
   const pollingFailuresRef = useRef<Record<string, number>>({});
   const generationAbortControllersRef = useRef<Record<string, AbortController>>({});
   const locallyCanceledItemIdsRef = useRef<Set<string>>(new Set());
@@ -1026,52 +1024,6 @@ export default function Home() {
     return () => window.clearTimeout(readyTimer);
   }, []);
 
-  useEffect(() => {
-    if (!isAgentPortalReady) return;
-
-    const updateDockOverlap = () => {
-      const dock = agentDockRef.current;
-      if (!dock) return;
-
-      const rect = dock.getBoundingClientRect();
-      const sampleY = Math.min(window.innerHeight - 1, Math.max(0, rect.top + 8));
-      const sampleXs = [0.25, 0.5, 0.75].map(position =>
-        Math.min(window.innerWidth - 1, Math.max(0, rect.left + rect.width * position)),
-      );
-      const isOverContent = sampleXs.some(x =>
-        document.elementsFromPoint(x, sampleY).some(element => {
-          if (dock.contains(element)) return false;
-          if (element === document.body || element === document.documentElement) return false;
-          return element.closest("main") !== null;
-        }),
-      );
-
-      setIsAgentDockOverContent(isOverContent);
-    };
-
-    const scheduleDockOverlapUpdate = () => {
-      if (dockOverlapFrameRef.current !== null) return;
-      dockOverlapFrameRef.current = window.requestAnimationFrame(() => {
-        dockOverlapFrameRef.current = null;
-        updateDockOverlap();
-      });
-    };
-
-    const readyTimer = window.setTimeout(scheduleDockOverlapUpdate, 0);
-    window.addEventListener("scroll", scheduleDockOverlapUpdate, { passive: true });
-    window.addEventListener("resize", scheduleDockOverlapUpdate);
-
-    return () => {
-      window.clearTimeout(readyTimer);
-      if (dockOverlapFrameRef.current !== null) {
-        window.cancelAnimationFrame(dockOverlapFrameRef.current);
-        dockOverlapFrameRef.current = null;
-      }
-      window.removeEventListener("scroll", scheduleDockOverlapUpdate);
-      window.removeEventListener("resize", scheduleDockOverlapUpdate);
-    };
-  }, [isAgentPortalReady, isAgentDockOpen]);
-
   // Load items from database on mount
   useEffect(() => {
     async function loadWorkspace() {
@@ -1271,24 +1223,27 @@ export default function Home() {
     destination: MaskDestination = "creative",
     operation?: ImageEditFeature,
     sourceItem?: StorageItem,
+    initialMode: CanvasEditorMode = "mask",
   ) => {
     setMaskTargetUrl(imageUrl);
     setMaskTargetId(id);
     setMaskDestination(destination);
     setMaskEditOperation(operation);
+    setMaskInitialMode(initialMode);
     setMaskEditSourceItem(sourceItem ?? null);
     setIsMaskOpen(true);
   };
 
-  const launchAssetMaskEditor = (_imageUrl: string, id: string): void => {
-    const item = items.find(entry => entry.id === id);
-    if (!item) {
-      pushWorkspaceNotice("error", "找不到原始媒体");
+  const launchReferenceMaskEditor = (reference: ReferenceImageRef): void => {
+    if (getMediaReferenceType(reference) !== "image") return;
+    const sourceItem = items.find(item => item.id === reference.id);
+    if (!sourceItem) {
+      launchMaskEditor(reference.url, reference.id, "creative");
       return;
     }
-    openOriginalItem(item, originalItem => {
-      launchMaskEditor(originalItem.url, originalItem.id);
-    }, "原始图片读取失败");
+    openOriginalItem(sourceItem, originalItem => {
+      launchMaskEditor(originalItem.url, originalItem.id, "creative");
+    }, "参考图原图读取失败");
   };
 
   const saveMaskOutput = async (output: CanvasMaskEditorOutput) => {
@@ -1329,6 +1284,11 @@ export default function Home() {
     } else {
       // Inject drew brush directly into reference seeds
       setReferenceImage(compressedMergedImage);
+      setReferenceImages(prev => prev.map(reference =>
+        reference.id === maskTargetId
+          ? { ...reference, type: "image", url: compressedMergedImage }
+          : reference,
+      ));
       // Auto populate helper suggestions into Prompt box
       if (!prompt.includes("modify the marked region")) {
         setPrompt(`In the marked region of the image, change: ${prompt || "[输入你的新修改构想...]"}`);
@@ -1628,7 +1588,6 @@ export default function Home() {
       onDownloadItem={handleDownloadItem}
       onExportMetadata={exportMetadataJson}
       onImageQuickEdit={handleImageQuickEdit}
-      onLaunchMaskEditor={launchAssetMaskEditor}
       onOpenFullscreen={handleOpenFullscreen}
       onOpenPanorama={handleOpenPanorama}
       onPromoteOriginal={promoteItemToOriginal}
@@ -1747,6 +1706,7 @@ export default function Home() {
         onPromptDropAsset={event => handlePromptDropAsset(event, "image-prompt")}
         onReferenceDropAsset={asset => handleReferenceDropAsset(asset, "image-prompt")}
         onReferenceDropFiles={files => handleReferenceDropFiles(files, "image-prompt")}
+        onReferenceEdit={launchReferenceMaskEditor}
         onReferenceRemove={removeReferenceImage}
         onReferenceUpload={handleImageUpload}
         onSelectAspectRatio={handleSelectImageAspectRatio}
@@ -1897,7 +1857,6 @@ export default function Home() {
 
             {isAgentPortalReady && !isAgentDockSuppressed && agentPortalHost && createPortal(
               <AgentDock
-                ref={agentDockRef}
                 activeCountdownId={activeCountdownId}
                 agentReferenceId={agentReferenceId}
                 agentReferences={agentReferences}
@@ -1911,7 +1870,6 @@ export default function Home() {
                 input={agentInput}
                 isLoading={isAgentLoading}
                 isOpen={isAgentDockOpen}
-                isOverContent={isAgentDockOverContent}
                 messages={agentMessages}
                 selectedChatModel={selectedChatModel}
 
@@ -2034,8 +1992,10 @@ export default function Home() {
             setMaskTargetUrl("");
             setMaskTargetId("");
             setMaskEditOperation(undefined);
+            setMaskInitialMode("mask");
             setMaskEditSourceItem(null);
           }}
+          initialMode={maskInitialMode}
           onSaveMask={saveMaskOutput}
         />
       )}

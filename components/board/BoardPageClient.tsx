@@ -4787,7 +4787,6 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           input={agentInput}
           isLoading={isAgentLoading}
           isOpen={isAgentDockOpen}
-          isOverContent={false}
           messages={agentMessages}
           selectedChatModel={selectedChatModel}
 

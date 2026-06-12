@@ -1,4 +1,4 @@
-import type { Dispatch, MouseEvent, MutableRefObject, SetStateAction } from "react";
+import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
 import type { CompareViewType } from "@/components/assets/ComparePanel";
 import { API_ROUTES } from "@/lib/api/routes";
@@ -178,7 +178,7 @@ export function useAssetActions({
 }: UseAssetActionsParams) {
   const confirmAction = useConfirm();
 
-  const toggleSelectItem = (id: string, event?: MouseEvent) => {
+  const toggleSelectItem = (id: string, event?: { shiftKey?: boolean }) => {
     if (event?.shiftKey && selectedItemIds.length > 0) {
       const lastSelectedIdx = filteredItems.findIndex(item => item.id === selectedItemIds[selectedItemIds.length - 1]);
       const currentSelectedIdx = filteredItems.findIndex(item => item.id === id);

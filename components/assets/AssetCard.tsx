@@ -1,5 +1,4 @@
 import {
-  CheckSquare,
   ChevronDown,
   Compass,
   Download,
@@ -9,16 +8,14 @@ import {
   MoreHorizontal,
   Mic2,
   Music,
-  Paintbrush,
   RefreshCw,
   SlidersHorizontal,
   Sparkles,
-  Square,
   Trash2,
   Video as VideoIcon,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState, type DragEvent, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type DragEvent, type MouseEvent, type PointerEvent } from "react";
 import AudioWaveformPreview from "@/components/audio/AudioWaveformPreview";
 import VideoFrameMenu from "@/components/assets/VideoFrameMenu";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
@@ -46,6 +43,8 @@ import {
   workbenchCardActionClassName,
 } from "@/components/workbench/OperationControls";
 
+type AssetSelectionEvent = { shiftKey?: boolean };
+
 interface AssetCardProps {
   canceling: boolean;
   inCompare: boolean;
@@ -58,7 +57,6 @@ interface AssetCardProps {
   onCaptureVideoFrame: (item: StorageItem, frame: CapturedVideoFrame) => void | Promise<unknown>;
   onDelete: (item: StorageItem) => void;
   onDownload: (item: StorageItem) => void;
-  onLaunchMaskEditor: (imageUrl: string, id: string) => void;
   onImageQuickEdit: (item: StorageItem, operation: ImageEditFeature) => void;
   onOpenFullscreen: (item: StorageItem) => void;
   onOpenPanorama: (item: StorageItem) => void;
@@ -68,7 +66,7 @@ interface AssetCardProps {
   onReuseTask: (item: StorageItem) => void;
   onSaveVoiceProfile: (item: StorageItem) => void;
   onToggleCompare: (id: string) => void;
-  onToggleSelect: (id: string, event?: MouseEvent<HTMLButtonElement>) => void;
+  onToggleSelect: (id: string, event?: AssetSelectionEvent) => void;
   onUseAgentReference: (item: StorageItem) => void;
   providerLabelsByKey?: Partial<Record<AiProvider, string>>;
 }
@@ -135,7 +133,6 @@ export default function AssetCard({
   onCaptureVideoFrame,
   onDelete,
   onDownload,
-  onLaunchMaskEditor,
   onImageQuickEdit,
   onOpenFullscreen,
   onOpenPanorama,
@@ -154,6 +151,9 @@ export default function AssetCard({
   const [frameMenuPlacement, setFrameMenuPlacement] = useState<FrameMenuPlacement | null>(null);
   const captureVideoFrameRef = useRef<VideoFrameCaptureRequest | null>(null);
   const hoverPromoteTimerRef = useRef<number | null>(null);
+  const longPressTimerRef = useRef<number | null>(null);
+  const longPressStartRef = useRef<{ x: number; y: number } | null>(null);
+  const suppressNextClickRef = useRef(false);
   const provider = tryParseProviderModel(item.model, selectedProvider)?.provider ?? selectedProvider;
   const providerLabel = providerLabelsByKey?.[provider] ?? getProviderMeta(provider).label;
   const isDraggableReference = item.status === "complete" && item.type !== "transcript";
@@ -189,6 +189,14 @@ export default function AssetCard({
     hoverPromoteTimerRef.current = null;
   };
 
+  const clearLongPressTimer = () => {
+    if (longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    longPressStartRef.current = null;
+  };
+
   const scheduleHoverPromote = () => {
     if (item.status !== "complete") return;
     clearHoverPromoteTimer();
@@ -202,7 +210,10 @@ export default function AssetCard({
     if (selected && item.status === "complete") onPromoteOriginal(item);
   }, [item, onPromoteOriginal, selected]);
 
-  useEffect(() => clearHoverPromoteTimer, []);
+  useEffect(() => () => {
+    clearHoverPromoteTimer();
+    clearLongPressTimer();
+  }, []);
 
   const imageHoverActions: WorkbenchActionDescriptor[] = item.type === "image"
     ? [
@@ -229,17 +240,8 @@ export default function AssetCard({
           id: "agent-reference",
           label: "Agent",
           onClick: () => onUseAgentReference(item),
-          title: "引用该图片至 Agent 智能代理进行对话与局部修改",
+          title: "引用该图片至 Agent 智能代理进行对话与分析",
           tone: WORKBENCH_OPERATION_META.analyze.tone,
-        },
-        {
-          ariaLabel: "局部修改",
-          icon: <Paintbrush className="h-3 w-3" />,
-          id: "local-edit",
-          label: "修改",
-          onClick: () => onLaunchMaskEditor(item.url, item.id),
-          title: "对该图片局部进行笔刷遮罩修改 & 创意局部重绘",
-          tone: WORKBENCH_OPERATION_META.localEdit.tone,
         },
       ]
     : [];
@@ -283,16 +285,6 @@ export default function AssetCard({
       onClick: () => onOpenFullscreen(item),
       title: "全屏大画幅细节放大",
       tone: WORKBENCH_OPERATION_META.fullscreen.tone,
-    },
-    {
-      active: selected,
-      ariaLabel: selected ? "取消选择此资产" : "选择此资产",
-      icon: selected ? <CheckSquare className="h-3 w-3" /> : <Square className="h-3 w-3" />,
-      id: "select",
-      label: selected ? "已选" : "选择",
-      onClick: event => onToggleSelect(item.id, event),
-      title: "选择此项；按住 Shift 可范围多选",
-      tone: "neutral",
     },
     ...(item.type !== "transcript"
       ? [
@@ -338,6 +330,38 @@ export default function AssetCard({
       TEXT
     </span>
   );
+  const handleCardClickCapture = (event: MouseEvent<HTMLDivElement>) => {
+    if (suppressNextClickRef.current) {
+      suppressNextClickRef.current = false;
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    if (!event.metaKey && !event.ctrlKey && !event.shiftKey) return;
+    const target = event.target;
+    if (target instanceof HTMLElement && target.closest("button,a,input,select,textarea,[role='button']")) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onToggleSelect(item.id, event);
+  };
+  const handleCardPointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === "mouse") return;
+    const target = event.target;
+    if (target instanceof HTMLElement && target.closest("button,a,input,select,textarea,[role='button']")) return;
+    clearLongPressTimer();
+    longPressStartRef.current = { x: event.clientX, y: event.clientY };
+    longPressTimerRef.current = window.setTimeout(() => {
+      suppressNextClickRef.current = true;
+      longPressTimerRef.current = null;
+      longPressStartRef.current = null;
+      onToggleSelect(item.id);
+    }, 460);
+  };
+  const handleCardPointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    const start = longPressStartRef.current;
+    if (!start) return;
+    if (Math.abs(event.clientX - start.x) > 8 || Math.abs(event.clientY - start.y) > 8) clearLongPressTimer();
+  };
 
   return (
     <div
@@ -347,8 +371,14 @@ export default function AssetCard({
       data-status={item.status}
       data-type={item.type}
       onDragStart={handleDragStart}
+      onClickCapture={handleCardClickCapture}
       onMouseEnter={scheduleHoverPromote}
       onMouseLeave={clearHoverPromoteTimer}
+      onPointerCancel={clearLongPressTimer}
+      onPointerDown={handleCardPointerDown}
+      onPointerLeave={clearLongPressTimer}
+      onPointerMove={handleCardPointerMove}
+      onPointerUp={clearLongPressTimer}
       className={`imagine-asset-card relative flex h-full flex-col overflow-hidden rounded-[10px] group border bg-slate-900 shadow-xl transition-all duration-300 ${
         selected ? "border-blue-500 ring-2 ring-blue-500/20" : "border-slate-850 hover:border-slate-750"
       }`}
@@ -383,12 +413,12 @@ export default function AssetCard({
                 type="button"
                 onClick={() => setIsQuickEditMenuOpen(prev => !prev)}
                 className={workbenchCardActionClassName(WORKBENCH_OPERATION_META.brush.tone)}
-                title="图片快捷编辑"
-                aria-label="图片快捷编辑"
+                title="选择重绘、擦除、扩图、抠图"
+                aria-label="AI 图像操作"
                 aria-expanded={isQuickEditMenuOpen}
               >
-                <Paintbrush className="h-3 w-3" />
-                <span className="text-[9px] font-bold">编辑</span>
+                <Sparkles className="h-3 w-3" />
+                <span className="text-[9px] font-bold">AI</span>
                 <ChevronDown className={`h-3 w-3 transition ${isQuickEditMenuOpen ? "rotate-180" : ""}`} />
               </button>
               {isQuickEditMenuOpen && (
@@ -551,12 +581,6 @@ export default function AssetCard({
                     <button type="button" onClick={() => runMobileAction(() => onOpenPanorama(item))}>
                       <Compass className="h-3.5 w-3.5 text-cyan-300" />
                       全景
-                    </button>
-                  )}
-                  {item.type === "image" && (
-                    <button type="button" onClick={() => runMobileAction(() => onLaunchMaskEditor(item.url, item.id))}>
-                      <Paintbrush className="h-3.5 w-3.5 text-amber-300" />
-                      修改
                     </button>
                   )}
                   {item.type === "image" && IMAGE_EDIT_OPERATION_ORDER.map(operation => {
