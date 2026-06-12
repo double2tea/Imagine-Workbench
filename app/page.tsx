@@ -1901,9 +1901,11 @@ export default function Home() {
           </div>
         </section>
 
-        <div className="hidden min-w-0 lg:block">
-          {renderAssetGalleryWorkspace()}
-        </div>
+        {isDesktopLayout !== false && (
+          <div className="hidden min-w-0 lg:block">
+            {renderAssetGalleryWorkspace()}
+          </div>
+        )}
 
       </main>
 
