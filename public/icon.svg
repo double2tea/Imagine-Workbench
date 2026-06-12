@@ -1,30 +1,37 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-4 -4 32 32" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
   <defs>
-    <radialGradient id="iw-body" cx="0" cy="0" r="1" gradientTransform="matrix(7.5 8.85 -9.52 8.1 14.15 8.5)" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#fff7ef"/>
-      <stop offset="0.5" stop-color="#f0c9b2"/>
-      <stop offset="1" stop-color="#d09a82"/>
-    </radialGradient>
-    <linearGradient id="iw-shade" x1="9.2" y1="5.75" x2="19.4" y2="21.05" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#ffffff" stop-opacity="0.72"/>
-      <stop offset="0.45" stop-color="#fff7e5" stop-opacity="0.12"/>
-      <stop offset="1" stop-color="#895948" stop-opacity="0.14"/>
+    <linearGradient id="iw-plume-base" x1="4.2" y1="23.4" x2="25.4" y2="11.4" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2f69d3"/>
+      <stop offset="0.48" stop-color="#4da6e8"/>
+      <stop offset="1" stop-color="#abe7f5"/>
     </linearGradient>
-    <radialGradient id="iw-blush" cx="0" cy="0" r="1" gradientTransform="matrix(3.28 0 0 1.94 14.32 17.43)" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#d98496" stop-opacity="0.18"/>
-      <stop offset="1" stop-color="transparent"/>
+    <linearGradient id="iw-plume-light" x1="4.4" y1="18" x2="24.2" y2="9.8" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#77d4e8"/>
+      <stop offset="0.58" stop-color="#d5f3f6"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.42"/>
+    </linearGradient>
+    <linearGradient id="iw-plume-warm" x1="12.5" y1="17.8" x2="24.8" y2="4.8" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#dff6fb" stop-opacity="0.28"/>
+      <stop offset="0.64" stop-color="#f8cd90" stop-opacity="0.38"/>
+      <stop offset="1" stop-color="#f5bf7e"/>
+    </linearGradient>
+    <linearGradient id="iw-plume-shade" x1="5.2" y1="24.4" x2="18.8" y2="20.1" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#235bbe" stop-opacity="0.58"/>
+      <stop offset="1" stop-color="#235bbe" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="iw-spark" cx="0" cy="0" r="1" gradientTransform="matrix(2.18 0 0 2.18 24.5 6.2)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff3de"/>
+      <stop offset="1" stop-color="#f6bd75"/>
     </radialGradient>
   </defs>
-  <path d="M13.52 4.55c1.18-1.43 3.71-.84 4.25.93 1.94-.17 3.54 1.22 3.66 3.16 1.64.59 2.69 2.15 2.48 3.96-.25 2.15-2.06 3.75-4.17 3.92-.63 1.98-2.57 3.37-4.8 3.37-1.64 0-3.16-.76-4.13-1.9-1.94.76-4.21-.04-5.1-1.86-1.94-.21-3.37-1.81-3.37-3.75 0-1.77 1.22-3.29 2.91-3.71-.17-.42-.25-.88-.25-1.35 0-2.27 1.9-4.13 4.17-4.13.93 0 1.81.29 2.48.8.34-.34.72-.59 1.27-.72Z" fill="url(#iw-body)"/>
-  <path d="M13.52 4.55c1.18-1.43 3.71-.84 4.25.93 1.94-.17 3.54 1.22 3.66 3.16 1.64.59 2.69 2.15 2.48 3.96-.25 2.15-2.06 3.75-4.17 3.92-.63 1.98-2.57 3.37-4.8 3.37-1.64 0-3.16-.76-4.13-1.9-1.94.76-4.21-.04-5.1-1.86-1.94-.21-3.37-1.81-3.37-3.75 0-1.77 1.22-3.29 2.91-3.71-.17-.42-.25-.88-.25-1.35 0-2.27 1.9-4.13 4.17-4.13.93 0 1.81.29 2.48.8.34-.34.72-.59 1.27-.72Z" fill="url(#iw-shade)"/>
-  <path d="M6.74 9.26c1.18-1.6 3.16-2.27 5.01-1.69 1.26-1.64 3.92-1.81 5.43-.34" stroke="rgba(255,255,255,0.58)" stroke-width="0.26" stroke-linecap="round"/>
-  <ellipse cx="9.01" cy="14.53" rx="1.43" ry="1.98" fill="#242b38"/>
-  <ellipse cx="15.58" cy="14.53" rx="1.43" ry="1.98" fill="#242b38"/>
-  <circle cx="8.55" cy="13.81" r="0.46" fill="#ffffff"/>
-  <circle cx="15.12" cy="13.81" r="0.46" fill="#ffffff"/>
-  <circle cx="9.51" cy="15.33" r="0.21" fill="#ffffff" opacity="0.4"/>
-  <circle cx="16.08" cy="15.33" r="0.21" fill="#ffffff" opacity="0.4"/>
-  <ellipse cx="7.75" cy="17.68" rx="2.61" ry="1.52" fill="url(#iw-blush)" opacity="0.86"/>
-  <ellipse cx="17.26" cy="17.68" rx="2.61" ry="1.52" fill="url(#iw-blush)" opacity="0.78"/>
-  <circle cx="17.01" cy="9.6" r="0.59" fill="#ffe8c6" opacity="0.92"/>
+  <g transform="translate(-2.4 -1.8) scale(1.22)">
+    <path d="M3.82 22.58c2.26-5.89 8.64-7.8 17.92-11.76-3.36 3.58-6.18 6.6-8.44 9.08 3.84-1.08 7.17-2.8 10.04-5.17-3.95 7.16-10.45 11.22-18.2 10.3-1.03-.12-1.67-1.48-1.32-2.45Z" fill="url(#iw-plume-base)"/>
+    <path d="M4.48 20.42c3.76-5.55 10.64-6.43 18.64-12.23-1.14 5.02-4.5 9.08-10.08 12.17-3.1 1.72-6.27 2.08-8.56.06Z" fill="url(#iw-plume-light)" opacity="0.86"/>
+    <path d="M10.14 20.63c3.88-3.72 9.8-7.72 14.46-16.68-.18 5.68-2.58 11.15-7.18 16.38-1.78 2.03-4.72 2.29-7.28.3Z" fill="url(#iw-plume-warm)" opacity="0.66"/>
+    <path d="M4.16 23.02c3.93.78 8.5.2 13.68-1.76-3.84 3.02-8.22 4.34-12.64 3.8-.82-.1-1.27-1.18-1.04-2.04Z" fill="url(#iw-plume-shade)" opacity="0.58"/>
+    <path d="M7.02 21.25c4.94.08 9.68-1.54 14.2-4.86" stroke="rgba(255,255,255,0.78)" stroke-width="0.58" stroke-linecap="round" opacity="0.52"/>
+    <path d="M24.5 3.3 25.05 5.68 27.33 6.22 25.05 6.78 24.5 9.16 23.94 6.78 21.66 6.22 23.94 5.68 24.5 3.3Z" fill="url(#iw-spark)"/>
+    <circle cx="18.24" cy="11.62" r="0.72" fill="#7db4f0" opacity="0.72"/>
+    <circle cx="21.26" cy="9.42" r="0.54" fill="#f4c5a2" opacity="0.68"/>
+  </g>
 </svg>
