@@ -107,7 +107,6 @@ import {
   createWorkspaceSafetySnapshot,
   downloadLatestWorkspaceSafetySnapshot,
   exportCompleteWorkspaceBackup,
-  exportCompleteWorkspaceBackupToLocalFolder,
   importWorkspaceBackup,
   previewWorkspaceBackup,
   repairStaleAssetSourceLinks,
@@ -115,7 +114,6 @@ import {
   type LocalStorageCleanupKind,
   type WorkspaceCleanupKind,
 } from "@/lib/data-management";
-import { disconnectLocalFolderTarget, selectLocalFolderTarget } from "@/lib/local-storage-targets";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 import { CLEAR_WORKSPACE_ASSETS_MESSAGE } from "@/lib/workspace-messages";
 
@@ -1509,33 +1507,6 @@ export default function Home() {
     }
   }, [pushWorkspaceNotice]);
 
-  const handleDataSelectLocalFolderTarget = useCallback(async () => {
-    try {
-      const summary = await selectLocalFolderTarget();
-      pushWorkspaceNotice("success", `已连接本地文件夹：${summary.localFolderName ?? "local-folder"}`);
-    } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "本地文件夹选择失败"));
-    }
-  }, [pushWorkspaceNotice]);
-
-  const handleDataExportWorkspaceToLocalFolder = useCallback(async (includeCredentials: boolean) => {
-    try {
-      const result = await exportCompleteWorkspaceBackupToLocalFolder(includeCredentials);
-      pushWorkspaceNotice("success", `已写入 ${result.directoryName}：${result.fileName}`);
-    } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "本地文件夹导出失败"));
-    }
-  }, [pushWorkspaceNotice]);
-
-  const handleDataDisconnectLocalFolderTarget = useCallback(async () => {
-    try {
-      await disconnectLocalFolderTarget();
-      pushWorkspaceNotice("success", "已断开本地文件夹目标，IndexedDB 数据未删除");
-    } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "本地文件夹断开失败"));
-    }
-  }, [pushWorkspaceNotice]);
-
   const handleDataImportWorkspace = useCallback(async (file: File, includeCredentials: boolean) => {
     try {
       const preview = await previewWorkspaceBackup(file);
@@ -2027,14 +1998,11 @@ export default function Home() {
         onClearLocalStorage={handleDataClearLocalStorage}
         onClose={() => setShowSettings(false)}
         onDownloadSafetySnapshot={handleDataDownloadSafetySnapshot}
-        onDisconnectLocalFolderTarget={handleDataDisconnectLocalFolderTarget}
-        onExportWorkspaceToLocalFolder={handleDataExportWorkspaceToLocalFolder}
         onExportWorkspace={handleDataExportWorkspace}
         onImportLocalAssets={handleDataImportLocalAssets}
         onImportWorkspace={handleDataImportWorkspace}
         onRepairAssetSources={handleDataRepairAssetSources}
         onResetBoards={handleDataResetBoards}
-        onSelectLocalFolderTarget={handleDataSelectLocalFolderTarget}
         onRunResolveCheck={() => void runResolveCheck()}
         onAddFetchedModels={addFetchedModels}
         onAddManualModels={addManualModels}
