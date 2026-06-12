@@ -2021,6 +2021,7 @@ export default function Home() {
         items={filteredItems.filter(item => item.status === "complete")}
         onCaptureVideoFrame={handleCaptureVideoFrame}
         onSavePanoramaScreenshots={handleSavePanoramaScreenshots}
+        onDownload={handleDownloadItem}
         onSaveVoiceProfile={handleSaveVoiceProfileSource}
         onClose={() => setFullscreenItem(null)}
         onSelectItem={handleOpenFullscreen}

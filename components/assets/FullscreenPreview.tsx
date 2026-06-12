@@ -1,4 +1,4 @@
-import { Check, Compass, Copy, FileText, Film, Mic2, Music, X } from "lucide-react";
+import { Check, Compass, Copy, Download, FileText, Film, Mic2, Music, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import AudioWaveformPreview from "@/components/audio/AudioWaveformPreview";
@@ -18,6 +18,7 @@ interface FullscreenPreviewProps {
   items?: StorageItem[];
   onCaptureVideoFrame: (item: StorageItem, frame: CapturedVideoFrame) => void | Promise<unknown>;
   onSavePanoramaScreenshots: (item: StorageItem, screenshots: PanoramaScreenshot[]) => void | Promise<void>;
+  onDownload?: (item: StorageItem) => void;
   onSaveVoiceProfile?: (item: StorageItem) => void;
   onClose: () => void;
   onSelectItem?: (item: StorageItem) => void;
@@ -25,12 +26,33 @@ interface FullscreenPreviewProps {
 
 type CopyStatus = "idle" | "copied" | "failed";
 type CopyResult = { itemId: string; status: Exclude<CopyStatus, "idle"> } | null;
+type ImagePanDragState = {
+  isDragging: boolean;
+  pointerId: number;
+  startX: number;
+  startY: number;
+  startOffsetX: number;
+  startOffsetY: number;
+};
 
-export default function FullscreenPreview({ item, items = [], onCaptureVideoFrame, onSavePanoramaScreenshots, onSaveVoiceProfile, onClose, onSelectItem }: FullscreenPreviewProps) {
+const MIN_ZOOM = 0.25;
+const MAX_ZOOM = 3;
+const ZOOM_STEP = 0.25;
+
+export default function FullscreenPreview({ item, items = [], onCaptureVideoFrame, onSavePanoramaScreenshots, onDownload, onSaveVoiceProfile, onClose, onSelectItem }: FullscreenPreviewProps) {
   const [copyResult, setCopyResult] = useState<CopyResult>(null);
   const [isFrameMenuOpen, setIsFrameMenuOpen] = useState(false);
+  const [imageScale, setImageScale] = useState(1);
+  const [imageOffset, setImageOffset] = useState({ x: 0, y: 0 });
+  const [isImageDragging, setIsImageDragging] = useState(false);
   const [panoramaItem, setPanoramaItem] = useState<StorageItem | null>(null);
   const captureVideoFrameRef = useRef<VideoFrameCaptureRequest | null>(null);
+  const imageScaleRef = useRef(1);
+  const imageOffsetRef = useRef({ x: 0, y: 0 });
+  const imageDragRef = useRef<ImagePanDragState | null>(null);
+  const imageWheelDeltaRef = useRef(0);
+  const imageWheelFrameRef = useRef<number | null>(null);
+  const previewItemsRef = useRef<StorageItem[]>([]);
   const previewItems = items.length > 0 ? items : item ? [item] : [];
   const showPreviewStrip = previewItems.length > 1 && Boolean(onSelectItem);
 
@@ -59,6 +81,142 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
     if (!item || panoramaItem?.id !== item.id) setPanoramaItem(null);
   }, [item, panoramaItem?.id]);
 
+  useEffect(() => {
+    previewItemsRef.current = previewItems;
+  }, [previewItems]);
+
+  useEffect(() => {
+    setImageScale(1);
+    imageScaleRef.current = 1;
+    setImageOffset({ x: 0, y: 0 });
+    imageOffsetRef.current = { x: 0, y: 0 };
+  }, [item?.id]);
+
+  useEffect(() => {
+    imageScaleRef.current = imageScale;
+  }, [imageScale]);
+
+  useEffect(() => {
+    imageOffsetRef.current = imageOffset;
+  }, [imageOffset]);
+
+  useEffect(() => {
+    return () => {
+      if (imageWheelFrameRef.current !== null) {
+        window.cancelAnimationFrame(imageWheelFrameRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!item) return;
+    const getCurrentIndex = () => {
+      return previewItemsRef.current.findIndex(entry => entry.id === item.id);
+    };
+    const goToPreviousItem = () => {
+      if (!onSelectItem) return;
+      const index = getCurrentIndex();
+      const target = index > 0 ? previewItemsRef.current[index - 1] : null;
+      if (target) onSelectItem(target);
+    };
+    const goToNextItem = () => {
+      if (!onSelectItem) return;
+      const index = getCurrentIndex();
+      const target = index >= 0 && index < previewItemsRef.current.length - 1 ? previewItemsRef.current[index + 1] : null;
+      if (target) onSelectItem(target);
+    };
+
+    const closeOnEscape = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") onClose();
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        goToPreviousItem();
+      }
+      if (event.key === "ArrowRight") {
+        event.preventDefault();
+        goToNextItem();
+      }
+      if (item?.type === "image") {
+        if (event.key === "+" || event.key === "=" || event.key === "Add") {
+          event.preventDefault();
+          setImageScale(scale => {
+            const boundedScale = Number(Math.min(MAX_ZOOM, scale + ZOOM_STEP).toFixed(2));
+            imageScaleRef.current = boundedScale;
+            if (boundedScale <= 1) {
+              setImageOffset({ x: 0, y: 0 });
+            }
+            return boundedScale;
+          });
+        }
+        if (event.key === "-" || event.key === "_" || event.key === "Subtract") {
+          event.preventDefault();
+          setImageScale(scale => {
+            const boundedScale = Number(Math.max(MIN_ZOOM, scale - ZOOM_STEP).toFixed(2));
+            imageScaleRef.current = boundedScale;
+            if (boundedScale <= 1) {
+              setImageOffset({ x: 0, y: 0 });
+            }
+            return boundedScale;
+          });
+        }
+      }
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [item, onClose, onSelectItem]);
+
+  const handleImagePointerDown = (event: React.PointerEvent<HTMLDivElement>): void => {
+    if (item?.type !== "image" || imageScale <= 1) return;
+    event.preventDefault();
+    imageDragRef.current = {
+      isDragging: true,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startOffsetX: imageOffsetRef.current.x,
+      startOffsetY: imageOffsetRef.current.y,
+    };
+    setIsImageDragging(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleImagePointerMove = (event: React.PointerEvent<HTMLDivElement>): void => {
+    const drag = imageDragRef.current;
+    if (!drag || !drag.isDragging || drag.pointerId !== event.pointerId || item?.type !== "image") return;
+    setImageOffset({
+      x: drag.startOffsetX + (event.clientX - drag.startX),
+      y: drag.startOffsetY + (event.clientY - drag.startY),
+    });
+  };
+
+  const stopImageDrag = (event: React.PointerEvent<HTMLDivElement>): void => {
+    const drag = imageDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    imageDragRef.current = null;
+    setIsImageDragging(false);
+    event.currentTarget.releasePointerCapture(event.pointerId);
+  };
+
+  const handleImageWheel = (event: React.WheelEvent<HTMLDivElement>): void => {
+    if (item?.type !== "image") return;
+    event.preventDefault();
+    imageWheelDeltaRef.current += event.deltaY;
+    if (imageWheelFrameRef.current !== null) return;
+    imageWheelFrameRef.current = window.requestAnimationFrame(() => {
+      const delta = imageWheelDeltaRef.current;
+      imageWheelDeltaRef.current = 0;
+      imageWheelFrameRef.current = null;
+      const nextScale = imageScaleRef.current * Math.exp(-delta * 0.001);
+      const boundedScale = Number(Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, nextScale)).toFixed(3));
+      imageScaleRef.current = boundedScale;
+      if (boundedScale <= 1) {
+        imageOffsetRef.current = { x: 0, y: 0 };
+        setImageOffset({ x: 0, y: 0 });
+      }
+      setImageScale(boundedScale);
+    });
+  };
+
   return (
     <AnimatePresence>
       {item && (
@@ -84,13 +242,31 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
             transition={WORKBENCH_PANEL_TRANSITION}
             className="flex h-full min-h-0 w-full flex-col items-center justify-center gap-3"
           >
-            <div className="flex min-h-0 w-full flex-1 items-center justify-center">
+            <div className="relative flex min-h-0 w-full flex-1 items-center justify-center">
               {item.type === "image" ? (
-                <PreviewImage
-                  src={item.url}
-                  alt={item.prompt}
-                  className="h-full w-full object-contain"
-                />
+                <>
+                  <div className="h-full w-full overflow-hidden">
+                    <div
+                      className={`flex h-full w-full items-center justify-center ${imageScale > 1 ? "cursor-grab touch-none" : ""} ${isImageDragging ? "cursor-grabbing" : ""}`}
+                      onWheel={handleImageWheel}
+                      onPointerDown={handleImagePointerDown}
+                      onPointerMove={handleImagePointerMove}
+                      onPointerUp={stopImageDrag}
+                      onPointerCancel={stopImageDrag}
+                      style={{ touchAction: "none" }}
+                    >
+                      <PreviewImage
+                        src={item.url}
+                        alt={item.prompt}
+                        className="h-full w-full object-contain will-change-transform"
+                        style={{
+                          transform: `translate(${imageOffset.x}px, ${imageOffset.y}px) scale(${imageScale})`,
+                          transformOrigin: "center",
+                        }}
+                      />
+                    </div>
+                  </div>
+                </>
               ) : item.type === "video" ? (
                 <div className="group/fullscreen-video relative h-full w-full">
                   <VideoAssetPlayer
@@ -175,9 +351,19 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
                 &ldquo;{item.prompt}&rdquo;
               </p>
               <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-500">
-                <span className="font-mono">ID: {item.id}</span>
                 <span className="font-mono">模型: {item.model}</span>
                 <span className="font-mono">比例: {formatDisplayedAspectRatio(item)}</span>
+                {onDownload && (
+                  <button
+                    type="button"
+                    onClick={() => onDownload(item)}
+                    className="imagine-motion-interactive inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-700 bg-slate-900 px-2.5 text-xs font-medium text-slate-200 hover:border-slate-500 hover:text-white"
+                    title="下载"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    下载
+                  </button>
+                )}
                 {item.type === "image" && (
                   <button
                     type="button"
