@@ -40,7 +40,11 @@ export function BoardStatusBadge({
   status: GenerationTaskStatus;
 }) {
   return (
-    <span className={`imagine-board-status-badge shrink-0 ${className}`} data-tone={statusTone(status)}>
+    <span
+      className={`imagine-board-status-badge shrink-0 ${className}`}
+      data-tone={statusTone(status)}
+      title={boardStatusLabel(status)}
+    >
       {children ?? boardStatusLabel(status)}
     </span>
   );
@@ -53,8 +57,17 @@ export function BoardTaskProgressBar({
   progress: number;
   status: GenerationTaskStatus;
 }) {
+  const statusLabel = boardStatusLabel(status);
   return (
-    <div className="imagine-board-task-progress">
+    <div
+      aria-label={statusLabel}
+      aria-valuemax={100}
+      aria-valuemin={0}
+      aria-valuenow={progress}
+      aria-valuetext={`${statusLabel} ${progress}%`}
+      className="imagine-board-task-progress"
+      role="progressbar"
+    >
       <div className="imagine-board-task-progress-fill" data-tone={statusTone(status)} style={{ width: `${progress}%` }} />
     </div>
   );
