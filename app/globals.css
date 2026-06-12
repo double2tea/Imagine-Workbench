@@ -2629,7 +2629,11 @@ html[data-imagine-theme="light"] .imagine-root-body {
 }
 
 .imagine-board-side-tab {
+  display: flex;
   min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   border-radius: var(--iw-radius-sm);
   font-size: 11px;
   font-weight: 600;
@@ -2641,6 +2645,16 @@ html[data-imagine-theme="light"] .imagine-root-body {
   background: var(--iw-surface-raised);
   color: var(--iw-text);
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+.board-side-tab-badge {
+  min-width: 1.25rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--iw-board-accent-amber) 18%, var(--iw-panel));
+  color: var(--iw-board-accent-amber);
+  padding: 1px 5px;
+  text-align: center;
+  font-size: 10px;
 }
 
 .imagine-board-side-panel-scroll {
@@ -3159,8 +3173,44 @@ html[data-imagine-theme="light"] .imagine-root-body {
   background: var(--iw-panel-soft);
 }
 
+.imagine-board-header-menu-action[data-state="on"] {
+  color: color-mix(in srgb, var(--iw-board-accent-amber) 70%, var(--iw-text));
+}
+
+.board-toolbar-toggle-state {
+  margin-left: auto;
+  min-width: 1.75rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--iw-border) 75%, transparent);
+  background: color-mix(in srgb, var(--iw-bg) 28%, var(--iw-panel));
+  padding: 1px 6px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--iw-faint);
+}
+
+.imagine-board-header-menu-action[data-state="on"] .board-toolbar-toggle-state {
+  border-color: color-mix(in srgb, var(--iw-board-accent-amber) 36%, var(--iw-border));
+  background: color-mix(in srgb, var(--iw-board-accent-amber) 12%, var(--iw-panel));
+  color: var(--iw-board-accent-amber);
+}
+
 .imagine-board-header-menu-action[data-action="danger"] {
   color: #fca5a5;
+}
+
+.board-toolbar-insert-group {
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.board-toolbar-insert-group[data-group="开始"] {
+  background: color-mix(in srgb, var(--iw-board-accent-amber) 7%, transparent);
+}
+
+.board-toolbar-menu-label {
+  letter-spacing: 0.01em;
 }
 
 .imagine-board-header-insert-row {
@@ -3176,6 +3226,46 @@ html[data-imagine-theme="light"] .imagine-root-body {
 
 .imagine-board-header-insert-row:hover {
   background: var(--iw-panel-soft);
+}
+
+.imagine-board-header-insert-row[data-active="true"] {
+  border-color: color-mix(in srgb, var(--iw-board-accent-amber) 28%, var(--iw-border));
+  background: color-mix(in srgb, var(--iw-board-accent-amber) 10%, var(--iw-panel));
+}
+
+.imagine-board-node-context-menu {
+  box-shadow: var(--iw-card-shadow);
+}
+
+.board-node-context-title {
+  max-width: 13rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board-node-context-group {
+  letter-spacing: 0.01em;
+}
+
+.board-node-context-action[data-group="run"] svg {
+  color: #34d399;
+}
+
+.board-node-context-action[data-group="agent"] svg {
+  color: var(--iw-board-edge-agent-context);
+}
+
+.board-node-context-action[data-group="media"] svg {
+  color: #60a5fa;
+}
+
+.board-node-context-action[data-group="selection"] svg {
+  color: var(--iw-board-accent-amber);
+}
+
+.board-node-context-action[data-group="danger"] svg {
+  color: #fca5a5;
 }
 
 .imagine-board-save-status {

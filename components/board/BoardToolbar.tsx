@@ -413,28 +413,41 @@ export default function BoardToolbar({
             isInsertMenuOpen,
             insertMenuPanelRef,
             insertMenuPosition,
-            "imagine-board-header-menu fixed z-[60] w-56 p-1.5",
+            "imagine-board-header-menu fixed z-[60] w-60 p-1.5",
             <div className="grid gap-2">
-              {BOARD_INSERT_GROUP_LABELS.map(groupLabel => (
-                <div key={groupLabel} className="grid gap-1">
-                  <span className="px-1 text-[10px] font-semibold text-[var(--iw-faint)]">{groupLabel}</span>
-                  {BOARD_INSERT_CATALOG.filter(item => boardInsertGroupLabel(item.kind) === groupLabel).map(item => (
-                    <button
-                      key={item.kind}
-                      type="button"
-                      onClick={() => handleInsert(item.kind)}
-                      className="imagine-board-header-insert-row"
-                    >
-                      <span
-                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border ${item.iconSurfaceClassName}`}
+              {BOARD_INSERT_GROUP_LABELS.map(groupLabel => {
+                const groupItems = BOARD_INSERT_CATALOG.filter(item => boardInsertGroupLabel(item.kind) === groupLabel);
+                return (
+                  <div key={groupLabel} className="board-toolbar-insert-group grid gap-1" data-group={groupLabel}>
+                    <span className="board-toolbar-menu-label flex items-center justify-between px-1 text-[10px] font-semibold text-[var(--iw-faint)]">
+                      <span>{groupLabel}</span>
+                      <span className="font-mono">{groupItems.length}</span>
+                    </span>
+                    {groupItems.map(item => (
+                      <button
+                        key={item.kind}
+                        type="button"
+                        onClick={() => handleInsert(item.kind)}
+                        className="imagine-board-header-insert-row"
+                        data-active={item.kind === lastInsertKind}
                       >
-                        <BoardInsertIcon kind={item.kind} icon={item.icon} iconClassName={item.iconClassName} />
-                      </span>
-                      <span className="text-xs font-semibold">{item.label}</span>
-                    </button>
-                  ))}
-                </div>
-              ))}
+                        <span
+                          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border ${item.iconSurfaceClassName}`}
+                        >
+                          <BoardInsertIcon kind={item.kind} icon={item.icon} iconClassName={item.iconClassName} />
+                        </span>
+                        <span className="min-w-0 text-xs font-semibold">
+                          <span className="block truncate">{item.label}</span>
+                          {item.kind === lastInsertKind ? (
+                            <span className="block text-[10px] font-medium text-[var(--iw-board-accent-amber)]">上次使用</span>
+                          ) : null}
+                        </span>
+                        {item.kind === lastInsertKind ? <Check className="ml-auto h-3.5 w-3.5 shrink-0 text-[var(--iw-board-accent-amber)]" /> : null}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })}
             </div>,
           )}
         </div>
@@ -539,9 +552,11 @@ export default function BoardToolbar({
                   setIsOverflowOpen(false);
                 }}
                 className="imagine-board-header-menu-action"
+                data-state={showGrid ? "on" : "off"}
                 aria-pressed={showGrid}
               >
-                {showGrid ? "隐藏网格" : "显示网格"}
+                <span>{showGrid ? "隐藏网格" : "显示网格"}</span>
+                <span className="board-toolbar-toggle-state">{showGrid ? "开" : "关"}</span>
               </button>
               <button
                 type="button"
@@ -550,10 +565,12 @@ export default function BoardToolbar({
                   setIsOverflowOpen(false);
                 }}
                 className="imagine-board-header-menu-action"
+                data-state={snapToGrid ? "on" : "off"}
                 aria-pressed={snapToGrid}
               >
                 <Magnet className="h-3.5 w-3.5" />
-                {snapToGrid ? "关闭磁吸" : "开启磁吸"}
+                <span>{snapToGrid ? "关闭磁吸" : "开启磁吸"}</span>
+                <span className="board-toolbar-toggle-state">{snapToGrid ? "开" : "关"}</span>
               </button>
               <button
                 type="button"
@@ -562,9 +579,11 @@ export default function BoardToolbar({
                   setIsOverflowOpen(false);
                 }}
                 className="imagine-board-header-menu-action"
+                data-state={showMiniMap ? "on" : "off"}
                 aria-pressed={showMiniMap}
               >
-                {showMiniMap ? "隐藏小地图" : "显示小地图"}
+                <span>{showMiniMap ? "隐藏小地图" : "显示小地图"}</span>
+                <span className="board-toolbar-toggle-state">{showMiniMap ? "开" : "关"}</span>
               </button>
               {trashedCount > 0 && onRestoreTrash ? (
                 <button

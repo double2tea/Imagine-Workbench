@@ -1,5 +1,20 @@
 "use client";
 
+import { Fragment } from "react";
+import {
+  Bot,
+  Clipboard,
+  Copy,
+  GitBranchPlus,
+  Images,
+  Mic2,
+  Pencil,
+  Play,
+  ScanSearch,
+  Trash2,
+  Ungroup,
+  type LucideIcon,
+} from "lucide-react";
 import { BOARD_NODE_CONTEXT_MENU_SIZE, clampFloatingMenuPosition } from "@/lib/board/interaction";
 import type { BoardNode } from "@/lib/board";
 
@@ -15,6 +30,42 @@ interface BoardNodeContextMenuProps {
   clientX: number;
   clientY: number;
   node: BoardNode;
+}
+
+type BoardNodeContextMenuGroup = "node" | "selection" | "media" | "run" | "agent" | "danger";
+
+const actionGroupLabels: Record<BoardNodeContextMenuGroup, string> = {
+  agent: "Agent",
+  danger: "危险操作",
+  media: "媒体",
+  node: "节点",
+  run: "执行",
+  selection: "多选",
+};
+
+const actionIcons: Record<string, LucideIcon> = {
+  agent: Bot,
+  "agent-send": Bot,
+  compare: ScanSearch,
+  "connect-selected": GitBranchPlus,
+  "copy-image": Clipboard,
+  "create-reference-group": Images,
+  delete: Trash2,
+  duplicate: Copy,
+  edit: Pencil,
+  execute: Play,
+  "group-selected": Images,
+  "save-voice-profile": Mic2,
+  ungroup: Ungroup,
+};
+
+function actionGroup(action: BoardNodeContextMenuAction): BoardNodeContextMenuGroup {
+  if (action.tone === "danger") return "danger";
+  if (action.id === "execute") return "run";
+  if (action.id === "agent" || action.id === "agent-send") return "agent";
+  if (action.id === "compare" || action.id === "copy-image" || action.id === "edit" || action.id === "save-voice-profile") return "media";
+  if (action.id === "connect-selected" || action.id === "group-selected" || action.id === "ungroup" || action.id === "create-reference-group") return "selection";
+  return "node";
 }
 
 export function buildBoardNodeContextMenuActions(input: {
@@ -70,25 +121,38 @@ export default function BoardNodeContextMenu({ actions, clientX, clientY, node }
 
   return (
     <div
-      className="imagine-board-node-context-menu fixed z-50 grid min-w-[12rem] gap-1 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)] p-1.5 text-[var(--iw-text)] shadow-lg"
+      className="imagine-board-node-context-menu fixed z-50 grid min-w-[13.5rem] gap-1 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)] p-1.5 text-[var(--iw-text)] shadow-lg"
       style={{ left: anchor.left, top: anchor.top }}
       onContextMenu={(event) => event.preventDefault()}
     >
-      <p className="px-2 py-1 text-[10px] font-semibold text-[var(--iw-muted)]">{node.title}</p>
-      {actions.map(action => (
-        <button
-          key={action.id}
-          type="button"
-          onClick={action.onSelect}
-          className={`imagine-header-button flex !h-9 w-full items-center !justify-start !rounded-md border border-transparent px-2.5 text-left text-xs font-semibold transition ${
-            action.tone === "danger"
-              ? "text-red-300 hover:border-red-400/30 hover:bg-red-500/10"
-              : "text-[var(--iw-text)] hover:border-[var(--iw-border)] hover:bg-[var(--iw-panel-soft)]"
-          }`}
-        >
-          {action.label}
-        </button>
-      ))}
+      <p className="board-node-context-title px-2 py-1 text-[10px] font-semibold text-[var(--iw-muted)]">{node.title}</p>
+      {actions.map((action, index) => {
+        const group = actionGroup(action);
+        const previousGroup = index > 0 ? actionGroup(actions[index - 1]) : null;
+        const Icon = actionIcons[action.id] ?? Copy;
+        return (
+          <Fragment key={action.id}>
+            {group !== previousGroup ? (
+              <span className="board-node-context-group px-2 pt-1 text-[10px] font-semibold text-[var(--iw-faint)]">
+                {actionGroupLabels[group]}
+              </span>
+            ) : null}
+            <button
+              type="button"
+              onClick={action.onSelect}
+              className={`board-node-context-action imagine-header-button flex !h-9 w-full items-center !justify-start gap-2 !rounded-md border border-transparent px-2.5 text-left text-xs font-semibold transition ${
+                action.tone === "danger"
+                  ? "text-red-300 hover:border-red-400/30 hover:bg-red-500/10"
+                  : "text-[var(--iw-text)] hover:border-[var(--iw-border)] hover:bg-[var(--iw-panel-soft)]"
+              }`}
+              data-group={group}
+            >
+              <Icon className="h-3.5 w-3.5 shrink-0 text-[var(--iw-muted)]" />
+              {action.label}
+            </button>
+          </Fragment>
+        );
+      })}
     </div>
   );
 }

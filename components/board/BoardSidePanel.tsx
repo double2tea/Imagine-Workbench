@@ -1,12 +1,23 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ChevronLeft, ChevronRight, PanelRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, ClipboardList, Images, PanelRight, SlidersHorizontal, type LucideIcon } from "lucide-react";
 
 const BOARD_SIDE_COLLAPSED_KEY = "imagine_board_side_collapsed";
 const BOARD_SIDE_TAB_KEY = "imagine_board_side_tab";
 
 export type BoardSidePanelTab = "inspector" | "tasks" | "assets";
+
+const BOARD_SIDE_TABS: ReadonlyArray<{
+  id: BoardSidePanelTab;
+  icon: LucideIcon;
+  label: string;
+  shortLabel: string;
+}> = [
+  { id: "inspector", icon: SlidersHorizontal, label: "检查器", shortLabel: "检查" },
+  { id: "tasks", icon: ClipboardList, label: "任务", shortLabel: "任务" },
+  { id: "assets", icon: Images, label: "本地资产", shortLabel: "资产" },
+];
 
 interface BoardSidePanelProps {
   assetsPanel: ReactNode;
@@ -77,30 +88,26 @@ export default function BoardSidePanel({
 
   const tabBar = (
     <div className="imagine-board-side-tabs shrink-0 grid grid-cols-3 gap-1 p-2">
-      <button
-        type="button"
-        data-active={activeTab === "inspector"}
-        className="imagine-board-side-tab px-2"
-        onClick={() => selectTab("inspector")}
-      >
-        检查器
-      </button>
-      <button
-        type="button"
-        data-active={activeTab === "tasks"}
-        className="imagine-board-side-tab px-2"
-        onClick={() => selectTab("tasks")}
-      >
-        任务{taskBadgeCount > 0 ? ` ${taskBadgeCount}` : ""}
-      </button>
-      <button
-        type="button"
-        data-active={activeTab === "assets"}
-        className="imagine-board-side-tab px-2"
-        onClick={() => selectTab("assets")}
-      >
-        本地资产
-      </button>
+      {BOARD_SIDE_TABS.map(tab => {
+        const Icon = tab.icon;
+        const isActive = activeTab === tab.id;
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            aria-label={tab.label}
+            data-active={isActive}
+            className="imagine-board-side-tab px-2"
+            onClick={() => selectTab(tab.id)}
+          >
+            <Icon className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">{tab.shortLabel}</span>
+            {tab.id === "tasks" && taskBadgeCount > 0 ? (
+              <span className="board-side-tab-badge font-mono">{taskBadgeCount}</span>
+            ) : null}
+          </button>
+        );
+      })}
     </div>
   );
 
