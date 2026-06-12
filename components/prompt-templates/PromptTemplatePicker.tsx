@@ -11,7 +11,7 @@ import {
   type PromptTemplateCategoryId,
 } from "@/lib/prompt-templates";
 
-export type PromptTemplatePickerAccent = "blue" | "teal" | "violet";
+export type PromptTemplatePickerAccent = "amber" | "blue" | "teal" | "violet";
 
 interface PromptTemplatePickerProps {
   accent?: PromptTemplatePickerAccent;
@@ -26,6 +26,7 @@ export interface PromptTemplatePickerHandle {
 }
 
 const accentClass: Record<PromptTemplatePickerAccent, string> = {
+  amber: "border-amber-400/25 bg-amber-500/12 text-amber-200 hover:bg-amber-500/18",
   blue: "border-blue-400/25 bg-blue-500/12 text-blue-200 hover:bg-blue-500/18",
   teal: "border-teal-400/25 bg-teal-500/12 text-teal-200 hover:bg-teal-500/18",
   violet: "border-violet-400/25 bg-violet-500/12 text-violet-200 hover:bg-violet-500/18",

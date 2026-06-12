@@ -359,7 +359,7 @@ export default function AudioGenerationPanel({
         actions={
           <PromptComposerToolbarActions
             ref={templatePickerRef}
-            accent="teal"
+            accent="amber"
             isOptimizing={isOptimizing}
             optimizeDisabled={isOptimizing || !prompt.trim()}
             optimizeLabel="润色"

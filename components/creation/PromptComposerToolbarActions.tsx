@@ -16,6 +16,7 @@ interface PromptComposerToolbarActionsProps {
 }
 
 const accentTextClass: Record<PromptTemplatePickerAccent, string> = {
+  amber: "text-amber-300 hover:text-amber-200",
   blue: "text-blue-300 hover:text-blue-200",
   teal: "text-teal-300 hover:text-teal-200",
   violet: "text-violet-300 hover:text-violet-200",
