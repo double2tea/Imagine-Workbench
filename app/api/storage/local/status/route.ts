@@ -1,6 +1,6 @@
-import { resolvePublicLocalStorageRuntimeStatus } from "@/lib/storage/local-runtime";
+import { resolvePublicLocalStorageRuntimeStatus } from "@/lib/storage/local-public-runtime";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {

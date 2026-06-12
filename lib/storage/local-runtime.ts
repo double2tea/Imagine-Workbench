@@ -9,24 +9,19 @@ import {
   type WorkspaceStorageMode,
 } from "./local-config";
 import {
-  getLocalWorkspacePathPlan,
+  getPublicLocalWorkspacePathPlan,
+  LOCAL_WORKSPACE_CLEANUP_POLICY,
+  LOCAL_WORKSPACE_SYNC_POLICY,
+  resolvePublicLocalStorageRuntimeStatus,
+  type LocalWorkspaceCleanupPolicy,
+  type LocalWorkspaceSyncPolicy,
+  type PublicLocalStorageRuntimeStatus,
+  type PublicLocalWorkspacePathPlan,
+} from "./local-public-runtime";
+import {
   resolveLocalWorkspacePaths,
-  type LocalWorkspacePathPlan,
   type LocalWorkspacePaths,
 } from "./local-paths";
-
-export interface LocalWorkspaceCleanupPolicy {
-  automaticStartupCleanup: false;
-  deleteAssetMovesToTrash: true;
-  explicitCleanupTargets: readonly ["orphan-assets", "stale-previews", "expired-trash"];
-  retainedSafetySnapshots: 1;
-}
-
-export interface LocalWorkspaceSyncPolicy {
-  bidirectionalSync: false;
-  migrationDirection: "explicit-import-export";
-  mode: "single-active-store";
-}
 
 export interface LocalStorageRuntimeStatus {
   cleanupPolicy: LocalWorkspaceCleanupPolicy;
@@ -37,33 +32,6 @@ export interface LocalStorageRuntimeStatus {
   syncPolicy: LocalWorkspaceSyncPolicy;
   targetKind: "indexeddb" | "local-database";
 }
-
-export interface PublicLocalWorkspacePathPlan extends LocalWorkspacePathPlan {
-  workspaceRootConfigured: boolean;
-}
-
-export interface PublicLocalStorageRuntimeStatus {
-  cleanupPolicy: LocalWorkspaceCleanupPolicy;
-  enabled: boolean;
-  mode: WorkspaceStorageMode;
-  pathPlan?: PublicLocalWorkspacePathPlan;
-  reason: LocalStorageDisabledReason | LocalStorageEnabledReason;
-  syncPolicy: LocalWorkspaceSyncPolicy;
-  targetKind: "indexeddb" | "local-database";
-}
-
-export const LOCAL_WORKSPACE_CLEANUP_POLICY: LocalWorkspaceCleanupPolicy = {
-  automaticStartupCleanup: false,
-  deleteAssetMovesToTrash: true,
-  explicitCleanupTargets: ["orphan-assets", "stale-previews", "expired-trash"],
-  retainedSafetySnapshots: 1,
-};
-
-export const LOCAL_WORKSPACE_SYNC_POLICY: LocalWorkspaceSyncPolicy = {
-  bidirectionalSync: false,
-  migrationDirection: "explicit-import-export",
-  mode: "single-active-store",
-};
 
 export function resolveLocalStorageRuntimeStatus(
   env: LocalStorageEnvironment,
@@ -110,12 +78,7 @@ export function toPublicLocalStorageRuntimeStatus(
   env: LocalStorageEnvironment = {},
 ): PublicLocalStorageRuntimeStatus {
   const pathPlan: PublicLocalWorkspacePathPlan | undefined =
-    status.mode === "local-database"
-      ? {
-          ...getLocalWorkspacePathPlan(),
-          workspaceRootConfigured: Boolean(env[IMAGINE_LOCAL_WORKSPACE_DIR_ENV]?.trim()),
-        }
-      : undefined;
+    status.mode === "local-database" ? getPublicLocalWorkspacePathPlan(env) : undefined;
 
   return {
     cleanupPolicy: status.cleanupPolicy,
@@ -128,8 +91,12 @@ export function toPublicLocalStorageRuntimeStatus(
   };
 }
 
-export function resolvePublicLocalStorageRuntimeStatus(
-  env: LocalStorageEnvironment,
-): PublicLocalStorageRuntimeStatus {
-  return toPublicLocalStorageRuntimeStatus(resolveLocalStorageRuntimeStatus(env), env);
-}
+export {
+  LOCAL_WORKSPACE_CLEANUP_POLICY,
+  LOCAL_WORKSPACE_SYNC_POLICY,
+  resolvePublicLocalStorageRuntimeStatus,
+  type LocalWorkspaceCleanupPolicy,
+  type LocalWorkspaceSyncPolicy,
+  type PublicLocalStorageRuntimeStatus,
+  type PublicLocalWorkspacePathPlan,
+};
