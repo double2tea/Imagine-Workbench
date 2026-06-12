@@ -1,4 +1,5 @@
 import {
+  CheckSquare,
   ChevronDown,
   Compass,
   Download,
@@ -11,6 +12,7 @@ import {
   RefreshCw,
   SlidersHorizontal,
   Sparkles,
+  Square,
   Trash2,
   Video as VideoIcon,
   X,
@@ -150,7 +152,6 @@ export default function AssetCard({
   const [isQuickEditMenuOpen, setIsQuickEditMenuOpen] = useState(false);
   const [frameMenuPlacement, setFrameMenuPlacement] = useState<FrameMenuPlacement | null>(null);
   const captureVideoFrameRef = useRef<VideoFrameCaptureRequest | null>(null);
-  const hoverPromoteTimerRef = useRef<number | null>(null);
   const longPressTimerRef = useRef<number | null>(null);
   const longPressStartRef = useRef<{ x: number; y: number } | null>(null);
   const suppressNextClickRef = useRef(false);
@@ -183,12 +184,6 @@ export default function AssetCard({
     void captureVideoFrameRef.current?.(mode);
   };
 
-  const clearHoverPromoteTimer = () => {
-    if (hoverPromoteTimerRef.current === null) return;
-    window.clearTimeout(hoverPromoteTimerRef.current);
-    hoverPromoteTimerRef.current = null;
-  };
-
   const clearLongPressTimer = () => {
     if (longPressTimerRef.current !== null) {
       window.clearTimeout(longPressTimerRef.current);
@@ -197,23 +192,11 @@ export default function AssetCard({
     longPressStartRef.current = null;
   };
 
-  const scheduleHoverPromote = () => {
-    if (item.status !== "complete") return;
-    clearHoverPromoteTimer();
-    hoverPromoteTimerRef.current = window.setTimeout(() => {
-      hoverPromoteTimerRef.current = null;
-      onPromoteOriginal(item);
-    }, 650);
-  };
-
   useEffect(() => {
     if (selected && item.status === "complete") onPromoteOriginal(item);
   }, [item, onPromoteOriginal, selected]);
 
-  useEffect(() => () => {
-    clearHoverPromoteTimer();
-    clearLongPressTimer();
-  }, []);
+  useEffect(() => clearLongPressTimer, []);
 
   const imageHoverActions: WorkbenchActionDescriptor[] = item.type === "image"
     ? [
@@ -372,8 +355,6 @@ export default function AssetCard({
       data-type={item.type}
       onDragStart={handleDragStart}
       onClickCapture={handleCardClickCapture}
-      onMouseEnter={scheduleHoverPromote}
-      onMouseLeave={clearHoverPromoteTimer}
       onPointerCancel={clearLongPressTimer}
       onPointerDown={handleCardPointerDown}
       onPointerLeave={clearLongPressTimer}
@@ -565,6 +546,10 @@ export default function AssetCard({
                 </div>
 
                 <div className="grid grid-cols-2 gap-1.5 p-2">
+                  <button type="button" onClick={() => runMobileAction(() => onToggleSelect(item.id))}>
+                    {selected ? <CheckSquare className="h-3.5 w-3.5 text-blue-300" /> : <Square className="h-3.5 w-3.5 text-slate-300" />}
+                    {selected ? "取消选择" : "选择"}
+                  </button>
                   {item.type === "image" && (
                     <button type="button" onClick={() => runMobileAction(() => onApplyVideoReference(item))}>
                       <VideoIcon className="h-3.5 w-3.5 text-purple-300" />

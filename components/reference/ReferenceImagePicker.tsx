@@ -1,4 +1,4 @@
-import type { ChangeEvent, DragEvent, KeyboardEvent } from "react";
+import type { ChangeEvent, DragEvent, KeyboardEvent, MouseEvent } from "react";
 import { CloudUpload, Layers, Music, X } from "lucide-react";
 import {
   type DraggedReferenceAsset,
@@ -154,8 +154,10 @@ export default function ReferenceImagePicker({
             const mediaType = getMediaReferenceType(reference);
             const token = getMediaReferencePromptToken(index, mediaType);
             const canEditReference = !roleMode && mediaType === "image" && onReferenceEdit !== undefined;
-            const handleReferenceDoubleClick = () => {
+            const handleReferenceDoubleClick = (event: MouseEvent<HTMLDivElement>) => {
               if (!canEditReference) return;
+              const target = event.target;
+              if (target instanceof HTMLElement && target.closest("button")) return;
               onReferenceEdit(reference);
             };
             const handleReferenceKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -195,6 +197,7 @@ export default function ReferenceImagePicker({
                     event.stopPropagation();
                     onRemove(reference.id);
                   }}
+                  onDoubleClick={event => event.stopPropagation()}
                   className="absolute top-1 right-1 bg-red-600/95 text-white rounded-md p-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition cursor-pointer hover:scale-105 z-10"
                   title="移除该图"
                 >
@@ -208,6 +211,7 @@ export default function ReferenceImagePicker({
                       event.stopPropagation();
                       onRoleChange?.(reference.id, getNextRole(reference));
                     }}
+                    onDoubleClick={event => event.stopPropagation()}
                     className={`absolute inset-x-0 bottom-0 py-1 text-[9px] font-sans font-bold text-center text-white backdrop-blur-subtle cursor-pointer transition-colors ${
                       isStart ? "bg-emerald-600/80" : isEnd ? "bg-amber-600/80" : "bg-black/60 hover:bg-black/80"
                     }`}

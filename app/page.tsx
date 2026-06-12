@@ -1245,7 +1245,7 @@ export default function Home() {
 
   const saveMaskOutput = async (output: CanvasMaskEditorOutput) => {
     if (output.operation && maskEditSourceItem) {
-      await runImageQuickEdit(
+      void runImageQuickEdit(
         maskEditSourceItem,
         output.operation,
         output.imageBase64,
@@ -1257,6 +1257,8 @@ export default function Home() {
       setIsMaskOpen(false);
       setMaskEditOperation(undefined);
       setMaskEditSourceItem(null);
+      setMaskTargetUrl("");
+      setMaskTargetId("");
       return;
     }
 

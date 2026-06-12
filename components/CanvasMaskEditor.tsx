@@ -58,7 +58,7 @@ interface CanvasMaskEditorProps {
   initialImageResolution?: string;
   initialPrompt?: string;
   onClose: () => void;
-  onSaveMask: (output: CanvasMaskEditorOutput) => void;
+  onSaveMask: (output: CanvasMaskEditorOutput) => void | Promise<void>;
 }
 
 export type CanvasEditorMode = "mask" | "erase" | "text" | "crop" | "outpaint" | "compare";
@@ -319,6 +319,7 @@ export default function CanvasMaskEditor({
   const [cropCursor, setCropCursor] = useState("crosshair");
   const [compareCurrentUrl, setCompareCurrentUrl] = useState<string | null>(null);
   const [imageResolution, setImageResolution] = useState(initialImageResolution);
+  const [isSaving, setIsSaving] = useState(false);
   const [outpaintCursorValue, setOutpaintCursorValue] = useState("default");
 
   const currentOutpaintPreviewSize = outpaintPreviewSize(canvasSize, outpaintMargins);
@@ -725,13 +726,14 @@ export default function CanvasMaskEditor({
     setWorkingImageUrl(nextBaseCanvas.toDataURL("image/png"));
   };
 
-  const handleApply = () => {
+  const handleApply = async () => {
+    if (isSaving) return;
     const canvas = canvasRef.current;
     const img = bgImgRef.current;
     if (!canvas || !img) return;
 
     if (operation === "outpaint") {
-      applyOutpaint(img, canvasSize.width, canvasSize.height);
+      await applyOutpaint(img, canvasSize.width, canvasSize.height);
       return;
     }
 
@@ -784,19 +786,23 @@ export default function CanvasMaskEditor({
     baseCtx.drawImage(img, 0, 0, sourceWidth, sourceHeight);
     textItems.forEach(item => drawScaledTextOverlay(baseCtx, item, scaleX, scaleY));
 
-    onSaveMask({
-      imageBase64: baseCanvas.toDataURL("image/png"),
-      imageResolution: selectedImageResolution,
-      maskBase64: maskCanvas.toDataURL("image/png"),
-      mergedImageBase64: mergeCanvas.toDataURL("image/png"),
-      operation,
-      outputSize: { width: sourceWidth, height: sourceHeight },
-      prompt: editPrompt.trim(),
-    });
-    onClose();
+    setIsSaving(true);
+    try {
+      await onSaveMask({
+        imageBase64: baseCanvas.toDataURL("image/png"),
+        imageResolution: selectedImageResolution,
+        maskBase64: maskCanvas.toDataURL("image/png"),
+        mergedImageBase64: mergeCanvas.toDataURL("image/png"),
+        operation,
+        outputSize: { width: sourceWidth, height: sourceHeight },
+        prompt: editPrompt.trim(),
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const applyOutpaint = (img: HTMLImageElement, width: number, height: number) => {
+  const applyOutpaint = async (img: HTMLImageElement, width: number, height: number) => {
     const sourceWidth = img.naturalWidth || img.width;
     const sourceHeight = img.naturalHeight || img.height;
     const scaleX = sourceWidth / width;
@@ -830,16 +836,20 @@ export default function CanvasMaskEditor({
     maskCtx.fillStyle = "#000000";
     maskCtx.fillRect(margins.left, margins.top, sourceWidth, sourceHeight);
 
-    onSaveMask({
-      imageBase64: baseCanvas.toDataURL("image/png"),
-      imageResolution: selectedImageResolution,
-      maskBase64: maskCanvas.toDataURL("image/png"),
-      mergedImageBase64: baseCanvas.toDataURL("image/png"),
-      operation,
-      outputSize: { width: nextWidth, height: nextHeight },
-      prompt: editPrompt.trim(),
-    });
-    onClose();
+    setIsSaving(true);
+    try {
+      await onSaveMask({
+        imageBase64: baseCanvas.toDataURL("image/png"),
+        imageResolution: selectedImageResolution,
+        maskBase64: maskCanvas.toDataURL("image/png"),
+        mergedImageBase64: baseCanvas.toDataURL("image/png"),
+        operation,
+        outputSize: { width: nextWidth, height: nextHeight },
+        prompt: editPrompt.trim(),
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const renderModeButton = ({ mode, label, hint, icon }: { mode: CanvasEditorMode; label: string; hint: string; icon: React.ReactNode }) => (
@@ -1241,13 +1251,13 @@ export default function CanvasMaskEditor({
               <OperationActionButton
                 type="button"
                 onClick={handleApply}
-                disabled={!canApply}
+                disabled={!canApply || isSaving}
                 tone="success"
                 variant="primary"
                 className="w-full"
               >
                 <Check className="h-4 w-4" />
-                应用编辑
+                {isSaving ? "应用中" : "应用编辑"}
               </OperationActionButton>
             </div>
           </aside>

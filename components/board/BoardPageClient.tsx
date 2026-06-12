@@ -2081,7 +2081,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         pushWorkspaceNotice("error", "未找到要编辑的图片节点");
         return;
       }
-      await runBoardImageQuickEdit(
+      void runBoardImageQuickEdit(
         sourceNode.id,
         sourceNode.title,
         sourceNode.position,
