@@ -1,5 +1,5 @@
 import { Clock3, ImageDown, SkipBack, SkipForward, type LucideIcon } from "lucide-react";
-import { WorkbenchPopoverMenu, WorkbenchPopoverMenuItem, type WorkbenchPopoverSurface } from "@/components/workbench/OperationControls";
+import { WorkbenchPopoverMenu, WorkbenchPopoverMenuItem, type WorkbenchPopoverPlacement, type WorkbenchPopoverSurface } from "@/components/workbench/OperationControls";
 import { getVideoFrameCaptureLabel, type VideoFrameCaptureMode } from "@/lib/video-frame";
 
 const frameCaptureActions: Array<{
@@ -17,6 +17,7 @@ interface VideoFrameMenuProps {
   isOpen: boolean;
   onSelect: (mode: VideoFrameCaptureMode) => void;
   onToggle: () => void;
+  placement?: WorkbenchPopoverPlacement;
   surface?: WorkbenchPopoverSurface;
   variant?: "compact" | "full";
 }
@@ -27,6 +28,7 @@ export default function VideoFrameMenu({
   isOpen,
   onSelect,
   onToggle,
+  placement = "above",
   surface = "floating",
   variant = "compact",
 }: VideoFrameMenuProps) {
@@ -46,7 +48,7 @@ export default function VideoFrameMenu({
         {variant === "full" ? <span className="text-xs font-semibold">截帧</span> : <span className="text-[9px] font-bold">截帧</span>}
       </button>
       {isOpen && (
-        <WorkbenchPopoverMenu align={align} surface={surface}>
+        <WorkbenchPopoverMenu align={align} placement={placement} surface={surface}>
           {frameCaptureActions.map(action => {
             const Icon = action.icon;
             return (

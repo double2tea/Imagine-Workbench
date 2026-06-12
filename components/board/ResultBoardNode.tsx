@@ -186,7 +186,6 @@ const ResultBoardNode = memo(function ResultBoardNode({
       activeStackAssetId={node.activeAssetId}
       isSelected={isSelected}
       onSelectStackAsset={onSelectStackAsset}
-      progress={item.progress}
       processingLabel={imageQuickEditProcessingTitleFromPrompt(item.prompt) ?? undefined}
       stackItems={stackItems}
       status={item.status}

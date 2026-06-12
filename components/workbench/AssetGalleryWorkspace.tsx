@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronLeft, ChevronRight, Image as ImageIcon, Music, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import AssetCard from "@/components/assets/AssetCard";
 import AssetSelectionBar from "@/components/assets/AssetSelectionBar";
 import AssetToolbar, { type AssetDatePreset, type AssetStatusFilter, type AssetTypeFilter } from "@/components/assets/AssetToolbar";
@@ -65,7 +65,7 @@ interface AssetGalleryWorkspaceProps {
   onSetFilterType: (value: AssetTypeFilter) => void;
   onSetSearchQuery: (value: string) => void;
   onToggleCompare: (id: string) => void;
-  onToggleSelect: (id: string) => void;
+  onToggleSelect: (id: string, event?: MouseEvent<HTMLButtonElement>) => void;
   onUseAgentReference: (item: StorageItem) => void;
   visibleItemsStep?: number;
   formatModelLabel: (value: string, fallbackProvider: AiProvider) => string;

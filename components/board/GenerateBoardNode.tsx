@@ -98,7 +98,7 @@ function resultContext(hasResultConnection: boolean, resultCount: number): { tit
 
 function runContext(node: GenerateNode, taskSummary: BoardGenerateTaskSummary | undefined): { title: string; tone: GenerateContextTone } {
   if (taskSummary?.status === "pending") return { title: "排队", tone: "processing" };
-  if (taskSummary?.status === "processing") return { title: `${taskSummary.progress}%`, tone: "processing" };
+  if (taskSummary?.status === "processing") return { title: "处理中", tone: "processing" };
   if (node.status === "complete") return { title: "完成", tone: "ok" };
   if (node.status === "failed") return { title: "失败", tone: "failed" };
   if (node.status === "processing") return { title: "处理中", tone: "processing" };
@@ -110,22 +110,6 @@ function statusLineTone(node: GenerateNode, taskSummary: BoardGenerateTaskSummar
   if (node.status === "complete") return "complete";
   if (node.status === "failed") return "failed";
   return "idle";
-}
-
-function statusLineWidth(tone: GenerateStatusLineTone, taskSummary: BoardGenerateTaskSummary | undefined): string {
-  if (tone === "processing") {
-    if (taskSummary?.status === "processing") return `${Math.max(8, Math.min(100, taskSummary.progress))}%`;
-    return "28%";
-  }
-  if (tone === "complete" || tone === "failed") return "100%";
-  return "18%";
-}
-
-function statusLineClass(tone: GenerateStatusLineTone): string {
-  if (tone === "processing") return "bg-blue-500 shadow-[0_0_14px_rgba(59,130,246,0.45)] animate-pulse";
-  if (tone === "complete") return "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.35)]";
-  if (tone === "failed") return "bg-red-400 shadow-[0_0_12px_rgba(248,113,113,0.32)]";
-  return "bg-slate-500/45";
 }
 
 const GenerateBoardNode = memo(function GenerateBoardNode({
@@ -226,12 +210,9 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
         audioOperationFormatOptions(getAudioModelCapabilities(node.model)).length > 0 ? node.audioFormat : "",
         `x${node.variantCount}`,
       ].filter(value => value.trim().length > 0).join(" / ");
-  const statusLabel = taskSummary
-    ? `${taskSummary.status === "pending" ? "排队" : "处理中"} ${taskSummary.progress}% / ${paramSummary}`
-    : `${statusText(node)} / ${paramSummary}`;
-  const compactStatusLabel = taskSummary
-    ? `${taskSummary.status === "pending" ? "排队" : "处理中"} ${taskSummary.progress}% · x${node.variantCount}`
-    : `${statusText(node)} · x${node.variantCount}`;
+  const taskStatusText = taskSummary?.status === "pending" ? "排队中" : "处理中";
+  const statusLabel = taskSummary ? `${taskStatusText} / ${paramSummary}` : `${statusText(node)} / ${paramSummary}`;
+  const compactStatusLabel = taskSummary ? `${taskStatusText} · x${node.variantCount}` : `${statusText(node)} · x${node.variantCount}`;
 
   useGSAP(() => {
     const previousLineTone = previousLineToneRef.current;
@@ -251,34 +232,16 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
           { scale: 0.96 },
           { scale: 1 },
           0,
-        )
-        .fromTo(
-          ".imagine-generate-status-track",
-          { boxShadow: "0 0 0 rgba(59,130,246,0)" },
-          { boxShadow: "0 0 18px rgba(59,130,246,0.22)", duration: 0.28 },
-          0.02,
         );
       return;
     }
 
     if (lineTone === "complete" || lineTone === "failed") {
-      const color = lineTone === "complete" ? "52,211,153" : "248,113,113";
       gsap.timeline({ defaults: { ease: WORKBENCH_GSAP_EASE } })
         .fromTo(
           ".imagine-status-chip",
           { scale: 0.98 },
           { scale: 1, duration: 0.18 },
-          0,
-        )
-        .fromTo(
-          ".imagine-generate-status-track",
-          { boxShadow: `0 0 0 rgba(${color},0)` },
-          {
-            boxShadow: `0 0 22px rgba(${color},0.3)`,
-            duration: 0.18,
-            repeat: 1,
-            yoyo: true,
-          },
           0,
         );
     }
@@ -459,13 +422,6 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
             )}
           </button>
         )}
-      </div>
-      <div className="imagine-generate-status-track h-1 overflow-hidden rounded-full bg-[var(--iw-panel-soft)]" title={`状态：${run.title}`}>
-        <div
-          className={`imagine-generate-status-fill h-full rounded-full transition-[width] ${statusLineClass(lineTone)}`}
-          data-state={lineTone}
-          style={{ width: statusLineWidth(lineTone, taskSummary) }}
-        />
       </div>
     </div>
   );

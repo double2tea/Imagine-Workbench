@@ -228,7 +228,6 @@ const AssetBoardNode = memo(function AssetBoardNode({
       isSelected={isSelected}
       onCancelProcessing={onCancelProcessing ? () => onCancelProcessing(node.id) : undefined}
       onSelectStackAsset={onSelectStackAsset}
-      progress={item.progress}
       processingLabel={imageQuickEditProcessingTitleFromPrompt(item.prompt) ?? undefined}
       stackItems={stackItems}
       status={item.status}

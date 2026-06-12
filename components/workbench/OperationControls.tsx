@@ -1,6 +1,6 @@
 "use client";
 
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { ButtonHTMLAttributes, MouseEvent, ReactNode } from "react";
 import {
   Check,
   Compass,
@@ -192,7 +192,7 @@ export interface WorkbenchActionDescriptor {
   icon: ReactNode;
   id: string;
   label?: string;
-  onClick: () => void;
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
   title: string;
   tone?: OperationTone;
 }
@@ -213,6 +213,7 @@ export function WorkbenchActionButton({
       type="button"
       disabled={action.disabled}
       data-active={action.active}
+      data-action-id={action.id}
       onClick={action.onClick}
       className={workbenchCardActionClassName(action.tone ?? "neutral", `imagine-motion-interactive ${className}`)}
       title={action.title}
@@ -242,25 +243,29 @@ export function WorkbenchActionStrip({
 }
 
 export type WorkbenchPopoverSurface = "floating" | "panel";
+export type WorkbenchPopoverPlacement = "above" | "below";
 
 export function WorkbenchPopoverMenu({
   align = "left",
   children,
   className = "",
+  placement = "above",
   surface = "floating",
 }: {
   align?: "left" | "right";
   children: ReactNode;
   className?: string;
+  placement?: WorkbenchPopoverPlacement;
   surface?: WorkbenchPopoverSurface;
 }) {
   const surfaceClassName = surface === "panel"
     ? "border-[var(--iw-border)] bg-[var(--iw-panel)] text-[var(--iw-text)]"
     : "border-white/12 bg-slate-950/94 text-slate-100 backdrop-blur";
+  const placementClassName = placement === "below" ? "top-full mt-1" : "bottom-full mb-1";
 
   return (
     <div
-      className={`imagine-motion-surface-reveal absolute bottom-full ${align === "right" ? "right-0" : "left-0"} ${surfaceClassName} mb-1 grid min-w-24 gap-1 rounded-lg border p-1 text-xs shadow-xl ${className}`}
+      className={`imagine-motion-surface-reveal absolute ${placementClassName} ${align === "right" ? "right-0" : "left-0"} ${surfaceClassName} grid min-w-24 gap-1 rounded-lg border p-1 text-xs shadow-xl ${className}`}
     >
       {children}
     </div>

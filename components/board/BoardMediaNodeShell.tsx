@@ -11,14 +11,9 @@ interface BoardMediaNodeShellProps {
   onCancelProcessing?: () => void;
   processingLabel?: string;
   onSelectStackAsset?: (assetId: string) => void;
-  progress?: number;
   stackItems: ReadonlyArray<Pick<StorageItem, "id">>;
   status?: StorageItem["status"];
   statusLabel?: string;
-}
-
-function clampProgress(progress: number): number {
-  return Math.max(0, Math.min(100, Math.round(progress)));
 }
 
 export default function BoardMediaNodeShell({
@@ -29,7 +24,6 @@ export default function BoardMediaNodeShell({
   onCancelProcessing,
   processingLabel = "编辑处理中",
   onSelectStackAsset,
-  progress = 0,
   stackItems,
   status,
   statusLabel,
@@ -39,12 +33,11 @@ export default function BoardMediaNodeShell({
   const hasStackSwitcher = stackItems.length > 1;
   const isProcessing = status === "pending" || status === "processing";
   const isFailed = status === "failed";
-  const progressValue = clampProgress(progress);
   const statusTitle = isFailed
     ? statusLabel ?? "任务失败"
     : status === "pending"
       ? "任务已排队"
-      : `${processingLabel} ${progressValue}%`;
+      : processingLabel;
 
   useGSAP(() => {
     const previousStatus = previousStatusRef.current;
@@ -86,19 +79,18 @@ export default function BoardMediaNodeShell({
           {children}
         </div>
         {(isProcessing || isFailed) && (
-          <div className="board-media-processing-visual pointer-events-none absolute inset-0 z-40 text-white">
-            {isProcessing && <span className="board-media-processing-dots absolute inset-0" />}
+          <div className="board-media-processing-visual pointer-events-none absolute inset-0 z-40">
+            {isProcessing && (
+              <>
+                <span className="board-media-processing-wash absolute inset-0" />
+                <span className="board-media-processing-sheen absolute inset-y-0 w-1/3" />
+              </>
+            )}
             <div className="absolute inset-0 flex items-center justify-center p-3">
               <div className="board-media-processing-pill imagine-motion-panel-reveal flex max-w-[calc(100%-24px)] items-center gap-2 rounded-full border border-white/15 bg-black/32 px-3 py-1.5 text-[11px] font-semibold text-white/90 shadow-lg backdrop-blur-md">
                 {isProcessing ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" /> : <X className="h-3.5 w-3.5 shrink-0 text-rose-200" />}
                 <span className="truncate">{statusTitle}</span>
               </div>
-            </div>
-            <div className="absolute inset-x-3 bottom-3 h-1 overflow-hidden rounded-full bg-white/18">
-              <div
-                className={`h-full rounded-full transition-[width] ${isFailed ? "bg-rose-400" : "bg-sky-300 shadow-[0_0_16px_rgba(125,211,252,0.55)]"}`}
-                style={{ width: `${isFailed ? 100 : Math.max(8, progressValue)}%` }}
-              />
             </div>
             {isProcessing && onCancelProcessing ? (
               <button
