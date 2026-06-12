@@ -297,6 +297,8 @@ export default function CanvasMaskEditor({
   const bgImgRef = useRef<HTMLImageElement | null>(null);
   const cropDragStateRef = useRef<CropDragState | null>(null);
   const outpaintDragStateRef = useRef<OutpaintDragState | null>(null);
+  const outpaintPendingMarginsRef = useRef<ReturnType<typeof defaultOutpaintMargins> | null>(null);
+  const outpaintDragRafRef = useRef<number | null>(null);
   const pendingMaskDataUrlRef = useRef<string | null>(null);
   const textIdRef = useRef(0);
 
@@ -415,6 +417,13 @@ export default function CanvasMaskEditor({
     maskImg.src = pendingMask;
   }, [canvasSize, imgLoaded]);
 
+  useEffect(() => () => {
+    if (outpaintDragRafRef.current !== null) {
+      cancelAnimationFrame(outpaintDragRafRef.current);
+      outpaintDragRafRef.current = null;
+    }
+  }, []);
+
   if (!isOpen) return null;
 
   const configureMaskStroke = (ctx: CanvasRenderingContext2D) => {
@@ -509,13 +518,22 @@ export default function CanvasMaskEditor({
       if (dragState) {
         const dx = point.x - dragState.start.x;
         const dy = point.y - dragState.start.y;
-        setOutpaintMargins({
+        outpaintPendingMarginsRef.current = {
           ...dragState.margins,
           left: dragState.side === "left" ? clampOutpaintMargin(dragState.margins.left - dx) : dragState.margins.left,
           right: dragState.side === "right" ? clampOutpaintMargin(dragState.margins.right + dx) : dragState.margins.right,
           top: dragState.side === "top" ? clampOutpaintMargin(dragState.margins.top - dy) : dragState.margins.top,
           bottom: dragState.side === "bottom" ? clampOutpaintMargin(dragState.margins.bottom + dy) : dragState.margins.bottom,
-        });
+        };
+        if (outpaintDragRafRef.current === null) {
+          outpaintDragRafRef.current = requestAnimationFrame(() => {
+            outpaintDragRafRef.current = null;
+            const nextMargins = outpaintPendingMarginsRef.current;
+            if (nextMargins) {
+              setOutpaintMargins(nextMargins);
+            }
+          });
+        }
         return;
       }
       setOutpaintCursorValue(outpaintCursor(getOutpaintResizeSide(point, editorStageSize)));
@@ -579,6 +597,14 @@ export default function CanvasMaskEditor({
     }
 
     if (editorMode === "outpaint") {
+      if (outpaintDragRafRef.current !== null) {
+        cancelAnimationFrame(outpaintDragRafRef.current);
+        outpaintDragRafRef.current = null;
+      }
+      if (outpaintPendingMarginsRef.current) {
+        setOutpaintMargins(outpaintPendingMarginsRef.current);
+        outpaintPendingMarginsRef.current = null;
+      }
       outpaintDragStateRef.current = null;
       return;
     }
