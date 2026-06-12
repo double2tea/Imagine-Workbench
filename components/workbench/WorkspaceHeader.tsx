@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Grid2X2, Moon, Plug, Settings, Sun, Trash2 } from "lucide-react";
-import ImagineMark from "@/components/brand/ImagineMark";
+import WorkspaceTopBarBrand from "@/components/workbench/WorkspaceTopBarBrand";
 import WorkspaceTopBar, {
   workspaceTopBarButtonClass,
   workspaceTopBarIconButtonClass,
@@ -32,18 +32,7 @@ export default function WorkspaceHeader({
     <WorkspaceTopBar
       sticky
       start={
-        <div className="z-10 flex min-w-0 flex-1 items-center gap-3">
-          <div className="imagine-brand-mark relative flex h-9 w-9 shrink-0 items-center justify-center">
-            <ImagineMark size="md" trackPointer />
-          </div>
-          <div className="min-w-0">
-            <h1 className="flex min-w-0 items-center gap-2 text-sm font-semibold tracking-tight text-[var(--iw-text)]">
-              <span className="truncate">Imagine Workbench</span>
-              <span className="imagine-workspace-badge shrink-0">v1.2</span>
-            </h1>
-            <p className="imagine-workspace-subtitle truncate">智能图像、视频与音频创作工作台</p>
-          </div>
-        </div>
+        <WorkspaceTopBarBrand subtitle="智能图像、视频与音频创作工作台" />
       }
       end={
         <div className="z-10 flex shrink-0 items-center gap-1.5 sm:gap-2">

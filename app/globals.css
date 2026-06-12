@@ -3138,6 +3138,19 @@ html[data-imagine-theme="light"] .imagine-root-body {
   justify-content: flex-end;
 }
 
+.imagine-topbar-brand {
+  flex: 1 1 auto;
+}
+
+.imagine-topbar-brand--compact {
+  flex: 0 1 auto;
+}
+
+.imagine-topbar-brand-mark {
+  height: 42px;
+  width: 42px;
+}
+
 .imagine-topbar-button:hover,
 .imagine-topbar-icon-button:hover {
   background: var(--iw-panel);
@@ -5866,7 +5879,7 @@ html[data-imagine-theme="light"] .imagine-mark-xs,
     font-size: 12px !important;
   }
 
-  .imagine-app-topbar h1 span:last-child,
+  .imagine-app-topbar .imagine-workspace-badge,
   .imagine-app-topbar p {
     display: none !important;
   }
@@ -5908,7 +5921,8 @@ html[data-imagine-theme="light"] .imagine-mark-xs,
     margin-top: 10px !important;
   }
 
-  .imagine-brand-mark {
+  .imagine-brand-mark,
+  .imagine-topbar-brand-mark {
     height: 32px !important;
     width: 32px !important;
     border-radius: 9px !important;

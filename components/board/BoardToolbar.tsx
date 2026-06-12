@@ -34,6 +34,7 @@ import type { BoardSaveStatus } from "@/hooks/useBoardState";
 import { useThemeMode } from "@/lib/theme-mode";
 import type { BoardSummary } from "@/lib/board";
 import BoardInsertIcon from "@/components/board/BoardInsertIcon";
+import WorkspaceTopBarBrand from "@/components/workbench/WorkspaceTopBarBrand";
 import WorkspaceTopBar, {
   workspaceTopBarButtonClass,
   workspaceTopBarIconButtonClass,
@@ -270,7 +271,11 @@ export default function BoardToolbar({
             <ArrowLeft className="h-4 w-4" />
           </button>
 
-        <div className="relative min-w-0">
+          <WorkspaceTopBarBrand compact showBadge={false} />
+
+          <span className="hidden h-7 w-px shrink-0 bg-[var(--iw-border)] md:block" aria-hidden="true" />
+
+          <div className="relative min-w-0">
           <button
             ref={boardMenuButtonRef}
             type="button"
