@@ -3092,29 +3092,29 @@ html[data-imagine-theme="light"] .imagine-root-body {
       "center center";
   }
 
-  .imagine-app-topbar-zone--start {
+  .imagine-app-topbar--has-center .imagine-app-topbar-zone--start {
     grid-area: start;
   }
 
-  .imagine-app-topbar-zone--center {
+  .imagine-app-topbar--has-center .imagine-app-topbar-zone--center {
     grid-area: center;
     justify-content: stretch;
   }
 
-  .imagine-app-topbar-zone--center:empty {
+  .imagine-app-topbar--has-center .imagine-app-topbar-zone--center:empty {
     display: none;
   }
 
-  .imagine-app-topbar-zone--center .imagine-board-header-insert-group {
+  .imagine-app-topbar--has-center .imagine-app-topbar-zone--center .imagine-board-header-insert-group {
     flex: 1;
   }
 
-  .imagine-app-topbar-zone--center .imagine-board-header-insert-group > button:first-child {
+  .imagine-app-topbar--has-center .imagine-app-topbar-zone--center .imagine-board-header-insert-group > button:first-child {
     flex: 1;
     justify-content: center;
   }
 
-  .imagine-app-topbar-zone--end {
+  .imagine-app-topbar--has-center .imagine-app-topbar-zone--end {
     grid-area: end;
   }
 }
