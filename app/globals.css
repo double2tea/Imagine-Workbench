@@ -3939,6 +3939,11 @@ html[data-imagine-theme="light"] .board-media-stack-switcher {
 .board-canvas.is-node-dragging .react-flow__connection-path {
   animation: none !important;
   filter: none !important;
+  transition: none !important;
+}
+
+.board-canvas.is-node-dragging .board-edge-toolbar {
+  display: none !important;
 }
 
 .board-canvas.is-node-dragging .react-flow__node *,

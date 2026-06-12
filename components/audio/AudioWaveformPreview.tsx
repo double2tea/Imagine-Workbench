@@ -11,10 +11,16 @@ interface AudioWaveformPreviewProps {
   tone?: "surface" | "media";
 }
 
+interface AudioWaveformData {
+  duration: number;
+  peaks: number[];
+}
+
 const SOURCE_POINT_COUNT = 160;
 const FULL_VISIBLE_POINT_COUNT = 96;
 const COMPACT_VISIBLE_POINT_COUNT = 72;
 const WAVEFORM_AMPLITUDE = 1.05;
+const waveformDataCache = new Map<string, Promise<AudioWaveformData>>();
 
 function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds <= 0) return "0:00";
@@ -83,6 +89,32 @@ function waveformPoints(peaks: number[], amplitude: number): string {
   return [...upper, ...lower].join(" ");
 }
 
+function loadAudioWaveformData(sourceUrl: string): Promise<AudioWaveformData> {
+  const cached = waveformDataCache.get(sourceUrl);
+  if (cached) return cached;
+
+  const request = (async () => {
+    const response = await fetch(sourceUrl);
+    const arrayBuffer = await response.arrayBuffer();
+    const context = new AudioContext();
+    try {
+      const buffer = await context.decodeAudioData(arrayBuffer);
+      return {
+        duration: buffer.duration,
+        peaks: computePeaks(buffer),
+      };
+    } finally {
+      await context.close();
+    }
+  })().catch((error: unknown) => {
+    waveformDataCache.delete(sourceUrl);
+    throw error;
+  });
+
+  waveformDataCache.set(sourceUrl, request);
+  return request;
+}
+
 export default function AudioWaveformPreview({
   src,
   className = "",
@@ -116,15 +148,11 @@ export default function AudioWaveformPreview({
     }
 
     async function loadWaveform() {
-      const response = await fetch(sourceUrl);
-      const arrayBuffer = await response.arrayBuffer();
-      const context = new AudioContext();
-      const buffer = await context.decodeAudioData(arrayBuffer);
+      const data = await loadAudioWaveformData(sourceUrl);
       if (!isCancelled) {
-        setDuration(buffer.duration);
-        setPeaks(computePeaks(buffer));
+        setDuration(data.duration);
+        setPeaks(data.peaks);
       }
-      await context.close();
     }
 
     void loadWaveform();

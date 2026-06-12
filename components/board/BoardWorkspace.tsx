@@ -217,6 +217,7 @@ const DEFAULT_BOARD_IMAGE_MODEL = "modelscope:Qwen/Qwen-Image";
 const DEFAULT_BOARD_REFERENCE_IMAGE_MODEL = "modelscope:Qwen/Qwen-Image-Edit";
 const BOARD_VIEWPORT_POSITION_EPSILON = 0.5;
 const BOARD_VIEWPORT_ZOOM_EPSILON = 0.001;
+const BOARD_VISIBLE_RENDER_NODE_THRESHOLD = 48;
 
 interface BoardSelectionSnapshot {
   edgeId: string | null;
@@ -1109,6 +1110,8 @@ export default function BoardWorkspace({
   const copiedNodeRef = useRef<CopiedBoardNode | null>(null);
   const hoverPromoteTimerRef = useRef<number | null>(null);
   const isNodeDragActiveRef = useRef(false);
+  const multiGridDropFrameRef = useRef<number | null>(null);
+  const pendingMultiGridDropPointRef = useRef<{ clientX: number; clientY: number } | null>(null);
   const pendingDragPositionByIdRef = useRef<Map<string, BoardPoint>>(new Map());
   const selectionRef = useRef<BoardSelectionSnapshot>({ edgeId: null, nodeId: null, nodeIds: [] });
   const isSyncingFlowNodesRef = useRef(false);
@@ -1646,13 +1649,27 @@ export default function BoardWorkspace({
   const [reactFlowNodes, setReactFlowNodes, onNodesChange] = useNodesState<BoardFlowNode>([]);
   const reactFlowNodesRef = useRef<BoardFlowNode[]>(reactFlowNodes);
   const clearActiveMultiGridDropTarget = useCallback((): void => {
+    if (multiGridDropFrameRef.current !== null) {
+      window.cancelAnimationFrame(multiGridDropFrameRef.current);
+      multiGridDropFrameRef.current = null;
+    }
+    pendingMultiGridDropPointRef.current = null;
     setActiveMultiGridDropTarget(null);
   }, []);
-  const updateActiveMultiGridDropTarget = useCallback((clientX: number, clientY: number): MultiGridCellDropTarget | null => {
-    const target = multiGridCellDropTargetFromClient(board.nodes, clientX, clientY);
-    setActiveMultiGridDropTarget(current => sameMultiGridCellDropTarget(current, target) ? current : target);
-    return target;
+  const scheduleActiveMultiGridDropTarget = useCallback((clientX: number, clientY: number): void => {
+    pendingMultiGridDropPointRef.current = { clientX, clientY };
+    if (multiGridDropFrameRef.current !== null) return;
+    multiGridDropFrameRef.current = window.requestAnimationFrame(() => {
+      multiGridDropFrameRef.current = null;
+      const point = pendingMultiGridDropPointRef.current;
+      pendingMultiGridDropPointRef.current = null;
+      const target = point ? multiGridCellDropTargetFromClient(board.nodes, point.clientX, point.clientY) : null;
+      setActiveMultiGridDropTarget(current => sameMultiGridCellDropTarget(current, target) ? current : target);
+    });
   }, [board.nodes]);
+  useEffect(() => () => {
+    if (multiGridDropFrameRef.current !== null) window.cancelAnimationFrame(multiGridDropFrameRef.current);
+  }, []);
   useLayoutEffect(() => {
     reactFlowNodesRef.current = reactFlowNodes;
   }, [reactFlowNodes]);
@@ -1690,7 +1707,7 @@ export default function BoardWorkspace({
           sourceHandle: edge.from.portId,
           targetHandle: edge.to.portId,
           type: "smoothstep",
-          animated: edge.kind === "result" || processing,
+          animated: !isNodeDragActive && (edge.kind === "result" || processing),
           data: { kind: edge.kind, processing },
           className: `imagine-board-edge imagine-board-edge-${edge.kind}`,
           markerEnd: { type: MarkerType.ArrowClosed, color: flowEdgeColorByKind[edge.kind], width: 18, height: 18 },
@@ -1698,7 +1715,7 @@ export default function BoardWorkspace({
         };
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- graph key gates processing animation without position churn
-    [boardGraphContentKey, boardPromptReferenceGraphIndex, flowEdgeColorByKind, selectedEdgeId],
+    [boardGraphContentKey, boardPromptReferenceGraphIndex, flowEdgeColorByKind, isNodeDragActive, selectedEdgeId],
   );
 
   const isValidBoardConnection = useCallback<IsValidConnection<BoardFlowEdge>>((connection) => {
@@ -1813,6 +1830,7 @@ export default function BoardWorkspace({
   }, []);
 
   const handleNodeMouseEnter = useCallback<NodeMouseHandler<BoardFlowNode>>((_event, node) => {
+    if (isNodeDragActiveRef.current) return;
     const item = promotableItemForNode(node.data.node);
     if (!item || item.status !== "complete") return;
     clearHoverPromoteTimer();
@@ -1907,8 +1925,9 @@ export default function BoardWorkspace({
   const handleNodeDragStart = useCallback<OnNodeDrag<BoardFlowNode>>(() => {
     isNodeDragActiveRef.current = true;
     setIsNodeDragActive(true);
+    clearHoverPromoteTimer();
     pendingDragPositionByIdRef.current.clear();
-  }, []);
+  }, [clearHoverPromoteTimer]);
 
   const handleNodeDrag = useCallback<OnNodeDrag<BoardFlowNode>>((event, node) => {
     const source = node.data.node;
@@ -1916,8 +1935,8 @@ export default function BoardWorkspace({
       clearActiveMultiGridDropTarget();
       return;
     }
-    updateActiveMultiGridDropTarget(event.clientX, event.clientY);
-  }, [clearActiveMultiGridDropTarget, updateActiveMultiGridDropTarget]);
+    scheduleActiveMultiGridDropTarget(event.clientX, event.clientY);
+  }, [clearActiveMultiGridDropTarget, scheduleActiveMultiGridDropTarget]);
 
   const handleNodeDragStop = useCallback<OnNodeDrag<BoardFlowNode>>((event, node, nodes) => {
     isNodeDragActiveRef.current = false;
@@ -2009,7 +2028,7 @@ export default function BoardWorkspace({
   }, [closeOverlayMenus, selectEdge, selectNode, updateSelectedNodeIds]);
 
   const snapToGrid = board.config.snapToGrid;
-  const onlyRenderVisibleBoardElements = true;
+  const onlyRenderVisibleBoardElements = board.nodes.length >= BOARD_VISIBLE_RENDER_NODE_THRESHOLD || isNodeDragActive;
   const shouldRenderMiniMap = board.config.showMiniMap && !isNodeDragActive;
 
   const flowPositionFromClient = useCallback((clientX: number, clientY: number): BoardPoint => {
@@ -2705,11 +2724,11 @@ export default function BoardWorkspace({
     event.preventDefault();
     event.dataTransfer.dropEffect = "copy";
     if (event.dataTransfer.types.includes(IMAGINE_BOARD_ASSET_DRAG_TYPE)) {
-      updateActiveMultiGridDropTarget(event.clientX, event.clientY);
+      scheduleActiveMultiGridDropTarget(event.clientX, event.clientY);
       return;
     }
     clearActiveMultiGridDropTarget();
-  }, [clearActiveMultiGridDropTarget, updateActiveMultiGridDropTarget]);
+  }, [clearActiveMultiGridDropTarget, scheduleActiveMultiGridDropTarget]);
 
   const handleBoardDragLeave = useCallback((event: ReactDragEvent<HTMLElement>): void => {
     const nextTarget = event.relatedTarget;
@@ -2932,7 +2951,7 @@ export default function BoardWorkspace({
                 zoomable
               />
             )}
-            {selectedNodeIds.length > 1 && selectedDownloadableCount > 0 && onDownloadSelectedAssets ? (
+            {!isNodeDragActive && selectedNodeIds.length > 1 && selectedDownloadableCount > 0 && onDownloadSelectedAssets ? (
               <NodeToolbar
                 nodeId={selectedNodeIds}
                 isVisible
