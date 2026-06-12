@@ -265,7 +265,7 @@ export function WorkbenchPopoverMenu({
 
   return (
     <div
-      className={`imagine-motion-surface-reveal absolute ${placementClassName} ${align === "right" ? "right-0" : "left-0"} ${surfaceClassName} grid min-w-24 gap-1 rounded-lg border p-1 text-xs shadow-xl ${className}`}
+      className={`imagine-motion-surface-reveal absolute z-40 ${placementClassName} ${align === "right" ? "right-0" : "left-0"} ${surfaceClassName} grid min-w-24 gap-1 rounded-lg border p-1 text-xs shadow-xl ${className}`}
     >
       {children}
     </div>

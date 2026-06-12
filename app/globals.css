@@ -2672,7 +2672,7 @@ html[data-imagine-theme="light"] .imagine-root-body {
   [class*="bg-[#0b0d13]"],
   [class*="bg-slate-950"],
   [class*="bg-slate-900"]
-):not([style*="background-image"]):not(.imagine-asset-hover-scrim):not(.imagine-workbench-shell):not(.board-canvas):not(.board-media-stack-badge):not(.board-media-meta):not(.board-media-stack-switcher) {
+):not([style*="background-image"]):not(.imagine-workbench-shell):not(.board-canvas):not(.board-media-stack-badge):not(.board-media-meta):not(.board-media-stack-switcher) {
   background-color: var(--iw-panel-solid, #ffffff) !important;
   background-image: none !important;
 }
@@ -4368,8 +4368,13 @@ html[data-imagine-theme="light"] .imagine-required-chip,
   container-type: inline-size;
 }
 
-.imagine-asset-topbar {
+.imagine-asset-controlbar {
   min-width: 0;
+  min-height: 44px;
+  padding: 8px 10px 7px;
+  border-bottom: 1px solid var(--iw-border);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--iw-surface-raised) 92%, transparent), color-mix(in srgb, var(--iw-panel) 92%, transparent));
 }
 
 .imagine-card-actions {
@@ -4377,7 +4382,7 @@ html[data-imagine-theme="light"] .imagine-required-chip,
 }
 
 .imagine-card-actions-shell {
-  transform: translateY(6px) scale(0.985);
+  transform: translateY(3px) scale(0.99);
   transition:
     opacity var(--iw-motion-surface) var(--iw-motion-ease),
     transform var(--iw-motion-surface) var(--iw-motion-ease);
@@ -4389,11 +4394,6 @@ html[data-imagine-theme="light"] .imagine-required-chip,
   transform: translateY(0) scale(1);
   opacity: 1 !important;
   pointer-events: auto !important;
-}
-
-.imagine-asset-hover-scrim {
-  background: rgba(2, 6, 23, 0.2) !important;
-  transition: opacity var(--iw-motion-surface) var(--iw-motion-ease) !important;
 }
 
 .imagine-card-action {
@@ -4420,7 +4420,46 @@ html[data-imagine-theme="light"] .imagine-required-chip,
 .imagine-asset-card .imagine-card-actions.imagine-floating-card-actions {
   max-width: 100%;
   flex-wrap: nowrap !important;
-  overflow: hidden;
+  overflow: visible;
+}
+
+.imagine-asset-controlbar .imagine-card-actions.imagine-floating-card-actions {
+  justify-content: flex-start !important;
+  gap: 4px !important;
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+.imagine-asset-controlbar .imagine-card-actions-shell {
+  opacity: 1 !important;
+  overflow-x: auto;
+  overflow-y: visible;
+  overscroll-behavior-inline: contain;
+  pointer-events: auto !important;
+  scrollbar-width: none;
+  transform: none !important;
+}
+
+.imagine-asset-controlbar .imagine-card-actions-shell:focus-within,
+.imagine-asset-controlbar .imagine-card-actions-shell[data-popover-open="true"] {
+  overflow: visible;
+  z-index: 2;
+}
+
+.imagine-asset-controlbar .imagine-card-actions-shell::-webkit-scrollbar {
+  display: none;
+}
+
+.imagine-asset-quick-edit-anchor {
+  z-index: 3;
+}
+
+.imagine-asset-quick-edit-anchor .imagine-card-action {
+  background: color-mix(in srgb, var(--iw-panel-soft) 84%, transparent) !important;
+  border-color: color-mix(in srgb, var(--iw-border) 86%, transparent) !important;
+  color: var(--iw-text) !important;
 }
 
 .imagine-asset-card .imagine-card-actions.imagine-floating-card-actions .imagine-card-action {
@@ -4450,6 +4489,24 @@ html[data-imagine-theme="light"] .imagine-required-chip,
 @container (min-width: 720px) {
   .imagine-asset-card .imagine-card-actions.imagine-floating-card-actions .imagine-card-action span {
     display: inline;
+  }
+}
+
+@container (max-width: 520px) {
+  .imagine-asset-controlbar {
+    align-items: flex-start;
+  }
+}
+
+@container (max-width: 560px) {
+  .imagine-asset-controlbar .imagine-card-action {
+    min-width: 26px;
+    min-height: 26px;
+    padding-inline: 6px !important;
+  }
+
+  .imagine-asset-quick-edit-anchor .imagine-card-action span {
+    display: none;
   }
 }
 
@@ -4565,11 +4622,6 @@ html[data-imagine-theme="light"] .imagine-audio-waveform-media {
   --iw-audio-wave-play-shadow: 0 10px 22px rgba(15, 23, 42, 0.1);
 }
 
-.imagine-workbench-shell.imagine-theme-light .imagine-asset-hover-scrim {
-  background: rgba(15, 23, 42, 0.16) !important;
-  background-image: none !important;
-}
-
 .imagine-workbench-shell.imagine-theme-light .imagine-card-actions {
   background: rgba(255, 255, 255, 0.92) !important;
   background-image: none !important;
@@ -4638,6 +4690,42 @@ html[data-imagine-theme="light"] .imagine-card-action[data-active="true"]:hover 
   background-image: none !important;
   border-color: #3b82f6 !important;
   color: #ffffff !important;
+}
+
+.imagine-asset-controlbar .imagine-card-actions.imagine-floating-card-actions,
+html.imagine-theme-light .imagine-asset-controlbar .imagine-card-actions.imagine-floating-card-actions,
+html[data-imagine-theme="light"] .imagine-asset-controlbar .imagine-card-actions.imagine-floating-card-actions,
+.imagine-workbench-shell.imagine-theme-light .imagine-asset-controlbar .imagine-card-actions.imagine-floating-card-actions {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.imagine-asset-controlbar .imagine-card-actions.imagine-floating-card-actions .imagine-card-action {
+  background: color-mix(in srgb, var(--iw-panel-soft) 84%, transparent) !important;
+  border-color: color-mix(in srgb, var(--iw-border) 86%, transparent) !important;
+  color: var(--iw-text) !important;
+  backdrop-filter: none;
+  box-shadow: none !important;
+}
+
+.imagine-asset-controlbar .imagine-card-actions.imagine-floating-card-actions .imagine-card-action:not(:disabled):hover {
+  background: color-mix(in srgb, var(--iw-accent) 12%, var(--iw-panel-soft)) !important;
+  border-color: color-mix(in srgb, var(--iw-accent) 32%, var(--iw-border)) !important;
+  color: var(--iw-accent-strong) !important;
+}
+
+.imagine-asset-controlbar .imagine-card-actions.imagine-floating-card-actions .imagine-card-action:disabled {
+  background: color-mix(in srgb, var(--iw-panel-soft) 46%, transparent) !important;
+  border-color: color-mix(in srgb, var(--iw-border) 58%, transparent) !important;
+  color: var(--iw-faint) !important;
+}
+
+.imagine-theme-light .imagine-asset-controlbar,
+html.imagine-theme-light .imagine-asset-controlbar,
+html[data-imagine-theme="light"] .imagine-asset-controlbar {
+  background: linear-gradient(180deg, #ffffff, #f8fafc) !important;
+  border-color: rgba(15, 23, 42, 0.08) !important;
 }
 
 .imagine-workbench-shell.imagine-theme-light .imagine-panorama-action {
@@ -5201,6 +5289,103 @@ html[data-imagine-theme="light"] .imagine-mark-xs,
   }
 }
 
+@media (min-width: 641px) and (max-width: 1023px) {
+  .imagine-mobile-asset-stream .imagine-asset-controlbar {
+    display: none !important;
+  }
+
+  .imagine-mobile-asset-stream .imagine-card-actions-shell {
+    display: none !important;
+  }
+
+  .imagine-mobile-asset-stream .imagine-mobile-action-trigger {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    z-index: 24;
+    display: flex !important;
+    width: 36px;
+    height: 36px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(15, 23, 42, 0.82);
+    padding: 0;
+    color: #e2e8f0;
+    backdrop-filter: blur(14px);
+    box-shadow: 0 10px 24px rgba(2, 6, 23, 0.28);
+  }
+
+  .imagine-mobile-action-sheet {
+    position: absolute;
+    inset: 0;
+    z-index: 32;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    background: linear-gradient(to top, rgba(2, 6, 23, 0.9), rgba(2, 6, 23, 0.28));
+    color: #e2e8f0;
+  }
+
+  .imagine-mobile-action-sheet > div:first-child {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+  }
+
+  .imagine-mobile-action-sheet-title {
+    color: #f1f5f9;
+  }
+
+  .imagine-mobile-action-sheet-close {
+    color: #cbd5e1;
+  }
+
+  .imagine-mobile-action-sheet > div:last-child button {
+    display: flex;
+    min-height: 34px;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(15, 23, 42, 0.72);
+    padding: 7px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #e2e8f0;
+  }
+
+  .imagine-theme-light .imagine-mobile-asset-stream .imagine-mobile-action-trigger {
+    border-color: rgba(15, 23, 42, 0.12);
+    background: rgba(255, 255, 255, 0.9);
+    color: #172033;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
+  }
+
+  .imagine-theme-light .imagine-mobile-action-sheet {
+    background: linear-gradient(to top, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.78), rgba(15, 23, 42, 0.14));
+    color: #172033;
+  }
+
+  .imagine-theme-light .imagine-mobile-action-sheet > div:first-child {
+    border-color: rgba(15, 23, 42, 0.1) !important;
+  }
+
+  .imagine-theme-light .imagine-mobile-action-sheet-title {
+    color: #172033;
+  }
+
+  .imagine-theme-light .imagine-mobile-action-sheet-close {
+    color: #667085;
+  }
+
+  .imagine-theme-light .imagine-mobile-action-sheet > div:last-child button {
+    border-color: rgba(15, 23, 42, 0.1);
+    background: rgba(255, 255, 255, 0.9);
+    color: #172033;
+  }
+}
+
 @media (max-width: 640px) {
   .imagine-workbench-shell > .absolute {
     opacity: 0.36;
@@ -5491,6 +5676,10 @@ html[data-imagine-theme="light"] .imagine-mark-xs,
     display: none !important;
   }
 
+  .imagine-mobile-asset-stream .imagine-asset-controlbar {
+    display: none !important;
+  }
+
   .imagine-asset-media {
     aspect-ratio: 4 / 3;
   }
@@ -5545,10 +5734,6 @@ html[data-imagine-theme="light"] .imagine-mark-xs,
     display: none !important;
   }
 
-  .imagine-mobile-asset-stream .imagine-asset-hover-scrim {
-    display: none !important;
-  }
-
   .imagine-mobile-asset-stream .imagine-card-actions {
     gap: 3px !important;
     flex-wrap: nowrap !important;
@@ -5556,12 +5741,11 @@ html[data-imagine-theme="light"] .imagine-mark-xs,
     padding: 3px !important;
   }
 
-  .imagine-asset-card .imagine-asset-hover-scrim,
-  .imagine-asset-card .imagine-card-actions {
+  .imagine-mobile-asset-stream .imagine-card-actions {
     opacity: 1 !important;
   }
 
-  .imagine-asset-card .imagine-card-actions {
+  .imagine-mobile-asset-stream .imagine-card-actions {
     pointer-events: auto !important;
   }
 

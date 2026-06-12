@@ -246,16 +246,6 @@ export default function AssetCard({
 
   const sharedHoverActions: WorkbenchActionDescriptor[] = [
     {
-      active: selected,
-      ariaLabel: selected ? "取消选择此资产" : "选择此资产",
-      icon: selected ? <CheckSquare className="h-3 w-3" /> : <Square className="h-3 w-3" />,
-      id: "select",
-      label: selected ? "已选" : "选择",
-      onClick: event => onToggleSelect(item.id, event),
-      title: "选择此项；按住 Shift 可范围多选",
-      tone: "neutral",
-    },
-    {
       ariaLabel: "复用任务参数",
       icon: <SlidersHorizontal className="h-3 w-3" />,
       id: "reuse",
@@ -286,6 +276,24 @@ export default function AssetCard({
       title: "下载该文件到本地",
       tone: WORKBENCH_OPERATION_META.download.tone,
     },
+    {
+      ariaLabel: "全屏预览",
+      icon: <Maximize2 className="h-3 w-3" />,
+      id: "fullscreen",
+      onClick: () => onOpenFullscreen(item),
+      title: "全屏大画幅细节放大",
+      tone: WORKBENCH_OPERATION_META.fullscreen.tone,
+    },
+    {
+      active: selected,
+      ariaLabel: selected ? "取消选择此资产" : "选择此资产",
+      icon: selected ? <CheckSquare className="h-3 w-3" /> : <Square className="h-3 w-3" />,
+      id: "select",
+      label: selected ? "已选" : "选择",
+      onClick: event => onToggleSelect(item.id, event),
+      title: "选择此项；按住 Shift 可范围多选",
+      tone: "neutral",
+    },
     ...(item.type !== "transcript"
       ? [
           {
@@ -301,14 +309,6 @@ export default function AssetCard({
         ]
       : []),
     {
-      ariaLabel: "全屏预览",
-      icon: <Maximize2 className="h-3 w-3" />,
-      id: "fullscreen",
-      onClick: () => onOpenFullscreen(item),
-      title: "全屏大画幅细节放大",
-      tone: WORKBENCH_OPERATION_META.fullscreen.tone,
-    },
-    {
       ariaLabel: "删除资产",
       icon: <Trash2 className="h-3 w-3" />,
       id: "delete",
@@ -317,6 +317,27 @@ export default function AssetCard({
       tone: WORKBENCH_OPERATION_META.delete.tone,
     },
   ];
+  const assetTypeBadge = item.type === "image" ? (
+    <span className="imagine-asset-type-badge flex shrink-0 items-center gap-1.5 px-2 py-1 text-[9px] font-bold tracking-wider uppercase rounded bg-blue-500/80 backdrop-blur-md text-white border border-blue-400/25">
+      <ImageIcon className="h-3 w-3" />
+      IMAGE
+    </span>
+  ) : item.type === "video" ? (
+    <span className="imagine-asset-type-badge flex shrink-0 items-center gap-1.5 px-2 py-1 text-[9px] font-bold tracking-wider uppercase rounded bg-purple-500/80 backdrop-blur-md text-white border border-purple-400/25">
+      <span className="h-1.5 w-1.5 rounded-full bg-red-400 animate-ping" />
+      VIDEO
+    </span>
+  ) : item.type === "audio" ? (
+    <span className="imagine-asset-type-badge imagine-audio-type-badge flex shrink-0 items-center gap-1.5 px-2 py-1 text-[9px] font-bold tracking-wider uppercase rounded border border-white/12 bg-slate-950/46 text-slate-100 backdrop-blur-md">
+      <Music className="h-3 w-3" />
+      AUDIO
+    </span>
+  ) : (
+    <span className="imagine-asset-type-badge flex shrink-0 items-center gap-1.5 px-2 py-1 text-[9px] font-bold tracking-wider uppercase rounded border border-cyan-400/20 bg-cyan-500/18 text-cyan-100 backdrop-blur-md">
+      <FileText className="h-3 w-3" />
+      TEXT
+    </span>
+  );
 
   return (
     <div
@@ -332,6 +353,73 @@ export default function AssetCard({
         selected ? "border-blue-500 ring-2 ring-blue-500/20" : "border-slate-850 hover:border-slate-750"
       }`}
     >
+      {item.status === "complete" && (
+        <div className="imagine-asset-controlbar flex items-start gap-2">
+          <div
+            className="imagine-card-actions-shell min-w-0 flex-1"
+            data-popover-open={frameMenuPlacement === "hover" ? "true" : "false"}
+          >
+            <WorkbenchActionStrip className="justify-start">
+              {item.type === "video" && (
+                <VideoFrameMenu
+                  buttonClassName={workbenchCardActionClassName(WORKBENCH_OPERATION_META.frame.tone)}
+                  isOpen={frameMenuPlacement === "hover"}
+                  onSelect={captureVideoFrame}
+                  onToggle={() => setFrameMenuPlacement(prev => prev === "hover" ? null : "hover")}
+                  placement="below"
+                />
+              )}
+
+              {sharedHoverActions.map(action => <WorkbenchActionButton key={action.id} action={action} />)}
+
+              {imageHoverActions.map(action => <WorkbenchActionButton key={action.id} action={action} />)}
+
+            </WorkbenchActionStrip>
+          </div>
+
+          {item.type === "image" && (
+            <div className="imagine-asset-quick-edit-anchor relative shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsQuickEditMenuOpen(prev => !prev)}
+                className={workbenchCardActionClassName(WORKBENCH_OPERATION_META.brush.tone)}
+                title="图片快捷编辑"
+                aria-label="图片快捷编辑"
+                aria-expanded={isQuickEditMenuOpen}
+              >
+                <Paintbrush className="h-3 w-3" />
+                <span className="text-[9px] font-bold">编辑</span>
+                <ChevronDown className={`h-3 w-3 transition ${isQuickEditMenuOpen ? "rotate-180" : ""}`} />
+              </button>
+              {isQuickEditMenuOpen && (
+                <WorkbenchPopoverMenu align="right" placement="below">
+                  {IMAGE_EDIT_OPERATION_ORDER.map(operation => {
+                    const action = imageEditOperationMeta(operation);
+                    const Icon = action.Icon;
+                    return (
+                      <WorkbenchPopoverMenuItem
+                        key={operation}
+                        onClick={() => {
+                          setIsQuickEditMenuOpen(false);
+                          onImageQuickEdit(item, operation);
+                        }}
+                        icon={<Icon className="h-3.5 w-3.5" />}
+                        iconClassName={operationToneClassName(action.tone)}
+                        title={action.title}
+                      >
+                        {action.label}
+                      </WorkbenchPopoverMenuItem>
+                    );
+                  })}
+                </WorkbenchPopoverMenu>
+              )}
+            </div>
+          )}
+
+          {assetTypeBadge}
+        </div>
+      )}
+
       <div className="imagine-asset-media relative aspect-[4/3] w-full bg-slate-950 overflow-hidden flex items-center justify-center border-b border-white/5">
         {item.status === "processing" || item.status === "pending" ? (
           <div className="imagine-generation-stage overflow-hidden">
@@ -507,87 +595,6 @@ export default function AssetCard({
               </div>
             )}
 
-            <div className="imagine-asset-hover-scrim absolute inset-0 bg-slate-950/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10 pointer-events-none" />
-            <div className="imagine-asset-topbar absolute inset-x-3 top-3 z-30 flex items-start gap-2 pointer-events-none">
-              <div className="imagine-card-actions-shell min-w-0 flex-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none group-hover:pointer-events-auto">
-                <WorkbenchActionStrip className="justify-start">
-                  {item.type === "video" && (
-                    <VideoFrameMenu
-                      buttonClassName={workbenchCardActionClassName(WORKBENCH_OPERATION_META.frame.tone)}
-                      isOpen={frameMenuPlacement === "hover"}
-                      onSelect={captureVideoFrame}
-                      onToggle={() => setFrameMenuPlacement(prev => prev === "hover" ? null : "hover")}
-                      placement="below"
-                    />
-                  )}
-
-                  {imageHoverActions.map(action => <WorkbenchActionButton key={action.id} action={action} />)}
-
-                  {item.type === "image" && (
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => setIsQuickEditMenuOpen(prev => !prev)}
-                        className={workbenchCardActionClassName(WORKBENCH_OPERATION_META.brush.tone)}
-                        title="图片快捷编辑"
-                        aria-label="图片快捷编辑"
-                        aria-expanded={isQuickEditMenuOpen}
-                      >
-                        <Paintbrush className="h-3 w-3" />
-                        <span className="text-[9px] font-bold">编辑</span>
-                        <ChevronDown className={`h-3 w-3 transition ${isQuickEditMenuOpen ? "rotate-180" : ""}`} />
-                      </button>
-                      {isQuickEditMenuOpen && (
-                        <WorkbenchPopoverMenu placement="below">
-                          {IMAGE_EDIT_OPERATION_ORDER.map(operation => {
-                            const action = imageEditOperationMeta(operation);
-                            const Icon = action.Icon;
-                            return (
-                              <WorkbenchPopoverMenuItem
-                                key={operation}
-                                onClick={() => {
-                                  setIsQuickEditMenuOpen(false);
-                                  onImageQuickEdit(item, operation);
-                                }}
-                                icon={<Icon className="h-3.5 w-3.5" />}
-                                iconClassName={operationToneClassName(action.tone)}
-                                title={action.title}
-                              >
-                                {action.label}
-                              </WorkbenchPopoverMenuItem>
-                            );
-                          })}
-                        </WorkbenchPopoverMenu>
-                      )}
-                    </div>
-                  )}
-
-                  {sharedHoverActions.map(action => <WorkbenchActionButton key={action.id} action={action} />)}
-                </WorkbenchActionStrip>
-              </div>
-
-              {item.type === "image" ? (
-                <span className="imagine-asset-type-badge flex shrink-0 items-center gap-1.5 px-2 py-1 text-[9px] font-bold tracking-wider uppercase rounded bg-blue-500/80 backdrop-blur-md text-white border border-blue-400/25">
-                  <ImageIcon className="h-3 w-3" />
-                  IMAGE
-                </span>
-              ) : item.type === "video" ? (
-                <span className="imagine-asset-type-badge flex shrink-0 items-center gap-1.5 px-2 py-1 text-[9px] font-bold tracking-wider uppercase rounded bg-purple-500/80 backdrop-blur-md text-white border border-purple-400/25">
-                  <span className="h-1.5 w-1.5 rounded-full bg-red-400 animate-ping" />
-                  VIDEO
-                </span>
-              ) : item.type === "audio" ? (
-                <span className="imagine-asset-type-badge imagine-audio-type-badge flex shrink-0 items-center gap-1.5 px-2 py-1 text-[9px] font-bold tracking-wider uppercase rounded border border-white/12 bg-slate-950/46 text-slate-100 backdrop-blur-md">
-                  <Music className="h-3 w-3" />
-                  AUDIO
-                </span>
-              ) : (
-                <span className="imagine-asset-type-badge flex shrink-0 items-center gap-1.5 px-2 py-1 text-[9px] font-bold tracking-wider uppercase rounded border border-cyan-400/20 bg-cyan-500/18 text-cyan-100 backdrop-blur-md">
-                  <FileText className="h-3 w-3" />
-                  TEXT
-                </span>
-              )}
-            </div>
           </div>
         )}
       </div>
