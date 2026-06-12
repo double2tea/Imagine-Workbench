@@ -370,13 +370,13 @@ export default function BoardToolbar({
         </div>
 
         <span
-          className={`imagine-board-save-status imagine-board-save-status--${saveMeta.tone}`}
+          className={`imagine-board-save-status imagine-board-save-status--${saveMeta.tone} hidden md:inline-flex`}
           title={saveMeta.title}
         >
           <span className="imagine-board-save-status-dot" aria-hidden />
           <span className="truncate">{saveMeta.label}</span>
         </span>
-        <span className="font-mono text-[10px] text-[var(--iw-faint)]">{nodeCount} 节点</span>
+        <span className="hidden font-mono text-[10px] text-[var(--iw-faint)] lg:inline">{nodeCount} 节点</span>
         </div>
       }
       center={
