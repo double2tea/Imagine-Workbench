@@ -214,116 +214,110 @@ export default function ImageGenerationPanel({
         </div>
       </div>
 
-      <details className="imagine-inline-disclosure">
-        <summary className="imagine-inline-disclosure-summary">
-          <span>高级参数</span>
-          <span className="font-mono text-[10px] text-[var(--iw-faint)]">反向词 · 分辨率 · 画质</span>
-        </summary>
-        <div className="imagine-inline-disclosure-panel">
-          <div>
-            <label className="mb-1.5 block imagine-section-label">反向提示词</label>
-            <input
-              type="text"
-              value={negativePrompt}
-              onChange={(event) => onNegativePromptChange(event.target.value)}
-              placeholder="不希望出现的元素，例如 blurred, text"
-              className="imagine-input py-2.5"
-            />
-          </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {imageResolutionOptions.length > 0 && (
-          <div>
-            <label className="mb-1.5 block imagine-section-label">
-              输出分辨率
-            </label>
-            {presetResolutionOptions.length > 0 && (
+      <div className="flex flex-col gap-3 border-t border-[var(--iw-border)] pt-3">
+        <div>
+          <label className="mb-1.5 block imagine-section-label">反向提示词</label>
+          <input
+            type="text"
+            value={negativePrompt}
+            onChange={(event) => onNegativePromptChange(event.target.value)}
+            placeholder="不希望出现的元素，例如 blurred, text"
+            className="imagine-input py-2.5"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {imageResolutionOptions.length > 0 && (
+            <div>
+              <label className="mb-1.5 block imagine-section-label">
+                输出分辨率
+              </label>
+              {presetResolutionOptions.length > 0 && (
+                <div className="imagine-option-group grid-cols-4">
+                  {presetResolutionOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      data-active={!isCustomImageResolution && imageResolution === option.value}
+                      onClick={() => onImageResolutionChange(option.value)}
+                      className="imagine-segment-btn"
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {supportsCustomImageSize && (
+                <div className="mt-2">
+                  <button
+                    type="button"
+                    onClick={() => onImageResolutionChange("custom")}
+                    data-active={isCustomImageResolution}
+                    className="imagine-segment-btn border border-[var(--iw-border)]"
+                  >
+                    自定义尺寸
+                  </button>
+                </div>
+              )}
+              {isCustomImageResolution && (
+                <div className="mt-2">
+                  <input
+                    type="text"
+                    value={customImageSize}
+                    onChange={(event) => onCustomImageSizeChange(event.target.value)}
+                    placeholder="例如 2560x1440，宽高需为 16 的倍数"
+                    className="imagine-input py-2.5 font-mono"
+                  />
+                  <p className="mt-1.5 font-mono text-[10px] leading-relaxed text-[var(--iw-faint)]">
+                    约束：最大边 ≤ 3840px，宽高为 16 的倍数，比例由尺寸决定且 ≤ 3:1，总像素 655,360-8,294,400。
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {capabilities.qualities.length > 0 && (
+            <div>
+              <label className="mb-1.5 block imagine-section-label">
+                画质档位
+              </label>
               <div className="imagine-option-group grid-cols-4">
-                {presetResolutionOptions.map((option) => (
+                {capabilities.qualities.map((option) => (
                   <button
                     key={option.value}
                     type="button"
-                    data-active={!isCustomImageResolution && imageResolution === option.value}
-                    onClick={() => onImageResolutionChange(option.value)}
+                    data-active={imageQuality === option.value}
+                    onClick={() => onImageQualityChange(option.value)}
                     className="imagine-segment-btn"
                   >
                     {option.label}
                   </button>
                 ))}
               </div>
-            )}
-            {supportsCustomImageSize && (
-              <div className="mt-2">
-                <button
-                  type="button"
-                  onClick={() => onImageResolutionChange("custom")}
-                  data-active={isCustomImageResolution}
-                  className="imagine-segment-btn border border-[var(--iw-border)]"
-                >
-                  自定义尺寸
-                </button>
-              </div>
-            )}
-            {isCustomImageResolution && (
-              <div className="mt-2">
-                <input
-                  type="text"
-                  value={customImageSize}
-                  onChange={(event) => onCustomImageSizeChange(event.target.value)}
-                  placeholder="例如 2560x1440，宽高需为 16 的倍数"
-                  className="imagine-input py-2.5 font-mono"
-                />
-                <p className="mt-1.5 font-mono text-[10px] leading-relaxed text-[var(--iw-faint)]">
-                  约束：最大边 ≤ 3840px，宽高为 16 的倍数，比例由尺寸决定且 ≤ 3:1，总像素 655,360-8,294,400。
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {capabilities.qualities.length > 0 && (
-          <div>
-            <label className="mb-1.5 block imagine-section-label">
-              画质档位
-            </label>
-            <div className="imagine-option-group grid-cols-4">
-              {capabilities.qualities.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  data-active={imageQuality === option.value}
-                  onClick={() => onImageQualityChange(option.value)}
-                  className="imagine-segment-btn"
-                >
-                  {option.label}
-                </button>
-              ))}
             </div>
-          </div>
-        )}
+          )}
 
-        {capabilities.thinkingLevels.length > 0 && (
-          <div>
-            <label className="mb-1.5 block imagine-section-label">图片思考等级</label>
-            <div className="imagine-option-group grid-cols-2">
-              {capabilities.thinkingLevels.map(option => (
-                <button
-                  key={option.value}
-                  type="button"
-                  data-active={imageThinkingLevel === option.value}
-                  data-tone="amber"
-                  onClick={() => onThinkingLevelChange(option.value)}
-                  className="imagine-segment-btn"
-                >
-                  {option.label}
-                </button>
-              ))}
+          {capabilities.thinkingLevels.length > 0 && (
+            <div>
+              <label className="mb-1.5 block imagine-section-label">图片思考等级</label>
+              <div className="imagine-option-group grid-cols-2">
+                {capabilities.thinkingLevels.map(option => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    data-active={imageThinkingLevel === option.value}
+                    data-tone="amber"
+                    onClick={() => onThinkingLevelChange(option.value)}
+                    className="imagine-segment-btn"
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
-
-      </div>
+          )}
         </div>
-      </details>
+      </div>
 
       <ReferenceImagePicker
         addLabel="多图垫"

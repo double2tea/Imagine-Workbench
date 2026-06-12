@@ -238,58 +238,52 @@ export default function VideoGenerationPanel({
       )}
 
       {(resolutionOptions.length > 0 || durationOptions.length > 0 || presetOptions.length > 0) && (
-        <details className="imagine-inline-disclosure">
-          <summary className="imagine-inline-disclosure-summary">
-            <span>输出参数</span>
-            <span className="font-mono text-[10px] text-[var(--iw-faint)]">分辨率 · 时长 · 预设</span>
-          </summary>
-          <div className={`imagine-inline-disclosure-panel grid grid-cols-1 gap-3 ${controlGridClass}`}>
-            {resolutionOptions.length > 0 && (
-              <div>
-                <label className="mb-1.5 block imagine-section-label">分辨率</label>
-                <select
-                  value={selectedResolution}
-                  onChange={(event) => onSelectResolution(event.target.value)}
-                  className="imagine-select py-2.5"
-                >
-                  {resolutionOptions.map(option => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+        <div className={`grid grid-cols-1 gap-3 border-t border-[var(--iw-border)] pt-3 ${controlGridClass}`}>
+          {resolutionOptions.length > 0 && (
+            <div>
+              <label className="mb-1.5 block imagine-section-label">分辨率</label>
+              <select
+                value={selectedResolution}
+                onChange={(event) => onSelectResolution(event.target.value)}
+                className="imagine-select py-2.5"
+              >
+                {resolutionOptions.map(option => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
-            {durationOptions.length > 0 && (
-              <div>
-                <label className="mb-1.5 block imagine-section-label">秒数</label>
-                <select
-                  value={selectedDuration}
-                  onChange={(event) => onSelectDuration(event.target.value)}
-                  className="imagine-select py-2.5"
-                >
-                  {durationOptions.map(option => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+          {durationOptions.length > 0 && (
+            <div>
+              <label className="mb-1.5 block imagine-section-label">秒数</label>
+              <select
+                value={selectedDuration}
+                onChange={(event) => onSelectDuration(event.target.value)}
+                className="imagine-select py-2.5"
+              >
+                {durationOptions.map(option => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
-            {presetOptions.length > 0 && (
-              <div>
-                <label className="mb-1.5 block imagine-section-label">预设</label>
-                <select
-                  value={selectedPreset}
-                  onChange={(event) => onSelectPreset(event.target.value)}
-                  className="imagine-select py-2.5"
-                >
-                  {presetOptions.map(option => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </div>
-        </details>
+          {presetOptions.length > 0 && (
+            <div>
+              <label className="mb-1.5 block imagine-section-label">预设</label>
+              <select
+                value={selectedPreset}
+                onChange={(event) => onSelectPreset(event.target.value)}
+                className="imagine-select py-2.5"
+              >
+                {presetOptions.map(option => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
       )}
 
       <ReferenceImagePicker
