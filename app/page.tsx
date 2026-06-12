@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useMemo, useState, useEffect, useRef, useSyncExternalStore } from "react";
+import React, { useCallback, useMemo, useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
 import AgentDock from "@/components/agent/AgentDock";
@@ -120,18 +120,18 @@ type NoticeType = "error" | "info" | "success";
 type MaskDestination = "creative" | "agent";
 const DESKTOP_LAYOUT_QUERY = "(min-width: 1024px)";
 
-function subscribeDesktopLayout(onStoreChange: () => void): () => void {
-  const mediaQuery = window.matchMedia(DESKTOP_LAYOUT_QUERY);
-  mediaQuery.addEventListener("change", onStoreChange);
-  return () => mediaQuery.removeEventListener("change", onStoreChange);
-}
+function useDesktopLayout(): boolean | null {
+  const [isDesktopLayout, setIsDesktopLayout] = useState<boolean | null>(null);
 
-function getDesktopLayoutSnapshot(): boolean {
-  return window.matchMedia(DESKTOP_LAYOUT_QUERY).matches;
-}
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(DESKTOP_LAYOUT_QUERY);
+    const update = () => setIsDesktopLayout(mediaQuery.matches);
+    update();
+    mediaQuery.addEventListener("change", update);
+    return () => mediaQuery.removeEventListener("change", update);
+  }, []);
 
-function getServerDesktopLayoutSnapshot(): boolean {
-  return false;
+  return isDesktopLayout;
 }
 
 function makeClientId(prefix: string): string {
@@ -221,11 +221,8 @@ function modelProviderIsAvailable(
 }
 
 export default function Home() {
-  const isDesktopLayout = useSyncExternalStore(
-    subscribeDesktopLayout,
-    getDesktopLayoutSnapshot,
-    getServerDesktopLayoutSnapshot,
-  );
+  const isDesktopLayout = useDesktopLayout();
+  const isMobileLayout = isDesktopLayout === false;
 
   // Database State
   const [items, setItems] = useState<StorageItem[]>([]);
@@ -1576,7 +1573,7 @@ export default function Home() {
       statusCounts={assetStats.statusCounts}
       typeCounts={assetStats.typeCounts}
       isCompareMode={isCompareMode}
-      initialVisibleItems={isDesktopLayout ? 48 : 18}
+      initialVisibleItems={isMobileLayout ? 18 : 48}
       onApplyVideoReference={applyAsVideoReference}
       onBatchDelete={handleGalleryBatchDelete}
       onBatchDownloadZip={handleBatchDownloadZip}
@@ -1604,7 +1601,7 @@ export default function Home() {
       onSetAssetModelFilter={setAssetModelFilter}
       onSetAssetStatusFilter={(value) => {
         setAssetStatusFilter(value);
-        if (!isDesktopLayout && value !== "all") {
+        if (isMobileLayout && value !== "all") {
           setMobileWorkbenchPanel("gallery");
         }
       }}
@@ -1615,7 +1612,7 @@ export default function Home() {
       onToggleCompare={toggleCompare}
       onToggleSelect={toggleSelectItem}
       onUseAgentReference={handleUseAgentReference}
-      visibleItemsStep={isDesktopLayout ? 48 : 18}
+      visibleItemsStep={isMobileLayout ? 18 : 48}
       formatModelLabel={formatStoredModelLabel}
       providerLabelsByKey={providerLabelsByKey}
     />
@@ -1795,7 +1792,7 @@ export default function Home() {
       >
 
         <section className="imagine-creator-panel imagine-creation-sidebar flex flex-col gap-4 min-w-0">
-          {!isDesktopLayout && (
+          {isMobileLayout && (
             <section className="imagine-mobile-workflow flex flex-col gap-3 lg:hidden">
               <MobileWorkbenchTabs
                 activePanel={mobileWorkbenchPanel}
@@ -1904,11 +1901,9 @@ export default function Home() {
           </div>
         </section>
 
-        {isDesktopLayout && (
-          <div className="hidden min-w-0 lg:block">
-            {renderAssetGalleryWorkspace()}
-          </div>
-        )}
+        <div className="hidden min-w-0 lg:block">
+          {renderAssetGalleryWorkspace()}
+        </div>
 
       </main>
 
