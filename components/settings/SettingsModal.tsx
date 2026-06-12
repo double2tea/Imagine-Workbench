@@ -57,12 +57,15 @@ interface SettingsModalProps {
   onClearAssets: () => Promise<void>;
   onDownloadSafetySnapshot: () => Promise<void>;
   onDuplicateCurrentBoard?: () => Promise<void>;
+  onDisconnectLocalFolderTarget: () => Promise<void>;
   onExportCurrentBoard?: (includeCredentials: boolean) => Promise<void>;
+  onExportWorkspaceToLocalFolder: (includeCredentials: boolean) => Promise<void>;
   onExportWorkspace: (includeCredentials: boolean) => Promise<void>;
   onImportLocalAssets: (files: File[]) => Promise<void>;
   onImportWorkspace: (file: File, includeCredentials: boolean) => Promise<void>;
   onRepairAssetSources: () => Promise<void>;
   onResetBoards: () => Promise<void>;
+  onSelectLocalFolderTarget: () => Promise<void>;
   onRunResolveCheck?: () => void;
   onAddFetchedModels: (category: ModelCategory, values: string[]) => void;
   onAddManualModels: (category: ModelCategory, value: string) => void;
@@ -116,12 +119,15 @@ export default function SettingsModal({
   onClose,
   onDownloadSafetySnapshot,
   onDuplicateCurrentBoard,
+  onDisconnectLocalFolderTarget,
   onExportCurrentBoard,
+  onExportWorkspaceToLocalFolder,
   onExportWorkspace,
   onImportLocalAssets,
   onImportWorkspace,
   onRepairAssetSources,
   onResetBoards,
+  onSelectLocalFolderTarget,
   onRunResolveCheck,
   onAddFetchedModels,
   onAddManualModels,
@@ -249,13 +255,16 @@ export default function SettingsModal({
                   onClearLocalStorage={onClearLocalStorage}
                   onDownloadSafetySnapshot={onDownloadSafetySnapshot}
                   onDuplicateCurrentBoard={onDuplicateCurrentBoard}
+                  onDisconnectLocalFolderTarget={onDisconnectLocalFolderTarget}
                   onExportCurrentBoard={onExportCurrentBoard}
+                  onExportWorkspaceToLocalFolder={onExportWorkspaceToLocalFolder}
                   onExportWorkspace={onExportWorkspace}
                   onImportLocalAssets={onImportLocalAssets}
                   onImportWorkspace={onImportWorkspace}
                   onRefreshSummary={refreshDataSummary}
                   onRepairAssetSources={onRepairAssetSources}
                   onResetBoards={onResetBoards}
+                  onSelectLocalFolderTarget={onSelectLocalFolderTarget}
                 />
               )}
             </div>

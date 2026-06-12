@@ -26,6 +26,12 @@ import type { AudioOperationMode } from "@/lib/providers/model-catalog";
 import { CUSTOM_PROVIDERS_STORAGE_KEY } from "@/lib/providers/custom-providers";
 import { collectBoardAssetIdsFromNodes } from "@/lib/assets/board-scope";
 import {
+  getLocalStorageTargetSummary,
+  writeWorkspaceBackupToLocalFolder,
+  type LocalFolderWorkspaceExportResult,
+  type LocalStorageTargetSummary,
+} from "@/lib/local-storage-targets";
+import {
   buildStorageItem,
   clearAllDB,
   deleteFromDB,
@@ -252,6 +258,7 @@ export interface WorkspaceDataSummary {
     latestSnapshot: WorkspaceSafetySnapshotSummary | null;
     origin: string;
   };
+  storageTarget: LocalStorageTargetSummary;
 }
 
 interface WorkspaceBackupAssetRecord extends Omit<StorageItem, "url"> {
@@ -292,6 +299,7 @@ export async function getWorkspaceDataSummary(items: StorageItem[] = []): Promis
   const stores = await getAssetDatabaseDiagnostics();
   const latestSnapshot = await getLatestWorkspaceSafetySnapshotSummary();
   const integrity = await buildWorkspaceIntegrityDiagnosticsWithPayloads(assetMetas, boards);
+  const storageTarget = await getLocalStorageTargetSummary();
   const largest = assetMetas
     .map(item => ({ id: item.id, label: item.prompt || item.model || item.id, bytes: estimateStorageRecordBytes(item) }))
     .sort((left, right) => right.bytes - left.bytes)
@@ -343,6 +351,7 @@ export async function getWorkspaceDataSummary(items: StorageItem[] = []): Promis
       latestSnapshot,
       origin: currentWorkspaceOrigin(),
     },
+    storageTarget,
   };
 }
 
@@ -353,6 +362,27 @@ export async function exportCompleteWorkspaceBackup(includeCredentials: boolean)
     filePrefix: "Imagine_Workbench_Backup",
     includeCredentials,
     includeSettings: true,
+  });
+}
+
+export async function exportCompleteWorkspaceBackupToLocalFolder(
+  includeCredentials: boolean,
+): Promise<LocalFolderWorkspaceExportResult> {
+  const archive = await createWorkspaceBackupArchive({
+    assets: await getAllFromDB(),
+    boards: await listBoardsFromDB(),
+    filePrefix: "Imagine_Workbench_Local_Backup",
+    includeCredentials,
+    includeSettings: true,
+  });
+  return writeWorkspaceBackupToLocalFolder({
+    assetCount: archive.assetCount,
+    blob: archive.blob,
+    boardCount: archive.boardCount,
+    exportedAt: archive.exportedAt,
+    fileName: archive.fileName,
+    includeCredentials,
+    settingsKeyCount: archive.settingsKeyCount,
   });
 }
 
