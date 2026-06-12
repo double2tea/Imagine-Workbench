@@ -3,15 +3,14 @@
 import type { LucideIcon } from "lucide-react";
 import BoardInsertIcon from "@/components/board/BoardInsertIcon";
 import { BOARD_QUICK_INSERT_IMPORT_KIND, BOARD_QUICK_INSERT_MENU_SIZE, clampFloatingMenuPosition } from "@/lib/board/interaction";
-import { BOARD_INSERT_GROUP_LABELS, boardInsertGroupLabel, isBoardInsertKind, type BoardInsertGroupLabel } from "@/lib/board/insert-catalog";
+import { BOARD_INSERT_GROUP_LABELS, boardInsertGroupLabel, isBoardInsertKind, type BoardInsertGroupLabel, type BoardInsertTone } from "@/lib/board/insert-catalog";
 import type { BoardPoint } from "@/lib/board";
 
 export interface BoardQuickInsertMenuItem {
   icon: LucideIcon;
-  iconClassName: string;
-  iconSurfaceClassName: string;
   kind: string;
   label: string;
+  tone: BoardInsertTone;
 }
 
 interface BoardQuickInsertMenuProps {
@@ -70,8 +69,8 @@ export default function BoardQuickInsertMenu({ clientX, clientY, items, position
                   data-accent="amber"
                   data-kind={item.kind}
                 >
-                  <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border ${item.iconSurfaceClassName}`}>
-                    <BoardInsertIcon kind={item.kind} icon={item.icon} iconClassName={item.iconClassName} />
+                  <span className="imagine-tone-surface flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border" data-tone={item.tone}>
+                    <BoardInsertIcon kind={item.kind} icon={item.icon} tone={item.tone} />
                   </span>
                   <span>{item.label}</span>
                 </button>

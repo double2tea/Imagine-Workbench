@@ -23,7 +23,8 @@ const AgentBoardNode = memo(function AgentBoardNode({ node, onSend, onUpdate }: 
       <button
         type="button"
         onClick={onSend}
-        className="nodrag flex h-8 items-center justify-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-500/15 text-xs font-semibold text-purple-100 transition hover:bg-purple-500/25"
+        className="imagine-tone-chip nodrag flex h-8 items-center justify-center gap-1.5 rounded-md border text-xs font-semibold transition"
+        data-tone="violet"
       >
         <AgentIdentityMark variant="inline" />
         <Send className="h-3.5 w-3.5" />

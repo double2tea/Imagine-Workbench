@@ -53,10 +53,10 @@ export default function BoardAssetCompareOverlay({ originalUrl, resultUrl, onClo
             className="absolute inset-0 z-10 h-full w-full cursor-ew-resize opacity-0"
             aria-label="对比滑块"
           />
-          <span className="pointer-events-none absolute bottom-2 left-2 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)]/90 px-2 py-1 text-[10px] font-semibold text-blue-300">
+          <span className="imagine-tone-chip pointer-events-none absolute bottom-2 left-2 rounded-md border px-2 py-1 text-[10px] font-semibold" data-tone="accent">
             参考
           </span>
-          <span className="pointer-events-none absolute bottom-2 right-2 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)]/90 px-2 py-1 text-[10px] font-semibold text-amber-300">
+          <span className="imagine-tone-chip pointer-events-none absolute bottom-2 right-2 rounded-md border px-2 py-1 text-[10px] font-semibold" data-tone="warning">
             结果
           </span>
         </div>

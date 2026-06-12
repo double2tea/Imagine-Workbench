@@ -120,9 +120,10 @@ export default function SaveVoiceProfileDialog({ item, onClose, onSave }: SaveVo
                         onClick={() => toggleTag(tag)}
                         className={`rounded-md border px-2 py-1 text-[11px] font-semibold transition ${
                           selectedTags.includes(tag)
-                            ? "border-amber-500/35 bg-amber-500/10 text-amber-700"
+                            ? "imagine-tone-chip"
                             : "border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)] hover:text-[var(--iw-text)]"
                         }`}
+                        data-tone="warning"
                       >
                         {tag}
                       </button>
@@ -133,7 +134,7 @@ export default function SaveVoiceProfileDialog({ item, onClose, onSave }: SaveVo
             </div>
           </div>
 
-          <label className="flex items-start gap-2 rounded-md border border-amber-500/20 bg-amber-500/8 p-3 text-[12px] leading-5 text-[var(--iw-text)]">
+          <label className="imagine-tone-surface flex items-start gap-2 rounded-md border p-3 text-[12px] leading-5 text-[var(--iw-text)]" data-tone="warning">
             <input
               type="checkbox"
               checked={consentAccepted}
@@ -143,7 +144,7 @@ export default function SaveVoiceProfileDialog({ item, onClose, onSave }: SaveVo
             我确认拥有该参考音频的使用权，并允许保存为可复用克隆音色源。
           </label>
 
-          {message && <p className="text-[12px] text-red-300">{message}</p>}
+          {message && <p className="imagine-tone-icon text-[12px]" data-tone="danger">{message}</p>}
         </div>
 
         <div className="flex justify-end gap-2 border-t border-[var(--iw-border)] px-4 py-3">

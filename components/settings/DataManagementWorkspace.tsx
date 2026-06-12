@@ -77,31 +77,34 @@ function healthCopy(status: WorkspaceDataSummary["integrity"]["status"] | undefi
   label: string;
   detail: string;
   className: string;
+  tone: WorkspaceDataSummary["integrity"]["status"];
 } {
   if (status === "healthy") {
     return {
       label: "健康",
       detail: "没有发现需要处理的数据问题",
-      className: "border-emerald-400/30 bg-emerald-500/10 text-emerald-100",
+      className: "imagine-tone-surface",
+      tone: "healthy",
     };
   }
   if (status === "critical") {
     return {
       label: "需修复",
       detail: "发现缺失引用或坏记录，建议先备份再处理",
-      className: "border-red-400/30 bg-red-500/10 text-red-100",
+      className: "imagine-tone-surface",
+      tone: "critical",
     };
   }
   return {
     label: "需关注",
     detail: "有可清理或可修复项目，当前数据仍可继续使用",
-    className: "border-amber-400/30 bg-amber-500/10 text-amber-100",
+    className: "imagine-tone-surface",
+    tone: "attention",
   };
 }
 
 function issueToneClassName(tone: HealthIssueGroup["tone"]): string {
-  if (tone === "critical") return "border-red-400/25 bg-red-500/10 text-red-100";
-  if (tone === "attention") return "border-amber-400/25 bg-amber-500/10 text-amber-100";
+  if (tone === "critical" || tone === "attention") return "imagine-tone-surface";
   return "border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)]";
 }
 
@@ -280,17 +283,17 @@ export default function DataManagementWorkspace({
       </div>
 
       {busyLabel ? (
-        <div className="rounded-lg border border-indigo-400/20 bg-indigo-500/10 px-3 py-2 font-mono text-[11px] text-indigo-200">
+        <div className="imagine-tone-surface rounded-lg border px-3 py-2 font-mono text-[11px]" data-tone="info">
           {busyLabel}...
         </div>
       ) : null}
       {summaryError ? (
-        <div className="rounded-lg border border-red-500/25 bg-red-950/20 px-3 py-2 text-[11px] leading-5 text-red-200">
+        <div className="imagine-tone-surface rounded-lg border px-3 py-2 text-[11px] leading-5" data-tone="danger">
           数据统计读取失败：{summaryError}
         </div>
       ) : null}
 
-      <section className={["rounded-lg border p-3", health.className].join(" ")}>
+      <section className={["imagine-data-health rounded-lg border p-3", health.className].join(" ")} data-tone={health.tone}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             {integrity?.status === "healthy" ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
@@ -333,7 +336,7 @@ export default function DataManagementWorkspace({
       <section className="rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-3">
         <div className="flex items-center justify-between gap-3">
           <p className="flex items-center gap-2 text-xs font-semibold text-[var(--iw-text)]">
-            <ListChecks className="h-3.5 w-3.5 text-emerald-300" />
+            <ListChecks className="imagine-tone-icon h-3.5 w-3.5" data-tone="success" />
             完整性诊断
           </p>
           <p className="font-mono text-[11px] text-[var(--iw-muted)]">
@@ -345,7 +348,11 @@ export default function DataManagementWorkspace({
             const expanded = expandedGroups[group.key] === true;
             const action = group.action;
             return (
-              <div key={group.key} className={["rounded-lg border px-3 py-2", issueToneClassName(group.tone)].join(" ")}>
+              <div
+                key={group.key}
+                className={["imagine-data-issue rounded-lg border px-3 py-2", issueToneClassName(group.tone)].join(" ")}
+                data-tone={group.tone}
+              >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <button
                     type="button"
@@ -379,7 +386,7 @@ export default function DataManagementWorkspace({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="flex items-center gap-2 text-xs font-semibold text-[var(--iw-text)]">
-              <Database className="h-3.5 w-3.5 text-blue-300" />
+              <Database className="imagine-tone-icon h-3.5 w-3.5" data-tone="accent" />
               存储结构
             </p>
             <p className="mt-1 text-[11px] leading-5 text-[var(--iw-muted)]">
@@ -417,7 +424,7 @@ export default function DataManagementWorkspace({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="flex items-center gap-2 text-xs font-semibold text-[var(--iw-text)]">
-              <FileArchive className="h-3.5 w-3.5 text-blue-300" />
+              <FileArchive className="imagine-tone-icon h-3.5 w-3.5" data-tone="accent" />
               备份与安全
             </p>
             <p className="mt-1 text-[11px] leading-5 text-[var(--iw-muted)]">
@@ -483,7 +490,7 @@ export default function DataManagementWorkspace({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="flex items-center gap-2 text-xs font-semibold text-[var(--iw-text)]">
-              <Wrench className="h-3.5 w-3.5 text-amber-300" />
+              <Wrench className="imagine-tone-icon h-3.5 w-3.5" data-tone="warning" />
               维护动作
             </p>
             <p className="mt-1 text-[11px] leading-5 text-[var(--iw-muted)]">
@@ -549,8 +556,8 @@ export default function DataManagementWorkspace({
         ) : null}
       </section>
 
-      <section className="rounded-lg border border-red-500/20 bg-red-950/10 p-3">
-        <p className="flex items-center gap-2 text-xs font-semibold text-red-200">
+      <section className="imagine-data-danger-zone imagine-tone-surface rounded-lg border p-3" data-tone="danger">
+        <p className="flex items-center gap-2 text-xs font-semibold">
           <Shield className="h-3.5 w-3.5" />
           危险区
         </p>

@@ -133,7 +133,7 @@ function ImportMediaButton({ className = "" }: { className?: string }) {
       onClick={() => openImport()}
       className={`imagine-secondary-action flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-[var(--iw-border)] text-[11px] font-semibold text-[var(--iw-text)] ${className}`}
     >
-      <Upload className="h-3.5 w-3.5 text-emerald-300" />
+      <Upload className="imagine-tone-icon h-3.5 w-3.5" data-tone="success" />
       从本机导入图片/视频/音频
     </button>
   );

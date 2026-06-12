@@ -347,7 +347,7 @@ export default function BoardToolbar({
             className={`${headerBtn} hidden shrink-0 lg:flex`}
             title="导入图片、视频或音频到画布"
           >
-            <Upload className="h-3.5 w-3.5 text-emerald-300" />
+            <Upload className="imagine-tone-icon h-3.5 w-3.5" data-tone="success" />
             <span>导入媒体</span>
           </button>
 

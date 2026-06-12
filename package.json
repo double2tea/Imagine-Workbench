@@ -13,6 +13,8 @@
     "lint:eslint": "eslint .",
     "typecheck": "tsc --noEmit",
     "check": "pnpm run lint && pnpm run typecheck",
+    "check:light-contrast": "node scripts/check-light-contrast.mjs",
+    "check:theme-colors": "node scripts/check-light-contrast.mjs",
     "test:e2e:audio": "node scripts/e2e-audio-workflow.mjs",
     "pages:build": "node scripts/build-cloudflare-pages.mjs",
     "pages:preview": "pnpm run pages:build && pnpm dlx wrangler pages dev .vercel/output/static",

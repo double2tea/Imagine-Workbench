@@ -29,10 +29,10 @@ const mediaTypeLabels: Record<GenerationTask["mediaType"], string> = {
 };
 
 function mediaIcon(task: GenerationTask) {
-  if (task.mediaType === "image") return <ImageIcon className={`${iconClassName} text-blue-300`} />;
-  if (task.mediaType === "video") return <Video className={`${iconClassName} text-violet-300`} />;
-  if (task.mediaType === "audio") return <Music className={`${iconClassName} text-cyan-300`} />;
-  return <FileText className={`${iconClassName} text-teal-300`} />;
+  if (task.mediaType === "image") return <ImageIcon className={`imagine-tone-icon ${iconClassName}`} data-tone="accent" />;
+  if (task.mediaType === "video") return <Video className={`imagine-tone-icon ${iconClassName}`} data-tone="violet" />;
+  if (task.mediaType === "audio") return <Music className={`imagine-tone-icon ${iconClassName}`} data-tone="info" />;
+  return <FileText className={`imagine-tone-icon ${iconClassName}`} data-tone="teal" />;
 }
 
 function taskTitle(task: GenerationTask, sourceNode: BoardNode | undefined): string {
@@ -108,7 +108,7 @@ function TaskRow({
       </div>
 
       {task.errorMessage ? (
-        <p className="mt-2 line-clamp-2 rounded-md border border-red-400/20 bg-red-500/10 px-2 py-1 text-[10px] leading-4 text-red-200">
+        <p className="imagine-tone-surface mt-2 line-clamp-2 rounded-md border px-2 py-1 text-[10px] leading-4" data-tone="danger">
           {task.errorMessage}
         </p>
       ) : null}

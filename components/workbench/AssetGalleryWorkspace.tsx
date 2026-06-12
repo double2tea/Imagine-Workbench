@@ -363,7 +363,7 @@ export default function AssetGalleryWorkspace({
                     limit: Math.min(visibleItemLimit + visibleItemsStep, filteredItems.length),
                   })
                 }
-                className="mx-auto mb-2 rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-xs font-semibold text-slate-300 transition hover:border-blue-400/45 hover:text-blue-100"
+                className="imagine-secondary-action mx-auto mb-2 rounded-lg border px-4 py-2 text-xs font-semibold transition"
               >
                 加载更多 {Math.min(visibleItemLimit, filteredItems.length)} / {filteredItems.length}
               </button>

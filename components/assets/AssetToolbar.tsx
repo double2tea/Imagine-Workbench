@@ -145,7 +145,7 @@ export default function AssetToolbar({
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1">
               {inFlightCount > 0 && (
-                <span className="font-mono text-[10px] text-indigo-300">{inFlightCount} 项进行中</span>
+                <span className="imagine-tone-icon font-mono text-[10px]" data-tone="info">{inFlightCount} 项进行中</span>
               )}
               <span className="imagine-meta-chip font-mono text-[10px]">{itemsCount} 项</span>
             </div>
@@ -192,7 +192,7 @@ export default function AssetToolbar({
         <button
           type="button"
           onClick={() => deleteItemsByStatus(["failed", "pending"])}
-          className="imagine-danger-action h-9 shrink-0 rounded-lg border border-red-500/20 bg-red-950/20 px-3 text-[10px] font-semibold text-red-300 transition-colors duration-150 hover:bg-red-950/35"
+          className="imagine-danger-action h-9 shrink-0 rounded-lg px-3 text-[10px] font-semibold transition-colors duration-150"
         >
           清失败
         </button>

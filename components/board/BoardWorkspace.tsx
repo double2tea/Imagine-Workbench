@@ -596,8 +596,7 @@ const BOARD_QUICK_INSERT_IMPORT_ITEM: BoardQuickInsertMenuItem = {
   kind: BOARD_QUICK_INSERT_IMPORT_KIND,
   label: "导入媒体",
   icon: Upload,
-  iconClassName: "text-emerald-300",
-  iconSurfaceClassName: "bg-emerald-500/10 border-emerald-400/20",
+  tone: "success",
 };
 
 function portKindFromHandle(handleId: string | null | undefined): BoardPortKind | null {

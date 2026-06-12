@@ -20,9 +20,9 @@ export default function MediaReferenceThumbnail({
       {type === "image" || (type === "video" && isImagePreviewUrl) ? (
         <PreviewImage src={reference.url} alt={alt} draggable={false} className="board-media-preview h-full w-full select-none object-cover" />
       ) : type === "video" ? (
-        <Video className="h-4 w-4 text-violet-200" />
+        <Video className="h-4 w-4 text-[var(--iw-tone-violet-text)]" />
       ) : (
-        <Music className="h-4 w-4 text-cyan-200" />
+        <Music className="h-4 w-4 text-[var(--iw-tone-info-text)]" />
       )}
       {type === "video" ? (
         <span className="absolute left-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded bg-black/65 text-violet-100 shadow-sm">

@@ -93,13 +93,8 @@ export default function WorkspaceNotices({ notices, onDismiss }: WorkspaceNotice
             exit={{ opacity: 0, y: -8, scale: 0.98 }}
             onMouseEnter={() => pauseDismiss(notice.id)}
             onMouseLeave={() => resumeDismiss(notice.id)}
-            className={`flex items-start gap-3 rounded-lg border px-3 py-2.5 shadow-2xl backdrop-blur-xl ${
-              notice.type === "error"
-                ? "border-red-500/30 bg-red-950/80 text-red-100"
-                : notice.type === "success"
-                  ? "border-emerald-500/30 bg-emerald-950/80 text-emerald-100"
-                  : "border-blue-500/30 bg-blue-950/80 text-blue-100"
-            }`}
+            className="imagine-tone-surface flex items-start gap-3 rounded-lg border px-3 py-2.5 shadow-2xl backdrop-blur-xl"
+            data-tone={notice.type === "error" ? "danger" : notice.type}
           >
             <Info className="mt-0.5 h-4 w-4 shrink-0 opacity-80" />
             <p className="min-w-0 flex-1 text-xs leading-5">{notice.message}</p>

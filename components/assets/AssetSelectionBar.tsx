@@ -44,7 +44,7 @@ export default function AssetSelectionBar({
               <button
                 type="button"
                 onClick={onDelete}
-                className="rounded-lg border border-red-500/20 bg-red-950/20 px-3 py-2 text-xs font-bold text-red-300 transition hover:bg-red-950/35"
+                className="imagine-danger-action rounded-lg px-3 py-2 text-xs font-bold transition"
               >
                 批量删除
               </button>

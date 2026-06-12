@@ -45,7 +45,7 @@ export function ProviderCredentialCard({
     <div className="imagine-settings-card">
       <div className="mb-3 flex items-center justify-between">
         <h4 className="imagine-settings-card-title">{title}</h4>
-        {apiKey ? <span className="text-[10px] font-semibold text-emerald-400">Key 已保存</span> : null}
+        {apiKey ? <span className="imagine-tone-icon text-[10px] font-semibold" data-tone="success">Key 已保存</span> : null}
       </div>
       <label className="imagine-settings-label">API Key</label>
       <input
@@ -78,13 +78,14 @@ export function ProviderCredentialCard({
         </div>
       ) : null}
       {registerUrl ? (
-        <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2">
+        <div className="imagine-tone-surface mt-3 flex items-center justify-between gap-2 rounded-lg border px-3 py-2" data-tone="warning">
           <span className="imagine-settings-hint">需要填入令牌后使用</span>
           <a
             href={registerUrl}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex h-7 items-center rounded-lg border border-amber-400/25 bg-amber-500/15 px-2.5 text-[10px] font-semibold text-amber-300 transition hover:bg-amber-500/20 hover:text-amber-200"
+            className="imagine-tone-chip inline-flex h-7 items-center rounded-lg border px-2.5 text-[10px] font-semibold transition"
+            data-tone="warning"
           >
             前往获取令牌
           </a>
@@ -103,16 +104,15 @@ export function ProviderCredentialCard({
         <button
           type="button"
           onClick={() => onClear(provider)}
-          className="h-8 rounded-lg border border-red-500/20 bg-red-950/20 px-3 text-[10px] font-semibold text-red-300 transition hover:bg-red-950/35"
+          className="imagine-danger-action h-8 rounded-lg px-3 text-[10px] font-semibold transition"
         >
           {clearLabel}
         </button>
       </div>
       {providerTest.provider === provider && providerTest.message ? (
         <p
-          className={`mt-2 font-mono text-[10px] ${
-            providerTest.status === "error" ? "text-red-300" : "text-emerald-300"
-          }`}
+          className="imagine-tone-icon mt-2 font-mono text-[10px]"
+          data-tone={providerTest.status === "error" ? "danger" : "success"}
         >
           {providerTest.message}
         </p>

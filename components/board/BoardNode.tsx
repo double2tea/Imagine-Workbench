@@ -58,18 +58,18 @@ interface BoardHandleProps {
 
 function nodeIcon(node: BoardNodeModel) {
   if (node.kind === "asset" || node.kind === "result") {
-    if (node.asset.type === "image") return <ImagePlus className="h-3.5 w-3.5 text-blue-500" />;
-    if (node.asset.type === "video") return <Video className="h-3.5 w-3.5 text-violet-500" />;
-    return <Music className="h-3.5 w-3.5 text-cyan-500" />;
+    if (node.asset.type === "image") return <ImagePlus className="imagine-tone-icon h-3.5 w-3.5" data-tone="accent" />;
+    if (node.asset.type === "video") return <Video className="imagine-tone-icon h-3.5 w-3.5" data-tone="violet" />;
+    return <Music className="imagine-tone-icon h-3.5 w-3.5" data-tone="info" />;
   }
-  if (node.kind === "image-generate") return <ImagePlus className="h-3.5 w-3.5 text-blue-300" />;
-  if (node.kind === "video-generate") return <Video className="h-3.5 w-3.5 text-violet-300" />;
-  if (node.kind === "audio-operation") return <AudioLines className="h-3.5 w-3.5 text-cyan-300" />;
-  if (node.kind === "runninghub-app") return <Workflow className="h-3.5 w-3.5 text-emerald-300" />;
+  if (node.kind === "image-generate") return <ImagePlus className="imagine-tone-icon h-3.5 w-3.5" data-tone="accent" />;
+  if (node.kind === "video-generate") return <Video className="imagine-tone-icon h-3.5 w-3.5" data-tone="violet" />;
+  if (node.kind === "audio-operation") return <AudioLines className="imagine-tone-icon h-3.5 w-3.5" data-tone="info" />;
+  if (node.kind === "runninghub-app") return <Workflow className="imagine-tone-icon h-3.5 w-3.5" data-tone="success" />;
   if (node.kind === "agent") return <AgentIdentityMark variant="inline" />;
-  if (node.kind === "reference-group") return <Layers className="h-3.5 w-3.5 text-cyan-300" />;
-  if (node.kind === "group") return <Layers className="h-3.5 w-3.5 text-emerald-300" />;
-  if (node.kind === "multi-grid") return <LayoutGrid className="h-3.5 w-3.5 text-emerald-300" />;
+  if (node.kind === "reference-group") return <Layers className="imagine-tone-icon h-3.5 w-3.5" data-tone="info" />;
+  if (node.kind === "group") return <Layers className="imagine-tone-icon h-3.5 w-3.5" data-tone="success" />;
+  if (node.kind === "multi-grid") return <LayoutGrid className="imagine-tone-icon h-3.5 w-3.5" data-tone="success" />;
   return null;
 }
 
@@ -219,7 +219,7 @@ function GenerateReferenceShelf({
         );
       })}
       {references.length > 6 ? (
-        <span className="flex h-9 items-center rounded-md border border-white/10 px-2 text-[10px] font-semibold text-blue-100">
+        <span className="imagine-tone-chip flex h-9 items-center rounded-md border px-2 text-[10px] font-semibold" data-tone="accent">
           +{references.length - 6}
         </span>
       ) : null}

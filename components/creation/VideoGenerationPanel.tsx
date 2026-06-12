@@ -281,7 +281,7 @@ export default function VideoGenerationPanel({
       <ReferenceImagePicker
         acceptedMediaTypes={capabilities.referenceMediaTypes}
         addLabel="添加参考"
-        browseClassName="font-medium text-violet-300 underline-offset-4 hover:text-violet-200 hover:underline cursor-pointer"
+        browseClassName="cursor-pointer font-medium text-[var(--iw-tone-violet-text)] underline-offset-4 hover:text-[var(--iw-tone-violet-text)] hover:underline"
         clearLabel={clearReferenceLabel}
         emptyHelp={`支持 ${acceptedReferenceText} | 最多 ${referenceLimit} 个 | ${referenceHelp}`}
         emptyLabel={`添加${referenceLabel}`}

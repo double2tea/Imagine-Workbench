@@ -142,10 +142,11 @@ export default function BoardNodeContextMenu({ actions, clientX, clientY, node }
               onClick={action.onSelect}
               className={`board-node-context-action imagine-header-button flex !h-9 w-full items-center !justify-start gap-2 !rounded-md border border-transparent px-2.5 text-left text-xs font-semibold transition ${
                 action.tone === "danger"
-                  ? "text-red-300 hover:border-red-400/30 hover:bg-red-500/10"
+                  ? "imagine-tone-link hover:border-[var(--iw-tone-danger-border)]"
                   : "text-[var(--iw-text)] hover:border-[var(--iw-border)] hover:bg-[var(--iw-panel-soft)]"
               }`}
               data-group={group}
+              data-tone={action.tone === "danger" ? "danger" : undefined}
             >
               <Icon className="h-3.5 w-3.5 shrink-0 text-[var(--iw-muted)]" />
               {action.label}

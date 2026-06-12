@@ -15,13 +15,6 @@ interface PromptComposerToolbarActionsProps {
   onOptimize: () => void;
 }
 
-const accentTextClass: Record<PromptTemplatePickerAccent, string> = {
-  amber: "text-amber-300 hover:text-amber-200",
-  blue: "text-blue-300 hover:text-blue-200",
-  teal: "text-teal-300 hover:text-teal-200",
-  violet: "text-violet-300 hover:text-violet-200",
-};
-
 const PromptComposerToolbarActions = forwardRef<PromptTemplatePickerHandle, PromptComposerToolbarActionsProps>(
   function PromptComposerToolbarActions(
     {
@@ -51,8 +44,9 @@ const PromptComposerToolbarActions = forwardRef<PromptTemplatePickerHandle, Prom
           className={`imagine-motion-interactive flex h-7 items-center gap-1 rounded-md px-2.5 text-[11px] font-semibold transition ${
             optimizeDisabled
               ? "cursor-not-allowed text-[var(--iw-faint)]"
-              : `cursor-pointer text-[var(--iw-muted)] hover:bg-[var(--iw-panel-soft)] ${accentTextClass[accent]}`
+              : "imagine-tone-link cursor-pointer text-[var(--iw-muted)] hover:bg-[var(--iw-panel-soft)]"
           }`}
+          data-tone={accent}
         >
           {isOptimizing ? (
             <RefreshCw className="h-3 w-3 animate-spin" />

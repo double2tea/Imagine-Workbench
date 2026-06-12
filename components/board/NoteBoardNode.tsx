@@ -34,7 +34,7 @@ const NoteBoardNode = memo(function NoteBoardNode({ node, onChange }: NoteBoardN
       }}
       onPointerDown={event => event.stopPropagation()}
     >
-      {didCopy ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+      {didCopy ? <Check className="imagine-tone-icon h-3.5 w-3.5" data-tone="success" /> : <Copy className="h-3.5 w-3.5" />}
     </button>
   );
 
@@ -44,7 +44,7 @@ const NoteBoardNode = memo(function NoteBoardNode({ node, onChange }: NoteBoardN
         <div className="shrink-0 border-b border-[var(--iw-border)] px-3 py-2">
           <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2 text-xs font-semibold text-[var(--iw-text)]">
-              <FileText className="h-3.5 w-3.5 shrink-0 text-cyan-400" />
+              <FileText className="imagine-tone-icon h-3.5 w-3.5 shrink-0" data-tone="info" />
               <span className="truncate">转写结果</span>
             </div>
             {copyButton}

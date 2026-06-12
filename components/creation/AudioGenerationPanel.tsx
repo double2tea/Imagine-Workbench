@@ -460,7 +460,8 @@ export default function AudioGenerationPanel({
                 <button
                   type="button"
                   onClick={openNewVoiceProfileEditor}
-                  className="flex h-7 items-center gap-1 rounded-md border border-amber-500/25 bg-amber-500/10 px-2 text-[10px] font-semibold text-amber-700 transition hover:bg-amber-500/15"
+                  className="imagine-tone-chip flex h-7 items-center gap-1 rounded-md border px-2 text-[10px] font-semibold transition"
+                  data-tone="warning"
                 >
                   保存
                 </button>
@@ -470,7 +471,8 @@ export default function AudioGenerationPanel({
                   <button
                     type="button"
                     onClick={() => openEditVoiceProfileEditor(selectedVoiceProfile)}
-                    className="flex h-7 items-center gap-1 rounded-md border border-amber-500/25 bg-amber-500/10 px-2 text-[10px] font-semibold text-amber-700 transition hover:bg-amber-500/15"
+                    className="imagine-tone-chip flex h-7 items-center gap-1 rounded-md border px-2 text-[10px] font-semibold transition"
+                    data-tone="warning"
                   >
                     <Pencil className="h-3 w-3" />
                     编辑
@@ -478,7 +480,8 @@ export default function AudioGenerationPanel({
                   <button
                     type="button"
                     onClick={() => void handleDeleteVoiceProfile()}
-                    className="flex h-7 items-center gap-1 rounded-md border border-red-400/30 bg-red-500/8 px-2 text-[10px] font-semibold text-red-600 transition hover:bg-red-500/12"
+                    className="imagine-tone-chip flex h-7 items-center gap-1 rounded-md border px-2 text-[10px] font-semibold transition"
+                    data-tone="danger"
                   >
                     <Trash2 className="h-3 w-3" />
                     删除
@@ -550,9 +553,10 @@ export default function AudioGenerationPanel({
                             onClick={() => toggleVoiceProfileTag(tag)}
                             className={`rounded-md border px-2 py-1 text-[10px] font-semibold transition ${
                               voiceProfileTags.includes(tag)
-                                ? "border-amber-500/35 bg-amber-500/10 text-amber-700"
+                                ? "imagine-tone-chip"
                                 : "border-[var(--iw-border)] bg-[var(--iw-panel)] text-[var(--iw-muted)] hover:text-[var(--iw-text)]"
                             }`}
+                            data-tone="warning"
                           >
                             {tag}
                           </button>

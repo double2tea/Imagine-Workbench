@@ -68,8 +68,8 @@ const inputClass = "nodrag nowheel h-8 min-w-0 rounded-md border border-[var(--i
 const labelClass = "text-[10px] font-medium text-[var(--iw-faint)]";
 const softPanelClass = "min-h-0 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)]";
 const chipClass = "imagine-generate-context-chip inline-flex h-6 min-w-0 items-center gap-1 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)] px-2 text-[10px] text-[var(--iw-muted)]";
-const iconButtonClass = "nodrag flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)] text-[var(--iw-muted)] transition hover:border-emerald-400/50 hover:text-emerald-100";
-const warningChipToneClass = "border-amber-400/20 bg-amber-500/10 text-amber-100";
+const iconButtonClass = "nodrag flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)] text-[var(--iw-muted)] transition hover:border-[var(--iw-tone-success-border)] hover:text-[var(--iw-tone-success-text)]";
+const warningChipToneClass = "imagine-tone-chip";
 
 const sourceOptions: Array<{ value: BoardRunningHubBindingSource; label: string }> = [
   { value: "prompt", label: "Prompt" },
@@ -427,7 +427,8 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
             type="button"
             onClick={() => void fetchAppSchema()}
             disabled={isFetchingSchema || node.targetType !== "ai-app"}
-            className="nodrag flex h-8 items-center gap-1.5 rounded-md border border-emerald-400/45 bg-emerald-500/10 px-3 text-[10px] font-semibold text-[var(--iw-text)] transition hover:bg-emerald-500/20 disabled:border-[var(--iw-border)] disabled:text-[var(--iw-faint)]"
+            className="imagine-tone-chip nodrag flex h-8 items-center gap-1.5 rounded-md border px-3 text-[10px] font-semibold transition disabled:border-[var(--iw-border)] disabled:bg-[var(--iw-panel-soft)] disabled:text-[var(--iw-faint)]"
+            data-tone="success"
             title="从 RunningHub 官方调用示例读取 nodeInfoList"
           >
             {isFetchingSchema ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ClipboardList className="h-3.5 w-3.5" />}
@@ -524,7 +525,7 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
             {focusResultNode ? (
               <button
                 type="button"
-                className={`${chipClass} nodrag cursor-pointer transition hover:border-emerald-400/40 hover:bg-emerald-500/15`}
+                className={`${chipClass} nodrag cursor-pointer transition hover:border-[var(--iw-tone-success-border)] hover:bg-[var(--iw-tone-success-bg)]`}
                 data-tone={resultTone}
                 onClick={(event) => {
                   event.stopPropagation();
@@ -565,7 +566,7 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
           )}
 
           {(importError || node.errorMessage) && (
-            <p className="line-clamp-3 rounded-md border border-red-400/30 bg-red-500/10 px-2 py-1 text-[10px] leading-4 text-red-200">
+            <p className="imagine-tone-surface line-clamp-3 rounded-md border px-2 py-1 text-[10px] leading-4" data-tone="danger">
               {importError ?? node.errorMessage}
             </p>
           )}
@@ -601,7 +602,7 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
                             className="nodrag nowheel h-7 min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1 text-[11px] font-semibold text-[var(--iw-text)] outline-none focus:border-emerald-400/40"
                             placeholder={bindingTitle(binding)}
                           />
-                          {binding.required && <span className="imagine-required-chip shrink-0 rounded border border-amber-400/25 bg-amber-500/10 px-1 text-[9px] text-amber-100">必填</span>}
+                          {binding.required && <span className="imagine-required-chip imagine-tone-chip shrink-0 rounded border px-1 text-[9px]" data-tone="warning">必填</span>}
                         </div>
                       </div>
                       <select

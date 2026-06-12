@@ -44,7 +44,7 @@ export function FeatureModelSettingsWorkspace({
     <div className="flex flex-col gap-3">
       <section className="imagine-settings-section">
         <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-amber-400" />
+          <Sparkles className="imagine-tone-icon h-4 w-4" data-tone="warning" />
           <div className="imagine-settings-section-title">图片快捷编辑默认模型</div>
         </div>
         <p className="mt-1 text-[10px] leading-relaxed text-[var(--iw-faint)]">

@@ -315,7 +315,7 @@ export default function ImageGenerationPanel({
 
       <ReferenceImagePicker
         addLabel="多图垫"
-        browseClassName="font-medium text-blue-300 underline-offset-4 hover:text-blue-200 hover:underline cursor-pointer"
+        browseClassName="cursor-pointer font-medium text-[var(--iw-tone-accent-text)] underline-offset-4 hover:text-[var(--iw-tone-accent-text)] hover:underline"
         clearLabel="清空所有垫图"
         emptyHelp={imageReferenceHelp}
         emptyLabel={imageReferenceLimit > 0 ? "添加图片" : "当前模型不支持参考图"}

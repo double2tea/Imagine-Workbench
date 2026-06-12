@@ -25,13 +25,6 @@ export interface PromptTemplatePickerHandle {
   open: (search?: string) => void;
 }
 
-const accentClass: Record<PromptTemplatePickerAccent, string> = {
-  amber: "border-amber-400/25 bg-amber-500/12 text-amber-200 hover:bg-amber-500/18",
-  blue: "border-blue-400/25 bg-blue-500/12 text-blue-200 hover:bg-blue-500/18",
-  teal: "border-teal-400/25 bg-teal-500/12 text-teal-200 hover:bg-teal-500/18",
-  violet: "border-violet-400/25 bg-violet-500/12 text-violet-200 hover:bg-violet-500/18",
-};
-
 const toolbarClass =
   "imagine-motion-interactive flex h-7 items-center gap-1 rounded-md border border-transparent bg-transparent px-2.5 text-[11px] font-semibold text-[var(--iw-muted)] transition hover:bg-[var(--iw-panel-soft)] hover:text-[var(--iw-text)]";
 
@@ -152,7 +145,8 @@ const PromptTemplatePicker = forwardRef<PromptTemplatePickerHandle, PromptTempla
               type="button"
               onClick={() => setCategoryId("all")}
               data-active={categoryId === "all"}
-              className="imagine-motion-interactive h-7 shrink-0 rounded-md border border-transparent px-2.5 text-[11px] font-semibold text-[var(--iw-muted)] hover:bg-[var(--iw-panel-soft)] data-[active=true]:border-blue-400/25 data-[active=true]:bg-blue-500/12 data-[active=true]:text-blue-500"
+              className="imagine-motion-interactive h-7 shrink-0 rounded-md border border-transparent px-2.5 text-[11px] font-semibold text-[var(--iw-muted)] hover:bg-[var(--iw-panel-soft)] data-[active=true]:border-[var(--iw-tone-accent-border)] data-[active=true]:bg-[var(--iw-tone-accent-bg)] data-[active=true]:text-[var(--iw-tone-accent-text)]"
+              data-tone="accent"
             >
               全部
             </button>
@@ -162,7 +156,8 @@ const PromptTemplatePicker = forwardRef<PromptTemplatePickerHandle, PromptTempla
                 type="button"
                 onClick={() => setCategoryId(category.id)}
                 data-active={categoryId === category.id}
-                className="imagine-motion-interactive h-7 shrink-0 rounded-md border border-transparent px-2.5 text-[11px] font-semibold text-[var(--iw-muted)] hover:bg-[var(--iw-panel-soft)] data-[active=true]:border-blue-400/25 data-[active=true]:bg-blue-500/12 data-[active=true]:text-blue-500"
+                className="imagine-motion-interactive h-7 shrink-0 rounded-md border border-transparent px-2.5 text-[11px] font-semibold text-[var(--iw-muted)] hover:bg-[var(--iw-panel-soft)] data-[active=true]:border-[var(--iw-tone-accent-border)] data-[active=true]:bg-[var(--iw-tone-accent-bg)] data-[active=true]:text-[var(--iw-tone-accent-text)]"
+                data-tone="accent"
               >
                 {category.label}
               </button>
@@ -177,7 +172,7 @@ const PromptTemplatePicker = forwardRef<PromptTemplatePickerHandle, PromptTempla
                   type="button"
                   onClick={() => setSelectedId(template.id)}
                   data-active={selectedTemplate?.id === template.id}
-                  className="imagine-motion-interactive w-full rounded-md px-2 py-1.5 text-left hover:bg-[var(--iw-panel)] data-[active=true]:bg-blue-500/12"
+                  className="imagine-motion-interactive w-full rounded-md px-2 py-1.5 text-left hover:bg-[var(--iw-panel)] data-[active=true]:bg-[var(--iw-tone-accent-bg)]"
                 >
                   <span className="block truncate text-[11px] font-semibold text-[var(--iw-text)]">{template.title}</span>
                   <span className="mt-0.5 block truncate text-[9px] text-[var(--iw-muted)]">{template.scene}</span>
@@ -253,8 +248,9 @@ const PromptTemplatePicker = forwardRef<PromptTemplatePickerHandle, PromptTempla
         className={
           triggerVariant === "toolbar"
             ? toolbarClass
-            : `imagine-secondary-action flex h-7 items-center gap-1 rounded-md border px-2.5 text-[11px] font-semibold transition ${accentClass[accent]}`
+            : "imagine-tone-chip flex h-7 items-center gap-1 rounded-md border px-2.5 text-[11px] font-semibold transition"
         }
+        data-tone={accent}
       >
         <BookOpenText className="h-3 w-3" />
         <span>{compact ? "模板" : "提示词模板"}</span>

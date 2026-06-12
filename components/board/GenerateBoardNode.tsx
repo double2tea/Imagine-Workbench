@@ -82,12 +82,7 @@ function statusText(node: GenerateNode): string {
 }
 
 function contextToneClass(tone: GenerateContextTone): string {
-  if (tone === "prompt") return "border-teal-400/20 bg-teal-500/10 text-teal-100";
-  if (tone === "reference") return "border-blue-400/20 bg-blue-500/10 text-blue-100";
-  if (tone === "result") return "border-emerald-400/20 bg-emerald-500/10 text-emerald-100";
-  if (tone === "processing") return "border-sky-400/20 bg-sky-500/10 text-sky-100";
-  if (tone === "ok") return "border-emerald-400/20 bg-emerald-500/10 text-emerald-100";
-  if (tone === "failed") return "border-red-400/25 bg-red-500/10 text-red-200";
+  if (tone !== "neutral") return "imagine-tone-chip";
   return "border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)]";
 }
 
@@ -314,7 +309,7 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
               key={item.key}
               type="button"
               data-tone={item.tone}
-              className={`${className} nodrag cursor-pointer transition hover:border-emerald-400/40 hover:bg-emerald-500/15`}
+              className={`${className} nodrag cursor-pointer transition hover:border-[var(--iw-tone-success-border)] hover:bg-[var(--iw-tone-success-bg)]`}
               title={item.tooltip}
               onClick={(event) => {
                 event.stopPropagation();
@@ -358,8 +353,9 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
       )}
       <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
         <span
-          className={`imagine-status-chip truncate text-[10px] font-mono ${node.status === "failed" ? "text-red-300" : "text-[var(--iw-muted)]"}`}
+          className={`imagine-status-chip truncate text-[10px] font-mono ${node.status === "failed" ? "imagine-tone-icon" : "text-[var(--iw-muted)]"}`}
           data-status={node.status}
+          data-tone="danger"
           title={node.errorMessage ?? statusLabel}
         >
           {node.errorMessage ?? compactStatusLabel}
@@ -386,7 +382,8 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
           <button
             type="button"
             onClick={onCancel}
-            className="imagine-generate-run-action nodrag flex h-8 items-center justify-center gap-1.5 rounded-md border border-red-400/25 bg-red-500/10 px-3 text-xs font-semibold text-red-300 transition hover:bg-red-500/15"
+            className="imagine-generate-run-action imagine-tone-chip nodrag flex h-8 items-center justify-center gap-1.5 rounded-md border px-3 text-xs font-semibold transition"
+            data-tone="danger"
             title="取消关联生成任务"
           >
             <Loader2 className="h-3.5 w-3.5 animate-spin" />

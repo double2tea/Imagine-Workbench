@@ -289,7 +289,7 @@ export function ConnectionSettingsWorkspace({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="imagine-settings-section-title flex items-center gap-2">
-                <Plug className="h-3.5 w-3.5 text-emerald-300" />
+                <Plug className="imagine-tone-icon h-3.5 w-3.5" data-tone="success" />
                 本地 DaVinci Resolve
               </div>
               <p className="mt-1 text-[10px] leading-relaxed text-[var(--iw-faint)]">
@@ -365,16 +365,16 @@ export function ConnectionSettingsWorkspace({
                     <span className="flex shrink-0 items-center gap-1.5">
                       <span className="imagine-settings-provider-count">{sectionCount}</span>
                       {hasKey ? (
-                        <span className="text-[9px] font-semibold text-emerald-400">Key</span>
+                        <span className="imagine-tone-icon text-[9px] font-semibold" data-tone="success">Key</span>
                       ) : null}
                       {testForProvider && providerTest.status === "testing" ? (
-                        <RefreshCw className="h-3.5 w-3.5 animate-spin text-amber-400" />
+                        <RefreshCw className="imagine-tone-icon h-3.5 w-3.5 animate-spin" data-tone="warning" />
                       ) : null}
                       {testForProvider && providerTest.status === "success" ? (
-                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                        <CheckCircle2 className="imagine-tone-icon h-3.5 w-3.5" data-tone="success" />
                       ) : null}
                       {testForProvider && providerTest.status === "error" ? (
-                        <XCircle className="h-3.5 w-3.5 text-red-400" />
+                        <XCircle className="imagine-tone-icon h-3.5 w-3.5" data-tone="danger" />
                       ) : null}
                     </span>
                   </button>
@@ -410,7 +410,7 @@ export function ConnectionSettingsWorkspace({
               <button
                 type="button"
                 onClick={() => void confirmDeleteCustomProvider()}
-                className="imagine-settings-toolbar-btn h-7 text-red-300"
+                className="imagine-danger-action h-7"
               >
                 <Trash2 className="h-3 w-3" />
                 删除
@@ -491,7 +491,7 @@ export function ConnectionSettingsWorkspace({
                           <span className="imagine-settings-list-label">{option.label}</span>
                           <span className="imagine-settings-list-value">{option.value}</span>
                         </span>
-                        {isSelectedAgent ? <Check className="h-4 w-4 shrink-0 text-amber-300" /> : null}
+                        {isSelectedAgent ? <Check className="imagine-tone-icon h-4 w-4 shrink-0" data-tone="warning" /> : null}
                       </button>
                     );
                   })
@@ -529,7 +529,7 @@ export function ConnectionSettingsWorkspace({
                           <span className="imagine-settings-list-label">{option.label}</span>
                           <span className="imagine-settings-list-value">{option.value}</span>
                         </span>
-                        {selected ? <Check className="h-4 w-4 shrink-0 text-amber-300" /> : null}
+                        {selected ? <Check className="imagine-tone-icon h-4 w-4 shrink-0" data-tone="warning" /> : null}
                       </button>
                     );
                   })}

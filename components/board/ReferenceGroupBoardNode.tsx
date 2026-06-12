@@ -104,7 +104,7 @@ const ReferenceGroupBoardNode = memo(function ReferenceGroupBoardNode({
                   event.stopPropagation();
                   onRemove(reference.assetId);
                 }}
-                className="nodrag flex h-5 w-5 items-center justify-center rounded text-[var(--iw-muted)] transition hover:bg-red-500/10 hover:text-red-300"
+                className="nodrag flex h-5 w-5 items-center justify-center rounded text-[var(--iw-muted)] transition hover:bg-[var(--iw-tone-danger-bg)] hover:text-[var(--iw-tone-danger-text)]"
                 title="移除"
               >
                 <X className="h-3 w-3" />

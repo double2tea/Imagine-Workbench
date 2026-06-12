@@ -72,7 +72,7 @@ export function AgentModelSelect({
       ))}
     </select>
     {hint ? (
-      <span className="text-[10px] leading-snug text-indigo-300/90">{hint}</span>
+      <span className="imagine-tone-icon text-[10px] leading-snug" data-tone="violet">{hint}</span>
     ) : null}
     </div>
   );

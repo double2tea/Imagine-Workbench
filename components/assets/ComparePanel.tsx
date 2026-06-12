@@ -28,11 +28,8 @@ function CompareFrame({ item, tone }: { item: StorageItem; tone: "blue" | "amber
       <div>
         <div className="mb-2 flex items-center justify-between gap-2">
           <span
-            className={`rounded border px-2 py-0.5 font-mono text-[10px] font-bold ${
-              isBlue
-                ? "border-blue-500/25 bg-blue-500/10 text-blue-300"
-                : "border-amber-500/25 bg-amber-500/10 text-amber-400"
-            }`}
+            className="imagine-tone-chip rounded border px-2 py-0.5 font-mono text-[10px] font-bold"
+            data-tone={tone}
           >
             {isBlue ? "A" : "B"} · {item.id.substring(0, 8)}
           </span>
@@ -51,7 +48,7 @@ function CompareFrame({ item, tone }: { item: StorageItem; tone: "blue" | "amber
             </div>
           ) : (
             <div className="flex h-full w-full flex-col gap-2 p-3">
-              <FileText className="h-4 w-4 shrink-0 text-cyan-300" />
+              <FileText className="imagine-tone-icon h-4 w-4 shrink-0" data-tone="info" />
               <p className="line-clamp-6 whitespace-pre-wrap text-xs leading-5 text-[var(--iw-muted)]">
                 {transcriptFromDataUrl(item.url) || "无转写文本"}
               </p>
@@ -146,7 +143,7 @@ export default function ComparePanel({
               className="pointer-events-none absolute inset-0 h-full w-full object-cover"
             />
             <div className="pointer-events-none absolute bottom-3 left-3 z-20 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)]/90 px-2.5 py-1 text-[10px] text-[var(--iw-muted)] backdrop-blur-md">
-              <span className="font-semibold text-blue-400">A</span>
+              <span className="imagine-tone-icon font-semibold" data-tone="accent">A</span>
               <span className="ml-1 font-mono text-[9px]">{first.id.substring(0, 8)}</span>
             </div>
 

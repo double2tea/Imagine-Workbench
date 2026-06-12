@@ -139,7 +139,7 @@ export default function ReferenceImagePicker({
           <button
             type="button"
             onClick={onClear}
-            className="text-[10px] text-red-300 transition hover:text-red-200 cursor-pointer"
+            className="cursor-pointer text-[10px] text-[var(--iw-tone-danger-text)] transition hover:text-[var(--iw-tone-danger-text)]"
           >
             {clearLabel}
           </button>
@@ -187,7 +187,7 @@ export default function ReferenceImagePicker({
                 {mediaType === "video" && <video src={reference.url} muted className="h-full w-full object-cover" />}
                 {mediaType === "audio" && (
                   <div className="flex h-full w-full items-center justify-center bg-black/30">
-                    <Music className="h-5 w-5 text-violet-100" />
+                    <Music className="h-5 w-5 text-[var(--iw-tone-violet-text)]" />
                   </div>
                 )}
                 {/* intentional image-overlay for contrast on arbitrary generated thumbs; black + white + role colors (emerald/amber/red) ensure legibility independent of theme vars (see design + pr1 review) */}

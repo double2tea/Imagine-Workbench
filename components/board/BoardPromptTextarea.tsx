@@ -102,7 +102,7 @@ function createReferenceChip(part: Extract<PromptEditorPart, { kind: "reference"
     chip.append(video);
   } else {
     const audioMark = document.createElement("span");
-    audioMark.className = "text-[10px] font-semibold uppercase tracking-wide text-cyan-100";
+    audioMark.className = "text-[10px] font-semibold uppercase tracking-wide text-[var(--iw-tone-info-text)]";
     audioMark.textContent = "AUD";
     chip.append(audioMark);
   }

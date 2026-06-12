@@ -23,11 +23,11 @@ function statusTone(status: GenerationTaskStatus): BoardStatusTone {
 }
 
 export function BoardStatusIcon({ status }: { status: GenerationTaskStatus }) {
-  if (status === "processing") return <Loader2 className={`${iconClassName} animate-spin text-sky-300`} />;
-  if (status === "pending") return <Clock3 className={`${iconClassName} text-amber-300`} />;
-  if (status === "failed") return <AlertTriangle className={`${iconClassName} text-red-300`} />;
+  if (status === "processing") return <Loader2 className={`imagine-tone-icon ${iconClassName} animate-spin`} data-tone="processing" />;
+  if (status === "pending") return <Clock3 className={`imagine-tone-icon ${iconClassName}`} data-tone="pending" />;
+  if (status === "failed") return <AlertTriangle className={`imagine-tone-icon ${iconClassName}`} data-tone="failed" />;
   if (status === "canceled") return <XCircle className={`${iconClassName} text-[var(--iw-faint)]`} />;
-  return <CheckCircle2 className={`${iconClassName} text-emerald-300`} />;
+  return <CheckCircle2 className={`imagine-tone-icon ${iconClassName}`} data-tone="complete" />;
 }
 
 export function BoardStatusBadge({

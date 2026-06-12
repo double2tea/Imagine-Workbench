@@ -41,19 +41,15 @@ export default function PromptComposerSurface({
 }: PromptComposerSurfaceProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const referenceThumbnails = resolvePromptReferenceThumbnails(prompt, references, acceptedMediaTypes);
-  const iconClassName = {
-    amber: "border-amber-500/20 bg-amber-500/10 text-amber-500",
-    blue: "border-blue-500/20 bg-blue-500/10 text-blue-300",
-    teal: "border-teal-500/20 bg-teal-500/10 text-teal-300",
-    violet: "border-violet-500/20 bg-violet-500/10 text-violet-300",
-  }[headerAccent];
-
   return (
     <div>
       {headerVariant === "toolbar" ? (
         <div className="mb-2 flex min-h-10 items-center justify-between gap-2 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5">
           <label className="flex min-w-0 items-center gap-2">
-            <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border ${iconClassName}`}>
+            <span
+              className="imagine-tone-surface flex h-7 w-7 shrink-0 items-center justify-center rounded-md border"
+              data-tone={headerAccent}
+            >
               {icon}
             </span>
             <span className="truncate text-xs font-semibold text-[var(--iw-text)]">{label}</span>

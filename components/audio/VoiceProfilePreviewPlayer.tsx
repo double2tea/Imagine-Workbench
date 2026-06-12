@@ -80,7 +80,8 @@ export default function VoiceProfilePreviewPlayer({ className = "", src }: Voice
         type="button"
         onClick={() => void togglePlayback()}
         disabled={hasError}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-amber-500/25 bg-amber-500/10 text-amber-700 transition hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:border-[var(--iw-border)] disabled:bg-[var(--iw-panel-soft)] disabled:text-[var(--iw-faint)]"
+        className="imagine-tone-chip flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition disabled:cursor-not-allowed disabled:border-[var(--iw-border)] disabled:bg-[var(--iw-panel-soft)] disabled:text-[var(--iw-faint)]"
+        data-tone="warning"
         aria-label={isPlaying ? "暂停音色预览" : "播放音色预览"}
         title={isPlaying ? "暂停" : "播放"}
       >

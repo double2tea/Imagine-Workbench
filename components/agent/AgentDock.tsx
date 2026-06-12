@@ -153,25 +153,27 @@ const TOOL_LABELS: Record<string, string> = {
   get_connected_context: "读取连接",
 };
 
-const SKILL_LABELS: Record<string, { label: string; className: string }> = {
-  Screenwriter: { label: "剧本写作", className: "bg-orange-500/12 text-orange-300 border-orange-500/20" },
-  ScriptAnalyzer: { label: "剧本分析", className: "bg-cyan-500/12 text-cyan-300 border-cyan-500/20" },
-  ShotBreakdownPlanner: { label: "分镜拆解", className: "bg-purple-500/12 text-purple-300 border-purple-500/20" },
-  StoryboardBoardComposer: { label: "分镜画板", className: "bg-fuchsia-500/12 text-fuchsia-300 border-fuchsia-500/20" },
-  BatchGenerationPlanner: { label: "批量规划", className: "bg-emerald-500/12 text-emerald-300 border-emerald-500/20" },
-  PromptEngineer: { label: "提示词工程", className: "bg-teal-500/12 text-teal-300 border-teal-500/20" },
-  PromptTemplateLibrarian: { label: "模板库", className: "bg-lime-500/12 text-lime-300 border-lime-500/20" },
-  BoardContextRetriever: { label: "画板上下文", className: "bg-blue-500/12 text-blue-300 border-blue-500/20" },
-  BoardComposer: { label: "画板编排", className: "bg-fuchsia-500/12 text-fuchsia-300 border-fuchsia-500/20" },
-  ImageGenerator: { label: "智能生图", className: "bg-rose-500/12 text-rose-300 border-rose-500/20" },
-  VideoGenerator: { label: "视频合成", className: "bg-purple-500/12 text-purple-300 border-purple-500/20" },
-  ImageEditor: { label: "局部重绘", className: "bg-amber-500/12 text-amber-300 border-amber-500/20" },
-  CreativePlanner: { label: "创意规划", className: "bg-indigo-500/12 text-indigo-300 border-indigo-500/20" },
-  SessionHistoryRetriever: { label: "历史回退", className: "bg-sky-500/12 text-sky-300 border-sky-500/20" },
-  VariationSuggester: { label: "变体推荐", className: "bg-emerald-500/12 text-emerald-300 border-emerald-500/20" },
-  AsyncTaskManager: { label: "后台跟踪", className: "bg-cyan-500/12 text-cyan-300 border-cyan-500/20" },
-  ProjectSummarizer: { label: "资产汇总", className: "bg-violet-500/12 text-violet-300 border-violet-500/20" },
-  ExportManager: { label: "批量导出", className: "bg-red-500/12 text-red-300 border-red-500/20" },
+type AgentSkillTone = "accent" | "cyan" | "danger" | "fuchsia" | "lime" | "orange" | "success" | "teal" | "violet" | "warning";
+
+const SKILL_LABELS: Record<string, { label: string; tone: AgentSkillTone }> = {
+  Screenwriter: { label: "剧本写作", tone: "orange" },
+  ScriptAnalyzer: { label: "剧本分析", tone: "cyan" },
+  ShotBreakdownPlanner: { label: "分镜拆解", tone: "violet" },
+  StoryboardBoardComposer: { label: "分镜画板", tone: "fuchsia" },
+  BatchGenerationPlanner: { label: "批量规划", tone: "success" },
+  PromptEngineer: { label: "提示词工程", tone: "teal" },
+  PromptTemplateLibrarian: { label: "模板库", tone: "lime" },
+  BoardContextRetriever: { label: "画板上下文", tone: "accent" },
+  BoardComposer: { label: "画板编排", tone: "fuchsia" },
+  ImageGenerator: { label: "智能生图", tone: "danger" },
+  VideoGenerator: { label: "视频合成", tone: "violet" },
+  ImageEditor: { label: "局部重绘", tone: "warning" },
+  CreativePlanner: { label: "创意规划", tone: "violet" },
+  SessionHistoryRetriever: { label: "历史回退", tone: "accent" },
+  VariationSuggester: { label: "变体推荐", tone: "success" },
+  AsyncTaskManager: { label: "后台跟踪", tone: "cyan" },
+  ProjectSummarizer: { label: "资产汇总", tone: "violet" },
+  ExportManager: { label: "批量导出", tone: "danger" },
 };
 
 const AGENT_ORB_POSITION_STORAGE_KEY = "imagine_agent_orb_position";
@@ -260,8 +262,8 @@ function renderAgentReferencePreview(type: MediaReferenceType, url: string): Rea
     return <video src={url} className="h-full w-full object-cover" muted playsInline preload="metadata" />;
   }
   return (
-    <div className="flex h-full w-full items-center justify-center bg-[var(--iw-panel-soft)] text-indigo-200">
-      <FileAudio className="h-5 w-5" />
+    <div className="flex h-full w-full items-center justify-center bg-[var(--iw-panel-soft)]">
+      <FileAudio className="imagine-tone-icon h-5 w-5" data-tone="violet" />
     </div>
   );
 }
@@ -282,7 +284,7 @@ function renderAgentContent(content: string): ReactNode {
 
         return (
           <div key={`${line.kind}-${index}`} className="grid grid-cols-[auto_1fr] gap-2 leading-relaxed">
-            <span className="mt-0.5 flex h-5 min-w-5 items-center justify-center rounded-md border border-blue-400/18 bg-blue-500/10 px-1.5 text-[10px] font-semibold text-blue-300">
+            <span className="imagine-tone-chip mt-0.5 flex h-5 min-w-5 items-center justify-center rounded-md border px-1.5 text-[10px] font-semibold" data-tone="accent">
               {line.marker ?? "•"}
             </span>
             <span>{renderInlineEmphasis(line.text)}</span>
@@ -325,8 +327,8 @@ function AgentMessage({
   return (
     <div className={`flex flex-col gap-1.5 ${message.role === "user" ? "self-end ml-10" : "self-start mr-10"}`}>
       <span className={`imagine-agent-role-label ${
-        message.role === "user" ? "text-right text-[var(--iw-faint)]" : "text-left text-indigo-300"
-      }`}>
+        message.role === "user" ? "text-right text-[var(--iw-faint)]" : "imagine-tone-icon text-left"
+      }`} data-tone={message.role === "assistant" ? "violet" : undefined}>
         {message.role === "user" ? "你" : "Agent"}
       </span>
 
@@ -335,13 +337,14 @@ function AgentMessage({
           {message.activeSkills.map((skillName) => {
             const info = SKILL_LABELS[skillName] ?? {
               label: skillName,
-              className: "bg-blue-500/10 text-blue-400 border-blue-500/15",
+              tone: "accent" satisfies AgentSkillTone,
             };
 
             return (
               <span
                 key={skillName}
-                className={`text-[10px] px-2 py-0.5 rounded-md border font-sans font-medium flex items-center gap-1 transition-transform duration-200 select-none ${info.className}`}
+                className="imagine-tone-chip flex items-center gap-1 rounded-md border px-2 py-0.5 font-sans text-[10px] font-medium transition-transform duration-200 select-none"
+                data-tone={info.tone}
                 title={`Activated Domain Skill: ${skillName}`}
               >
                 {info.label}
@@ -396,8 +399,8 @@ function AgentMessage({
 
           <div className="imagine-agent-action-panel-body">
             <p>
-              <strong className="text-blue-400">操作:</strong>{" "}
-              <code className="bg-black/30 px-1 py-0.5 rounded text-[10px] font-mono text-blue-300">
+              <strong className="imagine-tone-icon" data-tone="accent">操作:</strong>{" "}
+              <code className="imagine-tone-chip rounded px-1 py-0.5 font-mono text-[10px]" data-tone="accent">
                 {ACTION_LABELS[executableAction.type]}
               </code>
             </p>
@@ -442,7 +445,7 @@ function AgentMessage({
             )}
 
             {message.interactiveState === "completed" && (
-              <span className="text-[10px] text-emerald-400 font-medium flex items-center gap-1.5 px-2 py-1 bg-emerald-950/20 border border-emerald-900/40 rounded-lg">
+              <span className="imagine-tone-chip flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[10px] font-medium" data-tone="success">
                 <Check className="h-3 w-3" />
                 创意流程已触发并加载完毕
               </span>
@@ -464,8 +467,8 @@ function AgentMessage({
                 />
               </div>
               <div className="flex items-center justify-between text-[10px] mt-1.5 font-mono">
-                <span className="text-blue-400">自动模式: {countdownSeconds} 秒后执行</span>
-                <button onClick={onCancelCountdown} className="text-red-400 hover:text-red-300 underline cursor-pointer">
+                <span className="imagine-tone-icon" data-tone="accent">自动模式: {countdownSeconds} 秒后执行</span>
+                <button onClick={onCancelCountdown} className="imagine-tone-link cursor-pointer underline" data-tone="danger">
                   取消自动
                 </button>
               </div>
@@ -840,9 +843,9 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
 
               {isLoading && (
                 <div className="flex max-w-[90%] flex-col gap-1.5 self-start">
-                  <span className="imagine-agent-role-label text-indigo-300">Agent</span>
+                  <span className="imagine-agent-role-label imagine-tone-icon" data-tone="violet">Agent</span>
                   <div className="imagine-agent-loading px-4 py-3 text-xs text-[var(--iw-muted)] flex items-center gap-2">
-                    <RefreshCw className="h-3.5 w-3.5 animate-spin text-indigo-400" />
+                    <RefreshCw className="imagine-tone-icon h-3.5 w-3.5 animate-spin" data-tone="violet" />
                     <span>正在分析画廊与技能，整理下一步建议...</span>
                   </div>
                 </div>
@@ -862,7 +865,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
                 {renderAgentReferencePreview(visibleAgentReferenceType, visibleAgentReference.url)}
               </div>
               <div className="flex flex-col min-w-0">
-                <span className="text-[10px] font-bold text-indigo-300">
+                <span className="imagine-tone-icon text-[10px] font-bold" data-tone="violet">
                   {mediaReferenceLabel(visibleAgentReferenceType)}引用
                 </span>
                 <span className="max-w-[150px] truncate font-mono text-[9px] text-[var(--iw-faint)]">
@@ -876,7 +879,8 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
                 <button
                   type="button"
                   onClick={onMaskReference}
-                  className="px-2 py-1 bg-blue-600/30 hover:bg-blue-600 border border-blue-500/30 text-blue-200 hover:text-white rounded-lg text-[10px] font-bold transition flex items-center gap-1 cursor-pointer"
+                  className="imagine-tone-chip flex cursor-pointer items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-bold transition"
+                  data-tone="accent"
                   title="使用画笔抹除或标记局部涂层"
                 >
                   <Paintbrush className="h-3 w-3" />
@@ -911,7 +915,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
               />
             </div>
             {agentReferenceHint ? (
-              <span className="text-[10px] leading-snug text-indigo-300/90">{agentReferenceHint}</span>
+              <span className="imagine-tone-icon text-[10px] leading-snug" data-tone="violet">{agentReferenceHint}</span>
             ) : null}
           </div>
         ) : null}

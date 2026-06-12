@@ -32,7 +32,7 @@ export default function VideoFrameMenu({
   surface = "floating",
   variant = "compact",
 }: VideoFrameMenuProps) {
-  const iconClassName = surface === "panel" ? "text-[var(--iw-accent)]" : "text-cyan-200";
+  const iconClassName = surface === "panel" ? "text-[var(--iw-accent)]" : "text-[var(--iw-tone-info-text)]";
 
   return (
     <div className="relative">

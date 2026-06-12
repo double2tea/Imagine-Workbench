@@ -95,7 +95,7 @@ export default function BoardMediaNodeShell({
             )}
             <div className="absolute inset-0 flex items-center justify-center p-3">
               <div className="board-media-processing-pill imagine-motion-panel-reveal flex max-w-[calc(100%-24px)] items-center gap-2 rounded-full border border-white/15 bg-black/32 px-3 py-1.5 text-[11px] font-semibold text-white/90 shadow-lg backdrop-blur-md">
-                {isProcessing ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" /> : <X className="h-3.5 w-3.5 shrink-0 text-rose-200" />}
+                {isProcessing ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" /> : <X className="h-3.5 w-3.5 shrink-0 text-[var(--iw-tone-danger-text)]" />}
                 <span className="truncate">{statusTitle}</span>
               </div>
             </div>

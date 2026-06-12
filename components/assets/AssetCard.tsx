@@ -111,7 +111,7 @@ function processingTitle(item: StorageItem): string {
 
 function AudioProcessingWaveform() {
   return (
-    <div className="mt-3 flex h-12 w-full max-w-44 items-center gap-1.5 rounded-lg border border-cyan-400/10 bg-cyan-500/8 px-3">
+    <div className="mt-3 flex h-12 w-full max-w-44 items-center gap-1.5 rounded-lg border border-[var(--iw-tone-info-border)] bg-[var(--iw-tone-info-bg)] px-3">
       {Array.from({ length: 18 }).map((_, index) => (
         <span
           key={index}
@@ -436,7 +436,7 @@ export default function AssetCard({
           <div className="imagine-generation-stage overflow-hidden">
             <span className="imagine-generation-stage-glow" aria-hidden />
             <div className="imagine-generation-stage-icon">
-              <RefreshCw className="h-4 w-4 text-indigo-300 animate-spin" />
+              <RefreshCw className="h-4 w-4 animate-spin text-[var(--iw-tone-violet-text)]" />
             </div>
             <p className="imagine-generation-stage-title">
               {item.status === "pending" ? "任务已排队" : processingTitle(item)}
@@ -458,8 +458,8 @@ export default function AssetCard({
             </button>
           </div>
         ) : item.status === "failed" ? (
-          <div className="imagine-asset-failed-stage select-none text-red-300">
-            <X className="mb-2 h-6 w-6 shrink-0 text-red-400/70" />
+          <div className="imagine-asset-failed-stage select-none text-[var(--iw-tone-danger-text)]">
+            <X className="mb-2 h-6 w-6 shrink-0 text-[var(--iw-tone-danger-text)]" />
             <p className="text-xs font-semibold leading-5 text-[var(--iw-text)]">{failedTitle}</p>
             <p className="mt-1 line-clamp-2 max-w-full break-words text-[10px] leading-4 text-[var(--iw-muted)]">
               {item.errorMessage ?? "请核查 API Key 或重构参数。"}
@@ -514,7 +514,7 @@ export default function AssetCard({
                 onClick={() => onOpenFullscreen(item)}
                 className="flex h-full w-full cursor-pointer flex-col items-start justify-start gap-3 p-4 text-left"
               >
-                <FileText className="h-5 w-5 shrink-0 text-cyan-200" />
+                <FileText className="h-5 w-5 shrink-0 text-[var(--iw-tone-info-text)]" />
                 <p className="line-clamp-6 whitespace-pre-wrap text-xs leading-5 text-slate-200">
                   {transcriptText || "无转写文本"}
                 </p>
@@ -547,24 +547,24 @@ export default function AssetCard({
 
                 <div className="grid grid-cols-2 gap-1.5 p-2">
                   <button type="button" onClick={() => runMobileAction(() => onToggleSelect(item.id))}>
-                    {selected ? <CheckSquare className="h-3.5 w-3.5 text-blue-300" /> : <Square className="h-3.5 w-3.5 text-slate-300" />}
+                    {selected ? <CheckSquare className="imagine-tone-icon h-3.5 w-3.5" data-tone="accent" /> : <Square className="h-3.5 w-3.5 text-slate-300" />}
                     {selected ? "取消选择" : "选择"}
                   </button>
                   {item.type === "image" && (
                     <button type="button" onClick={() => runMobileAction(() => onApplyVideoReference(item))}>
-                      <VideoIcon className="h-3.5 w-3.5 text-purple-300" />
+                      <VideoIcon className="imagine-tone-icon h-3.5 w-3.5" data-tone="violet" />
                       生视频
                     </button>
                   )}
                   {item.type === "image" && (
                     <button type="button" onClick={() => runMobileAction(() => onUseAgentReference(item))}>
-                      <Sparkles className="h-3.5 w-3.5 text-blue-300" />
+                      <Sparkles className="imagine-tone-icon h-3.5 w-3.5" data-tone="accent" />
                       Agent
                     </button>
                   )}
                   {item.type === "image" && (
                     <button type="button" onClick={() => runMobileAction(() => onOpenPanorama(item))}>
-                      <Compass className="h-3.5 w-3.5 text-cyan-300" />
+                      <Compass className="imagine-tone-icon h-3.5 w-3.5" data-tone="info" />
                       全景
                     </button>
                   )}
@@ -579,16 +579,16 @@ export default function AssetCard({
                     );
                   })}
                   <button type="button" onClick={() => runMobileAction(() => onDownload(item))}>
-                    <Download className="h-3.5 w-3.5 text-emerald-300" />
+                    <Download className="imagine-tone-icon h-3.5 w-3.5" data-tone="success" />
                     下载
                   </button>
                   <button type="button" onClick={() => runMobileAction(() => onReuseTask(item))}>
-                    <SlidersHorizontal className="h-3.5 w-3.5 text-cyan-300" />
+                    <SlidersHorizontal className="imagine-tone-icon h-3.5 w-3.5" data-tone="info" />
                     复用
                   </button>
                   {item.type !== "transcript" && (
                     <button type="button" onClick={() => runMobileAction(() => onToggleCompare(item.id))}>
-                      <RefreshCw className="h-3.5 w-3.5 text-blue-300" />
+                      <RefreshCw className="imagine-tone-icon h-3.5 w-3.5" data-tone="accent" />
                       {inCompare ? "取消对比" : "对比"}
                     </button>
                   )}
@@ -597,7 +597,7 @@ export default function AssetCard({
                     放大
                   </button>
                   <button type="button" onClick={() => runMobileAction(() => onDelete(item))}>
-                    <Trash2 className="h-3.5 w-3.5 text-red-300" />
+                    <Trash2 className="imagine-tone-icon h-3.5 w-3.5" data-tone="danger" />
                     删除
                   </button>
                 </div>
@@ -653,7 +653,7 @@ export default function AssetCard({
             <span className="imagine-meta-chip rounded bg-white/5 px-1.5 py-0.5">📐 {formatDisplayedAspectRatio(item)}</span>
             <span className="imagine-meta-chip imagine-status-chip rounded bg-white/5 px-1.5 py-0.5">{item.status}</span>
             {item.errorMessage && (
-              <span className="max-w-[160px] truncate rounded bg-red-500/10 px-2 py-0.5 text-[10px] text-red-300" title={item.errorMessage}>
+              <span className="imagine-tone-chip max-w-[160px] truncate rounded px-2 py-0.5 text-[10px]" data-tone="danger" title={item.errorMessage}>
                 last error: {item.errorMessage}
               </span>
             )}

@@ -72,8 +72,8 @@ interface SortDrag {
 
 const cellToolButtonClassName = "flex h-6 w-6 items-center justify-center rounded border border-white/10 bg-black/20 text-white/75 shadow-sm backdrop-blur-md transition hover:border-emerald-300/50 hover:bg-black/45 hover:text-white";
 const destructiveCellToolButtonClassName = "flex h-6 w-6 items-center justify-center rounded border border-white/10 bg-black/20 text-red-100/75 shadow-sm backdrop-blur-md transition hover:border-red-200/70 hover:bg-red-500/55 hover:text-white";
-const toolbarButtonClassName = "inline-flex h-8 items-center gap-1.5 rounded-md border border-[var(--iw-border)] px-2 text-[11px] font-semibold text-[var(--iw-muted)] transition hover:border-emerald-400/50 hover:text-emerald-200 disabled:cursor-not-allowed disabled:opacity-40";
-const activeToolbarButtonClassName = "border-emerald-400/60 bg-emerald-400/10 text-emerald-100";
+const toolbarButtonClassName = "inline-flex h-8 items-center gap-1.5 rounded-md border border-[var(--iw-border)] px-2 text-[11px] font-semibold text-[var(--iw-muted)] transition hover:border-[var(--iw-tone-success-border)] hover:text-[var(--iw-tone-success-text)] disabled:cursor-not-allowed disabled:opacity-40";
+const activeToolbarButtonClassName = "imagine-tone-chip";
 const collapsedMultiGridNodeSize: BoardSize = { width: 360, height: 120 };
 const zoomStep = 0.1;
 
@@ -364,6 +364,7 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
             setIsEditingLayout(current => !current);
           }}
           className={`${toolbarButtonClassName} ml-auto ${isEditingLayout ? activeToolbarButtonClassName : ""}`}
+          data-tone="success"
           title="编辑排序"
           aria-label="编辑排序"
         >
@@ -510,7 +511,7 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
                     );
                   })()
                 ) : (
-                  <span className="flex h-full w-full flex-col items-center justify-center gap-1 text-[var(--iw-muted)]/65 transition group-hover/cell:text-emerald-200">
+                  <span className="flex h-full w-full flex-col items-center justify-center gap-1 text-[var(--iw-muted)]/65 transition group-hover/cell:text-[var(--iw-tone-success-text)]">
                     <Plus className="h-5 w-5" />
                     <span className="text-[10px] font-semibold">拖入图片</span>
                   </span>
@@ -614,7 +615,7 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
                 selectedItemId: firstStashedItem.assetId,
               });
             }}
-            className="ml-auto h-6 rounded-md border border-[var(--iw-border)] px-2 text-[10px] font-semibold text-[var(--iw-muted)] transition hover:border-emerald-400/50 hover:text-emerald-200"
+            className="ml-auto h-6 rounded-md border border-[var(--iw-border)] px-2 text-[10px] font-semibold text-[var(--iw-muted)] transition hover:border-[var(--iw-tone-success-border)] hover:text-[var(--iw-tone-success-text)]"
             title="恢复一张暂存图片到空格"
           >
             暂存 {stashedItems.length}
