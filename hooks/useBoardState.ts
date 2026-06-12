@@ -1195,13 +1195,15 @@ function createReferenceGroupBoardNode(
   nodes: BoardNode[],
 ): BoardReferenceGroupNode {
   const createdAt = nowIso();
+  const size = input.size ?? DEFAULT_REFERENCE_GROUP_NODE_SIZE;
+  const preferredPosition = input.position ?? moveDefaultPosition(nodes);
   return {
     id: createBoardId("ref_group"),
     kind: "reference-group",
     title: input.title ?? "Reference Group",
     references: input.references ?? [],
-    position: input.position ?? moveDefaultPosition(nodes),
-    size: input.size ?? DEFAULT_REFERENCE_GROUP_NODE_SIZE,
+    position: findAvailableBoardNodePosition(boardNodesWithAbsolutePositions(nodes), preferredPosition, size),
+    size,
     createdAt,
     updatedAt: createdAt,
   };

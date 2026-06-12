@@ -2225,10 +2225,11 @@ export default function BoardWorkspace({
       onConnectionError("请选择图片资产节点");
       return;
     }
+    const contextPosition = boardNodeAbsolutePosition(board.nodes, contextNode.id) ?? contextNode.position;
     addReferenceGroupNodeWithAssets({
       position: {
-        x: contextNode.position.x + contextNode.size.width + 72,
-        y: contextNode.position.y,
+        x: contextPosition.x + contextNode.size.width + 72,
+        y: contextPosition.y,
       },
     }, assetNodeIds);
     closeOverlayMenus();
