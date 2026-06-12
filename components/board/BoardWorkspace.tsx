@@ -101,7 +101,11 @@ import {
   type CreateAssetNodeInput,
 } from "@/lib/board";
 import { BoardNodeCallbacksContext, type BoardNodeCallbacks } from "@/lib/board/callbacks";
-import { BOARD_PORT_IDS, isValidBoardConnection as isValidBoardPortConnection } from "@/lib/board/ports";
+import {
+  BOARD_PORT_IDS,
+  getBoardNodePortDefinitions,
+  isValidBoardConnection as isValidBoardPortConnection,
+} from "@/lib/board/ports";
 import { BOARD_INSERT_CATALOG, type BoardInsertKind } from "@/lib/board/insert-catalog";
 import { findResultNodeForSource } from "@/lib/board/utils";
 import { findAvailableBoardNodePosition } from "@/lib/board/placement";
@@ -1406,6 +1410,16 @@ export default function BoardWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boardGraphContentKey]);
 
+  const resultSourceNodes = useMemo(() => {
+    const sourceIds = new Set<string>();
+    for (const edge of board.edges) {
+      if (edge.from.portId === BOARD_PORT_IDS.resultOut) {
+        sourceIds.add(edge.from.nodeId);
+      }
+    }
+    return sourceIds;
+  }, [board.edges]);
+
   const referenceFlowDataByNodeId = useMemo(() => {
     const dataById = new Map<string, BoardReferenceFlowData>();
     for (const node of board.nodes) {
@@ -1441,6 +1455,7 @@ export default function BoardWorkspace({
     const dataById = new Map<string, BoardMediaFlowData>();
     for (const node of board.nodes) {
       const connectedResultNode = node.kind === "result" ? node : resultNodeBySourceId.get(node.id);
+      const hasResultConnection = Boolean(connectedResultNode) || resultSourceNodes.has(node.id);
       const data: BoardMediaFlowData = {};
       if (node.kind === "asset") {
         data.assetStackItems = storageItemStackForAssetId(node.asset.assetId, galleryItemById);
@@ -1452,15 +1467,23 @@ export default function BoardWorkspace({
       }
       if (connectedResultNode) {
         data.connectedResultNodeId = connectedResultNode.id;
-        data.hasResultConnection = true;
         data.resultItems = storageItemsForAssetIds(connectedResultNode.resultAssetIds, galleryItemById);
       }
+      if (hasResultConnection) data.hasResultConnection = true;
       if (Object.keys(data).length > 0) dataById.set(node.id, data);
     }
     return dataById;
     // board.nodes/edges read inside; graph content + gallery item fingerprints gate result/media display data
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [boardGraphContentKey, boardPromptReferenceGraphIndex, galleryReferenceFingerprint, galleryTaskFingerprint, galleryItemById, resultNodeBySourceId]);
+  }, [
+    boardGraphContentKey,
+    boardPromptReferenceGraphIndex,
+    galleryReferenceFingerprint,
+    galleryTaskFingerprint,
+    galleryItemById,
+    resultNodeBySourceId,
+    resultSourceNodes,
+  ]);
 
   const flowNodeDataById = useMemo(() => {
     const dataById = new Map<string, BoardFlowNode["data"]>();
@@ -1700,11 +1723,42 @@ export default function BoardWorkspace({
     [themeMode],
   );
   const flowEdges = useMemo<BoardFlowEdge[]>(
-    () =>
-      board.edges.map(edge => {
+    () => {
+      const nodePortIdsById = new Map<string, Set<string>>();
+      for (const node of board.nodes) {
+        const hasResultConnection = resultSourceNodes.has(node.id);
+        nodePortIdsById.set(
+          node.id,
+          new Set(getBoardNodePortDefinitions(node, { hasResultConnection }).map(port => port.id)),
+        );
+      }
+      const result: BoardFlowEdge[] = [];
+      for (const edge of board.edges) {
         const sourceNode = boardPromptReferenceGraphIndex.nodeById.get(edge.from.nodeId);
+        const targetNode = boardPromptReferenceGraphIndex.nodeById.get(edge.to.nodeId);
+        const sourcePortIds = nodePortIdsById.get(edge.from.nodeId);
+        const targetPortIds = nodePortIdsById.get(edge.to.nodeId);
+        const sourcePortKind = portKindFromHandle(edge.from.portId);
+        const targetPortKind = portKindFromHandle(edge.to.portId);
+        if (
+          !sourceNode ||
+          !targetNode ||
+          !sourcePortIds?.has(edge.from.portId) ||
+          !targetPortIds?.has(edge.to.portId) ||
+          sourcePortKind === null ||
+          targetPortKind === null ||
+          !isValidBoardPortConnection(board.nodes, {
+            nodeId: edge.from.nodeId,
+            portId: edge.from.portId,
+            portKind: sourcePortKind,
+          }, {
+            nodeId: edge.to.nodeId,
+            portId: edge.to.portId,
+            portKind: targetPortKind,
+          })
+        ) continue;
         const processing = isResultSourceNode(sourceNode) && sourceNode.status === "processing";
-        return {
+        result.push({
           id: edge.id,
           source: edge.from.nodeId,
           target: edge.to.nodeId,
@@ -1716,10 +1770,12 @@ export default function BoardWorkspace({
           className: `imagine-board-edge imagine-board-edge-${edge.kind}`,
           markerEnd: { type: MarkerType.ArrowClosed, color: flowEdgeColorByKind[edge.kind], width: 18, height: 18 },
           style: { strokeWidth: selectedEdgeId === edge.id ? 3 : 2 },
-        };
-      }),
+        });
+      }
+      return result;
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- graph key gates processing animation without position churn
-    [boardGraphContentKey, boardPromptReferenceGraphIndex, flowEdgeColorByKind, isNodeDragActive, selectedEdgeId],
+    [board.nodes, boardGraphContentKey, boardPromptReferenceGraphIndex, flowEdgeColorByKind, isNodeDragActive, resultSourceNodes, selectedEdgeId],
   );
 
   const isValidBoardConnection = useCallback<IsValidConnection<BoardFlowEdge>>((connection) => {
