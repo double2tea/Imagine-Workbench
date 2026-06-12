@@ -34,6 +34,10 @@ import type { BoardSaveStatus } from "@/hooks/useBoardState";
 import { useThemeMode } from "@/lib/theme-mode";
 import type { BoardSummary } from "@/lib/board";
 import BoardInsertIcon from "@/components/board/BoardInsertIcon";
+import WorkspaceTopBar, {
+  workspaceTopBarButtonClass,
+  workspaceTopBarIconButtonClass,
+} from "@/components/workbench/WorkspaceTopBar";
 
 interface BoardToolbarProps {
   boardId: string;
@@ -79,10 +83,8 @@ function saveStatusMeta(status: BoardSaveStatus, error: string | null): {
   return { label: "就绪", tone: "idle" };
 }
 
-const headerBtn =
-  "imagine-board-header-btn flex h-9 min-h-9 items-center gap-1.5 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2.5 text-xs font-semibold text-[var(--iw-text)] transition";
-const iconBtn =
-  "imagine-board-header-icon flex h-9 w-9 min-w-9 items-center justify-center rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)] transition disabled:cursor-not-allowed disabled:opacity-40";
+const headerBtn = workspaceTopBarButtonClass;
+const iconBtn = workspaceTopBarIconButtonClass;
 const HEADER_MENU_GAP = 8;
 const HEADER_MENU_VIEWPORT_MARGIN = 12;
 const BOARD_MENU_ESTIMATED_HEIGHT = 380;
@@ -261,11 +263,12 @@ export default function BoardToolbar({
   }
 
   return (
-    <header className="imagine-board-header">
-      <div className="imagine-board-header-zone imagine-board-header-zone--document">
-        <button type="button" onClick={onBack} className={iconBtn} data-accent="amber" title="返回工作台">
-          <ArrowLeft className="h-4 w-4" />
-        </button>
+    <WorkspaceTopBar
+      start={
+        <div className="contents">
+          <button type="button" onClick={onBack} className={iconBtn} data-accent="amber" title="返回工作台">
+            <ArrowLeft className="h-4 w-4" />
+          </button>
 
         <div className="relative min-w-0">
           <button
@@ -369,10 +372,11 @@ export default function BoardToolbar({
           <span className="truncate">{saveMeta.label}</span>
         </span>
         <span className="font-mono text-[10px] text-[var(--iw-faint)]">{nodeCount} 节点</span>
-      </div>
-
-      <div className="imagine-board-header-zone imagine-board-header-zone--create">
-        <div className="relative flex min-w-0 items-center">
+        </div>
+      }
+      center={
+        <div className="contents">
+          <div className="relative flex min-w-0 items-center">
           <div className="imagine-board-header-insert-group flex shrink-0 overflow-hidden rounded-lg border border-[var(--iw-border)]">
             <button
               type="button"
@@ -450,52 +454,53 @@ export default function BoardToolbar({
               })}
             </div>,
           )}
+          </div>
+
+          <button
+            type="button"
+            onClick={onImportMedia}
+            className={`${headerBtn} shrink-0`}
+            title="导入图片、视频或音频到画布"
+          >
+            <Upload className="h-3.5 w-3.5 text-emerald-300" />
+            <span className="hidden md:inline">导入媒体</span>
+          </button>
+
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={onUndo}
+              disabled={!canUndo}
+              className={iconBtn}
+              title="撤销 (Ctrl+Z)"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={onRedo}
+              disabled={!canRedo}
+              className={iconBtn}
+              title="重做 (Ctrl+Shift+Z)"
+            >
+              <RotateCw className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
-
-        <button
-          type="button"
-          onClick={onImportMedia}
-          className={`${headerBtn} shrink-0`}
-          title="导入图片、视频或音频到画布"
-        >
-          <Upload className="h-3.5 w-3.5 text-emerald-300" />
-          <span className="hidden md:inline">导入媒体</span>
-        </button>
-
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={onUndo}
-            disabled={!canUndo}
-            className={iconBtn}
-            title="撤销 (Ctrl+Z)"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={onRedo}
-            disabled={!canRedo}
-            className={iconBtn}
-            title="重做 (Ctrl+Shift+Z)"
-          >
-            <RotateCw className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      </div>
-
-      <div className="imagine-board-header-zone imagine-board-header-zone--actions">
-        {trashedCount > 0 && onRestoreTrash ? (
-          <button
-            type="button"
-            onClick={onRestoreTrash}
-            className={`${headerBtn} hidden sm:flex`}
-            title="恢复最近删除的节点"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            <span>恢复 {trashedCount}</span>
-          </button>
-        ) : null}
+      }
+      end={
+        <div className="contents">
+          {trashedCount > 0 && onRestoreTrash ? (
+            <button
+              type="button"
+              onClick={onRestoreTrash}
+              className={`${headerBtn} hidden sm:flex`}
+              title="恢复最近删除的节点"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span>恢复 {trashedCount}</span>
+            </button>
+          ) : null}
 
         <div className="relative">
           <button
@@ -636,7 +641,8 @@ export default function BoardToolbar({
             </>,
           )}
         </div>
-      </div>
-    </header>
+        </div>
+      }
+    />
   );
 }

@@ -3060,89 +3060,92 @@ html[data-imagine-theme="light"] .imagine-root-body {
   color: #92400e !important;
 }
 
-.imagine-app-header {
-  min-height: 64px;
-  padding-block: 12px !important;
-  border-color: var(--iw-border) !important;
-  background: var(--iw-header) !important;
-  color: var(--iw-text);
-  backdrop-filter: blur(16px);
-  transition: background 200ms var(--iw-ease-out);
-}
-
-.imagine-board-header {
+.imagine-app-topbar {
   display: grid;
   min-height: 56px;
   width: 100%;
   flex-shrink: 0;
   align-items: center;
   gap: 8px 12px;
-  border-bottom: 1px solid var(--iw-border);
-  background: var(--iw-header);
+  overflow: hidden;
+  border-bottom: 1px solid var(--iw-border) !important;
+  background: var(--iw-header) !important;
   color: var(--iw-text);
-  padding: 8px 12px;
+  padding: 8px 12px !important;
   backdrop-filter: blur(16px);
   grid-template-columns: minmax(0, 1fr) auto auto;
+  transition: background 200ms var(--iw-ease-out);
+  user-select: none;
+}
+
+.imagine-app-topbar--sticky {
+  position: sticky;
+  top: 0;
+  z-index: 40;
 }
 
 @media (max-width: 767px) {
-  .imagine-board-header {
+  .imagine-app-topbar--has-center {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
-      "document actions"
-      "create create";
+      "start end"
+      "center center";
   }
 
-  .imagine-board-header-zone--document {
-    grid-area: document;
+  .imagine-app-topbar-zone--start {
+    grid-area: start;
   }
 
-  .imagine-board-header-zone--create {
-    grid-area: create;
+  .imagine-app-topbar-zone--center {
+    grid-area: center;
     justify-content: stretch;
   }
 
-  .imagine-board-header-zone--create .imagine-board-header-insert-group {
+  .imagine-app-topbar-zone--center:empty {
+    display: none;
+  }
+
+  .imagine-app-topbar-zone--center .imagine-board-header-insert-group {
     flex: 1;
   }
 
-  .imagine-board-header-zone--create .imagine-board-header-insert-group > button:first-child {
+  .imagine-app-topbar-zone--center .imagine-board-header-insert-group > button:first-child {
     flex: 1;
     justify-content: center;
   }
 
-  .imagine-board-header-zone--actions {
-    grid-area: actions;
+  .imagine-app-topbar-zone--end {
+    grid-area: end;
   }
 }
 
-.imagine-board-header-zone {
+.imagine-app-topbar-zone {
   display: flex;
   min-width: 0;
   align-items: center;
   gap: 8px;
 }
 
-.imagine-board-header-zone--document {
+.imagine-app-topbar-zone--start {
   flex-wrap: wrap;
 }
 
-.imagine-board-header-zone--create {
+.imagine-app-topbar-zone--center {
   justify-content: center;
 }
 
-.imagine-board-header-zone--actions {
+.imagine-app-topbar-zone--end {
   justify-content: flex-end;
 }
 
-.imagine-board-header-btn:hover,
-.imagine-board-header-icon:hover {
+.imagine-topbar-button:hover,
+.imagine-topbar-icon-button:hover {
   background: var(--iw-panel);
   color: var(--iw-text);
 }
 
-.imagine-board-header-btn[data-accent="amber"]:hover,
-.imagine-board-header-icon[data-accent="amber"]:hover {
+.imagine-topbar-button[data-accent="amber"]:hover,
+.imagine-topbar-icon-button[data-accent="amber"]:hover {
   border-color: color-mix(in srgb, var(--iw-board-accent-amber) 40%, var(--iw-border));
 }
 
@@ -5818,7 +5821,7 @@ html[data-imagine-theme="light"] .imagine-mark-xs,
   }
 
   .imagine-workbench-shell,
-  .imagine-app-header,
+  .imagine-app-topbar,
   .imagine-main-grid,
   .imagine-creator-panel,
   .imagine-mobile-workflow,
@@ -5829,37 +5832,37 @@ html[data-imagine-theme="light"] .imagine-mark-xs,
     min-width: 0 !important;
   }
 
-  .imagine-app-header,
+  .imagine-app-topbar,
   .imagine-main-grid {
     width: 100vw !important;
   }
 
-  .imagine-app-header {
+  .imagine-app-topbar {
     min-height: 48px;
     padding-inline: 10px !important;
     padding-block: 7px !important;
   }
 
-  .imagine-app-header > div:first-child {
+  .imagine-app-topbar-zone--start {
     flex: 1 1 auto;
   }
 
-  .imagine-app-header > div:last-child {
+  .imagine-app-topbar-zone--end {
     max-width: 148px;
   }
 
-  .imagine-app-header .imagine-header-button {
+  .imagine-app-topbar .imagine-header-button {
     width: 32px !important;
     justify-content: center !important;
     padding-inline: 0 !important;
   }
 
-  .imagine-app-header h1 {
+  .imagine-app-topbar h1 {
     font-size: 12px !important;
   }
 
-  .imagine-app-header h1 span:last-child,
-  .imagine-app-header p {
+  .imagine-app-topbar h1 span:last-child,
+  .imagine-app-topbar p {
     display: none !important;
   }
 
