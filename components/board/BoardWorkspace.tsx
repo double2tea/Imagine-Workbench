@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, Upload } from "lucide-react";
+import { Download, Layers, Ungroup, Upload } from "lucide-react";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ChangeEvent, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import {
   BaseEdge,
@@ -1209,6 +1209,14 @@ export default function BoardWorkspace({
     updateNoteBody,
     updatePromptNode,
   } = controller;
+  const selectedGroupNodeIds = useMemo(
+    () => selectedNodeIds.filter(nodeId => board.nodes.some(node => node.id === nodeId && node.kind === "group")),
+    [board.nodes, selectedNodeIds],
+  );
+  const canDownloadSelectedAssets = selectedDownloadableCount > 0 && onDownloadSelectedAssets !== undefined;
+  const selectionToolbarWidthClass = selectedGroupNodeIds.length > 0 || canDownloadSelectedAssets
+    ? "w-[330px]"
+    : "w-[240px]";
   const viewportRef = useRef<BoardViewport>(board.viewport);
   const setFlowHostRef = useCallback((element: HTMLElement | null): void => {
     flowHostRef.current = element;
@@ -2267,6 +2275,23 @@ export default function BoardWorkspace({
     closeOverlayMenus();
   }, [closeOverlayMenus, groupNodes, onConnectionError, selectedNodeIds, updateSelectedNodeIds]);
 
+  const createGroupFromSelectionToolbar = useCallback((): void => {
+    const groupId = groupNodes(selectedNodeIds);
+    if (!groupId) {
+      onConnectionError("至少选择两个节点才能打组");
+      return;
+    }
+    updateSelectedNodeIds([groupId]);
+    closeOverlayMenus();
+  }, [closeOverlayMenus, groupNodes, onConnectionError, selectedNodeIds, updateSelectedNodeIds]);
+
+  const ungroupSelectedGroups = useCallback((): void => {
+    if (selectedGroupNodeIds.length === 0) return;
+    selectedGroupNodeIds.forEach(ungroupNode);
+    updateSelectedNodeIds([]);
+    closeOverlayMenus();
+  }, [closeOverlayMenus, selectedGroupNodeIds, ungroupNode, updateSelectedNodeIds]);
+
   const ungroupSelectedNode = useCallback((nodeId: string): void => {
     ungroupNode(nodeId);
     updateSelectedNodeIds([]);
@@ -2951,7 +2976,7 @@ export default function BoardWorkspace({
                 zoomable
               />
             )}
-            {!isNodeDragActive && selectedNodeIds.length > 1 && selectedDownloadableCount > 0 && onDownloadSelectedAssets ? (
+            {!isNodeDragActive && selectedNodeIds.length > 1 ? (
               <NodeToolbar
                 nodeId={selectedNodeIds}
                 isVisible
@@ -2961,19 +2986,42 @@ export default function BoardWorkspace({
                 className="pointer-events-none z-40 max-w-[calc(100vw_-_24px)]"
                 style={{ contain: "layout paint style" }}
               >
-                <div className="pointer-events-auto flex h-10 w-[260px] shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-slate-950/88 px-2.5 text-[11px] font-semibold text-slate-100 shadow-[0_10px_24px_rgba(2,6,23,0.28)] backdrop-blur-md ring-1 ring-white/5">
+                <div className={`pointer-events-auto flex h-10 ${selectionToolbarWidthClass} shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-slate-950/88 px-2.5 text-[11px] font-semibold text-slate-100 shadow-[0_10px_24px_rgba(2,6,23,0.28)] backdrop-blur-md ring-1 ring-white/5`}>
                   <span className="min-w-0 flex-1 truncate px-1 text-slate-300">
-                    已选 {selectedNodeIds.length} 个 · 可下载 {selectedDownloadableCount} 个
+                    已选 {selectedNodeIds.length} 个{selectedDownloadableCount > 0 ? ` · 可下载 ${selectedDownloadableCount} 个` : ""}
                   </span>
-                  <button
-                    type="button"
-                    onClick={onDownloadSelectedAssets}
-                    className="flex h-7 w-[86px] shrink-0 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/10 text-[11px] font-semibold text-slate-100 transition hover:border-blue-300/40 hover:bg-blue-500/20 hover:text-white"
-                    title="下载所选媒体为 ZIP"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    批量下载
-                  </button>
+                  {selectedGroupNodeIds.length === 0 ? (
+                    <button
+                      type="button"
+                      onClick={createGroupFromSelectionToolbar}
+                      className="flex h-7 w-[66px] shrink-0 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/10 text-[11px] font-semibold text-slate-100 transition hover:border-emerald-300/40 hover:bg-emerald-500/20 hover:text-white"
+                      title="将所选节点打组"
+                    >
+                      <Layers className="h-3.5 w-3.5" />
+                      打组
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={ungroupSelectedGroups}
+                      className="flex h-7 w-[82px] shrink-0 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/10 text-[11px] font-semibold text-slate-100 transition hover:border-amber-300/40 hover:bg-amber-500/20 hover:text-white"
+                      title="取消所选分组"
+                    >
+                      <Ungroup className="h-3.5 w-3.5" />
+                      取消分组
+                    </button>
+                  )}
+                  {canDownloadSelectedAssets ? (
+                    <button
+                      type="button"
+                      onClick={onDownloadSelectedAssets}
+                      className="flex h-7 w-[86px] shrink-0 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/10 text-[11px] font-semibold text-slate-100 transition hover:border-blue-300/40 hover:bg-blue-500/20 hover:text-white"
+                      title="下载所选媒体为 ZIP"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      批量下载
+                    </button>
+                  ) : null}
                 </div>
               </NodeToolbar>
             ) : null}

@@ -357,7 +357,13 @@ function boardUploadIdPrefix(type: MediaReferenceType, index: number): string {
 }
 
 const BOARD_IMPORT_GRID_COLUMNS = 4;
-const BOARD_IMPORT_NODE_GAP = 40;
+const BOARD_IMPORT_NODE_VISIBLE_GAP = 32;
+const BOARD_IMPORT_NODE_VISUAL_OUTSET = {
+  top: 36,
+  right: 16,
+  bottom: 42,
+  left: 16,
+} as const;
 const BOARD_IMPORT_IMAGE_MAX_SIZE: BoardSize = { width: 420, height: 340 };
 const BOARD_IMPORT_IMAGE_MIN_SIZE: BoardSize = { width: 220, height: 180 };
 
@@ -407,6 +413,7 @@ async function boardImportNodeSize(item: StorageItem): Promise<BoardSize> {
 
 function boardImportNodePositions(origin: BoardPoint, sizes: readonly BoardSize[]): BoardPoint[] {
   if (sizes.length === 0) return [];
+  if (sizes.length === 1) return [origin];
   const columnCount = Math.min(BOARD_IMPORT_GRID_COLUMNS, sizes.length);
   const rowCount = Math.ceil(sizes.length / columnCount);
   const columnWidths = Array.from({ length: columnCount }, () => 0);
@@ -415,16 +422,31 @@ function boardImportNodePositions(origin: BoardPoint, sizes: readonly BoardSize[
   sizes.forEach((size, index) => {
     const column = index % columnCount;
     const row = Math.floor(index / columnCount);
-    columnWidths[column] = Math.max(columnWidths[column], size.width);
-    rowHeights[row] = Math.max(rowHeights[row], size.height);
+    columnWidths[column] = Math.max(
+      columnWidths[column],
+      size.width + BOARD_IMPORT_NODE_VISUAL_OUTSET.left + BOARD_IMPORT_NODE_VISUAL_OUTSET.right,
+    );
+    rowHeights[row] = Math.max(
+      rowHeights[row],
+      size.height + BOARD_IMPORT_NODE_VISUAL_OUTSET.top + BOARD_IMPORT_NODE_VISUAL_OUTSET.bottom,
+    );
   });
 
   return sizes.map((_size, index) => {
     const column = index % columnCount;
     const row = Math.floor(index / columnCount);
-    const x = columnWidths.slice(0, column).reduce((sum, width) => sum + width + BOARD_IMPORT_NODE_GAP, origin.x);
-    const y = rowHeights.slice(0, row).reduce((sum, height) => sum + height + BOARD_IMPORT_NODE_GAP, origin.y);
-    return { x, y };
+    const visualX = columnWidths.slice(0, column).reduce(
+      (sum, width) => sum + width + BOARD_IMPORT_NODE_VISIBLE_GAP,
+      origin.x - BOARD_IMPORT_NODE_VISUAL_OUTSET.left,
+    );
+    const visualY = rowHeights.slice(0, row).reduce(
+      (sum, height) => sum + height + BOARD_IMPORT_NODE_VISIBLE_GAP,
+      origin.y - BOARD_IMPORT_NODE_VISUAL_OUTSET.top,
+    );
+    return {
+      x: visualX + BOARD_IMPORT_NODE_VISUAL_OUTSET.left,
+      y: visualY + BOARD_IMPORT_NODE_VISUAL_OUTSET.top,
+    };
   });
 }
 
