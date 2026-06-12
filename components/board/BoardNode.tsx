@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import { AudioLines, ImagePlus, Layers, LayoutGrid, Music, Video, Workflow, X } from "lucide-react";
 import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
@@ -44,6 +44,12 @@ type BoardHandleZone = "edge" | "segment";
 
 const EMPTY_BOARD_PROMPT_REFERENCES: BoardPromptReference[] = [];
 const EMPTY_STORAGE_ITEMS: StorageItem[] = [];
+const MEDIA_TOP_CHROME_GAP = 12;
+const MEDIA_TITLE_CHROME_FALLBACK_WIDTH = "13rem";
+
+type BoardNodeShellStyle = CSSProperties & {
+  "--board-media-title-chrome-width"?: string;
+};
 
 interface BoardHandleProps {
   id: string;
@@ -233,8 +239,17 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
   const connectedResultNodeId = data.connectedResultNodeId;
   const focusConnectedResultNode = connectedResultNodeId ? () => c.onFocusNode(connectedResultNodeId) : undefined;
   const isMediaNode = node.kind === "asset" || node.kind === "result";
+  const shellRef = useRef<HTMLElement | null>(null);
+  const mediaTitleChromeRef = useRef<HTMLDivElement | null>(null);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [draftTitle, setDraftTitle] = useState(node.title);
+  const nodeShellStyle: BoardNodeShellStyle = isMediaNode
+    ? {
+        height: node.size.height,
+        width: node.size.width,
+        "--board-media-title-chrome-width": MEDIA_TITLE_CHROME_FALLBACK_WIDTH,
+      }
+    : { height: node.size.height, width: node.size.width };
   const ports = useMemo(
     () => getBoardNodePortDefinitions(node, { hasResultConnection: data.hasResultConnection }),
     [data.hasResultConnection, node],
@@ -245,6 +260,23 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
       setDraftTitle(currentTitle => currentTitle === node.title ? currentTitle : node.title);
     }
   }, [isEditingTitle, node.title]);
+
+  useLayoutEffect(() => {
+    if (!isMediaNode) return;
+    const shell = shellRef.current;
+    const titleChrome = mediaTitleChromeRef.current;
+    if (!shell || !titleChrome) return;
+
+    const updateTitleChromeWidth = () => {
+      const nextWidth = Math.ceil(titleChrome.getBoundingClientRect().width + MEDIA_TOP_CHROME_GAP);
+      shell.style.setProperty("--board-media-title-chrome-width", `${nextWidth}px`);
+    };
+
+    updateTitleChromeWidth();
+    const resizeObserver = new ResizeObserver(updateTitleChromeWidth);
+    resizeObserver.observe(titleChrome);
+    return () => resizeObserver.disconnect();
+  }, [isEditingTitle, isMediaNode, node.title]);
 
   const commitTitleEdit = () => {
     setIsEditingTitle(false);
@@ -356,10 +388,11 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
 
   return (
     <article
+      ref={shellRef}
       className={`board-node-shell imagine-board-node h-full !overflow-visible !rounded-lg ${selected ? "imagine-board-node-selected" : ""}`}
       data-kind={node.kind}
       data-selected={selected ? "true" : "false"}
-      style={{ height: node.size.height, width: node.size.width }}
+      style={nodeShellStyle}
     >
       {node.kind !== "multi-grid" && ports.map(handleForPort)}
       {selected && (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation" || node.kind === "runninghub-app") ? (
@@ -373,6 +406,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
       ) : null}
 
       <div
+        ref={isMediaNode ? mediaTitleChromeRef : undefined}
         className={[
           "flex h-9 items-center gap-2",
           isMediaNode
