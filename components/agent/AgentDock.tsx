@@ -630,7 +630,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
       : null;
 
   const agentReferenceHint = formatAgentReferenceHint(sendableAgentReferences, openRouterInputSupport);
-  const isIdleOrb = !isOpen && !isLoading && input.trim().length === 0 && !hasSendableAgentReferences;
+  const isIdleOrb = !isOpen && !isLoading && input.trim().length === 0;
 
   useLayoutEffect(() => {
     applyThemeClassesToDom(resolveThemeMode());

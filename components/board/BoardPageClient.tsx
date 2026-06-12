@@ -2544,6 +2544,11 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         boardController.endUndoGesture();
       }
 
+      const executionNodeIds = runQueue.map(item => item.id);
+      if (executionNodeIds.length > 1) {
+        boardController.groupNodes(executionNodeIds);
+      }
+
       let runFailureCount = 0;
       for (const item of runQueue) {
         const operation = item.operation;
