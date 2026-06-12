@@ -3,7 +3,11 @@ import test from "node:test";
 
 import { parseWorkspaceStorageMode } from "../lib/storage/local-config";
 import { resolveLocalWorkspacePaths } from "../lib/storage/local-paths";
-import { resolveLocalStorageRuntimeStatus } from "../lib/storage/local-runtime";
+import {
+  resolveLocalStorageRuntimeStatus,
+  resolvePublicLocalStorageRuntimeStatus,
+  toPublicLocalStorageRuntimeStatus,
+} from "../lib/storage/local-runtime";
 
 test("resolveLocalWorkspacePaths uses the default local workspace directory", () => {
   const paths = resolveLocalWorkspacePaths({ homeDir: "/Users/alice" });
@@ -40,6 +44,36 @@ test("resolveLocalStorageRuntimeStatus enables local database only when explicit
   assert.equal(status.cleanupPolicy.automaticStartupCleanup, false);
 });
 
+test("resolvePublicLocalStorageRuntimeStatus does not expose absolute local paths", () => {
+  const status = resolvePublicLocalStorageRuntimeStatus({
+    IMAGINE_LOCAL_WORKSPACE_DIR: "~/Creative",
+    IMAGINE_STORAGE_TARGET: "local-database",
+  });
+
+  assert.equal(Object.hasOwn(status, "paths"), false);
+  assert.deepEqual(status.pathPlan, {
+    assetDirectoryName: "assets",
+    databaseFileName: "imagine-workbench.sqlite",
+    exportDirectoryName: "exports",
+    previewDirectoryName: "previews",
+    trashDirectoryName: "trash",
+    workspaceRootConfigured: true,
+  });
+});
+
+test("toPublicLocalStorageRuntimeStatus redacts private runtime paths", () => {
+  const privateStatus = resolveLocalStorageRuntimeStatus({
+    IMAGINE_LOCAL_WORKSPACE_DIR: "~/Creative",
+    IMAGINE_STORAGE_TARGET: "local-database",
+  }, { homeDir: "/Users/alice" });
+  const publicStatus = toPublicLocalStorageRuntimeStatus(privateStatus, {
+    IMAGINE_LOCAL_WORKSPACE_DIR: "~/Creative",
+  });
+
+  assert.equal(Object.hasOwn(publicStatus, "paths"), false);
+  assert.equal(publicStatus.pathPlan?.workspaceRootConfigured, true);
+});
+
 test("resolveLocalStorageRuntimeStatus disables local database on hosted deployments", () => {
   const status = resolveLocalStorageRuntimeStatus({
     CF_PAGES: "1",
@@ -50,6 +84,10 @@ test("resolveLocalStorageRuntimeStatus disables local database on hosted deploym
   assert.equal(status.targetKind, "local-database");
   assert.equal(status.reason, "hosted-deployment");
   assert.equal(status.paths, undefined);
+});
+
+test("parseWorkspaceStorageMode trims selected storage targets", () => {
+  assert.equal(parseWorkspaceStorageMode(" local-database "), "local-database");
 });
 
 test("parseWorkspaceStorageMode rejects unknown storage targets", () => {

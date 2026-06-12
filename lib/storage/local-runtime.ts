@@ -8,7 +8,12 @@ import {
   type LocalStorageEnvironment,
   type WorkspaceStorageMode,
 } from "./local-config";
-import { resolveLocalWorkspacePaths, type LocalWorkspacePaths } from "./local-paths";
+import {
+  getLocalWorkspacePathPlan,
+  resolveLocalWorkspacePaths,
+  type LocalWorkspacePathPlan,
+  type LocalWorkspacePaths,
+} from "./local-paths";
 
 export interface LocalWorkspaceCleanupPolicy {
   automaticStartupCleanup: false;
@@ -28,6 +33,20 @@ export interface LocalStorageRuntimeStatus {
   enabled: boolean;
   mode: WorkspaceStorageMode;
   paths?: LocalWorkspacePaths;
+  reason: LocalStorageDisabledReason | LocalStorageEnabledReason;
+  syncPolicy: LocalWorkspaceSyncPolicy;
+  targetKind: "indexeddb" | "local-database";
+}
+
+export interface PublicLocalWorkspacePathPlan extends LocalWorkspacePathPlan {
+  workspaceRootConfigured: boolean;
+}
+
+export interface PublicLocalStorageRuntimeStatus {
+  cleanupPolicy: LocalWorkspaceCleanupPolicy;
+  enabled: boolean;
+  mode: WorkspaceStorageMode;
+  pathPlan?: PublicLocalWorkspacePathPlan;
   reason: LocalStorageDisabledReason | LocalStorageEnabledReason;
   syncPolicy: LocalWorkspaceSyncPolicy;
   targetKind: "indexeddb" | "local-database";
@@ -84,4 +103,33 @@ export function resolveLocalStorageRuntimeStatus(
     syncPolicy: LOCAL_WORKSPACE_SYNC_POLICY,
     targetKind,
   };
+}
+
+export function toPublicLocalStorageRuntimeStatus(
+  status: LocalStorageRuntimeStatus,
+  env: LocalStorageEnvironment = {},
+): PublicLocalStorageRuntimeStatus {
+  const pathPlan: PublicLocalWorkspacePathPlan | undefined =
+    status.mode === "local-database"
+      ? {
+          ...getLocalWorkspacePathPlan(),
+          workspaceRootConfigured: Boolean(env[IMAGINE_LOCAL_WORKSPACE_DIR_ENV]?.trim()),
+        }
+      : undefined;
+
+  return {
+    cleanupPolicy: status.cleanupPolicy,
+    enabled: status.enabled,
+    mode: status.mode,
+    pathPlan,
+    reason: status.reason,
+    syncPolicy: status.syncPolicy,
+    targetKind: status.targetKind,
+  };
+}
+
+export function resolvePublicLocalStorageRuntimeStatus(
+  env: LocalStorageEnvironment,
+): PublicLocalStorageRuntimeStatus {
+  return toPublicLocalStorageRuntimeStatus(resolveLocalStorageRuntimeStatus(env), env);
 }

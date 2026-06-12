@@ -20,6 +20,26 @@ export interface ResolveLocalWorkspacePathsOptions {
   workspaceDir?: string;
 }
 
+export interface LocalWorkspacePathPlan {
+  assetDirectoryName: string;
+  databaseFileName: string;
+  exportDirectoryName: string;
+  previewDirectoryName: string;
+  trashDirectoryName: string;
+}
+
+export function getLocalWorkspacePathPlan(): LocalWorkspacePathPlan {
+  const localDatabase = LOCAL_DATABASE_STORAGE_ADAPTER.localDatabase;
+  if (!localDatabase) throw new Error("Local database storage adapter is missing local database config");
+  return {
+    assetDirectoryName: localDatabase.assetDirectoryName,
+    databaseFileName: localDatabase.databaseFileName,
+    exportDirectoryName: LOCAL_WORKSPACE_EXPORTS_DIR,
+    previewDirectoryName: localDatabase.previewDirectoryName,
+    trashDirectoryName: LOCAL_WORKSPACE_TRASH_DIR,
+  };
+}
+
 export function resolveLocalWorkspaceRoot(options: ResolveLocalWorkspacePathsOptions = {}): string {
   const workspaceDir = options.workspaceDir?.trim();
   if (workspaceDir) return resolveUserPath(workspaceDir, options.homeDir ?? os.homedir());
@@ -28,15 +48,14 @@ export function resolveLocalWorkspaceRoot(options: ResolveLocalWorkspacePathsOpt
 
 export function resolveLocalWorkspacePaths(options: ResolveLocalWorkspacePathsOptions = {}): LocalWorkspacePaths {
   const rootDir = resolveLocalWorkspaceRoot(options);
-  const localDatabase = LOCAL_DATABASE_STORAGE_ADAPTER.localDatabase;
-  if (!localDatabase) throw new Error("Local database storage adapter is missing local database config");
+  const pathPlan = getLocalWorkspacePathPlan();
   return {
-    assetDir: path.join(rootDir, localDatabase.assetDirectoryName),
-    databaseFile: path.join(rootDir, localDatabase.databaseFileName),
-    exportDir: path.join(rootDir, LOCAL_WORKSPACE_EXPORTS_DIR),
-    previewDir: path.join(rootDir, localDatabase.previewDirectoryName),
+    assetDir: path.join(rootDir, pathPlan.assetDirectoryName),
+    databaseFile: path.join(rootDir, pathPlan.databaseFileName),
+    exportDir: path.join(rootDir, pathPlan.exportDirectoryName),
+    previewDir: path.join(rootDir, pathPlan.previewDirectoryName),
     rootDir,
-    trashDir: path.join(rootDir, LOCAL_WORKSPACE_TRASH_DIR),
+    trashDir: path.join(rootDir, pathPlan.trashDirectoryName),
   };
 }
 

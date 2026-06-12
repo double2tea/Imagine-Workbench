@@ -17,8 +17,9 @@ export interface LocalStorageEnvironment {
 }
 
 export function parseWorkspaceStorageMode(value: string | undefined): WorkspaceStorageMode {
-  if (value === undefined || value.trim() === "") return "browser";
-  if (value === "browser" || value === "local-database") return value;
+  const mode = value?.trim();
+  if (mode === undefined || mode === "") return "browser";
+  if (mode === "browser" || mode === "local-database") return mode;
   throw new Error(`${IMAGINE_STORAGE_TARGET_ENV} must be "browser" or "local-database"`);
 }
 
