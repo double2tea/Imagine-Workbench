@@ -31,16 +31,20 @@ import {
   deleteFromDB,
   getAssetDatabaseDiagnostics,
   getAllFromDB,
+  hasAssetBlobPayload,
+  hydrateAsset,
   hydrateAssets,
+  listAllAssetMetas,
   listBoardScopedAssetMetas,
   saveToDB,
   type AssetDatabaseDiagnostics,
   type GenerationReferenceMediaSnapshot,
   type GenerationRequestSnapshot,
   type StorageItem,
+  type StorageItemMeta,
 } from "@/lib/db";
 import { isMediaReferenceType, mediaReferenceTypeFromDataUri, mediaReferenceTypeFromMime } from "@/lib/media-references";
-import { compressReferenceImageFile, dataUriByteSize } from "@/lib/reference-images";
+import { compressReferenceImageFile } from "@/lib/reference-images";
 
 export const WORKSPACE_BACKUP_SCHEMA_VERSION = 1;
 
@@ -177,8 +181,40 @@ export interface WorkspaceAssetSourceRepairResult {
   repairedIds: string[];
 }
 
+export interface WorkspaceBoardAssetReference {
+  assetId: string;
+  boardId: string;
+  boardTitle: string;
+  field: string;
+  nodeId: string;
+  nodeKind: BoardNode["kind"];
+}
+
+export interface WorkspaceStaleAssetSourceLink {
+  assetId: string;
+  boardId: string;
+  model: string;
+  prompt: string;
+  sourceBoardNodeId: string;
+  status: StorageItem["status"];
+}
+
+export interface WorkspaceIntegrityDiagnostics {
+  brokenCompleteAssetIds: string[];
+  failedAssetIds: string[];
+  issueCount: number;
+  missingBoardReferences: WorkspaceBoardAssetReference[];
+  orphanedAssetIds: string[];
+  staleAssetSourceLinks: WorkspaceStaleAssetSourceLink[];
+  staleProcessingAssetIds: string[];
+  status: "healthy" | "attention" | "critical";
+}
+
+type AssetBlobPayloadExists = (asset: StorageItemMeta) => Promise<boolean>;
+
 export interface WorkspaceDataSummary {
   assets: {
+    audio: number;
     brokenComplete: number;
     failed: number;
     image: number;
@@ -192,8 +228,10 @@ export interface WorkspaceDataSummary {
     stores: AssetDatabaseDiagnostics;
     total: number;
     video: number;
+    transcript: number;
     estimatedBytes: number;
   };
+  integrity: WorkspaceIntegrityDiagnostics;
   boards: {
     total: number;
     nodes: number;
@@ -247,14 +285,15 @@ interface WorkspaceSafetySnapshotRecord extends WorkspaceSafetySnapshotSummary {
 }
 
 export async function getWorkspaceDataSummary(items: StorageItem[] = []): Promise<WorkspaceDataSummary> {
-  const assets = items.length > 0 ? items : await getAllFromDB();
+  const assetMetas: StorageItemMeta[] = items.length > 0 ? items : await listAllAssetMetas();
   const boards = await listBoardsFromDB();
   const boardAssetIds = collectBoardAssetIds(boards);
-  const assetIds = new Set(assets.map(item => item.id));
+  const assetIds = new Set(assetMetas.map(item => item.id));
   const stores = await getAssetDatabaseDiagnostics();
   const latestSnapshot = await getLatestWorkspaceSafetySnapshotSummary();
-  const largest = assets
-    .map(item => ({ id: item.id, label: item.prompt || item.model || item.id, bytes: estimateAssetBytes(item) }))
+  const integrity = await buildWorkspaceIntegrityDiagnosticsWithPayloads(assetMetas, boards);
+  const largest = assetMetas
+    .map(item => ({ id: item.id, label: item.prompt || item.model || item.id, bytes: estimateStorageRecordBytes(item) }))
     .sort((left, right) => right.bytes - left.bytes)
     .slice(0, 5);
   const localStorageEntries = readManagedLocalStorage(true);
@@ -264,21 +303,24 @@ export async function getWorkspaceDataSummary(items: StorageItem[] = []): Promis
 
   return {
     assets: {
-      brokenComplete: findBrokenCompleteAssetIds(assets).length,
-      failed: assets.filter(item => item.status === "failed").length,
-      image: assets.filter(item => item.type === "image").length,
+      audio: assetMetas.filter(item => item.type === "audio").length,
+      brokenComplete: integrity.brokenCompleteAssetIds.length,
+      failed: assetMetas.filter(item => item.status === "failed").length,
+      image: assetMetas.filter(item => item.type === "image").length,
       largest,
       missingBoardReferences: Array.from(boardAssetIds).filter(assetId => !assetIds.has(assetId)).length,
-      orphaned: findOrphanAssetIds(assets, boardAssetIds).length,
-      pending: assets.filter(item => item.status === "pending").length,
-      processing: assets.filter(item => item.status === "processing").length,
+      orphaned: findOrphanAssetIds(assetMetas, boardAssetIds).length,
+      pending: assetMetas.filter(item => item.status === "pending").length,
+      processing: assetMetas.filter(item => item.status === "processing").length,
       referencedByBoards: boardAssetIds.size,
-      staleProcessing: findStaleProcessingAssetIds(assets).length,
+      staleProcessing: findStaleProcessingAssetIds(assetMetas).length,
       stores,
-      total: assets.length,
-      video: assets.filter(item => item.type === "video").length,
-      estimatedBytes: assets.reduce((total, item) => total + estimateAssetBytes(item), 0),
+      total: assetMetas.length,
+      video: assetMetas.filter(item => item.type === "video").length,
+      transcript: assetMetas.filter(item => item.type === "transcript").length,
+      estimatedBytes: assetMetas.reduce((total, item) => total + estimateStorageRecordBytes(item), 0),
     },
+    integrity,
     boards: {
       total: boards.length,
       nodes: boards.reduce((total, board) => total + board.nodes.length, 0),
@@ -386,9 +428,9 @@ export async function resetBoardsToDefault(): Promise<void> {
 }
 
 export async function cleanupWorkspaceAssets(kind: WorkspaceCleanupKind): Promise<WorkspaceCleanupResult> {
-  const assets = await getAllFromDB();
+  const assets = await listAllAssetMetas();
   const boardAssetIds = collectBoardAssetIds(await listBoardsFromDB());
-  const ids = cleanupTargetIds(kind, assets, boardAssetIds);
+  const ids = await cleanupTargetIds(kind, assets, boardAssetIds);
   if (ids.length > 0) {
     await createWorkspaceSafetySnapshot("cleanup-assets");
   }
@@ -399,12 +441,12 @@ export async function cleanupWorkspaceAssets(kind: WorkspaceCleanupKind): Promis
 }
 
 export async function repairStaleAssetSourceLinks(): Promise<WorkspaceAssetSourceRepairResult> {
-  const [assets, boards] = await Promise.all([getAllFromDB(), listBoardsFromDB()]);
+  const [assets, boards] = await Promise.all([listAllAssetMetas(), listBoardsFromDB()]);
   const boardNodeIds = collectBoardNodeIds(boards);
   const staleAssets = assets.filter(item => item.sourceBoardNodeId && !boardNodeIds.has(item.sourceBoardNodeId));
 
   for (const item of staleAssets) {
-    await saveToDB({ ...item, sourceBoardNodeId: undefined });
+    await saveToDB({ ...(await hydrateAsset(item)), sourceBoardNodeId: undefined });
   }
 
   return { repairedIds: staleAssets.map(item => item.id) };
@@ -492,7 +534,7 @@ export async function createLocalUploadAsset(
   );
 }
 
-export function findOrphanAssetIds(items: StorageItem[], boardAssetIds: ReadonlySet<string>): string[] {
+export function findOrphanAssetIds(items: StorageItemMeta[], boardAssetIds: ReadonlySet<string>): string[] {
   return items
     .filter(item => item.status === "complete" && !boardAssetIds.has(item.id))
     .map(item => item.id);
@@ -523,19 +565,18 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
-function cleanupTargetIds(
+async function cleanupTargetIds(
   kind: WorkspaceCleanupKind,
-  assets: StorageItem[],
+  assets: StorageItemMeta[],
   boardAssetIds: ReadonlySet<string>,
-): string[] {
+): Promise<string[]> {
   if (kind === "failed") return assets.filter(item => item.status === "failed").map(item => item.id);
   if (kind === "stale-processing") return findStaleProcessingAssetIds(assets);
-  if (kind === "broken-complete") return findBrokenCompleteAssetIds(assets);
+  if (kind === "broken-complete") return findBrokenCompleteAssetIdsWithPayloads(assets);
   return findOrphanAssetIds(assets, boardAssetIds);
 }
 
-function findStaleProcessingAssetIds(items: StorageItem[]): string[] {
-  const now = Date.now();
+function findStaleProcessingAssetIds(items: StorageItemMeta[], now = Date.now()): string[] {
   return items
     .filter(item => {
       if (item.status !== "processing" && item.status !== "pending") return false;
@@ -545,10 +586,138 @@ function findStaleProcessingAssetIds(items: StorageItem[]): string[] {
     .map(item => item.id);
 }
 
-function findBrokenCompleteAssetIds(items: StorageItem[]): string[] {
+function findBrokenCompleteAssetIds(items: StorageItemMeta[]): string[] {
   return items
-    .filter(item => item.status === "complete" && item.url.trim().length === 0)
+    .filter(item => item.status === "complete" && !item.hasBlob && !item.url?.trim())
     .map(item => item.id);
+}
+
+async function findBrokenCompleteAssetIdsWithPayloads(
+  items: StorageItemMeta[],
+  assetBlobPayloadExists: AssetBlobPayloadExists = hasAssetBlobPayload,
+): Promise<string[]> {
+  const ids: string[] = [];
+  for (const item of items) {
+    if (item.status !== "complete") continue;
+    if (!item.hasBlob) {
+      if (!item.url?.trim()) ids.push(item.id);
+      continue;
+    }
+    if (!(await assetBlobPayloadExists(item))) ids.push(item.id);
+  }
+  return ids;
+}
+
+function collectBoardAssetReferences(boards: BoardDocument[]): WorkspaceBoardAssetReference[] {
+  const references: WorkspaceBoardAssetReference[] = [];
+  for (const board of boards) {
+    for (const node of board.nodes) {
+      const base = {
+        boardId: board.id,
+        boardTitle: board.title,
+        nodeId: node.id,
+        nodeKind: node.kind,
+      };
+      if (node.kind === "asset") {
+        references.push({ ...base, assetId: node.asset.assetId, field: "asset.assetId" });
+      }
+      if (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation" || node.kind === "runninghub-app") {
+        if (node.resultAssetId) references.push({ ...base, assetId: node.resultAssetId, field: "resultAssetId" });
+        for (const assetId of node.resultAssetIds ?? []) references.push({ ...base, assetId, field: "resultAssetIds" });
+      }
+      if (node.kind === "result") {
+        references.push({ ...base, assetId: node.asset.assetId, field: "asset.assetId" });
+        for (const assetId of node.resultAssetIds) references.push({ ...base, assetId, field: "resultAssetIds" });
+      }
+      if (node.kind === "reference-group") {
+        for (const reference of node.references) references.push({ ...base, assetId: reference.assetId, field: "references.assetId" });
+      }
+      if (node.kind === "multi-grid") {
+        for (const item of node.items) references.push({ ...base, assetId: item.assetId, field: "items.assetId" });
+      }
+    }
+  }
+  return references;
+}
+
+export function buildWorkspaceIntegrityDiagnostics(
+  assets: StorageItemMeta[],
+  boards: BoardDocument[],
+  now = Date.now(),
+): WorkspaceIntegrityDiagnostics {
+  const assetIds = new Set(assets.map(item => item.id));
+  const boardAssetIds = collectBoardAssetIds(boards);
+  const boardNodeIds = collectBoardNodeIds(boards);
+  const missingBoardReferences = collectBoardAssetReferences(boards).filter(reference => !assetIds.has(reference.assetId));
+  const staleAssetSourceLinks = assets
+    .filter(item => item.sourceBoardNodeId && !boardNodeIds.has(item.sourceBoardNodeId))
+    .map(item => ({
+      assetId: item.id,
+      boardId: item.boardId,
+      model: item.model,
+      prompt: item.prompt,
+      sourceBoardNodeId: item.sourceBoardNodeId ?? "",
+      status: item.status,
+    }));
+  const brokenCompleteAssetIds = findBrokenCompleteAssetIds(assets);
+  const failedAssetIds = assets.filter(item => item.status === "failed").map(item => item.id);
+  const orphanedAssetIds = findOrphanAssetIds(assets, boardAssetIds);
+  const staleProcessingAssetIds = findStaleProcessingAssetIds(assets, now);
+  const issueCount = workspaceIntegrityIssueCount({
+    brokenCompleteAssetIds,
+    failedAssetIds,
+    missingBoardReferences,
+    staleAssetSourceLinks,
+    staleProcessingAssetIds,
+  });
+  const status = workspaceIntegrityStatus(issueCount, missingBoardReferences.length, brokenCompleteAssetIds.length);
+  return {
+    brokenCompleteAssetIds,
+    failedAssetIds,
+    issueCount,
+    missingBoardReferences,
+    orphanedAssetIds,
+    staleAssetSourceLinks,
+    staleProcessingAssetIds,
+    status,
+  };
+}
+
+export async function buildWorkspaceIntegrityDiagnosticsWithPayloads(
+  assets: StorageItemMeta[],
+  boards: BoardDocument[],
+  now = Date.now(),
+  assetBlobPayloadExists: AssetBlobPayloadExists = hasAssetBlobPayload,
+): Promise<WorkspaceIntegrityDiagnostics> {
+  const diagnostics = buildWorkspaceIntegrityDiagnostics(assets, boards, now);
+  const brokenCompleteAssetIds = await findBrokenCompleteAssetIdsWithPayloads(assets, assetBlobPayloadExists);
+  const issueCount = workspaceIntegrityIssueCount({ ...diagnostics, brokenCompleteAssetIds });
+  return {
+    ...diagnostics,
+    brokenCompleteAssetIds,
+    issueCount,
+    status: workspaceIntegrityStatus(issueCount, diagnostics.missingBoardReferences.length, brokenCompleteAssetIds.length),
+  };
+}
+
+function workspaceIntegrityIssueCount(input: Pick<
+  WorkspaceIntegrityDiagnostics,
+  "brokenCompleteAssetIds" | "failedAssetIds" | "missingBoardReferences" | "staleAssetSourceLinks" | "staleProcessingAssetIds"
+>): number {
+  return input.missingBoardReferences.length +
+    input.staleAssetSourceLinks.length +
+    input.brokenCompleteAssetIds.length +
+    input.failedAssetIds.length +
+    input.staleProcessingAssetIds.length;
+}
+
+function workspaceIntegrityStatus(
+  issueCount: number,
+  missingBoardReferenceCount: number,
+  brokenCompleteAssetCount: number,
+): WorkspaceIntegrityDiagnostics["status"] {
+  if (missingBoardReferenceCount > 0 || brokenCompleteAssetCount > 0) return "critical";
+  return issueCount > 0 ? "attention" : "healthy";
 }
 
 async function exportWorkspaceBackup(input: {
@@ -1072,28 +1241,8 @@ function parseBoardSize(value: unknown): BoardSize {
 }
 
 function validateBoardAssetReferences(boards: BoardDocument[], assetIds: ReadonlySet<string>): void {
-  for (const board of boards) {
-    for (const node of board.nodes) {
-      if (node.kind === "asset" && !assetIds.has(node.asset.assetId)) {
-        throw new Error(`画板 ${board.title} 引用缺失资产 ${node.asset.assetId}`);
-      }
-      if (node.kind === "result") {
-        if (!assetIds.has(node.asset.assetId)) {
-          throw new Error(`画板 ${board.title} 引用缺失资产 ${node.asset.assetId}`);
-        }
-        for (const assetId of node.resultAssetIds) {
-          if (!assetIds.has(assetId)) throw new Error(`画板 ${board.title} 结果节点引用缺失结果资产 ${assetId}`);
-        }
-      }
-      if (node.kind === "reference-group") {
-        for (const reference of node.references) {
-          if (!assetIds.has(reference.assetId)) {
-            throw new Error(`画板 ${board.title} 参考组引用缺失资产 ${reference.assetId}`);
-          }
-        }
-      }
-    }
-  }
+  const missing = collectBoardAssetReferences(boards).find(reference => !assetIds.has(reference.assetId));
+  if (missing) throw new Error(`画板 ${missing.boardTitle} 节点 ${missing.nodeId} 引用缺失资产 ${missing.assetId}`);
 }
 
 function parseSettings(text: string): WorkspaceBackupSettings {
@@ -1266,13 +1415,24 @@ function mediaExtension(mimeType: string, type: StorageItem["type"]): string {
   return "mp4";
 }
 
-function estimateAssetBytes(item: StorageItem): number {
-  const dataUriBytes = dataUriByteSize(item.url);
-  return dataUriBytes ?? textByteSize(item.url) + textByteSize(JSON.stringify({
+function estimateStorageRecordBytes(item: StorageItemMeta): number {
+  const urlBytes = item.url ? textByteSize(item.url) : 0;
+  return urlBytes + textByteSize(JSON.stringify({
     id: item.id,
+    type: item.type,
     prompt: item.prompt,
     model: item.model,
+    aspectRatio: item.aspectRatio,
+    createdAt: item.createdAt,
+    status: item.status,
+    progress: item.progress,
+    scope: item.scope,
+    boardId: item.boardId,
+    operationName: item.operationName,
+    errorMessage: item.errorMessage,
     generationRequest: item.generationRequest,
+    contentHash: item.contentHash,
+    previewStatus: item.previewStatus,
   }));
 }
 

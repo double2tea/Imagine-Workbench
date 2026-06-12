@@ -8,7 +8,7 @@ import type { AudioOperationMode } from "./providers/model-catalog";
 import type { RunningHubTaskNodeBinding } from "./providers/types";
 
 const DB_NAME = "ImagineWorkbenchDB";
-const DB_VERSION = 5;
+const DB_VERSION = 7;
 const META_STORE = "assets_meta";
 const BLOB_STORE = "assets_blob";
 const HASH_BLOB_STORE = "asset_blob_payloads";
@@ -150,6 +150,23 @@ export interface ListAssetMetasOptions {
   offset?: number;
 }
 
+export interface AssetMetaPageCursor {
+  createdAt: string;
+  id: string;
+}
+
+export interface ListAssetMetaPageOptions {
+  boardId?: string;
+  cursor?: AssetMetaPageCursor;
+  statuses?: StorageItemMeta["status"][];
+  limit: number;
+}
+
+export interface AssetMetaPage {
+  items: StorageItemMeta[];
+  nextCursor?: AssetMetaPageCursor;
+}
+
 function isRemoteUrl(url: string): boolean {
   return url.startsWith("http://") || url.startsWith("https://");
 }
@@ -270,8 +287,23 @@ function ensureMetaIndexes(meta: IDBObjectStore): void {
   if (!meta.indexNames.contains("by_createdAt")) {
     meta.createIndex("by_createdAt", "createdAt", { unique: false });
   }
+  if (!meta.indexNames.contains("by_createdAt_id")) {
+    meta.createIndex("by_createdAt_id", ["createdAt", "id"], { unique: false });
+  }
   if (!meta.indexNames.contains("by_contentHash")) {
     meta.createIndex("by_contentHash", "contentHash", { unique: false });
+  }
+}
+
+function ensureGenerationTaskIndexes(tasks: IDBObjectStore): void {
+  if (!tasks.indexNames.contains("by_boardId")) {
+    tasks.createIndex("by_boardId", "source.boardId", { unique: false });
+  }
+  if (!tasks.indexNames.contains("by_status")) {
+    tasks.createIndex("by_status", "status", { unique: false });
+  }
+  if (!tasks.indexNames.contains("by_createdAt")) {
+    tasks.createIndex("by_createdAt", "createdAt", { unique: false });
   }
 }
 
@@ -319,6 +351,16 @@ function readHashBlobPayload(db: IDBDatabase, hash: string): Promise<string | nu
     };
     request.onerror = () => reject(request.error ?? new Error(`IndexedDB blob ${hash} read failed`));
     transaction.onerror = () => reject(transaction.error ?? request.error ?? new Error(`IndexedDB blob ${hash} transaction failed`));
+  });
+}
+
+function hasHashBlobPayload(db: IDBDatabase, hash: string): Promise<boolean> {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(HASH_BLOB_STORE, "readonly");
+    const request = transaction.objectStore(HASH_BLOB_STORE).getKey(hash);
+    request.onsuccess = () => resolve(request.result !== undefined);
+    request.onerror = () => reject(request.error ?? new Error(`IndexedDB blob ${hash} existence check failed`));
+    transaction.onerror = () => reject(transaction.error ?? request.error ?? new Error(`IndexedDB blob ${hash} existence transaction failed`));
   });
 }
 
@@ -416,9 +458,9 @@ export function openDatabase(): Promise<IDBDatabase> {
 
       if (!db.objectStoreNames.contains(GENERATION_TASK_STORE)) {
         const tasks = db.createObjectStore(GENERATION_TASK_STORE, { keyPath: "id" });
-        tasks.createIndex("by_boardId", "source.boardId", { unique: false });
-        tasks.createIndex("by_status", "status", { unique: false });
-        tasks.createIndex("by_createdAt", "createdAt", { unique: false });
+        ensureGenerationTaskIndexes(tasks);
+      } else {
+        ensureGenerationTaskIndexes(transaction.objectStore(GENERATION_TASK_STORE));
       }
 
       if (event.oldVersion > 0 && event.oldVersion < DB_VERSION) {
@@ -467,6 +509,14 @@ export async function getAssetBlobPayload(id: string): Promise<string | null> {
   const meta = await getAssetMeta(id);
   if (!meta?.hasBlob) return null;
   return getAssetBlobPayloadForMeta(meta);
+}
+
+export async function hasAssetBlobPayload(meta: StorageItemMeta): Promise<boolean> {
+  const normalized = normalizeMeta(meta);
+  if (!normalized.hasBlob) return false;
+  const db = await openDatabase();
+  if (normalized.contentHash && await hasHashBlobPayload(db, normalized.contentHash)) return true;
+  return (await readLegacyBlobRecord(db, normalized.id)) !== null;
 }
 
 export async function getAssetPreviewRecord(id: string): Promise<AssetPreviewRecord | null> {
@@ -569,10 +619,16 @@ export async function listAllAssetMetas(): Promise<StorageItemMeta[]> {
   const db = await openDatabase();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(META_STORE, "readonly");
-    const request = transaction.objectStore(META_STORE).getAll();
+    const request = transaction.objectStore(META_STORE).index("by_createdAt").openCursor(null, "prev");
+    const metas: StorageItemMeta[] = [];
     request.onsuccess = () => {
-      const metas = (request.result as StorageItemMeta[]).map(normalizeMeta);
-      resolve(sortMetas(metas));
+      const cursor = request.result;
+      if (!cursor) {
+        resolve(metas);
+        return;
+      }
+      metas.push(normalizeMeta(cursor.value as StorageItemMeta));
+      cursor.continue();
     };
     request.onerror = () => reject(request.error);
   });
@@ -615,6 +671,46 @@ export async function listAssetMetas(options: ListAssetMetasOptions = {}): Promi
   }
 
   return metas;
+}
+
+export async function listAssetMetaPage(options: ListAssetMetaPageOptions): Promise<AssetMetaPage> {
+  const limit = Math.max(0, options.limit);
+  if (limit === 0) return { items: [] };
+
+  const allowedStatuses = options.statuses && options.statuses.length > 0 ? new Set(options.statuses) : null;
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(META_STORE, "readonly");
+    const range = options.cursor
+      ? IDBKeyRange.upperBound([options.cursor.createdAt, options.cursor.id], true)
+      : null;
+    const request = transaction.objectStore(META_STORE).index("by_createdAt_id").openCursor(range, "prev");
+    const items: StorageItemMeta[] = [];
+
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) {
+        resolve({ items });
+        return;
+      }
+
+      const meta = normalizeMeta(cursor.value as StorageItemMeta);
+      const matchesBoard = options.boardId === undefined || meta.boardId === options.boardId;
+      const matchesStatus = !allowedStatuses || allowedStatuses.has(meta.status);
+      if (matchesBoard && matchesStatus) {
+        if (items.length < limit) {
+          items.push(meta);
+        } else {
+          const last = items[items.length - 1];
+          resolve({ items, nextCursor: { createdAt: last.createdAt, id: last.id } });
+          return;
+        }
+      }
+      cursor.continue();
+    };
+    request.onerror = () => reject(request.error);
+    transaction.onerror = () => reject(transaction.error ?? request.error ?? new Error("IndexedDB asset page read failed"));
+  });
 }
 
 async function listAssetMetasByStatus(status: StorageItemMeta["status"]): Promise<StorageItemMeta[]> {

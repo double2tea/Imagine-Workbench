@@ -174,6 +174,48 @@ export function generationTaskToGalleryItem(task: GenerationTask): StorageItem |
   };
 }
 
+function sortedUniqueTasks(tasks: GenerationTask[]): GenerationTask[] {
+  const unique = new Map<string, GenerationTask>();
+  for (const task of tasks) unique.set(task.id, task);
+  return sortedTasks(Array.from(unique.values()));
+}
+
+async function readAllGenerationTasks(): Promise<GenerationTask[]> {
+  const db = await openDatabase();
+  return new Promise<GenerationTask[]>((resolve, reject) => {
+    const transaction = db.transaction(GENERATION_TASK_STORE, "readonly");
+    const request = transaction.objectStore(GENERATION_TASK_STORE).getAll();
+    request.onsuccess = () => resolve(request.result as GenerationTask[]);
+    request.onerror = () => reject(request.error ?? new Error("Generation task list failed"));
+    transaction.onerror = () => reject(transaction.error ?? request.error ?? new Error("Generation task list transaction failed"));
+  });
+}
+
+async function readGenerationTasksByIndex(indexName: "by_boardId" | "by_status", value: string): Promise<GenerationTask[]> {
+  const db = await openDatabase();
+  return new Promise<GenerationTask[]>((resolve, reject) => {
+    const transaction = db.transaction(GENERATION_TASK_STORE, "readonly");
+    const request = transaction.objectStore(GENERATION_TASK_STORE).index(indexName).getAll(value);
+    request.onsuccess = () => resolve(request.result as GenerationTask[]);
+    request.onerror = () => reject(request.error ?? new Error("Generation task indexed list failed"));
+    transaction.onerror = () => reject(transaction.error ?? request.error ?? new Error("Generation task indexed list transaction failed"));
+  });
+}
+
+async function readGenerationTaskCandidates(options: ListGenerationTasksOptions): Promise<GenerationTask[]> {
+  if (options.boardId && options.boardId.trim()) {
+    return readGenerationTasksByIndex("by_boardId", options.boardId);
+  }
+  if (options.statuses?.length === 1) {
+    return readGenerationTasksByIndex("by_status", options.statuses[0]);
+  }
+  if (options.statuses && options.statuses.length > 1) {
+    const groups = await Promise.all(options.statuses.map(status => readGenerationTasksByIndex("by_status", status)));
+    return sortedUniqueTasks(groups.flat());
+  }
+  return readAllGenerationTasks();
+}
+
 export async function saveGenerationTask(task: GenerationTask): Promise<void> {
   const db = await openDatabase();
   return new Promise((resolve, reject) => {
@@ -196,13 +238,7 @@ export async function getGenerationTask(id: string): Promise<GenerationTask | nu
 }
 
 export async function listGenerationTasks(options: ListGenerationTasksOptions = {}): Promise<GenerationTask[]> {
-  const db = await openDatabase();
-  const tasks = await new Promise<GenerationTask[]>((resolve, reject) => {
-    const transaction = db.transaction(GENERATION_TASK_STORE, "readonly");
-    const request = transaction.objectStore(GENERATION_TASK_STORE).getAll();
-    request.onsuccess = () => resolve(request.result as GenerationTask[]);
-    request.onerror = () => reject(request.error ?? new Error("Generation task list failed"));
-  });
+  const tasks = await readGenerationTaskCandidates(options);
   const allowedStatuses = options.statuses ? new Set(options.statuses) : null;
   const allowedNodeIds = options.sourceBoardNodeIds ? new Set(options.sourceBoardNodeIds) : null;
   let filtered = tasks;

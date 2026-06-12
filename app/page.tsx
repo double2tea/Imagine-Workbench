@@ -1555,7 +1555,7 @@ export default function Home() {
     const labelByKind: Record<WorkspaceCleanupKind, string> = {
       failed: "失败任务",
       "stale-processing": "超过 2 小时的处理中/排队任务",
-      "broken-complete": "无媒体 URL 的完成记录",
+      "broken-complete": "缺少媒体内容的完成记录",
       orphaned: "未被任何画板引用的完成资产",
     };
     if (!(await confirmAction({ message: `确认清理${labelByKind[kind]}吗？`, tone: "danger", confirmLabel: "清理" }))) return;
