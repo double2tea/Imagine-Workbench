@@ -323,8 +323,18 @@ export default function CanvasMaskEditor({
   const [outpaintCursorValue, setOutpaintCursorValue] = useState("default");
 
   const currentOutpaintPreviewSize = outpaintPreviewSize(canvasSize, outpaintMargins);
-  const editorStageSize = editorMode === "outpaint" ? currentOutpaintPreviewSize : canvasSize;
-  const resolutionAspectRatio = aspectRatioFromSize(operation === "outpaint" ? currentOutpaintPreviewSize : canvasSize);
+  const isOutpaintMode = editorMode === "outpaint";
+  const editorStageSize = isOutpaintMode ? currentOutpaintPreviewSize : canvasSize;
+  const editorStageScale = isOutpaintMode ? Math.min(
+    1,
+    getEditorCanvasBounds().width / Math.max(1, editorStageSize.width),
+    getEditorCanvasBounds().height / Math.max(1, editorStageSize.height),
+  ) : 1;
+  const editorStageDisplaySize = {
+    width: Math.max(1, Math.round(editorStageSize.width * editorStageScale)),
+    height: Math.max(1, Math.round(editorStageSize.height * editorStageScale)),
+  };
+  const resolutionAspectRatio = aspectRatioFromSize(editorStageSize);
   const resolutionOptions = getEditorResolutionOptions(editModel, resolutionAspectRatio);
   const selectedImageResolution = resolutionOptions.some(option => option.value === imageResolution)
     ? imageResolution
@@ -906,146 +916,156 @@ export default function CanvasMaskEditor({
               <div
                 className="relative shrink-0 select-none overflow-hidden rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] shadow-inner"
                 style={{
-                  width: editorStageSize.width,
-                  height: editorStageSize.height,
+                  width: editorStageDisplaySize.width,
+                  height: editorStageDisplaySize.height,
                   backgroundImage: editorMode === "outpaint" || editorMode === "compare" ? undefined : `url(${workingImageUrl})`,
                   backgroundPosition: "center",
                   backgroundSize: "100% 100%",
                 }}
               >
-              {editorMode === "outpaint" && (
-                <>
-                  <div
-                    className="pointer-events-none absolute z-0 bg-[var(--iw-bg)]/70"
-                    style={{
-                      left: outpaintMargins.left,
-                      top: outpaintMargins.top,
-                      width: canvasSize.width,
-                      height: canvasSize.height,
-                      backgroundImage: `url(${workingImageUrl})`,
-                      backgroundPosition: "center",
-                      backgroundSize: "100% 100%",
-                    }}
-                  />
-                  <div
-                    className="pointer-events-none absolute z-20 border border-blue-200/80 shadow-[0_0_0_9999px_rgba(59,130,246,0.10)]"
-                    style={{
-                      left: outpaintMargins.left,
-                      top: outpaintMargins.top,
-                      width: canvasSize.width,
-                      height: canvasSize.height,
-                    }}
-                  />
-                  {(["left", "right", "top", "bottom"] as const).map(side => (
-                    <span
-                      key={side}
-                      className="pointer-events-none absolute z-30 rounded-full border border-blue-200/80 bg-blue-500/80 shadow-lg shadow-blue-950/35"
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    width: editorStageSize.width,
+                    height: editorStageSize.height,
+                  transform: isOutpaintMode ? `scale(${editorStageScale})` : undefined,
+                    transformOrigin: "top left",
+                  }}
+                >
+                {editorMode === "outpaint" && (
+                  <>
+                    <div
+                      className="pointer-events-none absolute z-0 bg-[var(--iw-bg)]/70"
                       style={{
-                        height: side === "left" || side === "right" ? 44 : 10,
-                        width: side === "left" || side === "right" ? 10 : 44,
-                        left: side === "left" ? 4 : side === "right" ? editorStageSize.width - 14 : "50%",
-                        top: side === "top" ? 4 : side === "bottom" ? editorStageSize.height - 14 : "50%",
-                        transform: "translate(-50%, -50%)",
+                        left: outpaintMargins.left,
+                        top: outpaintMargins.top,
+                        width: canvasSize.width,
+                        height: canvasSize.height,
+                        backgroundImage: `url(${workingImageUrl})`,
+                        backgroundPosition: "center",
+                        backgroundSize: "100% 100%",
                       }}
                     />
-                  ))}
-                </>
-              )}
-              <canvas
-                ref={canvasRef}
-                width={editorStageSize.width}
-                height={editorStageSize.height}
-                onPointerDown={handlePointerDown}
-                onPointerMove={handlePointerMove}
-                onPointerUp={stopPointerAction}
-                onPointerCancel={stopPointerAction}
-                onPointerLeave={stopPointerAction}
-                className="absolute inset-0 z-10 touch-none"
-                style={{
-                  cursor: editorMode === "text"
-                    ? "text"
-                    : editorMode === "crop"
-                      ? cropCursor
-                      : editorMode === "outpaint"
-                        ? outpaintCursorValue
-                        : editorMode === "compare"
-                          ? "default"
-                          : "crosshair",
-                }}
-              />
-              {editorMode === "compare" && (
-                <div className="pointer-events-none absolute inset-0 z-40 grid grid-cols-2 overflow-hidden">
-                  {[
-                    { label: "原图", url: imageUrl },
-                    { label: "当前", url: compareCurrentUrl ?? workingImageUrl },
-                  ].map(item => (
                     <div
-                      key={item.label}
-                      className="relative border-r border-[var(--iw-border)] bg-[var(--iw-bg)] bg-contain bg-center bg-no-repeat last:border-r-0"
-                      style={{ backgroundImage: `url(${item.url})` }}
-                    >
-                      <span className="absolute left-2 top-2 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)]/80 px-2 py-1 text-[10px] font-semibold text-[var(--iw-text)] shadow-sm backdrop-blur-md">
-                        {item.label}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {textItems.map(item => (
-                <span
-                  key={item.id}
-                  className="pointer-events-none absolute z-20 max-w-full whitespace-pre-wrap break-words px-1 text-center font-bold leading-none"
-                  style={{
-                    color: item.color,
-                    fontSize: item.size,
-                    left: item.x,
-                    top: item.y,
-                    textShadow: item.color === "#111827" ? "0 1px 4px rgba(255,255,255,0.8)" : "0 1px 5px rgba(0,0,0,0.8)",
-                    transform: "translate(-50%, -50%)",
-                  }}
-                >
-                  {item.value}
-                </span>
-              ))}
-
-              {cropRect && (
-                <div
-                  className="pointer-events-none absolute z-30 border border-blue-300 bg-blue-400/12 shadow-[0_0_0_9999px_rgba(2,6,23,0.45)]"
-                  style={{
-                    left: cropRect.x,
-                    top: cropRect.y,
-                    width: cropRect.width,
-                    height: cropRect.height,
-                  }}
-                >
-                  <span className="absolute left-1/3 top-0 h-full border-l border-blue-100/35" />
-                  <span className="absolute left-2/3 top-0 h-full border-l border-blue-100/35" />
-                  <span className="absolute left-0 top-1/3 w-full border-t border-blue-100/35" />
-                  <span className="absolute left-0 top-2/3 w-full border-t border-blue-100/35" />
-                  <span className="absolute left-2 top-2 rounded bg-[var(--iw-bg)]/75 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-blue-100 shadow-sm">
-                    {cropSizeLabel}
-                  </span>
-                  {(["nw", "ne", "se", "sw", "n", "e", "s", "w"] as const).map(handle => {
-                    const isWest = handle.includes("w");
-                    const isEast = handle.includes("e");
-                    const isNorth = handle.includes("n");
-                    const isSouth = handle.includes("s");
-
-                    return (
+                      className="pointer-events-none absolute z-20 border border-blue-200/80 shadow-[0_0_0_9999px_rgba(59,130,246,0.10)]"
+                      style={{
+                        left: outpaintMargins.left,
+                        top: outpaintMargins.top,
+                        width: canvasSize.width,
+                        height: canvasSize.height,
+                      }}
+                    />
+                    {(["left", "right", "top", "bottom"] as const).map(side => (
                       <span
-                        key={handle}
-                        className="absolute h-3 w-3 rounded-sm border border-blue-200 bg-[var(--iw-bg)] shadow-sm shadow-blue-950/40"
+                        key={side}
+                        className="pointer-events-none absolute z-30 rounded-full border border-blue-200/80 bg-blue-500/80 shadow-lg shadow-blue-950/35"
                         style={{
-                          left: isWest ? 0 : isEast ? "100%" : "50%",
-                          top: isNorth ? 0 : isSouth ? "100%" : "50%",
+                          height: side === "left" || side === "right" ? 44 : 10,
+                          width: side === "left" || side === "right" ? 10 : 44,
+                          left: side === "left" ? 4 : side === "right" ? editorStageSize.width - 14 : "50%",
+                          top: side === "top" ? 4 : side === "bottom" ? editorStageSize.height - 14 : "50%",
                           transform: "translate(-50%, -50%)",
                         }}
                       />
-                    );
-                  })}
-                </div>
-              )}
+                    ))}
+                  </>
+                )}
+                <canvas
+                  ref={canvasRef}
+                  width={editorStageSize.width}
+                  height={editorStageSize.height}
+                  onPointerDown={handlePointerDown}
+                  onPointerMove={handlePointerMove}
+                  onPointerUp={stopPointerAction}
+                  onPointerCancel={stopPointerAction}
+                  onPointerLeave={stopPointerAction}
+                  className="absolute inset-0 z-10 touch-none"
+                  style={{
+                    cursor: editorMode === "text"
+                      ? "text"
+                      : editorMode === "crop"
+                        ? cropCursor
+                        : editorMode === "outpaint"
+                          ? outpaintCursorValue
+                          : editorMode === "compare"
+                            ? "default"
+                            : "crosshair",
+                  }}
+                />
+                {editorMode === "compare" && (
+                  <div className="pointer-events-none absolute inset-0 z-40 grid grid-cols-2 overflow-hidden">
+                    {[
+                      { label: "原图", url: imageUrl },
+                      { label: "当前", url: compareCurrentUrl ?? workingImageUrl },
+                    ].map(item => (
+                      <div
+                        key={item.label}
+                        className="relative border-r border-[var(--iw-border)] bg-[var(--iw-bg)] bg-contain bg-center bg-no-repeat last:border-r-0"
+                        style={{ backgroundImage: `url(${item.url})` }}
+                      >
+                        <span className="absolute left-2 top-2 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)]/80 px-2 py-1 text-[10px] font-semibold text-[var(--iw-text)] shadow-sm backdrop-blur-md">
+                          {item.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {textItems.map(item => (
+                  <span
+                    key={item.id}
+                    className="pointer-events-none absolute z-20 max-w-full whitespace-pre-wrap break-words px-1 text-center font-bold leading-none"
+                    style={{
+                      color: item.color,
+                      fontSize: item.size,
+                      left: item.x,
+                      top: item.y,
+                      textShadow: item.color === "#111827" ? "0 1px 4px rgba(255,255,255,0.8)" : "0 1px 5px rgba(0,0,0,0.8)",
+                      transform: "translate(-50%, -50%)",
+                    }}
+                  >
+                    {item.value}
+                  </span>
+                ))}
+
+                {cropRect && (
+                  <div
+                    className="pointer-events-none absolute z-30 border border-blue-300 bg-blue-400/12 shadow-[0_0_0_9999px_rgba(2,6,23,0.45)]"
+                    style={{
+                      left: cropRect.x,
+                      top: cropRect.y,
+                      width: cropRect.width,
+                      height: cropRect.height,
+                    }}
+                  >
+                    <span className="absolute left-1/3 top-0 h-full border-l border-blue-100/35" />
+                    <span className="absolute left-2/3 top-0 h-full border-l border-blue-100/35" />
+                    <span className="absolute left-0 top-1/3 w-full border-t border-blue-100/35" />
+                    <span className="absolute left-0 top-2/3 w-full border-t border-blue-100/35" />
+                    <span className="absolute left-2 top-2 rounded bg-[var(--iw-bg)]/75 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-blue-100 shadow-sm">
+                      {cropSizeLabel}
+                    </span>
+                    {(["nw", "ne", "se", "sw", "n", "e", "s", "w"] as const).map(handle => {
+                      const isWest = handle.includes("w");
+                      const isEast = handle.includes("e");
+                      const isNorth = handle.includes("n");
+                      const isSouth = handle.includes("s");
+
+                      return (
+                        <span
+                          key={handle}
+                          className="absolute h-3 w-3 rounded-sm border border-blue-200 bg-[var(--iw-bg)] shadow-sm shadow-blue-950/40"
+                          style={{
+                            left: isWest ? 0 : isEast ? "100%" : "50%",
+                            top: isNorth ? 0 : isSouth ? "100%" : "50%",
+                            transform: "translate(-50%, -50%)",
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
               </div>
             )}
           </div>
