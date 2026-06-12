@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bot, FileText, ImagePlus, Layers3, MousePointerClick, Upload, type LucideIcon } from "lucide-react";
+import { Bot, FileText, ImagePlus, Layers3, MousePointerClick, Plus, Upload, type LucideIcon } from "lucide-react";
 
 const BOARD_HANDLES_HINT_KEY = "imagine_board_handles_hint_seen";
 
@@ -9,6 +9,10 @@ interface StartAction {
   description: string;
   icon: LucideIcon;
   label: string;
+}
+
+interface BoardEmptyHintProps {
+  onQuickInsert?: () => void;
 }
 
 const START_ACTIONS: readonly StartAction[] = [
@@ -25,7 +29,7 @@ function readHandlesHintSeen(): boolean {
   return window.localStorage.getItem(BOARD_HANDLES_HINT_KEY) === "1";
 }
 
-export default function BoardEmptyHint() {
+export default function BoardEmptyHint({ onQuickInsert }: BoardEmptyHintProps) {
   const [handlesHintSeen, setHandlesHintSeen] = useState(true);
 
   useEffect(() => {
@@ -42,25 +46,39 @@ export default function BoardEmptyHint() {
 
   return (
     <div className="imagine-board-empty-hint">
-      <div className="imagine-board-empty-hint-card pointer-events-auto">
+      <div
+        className="imagine-board-empty-hint-card pointer-events-auto"
+        onClick={event => event.stopPropagation()}
+        onPointerDown={event => event.stopPropagation()}
+      >
         <p className="text-sm font-semibold text-[var(--iw-text)]">从一个动作开始</p>
         <p className="mt-2 text-xs leading-5 text-[var(--iw-muted)]">
           顶栏导入、拖入文件、粘贴媒体，或双击空白处插入节点。
         </p>
+        {onQuickInsert ? (
+          <button
+            type="button"
+            onClick={onQuickInsert}
+            className="board-empty-start-action mt-4 flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-[var(--iw-border)] text-xs font-semibold text-[var(--iw-text)] transition"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            打开插入菜单
+          </button>
+        ) : null}
         <div className="mt-4 grid grid-cols-2 gap-1.5 text-left">
           {START_ACTIONS.map(action => {
             const Icon = action.icon;
             return (
-            <span
-              key={action.label}
-              className="board-empty-start-step rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5 text-[11px] font-semibold text-[var(--iw-text)]"
-            >
-              <Icon className="h-3.5 w-3.5 text-[var(--iw-muted)]" />
-              <span className="min-w-0">
-                <span className="block truncate">{action.label}</span>
-                <span className="block truncate text-[10px] font-medium text-[var(--iw-faint)]">{action.description}</span>
+              <span
+                key={action.label}
+                className="board-empty-start-step rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5 text-[11px] font-semibold text-[var(--iw-text)]"
+              >
+                <Icon className="h-3.5 w-3.5 text-[var(--iw-muted)]" />
+                <span className="min-w-0">
+                  <span className="block truncate">{action.label}</span>
+                  <span className="block truncate text-[10px] font-medium text-[var(--iw-faint)]">{action.description}</span>
+                </span>
               </span>
-            </span>
             );
           })}
         </div>

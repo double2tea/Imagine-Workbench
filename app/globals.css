@@ -2053,12 +2053,28 @@ html[data-imagine-theme="light"] .imagine-settings-overlay {
 }
 
 .imagine-board-empty-hint-card {
-  max-width: 320px;
+  max-width: 340px;
   padding: 20px 22px;
   border-radius: var(--iw-radius-lg);
-  border: 1px dashed var(--iw-border);
-  background: color-mix(in srgb, var(--iw-panel) 92%, transparent);
-  box-shadow: var(--iw-card-shadow);
+  border: 1px solid color-mix(in srgb, var(--iw-border) 76%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--iw-panel-solid) 92%, transparent), color-mix(in srgb, var(--iw-panel) 88%, transparent)),
+    var(--iw-panel);
+  box-shadow:
+    var(--iw-card-shadow),
+    inset 0 1px 0 color-mix(in srgb, var(--iw-text) 7%, transparent);
+}
+
+.board-empty-start-action {
+  background: linear-gradient(180deg, var(--iw-accent), var(--iw-accent-strong));
+  color: #ffffff;
+  box-shadow: 0 12px 28px var(--iw-accent-glow);
+}
+
+.board-empty-start-action:hover {
+  border-color: color-mix(in srgb, var(--iw-accent) 54%, var(--iw-border));
+  filter: brightness(1.04);
+  transform: translateY(-1px);
 }
 
 .board-empty-start-step {
@@ -2067,6 +2083,7 @@ html[data-imagine-theme="light"] .imagine-settings-overlay {
   align-items: center;
   gap: 6px;
   min-height: 42px;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--iw-text) 5%, transparent);
 }
 
 .board-empty-start-step svg {

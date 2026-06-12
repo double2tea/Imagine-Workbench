@@ -2563,6 +2563,26 @@ export default function BoardWorkspace({
     });
   }, [flowPositionFromClient, selectEdge, selectNode, updateSelectedNodeIds]);
 
+  const openEmptyStateQuickInsertMenu = useCallback((): void => {
+    const rect = flowHostRef.current?.getBoundingClientRect();
+    if (!rect) {
+      onWorkspaceNotice("info", "无法确定插入位置，请先双击画布");
+      return;
+    }
+    const clientX = rect.left + rect.width / 2;
+    const clientY = rect.top + rect.height / 2;
+    setNodeContextMenu(null);
+    selectNode(null);
+    selectEdge(null);
+    updateSelectedNodeIds([]);
+    setQuickInsertMenu({
+      clientX,
+      clientY,
+      position: flowPositionFromClient(clientX, clientY),
+      selectedNodeIds: [],
+    });
+  }, [flowPositionFromClient, onWorkspaceNotice, selectEdge, selectNode, updateSelectedNodeIds]);
+
   const handleCanvasContextMenu = useCallback((event: ReactMouseEvent<HTMLElement>): void => {
     if (event.defaultPrevented || isTextEntryTarget(event.target)) return;
     event.preventDefault();
@@ -2947,7 +2967,9 @@ export default function BoardWorkspace({
               style={multiGridDropOverlayStyle}
             />
           )}
-          {board.nodes.length === 0 && <BoardEmptyHint />}
+          {saveStatus !== "loading" && board.nodes.length === 0 && (
+            <BoardEmptyHint onQuickInsert={openEmptyStateQuickInsertMenu} />
+          )}
           {quickInsertMenu ? (
             <BoardQuickInsertMenu
               clientX={quickInsertMenu.clientX}
