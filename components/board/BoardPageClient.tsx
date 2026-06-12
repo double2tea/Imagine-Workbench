@@ -111,6 +111,7 @@ import {
 } from "@/lib/reference-images";
 import { transcriptFromDataUrl } from "@/lib/transcripts";
 import {
+  DEFAULT_AUDIO_ASSET_NODE_SIZE,
   DEFAULT_BOARD_ID,
   DEFAULT_AGENT_NODE_SIZE,
   DEFAULT_ASSET_NODE_SIZE,
@@ -342,12 +343,74 @@ function boardUploadIdPrefix(type: MediaReferenceType, index: number): string {
 
 const BOARD_IMPORT_GRID_COLUMNS = 4;
 const BOARD_IMPORT_NODE_GAP = 40;
+const BOARD_IMPORT_IMAGE_MAX_SIZE: BoardSize = { width: 420, height: 340 };
+const BOARD_IMPORT_IMAGE_MIN_SIZE: BoardSize = { width: 220, height: 180 };
 
-function boardImportNodePosition(origin: BoardPoint, index: number): BoardPoint {
+interface ImportedBoardItem {
+  item: StorageItem;
+  nodeSize: BoardSize;
+}
+
+function readImageDataUrlSize(url: string): Promise<BoardSize> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      if (image.naturalWidth <= 0 || image.naturalHeight <= 0) {
+        reject(new Error("图片尺寸无效"));
+        return;
+      }
+      resolve({ width: image.naturalWidth, height: image.naturalHeight });
+    };
+    image.onerror = () => reject(new Error("图片尺寸读取失败"));
+    image.src = url;
+  });
+}
+
+function fitBoardImportImageNodeSize(size: BoardSize): BoardSize {
+  if (size.width <= 0 || size.height <= 0) throw new Error("图片尺寸无效");
+  const aspectRatio = size.width / size.height;
+  let width = BOARD_IMPORT_IMAGE_MAX_SIZE.width;
+  let height = width / aspectRatio;
+
+  if (height > BOARD_IMPORT_IMAGE_MAX_SIZE.height) {
+    height = BOARD_IMPORT_IMAGE_MAX_SIZE.height;
+    width = height * aspectRatio;
+  }
+
   return {
-    x: origin.x + (index % BOARD_IMPORT_GRID_COLUMNS) * (DEFAULT_ASSET_NODE_SIZE.width + BOARD_IMPORT_NODE_GAP),
-    y: origin.y + Math.floor(index / BOARD_IMPORT_GRID_COLUMNS) * (DEFAULT_ASSET_NODE_SIZE.height + BOARD_IMPORT_NODE_GAP),
+    width: Math.round(Math.max(BOARD_IMPORT_IMAGE_MIN_SIZE.width, Math.min(BOARD_IMPORT_IMAGE_MAX_SIZE.width, width))),
+    height: Math.round(Math.max(BOARD_IMPORT_IMAGE_MIN_SIZE.height, Math.min(BOARD_IMPORT_IMAGE_MAX_SIZE.height, height))),
   };
+}
+
+async function boardImportNodeSize(item: StorageItem): Promise<BoardSize> {
+  if (item.type === "audio") return DEFAULT_AUDIO_ASSET_NODE_SIZE;
+  if (item.type === "video") return DEFAULT_ASSET_NODE_SIZE;
+  if (item.type !== "image") throw new Error("画板只支持导入图片、视频或音频文件");
+  return fitBoardImportImageNodeSize(await readImageDataUrlSize(item.url));
+}
+
+function boardImportNodePositions(origin: BoardPoint, sizes: readonly BoardSize[]): BoardPoint[] {
+  if (sizes.length === 0) return [];
+  const columnCount = Math.min(BOARD_IMPORT_GRID_COLUMNS, sizes.length);
+  const rowCount = Math.ceil(sizes.length / columnCount);
+  const columnWidths = Array.from({ length: columnCount }, () => 0);
+  const rowHeights = Array.from({ length: rowCount }, () => 0);
+
+  sizes.forEach((size, index) => {
+    const column = index % columnCount;
+    const row = Math.floor(index / columnCount);
+    columnWidths[column] = Math.max(columnWidths[column], size.width);
+    rowHeights[row] = Math.max(rowHeights[row], size.height);
+  });
+
+  return sizes.map((_size, index) => {
+    const column = index % columnCount;
+    const row = Math.floor(index / columnCount);
+    const x = columnWidths.slice(0, column).reduce((sum, width) => sum + width + BOARD_IMPORT_NODE_GAP, origin.x);
+    const y = rowHeights.slice(0, row).reduce((sum, height) => sum + height + BOARD_IMPORT_NODE_GAP, origin.y);
+    return { x, y };
+  });
 }
 
 function getProviderLabel(provider: AiProvider, customProviders: readonly CustomProviderDefinition[] = []): string {
@@ -3472,7 +3535,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       return;
     }
 
-    const importedItems: StorageItem[] = [];
+    const importedItems: ImportedBoardItem[] = [];
     for (let index = 0; index < boardFiles.length; index += 1) {
       const file = boardFiles[index];
       try {
@@ -3483,22 +3546,30 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           makeClientId(boardUploadIdPrefix(mediaType, index)),
           resolvedBoardId,
         );
+        const nodeSize = await boardImportNodeSize(item);
         const savedItem = await saveItemOrWarn(item, pushWorkspaceNotice);
         if (!savedItem) continue;
-        importedItems.push(savedItem);
+        importedItems.push({ item: savedItem, nodeSize });
       } catch (error) {
         pushWorkspaceNotice("error", toErrorMessage(error, `${file.name || "文件"} 导入失败`));
       }
     }
 
     if (importedItems.length === 0) return;
-    boardController.addAssetNodes(importedItems.map((item, index) => ({
-      asset: boardAssetReferenceFromStorageItem(item),
-      position: boardImportNodePosition(position, index),
-    })));
+    const nodePositions = boardImportNodePositions(position, importedItems.map(imported => imported.nodeSize));
+    const inputs = importedItems.map((imported, index) => ({
+      asset: boardAssetReferenceFromStorageItem(imported.item),
+      position: nodePositions[index],
+      size: importedItems.length > 1 ? imported.nodeSize : undefined,
+    }));
+    if (inputs.length > 1) {
+      boardController.addAssetNodesInGroup(inputs);
+    } else {
+      boardController.addAssetNodes(inputs);
+    }
     setItems(prev => [
-      ...importedItems,
-      ...prev.filter(item => !importedItems.some(importedItem => importedItem.id === item.id)),
+      ...importedItems.map(imported => imported.item),
+      ...prev.filter(item => !importedItems.some(imported => imported.item.id === item.id)),
     ]);
     pushWorkspaceNotice("success", `已导入 ${importedItems.length} 个文件到画板`);
   }, [boardController, pushWorkspaceNotice, resolvedBoardId]);

@@ -99,6 +99,11 @@ interface CompleteGenerationResultUpdate {
   status: BoardGenerationStatus;
 }
 
+interface AddAssetNodesInGroupResult {
+  groupId: string;
+  nodeIds: string[];
+}
+
 const DEFAULT_CUSTOM_IMAGE_RESOLUTION = "2560x1440";
 const DEFAULT_VARIANT_COUNT: BoardGenerateVariantCount = 1;
 const DEFAULT_BOARD_IMAGE_MODEL = "modelscope:Qwen/Qwen-Image";
@@ -141,6 +146,7 @@ export interface BoardStateController {
   addAgentNode: (input?: CreateAgentNodeInput) => string;
   addAssetNode: (input: CreateAssetNodeInput) => string;
   addAssetNodes: (inputs: CreateAssetNodeInput[]) => string[];
+  addAssetNodesInGroup: (inputs: CreateAssetNodeInput[]) => AddAssetNodesInGroupResult;
   addAssetNodeWithConnection: (input: CreateAssetNodeInput, from: BoardPortRef) => string;
   addResultNodeWithConnection: (input: CreateResultNodeInput, from: BoardPortRef) => string;
   completeGenerationResult: (sourceNodeId: string, update: CompleteGenerationResultUpdate) => void;
@@ -1560,6 +1566,46 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     return nodesToAdd.map(node => node.id);
   }, [board.nodes, mutateBoard]);
 
+  const addAssetNodesInGroup = useCallback((inputs: CreateAssetNodeInput[]): AddAssetNodesInGroupResult => {
+    if (inputs.length < 2) throw new Error("至少需要两个资产节点才能自动打组");
+    const nodesToAdd: BoardNode[] = [];
+    for (const input of inputs) {
+      const node = createAssetBoardNode(input, [...board.nodes, ...nodesToAdd]);
+      nodesToAdd.push(node);
+    }
+    const nodeIds = nodesToAdd.map(node => node.id);
+    const groupId = createBoardId("group");
+    mutateBoard(currentBoard => {
+      const combinedNodes = [...currentBoard.nodes, ...nodesToAdd];
+      const layout = createBoardGroupLayout(combinedNodes, nodeIds);
+      if (!layout) throw new Error("无法为导入资产创建分组布局");
+      const updatedAt = nowIso();
+      const groupNode: BoardGroupNode = {
+        id: groupId,
+        kind: "group",
+        title: "导入媒体组",
+        parentId: layout.parentId,
+        position: layout.position,
+        size: layout.size,
+        createdAt: updatedAt,
+        updatedAt,
+      };
+      const nextNodes = combinedNodes.map(node => {
+        const position = layout.childPositions.get(node.id);
+        return position ? { ...node, parentId: groupId, position, updatedAt } : node;
+      });
+      const firstChildIndex = nextNodes.findIndex(node => nodeIds.includes(node.id));
+      const insertIndex = firstChildIndex >= 0 ? firstChildIndex : nextNodes.length;
+      return touchBoard(
+        currentBoard,
+        [...nextNodes.slice(0, insertIndex), groupNode, ...nextNodes.slice(insertIndex)],
+      );
+    });
+    setSelectedNodeId(groupId);
+    setSelectedEdgeId(null);
+    return { groupId, nodeIds };
+  }, [board.nodes, mutateBoard]);
+
   const addAssetNodeWithConnection = useCallback((input: CreateAssetNodeInput, from: BoardPortRef): string => {
     const node = createAssetBoardNode(input, board.nodes);
     const to: BoardPortRef = { nodeId: node.id, portId: BOARD_PORT_IDS.assetIn, portKind: "asset" };
@@ -2697,6 +2743,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       addAgentNode,
       addAssetNode,
       addAssetNodes,
+      addAssetNodesInGroup,
       addAssetNodeWithConnection,
       addResultNodeWithConnection,
       completeGenerationResult,
@@ -2749,6 +2796,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       addAgentNode,
       addAssetNode,
       addAssetNodes,
+      addAssetNodesInGroup,
       addAssetNodeWithConnection,
       addResultNodeWithConnection,
       addGenerateNode,
