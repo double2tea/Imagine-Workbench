@@ -268,7 +268,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
     if (!shell || !titleChrome) return;
 
     const updateTitleChromeWidth = () => {
-      const nextWidth = Math.ceil(titleChrome.getBoundingClientRect().width + MEDIA_TOP_CHROME_GAP);
+      const nextWidth = titleChrome.offsetWidth + MEDIA_TOP_CHROME_GAP;
       shell.style.setProperty("--board-media-title-chrome-width", `${nextWidth}px`);
     };
 
