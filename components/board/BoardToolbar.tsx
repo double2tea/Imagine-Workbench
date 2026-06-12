@@ -344,11 +344,11 @@ export default function BoardToolbar({
           <button
             type="button"
             onClick={onImportMedia}
-            className={`${headerBtn} shrink-0`}
+            className={`${headerBtn} hidden shrink-0 lg:flex`}
             title="导入图片、视频或音频到画布"
           >
             <Upload className="h-3.5 w-3.5 text-emerald-300" />
-            <span className="hidden md:inline">导入媒体</span>
+            <span>导入媒体</span>
           </button>
 
           <div className="flex items-center gap-1">
@@ -389,7 +389,7 @@ export default function BoardToolbar({
             <button
               type="button"
               onClick={onRestoreTrash}
-              className={`${headerBtn} hidden sm:flex`}
+              className={`${headerBtn} hidden lg:flex`}
               title="恢复最近删除的节点"
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -428,7 +428,7 @@ export default function BoardToolbar({
                   setIsOverflowOpen(false);
                   onImportMedia();
                 }}
-                className="imagine-board-header-menu-action"
+                className="imagine-board-header-menu-action lg:hidden"
               >
                 <Upload className="h-3.5 w-3.5" />
                 导入媒体
@@ -491,8 +491,9 @@ export default function BoardToolbar({
                     setIsOverflowOpen(false);
                     onRestoreTrash();
                   }}
-                  className="imagine-board-header-menu-action sm:hidden"
+                  className="imagine-board-header-menu-action lg:hidden"
                 >
+                  <Trash2 className="h-3.5 w-3.5" />
                   恢复删除 ({trashedCount})
                 </button>
               ) : null}
