@@ -438,11 +438,37 @@ html::-webkit-scrollbar-thumb:hover {
 }
 
 .imagine-board-controls,
+.imagine-board-view-controls,
 .imagine-board-minimap {
   border-radius: 8px;
   border: 1px solid var(--iw-border);
   background: var(--iw-panel);
   color: var(--iw-text);
+}
+
+.imagine-board-view-controls {
+  display: flex;
+  margin-left: 50px;
+  overflow: hidden;
+}
+
+.imagine-board-view-toggle {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  color: var(--iw-muted);
+  transition: background-color 160ms var(--iw-ease-out), color 160ms var(--iw-ease-out);
+}
+
+.imagine-board-view-toggle + .imagine-board-view-toggle {
+  border-left: 1px solid var(--iw-border);
+}
+
+.imagine-board-view-toggle:hover,
+.imagine-board-view-toggle[data-state="on"] {
+  background: var(--iw-panel-soft);
+  color: var(--iw-board-accent-amber);
 }
 
 .imagine-board-edge {
@@ -3555,25 +3581,6 @@ html[data-imagine-theme="light"] .imagine-root-body {
   color: color-mix(in srgb, var(--iw-board-accent-amber) 70%, var(--iw-text));
 }
 
-.board-toolbar-toggle-state {
-  margin-left: auto;
-  min-width: 1.75rem;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--iw-border) 75%, transparent);
-  background: color-mix(in srgb, var(--iw-bg) 28%, var(--iw-panel));
-  padding: 1px 6px;
-  text-align: center;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--iw-faint);
-}
-
-.imagine-board-header-menu-action[data-state="on"] .board-toolbar-toggle-state {
-  border-color: color-mix(in srgb, var(--iw-board-accent-amber) 36%, var(--iw-border));
-  background: color-mix(in srgb, var(--iw-board-accent-amber) 12%, var(--iw-panel));
-  color: var(--iw-board-accent-amber);
-}
-
 .imagine-board-header-menu-action[data-action="danger"] {
   color: #fca5a5;
 }
@@ -4677,6 +4684,7 @@ html[data-imagine-theme="light"] .imagine-required-chip,
 }
 
 .imagine-workbench-shell.imagine-theme-light .imagine-board-controls,
+.imagine-workbench-shell.imagine-theme-light .imagine-board-view-controls,
 .imagine-workbench-shell.imagine-theme-light .imagine-board-minimap {
   background: rgba(255, 255, 255, 0.95) !important;
   border-color: rgba(15, 23, 42, 0.12) !important;

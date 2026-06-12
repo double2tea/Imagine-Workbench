@@ -7,7 +7,6 @@ import {
   ChevronDown,
   Grid2X2,
   Layers,
-  Magnet,
   MoreHorizontal,
   CircleHelp,
   Moon,
@@ -40,9 +39,6 @@ interface BoardToolbarProps {
   nodeCount: number;
   saveError: string | null;
   saveStatus: BoardSaveStatus;
-  showGrid: boolean;
-  showMiniMap: boolean;
-  snapToGrid: boolean;
   trashedCount: number;
   onBack: () => void;
   onClear: () => void;
@@ -55,9 +51,6 @@ interface BoardToolbarProps {
   onRestoreTrash?: () => void;
   onSelectBoard: (boardId: string) => void;
   onUndo: () => void;
-  onToggleGrid: () => void;
-  onToggleMiniMap: () => void;
-  onToggleSnapToGrid: () => void;
 }
 
 function saveStatusMeta(status: BoardSaveStatus, error: string | null): {
@@ -118,9 +111,6 @@ export default function BoardToolbar({
   nodeCount,
   saveError,
   saveStatus,
-  showGrid,
-  showMiniMap,
-  snapToGrid,
   trashedCount,
   onBack,
   onClear,
@@ -133,9 +123,6 @@ export default function BoardToolbar({
   onRestoreTrash,
   onSelectBoard,
   onUndo,
-  onToggleGrid,
-  onToggleMiniMap,
-  onToggleSnapToGrid,
 }: BoardToolbarProps) {
   const { themeMode, toggleThemeMode } = useThemeMode();
   const showAlert = useAlert();
@@ -443,46 +430,6 @@ export default function BoardToolbar({
               >
                 <CircleHelp className="h-3.5 w-3.5" />
                 连线说明
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onToggleGrid();
-                  setIsOverflowOpen(false);
-                }}
-                className="imagine-board-header-menu-action"
-                data-state={showGrid ? "on" : "off"}
-                aria-pressed={showGrid}
-              >
-                <span>{showGrid ? "隐藏网格" : "显示网格"}</span>
-                <span className="board-toolbar-toggle-state">{showGrid ? "开" : "关"}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onToggleSnapToGrid();
-                  setIsOverflowOpen(false);
-                }}
-                className="imagine-board-header-menu-action"
-                data-state={snapToGrid ? "on" : "off"}
-                aria-pressed={snapToGrid}
-              >
-                <Magnet className="h-3.5 w-3.5" />
-                <span>{snapToGrid ? "关闭磁吸" : "开启磁吸"}</span>
-                <span className="board-toolbar-toggle-state">{snapToGrid ? "开" : "关"}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onToggleMiniMap();
-                  setIsOverflowOpen(false);
-                }}
-                className="imagine-board-header-menu-action"
-                data-state={showMiniMap ? "on" : "off"}
-                aria-pressed={showMiniMap}
-              >
-                <span>{showMiniMap ? "隐藏小地图" : "显示小地图"}</span>
-                <span className="board-toolbar-toggle-state">{showMiniMap ? "开" : "关"}</span>
               </button>
               {trashedCount > 0 && onRestoreTrash ? (
                 <button

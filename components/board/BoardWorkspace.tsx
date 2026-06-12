@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, Layers, Ungroup, Upload } from "lucide-react";
+import { Download, Grid2X2, Layers, Magnet, Map as MapIcon, Ungroup, Upload } from "lucide-react";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ChangeEvent, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import {
   BaseEdge,
@@ -14,6 +14,7 @@ import {
   MarkerType,
   MiniMap,
   NodeToolbar,
+  Panel,
   PanOnScrollMode,
   Position,
   ReactFlow,
@@ -2889,9 +2890,6 @@ export default function BoardWorkspace({
         boardId={board.id}
         boardSummaries={boardSummaries}
         boardTitle={board.title}
-        showGrid={board.config.showGrid}
-        showMiniMap={board.config.showMiniMap}
-        snapToGrid={board.config.snapToGrid}
         nodeCount={board.nodes.length}
         canRedo={canRedo}
         canUndo={canUndo}
@@ -2908,9 +2906,6 @@ export default function BoardWorkspace({
         onOpenSettings={onOpenSettings}
         onRenameBoard={onRenameBoard}
         onSelectBoard={onSelectBoard}
-        onToggleGrid={() => updateBoardConfig({ showGrid: !board.config.showGrid })}
-        onToggleMiniMap={() => updateBoardConfig({ showMiniMap: !board.config.showMiniMap })}
-        onToggleSnapToGrid={() => updateBoardConfig({ snapToGrid: !board.config.snapToGrid })}
         onImportMedia={() => openMediaImportPicker()}
       />
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto]">
@@ -2985,6 +2980,41 @@ export default function BoardWorkspace({
           >
             {board.config.showGrid && <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="var(--iw-board-handle)" />}
             <Controls className="imagine-board-controls" />
+            <Panel position="bottom-left" className="imagine-board-view-controls nodrag nopan">
+              <button
+                type="button"
+                onClick={() => updateBoardConfig({ showGrid: !board.config.showGrid })}
+                className="imagine-board-view-toggle"
+                data-state={board.config.showGrid ? "on" : "off"}
+                aria-pressed={board.config.showGrid}
+                aria-label={board.config.showGrid ? "隐藏网格" : "显示网格"}
+                title={board.config.showGrid ? "隐藏网格" : "显示网格"}
+              >
+                <Grid2X2 className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => updateBoardConfig({ snapToGrid: !board.config.snapToGrid })}
+                className="imagine-board-view-toggle"
+                data-state={board.config.snapToGrid ? "on" : "off"}
+                aria-pressed={board.config.snapToGrid}
+                aria-label={board.config.snapToGrid ? "关闭磁吸" : "开启磁吸"}
+                title={board.config.snapToGrid ? "关闭磁吸" : "开启磁吸"}
+              >
+                <Magnet className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => updateBoardConfig({ showMiniMap: !board.config.showMiniMap })}
+                className="imagine-board-view-toggle"
+                data-state={board.config.showMiniMap ? "on" : "off"}
+                aria-pressed={board.config.showMiniMap}
+                aria-label={board.config.showMiniMap ? "隐藏小地图" : "显示小地图"}
+                title={board.config.showMiniMap ? "隐藏小地图" : "显示小地图"}
+              >
+                <MapIcon className="h-3.5 w-3.5" />
+              </button>
+            </Panel>
             {shouldRenderMiniMap && (
               <MiniMap
                 className="imagine-board-minimap"
