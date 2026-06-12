@@ -3681,7 +3681,7 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 
 .board-node-shell[data-kind="asset"] .board-asset-node-chrome > h2,
 .board-node-shell[data-kind="result"] .board-asset-node-chrome > h2 {
-  min-height: 2rem;
+  min-height: 1.5rem;
   border-color: color-mix(in srgb, var(--iw-border) 70%, transparent) !important;
   background: color-mix(in srgb, var(--iw-panel-solid) 86%, transparent) !important;
   box-shadow:

@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import { AudioLines, ImagePlus, Layers, LayoutGrid, Music, Video, Workflow, X } from "lucide-react";
 import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
@@ -44,12 +44,6 @@ type BoardHandleZone = "edge" | "segment";
 
 const EMPTY_BOARD_PROMPT_REFERENCES: BoardPromptReference[] = [];
 const EMPTY_STORAGE_ITEMS: StorageItem[] = [];
-const MEDIA_TOP_CHROME_GAP = 12;
-const MEDIA_TITLE_CHROME_FALLBACK_WIDTH = "13rem";
-
-type BoardNodeShellStyle = CSSProperties & {
-  "--board-media-title-chrome-width"?: string;
-};
 
 interface BoardHandleProps {
   id: string;
@@ -239,17 +233,8 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
   const connectedResultNodeId = data.connectedResultNodeId;
   const focusConnectedResultNode = connectedResultNodeId ? () => c.onFocusNode(connectedResultNodeId) : undefined;
   const isMediaNode = node.kind === "asset" || node.kind === "result";
-  const shellRef = useRef<HTMLElement | null>(null);
-  const mediaTitleChromeRef = useRef<HTMLDivElement | null>(null);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [draftTitle, setDraftTitle] = useState(node.title);
-  const nodeShellStyle: BoardNodeShellStyle = isMediaNode
-    ? {
-        height: node.size.height,
-        width: node.size.width,
-        "--board-media-title-chrome-width": MEDIA_TITLE_CHROME_FALLBACK_WIDTH,
-      }
-    : { height: node.size.height, width: node.size.width };
   const ports = useMemo(
     () => getBoardNodePortDefinitions(node, { hasResultConnection: data.hasResultConnection }),
     [data.hasResultConnection, node],
@@ -260,23 +245,6 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
       setDraftTitle(currentTitle => currentTitle === node.title ? currentTitle : node.title);
     }
   }, [isEditingTitle, node.title]);
-
-  useLayoutEffect(() => {
-    if (!isMediaNode) return;
-    const shell = shellRef.current;
-    const titleChrome = mediaTitleChromeRef.current;
-    if (!shell || !titleChrome) return;
-
-    const updateTitleChromeWidth = () => {
-      const nextWidth = titleChrome.offsetWidth + MEDIA_TOP_CHROME_GAP;
-      shell.style.setProperty("--board-media-title-chrome-width", `${nextWidth}px`);
-    };
-
-    updateTitleChromeWidth();
-    const resizeObserver = new ResizeObserver(updateTitleChromeWidth);
-    resizeObserver.observe(titleChrome);
-    return () => resizeObserver.disconnect();
-  }, [isEditingTitle, isMediaNode, node.title]);
 
   const commitTitleEdit = () => {
     setIsEditingTitle(false);
@@ -388,11 +356,10 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
 
   return (
     <article
-      ref={shellRef}
       className={`board-node-shell imagine-board-node h-full !overflow-visible !rounded-lg ${selected ? "imagine-board-node-selected" : ""}`}
       data-kind={node.kind}
       data-selected={selected ? "true" : "false"}
-      style={nodeShellStyle}
+      style={{ height: node.size.height, width: node.size.width }}
     >
       {node.kind !== "multi-grid" && ports.map(handleForPort)}
       {selected && (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation" || node.kind === "runninghub-app") ? (
@@ -406,20 +373,19 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
       ) : null}
 
       <div
-        ref={isMediaNode ? mediaTitleChromeRef : undefined}
         className={[
-          "flex h-9 items-center gap-2",
+          "flex items-center",
           isMediaNode
-            ? "pointer-events-none absolute -top-10 left-0 z-30 max-w-full board-asset-node-chrome"
-            : "rounded-t-lg px-3 imagine-board-node-header",
+            ? "pointer-events-none absolute -top-7 left-0 z-30 h-6 max-w-full gap-1.5 board-asset-node-chrome"
+            : "h-9 gap-2 rounded-t-lg px-3 imagine-board-node-header",
         ].join(" ")}
       >
         {isEditingTitle ? (
           <input
             autoFocus
             className={[
-              "nodrag pointer-events-auto h-7 min-w-0 rounded-md border border-blue-400 bg-[var(--iw-panel)] px-2 text-xs font-semibold text-[var(--iw-text)] outline-none ring-2 ring-blue-500/20",
-              isMediaNode ? "w-48 shadow-sm" : "w-full",
+              "nodrag pointer-events-auto min-w-0 rounded-md border border-blue-400 bg-[var(--iw-panel)] font-semibold text-[var(--iw-text)] outline-none ring-2 ring-blue-500/20",
+              isMediaNode ? "h-6 w-40 px-1.5 text-[11px] shadow-sm" : "h-7 w-full px-2 text-xs",
             ].join(" ")}
             value={draftTitle}
             onBlur={commitTitleEdit}
@@ -437,10 +403,10 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
         ) : (
           <h2
             className={[
-              "nodrag pointer-events-auto flex min-w-0 items-center gap-2 truncate text-xs font-semibold text-[var(--iw-text)]",
+              "nodrag pointer-events-auto flex min-w-0 items-center truncate font-semibold text-[var(--iw-text)]",
               isMediaNode
-                ? "rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)]/92 px-2.5 shadow-sm backdrop-blur"
-                : "",
+                ? "gap-1 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)]/92 px-1.5 py-0.5 text-[11px] shadow-sm backdrop-blur [&>svg]:h-3 [&>svg]:w-3"
+                : "gap-2 text-xs",
             ].join(" ")}
             title="双击重命名"
             onDoubleClick={event => {
