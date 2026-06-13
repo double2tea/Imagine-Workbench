@@ -296,7 +296,18 @@ test("dynamic media model gating requires catalog-known media capabilities", () 
     value: "12ai:claude-video-chat",
     label: "12AI claude-video-chat",
   });
+  assert.equal(dynamicProviderModelOption("12ai", "unlisted-image-alpha", "all", "12AI"), null);
+  assert.equal(dynamicProviderModelOption("12ai", "unlisted-video-alpha", "all", "12AI"), null);
+  assert.equal(dynamicProviderModelOption("12ai", "unlisted-tts-alpha", "all", "12AI"), null);
+  assert.deepEqual(dynamicProviderModelOption("12ai", "frontier-alpha", "all", "12AI"), {
+    value: "12ai:frontier-alpha",
+    label: "12AI frontier-alpha",
+  });
   assert.deepEqual(dynamicProviderModelOption("runninghub", "api:/openapi/v2/minimax/hailuo-2.3/t2v-pro", "video", "RunningHub"), {
+    value: "runninghub:api:/openapi/v2/minimax/hailuo-2.3/t2v-pro",
+    label: "RunningHub api:/openapi/v2/minimax/hailuo-2.3/t2v-pro",
+  });
+  assert.deepEqual(dynamicProviderModelOption("runninghub", "api:/openapi/v2/minimax/hailuo-2.3/t2v-pro", "all", "RunningHub"), {
     value: "runninghub:api:/openapi/v2/minimax/hailuo-2.3/t2v-pro",
     label: "RunningHub api:/openapi/v2/minimax/hailuo-2.3/t2v-pro",
   });
