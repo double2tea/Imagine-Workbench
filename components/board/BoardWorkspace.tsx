@@ -2018,9 +2018,10 @@ export default function BoardWorkspace({
     if (sameBoardSelectionSnapshot(selectionRef.current, nextSelection)) return;
     selectionRef.current = nextSelection;
     updateSelectedNodeIds(ids);
+    onSelectedNodeIdsChange?.(ids);
     selectEdge(nextSelection.edgeId);
     selectNode(nextSelection.nodeId);
-  }, [board.nodes, selectEdge, selectedEdgeId, selectedNodeId, selectedNodeIds, selectNode, updateSelectedNodeIds]);
+  }, [board.nodes, onSelectedNodeIdsChange, selectEdge, selectedEdgeId, selectedNodeId, selectedNodeIds, selectNode, updateSelectedNodeIds]);
 
   const handleNodeClick = useCallback<NodeMouseHandler<BoardFlowNode>>(() => {
     closeOverlayMenus();
