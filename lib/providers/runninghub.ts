@@ -131,7 +131,7 @@ export function resolveRunningHubStandardModelForReferences(
   model: RunningHubStandardModel,
   referenceCount: number,
 ): RunningHubStandardModel {
-  return resolveRunningHubStandardModel(model, referenceCount, false);
+  return resolveRunningHubStandardModel(model, referenceCount, false, false);
 }
 
 export function resolveRunningHubStandardModelForReferenceMedia(
@@ -143,6 +143,7 @@ export function resolveRunningHubStandardModelForReferenceMedia(
     model,
     references.length,
     references.some(reference => reference.type !== "image"),
+    references.some(reference => reference.type === "video"),
     referenceMode,
   );
 }
@@ -151,6 +152,7 @@ function resolveRunningHubStandardModel(
   model: RunningHubStandardModel,
   referenceCount: number,
   hasNonImageReference: boolean,
+  hasVideoReference: boolean,
   referenceMode?: RunningHubReferenceMode,
 ): RunningHubStandardModel {
   const routes = model.payloadMapping.referenceRoutes;
@@ -162,24 +164,36 @@ function resolveRunningHubStandardModel(
     return resolved;
   }
 
+  const imageOnlyRoute = referenceCount === 2
+    ? routes.firstLast ?? routes.imageToVideo
+    : routes.imageToVideo;
+  const imageSafeReferenceRoute = routes.reference && !hasVideoReference && routeRequiresVideoUrl(routes.reference, model.kind)
+    ? imageOnlyRoute ?? routes.reference
+    : routes.reference;
   const routedModel = hasNonImageReference
     ? routes.reference
     : referenceMode === "reference"
-      ? routes.reference ?? routes.imageToVideo
+      ? imageSafeReferenceRoute ?? routes.imageToVideo
       : referenceMode === "firstLast"
         ? referenceCount === 2
           ? routes.firstLast ?? routes.imageToVideo
-          : routes.imageToVideo ?? routes.reference
+          : routes.imageToVideo ?? imageSafeReferenceRoute
         : referenceCount === 1
-          ? routes.imageToVideo ?? routes.reference
+          ? routes.imageToVideo ?? imageSafeReferenceRoute
           : referenceCount === 2
-            ? routes.firstLast ?? routes.reference
-            : routes.reference;
+            ? routes.firstLast ?? imageSafeReferenceRoute
+            : imageSafeReferenceRoute;
   if (!routedModel) return model;
 
   const resolved = getRunningHubStandardModel(routedModel, model.kind);
   if (!resolved) throw new Error(model.label + " route target is not configured: " + routedModel);
   return resolved;
+}
+
+function routeRequiresVideoUrl(model: string, kind: RunningHubStandardModelKind): boolean {
+  const routed = getRunningHubStandardModel(model, kind);
+  if (!routed) return false;
+  return routed.payloadMapping.fields.some(field => field.source === "videoUrls" && field.valueType === "string");
 }
 
 export function getRunningHubStandardEndpoint(model: RunningHubStandardModel): string {

@@ -489,6 +489,40 @@ test("runninghub omni flash video models map resolution duration and references"
   );
 });
 
+test("runninghub omni flash image-only reference mode routes to image-to-video", () => {
+  const textVideo = getRunningHubStandardModel("api:/openapi/v2/gemini-omni-flash/text-to-video", "video");
+  const imageVideo = getRunningHubStandardModel("api:/openapi/v2/gemini-omni-flash/image-to-video", "video");
+  const videoEdit = getRunningHubStandardModel("api:/openapi/v2/gemini-omni-flash/video-edit", "video");
+  assert.ok(textVideo);
+  assert.ok(imageVideo);
+  assert.ok(videoEdit);
+
+  const routed = resolveRunningHubStandardModelForReferenceMedia(textVideo, [{ type: "image" }], "reference");
+  assert.equal(routed.model, imageVideo.model);
+  assert.notEqual(routed.model, videoEdit.model);
+
+  const body = buildRunningHubStandardBody(routed, {
+    prompt: "make it move",
+    aspectRatio: "16:9",
+    resolutionName: "1080p",
+    durationSeconds: "8",
+    referenceImages: [],
+    referenceMediaUrls: {
+      imageUrls: ["https://runninghub.example/input.png"],
+      videoUrls: [],
+      audioUrls: [],
+    },
+  });
+  assert.deepEqual(body, {
+    prompt: "make it move",
+    resolution: "1080p",
+    duration: "8",
+    aspectRatio: "16:9",
+    imageUrls: ["https://runninghub.example/input.png"],
+  });
+  assert.equal(Object.hasOwn(body, "videoUrl"), false);
+});
+
 test("runninghub videox 1.5 channel video models map documented fields", () => {
   const textVideo = getRunningHubStandardModel("api:/openapi/v2/rhart-video-g/text-to-video", "video");
   const imageVideo = getRunningHubStandardModel("api:/openapi/v2/rhart-video-g/image-to-video", "video");
