@@ -80,6 +80,8 @@ import {
   normalizeBoardMultiGridItems,
 } from "@/lib/board/multi-grid";
 import { DEFAULT_AUDIO_MODEL, getAudioModelCapabilities, getImageModelCapabilities, getImageResolutionOptions, getVideoModelCapabilities } from "@/lib/providers/model-catalog";
+import { RUNNINGHUB_YOUCHUAN_ADVANCED_DEFAULTS, isRunningHubYouchuanImageModel } from "@/lib/providers/runninghub";
+import type { RunningHubYouchuanAdvancedSettings } from "@/lib/providers/types";
 import {
   BOARD_PORT_IDS,
   filterValidBoardEdges,
@@ -284,6 +286,7 @@ function cloneBoardNodeForDuplicate(source: BoardNode, position: BoardPoint): Bo
         imageResolution: source.imageResolution,
         model: source.model,
         prompt: source.prompt,
+        runningHubYouchuan: isRunningHubYouchuanImageModel(source.model) ? source.runningHubYouchuan : undefined,
         status: "idle",
         thinkingLevel: source.thinkingLevel,
         variantCount: source.variantCount,
@@ -598,6 +601,24 @@ function readOptionalStringArray(value: unknown): string[] | undefined {
   return value.filter((item): item is string => typeof item === "string" && item.length > 0);
 }
 
+function readRunningHubYouchuanAdvancedSettings(value: unknown): RunningHubYouchuanAdvancedSettings | undefined {
+  if (!isRecord(value)) return undefined;
+  const chaos = readNumberInRange(value.chaos, 0, 100);
+  const stylize = readNumberInRange(value.stylize, 0, 1000);
+  const raw = typeof value.raw === "boolean" ? value.raw : undefined;
+  const iw = readNumberInRange(value.iw, 0, 3);
+  const sw = readNumberInRange(value.sw, 0, 1000);
+  const hd = typeof value.hd === "boolean" ? value.hd : undefined;
+  if (chaos === undefined || stylize === undefined || raw === undefined || iw === undefined || sw === undefined) {
+    return undefined;
+  }
+  return { chaos, stylize, raw, iw, sw, ...(hd === undefined ? {} : { hd }) };
+}
+
+function readNumberInRange(value: unknown, min: number, max: number): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max ? value : undefined;
+}
+
 function readAsrLanguage(value: unknown): "auto" | "zh" | "en" {
   if (value === "zh" || value === "en") return value;
   return "auto";
@@ -770,12 +791,15 @@ function normalizeBoardNode(node: unknown, index: number): BoardNode | null {
       kind: "image-generate",
       model,
       prompt: typeof node.prompt === "string" ? node.prompt : "",
-        aspectRatio: aspectRatio || defaults.aspectRatio,
-        customImageResolution: readOptionalString(node.customImageResolution) || defaults.customImageResolution,
-        imageQuality: readOptionalString(node.imageQuality) ?? defaults.imageQuality,
-        imageResolution: readOptionalString(node.imageResolution) || defaults.imageResolution,
-        resultStackKey: readOptionalString(node.resultStackKey),
-        status: normalizeGenerationStatus(node.status),
+      aspectRatio: aspectRatio || defaults.aspectRatio,
+      customImageResolution: readOptionalString(node.customImageResolution) || defaults.customImageResolution,
+      imageQuality: readOptionalString(node.imageQuality) ?? defaults.imageQuality,
+      imageResolution: readOptionalString(node.imageResolution) || defaults.imageResolution,
+      runningHubYouchuan: isRunningHubYouchuanImageModel(model)
+        ? readRunningHubYouchuanAdvancedSettings(node.runningHubYouchuan) ?? RUNNINGHUB_YOUCHUAN_ADVANCED_DEFAULTS
+        : undefined,
+      resultStackKey: readOptionalString(node.resultStackKey),
+      status: normalizeGenerationStatus(node.status),
       thinkingLevel: readOptionalString(node.thinkingLevel) ?? defaults.thinkingLevel,
       variantCount: normalizeVariantCount(node.variantCount),
       errorMessage: typeof node.errorMessage === "string" ? node.errorMessage : undefined,
@@ -1276,6 +1300,9 @@ function createGenerateBoardNode(input: CreateGenerateNodeInput, nodes: BoardNod
       customImageResolution: input.customImageResolution ?? imageDefaults.customImageResolution,
       imageQuality: input.imageQuality ?? imageDefaults.imageQuality,
       imageResolution: input.imageResolution ?? imageDefaults.imageResolution,
+      runningHubYouchuan: isRunningHubYouchuanImageModel(input.model)
+        ? input.runningHubYouchuan ?? RUNNINGHUB_YOUCHUAN_ADVANCED_DEFAULTS
+        : undefined,
       thinkingLevel: input.thinkingLevel ?? imageDefaults.thinkingLevel,
     };
   }
@@ -1401,6 +1428,7 @@ function sameGenerateUpdate(node: BoardImageGenerateNode | BoardVideoGenerateNod
     if ("customImageResolution" in input && node.customImageResolution !== input.customImageResolution) return false;
     if ("imageQuality" in input && node.imageQuality !== input.imageQuality) return false;
     if ("imageResolution" in input && node.imageResolution !== input.imageResolution) return false;
+    if ("runningHubYouchuan" in input && !sameRunningHubYouchuan(node.runningHubYouchuan, input.runningHubYouchuan)) return false;
     if ("thinkingLevel" in input && node.thinkingLevel !== input.thinkingLevel) return false;
   }
 
@@ -1422,6 +1450,20 @@ function sameGenerateUpdate(node: BoardImageGenerateNode | BoardVideoGenerateNod
   }
 
   return true;
+}
+
+function sameRunningHubYouchuan(
+  left: RunningHubYouchuanAdvancedSettings | undefined,
+  right: RunningHubYouchuanAdvancedSettings | undefined,
+): boolean {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  return left.chaos === right.chaos &&
+    left.stylize === right.stylize &&
+    left.raw === right.raw &&
+    left.iw === right.iw &&
+    left.sw === right.sw &&
+    (left.hd ?? false) === (right.hd ?? false);
 }
 
 function sameRunningHubAppUpdate(node: BoardRunningHubAppNode, input: BoardRunningHubAppNodeUpdate): boolean {

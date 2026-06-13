@@ -8,6 +8,11 @@ import PromptComposerToolbarActions from "@/components/creation/PromptComposerTo
 import ReferenceImagePicker, { type ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import { type DraggedReferenceAsset } from "@/components/reference/referenceDrag";
 import {
+  RUNNINGHUB_YOUCHUAN_ADVANCED_LIMITS,
+  isRunningHubYouchuanImageModel,
+  runningHubYouchuanSupportsHd,
+} from "@/lib/providers/runninghub";
+import {
   applyPromptTemplateText,
   detectPromptTemplateSlashCommand,
   insertPromptTemplateText,
@@ -16,6 +21,7 @@ import {
   type PromptTemplateSlashCommand,
 } from "@/lib/prompt-templates";
 import type { ImageModelCapabilities } from "@/lib/providers/model-catalog";
+import type { RunningHubYouchuanAdvancedSettings } from "@/lib/providers/types";
 
 interface ImageGenerationPanelProps {
   atDropdownNode: ReactNode;
@@ -26,6 +32,7 @@ interface ImageGenerationPanelProps {
   imageResolution: string;
   imageResolutionOptions: ImageModelCapabilities["resolutions"];
   imageThinkingLevel: string;
+  runningHubYouchuan: RunningHubYouchuanAdvancedSettings;
   isOptimizing: boolean;
   isSubmitting: boolean;
   supportsBackgroundGeneration: boolean;
@@ -52,6 +59,7 @@ interface ImageGenerationPanelProps {
   onReferenceEdit?: (reference: ReferenceImageRef) => void;
   onReferenceRemove: (id: string) => void;
   onReferenceUpload: (event: ChangeEvent<HTMLInputElement>) => void;
+  onRunningHubYouchuanChange: (value: RunningHubYouchuanAdvancedSettings) => void;
   onSelectAspectRatio: (value: string) => void;
   onSelectModel: (value: string) => void;
   onThinkingLevelChange: (value: string) => void;
@@ -74,6 +82,7 @@ export default function ImageGenerationPanel({
   prompt,
   promptRequired,
   referenceImages,
+  runningHubYouchuan,
   selectedAspectRatio,
   selectedModel,
   submitCount,
@@ -93,6 +102,7 @@ export default function ImageGenerationPanel({
   onReferenceEdit,
   onReferenceRemove,
   onReferenceUpload,
+  onRunningHubYouchuanChange,
   onSelectAspectRatio,
   onSelectModel,
   onThinkingLevelChange,
@@ -111,6 +121,12 @@ export default function ImageGenerationPanel({
     ? `${Math.min(referenceImages.length, imageReferenceLimit)}/${imageReferenceLimit}`
     : String(referenceImages.length);
   const generateDisabled = promptRequired && !prompt.trim();
+  const showYouchuanControls = isRunningHubYouchuanImageModel(selectedModel);
+  const showYouchuanHd = runningHubYouchuanSupportsHd(selectedModel);
+
+  const patchYouchuan = (patch: Partial<RunningHubYouchuanAdvancedSettings>): void => {
+    onRunningHubYouchuanChange({ ...runningHubYouchuan, ...patch });
+  };
 
   const handleApplyPromptTemplate = (template: PromptTemplate, mode: PromptTemplateApplyMode): void => {
     if (slashCommand && mode === "insert") {
@@ -313,6 +329,62 @@ export default function ImageGenerationPanel({
         </div>
       </div>
 
+      {showYouchuanControls && (
+        <div className="imagine-youchuan-panel">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <span className="imagine-section-label">悠船高级参数</span>
+            <div className="flex items-center gap-2">
+              <label className="imagine-youchuan-toggle">
+                <input
+                  type="checkbox"
+                  checked={runningHubYouchuan.raw}
+                  onChange={event => patchYouchuan({ raw: event.target.checked })}
+                  className="imagine-youchuan-checkbox"
+                />
+                Raw
+              </label>
+              {showYouchuanHd && (
+                <label className="imagine-youchuan-toggle">
+                  <input
+                    type="checkbox"
+                    checked={runningHubYouchuan.hd === true}
+                    onChange={event => patchYouchuan({ hd: event.target.checked })}
+                    className="imagine-youchuan-checkbox"
+                  />
+                  2K
+                </label>
+              )}
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <YouchuanSlider
+              label="Chaos"
+              value={runningHubYouchuan.chaos}
+              {...RUNNINGHUB_YOUCHUAN_ADVANCED_LIMITS.chaos}
+              onChange={chaos => patchYouchuan({ chaos })}
+            />
+            <YouchuanSlider
+              label="Stylize"
+              value={runningHubYouchuan.stylize}
+              {...RUNNINGHUB_YOUCHUAN_ADVANCED_LIMITS.stylize}
+              onChange={stylize => patchYouchuan({ stylize })}
+            />
+            <YouchuanSlider
+              label="图像权重"
+              value={runningHubYouchuan.iw}
+              {...RUNNINGHUB_YOUCHUAN_ADVANCED_LIMITS.iw}
+              onChange={iw => patchYouchuan({ iw })}
+            />
+            <YouchuanSlider
+              label="风格权重"
+              value={runningHubYouchuan.sw}
+              {...RUNNINGHUB_YOUCHUAN_ADVANCED_LIMITS.sw}
+              onChange={sw => patchYouchuan({ sw })}
+            />
+          </div>
+        </div>
+      )}
+
       <ReferenceImagePicker
         addLabel="多图垫"
         browseClassName="cursor-pointer font-medium text-[var(--iw-tone-accent-text)] underline-offset-4 hover:text-[var(--iw-tone-accent-text)] hover:underline"
@@ -347,5 +419,52 @@ export default function ImageGenerationPanel({
         />
       )}
     </div>
+  );
+}
+
+function YouchuanSlider({
+  label,
+  max,
+  min,
+  onChange,
+  step,
+  value,
+}: {
+  label: string;
+  max: number;
+  min: number;
+  onChange: (value: number) => void;
+  step: number;
+  value: number;
+}) {
+  const handleChange = (nextValue: string): void => {
+    const parsed = Number(nextValue);
+    if (Number.isFinite(parsed)) onChange(parsed);
+  };
+
+  return (
+    <label className="imagine-youchuan-slider">
+      <span className="flex items-center justify-between gap-2">
+        <span className="imagine-youchuan-slider-label">{label}</span>
+        <input
+          type="number"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={event => handleChange(event.target.value)}
+          className="imagine-youchuan-number"
+        />
+      </span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={event => handleChange(event.target.value)}
+        className="imagine-youchuan-range"
+      />
+    </label>
   );
 }

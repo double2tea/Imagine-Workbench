@@ -5,6 +5,7 @@ import test, { after } from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ImageModelCapabilities, VideoModelCapabilities } from "../lib/providers/model-catalog";
+import { RUNNINGHUB_YOUCHUAN_ADVANCED_DEFAULTS } from "../lib/providers/runninghub";
 
 const noop = (): void => {};
 
@@ -50,6 +51,7 @@ test("image generation panel generate button follows promptRequired", async () =
     prompt: "",
     promptRequired: true,
     referenceImages: [],
+    runningHubYouchuan: RUNNINGHUB_YOUCHUAN_ADVANCED_DEFAULTS,
     selectedAspectRatio: "1:1",
     selectedModel: "runninghub:ai-app-image:1961345119528140802",
     submitCount: 0,
@@ -68,6 +70,7 @@ test("image generation panel generate button follows promptRequired", async () =
     onReferenceDropFiles: noop,
     onReferenceRemove: noop,
     onReferenceUpload: noop,
+    onRunningHubYouchuanChange: noop,
     onSelectAspectRatio: noop,
     onSelectModel: noop,
     onThinkingLevelChange: noop,

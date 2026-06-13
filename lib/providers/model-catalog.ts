@@ -1580,7 +1580,7 @@ function runningHubImageParameterProfile(
       sizes: lower.includes("ultra") ? RUNNINGHUB_GEMINI_ULTRA_IMAGE_RESOLUTIONS : RUNNINGHUB_GEMINI_IMAGE_RESOLUTIONS,
     };
   }
-  if (lower.includes("youchuan/text-to-image-v81")) {
+  if (lower.includes("youchuan/text-to-image-v")) {
     return {
       aspectRatios: RUNNINGHUB_YOUCHUAN_V81_IMAGE_RATIOS,
       qualityLevels: RUNNINGHUB_YOUCHUAN_V81_QUALITY_OPTIONS,

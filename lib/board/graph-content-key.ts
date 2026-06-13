@@ -97,6 +97,7 @@ function serializeNodeContent(node: BoardNode): string {
         node.imageResolution,
         node.customImageResolution,
           node.imageQuality ?? "",
+          node.runningHubYouchuan ? JSON.stringify(node.runningHubYouchuan) : "",
           node.thinkingLevel ?? "",
           node.variantCount,
           node.resultAssetId ?? "",

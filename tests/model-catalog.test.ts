@@ -637,6 +637,11 @@ test("runninghub exposes concrete standard model capabilities", () => {
   assert.deepEqual(youchuan.aspectRatios.map(option => option.value), ["1:1", "4:3", "3:2", "16:9", "3:4", "2:3", "9:16"]);
   assert.deepEqual(youchuan.qualityLevels.map(option => option.value), ["1", "4"]);
   assert.deepEqual(youchuan.sizes.map(option => option.value), ["auto"]);
+  const youchuanV7 = getModelCapability("runninghub:api:/openapi/v2/youchuan/text-to-image-v7", "image");
+  assert.ok(youchuanV7);
+  assert.equal(youchuanV7.supportsReferences, true);
+  assert.equal(youchuanV7.maxReferenceImages, 1);
+  assert.deepEqual(youchuanV7.qualityLevels.map(option => option.value), ["1", "4"]);
   assert.throws(
     () => getModelCapability("runninghub:ai-app-audio:2061323800511344642", "audio"),
     /RunningHub audio is supported through AI App \/ Workflow targets/,

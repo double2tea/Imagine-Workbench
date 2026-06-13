@@ -40,6 +40,15 @@ export interface RunningHubTaskNodeBinding {
   deliveryMode: RunningHubTaskBindingDelivery;
 }
 
+export interface RunningHubYouchuanAdvancedSettings {
+  chaos: number;
+  stylize: number;
+  raw: boolean;
+  iw: number;
+  sw: number;
+  hd?: boolean;
+}
+
 export interface GenerateImageInput {
   prompt: string;
   model: string;
@@ -51,6 +60,7 @@ export interface GenerateImageInput {
   async: boolean;
   runningHubAccessPassword?: string;
   runningHubNodeInfoList?: RunningHubTaskNodeBinding[];
+  runningHubYouchuan?: RunningHubYouchuanAdvancedSettings;
 }
 
 export type ImageEditOperation = "redraw" | "erase" | "outpaint" | "cutout";

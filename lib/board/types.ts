@@ -1,4 +1,5 @@
 import type { AudioOperationMode } from "@/lib/providers/model-catalog";
+import type { RunningHubYouchuanAdvancedSettings } from "@/lib/providers/types";
 
 export type BoardNodeKind = "asset" | "prompt" | "reference-group" | "group" | "multi-grid" | "image-generate" | "video-generate" | "audio-operation" | "runninghub-app" | "agent" | "note" | "result";
 export type BoardAssetType = "image" | "video" | "audio";
@@ -130,6 +131,7 @@ export interface BoardImageGenerateNode extends BoardNodeBase {
   customImageResolution: string;
   imageQuality?: string;
   imageResolution: string;
+  runningHubYouchuan?: RunningHubYouchuanAdvancedSettings;
   thinkingLevel?: string;
   variantCount: BoardGenerateVariantCount;
   status: BoardGenerationStatus;
@@ -280,6 +282,7 @@ export type BoardGenerateNodeUpdate = Partial<{
   errorMessage: string;
   imageQuality: string;
   imageResolution: string;
+  runningHubYouchuan: RunningHubYouchuanAdvancedSettings;
   model: string;
   prompt: string;
   resultAssetId: string;
@@ -407,6 +410,7 @@ export interface CreateGenerateNodeInput {
   customImageResolution?: string;
   imageQuality?: string;
   imageResolution?: string;
+  runningHubYouchuan?: RunningHubYouchuanAdvancedSettings;
   thinkingLevel?: string;
   variantCount?: BoardGenerateVariantCount;
   videoDuration?: string;

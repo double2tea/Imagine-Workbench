@@ -26,7 +26,8 @@ import {
   type GenerationTaskSource,
   type GenerationTaskUpdate,
 } from "@/lib/generation-tasks";
-import type { RunningHubTaskNodeBinding } from "@/lib/providers/types";
+import type { RunningHubTaskNodeBinding, RunningHubYouchuanAdvancedSettings } from "@/lib/providers/types";
+import { isRunningHubYouchuanImageModel, runningHubYouchuanSupportsHd } from "@/lib/providers/runninghub";
 import { buildPromptWithReferenceMap } from "@/hooks/useReferenceState";
 import { audioOperationMissingReferenceMessage, audioOperationRequiresTextInput, readOptionalAudioFormat } from "@/lib/audio-operation-rules";
 import { getMediaReferenceType, mediaReferenceLabel } from "@/lib/media-references";
@@ -60,6 +61,7 @@ interface UseGenerationActionsParams {
   pushWorkspaceNotice: (type: NoticeType, message: string) => void;
   referenceImage: string | null;
   referenceImages: ReferenceImageRef[];
+  runningHubYouchuan: RunningHubYouchuanAdvancedSettings;
   selectedModel: string;
   selectedVideoModel: string;
   setGenerationTasks: Dispatch<SetStateAction<GenerationTask[]>>;
@@ -98,10 +100,20 @@ interface GenerationOverrides {
   videoResolution?: string;
   runningHubAccessPassword?: string;
   runningHubNodeInfoList?: RunningHubTaskNodeBinding[];
+  runningHubYouchuan?: RunningHubYouchuanAdvancedSettings;
 }
 
 function makeClientId(prefix: string): string {
   return `${prefix}_${Date.now()}`;
+}
+
+function runningHubYouchuanSettingsForModel(
+  model: string,
+  settings: RunningHubYouchuanAdvancedSettings,
+): RunningHubYouchuanAdvancedSettings {
+  if (runningHubYouchuanSupportsHd(model)) return settings;
+  const { hd: _hd, ...settingsWithoutHd } = settings;
+  return settingsWithoutHd;
 }
 
 function getStringField(value: unknown, field: string): string | null {
@@ -345,6 +357,7 @@ export function useGenerationActions({
   pushWorkspaceNotice,
   referenceImage,
   referenceImages,
+  runningHubYouchuan,
   selectedModel,
   selectedVideoModel,
   setGenerationTasks,
@@ -390,6 +403,9 @@ export function useGenerationActions({
     const requestImageQuality = overrides.imageQuality ?? activeImageQuality;
     const requestIsCustomImageResolution = overrides.isCustomImageResolution ?? isCustomImageResolution;
     const requestThinkingLevel = overrides.thinkingLevel ?? imageThinkingLevel;
+    const requestRunningHubYouchuan = isRunningHubYouchuanImageModel(requestModel)
+      ? runningHubYouchuanSettingsForModel(requestModel, overrides.runningHubYouchuan ?? runningHubYouchuan)
+      : undefined;
     const requestImageCapabilities = getImageModelCapabilities(requestModel);
     const requestAspectRatio =
       requestIsCustomImageResolution
@@ -444,6 +460,7 @@ export function useGenerationActions({
       thinkingLevel: requestThinkingLevel,
       runningHubAccessPassword: overrides.runningHubAccessPassword,
       runningHubNodeInfoList: overrides.runningHubNodeInfoList,
+      ...(requestRunningHubYouchuan ? { runningHubYouchuan: requestRunningHubYouchuan } : {}),
       referenceMedia: buildReferenceMediaSnapshot(activeReferenceImages, imageReferencePayloads),
     };
     const displayedImageSize = /^\d+x\d+$/.test(requestImageResolution) ? requestImageResolution : requestAspectRatio;

@@ -89,7 +89,8 @@ import {
   type VideoReferenceMode,
 } from "@/lib/providers/model-catalog";
 import { getProviderMeta, type CustomProviderDefinition } from "@/lib/providers/registry";
-import { runningHubAppPresetRequiresPrompt } from "@/lib/providers/runninghub";
+import { RUNNINGHUB_YOUCHUAN_ADVANCED_DEFAULTS, runningHubAppPresetRequiresPrompt } from "@/lib/providers/runninghub";
+import type { RunningHubYouchuanAdvancedSettings } from "@/lib/providers/types";
 import { saveClonedVoiceProfileFromAsset } from "@/lib/voice-profiles";
 import { getMediaReferenceType, mediaReferenceLabel, mediaReferenceTypeFromMime } from "@/lib/media-references";
 import { API_ROUTES } from "@/lib/api/routes";
@@ -258,6 +259,7 @@ export default function Home() {
   const [imageResolution, setImageResolution] = useState("1K");
   const [imageQuality, setImageQuality] = useState("auto");
   const [imageThinkingLevel, setImageThinkingLevel] = useState("minimal");
+  const [runningHubYouchuan, setRunningHubYouchuan] = useState<RunningHubYouchuanAdvancedSettings>(RUNNINGHUB_YOUCHUAN_ADVANCED_DEFAULTS);
   const [imageBackgroundGeneration, setImageBackgroundGeneration] = useState(false);
   const [videoDuration, setVideoDuration] = useState("10");
   const [videoPreset, setVideoPreset] = useState("normal");
@@ -697,6 +699,7 @@ export default function Home() {
     pushWorkspaceNotice,
     referenceImage,
     referenceImages,
+    runningHubYouchuan,
     selectedModel,
     selectedVideoModel,
     setGenerationTasks,
@@ -1007,6 +1010,7 @@ export default function Home() {
       }
       if (request?.imageQuality) setImageQuality(request.imageQuality);
       if (request?.thinkingLevel) setImageThinkingLevel(request.thinkingLevel);
+      if (request?.runningHubYouchuan) setRunningHubYouchuan(request.runningHubYouchuan);
       setTraditionalSubTab("image");
     } else {
       handleSelectVideoModel(model);
@@ -1746,6 +1750,7 @@ export default function Home() {
         prompt={prompt}
         promptRequired={imagePromptRequired}
         referenceImages={referenceImages}
+        runningHubYouchuan={runningHubYouchuan}
         selectedAspectRatio={aspectRatio}
         selectedModel={selectedModel}
         submitCount={imageSubmitCount}
@@ -1769,6 +1774,7 @@ export default function Home() {
         onReferenceEdit={launchReferenceMaskEditor}
         onReferenceRemove={removeReferenceImage}
         onReferenceUpload={handleImageUpload}
+        onRunningHubYouchuanChange={setRunningHubYouchuan}
         onSelectAspectRatio={handleSelectImageAspectRatio}
         onSelectModel={handleSelectImageModel}
         onThinkingLevelChange={setImageThinkingLevel}

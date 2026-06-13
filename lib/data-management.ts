@@ -23,6 +23,7 @@ import type {
   BoardViewport,
 } from "@/lib/board/types";
 import type { AudioOperationMode } from "@/lib/providers/model-catalog";
+import type { RunningHubYouchuanAdvancedSettings } from "@/lib/providers/types";
 import { CUSTOM_PROVIDERS_STORAGE_KEY } from "@/lib/providers/custom-providers";
 import { collectBoardAssetIdsFromNodes } from "@/lib/assets/board-scope";
 import {
@@ -935,6 +936,7 @@ function parseGenerationRequest(value: unknown): GenerationRequestSnapshot | und
     asrLanguage: readAsrLanguage(value.asrLanguage),
     optimizeTextPreview: readOptionalBoolean(value, "optimizeTextPreview"),
     voiceProfileId: readOptionalString(value, "voiceProfileId"),
+    runningHubYouchuan: readOptionalRunningHubYouchuanAdvancedSettings(value, "runningHubYouchuan"),
     referenceMedia: parseGenerationReferenceMedia(value.referenceMedia),
     referenceImages: readOptionalStringArray(value, "referenceImages"),
   };
@@ -1068,6 +1070,7 @@ function parseBoardNode(value: unknown): BoardNode {
       customImageResolution: readString(value, "customImageResolution"),
         imageQuality: readOptionalString(value, "imageQuality"),
         imageResolution: readString(value, "imageResolution"),
+        runningHubYouchuan: readOptionalRunningHubYouchuanAdvancedSettings(value, "runningHubYouchuan"),
         thinkingLevel: readOptionalString(value, "thinkingLevel"),
         variantCount: readVariantCount(value, "variantCount"),
         status: readGenerationStatus(value, "status"),
@@ -1510,6 +1513,38 @@ function readOptionalBoolean(record: Record<string, unknown>, field: string): bo
   if (value === undefined) return undefined;
   if (typeof value !== "boolean") throw new Error(`${field} 必须是布尔值`);
   return value;
+}
+
+function readOptionalRunningHubYouchuanAdvancedSettings(
+  record: Record<string, unknown>,
+  field: string,
+): RunningHubYouchuanAdvancedSettings | undefined {
+  const value = record[field];
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) throw new Error(`${field} 格式无效`);
+  return {
+    chaos: readNumberInRange(value, "chaos", 0, 100),
+    stylize: readNumberInRange(value, "stylize", 0, 1000),
+    raw: readBoolean(value, "raw"),
+    iw: readNumberInRange(value, "iw", 0, 3),
+    sw: readNumberInRange(value, "sw", 0, 1000),
+    ...readOptionalHd(value),
+  };
+}
+
+function readNumberInRange(record: Record<string, unknown>, field: string, min: number, max: number): number {
+  const value = record[field];
+  if (typeof value !== "number" || !Number.isFinite(value) || value < min || value > max) {
+    throw new Error(`${field} 必须是 ${min}-${max} 之间的数字`);
+  }
+  return value;
+}
+
+function readOptionalHd(record: Record<string, unknown>): Partial<Pick<RunningHubYouchuanAdvancedSettings, "hd">> {
+  const value = record.hd;
+  if (value === undefined) return {};
+  if (typeof value !== "boolean") throw new Error("hd 必须是布尔值");
+  return { hd: value };
 }
 
 function readOptionalSafePath(record: Record<string, unknown>, field: string): string | undefined {

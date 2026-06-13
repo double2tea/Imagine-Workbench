@@ -100,9 +100,9 @@ import {
   type VideoReferenceMode,
 } from "@/lib/providers/model-catalog";
 import { getProviderMeta, type CustomProviderDefinition } from "@/lib/providers/registry";
-import { runningHubAppPresetRequiresPrompt } from "@/lib/providers/runninghub";
+import { RUNNINGHUB_YOUCHUAN_ADVANCED_DEFAULTS, isRunningHubYouchuanImageModel, runningHubAppPresetRequiresPrompt } from "@/lib/providers/runninghub";
 import { saveClonedVoiceProfileFromAsset } from "@/lib/voice-profiles";
-import type { RunningHubTaskNodeBinding } from "@/lib/providers/types";
+import type { RunningHubTaskNodeBinding, RunningHubYouchuanAdvancedSettings } from "@/lib/providers/types";
 import {
   REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES,
   compressReferenceImageDataUrl,
@@ -661,6 +661,7 @@ function imageActionDefaults(model: string, aspectRatio: string | undefined): {
   customImageResolution: string;
   imageQuality?: string;
   imageResolution: string;
+  runningHubYouchuan?: RunningHubYouchuanAdvancedSettings;
   thinkingLevel?: string;
 } {
   const capabilities = getImageModelCapabilities(model);
@@ -674,6 +675,7 @@ function imageActionDefaults(model: string, aspectRatio: string | undefined): {
     customImageResolution: "2560x1440",
     imageQuality: capabilities.qualities[0]?.value,
     imageResolution: firstOptionValue(resolutionSource, "1K"),
+    runningHubYouchuan: isRunningHubYouchuanImageModel(model) ? RUNNINGHUB_YOUCHUAN_ADVANCED_DEFAULTS : undefined,
     thinkingLevel: capabilities.thinkingLevels[0]?.value,
   };
 }
@@ -1861,6 +1863,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     pushWorkspaceNotice,
     referenceImage,
     referenceImages,
+    runningHubYouchuan: RUNNINGHUB_YOUCHUAN_ADVANCED_DEFAULTS,
     selectedModel,
     selectedVideoModel,
     setGenerationTasks,
@@ -2608,6 +2611,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             prompt: promptValue,
             referenceImage: runReferences[0]?.url ?? null,
             referenceImages: runReferences,
+            runningHubYouchuan: defaults.runningHubYouchuan,
             size: operation.aspectRatio ?? defaults.aspectRatio,
             thinkingLevel: operation.thinkingLevel ?? defaults.thinkingLevel,
           });
@@ -3088,6 +3092,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         prompt: promptFromAgent,
         referenceImage: references[0]?.url ?? null,
         referenceImages: references,
+        runningHubYouchuan: defaults.runningHubYouchuan,
         size: defaults.aspectRatio,
         thinkingLevel: defaults.thinkingLevel,
       });
@@ -3984,6 +3989,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
               prompt: nextPrompt,
               referenceImage: references[0]?.url ?? null,
               referenceImages: references,
+              runningHubYouchuan: node.runningHubYouchuan ?? RUNNINGHUB_YOUCHUAN_ADVANCED_DEFAULTS,
               size: node.aspectRatio,
               thinkingLevel: node.thinkingLevel,
               allowEmptyPrompt: allowsEmptyPrompt,

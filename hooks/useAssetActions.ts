@@ -16,7 +16,7 @@ import { createWorkspaceSafetySnapshot } from "@/lib/data-management";
 import type { MediaReferenceRole, MediaReferenceType } from "@/lib/media-references";
 import { createPanoramaScreenshotStorageItem, type PanoramaScreenshot } from "@/lib/panorama/capture";
 import { tryParseProviderModel, type AiProvider } from "@/lib/providers/model-catalog";
-import type { RunningHubTaskNodeBinding } from "@/lib/providers/types";
+import type { RunningHubTaskNodeBinding, RunningHubYouchuanAdvancedSettings } from "@/lib/providers/types";
 import { resolveAssetOriginalUrl } from "@/lib/assets/resolve-url";
 import { getReferenceImagePayloadError, getReferenceMediaPayloadError, prepareReferenceImageUrlForRequest, prepareReferenceMediaUrlForRequest } from "@/lib/reference-images";
 import { createVideoFrameStorageItem, getVideoFrameCaptureLabel, type CapturedVideoFrame } from "@/lib/video-frame";
@@ -40,6 +40,7 @@ interface RetryRequestBody {
   images?: string[];
   runningHubAccessPassword?: string;
   runningHubNodeInfoList?: RunningHubTaskNodeBinding[];
+  runningHubYouchuan?: RunningHubYouchuanAdvancedSettings;
 }
 
 interface UseAssetActionsParams {
@@ -100,6 +101,7 @@ function buildRetryRequestBody(item: StorageItem): RetryRequestBody {
     aspectRatio: request?.aspectRatio ?? item.aspectRatio,
     runningHubAccessPassword: request?.runningHubAccessPassword,
     runningHubNodeInfoList: request?.runningHubNodeInfoList,
+    runningHubYouchuan: request?.runningHubYouchuan,
   };
 
   if (item.type === "image") {

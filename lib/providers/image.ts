@@ -150,6 +150,7 @@ interface RunningHubMediaInput {
   referenceMedia?: ReferenceMedia[];
   runningHubAccessPassword?: string;
   runningHubNodeInfoList?: RunningHubTaskNodeBinding[];
+  runningHubYouchuan?: GenerateImageInput["runningHubYouchuan"];
 }
 
 type RunningHubStatusMode = "standard" | "task-output";
@@ -715,6 +716,7 @@ async function buildRunningHubRequest(
         resolutionName: input.resolutionName,
         durationSeconds: input.durationSeconds,
         referenceImages: input.referenceImages,
+        youchuan: input.runningHubYouchuan,
         ...(referenceMediaUrls ? { referenceMediaUrls } : {}),
       }),
     };

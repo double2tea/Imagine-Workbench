@@ -1,5 +1,5 @@
 import type { MediaReferenceType } from "@/lib/media-references";
-import type { RunningHubTaskNodeBinding } from "./types";
+import type { RunningHubTaskNodeBinding, RunningHubYouchuanAdvancedSettings } from "./types";
 
 export const RUNNINGHUB_LLM_BASE_URL = "https://llm.runninghub.cn";
 export const RUNNINGHUB_DEFAULT_LLM_MODEL = "qwen/qwen3.7-max";
@@ -7,6 +7,8 @@ export const RUNNINGHUB_CONTROL_IMAGE_APP_MODEL = "ai-app-image:1961345119528140
 export const RUNNINGHUB_CONTROL_IMAGE_APP_LABEL = "RunningHub Control Image AI App";
 const RUNNINGHUB_PROVIDER_PREFIX = "runninghub:";
 const RUNNINGHUB_STANDARD_BASE_URLS = new Set(["https://www.runninghub.cn", "https://www.runninghub.ai"]);
+const RUNNINGHUB_YOUCHUAN_MODEL_MARKER = "/openapi/v2/youchuan/text-to-image";
+const RUNNINGHUB_YOUCHUAN_HD_MODEL_MARKER = "/openapi/v2/youchuan/text-to-image-v81";
 const SEEDANCE_15_DURATIONS = ["4", "5", "6", "7", "8", "9", "10", "11", "12"] as const;
 const SEEDANCE_20_DURATIONS = ["-1", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"] as const;
 const SEEDANCE_15_RESOLUTIONS = ["480p", "720p", "1080p"] as const;
@@ -48,6 +50,22 @@ const VEO_31_HD_RESOLUTIONS = ["720p", "1080p"] as const;
 
 export type RunningHubStandardModelKind = "image" | "video";
 export type RunningHubAppPresetKind = "image" | "video";
+
+export const RUNNINGHUB_YOUCHUAN_ADVANCED_DEFAULTS = {
+  chaos: 0,
+  stylize: 0,
+  raw: false,
+  iw: 1,
+  sw: 100,
+  hd: false,
+} satisfies RunningHubYouchuanAdvancedSettings;
+
+export const RUNNINGHUB_YOUCHUAN_ADVANCED_LIMITS = {
+  chaos: { min: 0, max: 100, step: 1 },
+  stylize: { min: 0, max: 1000, step: 1 },
+  iw: { min: 0, max: 3, step: 0.1 },
+  sw: { min: 0, max: 1000, step: 1 },
+} as const;
 
 export interface RunningHubAppPreset {
   model: string;
@@ -98,6 +116,7 @@ export interface RunningHubStandardRequestInput {
     videoUrls: string[];
     audioUrls: string[];
   };
+  youchuan?: RunningHubYouchuanAdvancedSettings;
 }
 
 export type RunningHubReferenceMode = "reference" | "firstLast";
@@ -139,6 +158,14 @@ export function hasRunningHubAppPreset(model: string): boolean {
 
 export function runningHubAppPresetRequiresPrompt(model: string): boolean {
   return getRunningHubAppPreset(model)?.promptRequired !== false;
+}
+
+export function isRunningHubYouchuanImageModel(model: string): boolean {
+  return normalizeRunningHubModel(model).includes(RUNNINGHUB_YOUCHUAN_MODEL_MARKER);
+}
+
+export function runningHubYouchuanSupportsHd(model: string): boolean {
+  return normalizeRunningHubModel(model).includes(RUNNINGHUB_YOUCHUAN_HD_MODEL_MARKER);
 }
 
 function normalizeRunningHubModel(model: string): string {
@@ -1275,12 +1302,15 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModel[] = [
     model: "api:/openapi/v2/youchuan/text-to-image-v7",
     label: "RunningHub Youchuan V7 Text-to-Image",
     kind: "image",
-    supportsReferences: false,
+    supportsReferences: true,
     minReferenceImages: 0,
-    maxReferenceImages: 0,
+    maxReferenceImages: 1,
     request: {
       type: "youchuan-image",
       endpoint: "/openapi/v2/youchuan/text-to-image-v7",
+      aspectField: "aspectRatio",
+      qualityField: "quality",
+      referenceField: "imageUrl",
       extra: {
         chaos: 0,
         quality: "1",
@@ -1520,12 +1550,28 @@ export function buildRunningHubStandardBody(
           ? { [model.request.referenceField]: referenceMediaUrls.imageUrls[0] }
           : {}),
         ...model.request.extra,
+        ...readYouchuanAdvancedSettings(input.youchuan, "hd" in model.request.extra),
         ...(model.request.qualityField && input.imageQuality && input.imageQuality !== "auto"
           ? { [model.request.qualityField]: input.imageQuality }
           : {}),
       };
     }
   }
+}
+
+function readYouchuanAdvancedSettings(
+  settings: RunningHubYouchuanAdvancedSettings | undefined,
+  supportsHd: boolean,
+): Record<string, unknown> {
+  if (!settings) return {};
+  return {
+    chaos: settings.chaos,
+    stylize: settings.stylize,
+    raw: settings.raw,
+    iw: settings.iw,
+    sw: settings.sw,
+    ...(supportsHd ? { hd: settings.hd === true } : {}),
+  };
 }
 
 function readDimensions(value: string | undefined): { width: number; height: number } | undefined {

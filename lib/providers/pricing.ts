@@ -85,6 +85,7 @@ const RUNNINGHUB_PRICES: ProviderPriceEntry[] = [
   { pathMatch: "rhart-image-n-g31-flash/image-to-image", price: 0.08, unit: "次" },
 
   // --- Youchuan ---
+  { pathMatch: "youchuan/text-to-image-v7", price: 0.54, unit: "次" },
   { pathMatch: "youchuan/text-to-image-v81", price: 0.54, unit: "次" },
 
   // --- Gemini Omni Flash (provisional manual pricing) ---

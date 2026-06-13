@@ -47,6 +47,14 @@ test("getModelPrice returns known RunningHub price", () => {
     getModelPrice("runninghub", "runninghub:api:/openapi/v2/rhart-video-g/text-to-video"),
     { price: 0.04, unit: "秒" },
   );
+  assert.deepEqual(
+    getModelPrice("runninghub", "runninghub:api:/openapi/v2/youchuan/text-to-image-v7"),
+    { price: 0.54, unit: "次" },
+  );
+  assert.deepEqual(
+    getModelPrice("runninghub", "runninghub:api:/openapi/v2/youchuan/text-to-image-v81"),
+    { price: 0.54, unit: "次" },
+  );
 });
 
 test("getModelPrice returns null for unknown model and provider", () => {

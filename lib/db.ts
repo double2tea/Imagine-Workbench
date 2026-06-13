@@ -5,7 +5,7 @@ import {
   type MediaReferenceType,
 } from "./media-references";
 import type { AudioOperationMode } from "./providers/model-catalog";
-import type { RunningHubTaskNodeBinding } from "./providers/types";
+import type { RunningHubTaskNodeBinding, RunningHubYouchuanAdvancedSettings } from "./providers/types";
 
 const DB_NAME = "ImagineWorkbenchDB";
 const DB_VERSION = 7;
@@ -45,6 +45,7 @@ export interface GenerationRequestSnapshot {
   voiceProfileId?: string;
   runningHubAccessPassword?: string;
   runningHubNodeInfoList?: RunningHubTaskNodeBinding[];
+  runningHubYouchuan?: RunningHubYouchuanAdvancedSettings;
   referenceMedia?: GenerationReferenceMediaSnapshot[];
   /** @deprecated Use referenceMedia. Kept only for reading pre-migration assets. */
   referenceImages?: string[];

@@ -9,6 +9,7 @@ import {
   runningHubResolvedNodeInfoAllowsEmptyPrompt,
 } from "@/lib/providers/runninghub-node-info";
 import { dataUriToBlob, optionalText, resolveProviderConfig } from "@/lib/providers/utils";
+import type { RunningHubYouchuanAdvancedSettings } from "@/lib/providers/types";
 import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, getReferenceImagePayloadError } from "@/lib/reference-images";
 
 export const runtime = "edge";
@@ -22,6 +23,7 @@ interface GenerateImageBody {
   thinkingLevel?: unknown;
   runningHubAccessPassword?: unknown;
   runningHubNodeInfoList?: unknown;
+  runningHubYouchuan?: unknown;
   referenceImage?: unknown;
   referenceImages?: unknown;
 }
@@ -60,6 +62,7 @@ export async function POST(req: NextRequest) {
       async: parsed.async,
       runningHubAccessPassword: optionalText(body.runningHubAccessPassword),
       runningHubNodeInfoList: runningHubNodeInfo.nodeInfoList,
+      runningHubYouchuan: readRunningHubYouchuanAdvancedSettings(body.runningHubYouchuan),
     });
 
     const imageUrls = result.imageUrls ?? (result.imageUrl ? [result.imageUrl] : []);
@@ -90,6 +93,51 @@ export async function POST(req: NextRequest) {
     if (response.status >= 500 && !(err instanceof ApiError)) console.error("Image generation route error:", err);
     return NextResponse.json(response.body, { status: response.status });
   }
+}
+
+function readRunningHubYouchuanAdvancedSettings(value: unknown): RunningHubYouchuanAdvancedSettings | undefined {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) throw new ImageRequestValidationError("runningHubYouchuan must be an object");
+  return {
+    chaos: readNumberInRange(value, "chaos", 0, 100),
+    stylize: readNumberInRange(value, "stylize", 0, 1000),
+    raw: readBooleanField(value, "raw"),
+    iw: readNumberInRange(value, "iw", 0, 3),
+    sw: readNumberInRange(value, "sw", 0, 1000),
+    ...readOptionalBooleanField(value, "hd"),
+  };
+}
+
+function readNumberInRange(record: Record<string, unknown>, field: keyof RunningHubYouchuanAdvancedSettings, min: number, max: number): number {
+  const value = record[field];
+  if (typeof value !== "number" || !Number.isFinite(value) || value < min || value > max) {
+    throw new ImageRequestValidationError(`runningHubYouchuan.${field} must be a number from ${min} to ${max}`);
+  }
+  return value;
+}
+
+function readBooleanField(record: Record<string, unknown>, field: keyof RunningHubYouchuanAdvancedSettings): boolean {
+  const value = record[field];
+  if (typeof value !== "boolean") {
+    throw new ImageRequestValidationError(`runningHubYouchuan.${field} must be a boolean`);
+  }
+  return value;
+}
+
+function readOptionalBooleanField(
+  record: Record<string, unknown>,
+  field: keyof RunningHubYouchuanAdvancedSettings,
+): Partial<Pick<RunningHubYouchuanAdvancedSettings, "hd">> {
+  const value = record[field];
+  if (value === undefined) return {};
+  if (typeof value !== "boolean") {
+    throw new ImageRequestValidationError(`runningHubYouchuan.${field} must be a boolean`);
+  }
+  return { hd: value };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 async function imageUrlResponse(imageUrl: string, source: string): Promise<Response> {
