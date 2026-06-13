@@ -42,7 +42,12 @@ function openBoardDatabase(): Promise<IDBDatabase> {
       }
     };
 
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      const db = request.result;
+      db.onversionchange = () => db.close();
+      resolve(db);
+    };
+    request.onblocked = () => reject(new Error("IndexedDB open blocked"));
     request.onerror = () => reject(request.error ?? new Error("IndexedDB open failed"));
   });
 }
@@ -66,8 +71,15 @@ function readStore<T>(mode: IDBTransactionMode, action: (store: IDBObjectStore) 
 
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error ?? new Error("IndexedDB request failed"));
-        transaction.onerror = () => reject(transaction.error ?? request.error ?? new Error("IndexedDB transaction failed"));
-        transaction.onabort = () => reject(transaction.error ?? request.error ?? new Error("IndexedDB transaction aborted"));
+        transaction.oncomplete = () => db.close();
+        transaction.onerror = () => {
+          db.close();
+          reject(transaction.error ?? request.error ?? new Error("IndexedDB transaction failed"));
+        };
+        transaction.onabort = () => {
+          db.close();
+          reject(transaction.error ?? request.error ?? new Error("IndexedDB transaction aborted"));
+        };
       }),
   );
 }
@@ -81,8 +93,15 @@ function readSummaryStore<T>(mode: IDBTransactionMode, action: (store: IDBObject
 
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error ?? new Error("IndexedDB request failed"));
-        transaction.onerror = () => reject(transaction.error ?? request.error ?? new Error("IndexedDB transaction failed"));
-        transaction.onabort = () => reject(transaction.error ?? request.error ?? new Error("IndexedDB transaction aborted"));
+        transaction.oncomplete = () => db.close();
+        transaction.onerror = () => {
+          db.close();
+          reject(transaction.error ?? request.error ?? new Error("IndexedDB transaction failed"));
+        };
+        transaction.onabort = () => {
+          db.close();
+          reject(transaction.error ?? request.error ?? new Error("IndexedDB transaction aborted"));
+        };
       }),
   );
 }
@@ -94,9 +113,18 @@ function writeBoardAndSummary(board: BoardDocument): Promise<void> {
         const transaction = db.transaction([STORE_NAME, SUMMARY_STORE], "readwrite");
         transaction.objectStore(STORE_NAME).put(board);
         transaction.objectStore(SUMMARY_STORE).put(toBoardSummaryRecord(board));
-        transaction.oncomplete = () => resolve();
-        transaction.onerror = () => reject(transaction.error ?? new Error("IndexedDB write failed"));
-        transaction.onabort = () => reject(transaction.error ?? new Error("IndexedDB write aborted"));
+        transaction.oncomplete = () => {
+          db.close();
+          resolve();
+        };
+        transaction.onerror = () => {
+          db.close();
+          reject(transaction.error ?? new Error("IndexedDB write failed"));
+        };
+        transaction.onabort = () => {
+          db.close();
+          reject(transaction.error ?? new Error("IndexedDB write aborted"));
+        };
       }),
   );
 }
@@ -168,8 +196,14 @@ export async function deleteBoardFromDB(id: string): Promise<void> {
         const transaction = db.transaction([STORE_NAME, SUMMARY_STORE], "readwrite");
         transaction.objectStore(STORE_NAME).delete(id);
         transaction.objectStore(SUMMARY_STORE).delete(id);
-        transaction.oncomplete = () => resolve();
-        transaction.onerror = () => reject(transaction.error ?? new Error("IndexedDB delete failed"));
+        transaction.oncomplete = () => {
+          db.close();
+          resolve();
+        };
+        transaction.onerror = () => {
+          db.close();
+          reject(transaction.error ?? new Error("IndexedDB delete failed"));
+        };
       }),
   );
 }
@@ -181,8 +215,14 @@ export async function clearBoardsFromDB(): Promise<void> {
         const transaction = db.transaction([STORE_NAME, SUMMARY_STORE], "readwrite");
         transaction.objectStore(STORE_NAME).clear();
         transaction.objectStore(SUMMARY_STORE).clear();
-        transaction.oncomplete = () => resolve();
-        transaction.onerror = () => reject(transaction.error ?? new Error("IndexedDB clear failed"));
+        transaction.oncomplete = () => {
+          db.close();
+          resolve();
+        };
+        transaction.onerror = () => {
+          db.close();
+          reject(transaction.error ?? new Error("IndexedDB clear failed"));
+        };
       }),
   );
 }
