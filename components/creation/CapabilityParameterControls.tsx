@@ -47,7 +47,7 @@ export default function CapabilityParameterControls({
         {booleanDescriptors.length > 0 && (
           <div className="flex flex-wrap items-center justify-end gap-2">
             {booleanDescriptors.map(descriptor => (
-              <label key={descriptor.key} className={`imagine-capability-toggle${compact ? " imagine-capability-toggle--compact" : ""}`}>
+              <label key={descriptor.key} className={`imagine-inline-chip-toggle${compact ? " h-6 px-2 text-[9px]" : ""}`}>
                 <input
                   type="checkbox"
                   checked={readBooleanValue(value, descriptor)}
