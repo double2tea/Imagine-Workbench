@@ -446,43 +446,6 @@ html::-webkit-scrollbar-thumb:hover {
   color: var(--iw-text);
 }
 
-.imagine-board-minimap {
-  overflow: hidden;
-  padding: 6px;
-}
-
-.board-light-minimap {
-  display: block;
-  cursor: crosshair;
-}
-
-.board-light-minimap-bg {
-  fill: color-mix(in srgb, var(--iw-panel-soft) 84%, transparent);
-}
-
-.board-light-minimap-node {
-  fill: var(--iw-board-minimap-node);
-  opacity: 0.72;
-}
-
-.board-light-minimap-node[data-kind="group"] {
-  fill: transparent;
-  opacity: 0.55;
-  stroke: var(--iw-board-minimap-node);
-  stroke-width: 1.2;
-}
-
-.board-light-minimap-node[data-selected="true"] {
-  fill: var(--iw-board-accent-amber);
-  opacity: 1;
-}
-
-.board-light-minimap-viewport {
-  fill: transparent;
-  stroke: var(--iw-board-accent-amber);
-  stroke-width: 1.5;
-}
-
 .imagine-board-view-controls {
   display: flex;
   margin-left: 50px;
@@ -4146,11 +4109,6 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
   opacity: 0.42 !important;
 }
 
-.board-node-shell[data-selected="true"][data-kind="asset"] .board-asset-node-chrome > h2,
-.board-node-shell[data-selected="true"][data-kind="result"] .board-asset-node-chrome > h2 {
-  color: var(--iw-text);
-}
-
 .board-media-preview {
   pointer-events: none;
   -webkit-user-drag: none;
@@ -4416,15 +4374,6 @@ html[data-imagine-theme="light"] .board-media-stack-switcher {
   display: none !important;
 }
 
-.board-canvas.is-node-dragging .react-flow__minimap,
-.board-canvas.is-viewport-moving .react-flow__minimap,
-.board-canvas.is-selection-moving .react-flow__minimap,
-.board-canvas.is-node-dragging .imagine-board-minimap,
-.board-canvas.is-viewport-moving .imagine-board-minimap,
-.board-canvas.is-selection-moving .imagine-board-minimap {
-  display: none !important;
-}
-
 .board-canvas.is-viewport-moving .react-flow__node-toolbar,
 .board-canvas.is-selection-moving .react-flow__node-toolbar {
   display: none !important;
@@ -4492,8 +4441,7 @@ html[data-imagine-theme="light"] .board-media-stack-switcher {
 
 .board-canvas.is-node-dragging .board-media-controls,
 .board-canvas.is-node-dragging .board-media-stack-badge,
-.board-canvas.is-node-dragging .board-media-stack-switcher,
-.board-canvas.is-node-dragging .board-asset-node-chrome {
+.board-canvas.is-node-dragging .board-media-stack-switcher {
   backdrop-filter: none !important;
   box-shadow: none !important;
   opacity: 0 !important;
@@ -4587,11 +4535,9 @@ html[data-imagine-theme="light"] .board-media-stack-switcher {
 .board-canvas.is-viewport-moving .board-media-controls,
 .board-canvas.is-viewport-moving .board-media-stack-badge,
 .board-canvas.is-viewport-moving .board-media-stack-switcher,
-.board-canvas.is-viewport-moving .board-asset-node-chrome,
 .board-canvas.is-selection-moving .board-media-controls,
 .board-canvas.is-selection-moving .board-media-stack-badge,
-.board-canvas.is-selection-moving .board-media-stack-switcher,
-.board-canvas.is-selection-moving .board-asset-node-chrome {
+.board-canvas.is-selection-moving .board-media-stack-switcher {
   backdrop-filter: none !important;
   box-shadow: none !important;
   opacity: 0 !important;
@@ -4693,6 +4639,12 @@ html[data-imagine-theme="light"] .board-media-stack-switcher {
 .imagine-workbench-shell.imagine-theme-light .react-flow__panel {
   background: rgba(255, 255, 255, 0.92) !important;
   border-color: rgba(15, 23, 42, 0.1) !important;
+}
+
+.imagine-workbench-shell.imagine-theme-light .board-canvas .react-flow__minimap.imagine-board-minimap {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: rgba(15, 23, 42, 0.12) !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06) !important;
 }
 
 .imagine-workbench-shell.imagine-theme-light .board-canvas .react-flow__edge-path {
