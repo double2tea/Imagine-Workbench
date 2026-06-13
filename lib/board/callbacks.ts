@@ -41,6 +41,7 @@ export interface BoardNodeCallbacks {
   onUpdateReferenceGroupItemRole: (nodeId: string, assetId: string, role: BoardReferenceRole) => void;
   onUpdateAgent: (nodeId: string, instruction: string) => void;
   onUpdateGenerate: (nodeId: string, input: BoardGenerateNodeUpdate) => void;
+  onExtractMultiGridItem: (nodeId: string, assetId: string, clientX: number, clientY: number) => void;
   onUpdateMultiGrid: (nodeId: string, input: BoardMultiGridNodeUpdate) => void;
   onUpdateMultiGridItemTransform: (nodeId: string, assetId: string, transform: Partial<Pick<BoardMultiGridItem, "offsetX" | "offsetY" | "scale">>) => void;
   onUpdateNodeSize: (nodeId: string, size: BoardSize) => void;

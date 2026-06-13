@@ -486,6 +486,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
         {node.kind === "multi-grid" && (
           <MultiGridBoardNode
             node={node}
+            onExtractItem={(assetId, clientX, clientY) => c.onExtractMultiGridItem(node.id, assetId, clientX, clientY)}
             onExport={() => c.onExportMultiGrid(node.id)}
             onResize={size => c.onUpdateNodeSize(node.id, size)}
             onUpdate={input => c.onUpdateMultiGrid(node.id, input)}

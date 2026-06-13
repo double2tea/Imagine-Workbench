@@ -15,6 +15,7 @@ import {
 
 interface MultiGridBoardNodeProps {
   node: BoardMultiGridNode;
+  onExtractItem: (assetId: string, clientX: number, clientY: number) => void;
   onExport: () => void | Promise<void>;
   onResize: (size: BoardSize) => void;
   onUpdate: (input: Partial<Pick<BoardMultiGridNode, "aspectRatio" | "gridSize" | "isCollapsed" | "items" | "selectedItemId">>) => void;
@@ -118,8 +119,15 @@ function cellIndexFromPoint(clientX: number, clientY: number, nodeId: string): n
   return Number.isInteger(cellIndex) ? cellIndex : undefined;
 }
 
+function isPointInsideMultiGrid(clientX: number, clientY: number, nodeId: string): boolean {
+  const element = document.elementFromPoint(clientX, clientY);
+  const root = element?.closest("[data-multi-grid-root-id]");
+  return root instanceof HTMLElement && root.dataset.multiGridRootId === nodeId;
+}
+
 const MultiGridBoardNode = memo(function MultiGridBoardNode({
   node,
+  onExtractItem,
   onExport,
   onResize,
   onUpdate,
@@ -239,10 +247,32 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
     event.preventDefault();
     event.stopPropagation();
     const nextPreview = dragPreviewForEvent(event, activeDrag);
+    if (!isPointInsideMultiGrid(event.clientX, event.clientY, node.id)) {
+      onExtractItem(activeDrag.assetId, event.clientX, event.clientY);
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+      cancelScheduledDragPreview();
+      setActiveDrag(null);
+      setDragPreview(null);
+      return;
+    }
     onUpdateItemTransform(activeDrag.assetId, {
       offsetX: nextPreview.offsetX,
       offsetY: nextPreview.offsetY,
     });
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    cancelScheduledDragPreview();
+    setActiveDrag(null);
+    setDragPreview(null);
+  };
+
+  const cancelItemDrag = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    if (!activeDrag || activeDrag.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
@@ -333,7 +363,7 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[var(--iw-panel)]">
+    <div className="flex h-full min-h-0 flex-col bg-[var(--iw-panel)]" data-multi-grid-root-id={node.id}>
       <div className="nodrag flex h-12 shrink-0 items-center gap-1.5 overflow-x-auto border-b border-[var(--iw-border)] px-2">
         <select
           name={`multi-grid-aspect-${node.id}`}
@@ -463,7 +493,7 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
                   endItemSort(event);
                 }}
                 onPointerCancel={(event) => {
-                  endItemDrag(event);
+                  cancelItemDrag(event);
                   cancelItemSort(event);
                 }}
                 onWheel={item ? event => handleItemWheel(event, item) : undefined}

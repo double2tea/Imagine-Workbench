@@ -1025,10 +1025,11 @@ function multiGridCellDropTargetFromClient(
   clientX: number,
   clientY: number,
 ): MultiGridCellDropTarget | null {
-  const element = document.elementFromPoint(clientX, clientY);
-  const cell = element?.closest<HTMLElement>("[data-multi-grid-id][data-multi-grid-cell-index]");
+  const cell = document.elementsFromPoint(clientX, clientY)
+    .map(element => element.closest<HTMLElement>("[data-multi-grid-id][data-multi-grid-cell-index]"))
+    .find((element): element is HTMLElement => element instanceof HTMLElement);
   const nodeId = cell?.dataset.multiGridId;
-  if (!cell || !nodeId) return null;
+  if (!nodeId) return null;
   const node = nodes.find(item => item.id === nodeId);
   if (node?.kind !== "multi-grid") return null;
   const cellIndex = Number(cell.dataset.multiGridCellIndex);
@@ -1149,6 +1150,7 @@ export default function BoardWorkspace({
     () => buildGalleryTaskFingerprint(galleryItems),
     [galleryItems],
   );
+
   const generationTaskFingerprint = useMemo(
     () => buildGenerationTaskFingerprint(generationTasks),
     [generationTasks],
@@ -1174,6 +1176,7 @@ export default function BoardWorkspace({
     addAssetNode,
     addAssetToMultiGrid,
     addAssetToReferenceGroup,
+    extractMultiGridItemToAssetNode,
     addGenerateNode,
     addGenerateNodeWithConnections,
     addGroupNode,
@@ -1311,6 +1314,67 @@ export default function BoardWorkspace({
     setQuickInsertMenu(null);
     setNodeContextMenu(null);
   }, []);
+
+  const snapToGrid = board.config.snapToGrid;
+  const flowPositionFromClient = useCallback((clientX: number, clientY: number): BoardPoint => {
+    const instance = flowInstanceRef.current;
+    if (instance) {
+      const point = instance.screenToFlowPosition(
+        { x: clientX, y: clientY },
+        { snapToGrid },
+      );
+      return snapBoardPoint(point, snapToGrid);
+    }
+    const rect = flowHostRef.current?.getBoundingClientRect();
+    const point = {
+      x: ((clientX - (rect?.left ?? 0)) - board.viewport.x) / board.viewport.zoom,
+      y: ((clientY - (rect?.top ?? 0)) - board.viewport.y) / board.viewport.zoom,
+    };
+    return snapBoardPoint(point, snapToGrid);
+  }, [board.viewport.x, board.viewport.y, board.viewport.zoom, snapToGrid]);
+
+  const centeredNodePosition = useCallback((point: BoardPoint, size: BoardSize): BoardPoint => {
+    const centered = {
+      x: point.x - size.width / 2,
+      y: point.y - size.height / 2,
+    };
+    if (snapToGrid) return snapBoardPoint(centered, true);
+    return {
+      x: Math.round(centered.x),
+      y: Math.round(centered.y),
+    };
+  }, [snapToGrid]);
+
+  const isPointInsideFlowHost = useCallback((clientX: number, clientY: number): boolean => {
+    const rect = flowHostRef.current?.getBoundingClientRect();
+    return Boolean(
+      rect &&
+      clientX >= rect.left &&
+      clientX <= rect.right &&
+      clientY >= rect.top &&
+      clientY <= rect.bottom
+    );
+  }, []);
+
+  const handleExtractMultiGridItem = useCallback((nodeId: string, assetId: string, clientX: number, clientY: number): void => {
+    if (!isPointInsideFlowHost(clientX, clientY)) return;
+    const position = centeredNodePosition(flowPositionFromClient(clientX, clientY), DEFAULT_ASSET_NODE_SIZE);
+    const extractedNodeId = extractMultiGridItemToAssetNode(nodeId, assetId, position);
+    if (!extractedNodeId) return;
+    selectNode(extractedNodeId);
+    selectEdge(null);
+    updateSelectedNodeIds([extractedNodeId]);
+    closeOverlayMenus();
+  }, [
+    centeredNodePosition,
+    closeOverlayMenus,
+    extractMultiGridItemToAssetNode,
+    flowPositionFromClient,
+    isPointInsideFlowHost,
+    selectEdge,
+    selectNode,
+    updateSelectedNodeIds,
+  ]);
 
   useEffect(() => {
     if (!focusNodeRequest) return;
@@ -1527,6 +1591,7 @@ export default function BoardWorkspace({
     onUpdateReferenceGroupItemRole: updateReferenceGroupItemRole,
     onUpdateAgent: updateAgentInstruction,
     onUpdateGenerate: updateGenerateNode,
+    onExtractMultiGridItem: handleExtractMultiGridItem,
     onUpdateMultiGrid: updateMultiGridNode,
     onUpdateMultiGridItemTransform: updateMultiGridItemTransform,
     onUpdateNodeSize: updateNodeSize,
@@ -1561,7 +1626,7 @@ export default function BoardWorkspace({
     onExecuteGenerateNode, onFetchRunningHubAppSchema, focusReferenceSourceNode, onAnalyzeBoardMedia, onOpenFullscreen,
     onOpenPanorama, onSaveVoiceProfile, moveGenerateReferenceEdge, moveReferenceGroupItem,
     deleteEdge, removeReferenceGroupItem, onSendAgentNode, onSendAssetToAgent, connectSelectedBoardPromptReference,
-    updateReferenceGroupItemRole, updateAgentInstruction, updateGenerateNode, updateMultiGridNode,
+    updateReferenceGroupItemRole, updateAgentInstruction, updateGenerateNode, handleExtractMultiGridItem, updateMultiGridNode,
     updateMultiGridItemTransform, onExportMultiGrid, measureAssetAspectRatio,
     updateNodeSize,
     updateNodeTitle, updateRunningHubAppNode, updateNoteBody, updatePromptNode,
@@ -2064,38 +2129,8 @@ export default function BoardWorkspace({
     updateSelectedNodeIds([]);
   }, [closeOverlayMenus, selectEdge, selectNode, updateSelectedNodeIds]);
 
-  const snapToGrid = board.config.snapToGrid;
   const onlyRenderVisibleBoardElements = board.nodes.length >= BOARD_VISIBLE_RENDER_NODE_THRESHOLD || isNodeDragActive;
   const shouldRenderMiniMap = board.config.showMiniMap && !isNodeDragActive;
-
-  const flowPositionFromClient = useCallback((clientX: number, clientY: number): BoardPoint => {
-    const instance = flowInstanceRef.current;
-    if (instance) {
-      const point = instance.screenToFlowPosition(
-        { x: clientX, y: clientY },
-        { snapToGrid },
-      );
-      return snapBoardPoint(point, snapToGrid);
-    }
-    const rect = flowHostRef.current?.getBoundingClientRect();
-    const point = {
-      x: ((clientX - (rect?.left ?? 0)) - board.viewport.x) / board.viewport.zoom,
-      y: ((clientY - (rect?.top ?? 0)) - board.viewport.y) / board.viewport.zoom,
-    };
-    return snapBoardPoint(point, snapToGrid);
-  }, [board.viewport.x, board.viewport.y, board.viewport.zoom, snapToGrid]);
-
-  const centeredNodePosition = useCallback((point: BoardPoint, size: BoardSize): BoardPoint => {
-    const centered = {
-      x: point.x - size.width / 2,
-      y: point.y - size.height / 2,
-    };
-    if (snapToGrid) return snapBoardPoint(centered, true);
-    return {
-      x: Math.round(centered.x),
-      y: Math.round(centered.y),
-    };
-  }, [snapToGrid]);
 
   const visibleCenterPosition = useCallback((size: BoardSize): BoardPoint | undefined => {
     const rect = flowHostRef.current?.getBoundingClientRect();

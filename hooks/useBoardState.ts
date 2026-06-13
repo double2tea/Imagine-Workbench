@@ -158,6 +158,7 @@ export interface BoardStateController {
   addGroupNode: (input?: CreateGroupNodeInput) => string;
   addMultiGridNode: (input?: CreateMultiGridNodeInput) => string;
   addAssetToMultiGrid: (nodeId: string, asset: BoardAssetReference, cellIndex?: number) => void;
+  extractMultiGridItemToAssetNode: (nodeId: string, assetId: string, position: BoardPoint) => string | null;
   groupNodes: (nodeIds: string[]) => string | null;
   ungroupNode: (nodeId: string) => void;
   addGenerateNodeWithConnection: (
@@ -1172,6 +1173,16 @@ function createAssetBoardNode(input: CreateAssetNodeInput, nodes: BoardNode[]): 
   };
 }
 
+function boardAssetReferenceFromMultiGridItem(item: BoardMultiGridItem): BoardAssetReference {
+  return {
+    assetId: item.assetId,
+    type: "image",
+    url: item.url,
+    model: item.model,
+    prompt: item.prompt,
+  };
+}
+
 function createResultBoardNode(input: CreateResultNodeInput, nodes: BoardNode[]): BoardResultNode {
   const createdAt = nowIso();
   return {
@@ -1694,6 +1705,45 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     setSelectedEdgeId(edgeId);
     return node.id;
   }, [board.nodes, mutateBoard]);
+
+  const extractMultiGridItemToAssetNode = useCallback((nodeId: string, assetId: string, position: BoardPoint): string | null => {
+    const sourceNode = boardRef.current.nodes.find(node => node.id === nodeId);
+    if (sourceNode?.kind !== "multi-grid") return null;
+    const sourceItem = sourceNode.items.find(item => item.assetId === assetId && typeof item.cellIndex === "number");
+    if (!sourceItem) return null;
+    const assetNodeId = createBoardId("asset");
+    mutateBoard(currentBoard => {
+      const currentSourceNode = currentBoard.nodes.find(node => node.id === nodeId);
+      if (currentSourceNode?.kind !== "multi-grid") return currentBoard;
+      const currentItem = currentSourceNode.items.find(item => item.assetId === assetId && typeof item.cellIndex === "number");
+      if (!currentItem) return currentBoard;
+      const updatedAt = nowIso();
+      const assetNode: BoardNode = {
+        ...createAssetBoardNode({
+          asset: boardAssetReferenceFromMultiGridItem(currentItem),
+          position,
+        }, currentBoard.nodes),
+        id: assetNodeId,
+      };
+      const nextNodes = currentBoard.nodes.map(node =>
+        node.id === nodeId && node.kind === "multi-grid"
+          ? {
+            ...node,
+            items: normalizeBoardMultiGridItems(
+              node.items.filter(item => item.assetId !== assetId),
+              node.gridSize,
+            ),
+            selectedItemId: node.selectedItemId === assetId ? undefined : node.selectedItemId,
+            updatedAt,
+          }
+          : node,
+      );
+      return touchBoard(currentBoard, [...nextNodes, assetNode]);
+    });
+    setSelectedNodeId(assetNodeId);
+    setSelectedEdgeId(null);
+    return assetNodeId;
+  }, [mutateBoard]);
 
   const addResultNodeWithConnection = useCallback((input: CreateResultNodeInput, from: BoardPortRef): string => {
     const node = createResultBoardNode(input, board.nodes);
@@ -2827,6 +2877,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       addGroupNode,
       addMultiGridNode,
       addAssetToMultiGrid,
+      extractMultiGridItemToAssetNode,
       addGenerateNodeWithConnection,
       addGenerateNodeWithConnections,
       groupNodes,
@@ -2879,6 +2930,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       addGroupNode,
       addMultiGridNode,
       addAssetToMultiGrid,
+      extractMultiGridItemToAssetNode,
       addGenerateNodeWithConnection,
       addGenerateNodeWithConnections,
       groupNodes,
