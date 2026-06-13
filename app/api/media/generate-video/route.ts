@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { apiErrorResponse, badRequest, requireApiText } from "@/lib/api/errors";
-import { DEFAULT_VIDEO_MODEL, getVideoModelCapabilities, parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
+import { apiErrorResponse, requireApiText } from "@/lib/api/errors";
+import { DEFAULT_VIDEO_MODEL, getModelCapability, getVideoModelCapabilities, parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
+import { ModelCapabilityValidationError, validateInputModalityReferences } from "@/lib/providers/model-capabilities";
 import { generateVideo } from "@/lib/providers/video";
 import {
   readRunningHubNodeInfoList,
@@ -39,6 +40,7 @@ export async function POST(req: NextRequest) {
     const modelValue = optionalText(body.model) ?? DEFAULT_VIDEO_MODEL;
     const parsed = parseProviderModel(modelValue, "12ai");
     const config = resolveProviderConfig(req, parsed.provider);
+    const modelCapability = getModelCapability(modelValue, "video");
     const capability = getVideoModelCapabilities(modelValue);
     const referenceMedia = readReferenceMedia(body.referenceMedia, body.images, body.image, body.lastFrame);
     const explicitRunningHubNodeInfoList = readRunningHubNodeInfoList(body.runningHubNodeInfoList);
@@ -47,7 +49,7 @@ export async function POST(req: NextRequest) {
     if (formatError) return NextResponse.json({ error: formatError }, { status: 400 });
     const payloadError = getReferenceMediaPayloadError(referenceMedia.map(reference => reference.dataUri));
     if (payloadError) return NextResponse.json({ error: payloadError }, { status: 413 });
-    validateReferenceCount(referenceMedia.length, capability.minReferenceImages, capability.maxReferenceImages);
+    validateInputModalityReferences(modelCapability.inputModalities, referenceMedia);
 
     const allowsEmptyPrompt = runningHubResolvedNodeInfoAllowsEmptyPrompt(parsed.model, "video", runningHubNodeInfo);
     const result = await generateVideo(config, {
@@ -69,6 +71,9 @@ export async function POST(req: NextRequest) {
     console.error("Generate video endpoint failed:", err);
     if (err instanceof ProviderModelParseError) {
       return NextResponse.json({ error: message, code: "invalid_provider_model" }, { status: 400 });
+    }
+    if (err instanceof ModelCapabilityValidationError) {
+      return NextResponse.json({ error: message, code: "invalid_reference_media" }, { status: 400 });
     }
     if (message.includes("No available channel")) {
       return NextResponse.json({ error: message, code: "provider_unavailable" }, { status: 503 });
@@ -129,19 +134,4 @@ function getReferenceMediaFormatError(referenceMedia: ReferenceMedia[], accepted
     if (!acceptedTypes.includes(actualType)) return `当前视频模型不支持${mediaReferenceLabel(actualType)}输入`;
   }
   return null;
-}
-
-function validateReferenceCount(count: number, min: number, max: number): void {
-  if (count < min) {
-    throw badRequest(
-      `Selected video model requires at least ${min} reference image(s)`,
-      "too_few_reference_media",
-    );
-  }
-  if (count > max) {
-    throw badRequest(
-      `Selected video model supports at most ${max} reference image(s)`,
-      "too_many_reference_media",
-    );
-  }
 }

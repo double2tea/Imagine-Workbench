@@ -1,3 +1,11 @@
+import {
+  getOptionalModelCapability,
+  type ProviderModelCapability,
+} from "./model-catalog";
+import {
+  modelHasKnownPricing,
+  type ModelPricedProfile,
+} from "./model-capabilities";
 import { getRunningHubStandardModel, resolveRunningHubStandardModelForReferenceMedia } from "./runninghub";
 
 export interface ModelPrice {
@@ -29,11 +37,36 @@ export interface ModelPriceOptions {
   videoResolution?: string;
 }
 
-interface ProviderPriceEntry {
-  /** Substring matched against model ID path (after `api:/openapi/v2/`) */
-  pathMatch: string;
-  price: number;
-  unit: string;
+export type GenerationModelPriceKind = "image" | "video" | "audio";
+
+export interface GenerationModelPriceInput {
+  kind: GenerationModelPriceKind;
+  duration?: string;
+  imageQuality?: string;
+  referenceTypes?: readonly PriceReferenceType[];
+  resolution?: string;
+  thinkingLevel?: string;
+  videoReferenceMode?: PriceVideoReferenceMode;
+  videoResolution?: string;
+}
+
+export function buildGenerationModelPriceOptions(input: GenerationModelPriceInput): ModelPriceOptions {
+  if (input.kind === "image") {
+    return {
+      imageQuality: input.imageQuality,
+      resolution: input.resolution,
+      thinkingLevel: input.thinkingLevel,
+    };
+  }
+  if (input.kind === "video") {
+    return {
+      duration: input.duration,
+      referenceTypes: input.referenceTypes,
+      videoReferenceMode: input.videoReferenceMode,
+      videoResolution: input.videoResolution,
+    };
+  }
+  return {};
 }
 
 const SHOW_PRICE_KEY = "imagine_show_price";
@@ -51,86 +84,10 @@ export function setShowPriceSetting(value: boolean): void {
   }
 }
 
-/**
- * RunningHub model price entries, keyed by model path substring.
- * Mapped from the SKU list fetched from RunningHub's pricing API.
- */
-const RUNNINGHUB_PRICES: ProviderPriceEntry[] = [
-  // --- GPT Image 2 ---
-  { pathMatch: "rhart-image-g-2-official/text-to-image", price: 0.06, unit: "次" },
-  { pathMatch: "rhart-image-g-2-official/image-to-image", price: 0.19, unit: "次" },
-  { pathMatch: "rhart-image-g-2/text-to-image", price: 0.10, unit: "次" },
-  { pathMatch: "rhart-image-g-2/image-to-image", price: 0.10, unit: "次" },
-
-  // --- Jimeng 4.6 ---
-  { pathMatch: "bytedance/jimeng-4.6/text-to-image", price: 0.17, unit: "张" },
-  { pathMatch: "bytedance/jimeng-4.6/image-to-image", price: 0.17, unit: "张" },
-
-  // --- Gemini Pro (low price channel) ---
-  { pathMatch: "rhart-image-n-pro/text-to-image", price: 0.40, unit: "次" },
-  { pathMatch: "rhart-image-n-pro/edit", price: 0.40, unit: "次" },
-
-  // --- Gemini Pro Official ---
-  { pathMatch: "rhart-image-n-pro-official/text-to-image", price: 0.80, unit: "次" },
-  { pathMatch: "rhart-image-n-pro-official/edit", price: 0.80, unit: "次" },
-  { pathMatch: "rhart-image-n-pro-official/text-to-image-ultra", price: 0.98, unit: "次" },
-  { pathMatch: "rhart-image-n-pro-official/edit-ultra", price: 0.98, unit: "次" },
-
-  // --- Gemini Flash Official ---
-  { pathMatch: "rhart-image-n-g31-flash-official/text-to-image", price: 0.14, unit: "张" },
-  { pathMatch: "rhart-image-n-g31-flash-official/image-to-image", price: 0.14, unit: "张" },
-
-  // --- Gemini Flash (channel/low price) ---
-  { pathMatch: "rhart-image-n-g31-flash/text-to-image", price: 0.08, unit: "次" },
-  { pathMatch: "rhart-image-n-g31-flash/image-to-image", price: 0.08, unit: "次" },
-
-  // --- Youchuan ---
-  { pathMatch: "youchuan/text-to-image-v7", price: 0.54, unit: "次" },
-  { pathMatch: "youchuan/text-to-image-v81", price: 0.54, unit: "次" },
-
-  // --- Gemini Omni Flash (provisional manual pricing) ---
-  { pathMatch: "gemini-omni-flash/text-to-video", price: 1.95, unit: "次" },
-  { pathMatch: "gemini-omni-flash/image-to-video", price: 1.95, unit: "次" },
-  { pathMatch: "gemini-omni-flash/video-edit", price: 1.95, unit: "次" },
-
-  // --- VideoX 1.5 Channel ---
-  { pathMatch: "rhart-video-g/text-to-video", price: 0.04, unit: "秒" },
-  { pathMatch: "rhart-video-g/image-to-video", price: 0.04, unit: "秒" },
-
-  // --- Veo 3.1 Fast Official ---
-  { pathMatch: "rhart-video-v3.1-fast-official/reference-to-video", price: 4.03, unit: "次" },
-  { pathMatch: "rhart-video-v3.1-fast-official/text-to-video", price: 2.35, unit: "次" },
-  { pathMatch: "rhart-video-v3.1-fast-official/image-to-video", price: 2.35, unit: "次" },
-  { pathMatch: "rhart-video-v3.1-fast/start-end-to-video", price: 1.50, unit: "次" },
-  { pathMatch: "rhart-video-v3.1-fast/text-to-video", price: 1.50, unit: "次" },
-  { pathMatch: "rhart-video-v3.1-fast/image-to-video", price: 1.50, unit: "次" },
-
-  // --- Veo 3.1 Lite Official ---
-  { pathMatch: "rhart-video-v3.1-lite-official/text-to-video", price: 0.32, unit: "秒" },
-  { pathMatch: "rhart-video-v3.1-lite-official/image-to-video", price: 0.32, unit: "秒" },
-  { pathMatch: "rhart-video-v3.1-lite-official/start-end-to-video", price: 2.52, unit: "次" },
-
-  // --- Veo 3.1 Pro Official ---
-  { pathMatch: "rhart-video-v3.1-pro-official/reference-to-video", price: 9.40, unit: "次" },
-  { pathMatch: "rhart-video-v3.1-pro-official/text-to-video", price: 4.70, unit: "次" },
-  { pathMatch: "rhart-video-v3.1-pro-official/image-to-video", price: 4.70, unit: "次" },
-  { pathMatch: "rhart-video-v3.1-pro/start-end-to-video", price: 0.90, unit: "次" },
-  { pathMatch: "rhart-video-v3.1-pro/text-to-video", price: 0.90, unit: "次" },
-];
-
-const KNOWN_PROVIDERS_WITH_PRICING = ["runninghub"];
-
 export function getModelPrice(provider: string, modelId: string): ModelPrice | null {
-  if (!KNOWN_PROVIDERS_WITH_PRICING.includes(provider)) return null;
-
-  // Match longest substring first (most specific match wins)
-  const sorted = [...RUNNINGHUB_PRICES].sort(
-    (a, b) => b.pathMatch.length - a.pathMatch.length,
-  );
-  for (const entry of sorted) {
-    if (modelId.includes(entry.pathMatch)) return { price: entry.price, unit: entry.unit };
-  }
-  return null;
+  const profile = getKnownPricingProfile(provider, modelId);
+  if (!profile) return null;
+  return { price: profile.price, unit: profile.displayUnit };
 }
 
 /**
@@ -144,11 +101,14 @@ export function calculateModelPrice(
   options?: ModelPriceOptions,
 ): CalculatedModelPrice | null {
   const effectiveModelId = resolveEffectivePriceModelId(provider, modelId, options);
-  const base = getModelPrice(provider, effectiveModelId);
-  if (!base) return null;
-  const resolvedBase = resolveOptionPriceOverride(provider, effectiveModelId, base, options);
+  const profile = getKnownPricingProfile(provider, effectiveModelId);
+  if (!profile) return null;
+  const resolvedBase = {
+    price: resolveOptionPriceOverride(profile, options) ?? profile.price,
+    unit: profile.displayUnit,
+  };
 
-  if (resolvedBase.unit === "秒" && options?.duration) {
+  if (profile.dimensions.some(dimension => dimension.calculation === "multiplyBySeconds") && options?.duration) {
     const seconds = parseFloat(options.duration);
     if (!isNaN(seconds) && seconds > 0) {
       return {
@@ -167,7 +127,9 @@ export function formatPriceValue(value: number): string {
 }
 
 function resolveEffectivePriceModelId(provider: string, modelId: string, options: ModelPriceOptions | undefined): string {
-  if (provider !== "runninghub") return modelId;
+  const profile = getKnownPricingProfile(provider, modelId);
+  if (!profile?.dimensions.some(dimension => dimension.routeToModel)) return modelId;
+
   const references = options?.referenceTypes ?? [];
   if (references.length === 0 || options?.videoReferenceMode === "none") return modelId;
 
@@ -188,22 +150,47 @@ function resolveEffectivePriceModelId(provider: string, modelId: string, options
 }
 
 function resolveOptionPriceOverride(
-  provider: string,
-  modelId: string,
-  base: ModelPrice,
+  profile: ModelPricedProfile,
   options: ModelPriceOptions | undefined,
-): ModelPrice {
-  if (provider === "runninghub" && modelId.includes("gemini-omni-flash") && options?.videoResolution?.toLowerCase() === "4k") {
-    const durationPrice = resolveGeminiOmniFlash4kPrice(options.duration);
-    return durationPrice === null ? base : { ...base, price: durationPrice };
+): number | null {
+  for (const override of profile.overrides ?? []) {
+    const matches = override.match.every(match => {
+      const value = readPriceDimensionOption(match.dimension, options);
+      return value !== undefined && value.toLowerCase() === match.value.toLowerCase();
+    });
+    if (!matches) continue;
+    if (override.dimensionPrices) {
+      const value = readPriceDimensionOption(override.dimensionPrices.dimension, options);
+      const price = override.dimensionPrices.values.find(item => item.value === value)?.price;
+      if (price !== undefined) return price;
+    }
+    if (override.price !== undefined) return override.price;
   }
-  return base;
+  return null;
 }
 
-function resolveGeminiOmniFlash4kPrice(duration: string | undefined): number | null {
-  if (duration === "4") return 3.15;
-  if (duration === "6") return 3.57;
-  if (duration === "8") return 3.78;
-  if (duration === "10") return 4.20;
-  return null;
+function getKnownPricingProfile(provider: string, modelId: string): ModelPricedProfile | null {
+  const capability = getPriceCapability(provider, modelId);
+  if (!capability || !modelHasKnownPricing(capability.pricing)) return null;
+  return capability.pricing;
+}
+
+function getPriceCapability(provider: string, modelId: string): ProviderModelCapability | undefined {
+  const modelValue = modelId.startsWith(`${provider}:`) || modelId.startsWith("12ai-async:")
+    ? modelId
+    : `${provider}:${modelId}`;
+  const capability = getOptionalModelCapability(modelValue);
+  return capability?.provider === provider ? capability : undefined;
+}
+
+function readPriceDimensionOption(key: string, options: ModelPriceOptions | undefined): string | undefined {
+  if (!options) return undefined;
+  if (key === "duration") return options.duration;
+  if (key === "imageQuality") return options.imageQuality;
+  if (key === "resolution") return options.resolution;
+  if (key === "thinkingLevel") return options.thinkingLevel;
+  if (key === "videoReferenceMode") return options.videoReferenceMode;
+  if (key === "videoResolution") return options.videoResolution;
+  if (key === "referenceTypes") return options.referenceTypes?.join(",");
+  return undefined;
 }

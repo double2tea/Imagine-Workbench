@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { AgentBoardContext } from "@/lib/agent-context";
 import { PROMPT_TEMPLATES } from "@/lib/prompt-templates";
 import { AGENT_BOARD_ACTION_TYPES, AGENT_WORKBENCH_ACTION_TYPES } from "@/lib/agent-actions";
-import { MODEL_CAPABILITIES, type ModelKind, type ProviderModelCapability } from "@/lib/providers/model-catalog";
+import { getListedModelCapabilities, type ModelKind, type ProviderModelCapability } from "@/lib/providers/model-catalog";
 import type { ToolDefinition } from "@/lib/providers/types";
 import { SKILL_REGISTRY } from "./skills";
 
@@ -262,9 +262,7 @@ export function executeToolCall(name: string, args: string, ctx: ToolContext): s
   switch (name) {
     case "query_models": {
       const { kind } = queryModelsSchema.parse(JSON.parse(args));
-      const filtered = kind
-        ? MODEL_CAPABILITIES.filter(c => c.kind === kind)
-        : MODEL_CAPABILITIES;
+      const filtered = getListedModelCapabilities(kind);
       return JSON.stringify(filtered.map(formatCapabilities));
     }
     case "get_agent_capabilities": {
@@ -372,7 +370,7 @@ function countBy(values: string[]): Record<string, number> {
 }
 
 function modelCountByKind(): Record<ModelKind, number> {
-  return MODEL_CAPABILITIES.reduce<Record<ModelKind, number>>((acc, model) => {
+  return getListedModelCapabilities().reduce<Record<ModelKind, number>>((acc, model) => {
     acc[model.kind] += 1;
     return acc;
   }, { audio: 0, chat: 0, image: 0, video: 0 });
@@ -640,6 +638,21 @@ function formatCapabilities(c: ProviderModelCapability): Record<string, unknown>
     audioModes: c.kind === "audio" ? c.audioModes : [],
     audioDefaultMode: c.kind === "audio" ? c.audioDefaultMode : undefined,
     audioOutputKinds: c.kind === "audio" ? c.audioOutputKinds : [],
+    inputModalities: c.inputModalities,
+    pricing: c.pricing.status === "priced"
+      ? {
+          status: c.pricing.status,
+          unit: c.pricing.displayUnit,
+          dimensions: c.pricing.dimensions.map(dimension => dimension.key),
+        }
+      : { status: c.pricing.status, reason: c.pricing.reason },
+    referenceSlots: c.referenceSlots.map(slot => ({
+      key: slot.key,
+      role: slot.role,
+      mediaTypes: slot.mediaTypes,
+      minCount: slot.minCount,
+      maxCount: slot.maxCount,
+    })),
     maxReferenceImages: c.maxReferenceImages,
     minReferenceImages: c.minReferenceImages,
     referenceMediaTypes: c.referenceMediaTypes,

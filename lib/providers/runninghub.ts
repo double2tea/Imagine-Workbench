@@ -3,8 +3,11 @@ import {
   defaultCapabilityParameterValues,
   pruneCapabilityParameterValues,
   validateCapabilityParameterValues,
+  type JsonValue,
   type ModelParameterDescriptor,
   type ModelParameterValues,
+  type ProviderPayloadFieldMappingDescriptor,
+  type ProviderPayloadMappingDescriptor,
 } from "./model-capabilities";
 import type { RunningHubTaskNodeBinding, RunningHubYouchuanAdvancedSettings } from "./types";
 
@@ -1654,6 +1657,16 @@ export function getRunningHubStandardEndpoint(model: RunningHubStandardModel): s
   return model.request.endpoint;
 }
 
+export function runningHubStandardPayloadMapping(model: RunningHubStandardModel): ProviderPayloadMappingDescriptor {
+  return {
+    provider: "runninghub",
+    endpoint: model.request.endpoint,
+    operation: runningHubPayloadMappingOperation(model.request),
+    fields: runningHubPayloadFieldMappings(model.request),
+    logic: runningHubPayloadMappingLogic(model.request),
+  };
+}
+
 export function validateRunningHubStandardReferenceCount(model: RunningHubStandardModel, referenceCount: number): void {
   if (!model.supportsReferences && referenceCount > 0) {
     throw new Error(`${model.label} does not support reference media`);
@@ -1664,6 +1677,130 @@ export function validateRunningHubStandardReferenceCount(model: RunningHubStanda
   if (referenceCount > model.maxReferenceImages) {
     throw new Error(`${model.label} supports at most ${model.maxReferenceImages} reference media items`);
   }
+}
+
+function runningHubPayloadMappingOperation(
+  request: RunningHubStandardRequest,
+): ProviderPayloadMappingDescriptor["operation"] {
+  if (request.type === "prompt-dimensions" || request.type === "aspect-resolution-image") return "promptDimensions";
+  if (request.type === "grok-image") return request.referenceField ? "singleReference" : "promptDimensions";
+  if (request.type === "node-dimensions") return "nodeFields";
+  if (request.type === "image-reference-video") {
+    if (request.lastReferenceField) return "firstLastFrames";
+    if (request.videoField || request.audioField) return "groupedReferences";
+    return request.referenceValue === "single" || request.referenceField !== "imageUrls" ? "singleReference" : "referenceArray";
+  }
+  return "providerSpecific";
+}
+
+function runningHubPayloadFieldMappings(
+  request: RunningHubStandardRequest,
+): ProviderPayloadFieldMappingDescriptor[] {
+  const fields: ProviderPayloadFieldMappingDescriptor[] = [];
+  if (request.type === "node-dimensions") {
+    fields.push({ target: request.promptField, source: "prompt", valueType: "string" });
+    if (request.widthField) fields.push({ target: request.widthField, source: "imageResolution", valueType: "number" });
+    if (request.heightField) fields.push({ target: request.heightField, source: "imageResolution", valueType: "number" });
+    fields.push(...extraLiteralFields(request.extra));
+    return fields;
+  }
+
+  fields.push({ target: "prompt", source: "prompt", valueType: "string" });
+  if (request.type === "grok-image") {
+    fields.push({ target: "model", source: "literal", valueType: "string", literal: request.model });
+    if (request.referenceField) fields.push({ target: request.referenceField, source: "imageUrls", valueType: "string" });
+    return fields;
+  }
+  if (request.type === "prompt-dimensions") {
+    fields.push({ target: "width", source: "imageResolution", valueType: "number" });
+    fields.push({ target: "height", source: "imageResolution", valueType: "number" });
+    if (request.referenceField) fields.push({ target: request.referenceField, source: "imageUrls", valueType: "array" });
+    fields.push(...extraLiteralFields(request.extra));
+    return fields;
+  }
+  if (request.type === "hailuo-video") {
+    fields.push({ target: "duration", source: "durationSeconds", valueType: "string" });
+    if (request.requiresReference) {
+      fields.push({ target: "firstImageUrl", source: "imageUrls", valueType: "string" });
+      fields.push({ target: "lastImageUrl", source: "imageUrls", valueType: "string" });
+    }
+    return fields;
+  }
+  if (request.type === "seedance-video" || request.type === "aspect-resolution-video") {
+    fields.push({ target: "resolution", source: "resolutionName", valueType: "string" });
+    fields.push({ target: "duration", source: "durationSeconds" });
+    fields.push({ target: request.aspectField, source: "aspectRatio", valueType: "string" });
+    fields.push(...extraLiteralFields(request.extra));
+    return fields;
+  }
+  if (request.type === "image-reference-video") {
+    if (!request.omitResolution) fields.push({ target: "resolution", source: "resolutionName", valueType: "string" });
+    if (request.durations) fields.push({ target: "duration", source: "durationSeconds" });
+    if (request.aspectField) fields.push({ target: request.aspectField, source: "aspectRatio", valueType: "string" });
+    fields.push({ target: request.referenceField, source: "imageUrls", valueType: request.referenceField === "imageUrls" ? "array" : "string" });
+    if (request.lastReferenceField) fields.push({ target: request.lastReferenceField, source: "imageUrls", valueType: "string" });
+    if (request.videoField) fields.push({ target: request.videoField, source: "videoUrls", valueType: request.videoField === "videoUrls" ? "array" : "string" });
+    if (request.audioField) fields.push({ target: request.audioField, source: "audioUrls", valueType: "array" });
+    fields.push(...extraLiteralFields(request.extra));
+    return fields;
+  }
+  if (request.type === "aspect-resolution-image") {
+    fields.push({ target: "aspectRatio", source: "aspectRatio", valueType: "string" });
+    fields.push({ target: "resolution", source: "imageResolution", valueType: "string" });
+    fields.push({ target: "quality", source: "imageQuality", valueType: "string" });
+    if (request.referenceField) fields.push({ target: request.referenceField, source: "imageUrls", valueType: "array" });
+    fields.push(...extraLiteralFields(request.extra));
+    return fields;
+  }
+  if (request.type === "youchuan-image") {
+    if (request.aspectField) fields.push({ target: request.aspectField, source: "aspectRatio", valueType: "string" });
+    if (request.qualityField) fields.push({ target: request.qualityField, source: "imageQuality", valueType: "string" });
+    if (request.referenceField) fields.push({ target: request.referenceField, source: "imageUrls", valueType: "string" });
+    fields.push(...extraLiteralFields(request.extra));
+  }
+  return fields;
+}
+
+function runningHubPayloadMappingLogic(request: RunningHubStandardRequest): ProviderPayloadMappingDescriptor["logic"] {
+  const logic: Array<NonNullable<ProviderPayloadMappingDescriptor["logic"]>[number]> = ["mediaUpload"];
+  if (
+    request.type === "prompt-dimensions" ||
+    request.type === "node-dimensions" ||
+    request.type === "aspect-resolution-image"
+  ) {
+    logic.push("dimensionDerivation");
+  }
+  if (
+    request.type === "hailuo-video" ||
+    request.type === "seedance-video" ||
+    request.type === "aspect-resolution-video" ||
+    request.type === "image-reference-video"
+  ) {
+    logic.push("durationCoercion");
+  }
+  if (request.type === "image-reference-video") logic.push("referenceRouting");
+  return logic;
+}
+
+function extraLiteralFields(extra: Record<string, unknown> | undefined): ProviderPayloadFieldMappingDescriptor[] {
+  if (!extra) return [];
+  return Object.entries(extra).flatMap(([target, literal]) =>
+    isJsonValue(literal) ? [{ target, source: "literal", literal } satisfies ProviderPayloadFieldMappingDescriptor] : [],
+  );
+}
+
+function isJsonValue(value: unknown): value is JsonValue {
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return true;
+  }
+  if (Array.isArray(value)) return value.every(isJsonValue);
+  if (typeof value !== "object") return false;
+  return Object.values(value).every(isJsonValue);
 }
 
 export function buildRunningHubStandardBody(

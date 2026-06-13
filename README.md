@@ -136,7 +136,7 @@ New providers are added through a centralized registry — no scattered if-else 
 }
 ```
 
-Then add model capabilities to `MODEL_CAPABILITIES` in `lib/providers/model-catalog.ts`. If the provider needs custom generation logic (non-OpenAI-compatible endpoints), add adapter branches in `lib/providers/image.ts`, `lib/providers/video.ts`, or `lib/providers/audio.ts`. OpenAI-compatible chat, model-listing, and immediate single-image endpoints work with zero additional adapter code.
+Then add model capabilities to `lib/providers/catalog/data/model-capabilities.json`; `lib/providers/model-catalog.ts` loads and validates that JSON as the typed catalog. If the provider needs custom generation logic (non-OpenAI-compatible endpoints), add adapter branches in `lib/providers/image.ts`, `lib/providers/video.ts`, or `lib/providers/audio.ts`. OpenAI-compatible chat, model-listing, and immediate single-image endpoints work with zero additional adapter code.
 
 The `AiProvider` type, `PROVIDER_KEYS`, settings UI cards, localStorage persistence, env var resolution, and model dropdown groups are all derived automatically from the registry.
 
@@ -231,6 +231,7 @@ DaVinci Resolve integration starts with [DaVinci Resolve Bridge](docs/resolve-br
 - `POST /api/media/video-download`: proxies completed video downloads.
 - `POST /api/media/audio-download`: proxies completed async audio downloads.
 - `POST /api/media/cancel`: cancels supported remote media operations.
+- `GET /api/model-capabilities`: exposes the unified model capability catalog for Workbench clients, plugins, and external integrations. This route is prerendered as static JSON during build.
 - `POST /api/chat/completions`: provider-neutral OpenAI-compatible chat completions proxy. Use provider-prefixed model IDs such as `mimo:mimo-v2.5` or `runninghub:qwen/qwen3.7-max`.
 - `POST /api/prompts/optimize`: expands a visual prompt through the selected chat model.
 - `GET /api/resolve/capabilities`: describes the image, video, and audio operations available to external or in-Resolve bridge clients.
@@ -262,6 +263,7 @@ app/
   api/resolve/provider-credentials Local Resolve plugin credential sharing
   api/agent/respond/route.ts       Agent response API
   api/runninghub/ai-app-schema     RunningHub AI App schema lookup
+  api/model-capabilities/route.ts  Unified model capability catalog API
   api/models/route.ts              Provider model listing
   v1/chat/completions/route.ts     OpenAI-compatible chat gateway
   v1/images/*                      OpenAI-compatible immediate image gateway
@@ -332,7 +334,7 @@ pnpm run test:providers
 - Reference images are passed as data URI base64 strings.
 - Provider metadata lives in `lib/providers/registry.ts` — the single source of truth for keys, labels, env vars, defaults, and UI fields.
 - The app keeps provider integration logic in `lib/providers/*`; avoid putting provider-specific request details directly in UI components.
-- Built-in model capabilities in `MODEL_CAPABILITIES` serve as initial defaults. The "获取模型" button fetches the live model list from each provider's `/v1/models` endpoint and merges it into the dropdowns. Models are auto-classified as chat/image/video by name.
+- Built-in model capabilities come from `lib/providers/catalog/data/model-capabilities.json`, with public/selectable entries derived through `getListedModelCapabilities()`. The "获取模型" button fetches the live model list from each provider's `/v1/models` endpoint and merges it into the dropdowns. Unknown live models are auto-classified as chat/image/video/audio by name.
 - Board documents are persisted separately from generated media. Board nodes reference assets by ID/url, while generated media remains owned by the IndexedDB asset store.
 - Board generation resolves connected image references against the latest IndexedDB asset item before submission.
 - React Flow node state on the board should stay single-source from the normalized board document. Use transient visual state only for active drag feedback, then write settled positions back to `useBoardState`.

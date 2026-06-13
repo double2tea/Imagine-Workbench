@@ -17,6 +17,7 @@ import {
 } from "@/lib/prompt-templates";
 import { AUDIO_MODE_LABELS, audioOperationFormatOptions, audioOperationRequiresTextInput } from "@/lib/audio-operation-rules";
 import { getAudioModelCapabilities, getVideoModelCapabilities } from "@/lib/providers/model-catalog";
+import { buildGenerationModelPriceOptions } from "@/lib/providers/pricing";
 import { selectVideoReferenceTypesForMode } from "@/lib/video-reference-selection";
 import { gsap, prefersReducedWorkbenchMotion, useGSAP, WORKBENCH_GSAP_EASE } from "@/lib/workbench-gsap";
 
@@ -408,13 +409,22 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
               <ModelPriceBadge
                 provider={node.model.split(":")[0]}
                 modelId={node.model}
-                duration={node.kind === "video-generate" ? node.videoDuration : undefined}
-                resolution={node.kind === "image-generate" ? (node.imageResolution === "custom" ? node.customImageResolution : node.imageResolution) : undefined}
-                imageQuality={node.kind === "image-generate" ? node.imageQuality : undefined}
-                referenceTypes={node.kind === "video-generate" ? videoPriceReferenceTypes : undefined}
-                thinkingLevel={node.kind === "image-generate" ? node.thinkingLevel : undefined}
-                videoReferenceMode={node.kind === "video-generate" ? activeVideoReferenceMode : undefined}
-                videoResolution={node.kind === "video-generate" ? node.videoResolution : undefined}
+                options={node.kind === "image-generate"
+                  ? buildGenerationModelPriceOptions({
+                      kind: "image",
+                      imageQuality: node.imageQuality,
+                      resolution: node.imageResolution === "custom" ? node.customImageResolution : node.imageResolution,
+                      thinkingLevel: node.thinkingLevel,
+                    })
+                  : node.kind === "video-generate"
+                    ? buildGenerationModelPriceOptions({
+                        kind: "video",
+                        duration: node.videoDuration,
+                        referenceTypes: videoPriceReferenceTypes,
+                        videoReferenceMode: activeVideoReferenceMode,
+                        videoResolution: node.videoResolution,
+                      })
+                    : buildGenerationModelPriceOptions({ kind: "audio" })}
               />
             )}
           </button>

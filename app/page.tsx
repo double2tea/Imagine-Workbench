@@ -83,7 +83,7 @@ import {
   getVideoModelCapabilities,
   imageParameterValuesFromLegacy,
   imageParameterValuesToRunningHubYouchuan,
-  supportsAsyncImageGeneration,
+  resolveAsyncImageModelValue,
   tryParseProviderModel,
   type AiProvider,
   type AudioOperationMode,
@@ -92,6 +92,7 @@ import {
 } from "@/lib/providers/model-catalog";
 import { getProviderMeta, type CustomProviderDefinition } from "@/lib/providers/registry";
 import { RUNNINGHUB_YOUCHUAN_ADVANCED_DEFAULTS, runningHubAppPresetRequiresPrompt } from "@/lib/providers/runninghub";
+import { buildGenerationModelPriceOptions } from "@/lib/providers/pricing";
 import type { RunningHubYouchuanAdvancedSettings } from "@/lib/providers/types";
 import { saveClonedVoiceProfileFromAsset } from "@/lib/voice-profiles";
 import { getMediaReferenceType, mediaReferenceLabel, mediaReferenceTypeFromMime } from "@/lib/media-references";
@@ -506,14 +507,8 @@ export default function Home() {
   const activeAudioFormat = audioFormatOptions.some(option => option.value === audioFormat)
     ? audioFormat
     : audioFormatOptions[0]?.value ?? "";
-  const canUseAsyncImageGeneration = supportsAsyncImageGeneration(selectedModel);
   const activeImageResolution = imageResolution === "custom" ? customImageSize.trim() : imageResolution;
   const activeImageQuality = imageCapabilities.qualities.some(option => option.value === imageQuality) ? imageQuality : undefined;
-  const selectedImageProviderModel = tryParseProviderModel(selectedModel, selectedProvider) ?? {
-    provider: selectedProvider,
-    model: selectedModel,
-    async: false,
-  };
   const activeVideoSize = videoCapabilities.sizes.some(option => option.value === aspectRatio) ? aspectRatio : "auto";
   const activeVideoResolution = videoCapabilities.resolutions.some(option => option.value === videoResolution)
     ? videoResolution
@@ -606,19 +601,33 @@ export default function Home() {
       ? (audioTextInputRequired && !prompt.trim()) || (audioStylePromptRequired && !audioStylePrompt.trim()) || !hasRequiredAudioReferences || (needsManualVoiceCloneConsent && !voiceCloneConsentAccepted)
       : (traditionalSubTab === "image" ? imagePromptRequired : videoPromptRequired) && !prompt.trim();
 
-  const canUseBackgroundImageGeneration =
-    canUseAsyncImageGeneration &&
-    selectedImageProviderModel.provider === "12ai" &&
-    (selectedImageProviderModel.model !== "gpt-image-2" || referenceImages.length === 0);
+  const asyncImageModel = resolveAsyncImageModelValue(selectedModel, referenceImages.length);
+  const canUseBackgroundImageGeneration = asyncImageModel !== null;
   const shouldUseAsyncImageGeneration = (imageBackgroundGeneration || isSubmittingImage) && canUseBackgroundImageGeneration;
-  const activeImageModel = shouldUseAsyncImageGeneration && selectedImageProviderModel.provider === "12ai"
-    ? `12ai-async:${selectedImageProviderModel.model}`
-    : selectedModel;
+  const activeImageModel = shouldUseAsyncImageGeneration && asyncImageModel ? asyncImageModel : selectedModel;
   const videoPriceReferenceTypes = selectVideoReferenceTypesForMode(
     referenceImages,
     referenceImage,
     activeVideoReferenceMode,
     videoCapabilities.maxReferenceImages,
+  );
+  const creatorPriceOptions = buildGenerationModelPriceOptions(
+    traditionalSubTab === "image"
+      ? {
+          kind: "image",
+          imageQuality,
+          resolution: activeImageResolution,
+          thinkingLevel: imageThinkingLevel,
+        }
+      : traditionalSubTab === "video"
+        ? {
+            kind: "video",
+            duration: activeVideoDuration ?? videoDuration,
+            referenceTypes: videoPriceReferenceTypes,
+            videoReferenceMode: activeVideoReferenceMode,
+            videoResolution,
+          }
+        : { kind: "audio" },
   );
 
   useClipboardImageImport({
@@ -1896,13 +1905,7 @@ export default function Home() {
                 submitCount={traditionalSubTab === "image" ? imageSubmitCount : traditionalSubTab === "audio" ? audioSubmitCount : videoSubmitCount}
                 priceProvider={traditionalSubTab === "image" ? selectedModel.split(":")[0] : traditionalSubTab === "audio" ? selectedAudioModel.split(":")[0] : selectedVideoModel.split(":")[0]}
                 priceModelId={traditionalSubTab === "image" ? selectedModel : traditionalSubTab === "audio" ? selectedAudioModel : selectedVideoModel}
-                priceDuration={traditionalSubTab === "video" ? activeVideoDuration ?? videoDuration : undefined}
-                priceResolution={traditionalSubTab === "image" ? activeImageResolution : undefined}
-                priceImageQuality={traditionalSubTab === "image" ? imageQuality : undefined}
-                priceReferenceTypes={traditionalSubTab === "video" ? videoPriceReferenceTypes : undefined}
-                priceThinkingLevel={traditionalSubTab === "image" ? imageThinkingLevel : undefined}
-                priceVideoReferenceMode={traditionalSubTab === "video" ? activeVideoReferenceMode : undefined}
-                priceVideoResolution={traditionalSubTab === "video" ? videoResolution : undefined}
+                priceOptions={creatorPriceOptions}
                 onGenerate={() => {
                   if (traditionalSubTab === "image") {
                     generateManualImage();

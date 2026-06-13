@@ -1,43 +1,23 @@
 "use client";
 
 import { usePriceDisplaySetting } from "@/hooks/usePriceDisplaySetting";
-import { calculateModelPrice, formatPriceValue } from "@/lib/providers/pricing";
+import { calculateModelPrice, formatPriceValue, type ModelPriceOptions } from "@/lib/providers/pricing";
 
 interface ModelPriceBadgeProps {
   provider: string;
   modelId: string;
-  duration?: string;
-  resolution?: string;
-  imageQuality?: string;
-  referenceTypes?: Array<"image" | "video" | "audio">;
-  thinkingLevel?: string;
-  videoReferenceMode?: "reference" | "firstLast" | "none";
-  videoResolution?: string;
+  options?: ModelPriceOptions;
 }
 
 export default function ModelPriceBadge({
   provider,
   modelId,
-  duration,
-  resolution,
-  imageQuality,
-  referenceTypes,
-  thinkingLevel,
-  videoReferenceMode,
-  videoResolution,
+  options,
 }: ModelPriceBadgeProps) {
   const [showPrice] = usePriceDisplaySetting();
   if (!showPrice) return null;
 
-  const price = calculateModelPrice(provider, modelId, {
-    duration,
-    imageQuality,
-    referenceTypes,
-    resolution,
-    thinkingLevel,
-    videoReferenceMode,
-    videoResolution,
-  });
+  const price = calculateModelPrice(provider, modelId, options);
   if (!price) return null;
 
   const formatted = price.isCalculated

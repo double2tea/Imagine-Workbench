@@ -11,7 +11,7 @@ import {
 import { getMediaReferenceType, mediaReferenceLabel } from "@/lib/media-references";
 import {
   DEFAULT_CHAT_MODEL,
-  MODEL_CAPABILITIES,
+  getListedModelCapabilities,
   parseProviderModel,
   ProviderModelParseError,
 } from "@/lib/providers/model-catalog";
@@ -247,7 +247,7 @@ const agentResponseSchema = z.object({
 
 // -- Model ID validation --
 
-const VALID_MODEL_IDS = new Set(MODEL_CAPABILITIES.map(c => c.value));
+const VALID_MODEL_IDS = new Set(getListedModelCapabilities().map(c => c.value));
 
 function validateActionModel(
   action: { type: string; params?: { model?: string; aspectRatio?: string } },

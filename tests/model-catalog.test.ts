@@ -7,9 +7,11 @@ import {
   DEFAULT_CHAT_MODEL,
   DEFAULT_VISION_CHAT_MODEL,
   IMAGE_MODEL_OPTIONS,
+  MODEL_CAPABILITY_CATALOG_VERSION,
   VIDEO_MODEL_OPTIONS,
   getImageModelCapabilities,
   getImageResolutionOptions,
+  getListedModelCapabilities,
   getModelCapabilities,
   getModelCapability,
   getVideoModelCapabilities,
@@ -17,9 +19,13 @@ import {
   imageParameterValuesToRunningHubYouchuan,
   isMimoWorkbenchTtsModel,
   parseProviderModel,
+  readModelCapabilityCatalog,
+  resolveAsyncImageModelValue,
   supportsAsyncImageGeneration,
   tryParseProviderModel,
+  type ModelCapabilityCatalogDocument,
 } from "../lib/providers/model-catalog";
+import modelCapabilityCatalog from "../lib/providers/catalog/data/model-capabilities.json";
 import {
   defaultCapabilityParameterValues,
   validateCapabilityParameterValues,
@@ -87,6 +93,79 @@ test("getModelCapabilities filters by kind and provider", () => {
   assert.ok(grokImageCapabilities.every(capability => capability.provider === "grok2api"));
 });
 
+test("model capabilities are loaded from the reusable JSON catalog", () => {
+  assert.equal(MODEL_CAPABILITY_CATALOG_VERSION, modelCapabilityCatalog.version);
+  assert.equal(getModelCapabilities().length, modelCapabilityCatalog.entries.length);
+
+  const hiddenRunningHubRoute = "runninghub:api:/openapi/v2/rhart-video-v3.1-fast-official/reference-to-video";
+  assert.equal(getModelCapability(hiddenRunningHubRoute, "video").listed, false);
+  assert.equal(getListedModelCapabilities("video", "runninghub").some(capability => capability.value === hiddenRunningHubRoute), false);
+  assert.equal(VIDEO_MODEL_OPTIONS.runninghub.some(option => option.value === hiddenRunningHubRoute), false);
+});
+
+test("model capability catalog fails fast on invalid provider keys", () => {
+  const catalog = cloneModelCapabilityCatalog();
+  (catalog.entries[0] as unknown as { provider: string }).provider = "not-a-provider";
+
+  assert.throws(
+    () => readModelCapabilityCatalog(catalog),
+    /has invalid provider/,
+  );
+});
+
+test("model capability catalog fails fast on descriptor reference slot drift", () => {
+  const catalog = cloneModelCapabilityCatalog();
+  const entry = catalog.entries.find(item => item.parameterDescriptors.some(descriptor => descriptor.kind === "reference"));
+  if (!entry) throw new Error("Expected at least one reference descriptor");
+  entry.referenceSlots = [];
+
+  assert.throws(
+    () => readModelCapabilityCatalog(catalog),
+    /has mismatched referenceSlots/,
+  );
+});
+
+test("model capability catalog fails fast on malformed pricing", () => {
+  const catalog = cloneModelCapabilityCatalog();
+  const entry = catalog.entries.find(item => item.pricing.status === "priced");
+  if (!entry || entry.pricing.status !== "priced") throw new Error("Expected at least one priced capability");
+  entry.pricing = { ...entry.pricing, price: -1 };
+
+  assert.throws(
+    () => readModelCapabilityCatalog(catalog),
+    /has invalid price/,
+  );
+});
+
+test("image video and audio model capabilities expose unified metadata", () => {
+  const generationCapabilities = getModelCapabilities().filter(capability => capability.kind !== "chat");
+
+  assert.ok(generationCapabilities.length > 0);
+  for (const capability of generationCapabilities) {
+    assert.ok(capability.inputModalities.text !== undefined || capability.inputModalities.images !== undefined || capability.inputModalities.audio !== undefined);
+    assert.ok(Array.isArray(capability.parameterDescriptors));
+    assert.ok(Array.isArray(capability.referenceSlots));
+    assert.ok(capability.pricing.status === "priced" || capability.pricing.status === "unpriced");
+    assert.deepEqual(
+      capability.referenceSlots,
+      capability.parameterDescriptors.filter(descriptor => descriptor.kind === "reference"),
+    );
+  }
+});
+
+function cloneModelCapabilityCatalog(): ModelCapabilityCatalogDocument {
+  return JSON.parse(JSON.stringify(modelCapabilityCatalog)) as ModelCapabilityCatalogDocument;
+}
+
+test("async image model resolution is driven by async capability reference limits", () => {
+  assert.equal(resolveAsyncImageModelValue("12ai:gpt-image-2", 0), "12ai-async:gpt-image-2");
+  assert.equal(resolveAsyncImageModelValue("12ai:gpt-image-2", 1), null);
+  assert.equal(
+    resolveAsyncImageModelValue("12ai:gemini-3.1-flash-image-preview", 1),
+    "12ai-async:gemini-3.1-flash-image-preview",
+  );
+});
+
 test("grok2api image references are limited to the edit model", () => {
   const grokImage = getModelCapability("grok2api:grok-imagine-image", "image");
   const grokImageEdit = getModelCapability("grok2api:grok-imagine-image-edit", "image");
@@ -115,6 +194,20 @@ test("runninghub control image app exposes one required image reference", () => 
   assert.equal(capabilities.minReferenceImages, 1);
   assert.equal(capabilities.maxReferenceImages, 1);
   assert.deepEqual(capabilities.referenceMediaTypes, ["image"]);
+});
+
+test("runninghub standard capabilities include pricing and payload mapping for listed and routed endpoints", () => {
+  const youchuan = getModelCapability("runninghub:api:/openapi/v2/youchuan/text-to-image-v7", "image");
+  assert.equal(youchuan.pricing.status, "priced");
+  if (youchuan.pricing.status !== "priced") throw new Error("Expected Youchuan pricing");
+  assert.equal(youchuan.pricing.price, 0.54);
+  assert.equal(youchuan.payloadMapping?.endpoint, "/openapi/v2/youchuan/text-to-image-v7");
+
+  const routedVideo = getModelCapability("runninghub:api:/openapi/v2/rhart-video-v3.1-fast-official/reference-to-video", "video");
+  assert.equal(routedVideo.pricing.status, "priced");
+  if (routedVideo.pricing.status !== "priced") throw new Error("Expected routed video pricing");
+  assert.equal(routedVideo.pricing.price, 4.03);
+  assert.equal(routedVideo.payloadMapping?.operation, "referenceArray");
 });
 
 test("unknown model capability fails fast", () => {

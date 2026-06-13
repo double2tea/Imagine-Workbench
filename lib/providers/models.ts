@@ -1,9 +1,6 @@
-import { formatProviderModel, getModelCapabilities, isAgentCompatibleModelId, type AiProvider, type ModelOption } from "./model-catalog";
+import { formatProviderModel, getListedModelCapabilities, isAgentCompatibleModelId, type AiProvider, type ModelOption } from "./model-catalog";
 import { getProviderMeta } from "./registry";
 import {
-  RUNNINGHUB_APP_PRESETS,
-  RUNNINGHUB_DEFAULT_LLM_MODEL,
-  RUNNINGHUB_STANDARD_MODELS,
   runningHubLlmBaseUrl,
 } from "./runninghub";
 import type { ProviderConfig } from "./types";
@@ -88,46 +85,22 @@ export function listStaticProviderModels(provider: AiProvider, kind: ModelKindFi
   if (provider === "runninghub") return runningHubStaticModels(kind);
   if (provider === "modelscope") return modelScopeStaticModels(kind);
 
-  return getModelCapabilities(kind === "all" ? undefined : kind, provider).map(capability => ({
+  return getListedModelCapabilities(kind === "all" ? undefined : kind, provider).map(capability => ({
     value: capability.value,
     label: capability.label,
   }));
 }
 
 function modelScopeStaticModels(kind: ModelKindFilter): ModelOption[] {
-  return getModelCapabilities(kind === "all" ? undefined : kind, "modelscope").map(capability => ({
+  return getListedModelCapabilities(kind === "all" ? undefined : kind, "modelscope").map(capability => ({
     value: capability.value,
     label: capability.label,
   }));
 }
 
 function runningHubStaticModels(kind: ModelKindFilter): ModelOption[] {
-  const chatModels = [
-    {
-      value: formatProviderModel("runninghub", RUNNINGHUB_DEFAULT_LLM_MODEL),
-      label: "RunningHub Qwen 3.7 Max",
-      kind: "chat",
-    },
-  ];
-  if (kind === "chat") return chatModels.map(model => ({ value: model.value, label: model.label }));
-  const standardModels = RUNNINGHUB_STANDARD_MODELS
-    .filter(model => model.listed !== false)
-    .filter(model => kind === "all" || model.kind === kind)
-    .map(model => ({
-      value: formatProviderModel("runninghub", model.model),
-      label: model.label,
-    }));
-  const appPresetModels = RUNNINGHUB_APP_PRESETS
-    .filter(model => kind === "all" || model.kind === kind)
-    .map(model => ({
-      value: formatProviderModel("runninghub", model.model),
-      label: model.label,
-    }));
-  return [
-    ...(kind === "all" ? chatModels.map(model => ({ value: model.value, label: model.label })) : []),
-    ...standardModels,
-    ...appPresetModels,
-  ];
+  return getListedModelCapabilities(kind === "all" ? undefined : kind, "runninghub")
+    .map(capability => ({ value: capability.value, label: capability.label }));
 }
 
 function readModelId(value: unknown, provider: AiProvider, kind: ModelKindFilter, label: string): ModelOption[] {

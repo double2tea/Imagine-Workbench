@@ -16,6 +16,7 @@ import {
   type PromptTemplateSlashCommand,
 } from "@/lib/prompt-templates";
 import type { ParameterOption, VideoModelCapabilities, VideoReferenceMode } from "@/lib/providers/model-catalog";
+import { buildGenerationModelPriceOptions } from "@/lib/providers/pricing";
 import { selectVideoReferenceTypesForMode } from "@/lib/video-reference-selection";
 
 interface VideoGenerationPanelProps {
@@ -305,10 +306,13 @@ export default function VideoGenerationPanel({
           isSubmitting={isSubmitting}
           priceProvider={selectedModel.split(":")[0]}
           priceModelId={selectedModel}
-          priceDuration={selectedDuration}
-          priceReferenceTypes={priceReferenceTypes}
-          priceVideoReferenceMode={selectedReferenceMode}
-          priceVideoResolution={selectedResolution}
+          priceOptions={buildGenerationModelPriceOptions({
+            kind: "video",
+            duration: selectedDuration,
+            referenceTypes: priceReferenceTypes,
+            videoReferenceMode: selectedReferenceMode,
+            videoResolution: selectedResolution,
+          })}
           submitCount={submitCount}
           onGenerate={onGenerate}
         />

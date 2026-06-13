@@ -19,6 +19,13 @@ export type ModelParameterValue =
   | undefined;
 export type ModelParameterValues = Record<string, ModelParameterValue>;
 export type ModelReferenceDelivery = "rawDataUri" | "uploadedUrl" | "fileName" | "openAiMultipart" | "providerNative";
+export type ModelPricingUnit = "request" | "second" | "token" | "credit";
+export type ModelPricingSource = "reviewedSnapshot" | "manualProvisional" | "providerRuntime";
+export type ModelPricingStatus = "priced" | "unpriced";
+export type ModelPricingUnavailableReason = "unverified" | "notApplicable" | "providerRuntime";
+export type ModelPricingDimensionCalculation = "multiplyBySeconds";
+export type JsonScalar = string | number | boolean | null;
+export type JsonValue = JsonScalar | readonly JsonValue[] | { readonly [key: string]: JsonValue };
 
 export interface ModelReferenceParameterValue {
   url: string;
@@ -104,23 +111,139 @@ export interface ModelMediaInputProfile {
   delivery: ModelReferenceDelivery;
 }
 
-export interface ModelPricingProfile {
-  lookupKey: string;
-  unit: "request" | "second" | "token" | "credit";
-  dimensions: readonly {
-    key: string;
-    calculation?: "multiplyBySeconds";
-    routeToModel?: boolean;
+export interface ModelPricingDimensionDescriptor {
+  key: string;
+  calculation?: ModelPricingDimensionCalculation;
+  routeToModel?: boolean;
+}
+
+export interface ModelPricingOverrideDescriptor {
+  match: readonly {
+    dimension: string;
+    value: string;
   }[];
-  source: "reviewedSnapshot" | "manualProvisional" | "providerRuntime";
+  price?: number;
+  dimensionPrices?: {
+    dimension: string;
+    values: readonly {
+      value: string;
+      price: number;
+    }[];
+  };
+}
+
+export interface ModelPricedProfile {
+  status: "priced";
+  lookupKey: string;
+  price: number;
+  unit: ModelPricingUnit;
+  displayUnit: string;
+  dimensions: readonly ModelPricingDimensionDescriptor[];
+  overrides?: readonly ModelPricingOverrideDescriptor[];
+  source: ModelPricingSource;
+}
+
+export interface ModelUnpricedProfile {
+  status: "unpriced";
+  reason: ModelPricingUnavailableReason;
+  source?: ModelPricingSource;
+}
+
+export type ModelPricingProfile = ModelPricedProfile | ModelUnpricedProfile;
+
+export interface ProviderPayloadFieldMappingDescriptor {
+  target: string;
+  source:
+    | "prompt"
+    | "aspectRatio"
+    | "imageResolution"
+    | "imageQuality"
+    | "resolutionName"
+    | "durationSeconds"
+    | "referenceUrls"
+    | "imageUrls"
+    | "videoUrls"
+    | "audioUrls"
+    | "literal";
+  valueType?: "string" | "number" | "boolean" | "array" | "object";
+  literal?: JsonValue;
+}
+
+export interface ProviderPayloadMappingDescriptor {
+  provider: string;
+  endpoint: string;
+  operation:
+    | "promptDimensions"
+    | "singleReference"
+    | "referenceArray"
+    | "groupedReferences"
+    | "firstLastFrames"
+    | "nodeFields"
+    | "providerSpecific";
+  fields: readonly ProviderPayloadFieldMappingDescriptor[];
+  logic?: readonly ("durationCoercion" | "dimensionDerivation" | "referenceRouting" | "mediaUpload")[];
 }
 
 export class ModelCapabilityValidationError extends Error {}
+
+export function pricedModel(
+  input: Omit<ModelPricedProfile, "status">,
+): ModelPricingProfile {
+  return { status: "priced", ...input };
+}
+
+export function unpricedModel(reason: ModelPricingUnavailableReason, source?: ModelPricingSource): ModelPricingProfile {
+  return source ? { status: "unpriced", reason, source } : { status: "unpriced", reason };
+}
+
+export function modelHasKnownPricing(profile: ModelPricingProfile): profile is ModelPricedProfile {
+  return profile.status === "priced";
+}
 
 export function referenceParameterDescriptors(
   descriptors: readonly ModelParameterDescriptor[],
 ): ModelReferenceParameterDescriptor[] {
   return descriptors.filter((descriptor): descriptor is ModelReferenceParameterDescriptor => descriptor.kind === "reference");
+}
+
+export function inputModalitiesReferenceMediaTypes(profile: ModelInputModalityProfile): MediaReferenceType[] {
+  const types: MediaReferenceType[] = [];
+  if (profile.images) types.push("image");
+  if (profile.videos) types.push("video");
+  if (profile.audio) types.push("audio");
+  return types;
+}
+
+export function inputModalitiesReferenceCountRange(profile: ModelInputModalityProfile): {
+  minCount: number;
+  maxCount: number;
+} {
+  const mediaProfiles = [profile.images, profile.videos, profile.audio].filter(
+    (item): item is ModelMediaInputProfile => item !== undefined,
+  );
+  if (mediaProfiles.length === 0) return { minCount: 0, maxCount: 0 };
+  return {
+    minCount: mediaProfiles.reduce((total, item) => total + item.minCount, 0),
+    maxCount: profile.mixed?.maxTotalCount ?? mediaProfiles.reduce((total, item) => total + item.maxCount, 0),
+  };
+}
+
+export function validateInputModalityReferences(
+  profile: ModelInputModalityProfile,
+  references: readonly { type: MediaReferenceType }[],
+): void {
+  const acceptedTypes = inputModalitiesReferenceMediaTypes(profile);
+  const unsupported = references.find(reference => !acceptedTypes.includes(reference.type));
+  if (unsupported) throw new ModelCapabilityValidationError(`Model does not support ${unsupported.type} references`);
+
+  const range = inputModalitiesReferenceCountRange(profile);
+  if (references.length < range.minCount || references.length > range.maxCount) {
+    throw new ModelCapabilityValidationError(`Model supports ${range.minCount}-${range.maxCount} reference media items`);
+  }
+
+  validateInputModalityTypeCount("image", profile.images, references, profile.mixed !== undefined);
+  validateInputModalityTypeCount("video", profile.videos, references, profile.mixed !== undefined);
+  validateInputModalityTypeCount("audio", profile.audio, references, profile.mixed !== undefined);
 }
 
 export function defaultCapabilityParameterValues(
@@ -217,4 +340,18 @@ function isReferenceParameterValue(value: unknown): value is ModelReferenceParam
   return typeof record.url === "string" &&
     (record.type === "image" || record.type === "video" || record.type === "audio") &&
     (record.role === undefined || typeof record.role === "string");
+}
+
+function validateInputModalityTypeCount(
+  type: MediaReferenceType,
+  profile: ModelMediaInputProfile | undefined,
+  references: readonly { type: MediaReferenceType }[],
+  mixed: boolean,
+): void {
+  if (!profile) return;
+  const count = references.filter(reference => reference.type === type).length;
+  const minCount = mixed ? 0 : profile.minCount;
+  if (count < minCount || count > profile.maxCount) {
+    throw new ModelCapabilityValidationError(`Model supports ${minCount}-${profile.maxCount} ${type} references`);
+  }
 }

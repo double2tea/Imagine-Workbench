@@ -59,15 +59,15 @@ When writing or changing TypeScript, prioritize the `typescript-project-specific
 
 Adding a new provider:
 1. Add an entry to `PROVIDER_REGISTRY` in `registry.ts` (key, label, env vars, defaults, capability flags).
-2. Add model capabilities to `MODEL_CAPABILITIES` in `model-catalog.ts`.
-3. If the provider needs non-OpenAI-compatible generation endpoints, add adapter branches in `image.ts` / `video.ts`. OpenAI-compatible chat, image, and model-listing work with zero additional adapter code.
+2. Add model capabilities to `lib/providers/catalog/data/model-capabilities.json`; `model-catalog.ts` loads and validates this JSON as the typed catalog.
+3. If the provider needs non-OpenAI-compatible generation endpoints, add adapter branches in `image.ts` / `video.ts` / `audio.ts`. OpenAI-compatible chat, image, and model-listing work with zero additional adapter code.
 4. No other changes required — `AiProvider` type, `PROVIDER_KEYS`, settings UI cards, localStorage, env resolution, dropdown groups all derive from the registry.
 
 Never hardcode provider strings (`"12ai"`, `"grok2api"`, `"xstx"`) in enumerations or arrays. Use `PROVIDER_KEYS`, `isKnownProvider()`, or `getProviderMeta()` from the registry.
 
 ### Adapter files
 
-- Model IDs and capabilities: `lib/providers/model-catalog.ts`
+- Model IDs and capabilities: `lib/providers/catalog/data/model-capabilities.json` loaded by `lib/providers/model-catalog.ts`
 - Credential / base URL resolution: `lib/providers/utils.ts` (delegates to registry)
 - Image generation/editing: `lib/providers/image.ts`
 - Video generation/status/download: `lib/providers/video.ts`

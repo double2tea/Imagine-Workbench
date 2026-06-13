@@ -92,7 +92,7 @@ import {
   getImageResolutionOptions,
   getModelCapability,
   getVideoModelCapabilities,
-  supportsAsyncImageGeneration,
+  resolveAsyncImageModelValue,
   tryParseProviderModel,
   type AiProvider,
   type AudioOperationMode,
@@ -1576,12 +1576,6 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const imageCapabilities = getImageModelCapabilities(selectedModel);
   const videoCapabilities = getVideoModelCapabilities(selectedVideoModel);
   const audioCapabilities = getAudioModelCapabilities(DEFAULT_AUDIO_MODEL);
-  const selectedImageProviderModel = tryParseProviderModel(selectedModel, selectedProvider) ?? {
-    provider: selectedProvider,
-    model: selectedModel,
-    async: false,
-  };
-  const canUseAsyncImageGeneration = supportsAsyncImageGeneration(selectedModel);
   const activeImageResolution = imageResolution === "custom" ? customImageSize.trim() : imageResolution;
   const customImageAspectRatio = imageResolution === "custom"
     ? getImageAspectRatioFromResolution(customImageSize.trim())
@@ -1650,12 +1644,10 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     setPrompt,
   });
 
-  const canUseBackgroundImageGeneration =
-    canUseAsyncImageGeneration &&
-    selectedImageProviderModel.provider === "12ai" &&
-    (selectedImageProviderModel.model !== "gpt-image-2" || referenceImages.length === 0);
+  const asyncImageModel = resolveAsyncImageModelValue(selectedModel, referenceImages.length);
+  const canUseBackgroundImageGeneration = asyncImageModel !== null;
   const activeImageModel = imageSubmitCount > 0 && canUseBackgroundImageGeneration
-    ? `12ai-async:${selectedImageProviderModel.model}`
+    ? asyncImageModel ?? selectedModel
     : selectedModel;
 
   useClipboardImageImport({

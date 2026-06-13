@@ -1,10 +1,10 @@
 export type { AiProvider } from "./registry";
 import type { AiProvider } from "./registry";
+import modelCapabilityCatalogJson from "./catalog/data/model-capabilities.json";
 import { PROVIDER_KEYS, isProviderKey } from "./registry";
 import {
-  RUNNINGHUB_APP_PRESETS,
-  RUNNINGHUB_DEFAULT_LLM_MODEL,
-  RUNNINGHUB_STANDARD_MODELS,
+  getRunningHubStandardModel,
+  runningHubStandardPayloadMapping,
   runningHubYouchuanParameterDescriptors,
   runningHubYouchuanQualityValues,
   runningHubYouchuanSettingsFromParameterValues,
@@ -14,11 +14,15 @@ import {
 import {
   referenceParameterDescriptors,
   defaultCapabilityParameterValues,
+  inputModalitiesReferenceCountRange,
+  inputModalitiesReferenceMediaTypes,
+  unpricedModel,
   type ModelInputModalityProfile,
   type ModelParameterDescriptor,
   type ModelParameterValues,
   type ModelPricingProfile,
   type ModelReferenceParameterDescriptor,
+  type ProviderPayloadMappingDescriptor,
 } from "./model-capabilities";
 import type { RunningHubYouchuanAdvancedSettings } from "./types";
 import type { MediaReferenceType } from "@/lib/media-references";
@@ -83,6 +87,7 @@ export interface ProviderModelCapability {
   provider: AiProvider;
   model: string;
   kind: ModelKind;
+  listed?: boolean;
   supportsAsync: boolean;
   supportsReferences: boolean;
   aspectRatios: ParameterOption[];
@@ -97,13 +102,24 @@ export interface ProviderModelCapability {
   audioDefaultMode?: AudioOperationMode;
   videoReferenceMode: VideoReferenceMode;
   videoReferenceModes: VideoReferenceMode[];
-  inputModalities?: ModelInputModalityProfile;
+  inputModalities: ModelInputModalityProfile;
   parameterDescriptors: ModelParameterDescriptor[];
-  pricing?: ModelPricingProfile;
+  referenceSlots: ModelReferenceParameterDescriptor[];
+  pricing: ModelPricingProfile;
+  payloadMapping?: ProviderPayloadMappingDescriptor;
   maxReferenceImages: number;
   minReferenceImages: number;
   referenceMediaTypes: MediaReferenceType[];
 }
+
+export interface ModelCapabilityCatalogDocument {
+  version: string;
+  source: string;
+  entries: ProviderModelCapability[];
+}
+
+const MODEL_CAPABILITY_CATALOG = modelCapabilityCatalogJson as unknown as ModelCapabilityCatalogDocument;
+export const MODEL_CAPABILITY_CATALOG_VERSION = MODEL_CAPABILITY_CATALOG.version;
 
 export const DEFAULT_IMAGE_MODEL = "12ai:gemini-3.1-flash-image-preview";
 export const DEFAULT_VIDEO_MODEL = "12ai:veo_3_1-fast";
@@ -111,26 +127,6 @@ export const DEFAULT_AUDIO_MODEL = "mimo:mimo-v2.5-tts";
 export const DEFAULT_CHAT_MODEL = "12ai:gemini-3.1-flash-lite-preview";
 /** @deprecated Agent no longer auto-switches models; alias kept for existing imports/tests. */
 export const DEFAULT_VISION_CHAT_MODEL = DEFAULT_CHAT_MODEL;
-
-const GEMINI_25_RATIOS: ParameterOption[] = [
-  { value: "1:1", label: "1:1 Square" },
-  { value: "2:3", label: "2:3 Portrait" },
-  { value: "3:2", label: "3:2 Landscape" },
-  { value: "3:4", label: "3:4 Portrait" },
-  { value: "4:3", label: "4:3 Landscape" },
-  { value: "4:5", label: "4:5 Social" },
-  { value: "5:4", label: "5:4 Landscape" },
-  { value: "9:16", label: "9:16 Vertical" },
-  { value: "16:9", label: "16:9 Cinema" },
-  { value: "21:9", label: "21:9 Wide" },
-];
-
-const GEMINI_31_EXTRA_RATIOS: ParameterOption[] = [
-  { value: "1:4", label: "1:4 Tall Strip" },
-  { value: "1:8", label: "1:8 Ultra Tall" },
-  { value: "4:1", label: "4:1 Banner" },
-  { value: "8:1", label: "8:1 Ultra Wide" },
-];
 
 function imageResolutionOption(value: string): ParameterOption {
   return { value, label: getImageResolutionLabel(value) };
@@ -223,19 +219,6 @@ const GROK_IMAGE_RATIOS: ParameterOption[] = [
   { value: "7:4", label: "7:4 Landscape" },
   { value: "4:7", label: "4:7 Portrait" },
   { value: "1:1", label: "1:1 Square" },
-];
-
-const GEMINI_31_IMAGE_SIZES: ParameterOption[] = [
-  imageResolutionOption("512px"),
-  { value: "1K", label: "1K" },
-  { value: "2K", label: "2K" },
-  { value: "4K", label: "4K" },
-];
-
-const GEMINI_PRO_IMAGE_SIZES: ParameterOption[] = [
-  { value: "1K", label: "1K" },
-  { value: "2K", label: "2K" },
-  { value: "4K", label: "4K" },
 ];
 
 const GPT_QUALITY_OPTIONS: ParameterOption[] = [
@@ -340,40 +323,6 @@ const RUNNINGHUB_GEMINI_ULTRA_IMAGE_RESOLUTIONS: ParameterOption[] = [
   { value: "8k", label: "8K" },
 ];
 
-const THINKING_LEVELS: ParameterOption[] = [
-  { value: "minimal", label: "Minimal" },
-  { value: "high", label: "High" },
-];
-
-const GROK_VIDEO_SIZES: ParameterOption[] = [
-  { value: "auto", label: "Auto" },
-  { value: "720x1280", label: "9:16 Vertical" },
-  { value: "1280x720", label: "16:9 Landscape" },
-  { value: "1024x1024", label: "1:1 Square" },
-  { value: "1024x1792", label: "4:7 Portrait" },
-  { value: "1792x1024", label: "7:4 Landscape" },
-];
-
-const GROK_VIDEO_RESOLUTIONS: ParameterOption[] = [
-  { value: "720p", label: "720p" },
-  { value: "480p", label: "480p" },
-];
-
-const GROK_VIDEO_DURATIONS: ParameterOption[] = [
-  { value: "6", label: "6s" },
-  { value: "10", label: "10s" },
-  { value: "12", label: "12s" },
-  { value: "16", label: "16s" },
-  { value: "20", label: "20s" },
-];
-
-const GROK_VIDEO_PRESETS: ParameterOption[] = [
-  { value: "normal", label: "Normal" },
-  { value: "fun", label: "Fun" },
-  { value: "spicy", label: "Spicy" },
-  { value: "custom", label: "Custom" },
-];
-
 const VEO_31_VIDEO_SIZES: ParameterOption[] = [
   { value: "auto", label: "Auto (source/default)" },
   { value: "16:9", label: "16:9 Landscape" },
@@ -391,12 +340,6 @@ const RUNNINGHUB_VIDEOX_15_SIZES: ParameterOption[] = [
 const VEO_31_VIDEO_RESOLUTIONS: ParameterOption[] = [
   { value: "720p", label: "720p" },
   { value: "1080p", label: "1080p" },
-];
-
-const VEO_31_VIDEO_DURATIONS: ParameterOption[] = [
-  { value: "4", label: "4s" },
-  { value: "6", label: "6s" },
-  { value: "8", label: "8s" },
 ];
 
 const SEEDANCE_VIDEO_SIZES: ParameterOption[] = [
@@ -437,13 +380,6 @@ const OMNI_FLASH_VIDEO_RESOLUTIONS: ParameterOption[] = [
   { value: "4k", label: "4K" },
 ];
 
-const OMNI_FLASH_VIDEO_DURATIONS: ParameterOption[] = [
-  { value: "4", label: "4s" },
-  { value: "6", label: "6s" },
-  { value: "8", label: "8s" },
-  { value: "10", label: "10s" },
-];
-
 const AUTO_ASPECT_RATIO: ParameterOption[] = [
   { value: "auto", label: "Auto" },
 ];
@@ -462,64 +398,6 @@ const MODELSCOPE_IMAGE_SIZES: ParameterOption[] = [
   imageResolutionOption("1584x1056"),
   imageResolutionOption("1056x1584"),
 ];
-
-const MODELSCOPE_CHAT_MODELS = [
-  {
-    model: "Qwen/Qwen3-235B-A22B",
-    label: "ModelScope Qwen3 235B A22B",
-  },
-  {
-    model: "Qwen/Qwen3-VL-235B-A22B-Instruct",
-    label: "ModelScope Qwen3 VL 235B A22B Instruct",
-  },
-  {
-    model: "MiniMax/MiniMax-M2.7:MiniMax",
-    label: "ModelScope MiniMax M2.7",
-  },
-] as const;
-
-type ModelScopeImageModel = {
-  model: string;
-  label: string;
-  supportsReferences: boolean;
-  maxReferenceImages?: number;
-};
-
-const MODELSCOPE_IMAGE_MODELS: readonly ModelScopeImageModel[] = [
-  {
-    model: "Tongyi-MAI/Z-Image-Turbo",
-    label: "ModelScope Z-Image Turbo",
-    supportsReferences: false,
-  },
-  {
-    model: "Qwen/Qwen-Image-2512",
-    label: "ModelScope Qwen Image 2512",
-    supportsReferences: false,
-  },
-  {
-    model: "Qwen/Qwen-Image-Edit-2511",
-    label: "ModelScope Qwen Image Edit 2511",
-    supportsReferences: true,
-    maxReferenceImages: 4,
-  },
-  {
-    model: "black-forest-labs/FLUX.2-klein-9B",
-    label: "ModelScope FLUX.2 Klein 9B",
-    supportsReferences: true,
-    maxReferenceImages: 4,
-  },
-  {
-    model: "Qwen/Qwen-Image",
-    label: "ModelScope Qwen Image",
-    supportsReferences: false,
-  },
-  {
-    model: "Qwen/Qwen-Image-Edit",
-    label: "ModelScope Qwen Image Edit",
-    supportsReferences: true,
-    maxReferenceImages: 4,
-  },
-] as const;
 
 const DOCUMENTED_IMAGE_SIZE_RATIOS: Record<string, string> = {
   "1664x928": "16:9",
@@ -553,17 +431,6 @@ const OPEN_DIMENSION_IMAGE_SIZES: ParameterOption[] = [
   imageResolutionOption("custom"),
 ];
 
-const AGNES_IMAGE_SIZES: ParameterOption[] = [
-  imageResolutionOption("1024x1024"),
-  imageResolutionOption("1024x768"),
-  imageResolutionOption("768x1024"),
-  imageResolutionOption("1152x768"),
-  imageResolutionOption("768x1152"),
-  imageResolutionOption("1280x720"),
-  imageResolutionOption("720x1280"),
-  imageResolutionOption("custom"),
-];
-
 const AGNES_IMAGE_SIZE_RATIOS: Record<string, string> = {
   "1024x768": "4:3",
   "768x1024": "3:4",
@@ -571,611 +438,7 @@ const AGNES_IMAGE_SIZE_RATIOS: Record<string, string> = {
   "768x1152": "2:3",
 };
 
-const AGNES_VIDEO_SIZES: ParameterOption[] = [
-  { value: "auto", label: "Auto" },
-  { value: "1152x768", label: "1152x768" },
-  { value: "768x1152", label: "768x1152" },
-  { value: "1280x720", label: "1280x720" },
-  { value: "720x1280", label: "720x1280" },
-];
-
-export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
-  imageCapability({
-    value: "12ai:gemini-3.1-flash-image-preview",
-    label: "12AI Gemini 3.1 Flash Image",
-    provider: "12ai",
-    model: "gemini-3.1-flash-image-preview",
-    supportsAsync: false,
-    supportsReferences: true,
-    aspectRatios: [...GEMINI_25_RATIOS, ...GEMINI_31_EXTRA_RATIOS],
-    sizes: GEMINI_31_IMAGE_SIZES,
-    thinkingLevels: THINKING_LEVELS,
-  }),
-  imageCapability({
-    value: "12ai:gemini-3-pro-image-preview",
-    label: "12AI Gemini 3 Pro Image",
-    provider: "12ai",
-    model: "gemini-3-pro-image-preview",
-    supportsAsync: false,
-    supportsReferences: true,
-    aspectRatios: [...GEMINI_25_RATIOS, ...GEMINI_31_EXTRA_RATIOS],
-    sizes: GEMINI_PRO_IMAGE_SIZES,
-  }),
-  imageCapability({
-    value: "12ai:gemini-2.5-flash-image",
-    label: "12AI Gemini 2.5 Flash Image",
-    provider: "12ai",
-    model: "gemini-2.5-flash-image",
-    supportsAsync: false,
-    supportsReferences: true,
-    aspectRatios: GEMINI_25_RATIOS,
-  }),
-  imageCapability({
-    value: "12ai:gpt-image-2",
-    label: "12AI GPT Image 2",
-    provider: "12ai",
-    model: "gpt-image-2",
-    supportsAsync: false,
-    supportsReferences: true,
-    aspectRatios: GPT_IMAGE_RATIOS,
-    sizes: GPT_IMAGE_SIZES,
-    qualityLevels: GPT_QUALITY_OPTIONS,
-  }),
-  imageCapability({
-    value: "12ai-async:gpt-image-2",
-    label: "12AI Async GPT Image 2",
-    provider: "12ai",
-    model: "gpt-image-2",
-    supportsAsync: true,
-    supportsReferences: false,
-    aspectRatios: GPT_IMAGE_RATIOS,
-    sizes: GPT_IMAGE_SIZES,
-    qualityLevels: GPT_QUALITY_OPTIONS,
-  }),
-  imageCapability({
-    value: "12ai-async:gemini-3.1-flash-image-preview",
-    label: "12AI Async Gemini 3.1 Image",
-    provider: "12ai",
-    model: "gemini-3.1-flash-image-preview",
-    supportsAsync: true,
-    supportsReferences: true,
-    aspectRatios: [...GEMINI_25_RATIOS, ...GEMINI_31_EXTRA_RATIOS],
-    sizes: GEMINI_31_IMAGE_SIZES,
-    thinkingLevels: THINKING_LEVELS,
-  }),
-  imageCapability({
-    value: "12ai-async:gemini-2.5-flash-image",
-    label: "12AI Async Gemini 2.5 Image",
-    provider: "12ai",
-    model: "gemini-2.5-flash-image",
-    supportsAsync: true,
-    supportsReferences: true,
-    aspectRatios: GEMINI_25_RATIOS,
-  }),
-  imageCapability({
-    value: "12ai-async:gemini-3-pro-image-preview",
-    label: "12AI Async Gemini 3 Pro Image",
-    provider: "12ai",
-    model: "gemini-3-pro-image-preview",
-    supportsAsync: true,
-    supportsReferences: true,
-    aspectRatios: [...GEMINI_25_RATIOS, ...GEMINI_31_EXTRA_RATIOS],
-    sizes: GEMINI_PRO_IMAGE_SIZES,
-  }),
-  imageCapability({
-    value: "grok2api:grok-imagine-image-lite",
-    label: "Grok2API Imagine Image Lite",
-    provider: "grok2api",
-    model: "grok-imagine-image-lite",
-    supportsAsync: false,
-    supportsReferences: false,
-    aspectRatios: GROK_IMAGE_RATIOS,
-    sizes: GROK_IMAGE_SIZES,
-  }),
-  imageCapability({
-    value: "grok2api:grok-imagine-image",
-    label: "Grok2API Imagine Image",
-    provider: "grok2api",
-    model: "grok-imagine-image",
-    supportsAsync: false,
-    supportsReferences: false,
-    aspectRatios: GROK_IMAGE_RATIOS,
-    sizes: GROK_IMAGE_SIZES,
-  }),
-  imageCapability({
-    value: "grok2api:grok-imagine-image-pro",
-    label: "Grok2API Imagine Image Pro",
-    provider: "grok2api",
-    model: "grok-imagine-image-pro",
-    supportsAsync: false,
-    supportsReferences: false,
-    aspectRatios: GROK_IMAGE_RATIOS,
-    sizes: GROK_IMAGE_SIZES,
-  }),
-  imageCapability({
-    value: "grok2api:grok-imagine-image-edit",
-    label: "Grok2API Image Edit",
-    provider: "grok2api",
-    model: "grok-imagine-image-edit",
-    supportsAsync: false,
-    supportsReferences: true,
-    aspectRatios: [{ value: "1:1", label: "1:1 Square" }],
-    sizes: [imageResolutionOption("1024x1024")],
-  }),
-  videoCapability({
-    value: "12ai:veo_3_1-fast",
-    label: "12AI Veo 3.1 Fast Reference",
-    provider: "12ai",
-    model: "veo_3_1-fast",
-    supportsReferences: true,
-    sizes: VEO_31_VIDEO_SIZES,
-    resolutions: VEO_31_VIDEO_RESOLUTIONS,
-    durations: VEO_31_VIDEO_DURATIONS,
-    videoReferenceMode: "reference",
-    maxReferenceImages: 3,
-    minReferenceImages: 0,
-    referenceMediaTypes: ["image", "video"],
-  }),
-  videoCapability({
-    value: "12ai:veo_3_1-fast-fl",
-    label: "12AI Veo 3.1 First/Last Frame",
-    provider: "12ai",
-    model: "veo_3_1-fast-fl",
-    supportsReferences: true,
-    sizes: VEO_31_VIDEO_SIZES,
-    resolutions: VEO_31_VIDEO_RESOLUTIONS,
-    durations: VEO_31_VIDEO_DURATIONS,
-    videoReferenceMode: "firstLast",
-    maxReferenceImages: 2,
-    minReferenceImages: 1,
-    referenceMediaTypes: ["image", "video"],
-  }),
-  videoCapability({
-    value: "12ai:omni_flash-10s",
-    label: "12AI Omni Flash 10s",
-    provider: "12ai",
-    model: "omni_flash-10s",
-    supportsReferences: true,
-    sizes: TWELVE_AI_OMNI_VIDEO_SIZES,
-    resolutions: OMNI_FLASH_VIDEO_RESOLUTIONS,
-    durations: OMNI_FLASH_VIDEO_DURATIONS,
-    videoReferenceMode: "reference",
-    maxReferenceImages: 7,
-    minReferenceImages: 0,
-    referenceMediaTypes: ["image", "video"],
-  }),
-  videoCapability({
-    value: "grok2api:grok-imagine-video",
-    label: "Grok2API Imagine Video",
-    provider: "grok2api",
-    model: "grok-imagine-video",
-    supportsReferences: true,
-    sizes: GROK_VIDEO_SIZES,
-    resolutions: GROK_VIDEO_RESOLUTIONS,
-    durations: GROK_VIDEO_DURATIONS,
-    presets: GROK_VIDEO_PRESETS,
-    videoReferenceMode: "reference",
-    maxReferenceImages: 7,
-    minReferenceImages: 0,
-    referenceMediaTypes: ["image", "video"],
-  }),
-  chatCapability({
-    value: "12ai:gemini-3.1-flash-lite-preview",
-    label: "12AI Gemini 3.1 Flash Lite Vision",
-    provider: "12ai",
-    model: "gemini-3.1-flash-lite-preview",
-  }),
-  ...MODELSCOPE_CHAT_MODELS.map(model =>
-    chatCapability({
-      value: formatProviderModel("modelscope", model.model),
-      label: model.label,
-      provider: "modelscope",
-      model: model.model,
-    }),
-  ),
-  chatCapability({
-    value: "mimo:mimo-v2.5-pro",
-    label: "MiMo V2.5 Pro",
-    provider: "mimo",
-    model: "mimo-v2.5-pro",
-  }),
-  chatCapability({
-    value: "mimo:mimo-v2.5",
-    label: "MiMo V2.5",
-    provider: "mimo",
-    model: "mimo-v2.5",
-  }),
-  chatCapability({
-    value: "mimo:mimo-v2-flash",
-    label: "MiMo V2 Flash",
-    provider: "mimo",
-    model: "mimo-v2-flash",
-  }),
-  audioCapability({
-    value: "mimo:mimo-v2.5-tts",
-    label: "MiMo V2.5 TTS",
-    provider: "mimo",
-    model: "mimo-v2.5-tts",
-    audioModes: ["tts"],
-    supportsReferences: false,
-    maxReferenceMedia: 0,
-    minReferenceMedia: 0,
-    formats: [{ value: "wav", label: "WAV" }],
-  }),
-  audioCapability({
-    value: "mimo:mimo-v2.5-tts-voicedesign",
-    label: "MiMo V2.5 Voice Design",
-    provider: "mimo",
-    model: "mimo-v2.5-tts-voicedesign",
-    audioModes: ["voice_design"],
-    supportsReferences: false,
-    maxReferenceMedia: 0,
-    minReferenceMedia: 0,
-    formats: [
-      { value: "wav", label: "WAV" },
-      { value: "pcm16", label: "PCM16" },
-    ],
-  }),
-  audioCapability({
-    value: "mimo:mimo-v2.5-tts-voiceclone",
-    label: "MiMo V2.5 Voice Clone",
-    provider: "mimo",
-    model: "mimo-v2.5-tts-voiceclone",
-    audioModes: ["voice_clone"],
-    supportsReferences: true,
-    maxReferenceMedia: 1,
-    minReferenceMedia: 1,
-    referenceMediaTypes: ["audio"],
-    formats: [
-      { value: "wav", label: "WAV" },
-      { value: "pcm16", label: "PCM16" },
-    ],
-  }),
-  audioCapability({
-    value: "mimo:mimo-v2.5-asr",
-    label: "MiMo V2.5 ASR",
-    provider: "mimo",
-    model: "mimo-v2.5-asr",
-    audioModes: ["asr"],
-    audioOutputKinds: ["transcript"],
-    audioDefaultMode: "asr",
-    supportsReferences: true,
-    maxReferenceMedia: 1,
-    minReferenceMedia: 1,
-    referenceMediaTypes: ["audio"],
-    formats: [],
-  }),
-  chatCapability({
-    value: formatProviderModel("runninghub", RUNNINGHUB_DEFAULT_LLM_MODEL),
-    label: "RunningHub Qwen 3.7 Max",
-    provider: "runninghub",
-    model: RUNNINGHUB_DEFAULT_LLM_MODEL,
-  }),
-  chatCapability({
-    value: "grok2api:grok-4.20-auto",
-    label: "Grok2API Grok 4.20 Auto",
-    provider: "grok2api",
-    model: "grok-4.20-auto",
-  }),
-  chatCapability({
-    value: "grok2api:grok-4.20-fast",
-    label: "Grok2API Grok 4.20 Fast",
-    provider: "grok2api",
-    model: "grok-4.20-fast",
-  }),
-  chatCapability({
-    value: "grok2api:grok-4.20-expert",
-    label: "Grok2API Grok 4.20 Expert",
-    provider: "grok2api",
-    model: "grok-4.20-expert",
-  }),
-  chatCapability({
-    value: "agnes:agnes-2.0-flash",
-    label: "Agnes AI Agnes 2.0 Flash",
-    provider: "agnes",
-    model: "agnes-2.0-flash",
-  }),
-  chatCapability({
-    value: "agnes:agnes-1.5-flash",
-    label: "Agnes AI Agnes 1.5 Flash",
-    provider: "agnes",
-    model: "agnes-1.5-flash",
-  }),
-  imageCapability({
-    value: "agnes:agnes-image-2.1-flash",
-    label: "Agnes AI Image 2.1 Flash",
-    provider: "agnes",
-    model: "agnes-image-2.1-flash",
-    supportsAsync: false,
-    supportsReferences: true,
-    aspectRatios: GPT_IMAGE_RATIOS,
-    sizes: AGNES_IMAGE_SIZES,
-  }),
-  videoCapability({
-    value: "agnes:agnes-video-v2.0",
-    label: "Agnes AI Video V2.0",
-    provider: "agnes",
-    model: "agnes-video-v2.0",
-    supportsReferences: true,
-    sizes: AGNES_VIDEO_SIZES,
-    videoReferenceMode: "reference",
-    maxReferenceImages: 2,
-    minReferenceImages: 0,
-  }),
-  chatCapability({
-    value: "xstx:claude-opus-4-7",
-    label: "星途 Claude Opus 4.7",
-    provider: "xstx",
-    model: "claude-opus-4-7",
-  }),
-  chatCapability({
-    value: "xstx:claude-opus-4-7-thinking",
-    label: "星途 Claude Opus 4.7 Thinking",
-    provider: "xstx",
-    model: "claude-opus-4-7-thinking",
-  }),
-  chatCapability({
-    value: "xstx:claude-opus-4-7-liang",
-    label: "星途 Claude Opus 4.7 Liang",
-    provider: "xstx",
-    model: "claude-opus-4-7-liang",
-  }),
-  chatCapability({
-    value: "xstx:claude-opus-4-6",
-    label: "星途 Claude Opus 4.6",
-    provider: "xstx",
-    model: "claude-opus-4-6",
-  }),
-  chatCapability({
-    value: "xstx:claude-opus-4-6-thinking",
-    label: "星途 Claude Opus 4.6 Thinking",
-    provider: "xstx",
-    model: "claude-opus-4-6-thinking",
-  }),
-  chatCapability({
-    value: "xstx:claude-opus-4-6-20260205",
-    label: "星途 Claude Opus 4.6 20260205",
-    provider: "xstx",
-    model: "claude-opus-4-6-20260205",
-  }),
-  chatCapability({
-    value: "xstx:claude-opus-4-6-20260205-thinking",
-    label: "星途 Claude Opus 4.6 20260205 Thinking",
-    provider: "xstx",
-    model: "claude-opus-4-6-20260205-thinking",
-  }),
-  chatCapability({
-    value: "xstx:claude-opus-4-5",
-    label: "星途 Claude Opus 4.5",
-    provider: "xstx",
-    model: "claude-opus-4-5",
-  }),
-  chatCapability({
-    value: "xstx:claude-opus-4-5-thinking",
-    label: "星途 Claude Opus 4.5 Thinking",
-    provider: "xstx",
-    model: "claude-opus-4-5-thinking",
-  }),
-  chatCapability({
-    value: "xstx:claude-opus-4-5-20251101",
-    label: "星途 Claude Opus 4.5 20251101",
-    provider: "xstx",
-    model: "claude-opus-4-5-20251101",
-  }),
-  chatCapability({
-    value: "xstx:claude-opus-4-5-20251101-thinking",
-    label: "星途 Claude Opus 4.5 20251101 Thinking",
-    provider: "xstx",
-    model: "claude-opus-4-5-20251101-thinking",
-  }),
-  chatCapability({
-    value: "xstx:claude-sonnet-4-6-20260217",
-    label: "星途 Claude Sonnet 4.6 20260217",
-    provider: "xstx",
-    model: "claude-sonnet-4-6-20260217",
-  }),
-  chatCapability({
-    value: "xstx:claude-sonnet-4-6-20260217-thinking",
-    label: "星途 Claude Sonnet 4.6 20260217 Thinking",
-    provider: "xstx",
-    model: "claude-sonnet-4-6-20260217-thinking",
-  }),
-  chatCapability({
-    value: "xstx:claude-sonnet-4-5",
-    label: "星途 Claude Sonnet 4.5",
-    provider: "xstx",
-    model: "claude-sonnet-4-5",
-  }),
-  chatCapability({
-    value: "xstx:claude-sonnet-4-5-thinking",
-    label: "星途 Claude Sonnet 4.5 Thinking",
-    provider: "xstx",
-    model: "claude-sonnet-4-5-thinking",
-  }),
-  chatCapability({
-    value: "xstx:claude-sonnet-4-5-20250929",
-    label: "星途 Claude Sonnet 4.5 20250929",
-    provider: "xstx",
-    model: "claude-sonnet-4-5-20250929",
-  }),
-  chatCapability({
-    value: "xstx:claude-sonnet-4-5-20250929-thinking",
-    label: "星途 Claude Sonnet 4.5 20250929 Thinking",
-    provider: "xstx",
-    model: "claude-sonnet-4-5-20250929-thinking",
-  }),
-  chatCapability({
-    value: "xstx:claude-haiku-4-5",
-    label: "星途 Claude Haiku 4.5",
-    provider: "xstx",
-    model: "claude-haiku-4-5",
-  }),
-  chatCapability({
-    value: "xstx:gpt-5.5-pro",
-    label: "星途 GPT-5.5 Pro",
-    provider: "xstx",
-    model: "gpt-5.5-pro",
-  }),
-  chatCapability({
-    value: "xstx:gpt-5.5",
-    label: "星途 GPT-5.5",
-    provider: "xstx",
-    model: "gpt-5.5",
-  }),
-  chatCapability({
-    value: "xstx:gpt-5.4",
-    label: "星途 GPT-5.4",
-    provider: "xstx",
-    model: "gpt-5.4",
-  }),
-  chatCapability({
-    value: "xstx:gpt-5.4-codex",
-    label: "星途 GPT-5.4 Codex",
-    provider: "xstx",
-    model: "gpt-5.4-codex",
-  }),
-  chatCapability({
-    value: "xstx:gemini-3.1-pro-high",
-    label: "星途 Gemini 3.1 Pro High",
-    provider: "xstx",
-    model: "gemini-3.1-pro-high",
-  }),
-  chatCapability({
-    value: "xstx:gemini-3.1-pro-preview",
-    label: "星途 Gemini 3.1 Pro Preview",
-    provider: "xstx",
-    model: "gemini-3.1-pro-preview",
-  }),
-  chatCapability({
-    value: "xstx:deepseek-v4-pro",
-    label: "星途 DeepSeek V4 Pro",
-    provider: "xstx",
-    model: "deepseek-v4-pro",
-  }),
-  chatCapability({
-    value: "xstx:deepseek-v4-flash",
-    label: "星途 DeepSeek V4 Flash",
-    provider: "xstx",
-    model: "deepseek-v4-flash",
-  }),
-  imageCapability({
-    value: "xstx:gpt-image-2",
-    label: "星途 GPT Image 2",
-    provider: "xstx",
-    model: "gpt-image-2",
-    supportsAsync: false,
-    supportsReferences: true,
-    aspectRatios: GPT_IMAGE_RATIOS,
-    sizes: GPT_IMAGE_SIZES,
-    qualityLevels: GPT_QUALITY_OPTIONS,
-  }),
-  imageCapability({
-    value: "xstx:gpt-image-2-2k",
-    label: "星途 GPT Image 2 (2K)",
-    provider: "xstx",
-    model: "gpt-image-2-2k",
-    supportsAsync: false,
-    supportsReferences: true,
-    aspectRatios: GPT_IMAGE_RATIOS,
-    sizes: GPT_IMAGE_SIZES.filter(s =>
-      s.value !== "3840x2160" &&
-      s.value !== "2160x3840" &&
-      s.value !== "3840x1920" &&
-      s.value !== "1920x3840"
-    ),
-  }),
-  imageCapability({
-    value: "xstx:gpt-image-2-4k",
-    label: "星途 GPT Image 2 (4K)",
-    provider: "xstx",
-    model: "gpt-image-2-4k",
-    supportsAsync: false,
-    supportsReferences: true,
-    aspectRatios: GPT_IMAGE_RATIOS,
-    sizes: GPT_IMAGE_SIZES,
-  }),
-  ...MODELSCOPE_IMAGE_MODELS.map(model =>
-    imageCapability({
-      value: formatProviderModel("modelscope", model.model),
-      label: model.label,
-      provider: "modelscope",
-      model: model.model,
-      supportsAsync: true,
-      supportsReferences: model.supportsReferences,
-      maxReferenceImages: model.maxReferenceImages,
-      sizes: MODELSCOPE_IMAGE_SIZES,
-    }),
-  ),
-  ...RUNNINGHUB_STANDARD_MODELS.filter(model => model.listed !== false).map(model => {
-    if (model.kind === "image") {
-      const profile = runningHubImageParameterProfile(model);
-      return imageCapability({
-        value: formatProviderModel("runninghub", model.model),
-        label: model.label,
-        provider: "runninghub",
-        model: model.model,
-        supportsAsync: false,
-        supportsReferences: model.supportsReferences,
-        ...profile,
-        inputModalities: runningHubInputModalities(model),
-        parameterDescriptors: [...runningHubYouchuanParameterDescriptors(model.model)],
-        maxReferenceImages: model.maxReferenceImages,
-        minReferenceImages: model.minReferenceImages,
-      });
-    }
-
-    const profile = runningHubVideoParameterProfile(model);
-    return videoCapability({
-      value: formatProviderModel("runninghub", model.model),
-      label: model.label,
-      provider: "runninghub",
-      model: model.model,
-      supportsReferences: model.supportsReferences,
-      ...profile,
-      inputModalities: runningHubInputModalities(model),
-      videoReferenceMode: model.videoReferenceMode ?? (model.supportsReferences ? "reference" : "none"),
-      videoReferenceModes: model.videoReferenceModes ? [...model.videoReferenceModes] : undefined,
-      maxReferenceImages: model.maxReferenceImages,
-      minReferenceImages: model.minReferenceImages,
-      referenceMediaTypes: model.referenceMediaTypes ? [...model.referenceMediaTypes] : undefined,
-    });
-  }),
-  ...RUNNINGHUB_APP_PRESETS.flatMap(preset => {
-    if (preset.kind === "image") {
-      return [
-        imageCapability({
-          value: formatProviderModel("runninghub", preset.model),
-          label: preset.label,
-          provider: "runninghub",
-          model: preset.model,
-          supportsAsync: false,
-          supportsReferences: preset.supportsReferences,
-          sizes: RUNNINGHUB_IMAGE_SIZES,
-          maxReferenceImages: preset.maxReferenceImages,
-          minReferenceImages: preset.minReferenceImages,
-          referenceMediaTypes: [...preset.referenceMediaTypes],
-        }),
-      ];
-    }
-    if (preset.kind === "video") {
-      return [
-        videoCapability({
-          value: formatProviderModel("runninghub", preset.model),
-          label: preset.label,
-          provider: "runninghub",
-          model: preset.model,
-          supportsReferences: preset.supportsReferences,
-          sizes: RUNNINGHUB_VIDEO_SIZES,
-          videoReferenceMode: preset.supportsReferences ? "reference" : "none",
-          maxReferenceImages: preset.maxReferenceImages,
-          minReferenceImages: preset.minReferenceImages,
-          referenceMediaTypes: [...preset.referenceMediaTypes],
-        }),
-      ];
-    }
-    return [];
-  }),
-];
+export const MODEL_CAPABILITIES: ProviderModelCapability[] = readModelCapabilityCatalog(MODEL_CAPABILITY_CATALOG);
 
 export const IMAGE_MODEL_OPTIONS = buildProviderOptionsRecord("image", false);
 export const VIDEO_MODEL_OPTIONS = buildProviderOptionsRecord("video", true);
@@ -1195,6 +458,17 @@ export function getModelCapability(value: string, kind?: ModelKind): ProviderMod
     throw new Error(`Unknown provider model capability: ${value}`);
   }
   return capability;
+}
+
+export function getOptionalModelCapability(value: string, kind?: ModelKind): ProviderModelCapability | undefined {
+  const parsed = tryParseProviderModel(value, "12ai");
+  if (!parsed) return undefined;
+  const capability = findModelCapability(parsed.provider, parsed.model, parsed.async, kind);
+  if (capability) return capability;
+  if (kind === "audio" && parsed.provider !== "mimo") return customMimoAudioCapability(parsed.provider, parsed.model);
+  if (parsed.provider === "runninghub" && kind !== "chat") return runningHubVirtualCapability(parsed.model, kind);
+  if (parsed.provider === "modelscope" && kind === "image") return modelScopeVirtualImageCapability(parsed.model);
+  return undefined;
 }
 
 function findModelCapability(
@@ -1219,6 +493,10 @@ export function getModelCapabilities(kind?: ModelKind, provider?: AiProvider): P
   );
 }
 
+export function getListedModelCapabilities(kind?: ModelKind, provider?: AiProvider): ProviderModelCapability[] {
+  return getModelCapabilities(kind, provider).filter(capability => capability.listed !== false);
+}
+
 export function supportsAsyncImageGeneration(value: string): boolean {
   const parsed = parseProviderModel(value, "12ai");
   return MODEL_CAPABILITIES.some(
@@ -1228,6 +506,21 @@ export function supportsAsyncImageGeneration(value: string): boolean {
       capability.model === parsed.model &&
       capability.supportsAsync,
   );
+}
+
+export function resolveAsyncImageModelValue(value: string, referenceCount: number): string | null {
+  const parsed = parseProviderModel(value, "12ai");
+  if (parsed.async) return value;
+  const capability = MODEL_CAPABILITIES.find(
+    item =>
+      item.kind === "image" &&
+      item.provider === parsed.provider &&
+      item.model === parsed.model &&
+      item.supportsAsync,
+  );
+  if (!capability) return null;
+  const referenceRange = inputModalitiesReferenceCountRange(capability.inputModalities);
+  return referenceCount <= referenceRange.maxCount ? capability.value : null;
 }
 
 export function formatProviderModel(provider: AiProvider, model: string): string {
@@ -1266,7 +559,7 @@ export function getImageModelCapabilities(value: string): ImageModelCapabilities
       qualities: capability.qualityLevels,
       thinkingLevels: capability.thinkingLevels,
       parameterDescriptors: capability.parameterDescriptors,
-      referenceSlots: referenceParameterDescriptors(capability.parameterDescriptors),
+      referenceSlots: capability.referenceSlots,
       maxReferenceImages: capability.maxReferenceImages,
       minReferenceImages: capability.minReferenceImages,
       referenceMediaTypes: capability.referenceMediaTypes,
@@ -1335,7 +628,7 @@ export function getVideoModelCapabilities(value: string): VideoModelCapabilities
     durations: capability?.durations ?? [],
     presets: capability?.presets ?? [],
     parameterDescriptors: capability?.parameterDescriptors ?? [],
-    referenceSlots: referenceParameterDescriptors(capability?.parameterDescriptors ?? []),
+    referenceSlots: capability?.referenceSlots ?? [],
     referenceMode: capability?.videoReferenceMode ?? "none",
     referenceModes: capability?.videoReferenceModes ?? [],
     maxReferenceImages: capability?.maxReferenceImages ?? 0,
@@ -1354,7 +647,7 @@ export function getAudioModelCapabilities(value: string): AudioModelCapabilities
     formats: capability?.presets ?? [],
     durations: capability?.durations ?? [],
     parameterDescriptors: capability?.parameterDescriptors ?? [],
-    referenceSlots: referenceParameterDescriptors(capability?.parameterDescriptors ?? []),
+    referenceSlots: capability?.referenceSlots ?? [],
     maxReferenceMedia: capability?.maxReferenceImages ?? 0,
     minReferenceMedia: capability?.minReferenceImages ?? 0,
     referenceMediaTypes: capability?.referenceMediaTypes ?? [],
@@ -1408,9 +701,11 @@ interface CapabilityInput {
   label: string;
   provider: AiProvider;
   model: string;
+  listed?: boolean;
   inputModalities?: ModelInputModalityProfile;
   parameterDescriptors?: ModelParameterDescriptor[];
   pricing?: ModelPricingProfile;
+  payloadMapping?: ProviderPayloadMappingDescriptor;
 }
 
 interface ImageCapabilityInput extends CapabilityInput {
@@ -1438,25 +733,64 @@ interface VideoCapabilityInput extends CapabilityInput {
   referenceMediaTypes?: MediaReferenceType[];
 }
 
-interface AudioCapabilityInput extends CapabilityInput {
-  audioModes?: AudioOperationMode[];
-  audioOutputKinds?: AudioOutputKind[];
-  audioDefaultMode?: AudioOperationMode;
-  supportsReferences: boolean;
-  formats?: ParameterOption[];
-  durations?: ParameterOption[];
-  maxReferenceMedia: number;
-  minReferenceMedia: number;
-  referenceMediaTypes?: MediaReferenceType[];
+function imageInputModalities(input: ImageCapabilityInput): ModelInputModalityProfile {
+  if (!input.supportsReferences) return { text: { required: true } };
+  return {
+    text: { required: true },
+    images: {
+      minCount: input.minReferenceImages ?? 0,
+      maxCount: input.maxReferenceImages ?? 4,
+      roles: ["content", "style", "object"],
+      delivery: "providerNative",
+    },
+  };
+}
+
+function videoInputModalities(input: VideoCapabilityInput): ModelInputModalityProfile {
+  if (!input.supportsReferences) return { text: { required: true } };
+  const referenceMediaTypes = input.referenceMediaTypes ?? ["image"];
+  return {
+    text: { required: true },
+    images: referenceMediaTypes.includes("image")
+      ? {
+          minCount: input.minReferenceImages,
+          maxCount: input.maxReferenceImages,
+          roles: input.videoReferenceMode === "firstLast" ? ["firstFrame", "lastFrame"] : ["reference"],
+          delivery: "providerNative",
+        }
+      : undefined,
+    videos: referenceMediaTypes.includes("video")
+      ? {
+          minCount: 0,
+          maxCount: input.maxReferenceImages,
+          roles: ["reference"],
+          delivery: "providerNative",
+        }
+      : undefined,
+    audio: referenceMediaTypes.includes("audio")
+      ? {
+          minCount: 0,
+          maxCount: input.maxReferenceImages,
+          roles: ["audioGuide"],
+          delivery: "providerNative",
+        }
+      : undefined,
+    mixed: referenceMediaTypes.length > 1 ? { maxTotalCount: input.maxReferenceImages } : undefined,
+  };
 }
 
 function imageCapability(input: ImageCapabilityInput): ProviderModelCapability {
+  const parameterDescriptors = input.parameterDescriptors ?? [];
+  const inputModalities = input.inputModalities ?? imageInputModalities(input);
+  const referenceRange = inputModalitiesReferenceCountRange(inputModalities);
+  const referenceMediaTypes = input.supportsReferences ? input.referenceMediaTypes ?? inputModalitiesReferenceMediaTypes(inputModalities) : [];
   return {
     value: input.value,
     label: input.label,
     provider: input.provider,
     model: input.model,
     kind: "image",
+    listed: input.listed,
     supportsAsync: input.supportsAsync,
     supportsReferences: input.supportsReferences,
     aspectRatios: input.aspectRatios ?? [],
@@ -1470,22 +804,28 @@ function imageCapability(input: ImageCapabilityInput): ProviderModelCapability {
     audioOutputKinds: [],
     videoReferenceMode: "none",
     videoReferenceModes: [],
-    inputModalities: input.inputModalities,
-    parameterDescriptors: input.parameterDescriptors ?? [],
-    pricing: input.pricing,
-    maxReferenceImages: input.supportsReferences ? input.maxReferenceImages ?? 4 : 0,
-    minReferenceImages: input.minReferenceImages ?? 0,
-    referenceMediaTypes: input.supportsReferences ? input.referenceMediaTypes ?? ["image"] : [],
+    inputModalities,
+    parameterDescriptors,
+    referenceSlots: referenceParameterDescriptors(parameterDescriptors),
+    pricing: input.pricing ?? unpricedModel("unverified"),
+    payloadMapping: input.payloadMapping,
+    maxReferenceImages: input.supportsReferences ? input.maxReferenceImages ?? referenceRange.maxCount : 0,
+    minReferenceImages: input.supportsReferences ? input.minReferenceImages ?? referenceRange.minCount : 0,
+    referenceMediaTypes,
   };
 }
 
 function videoCapability(input: VideoCapabilityInput): ProviderModelCapability {
+  const parameterDescriptors = input.parameterDescriptors ?? [];
+  const inputModalities = input.inputModalities ?? videoInputModalities(input);
+  const referenceMediaTypes = input.supportsReferences ? input.referenceMediaTypes ?? inputModalitiesReferenceMediaTypes(inputModalities) : [];
   return {
     value: input.value,
     label: input.label,
     provider: input.provider,
     model: input.model,
     kind: "video",
+    listed: input.listed,
     supportsAsync: false,
     supportsReferences: input.supportsReferences,
     aspectRatios: [],
@@ -1499,73 +839,82 @@ function videoCapability(input: VideoCapabilityInput): ProviderModelCapability {
     audioOutputKinds: [],
     videoReferenceMode: input.videoReferenceMode,
     videoReferenceModes: input.videoReferenceModes ?? (input.videoReferenceMode === "none" ? [] : [input.videoReferenceMode]),
-    inputModalities: input.inputModalities,
-    parameterDescriptors: input.parameterDescriptors ?? [],
-    pricing: input.pricing,
+    inputModalities,
+    parameterDescriptors,
+    referenceSlots: referenceParameterDescriptors(parameterDescriptors),
+    pricing: input.pricing ?? unpricedModel("unverified"),
+    payloadMapping: input.payloadMapping,
     maxReferenceImages: input.maxReferenceImages,
     minReferenceImages: input.minReferenceImages,
-    referenceMediaTypes: input.supportsReferences ? input.referenceMediaTypes ?? ["image"] : [],
+    referenceMediaTypes,
   };
 }
 
-function audioCapability(input: AudioCapabilityInput): ProviderModelCapability {
-  const audioModes = input.audioModes ?? ["tts"];
-  return {
-    value: input.value,
-    label: input.label,
-    provider: input.provider,
-    model: input.model,
-    kind: "audio",
-    supportsAsync: false,
-    supportsReferences: input.supportsReferences,
-    aspectRatios: [],
-    sizes: [],
-    thinkingLevels: [],
-    qualityLevels: [],
-    resolutions: [],
-    durations: input.durations ?? [],
-    presets: input.formats ?? [],
-    audioModes,
-    audioOutputKinds: input.audioOutputKinds ?? ["audio"],
-    audioDefaultMode: input.audioDefaultMode ?? audioModes[0],
-    videoReferenceMode: "none",
-    videoReferenceModes: [],
-    inputModalities: input.inputModalities,
-    parameterDescriptors: input.parameterDescriptors ?? [],
-    pricing: input.pricing,
-    maxReferenceImages: input.maxReferenceMedia,
-    minReferenceImages: input.minReferenceMedia,
-    referenceMediaTypes: input.supportsReferences ? input.referenceMediaTypes ?? ["audio"] : [],
-  };
+export function readModelCapabilityCatalog(catalog: ModelCapabilityCatalogDocument): ProviderModelCapability[] {
+  if (!isNonEmptyString(catalog.version)) throw new Error("Model capability catalog is missing a version");
+  if (!Array.isArray(catalog.entries) || catalog.entries.length === 0) {
+    throw new Error("Model capability catalog has no entries");
+  }
+
+  const seen = new Set<string>();
+  for (const entry of catalog.entries) {
+    if (!isNonEmptyString(entry.value)) throw new Error("Model capability catalog entry is missing value");
+    if (!isNonEmptyString(entry.label)) throw new Error(`${entry.value} is missing label`);
+    if (!isNonEmptyString(entry.provider) || !PROVIDER_KEYS.includes(entry.provider)) {
+      throw new Error(`${entry.value} has invalid provider`);
+    }
+    if (!isNonEmptyString(entry.model)) throw new Error(`${entry.value} is missing model`);
+    if (entry.kind !== "chat" && entry.kind !== "image" && entry.kind !== "video" && entry.kind !== "audio") {
+      throw new Error(`${entry.value} has invalid kind`);
+    }
+    if (seen.has(entry.value)) throw new Error(`Duplicate model capability catalog entry: ${entry.value}`);
+    seen.add(entry.value);
+    if (!entry.inputModalities) throw new Error(`${entry.value} is missing inputModalities`);
+    if (!Array.isArray(entry.parameterDescriptors)) throw new Error(`${entry.value} is missing parameterDescriptors`);
+    if (!Array.isArray(entry.referenceSlots)) throw new Error(`${entry.value} is missing referenceSlots`);
+    if (!referenceSlotsMatchDescriptors(entry)) throw new Error(`${entry.value} has mismatched referenceSlots`);
+    validateCatalogPricing(entry);
+    validateCatalogPayloadMapping(entry);
+  }
+  return catalog.entries;
 }
 
-function chatCapability(input: CapabilityInput): ProviderModelCapability {
-  return {
-    value: input.value,
-    label: input.label,
-    provider: input.provider,
-    model: input.model,
-    kind: "chat",
-    supportsAsync: false,
-    supportsReferences: false,
-    aspectRatios: [],
-    sizes: [],
-    thinkingLevels: [],
-    qualityLevels: [],
-    resolutions: [],
-    durations: [],
-    presets: [],
-    audioModes: [],
-    audioOutputKinds: [],
-    videoReferenceMode: "none",
-    videoReferenceModes: [],
-    inputModalities: input.inputModalities,
-    parameterDescriptors: input.parameterDescriptors ?? [],
-    pricing: input.pricing,
-    maxReferenceImages: 0,
-    minReferenceImages: 0,
-    referenceMediaTypes: [],
-  };
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function referenceSlotsMatchDescriptors(entry: ProviderModelCapability): boolean {
+  return JSON.stringify(entry.referenceSlots) === JSON.stringify(referenceParameterDescriptors(entry.parameterDescriptors));
+}
+
+function validateCatalogPricing(entry: ProviderModelCapability): void {
+  if (!entry.pricing) throw new Error(`${entry.value} is missing pricing`);
+  if (entry.pricing.status === "unpriced") {
+    if (!entry.pricing.reason) throw new Error(`${entry.value} is missing unpriced reason`);
+    return;
+  }
+  if (entry.pricing.status !== "priced") throw new Error(`${entry.value} has invalid pricing status`);
+  if (!isNonEmptyString(entry.pricing.lookupKey)) throw new Error(`${entry.value} priced entry is missing lookupKey`);
+  if (typeof entry.pricing.price !== "number" || !Number.isFinite(entry.pricing.price) || entry.pricing.price < 0) {
+    throw new Error(`${entry.value} priced entry has invalid price`);
+  }
+  if (!isNonEmptyString(entry.pricing.unit)) throw new Error(`${entry.value} priced entry is missing unit`);
+  if (!isNonEmptyString(entry.pricing.displayUnit)) throw new Error(`${entry.value} priced entry is missing displayUnit`);
+  if (!Array.isArray(entry.pricing.dimensions)) throw new Error(`${entry.value} priced entry is missing dimensions`);
+  if (!isNonEmptyString(entry.pricing.source)) throw new Error(`${entry.value} priced entry is missing source`);
+}
+
+function validateCatalogPayloadMapping(entry: ProviderModelCapability): void {
+  if (!entry.payloadMapping) return;
+  if (entry.payloadMapping.provider !== entry.provider) {
+    throw new Error(`${entry.value} payloadMapping provider does not match capability provider`);
+  }
+  if (!isNonEmptyString(entry.payloadMapping.endpoint)) {
+    throw new Error(`${entry.value} payloadMapping is missing endpoint`);
+  }
+  if (!Array.isArray(entry.payloadMapping.fields)) {
+    throw new Error(`${entry.value} payloadMapping is missing fields`);
+  }
 }
 
 function buildProviderOptionsRecord(kind: ModelKind, includeAsync: boolean): Record<AiProvider, ModelOption[]> {
@@ -1580,7 +929,8 @@ function optionsForKind(kind: ModelKind, provider?: AiProvider, includeAsync = t
   return MODEL_CAPABILITIES
     .filter(
       capability =>
-        capability.kind === kind &&
+      capability.kind === kind &&
+        capability.listed !== false &&
         (!provider || capability.provider === provider) &&
         (includeAsync || !capability.supportsAsync),
     )
@@ -1793,6 +1143,46 @@ function runningHubVirtualCapability(model: string, kind?: ModelKind): ProviderM
   const lower = model.toLowerCase();
   const isVideo = lower.includes("video");
   const resolvedKind: ModelKind = kind ?? (isVideo ? "video" : "image");
+  if (resolvedKind === "image" || resolvedKind === "video") {
+    const standardModel = getRunningHubStandardModel(model, resolvedKind);
+    if (standardModel?.kind === "image") {
+      const profile = runningHubImageParameterProfile(standardModel);
+      return imageCapability({
+        value: formatProviderModel("runninghub", standardModel.model),
+        label: standardModel.label,
+        provider: "runninghub",
+        model: standardModel.model,
+        supportsAsync: false,
+        supportsReferences: standardModel.supportsReferences,
+        ...profile,
+        inputModalities: runningHubInputModalities(standardModel),
+        parameterDescriptors: [...runningHubYouchuanParameterDescriptors(standardModel.model)],
+        pricing: unpricedModel("unverified"),
+        payloadMapping: runningHubStandardPayloadMapping(standardModel),
+        maxReferenceImages: standardModel.maxReferenceImages,
+        minReferenceImages: standardModel.minReferenceImages,
+      });
+    }
+    if (standardModel?.kind === "video") {
+      const profile = runningHubVideoParameterProfile(standardModel);
+      return videoCapability({
+        value: formatProviderModel("runninghub", standardModel.model),
+        label: standardModel.label,
+        provider: "runninghub",
+        model: standardModel.model,
+        supportsReferences: standardModel.supportsReferences,
+        ...profile,
+        inputModalities: runningHubInputModalities(standardModel),
+        pricing: unpricedModel("unverified"),
+        payloadMapping: runningHubStandardPayloadMapping(standardModel),
+        videoReferenceMode: standardModel.videoReferenceMode ?? (standardModel.supportsReferences ? "reference" : "none"),
+        videoReferenceModes: standardModel.videoReferenceModes ? [...standardModel.videoReferenceModes] : undefined,
+        maxReferenceImages: standardModel.maxReferenceImages,
+        minReferenceImages: standardModel.minReferenceImages,
+        referenceMediaTypes: standardModel.referenceMediaTypes ? [...standardModel.referenceMediaTypes] : undefined,
+      });
+    }
+  }
   if (resolvedKind === "video") {
     return videoCapability({
       value: formatProviderModel("runninghub", model),

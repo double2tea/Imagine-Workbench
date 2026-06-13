@@ -18,6 +18,7 @@ import {
 } from "@/lib/prompt-templates";
 import type { ImageModelCapabilities } from "@/lib/providers/model-catalog";
 import type { ModelParameterValues } from "@/lib/providers/model-capabilities";
+import { buildGenerationModelPriceOptions } from "@/lib/providers/pricing";
 
 interface ImageGenerationPanelProps {
   atDropdownNode: ReactNode;
@@ -362,9 +363,12 @@ export default function ImageGenerationPanel({
           isSubmitting={isSubmitting}
           priceProvider={selectedModel.split(":")[0]}
           priceModelId={selectedModel}
-          priceResolution={imageResolution}
-          priceImageQuality={imageQuality}
-          priceThinkingLevel={imageThinkingLevel}
+          priceOptions={buildGenerationModelPriceOptions({
+            kind: "image",
+            imageQuality,
+            resolution: imageResolution,
+            thinkingLevel: imageThinkingLevel,
+          })}
           submitCount={submitCount}
           onGenerate={onGenerate}
         />

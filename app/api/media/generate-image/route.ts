@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ApiError, apiErrorResponse, requireApiText } from "@/lib/api/errors";
 import { assertPublicHttpUrl } from "@/lib/api/url-safety";
-import { DEFAULT_IMAGE_MODEL, getImageModelCapabilities, getImageResolutionOptions, parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
+import { DEFAULT_IMAGE_MODEL, getImageModelCapabilities, getImageResolutionOptions, getModelCapability, parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
+import { ModelCapabilityValidationError, validateInputModalityReferences } from "@/lib/providers/model-capabilities";
 import { generateImage } from "@/lib/providers/image";
 import {
   readRunningHubNodeInfoList,
@@ -39,6 +40,7 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as GenerateImageBody;
     const modelValue = optionalText(body.model) ?? DEFAULT_IMAGE_MODEL;
     const parsed = parseProviderModel(modelValue, "12ai");
+    const modelCapability = getModelCapability(modelValue, "image");
     const config = resolveProviderConfig(req, parsed.provider);
     const requestImageResolution = optionalText(body.imageResolution);
     const aspectRatio = customImageSizeAspectRatio(requestImageResolution) ?? optionalText(body.aspectRatio) ?? "1:1";
@@ -50,7 +52,7 @@ export async function POST(req: NextRequest) {
     const runningHubNodeInfo = resolveRunningHubNodeInfoListForModel(parsed.model, explicitRunningHubNodeInfoList);
     const payloadError = getReferenceImagePayloadError([...referenceImages, ...runningHubYouchuanReferenceImages(runningHubYouchuan)]);
     if (payloadError) return NextResponse.json({ error: payloadError }, { status: 413 });
-    validateReferenceCount(modelValue, referenceImages.length);
+    validateInputModalityReferences(modelCapability.inputModalities, referenceImages.map(() => ({ type: "image" })));
 
     const allowsEmptyPrompt = runningHubResolvedNodeInfoAllowsEmptyPrompt(parsed.model, "image", runningHubNodeInfo);
     const result = await generateImage(config, {
@@ -90,6 +92,9 @@ export async function POST(req: NextRequest) {
     const message = err instanceof Error ? err.message : "Failed to generate image";
     if (err instanceof ImageRequestValidationError || err instanceof ProviderModelParseError) {
       return NextResponse.json({ error: message }, { status: 400 });
+    }
+    if (err instanceof ModelCapabilityValidationError) {
+      return NextResponse.json({ error: message, code: "invalid_reference_media" }, { status: 400 });
     }
     const response = apiErrorResponse(err, "Failed to generate image");
     if (response.status >= 500 && !(err instanceof ApiError)) console.error("Image generation route error:", err);
@@ -259,16 +264,6 @@ function resolveImageQuality(modelValue: string, imageQuality: string | undefine
   const capabilities = getImageModelCapabilities(modelValue);
   if (capabilities.qualities.some(option => option.value === imageQuality)) return imageQuality;
   throw new ImageRequestValidationError(`Unsupported imageQuality "${imageQuality}" for this image model`);
-}
-
-function validateReferenceCount(modelValue: string, count: number): void {
-  const capabilities = getImageModelCapabilities(modelValue);
-  if (count < capabilities.minReferenceImages) {
-    throw new ImageRequestValidationError(`Selected image model requires at least ${capabilities.minReferenceImages} reference image(s)`);
-  }
-  if (count > capabilities.maxReferenceImages) {
-    throw new ImageRequestValidationError(`Selected image model supports at most ${capabilities.maxReferenceImages} reference image(s)`);
-  }
 }
 
 function isValidCustomImageResolution(value: string, aspectRatio: string): boolean {

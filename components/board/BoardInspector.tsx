@@ -37,6 +37,7 @@ import {
   imageParameterValuesFromLegacy,
   imageParameterValuesToRunningHubYouchuan,
 } from "@/lib/providers/model-catalog";
+import { buildGenerationModelPriceOptions } from "@/lib/providers/pricing";
 import { includeCurrentModelOption, type BoardModelOptionGroup } from "@/lib/board/model-options";
 import type { MediaReferenceType } from "@/lib/media-references";
 import { getBoardNodePortDefinition } from "@/lib/board/ports";
@@ -612,9 +613,12 @@ function ImageGenerateInspector({
           <ModelPriceBadge
             provider={node.model.split(":")[0]}
             modelId={node.model}
-            resolution={node.imageResolution === "custom" ? node.customImageResolution : node.imageResolution}
-            imageQuality={node.imageQuality}
-            thinkingLevel={node.thinkingLevel}
+            options={buildGenerationModelPriceOptions({
+              kind: "image",
+              imageQuality: node.imageQuality,
+              resolution: node.imageResolution === "custom" ? node.customImageResolution : node.imageResolution,
+              thinkingLevel: node.thinkingLevel,
+            })}
           />
         )}
       </button>
@@ -749,10 +753,13 @@ function VideoGenerateInspector({
           <ModelPriceBadge
             provider={node.model.split(":")[0]}
             modelId={node.model}
-            duration={node.videoDuration}
-            referenceTypes={priceReferenceTypes}
-            videoReferenceMode={activeReferenceMode}
-            videoResolution={node.videoResolution}
+            options={buildGenerationModelPriceOptions({
+              kind: "video",
+              duration: node.videoDuration,
+              referenceTypes: priceReferenceTypes,
+              videoReferenceMode: activeReferenceMode,
+              videoResolution: node.videoResolution,
+            })}
           />
         )}
       </button>
@@ -989,7 +996,13 @@ function AudioOperationInspector({
       <button type="button" onClick={() => onExecuteGenerate(node.id)} disabled={isProcessing} data-tone="accent" className="imagine-primary-action flex !h-9 min-h-0 w-full items-center justify-center gap-2 !rounded-lg text-xs font-semibold text-white transition">
         {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
         执行音频节点
-        {!isProcessing && <ModelPriceBadge provider={node.model.split(":")[0]} modelId={node.model} />}
+        {!isProcessing && (
+          <ModelPriceBadge
+            provider={node.model.split(":")[0]}
+            modelId={node.model}
+            options={buildGenerationModelPriceOptions({ kind: "audio" })}
+          />
+        )}
       </button>
     </div>
   );

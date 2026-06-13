@@ -142,7 +142,7 @@ function getGenerateAcceptedReferenceTypes(node: BoardNode & { kind: "image-gene
 }
 
 function isAutoSelectableCapability(item: ReturnType<typeof getModelCapabilities>[number]): boolean {
-  return item.supportsReferences && !item.supportsAsync && !item.value.includes("<");
+  return item.listed !== false && item.supportsReferences && !item.supportsAsync && !item.value.includes("<");
 }
 
 function hasCompatibleReferenceModel(kind: "image-generate" | "video-generate" | "audio-operation"): boolean {

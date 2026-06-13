@@ -1,5 +1,6 @@
 import { AudioLines, RefreshCw, Sparkles, Video as VideoIcon } from "lucide-react";
 import ModelPriceBadge from "@/components/creation/ModelPriceBadge";
+import type { ModelPriceOptions } from "@/lib/providers/pricing";
 
 export type CreatorGenerateMode = "image" | "video" | "audio";
 
@@ -9,13 +10,7 @@ interface CreatorGenerateButtonProps {
   isSubmitting: boolean;
   priceProvider?: string;
   priceModelId?: string;
-  priceDuration?: string;
-  priceResolution?: string;
-  priceImageQuality?: string;
-  priceReferenceTypes?: Array<"image" | "video" | "audio">;
-  priceThinkingLevel?: string;
-  priceVideoReferenceMode?: "reference" | "firstLast" | "none";
-  priceVideoResolution?: string;
+  priceOptions?: ModelPriceOptions;
   submitCount: number;
   label?: string;
   onGenerate: () => void;
@@ -27,13 +22,7 @@ export default function CreatorGenerateButton({
   isSubmitting,
   priceProvider,
   priceModelId,
-  priceDuration,
-  priceResolution,
-  priceImageQuality,
-  priceReferenceTypes,
-  priceThinkingLevel,
-  priceVideoReferenceMode,
-  priceVideoResolution,
+  priceOptions,
   submitCount,
   label,
   onGenerate,
@@ -69,13 +58,7 @@ export default function CreatorGenerateButton({
         <ModelPriceBadge
           provider={priceProvider!}
           modelId={priceModelId!}
-          duration={priceDuration}
-          resolution={priceResolution}
-          imageQuality={priceImageQuality}
-          referenceTypes={priceReferenceTypes}
-          thinkingLevel={priceThinkingLevel}
-          videoReferenceMode={priceVideoReferenceMode}
-          videoResolution={priceVideoResolution}
+          options={priceOptions}
         />
       )}
     </button>

@@ -5,8 +5,9 @@ import { apiErrorResponse, badRequest, requireApiText } from "@/lib/api/errors";
 import { isRunningHubWorkflowAudioTarget } from "@/lib/audio-generation-routing";
 import { readOptionalAudioFormat } from "@/lib/audio-operation-rules";
 import { mediaReferenceLabel, mediaReferenceTypeFromBase64DataUri, type MediaReferenceType } from "@/lib/media-references";
+import { ModelCapabilityValidationError, validateInputModalityReferences } from "@/lib/providers/model-capabilities";
 import { generateAudioOperation } from "@/lib/providers/audio";
-import { parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
+import { getOptionalModelCapability, parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
 import { readRunningHubNodeInfoList } from "@/lib/providers/runninghub-node-info";
 import type { ReferenceMedia } from "@/lib/providers/types";
 import { optionalText, resolveProviderConfig } from "@/lib/providers/utils";
@@ -52,8 +53,14 @@ export async function POST(req: NextRequest) {
     }
 
     const referenceMedia = readReferenceMedia(body.referenceMedia);
-    const formatError = getReferenceMediaFormatError(referenceMedia);
+    const capability = getOptionalModelCapability(body.model, "audio");
+    if (!capability) throw badRequest("Unknown audio model capability", "invalid_audio_model");
+    if (!capability.audioModes.includes(body.mode)) {
+      throw badRequest("Selected audio model does not support this operation mode", "unsupported_audio_mode");
+    }
+    const formatError = getReferenceMediaFormatError(referenceMedia, capability.referenceMediaTypes);
     if (formatError) throw badRequest(formatError, "invalid_reference_media");
+    validateInputModalityReferences(capability.inputModalities, referenceMedia);
     const payloadError = getReferenceMediaPayloadError(referenceMedia.map(reference => reference.dataUri));
     if (payloadError) return NextResponse.json({ error: payloadError, code: "payload_too_large" }, { status: 413 });
 
@@ -81,6 +88,9 @@ export async function POST(req: NextRequest) {
     }
     if (err instanceof ProviderModelParseError) {
       return NextResponse.json({ error: message, code: "invalid_provider_model" }, { status: 400 });
+    }
+    if (err instanceof ModelCapabilityValidationError) {
+      return NextResponse.json({ error: message, code: "invalid_reference_media" }, { status: 400 });
     }
     const response = apiErrorResponse(audioOperationApiError(err) ?? err, "Failed to generate audio");
     if (response.status >= 500) console.error("Audio operation route error:", err);
@@ -116,8 +126,7 @@ function readReferenceMediaItem(dataUri: string): ReferenceMedia {
   return { dataUri, type };
 }
 
-function getReferenceMediaFormatError(referenceMedia: ReferenceMedia[]): string | null {
-  const acceptedTypes: MediaReferenceType[] = ["image", "video", "audio"];
+function getReferenceMediaFormatError(referenceMedia: ReferenceMedia[], acceptedTypes: MediaReferenceType[]): string | null {
   for (const reference of referenceMedia) {
     const actualType = mediaReferenceTypeFromBase64DataUri(reference.dataUri);
     if (!actualType) return "Audio reference media must be data:image/*, data:video/* or data:audio/* base64 data URIs";
