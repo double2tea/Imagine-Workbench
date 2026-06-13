@@ -1130,14 +1130,15 @@ export default function BoardWorkspace({
   const [assetCompare, setAssetCompare] = useState<{ originalUrl: string; resultUrl: string } | null>(null);
   const [flowReady, setFlowReady] = useState(false);
   const [isConnectionActive, setIsConnectionActive] = useState(false);
-  const [isNodeDragActive, setIsNodeDragActive] = useState(false);
-  const [isViewportMoveActive, setIsViewportMoveActive] = useState(false);
   const [activeMultiGridDropTarget, setActiveMultiGridDropTarget] = useState<MultiGridCellDropTarget | null>(null);
+  const setCanvasInteractionClass = useCallback((className: string, isActive: boolean): void => {
+    flowHostRef.current?.classList.toggle(className, isActive);
+  }, []);
   const setViewportMoveActive = useCallback((isActive: boolean): void => {
     if (isViewportMoveActiveRef.current === isActive) return;
     isViewportMoveActiveRef.current = isActive;
-    setIsViewportMoveActive(isActive);
-  }, []);
+    setCanvasInteractionClass("is-viewport-moving", isActive);
+  }, [setCanvasInteractionClass]);
   const beginViewportMove = useCallback((): void => {
     if (viewportMoveEndTimerRef.current !== null) {
       window.clearTimeout(viewportMoveEndTimerRef.current);
@@ -1154,7 +1155,9 @@ export default function BoardWorkspace({
   }, [setViewportMoveActive]);
   useEffect(() => () => {
     if (viewportMoveEndTimerRef.current !== null) window.clearTimeout(viewportMoveEndTimerRef.current);
-  }, []);
+    setCanvasInteractionClass("is-node-dragging", false);
+    setCanvasInteractionClass("is-viewport-moving", false);
+  }, [setCanvasInteractionClass]);
   const updateSelectedNodeIds = useCallback((nextIds: string[]): void => {
     setSelectedNodeIds(currentIds => {
       if (sameStringList(currentIds, nextIds)) return currentIds;
@@ -1862,7 +1865,7 @@ export default function BoardWorkspace({
           sourceHandle: edge.from.portId,
           targetHandle: edge.to.portId,
           type: "smoothstep",
-          animated: !isNodeDragActive && !isViewportMoveActive && (edge.kind === "result" || processing),
+          animated: edge.kind === "result" || processing,
           data: { kind: edge.kind, processing },
           className: `imagine-board-edge imagine-board-edge-${edge.kind}`,
           markerEnd: { type: MarkerType.ArrowClosed, color: flowEdgeColorByKind[edge.kind], width: 18, height: 18 },
@@ -1872,7 +1875,7 @@ export default function BoardWorkspace({
       return result;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- graph key gates processing animation without position churn
-    [board.nodes, boardGraphContentKey, boardPromptReferenceGraphIndex, flowEdgeColorByKind, isNodeDragActive, isViewportMoveActive, resultSourceNodes, selectedEdgeId],
+    [board.nodes, boardGraphContentKey, boardPromptReferenceGraphIndex, flowEdgeColorByKind, resultSourceNodes, selectedEdgeId],
   );
 
   const isValidBoardConnection = useCallback<IsValidConnection<BoardFlowEdge>>((connection) => {
@@ -2058,9 +2061,9 @@ export default function BoardWorkspace({
 
   const handleNodeDragStart = useCallback<OnNodeDrag<BoardFlowNode>>(() => {
     isNodeDragActiveRef.current = true;
-    setIsNodeDragActive(true);
+    setCanvasInteractionClass("is-node-dragging", true);
     pendingDragPositionByIdRef.current.clear();
-  }, []);
+  }, [setCanvasInteractionClass]);
 
   const handleNodeDrag = useCallback<OnNodeDrag<BoardFlowNode>>((event, node) => {
     const source = node.data.node;
@@ -2073,7 +2076,7 @@ export default function BoardWorkspace({
 
   const handleNodeDragStop = useCallback<OnNodeDrag<BoardFlowNode>>((event, node, nodes) => {
     isNodeDragActiveRef.current = false;
-    setIsNodeDragActive(false);
+    setCanvasInteractionClass("is-node-dragging", false);
     clearActiveMultiGridDropTarget();
     const positionById = new Map(pendingDragPositionByIdRef.current);
     const draggedNodes = nodes.length > 0 ? nodes : [node];
@@ -2103,7 +2106,7 @@ export default function BoardWorkspace({
     updateNodesPositions(Array.from(positionById, ([nodeId, position]) => ({ nodeId, position })));
     endUndoGesture();
     skipPositionSyncRef.current = false;
-  }, [addAssetToMultiGrid, beginUndoGesture, board.nodes, clearActiveMultiGridDropTarget, endUndoGesture, selectEdge, selectNode, updateNodesPositions, updateSelectedNodeIds]);
+  }, [addAssetToMultiGrid, beginUndoGesture, board.nodes, clearActiveMultiGridDropTarget, endUndoGesture, selectEdge, selectNode, setCanvasInteractionClass, updateNodesPositions, updateSelectedNodeIds]);
 
   const skipPositionSyncRef = useRef(false);
   const handleNodesChange = useCallback<OnNodesChange<BoardFlowNode>>((changes) => {
@@ -2170,9 +2173,8 @@ export default function BoardWorkspace({
     updateSelectedNodeIds([]);
   }, [closeOverlayMenus, selectEdge, selectNode, updateSelectedNodeIds]);
 
-  const isBoardInteractionActive = isNodeDragActive || isViewportMoveActive;
-  const onlyRenderVisibleBoardElements = board.nodes.length >= BOARD_VISIBLE_RENDER_NODE_THRESHOLD || isBoardInteractionActive;
-  const shouldRenderMiniMap = board.config.showMiniMap && !isBoardInteractionActive;
+  const onlyRenderVisibleBoardElements = board.nodes.length >= BOARD_VISIBLE_RENDER_NODE_THRESHOLD;
+  const shouldRenderMiniMap = board.config.showMiniMap;
 
   const visibleCenterPosition = useCallback((size: BoardSize): BoardPoint | undefined => {
     const rect = flowHostRef.current?.getBoundingClientRect();
@@ -2996,7 +2998,7 @@ export default function BoardWorkspace({
           onDragLeave={handleBoardDragLeave}
           onDragOver={handleBoardDragOver}
           onDrop={handleBoardDrop}
-          className={`board-canvas relative min-h-0 bg-[var(--iw-board-canvas-bg)]${isNodeDragActive ? " is-node-dragging" : ""}${isViewportMoveActive ? " is-viewport-moving" : ""}${isConnectionActive ? " is-connecting" : ""}`}
+          className={`board-canvas relative min-h-0 bg-[var(--iw-board-canvas-bg)]${isConnectionActive ? " is-connecting" : ""}`}
         >
           <BoardNodeCallbacksContext.Provider value={boardNodeCallbacks}>
           <ReactFlow
@@ -3105,7 +3107,7 @@ export default function BoardWorkspace({
                 zoomable
               />
             )}
-            {!isBoardInteractionActive && selectedNodeIds.length > 1 ? (
+            {selectedNodeIds.length > 1 ? (
               <NodeToolbar
                 nodeId={selectedNodeIds}
                 isVisible

@@ -1,5 +1,5 @@
 import { Loader2, X } from "lucide-react";
-import { useRef, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import type { StorageItem } from "@/lib/db";
 import { gsap, prefersReducedWorkbenchMotion, useGSAP, WORKBENCH_GSAP_EASE } from "@/lib/workbench-gsap";
 
@@ -32,7 +32,10 @@ export default function BoardMediaNodeShell({
 }: BoardMediaNodeShellProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const previousStatusRef = useRef<StorageItem["status"] | undefined>(undefined);
+  const [isHovered, setIsHovered] = useState(false);
+  const [hasFocusWithin, setHasFocusWithin] = useState(false);
   const hasStackSwitcher = stackItems.length > 1;
+  const shouldMountActionBar = isHovered || hasFocusWithin;
   const isProcessing = status === "pending" || status === "processing";
   const isFailed = status === "failed";
   const visualStatus = isFailed ? "failed" : isProcessing ? "processing" : status === "complete" ? "complete" : "idle";
@@ -71,13 +74,20 @@ export default function BoardMediaNodeShell({
   return (
     <div
       onDoubleClick={onDoubleClick}
+      onBlur={(event) => {
+        if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) return;
+        setHasFocusWithin(false);
+      }}
+      onFocus={() => setHasFocusWithin(true)}
+      onPointerEnter={() => setIsHovered(true)}
+      onPointerLeave={() => setIsHovered(false)}
       ref={containerRef}
       className="board-media-node group/board-video relative h-full min-h-0 overflow-visible"
       data-has-stack={hasStackSwitcher ? "true" : "false"}
       data-selected={isSelected ? "true" : "false"}
       data-status={visualStatus}
     >
-      {actionBar}
+      {shouldMountActionBar ? actionBar : null}
       <div className="board-media-commit-surface imagine-motion-media-reveal relative flex h-full min-h-0 items-center justify-center overflow-hidden bg-[var(--iw-panel-soft)]">
         <span className="board-media-commit-flash pointer-events-none absolute inset-0 z-30 opacity-0" />
         {hasStackSwitcher && (

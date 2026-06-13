@@ -4358,6 +4358,11 @@ html[data-imagine-theme="light"] .board-media-stack-switcher {
   display: none !important;
 }
 
+.board-canvas.is-node-dragging .react-flow__minimap,
+.board-canvas.is-viewport-moving .react-flow__minimap {
+  display: none !important;
+}
+
 .board-canvas.is-node-dragging .react-flow__node *,
 .board-canvas.is-node-dragging .react-flow__node *::before,
 .board-canvas.is-node-dragging .react-flow__node *::after,
@@ -4397,6 +4402,21 @@ html[data-imagine-theme="light"] .board-media-stack-switcher {
 
 .board-canvas.is-node-dragging .board-node-shell {
   box-shadow: 0 0 0 1px var(--iw-board-border) !important;
+}
+
+.board-canvas.is-node-dragging .board-media-commit-surface {
+  isolation: auto;
+  box-shadow: 0 0 0 1px var(--iw-board-border) !important;
+}
+
+.board-canvas.is-node-dragging .board-media-node {
+  contain: layout paint style;
+  overflow: hidden;
+}
+
+.board-canvas.is-node-dragging .board-media-commit-surface::before,
+.board-canvas.is-node-dragging .board-media-commit-surface::after {
+  display: none !important;
 }
 
 .board-canvas.is-node-dragging .board-node-handle {
@@ -4459,6 +4479,21 @@ html[data-imagine-theme="light"] .board-media-stack-switcher {
 
 .board-canvas.is-viewport-moving .board-node-shell {
   box-shadow: 0 0 0 1px var(--iw-board-border) !important;
+}
+
+.board-canvas.is-viewport-moving .board-media-commit-surface {
+  isolation: auto;
+  box-shadow: 0 0 0 1px var(--iw-board-border) !important;
+}
+
+.board-canvas.is-viewport-moving .board-media-node {
+  contain: layout paint style;
+  overflow: hidden;
+}
+
+.board-canvas.is-viewport-moving .board-media-commit-surface::before,
+.board-canvas.is-viewport-moving .board-media-commit-surface::after {
+  display: none !important;
 }
 
 .board-canvas.is-viewport-moving .board-node-handle {
