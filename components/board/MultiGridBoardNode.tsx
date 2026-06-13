@@ -119,10 +119,15 @@ function cellIndexFromPoint(clientX: number, clientY: number, nodeId: string): n
   return Number.isInteger(cellIndex) ? cellIndex : undefined;
 }
 
-function isPointInsideMultiGrid(clientX: number, clientY: number, nodeId: string): boolean {
-  const element = document.elementFromPoint(clientX, clientY);
-  const root = element?.closest("[data-multi-grid-root-id]");
-  return root instanceof HTMLElement && root.dataset.multiGridRootId === nodeId;
+function isPointInsideElement(clientX: number, clientY: number, element: HTMLElement | null): boolean {
+  const rect = element?.getBoundingClientRect();
+  return Boolean(
+    rect &&
+    clientX >= rect.left &&
+    clientX <= rect.right &&
+    clientY >= rect.top &&
+    clientY <= rect.bottom
+  );
 }
 
 const MultiGridBoardNode = memo(function MultiGridBoardNode({
@@ -147,6 +152,7 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
   const [dragPreview, setDragPreview] = useState<DragPreview | null>(null);
   const [isEditingLayout, setIsEditingLayout] = useState(false);
   const [sortDrag, setSortDrag] = useState<SortDrag | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const dragPreviewFrameRef = useRef<number | null>(null);
   const pendingDragPreviewRef = useRef<DragPreview | null>(null);
 
@@ -247,7 +253,7 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
     event.preventDefault();
     event.stopPropagation();
     const nextPreview = dragPreviewForEvent(event, activeDrag);
-    if (!isPointInsideMultiGrid(event.clientX, event.clientY, node.id)) {
+    if (!isPointInsideElement(event.clientX, event.clientY, rootRef.current)) {
       onExtractItem(activeDrag.assetId, event.clientX, event.clientY);
       if (event.currentTarget.hasPointerCapture(event.pointerId)) {
         event.currentTarget.releasePointerCapture(event.pointerId);
@@ -363,7 +369,7 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[var(--iw-panel)]" data-multi-grid-root-id={node.id}>
+    <div ref={rootRef} className="flex h-full min-h-0 flex-col bg-[var(--iw-panel)]" data-multi-grid-root-id={node.id}>
       <div className="nodrag flex h-12 shrink-0 items-center gap-1.5 overflow-x-auto border-b border-[var(--iw-border)] px-2">
         <select
           name={`multi-grid-aspect-${node.id}`}
