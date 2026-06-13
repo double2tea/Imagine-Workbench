@@ -4422,6 +4422,59 @@ html[data-imagine-theme="light"] .board-media-stack-switcher {
   opacity: 0.58;
 }
 
+.board-canvas.is-viewport-moving .react-flow__edge-path,
+.board-canvas.is-viewport-moving .react-flow__connection-path {
+  animation: none !important;
+  filter: none !important;
+  transition: none !important;
+}
+
+.board-canvas.is-viewport-moving .board-edge-toolbar {
+  display: none !important;
+}
+
+.board-canvas.is-viewport-moving .react-flow__node *,
+.board-canvas.is-viewport-moving .react-flow__node *::before,
+.board-canvas.is-viewport-moving .react-flow__node *::after,
+.board-canvas.is-viewport-moving .react-flow__edge *,
+.board-canvas.is-viewport-moving .react-flow__edge *::before,
+.board-canvas.is-viewport-moving .react-flow__edge *::after {
+  animation: none !important;
+}
+
+.board-canvas.is-viewport-moving .board-node-shell,
+.board-canvas.is-viewport-moving .board-media-controls,
+.board-canvas.is-viewport-moving .imagine-mark {
+  filter: none !important;
+  transition: none !important;
+}
+
+.board-canvas.is-viewport-moving .board-node-shell * {
+  transition: none !important;
+}
+
+.board-canvas.is-viewport-moving .board-node-shell [class*="backdrop-blur"] {
+  backdrop-filter: none !important;
+}
+
+.board-canvas.is-viewport-moving .board-node-shell {
+  box-shadow: 0 0 0 1px var(--iw-board-border) !important;
+}
+
+.board-canvas.is-viewport-moving .board-node-handle {
+  box-shadow: none !important;
+}
+
+.board-canvas.is-viewport-moving .board-media-controls,
+.board-canvas.is-viewport-moving .board-media-stack-badge,
+.board-canvas.is-viewport-moving .board-media-stack-switcher,
+.board-canvas.is-viewport-moving .board-asset-node-chrome {
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 .multi-grid-drop-cell-overlay {
   background: rgba(16, 185, 129, 0.14);
   border: 2px solid rgba(110, 231, 183, 0.92);

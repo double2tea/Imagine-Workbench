@@ -155,6 +155,7 @@ interface BoardWorkspaceProps {
 }
 
 type BoardFlowEdge = Edge<{ kind: BoardEdgeKind; processing?: boolean }, "smoothstep">;
+type BoardMoveHandler = NonNullable<ReactFlowProps<BoardFlowNode, BoardFlowEdge>["onMove"]>;
 type BoardReconnectStartHandler = NonNullable<ReactFlowProps<BoardFlowNode, BoardFlowEdge>["onReconnectStart"]>;
 type BoardReconnectEndHandler = NonNullable<ReactFlowProps<BoardFlowNode, BoardFlowEdge>["onReconnectEnd"]>;
 
@@ -221,6 +222,7 @@ const DEFAULT_BOARD_IMAGE_MODEL = "modelscope:Qwen/Qwen-Image";
 const DEFAULT_BOARD_REFERENCE_IMAGE_MODEL = "modelscope:Qwen/Qwen-Image-Edit";
 const BOARD_VIEWPORT_POSITION_EPSILON = 0.5;
 const BOARD_VIEWPORT_ZOOM_EPSILON = 0.001;
+const BOARD_VIEWPORT_MOVE_SETTLE_MS = 140;
 const BOARD_VISIBLE_RENDER_NODE_THRESHOLD = 48;
 
 interface BoardSelectionSnapshot {
@@ -1112,6 +1114,8 @@ export default function BoardWorkspace({
   const pendingImportPointRef = useRef<BoardPoint | null>(null);
   const copiedNodeRef = useRef<CopiedBoardNode | null>(null);
   const isNodeDragActiveRef = useRef(false);
+  const isViewportMoveActiveRef = useRef(false);
+  const viewportMoveEndTimerRef = useRef<number | null>(null);
   const multiGridDropFrameRef = useRef<number | null>(null);
   const pendingMultiGridDropPointRef = useRef<{ clientX: number; clientY: number } | null>(null);
   const pendingDragPositionByIdRef = useRef<Map<string, BoardPoint>>(new Map());
@@ -1127,7 +1131,30 @@ export default function BoardWorkspace({
   const [flowReady, setFlowReady] = useState(false);
   const [isConnectionActive, setIsConnectionActive] = useState(false);
   const [isNodeDragActive, setIsNodeDragActive] = useState(false);
+  const [isViewportMoveActive, setIsViewportMoveActive] = useState(false);
   const [activeMultiGridDropTarget, setActiveMultiGridDropTarget] = useState<MultiGridCellDropTarget | null>(null);
+  const setViewportMoveActive = useCallback((isActive: boolean): void => {
+    if (isViewportMoveActiveRef.current === isActive) return;
+    isViewportMoveActiveRef.current = isActive;
+    setIsViewportMoveActive(isActive);
+  }, []);
+  const beginViewportMove = useCallback((): void => {
+    if (viewportMoveEndTimerRef.current !== null) {
+      window.clearTimeout(viewportMoveEndTimerRef.current);
+      viewportMoveEndTimerRef.current = null;
+    }
+    setViewportMoveActive(true);
+  }, [setViewportMoveActive]);
+  const scheduleViewportMoveEnd = useCallback((): void => {
+    if (viewportMoveEndTimerRef.current !== null) window.clearTimeout(viewportMoveEndTimerRef.current);
+    viewportMoveEndTimerRef.current = window.setTimeout(() => {
+      viewportMoveEndTimerRef.current = null;
+      setViewportMoveActive(false);
+    }, BOARD_VIEWPORT_MOVE_SETTLE_MS);
+  }, [setViewportMoveActive]);
+  useEffect(() => () => {
+    if (viewportMoveEndTimerRef.current !== null) window.clearTimeout(viewportMoveEndTimerRef.current);
+  }, []);
   const updateSelectedNodeIds = useCallback((nextIds: string[]): void => {
     setSelectedNodeIds(currentIds => {
       if (sameStringList(currentIds, nextIds)) return currentIds;
@@ -1213,6 +1240,10 @@ export default function BoardWorkspace({
     updateNoteBody,
     updatePromptNode,
   } = controller;
+  const hasMultiGridNodes = useMemo(
+    () => board.nodes.some(node => node.kind === "multi-grid"),
+    [board.nodes],
+  );
   const selectedGroupNodeIds = useMemo(
     () => selectedNodeIds.filter(nodeId => board.nodes.some(node => node.id === nodeId && node.kind === "group")),
     [board.nodes, selectedNodeIds],
@@ -1831,7 +1862,7 @@ export default function BoardWorkspace({
           sourceHandle: edge.from.portId,
           targetHandle: edge.to.portId,
           type: "smoothstep",
-          animated: !isNodeDragActive && (edge.kind === "result" || processing),
+          animated: !isNodeDragActive && !isViewportMoveActive && (edge.kind === "result" || processing),
           data: { kind: edge.kind, processing },
           className: `imagine-board-edge imagine-board-edge-${edge.kind}`,
           markerEnd: { type: MarkerType.ArrowClosed, color: flowEdgeColorByKind[edge.kind], width: 18, height: 18 },
@@ -1841,7 +1872,7 @@ export default function BoardWorkspace({
       return result;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- graph key gates processing animation without position churn
-    [board.nodes, boardGraphContentKey, boardPromptReferenceGraphIndex, flowEdgeColorByKind, isNodeDragActive, resultSourceNodes, selectedEdgeId],
+    [board.nodes, boardGraphContentKey, boardPromptReferenceGraphIndex, flowEdgeColorByKind, isNodeDragActive, isViewportMoveActive, resultSourceNodes, selectedEdgeId],
   );
 
   const isValidBoardConnection = useCallback<IsValidConnection<BoardFlowEdge>>((connection) => {
@@ -2033,12 +2064,12 @@ export default function BoardWorkspace({
 
   const handleNodeDrag = useCallback<OnNodeDrag<BoardFlowNode>>((event, node) => {
     const source = node.data.node;
-    if ((source.kind !== "asset" && source.kind !== "result") || source.asset.type !== "image") {
+    if (!hasMultiGridNodes || (source.kind !== "asset" && source.kind !== "result") || source.asset.type !== "image") {
       clearActiveMultiGridDropTarget();
       return;
     }
     scheduleActiveMultiGridDropTarget(event.clientX, event.clientY);
-  }, [clearActiveMultiGridDropTarget, scheduleActiveMultiGridDropTarget]);
+  }, [clearActiveMultiGridDropTarget, hasMultiGridNodes, scheduleActiveMultiGridDropTarget]);
 
   const handleNodeDragStop = useCallback<OnNodeDrag<BoardFlowNode>>((event, node, nodes) => {
     isNodeDragActiveRef.current = false;
@@ -2092,11 +2123,21 @@ export default function BoardWorkspace({
     updateNodesPositions(settledPositions);
   }, [onNodesChange, updateNodesPositions]);
 
-  const handleMoveEnd = useCallback((_event: MouseEvent | TouchEvent | null, viewport: BoardViewport): void => {
+  const handleMoveStart = useCallback<BoardMoveHandler>(() => {
+    beginViewportMove();
+  }, [beginViewportMove]);
+
+  const handleMove = useCallback<BoardMoveHandler>(() => {
+    beginViewportMove();
+    scheduleViewportMoveEnd();
+  }, [beginViewportMove, scheduleViewportMoveEnd]);
+
+  const handleMoveEnd = useCallback<BoardMoveHandler>((_event, viewport): void => {
+    scheduleViewportMoveEnd();
     if (sameBoardViewportModel(viewportRef.current, viewport)) return;
     viewportRef.current = viewport;
     setViewport(viewport);
-  }, [setViewport]);
+  }, [scheduleViewportMoveEnd, setViewport]);
 
 
   const handleNodesDelete = useCallback<OnNodesDelete<BoardFlowNode>>(nodes => {
@@ -2129,8 +2170,9 @@ export default function BoardWorkspace({
     updateSelectedNodeIds([]);
   }, [closeOverlayMenus, selectEdge, selectNode, updateSelectedNodeIds]);
 
-  const onlyRenderVisibleBoardElements = board.nodes.length >= BOARD_VISIBLE_RENDER_NODE_THRESHOLD || isNodeDragActive;
-  const shouldRenderMiniMap = board.config.showMiniMap && !isNodeDragActive;
+  const isBoardInteractionActive = isNodeDragActive || isViewportMoveActive;
+  const onlyRenderVisibleBoardElements = board.nodes.length >= BOARD_VISIBLE_RENDER_NODE_THRESHOLD || isBoardInteractionActive;
+  const shouldRenderMiniMap = board.config.showMiniMap && !isBoardInteractionActive;
 
   const visibleCenterPosition = useCallback((size: BoardSize): BoardPoint | undefined => {
     const rect = flowHostRef.current?.getBoundingClientRect();
@@ -2954,7 +2996,7 @@ export default function BoardWorkspace({
           onDragLeave={handleBoardDragLeave}
           onDragOver={handleBoardDragOver}
           onDrop={handleBoardDrop}
-          className={`board-canvas relative min-h-0 bg-[var(--iw-board-canvas-bg)]${isNodeDragActive ? " is-node-dragging" : ""}${isConnectionActive ? " is-connecting" : ""}`}
+          className={`board-canvas relative min-h-0 bg-[var(--iw-board-canvas-bg)]${isNodeDragActive ? " is-node-dragging" : ""}${isViewportMoveActive ? " is-viewport-moving" : ""}${isConnectionActive ? " is-connecting" : ""}`}
         >
           <BoardNodeCallbacksContext.Provider value={boardNodeCallbacks}>
           <ReactFlow
@@ -3001,7 +3043,9 @@ export default function BoardWorkspace({
             onEdgeDoubleClick={handleEdgeDoubleClick}
             onEdgesDelete={handleEdgesDelete}
             onInit={handleFlowInit}
+            onMove={handleMove}
             onMoveEnd={handleMoveEnd}
+            onMoveStart={handleMoveStart}
             onNodeClick={handleNodeClick}
             onNodeContextMenu={handleNodeContextMenu}
             onNodeDrag={handleNodeDrag}
@@ -3061,7 +3105,7 @@ export default function BoardWorkspace({
                 zoomable
               />
             )}
-            {!isNodeDragActive && selectedNodeIds.length > 1 ? (
+            {!isBoardInteractionActive && selectedNodeIds.length > 1 ? (
               <NodeToolbar
                 nodeId={selectedNodeIds}
                 isVisible
