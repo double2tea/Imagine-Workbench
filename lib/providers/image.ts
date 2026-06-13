@@ -3,6 +3,7 @@ import { ApiError } from "../api/errors";
 import { isKnownProvider } from "./registry";
 import {
   buildRunningHubStandardBody,
+  getRunningHubYouchuanCatalog,
   getRunningHubStandardEndpoint,
   getRunningHubStandardModel,
   resolveRunningHubStandardModelForReferenceMedia,
@@ -705,6 +706,7 @@ async function buildRunningHubRequest(
     const referenceMediaUrls = routedModel.supportsReferences
       ? await uploadRunningHubStandardReferences(config, references)
       : undefined;
+    const runningHubYouchuan = await uploadRunningHubYouchuanReferences(config, routedModel.model, input.runningHubYouchuan);
     return {
       endpoint: getRunningHubStandardEndpoint(routedModel),
       statusMode: "standard",
@@ -716,7 +718,7 @@ async function buildRunningHubRequest(
         resolutionName: input.resolutionName,
         durationSeconds: input.durationSeconds,
         referenceImages: input.referenceImages,
-        youchuan: input.runningHubYouchuan,
+        youchuan: runningHubYouchuan,
         ...(referenceMediaUrls ? { referenceMediaUrls } : {}),
       }),
     };
@@ -920,6 +922,32 @@ async function uploadRunningHubStandardReferences(
     if (mediaType === "audio") urls.audioUrls.push(readRunningHubUploadUrl(response));
   }
   return urls;
+}
+
+async function uploadRunningHubYouchuanReferences(
+  config: ProviderConfig,
+  model: string,
+  settings: GenerateImageInput["runningHubYouchuan"],
+): Promise<GenerateImageInput["runningHubYouchuan"]> {
+  if (!settings) return undefined;
+  const catalog = getRunningHubYouchuanCatalog(model);
+  if (!catalog || catalog.referenceParams.length === 0) return settings;
+  const uploaded: GenerateImageInput["runningHubYouchuan"] = { ...settings };
+  for (const param of catalog.referenceParams) {
+    const value = settings[param.field];
+    if (!value) continue;
+    if (value.startsWith("http://") || value.startsWith("https://")) {
+      if (param.field === "sref") uploaded.sref = value;
+      if (param.field === "oref") uploaded.oref = value;
+      continue;
+    }
+    const urls = await uploadRunningHubStandardReferences(config, [{ dataUri: value, type: "image" }]);
+    const url = urls.imageUrls[0];
+    if (!url) throw new Error(`RunningHub Youchuan ${param.field} upload did not return an image URL`);
+    if (param.field === "sref") uploaded.sref = url;
+    if (param.field === "oref") uploaded.oref = url;
+  }
+  return uploaded;
 }
 
 function readRunningHubUploadUrl(response: RunningHubUploadResponse): string {

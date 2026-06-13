@@ -46,6 +46,11 @@ export interface RunningHubYouchuanAdvancedSettings {
   raw: boolean;
   iw: number;
   sw: number;
+  weird?: number;
+  tile?: boolean;
+  sref?: string;
+  oref?: string;
+  ow?: number;
   hd?: boolean;
 }
 

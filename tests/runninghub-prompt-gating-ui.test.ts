@@ -5,7 +5,6 @@ import test, { after } from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ImageModelCapabilities, VideoModelCapabilities } from "../lib/providers/model-catalog";
-import { RUNNINGHUB_YOUCHUAN_ADVANCED_DEFAULTS } from "../lib/providers/runninghub";
 
 const noop = (): void => {};
 
@@ -14,6 +13,8 @@ const imageCapabilities: ImageModelCapabilities = {
   resolutions: [{ value: "auto", label: "Auto" }],
   qualities: [],
   thinkingLevels: [],
+  parameterDescriptors: [],
+  referenceSlots: [],
   maxReferenceImages: 1,
   minReferenceImages: 0,
   referenceMediaTypes: ["image"],
@@ -24,6 +25,8 @@ const videoCapabilities: VideoModelCapabilities = {
   resolutions: [],
   durations: [],
   presets: [],
+  parameterDescriptors: [],
+  referenceSlots: [],
   referenceMode: "reference",
   referenceModes: ["reference"],
   maxReferenceImages: 1,
@@ -48,10 +51,10 @@ test("image generation panel generate button follows promptRequired", async () =
     isSubmitting: false,
     modelGroups: [{ provider: "runninghub", label: "RunningHub", options: [{ value: "runninghub:ai-app-image:1961345119528140802", label: "Control" }] }],
     negativePrompt: "",
+    parameterValues: {},
     prompt: "",
     promptRequired: true,
     referenceImages: [],
-    runningHubYouchuan: RUNNINGHUB_YOUCHUAN_ADVANCED_DEFAULTS,
     selectedAspectRatio: "1:1",
     selectedModel: "runninghub:ai-app-image:1961345119528140802",
     submitCount: 0,
@@ -64,13 +67,13 @@ test("image generation panel generate button follows promptRequired", async () =
     onImageResolutionChange: noop,
     onNegativePromptChange: noop,
     onOptimizePrompt: noop,
+    onParameterValuesChange: noop,
     onPromptChange: noop,
     onPromptDropAsset: noop,
     onReferenceDropAsset: noop,
     onReferenceDropFiles: noop,
     onReferenceRemove: noop,
     onReferenceUpload: noop,
-    onRunningHubYouchuanChange: noop,
     onSelectAspectRatio: noop,
     onSelectModel: noop,
     onThinkingLevelChange: noop,

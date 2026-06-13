@@ -81,6 +81,8 @@ import {
   getImageModelCapabilities,
   getImageResolutionOptions,
   getVideoModelCapabilities,
+  imageParameterValuesFromLegacy,
+  imageParameterValuesToRunningHubYouchuan,
   supportsAsyncImageGeneration,
   tryParseProviderModel,
   type AiProvider,
@@ -893,6 +895,14 @@ export default function Home() {
     featureModels: imageEditFeatureTargets,
     selectFeatureModel: selectImageEditFeatureTarget,
   } = useImageEditFeatureModels();
+  const imageParameterValues = useMemo(
+    () => imageParameterValuesFromLegacy(selectedModel, { runningHubYouchuan }),
+    [selectedModel, runningHubYouchuan],
+  );
+  const handleImageParameterValuesChange = (values: typeof imageParameterValues) => {
+    const nextYouchuan = imageParameterValuesToRunningHubYouchuan(selectedModel, values);
+    if (nextYouchuan) setRunningHubYouchuan(nextYouchuan);
+  };
   const handleSelectImageModel = (model: string) => {
     const capabilities = getImageModelCapabilities(model);
     const nextAspectRatio = capabilities.aspectRatios[0]?.value ?? "1:1";
@@ -916,6 +926,11 @@ export default function Home() {
     ) {
       setImageThinkingLevel(capabilities.thinkingLevels[0].value);
     }
+    const nextYouchuan = imageParameterValuesToRunningHubYouchuan(
+      model,
+      imageParameterValuesFromLegacy(model, { runningHubYouchuan }),
+    );
+    if (nextYouchuan) setRunningHubYouchuan(nextYouchuan);
   };
 
   const handleSelectImageAspectRatio = (value: string) => {
@@ -1728,10 +1743,10 @@ export default function Home() {
         isSubmitting={isSubmittingImage}
         modelGroups={imageModelGroups}
         negativePrompt={negativePrompt}
+        parameterValues={imageParameterValues}
         prompt={prompt}
         promptRequired={imagePromptRequired}
         referenceImages={referenceImages}
-        runningHubYouchuan={runningHubYouchuan}
         selectedAspectRatio={aspectRatio}
         selectedModel={selectedModel}
         submitCount={imageSubmitCount}
@@ -1748,6 +1763,7 @@ export default function Home() {
         onImageResolutionChange={setImageResolution}
         onNegativePromptChange={setNegativePrompt}
         onOptimizePrompt={optimizeActivePrompt}
+        onParameterValuesChange={handleImageParameterValuesChange}
         onPromptChange={value => handleTextareaChange(value, "image-prompt")}
         onPromptDropAsset={event => handlePromptDropAsset(event, "image-prompt")}
         onReferenceDropAsset={asset => handleReferenceDropAsset(asset, "image-prompt")}
@@ -1755,7 +1771,6 @@ export default function Home() {
         onReferenceEdit={launchReferenceMaskEditor}
         onReferenceRemove={removeReferenceImage}
         onReferenceUpload={handleImageUpload}
-        onRunningHubYouchuanChange={setRunningHubYouchuan}
         onSelectAspectRatio={handleSelectImageAspectRatio}
         onSelectModel={handleSelectImageModel}
         onThinkingLevelChange={setImageThinkingLevel}

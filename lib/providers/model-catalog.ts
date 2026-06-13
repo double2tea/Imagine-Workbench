@@ -5,8 +5,22 @@ import {
   RUNNINGHUB_APP_PRESETS,
   RUNNINGHUB_DEFAULT_LLM_MODEL,
   RUNNINGHUB_STANDARD_MODELS,
+  runningHubYouchuanParameterDescriptors,
+  runningHubYouchuanQualityValues,
+  runningHubYouchuanSettingsFromParameterValues,
+  runningHubYouchuanSettingsToParameterValues,
   type RunningHubStandardModel,
 } from "./runninghub";
+import {
+  referenceParameterDescriptors,
+  defaultCapabilityParameterValues,
+  type ModelInputModalityProfile,
+  type ModelParameterDescriptor,
+  type ModelParameterValues,
+  type ModelPricingProfile,
+  type ModelReferenceParameterDescriptor,
+} from "./model-capabilities";
+import type { RunningHubYouchuanAdvancedSettings } from "./types";
 import type { MediaReferenceType } from "@/lib/media-references";
 
 export interface ModelOption {
@@ -24,6 +38,8 @@ export interface ImageModelCapabilities {
   resolutions: ParameterOption[];
   qualities: ParameterOption[];
   thinkingLevels: ParameterOption[];
+  parameterDescriptors: ModelParameterDescriptor[];
+  referenceSlots: ModelReferenceParameterDescriptor[];
   maxReferenceImages: number;
   minReferenceImages: number;
   referenceMediaTypes: MediaReferenceType[];
@@ -34,6 +50,8 @@ export interface VideoModelCapabilities {
   resolutions: ParameterOption[];
   durations: ParameterOption[];
   presets: ParameterOption[];
+  parameterDescriptors: ModelParameterDescriptor[];
+  referenceSlots: ModelReferenceParameterDescriptor[];
   referenceMode: VideoReferenceMode;
   referenceModes: VideoReferenceMode[];
   maxReferenceImages: number;
@@ -47,6 +65,8 @@ export interface AudioModelCapabilities {
   defaultMode: AudioOperationMode;
   formats: ParameterOption[];
   durations: ParameterOption[];
+  parameterDescriptors: ModelParameterDescriptor[];
+  referenceSlots: ModelReferenceParameterDescriptor[];
   maxReferenceMedia: number;
   minReferenceMedia: number;
   referenceMediaTypes: MediaReferenceType[];
@@ -77,6 +97,9 @@ export interface ProviderModelCapability {
   audioDefaultMode?: AudioOperationMode;
   videoReferenceMode: VideoReferenceMode;
   videoReferenceModes: VideoReferenceMode[];
+  inputModalities?: ModelInputModalityProfile;
+  parameterDescriptors: ModelParameterDescriptor[];
+  pricing?: ModelPricingProfile;
   maxReferenceImages: number;
   minReferenceImages: number;
   referenceMediaTypes: MediaReferenceType[];
@@ -310,11 +333,6 @@ const RUNNINGHUB_YOUCHUAN_V81_IMAGE_RATIOS: ParameterOption[] = [
   { value: "3:4", label: "3:4 Portrait" },
   { value: "2:3", label: "2:3 Portrait" },
   { value: "9:16", label: "9:16 Vertical" },
-];
-
-const RUNNINGHUB_YOUCHUAN_V81_QUALITY_OPTIONS: ParameterOption[] = [
-  { value: "1", label: "Quality 1" },
-  { value: "4", label: "Quality 4" },
 ];
 
 const RUNNINGHUB_GEMINI_ULTRA_IMAGE_RESOLUTIONS: ParameterOption[] = [
@@ -1099,6 +1117,8 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
         supportsAsync: false,
         supportsReferences: model.supportsReferences,
         ...profile,
+        inputModalities: runningHubInputModalities(model),
+        parameterDescriptors: [...runningHubYouchuanParameterDescriptors(model.model)],
         maxReferenceImages: model.maxReferenceImages,
         minReferenceImages: model.minReferenceImages,
       });
@@ -1112,6 +1132,7 @@ export const MODEL_CAPABILITIES: ProviderModelCapability[] = [
       model: model.model,
       supportsReferences: model.supportsReferences,
       ...profile,
+      inputModalities: runningHubInputModalities(model),
       videoReferenceMode: model.videoReferenceMode ?? (model.supportsReferences ? "reference" : "none"),
       videoReferenceModes: model.videoReferenceModes ? [...model.videoReferenceModes] : undefined,
       maxReferenceImages: model.maxReferenceImages,
@@ -1244,6 +1265,8 @@ export function getImageModelCapabilities(value: string): ImageModelCapabilities
       resolutions: capability.sizes,
       qualities: capability.qualityLevels,
       thinkingLevels: capability.thinkingLevels,
+      parameterDescriptors: capability.parameterDescriptors,
+      referenceSlots: referenceParameterDescriptors(capability.parameterDescriptors),
       maxReferenceImages: capability.maxReferenceImages,
       minReferenceImages: capability.minReferenceImages,
       referenceMediaTypes: capability.referenceMediaTypes,
@@ -1254,10 +1277,34 @@ export function getImageModelCapabilities(value: string): ImageModelCapabilities
     resolutions: GPT_IMAGE_SIZES,
     qualities: GPT_QUALITY_OPTIONS,
     thinkingLevels: [],
+    parameterDescriptors: [],
+    referenceSlots: [],
     maxReferenceImages: 0,
     minReferenceImages: 0,
     referenceMediaTypes: [],
   };
+}
+
+export function imageParameterValuesFromLegacy(
+  model: string,
+  legacy: { runningHubYouchuan?: RunningHubYouchuanAdvancedSettings },
+): ModelParameterValues {
+  const descriptors = getImageModelCapabilities(model).parameterDescriptors;
+  if (descriptors.length === 0) return {};
+  const parsed = tryParseProviderModel(model, "12ai");
+  if (parsed?.provider === "runninghub") {
+    return runningHubYouchuanSettingsToParameterValues(parsed.model, legacy.runningHubYouchuan);
+  }
+  return defaultCapabilityParameterValues(descriptors);
+}
+
+export function imageParameterValuesToRunningHubYouchuan(
+  model: string,
+  values: ModelParameterValues,
+): RunningHubYouchuanAdvancedSettings | undefined {
+  const parsed = tryParseProviderModel(model, "12ai");
+  if (parsed?.provider !== "runninghub") return undefined;
+  return runningHubYouchuanSettingsFromParameterValues(parsed.model, values);
 }
 
 export function getImageResolutionOptions(value: string, aspectRatio: string): ParameterOption[] {
@@ -1287,6 +1334,8 @@ export function getVideoModelCapabilities(value: string): VideoModelCapabilities
     resolutions: capability?.resolutions ?? [],
     durations: capability?.durations ?? [],
     presets: capability?.presets ?? [],
+    parameterDescriptors: capability?.parameterDescriptors ?? [],
+    referenceSlots: referenceParameterDescriptors(capability?.parameterDescriptors ?? []),
     referenceMode: capability?.videoReferenceMode ?? "none",
     referenceModes: capability?.videoReferenceModes ?? [],
     maxReferenceImages: capability?.maxReferenceImages ?? 0,
@@ -1304,6 +1353,8 @@ export function getAudioModelCapabilities(value: string): AudioModelCapabilities
     defaultMode: capability?.audioDefaultMode ?? modes[0] ?? "tts",
     formats: capability?.presets ?? [],
     durations: capability?.durations ?? [],
+    parameterDescriptors: capability?.parameterDescriptors ?? [],
+    referenceSlots: referenceParameterDescriptors(capability?.parameterDescriptors ?? []),
     maxReferenceMedia: capability?.maxReferenceImages ?? 0,
     minReferenceMedia: capability?.minReferenceImages ?? 0,
     referenceMediaTypes: capability?.referenceMediaTypes ?? [],
@@ -1357,6 +1408,9 @@ interface CapabilityInput {
   label: string;
   provider: AiProvider;
   model: string;
+  inputModalities?: ModelInputModalityProfile;
+  parameterDescriptors?: ModelParameterDescriptor[];
+  pricing?: ModelPricingProfile;
 }
 
 interface ImageCapabilityInput extends CapabilityInput {
@@ -1416,6 +1470,9 @@ function imageCapability(input: ImageCapabilityInput): ProviderModelCapability {
     audioOutputKinds: [],
     videoReferenceMode: "none",
     videoReferenceModes: [],
+    inputModalities: input.inputModalities,
+    parameterDescriptors: input.parameterDescriptors ?? [],
+    pricing: input.pricing,
     maxReferenceImages: input.supportsReferences ? input.maxReferenceImages ?? 4 : 0,
     minReferenceImages: input.minReferenceImages ?? 0,
     referenceMediaTypes: input.supportsReferences ? input.referenceMediaTypes ?? ["image"] : [],
@@ -1442,6 +1499,9 @@ function videoCapability(input: VideoCapabilityInput): ProviderModelCapability {
     audioOutputKinds: [],
     videoReferenceMode: input.videoReferenceMode,
     videoReferenceModes: input.videoReferenceModes ?? (input.videoReferenceMode === "none" ? [] : [input.videoReferenceMode]),
+    inputModalities: input.inputModalities,
+    parameterDescriptors: input.parameterDescriptors ?? [],
+    pricing: input.pricing,
     maxReferenceImages: input.maxReferenceImages,
     minReferenceImages: input.minReferenceImages,
     referenceMediaTypes: input.supportsReferences ? input.referenceMediaTypes ?? ["image"] : [],
@@ -1470,6 +1530,9 @@ function audioCapability(input: AudioCapabilityInput): ProviderModelCapability {
     audioDefaultMode: input.audioDefaultMode ?? audioModes[0],
     videoReferenceMode: "none",
     videoReferenceModes: [],
+    inputModalities: input.inputModalities,
+    parameterDescriptors: input.parameterDescriptors ?? [],
+    pricing: input.pricing,
     maxReferenceImages: input.maxReferenceMedia,
     minReferenceImages: input.minReferenceMedia,
     referenceMediaTypes: input.supportsReferences ? input.referenceMediaTypes ?? ["audio"] : [],
@@ -1496,6 +1559,9 @@ function chatCapability(input: CapabilityInput): ProviderModelCapability {
     audioOutputKinds: [],
     videoReferenceMode: "none",
     videoReferenceModes: [],
+    inputModalities: input.inputModalities,
+    parameterDescriptors: input.parameterDescriptors ?? [],
+    pricing: input.pricing,
     maxReferenceImages: 0,
     minReferenceImages: 0,
     referenceMediaTypes: [],
@@ -1583,7 +1649,7 @@ function runningHubImageParameterProfile(
   if (lower.includes("youchuan/text-to-image-v")) {
     return {
       aspectRatios: RUNNINGHUB_YOUCHUAN_V81_IMAGE_RATIOS,
-      qualityLevels: RUNNINGHUB_YOUCHUAN_V81_QUALITY_OPTIONS,
+      qualityLevels: youchuanQualityOptions(model.model),
       sizes: AUTO_IMAGE_SIZES,
     };
   }
@@ -1599,6 +1665,10 @@ function runningHubImageParameterProfile(
     return { aspectRatios: GROK_IMAGE_RATIOS, sizes: GROK_IMAGE_SIZES };
   }
   return { aspectRatios: AUTO_ASPECT_RATIO, sizes: AUTO_IMAGE_SIZES };
+}
+
+function youchuanQualityOptions(model: string): ParameterOption[] {
+  return runningHubYouchuanQualityValues(model).map(value => ({ value, label: `Quality ${value}` }));
 }
 
 function runningHubVideoParameterProfile(
@@ -1647,6 +1717,36 @@ function optionList(values: readonly string[] | undefined): ParameterOption[] | 
     value,
     label: /^\d+$/.test(value) ? `${value}s` : value === "4k" ? "4K" : value,
   }));
+}
+
+function runningHubInputModalities(model: RunningHubStandardModel): ModelInputModalityProfile {
+  if (!model.supportsReferences) return { text: { required: true } };
+  if (model.kind === "image") {
+    return {
+      text: { required: true },
+      images: {
+        minCount: model.minReferenceImages,
+        maxCount: model.maxReferenceImages,
+        roles: ["content", "style", "object"],
+        delivery: "uploadedUrl",
+      },
+    };
+  }
+  return {
+    text: { required: true },
+    images: {
+      minCount: model.minReferenceImages,
+      maxCount: model.maxReferenceImages,
+      roles: model.videoReferenceMode === "firstLast" ? ["firstFrame", "lastFrame"] : ["reference"],
+      delivery: "uploadedUrl",
+    },
+    videos: model.referenceMediaTypes?.includes("video")
+      ? { minCount: 0, maxCount: model.maxReferenceImages, roles: ["reference"], delivery: "uploadedUrl" }
+      : undefined,
+    audio: model.referenceMediaTypes?.includes("audio")
+      ? { minCount: 0, maxCount: model.maxReferenceImages, roles: ["audioGuide"], delivery: "uploadedUrl" }
+      : undefined,
+  };
 }
 
 function aspectRatiosFromSizes(sizes: ParameterOption[]): ParameterOption[] {
@@ -1700,6 +1800,12 @@ function runningHubVirtualCapability(model: string, kind?: ModelKind): ProviderM
       provider: "runninghub",
       model,
       supportsReferences: true,
+      inputModalities: {
+        text: { required: true },
+        images: { minCount: 0, maxCount: 9, roles: ["reference"], delivery: "uploadedUrl" },
+        videos: { minCount: 0, maxCount: 9, roles: ["reference"], delivery: "uploadedUrl" },
+        audio: { minCount: 0, maxCount: 9, roles: ["audioGuide"], delivery: "uploadedUrl" },
+      },
       sizes: RUNNINGHUB_VIDEO_SIZES,
       videoReferenceMode: "reference",
       maxReferenceImages: 9,
@@ -1715,6 +1821,11 @@ function runningHubVirtualCapability(model: string, kind?: ModelKind): ProviderM
       model,
       supportsAsync: false,
       supportsReferences: true,
+      inputModalities: {
+        text: { required: true },
+        images: { minCount: 0, maxCount: 9, roles: ["content", "style", "object"], delivery: "uploadedUrl" },
+      },
+      parameterDescriptors: [...runningHubYouchuanParameterDescriptors(model)],
       maxReferenceImages: 9,
       sizes: RUNNINGHUB_IMAGE_SIZES,
     });

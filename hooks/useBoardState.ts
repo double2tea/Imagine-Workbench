@@ -608,11 +608,28 @@ function readRunningHubYouchuanAdvancedSettings(value: unknown): RunningHubYouch
   const raw = typeof value.raw === "boolean" ? value.raw : undefined;
   const iw = readNumberInRange(value.iw, 0, 3);
   const sw = readNumberInRange(value.sw, 0, 1000);
+  const weird = readNumberInRange(value.weird, 0, 3000);
+  const tile = typeof value.tile === "boolean" ? value.tile : undefined;
+  const sref = readOptionalString(value.sref);
+  const oref = readOptionalString(value.oref);
+  const ow = readNumberInRange(value.ow, 1, 1000);
   const hd = typeof value.hd === "boolean" ? value.hd : undefined;
   if (chaos === undefined || stylize === undefined || raw === undefined || iw === undefined || sw === undefined) {
     return undefined;
   }
-  return { chaos, stylize, raw, iw, sw, ...(hd === undefined ? {} : { hd }) };
+  return {
+    chaos,
+    stylize,
+    raw,
+    iw,
+    sw,
+    ...(weird === undefined ? {} : { weird }),
+    ...(tile === undefined ? {} : { tile }),
+    ...(sref === undefined ? {} : { sref }),
+    ...(oref === undefined ? {} : { oref }),
+    ...(ow === undefined ? {} : { ow }),
+    ...(hd === undefined ? {} : { hd }),
+  };
 }
 
 function readNumberInRange(value: unknown, min: number, max: number): number | undefined {
@@ -1463,6 +1480,11 @@ function sameRunningHubYouchuan(
     left.raw === right.raw &&
     left.iw === right.iw &&
     left.sw === right.sw &&
+    (left.weird ?? 0) === (right.weird ?? 0) &&
+    (left.tile ?? false) === (right.tile ?? false) &&
+    (left.sref ?? "") === (right.sref ?? "") &&
+    (left.oref ?? "") === (right.oref ?? "") &&
+    (left.ow ?? 100) === (right.ow ?? 100) &&
     (left.hd ?? false) === (right.hd ?? false);
 }
 

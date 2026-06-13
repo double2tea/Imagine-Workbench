@@ -1,5 +1,6 @@
 "use client";
 import VoiceProfilePreviewPlayer from "@/components/audio/VoiceProfilePreviewPlayer";
+import CapabilityParameterControls from "@/components/creation/CapabilityParameterControls";
 import ModelPriceBadge from "@/components/creation/ModelPriceBadge";
 import type { BoardGenerateInputSummary } from "@/components/board/GenerateBoardNode";
 
@@ -33,14 +34,9 @@ import {
   getImageResolutionOptions,
   getModelCapability,
   getVideoModelCapabilities,
+  imageParameterValuesFromLegacy,
+  imageParameterValuesToRunningHubYouchuan,
 } from "@/lib/providers/model-catalog";
-import {
-  RUNNINGHUB_YOUCHUAN_ADVANCED_DEFAULTS,
-  RUNNINGHUB_YOUCHUAN_ADVANCED_LIMITS,
-  isRunningHubYouchuanImageModel,
-  runningHubYouchuanSupportsHd,
-} from "@/lib/providers/runninghub";
-import type { RunningHubYouchuanAdvancedSettings } from "@/lib/providers/types";
 import { includeCurrentModelOption, type BoardModelOptionGroup } from "@/lib/board/model-options";
 import type { MediaReferenceType } from "@/lib/media-references";
 import { getBoardNodePortDefinition } from "@/lib/board/ports";
@@ -230,9 +226,10 @@ function imageModelPatch(model: string, current: BoardImageGenerateNode): BoardG
       ? current.imageResolution
       : firstOption(resolutionSource, "1K"),
     model,
-    runningHubYouchuan: isRunningHubYouchuanImageModel(model)
-      ? current.runningHubYouchuan ?? RUNNINGHUB_YOUCHUAN_ADVANCED_DEFAULTS
-      : undefined,
+    runningHubYouchuan: imageParameterValuesToRunningHubYouchuan(
+      model,
+      imageParameterValuesFromLegacy(model, { runningHubYouchuan: current.runningHubYouchuan }),
+    ),
     thinkingLevel: capabilities.thinkingLevels.some(option => option.value === current.thinkingLevel)
       ? current.thinkingLevel
       : capabilities.thinkingLevels[0]?.value,
@@ -500,11 +497,7 @@ function ImageGenerateInspector({
   const requiredReferenceTypes = getInputReferenceTypes(inputSummary);
   const selectableImageModelGroups = filterModelGroupsForReferenceTypes(imageModelGroups, "image", requiredReferenceTypes);
   const isProcessing = node.status === "processing";
-  const runningHubYouchuan = node.runningHubYouchuan ?? RUNNINGHUB_YOUCHUAN_ADVANCED_DEFAULTS;
-  const showYouchuanHd = runningHubYouchuanSupportsHd(node.model);
-  const patchYouchuan = (patch: Partial<RunningHubYouchuanAdvancedSettings>): void => {
-    onUpdateGenerate(node.id, { runningHubYouchuan: { ...runningHubYouchuan, ...patch } });
-  };
+  const parameterValues = imageParameterValuesFromLegacy(node.model, { runningHubYouchuan: node.runningHubYouchuan });
 
   const advancedFields = (
     <div className="imagine-panel-disclosure-body">
@@ -585,61 +578,15 @@ function ImageGenerateInspector({
           )}
         </div>
       )}
-      {isRunningHubYouchuanImageModel(node.model) && (
-        <div className="imagine-youchuan-panel imagine-youchuan-panel--compact">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="imagine-youchuan-slider-label">悠船高级</span>
-            <div className="flex items-center gap-2">
-              <label className="imagine-youchuan-toggle imagine-youchuan-toggle--compact">
-                <input
-                  type="checkbox"
-                  checked={runningHubYouchuan.raw}
-                  onChange={event => patchYouchuan({ raw: event.target.checked })}
-                  className="imagine-youchuan-checkbox"
-                />
-                Raw
-              </label>
-              {showYouchuanHd && (
-                <label className="imagine-youchuan-toggle imagine-youchuan-toggle--compact">
-                  <input
-                    type="checkbox"
-                    checked={runningHubYouchuan.hd === true}
-                    onChange={event => patchYouchuan({ hd: event.target.checked })}
-                    className="imagine-youchuan-checkbox"
-                  />
-                  2K
-                </label>
-              )}
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <BoardYouchuanSlider
-              label="Chaos"
-              value={runningHubYouchuan.chaos}
-              {...RUNNINGHUB_YOUCHUAN_ADVANCED_LIMITS.chaos}
-              onChange={chaos => patchYouchuan({ chaos })}
-            />
-            <BoardYouchuanSlider
-              label="Stylize"
-              value={runningHubYouchuan.stylize}
-              {...RUNNINGHUB_YOUCHUAN_ADVANCED_LIMITS.stylize}
-              onChange={stylize => patchYouchuan({ stylize })}
-            />
-            <BoardYouchuanSlider
-              label="IW"
-              value={runningHubYouchuan.iw}
-              {...RUNNINGHUB_YOUCHUAN_ADVANCED_LIMITS.iw}
-              onChange={iw => patchYouchuan({ iw })}
-            />
-            <BoardYouchuanSlider
-              label="SW"
-              value={runningHubYouchuan.sw}
-              {...RUNNINGHUB_YOUCHUAN_ADVANCED_LIMITS.sw}
-              onChange={sw => patchYouchuan({ sw })}
-            />
-          </div>
-        </div>
-      )}
+      <CapabilityParameterControls
+        compact
+        descriptors={capabilities.parameterDescriptors}
+        value={parameterValues}
+        onChange={nextValues => {
+          const nextYouchuan = imageParameterValuesToRunningHubYouchuan(node.model, nextValues);
+          if (nextYouchuan) onUpdateGenerate(node.id, { runningHubYouchuan: nextYouchuan });
+        }}
+      />
       <InspectorField title="变体">
         <VariantCountSelect value={node.variantCount} onChange={variantCount => onUpdateGenerate(node.id, { variantCount })} />
       </InspectorField>
@@ -672,53 +619,6 @@ function ImageGenerateInspector({
         )}
       </button>
     </div>
-  );
-}
-
-function BoardYouchuanSlider({
-  label,
-  max,
-  min,
-  onChange,
-  step,
-  value,
-}: {
-  label: string;
-  max: number;
-  min: number;
-  onChange: (value: number) => void;
-  step: number;
-  value: number;
-}) {
-  const handleChange = (nextValue: string): void => {
-    const parsed = Number(nextValue);
-    if (Number.isFinite(parsed)) onChange(parsed);
-  };
-
-  return (
-    <label className="imagine-youchuan-slider imagine-youchuan-slider--compact">
-      <span className="flex items-center justify-between gap-1">
-        <span className="imagine-youchuan-slider-label">{label}</span>
-        <input
-          type="number"
-          min={min}
-          max={max}
-          step={step}
-          value={value}
-          onChange={event => handleChange(event.target.value)}
-          className="imagine-youchuan-number imagine-youchuan-number--compact"
-        />
-      </span>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={event => handleChange(event.target.value)}
-        className="imagine-youchuan-range"
-      />
-    </label>
   );
 }
 

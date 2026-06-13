@@ -27,11 +27,10 @@ import {
   type GenerationTaskUpdate,
 } from "@/lib/generation-tasks";
 import type { RunningHubTaskNodeBinding, RunningHubYouchuanAdvancedSettings } from "@/lib/providers/types";
-import { isRunningHubYouchuanImageModel, runningHubYouchuanSupportsHd } from "@/lib/providers/runninghub";
 import { buildPromptWithReferenceMap } from "@/hooks/useReferenceState";
 import { audioOperationMissingReferenceMessage, audioOperationRequiresTextInput, readOptionalAudioFormat } from "@/lib/audio-operation-rules";
 import { getMediaReferenceType, mediaReferenceLabel } from "@/lib/media-references";
-import { getAudioModelCapabilities, getImageModelCapabilities, getVideoModelCapabilities, parseProviderModel, type AudioOperationMode, type VideoReferenceMode } from "@/lib/providers/model-catalog";
+import { getAudioModelCapabilities, getImageModelCapabilities, getVideoModelCapabilities, imageParameterValuesFromLegacy, imageParameterValuesToRunningHubYouchuan, parseProviderModel, type AudioOperationMode, type VideoReferenceMode } from "@/lib/providers/model-catalog";
 import { getProviderMeta } from "@/lib/providers/registry";
 import { runningHubAppPresetRequiresPrompt } from "@/lib/providers/runninghub";
 import { getReferenceImagePayloadError, getReferenceMediaPayloadError, prepareReferenceImageUrlForRequest, prepareReferenceMediaUrlForRequest } from "@/lib/reference-images";
@@ -110,10 +109,11 @@ function makeClientId(prefix: string): string {
 function runningHubYouchuanSettingsForModel(
   model: string,
   settings: RunningHubYouchuanAdvancedSettings,
-): RunningHubYouchuanAdvancedSettings {
-  if (runningHubYouchuanSupportsHd(model)) return settings;
-  const { hd: _hd, ...settingsWithoutHd } = settings;
-  return settingsWithoutHd;
+): RunningHubYouchuanAdvancedSettings | undefined {
+  return imageParameterValuesToRunningHubYouchuan(
+    model,
+    imageParameterValuesFromLegacy(model, { runningHubYouchuan: settings }),
+  );
 }
 
 function getStringField(value: unknown, field: string): string | null {
@@ -403,9 +403,10 @@ export function useGenerationActions({
     const requestImageQuality = overrides.imageQuality ?? activeImageQuality;
     const requestIsCustomImageResolution = overrides.isCustomImageResolution ?? isCustomImageResolution;
     const requestThinkingLevel = overrides.thinkingLevel ?? imageThinkingLevel;
-    const requestRunningHubYouchuan = isRunningHubYouchuanImageModel(requestModel)
-      ? runningHubYouchuanSettingsForModel(requestModel, overrides.runningHubYouchuan ?? runningHubYouchuan)
-      : undefined;
+    const requestRunningHubYouchuan = runningHubYouchuanSettingsForModel(
+      requestModel,
+      overrides.runningHubYouchuan ?? runningHubYouchuan,
+    );
     const requestImageCapabilities = getImageModelCapabilities(requestModel);
     const requestAspectRatio =
       requestIsCustomImageResolution

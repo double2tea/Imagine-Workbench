@@ -1528,6 +1528,11 @@ function readOptionalRunningHubYouchuanAdvancedSettings(
     raw: readBoolean(value, "raw"),
     iw: readNumberInRange(value, "iw", 0, 3),
     sw: readNumberInRange(value, "sw", 0, 1000),
+    ...readOptionalNumberInRange(value, "weird", 0, 3000),
+    ...readOptionalBooleanField(value, "tile"),
+    ...readOptionalStringField(value, "sref"),
+    ...readOptionalStringField(value, "oref"),
+    ...readOptionalNumberInRange(value, "ow", 1, 1000),
     ...readOptionalHd(value),
   };
 }
@@ -1538,6 +1543,29 @@ function readNumberInRange(record: Record<string, unknown>, field: string, min: 
     throw new Error(`${field} 必须是 ${min}-${max} 之间的数字`);
   }
   return value;
+}
+
+function readOptionalNumberInRange(record: Record<string, unknown>, field: keyof RunningHubYouchuanAdvancedSettings, min: number, max: number): Partial<RunningHubYouchuanAdvancedSettings> {
+  const value = record[field];
+  if (value === undefined) return {};
+  if (typeof value !== "number" || !Number.isFinite(value) || value < min || value > max) {
+    throw new Error(`${field} 必须是 ${min}-${max} 之间的数字`);
+  }
+  return { [field]: value };
+}
+
+function readOptionalBooleanField(record: Record<string, unknown>, field: keyof RunningHubYouchuanAdvancedSettings): Partial<RunningHubYouchuanAdvancedSettings> {
+  const value = record[field];
+  if (value === undefined) return {};
+  if (typeof value !== "boolean") throw new Error(`${field} 必须是布尔值`);
+  return { [field]: value };
+}
+
+function readOptionalStringField(record: Record<string, unknown>, field: "sref" | "oref"): Partial<Pick<RunningHubYouchuanAdvancedSettings, "sref" | "oref">> {
+  const value = record[field];
+  if (value === undefined) return {};
+  if (typeof value !== "string") throw new Error(`${field} 必须是字符串`);
+  return { [field]: value };
 }
 
 function readOptionalHd(record: Record<string, unknown>): Partial<Pick<RunningHubYouchuanAdvancedSettings, "hd">> {

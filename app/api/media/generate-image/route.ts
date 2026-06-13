@@ -9,6 +9,7 @@ import {
   runningHubResolvedNodeInfoAllowsEmptyPrompt,
 } from "@/lib/providers/runninghub-node-info";
 import { dataUriToBlob, optionalText, resolveProviderConfig } from "@/lib/providers/utils";
+import { getRunningHubYouchuanCatalog } from "@/lib/providers/runninghub";
 import type { RunningHubYouchuanAdvancedSettings } from "@/lib/providers/types";
 import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, getReferenceImagePayloadError } from "@/lib/reference-images";
 
@@ -44,9 +45,10 @@ export async function POST(req: NextRequest) {
     const imageResolution = resolveImageResolution(modelValue, aspectRatio, requestImageResolution);
     const imageQuality = resolveImageQuality(modelValue, optionalText(body.imageQuality));
     const referenceImages = readReferenceImages(body.referenceImages, body.referenceImage);
+    const runningHubYouchuan = readRunningHubYouchuanAdvancedSettings(body.runningHubYouchuan, parsed.model);
     const explicitRunningHubNodeInfoList = readRunningHubNodeInfoList(body.runningHubNodeInfoList);
     const runningHubNodeInfo = resolveRunningHubNodeInfoListForModel(parsed.model, explicitRunningHubNodeInfoList);
-    const payloadError = getReferenceImagePayloadError(referenceImages);
+    const payloadError = getReferenceImagePayloadError([...referenceImages, ...runningHubYouchuanReferenceImages(runningHubYouchuan)]);
     if (payloadError) return NextResponse.json({ error: payloadError }, { status: 413 });
     validateReferenceCount(modelValue, referenceImages.length);
 
@@ -62,7 +64,7 @@ export async function POST(req: NextRequest) {
       async: parsed.async,
       runningHubAccessPassword: optionalText(body.runningHubAccessPassword),
       runningHubNodeInfoList: runningHubNodeInfo.nodeInfoList,
-      runningHubYouchuan: readRunningHubYouchuanAdvancedSettings(body.runningHubYouchuan),
+      runningHubYouchuan,
     });
 
     const imageUrls = result.imageUrls ?? (result.imageUrl ? [result.imageUrl] : []);
@@ -95,17 +97,51 @@ export async function POST(req: NextRequest) {
   }
 }
 
-function readRunningHubYouchuanAdvancedSettings(value: unknown): RunningHubYouchuanAdvancedSettings | undefined {
+function readRunningHubYouchuanAdvancedSettings(value: unknown, model: string): RunningHubYouchuanAdvancedSettings | undefined {
   if (value === undefined) return undefined;
   if (!isRecord(value)) throw new ImageRequestValidationError("runningHubYouchuan must be an object");
-  return {
-    chaos: readNumberInRange(value, "chaos", 0, 100),
-    stylize: readNumberInRange(value, "stylize", 0, 1000),
-    raw: readBooleanField(value, "raw"),
-    iw: readNumberInRange(value, "iw", 0, 3),
-    sw: readNumberInRange(value, "sw", 0, 1000),
-    ...readOptionalBooleanField(value, "hd"),
-  };
+  const catalog = getRunningHubYouchuanCatalog(model);
+  if (!catalog) throw new ImageRequestValidationError("runningHubYouchuan is only supported for Youchuan image models");
+  const allowedFields = new Set<keyof RunningHubYouchuanAdvancedSettings>([
+    ...catalog.numericParams.map(param => param.field),
+    ...catalog.booleanParams.map(param => param.field),
+    ...catalog.referenceParams.map(param => param.field),
+  ]);
+  for (const field of Object.keys(value)) {
+    if (!allowedFields.has(field as keyof RunningHubYouchuanAdvancedSettings)) {
+      throw new ImageRequestValidationError(`runningHubYouchuan.${field} is not supported for this Youchuan model`);
+    }
+  }
+  const settings: Partial<RunningHubYouchuanAdvancedSettings> = {};
+  for (const param of catalog.numericParams) {
+    Object.assign(settings, {
+      [param.field]:
+        value[param.field] === undefined
+          ? param.defaultValue
+          : readNumberInRange(value, param.field, param.min, param.max),
+    });
+  }
+  for (const param of catalog.booleanParams) {
+    Object.assign(settings, {
+      [param.field]:
+        value[param.field] === undefined
+          ? param.defaultValue
+          : readBooleanField(value, param.field),
+    });
+  }
+  for (const param of catalog.referenceParams) {
+    Object.assign(settings, readOptionalImageReferenceField(value, param.field));
+  }
+  if (
+    typeof settings.chaos !== "number" ||
+    typeof settings.stylize !== "number" ||
+    typeof settings.raw !== "boolean" ||
+    typeof settings.iw !== "number" ||
+    typeof settings.sw !== "number"
+  ) {
+    throw new ImageRequestValidationError("runningHubYouchuan is missing required Youchuan parameters");
+  }
+  return settings as RunningHubYouchuanAdvancedSettings;
 }
 
 function readNumberInRange(record: Record<string, unknown>, field: keyof RunningHubYouchuanAdvancedSettings, min: number, max: number): number {
@@ -124,16 +160,23 @@ function readBooleanField(record: Record<string, unknown>, field: keyof RunningH
   return value;
 }
 
-function readOptionalBooleanField(
+function readOptionalImageReferenceField(
   record: Record<string, unknown>,
-  field: keyof RunningHubYouchuanAdvancedSettings,
-): Partial<Pick<RunningHubYouchuanAdvancedSettings, "hd">> {
+  field: "sref" | "oref",
+): Partial<Pick<RunningHubYouchuanAdvancedSettings, "sref" | "oref">> {
   const value = record[field];
   if (value === undefined) return {};
-  if (typeof value !== "boolean") {
-    throw new ImageRequestValidationError(`runningHubYouchuan.${field} must be a boolean`);
+  if (typeof value !== "string" || value.length === 0) {
+    throw new ImageRequestValidationError(`runningHubYouchuan.${field} must be an image URL or data URI`);
   }
-  return { hd: value };
+  if (!value.startsWith("data:image/") && !value.startsWith("http://") && !value.startsWith("https://")) {
+    throw new ImageRequestValidationError(`runningHubYouchuan.${field} must be an image URL or data URI`);
+  }
+  return { [field]: value };
+}
+
+function runningHubYouchuanReferenceImages(settings: RunningHubYouchuanAdvancedSettings | undefined): string[] {
+  return [settings?.sref, settings?.oref].filter((value): value is string => typeof value === "string" && value.length > 0);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

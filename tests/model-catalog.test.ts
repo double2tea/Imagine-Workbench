@@ -13,11 +13,17 @@ import {
   getModelCapabilities,
   getModelCapability,
   getVideoModelCapabilities,
+  imageParameterValuesFromLegacy,
+  imageParameterValuesToRunningHubYouchuan,
   isMimoWorkbenchTtsModel,
   parseProviderModel,
   supportsAsyncImageGeneration,
   tryParseProviderModel,
 } from "../lib/providers/model-catalog";
+import {
+  defaultCapabilityParameterValues,
+  validateCapabilityParameterValues,
+} from "../lib/providers/model-capabilities";
 import { getGenerationReferenceMedia } from "../lib/db";
 import {
   BOARD_PORT_IDS,
@@ -641,10 +647,79 @@ test("runninghub exposes concrete standard model capabilities", () => {
   assert.ok(youchuanV7);
   assert.equal(youchuanV7.supportsReferences, true);
   assert.equal(youchuanV7.maxReferenceImages, 1);
-  assert.deepEqual(youchuanV7.qualityLevels.map(option => option.value), ["1", "4"]);
+  assert.deepEqual(youchuanV7.qualityLevels.map(option => option.value), ["1", "2", "4"]);
   assert.throws(
     () => getModelCapability("runninghub:ai-app-audio:2061323800511344642", "audio"),
     /RunningHub audio is supported through AI App \/ Workflow targets/,
+  );
+});
+
+test("runninghub youchuan descriptors expose version-specific fields", () => {
+  const v7 = getImageModelCapabilities("runninghub:api:/openapi/v2/youchuan/text-to-image-v7");
+  const v81 = getImageModelCapabilities("runninghub:api:/openapi/v2/youchuan/text-to-image-v81");
+  const v7Keys = v7.parameterDescriptors.map(descriptor => descriptor.key);
+  const v81Keys = v81.parameterDescriptors.map(descriptor => descriptor.key);
+
+  assert.ok(v7Keys.includes("runninghub.youchuan.weird"));
+  assert.ok(v7Keys.includes("runninghub.youchuan.tile"));
+  assert.ok(v7Keys.includes("runninghub.youchuan.oref"));
+  assert.ok(v7Keys.includes("runninghub.youchuan.ow"));
+  assert.equal(v7Keys.includes("runninghub.youchuan.hd"), false);
+  assert.ok(v81Keys.includes("runninghub.youchuan.hd"));
+  assert.ok(v81Keys.includes("runninghub.youchuan.sref"));
+  assert.equal(v81Keys.includes("runninghub.youchuan.weird"), false);
+  assert.equal(v81Keys.includes("runninghub.youchuan.tile"), false);
+  assert.equal(v81Keys.includes("runninghub.youchuan.oref"), false);
+
+  assert.deepEqual(defaultCapabilityParameterValues(v7.parameterDescriptors), {
+    "runninghub.youchuan.chaos": 0,
+    "runninghub.youchuan.stylize": 0,
+    "runninghub.youchuan.iw": 1,
+    "runninghub.youchuan.sw": 100,
+    "runninghub.youchuan.weird": 0,
+    "runninghub.youchuan.ow": 100,
+    "runninghub.youchuan.raw": false,
+    "runninghub.youchuan.tile": false,
+  });
+  assert.throws(
+    () => validateCapabilityParameterValues(v81.parameterDescriptors, { "runninghub.youchuan.weird": 1 }),
+    /not supported/,
+  );
+});
+
+test("runninghub youchuan descriptor values bridge legacy settings", () => {
+  const values = imageParameterValuesFromLegacy("runninghub:api:/openapi/v2/youchuan/text-to-image-v7", {
+    runningHubYouchuan: {
+      chaos: 12,
+      stylize: 80,
+      raw: true,
+      iw: 1.2,
+      sw: 160,
+      sref: "data:image/png;base64,c3R5bGU=",
+      oref: "data:image/png;base64,b2JqZWN0",
+    },
+  });
+
+  assert.deepEqual(values["runninghub.youchuan.sref"], [
+    { url: "data:image/png;base64,c3R5bGU=", type: "image", role: "style" },
+  ]);
+  assert.deepEqual(values["runninghub.youchuan.oref"], [
+    { url: "data:image/png;base64,b2JqZWN0", type: "image", role: "object" },
+  ]);
+  assert.deepEqual(
+    imageParameterValuesToRunningHubYouchuan("runninghub:api:/openapi/v2/youchuan/text-to-image-v7", values),
+    {
+      chaos: 12,
+      stylize: 80,
+      raw: true,
+      iw: 1.2,
+      sw: 160,
+      weird: 0,
+      ow: 100,
+      tile: false,
+      sref: "data:image/png;base64,c3R5bGU=",
+      oref: "data:image/png;base64,b2JqZWN0",
+    },
   );
 });
 

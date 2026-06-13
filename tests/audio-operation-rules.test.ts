@@ -29,6 +29,8 @@ test("audio operation rules separate text and transcript output contracts", () =
     minReferenceMedia: 1,
     modes: ["asr"],
     outputKinds: ["transcript"],
+    parameterDescriptors: [],
+    referenceSlots: [],
     referenceMediaTypes: ["audio"],
   };
 
