@@ -710,7 +710,7 @@ test("runninghub advertised first-last modes route to first-last request shapes"
   assert.ok(omniFlash);
 
   assert.deepEqual(veoOfficial.videoReferenceModes, ["reference", "firstLast"]);
-  assert.deepEqual(omniFlash.videoReferenceModes, undefined);
+  assert.deepEqual(omniFlash.videoReferenceModes, ["reference"]);
 
   assert.equal(resolveRunningHubStandardModelForReferenceMedia(seedance, [{ type: "image" }, { type: "image" }], "firstLast").model, "api:/openapi/v2/bytedance/seedance-2.0-global-fast/image-to-video");
   assert.equal(resolveRunningHubStandardModelForReferenceMedia(veoLite, [{ type: "image" }, { type: "image" }], "firstLast").model, "api:/openapi/v2/rhart-video-v3.1-lite-official/start-end-to-video");

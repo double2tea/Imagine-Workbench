@@ -1,0 +1,25 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "allowJs": false,
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "noEmit": false,
+    "outDir": "../.tmp/model-catalog-generator",
+    "rootDir": "..",
+    "types": ["node"]
+  },
+  "include": [
+    "./generate-model-capabilities.ts",
+    "../lib/media-references.ts",
+    "../lib/providers/catalog/runninghub-standard-generator.ts",
+    "../lib/providers/catalog/runninghub-standard-option-profiles.ts",
+    "../lib/providers/catalog/runninghub-standard-pricing.ts",
+    "../lib/providers/catalog/runninghub-standard-source.ts",
+    "../lib/providers/model-capabilities.ts",
+    "../lib/providers/model-catalog.ts",
+    "../lib/providers/registry.ts",
+    "../lib/providers/runninghub-youchuan.ts",
+    "../lib/providers/types.ts"
+  ]
+}

@@ -46,6 +46,11 @@ import {
   RUNNINGHUB_CONTROL_IMAGE_APP_LABEL,
   RUNNINGHUB_CONTROL_IMAGE_APP_MODEL,
 } from "../lib/providers/runninghub";
+import {
+  generateModelCapabilityCatalog,
+  isRunningHubStandardCatalogEntry,
+} from "../lib/providers/catalog/runninghub-standard-generator";
+import { dynamicProviderModelOption } from "../lib/providers/model-gating";
 
 test("parseProviderModel reads provider prefixes", () => {
   assert.deepEqual(parseProviderModel("12ai-async:gemini-3.1-flash-image-preview", "12ai"), {
@@ -188,6 +193,11 @@ function cloneModelCapabilityCatalog(): ModelCapabilityCatalogDocument {
   return JSON.parse(JSON.stringify(modelCapabilityCatalog)) as ModelCapabilityCatalogDocument;
 }
 
+function hasRunningHubStandardGeneratedMarker(entry: ModelCapabilityCatalogDocument["entries"][number]): boolean {
+  const maybeGenerated = (entry as { generated?: { source?: unknown } }).generated;
+  return maybeGenerated?.source === "runninghub-standard";
+}
+
 test("async image model resolution is driven by async capability reference limits", () => {
   assert.equal(resolveAsyncImageModelValue("12ai:gpt-image-2", 0), "12ai-async:gpt-image-2");
   assert.equal(resolveAsyncImageModelValue("12ai:gpt-image-2", 1), null);
@@ -244,6 +254,44 @@ test("runninghub standard capabilities include pricing and payload mapping for l
   if (routedVideo.pricing.status !== "priced") throw new Error("Expected routed video pricing");
   assert.equal(routedVideo.pricing.price, 4.03);
   assert.equal(routedVideo.payloadMapping?.operation, "referenceArray");
+});
+
+test("runninghub standard generator preserves hand-authored catalog entries", () => {
+  const catalog = cloneModelCapabilityCatalog();
+  const generated = generateModelCapabilityCatalog(catalog);
+
+  assert.deepEqual(
+    generated.entries.filter(entry => !isRunningHubStandardCatalogEntry(entry)),
+    catalog.entries.filter(entry => !isRunningHubStandardCatalogEntry(entry)),
+  );
+});
+
+test("runninghub standard generator overwrites stale generated entries", () => {
+  const catalog = cloneModelCapabilityCatalog();
+  const stale = catalog.entries.find(entry => isRunningHubStandardCatalogEntry(entry) && hasRunningHubStandardGeneratedMarker(entry));
+  if (!stale) throw new Error("Expected a generated RunningHub Standard entry");
+  stale.label = "Manual stale edit";
+
+  const generated = generateModelCapabilityCatalog(catalog);
+  const repaired = generated.entries.find(entry => entry.value === stale.value);
+
+  assert.ok(repaired);
+  assert.notEqual(repaired.label, "Manual stale edit");
+});
+
+test("dynamic media model gating requires catalog-known media capabilities", () => {
+  assert.equal(dynamicProviderModelOption("12ai", "unlisted-image-alpha", "image", "12AI"), null);
+  assert.equal(dynamicProviderModelOption("12ai", "unlisted-video-alpha", "video", "12AI"), null);
+  assert.equal(dynamicProviderModelOption("12ai", "unlisted-tts-alpha", "audio", "12AI"), null);
+
+  assert.deepEqual(dynamicProviderModelOption("12ai", "frontier-alpha", "chat", "12AI"), {
+    value: "12ai:frontier-alpha",
+    label: "12AI frontier-alpha",
+  });
+  assert.deepEqual(dynamicProviderModelOption("runninghub", "api:/openapi/v2/minimax/hailuo-2.3/t2v-pro", "video", "RunningHub"), {
+    value: "runninghub:api:/openapi/v2/minimax/hailuo-2.3/t2v-pro",
+    label: "RunningHub api:/openapi/v2/minimax/hailuo-2.3/t2v-pro",
+  });
 });
 
 test("unknown model capability fails fast", () => {
@@ -829,7 +877,7 @@ test("runninghub exposes concrete standard model capabilities", () => {
   assert.deepEqual(minimaxSpeech.audioModes, ["tts"]);
   assert.throws(
     () => getModelCapability("runninghub:ai-app-audio:2061323800511344642", "audio"),
-    /RunningHub audio Standard Model is not configured/,
+    /Unknown provider model capability/,
   );
 });
 

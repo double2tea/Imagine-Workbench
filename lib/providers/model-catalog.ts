@@ -3,14 +3,9 @@ import type { AiProvider } from "./registry";
 import modelCapabilityCatalogJson from "./catalog/data/model-capabilities.json";
 import { PROVIDER_KEYS, isProviderKey } from "./registry";
 import {
-  getRunningHubStandardModel,
-  runningHubStandardPayloadMapping,
-  runningHubYouchuanParameterDescriptors,
-  runningHubYouchuanQualityValues,
   runningHubYouchuanSettingsFromParameterValues,
   runningHubYouchuanSettingsToParameterValues,
-  type RunningHubStandardModel,
-} from "./runninghub";
+} from "./runninghub-youchuan";
 import {
   referenceParameterDescriptors,
   defaultCapabilityParameterValues,
@@ -202,6 +197,13 @@ const GPT_IMAGE_SIZES: ParameterOption[] = [
   imageResolutionOption("custom"),
 ];
 
+const GPT_QUALITY_OPTIONS: ParameterOption[] = [
+  { value: "auto", label: "Auto" },
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" },
+];
+
 const GPT_IMAGE_RATIOS: ParameterOption[] = [
   { value: "1:1", label: "1:1 Square" },
   { value: "2:1", label: "2:1 Panorama" },
@@ -216,194 +218,10 @@ const GPT_IMAGE_RATIOS: ParameterOption[] = [
   { value: "9:16", label: "9:16 Vertical" },
 ];
 
-const GROK_IMAGE_SIZES: ParameterOption[] = [
-  imageResolutionOption("960x960"),
-  imageResolutionOption("720x1280"),
-  imageResolutionOption("1280x720"),
-  imageResolutionOption("1168x784"),
-  imageResolutionOption("784x1168"),
-];
-
-const GPT_QUALITY_OPTIONS: ParameterOption[] = [
-  { value: "auto", label: "Auto" },
-  { value: "low", label: "Low" },
-  { value: "medium", label: "Medium" },
-  { value: "high", label: "High" },
-];
-
-const RUNNINGHUB_GPT_IMAGE_CHANNEL_RATIOS: ParameterOption[] = [
-  { value: "empty", label: "Auto" },
-  { value: "3:2", label: "3:2 Landscape" },
-  { value: "1:1", label: "1:1 Square" },
-  { value: "2:3", label: "2:3 Portrait" },
-  { value: "5:4", label: "5:4 Landscape" },
-  { value: "4:5", label: "4:5 Portrait" },
-  { value: "16:9", label: "16:9 Cinema" },
-  { value: "9:16", label: "9:16 Vertical" },
-  { value: "21:9", label: "21:9 Wide" },
-  { value: "3:4", label: "3:4 Portrait" },
-  { value: "4:3", label: "4:3 Landscape" },
-];
-
-const RUNNINGHUB_GPT_IMAGE_OFFICIAL_RATIOS: ParameterOption[] = [
-  { value: "1:1", label: "1:1 Square" },
-  { value: "1:2", label: "1:2 Portrait" },
-  { value: "2:1", label: "2:1 Landscape" },
-  { value: "1:3", label: "1:3 Portrait" },
-  { value: "3:1", label: "3:1 Landscape" },
-  { value: "2:3", label: "2:3 Portrait" },
-  { value: "3:2", label: "3:2 Landscape" },
-  { value: "3:4", label: "3:4 Portrait" },
-  { value: "4:3", label: "4:3 Landscape" },
-  { value: "4:5", label: "4:5 Portrait" },
-  { value: "5:4", label: "5:4 Landscape" },
-  { value: "9:16", label: "9:16 Vertical" },
-  { value: "21:9", label: "21:9 Wide" },
-  { value: "9:21", label: "9:21 Portrait" },
-  { value: "16:9", label: "16:9 Cinema" },
-];
-
-const RUNNINGHUB_GPT_IMAGE_RESOLUTIONS: ParameterOption[] = [
-  { value: "1k", label: "1K" },
-  { value: "2k", label: "2K" },
-  { value: "4k", label: "4K" },
-];
-
-const RUNNINGHUB_GPT_QUALITY_OPTIONS: ParameterOption[] = [
-  { value: "low", label: "Low" },
-  { value: "medium", label: "Medium" },
-  { value: "high", label: "High" },
-];
-
-const RUNNINGHUB_GEMINI_FLASH_IMAGE_RATIOS: ParameterOption[] = [
-  { value: "1:1", label: "1:1 Square" },
-  { value: "16:9", label: "16:9 Cinema" },
-  { value: "9:16", label: "9:16 Vertical" },
-  { value: "4:3", label: "4:3 Landscape" },
-  { value: "3:4", label: "3:4 Portrait" },
-  { value: "3:2", label: "3:2 Landscape" },
-  { value: "2:3", label: "2:3 Portrait" },
-  { value: "5:4", label: "5:4 Landscape" },
-  { value: "4:5", label: "4:5 Portrait" },
-  { value: "21:9", label: "21:9 Wide" },
-  { value: "1:4", label: "1:4 Portrait" },
-  { value: "4:1", label: "4:1 Landscape" },
-  { value: "1:8", label: "1:8 Portrait" },
-  { value: "8:1", label: "8:1 Landscape" },
-];
-
-const RUNNINGHUB_GEMINI_PRO_IMAGE_RATIOS: ParameterOption[] = [
-  { value: "1:1", label: "1:1 Square" },
-  { value: "16:9", label: "16:9 Cinema" },
-  { value: "9:16", label: "9:16 Vertical" },
-  { value: "4:3", label: "4:3 Landscape" },
-  { value: "3:4", label: "3:4 Portrait" },
-  { value: "3:2", label: "3:2 Landscape" },
-  { value: "2:3", label: "2:3 Portrait" },
-  { value: "5:4", label: "5:4 Landscape" },
-  { value: "4:5", label: "4:5 Portrait" },
-  { value: "21:9", label: "21:9 Wide" },
-];
-
-const RUNNINGHUB_GEMINI_IMAGE_RESOLUTIONS: ParameterOption[] = [
-  { value: "1k", label: "1K" },
-  { value: "2k", label: "2K" },
-  { value: "4k", label: "4K" },
-];
-
-const RUNNINGHUB_YOUCHUAN_V81_IMAGE_RATIOS: ParameterOption[] = [
-  { value: "1:1", label: "1:1 Square" },
-  { value: "4:3", label: "4:3 Landscape" },
-  { value: "3:2", label: "3:2 Landscape" },
-  { value: "16:9", label: "16:9 Cinema" },
-  { value: "3:4", label: "3:4 Portrait" },
-  { value: "2:3", label: "2:3 Portrait" },
-  { value: "9:16", label: "9:16 Vertical" },
-];
-
-const RUNNINGHUB_GEMINI_ULTRA_IMAGE_RESOLUTIONS: ParameterOption[] = [
-  { value: "4k", label: "4K" },
-  { value: "8k", label: "8K" },
-];
-
-const RUNNINGHUB_SEEDREAM_V5_LITE_IMAGE_RESOLUTIONS: ParameterOption[] = [
-  { value: "auto", label: "Auto" },
-  { value: "2k", label: "2K" },
-  { value: "3k", label: "3K" },
-];
-
-const RUNNINGHUB_JIMENG_IMAGE_SIZES: ParameterOption[] = [
-  imageResolutionOption("auto"),
-  imageResolutionOption("1024x1024"),
-  imageResolutionOption("1536x1024"),
-  imageResolutionOption("1024x1536"),
-  imageResolutionOption("1536x1536"),
-  imageResolutionOption("2048x2048"),
-];
-
 const VEO_31_VIDEO_SIZES: ParameterOption[] = [
   { value: "auto", label: "Auto (source/default)" },
   { value: "16:9", label: "16:9 Landscape" },
   { value: "9:16", label: "9:16 Vertical" },
-];
-
-const RUNNINGHUB_VIDEOX_15_SIZES: ParameterOption[] = [
-  { value: "2:3", label: "2:3 Portrait" },
-  { value: "3:2", label: "3:2 Landscape" },
-  { value: "1:1", label: "1:1 Square" },
-  { value: "16:9", label: "16:9 Cinema" },
-  { value: "9:16", label: "9:16 Vertical" },
-];
-
-const VEO_31_VIDEO_RESOLUTIONS: ParameterOption[] = [
-  { value: "720p", label: "720p" },
-  { value: "1080p", label: "1080p" },
-];
-
-const SEEDANCE_VIDEO_SIZES: ParameterOption[] = [
-  { value: "auto", label: "Auto (adaptive)" },
-  { value: "16:9", label: "16:9 Landscape" },
-  { value: "9:16", label: "9:16 Vertical" },
-  { value: "1:1", label: "1:1 Square" },
-  { value: "4:3", label: "4:3 Landscape" },
-  { value: "3:4", label: "3:4 Portrait" },
-  { value: "21:9", label: "21:9 Wide" },
-];
-
-const SEEDANCE_VIDEO_RESOLUTIONS: ParameterOption[] = [
-  { value: "480p", label: "480p" },
-  { value: "720p", label: "720p" },
-  { value: "1080p", label: "1080p" },
-];
-
-const RUNNINGHUB_SEEDANCE_VIDEO_RESOLUTIONS: ParameterOption[] = [
-  ...SEEDANCE_VIDEO_RESOLUTIONS,
-  { value: "2k", label: "2K" },
-  { value: "4k", label: "4K" },
-];
-
-const HAILUO_VIDEO_SIZES: ParameterOption[] = [
-  { value: "auto", label: "Auto" },
-];
-
-const TWELVE_AI_OMNI_VIDEO_SIZES: ParameterOption[] = [
-  { value: "auto", label: "Auto (source/default)" },
-  { value: "16:9", label: "16:9 Landscape" },
-  { value: "9:16", label: "9:16 Vertical" },
-];
-
-const OMNI_FLASH_VIDEO_RESOLUTIONS: ParameterOption[] = [
-  { value: "720p", label: "720p" },
-  { value: "1080p", label: "1080p" },
-  { value: "4k", label: "4K" },
-];
-
-const AUTO_ASPECT_RATIO: ParameterOption[] = [
-  { value: "auto", label: "Auto" },
-];
-
-const AUTO_IMAGE_SIZES: ParameterOption[] = [
-  imageResolutionOption("auto"),
 ];
 
 const MODELSCOPE_IMAGE_SIZES: ParameterOption[] = [
@@ -426,29 +244,6 @@ const DOCUMENTED_IMAGE_SIZE_RATIOS: Record<string, string> = {
   "1056x1584": "2:3",
 };
 
-const RUNNINGHUB_VIDEO_SIZES: ParameterOption[] = [
-  { value: "auto", label: "Auto" },
-  { value: "1280x720", label: "1280x720" },
-  { value: "720x1280", label: "720x1280" },
-  { value: "1024x1024", label: "1024x1024" },
-];
-
-const RUNNINGHUB_IMAGE_SIZES: ParameterOption[] = RUNNINGHUB_VIDEO_SIZES.map(option =>
-  imageResolutionOption(option.value),
-);
-
-const OPEN_DIMENSION_IMAGE_SIZES: ParameterOption[] = [
-  imageResolutionOption("auto"),
-  imageResolutionOption("1024x1024"),
-  imageResolutionOption("1280x720"),
-  imageResolutionOption("720x1280"),
-  imageResolutionOption("1536x1024"),
-  imageResolutionOption("1024x1536"),
-  imageResolutionOption("1536x1536"),
-  imageResolutionOption("2048x2048"),
-  imageResolutionOption("custom"),
-];
-
 const AGNES_IMAGE_SIZE_RATIOS: Record<string, string> = {
   "1024x768": "4:3",
   "768x1024": "3:4",
@@ -466,9 +261,6 @@ export const CHAT_MODEL_OPTIONS = buildProviderOptionsRecord("chat", true);
 export function getModelCapability(value: string, kind?: ModelKind): ProviderModelCapability {
   const parsed = parseProviderModel(value, "12ai");
   const capability = findModelCapability(parsed.provider, parsed.model, parsed.async, kind);
-  if (!capability && parsed.provider === "runninghub") {
-    return runningHubVirtualCapability(parsed.model, kind);
-  }
   if (!capability && parsed.provider === "modelscope" && kind === "image") {
     return modelScopeVirtualImageCapability(parsed.model);
   }
@@ -484,7 +276,6 @@ export function getOptionalModelCapability(value: string, kind?: ModelKind): Pro
   const capability = findModelCapability(parsed.provider, parsed.model, parsed.async, kind);
   if (capability) return capability;
   if (kind === "audio" && parsed.provider !== "mimo") return customMimoAudioCapability(parsed.provider, parsed.model);
-  if (parsed.provider === "runninghub" && kind !== "chat") return runningHubVirtualCapability(parsed.model, kind);
   if (parsed.provider === "modelscope" && kind === "image") return modelScopeVirtualImageCapability(parsed.model);
   return undefined;
 }
@@ -1065,7 +856,6 @@ function getKnownCapability(value: string, kind: ModelKind): ProviderModelCapabi
   const capability = findModelCapability(parsed.provider, parsed.model, parsed.async, kind);
   if (capability) return capability;
   if (kind === "audio" && parsed.provider !== "mimo") return customMimoAudioCapability(parsed.provider, parsed.model);
-  if (parsed.provider === "runninghub" && kind !== "chat") return runningHubVirtualCapability(parsed.model, kind);
   if (parsed.provider === "modelscope" && kind === "image") return modelScopeVirtualImageCapability(parsed.model);
   return undefined;
 }
@@ -1093,170 +883,6 @@ function modelScopeVirtualImageCapability(model: string): ProviderModelCapabilit
     maxReferenceImages: supportsReferences ? 4 : undefined,
     sizes: MODELSCOPE_IMAGE_SIZES,
   });
-}
-
-function runningHubImageParameterProfile(
-  model: RunningHubStandardModel,
-): Pick<ImageCapabilityInput, "aspectRatios" | "qualityLevels" | "sizes"> {
-  const lower = model.model.toLowerCase();
-  if (model.resolutionOptions && !lower.includes("seedream-v5-lite")) {
-    return { sizes: optionList(model.resolutionOptions) };
-  }
-  if (lower.includes("rhart-image-g-2")) {
-    const isOfficial = lower.includes("official");
-    return {
-      aspectRatios: isOfficial ? RUNNINGHUB_GPT_IMAGE_OFFICIAL_RATIOS : RUNNINGHUB_GPT_IMAGE_CHANNEL_RATIOS,
-      qualityLevels: isOfficial ? RUNNINGHUB_GPT_QUALITY_OPTIONS : undefined,
-      sizes: RUNNINGHUB_GPT_IMAGE_RESOLUTIONS,
-    };
-  }
-  if (lower.includes("rhart-image-n-g31-flash")) {
-    return {
-      aspectRatios: RUNNINGHUB_GEMINI_FLASH_IMAGE_RATIOS,
-      sizes: RUNNINGHUB_GEMINI_IMAGE_RESOLUTIONS,
-    };
-  }
-  if (lower.includes("rhart-image-n-pro")) {
-    return {
-      aspectRatios: RUNNINGHUB_GEMINI_PRO_IMAGE_RATIOS,
-      sizes: lower.includes("ultra") ? RUNNINGHUB_GEMINI_ULTRA_IMAGE_RESOLUTIONS : RUNNINGHUB_GEMINI_IMAGE_RESOLUTIONS,
-    };
-  }
-  if (lower.includes("youchuan/text-to-image-v")) {
-    return {
-      aspectRatios: RUNNINGHUB_YOUCHUAN_V81_IMAGE_RATIOS,
-      qualityLevels: youchuanQualityOptions(model.model),
-      sizes: AUTO_IMAGE_SIZES,
-    };
-  }
-  if (lower.includes("seedream-v5-lite")) {
-    return { sizes: RUNNINGHUB_SEEDREAM_V5_LITE_IMAGE_RESOLUTIONS };
-  }
-  if (lower.includes("jimeng")) {
-    return { sizes: RUNNINGHUB_JIMENG_IMAGE_SIZES };
-  }
-  if (lower.includes("z-image") || lower.includes("f-2-dev")) {
-    return { sizes: OPEN_DIMENSION_IMAGE_SIZES };
-  }
-  if (lower.includes("rhart-image-g/")) {
-    return { sizes: GROK_IMAGE_SIZES };
-  }
-  return { aspectRatios: AUTO_ASPECT_RATIO, sizes: AUTO_IMAGE_SIZES };
-}
-
-function youchuanQualityOptions(model: string): ParameterOption[] {
-  return runningHubYouchuanQualityValues(model).map(value => ({ value, label: `Quality ${value}` }));
-}
-
-function runningHubVideoParameterProfile(
-  model: RunningHubStandardModel,
-): Pick<VideoCapabilityInput, "durations" | "resolutions" | "sizes"> {
-  const lower = model.model.toLowerCase();
-  if (lower.includes("hailuo")) {
-    return {
-      durations: optionList(model.durationOptions),
-      sizes: HAILUO_VIDEO_SIZES,
-    };
-  }
-  if (lower.includes("seedance")) {
-    return {
-      durations: optionList(model.durationOptions),
-      resolutions: optionList(model.resolutionOptions) ?? RUNNINGHUB_SEEDANCE_VIDEO_RESOLUTIONS,
-      sizes: SEEDANCE_VIDEO_SIZES,
-    };
-  }
-  if (lower.includes("gemini-omni-flash")) {
-    return {
-      durations: optionList(model.durationOptions),
-      resolutions: optionList(model.resolutionOptions) ?? OMNI_FLASH_VIDEO_RESOLUTIONS,
-      sizes: TWELVE_AI_OMNI_VIDEO_SIZES,
-    };
-  }
-  if (lower.includes("rhart-video-g/")) {
-    return {
-      durations: optionList(model.durationOptions),
-      resolutions: optionList(model.resolutionOptions),
-      sizes: RUNNINGHUB_VIDEOX_15_SIZES,
-    };
-  }
-  if (lower.includes("rhart-video-v3.1")) {
-    return {
-      durations: optionList(model.durationOptions),
-      resolutions: optionList(model.resolutionOptions) ?? VEO_31_VIDEO_RESOLUTIONS,
-      sizes: VEO_31_VIDEO_SIZES,
-    };
-  }
-  return {
-    durations: optionList(model.durationOptions),
-    resolutions: optionList(model.resolutionOptions),
-    sizes: optionList(model.sizeOptions) ?? RUNNINGHUB_VIDEO_SIZES,
-  };
-}
-
-function optionList(values: readonly string[] | undefined): ParameterOption[] | undefined {
-  return values?.map(value => ({
-    value,
-    label: /^\d+$/.test(value) ? `${value}s` : value === "4k" ? "4K" : value,
-  }));
-}
-
-function runningHubInputModalities(model: RunningHubStandardModel): ModelInputModalityProfile {
-  if (!model.supportsReferences) return { text: { required: true } };
-  if (model.kind === "image") {
-    return {
-      text: { required: true },
-      images: {
-        minCount: model.minReferenceImages,
-        maxCount: model.maxReferenceImages,
-        roles: ["content", "style", "object"],
-        delivery: "uploadedUrl",
-      },
-    };
-  }
-  if (model.kind === "audio") {
-    const referenceMediaTypes = model.referenceMediaTypes ?? [];
-    return {
-      text: { required: true },
-      images: referenceMediaTypes.includes("image")
-        ? { minCount: model.minReferenceImages, maxCount: model.maxReferenceImages, roles: ["reference"], delivery: "uploadedUrl" }
-        : undefined,
-      videos: referenceMediaTypes.includes("video")
-        ? { minCount: model.minReferenceImages, maxCount: model.maxReferenceImages, roles: ["reference"], delivery: "uploadedUrl" }
-        : undefined,
-      audio: referenceMediaTypes.includes("audio")
-        ? { minCount: model.minReferenceImages, maxCount: model.maxReferenceImages, roles: ["voice", "audioGuide"], delivery: "uploadedUrl" }
-        : undefined,
-      mixed: referenceMediaTypes.length > 1 ? { maxTotalCount: model.maxReferenceImages } : undefined,
-    };
-  }
-  const referenceMediaTypes = model.referenceMediaTypes ?? ["image"];
-  const imageCounts = model.referenceCounts?.images ?? { minCount: model.minReferenceImages, maxCount: model.maxReferenceImages };
-  const videoCounts = model.referenceCounts?.videos ?? {
-    minCount: !referenceMediaTypes.includes("image") && referenceMediaTypes.includes("video") ? model.minReferenceImages : 0,
-    maxCount: model.maxReferenceImages,
-  };
-  const audioCounts = model.referenceCounts?.audio ?? {
-    minCount: !referenceMediaTypes.includes("image") && !referenceMediaTypes.includes("video") && referenceMediaTypes.includes("audio") ? model.minReferenceImages : 0,
-    maxCount: model.maxReferenceImages,
-  };
-  return {
-    text: { required: true },
-    images: referenceMediaTypes.includes("image")
-      ? {
-          minCount: imageCounts.minCount,
-          maxCount: imageCounts.maxCount,
-          roles: model.videoReferenceMode === "firstLast" ? ["firstFrame", "lastFrame"] : ["reference"],
-          delivery: "uploadedUrl",
-        }
-      : undefined,
-    videos: referenceMediaTypes.includes("video")
-      ? { minCount: videoCounts.minCount, maxCount: videoCounts.maxCount, roles: ["reference"], delivery: "uploadedUrl" }
-      : undefined,
-    audio: referenceMediaTypes.includes("audio")
-      ? { minCount: audioCounts.minCount, maxCount: audioCounts.maxCount, roles: ["audioGuide"], delivery: "uploadedUrl" }
-      : undefined,
-    mixed: referenceMediaTypes.length > 1 ? { maxTotalCount: model.maxReferenceImages } : undefined,
-  };
 }
 
 function aspectRatiosFromSizes(sizes: ParameterOption[]): ParameterOption[] {
@@ -1297,107 +923,4 @@ function greatestCommonDivisor(a: number, b: number): number {
     right = next;
   }
   return left;
-}
-
-function runningHubVirtualCapability(model: string, kind?: ModelKind): ProviderModelCapability {
-  const lower = model.toLowerCase();
-  const isVideo = lower.includes("video");
-  const isAudio = lower.includes("audio") || lower.includes("speech") || lower.includes("music") || lower.includes("voice");
-  const resolvedKind: ModelKind = kind ?? (isAudio ? "audio" : isVideo ? "video" : "image");
-  if (resolvedKind === "image" || resolvedKind === "video" || resolvedKind === "audio") {
-    const standardModel = getRunningHubStandardModel(model, resolvedKind);
-    if (standardModel?.kind === "image") {
-      const profile = runningHubImageParameterProfile(standardModel);
-      return imageCapability({
-        value: formatProviderModel("runninghub", standardModel.model),
-        label: standardModel.label,
-        provider: "runninghub",
-        model: standardModel.model,
-        supportsAsync: false,
-        supportsReferences: standardModel.supportsReferences,
-        ...profile,
-        inputModalities: runningHubInputModalities(standardModel),
-        parameterDescriptors: [...runningHubYouchuanParameterDescriptors(standardModel.model)],
-        pricing: unpricedModel("unverified"),
-        payloadMapping: runningHubStandardPayloadMapping(standardModel),
-        maxReferenceImages: standardModel.maxReferenceImages,
-        minReferenceImages: standardModel.minReferenceImages,
-      });
-    }
-    if (standardModel?.kind === "video") {
-      const profile = runningHubVideoParameterProfile(standardModel);
-      return videoCapability({
-        value: formatProviderModel("runninghub", standardModel.model),
-        label: standardModel.label,
-        provider: "runninghub",
-        model: standardModel.model,
-        supportsReferences: standardModel.supportsReferences,
-        ...profile,
-        inputModalities: runningHubInputModalities(standardModel),
-        pricing: unpricedModel("unverified"),
-        payloadMapping: runningHubStandardPayloadMapping(standardModel),
-        videoReferenceMode: standardModel.videoReferenceMode ?? (standardModel.supportsReferences ? "reference" : "none"),
-        videoReferenceModes: standardModel.videoReferenceModes ? [...standardModel.videoReferenceModes] : undefined,
-        maxReferenceImages: standardModel.maxReferenceImages,
-        minReferenceImages: standardModel.minReferenceImages,
-        referenceMediaTypes: standardModel.referenceMediaTypes ? [...standardModel.referenceMediaTypes] : undefined,
-      });
-    }
-    if (standardModel?.kind === "audio") {
-      return audioCapability({
-        value: formatProviderModel("runninghub", standardModel.model),
-        label: standardModel.label,
-        provider: "runninghub",
-        model: standardModel.model,
-        modes: [...(standardModel.audioModes ?? ["tts"])],
-        formats: optionList(standardModel.audioFormatOptions),
-        supportsReferences: standardModel.supportsReferences,
-        inputModalities: runningHubInputModalities(standardModel),
-        pricing: unpricedModel("unverified"),
-        payloadMapping: runningHubStandardPayloadMapping(standardModel),
-        maxReferenceMedia: standardModel.maxReferenceImages,
-        minReferenceMedia: standardModel.minReferenceImages,
-        referenceMediaTypes: standardModel.referenceMediaTypes ? [...standardModel.referenceMediaTypes] : undefined,
-      });
-    }
-  }
-  if (resolvedKind === "video") {
-    return videoCapability({
-      value: formatProviderModel("runninghub", model),
-      label: `RunningHub ${model}`,
-      provider: "runninghub",
-      model,
-      supportsReferences: true,
-      inputModalities: {
-        text: { required: true },
-        images: { minCount: 0, maxCount: 9, roles: ["reference"], delivery: "uploadedUrl" },
-        videos: { minCount: 0, maxCount: 9, roles: ["reference"], delivery: "uploadedUrl" },
-        audio: { minCount: 0, maxCount: 9, roles: ["audioGuide"], delivery: "uploadedUrl" },
-      },
-      sizes: RUNNINGHUB_VIDEO_SIZES,
-      videoReferenceMode: "reference",
-      maxReferenceImages: 9,
-      minReferenceImages: 0,
-      referenceMediaTypes: ["image", "video", "audio"],
-    });
-  }
-  if (resolvedKind === "image") {
-    return imageCapability({
-      value: formatProviderModel("runninghub", model),
-      label: `RunningHub ${model}`,
-      provider: "runninghub",
-      model,
-      supportsAsync: false,
-      supportsReferences: true,
-      inputModalities: {
-        text: { required: true },
-        images: { minCount: 0, maxCount: 9, roles: ["content", "style", "object"], delivery: "uploadedUrl" },
-      },
-      parameterDescriptors: [...runningHubYouchuanParameterDescriptors(model)],
-      maxReferenceImages: 9,
-      sizes: RUNNINGHUB_IMAGE_SIZES,
-    });
-  }
-  if (resolvedKind === "audio") throw new Error(`RunningHub audio Standard Model is not configured: ${model}`);
-  throw new Error(`RunningHub does not support ${resolvedKind} models`);
 }

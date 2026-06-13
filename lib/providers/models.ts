@@ -1,4 +1,5 @@
-import { formatProviderModel, getListedModelCapabilities, isAgentCompatibleModelId, type AiProvider, type ModelOption } from "./model-catalog";
+import { getListedModelCapabilities, type AiProvider, type ModelOption } from "./model-catalog";
+import { dynamicProviderModelOption } from "./model-gating";
 import { getProviderMeta } from "./registry";
 import {
   runningHubLlmBaseUrl,
@@ -106,13 +107,9 @@ function runningHubStaticModels(kind: ModelKindFilter): ModelOption[] {
 function readModelId(value: unknown, provider: AiProvider, kind: ModelKindFilter, label: string): ModelOption[] {
   if (!isRecord(value)) return [];
   const id = readModelValue(value);
-  if (!id || !matchesKind(id, kind)) return [];
-  return [
-    {
-      value: formatProviderModel(provider, id),
-      label: `${label} ${id}`,
-    },
-  ];
+  if (!id) return [];
+  const option = dynamicProviderModelOption(provider, id, kind, label);
+  return option ? [option] : [];
 }
 
 function providerLabel(config: ProviderConfig): string {
@@ -122,19 +119,6 @@ function providerLabel(config: ProviderConfig): string {
 function readModelValue(value: Record<string, unknown>): string | undefined {
   const candidates = [value.id, value.name, value.model_id, value.modelId, value.Path, value.path];
   return candidates.find((candidate): candidate is string => typeof candidate === "string" && candidate.length > 0);
-}
-
-function matchesKind(model: string, kind: ModelKindFilter): boolean {
-  if (kind === "all") return true;
-  if (kind === "chat") return isAgentCompatibleModelId(model);
-  const lower = model.toLowerCase();
-  if (kind === "video") {
-    return lower.includes("video") || lower.includes("veo") || lower.includes("-to-video") || lower.includes("omni_flash");
-  }
-  if (kind === "audio") {
-    return lower.includes("audio") || lower.includes("tts") || lower.includes("voice") || lower.includes("speech") || lower.includes("asr");
-  }
-  return lower.includes("image") || lower.includes("imagen") || lower.includes("imagine") || lower.includes("text-to-image");
 }
 
 function dedupeOptions(options: ModelOption[]): ModelOption[] {

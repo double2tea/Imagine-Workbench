@@ -78,6 +78,7 @@
     "../lib/providers/pricing.ts",
     "../lib/providers/runninghub-app.ts",
     "../lib/providers/runninghub.ts",
+    "../lib/providers/runninghub-youchuan.ts",
     "../lib/providers/registry.ts",
     "../lib/board/runninghub-bindings.ts",
     "../lib/board/graph-content-key.ts",

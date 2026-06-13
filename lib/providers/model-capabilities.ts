@@ -167,6 +167,12 @@ export interface ProviderPayloadFieldMappingDescriptor {
     | "literal";
   valueType?: "string" | "number" | "boolean" | "array" | "object";
   literal?: JsonValue;
+  defaultValue?: string | number | boolean;
+  omitAuto?: boolean;
+  allowedValues?: readonly string[];
+  index?: number;
+  dimensionAxis?: "width" | "height";
+  durationValueType?: "string" | "number";
 }
 
 export interface ProviderPayloadMappingDescriptor {
@@ -182,6 +188,12 @@ export interface ProviderPayloadMappingDescriptor {
     | "providerSpecific";
   fields: readonly ProviderPayloadFieldMappingDescriptor[];
   logic?: readonly ("durationCoercion" | "dimensionDerivation" | "referenceRouting" | "mediaUpload")[];
+  referenceRoutes?: {
+    imageToImage?: string;
+    imageToVideo?: string;
+    firstLast?: string;
+    reference?: string;
+  };
 }
 
 export class ModelCapabilityValidationError extends Error {}

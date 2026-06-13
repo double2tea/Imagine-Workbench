@@ -13,11 +13,11 @@ import {
   DEFAULT_CHAT_MODEL,
   IMAGE_MODEL_OPTIONS,
   VIDEO_MODEL_OPTIONS,
-  formatProviderModel,
   tryParseProviderModel,
   type AiProvider,
   type ModelOption,
 } from "@/lib/providers/model-catalog";
+import { dynamicProviderModelOption, isSelectableModelOptionForKind } from "@/lib/providers/model-gating";
 import { getProviderMeta, isKnownProvider, isProviderKey, PROVIDER_KEYS, type CustomProviderDefinition } from "@/lib/providers/registry";
 import type { ProviderCredentials } from "@/lib/providers/types";
 import { API_ROUTES } from "@/lib/api/routes";
@@ -94,17 +94,14 @@ function mergeRecordModelOptions(
 }
 
 function classifyModelOption(option: ModelOption): ModelCategory {
-  const parsed = tryParseProviderModel(option.value, "12ai");
-  if (!parsed) return "chat";
-  const model = parsed.model.toLowerCase();
-  if (model.includes("audio") || model.includes("tts") || model.includes("voice") || model.includes("speech") || model.includes("asr")) return "audio";
-  if (model.includes("video") || model.includes("veo") || model.includes("omni_flash")) return "video";
-  if (model.includes("image") || model.includes("imagen") || model.includes("imagine")) return "image";
+  if (isSelectableModelOptionForKind(option, "audio")) return "audio";
+  if (isSelectableModelOptionForKind(option, "video")) return "video";
+  if (isSelectableModelOptionForKind(option, "image")) return "image";
   return "chat";
 }
 
 function isSelectableImageModel(option: ModelOption): boolean {
-  return tryParseProviderModel(option.value, "12ai")?.async === false;
+  return isSelectableModelOptionForKind(option, "image");
 }
 
 function isSelectableChatModel(option: ModelOption): boolean {
@@ -355,7 +352,14 @@ export function useProviderSettings({
       return;
     }
 
-    const byProvider = groupManualModels(selectedProvider, modelNames, getProviderLabel(selectedProvider), providerKeys);
+    const byProvider = groupManualModels(category, selectedProvider, modelNames, getProviderLabel(selectedProvider), providerKeys);
+    const manualCount = countManualModels(byProvider);
+    if (manualCount === 0) {
+      const message = `没有可添加的${modelCategoryLabel(category)}模型`;
+      setModelListMessage(message);
+      pushWorkspaceNotice("error", message);
+      return;
+    }
     if (category === "chat") {
       const next = mergeManualModelGroups(chatModelOptions, byProvider);
       saveModelOptions(category, setChatModelOptions, next);
@@ -370,7 +374,7 @@ export function useProviderSettings({
       saveModelOptions(category, setAudioModelOptions, next);
     }
 
-    const message = `已添加 ${countManualModels(byProvider)} 个${modelCategoryLabel(category)}模型`;
+    const message = `已添加 ${manualCount} 个${modelCategoryLabel(category)}模型`;
     setModelListMessage(message);
     pushWorkspaceNotice("success", message);
   };
@@ -423,7 +427,7 @@ export function useProviderSettings({
       }
 
       const fetchedChat = fetched.filter(option => classifyModelOption(option) === "chat").filter(isSelectableChatModel);
-      const fetchedImage = fetched.filter(option => classifyModelOption(option) === "image").filter(isSelectableImageModel);
+      const fetchedImage = fetched.filter(option => classifyModelOption(option) === "image");
       const fetchedVideo = fetched.filter(option => classifyModelOption(option) === "video");
       const fetchedAudio = fetched.filter(option => classifyModelOption(option) === "audio");
 
@@ -544,8 +548,8 @@ export function useProviderSettings({
 
       const restoredChatOptions = restoreModelOptions("imagine_chat_model_options", setChatModelOptions, CHAT_MODEL_OPTIONS, isSelectableChatModel);
       restoreModelOptions("imagine_image_model_options", setImageModelOptions, IMAGE_MODEL_OPTIONS, isSelectableImageModel);
-      restoreModelOptions("imagine_video_model_options", setVideoModelOptions, VIDEO_MODEL_OPTIONS);
-      restoreModelOptions("imagine_audio_model_options", setAudioModelOptions, AUDIO_MODEL_OPTIONS);
+      restoreModelOptions("imagine_video_model_options", setVideoModelOptions, VIDEO_MODEL_OPTIONS, option => isSelectableModelOptionForKind(option, "video"));
+      restoreModelOptions("imagine_audio_model_options", setAudioModelOptions, AUDIO_MODEL_OPTIONS, option => isSelectableModelOptionForKind(option, "audio"));
 
       const storedChatModel = localStorage.getItem("imagine_chat_model");
       setFetchedModelOptions(emptyFetchedModelOptions(restoredProviderKeys));
@@ -638,6 +642,7 @@ function parseManualModelNames(rawInput: string): string[] {
 }
 
 function groupManualModels(
+  category: ModelCategory,
   fallbackProvider: AiProvider,
   modelNames: string[],
   providerLabel: string,
@@ -645,11 +650,8 @@ function groupManualModels(
 ): Record<AiProvider, ModelOption[]> {
   const grouped = emptyProviderOptions(providerKeys);
   for (const modelName of modelNames) {
-    const value = formatProviderModel(fallbackProvider, modelName);
-    grouped[fallbackProvider].push({
-      value,
-      label: `${providerLabel} ${modelName}`,
-    });
+    const option = dynamicProviderModelOption(fallbackProvider, modelName, category, providerLabel);
+    if (option) grouped[fallbackProvider].push(option);
   }
   return grouped;
 }
