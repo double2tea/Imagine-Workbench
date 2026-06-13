@@ -28,7 +28,9 @@ import {
 import modelCapabilityCatalog from "../lib/providers/catalog/data/model-capabilities.json";
 import {
   defaultCapabilityParameterValues,
+  inputModalitiesReferenceCountRange,
   validateCapabilityParameterValues,
+  validateInputModalityReferences,
 } from "../lib/providers/model-capabilities";
 import { getGenerationReferenceMedia } from "../lib/db";
 import {
@@ -122,6 +124,34 @@ test("model capability catalog fails fast on descriptor reference slot drift", (
   assert.throws(
     () => readModelCapabilityCatalog(catalog),
     /has mismatched referenceSlots/,
+  );
+});
+
+test("model capability catalog derives legacy reference fields from input modalities", () => {
+  const catalog = cloneModelCapabilityCatalog();
+  const entry = catalog.entries.find(item => item.inputModalities.images !== undefined);
+  if (!entry) throw new Error("Expected at least one image reference capability");
+
+  const capabilities = readModelCapabilityCatalog(catalog);
+  const capability = capabilities.find(item => item.value === entry.value);
+  if (!capability) throw new Error("Expected normalized capability");
+
+  assert.equal(capability.supportsReferences, true);
+  assert.deepEqual(capability.referenceSlots, entry.parameterDescriptors.filter(descriptor => descriptor.kind === "reference"));
+  assert.deepEqual(capability.referenceMediaTypes, ["image"]);
+  assert.equal(capability.minReferenceImages, entry.inputModalities.images?.minCount);
+  assert.equal(capability.maxReferenceImages, entry.inputModalities.images?.maxCount);
+});
+
+test("model capability catalog fails fast on legacy reference field drift", () => {
+  const catalog = cloneModelCapabilityCatalog();
+  const entry = catalog.entries.find(item => item.inputModalities.images !== undefined);
+  if (!entry) throw new Error("Expected at least one image reference capability");
+  entry.maxReferenceImages = (entry.inputModalities.images?.maxCount ?? 0) + 1;
+
+  assert.throws(
+    () => readModelCapabilityCatalog(catalog),
+    /has mismatched maxReferenceImages/,
   );
 });
 
@@ -622,8 +652,25 @@ test("runninghub exposes concrete standard model capabilities", () => {
   assert.equal(seedance.videoReferenceMode, "reference");
   assert.deepEqual(seedance.videoReferenceModes, ["reference", "firstLast"]);
   assert.deepEqual(seedance.referenceMediaTypes, ["image", "video", "audio"]);
+  assert.equal(inputModalitiesReferenceCountRange(seedance.inputModalities).maxCount, seedance.maxReferenceImages);
+  assert.throws(
+    () => validateInputModalityReferences(seedance.inputModalities, [
+      { type: "image" },
+      { type: "video" },
+      { type: "audio" },
+      { type: "image" },
+      { type: "video" },
+      { type: "audio" },
+      { type: "image" },
+      { type: "video" },
+      { type: "audio" },
+      { type: "image" },
+    ]),
+    /当前模型支持 0-9 个参考媒体/,
+  );
   assert.deepEqual(seedanceMultimodal.referenceMediaTypes, ["image", "video", "audio"]);
   assert.equal(omniFlash.maxReferenceImages, 8);
+  assert.equal(inputModalitiesReferenceCountRange(omniFlash.inputModalities).maxCount, omniFlash.maxReferenceImages);
   assert.deepEqual(omniFlash.videoReferenceModes, ["reference"]);
   assert.deepEqual(omniFlash.sizes.map(option => option.value), ["auto", "16:9", "9:16"]);
   assert.deepEqual(omniFlash.resolutions.map(option => option.value), ["720p", "1080p", "4k"]);

@@ -10,7 +10,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [
         {
           "value": "1:1",
@@ -121,16 +120,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 4,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "12ai:gemini-3-pro-image-preview",
@@ -140,7 +133,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [
         {
           "value": "1:1",
@@ -238,16 +230,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 4,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "12ai:gemini-2.5-flash-image",
@@ -257,7 +243,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [
         {
           "value": "1:1",
@@ -326,16 +311,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 4,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "12ai:gpt-image-2",
@@ -345,7 +324,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [
         {
           "value": "1:1",
@@ -568,16 +546,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 4,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "12ai-async:gpt-image-2",
@@ -587,7 +559,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": true,
-      "supportsReferences": false,
       "aspectRatios": [
         {
           "value": "1:1",
@@ -800,14 +771,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "12ai-async:gemini-3.1-flash-image-preview",
@@ -817,7 +784,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": true,
-      "supportsReferences": true,
       "aspectRatios": [
         {
           "value": "1:1",
@@ -928,16 +894,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 4,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "12ai-async:gemini-2.5-flash-image",
@@ -947,7 +907,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": true,
-      "supportsReferences": true,
       "aspectRatios": [
         {
           "value": "1:1",
@@ -1016,16 +975,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 4,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "12ai-async:gemini-3-pro-image-preview",
@@ -1035,7 +988,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": true,
-      "supportsReferences": true,
       "aspectRatios": [
         {
           "value": "1:1",
@@ -1133,16 +1085,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 4,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "grok2api:grok-imagine-image-lite",
@@ -1152,7 +1098,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [
         {
           "value": "16:9",
@@ -1212,14 +1157,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "grok2api:grok-imagine-image",
@@ -1229,7 +1170,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [
         {
           "value": "16:9",
@@ -1289,14 +1229,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "grok2api:grok-imagine-image-pro",
@@ -1306,7 +1242,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [
         {
           "value": "16:9",
@@ -1366,14 +1301,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "grok2api:grok-imagine-image-edit",
@@ -1383,7 +1314,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [
         {
           "value": "1:1",
@@ -1421,16 +1351,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 4,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "12ai:veo_3_1-fast",
@@ -1440,7 +1364,6 @@
       "kind": "video",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -1514,17 +1437,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 3,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image",
-        "video"
-      ]
+      }
     },
     {
       "value": "12ai:veo_3_1-fast-fl",
@@ -1534,7 +1450,6 @@
       "kind": "video",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -1609,17 +1524,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 2,
-      "minReferenceImages": 1,
-      "referenceMediaTypes": [
-        "image",
-        "video"
-      ]
+      }
     },
     {
       "value": "12ai:omni_flash-10s",
@@ -1629,7 +1537,6 @@
       "kind": "video",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -1711,17 +1618,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 7,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image",
-        "video"
-      ]
+      }
     },
     {
       "value": "grok2api:grok-imagine-video",
@@ -1731,7 +1631,6 @@
       "kind": "video",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -1842,17 +1741,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 7,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image",
-        "video"
-      ]
+      }
     },
     {
       "value": "12ai:gemini-3.1-flash-lite-preview",
@@ -1862,7 +1754,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -1880,14 +1771,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "modelscope:Qwen/Qwen3-235B-A22B",
@@ -1897,7 +1784,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -1915,14 +1801,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "modelscope:Qwen/Qwen3-VL-235B-A22B-Instruct",
@@ -1932,7 +1814,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -1950,14 +1831,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "modelscope:MiniMax/MiniMax-M2.7:MiniMax",
@@ -1967,7 +1844,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -1985,14 +1861,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "mimo:mimo-v2.5-pro",
@@ -2002,7 +1874,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -2020,14 +1891,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "mimo:mimo-v2.5",
@@ -2037,7 +1904,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -2055,14 +1921,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "mimo:mimo-v2-flash",
@@ -2072,7 +1934,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -2090,14 +1951,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "mimo:mimo-v2.5-tts",
@@ -2107,7 +1964,6 @@
       "kind": "audio",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -2135,14 +1991,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "mimo:mimo-v2.5-tts-voicedesign",
@@ -2152,7 +2004,6 @@
       "kind": "audio",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -2184,14 +2035,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "mimo:mimo-v2.5-tts-voiceclone",
@@ -2201,7 +2048,6 @@
       "kind": "audio",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -2241,16 +2087,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 1,
-      "minReferenceImages": 1,
-      "referenceMediaTypes": [
-        "audio"
-      ]
+      }
     },
     {
       "value": "mimo:mimo-v2.5-asr",
@@ -2260,7 +2100,6 @@
       "kind": "audio",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -2291,16 +2130,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 1,
-      "minReferenceImages": 1,
-      "referenceMediaTypes": [
-        "audio"
-      ]
+      }
     },
     {
       "value": "runninghub:qwen/qwen3.7-max",
@@ -2310,7 +2143,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -2328,14 +2160,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "grok2api:grok-4.20-auto",
@@ -2345,7 +2173,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -2363,14 +2190,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "grok2api:grok-4.20-fast",
@@ -2380,7 +2203,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -2398,14 +2220,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "grok2api:grok-4.20-expert",
@@ -2415,7 +2233,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -2433,14 +2250,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "agnes:agnes-2.0-flash",
@@ -2450,7 +2263,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -2468,14 +2280,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "agnes:agnes-1.5-flash",
@@ -2485,7 +2293,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -2503,14 +2310,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "agnes:agnes-image-2.1-flash",
@@ -2520,7 +2323,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [
         {
           "value": "1:1",
@@ -2626,16 +2428,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 4,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "agnes:agnes-video-v2.0",
@@ -2645,7 +2441,6 @@
       "kind": "video",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -2694,16 +2489,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 2,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "xstx:claude-opus-4-7",
@@ -2713,7 +2502,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -2731,14 +2519,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "xstx:claude-opus-4-7-thinking",
@@ -2748,7 +2532,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -2766,14 +2549,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "xstx:claude-opus-4-7-liang",
@@ -2783,7 +2562,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -2801,14 +2579,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "xstx:claude-opus-4-6",
@@ -2818,7 +2592,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -2836,14 +2609,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "xstx:claude-opus-4-6-thinking",
@@ -2853,7 +2622,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -2871,14 +2639,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "xstx:claude-opus-4-6-20260205",
@@ -2888,7 +2652,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -2906,14 +2669,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "xstx:claude-opus-4-6-20260205-thinking",
@@ -2923,7 +2682,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -2941,14 +2699,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "xstx:claude-opus-4-5",
@@ -2958,7 +2712,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -2976,14 +2729,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "xstx:claude-opus-4-5-thinking",
@@ -2993,7 +2742,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -3011,14 +2759,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "xstx:claude-opus-4-5-20251101",
@@ -3028,7 +2772,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -3046,14 +2789,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "xstx:claude-opus-4-5-20251101-thinking",
@@ -3063,7 +2802,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -3081,14 +2819,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "xstx:claude-sonnet-4-6-20260217",
@@ -3098,7 +2832,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -3116,14 +2849,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "xstx:claude-sonnet-4-6-20260217-thinking",
@@ -3133,7 +2862,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -3151,14 +2879,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "xstx:claude-sonnet-4-5",
@@ -3168,7 +2892,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -3186,14 +2909,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "xstx:claude-sonnet-4-5-thinking",
@@ -3203,7 +2922,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -3221,14 +2939,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "xstx:claude-sonnet-4-5-20250929",
@@ -3238,7 +2952,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -3256,14 +2969,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "xstx:claude-sonnet-4-5-20250929-thinking",
@@ -3273,7 +2982,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -3291,14 +2999,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "xstx:claude-haiku-4-5",
@@ -3308,7 +3012,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -3326,14 +3029,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "xstx:gpt-5.5-pro",
@@ -3343,7 +3042,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -3361,14 +3059,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "xstx:gpt-5.5",
@@ -3378,7 +3072,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -3396,14 +3089,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "xstx:gpt-5.4",
@@ -3413,7 +3102,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -3431,14 +3119,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "xstx:gpt-5.4-codex",
@@ -3448,7 +3132,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -3466,14 +3149,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "xstx:gemini-3.1-pro-high",
@@ -3483,7 +3162,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -3501,14 +3179,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "xstx:gemini-3.1-pro-preview",
@@ -3518,7 +3192,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -3536,14 +3209,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "xstx:deepseek-v4-pro",
@@ -3553,7 +3222,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -3571,14 +3239,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "xstx:deepseek-v4-flash",
@@ -3588,7 +3252,6 @@
       "kind": "chat",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [],
       "thinkingLevels": [],
@@ -3606,14 +3269,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "xstx:gpt-image-2",
@@ -3623,7 +3282,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [
         {
           "value": "1:1",
@@ -3846,16 +3504,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 4,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "xstx:gpt-image-2-2k",
@@ -3865,7 +3517,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [
         {
           "value": "1:1",
@@ -4055,16 +3706,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 4,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "xstx:gpt-image-2-4k",
@@ -4074,7 +3719,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [
         {
           "value": "1:1",
@@ -4280,16 +3924,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 4,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "modelscope:Tongyi-MAI/Z-Image-Turbo",
@@ -4299,7 +3937,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": true,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [
         {
@@ -4350,14 +3987,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "modelscope:Qwen/Qwen-Image-2512",
@@ -4367,7 +4000,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": true,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [
         {
@@ -4418,14 +4050,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "modelscope:Qwen/Qwen-Image-Edit-2511",
@@ -4435,7 +4063,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": true,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -4496,16 +4123,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 4,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "modelscope:black-forest-labs/FLUX.2-klein-9B",
@@ -4515,7 +4136,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": true,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -4576,16 +4196,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 4,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "modelscope:Qwen/Qwen-Image",
@@ -4595,7 +4209,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": true,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [
         {
@@ -4646,14 +4259,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "modelscope:Qwen/Qwen-Image-Edit",
@@ -4663,7 +4272,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": true,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -4724,16 +4332,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 4,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/seedream-v5-lite/text-to-image",
@@ -4743,7 +4345,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -4808,7 +4409,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
@@ -4848,12 +4448,7 @@
           "mediaUpload",
           "dimensionDerivation"
         ]
-      },
-      "maxReferenceImages": 10,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/bytedance/jimeng-4.6/text-to-image",
@@ -4863,7 +4458,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -4928,7 +4522,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/bytedance/jimeng-4.6/text-to-image",
@@ -4983,12 +4576,7 @@
           "mediaUpload",
           "dimensionDerivation"
         ]
-      },
-      "maxReferenceImages": 16,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-image-g/text-to-image",
@@ -4998,7 +4586,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [
         {
           "value": "16:9",
@@ -5068,7 +4655,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
@@ -5093,12 +4679,7 @@
         "logic": [
           "mediaUpload"
         ]
-      },
-      "maxReferenceImages": 1,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-image/z-image/turbo",
@@ -5108,7 +4689,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [
         {
@@ -5163,7 +4743,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
@@ -5193,10 +4772,7 @@
           "mediaUpload",
           "dimensionDerivation"
         ]
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-image/f-2-dev/text-to-image",
@@ -5206,7 +4782,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [
         {
@@ -5261,7 +4836,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
@@ -5301,10 +4875,7 @@
           "mediaUpload",
           "dimensionDerivation"
         ]
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/minimax/hailuo-02/standard",
@@ -5314,7 +4885,6 @@
       "kind": "video",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -5357,7 +4927,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
@@ -5382,12 +4951,7 @@
           "mediaUpload",
           "durationCoercion"
         ]
-      },
-      "maxReferenceImages": 2,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/minimax/hailuo-02/pro",
@@ -5397,7 +4961,6 @@
       "kind": "video",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [
         {
@@ -5429,7 +4992,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
@@ -5454,10 +5016,7 @@
           "mediaUpload",
           "durationCoercion"
         ]
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/seedance-v1.5-pro/text-to-video",
@@ -5467,7 +5026,6 @@
       "kind": "video",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [
         {
@@ -5564,7 +5122,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
@@ -5608,10 +5165,7 @@
           "mediaUpload",
           "durationCoercion"
         ]
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/seedance-v1.5-pro/text-to-video-fast",
@@ -5621,7 +5175,6 @@
       "kind": "video",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [
         {
@@ -5714,7 +5267,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
@@ -5758,10 +5310,7 @@
           "mediaUpload",
           "durationCoercion"
         ]
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/bytedance/seedance-2.0-global-fast/text-to-video",
@@ -5771,7 +5320,6 @@
       "kind": "video",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -5916,10 +5464,12 @@
             "audioGuide"
           ],
           "delivery": "uploadedUrl"
+        },
+        "mixed": {
+          "maxTotalCount": 9
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
@@ -5968,14 +5518,7 @@
           "mediaUpload",
           "durationCoercion"
         ]
-      },
-      "maxReferenceImages": 9,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image",
-        "video",
-        "audio"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/bytedance/seedance-2.0-global/text-to-video",
@@ -5985,7 +5528,6 @@
       "kind": "video",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -6134,10 +5676,12 @@
             "audioGuide"
           ],
           "delivery": "uploadedUrl"
+        },
+        "mixed": {
+          "maxTotalCount": 9
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
@@ -6186,14 +5730,7 @@
           "mediaUpload",
           "durationCoercion"
         ]
-      },
-      "maxReferenceImages": 9,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image",
-        "video",
-        "audio"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/gemini-omni-flash/text-to-video",
@@ -6203,7 +5740,6 @@
       "kind": "video",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -6279,10 +5815,12 @@
             "reference"
           ],
           "delivery": "uploadedUrl"
+        },
+        "mixed": {
+          "maxTotalCount": 8
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/gemini-omni-flash/text-to-video",
@@ -6364,13 +5902,7 @@
           "mediaUpload",
           "durationCoercion"
         ]
-      },
-      "maxReferenceImages": 8,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image",
-        "video"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-image-n-g31-flash/text-to-image",
@@ -6380,7 +5912,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [
         {
           "value": "1:1",
@@ -6478,7 +6009,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/rhart-image-n-g31-flash/text-to-image",
@@ -6518,12 +6048,7 @@
           "mediaUpload",
           "dimensionDerivation"
         ]
-      },
-      "maxReferenceImages": 10,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-image-n-g31-flash-official/text-to-image",
@@ -6533,7 +6058,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [
         {
           "value": "1:1",
@@ -6631,7 +6155,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/rhart-image-n-g31-flash-official/text-to-image",
@@ -6671,12 +6194,7 @@
           "mediaUpload",
           "dimensionDerivation"
         ]
-      },
-      "maxReferenceImages": 14,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-image-n-pro/text-to-image",
@@ -6686,7 +6204,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [
         {
           "value": "1:1",
@@ -6768,7 +6285,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/rhart-image-n-pro/text-to-image",
@@ -6808,12 +6324,7 @@
           "mediaUpload",
           "dimensionDerivation"
         ]
-      },
-      "maxReferenceImages": 10,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-image-n-pro-official/text-to-image",
@@ -6823,7 +6334,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [
         {
           "value": "1:1",
@@ -6905,7 +6415,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/rhart-image-n-pro-official/text-to-image",
@@ -6945,12 +6454,7 @@
           "mediaUpload",
           "dimensionDerivation"
         ]
-      },
-      "maxReferenceImages": 10,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-image-n-pro-official/text-to-image-ultra",
@@ -6960,7 +6464,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [
         {
           "value": "1:1",
@@ -7038,7 +6541,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/rhart-image-n-pro-official/text-to-image-ultra",
@@ -7078,12 +6580,7 @@
           "mediaUpload",
           "dimensionDerivation"
         ]
-      },
-      "maxReferenceImages": 10,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-video-g/text-to-video",
@@ -7093,7 +6590,6 @@
       "kind": "video",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -7252,7 +6748,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/rhart-video-g/text-to-video",
@@ -7307,12 +6802,7 @@
           "mediaUpload",
           "durationCoercion"
         ]
-      },
-      "maxReferenceImages": 7,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-video-v3.1-fast/text-to-video",
@@ -7322,7 +6812,6 @@
       "kind": "video",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -7382,7 +6871,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/rhart-video-v3.1-fast/text-to-video",
@@ -7433,12 +6921,7 @@
           "mediaUpload",
           "durationCoercion"
         ]
-      },
-      "maxReferenceImages": 3,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-video-v3.1-fast-official/text-to-video",
@@ -7448,7 +6931,6 @@
       "kind": "video",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -7516,7 +6998,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/rhart-video-v3.1-fast-official/text-to-video",
@@ -7572,12 +7053,7 @@
           "mediaUpload",
           "durationCoercion"
         ]
-      },
-      "maxReferenceImages": 3,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-video-v3.1-pro/text-to-video",
@@ -7587,7 +7063,6 @@
       "kind": "video",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -7647,7 +7122,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/rhart-video-v3.1-pro/text-to-video",
@@ -7698,12 +7172,7 @@
           "mediaUpload",
           "durationCoercion"
         ]
-      },
-      "maxReferenceImages": 3,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-video-v3.1-pro-official/text-to-video",
@@ -7713,7 +7182,6 @@
       "kind": "video",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -7781,7 +7249,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/rhart-video-v3.1-pro-official/text-to-video",
@@ -7832,12 +7299,7 @@
           "mediaUpload",
           "durationCoercion"
         ]
-      },
-      "maxReferenceImages": 3,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-video-v3.1-lite-official/text-to-video",
@@ -7847,7 +7309,6 @@
       "kind": "video",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -7911,7 +7372,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/rhart-video-v3.1-lite-official/text-to-video",
@@ -7966,12 +7426,7 @@
           "mediaUpload",
           "durationCoercion"
         ]
-      },
-      "maxReferenceImages": 2,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-image-g-2/text-to-image",
@@ -7981,7 +7436,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [
         {
           "value": "empty",
@@ -8067,7 +7521,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/rhart-image-g-2/text-to-image",
@@ -8107,12 +7560,7 @@
           "mediaUpload",
           "dimensionDerivation"
         ]
-      },
-      "maxReferenceImages": 10,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-image-g-2-official/text-to-image",
@@ -8122,7 +7570,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [
         {
           "value": "1:1",
@@ -8237,7 +7684,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/rhart-image-g-2-official/text-to-image",
@@ -8277,12 +7723,7 @@
           "mediaUpload",
           "dimensionDerivation"
         ]
-      },
-      "maxReferenceImages": 10,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/youchuan/text-to-image-v7",
@@ -8292,7 +7733,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [
         {
           "value": "1:1",
@@ -8508,42 +7948,6 @@
           }
         }
       ],
-      "referenceSlots": [
-        {
-          "key": "runninghub.youchuan.sref",
-          "kind": "reference",
-          "label": "风格参考图",
-          "group": "references",
-          "providerField": "sref",
-          "mediaTypes": [
-            "image"
-          ],
-          "minCount": 0,
-          "maxCount": 1,
-          "role": "style",
-          "delivery": "uploadedUrl",
-          "ui": {
-            "control": "referenceSlot"
-          }
-        },
-        {
-          "key": "runninghub.youchuan.oref",
-          "kind": "reference",
-          "label": "对象参考图",
-          "group": "references",
-          "providerField": "oref",
-          "mediaTypes": [
-            "image"
-          ],
-          "minCount": 0,
-          "maxCount": 1,
-          "role": "object",
-          "delivery": "uploadedUrl",
-          "ui": {
-            "control": "referenceSlot"
-          }
-        }
-      ],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/youchuan/text-to-image-v7",
@@ -8632,12 +8036,7 @@
         "logic": [
           "mediaUpload"
         ]
-      },
-      "maxReferenceImages": 1,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/youchuan/text-to-image-v81",
@@ -8647,7 +8046,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [
         {
           "value": "1:1",
@@ -8814,25 +8212,6 @@
           }
         }
       ],
-      "referenceSlots": [
-        {
-          "key": "runninghub.youchuan.sref",
-          "kind": "reference",
-          "label": "风格参考图",
-          "group": "references",
-          "providerField": "sref",
-          "mediaTypes": [
-            "image"
-          ],
-          "minCount": 0,
-          "maxCount": 1,
-          "role": "style",
-          "delivery": "uploadedUrl",
-          "ui": {
-            "control": "referenceSlot"
-          }
-        }
-      ],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/youchuan/text-to-image-v81",
@@ -8911,12 +8290,7 @@
         "logic": [
           "mediaUpload"
         ]
-      },
-      "maxReferenceImages": 1,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:ai-app-image:1961345119528140802",
@@ -8926,7 +8300,6 @@
       "kind": "image",
       "listed": true,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -8971,16 +8344,10 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
-      },
-      "maxReferenceImages": 1,
-      "minReferenceImages": 1,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/seedream-v5-lite/image-to-image",
@@ -8990,7 +8357,6 @@
       "kind": "image",
       "listed": false,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -9055,7 +8421,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
@@ -9100,12 +8465,7 @@
           "mediaUpload",
           "dimensionDerivation"
         ]
-      },
-      "maxReferenceImages": 10,
-      "minReferenceImages": 1,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/bytedance/jimeng-4.6/image-to-image",
@@ -9115,7 +8475,6 @@
       "kind": "image",
       "listed": false,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -9180,7 +8539,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/bytedance/jimeng-4.6/image-to-image",
@@ -9240,12 +8598,7 @@
           "mediaUpload",
           "dimensionDerivation"
         ]
-      },
-      "maxReferenceImages": 14,
-      "minReferenceImages": 1,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-image-g/image-to-image",
@@ -9255,7 +8608,6 @@
       "kind": "image",
       "listed": false,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [
         {
           "value": "16:9",
@@ -9325,7 +8677,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
@@ -9355,12 +8706,7 @@
         "logic": [
           "mediaUpload"
         ]
-      },
-      "maxReferenceImages": 1,
-      "minReferenceImages": 1,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/minimax/hailuo-02/t2v-standard",
@@ -9370,7 +8716,6 @@
       "kind": "video",
       "listed": false,
       "supportsAsync": false,
-      "supportsReferences": false,
       "aspectRatios": [],
       "sizes": [
         {
@@ -9402,7 +8747,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
@@ -9427,10 +8771,7 @@
           "mediaUpload",
           "durationCoercion"
         ]
-      },
-      "maxReferenceImages": 0,
-      "minReferenceImages": 0,
-      "referenceMediaTypes": []
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/minimax/hailuo-02/i2v-standard",
@@ -9440,7 +8781,6 @@
       "kind": "video",
       "listed": false,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -9483,7 +8823,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
@@ -9518,12 +8857,7 @@
           "mediaUpload",
           "durationCoercion"
         ]
-      },
-      "maxReferenceImages": 2,
-      "minReferenceImages": 1,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/bytedance/seedance-2.0-global-fast/image-to-video",
@@ -9533,7 +8867,6 @@
       "kind": "video",
       "listed": false,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -9665,7 +8998,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
@@ -9737,12 +9069,7 @@
           "durationCoercion",
           "referenceRouting"
         ]
-      },
-      "maxReferenceImages": 2,
-      "minReferenceImages": 1,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/bytedance/seedance-2.0-global-fast/multimodal-video",
@@ -9752,7 +9079,6 @@
       "kind": "video",
       "listed": false,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -9896,10 +9222,12 @@
             "audioGuide"
           ],
           "delivery": "uploadedUrl"
+        },
+        "mixed": {
+          "maxTotalCount": 9
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
@@ -9976,14 +9304,7 @@
           "durationCoercion",
           "referenceRouting"
         ]
-      },
-      "maxReferenceImages": 9,
-      "minReferenceImages": 1,
-      "referenceMediaTypes": [
-        "image",
-        "video",
-        "audio"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/bytedance/seedance-2.0-global/image-to-video",
@@ -9993,7 +9314,6 @@
       "kind": "video",
       "listed": false,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -10129,7 +9449,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
@@ -10201,12 +9520,7 @@
           "durationCoercion",
           "referenceRouting"
         ]
-      },
-      "maxReferenceImages": 2,
-      "minReferenceImages": 1,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/bytedance/seedance-2.0-global/multimodal-video",
@@ -10216,7 +9530,6 @@
       "kind": "video",
       "listed": false,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -10364,10 +9677,12 @@
             "audioGuide"
           ],
           "delivery": "uploadedUrl"
+        },
+        "mixed": {
+          "maxTotalCount": 9
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
@@ -10444,14 +9759,7 @@
           "durationCoercion",
           "referenceRouting"
         ]
-      },
-      "maxReferenceImages": 9,
-      "minReferenceImages": 1,
-      "referenceMediaTypes": [
-        "image",
-        "video",
-        "audio"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/gemini-omni-flash/image-to-video",
@@ -10461,7 +9769,6 @@
       "kind": "video",
       "listed": false,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -10532,7 +9839,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/gemini-omni-flash/image-to-video",
@@ -10612,12 +9918,7 @@
           "durationCoercion",
           "referenceRouting"
         ]
-      },
-      "maxReferenceImages": 3,
-      "minReferenceImages": 1,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/gemini-omni-flash/video-edit",
@@ -10627,7 +9928,6 @@
       "kind": "video",
       "listed": false,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -10703,10 +10003,12 @@
             "reference"
           ],
           "delivery": "uploadedUrl"
+        },
+        "mixed": {
+          "maxTotalCount": 8
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/gemini-omni-flash/video-edit",
@@ -10791,13 +10093,7 @@
           "durationCoercion",
           "referenceRouting"
         ]
-      },
-      "maxReferenceImages": 8,
-      "minReferenceImages": 1,
-      "referenceMediaTypes": [
-        "image",
-        "video"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-image-n-g31-flash/image-to-image",
@@ -10807,7 +10103,6 @@
       "kind": "image",
       "listed": false,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [
         {
           "value": "1:1",
@@ -10905,7 +10200,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/rhart-image-n-g31-flash/image-to-image",
@@ -10950,12 +10244,7 @@
           "mediaUpload",
           "dimensionDerivation"
         ]
-      },
-      "maxReferenceImages": 10,
-      "minReferenceImages": 1,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-image-n-g31-flash-official/image-to-image",
@@ -10965,7 +10254,6 @@
       "kind": "image",
       "listed": false,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [
         {
           "value": "1:1",
@@ -11063,7 +10351,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/rhart-image-n-g31-flash-official/image-to-image",
@@ -11108,12 +10395,7 @@
           "mediaUpload",
           "dimensionDerivation"
         ]
-      },
-      "maxReferenceImages": 14,
-      "minReferenceImages": 1,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-image-n-pro/edit",
@@ -11123,7 +10405,6 @@
       "kind": "image",
       "listed": false,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [
         {
           "value": "1:1",
@@ -11205,7 +10486,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/rhart-image-n-pro/edit",
@@ -11250,12 +10530,7 @@
           "mediaUpload",
           "dimensionDerivation"
         ]
-      },
-      "maxReferenceImages": 10,
-      "minReferenceImages": 1,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-image-n-pro-official/edit",
@@ -11265,7 +10540,6 @@
       "kind": "image",
       "listed": false,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [
         {
           "value": "1:1",
@@ -11347,7 +10621,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/rhart-image-n-pro-official/edit",
@@ -11392,12 +10665,7 @@
           "mediaUpload",
           "dimensionDerivation"
         ]
-      },
-      "maxReferenceImages": 10,
-      "minReferenceImages": 1,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-image-n-pro-official/edit-ultra",
@@ -11407,7 +10675,6 @@
       "kind": "image",
       "listed": false,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [
         {
           "value": "1:1",
@@ -11485,7 +10752,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/rhart-image-n-pro-official/edit-ultra",
@@ -11530,12 +10796,7 @@
           "mediaUpload",
           "dimensionDerivation"
         ]
-      },
-      "maxReferenceImages": 10,
-      "minReferenceImages": 1,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-video-g/image-to-video",
@@ -11545,7 +10806,6 @@
       "kind": "video",
       "listed": false,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -11704,7 +10964,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/rhart-video-g/image-to-video",
@@ -11757,12 +11016,7 @@
           "durationCoercion",
           "referenceRouting"
         ]
-      },
-      "maxReferenceImages": 7,
-      "minReferenceImages": 1,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-video-v3.1-fast/image-to-video",
@@ -11772,7 +11026,6 @@
       "kind": "video",
       "listed": false,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -11831,7 +11084,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/rhart-video-v3.1-fast/image-to-video",
@@ -11880,12 +11132,7 @@
           "durationCoercion",
           "referenceRouting"
         ]
-      },
-      "maxReferenceImages": 3,
-      "minReferenceImages": 1,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-video-v3.1-fast/start-end-to-video",
@@ -11895,7 +11142,6 @@
       "kind": "video",
       "listed": false,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -11954,7 +11200,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/rhart-video-v3.1-fast/start-end-to-video",
@@ -12008,12 +11253,7 @@
           "durationCoercion",
           "referenceRouting"
         ]
-      },
-      "maxReferenceImages": 2,
-      "minReferenceImages": 2,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-video-v3.1-fast-official/image-to-video",
@@ -12023,7 +11263,6 @@
       "kind": "video",
       "listed": false,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -12090,7 +11329,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/rhart-video-v3.1-fast-official/image-to-video",
@@ -12149,12 +11387,7 @@
           "durationCoercion",
           "referenceRouting"
         ]
-      },
-      "maxReferenceImages": 2,
-      "minReferenceImages": 1,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-video-v3.1-fast-official/reference-to-video",
@@ -12164,7 +11397,6 @@
       "kind": "video",
       "listed": false,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -12214,7 +11446,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/rhart-video-v3.1-fast-official/reference-to-video",
@@ -12264,12 +11495,7 @@
           "durationCoercion",
           "referenceRouting"
         ]
-      },
-      "maxReferenceImages": 3,
-      "minReferenceImages": 1,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-video-v3.1-pro/image-to-video",
@@ -12279,7 +11505,6 @@
       "kind": "video",
       "listed": false,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -12334,7 +11559,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"
@@ -12369,12 +11593,7 @@
           "durationCoercion",
           "referenceRouting"
         ]
-      },
-      "maxReferenceImages": 3,
-      "minReferenceImages": 1,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-video-v3.1-pro/start-end-to-video",
@@ -12384,7 +11603,6 @@
       "kind": "video",
       "listed": false,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -12443,7 +11661,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/rhart-video-v3.1-pro/start-end-to-video",
@@ -12497,12 +11714,7 @@
           "durationCoercion",
           "referenceRouting"
         ]
-      },
-      "maxReferenceImages": 2,
-      "minReferenceImages": 2,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-video-v3.1-pro-official/image-to-video",
@@ -12512,7 +11724,6 @@
       "kind": "video",
       "listed": false,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -12579,7 +11790,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/rhart-video-v3.1-pro-official/image-to-video",
@@ -12633,12 +11843,7 @@
           "durationCoercion",
           "referenceRouting"
         ]
-      },
-      "maxReferenceImages": 2,
-      "minReferenceImages": 1,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-video-v3.1-pro-official/reference-to-video",
@@ -12648,7 +11853,6 @@
       "kind": "video",
       "listed": false,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -12702,7 +11906,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/rhart-video-v3.1-pro-official/reference-to-video",
@@ -12747,12 +11950,7 @@
           "durationCoercion",
           "referenceRouting"
         ]
-      },
-      "maxReferenceImages": 3,
-      "minReferenceImages": 1,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-video-v3.1-lite-official/image-to-video",
@@ -12762,7 +11960,6 @@
       "kind": "video",
       "listed": false,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -12825,7 +12022,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/rhart-video-v3.1-lite-official/image-to-video",
@@ -12878,12 +12074,7 @@
           "durationCoercion",
           "referenceRouting"
         ]
-      },
-      "maxReferenceImages": 1,
-      "minReferenceImages": 1,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-video-v3.1-lite-official/start-end-to-video",
@@ -12893,7 +12084,6 @@
       "kind": "video",
       "listed": false,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [],
       "sizes": [
         {
@@ -12943,7 +12133,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/rhart-video-v3.1-lite-official/start-end-to-video",
@@ -12993,12 +12182,7 @@
           "durationCoercion",
           "referenceRouting"
         ]
-      },
-      "maxReferenceImages": 2,
-      "minReferenceImages": 2,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-image-g-2/image-to-image",
@@ -13008,7 +12192,6 @@
       "kind": "image",
       "listed": false,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [
         {
           "value": "empty",
@@ -13094,7 +12277,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/rhart-image-g-2/image-to-image",
@@ -13139,12 +12321,7 @@
           "mediaUpload",
           "dimensionDerivation"
         ]
-      },
-      "maxReferenceImages": 10,
-      "minReferenceImages": 1,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     },
     {
       "value": "runninghub:api:/openapi/v2/rhart-image-g-2-official/image-to-image",
@@ -13154,7 +12331,6 @@
       "kind": "image",
       "listed": false,
       "supportsAsync": false,
-      "supportsReferences": true,
       "aspectRatios": [
         {
           "value": "1:1",
@@ -13269,7 +12445,6 @@
         }
       },
       "parameterDescriptors": [],
-      "referenceSlots": [],
       "pricing": {
         "status": "priced",
         "lookupKey": "api:/openapi/v2/rhart-image-g-2-official/image-to-image",
@@ -13314,12 +12489,7 @@
           "mediaUpload",
           "dimensionDerivation"
         ]
-      },
-      "maxReferenceImages": 10,
-      "minReferenceImages": 1,
-      "referenceMediaTypes": [
-        "image"
-      ]
+      }
     }
   ]
 }

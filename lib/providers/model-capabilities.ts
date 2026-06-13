@@ -1,4 +1,4 @@
-import type { MediaReferenceType } from "@/lib/media-references";
+import { mediaReferenceLabel, type MediaReferenceType } from "../media-references";
 
 export type ModelParameterGroup = "core" | "references" | "advanced" | "provider";
 export type ModelParameterKind = "number" | "boolean" | "enum" | "text" | "reference";
@@ -234,11 +234,11 @@ export function validateInputModalityReferences(
 ): void {
   const acceptedTypes = inputModalitiesReferenceMediaTypes(profile);
   const unsupported = references.find(reference => !acceptedTypes.includes(reference.type));
-  if (unsupported) throw new ModelCapabilityValidationError(`Model does not support ${unsupported.type} references`);
+  if (unsupported) throw new ModelCapabilityValidationError(`当前模型不支持${mediaReferenceLabel(unsupported.type)}输入`);
 
   const range = inputModalitiesReferenceCountRange(profile);
   if (references.length < range.minCount || references.length > range.maxCount) {
-    throw new ModelCapabilityValidationError(`Model supports ${range.minCount}-${range.maxCount} reference media items`);
+    throw new ModelCapabilityValidationError(`当前模型支持 ${range.minCount}-${range.maxCount} 个参考媒体`);
   }
 
   validateInputModalityTypeCount("image", profile.images, references, profile.mixed !== undefined);
@@ -352,6 +352,6 @@ function validateInputModalityTypeCount(
   const count = references.filter(reference => reference.type === type).length;
   const minCount = mixed ? 0 : profile.minCount;
   if (count < minCount || count > profile.maxCount) {
-    throw new ModelCapabilityValidationError(`Model supports ${minCount}-${profile.maxCount} ${type} references`);
+    throw new ModelCapabilityValidationError(`当前模型支持 ${minCount}-${profile.maxCount} 个${mediaReferenceLabel(type)}参考媒体`);
   }
 }

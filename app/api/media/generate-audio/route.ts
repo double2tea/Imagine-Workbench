@@ -4,7 +4,7 @@ import { audioOperationApiError } from "@/lib/api/audio-errors";
 import { apiErrorResponse, badRequest, requireApiText } from "@/lib/api/errors";
 import { isRunningHubWorkflowAudioTarget } from "@/lib/audio-generation-routing";
 import { readOptionalAudioFormat } from "@/lib/audio-operation-rules";
-import { mediaReferenceLabel, mediaReferenceTypeFromBase64DataUri, type MediaReferenceType } from "@/lib/media-references";
+import { mediaReferenceTypeFromBase64DataUri } from "@/lib/media-references";
 import { ModelCapabilityValidationError, validateInputModalityReferences } from "@/lib/providers/model-capabilities";
 import { generateAudioOperation } from "@/lib/providers/audio";
 import { getOptionalModelCapability, parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
     if (!capability.audioModes.includes(body.mode)) {
       throw badRequest("Selected audio model does not support this operation mode", "unsupported_audio_mode");
     }
-    const formatError = getReferenceMediaFormatError(referenceMedia, capability.referenceMediaTypes);
+    const formatError = getReferenceMediaFormatError(referenceMedia);
     if (formatError) throw badRequest(formatError, "invalid_reference_media");
     validateInputModalityReferences(capability.inputModalities, referenceMedia);
     const payloadError = getReferenceMediaPayloadError(referenceMedia.map(reference => reference.dataUri));
@@ -126,11 +126,10 @@ function readReferenceMediaItem(dataUri: string): ReferenceMedia {
   return { dataUri, type };
 }
 
-function getReferenceMediaFormatError(referenceMedia: ReferenceMedia[], acceptedTypes: MediaReferenceType[]): string | null {
+function getReferenceMediaFormatError(referenceMedia: ReferenceMedia[]): string | null {
   for (const reference of referenceMedia) {
     const actualType = mediaReferenceTypeFromBase64DataUri(reference.dataUri);
     if (!actualType) return "Audio reference media must be data:image/*, data:video/* or data:audio/* base64 data URIs";
-    if (!acceptedTypes.includes(actualType)) return `音频生成不支持${mediaReferenceLabel(actualType)}输入`;
   }
   return null;
 }

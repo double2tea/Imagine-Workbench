@@ -112,10 +112,21 @@ export interface ProviderModelCapability {
   referenceMediaTypes: MediaReferenceType[];
 }
 
+export type ModelCapabilityCatalogEntry = Omit<
+  ProviderModelCapability,
+  "supportsReferences" | "referenceSlots" | "maxReferenceImages" | "minReferenceImages" | "referenceMediaTypes"
+> & {
+  supportsReferences?: boolean;
+  referenceSlots?: ModelReferenceParameterDescriptor[];
+  maxReferenceImages?: number;
+  minReferenceImages?: number;
+  referenceMediaTypes?: MediaReferenceType[];
+};
+
 export interface ModelCapabilityCatalogDocument {
   version: string;
   source: string;
-  entries: ProviderModelCapability[];
+  entries: ModelCapabilityCatalogEntry[];
 }
 
 const MODEL_CAPABILITY_CATALOG = modelCapabilityCatalogJson as unknown as ModelCapabilityCatalogDocument;
@@ -857,6 +868,7 @@ export function readModelCapabilityCatalog(catalog: ModelCapabilityCatalogDocume
   }
 
   const seen = new Set<string>();
+  const entries: ProviderModelCapability[] = [];
   for (const entry of catalog.entries) {
     if (!isNonEmptyString(entry.value)) throw new Error("Model capability catalog entry is missing value");
     if (!isNonEmptyString(entry.label)) throw new Error(`${entry.value} is missing label`);
@@ -871,23 +883,55 @@ export function readModelCapabilityCatalog(catalog: ModelCapabilityCatalogDocume
     seen.add(entry.value);
     if (!entry.inputModalities) throw new Error(`${entry.value} is missing inputModalities`);
     if (!Array.isArray(entry.parameterDescriptors)) throw new Error(`${entry.value} is missing parameterDescriptors`);
-    if (!Array.isArray(entry.referenceSlots)) throw new Error(`${entry.value} is missing referenceSlots`);
-    if (!referenceSlotsMatchDescriptors(entry)) throw new Error(`${entry.value} has mismatched referenceSlots`);
     validateCatalogPricing(entry);
     validateCatalogPayloadMapping(entry);
+    entries.push(normalizeCatalogEntry(entry));
   }
-  return catalog.entries;
+  return entries;
 }
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
-function referenceSlotsMatchDescriptors(entry: ProviderModelCapability): boolean {
-  return JSON.stringify(entry.referenceSlots) === JSON.stringify(referenceParameterDescriptors(entry.parameterDescriptors));
+function normalizeCatalogEntry(entry: ModelCapabilityCatalogEntry): ProviderModelCapability {
+  const referenceSlots = referenceParameterDescriptors(entry.parameterDescriptors);
+  if (entry.referenceSlots !== undefined && JSON.stringify(entry.referenceSlots) !== JSON.stringify(referenceSlots)) {
+    throw new Error(`${entry.value} has mismatched referenceSlots`);
+  }
+
+  const referenceRange = inputModalitiesReferenceCountRange(entry.inputModalities);
+  const referenceMediaTypes = inputModalitiesReferenceMediaTypes(entry.inputModalities);
+  const supportsReferences = referenceMediaTypes.length > 0;
+  validateLegacyReferenceField(entry, "supportsReferences", supportsReferences);
+  validateLegacyReferenceField(entry, "minReferenceImages", referenceRange.minCount);
+  validateLegacyReferenceField(entry, "maxReferenceImages", referenceRange.maxCount);
+  if (
+    entry.referenceMediaTypes !== undefined &&
+    JSON.stringify(entry.referenceMediaTypes) !== JSON.stringify(referenceMediaTypes)
+  ) {
+    throw new Error(`${entry.value} has mismatched referenceMediaTypes`);
+  }
+
+  return {
+    ...entry,
+    supportsReferences,
+    referenceSlots,
+    maxReferenceImages: referenceRange.maxCount,
+    minReferenceImages: referenceRange.minCount,
+    referenceMediaTypes,
+  };
 }
 
-function validateCatalogPricing(entry: ProviderModelCapability): void {
+function validateLegacyReferenceField<K extends "supportsReferences" | "minReferenceImages" | "maxReferenceImages">(
+  entry: ModelCapabilityCatalogEntry,
+  key: K,
+  value: ProviderModelCapability[K],
+): void {
+  if (entry[key] !== undefined && entry[key] !== value) throw new Error(`${entry.value} has mismatched ${key}`);
+}
+
+function validateCatalogPricing(entry: ModelCapabilityCatalogEntry): void {
   if (!entry.pricing) throw new Error(`${entry.value} is missing pricing`);
   if (entry.pricing.status === "unpriced") {
     if (!entry.pricing.reason) throw new Error(`${entry.value} is missing unpriced reason`);
@@ -904,7 +948,7 @@ function validateCatalogPricing(entry: ProviderModelCapability): void {
   if (!isNonEmptyString(entry.pricing.source)) throw new Error(`${entry.value} priced entry is missing source`);
 }
 
-function validateCatalogPayloadMapping(entry: ProviderModelCapability): void {
+function validateCatalogPayloadMapping(entry: ModelCapabilityCatalogEntry): void {
   if (!entry.payloadMapping) return;
   if (entry.payloadMapping.provider !== entry.provider) {
     throw new Error(`${entry.value} payloadMapping provider does not match capability provider`);
@@ -1082,6 +1126,7 @@ function runningHubInputModalities(model: RunningHubStandardModel): ModelInputMo
       },
     };
   }
+  const referenceMediaTypes = model.referenceMediaTypes ?? ["image"];
   return {
     text: { required: true },
     images: {
@@ -1090,12 +1135,13 @@ function runningHubInputModalities(model: RunningHubStandardModel): ModelInputMo
       roles: model.videoReferenceMode === "firstLast" ? ["firstFrame", "lastFrame"] : ["reference"],
       delivery: "uploadedUrl",
     },
-    videos: model.referenceMediaTypes?.includes("video")
+    videos: referenceMediaTypes.includes("video")
       ? { minCount: 0, maxCount: model.maxReferenceImages, roles: ["reference"], delivery: "uploadedUrl" }
       : undefined,
-    audio: model.referenceMediaTypes?.includes("audio")
+    audio: referenceMediaTypes.includes("audio")
       ? { minCount: 0, maxCount: model.maxReferenceImages, roles: ["audioGuide"], delivery: "uploadedUrl" }
       : undefined,
+    mixed: referenceMediaTypes.length > 1 ? { maxTotalCount: model.maxReferenceImages } : undefined,
   };
 }
 

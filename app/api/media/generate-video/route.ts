@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiErrorResponse, requireApiText } from "@/lib/api/errors";
-import { DEFAULT_VIDEO_MODEL, getModelCapability, getVideoModelCapabilities, parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
+import { DEFAULT_VIDEO_MODEL, getModelCapability, parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
 import { ModelCapabilityValidationError, validateInputModalityReferences } from "@/lib/providers/model-capabilities";
 import { generateVideo } from "@/lib/providers/video";
 import {
@@ -9,7 +9,7 @@ import {
   runningHubResolvedNodeInfoAllowsEmptyPrompt,
 } from "@/lib/providers/runninghub-node-info";
 import { optionalText, resolveProviderConfig } from "@/lib/providers/utils";
-import { mediaReferenceLabel, mediaReferenceTypeFromBase64DataUri, type MediaReferenceType } from "@/lib/media-references";
+import { mediaReferenceTypeFromBase64DataUri } from "@/lib/media-references";
 import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, getReferenceMediaPayloadError } from "@/lib/reference-images";
 import type { ReferenceMedia } from "@/lib/providers/types";
 
@@ -41,11 +41,10 @@ export async function POST(req: NextRequest) {
     const parsed = parseProviderModel(modelValue, "12ai");
     const config = resolveProviderConfig(req, parsed.provider);
     const modelCapability = getModelCapability(modelValue, "video");
-    const capability = getVideoModelCapabilities(modelValue);
     const referenceMedia = readReferenceMedia(body.referenceMedia, body.images, body.image, body.lastFrame);
     const explicitRunningHubNodeInfoList = readRunningHubNodeInfoList(body.runningHubNodeInfoList);
     const runningHubNodeInfo = resolveRunningHubNodeInfoListForModel(parsed.model, explicitRunningHubNodeInfoList);
-    const formatError = getReferenceMediaFormatError(referenceMedia, capability.referenceMediaTypes);
+    const formatError = getReferenceMediaFormatError(referenceMedia);
     if (formatError) return NextResponse.json({ error: formatError }, { status: 400 });
     const payloadError = getReferenceMediaPayloadError(referenceMedia.map(reference => reference.dataUri));
     if (payloadError) return NextResponse.json({ error: payloadError }, { status: 413 });
@@ -127,11 +126,10 @@ function readReferenceMediaItem(dataUri: string): ReferenceMedia {
   return { dataUri, type };
 }
 
-function getReferenceMediaFormatError(referenceMedia: ReferenceMedia[], acceptedTypes: MediaReferenceType[]): string | null {
+function getReferenceMediaFormatError(referenceMedia: ReferenceMedia[]): string | null {
   for (const reference of referenceMedia) {
     const actualType = mediaReferenceTypeFromBase64DataUri(reference.dataUri);
     if (!actualType) return "Video reference media must be data:image/*, data:video/* or data:audio/* base64 data URIs";
-    if (!acceptedTypes.includes(actualType)) return `当前视频模型不支持${mediaReferenceLabel(actualType)}输入`;
   }
   return null;
 }
