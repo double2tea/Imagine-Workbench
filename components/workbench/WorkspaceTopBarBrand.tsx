@@ -1,6 +1,7 @@
 "use client";
 
 import ImagineMark from "@/components/brand/ImagineMark";
+import { APP_VERSION } from "@/lib/app-version";
 
 interface WorkspaceTopBarBrandProps {
   compact?: boolean;
@@ -9,13 +10,11 @@ interface WorkspaceTopBarBrandProps {
   version?: string;
 }
 
-const DEFAULT_WORKSPACE_VERSION = "v1.2";
-
 export default function WorkspaceTopBarBrand({
   compact = false,
   showBadge = true,
   subtitle,
-  version = DEFAULT_WORKSPACE_VERSION,
+  version = APP_VERSION,
 }: WorkspaceTopBarBrandProps) {
   const textClassName = compact ? "hidden min-w-0 xl:block" : "min-w-0";
 

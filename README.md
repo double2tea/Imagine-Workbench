@@ -317,6 +317,8 @@ Board generation resolves connected image references against the latest asset st
 pnpm run dev
 pnpm run dev:no-hmr
 pnpm run lint
+pnpm run check
+pnpm run check:version
 pnpm run build
 pnpm run pages:build
 pnpm run start
@@ -324,6 +326,8 @@ pnpm run test:providers
 ```
 
 `pnpm run dev` keeps Fast Refresh/HMR enabled for normal local work. `pnpm run dev:no-hmr` is only for non-interactive agent sessions that intentionally disable file watching while rewriting files rapidly. `pnpm run pages:build` clears prior Next/Vercel output and enables Vercel Corepack support so the Cloudflare adapter uses the `packageManager` version declared in `package.json`.
+
+The app version source of truth is `package.json`. `next.config.ts` exposes it to the UI as `NEXT_PUBLIC_APP_VERSION`, and `pnpm run check:version` verifies that the top-bar badge still follows that source. `pnpm run check` includes this version check.
 
 `next.config.ts` enables standalone output, React strict mode, and strict TypeScript build checking. ESLint is ignored during builds but should still be run during development. For production standalone output, build first and run the generated standalone server when needed.
 

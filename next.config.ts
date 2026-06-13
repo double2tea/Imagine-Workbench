@@ -1,9 +1,13 @@
 import type {NextConfig} from 'next';
 import path from 'node:path';
+import packageJson from './package.json';
 
 const projectRoot = path.resolve(process.cwd());
 
 const nextConfig: NextConfig = {
+  env: {
+    NEXT_PUBLIC_APP_VERSION: packageJson.version,
+  },
   reactStrictMode: true,
   eslint: {
     ignoreDuringBuilds: true,

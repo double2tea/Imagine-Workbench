@@ -27,6 +27,7 @@ Core boundaries:
 - Shared settings/data-management UI belongs in `components/settings/*`; workspace data operations belong in `lib/data-management.ts`.
 - App-root wrappers live in `components/workbench/WorkbenchProviders.tsx` (`ConfirmProvider` for confirm/alert dialogs).
 - Theme persistence and toggling live in `lib/theme-mode.ts` (`persistThemeMode`, `applyThemeClassesToDom`, `useThemeMode` for toolbar/header only). Do not put `themeMode` on `app/page.tsx` or `BoardPageClient` roots — that re-renders the whole workstation. Do not use `useSyncExternalStore` or `html { transition: color }` for theme.
+- App version source of truth is `package.json`; `next.config.ts` exposes it as `NEXT_PUBLIC_APP_VERSION`, UI reads `APP_VERSION` from `lib/app-version.ts`, and `pnpm run check:version` must stay included in `pnpm run check`.
 - Shared branding lives in `components/brand/ImagineMark.tsx`. Favicon is `public/icon.svg` only — do not add `app/icon.svg` (Cloudflare Pages `@cloudflare/next-on-pages` rejects non-edge App Router icon routes).
 
 ## TypeScript Rules
