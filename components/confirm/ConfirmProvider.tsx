@@ -126,7 +126,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
           >
             <motion.div
               ref={panelRef}
-              role={isAlert ? "dialog" : "alertdialog"}
+              role={isAlert ? "alertdialog" : "dialog"}
               aria-modal="true"
               aria-labelledby="imagine-confirm-title"
               aria-describedby="imagine-confirm-message"
@@ -155,7 +155,6 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                 )}
                 <button
                   type="button"
-                  autoFocus
                   className={`h-9 rounded-lg px-3 text-[11px] font-semibold transition ${
                     tone === "danger" && !isAlert
                       ? "imagine-danger-action border border-red-500/30"

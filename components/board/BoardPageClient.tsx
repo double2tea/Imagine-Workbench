@@ -175,7 +175,6 @@ import {
   type LocalStorageCleanupKind,
   type WorkspaceCleanupKind,
 } from "@/lib/data-management";
-import { CLEAR_WORKSPACE_ASSETS_MESSAGE } from "@/lib/workspace-messages";
 import { API_ROUTES } from "@/lib/api/routes";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 
@@ -4329,12 +4328,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     }
   }, [boardAssetsLoading, boardController, generationTasks, isBoardAssetScopeLoaded, items]);
 
-  const handleClearProject = async () => {
-    if (!(await confirmAction({
-      message: CLEAR_WORKSPACE_ASSETS_MESSAGE,
-      tone: "danger",
-      confirmLabel: "清空资产",
-    }))) return;
+  const clearProjectAssets = useCallback(async () => {
     try {
       await createWorkspaceSafetySnapshot("clear-assets");
       await clearAllDB();
@@ -4346,7 +4340,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, "本地资产库清空失败"));
     }
-  };
+  }, [pushWorkspaceNotice]);
 
   const reloadBoardAssetsFromDB = useCallback(async () => {
     await reloadBoardAssets();
@@ -4430,13 +4424,6 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   }, [pushWorkspaceNotice, resolvedBoardId]);
 
   const handleDataCleanupAssets = useCallback(async (kind: WorkspaceCleanupKind) => {
-    const labelByKind: Record<WorkspaceCleanupKind, string> = {
-      failed: "失败任务",
-      "stale-processing": "超过 2 小时的处理中/排队任务",
-      "broken-complete": "缺少媒体内容的完成记录",
-      orphaned: "未被任何画板引用的完成资产",
-    };
-    if (!(await confirmAction({ message: `确认清理${labelByKind[kind]}吗？`, tone: "danger", confirmLabel: "清理" }))) return;
     try {
       const result = await cleanupWorkspaceAssets(kind);
       await reloadBoardAssetsFromDB();
@@ -4444,13 +4431,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, "资产清理失败"));
     }
-  }, [confirmAction, pushWorkspaceNotice, reloadBoardAssetsFromDB]);
+  }, [pushWorkspaceNotice, reloadBoardAssetsFromDB]);
 
   const handleDataRepairAssetSources = useCallback(async () => {
-    if (!(await confirmAction({
-      message: "将扫描所有画板，并清除资产中指向已不存在画板节点的来源链接。资产文件、提示词和生成结果不会删除。确认继续？",
-      confirmLabel: "修复",
-    }))) return;
     try {
       const result = await repairStaleAssetSourceLinks();
       await reloadBoardAssetsFromDB();
@@ -4458,26 +4441,14 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, "来源链接修复失败"));
     }
-  }, [confirmAction, pushWorkspaceNotice, reloadBoardAssetsFromDB]);
+  }, [pushWorkspaceNotice, reloadBoardAssetsFromDB]);
 
   const handleDataClearLocalStorage = useCallback(async (kind: LocalStorageCleanupKind) => {
-    const labelByKind: Record<LocalStorageCleanupKind, string> = {
-      agent: "Agent 会话",
-      "model-cache": "模型缓存",
-      "provider-credentials": "provider 密钥",
-      "ui-preferences": "UI 偏好",
-    };
-    if (!(await confirmAction({ message: `确认清理${labelByKind[kind]}吗？`, tone: "danger", confirmLabel: "清理" }))) return;
     const count = clearLocalStorageGroup(kind);
     pushWorkspaceNotice("success", `已清理 ${count} 个本地键，刷新后完全生效`);
-  }, [confirmAction, pushWorkspaceNotice]);
+  }, [pushWorkspaceNotice]);
 
   const handleDataResetBoards = useCallback(async () => {
-    if (!(await confirmAction({
-      message: "确认重置所有画板为一个空白默认画板吗？",
-      tone: "danger",
-      confirmLabel: "重置",
-    }))) return;
     try {
       await resetBoardsToDefault();
       pushWorkspaceNotice("success", "画板已重置");
@@ -4485,7 +4456,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, "画板重置失败"));
     }
-  }, [confirmAction, pushWorkspaceNotice]);
+  }, [pushWorkspaceNotice]);
 
   const duplicateCurrentBoard = useCallback(async () => {
     try {
@@ -5025,7 +4996,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onAddFetchedModels={addFetchedModels}
         onAddManualModels={addManualModels}
         onCleanupAssets={handleDataCleanupAssets}
-        onClearAssets={handleClearProject}
+        onClearAssets={clearProjectAssets}
         onClearCredentials={clearProviderCredentials}
         onClearLocalStorage={handleDataClearLocalStorage}
         onClose={() => setShowSettings(false)}

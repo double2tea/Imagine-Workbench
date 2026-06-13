@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { API_ROUTES } from "@/lib/api/routes";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 
@@ -69,7 +69,7 @@ export function useResolveIntegrationSettings() {
   const [available, setAvailable] = useState(false);
   const [enabled, setEnabledState] = useState(false);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const nextAvailable = isResolveIntegrationAvailable();
     setAvailable(nextAvailable);
     setEnabledState(nextAvailable && readStoredResolveIntegrationEnabled());

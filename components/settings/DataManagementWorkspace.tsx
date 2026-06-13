@@ -16,6 +16,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
+import { useConfirm, type ConfirmRequest } from "@/components/confirm/ConfirmProvider";
 import { usePriceDisplaySetting } from "@/hooks/usePriceDisplaySetting";
 import {
   formatBytes,
@@ -24,6 +25,7 @@ import {
   type WorkspaceCleanupKind,
   type WorkspaceDataSummary,
 } from "@/lib/data-management";
+import { CLEAR_WORKSPACE_ASSETS_MESSAGE } from "@/lib/workspace-messages";
 
 interface DataManagementWorkspaceProps {
   hasCurrentBoard: boolean;
@@ -50,6 +52,8 @@ interface StatCardProps {
 }
 
 interface HealthAction {
+  busyLabel: string;
+  confirmRequest: ConfirmRequest;
   label: string;
   run: () => Promise<void>;
 }
@@ -108,6 +112,47 @@ function issueToneClassName(tone: HealthIssueGroup["tone"]): string {
   return "border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)]";
 }
 
+const CLEANUP_LABEL_BY_KIND: Record<WorkspaceCleanupKind, string> = {
+  failed: "失败任务",
+  "stale-processing": "超过 2 小时的处理中/排队任务",
+  "broken-complete": "缺少媒体内容的完成记录",
+  orphaned: "未被任何画板引用的完成资产",
+};
+
+const LOCAL_STORAGE_LABEL_BY_KIND: Record<LocalStorageCleanupKind, string> = {
+  agent: "Agent 会话",
+  "model-cache": "模型缓存",
+  "provider-credentials": "provider 密钥",
+  "ui-preferences": "UI 偏好",
+};
+
+const REPAIR_ASSET_SOURCES_CONFIRM_REQUEST: ConfirmRequest = {
+  message: "将扫描所有画板，并清除资产中指向已不存在画板节点的来源链接。资产文件、提示词和生成结果不会删除。确认继续？",
+  confirmLabel: "修复",
+};
+
+const RESET_BOARDS_CONFIRM_REQUEST: ConfirmRequest = {
+  message: "确认重置所有画板为一个空白默认画板吗？",
+  tone: "danger",
+  confirmLabel: "重置",
+};
+
+function buildCleanupConfirmRequest(kind: WorkspaceCleanupKind): ConfirmRequest {
+  return {
+    message: `确认清理${CLEANUP_LABEL_BY_KIND[kind]}吗？`,
+    tone: "danger",
+    confirmLabel: "清理",
+  };
+}
+
+function buildLocalStorageConfirmRequest(kind: LocalStorageCleanupKind): ConfirmRequest {
+  return {
+    message: `确认清理${LOCAL_STORAGE_LABEL_BY_KIND[kind]}吗？`,
+    tone: "danger",
+    confirmLabel: "清理",
+  };
+}
+
 function formatPercent(value: number | undefined): string {
   if (value === undefined) return "--";
   return `${Math.round(value * 100)}%`;
@@ -152,6 +197,7 @@ export default function DataManagementWorkspace({
 }: DataManagementWorkspaceProps) {
   const backupInputRef = useRef<HTMLInputElement | null>(null);
   const localAssetInputRef = useRef<HTMLInputElement | null>(null);
+  const confirmAction = useConfirm();
   const [busyLabel, setBusyLabel] = useState<string | null>(null);
   const [includeCredentials, setIncludeCredentials] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
@@ -165,6 +211,15 @@ export default function DataManagementWorkspace({
     } finally {
       setBusyLabel(null);
     }
+  };
+
+  const runConfirmedAction = async (
+    label: string,
+    request: ConfirmRequest,
+    action: () => Promise<void>,
+  ) => {
+    if (!(await confirmAction(request))) return;
+    await runAction(label, action);
   };
 
   const handleBackupFileChange = (fileList: FileList | null) => {
@@ -210,7 +265,12 @@ export default function DataManagementWorkspace({
         title: "完成但缺少媒体内容",
         count: integrity.brokenCompleteAssetIds.length,
         tone: "critical",
-        action: { label: "清坏记录", run: () => onCleanupAssets("broken-complete") },
+        action: {
+          label: "清坏记录",
+          busyLabel: "清坏记录中",
+          confirmRequest: buildCleanupConfirmRequest("broken-complete"),
+          run: () => onCleanupAssets("broken-complete"),
+        },
         details: integrity.brokenCompleteAssetIds,
       },
       {
@@ -218,7 +278,12 @@ export default function DataManagementWorkspace({
         title: "过期来源节点链接",
         count: integrity.staleAssetSourceLinks.length,
         tone: "attention",
-        action: { label: "修复来源", run: onRepairAssetSources },
+        action: {
+          label: "修复来源",
+          busyLabel: "修复来源中",
+          confirmRequest: REPAIR_ASSET_SOURCES_CONFIRM_REQUEST,
+          run: onRepairAssetSources,
+        },
         details: integrity.staleAssetSourceLinks.map(link =>
           `${link.assetId} / board:${link.boardId || "workspace"} / source:${link.sourceBoardNodeId} / ${link.status}`,
         ),
@@ -228,7 +293,12 @@ export default function DataManagementWorkspace({
         title: "过期进行中任务",
         count: integrity.staleProcessingAssetIds.length,
         tone: "attention",
-        action: { label: "清过期", run: () => onCleanupAssets("stale-processing") },
+        action: {
+          label: "清过期",
+          busyLabel: "清过期中",
+          confirmRequest: buildCleanupConfirmRequest("stale-processing"),
+          run: () => onCleanupAssets("stale-processing"),
+        },
         details: integrity.staleProcessingAssetIds,
       },
       {
@@ -236,7 +306,12 @@ export default function DataManagementWorkspace({
         title: "失败记录",
         count: integrity.failedAssetIds.length,
         tone: "attention",
-        action: { label: "清失败", run: () => onCleanupAssets("failed") },
+        action: {
+          label: "清失败",
+          busyLabel: "清失败中",
+          confirmRequest: buildCleanupConfirmRequest("failed"),
+          run: () => onCleanupAssets("failed"),
+        },
         details: integrity.failedAssetIds,
       },
     ];
@@ -368,7 +443,7 @@ export default function DataManagementWorkspace({
                     <button
                       type="button"
                       disabled={actionDisabled}
-                      onClick={() => void runAction(`${action.label}中`, action.run)}
+                      onClick={() => void runConfirmedAction(action.busyLabel, action.confirmRequest, action.run)}
                       className="imagine-secondary-action h-7 rounded-md border border-[var(--iw-border)] px-2 text-[10px] font-semibold text-[var(--iw-text)] disabled:opacity-50"
                     >
                       {action.label}
@@ -534,7 +609,7 @@ export default function DataManagementWorkspace({
             <button
               type="button"
               disabled={actionDisabled}
-              onClick={() => void runAction("清孤立中", () => onCleanupAssets("orphaned"))}
+              onClick={() => void runConfirmedAction("清孤立中", buildCleanupConfirmRequest("orphaned"), () => onCleanupAssets("orphaned"))}
               className="imagine-secondary-action h-9 rounded-lg border border-[var(--iw-border)] px-3 text-[11px] font-semibold text-[var(--iw-text)] disabled:opacity-50"
             >
               清孤立资产 ({assetSummary.orphaned})
@@ -562,23 +637,23 @@ export default function DataManagementWorkspace({
           危险区
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" disabled={actionDisabled} onClick={() => void runAction("清空资产中", onClearAssets)} className="imagine-danger-action h-9 rounded-lg px-3 text-[11px] font-semibold disabled:opacity-50">
+          <button type="button" disabled={actionDisabled} onClick={() => void runConfirmedAction("清空资产中", { message: CLEAR_WORKSPACE_ASSETS_MESSAGE, tone: "danger", confirmLabel: "清空资产" }, onClearAssets)} className="imagine-danger-action h-9 rounded-lg px-3 text-[11px] font-semibold disabled:opacity-50">
             <Trash2 className="mr-1 inline h-3.5 w-3.5" />
             清空资产
           </button>
-          <button type="button" disabled={actionDisabled} onClick={() => void runAction("重置画板中", onResetBoards)} className="imagine-danger-action h-9 rounded-lg px-3 text-[11px] font-semibold disabled:opacity-50">
+          <button type="button" disabled={actionDisabled} onClick={() => void runConfirmedAction("重置画板中", RESET_BOARDS_CONFIRM_REQUEST, onResetBoards)} className="imagine-danger-action h-9 rounded-lg px-3 text-[11px] font-semibold disabled:opacity-50">
             重置画板
           </button>
-          <button type="button" disabled={actionDisabled} onClick={() => void runAction("清 Agent 中", () => onClearLocalStorage("agent"))} className="imagine-danger-action h-9 rounded-lg px-3 text-[11px] font-semibold disabled:opacity-50">
+          <button type="button" disabled={actionDisabled} onClick={() => void runConfirmedAction("清 Agent 中", buildLocalStorageConfirmRequest("agent"), () => onClearLocalStorage("agent"))} className="imagine-danger-action h-9 rounded-lg px-3 text-[11px] font-semibold disabled:opacity-50">
             清 Agent
           </button>
-          <button type="button" disabled={actionDisabled} onClick={() => void runAction("清模型缓存中", () => onClearLocalStorage("model-cache"))} className="imagine-danger-action h-9 rounded-lg px-3 text-[11px] font-semibold disabled:opacity-50">
+          <button type="button" disabled={actionDisabled} onClick={() => void runConfirmedAction("清模型缓存中", buildLocalStorageConfirmRequest("model-cache"), () => onClearLocalStorage("model-cache"))} className="imagine-danger-action h-9 rounded-lg px-3 text-[11px] font-semibold disabled:opacity-50">
             清模型缓存
           </button>
-          <button type="button" disabled={actionDisabled} onClick={() => void runAction("清密钥中", () => onClearLocalStorage("provider-credentials"))} className="imagine-danger-action h-9 rounded-lg px-3 text-[11px] font-semibold disabled:opacity-50">
+          <button type="button" disabled={actionDisabled} onClick={() => void runConfirmedAction("清密钥中", buildLocalStorageConfirmRequest("provider-credentials"), () => onClearLocalStorage("provider-credentials"))} className="imagine-danger-action h-9 rounded-lg px-3 text-[11px] font-semibold disabled:opacity-50">
             清密钥
           </button>
-          <button type="button" disabled={actionDisabled} onClick={() => void runAction("清偏好中", () => onClearLocalStorage("ui-preferences"))} className="imagine-danger-action h-9 rounded-lg px-3 text-[11px] font-semibold disabled:opacity-50">
+          <button type="button" disabled={actionDisabled} onClick={() => void runConfirmedAction("清偏好中", buildLocalStorageConfirmRequest("ui-preferences"), () => onClearLocalStorage("ui-preferences"))} className="imagine-danger-action h-9 rounded-lg px-3 text-[11px] font-semibold disabled:opacity-50">
             清 UI 偏好
           </button>
         </div>
