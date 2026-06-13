@@ -30,7 +30,7 @@ import type { RunningHubTaskNodeBinding, RunningHubYouchuanAdvancedSettings } fr
 import { buildPromptWithReferenceMap } from "@/hooks/useReferenceState";
 import { audioOperationMissingReferenceMessage, audioOperationRequiresTextInput, readOptionalAudioFormat } from "@/lib/audio-operation-rules";
 import { getMediaReferenceType, mediaReferenceLabel } from "@/lib/media-references";
-import { getAudioModelCapabilities, getImageModelCapabilities, getVideoModelCapabilities, imageParameterValuesFromLegacy, imageParameterValuesToRunningHubYouchuan, parseProviderModel, type AudioOperationMode, type VideoReferenceMode } from "@/lib/providers/model-catalog";
+import { getAudioModelCapabilities, getImageModelCapabilities, getVideoModelCapabilities, imageParameterValuesFromLegacy, imageParameterValuesToRunningHubYouchuan, parseProviderModel, resolveImageModelQuality, type AudioOperationMode, type VideoReferenceMode } from "@/lib/providers/model-catalog";
 import { getProviderMeta } from "@/lib/providers/registry";
 import { runningHubAppPresetRequiresPrompt } from "@/lib/providers/runninghub";
 import { getReferenceImagePayloadError, getReferenceMediaPayloadError, prepareReferenceImageUrlForRequest, prepareReferenceMediaUrlForRequest } from "@/lib/reference-images";
@@ -400,7 +400,6 @@ export function useGenerationActions({
     const activeReferenceImage = activeReferenceImages[0]?.url ?? selectedReferenceImage;
     const requestModel = overrides.model ?? activeImageModel;
     const requestImageResolution = overrides.imageResolution ?? activeImageResolution;
-    const requestImageQuality = overrides.imageQuality ?? activeImageQuality;
     const requestIsCustomImageResolution = overrides.isCustomImageResolution ?? isCustomImageResolution;
     const requestThinkingLevel = overrides.thinkingLevel ?? imageThinkingLevel;
     const requestRunningHubYouchuan = runningHubYouchuanSettingsForModel(
@@ -408,6 +407,8 @@ export function useGenerationActions({
       overrides.runningHubYouchuan ?? runningHubYouchuan,
     );
     const requestImageCapabilities = getImageModelCapabilities(requestModel);
+    const requestedImageQuality = overrides.imageQuality ?? activeImageQuality;
+    const requestImageQuality = resolveImageModelQuality(requestModel, requestedImageQuality);
     const requestAspectRatio =
       requestIsCustomImageResolution
         ? customImageSizeAspectRatio(requestImageResolution) ?? (overrides.size ?? activeImageAspectRatio)

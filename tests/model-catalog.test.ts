@@ -20,6 +20,7 @@ import {
   isMimoWorkbenchTtsModel,
   parseProviderModel,
   readModelCapabilityCatalog,
+  resolveImageModelQuality,
   resolveAsyncImageModelValue,
   supportsAsyncImageGeneration,
   tryParseProviderModel,
@@ -211,6 +212,11 @@ test("reference-capable image models expose a usable reference limit", () => {
   assert.equal(capabilities.referenceMediaTypes.includes("image"), true);
   assert.equal(capabilities.minReferenceImages, 0);
   assert.equal(capabilities.maxReferenceImages >= 2, true);
+});
+
+test("image quality resolution follows the selected model capabilities", () => {
+  assert.equal(resolveImageModelQuality("runninghub:api:/openapi/v2/seedream-v5-lite/text-to-image", "1"), undefined);
+  assert.equal(resolveImageModelQuality("runninghub:api:/openapi/v2/youchuan/text-to-image-v7", "1"), "1");
 });
 
 test("runninghub control image app exposes one required image reference", () => {
@@ -582,10 +588,6 @@ test("runninghub exposes concrete standard model capabilities", () => {
   assert.equal(getProviderMeta("runninghub").supportsChat, true);
   assert.equal(getProviderMeta("runninghub").supportsAudio, true);
   assert.equal(CHAT_MODEL_OPTIONS["runninghub"].some(option => option.value === "runninghub:qwen/qwen3.7-max"), true);
-  assert.equal(IMAGE_MODEL_OPTIONS["runninghub"][0]?.value, "runninghub:api:/openapi/v2/seedream-v5-lite/text-to-image");
-  assert.equal(VIDEO_MODEL_OPTIONS["runninghub"][0]?.value, "runninghub:api:/openapi/v2/minimax/hailuo-02/standard");
-  assert.deepEqual(AUDIO_MODEL_OPTIONS["runninghub"], []);
-  assert.equal(IMAGE_MODEL_OPTIONS["runninghub"][0]?.label, "RunningHub Seedream V5 Lite Auto");
   assert.equal(
     IMAGE_MODEL_OPTIONS["runninghub"].some(
       option => option.value === "runninghub:api:/openapi/v2/seedream-v5-lite/text-to-image",
@@ -598,10 +600,23 @@ test("runninghub exposes concrete standard model capabilities", () => {
     ),
     true,
   );
+  assert.equal(
+    IMAGE_MODEL_OPTIONS["runninghub"].some(
+      option => option.value === "runninghub:api:/openapi/v2/alibaba/qwen-image-2.0/text-to-image",
+    ),
+    true,
+  );
+  assert.equal(
+    AUDIO_MODEL_OPTIONS["runninghub"].some(
+      option => option.value === "runninghub:api:/openapi/v2/rhart-audio/text-to-audio/speech-2.8-hd",
+    ),
+    true,
+  );
 
   const image = getModelCapability("runninghub:api:/openapi/v2/rhart-image/f-2-dev/text-to-image", "image");
   const video = getModelCapability("runninghub:api:/openapi/v2/minimax/hailuo-02/standard", "video");
   const seedream = getModelCapability("runninghub:api:/openapi/v2/seedream-v5-lite/text-to-image", "image");
+  const qwenImage = getModelCapability("runninghub:api:/openapi/v2/alibaba/qwen-image-2.0/text-to-image", "image");
   const seedance = getModelCapability("runninghub:api:/openapi/v2/bytedance/seedance-2.0-global-fast/text-to-video", "video");
   const seedanceMultimodal = getModelCapability(
     "runninghub:api:/openapi/v2/bytedance/seedance-2.0-global/text-to-video",
@@ -612,6 +627,8 @@ test("runninghub exposes concrete standard model capabilities", () => {
   const veo = getModelCapability("runninghub:api:/openapi/v2/rhart-video-v3.1-fast-official/text-to-video", "video");
   const videoXI2vHidden = "runninghub:api:/openapi/v2/rhart-video-g/image-to-video";
   const veoStartEndHidden = "runninghub:api:/openapi/v2/rhart-video-v3.1-fast/start-end-to-video";
+  const grokImage = getModelCapability("runninghub:api:/openapi/v2/rhart-image-g/text-to-image", "image");
+  const jimeng = getModelCapability("runninghub:api:/openapi/v2/bytedance/jimeng-4.6/text-to-image", "image");
   const gptImage = getModelCapability("runninghub:api:/openapi/v2/rhart-image-g-2-official/text-to-image", "image");
   const gptImageChannel = getModelCapability("runninghub:api:/openapi/v2/rhart-image-g-2/text-to-image", "image");
   const gptImageEditHidden = "runninghub:api:/openapi/v2/rhart-image-g-2-official/image-to-image";
@@ -622,7 +639,21 @@ test("runninghub exposes concrete standard model capabilities", () => {
   assert.equal(image.sizes.some(option => option.value === "custom"), true);
   assert.equal(seedream.supportsReferences, true);
   assert.equal(seedream.maxReferenceImages, 10);
-  assert.equal(seedream.sizes.some(option => option.value === "custom"), true);
+  assert.deepEqual(seedream.sizes.map(option => option.value), ["auto", "2k", "3k"]);
+  assert.deepEqual(seedream.qualityLevels, []);
+  assert.equal(seedream.payloadMapping?.fields.some(field => field.target === "width" || field.target === "height"), false);
+  assert.equal(seedream.payloadMapping?.fields.some(field => field.target === "resolution"), true);
+  assert.equal(qwenImage.payloadMapping?.operation, "promptDimensions");
+  assert.deepEqual(qwenImage.sizes.map(option => option.value).slice(0, 2), ["1024*1024", "1536*1536"]);
+  assert.deepEqual(jimeng.sizes.map(option => option.value), [
+    "auto",
+    "1024x1024",
+    "1536x1024",
+    "1024x1536",
+    "1536x1536",
+    "2048x2048",
+  ]);
+  assert.equal(jimeng.sizes.some(option => option.value === "1280x720" || option.value === "720x1280" || option.value === "custom"), false);
   assert.equal(getImageModelCapabilities("runninghub:api:/openapi/v2/seedream-v5-lite/text-to-image").maxReferenceImages, 10);
   assert.deepEqual(
     getImageModelCapabilities("runninghub:api:/openapi/v2/seedream-v5-lite/text-to-image").referenceMediaTypes,
@@ -716,6 +747,8 @@ test("runninghub exposes concrete standard model capabilities", () => {
   assert.equal(veo.maxReferenceImages, 3);
   assert.deepEqual(veo.durations.map(option => option.value), ["4", "6", "8"]);
   assert.equal(VIDEO_MODEL_OPTIONS["runninghub"].some(option => option.value === veoStartEndHidden), false);
+  assert.deepEqual(grokImage.sizes.map(option => option.value), ["960x960", "720x1280", "1280x720", "1168x784", "784x1168"]);
+  assert.equal(grokImage.payloadMapping?.fields.some(field => field.target === "aspectRatio" && field.source === "imageResolution"), true);
   assert.equal(gptImage.maxReferenceImages, 10);
   assert.equal(gptImage.supportsReferences, true);
   assert.deepEqual(gptImage.aspectRatios.map(option => option.value), [
@@ -738,6 +771,8 @@ test("runninghub exposes concrete standard model capabilities", () => {
   assert.deepEqual(gptImage.qualityLevels.map(option => option.value), ["low", "medium", "high"]);
   assert.deepEqual(gptImage.sizes.map(option => option.value), ["1k", "2k", "4k"]);
   assert.equal(gptImageChannel.aspectRatios.some(option => option.value === "2:1"), false);
+  assert.deepEqual(gptImageChannel.qualityLevels, []);
+  assert.equal(gptImageChannel.payloadMapping?.fields.some(field => field.target === "quality"), false);
   assert.equal(geminiFlash.maxReferenceImages, 14);
   assert.deepEqual(geminiFlash.aspectRatios.map(option => option.value), [
     "1:1",
@@ -756,6 +791,7 @@ test("runninghub exposes concrete standard model capabilities", () => {
     "8:1",
   ]);
   assert.deepEqual(geminiFlash.sizes.map(option => option.value), ["1k", "2k", "4k"]);
+  assert.equal(geminiFlash.payloadMapping?.fields.some(field => field.target === "quality"), false);
   assert.deepEqual(geminiProUltra.sizes.map(option => option.value), ["4k", "8k"]);
   assert.equal(IMAGE_MODEL_OPTIONS["runninghub"].some(option => option.value === gptImageEditHidden), false);
   assert.equal(
@@ -784,13 +820,16 @@ test("runninghub exposes concrete standard model capabilities", () => {
   assert.deepEqual(youchuan.qualityLevels.map(option => option.value), ["1", "4"]);
   assert.deepEqual(youchuan.sizes.map(option => option.value), ["auto"]);
   const youchuanV7 = getModelCapability("runninghub:api:/openapi/v2/youchuan/text-to-image-v7", "image");
+  const minimaxSpeech = getModelCapability("runninghub:api:/openapi/v2/rhart-audio/text-to-audio/speech-2.8-hd", "audio");
   assert.ok(youchuanV7);
   assert.equal(youchuanV7.supportsReferences, true);
   assert.equal(youchuanV7.maxReferenceImages, 1);
   assert.deepEqual(youchuanV7.qualityLevels.map(option => option.value), ["1", "2", "4"]);
+  assert.equal(minimaxSpeech.kind, "audio");
+  assert.deepEqual(minimaxSpeech.audioModes, ["tts"]);
   assert.throws(
     () => getModelCapability("runninghub:ai-app-audio:2061323800511344642", "audio"),
-    /RunningHub audio is supported through AI App \/ Workflow targets/,
+    /RunningHub audio Standard Model is not configured/,
   );
 });
 

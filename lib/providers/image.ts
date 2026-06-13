@@ -695,7 +695,7 @@ async function buildRunningHubRequest(
   mediaType: ProviderMediaType,
 ): Promise<RunningHubRequest> {
   const size = mediaType === "image" ? input.imageResolution : input.aspectRatio;
-  const standardModel = mediaType === "audio" ? null : getRunningHubStandardModel(input.model, mediaType);
+  const standardModel = getRunningHubStandardModel(input.model, mediaType);
   if (standardModel) {
     const references = input.referenceMedia ?? input.referenceImages.map(reference => ({ ...reference, type: "image" as const }));
     validateRunningHubStandardReferenceCount(standardModel, references.length);

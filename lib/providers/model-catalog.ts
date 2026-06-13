@@ -217,19 +217,11 @@ const GPT_IMAGE_RATIOS: ParameterOption[] = [
 ];
 
 const GROK_IMAGE_SIZES: ParameterOption[] = [
-  imageResolutionOption("1280x720"),
+  imageResolutionOption("960x960"),
   imageResolutionOption("720x1280"),
-  imageResolutionOption("1792x1024"),
-  imageResolutionOption("1024x1792"),
-  imageResolutionOption("1024x1024"),
-];
-
-const GROK_IMAGE_RATIOS: ParameterOption[] = [
-  { value: "16:9", label: "16:9 Landscape" },
-  { value: "9:16", label: "9:16 Vertical" },
-  { value: "7:4", label: "7:4 Landscape" },
-  { value: "4:7", label: "4:7 Portrait" },
-  { value: "1:1", label: "1:1 Square" },
+  imageResolutionOption("1280x720"),
+  imageResolutionOption("1168x784"),
+  imageResolutionOption("784x1168"),
 ];
 
 const GPT_QUALITY_OPTIONS: ParameterOption[] = [
@@ -332,6 +324,21 @@ const RUNNINGHUB_YOUCHUAN_V81_IMAGE_RATIOS: ParameterOption[] = [
 const RUNNINGHUB_GEMINI_ULTRA_IMAGE_RESOLUTIONS: ParameterOption[] = [
   { value: "4k", label: "4K" },
   { value: "8k", label: "8K" },
+];
+
+const RUNNINGHUB_SEEDREAM_V5_LITE_IMAGE_RESOLUTIONS: ParameterOption[] = [
+  { value: "auto", label: "Auto" },
+  { value: "2k", label: "2K" },
+  { value: "3k", label: "3K" },
+];
+
+const RUNNINGHUB_JIMENG_IMAGE_SIZES: ParameterOption[] = [
+  imageResolutionOption("auto"),
+  imageResolutionOption("1024x1024"),
+  imageResolutionOption("1536x1024"),
+  imageResolutionOption("1024x1536"),
+  imageResolutionOption("1536x1536"),
+  imageResolutionOption("2048x2048"),
 ];
 
 const VEO_31_VIDEO_SIZES: ParameterOption[] = [
@@ -589,6 +596,11 @@ export function getImageModelCapabilities(value: string): ImageModelCapabilities
   };
 }
 
+export function resolveImageModelQuality(value: string, imageQuality: string | undefined): string | undefined {
+  const qualities = getImageModelCapabilities(value).qualities;
+  return imageQuality && qualities.some(option => option.value === imageQuality) ? imageQuality : undefined;
+}
+
 export function imageParameterValuesFromLegacy(
   model: string,
   legacy: { runningHubYouchuan?: RunningHubYouchuanAdvancedSettings },
@@ -744,6 +756,18 @@ interface VideoCapabilityInput extends CapabilityInput {
   referenceMediaTypes?: MediaReferenceType[];
 }
 
+interface AudioCapabilityInput extends CapabilityInput {
+  modes: AudioOperationMode[];
+  outputKinds?: AudioOutputKind[];
+  defaultMode?: AudioOperationMode;
+  formats?: ParameterOption[];
+  durations?: ParameterOption[];
+  supportsReferences: boolean;
+  maxReferenceMedia?: number;
+  minReferenceMedia?: number;
+  referenceMediaTypes?: MediaReferenceType[];
+}
+
 function imageInputModalities(input: ImageCapabilityInput): ModelInputModalityProfile {
   if (!input.supportsReferences) return { text: { required: true } };
   return {
@@ -857,6 +881,61 @@ function videoCapability(input: VideoCapabilityInput): ProviderModelCapability {
     payloadMapping: input.payloadMapping,
     maxReferenceImages: input.maxReferenceImages,
     minReferenceImages: input.minReferenceImages,
+    referenceMediaTypes,
+  };
+}
+
+function audioInputModalities(input: AudioCapabilityInput): ModelInputModalityProfile {
+  if (!input.supportsReferences) return { text: { required: true } };
+  const referenceMediaTypes = input.referenceMediaTypes ?? ["audio"];
+  return {
+    text: { required: true },
+    images: referenceMediaTypes.includes("image")
+      ? { minCount: input.minReferenceMedia ?? 0, maxCount: input.maxReferenceMedia ?? 1, roles: ["reference"], delivery: "uploadedUrl" }
+      : undefined,
+    videos: referenceMediaTypes.includes("video")
+      ? { minCount: input.minReferenceMedia ?? 0, maxCount: input.maxReferenceMedia ?? 1, roles: ["reference"], delivery: "uploadedUrl" }
+      : undefined,
+    audio: referenceMediaTypes.includes("audio")
+      ? { minCount: input.minReferenceMedia ?? 0, maxCount: input.maxReferenceMedia ?? 1, roles: ["voice", "audioGuide"], delivery: "uploadedUrl" }
+      : undefined,
+    mixed: referenceMediaTypes.length > 1 ? { maxTotalCount: input.maxReferenceMedia ?? 1 } : undefined,
+  };
+}
+
+function audioCapability(input: AudioCapabilityInput): ProviderModelCapability {
+  const parameterDescriptors = input.parameterDescriptors ?? [];
+  const inputModalities = input.inputModalities ?? audioInputModalities(input);
+  const referenceRange = inputModalitiesReferenceCountRange(inputModalities);
+  const referenceMediaTypes = input.supportsReferences ? input.referenceMediaTypes ?? inputModalitiesReferenceMediaTypes(inputModalities) : [];
+  return {
+    value: input.value,
+    label: input.label,
+    provider: input.provider,
+    model: input.model,
+    kind: "audio",
+    listed: input.listed,
+    supportsAsync: false,
+    supportsReferences: input.supportsReferences,
+    aspectRatios: [],
+    sizes: [],
+    thinkingLevels: [],
+    qualityLevels: [],
+    resolutions: [],
+    durations: input.durations ?? [],
+    presets: input.formats ?? [],
+    audioModes: input.modes,
+    audioOutputKinds: input.outputKinds ?? ["audio"],
+    audioDefaultMode: input.defaultMode ?? input.modes[0],
+    videoReferenceMode: "none",
+    videoReferenceModes: [],
+    inputModalities,
+    parameterDescriptors,
+    referenceSlots: referenceParameterDescriptors(parameterDescriptors),
+    pricing: input.pricing ?? unpricedModel("unverified"),
+    payloadMapping: input.payloadMapping,
+    maxReferenceImages: input.supportsReferences ? input.maxReferenceMedia ?? referenceRange.maxCount : 0,
+    minReferenceImages: input.supportsReferences ? input.minReferenceMedia ?? referenceRange.minCount : 0,
     referenceMediaTypes,
   };
 }
@@ -1020,6 +1099,9 @@ function runningHubImageParameterProfile(
   model: RunningHubStandardModel,
 ): Pick<ImageCapabilityInput, "aspectRatios" | "qualityLevels" | "sizes"> {
   const lower = model.model.toLowerCase();
+  if (model.resolutionOptions && !lower.includes("seedream-v5-lite")) {
+    return { sizes: optionList(model.resolutionOptions) };
+  }
   if (lower.includes("rhart-image-g-2")) {
     const isOfficial = lower.includes("official");
     return {
@@ -1047,16 +1129,17 @@ function runningHubImageParameterProfile(
       sizes: AUTO_IMAGE_SIZES,
     };
   }
-  if (
-    lower.includes("seedream") ||
-    lower.includes("jimeng") ||
-    lower.includes("z-image") ||
-    lower.includes("f-2-dev")
-  ) {
+  if (lower.includes("seedream-v5-lite")) {
+    return { sizes: RUNNINGHUB_SEEDREAM_V5_LITE_IMAGE_RESOLUTIONS };
+  }
+  if (lower.includes("jimeng")) {
+    return { sizes: RUNNINGHUB_JIMENG_IMAGE_SIZES };
+  }
+  if (lower.includes("z-image") || lower.includes("f-2-dev")) {
     return { sizes: OPEN_DIMENSION_IMAGE_SIZES };
   }
   if (lower.includes("rhart-image-g/")) {
-    return { aspectRatios: GROK_IMAGE_RATIOS, sizes: GROK_IMAGE_SIZES };
+    return { sizes: GROK_IMAGE_SIZES };
   }
   return { aspectRatios: AUTO_ASPECT_RATIO, sizes: AUTO_IMAGE_SIZES };
 }
@@ -1103,7 +1186,11 @@ function runningHubVideoParameterProfile(
       sizes: VEO_31_VIDEO_SIZES,
     };
   }
-  return { sizes: RUNNINGHUB_VIDEO_SIZES };
+  return {
+    durations: optionList(model.durationOptions),
+    resolutions: optionList(model.resolutionOptions),
+    sizes: optionList(model.sizeOptions) ?? RUNNINGHUB_VIDEO_SIZES,
+  };
 }
 
 function optionList(values: readonly string[] | undefined): ParameterOption[] | undefined {
@@ -1126,20 +1213,47 @@ function runningHubInputModalities(model: RunningHubStandardModel): ModelInputMo
       },
     };
   }
+  if (model.kind === "audio") {
+    const referenceMediaTypes = model.referenceMediaTypes ?? [];
+    return {
+      text: { required: true },
+      images: referenceMediaTypes.includes("image")
+        ? { minCount: model.minReferenceImages, maxCount: model.maxReferenceImages, roles: ["reference"], delivery: "uploadedUrl" }
+        : undefined,
+      videos: referenceMediaTypes.includes("video")
+        ? { minCount: model.minReferenceImages, maxCount: model.maxReferenceImages, roles: ["reference"], delivery: "uploadedUrl" }
+        : undefined,
+      audio: referenceMediaTypes.includes("audio")
+        ? { minCount: model.minReferenceImages, maxCount: model.maxReferenceImages, roles: ["voice", "audioGuide"], delivery: "uploadedUrl" }
+        : undefined,
+      mixed: referenceMediaTypes.length > 1 ? { maxTotalCount: model.maxReferenceImages } : undefined,
+    };
+  }
   const referenceMediaTypes = model.referenceMediaTypes ?? ["image"];
+  const imageCounts = model.referenceCounts?.images ?? { minCount: model.minReferenceImages, maxCount: model.maxReferenceImages };
+  const videoCounts = model.referenceCounts?.videos ?? {
+    minCount: !referenceMediaTypes.includes("image") && referenceMediaTypes.includes("video") ? model.minReferenceImages : 0,
+    maxCount: model.maxReferenceImages,
+  };
+  const audioCounts = model.referenceCounts?.audio ?? {
+    minCount: !referenceMediaTypes.includes("image") && !referenceMediaTypes.includes("video") && referenceMediaTypes.includes("audio") ? model.minReferenceImages : 0,
+    maxCount: model.maxReferenceImages,
+  };
   return {
     text: { required: true },
-    images: {
-      minCount: model.minReferenceImages,
-      maxCount: model.maxReferenceImages,
-      roles: model.videoReferenceMode === "firstLast" ? ["firstFrame", "lastFrame"] : ["reference"],
-      delivery: "uploadedUrl",
-    },
+    images: referenceMediaTypes.includes("image")
+      ? {
+          minCount: imageCounts.minCount,
+          maxCount: imageCounts.maxCount,
+          roles: model.videoReferenceMode === "firstLast" ? ["firstFrame", "lastFrame"] : ["reference"],
+          delivery: "uploadedUrl",
+        }
+      : undefined,
     videos: referenceMediaTypes.includes("video")
-      ? { minCount: 0, maxCount: model.maxReferenceImages, roles: ["reference"], delivery: "uploadedUrl" }
+      ? { minCount: videoCounts.minCount, maxCount: videoCounts.maxCount, roles: ["reference"], delivery: "uploadedUrl" }
       : undefined,
     audio: referenceMediaTypes.includes("audio")
-      ? { minCount: 0, maxCount: model.maxReferenceImages, roles: ["audioGuide"], delivery: "uploadedUrl" }
+      ? { minCount: audioCounts.minCount, maxCount: audioCounts.maxCount, roles: ["audioGuide"], delivery: "uploadedUrl" }
       : undefined,
     mixed: referenceMediaTypes.length > 1 ? { maxTotalCount: model.maxReferenceImages } : undefined,
   };
@@ -1188,8 +1302,9 @@ function greatestCommonDivisor(a: number, b: number): number {
 function runningHubVirtualCapability(model: string, kind?: ModelKind): ProviderModelCapability {
   const lower = model.toLowerCase();
   const isVideo = lower.includes("video");
-  const resolvedKind: ModelKind = kind ?? (isVideo ? "video" : "image");
-  if (resolvedKind === "image" || resolvedKind === "video") {
+  const isAudio = lower.includes("audio") || lower.includes("speech") || lower.includes("music") || lower.includes("voice");
+  const resolvedKind: ModelKind = kind ?? (isAudio ? "audio" : isVideo ? "video" : "image");
+  if (resolvedKind === "image" || resolvedKind === "video" || resolvedKind === "audio") {
     const standardModel = getRunningHubStandardModel(model, resolvedKind);
     if (standardModel?.kind === "image") {
       const profile = runningHubImageParameterProfile(standardModel);
@@ -1225,6 +1340,23 @@ function runningHubVirtualCapability(model: string, kind?: ModelKind): ProviderM
         videoReferenceModes: standardModel.videoReferenceModes ? [...standardModel.videoReferenceModes] : undefined,
         maxReferenceImages: standardModel.maxReferenceImages,
         minReferenceImages: standardModel.minReferenceImages,
+        referenceMediaTypes: standardModel.referenceMediaTypes ? [...standardModel.referenceMediaTypes] : undefined,
+      });
+    }
+    if (standardModel?.kind === "audio") {
+      return audioCapability({
+        value: formatProviderModel("runninghub", standardModel.model),
+        label: standardModel.label,
+        provider: "runninghub",
+        model: standardModel.model,
+        modes: [...(standardModel.audioModes ?? ["tts"])],
+        formats: optionList(standardModel.audioFormatOptions),
+        supportsReferences: standardModel.supportsReferences,
+        inputModalities: runningHubInputModalities(standardModel),
+        pricing: unpricedModel("unverified"),
+        payloadMapping: runningHubStandardPayloadMapping(standardModel),
+        maxReferenceMedia: standardModel.maxReferenceImages,
+        minReferenceMedia: standardModel.minReferenceImages,
         referenceMediaTypes: standardModel.referenceMediaTypes ? [...standardModel.referenceMediaTypes] : undefined,
       });
     }
@@ -1266,8 +1398,6 @@ function runningHubVirtualCapability(model: string, kind?: ModelKind): ProviderM
       sizes: RUNNINGHUB_IMAGE_SIZES,
     });
   }
-  if (resolvedKind === "audio") {
-    throw new Error("RunningHub audio is supported through AI App / Workflow targets, not generic audio model capabilities");
-  }
+  if (resolvedKind === "audio") throw new Error(`RunningHub audio Standard Model is not configured: ${model}`);
   throw new Error(`RunningHub does not support ${resolvedKind} models`);
 }

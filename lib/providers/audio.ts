@@ -1,4 +1,5 @@
 import { generateRunningHubMedia, getRunningHubMediaStatus, downloadRunningHubMedia } from "./image";
+import { getRunningHubStandardModel } from "./runninghub";
 import {
   generateMimoTts,
   generateMimoTtsVoiceClone,
@@ -56,6 +57,16 @@ export async function generateAudioOperation(
   }
   if (input.voiceProfileId) {
     throw new Error("Voice profile IDs must be resolved before audio operation");
+  }
+
+  if (config.provider === "runninghub" && getRunningHubStandardModel(input.model, "audio")) {
+    const result = await generateAudio(config, input);
+    return {
+      type: "async",
+      outputKind: "audio",
+      operationName: result.operationName,
+      source: result.source,
+    };
   }
 
   if (config.provider === "mimo" || isMimoCompatibleAudioModel(input.model)) {

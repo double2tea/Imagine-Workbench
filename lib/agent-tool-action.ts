@@ -7,6 +7,7 @@ import {
   getImageResolutionOptions,
   getModelCapabilities,
   getVideoModelCapabilities,
+  resolveImageModelQuality,
 } from "./providers/model-catalog";
 
 export type { AgentGenerationParams };
@@ -45,9 +46,7 @@ export function resolveImageActionParams(
   const imageResolution = current.imageResolution && resolutionSource.some(option => option.value === current.imageResolution)
     ? current.imageResolution
     : firstOptionValue(resolutionSource, "1K");
-  const imageQuality = current.imageQuality && capabilities.qualities.some(option => option.value === current.imageQuality)
-    ? current.imageQuality
-    : capabilities.qualities[0]?.value;
+  const imageQuality = resolveImageModelQuality(model, current.imageQuality) ?? capabilities.qualities[0]?.value;
   const thinkingLevel = current.thinkingLevel && capabilities.thinkingLevels.some(option => option.value === current.thinkingLevel)
     ? current.thinkingLevel
     : capabilities.thinkingLevels[0]?.value;

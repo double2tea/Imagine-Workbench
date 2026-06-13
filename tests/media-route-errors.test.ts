@@ -70,7 +70,7 @@ test("native image generation route preserves RunningHub structured provider err
     const response = await postGenerateImage(jsonRequest({
       model: "runninghub:api:/openapi/v2/seedream-v5-lite/text-to-image",
       prompt: "enterprise gated image",
-      imageResolution: "1024x1024",
+      imageResolution: "2k",
     }, { Authorization: "Bearer rh_key" }) as Parameters<typeof postGenerateImage>[0]);
 
     assert.equal(response.status, 403);

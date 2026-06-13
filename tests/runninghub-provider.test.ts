@@ -80,26 +80,147 @@ test("runninghub standard video model validates duration", () => {
   );
 });
 
+test("runninghub mapped standard models route and validate mixed references", () => {
+  const hailuoText = getRunningHubStandardModel("api:/openapi/v2/minimax/hailuo-2.3/t2v-pro", "video");
+  const hailuoImage = getRunningHubStandardModel("api:/openapi/v2/minimax/hailuo-2.3/image-to-video-pro", "video");
+  const motion = getRunningHubStandardModel("api:/openapi/v2/kling-v3.0-std/motion-control", "video");
+  assert.ok(hailuoText);
+  assert.ok(hailuoImage);
+  assert.ok(motion);
+
+  assert.equal(
+    resolveRunningHubStandardModelForReferenceMedia(
+      hailuoText,
+      [{ type: "image" }],
+      "reference",
+    ).model,
+    hailuoImage.model,
+  );
+
+  assert.deepEqual(
+    buildRunningHubStandardBody(motion, {
+      prompt: "copy this motion",
+      referenceImages: [],
+      referenceMediaUrls: {
+        imageUrls: ["https://runninghub.example/character.png"],
+        videoUrls: ["https://runninghub.example/motion.mp4"],
+        audioUrls: [],
+      },
+    }),
+    {
+      imageUrl: "https://runninghub.example/character.png",
+      videoUrl: "https://runninghub.example/motion.mp4",
+      prompt: "copy this motion",
+      characterOrientation: "image",
+      keepOriginalSound: true,
+    },
+  );
+
+  assert.throws(
+    () => buildRunningHubStandardBody(motion, {
+      prompt: "missing video",
+      referenceImages: [],
+      referenceMediaUrls: {
+        imageUrls: ["https://runninghub.example/one.png", "https://runninghub.example/two.png"],
+        videoUrls: [],
+        audioUrls: [],
+      },
+    }),
+    /supports at most 1 图片 reference/,
+  );
+});
+
+test("runninghub mapped standard models coerce default numeric fields", () => {
+  const wanImage = getRunningHubStandardModel("api:/openapi/v2/alibaba/wan-2.7/text-to-image", "image");
+  const pixverse = getRunningHubStandardModel("api:/openapi/v2/pixverse-v6/text-to-video", "video");
+  assert.ok(wanImage);
+  assert.ok(pixverse);
+
+  assert.deepEqual(
+    buildRunningHubStandardBody(wanImage, {
+      prompt: "clean product render",
+      imageResolution: "auto",
+      referenceImages: [],
+    }),
+    {
+      prompt: "clean product render",
+      width: 1024,
+      height: 1024,
+      thinkingMode: true,
+    },
+  );
+
+  assert.equal(
+    buildRunningHubStandardBody(pixverse, {
+      prompt: "camera push in",
+      aspectRatio: "auto",
+      resolutionName: "auto",
+      durationSeconds: "auto",
+      referenceImages: [],
+    }).duration,
+    5,
+  );
+});
+
 test("runninghub standard image-to-image models use uploaded reference urls", () => {
   const seedream = getRunningHubStandardModel("api:/openapi/v2/seedream-v5-lite/image-to-image", "image");
+  const grokText = getRunningHubStandardModel("api:/openapi/v2/rhart-image-g/text-to-image", "image");
   const grok = getRunningHubStandardModel("api:/openapi/v2/rhart-image-g/image-to-image", "image");
   assert.ok(seedream);
+  assert.ok(grokText);
   assert.ok(grok);
 
   assert.deepEqual(
     buildRunningHubStandardBody(seedream, {
       prompt: "edit this image",
-      imageResolution: "1024x1024",
+      imageResolution: "2k",
       referenceImages: [{ dataUri: "data:image/png;base64,abc" }],
       referenceUrls: ["https://runninghub.example/input.png"],
     }),
     {
       prompt: "edit this image",
-      width: 1024,
-      height: 1024,
+      resolution: "2k",
       sequentialImageGeneration: "disabled",
       maxImages: 1,
       imageUrls: ["https://runninghub.example/input.png"],
+    },
+  );
+
+  assert.deepEqual(
+    buildRunningHubStandardBody(seedream, {
+      prompt: "use provider default resolution",
+      imageResolution: "auto",
+      referenceImages: [{ dataUri: "data:image/png;base64,abc" }],
+      referenceUrls: ["https://runninghub.example/input.png"],
+    }),
+    {
+      prompt: "use provider default resolution",
+      sequentialImageGeneration: "disabled",
+      maxImages: 1,
+      imageUrls: ["https://runninghub.example/input.png"],
+    },
+  );
+
+  assert.throws(
+    () => buildRunningHubStandardBody(seedream, {
+      prompt: "stale resolution",
+      imageResolution: "1024x1024",
+      referenceImages: [{ dataUri: "data:image/png;base64,abc" }],
+      referenceUrls: ["https://runninghub.example/input.png"],
+    }),
+    /Seedream V5 Lite Image-to-Image resolution must be 2k, 3k/,
+  );
+
+  assert.deepEqual(
+    buildRunningHubStandardBody(grokText, {
+      prompt: "poster",
+      imageResolution: "1280x720",
+      referenceImages: [],
+    }),
+    {
+      model: "g-4.2",
+      prompt: "poster",
+      aspectRatio: "1280x720",
     },
   );
 
@@ -289,7 +410,6 @@ test("runninghub omni flash video edit maps image and video references", () => {
     {
       prompt: "cat copies the reference motion",
       resolution: "720p",
-      duration: "6",
       aspectRatio: "16:9",
       imageUrls: ["https://runninghub.example/cat.png"],
       videoUrl: "https://runninghub.example/motion.mp4",
@@ -387,8 +507,10 @@ test("runninghub videox 1.5 channel video models map documented fields", () => {
 test("runninghub veo 3.1 and gpt image 2 variants map documented fields", () => {
   const veo = getRunningHubStandardModel("api:/openapi/v2/rhart-video-v3.1-fast-official/text-to-video", "video");
   const gptImage = getRunningHubStandardModel("api:/openapi/v2/rhart-image-g-2-official/text-to-image", "image");
+  const gptImageChannel = getRunningHubStandardModel("api:/openapi/v2/rhart-image-g-2/text-to-image", "image");
   assert.ok(veo);
   assert.ok(gptImage);
+  assert.ok(gptImageChannel);
 
   assert.deepEqual(
     buildRunningHubStandardBody(veo, {
@@ -436,6 +558,21 @@ test("runninghub veo 3.1 and gpt image 2 variants map documented fields", () => 
       resolution: "4k",
       quality: "high",
       imageUrls: ["https://runninghub.example/product.png"],
+    },
+  );
+
+  assert.deepEqual(
+    buildRunningHubStandardBody(gptImageChannel, {
+      prompt: "channel product photo",
+      aspectRatio: "16:9",
+      imageResolution: "4k",
+      imageQuality: "high",
+      referenceImages: [],
+    }),
+    {
+      prompt: "channel product photo",
+      aspectRatio: "16:9",
+      resolution: "4k",
     },
   );
 });
@@ -1027,7 +1164,7 @@ test("runninghub task creation reads documented and aliased task id fields", asy
           prompt: "task id shapes",
           model: "api:/openapi/v2/seedream-v5-lite/text-to-image",
           aspectRatio: "1:1",
-          imageResolution: "1024x1024",
+          imageResolution: "2k",
           referenceImages: [],
         },
         "image",
@@ -1180,7 +1317,7 @@ test("runninghub task creation error includes response summary when id is absent
             prompt: "missing task id",
             model: "api:/openapi/v2/seedream-v5-lite/text-to-image",
             aspectRatio: "1:1",
-            imageResolution: "1024x1024",
+            imageResolution: "2k",
             referenceImages: [],
           },
           "image",
@@ -1211,7 +1348,7 @@ test("runninghub task creation surfaces standard model access errors before task
             prompt: "enterprise only",
             model: "api:/openapi/v2/seedream-v5-lite/text-to-image",
             aspectRatio: "1:1",
-            imageResolution: "1024x1024",
+            imageResolution: "2k",
             referenceImages: [],
           },
           "image",
@@ -1247,7 +1384,7 @@ test("runninghub provider errors map rate limits to typed API errors", async () 
             prompt: "rate limited",
             model: "api:/openapi/v2/seedream-v5-lite/text-to-image",
             aspectRatio: "1:1",
-            imageResolution: "1024x1024",
+            imageResolution: "2k",
             referenceImages: [],
           },
           "image",
@@ -1319,12 +1456,14 @@ test("runninghub model listing filters standard models by metadata kind", async 
     const allModels = await listProviderModels(runningHubConfig, "all");
     const imageModels = await listProviderModels(runningHubConfig, "image");
     const videoModels = await listProviderModels(runningHubConfig, "video");
+    const audioModels = await listProviderModels(runningHubConfig, "audio");
 
     assert.equal(calls[0], "https://llm.runninghub.cn/v1/models");
     assert.equal(chatModels.some(option => option.value === "runninghub:qwen/qwen3.7-max"), true);
     assert.equal(allModels.some(option => option.value === "runninghub:qwen/qwen3.7-max"), true);
     assert.equal(allModels.some(option => option.value === "runninghub:ai-app-audio:<webappId>"), false);
-    assert.deepEqual(await listProviderModels(runningHubConfig, "audio"), []);
+    assert.equal(audioModels.some(option => option.value === "runninghub:api:/openapi/v2/rhart-audio/text-to-audio/speech-2.8-hd"), true);
+    assert.equal(audioModels.some(option => option.value === "runninghub:ai-app-audio:<webappId>"), false);
     assert.equal(
       imageModels.some(option => option.value === "runninghub:api:/openapi/v2/bytedance/seedance-2.0-global-fast/image-to-video"),
       false,
