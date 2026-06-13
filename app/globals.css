@@ -446,6 +446,43 @@ html::-webkit-scrollbar-thumb:hover {
   color: var(--iw-text);
 }
 
+.imagine-board-minimap {
+  overflow: hidden;
+  padding: 6px;
+}
+
+.board-light-minimap {
+  display: block;
+  cursor: crosshair;
+}
+
+.board-light-minimap-bg {
+  fill: color-mix(in srgb, var(--iw-panel-soft) 84%, transparent);
+}
+
+.board-light-minimap-node {
+  fill: var(--iw-board-minimap-node);
+  opacity: 0.72;
+}
+
+.board-light-minimap-node[data-kind="group"] {
+  fill: transparent;
+  opacity: 0.55;
+  stroke: var(--iw-board-minimap-node);
+  stroke-width: 1.2;
+}
+
+.board-light-minimap-node[data-selected="true"] {
+  fill: var(--iw-board-accent-amber);
+  opacity: 1;
+}
+
+.board-light-minimap-viewport {
+  fill: transparent;
+  stroke: var(--iw-board-accent-amber);
+  stroke-width: 1.5;
+}
+
 .imagine-board-view-controls {
   display: flex;
   margin-left: 50px;
@@ -492,12 +529,6 @@ html::-webkit-scrollbar-thumb:hover {
   background: currentColor;
   box-shadow: 0 0 8px currentColor;
   content: "";
-}
-
-.imagine-board-view-toggle[data-state="unavailable"] {
-  cursor: not-allowed;
-  color: var(--iw-faint);
-  opacity: 0.52;
 }
 
 .imagine-board-edge {
@@ -4387,7 +4418,10 @@ html[data-imagine-theme="light"] .board-media-stack-switcher {
 
 .board-canvas.is-node-dragging .react-flow__minimap,
 .board-canvas.is-viewport-moving .react-flow__minimap,
-.board-canvas.is-selection-moving .react-flow__minimap {
+.board-canvas.is-selection-moving .react-flow__minimap,
+.board-canvas.is-node-dragging .imagine-board-minimap,
+.board-canvas.is-viewport-moving .imagine-board-minimap,
+.board-canvas.is-selection-moving .imagine-board-minimap {
   display: none !important;
 }
 
@@ -4655,17 +4689,10 @@ html[data-imagine-theme="light"] .board-media-stack-switcher {
   border-color: rgba(15, 23, 42, 0.08) !important;
 }
 
-/* ReactFlow floating UI (Controls, MiniMap) in light board */
+/* ReactFlow floating UI in light board */
 .imagine-workbench-shell.imagine-theme-light .react-flow__panel {
   background: rgba(255, 255, 255, 0.92) !important;
   border-color: rgba(15, 23, 42, 0.1) !important;
-}
-
-/* MiniMap specific light overrides (overcomes the !important dark classes on the element) */
-.imagine-workbench-shell.imagine-theme-light .board-canvas .react-flow__minimap {
-  background: rgba(255, 255, 255, 0.95) !important;
-  border-color: rgba(15, 23, 42, 0.12) !important;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06) !important;
 }
 
 .imagine-workbench-shell.imagine-theme-light .board-canvas .react-flow__edge-path {

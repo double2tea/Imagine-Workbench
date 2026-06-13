@@ -12,7 +12,6 @@ import {
   Controls,
   EdgeToolbar,
   MarkerType,
-  MiniMap,
   NodeToolbar,
   Panel,
   PanOnScrollMode,
@@ -226,7 +225,9 @@ const BOARD_VIEWPORT_POSITION_EPSILON = 0.5;
 const BOARD_VIEWPORT_ZOOM_EPSILON = 0.001;
 const BOARD_VIEWPORT_MOVE_SETTLE_MS = 140;
 const BOARD_VISIBLE_RENDER_NODE_THRESHOLD = 120;
-const BOARD_MINIMAP_RENDER_NODE_THRESHOLD = 48;
+const BOARD_MINIMAP_WIDTH = 180;
+const BOARD_MINIMAP_HEIGHT = 128;
+const BOARD_MINIMAP_PADDING = 10;
 
 interface BoardSelectionSnapshot {
   edgeId: string | null;
@@ -243,6 +244,22 @@ interface MultiGridCellDropTarget {
   nodeId: string;
 }
 
+interface BoardMiniMapBounds {
+  height: number;
+  width: number;
+  x: number;
+  y: number;
+}
+
+interface LightweightBoardMiniMapProps {
+  nodes: BoardNodeModel[];
+  onCenter: (point: BoardPoint) => void;
+  selectedNodeId: string | null;
+  selectedNodeIds: string[];
+  viewport: BoardViewport;
+  viewportSize: BoardSize;
+}
+
 const SELECTION_TOOLBAR_GAP = 44;
 const EMPTY_STORAGE_ITEMS: StorageItem[] = [];
 
@@ -256,6 +273,41 @@ function sameBoardViewportModel(left: BoardViewport, right: BoardViewport): bool
     Math.abs(left.x - right.x) < BOARD_VIEWPORT_POSITION_EPSILON &&
     Math.abs(left.y - right.y) < BOARD_VIEWPORT_POSITION_EPSILON &&
     Math.abs(left.zoom - right.zoom) < BOARD_VIEWPORT_ZOOM_EPSILON
+  );
+}
+
+function sameBoardSize(left: BoardSize, right: BoardSize): boolean {
+  return (
+    Math.abs(left.width - right.width) < 0.5 &&
+    Math.abs(left.height - right.height) < 0.5
+  );
+}
+
+function boardMiniMapBounds(nodes: BoardNodeModel[]): BoardMiniMapBounds | null {
+  if (nodes.length === 0) return null;
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (const node of boardNodesWithAbsolutePositions(nodes)) {
+    minX = Math.min(minX, node.position.x);
+    minY = Math.min(minY, node.position.y);
+    maxX = Math.max(maxX, node.position.x + node.size.width);
+    maxY = Math.max(maxY, node.position.y + node.size.height);
+  }
+  if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) return null;
+  return {
+    height: Math.max(1, maxY - minY),
+    width: Math.max(1, maxX - minX),
+    x: minX,
+    y: minY,
+  };
+}
+
+function boardMiniMapScale(bounds: BoardMiniMapBounds): number {
+  return Math.min(
+    (BOARD_MINIMAP_WIDTH - BOARD_MINIMAP_PADDING * 2) / bounds.width,
+    (BOARD_MINIMAP_HEIGHT - BOARD_MINIMAP_PADDING * 2) / bounds.height,
   );
 }
 
@@ -768,6 +820,84 @@ function getBoardVar(varName: string, fallback: string): string {
   return val || fallback;
 }
 
+function LightweightBoardMiniMap({
+  nodes,
+  onCenter,
+  selectedNodeId,
+  selectedNodeIds,
+  viewport,
+  viewportSize,
+}: LightweightBoardMiniMapProps) {
+  const absoluteNodes = useMemo(() => boardNodesWithAbsolutePositions(nodes), [nodes]);
+  const bounds = useMemo(() => boardMiniMapBounds(nodes), [nodes]);
+  const selectedIds = useMemo(() => boardSelectedNodeIdSet(selectedNodeId, selectedNodeIds), [selectedNodeId, selectedNodeIds]);
+  if (!bounds) return null;
+
+  const scale = boardMiniMapScale(bounds);
+  const contentWidth = bounds.width * scale;
+  const contentHeight = bounds.height * scale;
+  const offsetX = (BOARD_MINIMAP_WIDTH - contentWidth) / 2;
+  const offsetY = (BOARD_MINIMAP_HEIGHT - contentHeight) / 2;
+  const toMiniX = (x: number): number => offsetX + (x - bounds.x) * scale;
+  const toMiniY = (y: number): number => offsetY + (y - bounds.y) * scale;
+  const viewX = -viewport.x / viewport.zoom;
+  const viewY = -viewport.y / viewport.zoom;
+  const viewportRect = viewportSize.width > 0 && viewportSize.height > 0
+    ? {
+      height: viewportSize.height / viewport.zoom * scale,
+      width: viewportSize.width / viewport.zoom * scale,
+      x: toMiniX(viewX),
+      y: toMiniY(viewY),
+    }
+    : null;
+
+  const handleMiniMapClick = (event: ReactMouseEvent<SVGSVGElement>): void => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = bounds.x + (event.clientX - rect.left - offsetX) / scale;
+    const y = bounds.y + (event.clientY - rect.top - offsetY) / scale;
+    onCenter({ x, y });
+  };
+
+  return (
+    <Panel position="bottom-right" className="imagine-board-minimap nodrag nopan">
+      <svg
+        aria-label="小地图"
+        className="board-light-minimap"
+        height={BOARD_MINIMAP_HEIGHT}
+        role="img"
+        viewBox={`0 0 ${BOARD_MINIMAP_WIDTH} ${BOARD_MINIMAP_HEIGHT}`}
+        width={BOARD_MINIMAP_WIDTH}
+        onClick={handleMiniMapClick}
+      >
+        <rect className="board-light-minimap-bg" x={0} y={0} width={BOARD_MINIMAP_WIDTH} height={BOARD_MINIMAP_HEIGHT} rx={6} />
+        {absoluteNodes.map(node => (
+          <rect
+            key={node.id}
+            className="board-light-minimap-node"
+            data-kind={node.kind}
+            data-selected={selectedIds.has(node.id) ? "true" : "false"}
+            height={Math.max(2, node.size.height * scale)}
+            rx={2}
+            width={Math.max(2, node.size.width * scale)}
+            x={toMiniX(node.position.x)}
+            y={toMiniY(node.position.y)}
+          />
+        ))}
+        {viewportRect && (
+          <rect
+            className="board-light-minimap-viewport"
+            height={Math.max(6, viewportRect.height)}
+            rx={3}
+            width={Math.max(6, viewportRect.width)}
+            x={viewportRect.x}
+            y={viewportRect.y}
+          />
+        )}
+      </svg>
+    </Panel>
+  );
+}
+
 function edgeColor(kind: BoardEdge["kind"]): string {
   const varNames: Record<BoardEdge["kind"], string> = { prompt: "--iw-board-edge-prompt", reference: "--iw-board-edge-reference", "agent-context": "--iw-board-edge-agent-context", result: "--iw-board-edge-result" };
   const fallbacks: Record<BoardEdge["kind"], string> = { prompt: "#2dd4bf", reference: "#60a5fa", "agent-context": "#a78bfa", result: "#34d399" };
@@ -1113,6 +1243,8 @@ export default function BoardWorkspace({
   const isCoarsePointer = useCoarsePointer();
   const flowInstanceRef = useRef<ReactFlowInstance<BoardFlowNode, BoardFlowEdge> | null>(null);
   const flowHostRef = useRef<HTMLElement | null>(null);
+  const [flowHostElement, setFlowHostElement] = useState<HTMLElement | null>(null);
+  const [flowHostSize, setFlowHostSize] = useState<BoardSize>({ height: 0, width: 0 });
   const mediaImportInputRef = useRef<HTMLInputElement>(null);
   const pendingImportPointRef = useRef<BoardPoint | null>(null);
   const copiedNodeRef = useRef<CopiedBoardNode | null>(null);
@@ -1301,7 +1433,22 @@ export default function BoardWorkspace({
   const viewportRef = useRef<BoardViewport>(board.viewport);
   const setFlowHostRef = useCallback((element: HTMLElement | null): void => {
     flowHostRef.current = element;
+    setFlowHostElement(element);
+    if (!element) return;
+    const nextSize = { height: element.clientHeight, width: element.clientWidth };
+    setFlowHostSize(current => sameBoardSize(current, nextSize) ? current : nextSize);
   }, []);
+  useEffect(() => {
+    if (!flowHostElement || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(entries => {
+      const rect = entries[0]?.contentRect;
+      if (!rect) return;
+      const nextSize = { height: rect.height, width: rect.width };
+      setFlowHostSize(current => sameBoardSize(current, nextSize) ? current : nextSize);
+    });
+    observer.observe(flowHostElement);
+    return () => observer.disconnect();
+  }, [flowHostElement]);
   useLayoutEffect(() => {
     viewportRef.current = board.viewport;
     selectionRef.current = { edgeId: selectedEdgeId, nodeId: selectedNodeId, nodeIds: selectedNodeIds };
@@ -2220,6 +2367,17 @@ export default function BoardWorkspace({
     flowInstanceRef.current = instance;
     setFlowReady(true);
   }, []);
+  const handleMiniMapCenter = useCallback((point: BoardPoint): void => {
+    if (flowHostSize.width <= 0 || flowHostSize.height <= 0) return;
+    const viewport = {
+      x: flowHostSize.width / 2 - point.x * viewportRef.current.zoom,
+      y: flowHostSize.height / 2 - point.y * viewportRef.current.zoom,
+      zoom: viewportRef.current.zoom,
+    };
+    viewportRef.current = viewport;
+    void flowInstanceRef.current?.setViewport(viewport, { duration: 0 });
+    setViewport(viewport);
+  }, [flowHostSize.height, flowHostSize.width, setViewport]);
 
   const handlePaneClick = useCallback((): void => {
     flowHostRef.current?.focus();
@@ -2230,11 +2388,7 @@ export default function BoardWorkspace({
   }, [closeOverlayMenus, selectEdge, selectNode, updateSelectedNodeIds]);
 
   const onlyRenderVisibleBoardElements = board.nodes.length >= BOARD_VISIBLE_RENDER_NODE_THRESHOLD;
-  const isMiniMapAvailable = board.nodes.length < BOARD_MINIMAP_RENDER_NODE_THRESHOLD;
-  const miniMapToggleTitle = isMiniMapAvailable
-    ? board.config.showMiniMap ? "隐藏小地图" : "显示小地图"
-    : `节点达到 ${BOARD_MINIMAP_RENDER_NODE_THRESHOLD} 个后，小地图已暂停以保持流畅`;
-  const shouldRenderMiniMap = board.config.showMiniMap && isMiniMapAvailable;
+  const shouldRenderMiniMap = board.config.showMiniMap;
 
   const visibleCenterPosition = useCallback((size: BoardSize): BoardPoint | undefined => {
     const rect = flowHostRef.current?.getBoundingClientRect();
@@ -2816,6 +2970,7 @@ export default function BoardWorkspace({
       event.target.closest(".react-flow__handle") ||
       event.target.closest(".react-flow__controls") ||
       event.target.closest(".react-flow__minimap") ||
+      event.target.closest(".imagine-board-minimap") ||
       event.target.closest(".imagine-board-quick-insert")
     ) {
       return;
@@ -3153,26 +3308,24 @@ export default function BoardWorkspace({
               </button>
               <button
                 type="button"
-                disabled={!isMiniMapAvailable}
-                onClick={() => {
-                  if (isMiniMapAvailable) updateBoardConfig({ showMiniMap: !board.config.showMiniMap });
-                }}
+                onClick={() => updateBoardConfig({ showMiniMap: !board.config.showMiniMap })}
                 className="imagine-board-view-toggle"
-                data-state={isMiniMapAvailable ? board.config.showMiniMap ? "on" : "off" : "unavailable"}
-                aria-pressed={isMiniMapAvailable && board.config.showMiniMap}
-                aria-label={miniMapToggleTitle}
-                title={miniMapToggleTitle}
+                data-state={board.config.showMiniMap ? "on" : "off"}
+                aria-pressed={board.config.showMiniMap}
+                aria-label={board.config.showMiniMap ? "隐藏小地图" : "显示小地图"}
+                title={board.config.showMiniMap ? "隐藏小地图" : "显示小地图"}
               >
                 <MapIcon className="h-3.5 w-3.5" />
               </button>
             </Panel>
             {shouldRenderMiniMap && (
-              <MiniMap
-                className="imagine-board-minimap"
-                nodeColor={getBoardVar("--iw-board-minimap-node", themeMode === "light" ? "#1e40af" : "#1d4ed8")}
-                maskColor={getBoardVar("--iw-board-minimap-mask", themeMode === "light" ? "rgba(241, 245, 249, 0.75)" : "rgba(2,6,23,0.66)")}
-                pannable
-                zoomable
+              <LightweightBoardMiniMap
+                nodes={board.nodes}
+                selectedNodeId={selectedNodeId}
+                selectedNodeIds={selectedNodeIds}
+                viewport={board.viewport}
+                viewportSize={flowHostSize}
+                onCenter={handleMiniMapCenter}
               />
             )}
             {selectedNodeIds.length > 1 ? (
