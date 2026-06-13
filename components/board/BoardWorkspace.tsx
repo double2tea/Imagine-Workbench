@@ -2230,7 +2230,11 @@ export default function BoardWorkspace({
   }, [closeOverlayMenus, selectEdge, selectNode, updateSelectedNodeIds]);
 
   const onlyRenderVisibleBoardElements = board.nodes.length >= BOARD_VISIBLE_RENDER_NODE_THRESHOLD;
-  const shouldRenderMiniMap = board.config.showMiniMap && board.nodes.length < BOARD_MINIMAP_RENDER_NODE_THRESHOLD;
+  const isMiniMapAvailable = board.nodes.length < BOARD_MINIMAP_RENDER_NODE_THRESHOLD;
+  const miniMapToggleTitle = isMiniMapAvailable
+    ? board.config.showMiniMap ? "隐藏小地图" : "显示小地图"
+    : `节点达到 ${BOARD_MINIMAP_RENDER_NODE_THRESHOLD} 个后，小地图已暂停以保持流畅`;
+  const shouldRenderMiniMap = board.config.showMiniMap && isMiniMapAvailable;
 
   const visibleCenterPosition = useCallback((size: BoardSize): BoardPoint | undefined => {
     const rect = flowHostRef.current?.getBoundingClientRect();
@@ -3149,12 +3153,15 @@ export default function BoardWorkspace({
               </button>
               <button
                 type="button"
-                onClick={() => updateBoardConfig({ showMiniMap: !board.config.showMiniMap })}
+                disabled={!isMiniMapAvailable}
+                onClick={() => {
+                  if (isMiniMapAvailable) updateBoardConfig({ showMiniMap: !board.config.showMiniMap });
+                }}
                 className="imagine-board-view-toggle"
-                data-state={board.config.showMiniMap ? "on" : "off"}
-                aria-pressed={board.config.showMiniMap}
-                aria-label={board.config.showMiniMap ? "隐藏小地图" : "显示小地图"}
-                title={board.config.showMiniMap ? "隐藏小地图" : "显示小地图"}
+                data-state={isMiniMapAvailable ? board.config.showMiniMap ? "on" : "off" : "unavailable"}
+                aria-pressed={isMiniMapAvailable && board.config.showMiniMap}
+                aria-label={miniMapToggleTitle}
+                title={miniMapToggleTitle}
               >
                 <MapIcon className="h-3.5 w-3.5" />
               </button>

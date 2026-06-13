@@ -9,6 +9,7 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_APP_VERSION: packageJson.version,
   },
   reactStrictMode: true,
+  devIndicators: false,
   eslint: {
     ignoreDuringBuilds: true,
   },
