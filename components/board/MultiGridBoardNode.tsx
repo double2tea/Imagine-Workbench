@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
+import { createPortal } from "react-dom";
 import { Archive, Download, Eraser, Maximize2, Minimize2, Minus, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
 import type { BoardMultiGridAspectRatio, BoardMultiGridItem, BoardMultiGridNode, BoardMultiGridSize, BoardSize } from "@/lib/board";
 import { DEFAULT_MULTI_GRID_NODE_SIZE } from "@/lib/board/defaults";
@@ -64,6 +65,12 @@ interface DragPreview {
   assetId: string;
   offsetX: number;
   offsetY: number;
+}
+
+interface ExtractPreview {
+  assetId: string;
+  clientX: number;
+  clientY: number;
 }
 
 interface SortDrag {
@@ -150,6 +157,7 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
   const [imageAspectRatioByAssetId, setImageAspectRatioByAssetId] = useState<ReadonlyMap<string, number>>(() => new Map());
   const [activeDrag, setActiveDrag] = useState<ActiveCellDrag | null>(null);
   const [dragPreview, setDragPreview] = useState<DragPreview | null>(null);
+  const [extractPreview, setExtractPreview] = useState<ExtractPreview | null>(null);
   const [isEditingLayout, setIsEditingLayout] = useState(false);
   const [sortDrag, setSortDrag] = useState<SortDrag | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -179,6 +187,7 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
     cancelScheduledDragPreview();
     setActiveDrag(null);
     setDragPreview(null);
+    setExtractPreview(null);
     setIsEditingLayout(false);
     setSortDrag(null);
   }, [node.id]);
@@ -230,6 +239,7 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
       offsetX: item.offsetX,
       offsetY: item.offsetY,
     });
+    setExtractPreview(null);
   };
 
   const beginItemSort = (event: ReactPointerEvent<HTMLDivElement>, item: BoardMultiGridItem): void => {
@@ -245,6 +255,18 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
     if (!activeDrag || activeDrag.pointerId !== event.pointerId) return;
     event.preventDefault();
     event.stopPropagation();
+    const isOutsideGrid = !isPointInsideElement(event.clientX, event.clientY, rootRef.current);
+    setExtractPreview(current => {
+      if (!isOutsideGrid) return current === null ? current : null;
+      if (
+        current?.assetId === activeDrag.assetId &&
+        current.clientX === event.clientX &&
+        current.clientY === event.clientY
+      ) {
+        return current;
+      }
+      return { assetId: activeDrag.assetId, clientX: event.clientX, clientY: event.clientY };
+    });
     scheduleDragPreview(dragPreviewForEvent(event, activeDrag));
   };
 
@@ -261,6 +283,7 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
       cancelScheduledDragPreview();
       setActiveDrag(null);
       setDragPreview(null);
+      setExtractPreview(null);
       return;
     }
     onUpdateItemTransform(activeDrag.assetId, {
@@ -273,6 +296,7 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
     cancelScheduledDragPreview();
     setActiveDrag(null);
     setDragPreview(null);
+    setExtractPreview(null);
   };
 
   const cancelItemDrag = (event: ReactPointerEvent<HTMLDivElement>): void => {
@@ -285,6 +309,7 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
     cancelScheduledDragPreview();
     setActiveDrag(null);
     setDragPreview(null);
+    setExtractPreview(null);
   };
 
   const endItemSort = (event: ReactPointerEvent<HTMLDivElement>): void => {
@@ -453,7 +478,12 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
 
       <div className="min-h-0 flex-1 p-3">
         <div
-          className="mx-auto grid max-h-full max-w-full overflow-hidden rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)]"
+          className={[
+            "mx-auto grid max-h-full max-w-full overflow-hidden rounded-lg border bg-[var(--iw-panel-soft)] transition-[border-color,box-shadow]",
+            extractPreview
+              ? "border-sky-300 shadow-[0_0_0_3px_rgba(59,130,246,0.18),0_0_24px_rgba(59,130,246,0.36)]"
+              : "border-[var(--iw-border)]",
+          ].join(" ")}
           style={{
             aspectRatio: aspectRatioCssValue(node.aspectRatio),
             gridTemplateColumns: `repeat(${node.gridSize}, minmax(0, 1fr))`,
@@ -469,6 +499,8 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
           {Array.from({ length: visibleCellCount }, (_, cellIndex) => {
             const item = itemByCellIndex.get(cellIndex);
             const isSelected = item?.assetId === node.selectedItemId;
+            const isActiveDragItem = Boolean(item && activeDrag?.assetId === item.assetId);
+            const isExtractDragItem = Boolean(item && extractPreview?.assetId === item.assetId);
             const isSortDragItem = Boolean(item && sortDrag?.assetId === item.assetId);
             const displayItem = item && dragPreview?.assetId === item.assetId
               ? { ...item, offsetX: dragPreview.offsetX, offsetY: dragPreview.offsetY }
@@ -508,7 +540,8 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
                   item ? isEditingLayout ? "cursor-move" : "cursor-grab active:cursor-grabbing" : "cursor-default",
                   item ? "" : "bg-[linear-gradient(135deg,rgba(16,185,129,0.08),rgba(255,255,255,0.02))] hover:border-emerald-300/50 hover:bg-emerald-400/10",
                   isSortDragItem ? "opacity-70" : "",
-                  isSelected ? "z-10 ring-2 ring-emerald-400" : "",
+                  isExtractDragItem ? "border-sky-300 bg-sky-400/10 opacity-60 ring-2 ring-sky-300/80" : "",
+                  isSelected && !isExtractDragItem ? "z-10 ring-2 ring-emerald-400" : "",
                 ].join(" ")}
                 title={item ? item.prompt || item.model : "拖入图片"}
               >
@@ -552,7 +585,7 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
                     <span className="text-[10px] font-semibold">拖入图片</span>
                   </span>
                 )}
-                {item && !isEditingLayout ? (
+                {item && !isEditingLayout && !isActiveDragItem ? (
                   <div
                     className={[
                       "pointer-events-none absolute inset-0 flex items-start justify-end p-1.5 opacity-0 transition",
@@ -634,6 +667,26 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
           })}
         </div>
       </div>
+
+      {typeof document !== "undefined" && extractPreview ? createPortal(
+        (() => {
+          const previewItem = node.items.find(item => item.assetId === extractPreview.assetId);
+          if (!previewItem) return null;
+          return (
+            <div
+              className="pointer-events-none fixed z-[9999] h-24 w-32 overflow-hidden rounded-md border border-sky-300/80 bg-white/80 opacity-85 shadow-[0_14px_40px_rgba(37,99,235,0.35)]"
+              style={{
+                left: extractPreview.clientX + 14,
+                top: extractPreview.clientY + 14,
+              }}
+            >
+              <img src={previewItem.url} alt="" className="h-full w-full object-cover" draggable={false} />
+              <div className="absolute inset-0 border border-white/70" />
+            </div>
+          );
+        })(),
+        document.body,
+      ) : null}
 
       <div className="nodrag flex min-h-[34px] shrink-0 items-center gap-2 border-t border-[var(--iw-border)] px-2 py-1">
         <span className="truncate text-[10px] font-semibold text-[var(--iw-muted)]">
