@@ -52,17 +52,17 @@ export default function CreatorGenerateButton({
       data-mode={mode}
       data-tone="accent"
       className={`imagine-primary-action imagine-creator-generate-btn flex w-full items-center justify-center gap-2 rounded-lg py-3 text-xs font-bold text-white transition duration-200 ${
-        disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer active:scale-[0.98]"
+        disabled ? "cursor-not-allowed" : "cursor-pointer active:scale-[0.98]"
       }`}
     >
       {isSubmitting ? (
-        <RefreshCw className="h-4 w-4 animate-spin text-white" />
+        <RefreshCw className="h-4 w-4 animate-spin text-current" />
       ) : isImage ? (
-        <Sparkles className="h-4 w-4 text-white" />
+        <Sparkles className="h-4 w-4 text-current" />
       ) : isAudio ? (
-        <AudioLines className="h-4 w-4 text-white" />
+        <AudioLines className="h-4 w-4 text-current" />
       ) : (
-        <VideoIcon className="h-4 w-4 text-white" />
+        <VideoIcon className="h-4 w-4 text-current" />
       )}
       <span className="truncate">{isSubmitting ? submittingLabel : (label ?? defaultLabel)}</span>
       {showPrice && (

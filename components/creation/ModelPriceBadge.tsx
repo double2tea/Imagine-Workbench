@@ -46,7 +46,7 @@ export default function ModelPriceBadge({
 
   return (
     <span
-      className="inline-flex shrink-0 items-center rounded-full border border-white/25 bg-white/15 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-white shadow-sm shadow-black/10"
+      className="imagine-model-price-badge inline-flex shrink-0 items-center rounded-full border border-white/25 bg-white/15 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-white shadow-sm shadow-black/10"
       title={price.detail ?? formatted}
     >
       {formatted}

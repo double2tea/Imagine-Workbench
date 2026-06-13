@@ -1068,6 +1068,13 @@ html::-webkit-scrollbar-thumb:hover {
   box-shadow: none !important;
 }
 
+.imagine-theme-dark .imagine-primary-action:disabled .imagine-model-price-badge {
+  border-color: var(--iw-border) !important;
+  background: rgba(15, 23, 42, 0.72) !important;
+  color: var(--iw-muted) !important;
+  box-shadow: none !important;
+}
+
 .imagine-theme-dark .imagine-secondary-action {
   background: var(--iw-panel-soft) !important;
   border-color: var(--iw-border) !important;
@@ -5017,10 +5024,17 @@ html[data-imagine-theme="light"] .imagine-required-chip,
 }
 
 .imagine-theme-light .imagine-primary-action:disabled {
-  background: #eef2f7 !important;
-  border-color: rgba(15, 23, 42, 0.1) !important;
-  color: #98a2b3 !important;
+  background: #f1f5f9 !important;
+  border-color: rgba(15, 23, 42, 0.14) !important;
+  color: #475569 !important;
   box-shadow: none !important;
+}
+
+.imagine-theme-light .imagine-primary-action:disabled .imagine-model-price-badge {
+  border-color: rgba(15, 23, 42, 0.16) !important;
+  background: #ffffff !important;
+  color: #475569 !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08) !important;
 }
 
 .imagine-filter-chip {
