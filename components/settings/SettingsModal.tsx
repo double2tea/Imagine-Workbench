@@ -1,5 +1,5 @@
 import { Settings, X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { AiProvider, ModelOption } from "@/lib/providers/model-catalog";
 import { ConnectionSettingsWorkspace } from "@/components/settings/ConnectionSettingsWorkspace";
@@ -137,6 +137,8 @@ export default function SettingsModal({
   const [tab, setTab] = useState<SettingsTab>("connections");
   const [dataSummary, setDataSummary] = useState<WorkspaceDataSummary | null>(null);
   const [dataSummaryError, setDataSummaryError] = useState<string | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
 
   const refreshDataSummary = useCallback(async () => {
     try {
@@ -156,6 +158,66 @@ export default function SettingsModal({
     return () => window.clearTimeout(refreshTimer);
   }, [open, refreshDataSummary, tab]);
 
+  useEffect(() => {
+    if (!open) return;
+
+    triggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const panel = panelRef.current;
+
+    const getFocusableElements = () =>
+      panel
+        ? Array.from(
+            panel.querySelectorAll<HTMLElement>(
+              'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+            ),
+          )
+        : [];
+
+    const focusTimer = window.setTimeout(() => {
+      getFocusableElements()[0]?.focus();
+    }, 0);
+
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+      const focusable = getFocusableElements();
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (event.shiftKey) {
+        if (document.activeElement === first) {
+          event.preventDefault();
+          last?.focus();
+        }
+        return;
+      }
+
+      if (document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.clearTimeout(focusTimer);
+      document.removeEventListener("keydown", onKeyDown);
+      const nextFocusTarget = triggerRef.current;
+      triggerRef.current = null;
+      if (nextFocusTarget?.isConnected) {
+        window.setTimeout(() => {
+          if (nextFocusTarget.isConnected) nextFocusTarget.focus();
+        }, 0);
+      }
+    };
+  }, [onClose, open]);
+
   return (
     <AnimatePresence>
       {open && (
@@ -167,6 +229,10 @@ export default function SettingsModal({
           className="imagine-settings-overlay fixed inset-0 z-50 flex items-stretch justify-end p-0 sm:items-center sm:justify-center sm:p-4"
         >
           <motion.div
+            ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="imagine-settings-title"
             initial={{ opacity: 0, scale: 0.965, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.965, y: 10 }}
@@ -174,7 +240,7 @@ export default function SettingsModal({
             className="imagine-settings-panel flex w-full flex-col overflow-hidden sm:rounded-2xl"
           >
             <div className="imagine-settings-header flex shrink-0 items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
-              <h3 className="imagine-settings-title flex items-center gap-2">
+              <h3 id="imagine-settings-title" className="imagine-settings-title flex items-center gap-2">
                 <Settings className="h-5 w-5 text-amber-500" />
                 设置
               </h3>

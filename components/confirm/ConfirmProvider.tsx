@@ -35,11 +35,19 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [request, setRequest] = useState<ConfirmRequest | null>(null);
   const resolveRef = useRef<((value: boolean) => void) | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
 
   const close = useCallback((value: boolean) => {
+    const nextFocusTarget = triggerRef.current;
     resolveRef.current?.(value);
     resolveRef.current = null;
+    triggerRef.current = null;
     setRequest(null);
+    if (nextFocusTarget?.isConnected) {
+      window.setTimeout(() => {
+        if (nextFocusTarget.isConnected) nextFocusTarget.focus();
+      }, 0);
+    }
   }, []);
 
   const confirm = useCallback((next: ConfirmRequest) => {
@@ -47,6 +55,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       if (resolveRef.current) {
         resolveRef.current(false);
       }
+      triggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       resolveRef.current = resolve;
       setRequest({ kind: "confirm", ...next });
     });
@@ -75,18 +84,23 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
     if (!request) return;
 
     const panel = panelRef.current;
-    const focusable = panel
-      ? Array.from(
-          panel.querySelectorAll<HTMLElement>(
-            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-          ),
-        )
-      : [];
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    first?.focus();
+    const getFocusableElements = () =>
+      panel
+        ? Array.from(
+            panel.querySelectorAll<HTMLElement>(
+              'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+            ),
+          )
+        : [];
+    const focusTimer = window.setTimeout(() => {
+      getFocusableElements()[0]?.focus();
+    }, 0);
 
     const onKeyDown = (event: KeyboardEvent): void => {
+      const focusable = getFocusableElements();
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
       if (event.key === "Escape") {
         event.preventDefault();
         close(isAlert);
@@ -107,7 +121,10 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
     };
 
     document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
+    return () => {
+      window.clearTimeout(focusTimer);
+      document.removeEventListener("keydown", onKeyDown);
+    };
   }, [close, isAlert, request]);
 
   return (
@@ -147,6 +164,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                 {!isAlert && (
                   <button
                     type="button"
+                    autoFocus
                     className="imagine-secondary-action h-9 rounded-lg border border-[var(--iw-border)] px-3 text-[11px] font-semibold text-[var(--iw-text)]"
                     onClick={() => close(false)}
                   >
