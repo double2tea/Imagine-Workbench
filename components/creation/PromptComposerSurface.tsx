@@ -1,4 +1,4 @@
-import { useState, type DragEvent, type ReactNode } from "react";
+import { useId, useState, type DragEvent, type ReactNode } from "react";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import PromptReferenceInlineOverlay, {
   resolvePromptReferenceThumbnails,
@@ -16,6 +16,7 @@ interface PromptComposerSurfaceProps {
   icon: ReactNode;
   label: string;
   mobileHint?: string;
+  name?: string;
   onChange: (value: string, caret: number) => void;
   onDropAsset: (event: DragEvent<HTMLTextAreaElement>) => void;
   placeholder: string;
@@ -33,6 +34,7 @@ export default function PromptComposerSurface({
   icon,
   label,
   mobileHint = "@ 可引用作品",
+  name = "prompt",
   onChange,
   onDropAsset,
   placeholder,
@@ -40,12 +42,13 @@ export default function PromptComposerSurface({
   references,
 }: PromptComposerSurfaceProps) {
   const [isDragOver, setIsDragOver] = useState(false);
+  const textareaId = useId();
   const referenceThumbnails = resolvePromptReferenceThumbnails(prompt, references, acceptedMediaTypes);
   return (
     <div>
       {headerVariant === "toolbar" ? (
         <div className="mb-2 flex min-h-10 items-center justify-between gap-2 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5">
-          <label className="flex min-w-0 items-center gap-2">
+          <label htmlFor={textareaId} className="flex min-w-0 items-center gap-2">
             <span
               className="imagine-tone-surface flex h-7 w-7 shrink-0 items-center justify-center rounded-md border"
               data-tone={headerAccent}
@@ -60,7 +63,7 @@ export default function PromptComposerSurface({
         </div>
       ) : (
         <div className="mb-2 flex items-center justify-between">
-          <label className="flex items-center gap-1.5 imagine-section-label">
+          <label htmlFor={textareaId} className="flex items-center gap-1.5 imagine-section-label">
             {icon}
             {label}
           </label>
@@ -76,6 +79,8 @@ export default function PromptComposerSurface({
         {atDropdownNode}
         <div className="relative">
           <textarea
+            id={textareaId}
+            name={name}
             value={prompt}
             onChange={(event) => onChange(event.target.value, event.target.selectionStart)}
             onDragEnter={(event) => {

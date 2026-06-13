@@ -99,6 +99,7 @@ export default function ReferenceImagePicker({
     : [];
   const canAdd = maxCount > 0 && visibleReferenceItems.length < maxCount;
   const accept = acceptedMediaTypes.map(type => `${type}/*`).join(",");
+  const uploadInputLabel = `${label}：${uploadLabel}`;
 
   const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
     const asset = onDropAsset && hasDraggedReferenceAsset(event.dataTransfer)
@@ -232,7 +233,14 @@ export default function ReferenceImagePicker({
             <label className="imagine-reference-add-tile">
               <span className="font-bold text-lg leading-none">+</span>
               <span className="mt-0.5 text-[9px] font-semibold">{addLabel}</span>
-              <input type="file" accept={accept} onChange={onUpload} className="hidden" />
+              <input
+                type="file"
+                name="reference-upload"
+                accept={accept}
+                aria-label={uploadInputLabel}
+                onChange={onUpload}
+                className="hidden"
+              />
             </label>
           )}
         </div>
@@ -244,7 +252,14 @@ export default function ReferenceImagePicker({
               {maxCount > 0 ? (
                 <label className={browseClassName}>
                   {uploadLabel}
-                  <input type="file" accept={accept} onChange={onUpload} className="hidden" />
+                  <input
+                    type="file"
+                    name="reference-upload"
+                    accept={accept}
+                    aria-label={uploadInputLabel}
+                    onChange={onUpload}
+                    className="hidden"
+                  />
                 </label>
               ) : (
                 <span>{uploadLabel}</span>

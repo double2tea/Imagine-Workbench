@@ -2918,6 +2918,8 @@ export default function BoardWorkspace({
         type="file"
         accept={BOARD_MEDIA_FILE_ACCEPT}
         multiple
+        name="board-media-import"
+        aria-label="导入画板媒体文件"
         className="hidden"
         onChange={handleMediaImportInputChange}
       />

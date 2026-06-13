@@ -327,6 +327,8 @@ export default function DataManagementWorkspace({
         ref={backupInputRef}
         type="file"
         accept=".zip,application/zip"
+        name="workspace-backup-import"
+        aria-label="导入工作区备份文件"
         className="hidden"
         onChange={event => handleBackupFileChange(event.target.files)}
       />
@@ -335,6 +337,8 @@ export default function DataManagementWorkspace({
         type="file"
         accept="image/*,video/*,audio/*"
         multiple
+        name="workspace-local-asset-import"
+        aria-label="导入本地媒体文件"
         className="hidden"
         onChange={event => handleLocalAssetChange(event.target.files)}
       />

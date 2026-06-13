@@ -1,4 +1,4 @@
-import { useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from "react";
+import { useId, useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from "react";
 import { Sparkles } from "lucide-react";
 import { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
 import CreatorGenerateButton from "@/components/creation/CreatorGenerateButton";
@@ -110,6 +110,9 @@ export default function ImageGenerationPanel({
 }: ImageGenerationPanelProps) {
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
   const [slashCommand, setSlashCommand] = useState<PromptTemplateSlashCommand | null>(null);
+  const aspectRatioId = useId();
+  const negativePromptId = useId();
+  const customImageSizeId = useId();
   const presetResolutionOptions = imageResolutionOptions.filter(option => option.value !== "custom");
   const supportsCustomImageSize = imageResolutionOptions.some(option => option.value === "custom");
   const isCustomImageResolution = imageResolution === "custom";
@@ -173,6 +176,7 @@ export default function ImageGenerationPanel({
         headerVariant="toolbar"
         icon={<Sparkles className="h-3.5 w-3.5" />}
         label="提示词"
+        name="image-prompt"
         onChange={handlePromptChange}
         onDropAsset={onPromptDropAsset}
         placeholder="写下你想创造的图片奇思妙想... 输入 @ 可引用作品"
@@ -187,6 +191,7 @@ export default function ImageGenerationPanel({
             {supportsBackgroundGeneration && (
               <label className="imagine-inline-chip-toggle shrink-0">
                 <input
+                  name="image-background-generation"
                   type="checkbox"
                   checked={imageBackgroundGeneration}
                   onChange={(event) => onImageBackgroundGenerationChange(event.target.checked)}
@@ -206,10 +211,12 @@ export default function ImageGenerationPanel({
         </div>
 
         <div className="imagine-parameter-field">
-          <label className="imagine-parameter-label-row imagine-section-label">
+          <label htmlFor={aspectRatioId} className="imagine-parameter-label-row imagine-section-label">
             画面宽高比
           </label>
           <select
+            id={aspectRatioId}
+            name="image-aspect-ratio"
             value={isCustomImageResolution ? "custom" : selectedAspectRatio}
             onChange={(event) => onSelectAspectRatio(event.target.value)}
             disabled={isCustomImageResolution}
@@ -226,8 +233,10 @@ export default function ImageGenerationPanel({
 
       <div className="flex flex-col gap-3 border-t border-[var(--iw-border)] pt-3">
         <div>
-          <label className="mb-1.5 block imagine-section-label">反向提示词</label>
+          <label htmlFor={negativePromptId} className="mb-1.5 block imagine-section-label">反向提示词</label>
           <input
+            id={negativePromptId}
+            name="image-negative-prompt"
             type="text"
             value={negativePrompt}
             onChange={(event) => onNegativePromptChange(event.target.value)}
@@ -272,6 +281,8 @@ export default function ImageGenerationPanel({
               {isCustomImageResolution && (
                 <div className="mt-2">
                   <input
+                    id={customImageSizeId}
+                    name="image-custom-size"
                     type="text"
                     value={customImageSize}
                     onChange={(event) => onCustomImageSizeChange(event.target.value)}

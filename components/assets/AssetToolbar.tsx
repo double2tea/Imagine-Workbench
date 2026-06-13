@@ -165,13 +165,16 @@ export default function AssetToolbar({
           <Search className="h-4 w-4" />
           <input
             type="text"
+            name="asset-search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="搜索提示词、模型..."
+            aria-label="搜索提示词、模型"
             className="imagine-toolbar-search h-9 rounded-lg border border-slate-800 bg-slate-950/55 pr-4 text-xs text-slate-200 placeholder-slate-600 transition-colors duration-150 focus:border-blue-400/35 focus:outline-none"
           />
         </div>
         <select
+          name="asset-model-filter"
           value={assetModelFilter}
           onChange={(e) => setAssetModelFilter(e.target.value)}
           className="imagine-toolbar-select h-9 min-w-0 rounded-lg border border-slate-800 bg-slate-950/55 px-3 font-mono text-[10px] text-slate-300 transition-colors duration-150 focus:border-blue-400/35 focus:outline-none sm:min-w-[9rem]"
@@ -273,6 +276,7 @@ export default function AssetToolbar({
               <div className="imagine-filter-date-range">
                 <input
                   type="date"
+                  name="asset-date-start"
                   value={assetDateStart}
                   onChange={(event) => handleDateStartChange(event.target.value)}
                   className="imagine-filter-date-input"
@@ -281,6 +285,7 @@ export default function AssetToolbar({
                 <span className="font-mono text-[10px] text-[var(--iw-faint)]">至</span>
                 <input
                   type="date"
+                  name="asset-date-end"
                   value={assetDateEnd}
                   onChange={(event) => handleDateEndChange(event.target.value)}
                   className="imagine-filter-date-input"

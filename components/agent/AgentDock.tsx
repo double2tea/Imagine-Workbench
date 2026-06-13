@@ -929,7 +929,14 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
                 title="上传媒体到 Agent 引用"
               >
                 <ImagePlus className="h-3.5 w-3.5" />
-                <input type="file" accept="image/*,video/*,audio/*" onChange={onUploadReference} className="hidden" />
+                <input
+                  type="file"
+                  accept="image/*,video/*,audio/*"
+                  name="agent-reference-upload"
+                  aria-label="上传媒体到 Agent 引用"
+                  onChange={onUploadReference}
+                  className="hidden"
+                />
               </label>
               <input
                 type="text"
