@@ -481,7 +481,7 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
           className={[
             "mx-auto grid max-h-full max-w-full overflow-hidden rounded-lg border bg-[var(--iw-panel-soft)] transition-[border-color,box-shadow]",
             extractPreview
-              ? "border-sky-300 shadow-[0_0_0_3px_rgba(59,130,246,0.18),0_0_24px_rgba(59,130,246,0.36)]"
+              ? "border-sky-300/80 shadow-[0_0_0_2px_rgba(59,130,246,0.14),0_0_16px_rgba(59,130,246,0.22)]"
               : "border-[var(--iw-border)]",
           ].join(" ")}
           style={{
@@ -540,7 +540,7 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
                   item ? isEditingLayout ? "cursor-move" : "cursor-grab active:cursor-grabbing" : "cursor-default",
                   item ? "" : "bg-[linear-gradient(135deg,rgba(16,185,129,0.08),rgba(255,255,255,0.02))] hover:border-emerald-300/50 hover:bg-emerald-400/10",
                   isSortDragItem ? "opacity-70" : "",
-                  isExtractDragItem ? "border-sky-300 bg-sky-400/10 opacity-60 ring-2 ring-sky-300/80" : "",
+                  isExtractDragItem ? "border-sky-300/70 bg-sky-50/70 opacity-45 ring-2 ring-sky-300/50" : "",
                   isSelected && !isExtractDragItem ? "z-10 ring-2 ring-emerald-400" : "",
                 ].join(" ")}
                 title={item ? item.prompt || item.model : "拖入图片"}
@@ -585,6 +585,9 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
                     <span className="text-[10px] font-semibold">拖入图片</span>
                   </span>
                 )}
+                {isExtractDragItem ? (
+                  <div className="pointer-events-none absolute inset-2 rounded-md border border-dashed border-sky-300/70 bg-white/30 shadow-[inset_0_0_18px_rgba(59,130,246,0.16)]" />
+                ) : null}
                 {item && !isEditingLayout && !isActiveDragItem ? (
                   <div
                     className={[
@@ -674,13 +677,13 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
           if (!previewItem) return null;
           return (
             <div
-              className="pointer-events-none fixed z-[9999] h-24 w-32 overflow-hidden rounded-md border border-sky-300/80 bg-white/80 opacity-85 shadow-[0_14px_40px_rgba(37,99,235,0.35)]"
+              className="pointer-events-none fixed z-[9999] h-28 w-40 overflow-hidden rounded-lg border border-sky-200/90 bg-white/90 opacity-90 ring-1 ring-white/80 shadow-[0_18px_48px_rgba(37,99,235,0.32)]"
               style={{
-                left: extractPreview.clientX + 14,
-                top: extractPreview.clientY + 14,
+                left: extractPreview.clientX + 18,
+                top: extractPreview.clientY + 18,
               }}
             >
-              <img src={previewItem.url} alt="" className="h-full w-full object-cover" draggable={false} />
+              <img src={previewItem.url} alt="" className="h-full w-full object-contain" draggable={false} />
               <div className="absolute inset-0 border border-white/70" />
             </div>
           );
