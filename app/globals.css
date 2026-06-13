@@ -4023,15 +4023,13 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
   transition: opacity var(--iw-motion-surface) var(--iw-motion-ease);
 }
 
-.board-media-node:is(:hover, :focus-within) .board-media-commit-surface,
-.board-media-node[data-selected="true"] .board-media-commit-surface {
+.board-media-node:is(:hover, :focus-within) .board-media-commit-surface {
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--iw-accent) 32%, var(--iw-border)),
     0 14px 34px color-mix(in srgb, var(--iw-bg) 34%, transparent);
 }
 
-.board-media-node:is(:hover, :focus-within) .board-media-commit-surface::after,
-.board-media-node[data-selected="true"] .board-media-commit-surface::after {
+.board-media-node:is(:hover, :focus-within) .board-media-commit-surface::after {
   opacity: 1;
 }
 
@@ -4098,10 +4096,10 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
   -webkit-user-drag: none;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .react-flow__node:not(.dragging) .board-media-preview {
-    animation: imagine-media-reveal var(--iw-motion-surface) var(--iw-motion-ease) both;
-  }
+.board-canvas .board-media-commit-surface.imagine-motion-media-reveal,
+.board-canvas .board-media-preview {
+  animation: none;
+  will-change: auto;
 }
 
 .board-media-processing-visual {
@@ -4359,7 +4357,8 @@ html[data-imagine-theme="light"] .board-media-stack-switcher {
 }
 
 .board-canvas.is-node-dragging .react-flow__minimap,
-.board-canvas.is-viewport-moving .react-flow__minimap {
+.board-canvas.is-viewport-moving .react-flow__minimap,
+.board-canvas.is-selection-moving .react-flow__minimap {
   display: none !important;
 }
 
@@ -4458,52 +4457,73 @@ html[data-imagine-theme="light"] .board-media-stack-switcher {
 .board-canvas.is-viewport-moving .react-flow__node *::after,
 .board-canvas.is-viewport-moving .react-flow__edge *,
 .board-canvas.is-viewport-moving .react-flow__edge *::before,
-.board-canvas.is-viewport-moving .react-flow__edge *::after {
+.board-canvas.is-viewport-moving .react-flow__edge *::after,
+.board-canvas.is-selection-moving .react-flow__node *,
+.board-canvas.is-selection-moving .react-flow__node *::before,
+.board-canvas.is-selection-moving .react-flow__node *::after,
+.board-canvas.is-selection-moving .react-flow__edge *,
+.board-canvas.is-selection-moving .react-flow__edge *::before,
+.board-canvas.is-selection-moving .react-flow__edge *::after {
   animation: none !important;
 }
 
 .board-canvas.is-viewport-moving .board-node-shell,
 .board-canvas.is-viewport-moving .board-media-controls,
-.board-canvas.is-viewport-moving .imagine-mark {
+.board-canvas.is-viewport-moving .imagine-mark,
+.board-canvas.is-selection-moving .board-node-shell,
+.board-canvas.is-selection-moving .board-media-controls,
+.board-canvas.is-selection-moving .imagine-mark {
   filter: none !important;
   transition: none !important;
 }
 
-.board-canvas.is-viewport-moving .board-node-shell * {
+.board-canvas.is-viewport-moving .board-node-shell *,
+.board-canvas.is-selection-moving .board-node-shell * {
   transition: none !important;
 }
 
-.board-canvas.is-viewport-moving .board-node-shell [class*="backdrop-blur"] {
+.board-canvas.is-viewport-moving .board-node-shell [class*="backdrop-blur"],
+.board-canvas.is-selection-moving .board-node-shell [class*="backdrop-blur"] {
   backdrop-filter: none !important;
 }
 
-.board-canvas.is-viewport-moving .board-node-shell {
+.board-canvas.is-viewport-moving .board-node-shell,
+.board-canvas.is-selection-moving .board-node-shell {
   box-shadow: 0 0 0 1px var(--iw-board-border) !important;
 }
 
-.board-canvas.is-viewport-moving .board-media-commit-surface {
+.board-canvas.is-viewport-moving .board-media-commit-surface,
+.board-canvas.is-selection-moving .board-media-commit-surface {
   isolation: auto;
   box-shadow: 0 0 0 1px var(--iw-board-border) !important;
 }
 
-.board-canvas.is-viewport-moving .board-media-node {
+.board-canvas.is-viewport-moving .board-media-node,
+.board-canvas.is-selection-moving .board-media-node {
   contain: layout paint style;
   overflow: hidden;
 }
 
 .board-canvas.is-viewport-moving .board-media-commit-surface::before,
-.board-canvas.is-viewport-moving .board-media-commit-surface::after {
+.board-canvas.is-viewport-moving .board-media-commit-surface::after,
+.board-canvas.is-selection-moving .board-media-commit-surface::before,
+.board-canvas.is-selection-moving .board-media-commit-surface::after {
   display: none !important;
 }
 
-.board-canvas.is-viewport-moving .board-node-handle {
+.board-canvas.is-viewport-moving .board-node-handle,
+.board-canvas.is-selection-moving .board-node-handle {
   box-shadow: none !important;
 }
 
 .board-canvas.is-viewport-moving .board-media-controls,
 .board-canvas.is-viewport-moving .board-media-stack-badge,
 .board-canvas.is-viewport-moving .board-media-stack-switcher,
-.board-canvas.is-viewport-moving .board-asset-node-chrome {
+.board-canvas.is-viewport-moving .board-asset-node-chrome,
+.board-canvas.is-selection-moving .board-media-controls,
+.board-canvas.is-selection-moving .board-media-stack-badge,
+.board-canvas.is-selection-moving .board-media-stack-switcher,
+.board-canvas.is-selection-moving .board-asset-node-chrome {
   backdrop-filter: none !important;
   box-shadow: none !important;
   opacity: 0 !important;

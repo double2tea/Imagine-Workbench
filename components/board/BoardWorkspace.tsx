@@ -158,6 +158,8 @@ type BoardFlowEdge = Edge<{ kind: BoardEdgeKind; processing?: boolean }, "smooth
 type BoardMoveHandler = NonNullable<ReactFlowProps<BoardFlowNode, BoardFlowEdge>["onMove"]>;
 type BoardReconnectStartHandler = NonNullable<ReactFlowProps<BoardFlowNode, BoardFlowEdge>["onReconnectStart"]>;
 type BoardReconnectEndHandler = NonNullable<ReactFlowProps<BoardFlowNode, BoardFlowEdge>["onReconnectEnd"]>;
+type BoardSelectionStartHandler = NonNullable<ReactFlowProps<BoardFlowNode, BoardFlowEdge>["onSelectionStart"]>;
+type BoardSelectionEndHandler = NonNullable<ReactFlowProps<BoardFlowNode, BoardFlowEdge>["onSelectionEnd"]>;
 
 const MEDIA_NODE_MIN_HEIGHT = 220;
 const MEDIA_NODE_MAX_HEIGHT = 330;
@@ -223,7 +225,8 @@ const DEFAULT_BOARD_REFERENCE_IMAGE_MODEL = "modelscope:Qwen/Qwen-Image-Edit";
 const BOARD_VIEWPORT_POSITION_EPSILON = 0.5;
 const BOARD_VIEWPORT_ZOOM_EPSILON = 0.001;
 const BOARD_VIEWPORT_MOVE_SETTLE_MS = 140;
-const BOARD_VISIBLE_RENDER_NODE_THRESHOLD = 48;
+const BOARD_VISIBLE_RENDER_NODE_THRESHOLD = 120;
+const BOARD_MINIMAP_RENDER_NODE_THRESHOLD = 48;
 
 interface BoardSelectionSnapshot {
   edgeId: string | null;
@@ -1116,6 +1119,9 @@ export default function BoardWorkspace({
   const isNodeDragActiveRef = useRef(false);
   const isViewportMoveActiveRef = useRef(false);
   const viewportMoveEndTimerRef = useRef<number | null>(null);
+  const isSelectionMoveActiveRef = useRef(false);
+  const selectionMoveEndTimerRef = useRef<number | null>(null);
+  const selectionMoveEndCleanupRef = useRef<(() => void) | null>(null);
   const multiGridDropFrameRef = useRef<number | null>(null);
   const pendingMultiGridDropPointRef = useRef<{ clientX: number; clientY: number } | null>(null);
   const pendingDragPositionByIdRef = useRef<Map<string, BoardPoint>>(new Map());
@@ -1139,6 +1145,11 @@ export default function BoardWorkspace({
     isViewportMoveActiveRef.current = isActive;
     setCanvasInteractionClass("is-viewport-moving", isActive);
   }, [setCanvasInteractionClass]);
+  const setSelectionMoveActive = useCallback((isActive: boolean): void => {
+    if (isSelectionMoveActiveRef.current === isActive) return;
+    isSelectionMoveActiveRef.current = isActive;
+    setCanvasInteractionClass("is-selection-moving", isActive);
+  }, [setCanvasInteractionClass]);
   const beginViewportMove = useCallback((): void => {
     if (viewportMoveEndTimerRef.current !== null) {
       window.clearTimeout(viewportMoveEndTimerRef.current);
@@ -1153,11 +1164,43 @@ export default function BoardWorkspace({
       setViewportMoveActive(false);
     }, BOARD_VIEWPORT_MOVE_SETTLE_MS);
   }, [setViewportMoveActive]);
+  const clearSelectionMoveEndListeners = useCallback((): void => {
+    selectionMoveEndCleanupRef.current?.();
+    selectionMoveEndCleanupRef.current = null;
+  }, []);
+  const scheduleSelectionMoveEnd = useCallback((): void => {
+    clearSelectionMoveEndListeners();
+    if (selectionMoveEndTimerRef.current !== null) window.clearTimeout(selectionMoveEndTimerRef.current);
+    selectionMoveEndTimerRef.current = window.setTimeout(() => {
+      selectionMoveEndTimerRef.current = null;
+      setSelectionMoveActive(false);
+    }, BOARD_VIEWPORT_MOVE_SETTLE_MS);
+  }, [clearSelectionMoveEndListeners, setSelectionMoveActive]);
+  const beginSelectionMove = useCallback((): void => {
+    clearSelectionMoveEndListeners();
+    if (selectionMoveEndTimerRef.current !== null) {
+      window.clearTimeout(selectionMoveEndTimerRef.current);
+      selectionMoveEndTimerRef.current = null;
+    }
+    const scheduleEnd = (): void => scheduleSelectionMoveEnd();
+    window.addEventListener("mouseup", scheduleEnd, { capture: true, once: true });
+    window.addEventListener("pointerup", scheduleEnd, { capture: true, once: true });
+    window.addEventListener("blur", scheduleEnd, { once: true });
+    selectionMoveEndCleanupRef.current = () => {
+      window.removeEventListener("mouseup", scheduleEnd, { capture: true });
+      window.removeEventListener("pointerup", scheduleEnd, { capture: true });
+      window.removeEventListener("blur", scheduleEnd);
+    };
+    setSelectionMoveActive(true);
+  }, [clearSelectionMoveEndListeners, scheduleSelectionMoveEnd, setSelectionMoveActive]);
   useEffect(() => () => {
     if (viewportMoveEndTimerRef.current !== null) window.clearTimeout(viewportMoveEndTimerRef.current);
+    if (selectionMoveEndTimerRef.current !== null) window.clearTimeout(selectionMoveEndTimerRef.current);
+    clearSelectionMoveEndListeners();
     setCanvasInteractionClass("is-node-dragging", false);
     setCanvasInteractionClass("is-viewport-moving", false);
-  }, [setCanvasInteractionClass]);
+    setCanvasInteractionClass("is-selection-moving", false);
+  }, [clearSelectionMoveEndListeners, setCanvasInteractionClass]);
   const updateSelectedNodeIds = useCallback((nextIds: string[]): void => {
     setSelectedNodeIds(currentIds => {
       if (sameStringList(currentIds, nextIds)) return currentIds;
@@ -2142,6 +2185,18 @@ export default function BoardWorkspace({
     setViewport(viewport);
   }, [scheduleViewportMoveEnd, setViewport]);
 
+  const handleSelectionStart = useCallback<BoardSelectionStartHandler>(() => {
+    beginSelectionMove();
+  }, [beginSelectionMove]);
+
+  const handleSelectionEnd = useCallback<BoardSelectionEndHandler>(() => {
+    scheduleSelectionMoveEnd();
+  }, [scheduleSelectionMoveEnd]);
+
+  const handleCanvasInteractionEnd = useCallback((): void => {
+    if (!isSelectionMoveActiveRef.current) return;
+    scheduleSelectionMoveEnd();
+  }, [scheduleSelectionMoveEnd]);
 
   const handleNodesDelete = useCallback<OnNodesDelete<BoardFlowNode>>(nodes => {
     for (const node of nodes) trashAndDeleteNode(node.id);
@@ -2174,7 +2229,7 @@ export default function BoardWorkspace({
   }, [closeOverlayMenus, selectEdge, selectNode, updateSelectedNodeIds]);
 
   const onlyRenderVisibleBoardElements = board.nodes.length >= BOARD_VISIBLE_RENDER_NODE_THRESHOLD;
-  const shouldRenderMiniMap = board.config.showMiniMap;
+  const shouldRenderMiniMap = board.config.showMiniMap && board.nodes.length < BOARD_MINIMAP_RENDER_NODE_THRESHOLD;
 
   const visibleCenterPosition = useCallback((size: BoardSize): BoardPoint | undefined => {
     const rect = flowHostRef.current?.getBoundingClientRect();
@@ -2998,6 +3053,9 @@ export default function BoardWorkspace({
           onDragLeave={handleBoardDragLeave}
           onDragOver={handleBoardDragOver}
           onDrop={handleBoardDrop}
+          onMouseUpCapture={handleCanvasInteractionEnd}
+          onPointerCancelCapture={handleCanvasInteractionEnd}
+          onPointerUpCapture={handleCanvasInteractionEnd}
           className={`board-canvas relative min-h-0 bg-[var(--iw-board-canvas-bg)]${isConnectionActive ? " is-connecting" : ""}`}
         >
           <BoardNodeCallbacksContext.Provider value={boardNodeCallbacks}>
@@ -3034,6 +3092,8 @@ export default function BoardWorkspace({
             onReconnectStart={handleReconnectStart}
             onReconnectEnd={handleReconnectEnd}
             onSelectionChange={handleSelectionChange}
+            onSelectionEnd={handleSelectionEnd}
+            onSelectionStart={handleSelectionStart}
             panOnDrag={isCoarsePointer ? true : reactFlowPanOnDrag}
             panOnScroll
             panOnScrollMode={PanOnScrollMode.Free}

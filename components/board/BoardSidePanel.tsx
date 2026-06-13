@@ -54,7 +54,7 @@ export default function BoardSidePanel({
   const [activeTab, setActiveTab] = useState<BoardSidePanelTab>("inspector");
   const [mobileOpen, setMobileOpen] = useState(false);
   const previousRevealKeyRef = useRef<string | null>(null);
-  const collapsed = collapsedPreference && !revealKey;
+  const collapsed = collapsedPreference;
 
   useEffect(() => {
     setCollapsedPreference(readCollapsedPreference());
