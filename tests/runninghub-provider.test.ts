@@ -132,8 +132,10 @@ test("runninghub mapped standard models route and validate mixed references", ()
 
 test("runninghub mapped standard models coerce default numeric fields", () => {
   const wanImage = getRunningHubStandardModel("api:/openapi/v2/alibaba/wan-2.7/text-to-image", "image");
+  const wanEditPro = getRunningHubStandardModel("api:/openapi/v2/alibaba/wan-2.7/image-edit-pro", "image");
   const pixverse = getRunningHubStandardModel("api:/openapi/v2/pixverse-v6/text-to-video", "video");
   assert.ok(wanImage);
+  assert.ok(wanEditPro);
   assert.ok(pixverse);
 
   assert.deepEqual(
@@ -147,6 +149,35 @@ test("runninghub mapped standard models coerce default numeric fields", () => {
       width: 1024,
       height: 1024,
       thinkingMode: true,
+    },
+  );
+
+  assert.deepEqual(
+    buildRunningHubStandardBody(wanImage, {
+      prompt: "wide product render",
+      imageResolution: "1536x1024",
+      referenceImages: [],
+    }),
+    {
+      prompt: "wide product render",
+      width: 1536,
+      height: 1024,
+      thinkingMode: true,
+    },
+  );
+
+  assert.deepEqual(
+    buildRunningHubStandardBody(wanEditPro, {
+      prompt: "wide product edit",
+      imageResolution: "1536x1024",
+      referenceImages: [{ dataUri: "data:image/png;base64,input" }],
+      referenceUrls: ["https://runninghub.example/wan.png"],
+    }),
+    {
+      imageUrls: ["https://runninghub.example/wan.png"],
+      prompt: "wide product edit",
+      width: 1536,
+      height: 1024,
     },
   );
 

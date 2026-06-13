@@ -261,6 +261,15 @@ function optionField(
   return { target, source, valueType: "string", defaultValue, allowedValues, durationValueType };
 }
 
+function dimensionOptionField(
+  target: string,
+  defaultValue: string,
+  allowedValues: readonly string[],
+  dimensionAxis: "width" | "height",
+): RunningHubMappedField {
+  return { target, source: "imageResolution", valueType: "number", defaultValue, allowedValues, dimensionAxis };
+}
+
 function mediaField(target: string, source: "imageUrls" | "videoUrls" | "audioUrls", valueType: "string" | "array", index?: number): RunningHubMappedField {
   return { target, source, valueType, index };
 }
@@ -279,8 +288,8 @@ function wanImageFields(references: boolean): readonly RunningHubMappedField[] {
   return [
     ...(references ? [mediaField("imageUrls", "imageUrls", "array")] : []),
     promptField(),
-    optionField("width", "imageResolution", "1024", WAN_27_IMAGE_SIZES),
-    optionField("height", "imageResolution", "1024", WAN_27_IMAGE_SIZES),
+    dimensionOptionField("width", "1024", WAN_27_IMAGE_SIZES, "width"),
+    dimensionOptionField("height", "1024", WAN_27_IMAGE_SIZES, "height"),
     ...(references ? [] : [literalField("thinkingMode", true)]),
   ];
 }

@@ -2828,7 +2828,7 @@
           {
             "target": "width",
             "source": "imageResolution",
-            "valueType": "string",
+            "valueType": "number",
             "defaultValue": "1024",
             "allowedValues": [
               "1024x1024",
@@ -2836,12 +2836,13 @@
               "1024x1536",
               "1536x1536",
               "2048x2048"
-            ]
+            ],
+            "dimensionAxis": "width"
           },
           {
             "target": "height",
             "source": "imageResolution",
-            "valueType": "string",
+            "valueType": "number",
             "defaultValue": "1024",
             "allowedValues": [
               "1024x1024",
@@ -2849,7 +2850,8 @@
               "1024x1536",
               "1536x1536",
               "2048x2048"
-            ]
+            ],
+            "dimensionAxis": "height"
           },
           {
             "target": "thinkingMode",
@@ -2950,7 +2952,7 @@
           {
             "target": "width",
             "source": "imageResolution",
-            "valueType": "string",
+            "valueType": "number",
             "defaultValue": "1024",
             "allowedValues": [
               "1024x1024",
@@ -2958,12 +2960,13 @@
               "1024x1536",
               "1536x1536",
               "2048x2048"
-            ]
+            ],
+            "dimensionAxis": "width"
           },
           {
             "target": "height",
             "source": "imageResolution",
-            "valueType": "string",
+            "valueType": "number",
             "defaultValue": "1024",
             "allowedValues": [
               "1024x1024",
@@ -2971,7 +2974,8 @@
               "1024x1536",
               "1536x1536",
               "2048x2048"
-            ]
+            ],
+            "dimensionAxis": "height"
           }
         ],
         "logic": [
@@ -3059,7 +3063,7 @@
           {
             "target": "width",
             "source": "imageResolution",
-            "valueType": "string",
+            "valueType": "number",
             "defaultValue": "1024",
             "allowedValues": [
               "1024x1024",
@@ -3067,12 +3071,13 @@
               "1024x1536",
               "1536x1536",
               "2048x2048"
-            ]
+            ],
+            "dimensionAxis": "width"
           },
           {
             "target": "height",
             "source": "imageResolution",
-            "valueType": "string",
+            "valueType": "number",
             "defaultValue": "1024",
             "allowedValues": [
               "1024x1024",
@@ -3080,7 +3085,8 @@
               "1024x1536",
               "1536x1536",
               "2048x2048"
-            ]
+            ],
+            "dimensionAxis": "height"
           },
           {
             "target": "thinkingMode",
@@ -3181,7 +3187,7 @@
           {
             "target": "width",
             "source": "imageResolution",
-            "valueType": "string",
+            "valueType": "number",
             "defaultValue": "1024",
             "allowedValues": [
               "1024x1024",
@@ -3189,12 +3195,13 @@
               "1024x1536",
               "1536x1536",
               "2048x2048"
-            ]
+            ],
+            "dimensionAxis": "width"
           },
           {
             "target": "height",
             "source": "imageResolution",
-            "valueType": "string",
+            "valueType": "number",
             "defaultValue": "1024",
             "allowedValues": [
               "1024x1024",
@@ -3202,7 +3209,8 @@
               "1024x1536",
               "1536x1536",
               "2048x2048"
-            ]
+            ],
+            "dimensionAxis": "height"
           }
         ],
         "logic": [
