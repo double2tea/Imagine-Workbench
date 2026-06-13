@@ -4362,6 +4362,11 @@ html[data-imagine-theme="light"] .board-media-stack-switcher {
   display: none !important;
 }
 
+.board-canvas.is-viewport-moving .react-flow__node-toolbar,
+.board-canvas.is-selection-moving .react-flow__node-toolbar {
+  display: none !important;
+}
+
 .board-canvas.is-node-dragging .react-flow__node *,
 .board-canvas.is-node-dragging .react-flow__node *::before,
 .board-canvas.is-node-dragging .react-flow__node *::after,
