@@ -336,20 +336,6 @@ export function formatProviderModel(provider: AiProvider, model: string): string
   return `${provider}:${model}`;
 }
 
-export function isAgentCompatibleModelId(model: string): boolean {
-  const lower = model.toLowerCase();
-  if (lower.includes("image")) return false;
-  if (lower.includes("imagen")) return false;
-  if (lower.includes("imagine")) return false;
-  if (lower.includes("video")) return false;
-  if (lower.includes("veo")) return false;
-  if (lower.includes("omni_flash")) return false;
-  if (lower.includes("tts")) return false;
-  if (lower.includes("audio")) return false;
-  if (lower.includes("embedding")) return false;
-  return true;
-}
-
 export function isMimoWorkbenchTtsModel(value: string): boolean {
   const parsed = tryParseProviderModel(value, "12ai");
   return parsed?.provider === "mimo" && (
