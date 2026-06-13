@@ -4852,6 +4852,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         <BoardSidePanel
           preserveTasksRevealKey={preserveTasksRevealKey}
           onPreserveTasksRevealConsumed={clearPreserveTasksRevealKey}
+          revealCanExpand={selectedNodeIds.length <= 1}
           revealKey={boardController.selectedNodeId ?? boardController.selectedEdgeId}
           taskBadgeCount={boardTaskBadgeCount}
           inspectorPanel={(

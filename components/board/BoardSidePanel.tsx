@@ -24,6 +24,7 @@ interface BoardSidePanelProps {
   inspectorPanel: ReactNode;
   preserveTasksRevealKey?: string | null;
   onPreserveTasksRevealConsumed?: () => void;
+  revealCanExpand?: boolean;
   revealKey?: string | null;
   taskBadgeCount?: number;
   tasksPanel: ReactNode;
@@ -46,6 +47,7 @@ export default function BoardSidePanel({
   inspectorPanel,
   preserveTasksRevealKey,
   onPreserveTasksRevealConsumed,
+  revealCanExpand = true,
   revealKey,
   taskBadgeCount = 0,
   tasksPanel,
@@ -54,7 +56,7 @@ export default function BoardSidePanel({
   const [activeTab, setActiveTab] = useState<BoardSidePanelTab>("inspector");
   const [mobileOpen, setMobileOpen] = useState(false);
   const previousRevealKeyRef = useRef<string | null>(null);
-  const collapsed = collapsedPreference;
+  const collapsed = collapsedPreference && !(revealCanExpand && revealKey);
 
   useEffect(() => {
     setCollapsedPreference(readCollapsedPreference());
