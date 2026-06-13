@@ -534,31 +534,6 @@ interface ImageCapabilityInput extends CapabilityInput {
   referenceMediaTypes?: MediaReferenceType[];
 }
 
-interface VideoCapabilityInput extends CapabilityInput {
-  supportsReferences: boolean;
-  sizes: ParameterOption[];
-  resolutions?: ParameterOption[];
-  durations?: ParameterOption[];
-  presets?: ParameterOption[];
-  videoReferenceMode: VideoReferenceMode;
-  videoReferenceModes?: VideoReferenceMode[];
-  maxReferenceImages: number;
-  minReferenceImages: number;
-  referenceMediaTypes?: MediaReferenceType[];
-}
-
-interface AudioCapabilityInput extends CapabilityInput {
-  modes: AudioOperationMode[];
-  outputKinds?: AudioOutputKind[];
-  defaultMode?: AudioOperationMode;
-  formats?: ParameterOption[];
-  durations?: ParameterOption[];
-  supportsReferences: boolean;
-  maxReferenceMedia?: number;
-  minReferenceMedia?: number;
-  referenceMediaTypes?: MediaReferenceType[];
-}
-
 function imageInputModalities(input: ImageCapabilityInput): ModelInputModalityProfile {
   if (!input.supportsReferences) return { text: { required: true } };
   return {
@@ -569,39 +544,6 @@ function imageInputModalities(input: ImageCapabilityInput): ModelInputModalityPr
       roles: ["content", "style", "object"],
       delivery: "providerNative",
     },
-  };
-}
-
-function videoInputModalities(input: VideoCapabilityInput): ModelInputModalityProfile {
-  if (!input.supportsReferences) return { text: { required: true } };
-  const referenceMediaTypes = input.referenceMediaTypes ?? ["image"];
-  return {
-    text: { required: true },
-    images: referenceMediaTypes.includes("image")
-      ? {
-          minCount: input.minReferenceImages,
-          maxCount: input.maxReferenceImages,
-          roles: input.videoReferenceMode === "firstLast" ? ["firstFrame", "lastFrame"] : ["reference"],
-          delivery: "providerNative",
-        }
-      : undefined,
-    videos: referenceMediaTypes.includes("video")
-      ? {
-          minCount: 0,
-          maxCount: input.maxReferenceImages,
-          roles: ["reference"],
-          delivery: "providerNative",
-        }
-      : undefined,
-    audio: referenceMediaTypes.includes("audio")
-      ? {
-          minCount: 0,
-          maxCount: input.maxReferenceImages,
-          roles: ["audioGuide"],
-          delivery: "providerNative",
-        }
-      : undefined,
-    mixed: referenceMediaTypes.length > 1 ? { maxTotalCount: input.maxReferenceImages } : undefined,
   };
 }
 
@@ -637,96 +579,6 @@ function imageCapability(input: ImageCapabilityInput): ProviderModelCapability {
     payloadMapping: input.payloadMapping,
     maxReferenceImages: input.supportsReferences ? input.maxReferenceImages ?? referenceRange.maxCount : 0,
     minReferenceImages: input.supportsReferences ? input.minReferenceImages ?? referenceRange.minCount : 0,
-    referenceMediaTypes,
-  };
-}
-
-function videoCapability(input: VideoCapabilityInput): ProviderModelCapability {
-  const parameterDescriptors = input.parameterDescriptors ?? [];
-  const inputModalities = input.inputModalities ?? videoInputModalities(input);
-  const referenceMediaTypes = input.supportsReferences ? input.referenceMediaTypes ?? inputModalitiesReferenceMediaTypes(inputModalities) : [];
-  return {
-    value: input.value,
-    label: input.label,
-    provider: input.provider,
-    model: input.model,
-    kind: "video",
-    listed: input.listed,
-    supportsAsync: false,
-    supportsReferences: input.supportsReferences,
-    aspectRatios: [],
-    sizes: input.sizes,
-    thinkingLevels: [],
-    qualityLevels: [],
-    resolutions: input.resolutions ?? [],
-    durations: input.durations ?? [],
-    presets: input.presets ?? [],
-    audioModes: [],
-    audioOutputKinds: [],
-    videoReferenceMode: input.videoReferenceMode,
-    videoReferenceModes: input.videoReferenceModes ?? (input.videoReferenceMode === "none" ? [] : [input.videoReferenceMode]),
-    inputModalities,
-    parameterDescriptors,
-    referenceSlots: referenceParameterDescriptors(parameterDescriptors),
-    pricing: input.pricing ?? unpricedModel("unverified"),
-    payloadMapping: input.payloadMapping,
-    maxReferenceImages: input.maxReferenceImages,
-    minReferenceImages: input.minReferenceImages,
-    referenceMediaTypes,
-  };
-}
-
-function audioInputModalities(input: AudioCapabilityInput): ModelInputModalityProfile {
-  if (!input.supportsReferences) return { text: { required: true } };
-  const referenceMediaTypes = input.referenceMediaTypes ?? ["audio"];
-  return {
-    text: { required: true },
-    images: referenceMediaTypes.includes("image")
-      ? { minCount: input.minReferenceMedia ?? 0, maxCount: input.maxReferenceMedia ?? 1, roles: ["reference"], delivery: "uploadedUrl" }
-      : undefined,
-    videos: referenceMediaTypes.includes("video")
-      ? { minCount: input.minReferenceMedia ?? 0, maxCount: input.maxReferenceMedia ?? 1, roles: ["reference"], delivery: "uploadedUrl" }
-      : undefined,
-    audio: referenceMediaTypes.includes("audio")
-      ? { minCount: input.minReferenceMedia ?? 0, maxCount: input.maxReferenceMedia ?? 1, roles: ["voice", "audioGuide"], delivery: "uploadedUrl" }
-      : undefined,
-    mixed: referenceMediaTypes.length > 1 ? { maxTotalCount: input.maxReferenceMedia ?? 1 } : undefined,
-  };
-}
-
-function audioCapability(input: AudioCapabilityInput): ProviderModelCapability {
-  const parameterDescriptors = input.parameterDescriptors ?? [];
-  const inputModalities = input.inputModalities ?? audioInputModalities(input);
-  const referenceRange = inputModalitiesReferenceCountRange(inputModalities);
-  const referenceMediaTypes = input.supportsReferences ? input.referenceMediaTypes ?? inputModalitiesReferenceMediaTypes(inputModalities) : [];
-  return {
-    value: input.value,
-    label: input.label,
-    provider: input.provider,
-    model: input.model,
-    kind: "audio",
-    listed: input.listed,
-    supportsAsync: false,
-    supportsReferences: input.supportsReferences,
-    aspectRatios: [],
-    sizes: [],
-    thinkingLevels: [],
-    qualityLevels: [],
-    resolutions: [],
-    durations: input.durations ?? [],
-    presets: input.formats ?? [],
-    audioModes: input.modes,
-    audioOutputKinds: input.outputKinds ?? ["audio"],
-    audioDefaultMode: input.defaultMode ?? input.modes[0],
-    videoReferenceMode: "none",
-    videoReferenceModes: [],
-    inputModalities,
-    parameterDescriptors,
-    referenceSlots: referenceParameterDescriptors(parameterDescriptors),
-    pricing: input.pricing ?? unpricedModel("unverified"),
-    payloadMapping: input.payloadMapping,
-    maxReferenceImages: input.supportsReferences ? input.maxReferenceMedia ?? referenceRange.maxCount : 0,
-    minReferenceImages: input.supportsReferences ? input.minReferenceMedia ?? referenceRange.minCount : 0,
     referenceMediaTypes,
   };
 }
