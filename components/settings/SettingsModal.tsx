@@ -138,7 +138,12 @@ export default function SettingsModal({
   const [dataSummary, setDataSummary] = useState<WorkspaceDataSummary | null>(null);
   const [dataSummaryError, setDataSummaryError] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const onCloseRef = useRef(onClose);
   const triggerRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   const refreshDataSummary = useCallback(async () => {
     try {
@@ -180,7 +185,7 @@ export default function SettingsModal({
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
 
@@ -216,7 +221,7 @@ export default function SettingsModal({
         }, 0);
       }
     };
-  }, [onClose, open]);
+  }, [open]);
 
   return (
     <AnimatePresence>
