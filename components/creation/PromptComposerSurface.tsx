@@ -6,6 +6,11 @@ import PromptReferenceInlineOverlay, {
 import { hasDraggedReferenceAsset } from "@/components/reference/referenceDrag";
 import type { MediaReferenceType } from "@/lib/media-references";
 
+export interface PromptComposerSelectionRange {
+  end: number;
+  start: number;
+}
+
 interface PromptComposerSurfaceProps {
   acceptedMediaTypes: ReadonlyArray<MediaReferenceType>;
   actions: ReactNode;
@@ -19,6 +24,7 @@ interface PromptComposerSurfaceProps {
   name?: string;
   onChange: (value: string, caret: number) => void;
   onDropAsset: (event: DragEvent<HTMLTextAreaElement>) => void;
+  onSelectionChange?: (selection: PromptComposerSelectionRange) => void;
   placeholder: string;
   prompt: string;
   references: ReadonlyArray<ReferenceImageRef>;
@@ -37,6 +43,7 @@ export default function PromptComposerSurface({
   name = "prompt",
   onChange,
   onDropAsset,
+  onSelectionChange,
   placeholder,
   prompt,
   references,
@@ -44,6 +51,9 @@ export default function PromptComposerSurface({
   const [isDragOver, setIsDragOver] = useState(false);
   const textareaId = useId();
   const referenceThumbnails = resolvePromptReferenceThumbnails(prompt, references, acceptedMediaTypes);
+  const emitSelection = (element: HTMLTextAreaElement): void => {
+    onSelectionChange?.({ end: element.selectionEnd, start: element.selectionStart });
+  };
   return (
     <div>
       {headerVariant === "toolbar" ? (
@@ -82,7 +92,12 @@ export default function PromptComposerSurface({
             id={textareaId}
             name={name}
             value={prompt}
-            onChange={(event) => onChange(event.target.value, event.target.selectionStart)}
+            onBlur={(event) => emitSelection(event.currentTarget)}
+            onChange={(event) => {
+              onChange(event.target.value, event.target.selectionStart);
+              emitSelection(event.currentTarget);
+            }}
+            onClick={(event) => emitSelection(event.currentTarget)}
             onDragEnter={(event) => {
               if (!hasDraggedReferenceAsset(event.dataTransfer)) return;
               event.preventDefault();
@@ -103,6 +118,8 @@ export default function PromptComposerSurface({
               setIsDragOver(false);
               onDropAsset(event);
             }}
+            onKeyUp={(event) => emitSelection(event.currentTarget)}
+            onSelect={(event) => emitSelection(event.currentTarget)}
             placeholder={placeholder}
             className={`imagine-field-textarea relative z-10 h-24 text-sm leading-6 caret-[var(--iw-text)] transition-all duration-200 ${
               isDragOver ? "scale-[1.01]" : ""

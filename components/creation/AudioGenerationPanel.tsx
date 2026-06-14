@@ -3,7 +3,7 @@ import { AudioLines, Pencil, Trash2 } from "lucide-react";
 import VoiceProfilePreviewPlayer from "@/components/audio/VoiceProfilePreviewPlayer";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
 import CreatorGenerateButton from "@/components/creation/CreatorGenerateButton";
-import PromptComposerSurface from "@/components/creation/PromptComposerSurface";
+import PromptComposerSurface, { type PromptComposerSelectionRange } from "@/components/creation/PromptComposerSurface";
 import PromptComposerToolbarActions from "@/components/creation/PromptComposerToolbarActions";
 import { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
 import type { ModelOptionGroup } from "@/components/creation/ModelSelectCombobox";
@@ -115,6 +115,7 @@ export default function AudioGenerationPanel({
 }: AudioGenerationPanelProps) {
   const confirmAction = useConfirm();
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
+  const promptSelectionRef = useRef<PromptComposerSelectionRange | null>(null);
   const [slashCommand, setSlashCommand] = useState<PromptTemplateSlashCommand | null>(null);
   const [voiceProfiles, setVoiceProfiles] = useState<VoiceProfile[]>([]);
   const [voiceProfileName, setVoiceProfileName] = useState("");
@@ -225,10 +226,20 @@ export default function AudioGenerationPanel({
     if (slashCommand && applyMode === "insert") {
       const result = insertPromptTemplateText(prompt, template.positivePrompt, slashCommand.start, slashCommand.end);
       onPromptChange(result.prompt);
+      promptSelectionRef.current = { end: result.caret, start: result.caret };
+      setSlashCommand(null);
+      return;
+    }
+    if (applyMode === "insert") {
+      const selection = promptSelectionRef.current ?? { end: prompt.length, start: prompt.length };
+      const result = insertPromptTemplateText(prompt, template.positivePrompt, selection.start, selection.end);
+      onPromptChange(result.prompt);
+      promptSelectionRef.current = { end: result.caret, start: result.caret };
       setSlashCommand(null);
       return;
     }
     onPromptChange(applyPromptTemplateText(prompt, template.positivePrompt, applyMode));
+    promptSelectionRef.current = { end: template.positivePrompt.trim().length, start: template.positivePrompt.trim().length };
     setSlashCommand(null);
   };
 
@@ -375,6 +386,9 @@ export default function AudioGenerationPanel({
         label="音频创作"
         onChange={handlePromptChange}
         onDropAsset={onPromptDropAsset}
+        onSelectionChange={(selection) => {
+          promptSelectionRef.current = selection;
+        }}
         placeholder={promptPlaceholder}
         prompt={prompt}
         references={referenceImages}

@@ -3,7 +3,7 @@ import { Video as VideoIcon } from "lucide-react";
 import { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
 import CreatorGenerateButton from "@/components/creation/CreatorGenerateButton";
 import ModelSelectCombobox, { type ModelOptionGroup } from "@/components/creation/ModelSelectCombobox";
-import PromptComposerSurface from "@/components/creation/PromptComposerSurface";
+import PromptComposerSurface, { type PromptComposerSelectionRange } from "@/components/creation/PromptComposerSurface";
 import PromptComposerToolbarActions from "@/components/creation/PromptComposerToolbarActions";
 import ReferenceImagePicker, { type ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import { type DraggedReferenceAsset } from "@/components/reference/referenceDrag";
@@ -109,6 +109,7 @@ export default function VideoGenerationPanel({
   showGenerateButton = true,
 }: VideoGenerationPanelProps) {
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
+  const promptSelectionRef = useRef<PromptComposerSelectionRange | null>(null);
   const [slashCommand, setSlashCommand] = useState<PromptTemplateSlashCommand | null>(null);
   const acceptedReferenceText = capabilities.referenceMediaTypes.includes("audio")
     ? "图片 / 视频 / 音频"
@@ -142,10 +143,20 @@ export default function VideoGenerationPanel({
     if (slashCommand && mode === "insert") {
       const result = insertPromptTemplateText(prompt, template.positivePrompt, slashCommand.start, slashCommand.end);
       onPromptChange(result.prompt);
+      promptSelectionRef.current = { end: result.caret, start: result.caret };
+      setSlashCommand(null);
+      return;
+    }
+    if (mode === "insert") {
+      const selection = promptSelectionRef.current ?? { end: prompt.length, start: prompt.length };
+      const result = insertPromptTemplateText(prompt, template.positivePrompt, selection.start, selection.end);
+      onPromptChange(result.prompt);
+      promptSelectionRef.current = { end: result.caret, start: result.caret };
       setSlashCommand(null);
       return;
     }
     onPromptChange(applyPromptTemplateText(prompt, template.positivePrompt, mode));
+    promptSelectionRef.current = { end: template.positivePrompt.trim().length, start: template.positivePrompt.trim().length };
     setSlashCommand(null);
   };
 
@@ -183,6 +194,9 @@ export default function VideoGenerationPanel({
         label="视频场景运动描述"
         onChange={handlePromptChange}
         onDropAsset={onPromptDropAsset}
+        onSelectionChange={(selection) => {
+          promptSelectionRef.current = selection;
+        }}
         placeholder={promptPlaceholder}
         prompt={prompt}
         references={referenceImages}

@@ -4,7 +4,7 @@ import CapabilityParameterControls from "@/components/creation/CapabilityParamet
 import { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
 import CreatorGenerateButton from "@/components/creation/CreatorGenerateButton";
 import ModelSelectCombobox, { type ModelOptionGroup } from "@/components/creation/ModelSelectCombobox";
-import PromptComposerSurface from "@/components/creation/PromptComposerSurface";
+import PromptComposerSurface, { type PromptComposerSelectionRange } from "@/components/creation/PromptComposerSurface";
 import PromptComposerToolbarActions from "@/components/creation/PromptComposerToolbarActions";
 import ReferenceImagePicker, { type ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import { type DraggedReferenceAsset } from "@/components/reference/referenceDrag";
@@ -106,6 +106,7 @@ export default function ImageGenerationPanel({
   showGenerateButton = true,
 }: ImageGenerationPanelProps) {
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
+  const promptSelectionRef = useRef<PromptComposerSelectionRange | null>(null);
   const [slashCommand, setSlashCommand] = useState<PromptTemplateSlashCommand | null>(null);
   const aspectRatioId = useId();
   const negativePromptId = useId();
@@ -126,11 +127,22 @@ export default function ImageGenerationPanel({
     if (slashCommand && mode === "insert") {
       const result = insertPromptTemplateText(prompt, template.positivePrompt, slashCommand.start, slashCommand.end);
       onPromptChange(result.prompt);
+      promptSelectionRef.current = { end: result.caret, start: result.caret };
+      setSlashCommand(null);
+      if (template.negativePrompt) onNegativePromptChange(template.negativePrompt);
+      return;
+    }
+    if (mode === "insert") {
+      const selection = promptSelectionRef.current ?? { end: prompt.length, start: prompt.length };
+      const result = insertPromptTemplateText(prompt, template.positivePrompt, selection.start, selection.end);
+      onPromptChange(result.prompt);
+      promptSelectionRef.current = { end: result.caret, start: result.caret };
       setSlashCommand(null);
       if (template.negativePrompt) onNegativePromptChange(template.negativePrompt);
       return;
     }
     onPromptChange(applyPromptTemplateText(prompt, template.positivePrompt, mode));
+    promptSelectionRef.current = { end: template.positivePrompt.trim().length, start: template.positivePrompt.trim().length };
     setSlashCommand(null);
     if (template.negativePrompt) onNegativePromptChange(template.negativePrompt);
   };
@@ -170,6 +182,9 @@ export default function ImageGenerationPanel({
         name="image-prompt"
         onChange={handlePromptChange}
         onDropAsset={onPromptDropAsset}
+        onSelectionChange={(selection) => {
+          promptSelectionRef.current = selection;
+        }}
         placeholder="写下你想创造的图片奇思妙想... 输入 @ 可引用作品"
         prompt={prompt}
         references={referenceImages}

@@ -20,6 +20,7 @@ import type { BoardPromptReference } from "@/lib/board/prompt-references";
 import { getMediaReferencePromptToken, getMediaReferenceType, mediaReferenceLabel } from "@/lib/media-references";
 import { registerBoardTextCommit, unregisterBoardTextCommit } from "@/lib/board/text-flush-registry";
 import { detectPromptTemplateSlashCommand, type PromptTemplateSlashCommand } from "@/lib/prompt-templates";
+import { isPromptTemplatePickerInteractionActive } from "@/lib/prompt-template-picker-dom";
 
 function detectAtSearch(value: string, caret: number): string | null {
   const beforeCaret = value.slice(0, caret);
@@ -532,10 +533,12 @@ const BoardPromptTextarea = forwardRef<BoardPromptTextareaHandle, BoardPromptTex
             onCopy={handleCopy}
             onCut={handleCut}
             onPaste={handlePaste}
-            onBlur={() => {
+            onBlur={(event) => {
               if (readOnly) return;
+              const nextFocusTarget = event.relatedTarget;
               flush();
               window.setTimeout(() => {
+                if (isPromptTemplatePickerInteractionActive(nextFocusTarget)) return;
                 setAtSearch(null);
                 onSlashCommand?.(null);
               }, 120);

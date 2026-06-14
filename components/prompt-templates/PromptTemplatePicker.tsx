@@ -10,6 +10,7 @@ import {
   type PromptTemplateApplyMode,
   type PromptTemplateCategoryId,
 } from "@/lib/prompt-templates";
+import { markPromptTemplatePickerPointerDown } from "@/lib/prompt-template-picker-dom";
 
 export type PromptTemplatePickerAccent = "amber" | "blue" | "teal" | "violet";
 
@@ -58,7 +59,8 @@ const PromptTemplatePicker = forwardRef<PromptTemplatePickerHandle, PromptTempla
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
 
   const openPicker = (search?: string): void => {
-    if (typeof search === "string") setQuery(search);
+    setQuery(typeof search === "string" ? search : "");
+    setCategoryId("all");
     const button = buttonRef.current;
     if (button) setPosition(getPanelPosition(button));
     setIsOpen(true);
@@ -111,6 +113,8 @@ const PromptTemplatePicker = forwardRef<PromptTemplatePickerHandle, PromptTempla
   const panel = isOpen && position
     ? createPortal(
       <div
+        data-prompt-template-picker-surface="true"
+        onPointerDownCapture={markPromptTemplatePickerPointerDown}
         className="imagine-motion-surface-reveal fixed z-[120] flex max-h-[min(27.5rem,calc(100vh-1rem))] w-[min(26.25rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-lg border border-[var(--iw-border)] bg-[var(--iw-surface-raised)] shadow-[0_22px_60px_rgba(15,23,42,0.28)] backdrop-blur-xl"
         style={{ left: position.left, top: position.top }}
       >
