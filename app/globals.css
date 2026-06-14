@@ -4618,10 +4618,6 @@ html[data-imagine-theme="light"] .board-media-stack-switcher {
 
 .imagine-workbench-shell.imagine-theme-light .board-canvas .react-flow__pane {
   background-color: #edf3f8 !important;
-  background-image:
-    linear-gradient(rgba(148, 163, 184, 0.10) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.10) 1px, transparent 1px) !important;
-  background-size: 24px 24px;
 }
 
 .imagine-workbench-shell.imagine-theme-light article.rounded-lg.border.bg-slate-900 {
