@@ -1,5 +1,6 @@
 import { memo, useMemo, useRef, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { AudioLines, ImagePlus, Loader2, Play, Video, X } from "lucide-react";
+import CinematicProfileControls from "@/components/creation/CinematicProfileControls";
 import ModelPriceBadge from "@/components/creation/ModelPriceBadge";
 import BoardPromptTextarea, { type BoardPromptTextareaHandle } from "@/components/board/BoardPromptTextarea";
 import MediaReferenceThumbnail from "@/components/reference/MediaReferenceThumbnail";
@@ -129,6 +130,7 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
   const slashCommandRef = useRef<PromptTemplateSlashCommand | null>(null);
   const isProcessing = node.status === "processing" || taskSummary?.status === "processing" || taskSummary?.status === "pending";
   const isAudioNode = node.kind === "audio-operation";
+  const isVideoNode = node.kind === "video-generate";
   const textInputRequired = !isAudioNode || audioOperationRequiresTextInput(node.audioMode);
   const usesOptionalTextInput = isAudioNode && !textInputRequired;
   const promptPreview = inputSummary?.promptPreview ?? null;
@@ -136,14 +138,14 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
   const referenceCount = inputSummary?.referenceCount ?? 0;
   const referencePreviews = inputSummary?.referencePreviews ?? [];
   const videoCapabilities = useMemo(
-    () => node.kind === "video-generate" ? getVideoModelCapabilities(node.model) : null,
-    [node.kind, node.model],
+    () => isVideoNode ? getVideoModelCapabilities(node.model) : null,
+    [isVideoNode, node.model],
   );
-  const activeVideoReferenceMode = node.kind === "video-generate"
+  const activeVideoReferenceMode = isVideoNode
     ? node.videoReferenceMode ?? videoCapabilities?.referenceMode ?? "none"
     : "none";
   const videoPriceReferenceTypes = useMemo(
-    () => node.kind === "video-generate" && videoCapabilities
+    () => isVideoNode && videoCapabilities
       ? selectVideoReferenceTypesForMode(
         referencePreviews.map(reference => ({
           id: reference.id,
@@ -156,7 +158,7 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
         videoCapabilities.maxReferenceImages,
       )
       : [],
-    [activeVideoReferenceMode, node.kind, referencePreviews, videoCapabilities],
+    [activeVideoReferenceMode, isVideoNode, referencePreviews, videoCapabilities],
   );
   const result = resultContext(hasResultConnection, resultItems.length);
   const run = runContext(node, taskSummary);
@@ -352,7 +354,7 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
           </div>
         </div>
       )}
-      <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
+      <div className="grid grid-cols-[1fr_minmax(110px,0.9fr)_auto_auto] items-center gap-2">
         <span
           className={`imagine-status-chip truncate text-[10px] font-mono ${node.status === "failed" ? "imagine-tone-icon" : "text-[var(--iw-muted)]"}`}
           data-status={node.status}
@@ -361,6 +363,18 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
         >
           {node.errorMessage ?? compactStatusLabel}
         </span>
+        {node.kind === "image-generate" || isVideoNode ? (
+          <CinematicProfileControls
+            accent={isVideoNode ? "violet" : "blue"}
+            className="nodrag h-8"
+            mediaType={isVideoNode ? "video" : "image"}
+            variant="compact"
+            value={node.cinematicProfile}
+            onChange={cinematicProfile => onUpdate({ cinematicProfile })}
+          />
+        ) : (
+          <span />
+        )}
         <div className="imagine-generate-variant-group nodrag flex h-8 overflow-hidden rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)]" title="变体数量">
           {variantCountOptions.map(count => (
             <button

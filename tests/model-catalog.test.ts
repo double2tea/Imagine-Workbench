@@ -27,6 +27,7 @@ import {
   type ModelCapabilityCatalogDocument,
 } from "../lib/providers/model-catalog";
 import modelCapabilityCatalog from "../lib/providers/catalog/data/model-capabilities.json";
+import { DEFAULT_CINEMATIC_PROFILE } from "../lib/cinematic-controls";
 import {
   defaultCapabilityParameterValues,
   inputModalitiesReferenceCountRange,
@@ -368,6 +369,7 @@ test("board reference groups preserve media types for generate connections", () 
     prompt: "",
     model: "runninghub:api:/openapi/v2/bytedance/seedance-2.0-global/text-to-video",
     aspectRatio: "16:9",
+    cinematicProfile: DEFAULT_CINEMATIC_PROFILE,
     variantCount: 1,
     status: "idle",
   };
@@ -410,6 +412,7 @@ test("board video reference connections auto-switch to an audio-compatible model
     prompt: "",
     model: "12ai:veo_3_1-fast",
     aspectRatio: "16:9",
+    cinematicProfile: DEFAULT_CINEMATIC_PROFILE,
     variantCount: 1,
     status: "idle",
   };
@@ -458,6 +461,7 @@ test("board video reference connections recover from unknown current models", ()
     prompt: "",
     model: "12ai:not-a-real-video-model",
     aspectRatio: "auto",
+    cinematicProfile: DEFAULT_CINEMATIC_PROFILE,
     variantCount: 1,
     status: "idle",
   };
@@ -503,6 +507,7 @@ test("board image reference connections auto-switch to an image-reference model"
     prompt: "",
     model: originalModel,
     aspectRatio: "1:1",
+    cinematicProfile: DEFAULT_CINEMATIC_PROFILE,
     customImageResolution: "2560x1440",
     imageResolution: "1024x1024",
     variantCount: 1,

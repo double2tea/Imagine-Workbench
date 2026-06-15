@@ -114,6 +114,7 @@ import {
   prepareReferenceImageUrlForRequest,
   prepareReferenceMediaUrlForRequest,
 } from "@/lib/reference-images";
+import { DEFAULT_CINEMATIC_PROFILE, cinematicProfileKey } from "@/lib/cinematic-controls";
 import { transcriptFromDataUrl } from "@/lib/transcripts";
 import {
   DEFAULT_AUDIO_ASSET_NODE_SIZE,
@@ -777,11 +778,13 @@ function buildGenerateNodeUpdate(
     if (params?.imageResolution?.trim()) update.imageResolution = params.imageResolution;
     if (params?.imageQuality?.trim()) update.imageQuality = params.imageQuality;
     if (params?.thinkingLevel?.trim()) update.thinkingLevel = params.thinkingLevel;
+    if (params?.cinematicProfile) update.cinematicProfile = params.cinematicProfile;
   } else if (node.kind === "video-generate") {
     if (params?.videoResolution?.trim()) update.videoResolution = params.videoResolution;
     if (params?.videoDuration?.trim()) update.videoDuration = params.videoDuration;
     if (params?.videoPreset?.trim()) update.videoPreset = params.videoPreset;
     if (params?.videoReferenceMode) update.videoReferenceMode = params.videoReferenceMode;
+    if (params?.cinematicProfile) update.cinematicProfile = params.cinematicProfile;
   } else {
     if (params?.audioFormat?.trim()) update.audioFormat = params.audioFormat;
     if (params?.audioMode) update.audioMode = params.audioMode;
@@ -826,6 +829,7 @@ function createPreviewBoardNode(operation: AgentBoardPatchCreateNodeOperation, i
       ...base,
       ...defaults,
       kind: "image-generate",
+      cinematicProfile: operation.cinematicProfile ?? DEFAULT_CINEMATIC_PROFILE,
       size: DEFAULT_GENERATE_NODE_SIZE,
       model,
       prompt: operation.prompt ?? "",
@@ -870,6 +874,7 @@ function createPreviewBoardNode(operation: AgentBoardPatchCreateNodeOperation, i
     ...base,
     ...defaults,
     kind: "video-generate",
+    cinematicProfile: operation.cinematicProfile ?? DEFAULT_CINEMATIC_PROFILE,
     size: DEFAULT_GENERATE_NODE_SIZE,
     model,
     prompt: operation.prompt ?? "",
@@ -1201,9 +1206,9 @@ function resultStackKeyForConfig({
 
 function resultStackKeyForNode(node: ExecutableBoardNode, edges: BoardDocument["edges"]): string {
   const sizeKey = node.kind === "image-generate"
-    ? `${node.aspectRatio}|${node.imageResolution}|${node.customImageResolution}`
+    ? `${node.aspectRatio}|${node.imageResolution}|${node.customImageResolution}|${cinematicProfileKey(node.cinematicProfile)}`
       : node.kind === "video-generate"
-        ? `${node.aspectRatio}|${node.videoResolution ?? ""}`
+        ? `${node.aspectRatio}|${node.videoResolution ?? ""}|${cinematicProfileKey(node.cinematicProfile)}`
         : node.kind === "audio-operation"
           ? `${node.audioMode}|${node.audioFormat}|${node.voiceCloneConsentAccepted === true ? "clone-consent" : ""}|${node.voiceProfileId ?? ""}`
       : `${node.targetType}|${node.outputType}|${node.targetId}|${node.bindings.map(binding => [
@@ -2604,6 +2609,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             imageQuality: operation.imageQuality ?? defaults.imageQuality,
             imageResolution: operation.imageResolution ?? defaults.imageResolution,
             isCustomImageResolution: isCustomImageResolutionValue(operation.imageResolution ?? defaults.imageResolution),
+            cinematicProfile: operation.cinematicProfile,
             model,
             prompt: promptValue,
             referenceImage: runReferences[0]?.url ?? null,
@@ -2642,6 +2648,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             boardNodeId: item.id,
             boardResultStackKey: resultStackKey,
             model,
+            cinematicProfile: operation.cinematicProfile,
             prompt: promptValue,
             referenceImage: runReferences[0]?.url ?? null,
             referenceImages: runReferences,
@@ -4006,6 +4013,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
               imageQuality: node.imageQuality,
               imageResolution: nodeImageResolution,
               isCustomImageResolution: node.imageResolution === "custom",
+              cinematicProfile: node.cinematicProfile,
               model: node.model,
               prompt: nextPrompt,
               referenceImage: references[0]?.url ?? null,
@@ -4031,6 +4039,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
               boardId: resolvedBoardId,
               boardNodeId: nodeId,
               boardResultStackKey: resultStackKey,
+              cinematicProfile: node.cinematicProfile,
               model: node.model,
               prompt: nextPrompt,
               referenceImage: references[0]?.url ?? null,

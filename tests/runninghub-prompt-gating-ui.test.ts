@@ -4,6 +4,7 @@ import path from "node:path";
 import test, { after } from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { DEFAULT_CINEMATIC_PROFILE } from "../lib/cinematic-controls";
 import type { ImageModelCapabilities, VideoModelCapabilities } from "../lib/providers/model-catalog";
 
 const noop = (): void => {};
@@ -41,6 +42,7 @@ test("image generation panel generate button follows promptRequired", async () =
   const baseProps: ImagePanelProps = {
     atDropdownNode: null,
     capabilities: imageCapabilities,
+    cinematicProfile: DEFAULT_CINEMATIC_PROFILE,
     customImageSize: "",
     imageBackgroundGeneration: false,
     imageQuality: "",
@@ -60,6 +62,7 @@ test("image generation panel generate button follows promptRequired", async () =
     submitCount: 0,
     supportsBackgroundGeneration: false,
     onClearReferences: noop,
+    onCinematicProfileChange: noop,
     onCustomImageSizeChange: noop,
     onGenerate: noop,
     onImageBackgroundGenerationChange: noop,
@@ -93,6 +96,7 @@ test("video generation panel generate button follows promptRequired", async () =
   const baseProps: VideoPanelProps = {
     atDropdownNode: null,
     capabilities: videoCapabilities,
+    cinematicProfile: DEFAULT_CINEMATIC_PROFILE,
     clearReferenceLabel: "Clear",
     durationOptions: [],
     isOptimizing: false,
@@ -117,6 +121,7 @@ test("video generation panel generate button follows promptRequired", async () =
     selectedSize: "16:9",
     submitCount: 0,
     onClearReferences: noop,
+    onCinematicProfileChange: noop,
     onGenerate: noop,
     onOptimizePrompt: noop,
     onPromptChange: noop,

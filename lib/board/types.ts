@@ -1,5 +1,6 @@
 import type { AudioOperationMode } from "@/lib/providers/model-catalog";
 import type { RunningHubYouchuanAdvancedSettings } from "@/lib/providers/types";
+import type { CinematicProfile } from "@/lib/cinematic-controls";
 
 export type BoardNodeKind = "asset" | "prompt" | "reference-group" | "group" | "multi-grid" | "image-generate" | "video-generate" | "audio-operation" | "runninghub-app" | "agent" | "note" | "result";
 export type BoardAssetType = "image" | "video" | "audio";
@@ -128,6 +129,7 @@ export interface BoardImageGenerateNode extends BoardNodeBase {
   prompt: string;
   model: string;
   aspectRatio: string;
+  cinematicProfile: CinematicProfile;
   customImageResolution: string;
   imageQuality?: string;
   imageResolution: string;
@@ -146,6 +148,7 @@ export interface BoardVideoGenerateNode extends BoardNodeBase {
   prompt: string;
   model: string;
   aspectRatio: string;
+  cinematicProfile: CinematicProfile;
   videoDuration?: string;
   videoPreset?: string;
   videoReferenceMode?: BoardVideoReferenceMode;
@@ -278,6 +281,7 @@ export type BoardGenerateNodeUpdate = Partial<{
   audioMode: AudioOperationMode;
   audioStylePrompt: string;
   asrLanguage: "auto" | "zh" | "en";
+  cinematicProfile: CinematicProfile;
   customImageResolution: string;
   errorMessage: string;
   imageQuality: string;
@@ -410,6 +414,7 @@ export interface CreateGenerateNodeInput {
   customImageResolution?: string;
   imageQuality?: string;
   imageResolution?: string;
+  cinematicProfile?: CinematicProfile;
   runningHubYouchuan?: RunningHubYouchuanAdvancedSettings;
   thinkingLevel?: string;
   variantCount?: BoardGenerateVariantCount;

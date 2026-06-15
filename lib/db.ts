@@ -5,6 +5,7 @@ import {
   type MediaReferenceType,
 } from "./media-references";
 import type { AudioOperationMode } from "./providers/model-catalog";
+import type { CinematicProfile } from "./cinematic-controls";
 import type { RunningHubTaskNodeBinding, RunningHubYouchuanAdvancedSettings } from "./providers/types";
 
 const DB_NAME = "ImagineWorkbenchDB";
@@ -37,6 +38,7 @@ export interface GenerationRequestSnapshot {
   imageResolution?: string;
   imageQuality?: string;
   thinkingLevel?: string;
+  cinematicProfile?: CinematicProfile;
   videoDurationSeconds?: string;
   videoPreset?: string;
   videoReferenceMode?: "reference" | "firstLast";

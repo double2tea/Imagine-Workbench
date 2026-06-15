@@ -1,4 +1,5 @@
 import type { AudioOperationMode } from "@/lib/providers/model-catalog";
+import type { CinematicProfile } from "@/lib/cinematic-controls";
 
 export const AGENT_WORKBENCH_ACTION_TYPES = [
   "none",
@@ -65,6 +66,7 @@ export interface AgentBoardPatchCreateNodeOperation {
   imageResolution?: string;
   imageQuality?: string;
   thinkingLevel?: string;
+  cinematicProfile?: CinematicProfile;
   videoResolution?: string;
   videoDuration?: string;
   videoPreset?: string;
@@ -89,6 +91,7 @@ export interface AgentBoardPatchUpdateNodeOperation {
   imageResolution?: string;
   imageQuality?: string;
   thinkingLevel?: string;
+  cinematicProfile?: CinematicProfile;
   videoResolution?: string;
   videoDuration?: string;
   videoPreset?: string;
@@ -127,6 +130,7 @@ export interface AgentGenerationParams {
   imageResolution?: string;
   imageQuality?: string;
   thinkingLevel?: string;
+  cinematicProfile?: CinematicProfile;
   videoResolution?: string;
   videoDuration?: string;
   videoPreset?: string;

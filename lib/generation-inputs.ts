@@ -3,6 +3,7 @@ import type {
   GenerationRequestSnapshot,
 } from "./db";
 import { getGenerationReferenceMedia } from "./db";
+import type { CinematicProfile } from "./cinematic-controls";
 import type {
   MediaReferenceRole,
   MediaReferenceType,
@@ -68,6 +69,7 @@ export interface GenerationInputModelControls {
   imageResolution?: string;
   imageQuality?: string;
   thinkingLevel?: string;
+  cinematicProfile?: CinematicProfile;
   videoDurationSeconds?: string;
   videoPreset?: string;
   videoReferenceMode?: Extract<VideoReferenceMode, "reference" | "firstLast">;
@@ -180,6 +182,7 @@ export function generationInputModelControlsFromRequest(
     imageResolution: request.imageResolution,
     imageQuality: request.imageQuality,
     thinkingLevel: request.thinkingLevel,
+    cinematicProfile: request.cinematicProfile,
     videoDurationSeconds: request.videoDurationSeconds,
     videoPreset: request.videoPreset,
     videoReferenceMode: request.videoReferenceMode,

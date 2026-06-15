@@ -1,11 +1,11 @@
-export type CinematicCamera = "auto" | "arri-alexa-35" | "arri-alexa-65" | "sony-venice-2" | "red-v-raptor" | "imax-65mm" | "bolex-16mm" | "film-35mm" | "mirrorless" | "dslr" | "smartphone";
-export type CinematicPalette = "auto" | "natural-clean" | "warm-film" | "bleach-bypass" | "neon-noir";
-export type CinematicLighting = "auto" | "soft-window" | "overhead-fall" | "contre-jour" | "low-key";
+export type CinematicCamera = "auto" | "arri-alexa-35" | "arri-alexa-65" | "sony-venice-2" | "red-v-raptor" | "imax-65mm" | "bolex-16mm" | "film-35mm" | "mirrorless" | "dslr" | "smartphone" | "drone" | "action-camera" | "camcorder" | "gimbal-rig";
+export type CinematicPalette = "auto" | "natural-clean" | "warm-film" | "bleach-bypass" | "neon-noir" | "teal-orange" | "pastel-air" | "monochrome" | "muted-earth" | "cyberpunk" | "cross-process";
+export type CinematicLighting = "auto" | "soft-window" | "overhead-fall" | "contre-jour" | "low-key" | "golden-hour" | "practical-lamps" | "volumetric-rays" | "neon-edge" | "moonlight-blue" | "harsh-flash";
 export type CinematicLens = "auto" | "zeiss-master-prime" | "cooke-s4" | "panavision-c-series" | "anamorphic" | "macro" | "vintage-haze" | "canon-k35" | "leica-summilux-c" | "helios-44" | "fisheye" | "telephoto-zoom";
 export type CinematicFocalLength = "auto" | "12mm" | "24mm" | "35mm" | "50mm" | "75mm" | "100mm";
 export type CinematicAperture = "auto" | "f1.2" | "f1.4" | "f2" | "f2.8" | "f4" | "f5.6" | "f8" | "f11" | "f16" | "f22";
 export type CinematicMovement = "auto" | "locked-off" | "slow-dolly" | "steadicam" | "handheld" | "orbit" | "crane";
-export type CinematicEffect = "auto" | "film-grain" | "halation" | "bloom" | "vignette" | "chromatic-aberration" | "motion-blur" | "lens-flare";
+export type CinematicEffect = "auto" | "film-grain" | "halation" | "bloom" | "vignette" | "chromatic-aberration" | "motion-blur" | "lens-flare" | "anamorphic-widescreen";
 export type CinematicControlKind = "camera" | "palette" | "lighting" | "lens" | "focalLength" | "aperture" | "movement" | "effect";
 export type CinematicMediaType = "image" | "video";
 
@@ -59,6 +59,10 @@ export const CINEMATIC_CAMERA_OPTIONS: readonly CinematicOption<CinematicCamera>
   { value: "mirrorless", label: "Mirrorless", prompt: "modern full-frame mirrorless camera look with clean compact digital sharpness", visual: previewImage("camera-mirrorless") },
   { value: "dslr", label: "DSLR", prompt: "DSLR photo-video hybrid look with crisp detail and natural contrast", visual: previewImage("camera-dslr") },
   { value: "smartphone", label: "Smartphone", prompt: "modern smartphone camera look with computational clarity and deep focus", visual: previewImage("camera-smartphone") },
+  { value: "drone", label: "Drone", prompt: "drone camera look with elevated aerial perspective and wide stabilized motion", visual: previewImage("camera-drone") },
+  { value: "action-camera", label: "Action Cam", prompt: "action camera look with rugged ultra-wide perspective and kinetic clarity", visual: previewImage("camera-action-camera") },
+  { value: "camcorder", label: "Camcorder", prompt: "handheld camcorder look with practical video texture and documentary immediacy", visual: previewImage("camera-camcorder") },
+  { value: "gimbal-rig", label: "Gimbal Rig", prompt: "gimbal-mounted camera look with smooth stabilized handheld movement", visual: previewImage("camera-gimbal-rig") },
 ];
 
 export const CINEMATIC_PALETTE_OPTIONS: readonly CinematicOption<CinematicPalette>[] = [
@@ -67,6 +71,12 @@ export const CINEMATIC_PALETTE_OPTIONS: readonly CinematicOption<CinematicPalett
   { value: "warm-film", label: "Warm Film", prompt: "warm film color with gentle halation", visual: previewImage("palette-warm-film") },
   { value: "bleach-bypass", label: "Bleach Bypass", prompt: "bleach bypass contrast with restrained saturation", visual: previewImage("palette-bleach-bypass") },
   { value: "neon-noir", label: "Neon Noir", prompt: "neon noir color contrast with deep shadows", visual: previewImage("palette-neon-noir") },
+  { value: "teal-orange", label: "Teal Orange", prompt: "teal shadows and warm orange highlights with cinematic blockbuster contrast", visual: previewImage("palette-teal-orange") },
+  { value: "pastel-air", label: "Pastel Air", prompt: "soft airy pastel color palette with low contrast daylight", visual: previewImage("palette-pastel-air") },
+  { value: "monochrome", label: "Monochrome", prompt: "elegant black-and-white cinematic contrast", visual: previewImage("palette-monochrome") },
+  { value: "muted-earth", label: "Muted Earth", prompt: "muted earth tone palette with olive, clay, taupe, and natural warmth", visual: previewImage("palette-muted-earth") },
+  { value: "cyberpunk", label: "Cyberpunk", prompt: "cyberpunk color grade with saturated magenta, cyan, and electric night contrast", visual: previewImage("palette-cyberpunk") },
+  { value: "cross-process", label: "Cross Process", prompt: "cross-processed film color with stylized green-yellow shifts", visual: previewImage("palette-cross-process") },
 ];
 
 export const CINEMATIC_LIGHTING_OPTIONS: readonly CinematicOption<CinematicLighting>[] = [
@@ -75,6 +85,12 @@ export const CINEMATIC_LIGHTING_OPTIONS: readonly CinematicOption<CinematicLight
   { value: "overhead-fall", label: "Overhead Fall", prompt: "overhead light with dramatic falloff", visual: previewImage("lighting-overhead-fall") },
   { value: "contre-jour", label: "Contre Jour", prompt: "contre-jour backlight and rim highlights", visual: previewImage("lighting-contre-jour") },
   { value: "low-key", label: "Low Key", prompt: "low-key lighting with shaped shadows", visual: previewImage("lighting-low-key") },
+  { value: "golden-hour", label: "Golden Hour", prompt: "golden hour low sun side light with warm long shadows", visual: previewImage("lighting-golden-hour") },
+  { value: "practical-lamps", label: "Practical Lamps", prompt: "visible warm practical lamp lighting integrated into the scene", visual: previewImage("lighting-practical-lamps") },
+  { value: "volumetric-rays", label: "Volumetric Rays", prompt: "volumetric light rays through haze", visual: previewImage("lighting-volumetric-rays") },
+  { value: "neon-edge", label: "Neon Edge", prompt: "colored neon rim light shaping the subject edges", visual: previewImage("lighting-neon-edge") },
+  { value: "moonlight-blue", label: "Moonlight Blue", prompt: "cool blue moonlight with soft night contrast", visual: previewImage("lighting-moonlight-blue") },
+  { value: "harsh-flash", label: "Harsh Flash", prompt: "direct harsh flash lighting with sharp shadows and raw texture", visual: previewImage("lighting-harsh-flash") },
 ];
 
 export const CINEMATIC_LENS_OPTIONS: readonly CinematicOption<CinematicLens>[] = [
@@ -135,6 +151,7 @@ export const CINEMATIC_EFFECT_OPTIONS: readonly CinematicOption<CinematicEffect>
   { value: "chromatic-aberration", label: "Chromatic Aberration", prompt: "tasteful chromatic aberration near high-contrast frame edges", visual: previewImage("effect-chromatic-aberration") },
   { value: "motion-blur", label: "Motion Blur", prompt: "directional cinematic motion blur while keeping the subject readable", visual: previewImage("effect-motion-blur") },
   { value: "lens-flare", label: "Lens Flare", prompt: "realistic cinematic lens flare from a bright side light", visual: previewImage("effect-lens-flare") },
+  { value: "anamorphic-widescreen", label: "Anamorphic Wide", prompt: "anamorphic widescreen 2.39:1 framing with oval bokeh and subtle horizontal lens flare", visual: previewImage("effect-anamorphic-widescreen") },
 ];
 
 export function normalizeCinematicProfile(value: unknown): CinematicProfile {

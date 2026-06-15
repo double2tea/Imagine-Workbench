@@ -83,6 +83,11 @@ import { DEFAULT_AUDIO_MODEL, getAudioModelCapabilities, getImageModelCapabiliti
 import { RUNNINGHUB_YOUCHUAN_ADVANCED_DEFAULTS, isRunningHubYouchuanImageModel } from "@/lib/providers/runninghub";
 import type { RunningHubYouchuanAdvancedSettings } from "@/lib/providers/types";
 import {
+  DEFAULT_CINEMATIC_PROFILE,
+  normalizeCinematicProfile,
+  sameCinematicProfile,
+} from "@/lib/cinematic-controls";
+import {
   BOARD_PORT_IDS,
   filterValidBoardEdges,
   resolveBoardConnectionKind,
@@ -282,6 +287,7 @@ function cloneBoardNodeForDuplicate(source: BoardNode, position: BoardPoint): Bo
         kind: "image-generate",
         aspectRatio: source.aspectRatio,
         customImageResolution: source.customImageResolution,
+        cinematicProfile: source.cinematicProfile,
         imageQuality: source.imageQuality,
         imageResolution: source.imageResolution,
         model: source.model,
@@ -296,6 +302,7 @@ function cloneBoardNodeForDuplicate(source: BoardNode, position: BoardPoint): Bo
         ...shell,
         kind: "video-generate",
         aspectRatio: source.aspectRatio,
+        cinematicProfile: source.cinematicProfile,
         model: source.model,
         prompt: source.prompt,
         status: "idle",
@@ -809,6 +816,7 @@ function normalizeBoardNode(node: unknown, index: number): BoardNode | null {
       model,
       prompt: typeof node.prompt === "string" ? node.prompt : "",
       aspectRatio: aspectRatio || defaults.aspectRatio,
+      cinematicProfile: normalizeCinematicProfile(node.cinematicProfile),
       customImageResolution: readOptionalString(node.customImageResolution) || defaults.customImageResolution,
       imageQuality: readOptionalString(node.imageQuality) ?? defaults.imageQuality,
       imageResolution: readOptionalString(node.imageResolution) || defaults.imageResolution,
@@ -832,6 +840,7 @@ function normalizeBoardNode(node: unknown, index: number): BoardNode | null {
         model,
         prompt: typeof node.prompt === "string" ? node.prompt : "",
         aspectRatio: aspectRatio || defaults.aspectRatio,
+        cinematicProfile: normalizeCinematicProfile(node.cinematicProfile),
         resultStackKey: readOptionalString(node.resultStackKey),
         status: normalizeGenerationStatus(node.status),
       videoDuration: readOptionalString(node.videoDuration) ?? defaults.videoDuration,
@@ -1314,6 +1323,7 @@ function createGenerateBoardNode(input: CreateGenerateNodeInput, nodes: BoardNod
       ...baseNode,
       kind: "image-generate",
       aspectRatio: input.aspectRatio || imageDefaults.aspectRatio,
+      cinematicProfile: input.cinematicProfile ?? DEFAULT_CINEMATIC_PROFILE,
       customImageResolution: input.customImageResolution ?? imageDefaults.customImageResolution,
       imageQuality: input.imageQuality ?? imageDefaults.imageQuality,
       imageResolution: input.imageResolution ?? imageDefaults.imageResolution,
@@ -1343,6 +1353,7 @@ function createGenerateBoardNode(input: CreateGenerateNodeInput, nodes: BoardNod
     ...baseNode,
     kind: "video-generate",
     aspectRatio: input.aspectRatio || videoDefaults.aspectRatio,
+    cinematicProfile: input.cinematicProfile ?? DEFAULT_CINEMATIC_PROFILE,
     videoDuration: input.videoDuration ?? videoDefaults.videoDuration,
     videoPreset: input.videoPreset ?? videoDefaults.videoPreset,
     videoReferenceMode: input.videoReferenceMode ?? videoDefaults.videoReferenceMode,
@@ -1442,6 +1453,7 @@ function sameGenerateUpdate(node: BoardImageGenerateNode | BoardVideoGenerateNod
 
   if (node.kind === "image-generate") {
     if ("aspectRatio" in input && node.aspectRatio !== input.aspectRatio) return false;
+    if ("cinematicProfile" in input && !sameCinematicProfile(node.cinematicProfile, input.cinematicProfile)) return false;
     if ("customImageResolution" in input && node.customImageResolution !== input.customImageResolution) return false;
     if ("imageQuality" in input && node.imageQuality !== input.imageQuality) return false;
     if ("imageResolution" in input && node.imageResolution !== input.imageResolution) return false;
@@ -1451,6 +1463,7 @@ function sameGenerateUpdate(node: BoardImageGenerateNode | BoardVideoGenerateNod
 
   if (node.kind === "video-generate") {
     if ("aspectRatio" in input && node.aspectRatio !== input.aspectRatio) return false;
+    if ("cinematicProfile" in input && !sameCinematicProfile(node.cinematicProfile, input.cinematicProfile)) return false;
     if ("videoDuration" in input && node.videoDuration !== input.videoDuration) return false;
     if ("videoPreset" in input && node.videoPreset !== input.videoPreset) return false;
     if ("videoReferenceMode" in input && node.videoReferenceMode !== input.videoReferenceMode) return false;

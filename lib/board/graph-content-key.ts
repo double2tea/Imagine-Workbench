@@ -1,4 +1,5 @@
 import type { BoardEdge, BoardMultiGridItem, BoardNode, BoardReferenceGroupItem } from "@/lib/board/types";
+import { cinematicProfileKey } from "@/lib/cinematic-controls";
 
 const FNV_OFFSET_BASIS = 2_166_136_261;
 const FNV_PRIME = 16_777_619;
@@ -94,6 +95,7 @@ function serializeNodeContent(node: BoardNode): string {
         node.status,
         fingerprintLargeText(node.prompt),
         node.aspectRatio,
+        cinematicProfileKey(node.cinematicProfile),
         node.imageResolution,
         node.customImageResolution,
           node.imageQuality ?? "",
@@ -114,6 +116,7 @@ function serializeNodeContent(node: BoardNode): string {
         node.status,
         fingerprintLargeText(node.prompt),
         node.aspectRatio,
+        cinematicProfileKey(node.cinematicProfile),
         node.videoDuration ?? "",
           node.videoPreset ?? "",
           node.videoReferenceMode ?? "",

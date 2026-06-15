@@ -52,6 +52,7 @@ import {
 } from "@/lib/db";
 import { isMediaReferenceType, mediaReferenceTypeFromDataUri, mediaReferenceTypeFromMime } from "@/lib/media-references";
 import { compressReferenceImageFile } from "@/lib/reference-images";
+import { normalizeCinematicProfile } from "@/lib/cinematic-controls";
 
 export const WORKSPACE_BACKUP_SCHEMA_VERSION = 2;
 const SUPPORTED_WORKSPACE_BACKUP_SCHEMA_VERSIONS = new Set([1, WORKSPACE_BACKUP_SCHEMA_VERSION]);
@@ -1013,6 +1014,7 @@ function parseGenerationRequest(value: unknown): GenerationRequestSnapshot | und
     imageResolution: readOptionalString(value, "imageResolution"),
     imageQuality: readOptionalString(value, "imageQuality"),
     thinkingLevel: readOptionalString(value, "thinkingLevel"),
+    cinematicProfile: value.cinematicProfile === undefined ? undefined : normalizeCinematicProfile(value.cinematicProfile),
     videoDurationSeconds: readOptionalString(value, "videoDurationSeconds"),
     videoPreset: readOptionalString(value, "videoPreset"),
     videoReferenceMode: readVideoReferenceMode(value.videoReferenceMode),
@@ -1154,6 +1156,7 @@ function parseBoardNode(value: unknown): BoardNode {
       prompt: readText(value, "prompt"),
       model: readString(value, "model"),
       aspectRatio: readString(value, "aspectRatio"),
+      cinematicProfile: normalizeCinematicProfile(value.cinematicProfile),
       customImageResolution: readString(value, "customImageResolution"),
         imageQuality: readOptionalString(value, "imageQuality"),
         imageResolution: readString(value, "imageResolution"),
@@ -1174,6 +1177,7 @@ function parseBoardNode(value: unknown): BoardNode {
       prompt: readText(value, "prompt"),
       model: readString(value, "model"),
       aspectRatio: readString(value, "aspectRatio"),
+      cinematicProfile: normalizeCinematicProfile(value.cinematicProfile),
       videoDuration: readOptionalString(value, "videoDuration"),
         videoPreset: readOptionalString(value, "videoPreset"),
         videoReferenceMode: readVideoReferenceMode(value.videoReferenceMode),

@@ -1,6 +1,7 @@
 import { useId, useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from "react";
 import { Sparkles } from "lucide-react";
 import CapabilityParameterControls from "@/components/creation/CapabilityParameterControls";
+import CinematicProfileControls from "@/components/creation/CinematicProfileControls";
 import { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
 import CreatorGenerateButton from "@/components/creation/CreatorGenerateButton";
 import ModelSelectCombobox, { type ModelOptionGroup } from "@/components/creation/ModelSelectCombobox";
@@ -19,11 +20,13 @@ import {
 import type { ImageModelCapabilities } from "@/lib/providers/model-catalog";
 import type { ModelParameterValues } from "@/lib/providers/model-capabilities";
 import { buildGenerationModelPriceOptions } from "@/lib/providers/pricing";
+import type { CinematicProfile } from "@/lib/cinematic-controls";
 
 interface ImageGenerationPanelProps {
   atDropdownNode: ReactNode;
   capabilities: ImageModelCapabilities;
   customImageSize: string;
+  cinematicProfile: CinematicProfile;
   imageQuality: string;
   imageBackgroundGeneration: boolean;
   imageResolution: string;
@@ -42,6 +45,7 @@ interface ImageGenerationPanelProps {
   selectedModel: string;
   submitCount: number;
   onClearReferences: () => void;
+  onCinematicProfileChange: (value: CinematicProfile) => void;
   onCustomImageSizeChange: (value: string) => void;
   onGenerate: () => void;
   onImageBackgroundGenerationChange: (value: boolean) => void;
@@ -67,6 +71,7 @@ interface ImageGenerationPanelProps {
 export default function ImageGenerationPanel({
   atDropdownNode,
   capabilities,
+  cinematicProfile,
   customImageSize,
   imageQuality,
   imageBackgroundGeneration,
@@ -86,6 +91,7 @@ export default function ImageGenerationPanel({
   submitCount,
   supportsBackgroundGeneration,
   onClearReferences,
+  onCinematicProfileChange,
   onCustomImageSizeChange,
   onGenerate,
   onImageBackgroundGenerationChange,
@@ -240,6 +246,13 @@ export default function ImageGenerationPanel({
       </div>
 
       <div className="flex flex-col gap-3 border-t border-[var(--iw-border)] pt-3">
+        <CinematicProfileControls
+          accent="blue"
+          mediaType="image"
+          value={cinematicProfile}
+          onChange={onCinematicProfileChange}
+        />
+
         <div>
           <label htmlFor={negativePromptId} className="mb-1.5 block imagine-section-label">反向提示词</label>
           <input

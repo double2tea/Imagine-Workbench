@@ -1,6 +1,7 @@
 import { useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from "react";
 import { Video as VideoIcon } from "lucide-react";
 import { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
+import CinematicProfileControls from "@/components/creation/CinematicProfileControls";
 import CreatorGenerateButton from "@/components/creation/CreatorGenerateButton";
 import ModelSelectCombobox, { type ModelOptionGroup } from "@/components/creation/ModelSelectCombobox";
 import PromptComposerSurface, { type PromptComposerSelectionRange } from "@/components/creation/PromptComposerSurface";
@@ -18,10 +19,12 @@ import {
 import type { ParameterOption, VideoModelCapabilities, VideoReferenceMode } from "@/lib/providers/model-catalog";
 import { buildGenerationModelPriceOptions } from "@/lib/providers/pricing";
 import { selectVideoReferenceTypesForMode } from "@/lib/video-reference-selection";
+import type { CinematicProfile } from "@/lib/cinematic-controls";
 
 interface VideoGenerationPanelProps {
   atDropdownNode: ReactNode;
   capabilities: VideoModelCapabilities;
+  cinematicProfile: CinematicProfile;
   clearReferenceLabel: string;
   isOptimizing: boolean;
   isSubmitting: boolean;
@@ -46,6 +49,7 @@ interface VideoGenerationPanelProps {
   selectedSize: string;
   submitCount: number;
   onClearReferences: () => void;
+  onCinematicProfileChange: (value: CinematicProfile) => void;
   onGenerate: () => void;
   onOptimizePrompt: () => void;
   onPromptChange: (value: string) => void;
@@ -68,6 +72,7 @@ interface VideoGenerationPanelProps {
 export default function VideoGenerationPanel({
   atDropdownNode,
   capabilities,
+  cinematicProfile,
   clearReferenceLabel,
   isOptimizing,
   isSubmitting,
@@ -92,6 +97,7 @@ export default function VideoGenerationPanel({
   selectedSize,
   submitCount,
   onClearReferences,
+  onCinematicProfileChange,
   onGenerate,
   onOptimizePrompt,
   onPromptChange,
@@ -245,6 +251,13 @@ export default function VideoGenerationPanel({
           </select>
         </div>
       )}
+
+      <CinematicProfileControls
+        accent="violet"
+        mediaType="video"
+        value={cinematicProfile}
+        onChange={onCinematicProfileChange}
+      />
 
       {(resolutionOptions.length > 0 || durationOptions.length > 0 || presetOptions.length > 0) && (
         <div className={`grid grid-cols-1 gap-3 border-t border-[var(--iw-border)] pt-3 ${controlGridClass}`}>

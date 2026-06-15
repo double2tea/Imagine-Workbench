@@ -108,6 +108,7 @@ import {
   prepareReferenceImageUrlForRequest,
 } from "@/lib/reference-images";
 import { selectVideoReferenceTypesForMode } from "@/lib/video-reference-selection";
+import { DEFAULT_CINEMATIC_PROFILE, type CinematicProfile } from "@/lib/cinematic-controls";
 import {
   cleanupWorkspaceAssets,
   clearLocalStorageGroup,
@@ -273,6 +274,7 @@ export default function Home() {
   const [videoPreset, setVideoPreset] = useState("normal");
   const [selectedVideoReferenceMode, setSelectedVideoReferenceMode] = useState<VideoReferenceMode>("reference");
   const [videoResolution, setVideoResolution] = useState("720p");
+  const [cinematicProfile, setCinematicProfile] = useState<CinematicProfile>(DEFAULT_CINEMATIC_PROFILE);
   const [customImageSize, setCustomImageSize] = useState("2560x1440");
   const [traditionalSubTab, setTraditionalSubTab] = useState<CreationMode>("image");
   const [isAgentDockOpen, setIsAgentDockOpen] = useState(false);
@@ -700,6 +702,7 @@ export default function Home() {
     generateManualAudio,
     generateManualImage,
     generateManualVideo,
+    retryGenerationTask,
   } = useGenerationActions({
     activeImageAspectRatio,
     activeImageModel,
@@ -711,6 +714,7 @@ export default function Home() {
     activeVideoResolution,
     activeVideoSize,
     buildProviderHeaders,
+    cinematicProfile,
     generationAbortControllersRef,
     imageThinkingLevel,
     isCustomImageResolution: imageResolution === "custom",
@@ -1014,6 +1018,7 @@ export default function Home() {
     setPrompt(item.type === "transcript" ? request?.prompt ?? "" : item.prompt);
     setReferenceImages(references);
     setReferenceImage(references[0]?.url ?? null);
+    setCinematicProfile(request?.cinematicProfile ?? DEFAULT_CINEMATIC_PROFILE);
 
     if (item.type === "audio" || item.type === "transcript") {
       handleSelectAudioModel(model);
@@ -1060,13 +1065,13 @@ export default function Home() {
   }
 
   const retryGalleryItem = useCallback((item: StorageItem) => {
-    if (!generationTasks.some(task => task.id === item.id)) {
+    const task = generationTasks.find(task => task.id === item.id);
+    if (!task) {
       void retryFailedItem(item);
       return;
     }
-    reuseTaskInComposer(item);
-    pushWorkspaceNotice("info", "已复用失败任务参数，可重新点击生成");
-  }, [generationTasks, pushWorkspaceNotice, retryFailedItem, reuseTaskInComposer]);
+    void retryGenerationTask(task);
+  }, [generationTasks, retryFailedItem, retryGenerationTask]);
 
   useEffect(() => {
     const readyTimer = window.setTimeout(() => {
@@ -1802,6 +1807,7 @@ export default function Home() {
         showGenerateButton={showGenerateButton}
         atDropdownNode={atDropdown.visible && atDropdown.type === "image-prompt" ? renderAtDropdown("image-prompt") : null}
         capabilities={imageCapabilities}
+        cinematicProfile={cinematicProfile}
         customImageSize={customImageSize}
         imageBackgroundGeneration={imageBackgroundGeneration}
         imageQuality={imageQuality}
@@ -1825,6 +1831,7 @@ export default function Home() {
           setReferenceImage(null);
           setPrompt(removePromptReferenceTokens);
         }}
+        onCinematicProfileChange={setCinematicProfile}
         onCustomImageSizeChange={setCustomImageSize}
         onGenerate={generateManualImage}
         onImageBackgroundGenerationChange={setImageBackgroundGeneration}
@@ -1850,6 +1857,7 @@ export default function Home() {
         showGenerateButton={showGenerateButton}
         atDropdownNode={atDropdown.visible && atDropdown.type === "video-prompt" ? renderAtDropdown("video-prompt") : null}
         capabilities={videoCapabilities}
+        cinematicProfile={cinematicProfile}
         clearReferenceLabel={videoClearReferenceLabel}
         durationOptions={videoCapabilities.durations}
         isOptimizing={isOptimizing}
@@ -1878,6 +1886,7 @@ export default function Home() {
           setReferenceImage(null);
           setPrompt(removePromptReferenceTokens);
         }}
+        onCinematicProfileChange={setCinematicProfile}
         onGenerate={generateManualVideo}
         onOptimizePrompt={optimizeActivePrompt}
         onPromptChange={value => handleTextareaChange(value, "video-prompt")}

@@ -11,6 +11,7 @@ import {
   deleteFromDB,
   getAssetMeta,
   getAssetMetasByIds,
+  getGenerationReferenceMedia,
   hydrateAssets,
   saveToDB,
   type GenerationReferenceMediaSnapshot,
@@ -37,6 +38,11 @@ import { getReferenceImagePayloadError, getReferenceMediaPayloadError, prepareRe
 import { transcriptPreview, transcriptToDataUrl } from "@/lib/transcripts";
 import { selectVideoReferencesForMode } from "@/lib/video-reference-selection";
 import { getVoiceProfile, isVoiceProfileUsableForAudioModel } from "@/lib/voice-profiles";
+import {
+  applyCinematicProfileToPrompt,
+  hasActiveCinematicProfile,
+  type CinematicProfile,
+} from "@/lib/cinematic-controls";
 
 type NoticeType = "error" | "info" | "success";
 
@@ -52,6 +58,7 @@ interface UseGenerationActionsParams {
   activeVideoResolution: string | undefined;
   activeVideoSize: string;
   buildProviderHeaders: (target?: string) => Record<string, string>;
+  cinematicProfile?: CinematicProfile;
   generationAbortControllersRef: MutableRefObject<Record<string, AbortController>>;
   imageThinkingLevel: string;
   isCustomImageResolution: boolean;
@@ -78,6 +85,7 @@ interface GenerationOverrides {
   audioFormat?: string;
   audioStylePrompt?: string;
   asrLanguage?: "auto" | "zh" | "en";
+  cinematicProfile?: CinematicProfile;
   optimizeTextPreview?: boolean;
   voiceProfileId?: string;
   voiceCloneConsentAccepted?: boolean;
@@ -312,6 +320,15 @@ function buildReferenceMediaSnapshot(
   });
 }
 
+function taskRequestReferences(request: GenerationRequestSnapshot): ReferenceImageRef[] {
+  return getGenerationReferenceMedia(request).map((reference, index) => ({
+    id: `retry_reference_${index + 1}`,
+    type: reference.type,
+    url: reference.url,
+    ...(reference.role ? { role: reference.role } : {}),
+  }));
+}
+
 function customImageSizeAspectRatio(size: string): string | null {
   const match = size.match(/^(\d+)x(\d+)$/);
   if (!match) return null;
@@ -349,6 +366,7 @@ export function useGenerationActions({
   activeVideoResolution,
   activeVideoSize,
   buildProviderHeaders,
+  cinematicProfile,
   generationAbortControllersRef,
   imageThinkingLevel,
   isCustomImageResolution,
@@ -406,6 +424,7 @@ export function useGenerationActions({
       requestModel,
       overrides.runningHubYouchuan ?? runningHubYouchuan,
     );
+    const requestCinematicProfile = overrides.cinematicProfile ?? cinematicProfile;
     const requestImageCapabilities = getImageModelCapabilities(requestModel);
     const requestedImageQuality = overrides.imageQuality ?? activeImageQuality;
     const requestImageQuality = resolveImageModelQuality(requestModel, requestedImageQuality);
@@ -452,7 +471,8 @@ export function useGenerationActions({
       return false;
     }
     setImageSubmitCount(prev => prev + 1);
-    const generationPrompt = buildPromptWithReferenceMap(activePrompt, activeReferenceImages, imageReferenceUrls);
+    const cinematicPrompt = applyCinematicProfileToPrompt(activePrompt, requestCinematicProfile, "image");
+    const generationPrompt = buildPromptWithReferenceMap(cinematicPrompt, activeReferenceImages, imageReferenceUrls);
     const generationRequest: GenerationRequestSnapshot = {
       prompt: generationPrompt,
       model: requestModel,
@@ -460,6 +480,7 @@ export function useGenerationActions({
       imageResolution: requestImageResolution,
       imageQuality: requestImageQuality,
       thinkingLevel: requestThinkingLevel,
+      ...(hasActiveCinematicProfile(requestCinematicProfile, "image") ? { cinematicProfile: requestCinematicProfile } : {}),
       runningHubAccessPassword: overrides.runningHubAccessPassword,
       runningHubNodeInfoList: overrides.runningHubNodeInfoList,
       ...(requestRunningHubYouchuan ? { runningHubYouchuan: requestRunningHubYouchuan } : {}),
@@ -608,6 +629,7 @@ export function useGenerationActions({
     const requestVideoReferenceMode = overrides.videoReferenceMode ?? activeVideoReferenceMode;
     const requestVideoResolution = overrides.videoResolution ?? activeVideoResolution;
     const requestVideoCapabilities = getVideoModelCapabilities(requestModel);
+    const requestCinematicProfile = overrides.cinematicProfile ?? cinematicProfile;
 
     if (!activePrompt.trim() && overrides.allowEmptyPrompt !== true && runningHubAppPresetRequiresPrompt(requestModel)) return false;
     const videoReferences = selectVideoReferencesForMode(
@@ -635,7 +657,8 @@ export function useGenerationActions({
       return false;
     }
     setVideoSubmitCount(prev => prev + 1);
-    const generationPrompt = buildPromptWithReferenceMap(activePrompt, activeReferenceImages, videoReferenceUrls);
+    const cinematicPrompt = applyCinematicProfileToPrompt(activePrompt, requestCinematicProfile, "video");
+    const generationPrompt = buildPromptWithReferenceMap(cinematicPrompt, activeReferenceImages, videoReferenceUrls);
     const generationRequest: GenerationRequestSnapshot = {
       prompt: generationPrompt,
       model: requestModel,
@@ -644,6 +667,7 @@ export function useGenerationActions({
       videoPreset: requestVideoPreset,
       videoReferenceMode: requestVideoReferenceMode === "none" ? undefined : requestVideoReferenceMode,
       videoResolution: requestVideoResolution,
+      ...(hasActiveCinematicProfile(requestCinematicProfile, "video") ? { cinematicProfile: requestCinematicProfile } : {}),
       runningHubAccessPassword: overrides.runningHubAccessPassword,
       runningHubNodeInfoList: overrides.runningHubNodeInfoList,
       referenceMedia: buildReferenceMediaSnapshot(videoReferences, videoReferencePayloads),
@@ -1009,9 +1033,72 @@ export function useGenerationActions({
     return true;
   };
 
+  const retryGenerationTask = async (task: GenerationTask) => {
+    if (task.status !== "failed") {
+      pushWorkspaceNotice("error", "只能重试失败任务");
+      return false;
+    }
+    if (!task.request) {
+      pushWorkspaceNotice("error", "失败任务缺少生成请求快照，无法重试");
+      return false;
+    }
+
+    const request = task.request;
+    const retryReferences = taskRequestReferences(request);
+    const allowEmptyPrompt = request.prompt.trim().length === 0;
+
+    if (task.mediaType === "image") {
+      return generateManualImage({
+        allowEmptyPrompt,
+        cinematicProfile: request.cinematicProfile,
+        imageQuality: request.imageQuality,
+        imageResolution: request.imageResolution,
+        isCustomImageResolution: request.imageResolution ? /^\d+x\d+$/.test(request.imageResolution) : false,
+        model: request.model,
+        prompt: task.prompt,
+        referenceImages: retryReferences,
+        runningHubNodeInfoList: request.runningHubNodeInfoList,
+        runningHubYouchuan: request.runningHubYouchuan,
+        size: request.aspectRatio,
+        thinkingLevel: request.thinkingLevel,
+      });
+    }
+
+    if (task.mediaType === "video") {
+      return generateManualVideo({
+        allowEmptyPrompt,
+        cinematicProfile: request.cinematicProfile,
+        model: request.model,
+        prompt: task.prompt,
+        referenceImages: retryReferences,
+        runningHubNodeInfoList: request.runningHubNodeInfoList,
+        size: request.aspectRatio,
+        videoDuration: request.videoDurationSeconds,
+        videoPreset: request.videoPreset,
+        videoReferenceMode: request.videoReferenceMode,
+        videoResolution: request.videoResolution,
+      });
+    }
+
+    return generateManualAudio({
+      allowEmptyPrompt,
+      asrLanguage: request.asrLanguage,
+      audioFormat: request.audioFormat,
+      audioMode: request.audioMode,
+      audioStylePrompt: request.audioStylePrompt,
+      model: request.model,
+      optimizeTextPreview: request.optimizeTextPreview,
+      prompt: task.mediaType === "transcript" ? request.prompt : task.prompt,
+      referenceImages: retryReferences,
+      runningHubNodeInfoList: request.runningHubNodeInfoList,
+      voiceProfileId: request.voiceProfileId,
+    });
+  };
+
   return {
     generateManualAudio,
     generateManualImage,
     generateManualVideo,
+    retryGenerationTask,
   };
 }

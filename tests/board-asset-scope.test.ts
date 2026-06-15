@@ -5,6 +5,7 @@ import {
   collectBoardAssetIdsFromNodes,
   collectPlacedBoardAssetIdsFromNodes,
 } from "../lib/assets/board-scope";
+import { DEFAULT_CINEMATIC_PROFILE } from "../lib/cinematic-controls";
 import type { BoardNode } from "../lib/board/types";
 
 const timestamp = "2026-06-05T00:00:00.000Z";
@@ -20,6 +21,7 @@ const generateNode: BoardNode = {
   prompt: "test",
   model: "model",
   aspectRatio: "1:1",
+  cinematicProfile: DEFAULT_CINEMATIC_PROFILE,
   customImageResolution: "1024x1024",
   imageResolution: "1K",
   status: "complete",

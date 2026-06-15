@@ -56,7 +56,10 @@ import type {
   BoardVideoGenerateNode,
 } from "@/lib/board";
 import { selectVideoReferenceTypesForMode } from "@/lib/video-reference-selection";
+import { hasActiveCinematicProfile } from "@/lib/cinematic-controls";
 import { VOICE_PROFILES_CHANGED_EVENT, getVisibleVoiceProfilesForAudioModel, isBuiltInVoiceProfileId, listVoiceProfiles, type VoiceProfile } from "@/lib/voice-profiles";
+
+const CINEMATIC_PROFILE_SUMMARY_LABEL = "电影风格";
 
 interface BoardInspectorProps {
   audioModelGroups: BoardModelOptionGroup[];
@@ -145,10 +148,10 @@ function describePortEndpoint(nodes: BoardNode[], ref: BoardPortRef): string {
 function generateParamSummary(node: BoardGenerateNode): string {
   if (node.kind === "image-generate") {
     const resolution = node.imageResolution === "custom" ? node.customImageResolution : node.imageResolution;
-    return `${node.model} / ${resolution} / x${node.variantCount}`;
+    return `${node.model} / ${resolution}${hasActiveCinematicProfile(node.cinematicProfile, "image") ? ` / ${CINEMATIC_PROFILE_SUMMARY_LABEL}` : ""} / x${node.variantCount}`;
   }
   if (node.kind === "video-generate") {
-    return `${node.model} / ${node.aspectRatio}${node.videoDuration ? ` / ${node.videoDuration}s` : ""} / x${node.variantCount}`;
+    return `${node.model} / ${node.aspectRatio}${node.videoDuration ? ` / ${node.videoDuration}s` : ""}${hasActiveCinematicProfile(node.cinematicProfile, "video") ? ` / ${CINEMATIC_PROFILE_SUMMARY_LABEL}` : ""} / x${node.variantCount}`;
   }
   return [
     node.model,
