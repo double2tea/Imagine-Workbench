@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import * as os from "node:os";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { badRequest } from "./errors";
 import { isProviderKey } from "../providers/registry";
@@ -21,7 +21,7 @@ const credentialWriteQueues = new Map<string, Promise<void>>();
 
 export function resolveProviderCredentialsPath(options: ResolveProviderCredentialPathOptions = {}): string {
   return join(
-    options.homeDir ?? os.homedir(),
+    options.homeDir ?? homedir(),
     "Library",
     "Application Support",
     "Imagine Workbench",
@@ -158,6 +158,7 @@ function enqueueCredentialStoreUpdate<T>(credentialsPath: string, update: () => 
   const nextQueue = pending.then(() => undefined, () => undefined);
   credentialWriteQueues.set(credentialsPath, nextQueue);
   void nextQueue.then(() => {
+    // A newer queued write owns cleanup if the map entry has already advanced.
     if (credentialWriteQueues.get(credentialsPath) === nextQueue) {
       credentialWriteQueues.delete(credentialsPath);
     }
@@ -169,9 +170,7 @@ async function writeCredentialStore(credentialsPath: string, store: ResolveProvi
   await mkdir(dirname(credentialsPath), { recursive: true });
   const tempPath = `${credentialsPath}.${process.pid}.${randomUUID()}.tmp`;
   await writeFile(tempPath, `${JSON.stringify(store, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
-  await chmod(tempPath, 0o600);
   await rename(tempPath, credentialsPath);
-  await chmod(credentialsPath, 0o600);
 }
 
 function isMissingFileError(error: unknown): boolean {
