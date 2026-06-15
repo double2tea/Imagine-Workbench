@@ -49,6 +49,7 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
   const [panoramaItem, setPanoramaItem] = useState<StorageItem | null>(null);
   const [isDiagnosticsOpen, setIsDiagnosticsOpen] = useState(false);
   const captureVideoFrameRef = useRef<VideoFrameCaptureRequest | null>(null);
+  const imageWheelTargetRef = useRef<HTMLDivElement | null>(null);
   const imageScaleRef = useRef(1);
   const imageOffsetRef = useRef({ x: 0, y: 0 });
   const imageDragRef = useRef<ImagePanDragState | null>(null);
@@ -210,25 +211,31 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
     event.currentTarget.releasePointerCapture(event.pointerId);
   };
 
-  const handleImageWheel = (event: React.WheelEvent<HTMLDivElement>): void => {
-    if (item?.type !== "image") return;
-    event.preventDefault();
-    imageWheelDeltaRef.current += event.deltaY;
-    if (imageWheelFrameRef.current !== null) return;
-    imageWheelFrameRef.current = window.requestAnimationFrame(() => {
-      const delta = imageWheelDeltaRef.current;
-      imageWheelDeltaRef.current = 0;
-      imageWheelFrameRef.current = null;
-      const nextScale = imageScaleRef.current * Math.exp(-delta * 0.001);
-      const boundedScale = Number(Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, nextScale)).toFixed(3));
-      imageScaleRef.current = boundedScale;
-      if (boundedScale <= 1) {
-        imageOffsetRef.current = { x: 0, y: 0 };
-        setImageOffset({ x: 0, y: 0 });
-      }
-      setImageScale(boundedScale);
-    });
-  };
+  useEffect(() => {
+    if (item?.type !== "image") return undefined;
+    const element = imageWheelTargetRef.current;
+    if (!element) return undefined;
+    const handleImageWheel = (event: globalThis.WheelEvent): void => {
+      event.preventDefault();
+      imageWheelDeltaRef.current += event.deltaY;
+      if (imageWheelFrameRef.current !== null) return;
+      imageWheelFrameRef.current = window.requestAnimationFrame(() => {
+        const delta = imageWheelDeltaRef.current;
+        imageWheelDeltaRef.current = 0;
+        imageWheelFrameRef.current = null;
+        const nextScale = imageScaleRef.current * Math.exp(-delta * 0.001);
+        const boundedScale = Number(Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, nextScale)).toFixed(3));
+        imageScaleRef.current = boundedScale;
+        if (boundedScale <= 1) {
+          imageOffsetRef.current = { x: 0, y: 0 };
+          setImageOffset({ x: 0, y: 0 });
+        }
+        setImageScale(boundedScale);
+      });
+    };
+    element.addEventListener("wheel", handleImageWheel, { passive: false });
+    return () => element.removeEventListener("wheel", handleImageWheel);
+  }, [item?.type]);
 
   return (
     <AnimatePresence>
@@ -260,8 +267,8 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
                 <>
                   <div className="h-full w-full overflow-hidden">
                     <div
+                      ref={imageWheelTargetRef}
                       className={`flex h-full w-full items-center justify-center ${imageScale > 1 ? "cursor-grab touch-none" : ""} ${isImageDragging ? "cursor-grabbing" : ""}`}
-                      onWheel={handleImageWheel}
                       onPointerDown={handleImagePointerDown}
                       onPointerMove={handleImagePointerMove}
                       onPointerUp={stopImageDrag}
