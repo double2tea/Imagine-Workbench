@@ -54,6 +54,112 @@ interface PreviewTarget {
   value: string;
 }
 
+type CinematicOptionDescriptions = {
+  [Field in CinematicField]: Record<CinematicProfile[Field], string>;
+};
+
+const optionDescriptions: CinematicOptionDescriptions = {
+  camera: {
+    auto: "不额外指定拍摄设备，让模型按画面内容自行决定。",
+    "arri-alexa-35": "偏现代数字电影机质感，动态范围高，肤色和高光更稳。",
+    "arri-alexa-65": "偏大画幅电影感，空间更开阔，主体和背景分离更明显。",
+    "sony-venice-2": "偏全画幅数字电影质感，高光过渡柔和，适合写实场景。",
+    "red-v-raptor": "偏锐利高解析数字影像，细节和边缘更清晰。",
+    "imax-65mm": "强调宏大尺度和清晰细节，适合史诗感、建筑、自然大景。",
+    "bolex-16mm": "偏 16mm 胶片手作感，颗粒更明显，纪录片气质更强。",
+    "film-35mm": "偏 35mm 胶片质感，颗粒、色彩和高光更有模拟味。",
+    mirrorless: "偏现代微单拍摄质感，干净、轻便、数字感较自然。",
+    dslr: "偏单反视频/照片混合质感，对比自然，细节清楚。",
+    smartphone: "偏手机计算摄影效果，清晰、深景深，生活化更强。",
+    drone: "偏无人机航拍视角，强调高机位、开阔空间和稳定运动。",
+    "action-camera": "偏运动相机效果，超广角、动感强，适合第一视角或户外场景。",
+    camcorder: "偏手持摄像机和纪录片质感，画面更直接、更生活化。",
+    "gimbal-rig": "偏稳定器拍摄效果，运动平滑，适合跟拍和移动镜头。",
+  },
+  palette: {
+    auto: "不额外指定色彩风格，保留模型默认色彩判断。",
+    "natural-clean": "自然干净的色彩，饱和度和对比都较克制。",
+    "warm-film": "暖调胶片色彩，高光更柔，整体更有怀旧感。",
+    "bleach-bypass": "低饱和高反差，画面更冷峻、硬朗。",
+    "neon-noir": "霓虹夜景风格，深阴影和高饱和色光更明显。",
+    "teal-orange": "青橙电影调色，冷暖对比强，商业片感更明显。",
+    "pastel-air": "低对比柔和粉彩，画面更轻盈、通透。",
+    monochrome: "黑白影像风格，主要依赖明暗和轮廓表达情绪。",
+    "muted-earth": "低饱和大地色，适合自然、复古、户外或生活方式场景。",
+    cyberpunk: "高饱和赛博色彩，偏洋红、青蓝和夜景灯光。",
+    "cross-process": "交叉冲洗胶片感，色相偏移更明显，风格化更强。",
+  },
+  lighting: {
+    auto: "不额外指定光线，让模型按场景自动处理。",
+    "soft-window": "柔和窗光，阴影过渡自然，适合人物和室内写实。",
+    "overhead-fall": "顶部光源向下衰减，氛围更戏剧化。",
+    "contre-jour": "逆光和轮廓光更强，主体边缘更亮，背景更有层次。",
+    "low-key": "低调照明，阴影面积大，适合悬疑、冷峻或高级感画面。",
+    "golden-hour": "黄金时刻暖光，低角度阳光和长阴影更明显。",
+    "practical-lamps": "强调画面中可见灯具带来的实际光源，生活感更强。",
+    "volumetric-rays": "空气中可见光束和雾化层次更明显。",
+    "neon-edge": "彩色霓虹边缘光，主体轮廓更突出。",
+    "moonlight-blue": "冷蓝月光氛围，适合夜景和安静情绪。",
+    "harsh-flash": "直闪硬光，阴影锐利，画面更直接、更粗粝。",
+  },
+  lens: {
+    auto: "不额外指定镜头特性，让模型按构图自动处理。",
+    "zeiss-master-prime": "偏高解析、低炫光、干净锐利的电影镜头效果。",
+    "cooke-s4": "偏温暖柔和的 Cooke 风格，肤色和高光更圆润。",
+    "panavision-c-series": "偏经典变形镜头质感，椭圆焦外和电影感更强。",
+    anamorphic: "变形宽银幕镜头感，横向光晕和焦外更有电影味。",
+    macro: "微距细节，浅景深更明显，适合产品、材质和局部特写。",
+    "vintage-haze": "老镜头雾化感，高光更散，画面更柔。",
+    "canon-k35": "复古电影镜头暖调，反差较柔，人物更有年代感。",
+    "leica-summilux-c": "高端电影镜头质感，清晰但不过硬，焦外顺滑。",
+    "helios-44": "复古旋焦效果，背景焦外更旋转、更风格化。",
+    fisheye: "鱼眼超广角畸变，空间夸张，适合特殊视角。",
+    "telephoto-zoom": "长焦压缩空间，主体更突出，背景更贴近。",
+  },
+  focalLength: {
+    auto: "不额外指定焦段，让模型按画面内容自动选择。",
+    "12mm": "超广角视角，空间夸张，适合大场景和近距离冲击感。",
+    "24mm": "广角电影视角，环境信息多，适合建立场景。",
+    "35mm": "自然叙事视角，环境和人物比例较平衡。",
+    "50mm": "标准人像视角，主体自然，畸变较少。",
+    "75mm": "中长焦压缩，人物更突出，背景更柔。",
+    "100mm": "长焦压缩更强，适合远距离、局部和安静观察感。",
+  },
+  aperture: {
+    auto: "不额外指定光圈和景深。",
+    "f1.2": "极浅景深，背景大幅虚化，主体分离最强。",
+    "f1.4": "浅景深明显，适合人像、夜景和柔和焦外。",
+    f2: "浅景深但仍保留部分环境信息。",
+    "f2.8": "电影常用浅景深，主体清楚，背景适度虚化。",
+    f4: "中等景深，主体和部分背景都可读。",
+    "f5.6": "平衡景深，环境信息更完整。",
+    f8: "深景深，前后景都更清楚。",
+    f11: "更深景深，适合环境、建筑和群像。",
+    f16: "很深景深，画面整体更清晰。",
+    f22: "最大深景深倾向，前景和背景都尽量清楚。",
+  },
+  movement: {
+    auto: "不额外指定运动方式，让模型按视频内容自动处理。",
+    "locked-off": "固定机位，画面稳定，适合观察感和构图展示。",
+    "slow-dolly": "缓慢推轨或拉轨，空间层次和情绪推进更明显。",
+    steadicam: "平滑跟拍，适合人物行走和连续运动。",
+    handheld: "轻微手持晃动，现场感和纪录感更强。",
+    orbit: "围绕主体环绕移动，强调空间和主体轮廓。",
+    crane: "升降镜头，适合揭示场景规模或制造开阔感。",
+  },
+  effect: {
+    auto: "不额外指定后期效果。",
+    "film-grain": "增加细腻胶片颗粒，让画面更有模拟质感。",
+    halation: "高光边缘出现暖色晕染，胶片感更强。",
+    bloom: "高光柔化扩散，画面更梦幻、更柔和。",
+    vignette: "边缘轻微压暗，把注意力集中到画面中心。",
+    "chromatic-aberration": "边缘轻微色散，增加镜头瑕疵和风格化质感。",
+    "motion-blur": "方向性动态模糊，强化速度和运动感。",
+    "lens-flare": "真实镜头眩光，适合强侧光和逆光画面。",
+    "anamorphic-widescreen": "2.39:1 宽银幕感，横向光晕和变形镜头气质更明显。",
+  },
+};
+
 const accentClassNames: Record<NonNullable<CinematicProfileControlsProps["accent"]>, {
   active: string;
   button: string;
@@ -86,6 +192,12 @@ function optionVisualStyle(visual: string): CSSProperties {
   return visual ? { backgroundImage: `url(${visual})` } : {};
 }
 
+function optionDescription(field: CinematicField, value: string): string {
+  const description = (optionDescriptions[field] as Record<string, string>)[value];
+  if (!description) throw new Error(`Missing cinematic option description: ${field}:${value}`);
+  return description;
+}
+
 function OptionGrid<T extends string>({
   accent,
   disabled,
@@ -116,14 +228,22 @@ function OptionGrid<T extends string>({
             aria-disabled={disabled}
             data-disabled={disabled}
             data-selected={selected}
-            onBlur={() => onPreview(null)}
+            onBlur={() => {
+              if (!disabled) onPreview(null);
+            }}
             onClick={() => {
               if (!disabled) onSelect(field, option.value);
             }}
-            onFocus={() => onPreview({ field, value: option.value })}
-            onMouseEnter={() => onPreview({ field, value: option.value })}
-            onMouseLeave={() => onPreview(null)}
-            className={`group min-w-0 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-2 text-left transition hover:border-[var(--iw-border-strong)] data-[disabled=true]:cursor-not-allowed data-[disabled=true]:opacity-55 ${accentClassNames[accent].ring}`}
+            onFocus={() => {
+              if (!disabled) onPreview({ field, value: option.value });
+            }}
+            onMouseEnter={() => {
+              if (!disabled) onPreview({ field, value: option.value });
+            }}
+            onMouseLeave={() => {
+              if (!disabled) onPreview(null);
+            }}
+            className={`group min-w-0 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-2 text-left transition data-[disabled=true]:cursor-not-allowed data-[disabled=true]:opacity-55 ${disabled ? "" : "hover:border-[var(--iw-border-strong)]"} ${accentClassNames[accent].ring}`}
           >
             <span
               className="relative mb-2 flex aspect-video overflow-hidden rounded-md border border-white/10 bg-[var(--iw-panel)] bg-cover bg-center"
@@ -181,12 +301,13 @@ export default function CinematicProfileControls({
   const summaryItems = sections.slice(0, mediaType === "video" ? 4 : 3);
   const summaryGridClassName = mediaType === "video" ? "grid-cols-4" : "grid-cols-3";
   const activeSection = sections.find(section => section.field === activeField) ?? sections[0];
-  const activeValue = String(value[activeSection.field]);
+  const activeValue = String(value[activeSection.field] ?? "");
   const previewSection = previewTarget
     ? sections.find(section => section.field === previewTarget.field) ?? activeSection
     : activeSection;
   const previewValue = previewTarget?.value ?? activeValue;
   const previewOption = selectedSectionOption(previewSection, previewValue);
+  const previewDescription = optionDescription(previewSection.field, previewOption.value);
 
   useEffect(() => {
     setMounted(true);
@@ -273,9 +394,9 @@ export default function CinematicProfileControls({
           </div>
         </div>
 
-        <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] overflow-hidden lg:grid-cols-[240px_minmax(0,1fr)] lg:grid-rows-1">
-          <div className="border-b border-[var(--iw-border)] p-3 lg:border-b-0 lg:border-r">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-1">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="shrink-0 border-b border-[var(--iw-border)] p-3">
+            <div className="flex gap-2 overflow-x-auto pb-1">
               {sections.map(section => {
                 const sectionValue = String(value[section.field]);
                 const sectionOption = selectedSectionOption(section, sectionValue);
@@ -289,18 +410,18 @@ export default function CinematicProfileControls({
                       setActiveField(section.field);
                       setPreviewTarget(null);
                     }}
-                    className={`flex min-w-0 items-center gap-2 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-2 text-left transition hover:border-[var(--iw-border-strong)] ${accentClassNames[accent].nav}`}
+                    className={`flex min-w-32 shrink-0 items-center gap-2 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5 text-left transition hover:border-[var(--iw-border-strong)] sm:min-w-36 ${accentClassNames[accent].nav}`}
                   >
                     <span
-                      className="h-9 w-12 shrink-0 rounded-md border border-white/10 bg-[var(--iw-panel)] bg-cover bg-center"
+                      className="h-8 w-11 shrink-0 rounded-md border border-white/10 bg-[var(--iw-panel)] bg-cover bg-center"
                       style={optionVisualStyle(sectionOption.visual)}
                     />
                     <span className="min-w-0">
-                      <span className="flex items-center gap-1.5 text-xs font-semibold text-[var(--iw-text)]">
+                      <span className="flex items-center gap-1 text-[10px] font-semibold text-[var(--iw-muted)]">
                         {section.icon}
                         {section.title}
                       </span>
-                      <span className="block truncate text-[10px] text-[var(--iw-muted)]">{sectionOption.label}</span>
+                      <span className="block truncate text-[11px] font-semibold text-[var(--iw-text)]">{sectionOption.label}</span>
                     </span>
                   </button>
                 );
@@ -308,8 +429,8 @@ export default function CinematicProfileControls({
             </div>
           </div>
 
-          <div className="min-h-0 overflow-y-auto p-4">
-            <section className="mb-4 overflow-hidden rounded-xl border border-[var(--iw-border)] bg-[var(--iw-panel-soft)]/70">
+          <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto p-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
+            <section className="overflow-hidden rounded-xl border border-[var(--iw-border)] bg-[var(--iw-panel-soft)]/70 lg:self-start">
               <div
                 className="relative aspect-video min-h-44 bg-[var(--iw-panel)] bg-cover bg-center sm:min-h-56"
                 style={optionVisualStyle(previewOption.visual)}
@@ -327,6 +448,10 @@ export default function CinematicProfileControls({
                     示意图
                   </span>
                 </div>
+              </div>
+              <div className="border-t border-[var(--iw-border)] p-3">
+                <div className="mb-1 text-[10px] font-semibold text-[var(--iw-muted)]">效果说明</div>
+                <p className="text-xs leading-5 text-[var(--iw-text)]">{previewDescription}</p>
               </div>
             </section>
 
