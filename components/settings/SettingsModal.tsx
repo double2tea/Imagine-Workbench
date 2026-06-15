@@ -268,7 +268,7 @@ export default function SettingsModal({
               ))}
             </div>
 
-            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 font-sans text-xs sm:p-6">
+            <div className="imagine-settings-content flex min-h-0 flex-1 flex-col overflow-y-auto p-4 font-sans text-xs sm:p-6">
               {tab === "connections" && (
                 <ConnectionSettingsWorkspace
                   chatModelGroups={chatModelGroups}

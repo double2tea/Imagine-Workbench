@@ -1750,8 +1750,8 @@ html[data-imagine-theme="light"] .imagine-settings-overlay {
 
 .imagine-settings-panel {
   width: 100%;
-  height: 100dvh;
-  max-height: 100dvh;
+  height: 100svh;
+  max-height: 100svh;
   border: 1px solid var(--iw-border);
   background: var(--iw-panel);
   color: var(--iw-text);
@@ -1767,6 +1767,10 @@ html[data-imagine-theme="light"] .imagine-settings-overlay {
     width: min(calc(100dvw - 2rem), 64rem);
     height: min(calc(100dvh - 2rem), 52rem);
     max-height: calc(100dvh - 2rem);
+  }
+
+  .imagine-settings-footer {
+    padding: 16px 24px;
   }
 }
 
@@ -2210,7 +2214,7 @@ html[data-imagine-theme="light"] .imagine-settings-overlay {
   flex-shrink: 0;
   border-top: 1px solid var(--iw-border);
   background: color-mix(in srgb, var(--iw-bg) 28%, var(--iw-panel));
-  padding: 12px 16px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
   text-align: right;
 }
 
@@ -6684,8 +6688,19 @@ html[data-imagine-theme="light"] .imagine-mark-xs,
     gap: 10px !important;
   }
 
+  .imagine-mobile-workbench-tabs {
+    height: 40px;
+    padding: 3px !important;
+  }
+
+  .imagine-mobile-workbench-tab {
+    min-height: 32px;
+    font-size: 11px;
+  }
+
   .imagine-mobile-composer {
-    padding: 10px !important;
+    gap: 9px !important;
+    padding: 9px !important;
   }
 
   .imagine-mobile-composer > .mt-3 {
@@ -6712,17 +6727,23 @@ html[data-imagine-theme="light"] .imagine-mark-xs,
 
   .imagine-tabbar {
     display: grid !important;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    height: 34px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    height: 36px;
     max-width: 100%;
     overflow: hidden;
+    padding: 3px !important;
   }
 
   .imagine-tab-button {
-    gap: 5px !important;
+    gap: 4px !important;
     min-width: 0 !important;
-    font-size: 10px !important;
-    padding-block: 5px !important;
+    font-size: 9.5px !important;
+    padding-block: 4px !important;
+  }
+
+  .imagine-tab-button svg {
+    height: 12px !important;
+    width: 12px !important;
   }
 
   .imagine-tab-button span {
@@ -6750,22 +6771,143 @@ html[data-imagine-theme="light"] .imagine-mark-xs,
   }
 
   .imagine-field-shell {
-    padding: 10px !important;
+    padding: 9px !important;
   }
 
   .imagine-field-shell textarea {
-    height: 104px !important;
+    height: 88px !important;
     font-size: 16px !important;
-    line-height: 1.5 !important;
+    line-height: 1.45 !important;
   }
 
   .imagine-workbench-shell :is(input:not([type="checkbox"]), select) {
+    min-height: 36px !important;
     font-size: 16px !important;
   }
 
-  .imagine-primary-action {
-    min-height: 42px;
-    font-size: 12px !important;
+  .imagine-mobile-composer .imagine-creator-generate-btn {
+    min-height: 38px;
+    padding-block: 8px !important;
+    font-size: 11px !important;
+  }
+
+  .imagine-creator-generate-btn svg {
+    height: 14px !important;
+    width: 14px !important;
+  }
+
+  .imagine-parameter-grid,
+  .imagine-mobile-composer > .animate-fade-in {
+    gap: 10px !important;
+  }
+
+  .imagine-parameter-field {
+    grid-template-rows: 22px auto;
+    gap: 5px;
+  }
+
+  .imagine-parameter-label-row {
+    min-height: 22px;
+  }
+
+  .imagine-option-group {
+    gap: 4px;
+    padding: 4px;
+  }
+
+  .imagine-segment-btn {
+    min-height: 28px;
+    padding-inline: 6px;
+    font-size: 9px;
+  }
+
+  .imagine-settings-panel {
+    border-inline: 0;
+  }
+
+  .imagine-settings-header {
+    padding: 10px 12px !important;
+  }
+
+  .imagine-settings-title {
+    font-size: 14px;
+  }
+
+  .imagine-settings-title svg,
+  .imagine-settings-close-btn svg {
+    height: 18px !important;
+    width: 18px !important;
+  }
+
+  .imagine-settings-tabs {
+    padding-inline: 12px !important;
+  }
+
+  .imagine-settings-tab {
+    padding: 8px 12px;
+    font-size: 11px;
+  }
+
+  .imagine-settings-content {
+    padding: 10px 12px !important;
+  }
+
+  .imagine-settings-workspace,
+  .imagine-settings-workspace-body,
+  .imagine-settings-workspace-main {
+    gap: 8px;
+  }
+
+  .imagine-settings-workspace-actions {
+    gap: 8px;
+  }
+
+  .imagine-settings-toolbar-btn {
+    height: 30px;
+    padding-inline: 9px;
+  }
+
+  .imagine-settings-provider-search {
+    padding-inline: 8px;
+  }
+
+  .imagine-settings-provider-list {
+    min-height: 7.5rem;
+  }
+
+  .imagine-settings-list.imagine-settings-provider-list {
+    max-height: 10.5rem;
+  }
+
+  .imagine-settings-workspace-segment .imagine-segment-btn {
+    min-height: 30px;
+    height: 30px;
+    font-size: 9.5px;
+  }
+
+  .imagine-settings-section,
+  .imagine-settings-card {
+    gap: 6px;
+    padding: 10px;
+  }
+
+  .imagine-settings-section-title {
+    font-size: 12px;
+  }
+
+  .imagine-settings-list-row {
+    min-height: 34px;
+    gap: 8px;
+    padding: 6px 9px;
+  }
+
+  .imagine-settings-list-label {
+    font-size: 11px;
+  }
+
+  .imagine-settings-save-button {
+    padding: 7px 14px;
+    font-size: 11px;
   }
 
   .imagine-upload-zone {
