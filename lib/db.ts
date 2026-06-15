@@ -219,9 +219,10 @@ function normalizeLibraryCategory(value: LibraryAssetCategory | undefined): Libr
   return "other";
 }
 
-function normalizeLibraryMediaType(value: LibraryAssetMediaType): LibraryAssetMediaType {
+function normalizeLibraryMediaType(value: unknown): LibraryAssetMediaType {
   if (value === "image" || value === "video" || value === "audio") return value;
-  throw new Error(`Unsupported library media type: ${value}`);
+  // Keep one corrupted/future library record from blocking the whole library list.
+  return "image";
 }
 
 function normalizeLibraryRecord(record: LibraryAssetRecord): LibraryAssetRecord {
@@ -988,7 +989,7 @@ export async function saveToDB(item: StorageItem): Promise<void> {
   }
 }
 
-async function deleteAssetRecordOnly(id: string, deleteLibraryRecord: boolean): Promise<StorageItemMeta | null> {
+async function deleteAssetRecordOnly(id: string): Promise<StorageItemMeta | null> {
   const db = await openDatabase();
   let deletedMeta: StorageItemMeta | null = null;
   let deletedContentHash: string | undefined;
@@ -1003,7 +1004,7 @@ async function deleteAssetRecordOnly(id: string, deleteLibraryRecord: boolean): 
       metaStore.delete(id);
       transaction.objectStore(BLOB_STORE).delete(id);
       transaction.objectStore(PREVIEW_STORE).delete(id);
-      if (deleteLibraryRecord && deletedMeta?.libraryItemId) {
+      if (deletedMeta?.libraryItemId) {
         transaction.objectStore(LIBRARY_STORE).delete(deletedMeta.libraryItemId);
       }
     };
@@ -1019,7 +1020,7 @@ async function deleteAssetRecordOnly(id: string, deleteLibraryRecord: boolean): 
 }
 
 export async function deleteFromDB(id: string): Promise<void> {
-  await deleteAssetRecordOnly(id, true);
+  await deleteAssetRecordOnly(id);
 }
 
 export async function clearAllDB(): Promise<void> {

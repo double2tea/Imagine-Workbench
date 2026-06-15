@@ -121,6 +121,7 @@ export async function addSourceAssetToLibrary(
 
 export async function importFilesToLibrary(files: File[]): Promise<LibraryAssetRecord[]> {
   const records: LibraryAssetRecord[] = [];
+  const backingAssetIds: string[] = [];
   try {
     for (const file of files) {
       if (!isLibraryFileType(file)) throw new Error("素材库只支持图片、视频和音频");
@@ -147,11 +148,18 @@ export async function importFilesToLibrary(files: File[]): Promise<LibraryAssetR
         createdAt: now,
         updatedAt: now,
       };
+      backingAssetIds.push(backing.id);
       await saveLibraryAssetPair(backing, record);
       records.push(record);
     }
   } catch (error) {
-    await Promise.all(records.map(record => deleteLibraryAssetRecord(record.id).catch(() => undefined)));
+    const recordedAssetIds = new Set(records.map(record => record.assetId));
+    await Promise.all([
+      ...records.map(record => deleteLibraryAssetRecord(record.id).catch(() => undefined)),
+      ...backingAssetIds
+        .filter(id => !recordedAssetIds.has(id))
+        .map(id => deleteFromDB(id).catch(() => undefined)),
+    ]);
     throw error;
   }
   return records;

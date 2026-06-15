@@ -54,6 +54,7 @@ import { isMediaReferenceType, mediaReferenceTypeFromDataUri, mediaReferenceType
 import { compressReferenceImageFile } from "@/lib/reference-images";
 
 export const WORKSPACE_BACKUP_SCHEMA_VERSION = 2;
+const SUPPORTED_WORKSPACE_BACKUP_SCHEMA_VERSIONS = new Set([1, WORKSPACE_BACKUP_SCHEMA_VERSION]);
 
 const BACKUP_APP_NAME = "Imagine Workbench";
 const MANIFEST_FILE = "manifest.json";
@@ -460,9 +461,13 @@ export async function resetBoardsToDefault(): Promise<void> {
 }
 
 export async function cleanupWorkspaceAssets(kind: WorkspaceCleanupKind): Promise<WorkspaceCleanupResult> {
-  const assets = await listAllAssetMetas();
-  const boardAssetIds = collectBoardAssetIds(await listBoardsFromDB());
-  const libraryAssetIds = new Set((await listLibraryAssetRecords()).map(record => record.assetId));
+  const [assets, boards, libraryRecords] = await Promise.all([
+    listAllAssetMetas(),
+    listBoardsFromDB(),
+    listLibraryAssetRecords(),
+  ]);
+  const boardAssetIds = collectBoardAssetIds(boards);
+  const libraryAssetIds = new Set(libraryRecords.map(record => record.assetId));
   const protectedAssetIds = new Set([...boardAssetIds, ...libraryAssetIds]);
   const ids = await cleanupTargetIds(kind, assets, protectedAssetIds);
   if (ids.length > 0) {
@@ -903,7 +908,7 @@ function parseManifest(text: string): WorkspaceBackupManifest {
   const app = readString(value, "app");
   const schemaVersion = readNumber(value, "schemaVersion");
   if (app !== BACKUP_APP_NAME) throw new Error("不是 Imagine Workbench 备份");
-  if (schemaVersion !== 1 && schemaVersion !== WORKSPACE_BACKUP_SCHEMA_VERSION) throw new Error("备份版本不兼容");
+  if (!SUPPORTED_WORKSPACE_BACKUP_SCHEMA_VERSIONS.has(schemaVersion)) throw new Error("备份版本不兼容");
   const counts = readRecord(value, "counts");
   return {
     app,

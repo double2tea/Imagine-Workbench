@@ -126,7 +126,7 @@ export function useAssetLibrary() {
     }
   }, [reload]);
 
-  return {
+  return useMemo(() => ({
     entries,
     error,
     loading,
@@ -135,5 +135,5 @@ export function useAssetLibrary() {
     reload,
     removeRecord,
     updateRecord,
-  };
+  }), [addSource, entries, error, importFiles, loading, reload, removeRecord, updateRecord]);
 }
