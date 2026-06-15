@@ -370,12 +370,7 @@ function ensureLibraryIndexes(library: IDBObjectStore): void {
   if (!library.indexNames.contains("by_assetId")) {
     library.createIndex("by_assetId", "assetId", { unique: false });
   }
-  if (library.indexNames.contains("by_sourceAssetId") && !library.index("by_sourceAssetId").unique) {
-    library.deleteIndex("by_sourceAssetId");
-  }
-  if (!library.indexNames.contains("by_sourceAssetId")) {
-    library.createIndex("by_sourceAssetId", "sourceAssetId", { unique: true });
-  }
+  ensureLibrarySourceAssetIndex(library);
   if (!library.indexNames.contains("by_mediaType")) {
     library.createIndex("by_mediaType", "mediaType", { unique: false });
   }
@@ -385,6 +380,32 @@ function ensureLibraryIndexes(library: IDBObjectStore): void {
   if (!library.indexNames.contains("by_updatedAt")) {
     library.createIndex("by_updatedAt", "updatedAt", { unique: false });
   }
+}
+
+function ensureLibrarySourceAssetIndex(library: IDBObjectStore): void {
+  if (library.indexNames.contains("by_sourceAssetId") && library.index("by_sourceAssetId").unique) return;
+
+  const seenSourceIds = new Set<string>();
+  const request = library.openCursor();
+  request.onsuccess = () => {
+    const cursor = request.result;
+    if (!cursor) {
+      if (library.indexNames.contains("by_sourceAssetId")) {
+        library.deleteIndex("by_sourceAssetId");
+      }
+      library.createIndex("by_sourceAssetId", "sourceAssetId", { unique: true });
+      return;
+    }
+
+    const record = cursor.value as LibraryAssetRecord;
+    const sourceAssetId = normalizeOptionalString(record.sourceAssetId);
+    if (sourceAssetId && seenSourceIds.has(sourceAssetId)) {
+      cursor.update({ ...record, sourceAssetId: undefined });
+    } else if (sourceAssetId) {
+      seenSourceIds.add(sourceAssetId);
+    }
+    cursor.continue();
+  };
 }
 
 function migrateLegacyStore(db: IDBDatabase, transaction: IDBTransaction): void {
@@ -644,20 +665,27 @@ export async function deleteLibraryAssetRecord(id: string): Promise<void> {
     await deleteLibraryRecordOnly(id);
     return;
   }
-  const meta = await getAssetMeta(record.assetId);
   const db = await openDatabase();
+  let contentHash: string | undefined;
   await new Promise<void>((resolve, reject) => {
     const transaction = db.transaction([LIBRARY_STORE, META_STORE, BLOB_STORE, PREVIEW_STORE], "readwrite");
+    const metaStore = transaction.objectStore(META_STORE);
+    const metaRequest = metaStore.get(record.assetId);
+    metaRequest.onsuccess = () => {
+      const meta = metaRequest.result as StorageItemMeta | undefined;
+      contentHash = meta ? normalizeMeta(meta).contentHash : undefined;
+      metaStore.delete(record.assetId);
+      transaction.objectStore(BLOB_STORE).delete(record.assetId);
+      transaction.objectStore(PREVIEW_STORE).delete(record.assetId);
+    };
+    metaRequest.onerror = () => reject(metaRequest.error ?? new Error("IndexedDB library asset metadata read failed"));
     transaction.objectStore(LIBRARY_STORE).delete(id);
-    transaction.objectStore(META_STORE).delete(record.assetId);
-    transaction.objectStore(BLOB_STORE).delete(record.assetId);
-    transaction.objectStore(PREVIEW_STORE).delete(record.assetId);
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error ?? new Error("IndexedDB library asset delete failed"));
     transaction.onabort = () => reject(transaction.error ?? new Error("IndexedDB library asset delete aborted"));
   });
-  if (meta?.contentHash) {
-    await deleteUnreferencedHashBlobPayload(meta.contentHash);
+  if (contentHash) {
+    await deleteUnreferencedHashBlobPayload(contentHash);
   }
 }
 
@@ -970,27 +998,33 @@ export async function saveToDB(item: StorageItem): Promise<void> {
 }
 
 async function deleteAssetRecordOnly(id: string, deleteLibraryRecord: boolean): Promise<StorageItemMeta | null> {
-  const meta = await getAssetMeta(id);
   const db = await openDatabase();
+  let deletedMeta: StorageItemMeta | null = null;
+  let deletedContentHash: string | undefined;
   await new Promise<void>((resolve, reject) => {
-    const storeNames = deleteLibraryRecord && meta?.libraryItemId
-      ? [META_STORE, BLOB_STORE, PREVIEW_STORE, LIBRARY_STORE]
-      : [META_STORE, BLOB_STORE, PREVIEW_STORE];
-    const transaction = db.transaction(storeNames, "readwrite");
-    transaction.objectStore(META_STORE).delete(id);
-    transaction.objectStore(BLOB_STORE).delete(id);
-    transaction.objectStore(PREVIEW_STORE).delete(id);
-    if (deleteLibraryRecord && meta?.libraryItemId) {
-      transaction.objectStore(LIBRARY_STORE).delete(meta.libraryItemId);
-    }
+    const transaction = db.transaction([META_STORE, BLOB_STORE, PREVIEW_STORE, LIBRARY_STORE], "readwrite");
+    const metaStore = transaction.objectStore(META_STORE);
+    const metaRequest = metaStore.get(id);
+    metaRequest.onsuccess = () => {
+      const meta = metaRequest.result as StorageItemMeta | undefined;
+      deletedMeta = meta ? normalizeMeta(meta) : null;
+      deletedContentHash = deletedMeta?.contentHash;
+      metaStore.delete(id);
+      transaction.objectStore(BLOB_STORE).delete(id);
+      transaction.objectStore(PREVIEW_STORE).delete(id);
+      if (deleteLibraryRecord && deletedMeta?.libraryItemId) {
+        transaction.objectStore(LIBRARY_STORE).delete(deletedMeta.libraryItemId);
+      }
+    };
+    metaRequest.onerror = () => reject(metaRequest.error ?? new Error("IndexedDB delete metadata read failed"));
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error ?? new Error("IndexedDB delete failed"));
     transaction.onabort = () => reject(transaction.error ?? new Error("IndexedDB delete aborted"));
   });
-  if (meta?.contentHash) {
-    await deleteUnreferencedHashBlobPayload(meta.contentHash);
+  if (deletedContentHash) {
+    await deleteUnreferencedHashBlobPayload(deletedContentHash);
   }
-  return meta;
+  return deletedMeta;
 }
 
 export async function deleteFromDB(id: string): Promise<void> {
@@ -1059,10 +1093,6 @@ export async function listWorkspaceGalleryMetas(options?: {
         }
       }
 
-      if (limit !== undefined && limit >= 0 && metas.length >= limit) {
-        resolve(metas);
-        return;
-      }
       cursor.continue();
     };
     request.onerror = () => reject(request.error ?? new Error("IndexedDB workspace gallery read failed"));

@@ -127,6 +127,7 @@ export default function AssetLibraryModal({
   }, [onClose, open]);
 
   useEffect(() => {
+    setActionError(null);
     if (!activeEntry) {
       setDraftTitle("");
       setDraftCategory("other");

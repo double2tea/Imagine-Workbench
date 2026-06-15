@@ -28,9 +28,13 @@ export function useAssetLibrary() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const mountedRef = useRef(false);
+  const loadVersionRef = useRef(0);
 
   const reload = useCallback(async () => {
-    if (mountedRef.current) {
+    const loadVersion = loadVersionRef.current + 1;
+    loadVersionRef.current = loadVersion;
+    const canUpdate = () => mountedRef.current && loadVersionRef.current === loadVersion;
+    if (canUpdate()) {
       setLoading(true);
       setError(null);
     }
@@ -38,16 +42,16 @@ export function useAssetLibrary() {
       const nextRecords = await listLibraryAssetRecords();
       const metas = await getAssetMetasByIds(nextRecords.map(record => record.assetId));
       const items = await hydrateAssets(metas);
-      if (mountedRef.current) {
+      if (canUpdate()) {
         setRecords(nextRecords);
         setItemsById(new Map(items.map(item => [item.id, item])));
       }
     } catch (caught) {
       const nextError = normalizeError(caught);
-      if (mountedRef.current) setError(nextError);
+      if (canUpdate()) setError(nextError);
       throw nextError;
     } finally {
-      if (mountedRef.current) setLoading(false);
+      if (canUpdate()) setLoading(false);
     }
   }, []);
 
@@ -55,6 +59,7 @@ export function useAssetLibrary() {
     mountedRef.current = true;
     void reload().catch(() => undefined);
     return () => {
+      loadVersionRef.current += 1;
       mountedRef.current = false;
     };
   }, [reload]);
@@ -65,7 +70,7 @@ export function useAssetLibrary() {
   );
 
   const addSource = useCallback(async (source: StorageItem) => {
-    setError(null);
+    if (mountedRef.current) setError(null);
     try {
       const result = await addSourceAssetToLibrary(source);
       await reload();
@@ -78,7 +83,7 @@ export function useAssetLibrary() {
   }, [reload]);
 
   const importFiles = useCallback(async (files: File[]) => {
-    setError(null);
+    if (mountedRef.current) setError(null);
     try {
       const imported = await importFilesToLibrary(files);
       await reload();
@@ -91,7 +96,7 @@ export function useAssetLibrary() {
   }, [reload]);
 
   const updateRecord = useCallback(async (record: LibraryAssetRecord) => {
-    setError(null);
+    if (mountedRef.current) setError(null);
     try {
       await saveLibraryAssetRecord({
         ...record,
@@ -106,7 +111,7 @@ export function useAssetLibrary() {
   }, [reload]);
 
   const removeRecord = useCallback(async (record: LibraryAssetRecord) => {
-    setError(null);
+    if (mountedRef.current) setError(null);
     try {
       await deleteLibraryAssetRecord(record.id);
       await reload();
