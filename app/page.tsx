@@ -5,11 +5,12 @@ import { createPortal } from "react-dom";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
 import AgentDock from "@/components/agent/AgentDock";
 import CanvasMaskEditor, { type CanvasEditorMode, type CanvasMaskEditorOutput } from "@/components/CanvasMaskEditor";
+import VisualPromptAdjustEditor from "@/components/VisualPromptAdjustEditor";
 import SaveVoiceProfileDialog, { type SaveVoiceProfileDialogInput } from "@/components/audio/SaveVoiceProfileDialog";
 import FloatingCompareButton from "@/components/assets/FloatingCompareButton";
 import FullscreenPreview from "@/components/assets/FullscreenPreview";
-import PanoramaOverlay from "@/components/panorama/PanoramaOverlay";
 import AssetLibraryModal from "@/components/library/AssetLibraryModal";
+import PanoramaOverlay from "@/components/panorama/PanoramaOverlay";
 import CreationModeTabs, { type CreationMode } from "@/components/creation/CreationModeTabs";
 import AudioGenerationPanel from "@/components/creation/AudioGenerationPanel";
 import CreatorGenerateButton from "@/components/creation/CreatorGenerateButton";
@@ -40,8 +41,8 @@ import {
 import { useAgentController } from "@/hooks/useAgentController";
 import { useAssetActions } from "@/hooks/useAssetActions";
 import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
-import { useClipboardImageImport } from "@/hooks/useClipboardImageImport";
 import { useAssetLibrary } from "@/hooks/useAssetLibrary";
+import { useClipboardImageImport } from "@/hooks/useClipboardImageImport";
 import { useGenerationActions } from "@/hooks/useGenerationActions";
 import { useGenerationTaskStore } from "@/hooks/useGenerationTaskStore";
 import { useMediaPolling } from "@/hooks/useMediaPolling";
@@ -73,6 +74,7 @@ import {
   resolveImageQuickEditTarget,
   submitImageQuickEdit,
 } from "@/lib/image-quick-edit-targets";
+import { isVisualAdjustmentFeature } from "@/lib/image-visual-adjustment-prompts";
 import {
   DEFAULT_AUDIO_MODEL,
   DEFAULT_IMAGE_MODEL,
@@ -125,9 +127,9 @@ import { CLEAR_WORKSPACE_ASSETS_MESSAGE } from "@/lib/workspace-messages";
 
 type NoticeType = "error" | "info" | "success";
 type MaskDestination = "creative" | "agent";
+type AssetLibraryMode = "manage" | "reference";
 
 interface WorkspaceImageQuickEditJob {
-type AssetLibraryMode = "manage" | "reference";
   controller: AbortController;
   editImageResolution: string;
   editImageUrl: string;
@@ -327,16 +329,16 @@ export default function Home() {
     setSearchQuery,
     setSelectedItemIds,
   } = useAssetWorkspaceState(workspaceGalleryItems);
+  const assetLibrary = useAssetLibrary();
 
   // Agent State
-  const assetLibrary = useAssetLibrary();
   const [agentInput, setAgentInput] = useState("");
 
   const [showSettings, setShowSettings] = useState(false);
-
-  const [isOptimizing, setIsOptimizing] = useState(false);
   const [assetLibraryMode, setAssetLibraryMode] = useState<AssetLibraryMode>("manage");
   const [isAssetLibraryOpen, setIsAssetLibraryOpen] = useState(false);
+
+  const [isOptimizing, setIsOptimizing] = useState(false);
   const [imageSubmitCount, setImageSubmitCount] = useState(0);
   const [videoSubmitCount, setVideoSubmitCount] = useState(0);
   const [audioSubmitCount, setAudioSubmitCount] = useState(0);
@@ -1502,9 +1504,9 @@ export default function Home() {
       setItems([]);
       setSelectedItemIds([]);
       setCompareItemIds([]);
+      await assetLibrary.reload();
       pushWorkspaceNotice("success", "本地资产库已清空");
     } catch (error) {
-      await assetLibrary.reload();
       pushWorkspaceNotice("error", toErrorMessage(error, "本地资产库清空失败"));
     }
   }, [assetLibrary, pushWorkspaceNotice, setCompareItemIds, setSelectedItemIds]);
@@ -1528,8 +1530,6 @@ export default function Home() {
     );
   }, []);
 
-  const handleDataExportWorkspace = useCallback(async (includeCredentials: boolean) => {
-    try {
   const activePromptReferenceTarget = useCallback((): Exclude<AtDropdownTarget, "agent-prompt"> => {
     if (traditionalSubTab === "audio") return "audio-prompt";
     if (traditionalSubTab === "video") return "video-prompt";
@@ -1572,6 +1572,8 @@ export default function Home() {
     setIsAssetLibraryOpen(false);
   }, [activePromptReferenceTarget, handleSelectAtItem, pushWorkspaceNotice]);
 
+  const handleDataExportWorkspace = useCallback(async (includeCredentials: boolean) => {
+    try {
       const result = await exportCompleteWorkspaceBackup(includeCredentials);
       pushWorkspaceNotice("success", `已导出备份：${result.fileName}`);
     } catch (error) {
@@ -1706,11 +1708,11 @@ export default function Home() {
       onDownloadItem={handleDownloadItem}
       onExportMetadata={exportMetadataJson}
       onImageQuickEdit={handleImageQuickEdit}
-      onOpenFullscreen={handleOpenFullscreen}
-      onOpenPanorama={handleOpenPanorama}
       onAddToLibrary={handleAddItemToLibrary}
-      onPromoteOriginal={promoteItemToOriginal}
+      onOpenFullscreen={handleOpenFullscreen}
       onOpenLibrary={() => openAssetLibrary("manage")}
+      onOpenPanorama={handleOpenPanorama}
+      onPromoteOriginal={promoteItemToOriginal}
       onResetCompare={() => {
         setIsCompareMode(false);
         setCompareItemIds([]);
@@ -1778,9 +1780,9 @@ export default function Home() {
           onReferenceDropFiles={files => handleReferenceDropFiles(files, "audio-prompt")}
           onReferenceRemove={removeReferenceImage}
           onReferenceUpload={event => handleReferenceUpload(event, "audio-prompt")}
+          onOpenAssetLibrary={() => openAssetLibrary("reference")}
           onSelectFormat={setAudioFormat}
           onSelectMode={handleSelectAudioMode}
-          onOpenAssetLibrary={() => openAssetLibrary("reference")}
           onSelectModel={handleSelectAudioModel}
           onSelectVoiceProfile={setSelectedVoiceProfileId}
           onVoiceCloneConsentChange={setVoiceCloneConsentAccepted}
@@ -1832,9 +1834,9 @@ export default function Home() {
         onReferenceEdit={launchReferenceMaskEditor}
         onReferenceRemove={removeReferenceImage}
         onReferenceUpload={handleImageUpload}
+        onOpenAssetLibrary={() => openAssetLibrary("reference")}
         onSelectAspectRatio={handleSelectImageAspectRatio}
         onSelectModel={handleSelectImageModel}
-        onOpenAssetLibrary={() => openAssetLibrary("reference")}
         onThinkingLevelChange={setImageThinkingLevel}
       />
     ) : (
@@ -1879,9 +1881,9 @@ export default function Home() {
         onReferenceRemove={removeReferenceImage}
         onReferenceRoleChange={(id, role) => toggleReferenceRole(id, role ?? "general")}
         onReferenceUpload={event => handleReferenceUpload(event, "video-prompt")}
+        onOpenAssetLibrary={() => openAssetLibrary("reference")}
         onSelectDuration={setVideoDuration}
         onSelectReferenceMode={setSelectedVideoReferenceMode}
-        onOpenAssetLibrary={() => openAssetLibrary("reference")}
         onSelectResolution={setVideoResolution}
         onSelectModel={handleSelectVideoModel}
         onSelectPreset={setVideoPreset}
@@ -2031,8 +2033,6 @@ export default function Home() {
 
       </main>
 
-      <SettingsModal
-        audioModelGroups={audioModelGroups}
       <AssetLibraryModal
         entries={assetLibrary.entries}
         loading={assetLibrary.loading}
@@ -2046,6 +2046,8 @@ export default function Home() {
         onUpdate={assetLibrary.updateRecord}
       />
 
+      <SettingsModal
+        audioModelGroups={audioModelGroups}
         chatModelGroups={chatModelGroups}
         fetchedModelOptions={fetchedModelOptions}
         imageModelGroups={imageModelGroups}
@@ -2114,7 +2116,23 @@ export default function Home() {
       />
 
       {/* Inpainting Mask Drawer overlay loader */}
-      {isMaskOpen && (
+      {isMaskOpen && maskEditOperation && isVisualAdjustmentFeature(maskEditOperation) ? (
+        <VisualPromptAdjustEditor
+          imageUrl={maskTargetUrl}
+          editModel={resolveImageQuickEditTarget(maskEditOperation, imageEditFeatureTargets[maskEditOperation]).model}
+          isOpen={isMaskOpen}
+          operation={maskEditOperation}
+          onClose={() => {
+            setIsMaskOpen(false);
+            setMaskTargetUrl("");
+            setMaskTargetId("");
+            setMaskEditOperation(undefined);
+            setMaskInitialMode("mask");
+            setMaskEditSourceItem(null);
+          }}
+          onApply={saveMaskOutput}
+        />
+      ) : isMaskOpen && (
         <CanvasMaskEditor
           imageUrl={maskTargetUrl}
           editModel={maskEditOperation ? resolveImageQuickEditTarget(maskEditOperation, imageEditFeatureTargets[maskEditOperation]).model : undefined}

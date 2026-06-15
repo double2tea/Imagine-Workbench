@@ -8,6 +8,10 @@ import {
   resolveImageQuickEditTarget,
   submitImageQuickEdit,
 } from "../lib/image-quick-edit-targets";
+import {
+  buildAngleAdjustmentPrompt,
+  buildLightingAdjustmentPrompt,
+} from "../lib/image-visual-adjustment-prompts";
 import { formatProviderModel } from "../lib/providers/model-catalog";
 import { RUNNINGHUB_CONTROL_IMAGE_APP_MODEL } from "../lib/providers/runninghub";
 
@@ -16,6 +20,22 @@ const RUNNINGHUB_CONTROL_IMAGE_MODEL_VALUE = formatProviderModel("runninghub", R
 test("quick edit defaults cutout to RunningHub dedicated target", () => {
   assert.equal(DEFAULT_IMAGE_EDIT_FEATURE_TARGETS.cutout, RUNNINGHUB_CUTOUT_TARGET_ID);
   assert.equal(resolveImageQuickEditTarget("cutout", RUNNINGHUB_CUTOUT_TARGET_ID).model, RUNNINGHUB_CONTROL_IMAGE_MODEL_VALUE);
+  assert.equal(DEFAULT_IMAGE_EDIT_FEATURE_TARGETS.angle, "model:12ai:gemini-3-pro-image-preview");
+  assert.equal(DEFAULT_IMAGE_EDIT_FEATURE_TARGETS.lighting, "model:12ai:gemini-3-pro-image-preview");
+});
+
+test("angle and lighting targets use prompt-only image edit route", () => {
+  const angle = resolveImageQuickEditTarget("angle", "model:12ai:gpt-image-2");
+  const lighting = resolveImageQuickEditTarget("lighting", "model:12ai:gemini-3-pro-image-preview");
+
+  assert.equal(angle.executionMode, "image-edit-route");
+  assert.equal(angle.promptRequired, true);
+  assert.equal(angle.maskRequired, false);
+  assert.equal(angle.guideSupported, true);
+  assert.equal(lighting.executionMode, "image-edit-route");
+  assert.equal(lighting.promptRequired, true);
+  assert.equal(lighting.maskRequired, false);
+  assert.equal(lighting.guideSupported, true);
 });
 
 test("quick edit target options expose dedicated cutout app without generic RunningHub duplicate", () => {
@@ -85,6 +105,24 @@ test("generic quick edit targets submit through image edit route", async () => {
   } finally {
     restore();
   }
+});
+
+test("visual adjustment prompt compiler branches by model family", () => {
+  const anglePrompt = buildAngleAdjustmentPrompt(
+    { rotation: 90, tilt: -30, zoom: 80, wideAngle: true },
+    "12ai:gpt-image-2",
+  );
+  const lightingPrompt = buildLightingAdjustmentPrompt(
+    { direction: "left", height: 40, intensity: 80, temperature: 3200, rimLight: true },
+    "12ai:gemini-3-pro-image-preview",
+  );
+
+  assert.match(anglePrompt, /Goal:/);
+  assert.match(anglePrompt, /right side view/);
+  assert.match(anglePrompt, /Preserve:/);
+  assert.match(lightingPrompt, /Use Image 1 as the source image/);
+  assert.match(lightingPrompt, /camera left/);
+  assert.match(lightingPrompt, /warm tungsten/);
 });
 
 test("RunningHub cutout target submits through generate image route and downloads async result", async () => {

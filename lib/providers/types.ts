@@ -68,7 +68,7 @@ export interface GenerateImageInput {
   runningHubYouchuan?: RunningHubYouchuanAdvancedSettings;
 }
 
-export type ImageEditOperation = "redraw" | "erase" | "outpaint" | "cutout";
+export type ImageEditOperation = "redraw" | "erase" | "outpaint" | "cutout" | "angle" | "lighting";
 
 export interface EditImageInput {
   operation: ImageEditOperation;

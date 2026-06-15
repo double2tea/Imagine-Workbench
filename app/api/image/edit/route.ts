@@ -22,7 +22,7 @@ interface EditImageBody {
 
 class ImageEditRequestValidationError extends Error {}
 
-const IMAGE_EDIT_OPERATIONS = new Set<ImageEditOperation>(["redraw", "erase", "outpaint", "cutout"]);
+const IMAGE_EDIT_OPERATIONS = new Set<ImageEditOperation>(["redraw", "erase", "outpaint", "cutout", "angle", "lighting"]);
 
 export async function POST(req: NextRequest) {
   try {
@@ -114,7 +114,7 @@ function readOperation(value: unknown): ImageEditOperation {
 }
 
 function validatePrompt(operation: ImageEditOperation, prompt: string | undefined): void {
-  if ((operation === "redraw" || operation === "outpaint") && !prompt) {
+  if ((operation === "redraw" || operation === "outpaint" || operation === "angle" || operation === "lighting") && !prompt) {
     throw new ImageEditRequestValidationError("prompt is required for this image edit operation");
   }
 }

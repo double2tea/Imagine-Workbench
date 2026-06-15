@@ -7,7 +7,7 @@ import {
   RUNNINGHUB_CONTROL_IMAGE_APP_MODEL,
 } from "./providers/runninghub";
 
-export type ImageEditFeature = "redraw" | "erase" | "outpaint" | "cutout";
+export type ImageEditFeature = "redraw" | "erase" | "outpaint" | "cutout" | "angle" | "lighting";
 
 export interface ImageEditFeatureMeta {
   key: ImageEditFeature;
@@ -35,6 +35,8 @@ export const IMAGE_EDIT_FEATURES: readonly ImageEditFeatureMeta[] = [
   { key: "erase", label: "擦除", description: "遮罩区域移除并补全背景" },
   { key: "outpaint", label: "扩图", description: "向画面外延展内容" },
   { key: "cutout", label: "抠图", description: "移除背景并保留主体" },
+  { key: "angle", label: "角度", description: "通过视角控件生成镜头调整提示词" },
+  { key: "lighting", label: "打光", description: "通过灯光控件生成重打光提示词" },
 ];
 
 export function imageEditFeatureMeta(feature: ImageEditFeature): ImageEditFeatureMeta {
@@ -66,6 +68,8 @@ export const DEFAULT_IMAGE_EDIT_FEATURE_TARGETS: ImageEditFeatureTargets = {
   erase: genericTargetId(NANO_BANANA_PRO_MODEL),
   outpaint: genericTargetId(NANO_BANANA_PRO_MODEL),
   cutout: RUNNINGHUB_CUTOUT_TARGET_ID,
+  angle: genericTargetId(NANO_BANANA_PRO_MODEL),
+  lighting: genericTargetId(NANO_BANANA_PRO_MODEL),
 };
 
 const DEDICATED_TARGETS: readonly ImageQuickEditTarget[] = [
@@ -242,8 +246,8 @@ function genericImageEditTarget(feature: ImageEditFeature, model: string, label:
     label,
     model,
     executionMode: "image-edit-route",
-    promptRequired: feature === "redraw" || feature === "outpaint",
-    maskRequired: feature !== "cutout",
+    promptRequired: feature === "redraw" || feature === "outpaint" || feature === "angle" || feature === "lighting",
+    maskRequired: feature === "redraw" || feature === "erase" || feature === "outpaint",
     guideSupported: feature !== "cutout",
   };
 }

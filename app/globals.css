@@ -4621,7 +4621,7 @@ html[data-imagine-theme="light"] .board-media-stack-switcher {
 }
 
 .imagine-workbench-shell.imagine-theme-light .board-canvas .react-flow__pane {
-  background-color: #edf3f8 !important;
+  background-color: transparent !important;
 }
 
 .imagine-workbench-shell.imagine-theme-light article.rounded-lg.border.bg-slate-900 {
@@ -7318,6 +7318,104 @@ html[data-imagine-theme="light"] .imagine-mark-xs,
   .imagine-agent-dock:not(.imagine-agent-dock-idle-orb) form {
     min-width: 0;
   }
+}
+
+.imagine-visual-adjust-overlay {
+  background: rgba(0, 0, 0, 0.74);
+}
+
+.imagine-workbench-shell.imagine-theme-light .imagine-visual-adjust-overlay {
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.imagine-visual-adjust-editor {
+  background: var(--iw-panel-solid) !important;
+  border-color: var(--iw-border) !important;
+  color: var(--iw-text) !important;
+  box-shadow: var(--iw-card-shadow) !important;
+}
+
+.imagine-visual-adjust-main {
+  background: var(--iw-panel-solid) !important;
+  border-color: var(--iw-border) !important;
+}
+
+.imagine-visual-adjust-controls {
+  background: var(--iw-panel) !important;
+  color: var(--iw-text) !important;
+}
+
+.imagine-workbench-shell.imagine-theme-light .imagine-visual-adjust-stage,
+.imagine-visual-adjust-stage {
+  background: #2a2a2a !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.imagine-visual-adjust-close {
+  color: var(--iw-muted) !important;
+}
+
+.imagine-visual-adjust-close:hover {
+  background: var(--iw-panel-soft) !important;
+  color: var(--iw-text) !important;
+}
+
+.imagine-visual-adjust-editor :is(h2, label, .font-medium) {
+  color: var(--iw-text) !important;
+}
+
+.imagine-visual-adjust-editor .imagine-operation-section-label,
+.imagine-visual-adjust-range-value {
+  color: var(--iw-muted) !important;
+}
+
+.imagine-visual-adjust-toggle-row {
+  background: var(--iw-panel-soft) !important;
+  border-color: var(--iw-border) !important;
+}
+
+.imagine-visual-adjust-editor select {
+  background: color-mix(in srgb, var(--iw-bg) 36%, var(--iw-panel)) !important;
+  border-color: var(--iw-border) !important;
+  color: var(--iw-text) !important;
+}
+
+.imagine-visual-adjust-editor input[type="range"] {
+  accent-color: var(--iw-accent) !important;
+}
+
+.imagine-visual-adjust-stage :is(.text-white, label, .font-medium) {
+  color: #ffffff !important;
+}
+
+.imagine-angle-view-button {
+  min-width: 36px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0;
+  backdrop-filter: blur(10px);
+  transition:
+    background-color var(--iw-motion-base) var(--iw-motion-ease),
+    border-color var(--iw-motion-base) var(--iw-motion-ease),
+    color var(--iw-motion-base) var(--iw-motion-ease),
+    transform var(--iw-motion-base) var(--iw-motion-ease);
+}
+
+.imagine-angle-view-button:hover,
+.imagine-angle-view-button[data-active="true"] {
+  border-color: rgba(255, 255, 255, 0.34);
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.imagine-angle-view-button:active {
+  transform: scale(0.96);
 }
 
 @media (max-width: 860px) {

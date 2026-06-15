@@ -134,6 +134,16 @@ const OPERATION_COPY: Record<ImageEditFeature, { title: string; hint: string; pr
     hint: "移除背景并保留主体",
     promptPlaceholder: "可选：主体保留要求",
   },
+  angle: {
+    title: "角度",
+    hint: "通过视角控件调整画面角度",
+    promptPlaceholder: "例如：调整为低角度中景，保持主体一致",
+  },
+  lighting: {
+    title: "打光",
+    hint: "通过灯光控件调整画面光线",
+    promptPlaceholder: "例如：从左前方加入暖色主光",
+  },
 };
 
 function defaultOutpaintMargins() {

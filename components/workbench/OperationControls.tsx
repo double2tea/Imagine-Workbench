@@ -2,6 +2,7 @@
 
 import type { ButtonHTMLAttributes, MouseEvent, ReactNode } from "react";
 import {
+  Box,
   Check,
   Compass,
   Crop,
@@ -19,6 +20,7 @@ import {
   Sparkles,
   SquareDashed,
   SquarePen,
+  Sun,
   Trash2,
   Type,
   Video,
@@ -36,7 +38,7 @@ export interface WorkbenchOperationMeta {
   tone: OperationTone;
 }
 
-export const IMAGE_EDIT_OPERATION_ORDER: readonly ImageEditFeature[] = ["redraw", "erase", "outpaint", "cutout"];
+export const IMAGE_EDIT_OPERATION_ORDER: readonly ImageEditFeature[] = ["redraw", "erase", "outpaint", "cutout", "angle", "lighting"];
 
 export const IMAGE_EDIT_OPERATION_META: Record<ImageEditFeature, WorkbenchOperationMeta> = {
   redraw: {
@@ -61,6 +63,18 @@ export const IMAGE_EDIT_OPERATION_META: Record<ImageEditFeature, WorkbenchOperat
     Icon: Scissors,
     label: imageEditFeatureLabel("cutout"),
     title: "移除背景并保留主体",
+    tone: "accent",
+  },
+  angle: {
+    Icon: Box,
+    label: imageEditFeatureLabel("angle"),
+    title: "调整画面视角",
+    tone: "accent",
+  },
+  lighting: {
+    Icon: Sun,
+    label: imageEditFeatureLabel("lighting"),
+    title: "调整画面打光",
     tone: "accent",
   },
 };

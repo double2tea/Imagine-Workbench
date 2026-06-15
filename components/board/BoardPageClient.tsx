@@ -18,9 +18,10 @@ import {
 import { isCustomImageResolutionValue } from "@/lib/agent-tool-action";
 import AtReferenceDropdown from "@/components/reference/AtReferenceDropdown";
 import CanvasMaskEditor, { type CanvasMaskEditorOutput } from "@/components/CanvasMaskEditor";
+import VisualPromptAdjustEditor from "@/components/VisualPromptAdjustEditor";
 import FullscreenPreview from "@/components/assets/FullscreenPreview";
-import PanoramaOverlay from "@/components/panorama/PanoramaOverlay";
 import AssetLibraryModal from "@/components/library/AssetLibraryModal";
+import PanoramaOverlay from "@/components/panorama/PanoramaOverlay";
 import BoardInspector from "@/components/board/BoardInspector";
 import BoardSidePanel from "@/components/board/BoardSidePanel";
 import BoardSideAssetList from "@/components/board/BoardSideAssetList";
@@ -33,8 +34,8 @@ import { getSendableAgentMediaReferences, type AgentReferenceInputSupport } from
 
 import { useAgentController } from "@/hooks/useAgentController";
 import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
-import { useBoardAssetStore } from "@/hooks/useBoardAssetStore";
 import { useAssetLibrary } from "@/hooks/useAssetLibrary";
+import { useBoardAssetStore } from "@/hooks/useBoardAssetStore";
 import { collectPlacedBoardAssetIdsFromNodes } from "@/lib/assets/board-scope";
 import { downloadStorageItemsZip, storageItemDownloadExtension } from "@/lib/assets/download-zip";
 import { saveItemWithPreview } from "@/lib/assets/previews";
@@ -71,6 +72,7 @@ import {
   resolveImageQuickEditTarget,
   submitImageQuickEdit,
 } from "@/lib/image-quick-edit-targets";
+import { isVisualAdjustmentFeature } from "@/lib/image-visual-adjustment-prompts";
 import {
   buildStorageItem,
   clearAllDB,
@@ -1390,9 +1392,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const [agentInput, setAgentInput] = useState("");
   const [isAgentDockOpen, setIsAgentDockOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [isAssetLibraryOpen, setIsAssetLibraryOpen] = useState(false);
   const [renameDialogDraft, setRenameDialogDraft] = useState<string | null>(null);
 
-  const [isAssetLibraryOpen, setIsAssetLibraryOpen] = useState(false);
   const [, setIsOptimizing] = useState(false);
   const [imageSubmitCount, setImageSubmitCount] = useState(0);
   const [, setVideoSubmitCount] = useState(0);
@@ -1666,9 +1668,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   });
 
   const { searchableReferenceImages } = useAssetWorkspaceState(items);
+  const assetLibrary = useAssetLibrary();
   const resolveBoardReferenceUrl = useCallback<BoardReferenceUrlResolver>((assetId, fallbackUrl) => {
     const item = items.find(entry => entry.id === assetId);
-  const assetLibrary = useAssetLibrary();
     return item && item.status === "complete" && item.url.trim() ? item.url : fallbackUrl;
   }, [items]);
   const resolveOriginalStorageItem = useCallback(async (item: StorageItem): Promise<StorageItem> => {
@@ -3536,8 +3538,6 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     return assetNodeId;
   }, [boardController]);
 
-  const handleExportMultiGrid = useCallback(async (nodeId: string): Promise<void> => {
-    try {
   const handleImportFilesToLibrary = useCallback(async (files: File[]) => {
     try {
       const imported = await assetLibrary.importFiles(files);
@@ -3557,6 +3557,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     pushWorkspaceNotice("success", "已加入当前画板");
   }, [addAssetToBoard, pushWorkspaceNotice]);
 
+  const handleExportMultiGrid = useCallback(async (nodeId: string): Promise<void> => {
+    try {
       const node = boardController.board.nodes.find(item => item.id === nodeId);
       if (node?.kind !== "multi-grid") {
         throw new Error("目标节点不是多宫格");
@@ -4927,9 +4929,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
               items={items}
               loading={boardAssetsLoading}
               onAddToBoard={addAssetToBoard}
+              onOpenAssetLibrary={() => setIsAssetLibraryOpen(true)}
             />
           )}
-              onOpenAssetLibrary={() => setIsAssetLibraryOpen(true)}
           tasksPanel={(
             <BoardTaskQueuePanel
               cancelingTaskIds={cancelingBoardItemIds}
@@ -4946,8 +4948,6 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         />
       </BoardWorkspace>
 
-      {!showSettings && !isMaskOpen && !fullscreenItem && !panoramaItem && !voiceProfileSourceItem && (
-        <AgentDock
       <AssetLibraryModal
         entries={assetLibrary.entries}
         loading={assetLibrary.loading}
@@ -4961,6 +4961,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onUpdate={assetLibrary.updateRecord}
       />
 
+      {!showSettings && !isMaskOpen && !fullscreenItem && !panoramaItem && !voiceProfileSourceItem && (
+        <AgentDock
           activeCountdownId={activeCountdownId}
           agentReferenceId={agentReferenceId}
           agentReferences={agentReferences}
@@ -5072,7 +5074,21 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onClose={() => setVoiceProfileSourceItem(null)}
         onSave={handleSaveVoiceProfileFromAsset}
       />
-      {isMaskOpen && (
+      {isMaskOpen && maskEditOperation && isVisualAdjustmentFeature(maskEditOperation) ? (
+        <VisualPromptAdjustEditor
+          imageUrl={maskTargetUrl}
+          editModel={resolveImageQuickEditTarget(maskEditOperation, imageEditFeatureTargets[maskEditOperation]).model}
+          isOpen={isMaskOpen}
+          operation={maskEditOperation}
+          onClose={() => {
+            setIsMaskOpen(false);
+            setMaskEditOperation(undefined);
+            setMaskEditSourceItem(null);
+            setMaskSourceNodeId(null);
+          }}
+          onApply={saveMaskOutput}
+        />
+      ) : isMaskOpen && (
         <CanvasMaskEditor
           imageUrl={maskTargetUrl}
           editModel={maskEditOperation ? resolveImageQuickEditTarget(maskEditOperation, imageEditFeatureTargets[maskEditOperation]).model : undefined}

@@ -297,6 +297,25 @@ function buildImageEditPrompt(input: EditImageInput): string {
       userPrompt ? `Outpaint instruction: ${userPrompt}` : "Outpaint instruction: continue the image beyond its original frame.",
     ].join("\n");
   }
+  if (input.operation === "angle") {
+    return [
+      "The first input image is the source image to edit.",
+      guideText,
+      "Change the camera viewpoint according to the edit instruction.",
+      "Preserve the subject identity, key objects, visual style, scene mood, and coherent scene content.",
+      "Reconstruct only the newly visible parts needed for the changed camera viewpoint.",
+      userPrompt ? `Edit instruction: ${userPrompt}` : "Edit instruction: adjust the camera angle while keeping the source image recognizable.",
+    ].join("\n");
+  }
+  if (input.operation === "lighting") {
+    return [
+      "The first input image is the source image to relight.",
+      guideText,
+      "Change only lighting, highlights, shadows, color temperature, and rim light according to the edit instruction.",
+      "Preserve the subject identity, camera angle, geometry, composition, texture detail, and scene content.",
+      userPrompt ? `Edit instruction: ${userPrompt}` : "Edit instruction: relight the source image naturally.",
+    ].join("\n");
+  }
   return [
     "Remove the background from the first image and keep the main subject.",
     "Return a clean cutout-style result with a transparent or plain neutral background if transparency is unavailable.",

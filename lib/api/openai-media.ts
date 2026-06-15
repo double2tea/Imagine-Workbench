@@ -11,7 +11,7 @@ import { assertOpenAiCompatibleGatewayAccess } from "./openai-auth";
 import { assertPublicHttpUrl } from "./url-safety";
 import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, dataUriByteSize } from "../reference-images";
 
-const IMAGE_EDIT_OPERATIONS = new Set<ImageEditOperation>(["redraw", "erase", "outpaint", "cutout"]);
+const IMAGE_EDIT_OPERATIONS = new Set<ImageEditOperation>(["redraw", "erase", "outpaint", "cutout", "angle", "lighting"]);
 const TRANSCRIPTION_LANGUAGES = new Set<MimoAsrLanguage>(["auto", "zh", "en"]);
 
 const imageGenerationSchema = z.object({
@@ -280,7 +280,7 @@ function readImageEditOperation(value: FormDataEntryValue | null): ImageEditOper
 }
 
 function validateImageEditPrompt(operation: ImageEditOperation, prompt: string | undefined): void {
-  if ((operation === "redraw" || operation === "outpaint") && !prompt) {
+  if ((operation === "redraw" || operation === "outpaint" || operation === "angle" || operation === "lighting") && !prompt) {
     throw badRequest("prompt is required for this image edit operation", "missing_required_field");
   }
 }
