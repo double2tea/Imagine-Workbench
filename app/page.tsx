@@ -1507,6 +1507,7 @@ export default function Home() {
       await assetLibrary.reload();
       pushWorkspaceNotice("success", "本地资产库已清空");
     } catch (error) {
+      await assetLibrary.reload();
       pushWorkspaceNotice("error", toErrorMessage(error, "本地资产库清空失败"));
     }
   }, [assetLibrary, pushWorkspaceNotice, setCompareItemIds, setSelectedItemIds]);

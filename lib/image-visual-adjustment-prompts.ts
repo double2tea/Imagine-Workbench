@@ -17,6 +17,17 @@ export interface LightingAdjustmentState {
 
 type PromptModelFamily = "gpt-image-2" | "nano-banana-pro" | "generic";
 
+const ANGLE_ZOOM_CLOSEUP_THRESHOLD = 65;
+const ANGLE_ZOOM_WIDE_THRESHOLD = 35;
+const ANGLE_TILT_ELEVATED_THRESHOLD = 20;
+const ANGLE_TILT_LOW_ANGLE_THRESHOLD = -20;
+export const LIGHT_HEIGHT_HIGH_THRESHOLD = 35;
+export const LIGHT_HEIGHT_LOW_THRESHOLD = -35;
+const LIGHT_INTENSITY_STRONG_THRESHOLD = 70;
+const LIGHT_INTENSITY_SOFT_THRESHOLD = 35;
+export const LIGHT_TEMPERATURE_COOL_THRESHOLD = 6200;
+export const LIGHT_TEMPERATURE_WARM_THRESHOLD = 3800;
+
 export function buildAngleAdjustmentPrompt(state: AngleAdjustmentState, model: string | undefined): string {
   const camera = angleCameraPhrases(state);
   const family = promptModelFamily(model);
@@ -96,11 +107,23 @@ function angleCameraPhrases(state: AngleAdjustmentState): {
 } {
   return {
     azimuth: azimuthPhrase(state.rotation),
-    distance: state.zoom >= 65 ? "close-up shot" : state.zoom <= 35 ? "wide shot" : "medium shot",
-    elevation: state.tilt >= 20 ? "elevated shot" : state.tilt <= -20 ? "low-angle shot" : "eye-level shot",
+    distance: distancePhrase(state.zoom),
+    elevation: elevationPhrase(state.tilt),
     lens: state.wideAngle ? "wide-angle lens with controlled perspective distortion" : "natural perspective lens",
     wideAngle: state.wideAngle ? ", with a wide-angle lens feel" : "",
   };
+}
+
+function distancePhrase(zoom: number): string {
+  if (zoom >= ANGLE_ZOOM_CLOSEUP_THRESHOLD) return "close-up shot";
+  if (zoom <= ANGLE_ZOOM_WIDE_THRESHOLD) return "wide shot";
+  return "medium shot";
+}
+
+function elevationPhrase(tilt: number): string {
+  if (tilt >= ANGLE_TILT_ELEVATED_THRESHOLD) return "elevated shot";
+  if (tilt <= ANGLE_TILT_LOW_ANGLE_THRESHOLD) return "low-angle shot";
+  return "eye-level shot";
 }
 
 function azimuthPhrase(rotation: number): string {
@@ -128,11 +151,29 @@ function lightingPhrases(state: LightingAdjustmentState): {
 } {
   return {
     direction: directionPhrase(state.direction),
-    height: state.height >= 35 ? "a high angle" : state.height <= -35 ? "a low angle" : "eye level",
-    intensity: state.intensity >= 70 ? "strong" : state.intensity <= 35 ? "soft" : "balanced",
+    height: heightPhrase(state.height),
+    intensity: intensityPhrase(state.intensity),
     rimLight: state.rimLight ? " Add a subtle rim light around the subject." : "",
-    temperature: state.temperature >= 6200 ? "cool daylight" : state.temperature <= 3800 ? "warm tungsten" : "neutral white",
+    temperature: temperaturePhrase(state.temperature),
   };
+}
+
+function heightPhrase(height: number): string {
+  if (height >= LIGHT_HEIGHT_HIGH_THRESHOLD) return "a high angle";
+  if (height <= LIGHT_HEIGHT_LOW_THRESHOLD) return "a low angle";
+  return "eye level";
+}
+
+function intensityPhrase(intensity: number): string {
+  if (intensity >= LIGHT_INTENSITY_STRONG_THRESHOLD) return "strong";
+  if (intensity <= LIGHT_INTENSITY_SOFT_THRESHOLD) return "soft";
+  return "balanced";
+}
+
+function temperaturePhrase(temperature: number): string {
+  if (temperature >= LIGHT_TEMPERATURE_COOL_THRESHOLD) return "cool daylight";
+  if (temperature <= LIGHT_TEMPERATURE_WARM_THRESHOLD) return "warm tungsten";
+  return "neutral white";
 }
 
 function directionPhrase(direction: LightingAdjustmentState["direction"]): string {

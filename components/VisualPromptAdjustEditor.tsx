@@ -12,6 +12,10 @@ import {
 import {
   buildAngleAdjustmentPrompt,
   buildLightingAdjustmentPrompt,
+  LIGHT_HEIGHT_HIGH_THRESHOLD,
+  LIGHT_HEIGHT_LOW_THRESHOLD,
+  LIGHT_TEMPERATURE_COOL_THRESHOLD,
+  LIGHT_TEMPERATURE_WARM_THRESHOLD,
   type AngleAdjustmentState,
   type LightingAdjustmentState,
 } from "@/lib/image-visual-adjustment-prompts";
@@ -61,6 +65,42 @@ const ANGLE_VIEW_PRESETS: Array<{
   { className: "bottom-8 left-1/2 -translate-x-1/2", label: "B", state: { rotation: 0, tilt: 50 } },
   { className: "left-[23%] top-[28%]", label: "BK", state: { rotation: 180, tilt: 0 } },
 ];
+const ANGLE_BASE_ROTATE_Y = 28;
+const ANGLE_BASE_ROTATE_X = -11;
+const ANGLE_ROTATION_SENSITIVITY = 0.26;
+const ANGLE_TILT_SENSITIVITY = 0.24;
+const ANGLE_BASE_SCALE = 0.84;
+const ANGLE_ZOOM_SCALE_DIVISOR = 500;
+const ANGLE_CUBE_ROTATE_X_OFFSET = 20;
+const ANGLE_CUBE_ROTATE_Y_OFFSET = 22;
+const ANGLE_SHADOW_BASE_Y = 20;
+const ANGLE_SHADOW_TILT_FACTOR = 0.14;
+const ANGLE_SHADOW_BASE_SCALE = 0.78;
+const ANGLE_SHADOW_ZOOM_SCALE_DIVISOR = 420;
+const ANGLE_WIDE_LENS_INSET = 54;
+const ANGLE_NATURAL_LENS_INSET = 22;
+const ANGLE_WIDE_SIDE_GLOW_OPACITY = 0.34;
+const ANGLE_NATURAL_SIDE_GLOW_OPACITY = 0.2;
+const LIGHT_GUIDE_CORE_ALPHA = 0.85;
+const LIGHT_GUIDE_MID_STOP = 0.35;
+const LIGHT_GUIDE_MID_ALPHA = 0.38;
+const LIGHT_GUIDE_SHADOW_ALPHA = 0.85;
+const LIGHT_VISUAL_BASE_OPACITY = 0.22;
+const LIGHT_VISUAL_OPACITY_DIVISOR = 210;
+const LIGHT_HEIGHT_TILT_FACTOR = -0.06;
+const LIGHT_BEAM_BASE_WIDTH = 30;
+const LIGHT_BEAM_WIDTH_FACTOR = 0.22;
+const LIGHT_BEAM_BACK_OPACITY = 0.42;
+const LIGHT_BEAM_VISIBLE_OPACITY = 0.76;
+const LIGHT_DOME_CORE_ALPHA = 0.34;
+const LIGHT_DOME_EDGE_ALPHA = 0.13;
+const LIGHT_ORB_MID_ALPHA = 0.45;
+const LIGHT_ORB_BASE_SIZE = 24;
+const LIGHT_ORB_SIZE_FACTOR = 0.42;
+const LIGHT_ORB_BACK_OPACITY = 0.45;
+const LIGHT_ORB_VISIBLE_OPACITY = 0.84;
+const LIGHT_SURFACE_CORE_ALPHA = 0.58;
+const LIGHT_RIM_OPACITY = 0.62;
 
 export default function VisualPromptAdjustEditor({
   editModel,
@@ -119,6 +159,10 @@ export default function VisualPromptAdjustEditor({
       setErrorMessage("图片加载失败，请换一张图片后重试。");
     };
     img.src = imageUrl;
+    return () => {
+      img.onload = null;
+      img.onerror = null;
+    };
   }, [imageUrl, isOpen]);
 
   useEffect(() => {
@@ -637,15 +681,15 @@ function RangeControl({
 }
 
 function angleVisualState(state: AngleAdjustmentState): AngleVisualState {
-  const rotateY = 28 + state.rotation * 0.26;
-  const rotateX = -11 - state.tilt * 0.24;
-  const scale = 0.84 + state.zoom / 500;
+  const rotateY = ANGLE_BASE_ROTATE_Y + state.rotation * ANGLE_ROTATION_SENSITIVITY;
+  const rotateX = ANGLE_BASE_ROTATE_X - state.tilt * ANGLE_TILT_SENSITIVITY;
+  const scale = ANGLE_BASE_SCALE + state.zoom / ANGLE_ZOOM_SCALE_DIVISOR;
   return {
     cardTransform: `translateZ(36px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(${scale})`,
-    cubeTransform: `rotateX(${rotateX + 20}deg) rotateY(${rotateY + 22}deg)`,
-    floorShadowTransform: `translateY(${20 + Math.abs(state.tilt) * 0.14}px) scale(${0.78 + state.zoom / 420}) rotateX(68deg)`,
-    lensInset: state.wideAngle ? 54 : 22,
-    sideGlowOpacity: state.wideAngle ? 0.34 : 0.2,
+    cubeTransform: `rotateX(${rotateX + ANGLE_CUBE_ROTATE_X_OFFSET}deg) rotateY(${rotateY + ANGLE_CUBE_ROTATE_Y_OFFSET}deg)`,
+    floorShadowTransform: `translateY(${ANGLE_SHADOW_BASE_Y + Math.abs(state.tilt) * ANGLE_SHADOW_TILT_FACTOR}px) scale(${ANGLE_SHADOW_BASE_SCALE + state.zoom / ANGLE_SHADOW_ZOOM_SCALE_DIVISOR}) rotateX(68deg)`,
+    lensInset: state.wideAngle ? ANGLE_WIDE_LENS_INSET : ANGLE_NATURAL_LENS_INSET,
+    sideGlowOpacity: state.wideAngle ? ANGLE_WIDE_SIDE_GLOW_OPACITY : ANGLE_NATURAL_SIDE_GLOW_OPACITY,
   };
 }
 
@@ -690,9 +734,9 @@ function renderLightingGuide(size: CanvasSize, state: LightingAdjustmentState): 
   const point = lightPoint(size, state);
   const radius = Math.max(size.width, size.height) * 0.75;
   const gradient = ctx.createRadialGradient(point.x, point.y, 0, point.x, point.y, radius);
-  gradient.addColorStop(0, colorStop(state.temperature, 0.85));
-  gradient.addColorStop(0.35, colorStop(state.temperature, 0.38));
-  gradient.addColorStop(1, "rgba(0,0,0,0.85)");
+  gradient.addColorStop(0, colorStop(state.temperature, LIGHT_GUIDE_CORE_ALPHA));
+  gradient.addColorStop(LIGHT_GUIDE_MID_STOP, colorStop(state.temperature, LIGHT_GUIDE_MID_ALPHA));
+  gradient.addColorStop(1, `rgba(0,0,0,${LIGHT_GUIDE_SHADOW_ALPHA})`);
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, size.width, size.height);
   return canvas.toDataURL("image/png");
@@ -702,24 +746,24 @@ function lightingVisualState(state: LightingAdjustmentState): LightingVisualStat
   const point = lightStagePoint(state);
   const surfacePoint = lightSurfacePoint(state);
   const color = colorStop(state.temperature, 1);
-  const opacity = 0.22 + state.intensity / 210;
-  const heightTilt = state.height * -0.06;
+  const opacity = LIGHT_VISUAL_BASE_OPACITY + state.intensity / LIGHT_VISUAL_OPACITY_DIVISOR;
+  const heightTilt = state.height * LIGHT_HEIGHT_TILT_FACTOR;
   const beamAngle = Math.atan2(50 - point.y, 50 - point.x) * 180 / Math.PI;
-  const beamWidth = 30 + state.intensity * 0.22;
+  const beamWidth = LIGHT_BEAM_BASE_WIDTH + state.intensity * LIGHT_BEAM_WIDTH_FACTOR;
   return {
     beamStyle: {
       background: `linear-gradient(90deg, ${colorStop(state.temperature, opacity)} 0%, ${colorStop(state.temperature, opacity * 0.5)} 38%, rgba(255,255,255,0.04) 72%, transparent 100%)`,
       clipPath: "polygon(0% 42%, 100% 0%, 100% 100%, 0% 58%)",
       height: "24%",
       left: `${point.x}%`,
-      opacity: state.direction === "back" ? 0.42 : 0.76,
+      opacity: state.direction === "back" ? LIGHT_BEAM_BACK_OPACITY : LIGHT_BEAM_VISIBLE_OPACITY,
       top: `${point.y}%`,
       transform: `translate(0, -50%) rotate(${beamAngle}deg)`,
       transformOrigin: "0% 50%",
       width: `${beamWidth}%`,
     },
     domeStyle: {
-      background: `radial-gradient(circle at ${point.x}% ${point.y}%, ${colorStop(state.temperature, 0.34)} 0%, ${colorStop(state.temperature, 0.13)} 24%, transparent 58%)`,
+      background: `radial-gradient(circle at ${point.x}% ${point.y}%, ${colorStop(state.temperature, LIGHT_DOME_CORE_ALPHA)} 0%, ${colorStop(state.temperature, LIGHT_DOME_EDGE_ALPHA)} 24%, transparent 58%)`,
     },
     markerStyle: {
       left: `${point.x}%`,
@@ -727,23 +771,23 @@ function lightingVisualState(state: LightingAdjustmentState): LightingVisualStat
       transform: "translate(-50%, -50%)",
     },
     orbStyle: {
-      background: `radial-gradient(circle, ${color} 0%, ${colorStop(state.temperature, 0.45)} 28%, transparent 70%)`,
-      height: `${24 + state.intensity * 0.42}%`,
+      background: `radial-gradient(circle, ${color} 0%, ${colorStop(state.temperature, LIGHT_ORB_MID_ALPHA)} 28%, transparent 70%)`,
+      height: `${LIGHT_ORB_BASE_SIZE + state.intensity * LIGHT_ORB_SIZE_FACTOR}%`,
       left: `${point.x}%`,
-      opacity: state.direction === "back" ? 0.45 : 0.84,
+      opacity: state.direction === "back" ? LIGHT_ORB_BACK_OPACITY : LIGHT_ORB_VISIBLE_OPACITY,
       top: `${point.y}%`,
       transform: "translate(-50%, -50%)",
-      width: `${24 + state.intensity * 0.42}%`,
+      width: `${LIGHT_ORB_BASE_SIZE + state.intensity * LIGHT_ORB_SIZE_FACTOR}%`,
     },
     overlayStyle: {
       background: [
-        `radial-gradient(circle at ${surfacePoint.x}% ${surfacePoint.y}%, ${colorStop(state.temperature, 0.58)} 0%, rgba(255,255,255,0.12) ${Math.max(16, state.intensity / 2)}%, transparent 68%)`,
+        `radial-gradient(circle at ${surfacePoint.x}% ${surfacePoint.y}%, ${colorStop(state.temperature, LIGHT_SURFACE_CORE_ALPHA)} 0%, rgba(255,255,255,0.12) ${Math.max(16, state.intensity / 2)}%, transparent 68%)`,
         `linear-gradient(${shadowGradientAngle(state.direction)}deg, rgba(15,23,42,0.42), transparent 48%)`,
       ].join(", "),
       mixBlendMode: "screen",
     },
     panelTransform: `translateZ(42px) rotateX(${-10 + heightTilt}deg) rotateY(24deg) scale(0.86)`,
-    rimOpacity: state.rimLight ? 0.62 : 0,
+    rimOpacity: state.rimLight ? LIGHT_RIM_OPACITY : 0,
   };
 }
 
@@ -800,13 +844,13 @@ function lightSurfacePoint(state: LightingAdjustmentState): { x: number; y: numb
 }
 
 function resolveHeightBase(height: number, high: number, low: number, middle: number): number {
-  if (height >= 35) return high;
-  if (height <= -35) return low;
+  if (height >= LIGHT_HEIGHT_HIGH_THRESHOLD) return high;
+  if (height <= LIGHT_HEIGHT_LOW_THRESHOLD) return low;
   return middle;
 }
 
 function colorStop(temperature: number, alpha: number): string {
-  if (temperature >= 6200) return `rgba(190,220,255,${alpha})`;
-  if (temperature <= 3800) return `rgba(255,190,120,${alpha})`;
+  if (temperature >= LIGHT_TEMPERATURE_COOL_THRESHOLD) return `rgba(190,220,255,${alpha})`;
+  if (temperature <= LIGHT_TEMPERATURE_WARM_THRESHOLD) return `rgba(255,190,120,${alpha})`;
   return `rgba(255,255,245,${alpha})`;
 }
