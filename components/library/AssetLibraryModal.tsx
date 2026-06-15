@@ -1,7 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
-import { Download, Heart, Image as ImageIcon, Music, Search, Trash2, Upload, Video, X } from "lucide-react";
+import {
+  Download,
+  Grid2X2,
+  Heart,
+  Image as ImageIcon,
+  List,
+  Maximize2,
+  Music,
+  Search,
+  Trash2,
+  Upload,
+  Video,
+  X,
+} from "lucide-react";
 import AudioWaveformPreview from "@/components/audio/AudioWaveformPreview";
 import PreviewImage from "@/components/PreviewImage";
 import {
@@ -19,6 +32,11 @@ import type { LibraryAssetEntry } from "@/hooks/useAssetLibrary";
 
 type MediaFilter = "all" | LibraryAssetMediaType;
 type CategoryFilter = "all" | LibraryAssetCategory;
+type ViewMode = "grid" | "list";
+
+const MIN_GRID_CARD_SIZE = 140;
+const MAX_GRID_CARD_SIZE = 280;
+const DEFAULT_GRID_CARD_SIZE = 180;
 
 interface AssetLibraryModalProps {
   entries: LibraryAssetEntry[];
@@ -71,6 +89,30 @@ function renderAssetThumbnail(entry: LibraryAssetEntry) {
   return mediaIcon(entry.record.mediaType);
 }
 
+function renderAssetFullscreenMedia(entry: LibraryAssetEntry) {
+  if (entry.item?.type === "image") {
+    return <PreviewImage src={entry.item.url} alt={entry.record.title} className="h-full w-full object-contain" />;
+  }
+  if (entry.item?.type === "video") {
+    return <video src={entry.item.url} controls autoPlay className="h-full w-full object-contain" />;
+  }
+  if (entry.item?.type === "audio") {
+    return (
+      <AudioWaveformPreview
+        src={entry.item.url}
+        size="full"
+        tone="media"
+        className="h-[min(52vh,420px)] max-h-full w-full max-w-5xl rounded-2xl"
+      />
+    );
+  }
+  return (
+    <div className="flex h-full w-full items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white/70">
+      {mediaIcon(entry.record.mediaType)}
+    </div>
+  );
+}
+
 function actionErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message.trim() ? error.message : fallback;
 }
@@ -91,7 +133,10 @@ export default function AssetLibraryModal({
   const [mediaFilter, setMediaFilter] = useState<MediaFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
   const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [gridCardSize, setGridCardSize] = useState(DEFAULT_GRID_CARD_SIZE);
   const [activeRecordId, setActiveRecordId] = useState<string | null | undefined>(undefined);
+  const [fullscreenEntry, setFullscreenEntry] = useState<LibraryAssetEntry | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftCategory, setDraftCategory] = useState<LibraryAssetCategory>("other");
   const [draftNotes, setDraftNotes] = useState("");
@@ -135,6 +180,10 @@ export default function AssetLibraryModal({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.preventDefault();
+      if (fullscreenEntry) {
+        setFullscreenEntry(null);
+        return;
+      }
       onClose();
     };
     document.addEventListener("keydown", onKeyDown);
@@ -142,7 +191,7 @@ export default function AssetLibraryModal({
       window.clearTimeout(focusTimer);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [onClose, open]);
+  }, [fullscreenEntry, onClose, open]);
 
   useEffect(() => {
     setActionError(null);
@@ -341,6 +390,47 @@ export default function AssetLibraryModal({
                   </button>
                 ))}
               </div>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    data-active={viewMode === "grid"}
+                    onClick={() => setViewMode("grid")}
+                    className="imagine-filter-chip flex items-center gap-1"
+                    aria-label="网格显示"
+                    title="网格显示"
+                  >
+                    <Grid2X2 className="h-3 w-3" />
+                    网格
+                  </button>
+                  <button
+                    type="button"
+                    data-active={viewMode === "list"}
+                    onClick={() => setViewMode("list")}
+                    className="imagine-filter-chip flex items-center gap-1"
+                    aria-label="列表显示"
+                    title="列表显示"
+                  >
+                    <List className="h-3 w-3" />
+                    列表
+                  </button>
+                </div>
+                {viewMode === "grid" && (
+                  <label className="flex items-center gap-2 text-[10px] font-semibold text-[var(--iw-muted)]">
+                    大小
+                    <input
+                      type="range"
+                      min={MIN_GRID_CARD_SIZE}
+                      max={MAX_GRID_CARD_SIZE}
+                      step={20}
+                      value={gridCardSize}
+                      onChange={event => setGridCardSize(Number(event.target.value))}
+                      className="h-1 w-32 accent-[var(--iw-accent)]"
+                      aria-label="调整网格素材大小"
+                    />
+                  </label>
+                )}
+              </div>
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-3">
@@ -352,8 +442,11 @@ export default function AssetLibraryModal({
                 <p className="rounded-lg border border-dashed border-[var(--iw-border)] px-3 py-8 text-center text-xs text-[var(--iw-muted)]">
                   暂无匹配素材
                 </p>
-              ) : (
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+              ) : viewMode === "grid" ? (
+                <div
+                  className="grid gap-2"
+                  style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${gridCardSize}px, 1fr))` }}
+                >
                   {filteredEntries.map(entry => {
                     const selected = activeRecord?.id === entry.record.id;
                     return (
@@ -362,13 +455,15 @@ export default function AssetLibraryModal({
                         type="button"
                         data-active={selected}
                         onClick={() => setActiveRecordId(entry.record.id)}
-                        onDoubleClick={() => {
-                          if (mode === "select") onSelect?.(entry);
-                        }}
-                        className="imagine-asset-card flex min-w-0 flex-col overflow-hidden rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-left transition hover:border-[var(--iw-accent)] data-[active=true]:border-[var(--iw-accent)]"
+                        onDoubleClick={() => setFullscreenEntry(entry)}
+                        className="group imagine-asset-card flex min-w-0 flex-col overflow-hidden rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-left transition hover:border-[var(--iw-accent)] data-[active=true]:border-[var(--iw-accent)]"
+                        title="双击全屏预览"
                       >
                         <span className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-black/35">
                           {renderAssetThumbnail(entry)}
+                          <span className="absolute bottom-2 right-2 rounded-md bg-black/55 p-1 text-white/80 opacity-0 transition group-hover:opacity-100">
+                            <Maximize2 className="h-3 w-3" />
+                          </span>
                           {entry.record.favorite && (
                             <span className="absolute right-2 top-2 rounded-md bg-black/55 p-1 text-rose-300">
                               <Heart className="h-3 w-3 fill-current" />
@@ -382,6 +477,42 @@ export default function AssetLibraryModal({
                             <span>{LIBRARY_ASSET_CATEGORY_LABELS[entry.record.category]}</span>
                             <span className="font-mono text-[var(--iw-faint)]">{formatDate(entry.record.updatedAt)}</span>
                           </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-col gap-1.5">
+                  {filteredEntries.map(entry => {
+                    const selected = activeRecord?.id === entry.record.id;
+                    return (
+                      <button
+                        key={entry.record.id}
+                        type="button"
+                        data-active={selected}
+                        onClick={() => setActiveRecordId(entry.record.id)}
+                        onDoubleClick={() => setFullscreenEntry(entry)}
+                        className="imagine-asset-card grid min-w-0 grid-cols-[88px_minmax(0,1fr)_auto] items-center gap-3 overflow-hidden rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-2 text-left transition hover:border-[var(--iw-accent)] data-[active=true]:border-[var(--iw-accent)]"
+                        title="双击全屏预览"
+                      >
+                        <span className="relative flex aspect-[4/3] items-center justify-center overflow-hidden rounded-md bg-black/35">
+                          {renderAssetThumbnail(entry)}
+                        </span>
+                        <span className="flex min-w-0 flex-col gap-1">
+                          <span className="truncate text-xs font-semibold text-[var(--iw-text)]">{entry.record.title}</span>
+                          <span className="line-clamp-1 text-[10px] text-[var(--iw-muted)]">
+                            {entry.record.tags.length > 0 ? entry.record.tags.join(", ") : entry.record.notes}
+                          </span>
+                          <span className="flex items-center gap-1.5 text-[10px] text-[var(--iw-faint)]">
+                            {mediaIcon(entry.record.mediaType)}
+                            <span>{LIBRARY_ASSET_CATEGORY_LABELS[entry.record.category]}</span>
+                            <span className="font-mono">{formatDate(entry.record.updatedAt)}</span>
+                          </span>
+                        </span>
+                        <span className="flex items-center gap-2 text-[var(--iw-muted)]">
+                          {entry.record.favorite && <Heart className="h-3.5 w-3.5 fill-current text-rose-300" />}
+                          <Maximize2 className="h-3.5 w-3.5" />
                         </span>
                       </button>
                     );
@@ -492,6 +623,37 @@ export default function AssetLibraryModal({
           </aside>
         </div>
       </div>
+      {fullscreenEntry && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="asset-library-fullscreen-title"
+          className="fixed inset-0 z-[90] flex flex-col bg-slate-950/95 p-3 text-white backdrop-blur-md sm:p-5"
+        >
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 pb-3">
+            <div className="min-w-0">
+              <h3 id="asset-library-fullscreen-title" className="truncate text-sm font-semibold">
+                {fullscreenEntry.record.title}
+              </h3>
+              <p className="mt-1 font-mono text-[10px] text-white/45">
+                {LIBRARY_ASSET_MEDIA_TYPE_LABELS[fullscreenEntry.record.mediaType]} ·{" "}
+                {LIBRARY_ASSET_CATEGORY_LABELS[fullscreenEntry.record.category]} · {formatDate(fullscreenEntry.record.updatedAt)}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setFullscreenEntry(null)}
+              className="imagine-secondary-action flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/10 text-white"
+              aria-label="关闭全屏预览"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="flex min-h-0 flex-1 items-center justify-center py-4">
+            {renderAssetFullscreenMedia(fullscreenEntry)}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
