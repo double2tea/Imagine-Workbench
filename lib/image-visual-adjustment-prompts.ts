@@ -170,6 +170,7 @@ function intensityPhrase(intensity: number): string {
   return "balanced";
 }
 
+// Kelvin color temperature: higher values are cooler/bluer, lower values are warmer/oranger.
 function temperaturePhrase(temperature: number): string {
   if (temperature >= LIGHT_TEMPERATURE_COOL_THRESHOLD) return "cool daylight";
   if (temperature <= LIGHT_TEMPERATURE_WARM_THRESHOLD) return "warm tungsten";

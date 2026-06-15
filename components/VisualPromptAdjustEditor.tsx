@@ -736,6 +736,7 @@ function renderLightingGuide(size: CanvasSize, state: LightingAdjustmentState): 
   const gradient = ctx.createRadialGradient(point.x, point.y, 0, point.x, point.y, radius);
   gradient.addColorStop(0, colorStop(state.temperature, LIGHT_GUIDE_CORE_ALPHA));
   gradient.addColorStop(LIGHT_GUIDE_MID_STOP, colorStop(state.temperature, LIGHT_GUIDE_MID_ALPHA));
+  // Shadow stop stays neutral black instead of following the temperature tint.
   gradient.addColorStop(1, `rgba(0,0,0,${LIGHT_GUIDE_SHADOW_ALPHA})`);
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, size.width, size.height);
