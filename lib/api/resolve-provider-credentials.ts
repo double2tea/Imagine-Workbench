@@ -1,5 +1,6 @@
+import { randomUUID } from "node:crypto";
 import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
+import * as os from "node:os";
 import { dirname, join } from "node:path";
 import { badRequest } from "./errors";
 import { isProviderKey } from "../providers/registry";
@@ -12,16 +13,20 @@ export interface ResolveProviderCredentialEntry {
 
 export type ResolveProviderCredentialStore = Record<string, ResolveProviderCredentialEntry>;
 
-const CREDENTIALS_PATH = join(
-  homedir(),
-  "Library",
-  "Application Support",
-  "Imagine Workbench",
-  "resolve-provider-credentials.json",
-);
+export interface ResolveProviderCredentialPathOptions {
+  homeDir?: string;
+}
 
-export function resolveProviderCredentialsPath(): string {
-  return CREDENTIALS_PATH;
+const credentialWriteQueues = new Map<string, Promise<void>>();
+
+export function resolveProviderCredentialsPath(options: ResolveProviderCredentialPathOptions = {}): string {
+  return join(
+    options.homeDir ?? os.homedir(),
+    "Library",
+    "Application Support",
+    "Imagine Workbench",
+    "resolve-provider-credentials.json",
+  );
 }
 
 export function assertLocalResolveCredentialRequest(req: Request): void {
@@ -31,9 +36,15 @@ export function assertLocalResolveCredentialRequest(req: Request): void {
   }
 }
 
-export async function readResolveProviderCredentials(): Promise<ResolveProviderCredentialStore> {
+export async function readResolveProviderCredentials(
+  options: ResolveProviderCredentialPathOptions = {},
+): Promise<ResolveProviderCredentialStore> {
+  return readCredentialStore(resolveProviderCredentialsPath(options));
+}
+
+async function readCredentialStore(credentialsPath: string): Promise<ResolveProviderCredentialStore> {
   try {
-    const raw = await readFile(CREDENTIALS_PATH, "utf8");
+    const raw = await readFile(credentialsPath, "utf8");
     return parseResolveProviderCredentialsJson(raw);
   } catch (error) {
     if (isMissingFileError(error)) return {};
@@ -45,19 +56,26 @@ export function parseResolveProviderCredentialsJson(raw: string): ResolveProvide
   return parseResolveProviderCredentialStore(parseFirstJsonValue(raw));
 }
 
-export async function writeResolveProviderCredential(provider: string, input: unknown): Promise<ResolveProviderCredentialStore> {
+export async function writeResolveProviderCredential(
+  provider: string,
+  input: unknown,
+  options: ResolveProviderCredentialPathOptions = {},
+): Promise<ResolveProviderCredentialStore> {
   if (!isProviderKey(provider)) {
     throw badRequest("provider must be a valid provider key", "invalid_provider");
   }
-  const store = await readResolveProviderCredentials();
   const nextEntry = parseResolveProviderCredentialEntry(input);
-  if (!nextEntry.apiKey && !nextEntry.baseUrl) {
-    delete store[provider];
-  } else {
-    store[provider] = nextEntry;
-  }
-  await writeCredentialStore(store);
-  return store;
+  const credentialsPath = resolveProviderCredentialsPath(options);
+  return enqueueCredentialStoreUpdate(credentialsPath, async () => {
+    const store = await readCredentialStore(credentialsPath);
+    if (!nextEntry.apiKey && !nextEntry.baseUrl) {
+      delete store[provider];
+    } else {
+      store[provider] = nextEntry;
+    }
+    await writeCredentialStore(credentialsPath, store);
+    return store;
+  });
 }
 
 function parseResolveProviderCredentialStore(value: unknown): ResolveProviderCredentialStore {
@@ -134,13 +152,26 @@ function readOptionalString(value: unknown): string {
   return value.trim();
 }
 
-async function writeCredentialStore(store: ResolveProviderCredentialStore): Promise<void> {
-  await mkdir(dirname(CREDENTIALS_PATH), { recursive: true });
-  const tempPath = `${CREDENTIALS_PATH}.tmp`;
+function enqueueCredentialStoreUpdate<T>(credentialsPath: string, update: () => Promise<T>): Promise<T> {
+  const previous = credentialWriteQueues.get(credentialsPath) ?? Promise.resolve();
+  const pending = previous.catch(() => undefined).then(update);
+  const nextQueue = pending.then(() => undefined, () => undefined);
+  credentialWriteQueues.set(credentialsPath, nextQueue);
+  void nextQueue.then(() => {
+    if (credentialWriteQueues.get(credentialsPath) === nextQueue) {
+      credentialWriteQueues.delete(credentialsPath);
+    }
+  });
+  return pending;
+}
+
+async function writeCredentialStore(credentialsPath: string, store: ResolveProviderCredentialStore): Promise<void> {
+  await mkdir(dirname(credentialsPath), { recursive: true });
+  const tempPath = `${credentialsPath}.${process.pid}.${randomUUID()}.tmp`;
   await writeFile(tempPath, `${JSON.stringify(store, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
   await chmod(tempPath, 0o600);
-  await rename(tempPath, CREDENTIALS_PATH);
-  await chmod(CREDENTIALS_PATH, 0o600);
+  await rename(tempPath, credentialsPath);
+  await chmod(credentialsPath, 0o600);
 }
 
 function isMissingFileError(error: unknown): boolean {
