@@ -1,9 +1,10 @@
-import { Check, Compass, Copy, Download, FileText, Film, Mic2, Music, X } from "lucide-react";
+import { Check, Compass, Copy, Download, FileText, Film, Info, Mic2, Music, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import AudioWaveformPreview from "@/components/audio/AudioWaveformPreview";
 import VideoFrameMenu from "@/components/assets/VideoFrameMenu";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
+import GenerationDiagnosticsDrawer from "@/components/assets/GenerationDiagnosticsDrawer";
 import PanoramaOverlay from "@/components/panorama/PanoramaOverlay";
 import PreviewImage from "@/components/PreviewImage";
 import type { StorageItem } from "@/lib/db";
@@ -46,6 +47,7 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
   const [imageOffset, setImageOffset] = useState({ x: 0, y: 0 });
   const [isImageDragging, setIsImageDragging] = useState(false);
   const [panoramaItem, setPanoramaItem] = useState<StorageItem | null>(null);
+  const [isDiagnosticsOpen, setIsDiagnosticsOpen] = useState(false);
   const captureVideoFrameRef = useRef<VideoFrameCaptureRequest | null>(null);
   const imageScaleRef = useRef(1);
   const imageOffsetRef = useRef({ x: 0, y: 0 });
@@ -80,6 +82,10 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
   useEffect(() => {
     if (!item || panoramaItem?.id !== item.id) setPanoramaItem(null);
   }, [item, panoramaItem?.id]);
+
+  useEffect(() => {
+    setIsDiagnosticsOpen(false);
+  }, [item?.id]);
 
   useEffect(() => {
     previewItemsRef.current = previewItems;
@@ -127,6 +133,13 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
     };
 
     const closeOnEscape = (event: KeyboardEvent): void => {
+      if (isDiagnosticsOpen) {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          setIsDiagnosticsOpen(false);
+        }
+        return;
+      }
       if (event.key === "Escape") onClose();
       if (event.key === "ArrowLeft") {
         event.preventDefault();
@@ -163,7 +176,7 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [item, onClose, onSelectItem]);
+  }, [isDiagnosticsOpen, item, onClose, onSelectItem]);
 
   const handleImagePointerDown = (event: React.PointerEvent<HTMLDivElement>): void => {
     if (item?.type !== "image" || imageScale <= 1) return;
@@ -387,6 +400,15 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
                   </button>
                 )}
                 <button
+                  type="button"
+                  onClick={() => setIsDiagnosticsOpen(true)}
+                  className="imagine-motion-interactive inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-700 bg-slate-900 px-2.5 text-xs font-medium text-slate-200 hover:border-slate-500 hover:text-white"
+                  title="查看生成诊断"
+                >
+                  <Info className="h-3.5 w-3.5" />
+                  诊断
+                </button>
+                <button
                   onClick={() => copyPrompt(item.id, item.prompt)}
                   className="imagine-motion-interactive inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-700 bg-slate-900 px-2.5 text-xs font-medium text-slate-200 hover:border-slate-500 hover:text-white"
                   title="复制 prompt"
@@ -402,6 +424,12 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
               item={panoramaItem}
               onClose={() => setPanoramaItem(null)}
               onSaveScreenshots={onSavePanoramaScreenshots}
+            />
+          )}
+          {isDiagnosticsOpen && (
+            <GenerationDiagnosticsDrawer
+              item={item}
+              onClose={() => setIsDiagnosticsOpen(false)}
             />
           )}
         </motion.div>
