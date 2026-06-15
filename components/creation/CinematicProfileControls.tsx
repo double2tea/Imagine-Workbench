@@ -49,19 +49,27 @@ interface CinematicSection<T extends string> {
   title: string;
 }
 
+interface PreviewTarget {
+  field: CinematicField;
+  value: string;
+}
+
 const accentClassNames: Record<NonNullable<CinematicProfileControlsProps["accent"]>, {
   active: string;
   button: string;
+  nav: string;
   ring: string;
 }> = {
   blue: {
     active: "data-[active=true]:border-blue-400/60 data-[active=true]:bg-blue-500/10",
     button: "border-blue-400/40 bg-blue-500/15 text-blue-100 hover:bg-blue-500/25",
+    nav: "data-[selected=true]:border-blue-400/70 data-[selected=true]:bg-blue-500/10",
     ring: "data-[selected=true]:border-blue-400 data-[selected=true]:shadow-[0_0_0_1px_rgba(96,165,250,0.45)]",
   },
   violet: {
     active: "data-[active=true]:border-violet-400/60 data-[active=true]:bg-violet-500/10",
     button: "border-violet-400/40 bg-violet-500/15 text-violet-100 hover:bg-violet-500/25",
+    nav: "data-[selected=true]:border-violet-400/70 data-[selected=true]:bg-violet-500/10",
     ring: "data-[selected=true]:border-violet-400 data-[selected=true]:shadow-[0_0_0_1px_rgba(167,139,250,0.45)]",
   },
 };
@@ -85,6 +93,7 @@ function OptionGrid<T extends string>({
   icon,
   options,
   value,
+  onPreview,
   onSelect,
 }: {
   accent: NonNullable<CinematicProfileControlsProps["accent"]>;
@@ -93,23 +102,31 @@ function OptionGrid<T extends string>({
   icon: ReactNode;
   options: readonly CinematicOption<T>[];
   value: string;
+  onPreview: (target: PreviewTarget | null) => void;
   onSelect: (field: CinematicField, value: string) => void;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
       {options.map(option => {
         const selected = option.value === value;
         return (
           <button
             key={option.value}
             type="button"
-            disabled={disabled}
+            aria-disabled={disabled}
+            data-disabled={disabled}
             data-selected={selected}
-            onClick={() => onSelect(field, option.value)}
-            className={`group min-w-0 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-2 text-left transition hover:border-[var(--iw-border-strong)] disabled:cursor-not-allowed disabled:opacity-55 ${accentClassNames[accent].ring}`}
+            onBlur={() => onPreview(null)}
+            onClick={() => {
+              if (!disabled) onSelect(field, option.value);
+            }}
+            onFocus={() => onPreview({ field, value: option.value })}
+            onMouseEnter={() => onPreview({ field, value: option.value })}
+            onMouseLeave={() => onPreview(null)}
+            className={`group min-w-0 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-2 text-left transition hover:border-[var(--iw-border-strong)] data-[disabled=true]:cursor-not-allowed data-[disabled=true]:opacity-55 ${accentClassNames[accent].ring}`}
           >
             <span
-              className="relative mb-2 flex h-14 overflow-hidden rounded-md border border-white/10 bg-[var(--iw-panel)] bg-cover bg-center"
+              className="relative mb-2 flex aspect-video overflow-hidden rounded-md border border-white/10 bg-[var(--iw-panel)] bg-cover bg-center"
               style={optionVisualStyle(option.visual)}
             >
               <span className="absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-md border border-white/15 bg-black/35 text-white shadow-sm">
@@ -129,6 +146,10 @@ function OptionGrid<T extends string>({
   );
 }
 
+function selectedSectionOption<T extends string>(section: CinematicSection<T>, value: string): CinematicOption<T> {
+  return section.options.find(option => option.value === value) ?? section.options[0];
+}
+
 export default function CinematicProfileControls({
   accent = "blue",
   className = "",
@@ -142,6 +163,8 @@ export default function CinematicProfileControls({
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [activeField, setActiveField] = useState<CinematicField>("camera");
+  const [previewTarget, setPreviewTarget] = useState<PreviewTarget | null>(null);
   const isEnabled = value.enabled;
   const sections = useMemo<Array<CinematicSection<string>>>(() => [
     { field: "camera", icon: <Video className="h-3.5 w-3.5" />, options: CINEMATIC_CAMERA_OPTIONS, title: "摄影机" },
@@ -157,10 +180,24 @@ export default function CinematicProfileControls({
   ], [mediaType]);
   const summaryItems = sections.slice(0, mediaType === "video" ? 4 : 3);
   const summaryGridClassName = mediaType === "video" ? "grid-cols-4" : "grid-cols-3";
+  const activeSection = sections.find(section => section.field === activeField) ?? sections[0];
+  const activeValue = String(value[activeSection.field]);
+  const previewSection = previewTarget
+    ? sections.find(section => section.field === previewTarget.field) ?? activeSection
+    : activeSection;
+  const previewValue = previewTarget?.value ?? activeValue;
+  const previewOption = selectedSectionOption(previewSection, previewValue);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!sections.some(section => section.field === activeField)) {
+      setActiveField(sections[0].field);
+      setPreviewTarget(null);
+    }
+  }, [activeField, sections]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -200,7 +237,7 @@ export default function CinematicProfileControls({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="flex max-h-[86vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-[var(--iw-border)] bg-[var(--iw-panel)] shadow-2xl"
+        className="flex max-h-[86vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-[var(--iw-border)] bg-[var(--iw-panel)] shadow-2xl"
         onClick={event => event.stopPropagation()}
       >
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--iw-border)] px-4 py-3">
@@ -208,7 +245,7 @@ export default function CinematicProfileControls({
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)]">
               <Clapperboard className="h-4 w-4" />
             </span>
-            <h2 id={titleId} className="truncate text-sm font-semibold text-[var(--iw-text)]">摄影机与镜头控制</h2>
+            <h2 id={titleId} className="truncate text-sm font-semibold text-[var(--iw-text)]">影像风格</h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <button
@@ -229,32 +266,86 @@ export default function CinematicProfileControls({
               type="button"
               onClick={closeDialog}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)] transition hover:bg-[var(--iw-panel)] hover:text-[var(--iw-text)]"
-              aria-label="关闭摄影控制"
+              aria-label="关闭影像风格"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            {sections.map(section => (
-              <section key={section.field} className="rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)]/70 p-3">
-                <h3 className="mb-3 flex items-center gap-2 text-xs font-semibold text-[var(--iw-text)]">
-                  {section.icon}
-                  {section.title}
-                </h3>
-                <OptionGrid
-                  accent={accent}
-                  disabled={!isEnabled}
-                  field={section.field}
-                  icon={section.icon}
-                  options={section.options}
-                  value={String(value[section.field])}
-                  onSelect={selectOption}
-                />
-              </section>
-            ))}
+        <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] overflow-hidden lg:grid-cols-[240px_minmax(0,1fr)] lg:grid-rows-1">
+          <div className="border-b border-[var(--iw-border)] p-3 lg:border-b-0 lg:border-r">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-1">
+              {sections.map(section => {
+                const sectionValue = String(value[section.field]);
+                const sectionOption = selectedSectionOption(section, sectionValue);
+                const active = section.field === activeField;
+                return (
+                  <button
+                    key={section.field}
+                    type="button"
+                    data-selected={active}
+                    onClick={() => {
+                      setActiveField(section.field);
+                      setPreviewTarget(null);
+                    }}
+                    className={`flex min-w-0 items-center gap-2 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-2 text-left transition hover:border-[var(--iw-border-strong)] ${accentClassNames[accent].nav}`}
+                  >
+                    <span
+                      className="h-9 w-12 shrink-0 rounded-md border border-white/10 bg-[var(--iw-panel)] bg-cover bg-center"
+                      style={optionVisualStyle(sectionOption.visual)}
+                    />
+                    <span className="min-w-0">
+                      <span className="flex items-center gap-1.5 text-xs font-semibold text-[var(--iw-text)]">
+                        {section.icon}
+                        {section.title}
+                      </span>
+                      <span className="block truncate text-[10px] text-[var(--iw-muted)]">{sectionOption.label}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="min-h-0 overflow-y-auto p-4">
+            <section className="mb-4 overflow-hidden rounded-xl border border-[var(--iw-border)] bg-[var(--iw-panel-soft)]/70">
+              <div
+                className="relative aspect-video min-h-44 bg-[var(--iw-panel)] bg-cover bg-center sm:min-h-56"
+                style={optionVisualStyle(previewOption.visual)}
+              >
+                <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
+                <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="mb-1 flex items-center gap-2 text-xs font-semibold text-white/80">
+                      {previewSection.icon}
+                      {previewSection.title}
+                    </div>
+                    <div className="truncate text-base font-semibold text-white">{previewOption.label}</div>
+                  </div>
+                  <span className="shrink-0 rounded-md border border-white/15 bg-black/35 px-2 py-1 text-[10px] font-semibold text-white/80">
+                    示意图
+                  </span>
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)]/70 p-3">
+              <h3 className="mb-3 flex items-center gap-2 text-xs font-semibold text-[var(--iw-text)]">
+                {activeSection.icon}
+                {activeSection.title}
+              </h3>
+              <OptionGrid
+                accent={accent}
+                disabled={!isEnabled}
+                field={activeSection.field}
+                icon={activeSection.icon}
+                options={activeSection.options}
+                value={activeValue}
+                onPreview={setPreviewTarget}
+                onSelect={selectOption}
+              />
+            </section>
           </div>
         </div>
       </div>
@@ -270,7 +361,7 @@ export default function CinematicProfileControls({
           data-active={isEnabled}
           onClick={() => setIsOpen(true)}
           className={`flex min-w-0 items-center gap-1.5 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 text-left text-[10px] font-semibold text-[var(--iw-muted)] transition hover:border-[var(--iw-border-strong)] hover:bg-[var(--iw-panel)] hover:text-[var(--iw-text)] ${accentClassNames[accent].active} ${className}`}
-          title="摄影机与镜头控制"
+          title="影像风格"
         >
           <Clapperboard className="h-3.5 w-3.5 shrink-0" />
           <span className="min-w-0 truncate">摄影风格 · {compactLabel}</span>
