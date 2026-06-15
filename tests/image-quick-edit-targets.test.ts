@@ -31,7 +31,7 @@ test("angle and lighting targets use prompt-only image edit route", () => {
   assert.equal(angle.executionMode, "image-edit-route");
   assert.equal(angle.promptRequired, true);
   assert.equal(angle.maskRequired, false);
-  assert.equal(angle.guideSupported, true);
+  assert.equal(angle.guideSupported, false);
   assert.equal(lighting.executionMode, "image-edit-route");
   assert.equal(lighting.promptRequired, true);
   assert.equal(lighting.maskRequired, false);

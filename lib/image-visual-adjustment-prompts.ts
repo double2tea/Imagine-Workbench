@@ -136,6 +136,7 @@ function elevationPhrase(tilt: number): string {
 
 function azimuthPhrase(rotation: number): string {
   if (!Number.isFinite(rotation)) return "front view";
+  // Offset by half a 45-degree bin so each label is centered on its direction.
   const normalized = ((((rotation % 360) + 360) % 360) + 22.5) % 360;
   const index = Math.floor(normalized / 45);
   const phrases = [

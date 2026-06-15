@@ -91,14 +91,9 @@ const LIGHT_GUIDE_MID_ALPHA = 0.38;
 const LIGHT_GUIDE_SHADOW_ALPHA = 0.85;
 const LIGHT_HEIGHT_TILT_FACTOR = -0.06;
 const LIGHT_PANEL_DEPTH = 0.08;
-const THREE_LIGHT_POSITION = new THREE.Vector3();
-const THREE_LIGHT_TARGET = new THREE.Vector3(0, -0.08, -0.22);
-const THREE_LIGHT_DIRECTION = new THREE.Vector3();
-const THREE_LIGHT_MIDPOINT = new THREE.Vector3();
-const THREE_UP_VECTOR = new THREE.Vector3(0, 1, 0);
-const THREE_COOL_LIGHT_COLOR = new THREE.Color(0xbfdcff);
-const THREE_WARM_LIGHT_COLOR = new THREE.Color(0xffbf7a);
-const THREE_NEUTRAL_LIGHT_COLOR = new THREE.Color(0xffffff);
+const THREE_COOL_LIGHT_COLOR = 0xbfdcff;
+const THREE_WARM_LIGHT_COLOR = 0xffbf7a;
+const THREE_NEUTRAL_LIGHT_COLOR = 0xffffff;
 
 export default function VisualPromptAdjustEditor({
   editModel,
@@ -319,6 +314,16 @@ function PreviewStage({
   const lightingWheelRef = useRef<HTMLDivElement | null>(null);
   const angleDragRef = useRef<{ x: number; y: number; state: AngleAdjustmentState } | null>(null);
   const lightingDragRef = useRef(false);
+  const angleStateRef = useRef(angleState);
+  const lightingStateRef = useRef(lightingState);
+
+  useEffect(() => {
+    angleStateRef.current = angleState;
+  }, [angleState]);
+
+  useEffect(() => {
+    lightingStateRef.current = lightingState;
+  }, [lightingState]);
   useGSAP(() => {
     if (prefersReducedWorkbenchMotion()) return;
     gsap.fromTo(
@@ -380,14 +385,15 @@ function PreviewStage({
     if (!element) return undefined;
     const handleWheel = (event: globalThis.WheelEvent) => {
       event.preventDefault();
+      const current = angleStateRef.current;
       onAngleChange({
-        ...angleState,
-        zoom: clampInt(angleState.zoom - event.deltaY * 0.08, 0, 100),
+        ...current,
+        zoom: clampInt(current.zoom - event.deltaY * 0.08, 0, 100),
       });
     };
     element.addEventListener("wheel", handleWheel, { passive: false });
     return () => element.removeEventListener("wheel", handleWheel);
-  }, [angleState, onAngleChange, operation]);
+  }, [onAngleChange, operation]);
 
   useEffect(() => {
     if (operation !== "lighting") return undefined;
@@ -395,14 +401,15 @@ function PreviewStage({
     if (!element) return undefined;
     const handleWheel = (event: globalThis.WheelEvent) => {
       event.preventDefault();
+      const current = lightingStateRef.current;
       onLightingChange({
-        ...lightingState,
-        intensity: clampInt(lightingState.intensity - event.deltaY * 0.08, 0, 100),
+        ...current,
+        intensity: clampInt(current.intensity - event.deltaY * 0.08, 0, 100),
       });
     };
     element.addEventListener("wheel", handleWheel, { passive: false });
     return () => element.removeEventListener("wheel", handleWheel);
-  }, [lightingState, onLightingChange, operation]);
+  }, [onLightingChange, operation]);
 
   return (
     <div ref={scopeRef} className="imagine-visual-adjust-stage relative flex min-h-[420px] items-center justify-center overflow-hidden rounded-[26px] border border-white/10 bg-[#2a2a2a] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),inset_0_-70px_90px_rgba(0,0,0,0.22)] lg:min-h-[560px]">
@@ -476,6 +483,7 @@ function PreviewStage({
 
 interface ThreeCardScene {
   ambientLight: THREE.AmbientLight;
+  alive: { current: boolean };
   camera: THREE.PerspectiveCamera;
   cardGroup: THREE.Group;
   guideGroup: THREE.Group;
@@ -485,7 +493,19 @@ interface ThreeCardScene {
   lightMarker: THREE.Mesh;
   renderer: THREE.WebGLRenderer;
   rimLight: THREE.DirectionalLight;
+  scheduleRender: () => void;
   scene: THREE.Scene;
+  scratch: ThreeCardScratch;
+}
+
+interface ThreeCardScratch {
+  lightColor: THREE.Color;
+  lightDirection: THREE.Vector3;
+  lightHaloPosition: THREE.Vector3;
+  lightMidpoint: THREE.Vector3;
+  lightPosition: THREE.Vector3;
+  lightTarget: THREE.Vector3;
+  upVector: THREE.Vector3;
 }
 
 function ThreeCardViewport({
@@ -582,6 +602,46 @@ function ThreeCardViewport({
     );
     scene.add(lightMarker);
 
+    const alive = { current: true };
+    let renderFrameId: number | null = null;
+    const renderNow = () => {
+      if (!alive.current || !renderer.domElement.isConnected) return;
+      renderer.render(scene, camera);
+    };
+    const scheduleRender = () => {
+      if (!alive.current || renderFrameId !== null) return;
+      renderFrameId = window.requestAnimationFrame(() => {
+        renderFrameId = null;
+        renderNow();
+      });
+    };
+    const scratch: ThreeCardScratch = {
+      lightColor: new THREE.Color(0xffffff),
+      lightDirection: new THREE.Vector3(),
+      lightHaloPosition: new THREE.Vector3(),
+      lightMidpoint: new THREE.Vector3(),
+      lightPosition: new THREE.Vector3(),
+      lightTarget: new THREE.Vector3(0, -0.08, -0.22),
+      upVector: new THREE.Vector3(0, 1, 0),
+    };
+    const sceneHandle: ThreeCardScene = {
+      alive,
+      ambientLight,
+      camera,
+      cardGroup,
+      guideGroup,
+      keyLight,
+      lightBeam,
+      lightHalo,
+      lightMarker,
+      renderer,
+      rimLight,
+      scheduleRender,
+      scene,
+      scratch,
+    };
+    sceneRef.current = sceneHandle;
+
     let reliefDepth: ReliefDepthData | null = null;
     let depthTexture: THREE.CanvasTexture | null = null;
     let backTexture: THREE.Texture | null = null;
@@ -665,7 +725,6 @@ function ThreeCardViewport({
         new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.12, transparent: true }),
       );
       cardGroup.add(edges);
-      const sceneHandle = { ambientLight, camera, cardGroup, guideGroup, keyLight, lightBeam, lightHalo, lightMarker, renderer, rimLight, scene };
       applyThreeCardState(
         sceneHandle,
         operation,
@@ -674,9 +733,6 @@ function ThreeCardViewport({
       );
     });
 
-    const sceneHandle: ThreeCardScene = { ambientLight, camera, cardGroup, guideGroup, keyLight, lightBeam, lightHalo, lightMarker, renderer, rimLight, scene };
-    sceneRef.current = sceneHandle;
-
     const resize = () => {
       const rect = canvas.getBoundingClientRect();
       const width = Math.max(1, Math.floor(rect.width));
@@ -684,7 +740,7 @@ function ThreeCardViewport({
       renderer.setSize(width, height, false);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
-      renderer.render(scene, camera);
+      renderNow();
     };
     const resizeObserver = new ResizeObserver(resize);
     resizeObserver.observe(canvas);
@@ -692,6 +748,8 @@ function ThreeCardViewport({
 
     return () => {
       disposed = true;
+      alive.current = false;
+      if (renderFrameId !== null) window.cancelAnimationFrame(renderFrameId);
       resizeObserver.disconnect();
       gsap.killTweensOf([
         ambientLight,
@@ -729,7 +787,7 @@ function ThreeCardViewport({
 
   useEffect(() => {
     const sceneHandle = sceneRef.current;
-    if (!sceneHandle) return;
+    if (!sceneHandle?.alive.current || !sceneHandle.renderer.domElement.isConnected) return;
     applyThreeCardState(sceneHandle, operation, angleVisual, lightingState);
   }, [angleVisual, lightingState, operation]);
 
@@ -952,12 +1010,13 @@ function applyThreeCardState(
   angleVisual: AngleVisualState | undefined,
   lightingState: LightingAdjustmentState,
 ): void {
-  const render = () => sceneHandle.renderer.render(sceneHandle.scene, sceneHandle.camera);
+  if (!sceneHandle.alive.current || !sceneHandle.renderer.domElement.isConnected) return;
+  const scheduleRender = sceneHandle.scheduleRender;
   if (operation === "angle" && angleVisual) {
     gsap.to(sceneHandle.cardGroup.rotation, {
       duration: 0.24,
       ease: "power2.out",
-      onUpdate: render,
+      onUpdate: scheduleRender,
       overwrite: "auto",
       x: THREE.MathUtils.degToRad(angleVisual.tilt),
       y: THREE.MathUtils.degToRad(angleVisual.yaw),
@@ -966,7 +1025,7 @@ function applyThreeCardState(
     gsap.to(sceneHandle.cardGroup.scale, {
       duration: 0.24,
       ease: "power2.out",
-      onUpdate: render,
+      onUpdate: scheduleRender,
       overwrite: "auto",
       x: angleVisual.scale * 1.18,
       y: angleVisual.scale * 1.18,
@@ -975,72 +1034,72 @@ function applyThreeCardState(
     gsap.to(sceneHandle.cardGroup.position, {
       duration: 0.24,
       ease: "power2.out",
-      onUpdate: render,
+      onUpdate: scheduleRender,
       overwrite: "auto",
       x: 0,
       y: -0.08,
       z: -0.22,
     });
     sceneHandle.guideGroup.visible = true;
-    gsap.to(sceneHandle.guideGroup.scale, { duration: 0.24, ease: "power2.out", onUpdate: render, overwrite: "auto", x: 1, y: 1, z: 1 });
-    gsap.to(sceneHandle.guideGroup.rotation, { duration: 0.24, ease: "power2.out", onUpdate: render, overwrite: "auto", x: 0, y: 0, z: 0 });
-    gsap.to(sceneHandle.ambientLight, { duration: 0.22, ease: "power2.out", intensity: 1.38, onUpdate: render, overwrite: "auto" });
+    gsap.to(sceneHandle.guideGroup.scale, { duration: 0.24, ease: "power2.out", onUpdate: scheduleRender, overwrite: "auto", x: 1, y: 1, z: 1 });
+    gsap.to(sceneHandle.guideGroup.rotation, { duration: 0.24, ease: "power2.out", onUpdate: scheduleRender, overwrite: "auto", x: 0, y: 0, z: 0 });
+    gsap.to(sceneHandle.ambientLight, { duration: 0.22, ease: "power2.out", intensity: 1.38, onUpdate: scheduleRender, overwrite: "auto" });
     sceneHandle.keyLight.color.set(0xffffff);
-    gsap.to(sceneHandle.keyLight, { duration: 0.22, ease: "power2.out", intensity: 2.1, onUpdate: render, overwrite: "auto" });
-    gsap.to(sceneHandle.keyLight.position, { duration: 0.24, ease: "power2.out", onUpdate: render, overwrite: "auto", x: 2.6, y: 2.2, z: 3.2 });
-    gsap.to(sceneHandle.rimLight, { duration: 0.22, ease: "power2.out", intensity: 0.45, onUpdate: render, overwrite: "auto" });
+    gsap.to(sceneHandle.keyLight, { duration: 0.22, ease: "power2.out", intensity: 2.1, onUpdate: scheduleRender, overwrite: "auto" });
+    gsap.to(sceneHandle.keyLight.position, { duration: 0.24, ease: "power2.out", onUpdate: scheduleRender, overwrite: "auto", x: 2.6, y: 2.2, z: 3.2 });
+    gsap.to(sceneHandle.rimLight, { duration: 0.22, ease: "power2.out", intensity: 0.45, onUpdate: scheduleRender, overwrite: "auto" });
     sceneHandle.lightBeam.visible = false;
     sceneHandle.lightHalo.visible = false;
     sceneHandle.lightMarker.visible = false;
   } else {
-    const lightPosition = threeLightPosition(lightingState);
-    const color = threeTemperatureColor(lightingState.temperature);
+    const lightPosition = setThreeLightPosition(lightingState, sceneHandle.scratch.lightPosition);
+    const color = setThreeTemperatureColor(lightingState.temperature, sceneHandle.scratch.lightColor);
     gsap.to(sceneHandle.cardGroup.rotation, {
       duration: 0.28,
       ease: "power2.out",
-      onUpdate: render,
+      onUpdate: scheduleRender,
       overwrite: "auto",
       x: THREE.MathUtils.degToRad(-8 + lightingState.height * LIGHT_HEIGHT_TILT_FACTOR),
       y: THREE.MathUtils.degToRad(24),
       z: 0,
     });
-    gsap.to(sceneHandle.cardGroup.scale, { duration: 0.28, ease: "power2.out", onUpdate: render, overwrite: "auto", x: 0.96, y: 0.96, z: 0.96 });
-    gsap.to(sceneHandle.cardGroup.position, { duration: 0.28, ease: "power2.out", onUpdate: render, overwrite: "auto", x: 0, y: -0.08, z: -0.22 });
+    gsap.to(sceneHandle.cardGroup.scale, { duration: 0.28, ease: "power2.out", onUpdate: scheduleRender, overwrite: "auto", x: 0.96, y: 0.96, z: 0.96 });
+    gsap.to(sceneHandle.cardGroup.position, { duration: 0.28, ease: "power2.out", onUpdate: scheduleRender, overwrite: "auto", x: 0, y: -0.08, z: -0.22 });
     sceneHandle.guideGroup.visible = true;
-    gsap.to(sceneHandle.guideGroup.scale, { duration: 0.28, ease: "power2.out", onUpdate: render, overwrite: "auto", x: 1.03, y: 1.03, z: 1.03 });
-    gsap.to(sceneHandle.guideGroup.rotation, { duration: 0.28, ease: "power2.out", onUpdate: render, overwrite: "auto", x: 0, y: THREE.MathUtils.degToRad(6), z: 0 });
-    gsap.to(sceneHandle.ambientLight, { duration: 0.2, ease: "power2.out", intensity: 0.88, onUpdate: render, overwrite: "auto" });
+    gsap.to(sceneHandle.guideGroup.scale, { duration: 0.28, ease: "power2.out", onUpdate: scheduleRender, overwrite: "auto", x: 1.03, y: 1.03, z: 1.03 });
+    gsap.to(sceneHandle.guideGroup.rotation, { duration: 0.28, ease: "power2.out", onUpdate: scheduleRender, overwrite: "auto", x: 0, y: THREE.MathUtils.degToRad(6), z: 0 });
+    gsap.to(sceneHandle.ambientLight, { duration: 0.2, ease: "power2.out", intensity: 0.88, onUpdate: scheduleRender, overwrite: "auto" });
     sceneHandle.keyLight.color.copy(color);
-    gsap.to(sceneHandle.keyLight, { duration: 0.2, ease: "power2.out", intensity: 1.55 + lightingState.intensity / 24, onUpdate: render, overwrite: "auto" });
-    gsap.to(sceneHandle.keyLight.position, { duration: 0.26, ease: "power2.out", onUpdate: render, overwrite: "auto", x: lightPosition.x, y: lightPosition.y, z: lightPosition.z });
-    gsap.to(sceneHandle.rimLight, { duration: 0.22, ease: "power2.out", intensity: lightingState.rimLight ? 0.75 : 0.18, onUpdate: render, overwrite: "auto" });
-    updateThreeLightBeam(sceneHandle.lightBeam, lightPosition, color, lightingState.intensity);
+    gsap.to(sceneHandle.keyLight, { duration: 0.2, ease: "power2.out", intensity: 1.55 + lightingState.intensity / 24, onUpdate: scheduleRender, overwrite: "auto" });
+    gsap.to(sceneHandle.keyLight.position, { duration: 0.26, ease: "power2.out", onUpdate: scheduleRender, overwrite: "auto", x: lightPosition.x, y: lightPosition.y, z: lightPosition.z });
+    gsap.to(sceneHandle.rimLight, { duration: 0.22, ease: "power2.out", intensity: lightingState.rimLight ? 0.75 : 0.18, onUpdate: scheduleRender, overwrite: "auto" });
+    updateThreeLightBeam(sceneHandle.lightBeam, lightPosition, color, lightingState.intensity, sceneHandle.scratch);
     sceneHandle.lightHalo.visible = true;
-    const haloPosition = lightPosition.clone().multiplyScalar(0.78);
-    gsap.to(sceneHandle.lightHalo.position, { duration: 0.26, ease: "power2.out", onUpdate: render, overwrite: "auto", x: haloPosition.x, y: haloPosition.y, z: haloPosition.z });
+    const haloPosition = sceneHandle.scratch.lightHaloPosition.copy(lightPosition).multiplyScalar(0.78);
+    gsap.to(sceneHandle.lightHalo.position, { duration: 0.26, ease: "power2.out", onUpdate: scheduleRender, overwrite: "auto", x: haloPosition.x, y: haloPosition.y, z: haloPosition.z });
     const haloScale = 0.72 + lightingState.intensity / 115;
-    gsap.to(sceneHandle.lightHalo.scale, { duration: 0.22, ease: "power2.out", onUpdate: render, overwrite: "auto", x: haloScale, y: haloScale, z: haloScale });
+    gsap.to(sceneHandle.lightHalo.scale, { duration: 0.22, ease: "power2.out", onUpdate: scheduleRender, overwrite: "auto", x: haloScale, y: haloScale, z: haloScale });
     const haloMaterial = sceneHandle.lightHalo.material;
     if (haloMaterial instanceof THREE.MeshBasicMaterial) {
       haloMaterial.color.copy(color);
       haloMaterial.opacity = 0.16 + lightingState.intensity / 420;
     }
     sceneHandle.lightMarker.visible = true;
-    gsap.to(sceneHandle.lightMarker.position, { duration: 0.26, ease: "power2.out", onUpdate: render, overwrite: "auto", x: haloPosition.x, y: haloPosition.y, z: haloPosition.z });
+    gsap.to(sceneHandle.lightMarker.position, { duration: 0.26, ease: "power2.out", onUpdate: scheduleRender, overwrite: "auto", x: haloPosition.x, y: haloPosition.y, z: haloPosition.z });
     const markerMaterial = sceneHandle.lightMarker.material;
     if (markerMaterial instanceof THREE.MeshBasicMaterial) markerMaterial.color.copy(color);
   }
-  sceneHandle.renderer.render(sceneHandle.scene, sceneHandle.camera);
+  scheduleRender();
 }
 
-function updateThreeLightBeam(mesh: THREE.Mesh, lightPosition: THREE.Vector3, color: THREE.Color, intensity: number): void {
-  const direction = THREE_LIGHT_DIRECTION.copy(lightPosition).sub(THREE_LIGHT_TARGET);
+function updateThreeLightBeam(mesh: THREE.Mesh, lightPosition: THREE.Vector3, color: THREE.Color, intensity: number, scratch: ThreeCardScratch): void {
+  const direction = scratch.lightDirection.copy(lightPosition).sub(scratch.lightTarget);
   const distance = direction.length();
-  const midpoint = THREE_LIGHT_MIDPOINT.copy(THREE_LIGHT_TARGET).addScaledVector(direction, 0.48);
+  const midpoint = scratch.lightMidpoint.copy(scratch.lightTarget).addScaledVector(direction, 0.48);
   mesh.visible = true;
   mesh.position.copy(midpoint);
   mesh.scale.set(0.22 + intensity / 360, distance * 0.72, 0.22 + intensity / 360);
-  mesh.quaternion.setFromUnitVectors(THREE_UP_VECTOR, direction.normalize());
+  mesh.quaternion.setFromUnitVectors(scratch.upVector, direction.normalize());
   const material = mesh.material;
   if (material instanceof THREE.MeshBasicMaterial) {
     material.color.copy(color);
@@ -1414,20 +1473,20 @@ function lightStagePoint(state: LightingAdjustmentState): { x: number; y: number
   return points[state.direction];
 }
 
-function threeLightPosition(state: LightingAdjustmentState): THREE.Vector3 {
+function setThreeLightPosition(state: LightingAdjustmentState, target: THREE.Vector3): THREE.Vector3 {
   const height = state.height / 42;
-  if (state.direction === "back") return THREE_LIGHT_POSITION.set(0, 1.5 + height, -3.4);
-  if (state.direction === "bottom") return THREE_LIGHT_POSITION.set(0, -2.7, 1.4);
-  if (state.direction === "left") return THREE_LIGHT_POSITION.set(-3.3, 1.1 + height, 1.9);
-  if (state.direction === "right") return THREE_LIGHT_POSITION.set(3.3, 1.1 + height, 1.9);
-  if (state.direction === "top") return THREE_LIGHT_POSITION.set(0, 3.2, 1.6);
-  return THREE_LIGHT_POSITION.set(0, 1.2 + height, 3.5);
+  if (state.direction === "back") return target.set(0, 1.5 + height, -3.4);
+  if (state.direction === "bottom") return target.set(0, -2.7, 1.4);
+  if (state.direction === "left") return target.set(-3.3, 1.1 + height, 1.9);
+  if (state.direction === "right") return target.set(3.3, 1.1 + height, 1.9);
+  if (state.direction === "top") return target.set(0, 3.2, 1.6);
+  return target.set(0, 1.2 + height, 3.5);
 }
 
-function threeTemperatureColor(temperature: number): THREE.Color {
-  if (temperature >= LIGHT_TEMPERATURE_COOL_THRESHOLD) return THREE_COOL_LIGHT_COLOR;
-  if (temperature <= LIGHT_TEMPERATURE_WARM_THRESHOLD) return THREE_WARM_LIGHT_COLOR;
-  return THREE_NEUTRAL_LIGHT_COLOR;
+function setThreeTemperatureColor(temperature: number, target: THREE.Color): THREE.Color {
+  if (temperature >= LIGHT_TEMPERATURE_COOL_THRESHOLD) return target.setHex(THREE_COOL_LIGHT_COLOR);
+  if (temperature <= LIGHT_TEMPERATURE_WARM_THRESHOLD) return target.setHex(THREE_WARM_LIGHT_COLOR);
+  return target.setHex(THREE_NEUTRAL_LIGHT_COLOR);
 }
 
 function resolveHeightBase(height: number, high: number, low: number, middle: number): number {
