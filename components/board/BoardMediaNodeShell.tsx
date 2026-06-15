@@ -35,7 +35,7 @@ export default function BoardMediaNodeShell({
   const [isHovered, setIsHovered] = useState(false);
   const [hasFocusWithin, setHasFocusWithin] = useState(false);
   const hasStackSwitcher = stackItems.length > 1;
-  const shouldMountActionBar = isHovered || hasFocusWithin;
+  const shouldMountActionBar = isSelected || isHovered || hasFocusWithin;
   const isProcessing = status === "pending" || status === "processing";
   const isFailed = status === "failed";
   const visualStatus = isFailed ? "failed" : isProcessing ? "processing" : status === "complete" ? "complete" : "idle";
@@ -87,7 +87,17 @@ export default function BoardMediaNodeShell({
       data-selected={isSelected ? "true" : "false"}
       data-status={visualStatus}
     >
-      {shouldMountActionBar ? actionBar : null}
+      {shouldMountActionBar ? (
+        <>
+          <div
+            aria-hidden="true"
+            className="nodrag nopan pointer-events-auto absolute bottom-full left-0 right-0 z-30 h-12"
+            onDoubleClick={event => event.stopPropagation()}
+            onPointerDown={event => event.stopPropagation()}
+          />
+          {actionBar}
+        </>
+      ) : null}
       <div className="board-media-commit-surface imagine-motion-media-reveal relative flex h-full min-h-0 items-center justify-center overflow-hidden bg-[var(--iw-panel-soft)]">
         <span className="board-media-commit-flash pointer-events-none absolute inset-0 z-30 opacity-0" />
         {hasStackSwitcher && (
