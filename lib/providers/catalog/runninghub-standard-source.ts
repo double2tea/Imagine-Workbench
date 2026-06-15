@@ -1083,7 +1083,7 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModelSource[
     request: {
       type: "node-dimensions",
       endpoint: "/openapi/v2/rhart-image/z-image/turbo",
-      promptField: "10##text",
+      promptField: "prompt",
       extra: {
         "28##select": "8",
         "29##file_type": "PNG",

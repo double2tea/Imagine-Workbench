@@ -16281,7 +16281,7 @@
         "operation": "nodeFields",
         "fields": [
           {
-            "target": "10##text",
+            "target": "prompt",
             "source": "prompt",
             "valueType": "string"
           },

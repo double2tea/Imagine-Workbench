@@ -52,6 +52,23 @@ test("runninghub standard image model builds documented node field body", () => 
   );
 });
 
+test("runninghub z-image turbo uses documented prompt field", () => {
+  const model = getRunningHubStandardModel("api:/openapi/v2/rhart-image/z-image/turbo", "image");
+  assert.ok(model);
+
+  assert.deepEqual(
+    buildRunningHubStandardBody(model, {
+      prompt: "minimal product render",
+      referenceImages: [],
+    }),
+    {
+      prompt: "minimal product render",
+      "28##select": "8",
+      "29##file_type": "PNG",
+    },
+  );
+});
+
 test("runninghub standard video model validates duration", () => {
   const model = getRunningHubStandardModel("api:/openapi/v2/minimax/hailuo-02/standard", "video");
   assert.ok(model);
