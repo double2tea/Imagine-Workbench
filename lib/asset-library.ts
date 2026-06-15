@@ -1,6 +1,7 @@
 import {
   buildStorageItem,
   deleteFromDB,
+  deleteLibraryAssetRecord,
   getLibraryAssetRecordBySourceAssetId,
   hydrateAsset,
   listLibraryAssetRecords,
@@ -42,6 +43,10 @@ function isLibraryMediaType(type: StorageItem["type"]): type is LibraryAssetMedi
   return type === "image" || type === "video" || type === "audio";
 }
 
+function isLibraryFileType(file: File): boolean {
+  return file.type.startsWith("image/") || file.type.startsWith("video/") || file.type.startsWith("audio/");
+}
+
 function defaultLibraryTitle(item: Pick<StorageItem, "prompt" | "model" | "operationName">, fallback: string): string {
   const prompt = item.prompt.trim();
   if (prompt) return prompt.slice(0, 80);
@@ -74,7 +79,11 @@ async function saveLibraryAssetPair(backing: StorageItem, record: LibraryAssetRe
   try {
     await saveLibraryAssetRecord(record);
   } catch (error) {
-    await deleteFromDB(backing.id);
+    try {
+      await deleteFromDB(backing.id);
+    } catch {
+      // Best-effort rollback; preserve the original save error for callers.
+    }
     throw error;
   }
 }
@@ -113,32 +122,38 @@ export async function addSourceAssetToLibrary(
 
 export async function importFilesToLibrary(files: File[]): Promise<LibraryAssetRecord[]> {
   const records: LibraryAssetRecord[] = [];
-  for (const file of files) {
-    const recordId = makeClientId("library_item");
-    const asset = await createLocalUploadAsset(file, makeClientId("library_asset"));
-    if (!isLibraryMediaType(asset.type)) throw new Error("素材库只支持图片、视频和音频");
-    const mediaType = asset.type;
-    const now = new Date().toISOString();
-    const backing = buildStorageItem({
-      ...asset,
-      operationName: "asset-library",
-      libraryItemId: recordId,
-    });
-    const record: LibraryAssetRecord = {
-      id: recordId,
-      assetId: backing.id,
-      origin: "imported",
-      mediaType,
-      category: "other",
-      title: file.name || defaultLibraryTitle(backing, LIBRARY_ASSET_MEDIA_TYPE_LABELS[mediaType]),
-      notes: "",
-      tags: [],
-      favorite: false,
-      createdAt: now,
-      updatedAt: now,
-    };
-    await saveLibraryAssetPair(backing, record);
-    records.push(record);
+  try {
+    for (const file of files) {
+      if (!isLibraryFileType(file)) throw new Error("素材库只支持图片、视频和音频");
+      const recordId = makeClientId("library_item");
+      const asset = await createLocalUploadAsset(file, makeClientId("library_asset"));
+      if (!isLibraryMediaType(asset.type)) throw new Error("素材库只支持图片、视频和音频");
+      const mediaType = asset.type;
+      const now = new Date().toISOString();
+      const backing = buildStorageItem({
+        ...asset,
+        operationName: "asset-library",
+        libraryItemId: recordId,
+      });
+      const record: LibraryAssetRecord = {
+        id: recordId,
+        assetId: backing.id,
+        origin: "imported",
+        mediaType,
+        category: "other",
+        title: file.name || defaultLibraryTitle(backing, LIBRARY_ASSET_MEDIA_TYPE_LABELS[mediaType]),
+        notes: "",
+        tags: [],
+        favorite: false,
+        createdAt: now,
+        updatedAt: now,
+      };
+      await saveLibraryAssetPair(backing, record);
+      records.push(record);
+    }
+  } catch (error) {
+    await Promise.all(records.map(record => deleteLibraryAssetRecord(record.id).catch(() => undefined)));
+    throw error;
   }
   return records;
 }

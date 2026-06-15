@@ -34,7 +34,7 @@ import { getSendableAgentMediaReferences, type AgentReferenceInputSupport } from
 
 import { useAgentController } from "@/hooks/useAgentController";
 import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
-import { useAssetLibrary } from "@/hooks/useAssetLibrary";
+import { useAssetLibrary, type LibraryAssetEntry } from "@/hooks/useAssetLibrary";
 import { useBoardAssetStore } from "@/hooks/useBoardAssetStore";
 import { collectPlacedBoardAssetIdsFromNodes } from "@/lib/assets/board-scope";
 import { downloadStorageItemsZip, storageItemDownloadExtension } from "@/lib/assets/download-zip";
@@ -3547,14 +3547,18 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     }
   }, [assetLibrary, pushWorkspaceNotice]);
 
-  const handleSelectLibraryAsset = useCallback((entry: { item: StorageItem | null }) => {
+  const handleSelectLibraryAsset = useCallback((entry: LibraryAssetEntry) => {
     if (!entry.item) {
       pushWorkspaceNotice("error", "该素材缺少媒体内容");
       return;
     }
-    addAssetToBoard(entry.item);
-    setIsAssetLibraryOpen(false);
-    pushWorkspaceNotice("success", "已加入当前画板");
+    try {
+      addAssetToBoard(entry.item);
+      setIsAssetLibraryOpen(false);
+      pushWorkspaceNotice("success", "已加入当前画板");
+    } catch (error) {
+      pushWorkspaceNotice("error", toErrorMessage(error, "加入画板失败"));
+    }
   }, [addAssetToBoard, pushWorkspaceNotice]);
 
   const handleExportMultiGrid = useCallback(async (nodeId: string): Promise<void> => {

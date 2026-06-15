@@ -1504,8 +1504,8 @@ export default function Home() {
       setItems([]);
       setSelectedItemIds([]);
       setCompareItemIds([]);
-      await assetLibrary.reload();
       pushWorkspaceNotice("success", "本地资产库已清空");
+      void assetLibrary.reload().catch(() => undefined);
     } catch (error) {
       await assetLibrary.reload().catch(() => undefined);
       pushWorkspaceNotice("error", toErrorMessage(error, "本地资产库清空失败"));
@@ -1554,7 +1554,10 @@ export default function Home() {
   const handleImportFilesToLibrary = useCallback(async (files: File[]) => {
     try {
       const imported = await assetLibrary.importFiles(files);
-      pushWorkspaceNotice("success", `已导入 ${imported.length} 个素材`);
+      pushWorkspaceNotice(
+        imported.length > 0 ? "success" : "info",
+        imported.length > 0 ? `已导入 ${imported.length} 个素材` : "未导入任何素材，请检查文件格式",
+      );
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, "素材导入失败"));
     }

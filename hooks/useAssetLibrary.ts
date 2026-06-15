@@ -3,6 +3,7 @@ import {
   deleteLibraryAssetRecord,
   getAssetMetasByIds,
   hydrateAssets,
+  getLibraryAssetRecord,
   listLibraryAssetRecords,
   saveLibraryAssetRecord,
   type LibraryAssetRecord,
@@ -98,6 +99,8 @@ export function useAssetLibrary() {
   const updateRecord = useCallback(async (record: LibraryAssetRecord) => {
     if (mountedRef.current) setError(null);
     try {
+      const existing = await getLibraryAssetRecord(record.id);
+      if (!existing) throw new Error(`Library asset record not found: ${record.id}`);
       await saveLibraryAssetRecord({
         ...record,
         updatedAt: new Date().toISOString(),
@@ -126,7 +129,6 @@ export function useAssetLibrary() {
     entries,
     error,
     loading,
-    records,
     addSource,
     importFiles,
     reload,

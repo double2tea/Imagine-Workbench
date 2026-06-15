@@ -285,7 +285,9 @@ export default function ReferenceImagePicker({
               {onOpenLibrary && maxCount > 0 ? (
                 <>
                   {" / "}
-                  <button type="button" onClick={onOpenLibrary} className={browseClassName}>{libraryBrowseLabel}</button>
+                  <button type="button" onClick={onOpenLibrary} className={browseClassName}>
+                    {libraryBrowseLabel}
+                  </button>
                 </>
               ) : null}
           </span>

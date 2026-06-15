@@ -25,7 +25,7 @@ interface AssetLibraryModalProps {
   loading?: boolean;
   mode: "manage" | "select";
   open: boolean;
-  title?: string;
+  title: string;
   onClose: () => void;
   onImportFiles: (files: File[]) => Promise<unknown>;
   onRemove: (record: LibraryAssetRecord) => Promise<void>;
@@ -55,7 +55,20 @@ function recordSearchText(entry: LibraryAssetEntry): string {
     LIBRARY_ASSET_MEDIA_TYPE_LABELS[record.mediaType],
     item?.prompt,
     item?.model,
-  ].join(" ").toLowerCase();
+  ].filter(Boolean).join(" ").toLowerCase();
+}
+
+function renderAssetThumbnail(entry: LibraryAssetEntry) {
+  if (entry.item?.type === "image") {
+    return <PreviewImage src={entry.item.url} alt={entry.record.title} className="h-full w-full object-cover" />;
+  }
+  if (entry.item?.type === "video") {
+    return <video src={entry.item.url} muted preload="metadata" className="h-full w-full object-cover" />;
+  }
+  if (entry.item?.type === "audio") {
+    return <AudioWaveformPreview src={entry.item.url} size="compact" tone="media" />;
+  }
+  return mediaIcon(entry.record.mediaType);
 }
 
 function actionErrorMessage(error: unknown, fallback: string): string {
@@ -67,7 +80,7 @@ export default function AssetLibraryModal({
   loading = false,
   mode,
   open,
-  title = "素材库",
+  title,
   onClose,
   onImportFiles,
   onRemove,
@@ -78,12 +91,15 @@ export default function AssetLibraryModal({
   const [mediaFilter, setMediaFilter] = useState<MediaFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
   const [favoritesOnly, setFavoritesOnly] = useState(false);
-  const [activeRecordId, setActiveRecordId] = useState<string | null>(null);
+  const [activeRecordId, setActiveRecordId] = useState<string | null | undefined>(undefined);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftCategory, setDraftCategory] = useState<LibraryAssetCategory>("other");
   const [draftNotes, setDraftNotes] = useState("");
   const [draftTags, setDraftTags] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [togglingFavorite, setTogglingFavorite] = useState(false);
+  const [removing, setRemoving] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -100,9 +116,11 @@ export default function AssetLibraryModal({
   }, [categoryFilter, entries, favoritesOnly, mediaFilter, query]);
 
   const activeEntry = useMemo(() => {
+    if (activeRecordId === null) return null;
     if (activeRecordId) {
       const found = entries.find(entry => entry.record.id === activeRecordId);
       if (found) return found;
+      return null;
     }
     return filteredEntries[0] ?? entries[0] ?? null;
   }, [activeRecordId, entries, filteredEntries]);
@@ -154,21 +172,21 @@ export default function AssetLibraryModal({
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
     event.target.value = "";
-    if (files.length === 0) return;
-    setBusy(true);
+    if (files.length === 0 || importing) return;
+    setImporting(true);
     setActionError(null);
     try {
       await onImportFiles(files);
     } catch (error) {
       setActionError(actionErrorMessage(error, "素材导入失败"));
     } finally {
-      setBusy(false);
+      setImporting(false);
     }
   };
 
   const saveDraft = async () => {
-    if (!activeRecord || !hasDraftChanges) return;
-    setBusy(true);
+    if (!activeRecord || !hasDraftChanges || savingDraft) return;
+    setSavingDraft(true);
     setActionError(null);
     try {
       await onUpdate({
@@ -181,25 +199,26 @@ export default function AssetLibraryModal({
     } catch (error) {
       setActionError(actionErrorMessage(error, "保存素材信息失败"));
     } finally {
-      setBusy(false);
+      setSavingDraft(false);
     }
   };
 
   const toggleFavorite = async (record: LibraryAssetRecord) => {
-    setBusy(true);
+    if (togglingFavorite) return;
+    setTogglingFavorite(true);
     setActionError(null);
     try {
       await onUpdate({ ...record, favorite: !record.favorite });
     } catch (error) {
       setActionError(actionErrorMessage(error, "更新收藏状态失败"));
     } finally {
-      setBusy(false);
+      setTogglingFavorite(false);
     }
   };
 
   const removeActive = async () => {
-    if (!activeRecord) return;
-    setBusy(true);
+    if (!activeRecord || removing) return;
+    setRemoving(true);
     setActionError(null);
     try {
       await onRemove(activeRecord);
@@ -207,7 +226,7 @@ export default function AssetLibraryModal({
     } catch (error) {
       setActionError(actionErrorMessage(error, "移出素材库失败"));
     } finally {
-      setBusy(false);
+      setRemoving(false);
     }
   };
 
@@ -215,11 +234,14 @@ export default function AssetLibraryModal({
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-3 backdrop-blur-md sm:p-6">
       <div
         ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="asset-library-modal-title"
         className="flex h-[min(760px,92vh)] w-[min(1120px,96vw)] min-w-0 flex-col overflow-hidden rounded-2xl border border-[var(--iw-border)] bg-[var(--iw-panel)] shadow-2xl"
       >
         <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--iw-border)] px-4 py-3">
           <div className="min-w-0">
-            <h2 className="truncate text-sm font-semibold text-[var(--iw-text)]">{title}</h2>
+            <h2 id="asset-library-modal-title" className="truncate text-sm font-semibold text-[var(--iw-text)]">{title}</h2>
             <p className="mt-0.5 font-mono text-[10px] text-[var(--iw-faint)]">
               {entries.length} 项 · 图片/视频/音频
             </p>
@@ -238,7 +260,7 @@ export default function AssetLibraryModal({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              disabled={busy}
+              disabled={importing}
               className="imagine-secondary-action flex h-9 items-center gap-1.5 rounded-lg border border-[var(--iw-border)] px-3 text-[11px] font-semibold"
             >
               <Upload className="h-3.5 w-3.5" />
@@ -346,15 +368,7 @@ export default function AssetLibraryModal({
                         className="imagine-asset-card flex min-w-0 flex-col overflow-hidden rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-left transition hover:border-[var(--iw-accent)] data-[active=true]:border-[var(--iw-accent)]"
                       >
                         <span className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-black/35">
-                          {entry.item?.type === "image" ? (
-                            <PreviewImage src={entry.item.url} alt={entry.record.title} className="h-full w-full object-cover" />
-                          ) : entry.item?.type === "video" ? (
-                            <video src={entry.item.url} muted preload="metadata" className="h-full w-full object-cover" />
-                          ) : entry.item?.type === "audio" ? (
-                            <AudioWaveformPreview src={entry.item.url} size="compact" tone="media" />
-                          ) : (
-                            mediaIcon(entry.record.mediaType)
-                          )}
+                          {renderAssetThumbnail(entry)}
                           {entry.record.favorite && (
                             <span className="absolute right-2 top-2 rounded-md bg-black/55 p-1 text-rose-300">
                               <Heart className="h-3 w-3 fill-current" />
@@ -395,7 +409,7 @@ export default function AssetLibraryModal({
                   <button
                     type="button"
                     onClick={() => void toggleFavorite(activeRecord)}
-                    disabled={busy}
+                    disabled={togglingFavorite}
                     className="imagine-secondary-action flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--iw-border)]"
                     aria-label={activeRecord.favorite ? "取消收藏" : "收藏素材"}
                   >
@@ -444,7 +458,7 @@ export default function AssetLibraryModal({
                 <button
                   type="button"
                   onClick={() => void saveDraft()}
-                  disabled={busy || !hasDraftChanges}
+                  disabled={savingDraft || !hasDraftChanges}
                   className="imagine-primary-action h-9 rounded-lg px-3 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   保存信息
@@ -463,7 +477,7 @@ export default function AssetLibraryModal({
                 <button
                   type="button"
                   onClick={() => void removeActive()}
-                  disabled={busy}
+                  disabled={removing}
                   className="imagine-danger-action flex h-9 items-center justify-center gap-1.5 rounded-lg text-[11px] font-semibold"
                 >
                   <Trash2 className="h-3.5 w-3.5" />

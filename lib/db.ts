@@ -221,7 +221,7 @@ function normalizeLibraryCategory(value: LibraryAssetCategory | undefined): Libr
 
 function normalizeLibraryMediaType(value: LibraryAssetMediaType): LibraryAssetMediaType {
   if (value === "image" || value === "video" || value === "audio") return value;
-  throw new Error("素材库只支持图片、视频和音频");
+  throw new Error(`Unsupported library media type: ${value}`);
 }
 
 function normalizeLibraryRecord(record: LibraryAssetRecord): LibraryAssetRecord {
@@ -405,6 +405,9 @@ function ensureLibrarySourceAssetIndex(library: IDBObjectStore): void {
       seenSourceIds.add(sourceAssetId);
     }
     cursor.continue();
+  };
+  request.onerror = () => {
+    throw request.error ?? new Error("IndexedDB library source index migration failed");
   };
 }
 
@@ -661,10 +664,7 @@ export async function saveLibraryAssetRecord(record: LibraryAssetRecord): Promis
 
 export async function deleteLibraryAssetRecord(id: string): Promise<void> {
   const record = await getLibraryAssetRecord(id);
-  if (!record) {
-    await deleteLibraryRecordOnly(id);
-    return;
-  }
+  if (!record) return;
   const db = await openDatabase();
   let contentHash: string | undefined;
   await new Promise<void>((resolve, reject) => {
@@ -677,9 +677,9 @@ export async function deleteLibraryAssetRecord(id: string): Promise<void> {
       metaStore.delete(record.assetId);
       transaction.objectStore(BLOB_STORE).delete(record.assetId);
       transaction.objectStore(PREVIEW_STORE).delete(record.assetId);
+      transaction.objectStore(LIBRARY_STORE).delete(id);
     };
     metaRequest.onerror = () => reject(metaRequest.error ?? new Error("IndexedDB library asset metadata read failed"));
-    transaction.objectStore(LIBRARY_STORE).delete(id);
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error ?? new Error("IndexedDB library asset delete failed"));
     transaction.onabort = () => reject(transaction.error ?? new Error("IndexedDB library asset delete aborted"));
@@ -687,17 +687,6 @@ export async function deleteLibraryAssetRecord(id: string): Promise<void> {
   if (contentHash) {
     await deleteUnreferencedHashBlobPayload(contentHash);
   }
-}
-
-async function deleteLibraryRecordOnly(id: string): Promise<void> {
-  const db = await openDatabase();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(LIBRARY_STORE, "readwrite");
-    transaction.objectStore(LIBRARY_STORE).delete(id);
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error ?? new Error("IndexedDB library delete failed"));
-    transaction.onabort = () => reject(transaction.error ?? new Error("IndexedDB library delete aborted"));
-  });
 }
 
 async function getAssetBlobPayloadForMeta(meta: StorageItemMeta): Promise<string | null> {
@@ -1068,36 +1057,11 @@ export async function listWorkspaceGalleryMetas(options?: {
   limit?: number;
   offset?: number;
 }): Promise<StorageItemMeta[]> {
+  const metas = (await listAssetMetasByBoardId("")).filter(meta => !meta.libraryItemId);
   const offset = Math.max(0, options?.offset ?? 0);
   const limit = options?.limit;
-  const db = await openDatabase();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(META_STORE, "readonly");
-    const request = transaction.objectStore(META_STORE).index("by_createdAt_id").openCursor(null, "prev");
-    const metas: StorageItemMeta[] = [];
-    let skipped = 0;
-
-    request.onsuccess = () => {
-      const cursor = request.result;
-      if (!cursor) {
-        resolve(metas);
-        return;
-      }
-
-      const meta = normalizeMeta(cursor.value as StorageItemMeta);
-      if (meta.boardId === "" && !meta.libraryItemId) {
-        if (skipped < offset) {
-          skipped += 1;
-        } else if (limit === undefined || limit < 0 || metas.length < limit) {
-          metas.push(meta);
-        }
-      }
-
-      cursor.continue();
-    };
-    request.onerror = () => reject(request.error ?? new Error("IndexedDB workspace gallery read failed"));
-    transaction.onerror = () => reject(transaction.error ?? request.error ?? new Error("IndexedDB workspace gallery transaction failed"));
-  });
+  if (limit !== undefined && limit >= 0) return metas.slice(offset, offset + limit);
+  return offset > 0 ? metas.slice(offset) : metas;
 }
 
 /** Full hydration — avoid on board route; prefer scoped loaders. */

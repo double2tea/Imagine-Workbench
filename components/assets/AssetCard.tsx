@@ -600,7 +600,7 @@ export default function AssetCard({
                   {canAddToLibrary && (
                     <button type="button" onClick={() => runMobileAction(() => onAddToLibrary(item))}>
                       <WorkbenchOperationIcon operation="library" className="imagine-tone-icon h-3.5 w-3.5" />
-                      存素材
+                      {WORKBENCH_OPERATION_META.library.label}
                     </button>
                   )}
                   {item.type !== "transcript" && (

@@ -9,6 +9,8 @@ import { IMAGINE_BOARD_ASSET_DRAG_TYPE } from "@/lib/board/interaction";
 import type { StorageItem } from "@/lib/db";
 
 const PAGE_SIZE = 36;
+const SIDE_ACTION_BUTTON_CLASS =
+  "imagine-secondary-action flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-[var(--iw-border)] text-[11px] font-semibold text-[var(--iw-text)]";
 
 type AssetFilter = "all" | "image" | "video" | "audio";
 type BoardSideMediaType = Extract<StorageItem["type"], "image" | "video" | "audio">;
@@ -132,7 +134,7 @@ function ImportMediaButton({ className = "" }: { className?: string }) {
     <button
       type="button"
       onClick={() => openImport()}
-      className={`imagine-secondary-action flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-[var(--iw-border)] text-[11px] font-semibold text-[var(--iw-text)] ${className}`}
+      className={`${SIDE_ACTION_BUTTON_CLASS} ${className}`}
     >
       <Upload className="imagine-tone-icon h-3.5 w-3.5" data-tone="success" />
       从本机导入图片/视频/音频
@@ -146,7 +148,7 @@ function AssetLibraryButton({ onOpen }: { onOpen?: () => void }) {
     <button
       type="button"
       onClick={onOpen}
-      className="imagine-secondary-action flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-[var(--iw-border)] text-[11px] font-semibold text-[var(--iw-text)]"
+      className={SIDE_ACTION_BUTTON_CLASS}
     >
       <FolderHeart className="imagine-tone-icon h-3.5 w-3.5" data-tone="accent" />
       打开素材库
