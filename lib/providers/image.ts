@@ -1211,7 +1211,7 @@ function build12AiGeminiAsyncImageInput(input: GenerateImageInput): Record<strin
     n: 1,
     ...(images.length > 0 ? { images } : {}),
     ...(input.aspectRatio && input.aspectRatio !== "auto" ? { aspect_ratio: input.aspectRatio } : {}),
-    ...(input.imageResolution ? { image_size: input.imageResolution } : {}),
+    ...(supportsGeminiImageSize(input.model) ? { image_size: input.imageResolution } : {}),
   };
 }
 

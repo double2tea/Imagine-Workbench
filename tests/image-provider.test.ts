@@ -87,6 +87,38 @@ test("12AI GPT async image generation maps size and quality inside task input", 
   }
 });
 
+test("12AI Gemini 2.5 async image generation omits unsupported image size", async () => {
+  const originalFetch = globalThis.fetch;
+  let requestBody: unknown;
+  globalThis.fetch = async (_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    requestBody = init?.body ? JSON.parse(String(init.body)) as unknown : null;
+    return Response.json({ id: "task_gemini_25", status: "queued" });
+  };
+
+  try {
+    const result = await generateImage(twelveAiConfig, {
+      prompt: "poster",
+      model: "gemini-2.5-flash-image",
+      aspectRatio: "1:1",
+      imageResolution: "1024x1024",
+      referenceImages: [],
+      async: true,
+    });
+
+    assert.equal(result.operationName, "12ai:image:task_gemini_25");
+    assert.deepEqual(requestBody, {
+      model: "gemini-2.5-flash-image",
+      input: {
+        prompt: "poster",
+        n: 1,
+        aspect_ratio: "1:1",
+      },
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("12AI async image status polling reads task outputs", async () => {
   const originalFetch = globalThis.fetch;
   let requestUrl = "";
