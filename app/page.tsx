@@ -2126,7 +2126,7 @@ export default function Home() {
       {isMaskOpen && maskEditOperation && isVisualAdjustmentFeature(maskEditOperation) && (
         <VisualPromptAdjustEditor
           imageUrl={maskTargetUrl}
-          editModel={resolveImageQuickEditTarget(maskEditOperation, imageEditFeatureTargets[maskEditOperation]).model}
+          editModel={resolveImageQuickEditTarget(maskEditOperation, imageEditFeatureTargets[maskEditOperation])?.model}
           isOpen={isMaskOpen}
           operation={maskEditOperation}
           onClose={() => {
@@ -2143,7 +2143,7 @@ export default function Home() {
       {isMaskOpen && (!maskEditOperation || !isVisualAdjustmentFeature(maskEditOperation)) && (
         <CanvasMaskEditor
           imageUrl={maskTargetUrl}
-          editModel={maskEditOperation ? resolveImageQuickEditTarget(maskEditOperation, imageEditFeatureTargets[maskEditOperation]).model : undefined}
+          editModel={maskEditOperation ? resolveImageQuickEditTarget(maskEditOperation, imageEditFeatureTargets[maskEditOperation])?.model : undefined}
           isOpen={isMaskOpen}
           operation={maskEditOperation}
           onClose={() => {

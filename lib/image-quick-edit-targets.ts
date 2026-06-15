@@ -248,7 +248,7 @@ function genericImageEditTarget(feature: ImageEditFeature, model: string, label:
     executionMode: "image-edit-route",
     promptRequired: feature === "redraw" || feature === "outpaint" || feature === "angle" || feature === "lighting",
     maskRequired: feature === "redraw" || feature === "erase" || feature === "outpaint",
-    guideSupported: feature !== "cutout",
+    guideSupported: feature !== "cutout" && feature !== "angle",
   };
 }
 

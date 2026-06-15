@@ -18,6 +18,7 @@ export interface LightingAdjustmentState {
 const PROMPT_FAMILY_GPT_IMAGE = "gpt-image-2";
 const PROMPT_FAMILY_NANO_BANANA = "nano-banana-pro";
 const PROMPT_FAMILY_GENERIC = "generic";
+const PROMPT_FAMILY_NANO_BANANA_MODEL_SUBSTRING = "gemini-3-pro-image";
 type PromptModelFamily =
   | typeof PROMPT_FAMILY_GPT_IMAGE
   | typeof PROMPT_FAMILY_NANO_BANANA
@@ -37,7 +38,7 @@ export const LIGHT_TEMPERATURE_WARM_THRESHOLD = 3800;
 export function buildAngleAdjustmentPrompt(state: AngleAdjustmentState, model: string | undefined): string {
   const camera = angleCameraPhrases(state);
   const family = promptModelFamily(model);
-  if (family === "gpt-image-2") {
+  if (family === PROMPT_FAMILY_GPT_IMAGE) {
     return [
       "Source image: the first input image is the image to edit.",
       `Goal: change the camera viewpoint to a ${camera.azimuth}, ${camera.elevation}, ${camera.distance}${camera.wideAngle}.`,
@@ -46,7 +47,7 @@ export function buildAngleAdjustmentPrompt(state: AngleAdjustmentState, model: s
       "Constraints: no unrelated objects, no extra text, no watermark, keep all other aspects unchanged.",
     ].join("\n");
   }
-  if (family === "nano-banana-pro") {
+  if (family === PROMPT_FAMILY_NANO_BANANA) {
     return [
       "Use Image 1 as the source image and preserve its subject identity, scene content, style, and mood.",
       `Create a professional camera-angle edit: ${camera.azimuth}, ${camera.elevation}, ${camera.distance}${camera.wideAngle}.`,
@@ -67,7 +68,7 @@ export function buildLightingAdjustmentPrompt(state: LightingAdjustmentState, mo
   const lighting = lightingPhrases(state);
   const rimLightSentence = lighting.rimLight ? ` ${lighting.rimLight}` : "";
   const family = promptModelFamily(model);
-  if (family === "gpt-image-2") {
+  if (family === PROMPT_FAMILY_GPT_IMAGE) {
     return [
       "Source image: the first input image is the image to relight.",
       "Guide image: any additional input image is a lighting guide only, not a content replacement.",
@@ -77,7 +78,7 @@ export function buildLightingAdjustmentPrompt(state: LightingAdjustmentState, mo
       "Constraints: no unrelated objects, no extra text, no watermark, keep all non-lighting details unchanged.",
     ].join("\n");
   }
-  if (family === "nano-banana-pro") {
+  if (family === PROMPT_FAMILY_NANO_BANANA) {
     return [
       "Use Image 1 as the source image and preserve its subject identity, scene content, composition, and style.",
       "Use Image 2, if provided, only as a lighting direction guide.",
@@ -101,7 +102,7 @@ export function isVisualAdjustmentFeature(feature: ImageEditFeature): feature is
 function promptModelFamily(model: string | undefined): PromptModelFamily {
   if (!model) return PROMPT_FAMILY_GENERIC;
   if (model.includes(PROMPT_FAMILY_GPT_IMAGE)) return PROMPT_FAMILY_GPT_IMAGE;
-  if (model.includes("gemini-3-pro-image")) return PROMPT_FAMILY_NANO_BANANA;
+  if (model.includes(PROMPT_FAMILY_NANO_BANANA_MODEL_SUBSTRING)) return PROMPT_FAMILY_NANO_BANANA;
   return PROMPT_FAMILY_GENERIC;
 }
 
@@ -134,6 +135,7 @@ function elevationPhrase(tilt: number): string {
 }
 
 function azimuthPhrase(rotation: number): string {
+  if (!Number.isFinite(rotation)) return "front view";
   const normalized = ((((rotation % 360) + 360) % 360) + 22.5) % 360;
   const index = Math.floor(normalized / 45);
   const phrases = [

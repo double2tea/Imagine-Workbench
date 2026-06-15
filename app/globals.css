@@ -7383,10 +7383,6 @@ html[data-imagine-theme="light"] .imagine-mark-xs,
   accent-color: var(--iw-accent) !important;
 }
 
-.imagine-visual-adjust-stage :is(.text-white, label, .font-medium) {
-  color: #ffffff !important;
-}
-
 .imagine-angle-view-button {
   min-width: 36px;
   height: 30px;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent, type WheelEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import * as THREE from "three";
 import { Box, RotateCcw, Sun, X } from "lucide-react";
 import type { CanvasMaskEditorOutput } from "@/components/CanvasMaskEditor";
@@ -65,6 +65,7 @@ const ANGLE_VIEW_PRESETS: Array<{
   { className: "bottom-8 left-1/2 -translate-x-1/2", label: "B", state: { rotation: 0, tilt: 50 } },
   { className: "left-[23%] top-[28%]", label: "BK", state: { rotation: 180, tilt: 0 } },
 ];
+const STUDIO_FLOOR_Y = -1.34;
 const ANGLE_PANEL_DEPTH = 0.11;
 const ANGLE_BASE_ROTATE_Y = 0;
 const ANGLE_BASE_ROTATE_X = 0;
@@ -76,28 +77,28 @@ const ANGLE_BASE_SCALE = 0.78;
 const ANGLE_ZOOM_SCALE_DIVISOR = 240;
 const ANGLE_SIDE_SCALE_REDUCTION = 0.13;
 const ANGLE_TILT_SCALE_REDUCTION = 0.05;
-const ANGLE_VISUAL_SIDE_LIMIT = 68;
+const RELIEF_GRID_COLUMNS = 128;
+const RELIEF_GRID_ROWS = 84;
+const RELIEF_PREVIEW_TEXTURE_SIZE = 192;
+const ANGLE_RELIEF_DEPTH = 0.34;
+const LIGHTING_RELIEF_DEPTH = 0.42;
+const ANGLE_VISUAL_SIDE_LIMIT = 74;
 const ANGLE_VISUAL_BACK_START = 120;
-const ANGLE_VISUAL_BACK_LIMIT = 154;
+const ANGLE_VISUAL_BACK_LIMIT = 160;
 const LIGHT_GUIDE_CORE_ALPHA = 0.85;
 const LIGHT_GUIDE_MID_STOP = 0.35;
 const LIGHT_GUIDE_MID_ALPHA = 0.38;
 const LIGHT_GUIDE_SHADOW_ALPHA = 0.85;
-const LIGHT_VISUAL_BASE_OPACITY = 0.22;
-const LIGHT_VISUAL_OPACITY_DIVISOR = 210;
 const LIGHT_HEIGHT_TILT_FACTOR = -0.06;
-const LIGHT_BEAM_BASE_WIDTH = 30;
-const LIGHT_BEAM_WIDTH_FACTOR = 0.22;
-const LIGHT_BEAM_BACK_OPACITY = 0.42;
-const LIGHT_BEAM_VISIBLE_OPACITY = 0.76;
-const LIGHT_DOME_CORE_ALPHA = 0.34;
-const LIGHT_DOME_EDGE_ALPHA = 0.13;
-const LIGHT_ORB_MID_ALPHA = 0.45;
-const LIGHT_ORB_BASE_SIZE = 24;
-const LIGHT_ORB_SIZE_FACTOR = 0.42;
-const LIGHT_ORB_BACK_OPACITY = 0.45;
-const LIGHT_ORB_VISIBLE_OPACITY = 0.84;
 const LIGHT_PANEL_DEPTH = 0.08;
+const THREE_LIGHT_POSITION = new THREE.Vector3();
+const THREE_LIGHT_TARGET = new THREE.Vector3(0, -0.08, -0.22);
+const THREE_LIGHT_DIRECTION = new THREE.Vector3();
+const THREE_LIGHT_MIDPOINT = new THREE.Vector3();
+const THREE_UP_VECTOR = new THREE.Vector3(0, 1, 0);
+const THREE_COOL_LIGHT_COLOR = new THREE.Color(0xbfdcff);
+const THREE_WARM_LIGHT_COLOR = new THREE.Color(0xffbf7a);
+const THREE_NEUTRAL_LIGHT_COLOR = new THREE.Color(0xffffff);
 
 export default function VisualPromptAdjustEditor({
   editModel,
@@ -117,7 +118,7 @@ export default function VisualPromptAdjustEditor({
   const [lightingState, setLightingState] = useState<LightingAdjustmentState>(DEFAULT_LIGHTING_STATE);
 
   const aspectRatio = aspectRatioFromSize(imageSize);
-  const resolutionOptions = getEditorResolutionOptions(editModel, aspectRatio);
+  const resolutionOptions = useMemo(() => getEditorResolutionOptions(editModel, aspectRatio), [aspectRatio, editModel]);
   const selectedImageResolution = resolutionOptions.some(option => option.value === imageResolution)
     ? imageResolution
     : resolutionOptions[0]?.value ?? "auto";
@@ -173,7 +174,6 @@ export default function VisualPromptAdjustEditor({
       : buildLightingAdjustmentPrompt(lightingState, editModel)
   ), [angleState, editModel, lightingState, operation]);
   const angleVisual = useMemo(() => angleVisualState(angleState), [angleState]);
-  const lightingVisual = useMemo(() => lightingVisualState(lightingState), [lightingState]);
 
   const handleApply = useCallback(async () => {
     const img = imageRef.current;
@@ -233,7 +233,6 @@ export default function VisualPromptAdjustEditor({
             angleVisual={angleVisual}
             imageUrl={imageUrl}
             lightingState={lightingState}
-            lightingVisual={lightingVisual}
             onAngleChange={setAngleState}
             onLightingChange={setLightingState}
             operation={operation}
@@ -248,7 +247,9 @@ export default function VisualPromptAdjustEditor({
           )}
           <OperationSection label="分辨率" className="mt-4">
             <select
+              aria-label="分辨率"
               className="imagine-visual-adjust-select imagine-control--sm mt-2 w-full rounded-xl border border-white/10 bg-white/[0.06] px-3 py-3 text-sm text-white outline-none focus:border-white/30"
+              name="visual-adjust-resolution"
               value={selectedImageResolution}
               onChange={event => setImageResolution(event.target.value)}
             >
@@ -296,19 +297,11 @@ interface AngleVisualState {
   yaw: number;
 }
 
-interface LightingVisualState {
-  beamStyle: CSSProperties;
-  domeStyle: CSSProperties;
-  markerStyle: CSSProperties;
-  orbStyle: CSSProperties;
-}
-
 function PreviewStage({
   angleState,
   angleVisual,
   imageUrl,
   lightingState,
-  lightingVisual,
   onAngleChange,
   onLightingChange,
   operation,
@@ -317,12 +310,13 @@ function PreviewStage({
   angleVisual: AngleVisualState;
   imageUrl: string;
   lightingState: LightingAdjustmentState;
-  lightingVisual: LightingVisualState;
   onAngleChange: (state: AngleAdjustmentState) => void;
   onLightingChange: (state: LightingAdjustmentState) => void;
   operation: "angle" | "lighting";
 }) {
   const scopeRef = useRef<HTMLDivElement | null>(null);
+  const angleWheelRef = useRef<HTMLDivElement | null>(null);
+  const lightingWheelRef = useRef<HTMLDivElement | null>(null);
   const angleDragRef = useRef<{ x: number; y: number; state: AngleAdjustmentState } | null>(null);
   const lightingDragRef = useRef(false);
   useGSAP(() => {
@@ -330,7 +324,7 @@ function PreviewStage({
     gsap.fromTo(
       ".visual-adjust-motion-item",
       { opacity: 0, scale: 0.96, y: 8 },
-      { opacity: 1, scale: 1, y: 0, duration: 0.26, ease: WORKBENCH_GSAP_EASE, stagger: 0.035 },
+      { opacity: 1, scale: 1, y: 0, duration: 0.26, ease: WORKBENCH_GSAP_EASE },
     );
   }, { dependencies: [operation, imageUrl], revertOnUpdate: true, scope: scopeRef });
 
@@ -343,8 +337,8 @@ function PreviewStage({
     if (!drag) return;
     const nextState = {
       ...drag.state,
-      rotation: clampNumber(drag.state.rotation + (event.clientX - drag.x) * ANGLE_POINTER_ROTATION_SENSITIVITY, -180, 180),
-      tilt: clampNumber(drag.state.tilt + (event.clientY - drag.y) * ANGLE_POINTER_TILT_SENSITIVITY, -60, 60),
+      rotation: clampInt(drag.state.rotation + (event.clientX - drag.x) * ANGLE_POINTER_ROTATION_SENSITIVITY, -180, 180),
+      tilt: clampInt(drag.state.tilt + (event.clientY - drag.y) * ANGLE_POINTER_TILT_SENSITIVITY, -60, 60),
     };
     angleDragRef.current = { x: event.clientX, y: event.clientY, state: nextState };
     onAngleChange(nextState);
@@ -355,13 +349,6 @@ function PreviewStage({
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
   };
-  const handleAngleWheel = (event: WheelEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    onAngleChange({
-      ...angleState,
-      zoom: clampNumber(angleState.zoom - event.deltaY * 0.08, 0, 100),
-    });
-  };
   const applyLightingPointer = (event: PointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     const x = (event.clientX - rect.left) / rect.width * 100;
@@ -369,7 +356,7 @@ function PreviewStage({
     onLightingChange({
       ...lightingState,
       direction: directionFromPreviewPoint(x, y),
-      height: clampNumber((50 - y) * 2, -100, 100),
+      height: clampInt((50 - y) * 2, -100, 100),
     });
   };
   const handleLightingPointerDown = (event: PointerEvent<HTMLDivElement>) => {
@@ -387,13 +374,35 @@ function PreviewStage({
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
   };
-  const handleLightingWheel = (event: WheelEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    onLightingChange({
-      ...lightingState,
-      intensity: clampNumber(lightingState.intensity - event.deltaY * 0.08, 0, 100),
-    });
-  };
+  useEffect(() => {
+    if (operation !== "angle") return undefined;
+    const element = angleWheelRef.current;
+    if (!element) return undefined;
+    const handleWheel = (event: globalThis.WheelEvent) => {
+      event.preventDefault();
+      onAngleChange({
+        ...angleState,
+        zoom: clampInt(angleState.zoom - event.deltaY * 0.08, 0, 100),
+      });
+    };
+    element.addEventListener("wheel", handleWheel, { passive: false });
+    return () => element.removeEventListener("wheel", handleWheel);
+  }, [angleState, onAngleChange, operation]);
+
+  useEffect(() => {
+    if (operation !== "lighting") return undefined;
+    const element = lightingWheelRef.current;
+    if (!element) return undefined;
+    const handleWheel = (event: globalThis.WheelEvent) => {
+      event.preventDefault();
+      onLightingChange({
+        ...lightingState,
+        intensity: clampInt(lightingState.intensity - event.deltaY * 0.08, 0, 100),
+      });
+    };
+    element.addEventListener("wheel", handleWheel, { passive: false });
+    return () => element.removeEventListener("wheel", handleWheel);
+  }, [lightingState, onLightingChange, operation]);
 
   return (
     <div ref={scopeRef} className="imagine-visual-adjust-stage relative flex min-h-[420px] items-center justify-center overflow-hidden rounded-[26px] border border-white/10 bg-[#2a2a2a] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),inset_0_-70px_90px_rgba(0,0,0,0.22)] lg:min-h-[560px]">
@@ -407,16 +416,15 @@ function PreviewStage({
       >
         {operation === "angle" ? (
           <div
+            ref={angleWheelRef}
             aria-label="拖拽方块调整角度"
             className="absolute inset-0 cursor-grab touch-none select-none active:cursor-grabbing"
             onPointerCancel={handleAnglePointerEnd}
             onPointerDown={handleAnglePointerDown}
             onPointerMove={handleAnglePointerMove}
             onPointerUp={handleAnglePointerEnd}
-            onWheel={handleAngleWheel}
             style={{ transformStyle: "preserve-3d" }}
           >
-            <div className="pointer-events-none absolute left-1/2 top-1/2 h-[72%] max-h-[390px] w-[74%] max-w-[580px] -translate-x-1/2 -translate-y-1/2 rounded-[30px] border border-white/[0.055] bg-[#222]/45 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.025),0_30px_90px_rgba(0,0,0,0.22)]" />
             <ThreeCardViewport
               angleVisual={angleVisual}
               imageUrl={imageUrl}
@@ -443,27 +451,20 @@ function PreviewStage({
           </div>
         ) : (
           <div
+            ref={lightingWheelRef}
             aria-label="拖拽光源调整打光"
             className="absolute inset-0 cursor-crosshair touch-none select-none"
             onPointerCancel={handleLightingPointerEnd}
             onPointerDown={handleLightingPointerDown}
             onPointerMove={handleLightingPointerMove}
             onPointerUp={handleLightingPointerEnd}
-            onWheel={handleLightingWheel}
             style={{ transformStyle: "preserve-3d" }}
           >
-            <div className="absolute left-1/2 top-[76%] h-28 w-[52%] -translate-x-1/2 rounded-[999px] bg-black/30 blur-2xl" />
-            <div className="pointer-events-none absolute left-1/2 top-1/2 aspect-square h-[82%] max-h-[430px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/[0.06] bg-[radial-gradient(circle_at_38%_34%,rgba(255,255,255,0.14),rgba(255,255,255,0.045)_34%,rgba(20,23,25,0.12)_68%,rgba(0,0,0,0.24)_100%)] shadow-[inset_0_0_82px_rgba(255,255,255,0.08),0_34px_100px_rgba(0,0,0,0.28)]" />
-            <div className="pointer-events-none absolute left-1/2 top-1/2 aspect-square h-[84%] max-h-[430px] -translate-x-1/2 -translate-y-1/2 rounded-full" style={lightingVisual.domeStyle} />
-            <div className="pointer-events-none absolute left-1/2 top-1/2 aspect-square h-[60%] max-h-[310px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10" />
-            <div className="pointer-events-none absolute z-10" style={lightingVisual.beamStyle} />
             <ThreeCardViewport
               imageUrl={imageUrl}
               lightingState={lightingState}
               operation="lighting"
             />
-            <div className="pointer-events-none absolute z-20 rounded-full blur-2xl" style={lightingVisual.orbStyle} />
-            <div className="pointer-events-none absolute z-30 h-5 w-5 rounded-full border-2 border-white bg-white shadow-[0_0_24px_rgba(255,255,255,0.95)]" style={lightingVisual.markerStyle} />
             <LightingCompassMap imageUrl={imageUrl} state={lightingState} onChange={onLightingChange} />
             <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-white/10 bg-white/[0.07] px-4 py-1 text-xs font-semibold text-white/70">主光源</div>
           </div>
@@ -517,14 +518,16 @@ function ThreeCardViewport({
     renderer.setClearColor(0x000000, 0);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.08;
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 50);
-    camera.position.set(0, 0, 6.3);
+    scene.fog = new THREE.Fog(0x111111, 5.8, 11.2);
+    const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 50);
+    camera.position.set(0, 0.28, 6.25);
+    camera.lookAt(0, -0.1, 0);
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 1.35);
     const keyLight = new THREE.PointLight(0xffffff, 2.2, 12, 1.6);
@@ -537,13 +540,15 @@ function ThreeCardViewport({
     const cardGroup = new THREE.Group();
     scene.add(cardGroup);
 
+    const studioGroup = createStudioRoom();
+    scene.add(studioGroup);
+
     const guideGroup = createThreeGuideGroup();
     scene.add(guideGroup);
 
-    const floor = new THREE.Mesh(new THREE.CircleGeometry(2.45, 96), new THREE.ShadowMaterial({ color: 0x000000, opacity: 0.32 }));
-    floor.position.set(0, -1.22, 0);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(7.2, 5.6), new THREE.ShadowMaterial({ color: 0x000000, opacity: 0.34 }));
+    floor.position.set(0, STUDIO_FLOOR_Y + 0.012, 0.4);
     floor.rotation.x = -Math.PI / 2;
-    floor.scale.set(1.55, 0.5, 1);
     floor.receiveShadow = true;
     scene.add(floor);
 
@@ -577,50 +582,72 @@ function ThreeCardViewport({
     );
     scene.add(lightMarker);
 
+    let reliefDepth: ReliefDepthData | null = null;
     let depthTexture: THREE.CanvasTexture | null = null;
-    const texture = new THREE.TextureLoader().load(imageUrl, loadedTexture => {
-      if (disposed) return;
+    let backTexture: THREE.Texture | null = null;
+    let loadedTextureRef: THREE.Texture | null = null;
+    new THREE.TextureLoader().load(imageUrl, loadedTexture => {
+      if (disposed) {
+        loadedTexture.dispose();
+        return;
+      }
+      loadedTextureRef = loadedTexture;
       loadedTexture.colorSpace = THREE.SRGBColorSpace;
       loadedTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      backTexture = loadedTexture.clone();
+      backTexture.wrapS = THREE.RepeatWrapping;
+      backTexture.repeat.x = -1;
+      backTexture.offset.x = 1;
+      backTexture.needsUpdate = true;
       const image = loadedTexture.image as HTMLImageElement | undefined;
       const aspect = image && image.naturalHeight > 0 ? image.naturalWidth / image.naturalHeight : 1.5;
       const width = operation === "angle" ? 3.08 : 3.18;
       const height = width / aspect;
       const depth = operation === "angle" ? ANGLE_PANEL_DEPTH : LIGHT_PANEL_DEPTH;
-      depthTexture = image ? createPseudoDepthTexture(image) : null;
+      reliefDepth = image ? createReliefDepthData(image) : null;
+      depthTexture = reliefDepth ? createDepthTexture(reliefDepth) : null;
       const backingGeometry = new THREE.BoxGeometry(width, height, depth);
       const sideMaterial = new THREE.MeshStandardMaterial({
         color: 0x505050,
         metalness: 0.08,
         roughness: 0.78,
       });
-      const backingMaterial = new THREE.MeshStandardMaterial({
+      const backingFrontMaterial = new THREE.MeshStandardMaterial({
         color: 0x303030,
         metalness: 0.05,
         roughness: 0.82,
+      });
+      const backingBackMaterial = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        emissive: 0xffffff,
+        emissiveIntensity: operation === "angle" ? 0.08 : 0.03,
+        emissiveMap: backTexture,
+        map: backTexture,
+        metalness: 0,
+        roughness: 0.72,
       });
       const backing = new THREE.Mesh(backingGeometry, [
         sideMaterial,
         sideMaterial,
         sideMaterial,
         sideMaterial,
-        backingMaterial,
-        backingMaterial,
+        backingFrontMaterial,
+        backingBackMaterial,
       ]);
       backing.castShadow = true;
       backing.receiveShadow = true;
       backing.position.z = -depth / 2;
       cardGroup.add(backing);
 
-      const reliefGeometry = new THREE.PlaneGeometry(width * 0.985, height * 0.985, 96, 64);
+      const reliefGeometry = new THREE.PlaneGeometry(width * 0.985, height * 0.985, RELIEF_GRID_COLUMNS, RELIEF_GRID_ROWS);
+      if (reliefDepth) {
+        applyReliefDepthToGeometry(reliefGeometry, reliefDepth, operation === "angle" ? ANGLE_RELIEF_DEPTH : LIGHTING_RELIEF_DEPTH);
+      }
       const reliefMaterial = new THREE.MeshStandardMaterial({
         bumpMap: depthTexture ?? undefined,
-        bumpScale: operation === "angle" ? 0.025 : 0.038,
-        displacementBias: operation === "angle" ? -0.026 : -0.018,
-        displacementMap: depthTexture ?? undefined,
-        displacementScale: operation === "angle" ? 0.092 : 0.135,
+        bumpScale: operation === "angle" ? 0.07 : 0.095,
         emissive: 0xffffff,
-        emissiveIntensity: operation === "angle" ? 0.17 : 0.055,
+        emissiveIntensity: operation === "angle" ? 0.12 : 0.035,
         emissiveMap: loadedTexture,
         map: loadedTexture,
         metalness: 0,
@@ -666,15 +693,35 @@ function ThreeCardViewport({
     return () => {
       disposed = true;
       resizeObserver.disconnect();
+      gsap.killTweensOf([
+        ambientLight,
+        cardGroup.position,
+        cardGroup.rotation,
+        cardGroup.scale,
+        guideGroup.rotation,
+        guideGroup.scale,
+        keyLight,
+        keyLight.position,
+        lightHalo.position,
+        lightHalo.scale,
+        lightMarker.position,
+        rimLight,
+      ]);
+      const disposedMaterials = new Set<THREE.Material>();
       scene.traverse(object => {
         if (object instanceof THREE.Mesh || object instanceof THREE.Line || object instanceof THREE.LineSegments) {
           object.geometry.dispose();
           const materials = Array.isArray(object.material) ? object.material : [object.material];
-          for (const material of materials) material.dispose();
+          for (const material of materials) {
+            if (disposedMaterials.has(material)) continue;
+            material.dispose();
+            disposedMaterials.add(material);
+          }
         }
       });
       depthTexture?.dispose();
-      texture.dispose();
+      backTexture?.dispose();
+      loadedTextureRef?.dispose();
       renderer.dispose();
       sceneRef.current = null;
     };
@@ -691,33 +738,96 @@ function ThreeCardViewport({
   );
 }
 
+function createStudioRoom(): THREE.Group {
+  const group = new THREE.Group();
+  const wallMaterial = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    opacity: 0.035,
+    side: THREE.DoubleSide,
+    transparent: true,
+  });
+  const floorMaterial = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    opacity: 0.026,
+    side: THREE.DoubleSide,
+    transparent: true,
+  });
+
+  const floorPlane = new THREE.Mesh(new THREE.PlaneGeometry(7.6, 6.2), floorMaterial);
+  floorPlane.position.set(0, STUDIO_FLOOR_Y, 0.2);
+  floorPlane.rotation.x = -Math.PI / 2;
+  group.add(floorPlane);
+
+  const backWall = new THREE.Mesh(new THREE.PlaneGeometry(7.2, 3.4), wallMaterial);
+  backWall.position.set(0, 0.2, -2.45);
+  group.add(backWall);
+
+  const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(5.4, 3.2), wallMaterial.clone());
+  leftWall.position.set(-3.45, 0.08, 0.2);
+  leftWall.rotation.y = Math.PI / 2;
+  group.add(leftWall);
+
+  const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(5.4, 3.2), wallMaterial.clone());
+  rightWall.position.set(3.45, 0.08, 0.2);
+  rightWall.rotation.y = -Math.PI / 2;
+  group.add(rightWall);
+
+  const gridMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.12, transparent: true });
+  for (let index = -6; index <= 6; index += 1) {
+    const x = index * 0.46;
+    group.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x, STUDIO_FLOOR_Y + 0.01, -2.35), new THREE.Vector3(x * 1.45, STUDIO_FLOOR_Y + 0.01, 2.9)]),
+      gridMaterial,
+    ));
+  }
+  for (let index = 0; index <= 9; index += 1) {
+    const z = -2.35 + index * 0.58;
+    const spread = 2.85 + index * 0.16;
+    group.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-spread, STUDIO_FLOOR_Y + 0.012, z), new THREE.Vector3(spread, STUDIO_FLOOR_Y + 0.012, z)]),
+      gridMaterial,
+    ));
+  }
+
+  const horizon = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-2.9, -0.15, -2.42), new THREE.Vector3(2.9, -0.15, -2.42)]),
+    new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.16, transparent: true }),
+  );
+  group.add(horizon);
+
+  return group;
+}
+
 function createThreeGuideGroup(): THREE.Group {
   const group = new THREE.Group();
   const panel = new THREE.Mesh(
-    new THREE.PlaneGeometry(4.25, 2.55),
+    new THREE.PlaneGeometry(4.8, 2.72),
     new THREE.MeshBasicMaterial({
       color: 0xffffff,
-      opacity: 0.025,
+      opacity: 0.018,
       side: THREE.DoubleSide,
       transparent: true,
     }),
   );
-  panel.position.set(0, 0, -0.55);
+  panel.position.set(0, -0.02, -1.55);
   group.add(panel);
 
   const ring = new THREE.Mesh(
-    new THREE.TorusGeometry(1.64, 0.01, 8, 128),
-    new THREE.MeshBasicMaterial({ color: 0xffffff, opacity: 0.14, transparent: true }),
+    new THREE.TorusGeometry(1.72, 0.012, 8, 128),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, opacity: 0.18, transparent: true }),
   );
-  ring.position.set(0, -0.02, -0.12);
+  ring.position.set(0, STUDIO_FLOOR_Y + 0.03, -0.18);
+  ring.rotation.x = Math.PI / 2;
   group.add(ring);
 
-  const lineMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.09, transparent: true });
+  const lineMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.12, transparent: true });
   const lines: Array<[THREE.Vector3, THREE.Vector3]> = [
-    [new THREE.Vector3(-2.18, 0, -0.5), new THREE.Vector3(2.18, 0, -0.5)],
-    [new THREE.Vector3(0, -1.34, -0.5), new THREE.Vector3(0, 1.34, -0.5)],
-    [new THREE.Vector3(-1.9, -1.02, -0.5), new THREE.Vector3(1.9, 1.02, -0.5)],
-    [new THREE.Vector3(-1.9, 1.02, -0.5), new THREE.Vector3(1.9, -1.02, -0.5)],
+    [new THREE.Vector3(-2.05, STUDIO_FLOOR_Y + 0.04, -0.18), new THREE.Vector3(2.05, STUDIO_FLOOR_Y + 0.04, -0.18)],
+    [new THREE.Vector3(0, STUDIO_FLOOR_Y + 0.04, -2.05), new THREE.Vector3(0, STUDIO_FLOOR_Y + 0.04, 1.7)],
+    [new THREE.Vector3(-1.62, STUDIO_FLOOR_Y + 0.04, -1.8), new THREE.Vector3(1.62, STUDIO_FLOOR_Y + 0.04, 1.44)],
+    [new THREE.Vector3(-1.62, STUDIO_FLOOR_Y + 0.04, 1.44), new THREE.Vector3(1.62, STUDIO_FLOOR_Y + 0.04, -1.8)],
+    [new THREE.Vector3(-2.05, -0.18, -1.56), new THREE.Vector3(2.05, -0.18, -1.56)],
+    [new THREE.Vector3(0, -1.12, -1.56), new THREE.Vector3(0, 1.24, -1.56)],
   ];
   for (const [from, to] of lines) {
     const geometry = new THREE.BufferGeometry().setFromPoints([from, to]);
@@ -726,60 +836,197 @@ function createThreeGuideGroup(): THREE.Group {
   return group;
 }
 
+interface ReliefDepthData {
+  data: Float32Array;
+  size: number;
+}
+
+function createReliefDepthData(image: HTMLImageElement): ReliefDepthData {
+  const size = RELIEF_PREVIEW_TEXTURE_SIZE;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) throw new Error("无法创建深度预览画布");
+  context.drawImage(image, 0, 0, size, size);
+  const imageData = context.getImageData(0, 0, size, size);
+  const pixels = imageData.data;
+  const depthData = new Float32Array(size * size);
+  const luminanceAt = (x: number, y: number): number => {
+    const clampedX = Math.min(size - 1, Math.max(0, x));
+    const clampedY = Math.min(size - 1, Math.max(0, y));
+    const index = (clampedY * size + clampedX) * 4;
+    return (pixels[index] * 0.299 + pixels[index + 1] * 0.587 + pixels[index + 2] * 0.114) / 255;
+  };
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const index = (y * size + x) * 4;
+      const red = pixels[index] / 255;
+      const green = pixels[index + 1] / 255;
+      const blue = pixels[index + 2] / 255;
+      const max = Math.max(red, green, blue);
+      const min = Math.min(red, green, blue);
+      const luminance = luminanceAt(x, y);
+      const saturation = max === 0 ? 0 : (max - min) / max;
+      const edge = Math.min(1, Math.abs(luminanceAt(x + 1, y) - luminanceAt(x - 1, y)) * 2.8 + Math.abs(luminanceAt(x, y + 1) - luminanceAt(x, y - 1)) * 2.8);
+      const nx = x / (size - 1) - 0.5;
+      const ny = y / (size - 1) - 0.5;
+      const centerWeight = Math.max(0, 1 - Math.sqrt(nx * nx + ny * ny) * 1.65);
+      const subjectWeight = Math.max(0, 1 - luminance) * 0.36 + saturation * 0.46 + edge * 0.48 + centerWeight * 0.22;
+      depthData[y * size + x] = smoothstep(0.18, 0.86, subjectWeight);
+    }
+  }
+  blurDepthData(depthData, size);
+  return { data: depthData, size };
+}
+
+function createDepthTexture(depth: ReliefDepthData): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = depth.size;
+  canvas.height = depth.size;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("无法创建深度纹理");
+  const imageData = context.createImageData(depth.size, depth.size);
+  for (let index = 0; index < depth.data.length; index += 1) {
+    const value = Math.round(depth.data[index] * 255);
+    const pixelIndex = index * 4;
+    imageData.data[pixelIndex] = value;
+    imageData.data[pixelIndex + 1] = value;
+    imageData.data[pixelIndex + 2] = value;
+    imageData.data[pixelIndex + 3] = 255;
+  }
+  context.putImageData(imageData, 0, 0);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.NoColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function applyReliefDepthToGeometry(geometry: THREE.PlaneGeometry, depth: ReliefDepthData, strength: number): void {
+  const positions = geometry.attributes.position;
+  for (let index = 0; index < positions.count; index += 1) {
+    const x = positions.getX(index);
+    const y = positions.getY(index);
+    const u = geometry.parameters.width === 0 ? 0.5 : x / geometry.parameters.width + 0.5;
+    const v = geometry.parameters.height === 0 ? 0.5 : 0.5 - y / geometry.parameters.height;
+    const depthValue = sampleDepth(depth, u, v);
+    const edgeFalloff = Math.min(1, Math.max(0, Math.min(u, 1 - u, v, 1 - v) * 10));
+    positions.setZ(index, depthValue * strength * edgeFalloff);
+  }
+  positions.needsUpdate = true;
+  geometry.computeVertexNormals();
+}
+
+function sampleDepth(depth: ReliefDepthData, u: number, v: number): number {
+  const x = Math.min(depth.size - 1, Math.max(0, Math.round(u * (depth.size - 1))));
+  const y = Math.min(depth.size - 1, Math.max(0, Math.round(v * (depth.size - 1))));
+  return depth.data[y * depth.size + x] ?? 0;
+}
+
+function blurDepthData(data: Float32Array, size: number): void {
+  const copy = new Float32Array(data);
+  for (let y = 1; y < size - 1; y += 1) {
+    for (let x = 1; x < size - 1; x += 1) {
+      const index = y * size + x;
+      data[index] = (
+        copy[index] * 4
+        + copy[index - 1]
+        + copy[index + 1]
+        + copy[index - size]
+        + copy[index + size]
+      ) / 8;
+    }
+  }
+}
+
+function smoothstep(edge0: number, edge1: number, value: number): number {
+  const ratio = clampRatio((value - edge0) / (edge1 - edge0));
+  return ratio * ratio * (3 - 2 * ratio);
+}
+
 function applyThreeCardState(
   sceneHandle: ThreeCardScene,
   operation: "angle" | "lighting",
   angleVisual: AngleVisualState | undefined,
   lightingState: LightingAdjustmentState,
 ): void {
+  const render = () => sceneHandle.renderer.render(sceneHandle.scene, sceneHandle.camera);
   if (operation === "angle" && angleVisual) {
-    sceneHandle.cardGroup.rotation.set(
-      THREE.MathUtils.degToRad(angleVisual.tilt),
-      THREE.MathUtils.degToRad(angleVisual.yaw),
-      0,
-    );
-    sceneHandle.cardGroup.scale.setScalar(angleVisual.scale * 1.18);
-    sceneHandle.cardGroup.position.set(0, -0.04, 0);
+    gsap.to(sceneHandle.cardGroup.rotation, {
+      duration: 0.24,
+      ease: "power2.out",
+      onUpdate: render,
+      overwrite: "auto",
+      x: THREE.MathUtils.degToRad(angleVisual.tilt),
+      y: THREE.MathUtils.degToRad(angleVisual.yaw),
+      z: 0,
+    });
+    gsap.to(sceneHandle.cardGroup.scale, {
+      duration: 0.24,
+      ease: "power2.out",
+      onUpdate: render,
+      overwrite: "auto",
+      x: angleVisual.scale * 1.18,
+      y: angleVisual.scale * 1.18,
+      z: angleVisual.scale * 1.18,
+    });
+    gsap.to(sceneHandle.cardGroup.position, {
+      duration: 0.24,
+      ease: "power2.out",
+      onUpdate: render,
+      overwrite: "auto",
+      x: 0,
+      y: -0.08,
+      z: -0.22,
+    });
     sceneHandle.guideGroup.visible = true;
-    sceneHandle.guideGroup.scale.setScalar(1);
-    sceneHandle.guideGroup.rotation.set(0, 0, 0);
-    sceneHandle.ambientLight.intensity = 1.38;
+    gsap.to(sceneHandle.guideGroup.scale, { duration: 0.24, ease: "power2.out", onUpdate: render, overwrite: "auto", x: 1, y: 1, z: 1 });
+    gsap.to(sceneHandle.guideGroup.rotation, { duration: 0.24, ease: "power2.out", onUpdate: render, overwrite: "auto", x: 0, y: 0, z: 0 });
+    gsap.to(sceneHandle.ambientLight, { duration: 0.22, ease: "power2.out", intensity: 1.38, onUpdate: render, overwrite: "auto" });
     sceneHandle.keyLight.color.set(0xffffff);
-    sceneHandle.keyLight.intensity = 2.1;
-    sceneHandle.keyLight.position.set(2.6, 2.2, 3.2);
-    sceneHandle.rimLight.intensity = 0.45;
+    gsap.to(sceneHandle.keyLight, { duration: 0.22, ease: "power2.out", intensity: 2.1, onUpdate: render, overwrite: "auto" });
+    gsap.to(sceneHandle.keyLight.position, { duration: 0.24, ease: "power2.out", onUpdate: render, overwrite: "auto", x: 2.6, y: 2.2, z: 3.2 });
+    gsap.to(sceneHandle.rimLight, { duration: 0.22, ease: "power2.out", intensity: 0.45, onUpdate: render, overwrite: "auto" });
     sceneHandle.lightBeam.visible = false;
     sceneHandle.lightHalo.visible = false;
     sceneHandle.lightMarker.visible = false;
   } else {
     const lightPosition = threeLightPosition(lightingState);
     const color = threeTemperatureColor(lightingState.temperature);
-    sceneHandle.cardGroup.rotation.set(
-      THREE.MathUtils.degToRad(-8 + lightingState.height * LIGHT_HEIGHT_TILT_FACTOR),
-      THREE.MathUtils.degToRad(24),
-      0,
-    );
-    sceneHandle.cardGroup.scale.setScalar(0.96);
-    sceneHandle.cardGroup.position.set(0, -0.06, 0);
+    gsap.to(sceneHandle.cardGroup.rotation, {
+      duration: 0.28,
+      ease: "power2.out",
+      onUpdate: render,
+      overwrite: "auto",
+      x: THREE.MathUtils.degToRad(-8 + lightingState.height * LIGHT_HEIGHT_TILT_FACTOR),
+      y: THREE.MathUtils.degToRad(24),
+      z: 0,
+    });
+    gsap.to(sceneHandle.cardGroup.scale, { duration: 0.28, ease: "power2.out", onUpdate: render, overwrite: "auto", x: 0.96, y: 0.96, z: 0.96 });
+    gsap.to(sceneHandle.cardGroup.position, { duration: 0.28, ease: "power2.out", onUpdate: render, overwrite: "auto", x: 0, y: -0.08, z: -0.22 });
     sceneHandle.guideGroup.visible = true;
-    sceneHandle.guideGroup.scale.setScalar(1.03);
-    sceneHandle.guideGroup.rotation.set(0, THREE.MathUtils.degToRad(6), 0);
-    sceneHandle.ambientLight.intensity = 0.88;
+    gsap.to(sceneHandle.guideGroup.scale, { duration: 0.28, ease: "power2.out", onUpdate: render, overwrite: "auto", x: 1.03, y: 1.03, z: 1.03 });
+    gsap.to(sceneHandle.guideGroup.rotation, { duration: 0.28, ease: "power2.out", onUpdate: render, overwrite: "auto", x: 0, y: THREE.MathUtils.degToRad(6), z: 0 });
+    gsap.to(sceneHandle.ambientLight, { duration: 0.2, ease: "power2.out", intensity: 0.88, onUpdate: render, overwrite: "auto" });
     sceneHandle.keyLight.color.copy(color);
-    sceneHandle.keyLight.intensity = 1.55 + lightingState.intensity / 24;
-    sceneHandle.keyLight.position.copy(lightPosition);
-    sceneHandle.rimLight.intensity = lightingState.rimLight ? 0.75 : 0.18;
+    gsap.to(sceneHandle.keyLight, { duration: 0.2, ease: "power2.out", intensity: 1.55 + lightingState.intensity / 24, onUpdate: render, overwrite: "auto" });
+    gsap.to(sceneHandle.keyLight.position, { duration: 0.26, ease: "power2.out", onUpdate: render, overwrite: "auto", x: lightPosition.x, y: lightPosition.y, z: lightPosition.z });
+    gsap.to(sceneHandle.rimLight, { duration: 0.22, ease: "power2.out", intensity: lightingState.rimLight ? 0.75 : 0.18, onUpdate: render, overwrite: "auto" });
     updateThreeLightBeam(sceneHandle.lightBeam, lightPosition, color, lightingState.intensity);
     sceneHandle.lightHalo.visible = true;
-    sceneHandle.lightHalo.position.copy(lightPosition.clone().multiplyScalar(0.78));
-    sceneHandle.lightHalo.scale.setScalar(0.72 + lightingState.intensity / 115);
+    const haloPosition = lightPosition.clone().multiplyScalar(0.78);
+    gsap.to(sceneHandle.lightHalo.position, { duration: 0.26, ease: "power2.out", onUpdate: render, overwrite: "auto", x: haloPosition.x, y: haloPosition.y, z: haloPosition.z });
+    const haloScale = 0.72 + lightingState.intensity / 115;
+    gsap.to(sceneHandle.lightHalo.scale, { duration: 0.22, ease: "power2.out", onUpdate: render, overwrite: "auto", x: haloScale, y: haloScale, z: haloScale });
     const haloMaterial = sceneHandle.lightHalo.material;
     if (haloMaterial instanceof THREE.MeshBasicMaterial) {
       haloMaterial.color.copy(color);
       haloMaterial.opacity = 0.16 + lightingState.intensity / 420;
     }
     sceneHandle.lightMarker.visible = true;
-    sceneHandle.lightMarker.position.copy(lightPosition.clone().multiplyScalar(0.78));
+    gsap.to(sceneHandle.lightMarker.position, { duration: 0.26, ease: "power2.out", onUpdate: render, overwrite: "auto", x: haloPosition.x, y: haloPosition.y, z: haloPosition.z });
     const markerMaterial = sceneHandle.lightMarker.material;
     if (markerMaterial instanceof THREE.MeshBasicMaterial) markerMaterial.color.copy(color);
   }
@@ -787,17 +1034,17 @@ function applyThreeCardState(
 }
 
 function updateThreeLightBeam(mesh: THREE.Mesh, lightPosition: THREE.Vector3, color: THREE.Color, intensity: number): void {
-  const target = new THREE.Vector3(0, 0, 0);
-  const midpoint = lightPosition.clone().multiplyScalar(0.5);
-  const distance = lightPosition.distanceTo(target);
+  const direction = THREE_LIGHT_DIRECTION.copy(lightPosition).sub(THREE_LIGHT_TARGET);
+  const distance = direction.length();
+  const midpoint = THREE_LIGHT_MIDPOINT.copy(THREE_LIGHT_TARGET).addScaledVector(direction, 0.48);
   mesh.visible = true;
   mesh.position.copy(midpoint);
-  mesh.scale.set(0.55 + intensity / 140, distance, 0.55 + intensity / 140);
-  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), lightPosition.clone().normalize());
+  mesh.scale.set(0.22 + intensity / 360, distance * 0.72, 0.22 + intensity / 360);
+  mesh.quaternion.setFromUnitVectors(THREE_UP_VECTOR, direction.normalize());
   const material = mesh.material;
   if (material instanceof THREE.MeshBasicMaterial) {
     material.color.copy(color);
-    material.opacity = 0.08 + intensity / 560;
+    material.opacity = 0.035 + intensity / 1600;
   }
 }
 
@@ -876,7 +1123,7 @@ function LightingCompassMap({
     onChange({
       ...state,
       direction: directionFromPreviewPoint(x, y),
-      height: clampNumber((50 - y) * 2, -100, 100),
+      height: clampInt((50 - y) * 2, -100, 100),
     });
   };
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
@@ -922,7 +1169,11 @@ function LightingCompassMap({
 }
 
 function clampNumber(value: number, min: number, max: number): number {
-  return Math.round(Math.min(max, Math.max(min, value)));
+  return Math.min(max, Math.max(min, value));
+}
+
+function clampInt(value: number, min: number, max: number): number {
+  return Math.round(clampNumber(value, min, max));
 }
 
 function clampRatio(value: number): number {
@@ -938,7 +1189,7 @@ function orbitPointFromRotation(rotation: number): { x: number; y: number } {
 }
 
 function rotationFromOrbitPoint(x: number, y: number): number {
-  return clampNumber(Math.atan2(x - 50, y - 50) * 180 / Math.PI, -180, 180);
+  return clampInt(Math.atan2(x - 50, y - 50) * 180 / Math.PI, -180, 180);
 }
 
 function directionFromPreviewPoint(x: number, y: number): LightingAdjustmentState["direction"] {
@@ -972,7 +1223,9 @@ function AngleControls({
       <label className="imagine-visual-adjust-toggle-row flex items-center justify-between rounded-xl border px-4 py-3 text-sm">
         <span className="font-medium">广角镜头</span>
         <input
+          aria-label="广角镜头"
           className="accent-blue-500"
+          name="visual-adjust-wide-angle"
           type="checkbox"
           checked={state.wideAngle}
           onChange={event => onChange({ ...state, wideAngle: event.target.checked })}
@@ -1011,7 +1264,9 @@ function LightingControls({
       <label className="imagine-visual-adjust-toggle-row flex items-center justify-between rounded-xl border px-4 py-3 text-sm">
         <span className="font-medium">轮廓光</span>
         <input
+          aria-label="轮廓光"
           className="accent-blue-500"
+          name="visual-adjust-rim-light"
           type="checkbox"
           checked={state.rimLight}
           onChange={event => onChange({ ...state, rimLight: event.target.checked })}
@@ -1045,7 +1300,9 @@ function RangeControl({
         <span className="imagine-visual-adjust-range-value font-mono text-xs">{value}{suffix}</span>
       </span>
       <input
+        aria-label={label}
         className="accent-blue-500"
+        name={`visual-adjust-${label}`}
         type="range"
         min={min}
         max={max}
@@ -1130,45 +1387,6 @@ function renderLightingGuide(size: CanvasSize, state: LightingAdjustmentState): 
   return canvas.toDataURL("image/png");
 }
 
-function lightingVisualState(state: LightingAdjustmentState): LightingVisualState {
-  const point = lightStagePoint(state);
-  const color = colorStop(state.temperature, 1);
-  const opacity = LIGHT_VISUAL_BASE_OPACITY + state.intensity / LIGHT_VISUAL_OPACITY_DIVISOR;
-  const beamAngle = Math.atan2(50 - point.y, 50 - point.x) * 180 / Math.PI;
-  const beamWidth = LIGHT_BEAM_BASE_WIDTH + state.intensity * LIGHT_BEAM_WIDTH_FACTOR;
-  const orbSize = LIGHT_ORB_BASE_SIZE + state.intensity * LIGHT_ORB_SIZE_FACTOR;
-  return {
-    beamStyle: {
-      background: `linear-gradient(90deg, ${colorStop(state.temperature, opacity)} 0%, ${colorStop(state.temperature, opacity * 0.5)} 38%, rgba(255,255,255,0.04) 72%, transparent 100%)`,
-      clipPath: "polygon(0% 42%, 100% 0%, 100% 100%, 0% 58%)",
-      height: "24%",
-      left: `${point.x}%`,
-      opacity: state.direction === "back" ? LIGHT_BEAM_BACK_OPACITY : LIGHT_BEAM_VISIBLE_OPACITY,
-      top: `${point.y}%`,
-      transform: `translate(0, -50%) rotate(${beamAngle}deg)`,
-      transformOrigin: "0% 50%",
-      width: `${beamWidth}%`,
-    },
-    domeStyle: {
-      background: `radial-gradient(circle at ${point.x}% ${point.y}%, ${colorStop(state.temperature, LIGHT_DOME_CORE_ALPHA)} 0%, ${colorStop(state.temperature, LIGHT_DOME_EDGE_ALPHA)} 24%, transparent 58%)`,
-    },
-    markerStyle: {
-      left: `${point.x}%`,
-      top: `${point.y}%`,
-      transform: "translate(-50%, -50%)",
-    },
-    orbStyle: {
-      background: `radial-gradient(circle, ${color} 0%, ${colorStop(state.temperature, LIGHT_ORB_MID_ALPHA)} 28%, transparent 70%)`,
-      height: `${orbSize}%`,
-      left: `${point.x}%`,
-      opacity: state.direction === "back" ? LIGHT_ORB_BACK_OPACITY : LIGHT_ORB_VISIBLE_OPACITY,
-      top: `${point.y}%`,
-      transform: "translate(-50%, -50%)",
-      width: `${orbSize}%`,
-    },
-  };
-}
-
 function lightPoint(size: CanvasSize, state: LightingAdjustmentState): { x: number; y: number } {
   const yBase = resolveHeightBase(state.height, 18, 82, 50);
   const points: Record<LightingAdjustmentState["direction"], { x: number; y: number }> = {
@@ -1198,21 +1416,18 @@ function lightStagePoint(state: LightingAdjustmentState): { x: number; y: number
 
 function threeLightPosition(state: LightingAdjustmentState): THREE.Vector3 {
   const height = state.height / 42;
-  const positions: Record<LightingAdjustmentState["direction"], THREE.Vector3> = {
-    back: new THREE.Vector3(0, 1.5 + height, -3.4),
-    bottom: new THREE.Vector3(0, -2.7, 1.4),
-    front: new THREE.Vector3(0, 1.2 + height, 3.5),
-    left: new THREE.Vector3(-3.3, 1.1 + height, 1.9),
-    right: new THREE.Vector3(3.3, 1.1 + height, 1.9),
-    top: new THREE.Vector3(0, 3.2, 1.6),
-  };
-  return positions[state.direction];
+  if (state.direction === "back") return THREE_LIGHT_POSITION.set(0, 1.5 + height, -3.4);
+  if (state.direction === "bottom") return THREE_LIGHT_POSITION.set(0, -2.7, 1.4);
+  if (state.direction === "left") return THREE_LIGHT_POSITION.set(-3.3, 1.1 + height, 1.9);
+  if (state.direction === "right") return THREE_LIGHT_POSITION.set(3.3, 1.1 + height, 1.9);
+  if (state.direction === "top") return THREE_LIGHT_POSITION.set(0, 3.2, 1.6);
+  return THREE_LIGHT_POSITION.set(0, 1.2 + height, 3.5);
 }
 
 function threeTemperatureColor(temperature: number): THREE.Color {
-  if (temperature >= LIGHT_TEMPERATURE_COOL_THRESHOLD) return new THREE.Color(0xbfdcff);
-  if (temperature <= LIGHT_TEMPERATURE_WARM_THRESHOLD) return new THREE.Color(0xffbf7a);
-  return new THREE.Color(0xffffff);
+  if (temperature >= LIGHT_TEMPERATURE_COOL_THRESHOLD) return THREE_COOL_LIGHT_COLOR;
+  if (temperature <= LIGHT_TEMPERATURE_WARM_THRESHOLD) return THREE_WARM_LIGHT_COLOR;
+  return THREE_NEUTRAL_LIGHT_COLOR;
 }
 
 function resolveHeightBase(height: number, high: number, low: number, middle: number): number {
