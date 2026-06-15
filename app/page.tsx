@@ -1711,7 +1711,6 @@ export default function Home() {
       onImageQuickEdit={handleImageQuickEdit}
       onAddToLibrary={handleAddItemToLibrary}
       onOpenFullscreen={handleOpenFullscreen}
-      onOpenLibrary={() => openAssetLibrary("manage")}
       onOpenPanorama={handleOpenPanorama}
       onPromoteOriginal={promoteItemToOriginal}
       onResetCompare={() => {
@@ -1909,6 +1908,7 @@ export default function Home() {
 
       <WorkspaceHeader
         onClearProject={handleClearProject}
+        onOpenAssetLibrary={() => openAssetLibrary("manage")}
         onOpenSettings={() => setShowSettings(prev => !prev)}
         onRunResolveCheck={() => void runResolveCheck()}
         resolveCheckStatus={resolveCheckStatus}

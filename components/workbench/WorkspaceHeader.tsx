@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Grid2X2, Moon, Plug, Settings, Sun, Trash2 } from "lucide-react";
+import { FolderHeart, Grid2X2, Moon, Plug, Settings, Sun, Trash2 } from "lucide-react";
 import WorkspaceTopBarBrand from "@/components/workbench/WorkspaceTopBarBrand";
 import WorkspaceTopBar, {
   workspaceTopBarButtonClass,
@@ -13,6 +13,7 @@ export type { ThemeMode };
 
 interface WorkspaceHeaderProps {
   onClearProject: () => void;
+  onOpenAssetLibrary: () => void;
   onOpenSettings: () => void;
   onRunResolveCheck: () => void;
   resolveCheckStatus: "idle" | "running";
@@ -21,6 +22,7 @@ interface WorkspaceHeaderProps {
 
 export default function WorkspaceHeader({
   onClearProject,
+  onOpenAssetLibrary,
   onOpenSettings,
   onRunResolveCheck,
   resolveCheckStatus,
@@ -40,6 +42,11 @@ export default function WorkspaceHeader({
             <Grid2X2 className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">画板</span>
           </Link>
+
+          <button type="button" onClick={onOpenAssetLibrary} className={`${workspaceTopBarButtonClass} cursor-pointer`}>
+            <FolderHeart className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">素材库</span>
+          </button>
 
           {showResolveCheck ? (
             <button
