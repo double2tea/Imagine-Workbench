@@ -35,23 +35,30 @@ import {
   hasAssetBlobPayload,
   hydrateAsset,
   hydrateAssets,
+  listLibraryAssetRecords,
   listAllAssetMetas,
   listBoardScopedAssetMetas,
+  saveLibraryAssetRecord,
   saveToDB,
   type AssetDatabaseDiagnostics,
   type GenerationReferenceMediaSnapshot,
   type GenerationRequestSnapshot,
+  type LibraryAssetCategory,
+  type LibraryAssetMediaType,
+  type LibraryAssetOrigin,
+  type LibraryAssetRecord,
   type StorageItem,
   type StorageItemMeta,
 } from "@/lib/db";
 import { isMediaReferenceType, mediaReferenceTypeFromDataUri, mediaReferenceTypeFromMime } from "@/lib/media-references";
 import { compressReferenceImageFile } from "@/lib/reference-images";
 
-export const WORKSPACE_BACKUP_SCHEMA_VERSION = 1;
+export const WORKSPACE_BACKUP_SCHEMA_VERSION = 2;
 
 const BACKUP_APP_NAME = "Imagine Workbench";
 const MANIFEST_FILE = "manifest.json";
 const ASSET_INDEX_FILE = "assets/index.json";
+const LIBRARY_INDEX_FILE = "library/index.json";
 const BOARD_INDEX_FILE = "boards/index.json";
 const SETTINGS_FILE = "settings/local-storage.json";
 const MAX_BACKUP_FILE_COUNT = 10000;
@@ -126,14 +133,16 @@ export type WorkspaceSafetySnapshotReason =
 
 export interface WorkspaceBackupManifest {
   app: typeof BACKUP_APP_NAME;
-  schemaVersion: typeof WORKSPACE_BACKUP_SCHEMA_VERSION;
+  schemaVersion: number;
   exportedAt: string;
   assetsFile: typeof ASSET_INDEX_FILE;
+  libraryFile?: typeof LIBRARY_INDEX_FILE;
   boardsFile: typeof BOARD_INDEX_FILE;
   settingsFile?: typeof SETTINGS_FILE;
   counts: {
     assets: number;
     boards: number;
+    libraryAssets?: number;
     settingsKeys: number;
   };
 }
@@ -142,6 +151,7 @@ export interface WorkspaceExportResult {
   assetCount: number;
   boardCount: number;
   fileName: string;
+  libraryAssetCount: number;
   settingsKeyCount: number;
 }
 
@@ -151,6 +161,7 @@ export interface WorkspaceSafetySnapshotSummary {
   createdAt: string;
   fileName: string;
   id: string;
+  libraryAssetCount: number;
   origin: string;
   reason: WorkspaceSafetySnapshotReason;
   settingsKeyCount: number;
@@ -163,6 +174,7 @@ export interface WorkspaceImportPreview {
   exportedAt: string;
   includesCredentials: boolean;
   includesMediaFiles: boolean;
+  libraryAssetCount: number;
   schemaVersion: number;
   settingsKeyCount: number;
 }
@@ -170,6 +182,7 @@ export interface WorkspaceImportPreview {
 export interface WorkspaceImportResult {
   assetCount: number;
   boardCount: number;
+  libraryAssetCount: number;
   settingsKeyCount: number;
 }
 
@@ -268,6 +281,7 @@ interface WorkspaceBackupSettings {
 interface ParsedBackup {
   assets: StorageItem[];
   boards: BoardDocument[];
+  libraryAssets: LibraryAssetRecord[];
   settings: WorkspaceBackupSettings;
 }
 
@@ -289,10 +303,18 @@ export async function getWorkspaceDataSummary(items: StorageItem[] = []): Promis
   const assetMetas: StorageItemMeta[] = items.length > 0 ? items : await listAllAssetMetas();
   const boards = await listBoardsFromDB();
   const boardAssetIds = collectBoardAssetIds(boards);
+  const libraryAssetIds = new Set((await listLibraryAssetRecords()).map(record => record.assetId));
+  const protectedAssetIds = new Set([...boardAssetIds, ...libraryAssetIds]);
   const assetIds = new Set(assetMetas.map(item => item.id));
   const stores = await getAssetDatabaseDiagnostics();
   const latestSnapshot = await getLatestWorkspaceSafetySnapshotSummary();
-  const integrity = await buildWorkspaceIntegrityDiagnosticsWithPayloads(assetMetas, boards);
+  const integrity = await buildWorkspaceIntegrityDiagnosticsWithPayloads(
+    assetMetas,
+    boards,
+    Date.now(),
+    hasAssetBlobPayload,
+    protectedAssetIds,
+  );
   const largest = assetMetas
     .map(item => ({ id: item.id, label: item.prompt || item.model || item.id, bytes: estimateStorageRecordBytes(item) }))
     .sort((left, right) => right.bytes - left.bytes)
@@ -310,7 +332,7 @@ export async function getWorkspaceDataSummary(items: StorageItem[] = []): Promis
       image: assetMetas.filter(item => item.type === "image").length,
       largest,
       missingBoardReferences: Array.from(boardAssetIds).filter(assetId => !assetIds.has(assetId)).length,
-      orphaned: findOrphanAssetIds(assetMetas, boardAssetIds).length,
+      orphaned: findOrphanAssetIds(assetMetas, protectedAssetIds).length,
       pending: assetMetas.filter(item => item.status === "pending").length,
       processing: assetMetas.filter(item => item.status === "processing").length,
       referencedByBoards: boardAssetIds.size,
@@ -378,18 +400,23 @@ export async function previewWorkspaceBackup(file: File): Promise<WorkspaceImpor
   validateZipFileCount(zip);
   const manifest = parseManifest(await readRequiredZipText(zip, MANIFEST_FILE));
   const assetRecords = parseAssetRecords(await readRequiredZipText(zip, manifest.assetsFile));
+  const libraryRecords = manifest.libraryFile
+    ? parseLibraryAssetRecords(await readRequiredZipText(zip, manifest.libraryFile))
+    : [];
   const boards = parseBoardDocuments(await readRequiredZipText(zip, manifest.boardsFile));
   const settings = manifest.settingsFile
     ? parseSettings(await readRequiredZipText(zip, manifest.settingsFile))
     : { localStorage: {} };
 
   validateBoardAssetReferences(boards, new Set(assetRecords.map(asset => asset.id)));
+  validateLibraryAssetReferences(libraryRecords, new Set(assetRecords.map(asset => asset.id)));
   return {
     assetCount: assetRecords.length,
     boardCount: boards.length,
     exportedAt: manifest.exportedAt,
     includesCredentials: Object.keys(settings.localStorage).some(isProviderCredentialKey),
     includesMediaFiles: assetRecords.some(asset => Boolean(asset.mediaFile)),
+    libraryAssetCount: libraryRecords.length,
     schemaVersion: manifest.schemaVersion,
     settingsKeyCount: Object.keys(settings.localStorage).length,
   };
@@ -411,11 +438,15 @@ export async function importWorkspaceBackup(
   for (const board of parsed.boards) {
     await saveBoardToDB(board);
   }
+  for (const record of parsed.libraryAssets) {
+    await saveLibraryAssetRecord(record);
+  }
   writeManagedLocalStorage(parsed.settings.localStorage, includeCredentials);
 
   return {
     assetCount: parsed.assets.length,
     boardCount: parsed.boards.length,
+    libraryAssetCount: parsed.libraryAssets.length,
     settingsKeyCount: Object.keys(parsed.settings.localStorage).filter(key =>
       includeCredentials || !isProviderCredentialKey(key),
     ).length,
@@ -431,7 +462,9 @@ export async function resetBoardsToDefault(): Promise<void> {
 export async function cleanupWorkspaceAssets(kind: WorkspaceCleanupKind): Promise<WorkspaceCleanupResult> {
   const assets = await listAllAssetMetas();
   const boardAssetIds = collectBoardAssetIds(await listBoardsFromDB());
-  const ids = await cleanupTargetIds(kind, assets, boardAssetIds);
+  const libraryAssetIds = new Set((await listLibraryAssetRecords()).map(record => record.assetId));
+  const protectedAssetIds = new Set([...boardAssetIds, ...libraryAssetIds]);
+  const ids = await cleanupTargetIds(kind, assets, protectedAssetIds);
   if (ids.length > 0) {
     await createWorkspaceSafetySnapshot("cleanup-assets");
   }
@@ -489,6 +522,7 @@ export async function createWorkspaceSafetySnapshot(
     createdAt: archive.exportedAt,
     fileName: archive.fileName,
     id: LATEST_SAFETY_SNAPSHOT_ID,
+    libraryAssetCount: archive.libraryAssetCount,
     origin: currentWorkspaceOrigin(),
     reason,
     settingsKeyCount: archive.settingsKeyCount,
@@ -535,9 +569,9 @@ export async function createLocalUploadAsset(
   );
 }
 
-export function findOrphanAssetIds(items: StorageItemMeta[], boardAssetIds: ReadonlySet<string>): string[] {
+export function findOrphanAssetIds(items: StorageItemMeta[], protectedAssetIds: ReadonlySet<string>): string[] {
   return items
-    .filter(item => item.status === "complete" && !boardAssetIds.has(item.id))
+    .filter(item => item.status === "complete" && !protectedAssetIds.has(item.id))
     .map(item => item.id);
 }
 
@@ -569,12 +603,12 @@ export function formatBytes(bytes: number): string {
 async function cleanupTargetIds(
   kind: WorkspaceCleanupKind,
   assets: StorageItemMeta[],
-  boardAssetIds: ReadonlySet<string>,
+  protectedAssetIds: ReadonlySet<string>,
 ): Promise<string[]> {
   if (kind === "failed") return assets.filter(item => item.status === "failed").map(item => item.id);
   if (kind === "stale-processing") return findStaleProcessingAssetIds(assets);
   if (kind === "broken-complete") return findBrokenCompleteAssetIdsWithPayloads(assets);
-  return findOrphanAssetIds(assets, boardAssetIds);
+  return findOrphanAssetIds(assets, protectedAssetIds);
 }
 
 function findStaleProcessingAssetIds(items: StorageItemMeta[], now = Date.now()): string[] {
@@ -645,6 +679,7 @@ export function buildWorkspaceIntegrityDiagnostics(
   assets: StorageItemMeta[],
   boards: BoardDocument[],
   now = Date.now(),
+  protectedAssetIds?: ReadonlySet<string>,
 ): WorkspaceIntegrityDiagnostics {
   const assetIds = new Set(assets.map(item => item.id));
   const boardAssetIds = collectBoardAssetIds(boards);
@@ -662,7 +697,7 @@ export function buildWorkspaceIntegrityDiagnostics(
     }));
   const brokenCompleteAssetIds = findBrokenCompleteAssetIds(assets);
   const failedAssetIds = assets.filter(item => item.status === "failed").map(item => item.id);
-  const orphanedAssetIds = findOrphanAssetIds(assets, boardAssetIds);
+  const orphanedAssetIds = findOrphanAssetIds(assets, protectedAssetIds ?? boardAssetIds);
   const staleProcessingAssetIds = findStaleProcessingAssetIds(assets, now);
   const issueCount = workspaceIntegrityIssueCount({
     brokenCompleteAssetIds,
@@ -689,8 +724,9 @@ export async function buildWorkspaceIntegrityDiagnosticsWithPayloads(
   boards: BoardDocument[],
   now = Date.now(),
   assetBlobPayloadExists: AssetBlobPayloadExists = hasAssetBlobPayload,
+  protectedAssetIds?: ReadonlySet<string>,
 ): Promise<WorkspaceIntegrityDiagnostics> {
-  const diagnostics = buildWorkspaceIntegrityDiagnostics(assets, boards, now);
+  const diagnostics = buildWorkspaceIntegrityDiagnostics(assets, boards, now, protectedAssetIds);
   const brokenCompleteAssetIds = await findBrokenCompleteAssetIdsWithPayloads(assets, assetBlobPayloadExists);
   const issueCount = workspaceIntegrityIssueCount({ ...diagnostics, brokenCompleteAssetIds });
   return {
@@ -734,6 +770,7 @@ async function exportWorkspaceBackup(input: {
     assetCount: archive.assetCount,
     boardCount: archive.boardCount,
     fileName: archive.fileName,
+    libraryAssetCount: archive.libraryAssetCount,
     settingsKeyCount: archive.settingsKeyCount,
   };
 }
@@ -750,6 +787,9 @@ async function createWorkspaceBackupArchive(input: {
   for (const asset of input.assets) {
     assetRecords.push(addAssetToZip(zip, asset));
   }
+  const exportedAssetIds = new Set(input.assets.map(asset => asset.id));
+  const libraryRecords = (await listLibraryAssetRecords())
+    .filter(record => exportedAssetIds.has(record.assetId));
 
   const settings = input.includeSettings
     ? { localStorage: readManagedLocalStorage(input.includeCredentials) }
@@ -760,17 +800,20 @@ async function createWorkspaceBackupArchive(input: {
     schemaVersion: WORKSPACE_BACKUP_SCHEMA_VERSION,
     exportedAt,
     assetsFile: ASSET_INDEX_FILE,
+    libraryFile: LIBRARY_INDEX_FILE,
     boardsFile: BOARD_INDEX_FILE,
     settingsFile: input.includeSettings ? SETTINGS_FILE : undefined,
     counts: {
       assets: assetRecords.length,
       boards: input.boards.length,
+      libraryAssets: libraryRecords.length,
       settingsKeys: Object.keys(settings.localStorage).length,
     },
   };
 
   zip.file(MANIFEST_FILE, JSON.stringify(manifest, null, 2));
   zip.file(ASSET_INDEX_FILE, JSON.stringify(assetRecords, null, 2));
+  zip.file(LIBRARY_INDEX_FILE, JSON.stringify(libraryRecords, null, 2));
   zip.file(BOARD_INDEX_FILE, JSON.stringify(input.boards, null, 2));
   if (input.includeSettings) zip.file(SETTINGS_FILE, JSON.stringify(settings, null, 2));
 
@@ -782,6 +825,7 @@ async function createWorkspaceBackupArchive(input: {
     boardCount: input.boards.length,
     exportedAt,
     fileName,
+    libraryAssetCount: libraryRecords.length,
     settingsKeyCount: Object.keys(settings.localStorage).length,
   };
 }
@@ -807,6 +851,9 @@ async function parseWorkspaceBackup(file: File): Promise<ParsedBackup> {
   validateZipFileCount(zip);
   const manifest = parseManifest(await readRequiredZipText(zip, MANIFEST_FILE));
   const assetRecords = parseAssetRecords(await readRequiredZipText(zip, manifest.assetsFile));
+  const libraryRecords = manifest.libraryFile
+    ? parseLibraryAssetRecords(await readRequiredZipText(zip, manifest.libraryFile))
+    : [];
   const boards = parseBoardDocuments(await readRequiredZipText(zip, manifest.boardsFile));
   const settings = manifest.settingsFile
     ? parseSettings(await readRequiredZipText(zip, manifest.settingsFile))
@@ -815,9 +862,11 @@ async function parseWorkspaceBackup(file: File): Promise<ParsedBackup> {
 
   if (manifest.counts.assets !== assets.length) throw new Error("备份资产数量与 manifest 不一致");
   if (manifest.counts.boards !== boards.length) throw new Error("备份画板数量与 manifest 不一致");
+  if ((manifest.counts.libraryAssets ?? 0) !== libraryRecords.length) throw new Error("备份素材库数量与 manifest 不一致");
   validateBoardAssetReferences(boards, new Set(assets.map(asset => asset.id)));
+  validateLibraryAssetReferences(libraryRecords, new Set(assets.map(asset => asset.id)));
 
-  return { assets, boards, settings };
+  return { assets, boards, libraryAssets: libraryRecords, settings };
 }
 
 function validateZipFileCount(zip: JSZip): void {
@@ -854,18 +903,20 @@ function parseManifest(text: string): WorkspaceBackupManifest {
   const app = readString(value, "app");
   const schemaVersion = readNumber(value, "schemaVersion");
   if (app !== BACKUP_APP_NAME) throw new Error("不是 Imagine Workbench 备份");
-  if (schemaVersion !== WORKSPACE_BACKUP_SCHEMA_VERSION) throw new Error("备份版本不兼容");
+  if (schemaVersion !== 1 && schemaVersion !== WORKSPACE_BACKUP_SCHEMA_VERSION) throw new Error("备份版本不兼容");
   const counts = readRecord(value, "counts");
   return {
     app,
-    schemaVersion: WORKSPACE_BACKUP_SCHEMA_VERSION,
+    schemaVersion,
     exportedAt: readDateString(value, "exportedAt"),
     assetsFile: readLiteral(value, "assetsFile", ASSET_INDEX_FILE),
+    libraryFile: readOptionalLiteral(value, "libraryFile", LIBRARY_INDEX_FILE),
     boardsFile: readLiteral(value, "boardsFile", BOARD_INDEX_FILE),
     settingsFile: readOptionalLiteral(value, "settingsFile", SETTINGS_FILE),
     counts: {
       assets: readNumber(counts, "assets"),
       boards: readNumber(counts, "boards"),
+      libraryAssets: readOptionalNumber(counts, "libraryAssets"),
       settingsKeys: readNumber(counts, "settingsKeys"),
     },
   };
@@ -905,6 +956,7 @@ function parseAssetRecord(value: unknown, index: number): WorkspaceBackupAssetRe
     maskOriginalId: readOptionalString(value, "maskOriginalId"),
     sourceBoardNodeId: readOptionalString(value, "sourceBoardNodeId"),
     sourceBoardResultStackKey: readOptionalString(value, "sourceBoardResultStackKey"),
+    libraryItemId: readOptionalString(value, "libraryItemId"),
     scope: value.scope === "board" ? "board" : "workspace",
     boardId: typeof value.boardId === "string" ? value.boardId : "",
     hasBlob:
@@ -913,6 +965,36 @@ function parseAssetRecord(value: unknown, index: number): WorkspaceBackupAssetRe
         : Boolean(value.mediaFile || readOptionalString(value, "url")?.startsWith("data:")),
     mediaFile: readOptionalSafePath(value, "mediaFile"),
     mediaMimeType: readOptionalString(value, "mediaMimeType"),
+  };
+}
+
+function parseLibraryAssetRecords(text: string): LibraryAssetRecord[] {
+  const value: unknown = JSON.parse(text);
+  if (!Array.isArray(value)) throw new Error("素材库索引必须是数组");
+  const seenIds = new Set<string>();
+  return value.map((record, index) => {
+    const parsed = parseLibraryAssetRecord(record, index);
+    if (seenIds.has(parsed.id)) throw new Error(`素材库 ID 重复：${parsed.id}`);
+    seenIds.add(parsed.id);
+    return parsed;
+  });
+}
+
+function parseLibraryAssetRecord(value: unknown, index: number): LibraryAssetRecord {
+  if (!isRecord(value)) throw new Error(`素材库 ${index + 1} 格式无效`);
+  return {
+    id: readString(value, "id"),
+    assetId: readString(value, "assetId"),
+    sourceAssetId: readOptionalString(value, "sourceAssetId"),
+    origin: readLibraryAssetOrigin(value, "origin"),
+    mediaType: readLibraryAssetMediaType(value, "mediaType"),
+    category: readLibraryAssetCategory(value, "category"),
+    title: readString(value, "title"),
+    notes: readText(value, "notes"),
+    tags: readOptionalStringArray(value, "tags") ?? [],
+    favorite: readBoolean(value, "favorite"),
+    createdAt: readDateString(value, "createdAt"),
+    updatedAt: readDateString(value, "updatedAt"),
   };
 }
 
@@ -1248,6 +1330,11 @@ function validateBoardAssetReferences(boards: BoardDocument[], assetIds: Readonl
   if (missing) throw new Error(`画板 ${missing.boardTitle} 节点 ${missing.nodeId} 引用缺失资产 ${missing.assetId}`);
 }
 
+function validateLibraryAssetReferences(records: LibraryAssetRecord[], assetIds: ReadonlySet<string>): void {
+  const missing = records.find(record => !assetIds.has(record.assetId));
+  if (missing) throw new Error(`素材库 ${missing.title} 引用缺失资产 ${missing.assetId}`);
+}
+
 function parseSettings(text: string): WorkspaceBackupSettings {
   const value: unknown = JSON.parse(text);
   if (!isRecord(value)) throw new Error("设置文件格式无效");
@@ -1395,7 +1482,7 @@ async function getLatestWorkspaceSafetySnapshotRecord(): Promise<WorkspaceSafety
 function toSafetySnapshotSummary(record: WorkspaceSafetySnapshotRecord): WorkspaceSafetySnapshotSummary {
   const { blob: _blob, ...summary } = record;
   void _blob;
-  return summary;
+  return { ...summary, libraryAssetCount: summary.libraryAssetCount ?? 0 };
 }
 
 function parseDataUri(value: string): DataUriParts | null {
@@ -1596,6 +1683,13 @@ function readNumber(record: Record<string, unknown>, field: string): number {
   return value;
 }
 
+function readOptionalNumber(record: Record<string, unknown>, field: string): number | undefined {
+  const value = record[field];
+  if (value === undefined) return undefined;
+  if (typeof value !== "number" || !Number.isFinite(value)) throw new Error(`${field} 必须是有限数字`);
+  return value;
+}
+
 function readBoolean(record: Record<string, unknown>, field: string): boolean {
   const value = record[field];
   if (typeof value !== "boolean") throw new Error(`${field} 必须是布尔值`);
@@ -1624,6 +1718,26 @@ function readAssetType(record: Record<string, unknown>, field: string): StorageI
 function readBoardAssetType(record: Record<string, unknown>, field: string): "image" | "video" | "audio" {
   const value = record[field];
   if (value !== "image" && value !== "video" && value !== "audio") throw new Error(`${field} 类型无效`);
+  return value;
+}
+
+function readLibraryAssetMediaType(record: Record<string, unknown>, field: string): LibraryAssetMediaType {
+  const value = record[field];
+  if (value !== "image" && value !== "video" && value !== "audio") throw new Error(`${field} 类型无效`);
+  return value;
+}
+
+function readLibraryAssetCategory(record: Record<string, unknown>, field: string): LibraryAssetCategory {
+  const value = record[field];
+  if (value !== "character" && value !== "scene" && value !== "prop" && value !== "style" && value !== "other") {
+    throw new Error(`${field} 分类无效`);
+  }
+  return value;
+}
+
+function readLibraryAssetOrigin(record: Record<string, unknown>, field: string): LibraryAssetOrigin {
+  const value = record[field];
+  if (value !== "promoted" && value !== "imported") throw new Error(`${field} 来源无效`);
   return value;
 }
 

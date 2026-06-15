@@ -8,17 +8,21 @@ import type { AudioOperationMode } from "./providers/model-catalog";
 import type { RunningHubTaskNodeBinding, RunningHubYouchuanAdvancedSettings } from "./providers/types";
 
 const DB_NAME = "ImagineWorkbenchDB";
-const DB_VERSION = 7;
+const DB_VERSION = 8;
 const META_STORE = "assets_meta";
 const BLOB_STORE = "assets_blob";
 const HASH_BLOB_STORE = "asset_blob_payloads";
 const PREVIEW_STORE = "asset_previews";
 const LEGACY_STORE = "assets";
+const LIBRARY_STORE = "asset_library";
 export const GENERATION_TASK_STORE = "generation_tasks";
 
 export type AssetScope = "workspace" | "board";
 export type AssetPreviewStatus = "ready" | "missing" | "failed";
 export type StorageItemType = "image" | "video" | "audio" | "transcript";
+export type LibraryAssetMediaType = Extract<StorageItemType, "image" | "video" | "audio">;
+export type LibraryAssetCategory = "character" | "scene" | "prop" | "style" | "other";
+export type LibraryAssetOrigin = "promoted" | "imported";
 
 export interface GenerationReferenceMediaSnapshot {
   url: string;
@@ -69,6 +73,8 @@ export interface StorageItemMeta {
   maskOriginalId?: string;
   sourceBoardNodeId?: string;
   sourceBoardResultStackKey?: string;
+  /** Present only for hidden media records backing persistent library items. */
+  libraryItemId?: string;
   /** Remote http(s) URL only when hasBlob is false. */
   url?: string;
   hasBlob: boolean;
@@ -76,6 +82,21 @@ export interface StorageItemMeta {
   contentHash?: string;
   previewStatus?: AssetPreviewStatus;
   previewUpdatedAt?: string;
+}
+
+export interface LibraryAssetRecord {
+  id: string;
+  assetId: string;
+  sourceAssetId?: string;
+  origin: LibraryAssetOrigin;
+  mediaType: LibraryAssetMediaType;
+  category: LibraryAssetCategory;
+  title: string;
+  notes: string;
+  tags: string[];
+  favorite: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /** Hydrated asset record used across UI and generation flows. */
@@ -107,6 +128,7 @@ interface AssetBlobPayloadRecord {
 export interface AssetDatabaseDiagnostics {
   version: number;
   metaRecords: number;
+  libraryRecords: number;
   legacyBlobRecords: number;
   sharedBlobRecords: number;
   previewRecords: number;
@@ -139,6 +161,7 @@ interface LegacyStorageItem {
   maskOriginalId?: string;
   sourceBoardNodeId?: string;
   sourceBoardResultStackKey?: string;
+  libraryItemId?: string;
   scope?: AssetScope;
   boardId?: string;
 }
@@ -186,6 +209,38 @@ function normalizeContentHash(value: string | undefined): string | undefined {
   return hash ? hash : undefined;
 }
 
+function normalizeOptionalString(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function normalizeLibraryCategory(value: LibraryAssetCategory | undefined): LibraryAssetCategory {
+  if (value === "character" || value === "scene" || value === "prop" || value === "style") return value;
+  return "other";
+}
+
+function normalizeLibraryMediaType(value: LibraryAssetMediaType): LibraryAssetMediaType {
+  if (value === "image" || value === "video" || value === "audio") return value;
+  throw new Error("素材库只支持图片、视频和音频");
+}
+
+function normalizeLibraryRecord(record: LibraryAssetRecord): LibraryAssetRecord {
+  return {
+    id: record.id,
+    assetId: record.assetId,
+    sourceAssetId: normalizeOptionalString(record.sourceAssetId),
+    origin: record.origin === "imported" ? "imported" : "promoted",
+    mediaType: normalizeLibraryMediaType(record.mediaType),
+    category: normalizeLibraryCategory(record.category),
+    title: record.title.trim(),
+    notes: record.notes,
+    tags: record.tags.map(tag => tag.trim()).filter(tag => tag.length > 0),
+    favorite: Boolean(record.favorite),
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+  };
+}
+
 function normalizeMeta(meta: StorageItemMeta): StorageItemMeta {
   const scope: AssetScope = meta.scope === "board" ? "board" : "workspace";
   const hasBlob = Boolean(meta.hasBlob);
@@ -198,6 +253,7 @@ function normalizeMeta(meta: StorageItemMeta): StorageItemMeta {
     boardId: normalizeBoardId(meta.boardId, scope),
     hasBlob,
     contentHash: hasBlob ? normalizeContentHash(meta.contentHash) : undefined,
+    libraryItemId: normalizeOptionalString(meta.libraryItemId),
     url: !hasBlob && meta.url && isRemoteUrl(meta.url) ? meta.url : undefined,
     previewStatus,
     previewUpdatedAt: meta.previewUpdatedAt,
@@ -232,6 +288,7 @@ function splitIncomingItem(item: StorageItem): { meta: StorageItemMeta; blob: st
     maskOriginalId: item.maskOriginalId,
     sourceBoardNodeId: item.sourceBoardNodeId,
     sourceBoardResultStackKey: item.sourceBoardResultStackKey,
+    libraryItemId: normalizeOptionalString(item.libraryItemId),
     url: blob ? undefined : url || undefined,
     hasBlob: Boolean(blob),
   });
@@ -272,6 +329,7 @@ function legacyToMeta(raw: LegacyStorageItem): { meta: StorageItemMeta; blob: st
     maskOriginalId: raw.maskOriginalId,
     sourceBoardNodeId: raw.sourceBoardNodeId,
     sourceBoardResultStackKey: raw.sourceBoardResultStackKey,
+    libraryItemId: normalizeOptionalString(raw.libraryItemId),
     url: blob ? undefined : raw.url || undefined,
     hasBlob: Boolean(blob),
   });
@@ -305,6 +363,24 @@ function ensureGenerationTaskIndexes(tasks: IDBObjectStore): void {
   }
   if (!tasks.indexNames.contains("by_createdAt")) {
     tasks.createIndex("by_createdAt", "createdAt", { unique: false });
+  }
+}
+
+function ensureLibraryIndexes(library: IDBObjectStore): void {
+  if (!library.indexNames.contains("by_assetId")) {
+    library.createIndex("by_assetId", "assetId", { unique: false });
+  }
+  if (!library.indexNames.contains("by_sourceAssetId")) {
+    library.createIndex("by_sourceAssetId", "sourceAssetId", { unique: false });
+  }
+  if (!library.indexNames.contains("by_mediaType")) {
+    library.createIndex("by_mediaType", "mediaType", { unique: false });
+  }
+  if (!library.indexNames.contains("by_category")) {
+    library.createIndex("by_category", "category", { unique: false });
+  }
+  if (!library.indexNames.contains("by_updatedAt")) {
+    library.createIndex("by_updatedAt", "updatedAt", { unique: false });
   }
 }
 
@@ -457,6 +533,13 @@ export function openDatabase(): Promise<IDBDatabase> {
         db.createObjectStore(PREVIEW_STORE, { keyPath: "assetId" });
       }
 
+      if (!db.objectStoreNames.contains(LIBRARY_STORE)) {
+        const library = db.createObjectStore(LIBRARY_STORE, { keyPath: "id" });
+        ensureLibraryIndexes(library);
+      } else {
+        ensureLibraryIndexes(transaction.objectStore(LIBRARY_STORE));
+      }
+
       if (!db.objectStoreNames.contains(GENERATION_TASK_STORE)) {
         const tasks = db.createObjectStore(GENERATION_TASK_STORE, { keyPath: "id" });
         ensureGenerationTaskIndexes(tasks);
@@ -492,6 +575,75 @@ export async function getAssetMetasByIds(ids: string[]): Promise<StorageItemMeta
   const uniqueIds = Array.from(new Set(ids));
   const metas = await Promise.all(uniqueIds.map(id => getAssetMeta(id)));
   return sortMetas(metas.filter((meta): meta is StorageItemMeta => meta !== null));
+}
+
+export async function listLibraryAssetRecords(): Promise<LibraryAssetRecord[]> {
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(LIBRARY_STORE, "readonly");
+    const request = transaction.objectStore(LIBRARY_STORE).index("by_updatedAt").openCursor(null, "prev");
+    const records: LibraryAssetRecord[] = [];
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) {
+        resolve(records);
+        return;
+      }
+      records.push(normalizeLibraryRecord(cursor.value as LibraryAssetRecord));
+      cursor.continue();
+    };
+    request.onerror = () => reject(request.error ?? new Error("IndexedDB library read failed"));
+    transaction.onerror = () => reject(transaction.error ?? request.error ?? new Error("IndexedDB library transaction failed"));
+  });
+}
+
+export async function getLibraryAssetRecord(id: string): Promise<LibraryAssetRecord | null> {
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(LIBRARY_STORE, "readonly");
+    const request = transaction.objectStore(LIBRARY_STORE).get(id);
+    request.onsuccess = () => {
+      const value = request.result as LibraryAssetRecord | undefined;
+      resolve(value ? normalizeLibraryRecord(value) : null);
+    };
+    request.onerror = () => reject(request.error ?? new Error(`IndexedDB library ${id} read failed`));
+  });
+}
+
+export async function getLibraryAssetRecordBySourceAssetId(sourceAssetId: string): Promise<LibraryAssetRecord | null> {
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(LIBRARY_STORE, "readonly");
+    const request = transaction.objectStore(LIBRARY_STORE).index("by_sourceAssetId").get(sourceAssetId);
+    request.onsuccess = () => {
+      const value = request.result as LibraryAssetRecord | undefined;
+      resolve(value ? normalizeLibraryRecord(value) : null);
+    };
+    request.onerror = () => reject(request.error ?? new Error(`IndexedDB library source ${sourceAssetId} read failed`));
+  });
+}
+
+export async function saveLibraryAssetRecord(record: LibraryAssetRecord): Promise<void> {
+  const db = await openDatabase();
+  const normalized = normalizeLibraryRecord(record);
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(LIBRARY_STORE, "readwrite");
+    transaction.objectStore(LIBRARY_STORE).put(normalized);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error ?? new Error("IndexedDB library save failed"));
+    transaction.onabort = () => reject(transaction.error ?? new Error("IndexedDB library save aborted"));
+  });
+}
+
+export async function deleteLibraryAssetRecord(id: string): Promise<void> {
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(LIBRARY_STORE, "readwrite");
+    transaction.objectStore(LIBRARY_STORE).delete(id);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error ?? new Error("IndexedDB library delete failed"));
+    transaction.onabort = () => reject(transaction.error ?? new Error("IndexedDB library delete aborted"));
+  });
 }
 
 async function getAssetBlobPayloadForMeta(meta: StorageItemMeta): Promise<string | null> {
@@ -539,17 +691,20 @@ export async function getAssetDatabaseDiagnostics(): Promise<AssetDatabaseDiagno
     legacyBlobRecords,
     sharedBlobRecords,
     previewRecords,
+    libraryRecords,
     legacyAssetRecords,
   ] = await Promise.all([
     countStoreRecords(db, META_STORE),
     countStoreRecords(db, BLOB_STORE),
     countStoreRecords(db, HASH_BLOB_STORE),
     countStoreRecords(db, PREVIEW_STORE),
+    countStoreRecords(db, LIBRARY_STORE),
     countStoreRecords(db, LEGACY_STORE),
   ]);
   return {
     version: DB_VERSION,
     metaRecords,
+    libraryRecords,
     legacyBlobRecords,
     sharedBlobRecords,
     previewRecords,
@@ -807,7 +962,7 @@ export async function deleteFromDB(id: string): Promise<void> {
 export async function clearAllDB(): Promise<void> {
   const db = await openDatabase();
   return new Promise((resolve, reject) => {
-    const stores = [META_STORE, BLOB_STORE, HASH_BLOB_STORE, PREVIEW_STORE, GENERATION_TASK_STORE];
+    const stores = [META_STORE, BLOB_STORE, HASH_BLOB_STORE, PREVIEW_STORE, LIBRARY_STORE, GENERATION_TASK_STORE];
     if (db.objectStoreNames.contains(LEGACY_STORE)) stores.push(LEGACY_STORE);
     const transaction = db.transaction(stores, "readwrite");
     for (const storeName of stores) {
@@ -841,7 +996,10 @@ export async function listWorkspaceGalleryMetas(options?: {
   limit?: number;
   offset?: number;
 }): Promise<StorageItemMeta[]> {
-  return listAssetMetas({ boardId: "", ...options });
+  const metas = (await listAssetMetas({ boardId: "" })).filter(meta => !meta.libraryItemId);
+  const offset = Math.max(0, options?.offset ?? 0);
+  if (options?.limit !== undefined && options.limit >= 0) return metas.slice(offset, offset + options.limit);
+  return offset > 0 ? metas.slice(offset) : metas;
 }
 
 /** Full hydration — avoid on board route; prefer scoped loaders. */

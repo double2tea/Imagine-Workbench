@@ -55,6 +55,7 @@ interface AssetCardProps {
   onDelete: (item: StorageItem) => void;
   onDownload: (item: StorageItem) => void;
   onImageQuickEdit: (item: StorageItem, operation: ImageEditFeature) => void;
+  onAddToLibrary: (item: StorageItem) => void;
   onOpenFullscreen: (item: StorageItem) => void;
   onOpenPanorama: (item: StorageItem) => void;
   onPromoteOriginal: (item: StorageItem) => void;
@@ -131,6 +132,7 @@ export default function AssetCard({
   onDelete,
   onDownload,
   onImageQuickEdit,
+  onAddToLibrary,
   onOpenFullscreen,
   onOpenPanorama,
   onPromoteOriginal,
@@ -156,6 +158,7 @@ export default function AssetCard({
   const failedTitle = isContentSafetyError(item.errorMessage) ? "内容安全拦截" : "生成失败 / 链接中断";
   const referenceMedia = getGenerationReferenceMedia(item.generationRequest);
   const transcriptText = item.type === "transcript" ? transcriptFromDataUrl(item.url) : "";
+  const canAddToLibrary = item.status === "complete" && (item.type === "image" || item.type === "video" || item.type === "audio");
 
   const handleDragStart = (event: DragEvent<HTMLDivElement>) => {
     if (!isDraggableReference) {
@@ -256,6 +259,19 @@ export default function AssetCard({
       title: "下载该文件到本地",
       tone: WORKBENCH_OPERATION_META.download.tone,
     },
+    ...(canAddToLibrary
+      ? [
+          {
+            ariaLabel: "存入素材库",
+            icon: <WorkbenchOperationIcon operation="library" className="h-3 w-3" />,
+            id: "library",
+            label: WORKBENCH_OPERATION_META.library.label,
+            onClick: () => onAddToLibrary(item),
+            title: WORKBENCH_OPERATION_META.library.title,
+            tone: WORKBENCH_OPERATION_META.library.tone,
+          },
+        ]
+      : []),
     {
       ariaLabel: "全屏预览",
       icon: <WorkbenchOperationIcon operation="fullscreen" className="h-3 w-3" />,
@@ -581,6 +597,12 @@ export default function AssetCard({
                     <WorkbenchOperationIcon operation="reuse" className="imagine-tone-icon h-3.5 w-3.5" />
                     复用
                   </button>
+                  {canAddToLibrary && (
+                    <button type="button" onClick={() => runMobileAction(() => onAddToLibrary(item))}>
+                      <WorkbenchOperationIcon operation="library" className="imagine-tone-icon h-3.5 w-3.5" />
+                      存素材
+                    </button>
+                  )}
                   {item.type !== "transcript" && (
                     <button type="button" onClick={() => runMobileAction(() => onToggleCompare(item.id))}>
                       <WorkbenchOperationIcon operation="compare" className="imagine-tone-icon h-3.5 w-3.5" />

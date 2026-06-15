@@ -68,6 +68,7 @@ interface AudioGenerationPanelProps {
   onReferenceDropFiles: (files: File[]) => void;
   onReferenceRemove: (id: string) => void;
   onReferenceUpload: (event: ChangeEvent<HTMLInputElement>) => void;
+  onOpenAssetLibrary?: () => void;
   onSelectFormat: (value: string) => void;
   onSelectMode: (value: AudioOperationMode) => void;
   onSelectModel: (value: string) => void;
@@ -104,6 +105,7 @@ export default function AudioGenerationPanel({
   onReferenceDropFiles,
   onReferenceRemove,
   onReferenceUpload,
+  onOpenAssetLibrary,
   onSelectFormat,
   onSelectMode,
   onSelectModel,
@@ -439,6 +441,7 @@ export default function AudioGenerationPanel({
         onDropAsset={onReferenceDropAsset}
         onDropFiles={onReferenceDropFiles}
         onRemove={onReferenceRemove}
+        onOpenLibrary={onOpenAssetLibrary}
         onUpload={onReferenceUpload}
       />
 

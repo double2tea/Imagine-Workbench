@@ -20,6 +20,7 @@ import AtReferenceDropdown from "@/components/reference/AtReferenceDropdown";
 import CanvasMaskEditor, { type CanvasMaskEditorOutput } from "@/components/CanvasMaskEditor";
 import FullscreenPreview from "@/components/assets/FullscreenPreview";
 import PanoramaOverlay from "@/components/panorama/PanoramaOverlay";
+import AssetLibraryModal from "@/components/library/AssetLibraryModal";
 import BoardInspector from "@/components/board/BoardInspector";
 import BoardSidePanel from "@/components/board/BoardSidePanel";
 import BoardSideAssetList from "@/components/board/BoardSideAssetList";
@@ -33,6 +34,7 @@ import { getSendableAgentMediaReferences, type AgentReferenceInputSupport } from
 import { useAgentController } from "@/hooks/useAgentController";
 import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
 import { useBoardAssetStore } from "@/hooks/useBoardAssetStore";
+import { useAssetLibrary } from "@/hooks/useAssetLibrary";
 import { collectPlacedBoardAssetIdsFromNodes } from "@/lib/assets/board-scope";
 import { downloadStorageItemsZip, storageItemDownloadExtension } from "@/lib/assets/download-zip";
 import { saveItemWithPreview } from "@/lib/assets/previews";
@@ -1390,6 +1392,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const [showSettings, setShowSettings] = useState(false);
   const [renameDialogDraft, setRenameDialogDraft] = useState<string | null>(null);
 
+  const [isAssetLibraryOpen, setIsAssetLibraryOpen] = useState(false);
   const [, setIsOptimizing] = useState(false);
   const [imageSubmitCount, setImageSubmitCount] = useState(0);
   const [, setVideoSubmitCount] = useState(0);
@@ -1665,6 +1668,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const { searchableReferenceImages } = useAssetWorkspaceState(items);
   const resolveBoardReferenceUrl = useCallback<BoardReferenceUrlResolver>((assetId, fallbackUrl) => {
     const item = items.find(entry => entry.id === assetId);
+  const assetLibrary = useAssetLibrary();
     return item && item.status === "complete" && item.url.trim() ? item.url : fallbackUrl;
   }, [items]);
   const resolveOriginalStorageItem = useCallback(async (item: StorageItem): Promise<StorageItem> => {
@@ -3534,6 +3538,25 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
   const handleExportMultiGrid = useCallback(async (nodeId: string): Promise<void> => {
     try {
+  const handleImportFilesToLibrary = useCallback(async (files: File[]) => {
+    try {
+      const imported = await assetLibrary.importFiles(files);
+      pushWorkspaceNotice("success", `已导入 ${imported.length} 个素材`);
+    } catch (error) {
+      pushWorkspaceNotice("error", toErrorMessage(error, "素材导入失败"));
+    }
+  }, [assetLibrary, pushWorkspaceNotice]);
+
+  const handleSelectLibraryAsset = useCallback((entry: { item: StorageItem | null }) => {
+    if (!entry.item) {
+      pushWorkspaceNotice("error", "该素材缺少媒体内容");
+      return;
+    }
+    addAssetToBoard(entry.item);
+    setIsAssetLibraryOpen(false);
+    pushWorkspaceNotice("success", "已加入当前画板");
+  }, [addAssetToBoard, pushWorkspaceNotice]);
+
       const node = boardController.board.nodes.find(item => item.id === nodeId);
       if (node?.kind !== "multi-grid") {
         throw new Error("目标节点不是多宫格");
@@ -4906,6 +4929,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
               onAddToBoard={addAssetToBoard}
             />
           )}
+              onOpenAssetLibrary={() => setIsAssetLibraryOpen(true)}
           tasksPanel={(
             <BoardTaskQueuePanel
               cancelingTaskIds={cancelingBoardItemIds}
@@ -4924,6 +4948,19 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
       {!showSettings && !isMaskOpen && !fullscreenItem && !panoramaItem && !voiceProfileSourceItem && (
         <AgentDock
+      <AssetLibraryModal
+        entries={assetLibrary.entries}
+        loading={assetLibrary.loading}
+        mode="select"
+        open={isAssetLibraryOpen}
+        title="从素材库加入画板"
+        onClose={() => setIsAssetLibraryOpen(false)}
+        onImportFiles={handleImportFilesToLibrary}
+        onRemove={assetLibrary.removeRecord}
+        onSelect={handleSelectLibraryAsset}
+        onUpdate={assetLibrary.updateRecord}
+      />
+
           activeCountdownId={activeCountdownId}
           agentReferenceId={agentReferenceId}
           agentReferences={agentReferences}

@@ -1,4 +1,4 @@
-import { Search } from "lucide-react";
+import { FolderHeart, Search } from "lucide-react";
 import type { StorageItem } from "@/lib/db";
 import type { AiProvider } from "@/lib/providers/model-catalog";
 
@@ -25,6 +25,7 @@ interface AssetToolbarProps {
   deleteItemsByStatus: (statuses: StorageItem["status"][]) => void;
   exportMetadataJson: () => void;
   formatModelLabel: (value: string, fallbackProvider: AiProvider) => string;
+  onOpenLibrary?: () => void;
   setAssetDateEnd: (value: string) => void;
   setAssetDatePreset: (value: AssetDatePreset) => void;
   setAssetDateStart: (value: string) => void;
@@ -99,6 +100,7 @@ export default function AssetToolbar({
   deleteItemsByStatus,
   exportMetadataJson,
   formatModelLabel,
+  onOpenLibrary,
   setAssetDateEnd,
   setAssetDatePreset,
   setAssetDateStart,
@@ -192,6 +194,16 @@ export default function AssetToolbar({
         >
           导出
         </button>
+        {onOpenLibrary && (
+          <button
+            type="button"
+            onClick={onOpenLibrary}
+            className="imagine-secondary-action flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-950/55 px-3 text-[10px] font-semibold text-slate-300 transition-colors duration-150 hover:bg-slate-900"
+          >
+            <FolderHeart className="h-3.5 w-3.5" />
+            素材库
+          </button>
+        )}
         <button
           type="button"
           onClick={() => deleteItemsByStatus(["failed", "pending"])}

@@ -55,6 +55,7 @@ interface VideoGenerationPanelProps {
   onReferenceRemove: (id: string) => void;
   onReferenceRoleChange: (id: string, role: ReferenceImageRef["role"]) => void;
   onReferenceUpload: (event: ChangeEvent<HTMLInputElement>) => void;
+  onOpenAssetLibrary?: () => void;
   onSelectDuration: (value: string) => void;
   onSelectReferenceMode: (value: VideoReferenceMode) => void;
   onSelectResolution: (value: string) => void;
@@ -100,6 +101,7 @@ export default function VideoGenerationPanel({
   onReferenceRemove,
   onReferenceRoleChange,
   onReferenceUpload,
+  onOpenAssetLibrary,
   onSelectDuration,
   onSelectReferenceMode,
   onSelectResolution,
@@ -309,6 +311,7 @@ export default function VideoGenerationPanel({
         onDropAsset={onReferenceDropAsset}
         onDropFiles={onReferenceDropFiles}
         onRemove={onReferenceRemove}
+        onOpenLibrary={onOpenAssetLibrary}
         onRoleChange={onReferenceRoleChange}
         onUpload={onReferenceUpload}
       />

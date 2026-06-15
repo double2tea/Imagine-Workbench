@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CheckCircle2, ImageIcon, Music, PlusCircle, Upload, Video } from "lucide-react";
+import { CheckCircle2, FolderHeart, ImageIcon, Music, PlusCircle, Upload, Video } from "lucide-react";
 import { useBoardMediaImport } from "@/components/board/BoardMediaImportContext";
 import PreviewImage from "@/components/PreviewImage";
 import { ensureHydratedStorageItem } from "@/lib/assets/ensure-hydrated";
@@ -32,6 +32,7 @@ interface BoardSideAssetListProps {
   items: StorageItem[];
   loading?: boolean;
   onAddToBoard: (item: StorageItem) => void;
+  onOpenAssetLibrary?: () => void;
 }
 
 function BoardSideAssetRow({
@@ -139,12 +140,27 @@ function ImportMediaButton({ className = "" }: { className?: string }) {
   );
 }
 
+function AssetLibraryButton({ onOpen }: { onOpen?: () => void }) {
+  if (!onOpen) return null;
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="imagine-secondary-action flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-[var(--iw-border)] text-[11px] font-semibold text-[var(--iw-text)]"
+    >
+      <FolderHeart className="imagine-tone-icon h-3.5 w-3.5" data-tone="accent" />
+      打开素材库
+    </button>
+  );
+}
+
 export default function BoardSideAssetList({
   canvasAssetIds,
   highlightAssetId,
   items,
   loading = false,
   onAddToBoard,
+  onOpenAssetLibrary,
 }: BoardSideAssetListProps) {
   const [visibleLimit, setVisibleLimit] = useState(PAGE_SIZE);
   const [filter, setFilter] = useState<AssetFilter>("all");
@@ -172,6 +188,7 @@ export default function BoardSideAssetList({
   if (loading) {
     return (
       <div className="flex flex-col gap-2 px-3 pb-3 pt-1">
+        <AssetLibraryButton onOpen={onOpenAssetLibrary} />
         <ImportMediaButton />
         <p className="rounded-lg border border-dashed border-[var(--iw-border)] px-3 py-6 text-center text-xs text-[var(--iw-muted)]">
           正在加载本画板资产…
@@ -183,6 +200,7 @@ export default function BoardSideAssetList({
   if (items.length === 0) {
     return (
       <div className="flex flex-col gap-2 px-3 pb-3 pt-1">
+        <AssetLibraryButton onOpen={onOpenAssetLibrary} />
         <ImportMediaButton />
         <p className="rounded-lg border border-dashed border-[var(--iw-border)] px-3 py-6 text-center text-xs text-[var(--iw-muted)]">
           本画板暂无关联资产。使用上方导入，或在此画板生成后出现在列表中。
@@ -193,6 +211,7 @@ export default function BoardSideAssetList({
 
   return (
     <div className="flex flex-col gap-2 px-3 pb-3 pt-1">
+      <AssetLibraryButton onOpen={onOpenAssetLibrary} />
       <ImportMediaButton />
       <div className="flex flex-wrap gap-1.5">
         {filterChips.map(chip => (

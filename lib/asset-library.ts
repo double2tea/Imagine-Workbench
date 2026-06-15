@@ -1,0 +1,140 @@
+import {
+  buildStorageItem,
+  getLibraryAssetRecordBySourceAssetId,
+  hydrateAsset,
+  listLibraryAssetRecords,
+  saveLibraryAssetRecord,
+  saveToDB,
+  type LibraryAssetCategory,
+  type LibraryAssetMediaType,
+  type LibraryAssetRecord,
+  type StorageItem,
+} from "@/lib/db";
+import { createLocalUploadAsset } from "@/lib/data-management";
+
+export const LIBRARY_ASSET_CATEGORIES: readonly LibraryAssetCategory[] = ["character", "scene", "prop", "style", "other"];
+export const LIBRARY_ASSET_MEDIA_TYPES: readonly LibraryAssetMediaType[] = ["image", "video", "audio"];
+
+export const LIBRARY_ASSET_CATEGORY_LABELS: Record<LibraryAssetCategory, string> = {
+  character: "角色",
+  scene: "场景",
+  prop: "道具",
+  style: "风格",
+  other: "其他",
+};
+
+export const LIBRARY_ASSET_MEDIA_TYPE_LABELS: Record<LibraryAssetMediaType, string> = {
+  audio: "音频",
+  image: "图片",
+  video: "视频",
+};
+
+function makeClientId(prefix: string): string {
+  const cryptoApi = typeof crypto !== "undefined" ? crypto : null;
+  if (cryptoApi && typeof cryptoApi.randomUUID === "function") {
+    return `${prefix}_${cryptoApi.randomUUID()}`;
+  }
+  return `${prefix}_${Date.now()}`;
+}
+
+function isLibraryMediaType(type: StorageItem["type"]): type is LibraryAssetMediaType {
+  return type === "image" || type === "video" || type === "audio";
+}
+
+function defaultLibraryTitle(item: Pick<StorageItem, "prompt" | "model" | "operationName">, fallback: string): string {
+  const prompt = item.prompt.trim();
+  if (prompt) return prompt.slice(0, 80);
+  const operation = item.operationName?.trim();
+  if (operation) return operation;
+  const model = item.model.trim();
+  return model || fallback;
+}
+
+async function saveLibraryBackingAsset(
+  source: StorageItem,
+  recordId: string,
+  assetId: string,
+): Promise<StorageItem> {
+  const hydrated = await hydrateAsset(source);
+  const backing = buildStorageItem({
+    ...hydrated,
+    id: assetId,
+    createdAt: new Date().toISOString(),
+    operationName: "asset-library",
+    sourceBoardNodeId: undefined,
+    sourceBoardResultStackKey: undefined,
+    libraryItemId: recordId,
+  });
+  await saveToDB(backing);
+  return backing;
+}
+
+export async function addSourceAssetToLibrary(
+  source: StorageItem,
+  category: LibraryAssetCategory = "other",
+): Promise<{ record: LibraryAssetRecord; created: boolean }> {
+  if (source.status !== "complete") throw new Error("只有已完成的图片、视频或音频可加入素材库");
+  if (!isLibraryMediaType(source.type)) throw new Error("素材库只支持图片、视频和音频");
+
+  const existing = await getLibraryAssetRecordBySourceAssetId(source.id);
+  if (existing) return { record: existing, created: false };
+
+  const now = new Date().toISOString();
+  const recordId = makeClientId("library_item");
+  const backingAssetId = makeClientId("library_asset");
+  await saveLibraryBackingAsset(source, recordId, backingAssetId);
+  const record: LibraryAssetRecord = {
+    id: recordId,
+    assetId: backingAssetId,
+    sourceAssetId: source.id,
+    origin: "promoted",
+    mediaType: source.type,
+    category,
+    title: defaultLibraryTitle(source, LIBRARY_ASSET_MEDIA_TYPE_LABELS[source.type]),
+    notes: "",
+    tags: [],
+    favorite: false,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await saveLibraryAssetRecord(record);
+  return { record, created: true };
+}
+
+export async function importFilesToLibrary(files: File[]): Promise<LibraryAssetRecord[]> {
+  const records: LibraryAssetRecord[] = [];
+  for (const file of files) {
+    const recordId = makeClientId("library_item");
+    const asset = await createLocalUploadAsset(file, makeClientId("library_asset"));
+    if (!isLibraryMediaType(asset.type)) throw new Error("素材库只支持图片、视频和音频");
+    const mediaType = asset.type;
+    const now = new Date().toISOString();
+    const backing = buildStorageItem({
+      ...asset,
+      operationName: "asset-library",
+      libraryItemId: recordId,
+    });
+    await saveToDB(backing);
+    const record: LibraryAssetRecord = {
+      id: recordId,
+      assetId: backing.id,
+      origin: "imported",
+      mediaType,
+      category: "other",
+      title: file.name || defaultLibraryTitle(backing, LIBRARY_ASSET_MEDIA_TYPE_LABELS[mediaType]),
+      notes: "",
+      tags: [],
+      favorite: false,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await saveLibraryAssetRecord(record);
+    records.push(record);
+  }
+  return records;
+}
+
+export async function getLibraryAssetIds(): Promise<Set<string>> {
+  const records = await listLibraryAssetRecords();
+  return new Set(records.map(record => record.assetId));
+}

@@ -57,6 +57,7 @@ interface ImageGenerationPanelProps {
   onReferenceEdit?: (reference: ReferenceImageRef) => void;
   onReferenceRemove: (id: string) => void;
   onReferenceUpload: (event: ChangeEvent<HTMLInputElement>) => void;
+  onOpenAssetLibrary?: () => void;
   onSelectAspectRatio: (value: string) => void;
   onSelectModel: (value: string) => void;
   onThinkingLevelChange: (value: string) => void;
@@ -100,6 +101,7 @@ export default function ImageGenerationPanel({
   onReferenceEdit,
   onReferenceRemove,
   onReferenceUpload,
+  onOpenAssetLibrary,
   onSelectAspectRatio,
   onSelectModel,
   onThinkingLevelChange,
@@ -368,6 +370,7 @@ export default function ImageGenerationPanel({
         onDropFiles={onReferenceDropFiles}
         onReferenceEdit={onReferenceEdit}
         onRemove={onReferenceRemove}
+        onOpenLibrary={onOpenAssetLibrary}
         onUpload={onReferenceUpload}
       />
 

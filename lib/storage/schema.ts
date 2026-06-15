@@ -9,6 +9,7 @@ export const WORKSPACE_STORAGE_TABLE_NAMES = [
   "assets",
   "asset_payloads",
   "asset_previews",
+  "asset_library",
   "boards",
   "generation_tasks",
   "settings",

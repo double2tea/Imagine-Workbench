@@ -9,6 +9,7 @@ import SaveVoiceProfileDialog, { type SaveVoiceProfileDialogInput } from "@/comp
 import FloatingCompareButton from "@/components/assets/FloatingCompareButton";
 import FullscreenPreview from "@/components/assets/FullscreenPreview";
 import PanoramaOverlay from "@/components/panorama/PanoramaOverlay";
+import AssetLibraryModal from "@/components/library/AssetLibraryModal";
 import CreationModeTabs, { type CreationMode } from "@/components/creation/CreationModeTabs";
 import AudioGenerationPanel from "@/components/creation/AudioGenerationPanel";
 import CreatorGenerateButton from "@/components/creation/CreatorGenerateButton";
@@ -30,7 +31,7 @@ import {
   deleteFromDB,
   getGenerationReferenceMedia,
   hydrateAssets,
-  listAllAssetMetas,
+  listWorkspaceGalleryMetas,
   mergeStorageItems,
   metaToPlaceholderItem,
   saveToDB,
@@ -40,6 +41,7 @@ import { useAgentController } from "@/hooks/useAgentController";
 import { useAssetActions } from "@/hooks/useAssetActions";
 import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
 import { useClipboardImageImport } from "@/hooks/useClipboardImageImport";
+import { useAssetLibrary } from "@/hooks/useAssetLibrary";
 import { useGenerationActions } from "@/hooks/useGenerationActions";
 import { useGenerationTaskStore } from "@/hooks/useGenerationTaskStore";
 import { useMediaPolling } from "@/hooks/useMediaPolling";
@@ -125,6 +127,7 @@ type NoticeType = "error" | "info" | "success";
 type MaskDestination = "creative" | "agent";
 
 interface WorkspaceImageQuickEditJob {
+type AssetLibraryMode = "manage" | "reference";
   controller: AbortController;
   editImageResolution: string;
   editImageUrl: string;
@@ -326,11 +329,14 @@ export default function Home() {
   } = useAssetWorkspaceState(workspaceGalleryItems);
 
   // Agent State
+  const assetLibrary = useAssetLibrary();
   const [agentInput, setAgentInput] = useState("");
 
   const [showSettings, setShowSettings] = useState(false);
 
   const [isOptimizing, setIsOptimizing] = useState(false);
+  const [assetLibraryMode, setAssetLibraryMode] = useState<AssetLibraryMode>("manage");
+  const [isAssetLibraryOpen, setIsAssetLibraryOpen] = useState(false);
   const [imageSubmitCount, setImageSubmitCount] = useState(0);
   const [videoSubmitCount, setVideoSubmitCount] = useState(0);
   const [audioSubmitCount, setAudioSubmitCount] = useState(0);
@@ -1071,7 +1077,7 @@ export default function Home() {
   useEffect(() => {
     async function loadWorkspace() {
       try {
-        const metas = (await listAllAssetMetas()).filter(meta => meta.scope === "workspace" && !meta.boardId);
+        const metas = await listWorkspaceGalleryMetas();
         setItems(metas.map(metaToPlaceholderItem));
         const firstBatch = metas.slice(0, 40);
         if (firstBatch.length > 0) {
@@ -1498,9 +1504,10 @@ export default function Home() {
       setCompareItemIds([]);
       pushWorkspaceNotice("success", "本地资产库已清空");
     } catch (error) {
+      await assetLibrary.reload();
       pushWorkspaceNotice("error", toErrorMessage(error, "本地资产库清空失败"));
     }
-  }, [pushWorkspaceNotice, setCompareItemIds, setSelectedItemIds]);
+  }, [assetLibrary, pushWorkspaceNotice, setCompareItemIds, setSelectedItemIds]);
 
   const handleClearProject = async () => {
     if (!(await confirmAction({
@@ -1514,7 +1521,7 @@ export default function Home() {
   };
 
   const reloadAssetsFromDB = useCallback(async () => {
-    const metas = (await listAllAssetMetas()).filter(meta => meta.scope === "workspace" && !meta.boardId);
+    const metas = await listWorkspaceGalleryMetas();
     setItems(metas.map(metaToPlaceholderItem));
     void hydrateAssets(metas.slice(0, 80)).then(hydrated =>
       setItems(current => mergeStorageItems(current, hydrated)),
@@ -1523,6 +1530,48 @@ export default function Home() {
 
   const handleDataExportWorkspace = useCallback(async (includeCredentials: boolean) => {
     try {
+  const activePromptReferenceTarget = useCallback((): Exclude<AtDropdownTarget, "agent-prompt"> => {
+    if (traditionalSubTab === "audio") return "audio-prompt";
+    if (traditionalSubTab === "video") return "video-prompt";
+    return "image-prompt";
+  }, [traditionalSubTab]);
+
+  const openAssetLibrary = useCallback((mode: AssetLibraryMode) => {
+    setAssetLibraryMode(mode);
+    setIsAssetLibraryOpen(true);
+  }, []);
+
+  const handleAddItemToLibrary = useCallback(async (item: StorageItem) => {
+    try {
+      const result = await assetLibrary.addSource(item);
+      pushWorkspaceNotice("success", result.created ? "已存入素材库" : "素材库中已有该作品");
+    } catch (error) {
+      pushWorkspaceNotice("error", toErrorMessage(error, "存入素材库失败"));
+    }
+  }, [assetLibrary, pushWorkspaceNotice]);
+
+  const handleImportFilesToLibrary = useCallback(async (files: File[]) => {
+    try {
+      const imported = await assetLibrary.importFiles(files);
+      pushWorkspaceNotice("success", `已导入 ${imported.length} 个素材`);
+    } catch (error) {
+      pushWorkspaceNotice("error", toErrorMessage(error, "素材导入失败"));
+    }
+  }, [assetLibrary, pushWorkspaceNotice]);
+
+  const handleSelectLibraryEntry = useCallback((entry: { item: StorageItem | null }) => {
+    if (!entry.item) {
+      pushWorkspaceNotice("error", "该素材缺少媒体内容");
+      return;
+    }
+    if (entry.item.type === "transcript") {
+      pushWorkspaceNotice("error", "素材库不支持转写作为参考媒体");
+      return;
+    }
+    handleSelectAtItem(entry.item.url, entry.item.id, activePromptReferenceTarget(), entry.item.type);
+    setIsAssetLibraryOpen(false);
+  }, [activePromptReferenceTarget, handleSelectAtItem, pushWorkspaceNotice]);
+
       const result = await exportCompleteWorkspaceBackup(includeCredentials);
       pushWorkspaceNotice("success", `已导出备份：${result.fileName}`);
     } catch (error) {
@@ -1659,7 +1708,9 @@ export default function Home() {
       onImageQuickEdit={handleImageQuickEdit}
       onOpenFullscreen={handleOpenFullscreen}
       onOpenPanorama={handleOpenPanorama}
+      onAddToLibrary={handleAddItemToLibrary}
       onPromoteOriginal={promoteItemToOriginal}
+      onOpenLibrary={() => openAssetLibrary("manage")}
       onResetCompare={() => {
         setIsCompareMode(false);
         setCompareItemIds([]);
@@ -1729,6 +1780,7 @@ export default function Home() {
           onReferenceUpload={event => handleReferenceUpload(event, "audio-prompt")}
           onSelectFormat={setAudioFormat}
           onSelectMode={handleSelectAudioMode}
+          onOpenAssetLibrary={() => openAssetLibrary("reference")}
           onSelectModel={handleSelectAudioModel}
           onSelectVoiceProfile={setSelectedVoiceProfileId}
           onVoiceCloneConsentChange={setVoiceCloneConsentAccepted}
@@ -1782,6 +1834,7 @@ export default function Home() {
         onReferenceUpload={handleImageUpload}
         onSelectAspectRatio={handleSelectImageAspectRatio}
         onSelectModel={handleSelectImageModel}
+        onOpenAssetLibrary={() => openAssetLibrary("reference")}
         onThinkingLevelChange={setImageThinkingLevel}
       />
     ) : (
@@ -1828,6 +1881,7 @@ export default function Home() {
         onReferenceUpload={event => handleReferenceUpload(event, "video-prompt")}
         onSelectDuration={setVideoDuration}
         onSelectReferenceMode={setSelectedVideoReferenceMode}
+        onOpenAssetLibrary={() => openAssetLibrary("reference")}
         onSelectResolution={setVideoResolution}
         onSelectModel={handleSelectVideoModel}
         onSelectPreset={setVideoPreset}
@@ -1979,6 +2033,19 @@ export default function Home() {
 
       <SettingsModal
         audioModelGroups={audioModelGroups}
+      <AssetLibraryModal
+        entries={assetLibrary.entries}
+        loading={assetLibrary.loading}
+        mode={assetLibraryMode === "reference" ? "select" : "manage"}
+        open={isAssetLibraryOpen}
+        title={assetLibraryMode === "reference" ? "从素材库选择" : "素材库"}
+        onClose={() => setIsAssetLibraryOpen(false)}
+        onImportFiles={handleImportFilesToLibrary}
+        onRemove={assetLibrary.removeRecord}
+        onSelect={handleSelectLibraryEntry}
+        onUpdate={assetLibrary.updateRecord}
+      />
+
         chatModelGroups={chatModelGroups}
         fetchedModelOptions={fetchedModelOptions}
         imageModelGroups={imageModelGroups}

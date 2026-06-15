@@ -47,7 +47,9 @@ interface AssetGalleryWorkspaceProps {
   onDownloadItem: (item: StorageItem) => void;
   onExportMetadata: () => void;
   onImageQuickEdit: (item: StorageItem, operation: ImageEditFeature) => void;
+  onAddToLibrary: (item: StorageItem) => void;
   onOpenFullscreen: (item: StorageItem) => void;
+  onOpenLibrary?: () => void;
   onOpenPanorama: (item: StorageItem) => void;
   onPromoteOriginal: (item: StorageItem) => void;
   onResetCompare: () => void;
@@ -110,7 +112,9 @@ export default function AssetGalleryWorkspace({
   onDownloadItem,
   onExportMetadata,
   onImageQuickEdit,
+  onAddToLibrary,
   onOpenFullscreen,
+  onOpenLibrary,
   onOpenPanorama,
   onPromoteOriginal,
   onResetCompare,
@@ -244,6 +248,7 @@ export default function AssetGalleryWorkspace({
         deleteItemsByStatus={onDeleteItemsByStatus}
         exportMetadataJson={onExportMetadata}
         formatModelLabel={formatModelLabel}
+        onOpenLibrary={onOpenLibrary}
         setAssetDateEnd={onSetAssetDateEnd}
         setAssetDatePreset={onSetAssetDatePreset}
         setAssetDateStart={onSetAssetDateStart}
@@ -336,6 +341,7 @@ export default function AssetGalleryWorkspace({
                           onDelete={onDeleteItem}
                           onDownload={onDownloadItem}
                           onImageQuickEdit={onImageQuickEdit}
+                          onAddToLibrary={onAddToLibrary}
                           onOpenFullscreen={onOpenFullscreen}
                           onOpenPanorama={onOpenPanorama}
                           onPromoteOriginal={onPromoteOriginal}

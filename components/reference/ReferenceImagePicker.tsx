@@ -21,6 +21,7 @@ interface ReferenceImagePickerProps {
   roleMode?: boolean;
   uploadLabel: string;
   onClear: () => void;
+  onOpenLibrary?: () => void;
   onDropAsset?: (asset: DraggedReferenceAsset) => void;
   onDropFiles?: (files: File[]) => void;
   onReferenceEdit?: (reference: ReferenceImageRef) => void;
@@ -83,6 +84,7 @@ export default function ReferenceImagePicker({
   roleMode = false,
   uploadLabel,
   onClear,
+  onOpenLibrary,
   onDropAsset,
   onDropFiles,
   onReferenceEdit,
@@ -230,18 +232,30 @@ export default function ReferenceImagePicker({
           })}
 
           {canAdd && (
-            <label className="imagine-reference-add-tile">
-              <span className="font-bold text-lg leading-none">+</span>
-              <span className="mt-0.5 text-[9px] font-semibold">{addLabel}</span>
-              <input
-                type="file"
-                name="reference-upload"
-                accept={accept}
-                aria-label={uploadInputLabel}
-                onChange={onUpload}
-                className="hidden"
-              />
-            </label>
+            <>
+              <label className="imagine-reference-add-tile">
+                <span className="font-bold text-lg leading-none">+</span>
+                <span className="mt-0.5 text-[9px] font-semibold">{addLabel}</span>
+                <input
+                  type="file"
+                  name="reference-upload"
+                  accept={accept}
+                  aria-label={uploadInputLabel}
+                  onChange={onUpload}
+                  className="hidden"
+                />
+              </label>
+              {onOpenLibrary && (
+                <button
+                  type="button"
+                  onClick={onOpenLibrary}
+                  className="imagine-reference-add-tile"
+                >
+                  <span className="font-bold text-lg leading-none">L</span>
+                  <span className="mt-0.5 text-[9px] font-semibold">素材库</span>
+                </button>
+              )}
+            </>
           )}
         </div>
       ) : (
@@ -264,6 +278,12 @@ export default function ReferenceImagePicker({
               ) : (
                 <span>{uploadLabel}</span>
               )}
+              {onOpenLibrary && maxCount > 0 ? (
+                <>
+                  {" / "}
+                  <button type="button" onClick={onOpenLibrary} className={browseClassName}>从素材库选择</button>
+                </>
+              ) : null}
           </span>
           <span className="mt-1 hidden text-[9px] text-[var(--iw-faint)] sm:inline">{emptyHelp}</span>
         </div>
