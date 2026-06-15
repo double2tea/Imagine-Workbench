@@ -2120,7 +2120,7 @@ export default function Home() {
       />
 
       {/* Inpainting Mask Drawer overlay loader */}
-      {isMaskOpen && maskEditOperation && isVisualAdjustmentFeature(maskEditOperation) ? (
+      {isMaskOpen && maskEditOperation && isVisualAdjustmentFeature(maskEditOperation) && (
         <VisualPromptAdjustEditor
           imageUrl={maskTargetUrl}
           editModel={resolveImageQuickEditTarget(maskEditOperation, imageEditFeatureTargets[maskEditOperation]).model}
@@ -2136,7 +2136,8 @@ export default function Home() {
           }}
           onApply={saveMaskOutput}
         />
-      ) : isMaskOpen && (
+      )}
+      {isMaskOpen && (!maskEditOperation || !isVisualAdjustmentFeature(maskEditOperation)) && (
         <CanvasMaskEditor
           imageUrl={maskTargetUrl}
           editModel={maskEditOperation ? resolveImageQuickEditTarget(maskEditOperation, imageEditFeatureTargets[maskEditOperation]).model : undefined}

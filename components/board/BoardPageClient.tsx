@@ -5078,7 +5078,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onClose={() => setVoiceProfileSourceItem(null)}
         onSave={handleSaveVoiceProfileFromAsset}
       />
-      {isMaskOpen && maskEditOperation && isVisualAdjustmentFeature(maskEditOperation) ? (
+      {isMaskOpen && maskEditOperation && isVisualAdjustmentFeature(maskEditOperation) && (
         <VisualPromptAdjustEditor
           imageUrl={maskTargetUrl}
           editModel={resolveImageQuickEditTarget(maskEditOperation, imageEditFeatureTargets[maskEditOperation]).model}
@@ -5092,7 +5092,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           }}
           onApply={saveMaskOutput}
         />
-      ) : isMaskOpen && (
+      )}
+      {isMaskOpen && (!maskEditOperation || !isVisualAdjustmentFeature(maskEditOperation)) && (
         <CanvasMaskEditor
           imageUrl={maskTargetUrl}
           editModel={maskEditOperation ? resolveImageQuickEditTarget(maskEditOperation, imageEditFeatureTargets[maskEditOperation]).model : undefined}

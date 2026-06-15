@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, type WheelEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent, type WheelEvent } from "react";
 import { Box, RotateCcw, Sun, X } from "lucide-react";
 import type { CanvasMaskEditorOutput } from "@/components/CanvasMaskEditor";
 import {
@@ -65,20 +65,21 @@ const ANGLE_VIEW_PRESETS: Array<{
   { className: "bottom-8 left-1/2 -translate-x-1/2", label: "B", state: { rotation: 0, tilt: 50 } },
   { className: "left-[23%] top-[28%]", label: "BK", state: { rotation: 180, tilt: 0 } },
 ];
-const ANGLE_BASE_ROTATE_Y = 28;
-const ANGLE_BASE_ROTATE_X = -11;
-const ANGLE_ROTATION_SENSITIVITY = 0.26;
-const ANGLE_TILT_SENSITIVITY = 0.24;
-const ANGLE_BASE_SCALE = 0.84;
-const ANGLE_ZOOM_SCALE_DIVISOR = 500;
-const ANGLE_CUBE_ROTATE_X_OFFSET = 20;
-const ANGLE_CUBE_ROTATE_Y_OFFSET = 22;
+const ANGLE_PANEL_DEPTH = 54;
+const ANGLE_BASE_ROTATE_Y = 0;
+const ANGLE_BASE_ROTATE_X = 0;
+const ANGLE_ROTATION_SENSITIVITY = 1;
+const ANGLE_TILT_SENSITIVITY = 0.72;
+const ANGLE_POINTER_ROTATION_SENSITIVITY = 0.45;
+const ANGLE_POINTER_TILT_SENSITIVITY = 0.28;
+const ANGLE_BASE_SCALE = 0.82;
+const ANGLE_ZOOM_SCALE_DIVISOR = 180;
 const ANGLE_SHADOW_BASE_Y = 20;
 const ANGLE_SHADOW_TILT_FACTOR = 0.14;
 const ANGLE_SHADOW_BASE_SCALE = 0.78;
 const ANGLE_SHADOW_ZOOM_SCALE_DIVISOR = 420;
-const ANGLE_WIDE_LENS_INSET = 54;
-const ANGLE_NATURAL_LENS_INSET = 22;
+const ANGLE_WIDE_LENS_INSET = 62;
+const ANGLE_NATURAL_LENS_INSET = 18;
 const ANGLE_WIDE_SIDE_GLOW_OPACITY = 0.34;
 const ANGLE_NATURAL_SIDE_GLOW_OPACITY = 0.2;
 const LIGHT_GUIDE_CORE_ALPHA = 0.85;
@@ -101,6 +102,7 @@ const LIGHT_ORB_BACK_OPACITY = 0.45;
 const LIGHT_ORB_VISIBLE_OPACITY = 0.84;
 const LIGHT_SURFACE_CORE_ALPHA = 0.58;
 const LIGHT_RIM_OPACITY = 0.62;
+const LIGHT_PANEL_DEPTH = 34;
 
 export default function VisualPromptAdjustEditor({
   editModel,
@@ -172,15 +174,15 @@ export default function VisualPromptAdjustEditor({
     }
   }, [imageResolution, isOpen, resolutionOptions]);
 
-  if (!isOpen) return null;
+  const prompt = useMemo(() => (
+    operation === "angle"
+      ? buildAngleAdjustmentPrompt(angleState, editModel)
+      : buildLightingAdjustmentPrompt(lightingState, editModel)
+  ), [angleState, editModel, lightingState, operation]);
+  const angleVisual = useMemo(() => angleVisualState(angleState), [angleState]);
+  const lightingVisual = useMemo(() => lightingVisualState(lightingState), [lightingState]);
 
-  const prompt = operation === "angle"
-    ? buildAngleAdjustmentPrompt(angleState, editModel)
-    : buildLightingAdjustmentPrompt(lightingState, editModel);
-  const angleVisual = angleVisualState(angleState);
-  const lightingVisual = lightingVisualState(lightingState);
-
-  const handleApply = async () => {
+  const handleApply = useCallback(async () => {
     const img = imageRef.current;
     if (!img) {
       setErrorMessage("图片尚未加载完成。");
@@ -206,7 +208,9 @@ export default function VisualPromptAdjustEditor({
     } finally {
       setIsApplying(false);
     }
-  };
+  }, [imageSize, lightingState, onApply, operation, prompt, selectedImageResolution]);
+
+  if (!isOpen) return null;
 
   return (
     <div className="imagine-visual-adjust-overlay fixed inset-0 z-[80] flex items-center justify-center px-4 py-6 backdrop-blur-sm">
@@ -296,7 +300,6 @@ export default function VisualPromptAdjustEditor({
 
 interface AngleVisualState {
   cardTransform: string;
-  cubeTransform: string;
   floorShadowTransform: string;
   lensInset: number;
   sideGlowOpacity: number;
@@ -337,7 +340,7 @@ function PreviewStage({
   const angleDragRef = useRef<{ x: number; y: number; state: AngleAdjustmentState } | null>(null);
   const lightingDragRef = useRef(false);
   const panelSize = scaleToFitSize(previewSize, operation === "angle"
-    ? { width: 310, height: 310 }
+    ? { width: 430, height: 300 }
     : { width: 280, height: 200 });
 
   useGSAP(() => {
@@ -356,11 +359,13 @@ function PreviewStage({
   const handleAnglePointerMove = (event: PointerEvent<HTMLDivElement>) => {
     const drag = angleDragRef.current;
     if (!drag) return;
-    onAngleChange({
+    const nextState = {
       ...drag.state,
-      rotation: clampNumber(drag.state.rotation + (event.clientX - drag.x) * 0.45, -180, 180),
-      tilt: clampNumber(drag.state.tilt + (event.clientY - drag.y) * 0.28, -60, 60),
-    });
+      rotation: clampNumber(drag.state.rotation + (event.clientX - drag.x) * ANGLE_POINTER_ROTATION_SENSITIVITY, -180, 180),
+      tilt: clampNumber(drag.state.tilt + (event.clientY - drag.y) * ANGLE_POINTER_TILT_SENSITIVITY, -60, 60),
+    };
+    angleDragRef.current = { x: event.clientX, y: event.clientY, state: nextState };
+    onAngleChange(nextState);
   };
   const handleAnglePointerEnd = (event: PointerEvent<HTMLDivElement>) => {
     angleDragRef.current = null;
@@ -443,6 +448,7 @@ function PreviewStage({
               className="absolute left-1/2 top-[73%] h-16 w-[38%] -translate-x-1/2 rounded-[999px] bg-black/50 blur-2xl"
               style={{ transform: angleVisual.floorShadowTransform }}
             />
+            <div className="pointer-events-none absolute left-1/2 top-[53%] h-[72%] w-[72%] max-w-[540px] -translate-x-1/2 -translate-y-1/2 rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_50%_50%,transparent_0_42%,rgba(255,255,255,0.08)_43%,transparent_44%)]" />
             <div
               className="absolute left-1/2 top-1/2 transition-transform duration-200 ease-out"
               style={{
@@ -453,32 +459,13 @@ function PreviewStage({
               }}
             >
               <div
-                className="absolute -inset-3 rounded-[22px] border border-white/20"
+                className="absolute -inset-4 rounded-[24px] border border-white/15"
                 style={{
                   background: `radial-gradient(circle at 78% 12%, rgba(255,255,255,${angleVisual.sideGlowOpacity}), transparent 34%)`,
-                  transform: "translate3d(-12px, -8px, -28px)",
+                  transform: `translateZ(${-ANGLE_PANEL_DEPTH}px)`,
                 }}
               />
-              <div
-                className="absolute inset-0 overflow-hidden rounded-[16px] border border-white/40 bg-[#111] shadow-[0_18px_40px_rgba(0,0,0,0.42)]"
-                style={{ transform: "translateZ(34px)" }}
-              >
-                <img src={imageUrl} alt="" className="h-full w-full object-cover" draggable={false} />
-                <div
-                  className="pointer-events-none absolute inset-0"
-                  style={{
-                    boxShadow: `inset ${angleVisual.lensInset}px 0 90px rgba(15,23,42,0.12), inset ${-angleVisual.lensInset}px 0 90px rgba(255,255,255,0.18)`,
-                  }}
-                />
-              </div>
-              <div
-                className="absolute bottom-1 right-[-42px] top-1 w-20 rounded-r-[18px] border border-white/10 bg-gradient-to-r from-[#505050] via-[#343434] to-[#171717]"
-                style={{ transform: "rotateY(86deg) translateZ(38px)", transformOrigin: "left center" }}
-              />
-              <div
-                className="absolute bottom-[-42px] left-1 right-1 h-20 rounded-b-[18px] border border-white/10 bg-gradient-to-b from-[#4f4f4f] via-[#303030] to-[#151515]"
-                style={{ transform: "rotateX(-86deg) translateZ(38px)", transformOrigin: "top center" }}
-              />
+              <ImageSlab imageUrl={imageUrl} depth={ANGLE_PANEL_DEPTH} lensInset={angleVisual.lensInset} />
             </div>
             {ANGLE_VIEW_PRESETS.map(preset => (
               <button
@@ -496,7 +483,7 @@ function PreviewStage({
                 {preset.label}
               </button>
             ))}
-            <AngleGizmo transform={angleVisual.cubeTransform} />
+            <AngleOrbitMap imageUrl={imageUrl} state={angleState} onChange={onAngleChange} />
           </div>
         ) : (
           <div
@@ -527,14 +514,15 @@ function PreviewStage({
                 className="absolute -inset-3 rounded-[22px] border border-white/10 bg-black/20 shadow-[0_30px_80px_rgba(0,0,0,0.42)]"
                 style={{ transform: "translateZ(-30px)" }}
               />
-              <div className="absolute inset-0 overflow-hidden rounded-[15px] border border-white/35 bg-[#111] shadow-2xl" style={{ transform: "translateZ(22px)" }}>
-                <img src={imageUrl} alt="" className="h-full w-full object-cover" draggable={false} />
+              <ImageSlab imageUrl={imageUrl} depth={LIGHT_PANEL_DEPTH} lensInset={ANGLE_NATURAL_LENS_INSET} />
+              <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[15px]" style={{ transform: `translateZ(${LIGHT_PANEL_DEPTH / 2 + 2}px)` }}>
                 <div className="pointer-events-none absolute inset-0" style={lightingVisual.overlayStyle} />
                 <div className="pointer-events-none absolute inset-0 rounded-[18px] ring-4 ring-white/70" style={{ opacity: lightingVisual.rimOpacity }} />
               </div>
             </div>
             <div className="pointer-events-none absolute z-20 rounded-full blur-2xl" style={lightingVisual.orbStyle} />
             <div className="pointer-events-none absolute z-30 h-5 w-5 rounded-full border-2 border-white bg-white shadow-[0_0_24px_rgba(255,255,255,0.95)]" style={lightingVisual.markerStyle} />
+            <LightingCompassMap imageUrl={imageUrl} state={lightingState} onChange={onLightingChange} />
             <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-white/10 bg-white/[0.07] px-4 py-1 text-xs font-semibold text-white/70">主光源</div>
           </div>
         )}
@@ -543,25 +531,215 @@ function PreviewStage({
   );
 }
 
-function AngleGizmo({ transform }: { transform: string }) {
+function ImageSlab({
+  depth,
+  imageUrl,
+  lensInset,
+}: {
+  depth: number;
+  imageUrl: string;
+  lensInset: number;
+}) {
+  const halfDepth = depth / 2;
   return (
-    <div className="absolute bottom-4 left-4 h-20 w-20 rounded-2xl border border-white/10 bg-black/25 p-4 backdrop-blur">
-      <div className="relative h-full w-full" style={{ perspective: 260 }}>
+    <>
+      <div
+        className="absolute inset-0 overflow-hidden rounded-[16px] border border-white/45 bg-[#111] shadow-[0_24px_55px_rgba(0,0,0,0.44)]"
+        style={{ backfaceVisibility: "hidden", transform: `translateZ(${halfDepth}px)` }}
+      >
+        <img src={imageUrl} alt="" className="h-full w-full object-cover" draggable={false} />
         <div
-          className="absolute inset-3 transition-transform duration-200"
-          style={{ transform, transformStyle: "preserve-3d" }}
-        >
-          <div className="absolute inset-0 rounded-md border border-white/35 bg-slate-100/80" style={{ transform: "translateZ(16px)" }} />
-          <div className="absolute inset-0 rounded-md border border-white/20 bg-blue-500/70" style={{ transform: "rotateY(90deg) translateZ(16px)" }} />
-          <div className="absolute inset-0 rounded-md border border-white/20 bg-slate-500/75" style={{ transform: "rotateX(90deg) translateZ(16px)" }} />
-        </div>
+          className="pointer-events-none absolute inset-0"
+          style={{
+            boxShadow: `inset ${lensInset}px 0 90px rgba(15,23,42,0.16), inset ${-lensInset}px 0 90px rgba(255,255,255,0.2)`,
+          }}
+        />
       </div>
+      <div
+        className="absolute inset-0 overflow-hidden rounded-[16px] border border-white/20 bg-[#191919]"
+        style={{ backfaceVisibility: "hidden", transform: `rotateY(180deg) translateZ(${halfDepth}px)` }}
+      >
+        <img src={imageUrl} alt="" className="h-full w-full scale-105 object-cover opacity-25 blur-[1px]" draggable={false} />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,rgba(255,255,255,0.14),rgba(20,20,20,0.86)_58%,rgba(0,0,0,0.96)_100%)]" />
+        <div className="absolute inset-5 rounded-[12px] border border-white/10" />
+      </div>
+      <div
+        className="absolute bottom-0 top-0 rounded-r-[14px] border border-white/10 bg-gradient-to-r from-[#5a5a5a] via-[#363636] to-[#171717]"
+        style={{
+          right: -halfDepth,
+          transform: "rotateY(90deg)",
+          transformOrigin: "left center",
+          width: depth,
+        }}
+      />
+      <div
+        className="absolute bottom-0 top-0 rounded-l-[14px] border border-white/10 bg-gradient-to-l from-[#5a5a5a] via-[#363636] to-[#171717]"
+        style={{
+          left: -halfDepth,
+          transform: "rotateY(-90deg)",
+          transformOrigin: "right center",
+          width: depth,
+        }}
+      />
+      <div
+        className="absolute left-0 right-0 rounded-t-[14px] border border-white/10 bg-gradient-to-t from-[#5a5a5a] via-[#363636] to-[#171717]"
+        style={{
+          height: depth,
+          top: -halfDepth,
+          transform: "rotateX(90deg)",
+          transformOrigin: "bottom center",
+        }}
+      />
+      <div
+        className="absolute left-0 right-0 rounded-b-[14px] border border-white/10 bg-gradient-to-b from-[#5a5a5a] via-[#363636] to-[#171717]"
+        style={{
+          bottom: -halfDepth,
+          height: depth,
+          transform: "rotateX(-90deg)",
+          transformOrigin: "top center",
+        }}
+      />
+      <div
+        className="pointer-events-none absolute left-1/2 top-1/2 h-px w-px rounded-full bg-white/40 shadow-[0_0_18px_rgba(255,255,255,0.5)]"
+        style={{ transform: `translate3d(-50%, -50%, ${halfDepth + 4}px)` }}
+      />
+    </>
+  );
+}
+
+function AngleOrbitMap({
+  imageUrl,
+  onChange,
+  state,
+}: {
+  imageUrl: string;
+  onChange: (state: AngleAdjustmentState) => void;
+  state: AngleAdjustmentState;
+}) {
+  const draggingRef = useRef(false);
+  const camera = orbitPointFromRotation(state.rotation);
+  const setRotationFromEvent = (event: PointerEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / rect.width * 100;
+    const y = (event.clientY - rect.top) / rect.height * 100;
+    onChange({ ...state, rotation: rotationFromOrbitPoint(x, y) });
+  };
+  const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    draggingRef.current = true;
+    setRotationFromEvent(event);
+  };
+  const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    if (!draggingRef.current) return;
+    setRotationFromEvent(event);
+  };
+  const handlePointerEnd = (event: PointerEvent<HTMLDivElement>) => {
+    draggingRef.current = false;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
+
+  return (
+    <div
+      className="absolute bottom-4 left-4 h-28 w-28 touch-none rounded-2xl border border-white/10 bg-black/30 p-2 backdrop-blur"
+      onPointerCancel={handlePointerEnd}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerEnd}
+    >
+      <svg aria-hidden="true" className="absolute inset-0 h-full w-full" viewBox="0 0 100 100">
+        <ellipse cx="50" cy="50" rx="32" ry="32" fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="1" />
+        <line x1={camera.x} y1={camera.y} x2="50" y2="50" stroke="rgba(255,255,255,0.42)" strokeWidth="1.2" />
+        <circle cx={camera.x} cy={camera.y} r="5" fill="white" />
+      </svg>
+      <div className="absolute left-1/2 top-1/2 h-9 w-12 -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-md border border-white/35 bg-[#111] shadow-[0_8px_24px_rgba(0,0,0,0.4)]">
+        <img src={imageUrl} alt="" className="h-full w-full object-cover" draggable={false} />
+      </div>
+      <div className="pointer-events-none absolute left-1/2 top-1/2 h-11 w-14 -translate-x-1/2 -translate-y-1/2 rounded-md border border-white/10" />
+    </div>
+  );
+}
+
+function LightingCompassMap({
+  imageUrl,
+  onChange,
+  state,
+}: {
+  imageUrl: string;
+  onChange: (state: LightingAdjustmentState) => void;
+  state: LightingAdjustmentState;
+}) {
+  const draggingRef = useRef(false);
+  const point = lightStagePoint(state);
+  const lightColor = colorStop(state.temperature, 1);
+  const setLightingFromEvent = (event: PointerEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / rect.width * 100;
+    const y = (event.clientY - rect.top) / rect.height * 100;
+    onChange({
+      ...state,
+      direction: directionFromPreviewPoint(x, y),
+      height: clampNumber((50 - y) * 2, -100, 100),
+    });
+  };
+  const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    draggingRef.current = true;
+    setLightingFromEvent(event);
+  };
+  const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    if (!draggingRef.current) return;
+    setLightingFromEvent(event);
+  };
+  const handlePointerEnd = (event: PointerEvent<HTMLDivElement>) => {
+    draggingRef.current = false;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
+
+  return (
+    <div
+      className="absolute bottom-4 left-4 h-28 w-28 touch-none rounded-2xl border border-white/10 bg-black/30 p-2 backdrop-blur"
+      onPointerCancel={handlePointerEnd}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerEnd}
+    >
+      <svg aria-hidden="true" className="absolute inset-0 h-full w-full" viewBox="0 0 100 100">
+        <rect x="31" y="37" width="38" height="26" rx="4" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.22)" />
+        <line x1={point.x} y1={point.y} x2="50" y2="50" stroke={lightColor} strokeWidth="1.5" strokeLinecap="round" />
+        <circle cx={point.x} cy={point.y} r="6" fill={lightColor} />
+        <circle cx={point.x} cy={point.y} r="13" fill={lightColor} opacity="0.18" />
+      </svg>
+      <div className="absolute left-1/2 top-1/2 h-8 w-11 -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded border border-white/30 bg-[#111]">
+        <img src={imageUrl} alt="" className="h-full w-full object-cover" draggable={false} />
+      </div>
+      <span className="pointer-events-none absolute left-1/2 top-1 -translate-x-1/2 text-[10px] font-semibold text-white/45">T</span>
+      <span className="pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 text-[10px] font-semibold text-white/45">B</span>
+      <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-white/45">L</span>
+      <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-white/45">R</span>
     </div>
   );
 }
 
 function clampNumber(value: number, min: number, max: number): number {
   return Math.round(Math.min(max, Math.max(min, value)));
+}
+
+function orbitPointFromRotation(rotation: number): { x: number; y: number } {
+  const radians = rotation * Math.PI / 180;
+  return {
+    x: 50 + Math.sin(radians) * 32,
+    y: 50 + Math.cos(radians) * 32,
+  };
+}
+
+function rotationFromOrbitPoint(x: number, y: number): number {
+  return clampNumber(Math.atan2(x - 50, y - 50) * 180 / Math.PI, -180, 180);
 }
 
 function directionFromPreviewPoint(x: number, y: number): LightingAdjustmentState["direction"] {
@@ -685,9 +863,8 @@ function angleVisualState(state: AngleAdjustmentState): AngleVisualState {
   const rotateX = ANGLE_BASE_ROTATE_X - state.tilt * ANGLE_TILT_SENSITIVITY;
   const scale = ANGLE_BASE_SCALE + state.zoom / ANGLE_ZOOM_SCALE_DIVISOR;
   return {
-    cardTransform: `translateZ(36px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(${scale})`,
-    cubeTransform: `rotateX(${rotateX + ANGLE_CUBE_ROTATE_X_OFFSET}deg) rotateY(${rotateY + ANGLE_CUBE_ROTATE_Y_OFFSET}deg)`,
-    floorShadowTransform: `translateY(${ANGLE_SHADOW_BASE_Y + Math.abs(state.tilt) * ANGLE_SHADOW_TILT_FACTOR}px) scale(${ANGLE_SHADOW_BASE_SCALE + state.zoom / ANGLE_SHADOW_ZOOM_SCALE_DIVISOR}) rotateX(68deg)`,
+    cardTransform: `translateZ(${state.wideAngle ? 18 : 36}px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(${scale})`,
+    floorShadowTransform: `translateY(${ANGLE_SHADOW_BASE_Y + Math.abs(state.tilt) * ANGLE_SHADOW_TILT_FACTOR}px) scale(${ANGLE_SHADOW_BASE_SCALE + state.zoom / ANGLE_SHADOW_ZOOM_SCALE_DIVISOR}) rotateX(68deg) rotateZ(${state.rotation * 0.08}deg)`,
     lensInset: state.wideAngle ? ANGLE_WIDE_LENS_INSET : ANGLE_NATURAL_LENS_INSET,
     sideGlowOpacity: state.wideAngle ? ANGLE_WIDE_SIDE_GLOW_OPACITY : ANGLE_NATURAL_SIDE_GLOW_OPACITY,
   };
@@ -751,6 +928,7 @@ function lightingVisualState(state: LightingAdjustmentState): LightingVisualStat
   const heightTilt = state.height * LIGHT_HEIGHT_TILT_FACTOR;
   const beamAngle = Math.atan2(50 - point.y, 50 - point.x) * 180 / Math.PI;
   const beamWidth = LIGHT_BEAM_BASE_WIDTH + state.intensity * LIGHT_BEAM_WIDTH_FACTOR;
+  const orbSize = LIGHT_ORB_BASE_SIZE + state.intensity * LIGHT_ORB_SIZE_FACTOR;
   return {
     beamStyle: {
       background: `linear-gradient(90deg, ${colorStop(state.temperature, opacity)} 0%, ${colorStop(state.temperature, opacity * 0.5)} 38%, rgba(255,255,255,0.04) 72%, transparent 100%)`,
@@ -773,12 +951,12 @@ function lightingVisualState(state: LightingAdjustmentState): LightingVisualStat
     },
     orbStyle: {
       background: `radial-gradient(circle, ${color} 0%, ${colorStop(state.temperature, LIGHT_ORB_MID_ALPHA)} 28%, transparent 70%)`,
-      height: `${LIGHT_ORB_BASE_SIZE + state.intensity * LIGHT_ORB_SIZE_FACTOR}%`,
+      height: `${orbSize}%`,
       left: `${point.x}%`,
       opacity: state.direction === "back" ? LIGHT_ORB_BACK_OPACITY : LIGHT_ORB_VISIBLE_OPACITY,
       top: `${point.y}%`,
       transform: "translate(-50%, -50%)",
-      width: `${LIGHT_ORB_BASE_SIZE + state.intensity * LIGHT_ORB_SIZE_FACTOR}%`,
+      width: `${orbSize}%`,
     },
     overlayStyle: {
       background: [
@@ -794,6 +972,7 @@ function lightingVisualState(state: LightingAdjustmentState): LightingVisualStat
 
 function shadowGradientAngle(direction: LightingAdjustmentState["direction"]): number {
   const angles: Record<LightingAdjustmentState["direction"], number> = {
+    // Back/front/top keep the stage gradient subtle; the visible beam and surface hotspot carry direction.
     back: 0,
     bottom: 180,
     front: 0,

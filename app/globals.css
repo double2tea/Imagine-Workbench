@@ -7345,7 +7345,6 @@ html[data-imagine-theme="light"] .imagine-mark-xs,
   color: var(--iw-text) !important;
 }
 
-.imagine-workbench-shell.imagine-theme-light .imagine-visual-adjust-stage,
 .imagine-visual-adjust-stage {
   background: #2a2a2a !important;
   border-color: rgba(255, 255, 255, 0.1) !important;

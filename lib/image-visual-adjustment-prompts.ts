@@ -15,7 +15,13 @@ export interface LightingAdjustmentState {
   rimLight: boolean;
 }
 
-type PromptModelFamily = "gpt-image-2" | "nano-banana-pro" | "generic";
+const PROMPT_FAMILY_GPT_IMAGE = "gpt-image-2";
+const PROMPT_FAMILY_NANO_BANANA = "nano-banana-pro";
+const PROMPT_FAMILY_GENERIC = "generic";
+type PromptModelFamily =
+  | typeof PROMPT_FAMILY_GPT_IMAGE
+  | typeof PROMPT_FAMILY_NANO_BANANA
+  | typeof PROMPT_FAMILY_GENERIC;
 
 const ANGLE_ZOOM_CLOSEUP_THRESHOLD = 65;
 const ANGLE_ZOOM_WIDE_THRESHOLD = 35;
@@ -59,13 +65,14 @@ export function buildAngleAdjustmentPrompt(state: AngleAdjustmentState, model: s
 
 export function buildLightingAdjustmentPrompt(state: LightingAdjustmentState, model: string | undefined): string {
   const lighting = lightingPhrases(state);
+  const rimLightSentence = lighting.rimLight ? ` ${lighting.rimLight}` : "";
   const family = promptModelFamily(model);
   if (family === "gpt-image-2") {
     return [
       "Source image: the first input image is the image to relight.",
       "Guide image: any additional input image is a lighting guide only, not a content replacement.",
       `Goal: relight the image with ${lighting.direction} at ${lighting.height}.`,
-      `Change only: lighting direction, shadow direction, highlight placement, intensity set to ${lighting.intensity}, and color temperature set to ${lighting.temperature}.${lighting.rimLight}`,
+      `Change only: lighting direction, shadow direction, highlight placement, intensity set to ${lighting.intensity}, and color temperature set to ${lighting.temperature}.${rimLightSentence}`,
       "Preserve: subject identity, camera angle, geometry, composition, texture detail, key objects, and scene content.",
       "Constraints: no unrelated objects, no extra text, no watermark, keep all non-lighting details unchanged.",
     ].join("\n");
@@ -75,13 +82,13 @@ export function buildLightingAdjustmentPrompt(state: LightingAdjustmentState, mo
       "Use Image 1 as the source image and preserve its subject identity, scene content, composition, and style.",
       "Use Image 2, if provided, only as a lighting direction guide.",
       `Create a professional relighting edit with ${lighting.direction} at ${lighting.height}.`,
-      `Lighting: ${lighting.intensity}, ${lighting.temperature}, natural shadows and highlights.${lighting.rimLight}`,
+      `Lighting: ${lighting.intensity}, ${lighting.temperature}, natural shadows and highlights.${rimLightSentence}`,
       "Keep unchanged: camera angle, layout, geometry, texture detail, and all non-lighting content.",
     ].join("\n");
   }
   return [
     `Relight the provided image as if the key light is coming from ${lighting.direction} at ${lighting.height}.`,
-    `Set light intensity to ${lighting.intensity} with ${lighting.temperature} color temperature.${lighting.rimLight}`,
+    `Set light intensity to ${lighting.intensity} with ${lighting.temperature} color temperature.${rimLightSentence}`,
     "Preserve subject identity, composition, texture detail, and the original scene content.",
     "Only change lighting, highlights, shadows, and color temperature.",
   ].join("\n");
@@ -92,10 +99,10 @@ export function isVisualAdjustmentFeature(feature: ImageEditFeature): feature is
 }
 
 function promptModelFamily(model: string | undefined): PromptModelFamily {
-  if (!model) return "generic";
-  if (model.includes("gpt-image-2")) return "gpt-image-2";
-  if (model.includes("gemini-3-pro-image") || model.includes("gemini-3-pro-image-preview")) return "nano-banana-pro";
-  return "generic";
+  if (!model) return PROMPT_FAMILY_GENERIC;
+  if (model.includes(PROMPT_FAMILY_GPT_IMAGE)) return PROMPT_FAMILY_GPT_IMAGE;
+  if (model.includes("gemini-3-pro-image")) return PROMPT_FAMILY_NANO_BANANA;
+  return PROMPT_FAMILY_GENERIC;
 }
 
 function angleCameraPhrases(state: AngleAdjustmentState): {
@@ -139,7 +146,7 @@ function azimuthPhrase(rotation: number): string {
     "left side view",
     "front-left quarter view",
   ] as const;
-  return phrases[index] ?? "front view";
+  return phrases[index]!;
 }
 
 function lightingPhrases(state: LightingAdjustmentState): {
@@ -153,7 +160,7 @@ function lightingPhrases(state: LightingAdjustmentState): {
     direction: directionPhrase(state.direction),
     height: heightPhrase(state.height),
     intensity: intensityPhrase(state.intensity),
-    rimLight: state.rimLight ? " Add a subtle rim light around the subject." : "",
+    rimLight: state.rimLight ? "Add a subtle rim light around the subject." : "",
     temperature: temperaturePhrase(state.temperature),
   };
 }
