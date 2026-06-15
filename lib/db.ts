@@ -8,7 +8,7 @@ import type { AudioOperationMode } from "./providers/model-catalog";
 import type { RunningHubTaskNodeBinding, RunningHubYouchuanAdvancedSettings } from "./providers/types";
 
 const DB_NAME = "ImagineWorkbenchDB";
-const DB_VERSION = 8;
+const DB_VERSION = 9;
 const META_STORE = "assets_meta";
 const BLOB_STORE = "assets_blob";
 const HASH_BLOB_STORE = "asset_blob_payloads";
@@ -370,8 +370,11 @@ function ensureLibraryIndexes(library: IDBObjectStore): void {
   if (!library.indexNames.contains("by_assetId")) {
     library.createIndex("by_assetId", "assetId", { unique: false });
   }
+  if (library.indexNames.contains("by_sourceAssetId") && !library.index("by_sourceAssetId").unique) {
+    library.deleteIndex("by_sourceAssetId");
+  }
   if (!library.indexNames.contains("by_sourceAssetId")) {
-    library.createIndex("by_sourceAssetId", "sourceAssetId", { unique: false });
+    library.createIndex("by_sourceAssetId", "sourceAssetId", { unique: true });
   }
   if (!library.indexNames.contains("by_mediaType")) {
     library.createIndex("by_mediaType", "mediaType", { unique: false });
@@ -636,6 +639,29 @@ export async function saveLibraryAssetRecord(record: LibraryAssetRecord): Promis
 }
 
 export async function deleteLibraryAssetRecord(id: string): Promise<void> {
+  const record = await getLibraryAssetRecord(id);
+  if (!record) {
+    await deleteLibraryRecordOnly(id);
+    return;
+  }
+  const meta = await getAssetMeta(record.assetId);
+  const db = await openDatabase();
+  await new Promise<void>((resolve, reject) => {
+    const transaction = db.transaction([LIBRARY_STORE, META_STORE, BLOB_STORE, PREVIEW_STORE], "readwrite");
+    transaction.objectStore(LIBRARY_STORE).delete(id);
+    transaction.objectStore(META_STORE).delete(record.assetId);
+    transaction.objectStore(BLOB_STORE).delete(record.assetId);
+    transaction.objectStore(PREVIEW_STORE).delete(record.assetId);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error ?? new Error("IndexedDB library asset delete failed"));
+    transaction.onabort = () => reject(transaction.error ?? new Error("IndexedDB library asset delete aborted"));
+  });
+  if (meta?.contentHash) {
+    await deleteUnreferencedHashBlobPayload(meta.contentHash);
+  }
+}
+
+async function deleteLibraryRecordOnly(id: string): Promise<void> {
   const db = await openDatabase();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(LIBRARY_STORE, "readwrite");
@@ -943,20 +969,32 @@ export async function saveToDB(item: StorageItem): Promise<void> {
   }
 }
 
-export async function deleteFromDB(id: string): Promise<void> {
+async function deleteAssetRecordOnly(id: string, deleteLibraryRecord: boolean): Promise<StorageItemMeta | null> {
   const meta = await getAssetMeta(id);
   const db = await openDatabase();
   await new Promise<void>((resolve, reject) => {
-    const transaction = db.transaction([META_STORE, BLOB_STORE, PREVIEW_STORE], "readwrite");
+    const storeNames = deleteLibraryRecord && meta?.libraryItemId
+      ? [META_STORE, BLOB_STORE, PREVIEW_STORE, LIBRARY_STORE]
+      : [META_STORE, BLOB_STORE, PREVIEW_STORE];
+    const transaction = db.transaction(storeNames, "readwrite");
     transaction.objectStore(META_STORE).delete(id);
     transaction.objectStore(BLOB_STORE).delete(id);
     transaction.objectStore(PREVIEW_STORE).delete(id);
+    if (deleteLibraryRecord && meta?.libraryItemId) {
+      transaction.objectStore(LIBRARY_STORE).delete(meta.libraryItemId);
+    }
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error ?? new Error("IndexedDB delete failed"));
+    transaction.onabort = () => reject(transaction.error ?? new Error("IndexedDB delete aborted"));
   });
   if (meta?.contentHash) {
     await deleteUnreferencedHashBlobPayload(meta.contentHash);
   }
+  return meta;
+}
+
+export async function deleteFromDB(id: string): Promise<void> {
+  await deleteAssetRecordOnly(id, true);
 }
 
 export async function clearAllDB(): Promise<void> {
@@ -996,10 +1034,40 @@ export async function listWorkspaceGalleryMetas(options?: {
   limit?: number;
   offset?: number;
 }): Promise<StorageItemMeta[]> {
-  const metas = (await listAssetMetas({ boardId: "" })).filter(meta => !meta.libraryItemId);
   const offset = Math.max(0, options?.offset ?? 0);
-  if (options?.limit !== undefined && options.limit >= 0) return metas.slice(offset, offset + options.limit);
-  return offset > 0 ? metas.slice(offset) : metas;
+  const limit = options?.limit;
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(META_STORE, "readonly");
+    const request = transaction.objectStore(META_STORE).index("by_createdAt_id").openCursor(null, "prev");
+    const metas: StorageItemMeta[] = [];
+    let skipped = 0;
+
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) {
+        resolve(metas);
+        return;
+      }
+
+      const meta = normalizeMeta(cursor.value as StorageItemMeta);
+      if (meta.boardId === "" && !meta.libraryItemId) {
+        if (skipped < offset) {
+          skipped += 1;
+        } else if (limit === undefined || limit < 0 || metas.length < limit) {
+          metas.push(meta);
+        }
+      }
+
+      if (limit !== undefined && limit >= 0 && metas.length >= limit) {
+        resolve(metas);
+        return;
+      }
+      cursor.continue();
+    };
+    request.onerror = () => reject(request.error ?? new Error("IndexedDB workspace gallery read failed"));
+    transaction.onerror = () => reject(transaction.error ?? request.error ?? new Error("IndexedDB workspace gallery transaction failed"));
+  });
 }
 
 /** Full hydration — avoid on board route; prefer scoped loaders. */

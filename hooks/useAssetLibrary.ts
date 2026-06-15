@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   deleteLibraryAssetRecord,
   getAssetMetasByIds,
@@ -18,26 +18,45 @@ export interface LibraryAssetEntry {
   item: StorageItem | null;
 }
 
+function normalizeError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
 export function useAssetLibrary() {
   const [records, setRecords] = useState<LibraryAssetRecord[]>([]);
   const [itemsById, setItemsById] = useState<Map<string, StorageItem>>(() => new Map());
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const mountedRef = useRef(false);
 
   const reload = useCallback(async () => {
-    setLoading(true);
+    if (mountedRef.current) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const nextRecords = await listLibraryAssetRecords();
       const metas = await getAssetMetasByIds(nextRecords.map(record => record.assetId));
       const items = await hydrateAssets(metas);
-      setRecords(nextRecords);
-      setItemsById(new Map(items.map(item => [item.id, item])));
+      if (mountedRef.current) {
+        setRecords(nextRecords);
+        setItemsById(new Map(items.map(item => [item.id, item])));
+      }
+    } catch (caught) {
+      const nextError = normalizeError(caught);
+      if (mountedRef.current) setError(nextError);
+      throw nextError;
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void reload();
+    mountedRef.current = true;
+    void reload().catch(() => undefined);
+    return () => {
+      mountedRef.current = false;
+    };
   }, [reload]);
 
   const entries = useMemo<LibraryAssetEntry[]>(
@@ -46,32 +65,61 @@ export function useAssetLibrary() {
   );
 
   const addSource = useCallback(async (source: StorageItem) => {
-    const result = await addSourceAssetToLibrary(source);
-    await reload();
-    return result;
+    setError(null);
+    try {
+      const result = await addSourceAssetToLibrary(source);
+      await reload();
+      return result;
+    } catch (caught) {
+      const nextError = normalizeError(caught);
+      if (mountedRef.current) setError(nextError);
+      throw nextError;
+    }
   }, [reload]);
 
   const importFiles = useCallback(async (files: File[]) => {
-    const imported = await importFilesToLibrary(files);
-    await reload();
-    return imported;
+    setError(null);
+    try {
+      const imported = await importFilesToLibrary(files);
+      await reload();
+      return imported;
+    } catch (caught) {
+      const nextError = normalizeError(caught);
+      if (mountedRef.current) setError(nextError);
+      throw nextError;
+    }
   }, [reload]);
 
   const updateRecord = useCallback(async (record: LibraryAssetRecord) => {
-    await saveLibraryAssetRecord({
-      ...record,
-      updatedAt: new Date().toISOString(),
-    });
-    await reload();
+    setError(null);
+    try {
+      await saveLibraryAssetRecord({
+        ...record,
+        updatedAt: new Date().toISOString(),
+      });
+      await reload();
+    } catch (caught) {
+      const nextError = normalizeError(caught);
+      if (mountedRef.current) setError(nextError);
+      throw nextError;
+    }
   }, [reload]);
 
   const removeRecord = useCallback(async (record: LibraryAssetRecord) => {
-    await deleteLibraryAssetRecord(record.id);
-    await reload();
+    setError(null);
+    try {
+      await deleteLibraryAssetRecord(record.id);
+      await reload();
+    } catch (caught) {
+      const nextError = normalizeError(caught);
+      if (mountedRef.current) setError(nextError);
+      throw nextError;
+    }
   }, [reload]);
 
   return {
     entries,
+    error,
     loading,
     records,
     addSource,

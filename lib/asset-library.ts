@@ -1,5 +1,6 @@
 import {
   buildStorageItem,
+  deleteFromDB,
   getLibraryAssetRecordBySourceAssetId,
   hydrateAsset,
   listLibraryAssetRecords,
@@ -34,7 +35,7 @@ function makeClientId(prefix: string): string {
   if (cryptoApi && typeof cryptoApi.randomUUID === "function") {
     return `${prefix}_${cryptoApi.randomUUID()}`;
   }
-  return `${prefix}_${Date.now()}`;
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
 function isLibraryMediaType(type: StorageItem["type"]): type is LibraryAssetMediaType {
@@ -50,7 +51,7 @@ function defaultLibraryTitle(item: Pick<StorageItem, "prompt" | "model" | "opera
   return model || fallback;
 }
 
-async function saveLibraryBackingAsset(
+async function buildLibraryBackingAsset(
   source: StorageItem,
   recordId: string,
   assetId: string,
@@ -65,8 +66,17 @@ async function saveLibraryBackingAsset(
     sourceBoardResultStackKey: undefined,
     libraryItemId: recordId,
   });
-  await saveToDB(backing);
   return backing;
+}
+
+async function saveLibraryAssetPair(backing: StorageItem, record: LibraryAssetRecord): Promise<void> {
+  await saveToDB(backing);
+  try {
+    await saveLibraryAssetRecord(record);
+  } catch (error) {
+    await deleteFromDB(backing.id);
+    throw error;
+  }
 }
 
 export async function addSourceAssetToLibrary(
@@ -82,7 +92,7 @@ export async function addSourceAssetToLibrary(
   const now = new Date().toISOString();
   const recordId = makeClientId("library_item");
   const backingAssetId = makeClientId("library_asset");
-  await saveLibraryBackingAsset(source, recordId, backingAssetId);
+  const backing = await buildLibraryBackingAsset(source, recordId, backingAssetId);
   const record: LibraryAssetRecord = {
     id: recordId,
     assetId: backingAssetId,
@@ -97,7 +107,7 @@ export async function addSourceAssetToLibrary(
     createdAt: now,
     updatedAt: now,
   };
-  await saveLibraryAssetRecord(record);
+  await saveLibraryAssetPair(backing, record);
   return { record, created: true };
 }
 
@@ -114,7 +124,6 @@ export async function importFilesToLibrary(files: File[]): Promise<LibraryAssetR
       operationName: "asset-library",
       libraryItemId: recordId,
     });
-    await saveToDB(backing);
     const record: LibraryAssetRecord = {
       id: recordId,
       assetId: backing.id,
@@ -128,7 +137,7 @@ export async function importFilesToLibrary(files: File[]): Promise<LibraryAssetR
       createdAt: now,
       updatedAt: now,
     };
-    await saveLibraryAssetRecord(record);
+    await saveLibraryAssetPair(backing, record);
     records.push(record);
   }
   return records;

@@ -303,6 +303,8 @@ export default function VideoGenerationPanel({
         emptyHelp={`支持 ${acceptedReferenceText} | 最多 ${referenceLimit} 个 | ${referenceHelp}`}
         emptyLabel={`添加${referenceLabel}`}
         label={`${referenceLabel} ${referenceImages.length > 0 ? `(${Math.min(referenceImages.length, referenceLimit)}/${referenceLimit})` : ""}`}
+        libraryBrowseLabel="从素材库选择"
+        libraryTileLabel="素材库"
         maxCount={referenceLimit}
         references={referenceImages}
         roleMode={referenceMode === "firstLast"}

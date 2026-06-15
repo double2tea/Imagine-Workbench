@@ -58,6 +58,10 @@ function recordSearchText(entry: LibraryAssetEntry): string {
   ].join(" ").toLowerCase();
 }
 
+function actionErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message.trim() ? error.message : fallback;
+}
+
 export default function AssetLibraryModal({
   entries,
   loading = false,
@@ -80,6 +84,7 @@ export default function AssetLibraryModal({
   const [draftNotes, setDraftNotes] = useState("");
   const [draftTags, setDraftTags] = useState("");
   const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -104,6 +109,7 @@ export default function AssetLibraryModal({
 
   useEffect(() => {
     if (!open) return;
+    setActionError(null);
     const panel = panelRef.current;
     const focusTimer = window.setTimeout(() => {
       panel?.querySelector<HTMLElement>('button, input, select, textarea, [tabindex]:not([tabindex="-1"])')?.focus();
@@ -149,8 +155,11 @@ export default function AssetLibraryModal({
     event.target.value = "";
     if (files.length === 0) return;
     setBusy(true);
+    setActionError(null);
     try {
       await onImportFiles(files);
+    } catch (error) {
+      setActionError(actionErrorMessage(error, "素材导入失败"));
     } finally {
       setBusy(false);
     }
@@ -159,6 +168,7 @@ export default function AssetLibraryModal({
   const saveDraft = async () => {
     if (!activeRecord || !hasDraftChanges) return;
     setBusy(true);
+    setActionError(null);
     try {
       await onUpdate({
         ...activeRecord,
@@ -167,6 +177,8 @@ export default function AssetLibraryModal({
         notes: draftNotes,
         tags: draftTags.split(",").map(tag => tag.trim()).filter(tag => tag.length > 0),
       });
+    } catch (error) {
+      setActionError(actionErrorMessage(error, "保存素材信息失败"));
     } finally {
       setBusy(false);
     }
@@ -174,8 +186,11 @@ export default function AssetLibraryModal({
 
   const toggleFavorite = async (record: LibraryAssetRecord) => {
     setBusy(true);
+    setActionError(null);
     try {
       await onUpdate({ ...record, favorite: !record.favorite });
+    } catch (error) {
+      setActionError(actionErrorMessage(error, "更新收藏状态失败"));
     } finally {
       setBusy(false);
     }
@@ -184,9 +199,12 @@ export default function AssetLibraryModal({
   const removeActive = async () => {
     if (!activeRecord) return;
     setBusy(true);
+    setActionError(null);
     try {
       await onRemove(activeRecord);
       setActiveRecordId(null);
+    } catch (error) {
+      setActionError(actionErrorMessage(error, "移出素材库失败"));
     } finally {
       setBusy(false);
     }
@@ -209,8 +227,10 @@ export default function AssetLibraryModal({
             <input
               ref={fileInputRef}
               type="file"
+              name="asset-library-import"
               multiple
               accept="image/*,video/*,audio/*"
+              aria-label="导入素材到素材库"
               onChange={handleFileChange}
               className="hidden"
             />
@@ -357,6 +377,11 @@ export default function AssetLibraryModal({
           </section>
 
           <aside className="flex min-h-0 flex-col gap-3 overflow-y-auto p-3">
+            {actionError && (
+              <p className="rounded-lg border border-[var(--iw-tone-danger-border)] bg-[var(--iw-tone-danger-surface)] px-3 py-2 text-xs text-[var(--iw-tone-danger-text)]">
+                {actionError}
+              </p>
+            )}
             {activeEntry && activeRecord ? (
               <>
                 <div className="flex items-start justify-between gap-2">

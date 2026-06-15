@@ -1,5 +1,5 @@
 import type { ChangeEvent, DragEvent, KeyboardEvent, MouseEvent } from "react";
-import { CloudUpload, Layers, Music, X } from "lucide-react";
+import { CloudUpload, FolderHeart, Layers, Music, X } from "lucide-react";
 import {
   type DraggedReferenceAsset,
   hasDraggedReferenceAsset,
@@ -20,6 +20,8 @@ interface ReferenceImagePickerProps {
   references: ReferenceImageRef[];
   roleMode?: boolean;
   uploadLabel: string;
+  libraryBrowseLabel: string;
+  libraryTileLabel: string;
   onClear: () => void;
   onOpenLibrary?: () => void;
   onDropAsset?: (asset: DraggedReferenceAsset) => void;
@@ -83,6 +85,8 @@ export default function ReferenceImagePicker({
   references,
   roleMode = false,
   uploadLabel,
+  libraryBrowseLabel,
+  libraryTileLabel,
   onClear,
   onOpenLibrary,
   onDropAsset,
@@ -251,8 +255,8 @@ export default function ReferenceImagePicker({
                   onClick={onOpenLibrary}
                   className="imagine-reference-add-tile"
                 >
-                  <span className="font-bold text-lg leading-none">L</span>
-                  <span className="mt-0.5 text-[9px] font-semibold">素材库</span>
+                  <FolderHeart className="h-4 w-4" />
+                  <span className="mt-0.5 text-[9px] font-semibold">{libraryTileLabel}</span>
                 </button>
               )}
             </>
@@ -281,7 +285,7 @@ export default function ReferenceImagePicker({
               {onOpenLibrary && maxCount > 0 ? (
                 <>
                   {" / "}
-                  <button type="button" onClick={onOpenLibrary} className={browseClassName}>从素材库选择</button>
+                  <button type="button" onClick={onOpenLibrary} className={browseClassName}>{libraryBrowseLabel}</button>
                 </>
               ) : null}
           </span>

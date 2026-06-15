@@ -361,6 +361,8 @@ export default function ImageGenerationPanel({
         emptyHelp={imageReferenceHelp}
         emptyLabel={imageReferenceLimit > 0 ? "添加图片" : "当前模型不支持参考图"}
         label={`创意参考图 / 多图垫图 ${referenceImages.length > 0 ? `(${imageReferenceCountLabel})` : ""}`}
+        libraryBrowseLabel="从素材库选择"
+        libraryTileLabel="素材库"
         maxCount={imageReferenceLimit}
         references={referenceImages}
         uploadLabel={imageReferenceLimit > 0 ? "浏览上传" : "不可上传"}

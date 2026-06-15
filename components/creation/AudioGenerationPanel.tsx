@@ -434,6 +434,8 @@ export default function AudioGenerationPanel({
         emptyHelp={referenceLimit > 0 ? "可拖入右侧资产或上传音频/视频/图片参考" : "当前模型不支持参考媒体"}
         emptyLabel={referenceLimit > 0 ? "拖入参考媒体" : "无需参考媒体"}
         label={`参考媒体 ${referenceLimit > 0 ? `${Math.min(referenceImages.length, referenceLimit)}/${referenceLimit}` : "0/0"}`}
+        libraryBrowseLabel="从素材库选择"
+        libraryTileLabel="素材库"
         maxCount={referenceLimit}
         references={referenceImages}
         uploadLabel={referenceLimit > 0 ? "上传参考" : "不可上传"}
