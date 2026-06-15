@@ -612,7 +612,7 @@ export default function Home() {
 
   const asyncImageModel = resolveAsyncImageModelValue(selectedModel, referenceImages.length);
   const canUseBackgroundImageGeneration = asyncImageModel !== null;
-  const shouldUseAsyncImageGeneration = (imageBackgroundGeneration || isSubmittingImage) && canUseBackgroundImageGeneration;
+  const shouldUseAsyncImageGeneration = imageBackgroundGeneration && canUseBackgroundImageGeneration;
   const activeImageModel = shouldUseAsyncImageGeneration && asyncImageModel ? asyncImageModel : selectedModel;
   const videoPriceReferenceTypes = selectVideoReferenceTypesForMode(
     referenceImages,
