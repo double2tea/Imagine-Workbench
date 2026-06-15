@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { badRequest } from "./errors";
@@ -170,7 +170,12 @@ async function writeCredentialStore(credentialsPath: string, store: ResolveProvi
   await mkdir(dirname(credentialsPath), { recursive: true });
   const tempPath = `${credentialsPath}.${process.pid}.${randomUUID()}.tmp`;
   await writeFile(tempPath, `${JSON.stringify(store, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
-  await rename(tempPath, credentialsPath);
+  try {
+    await rename(tempPath, credentialsPath);
+  } catch (error) {
+    await unlink(tempPath).catch(() => undefined);
+    throw error;
+  }
 }
 
 function isMissingFileError(error: unknown): boolean {
