@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { createPortal } from "react-dom";
 import {
   Download,
   FolderHeart,
@@ -39,6 +40,8 @@ type ViewMode = "grid" | "list";
 const MIN_GRID_CARD_SIZE = 140;
 const MAX_GRID_CARD_SIZE = 280;
 const DEFAULT_GRID_CARD_SIZE = 180;
+const FIELD_LABEL_CLASS_NAME = "flex flex-col gap-1.5 text-[10px] font-semibold text-[var(--iw-muted)]";
+const FIELD_CONTROL_CLASS_NAME = "rounded-lg border border-[var(--iw-border)] bg-[color-mix(in_srgb,var(--iw-panel-solid)_82%,transparent)] px-3 text-xs text-[var(--iw-text)] outline-none transition focus:border-[color-mix(in_srgb,var(--iw-accent)_58%,var(--iw-border))] focus:ring-2 focus:ring-[var(--iw-accent-soft)]";
 
 interface AssetLibraryModalProps {
   entries: LibraryAssetEntry[];
@@ -108,14 +111,6 @@ function renderAssetInspectorPreview(entry: LibraryAssetEntry) {
   return mediaIcon(entry.record.mediaType);
 }
 
-function fieldLabelClassName(): string {
-  return "flex flex-col gap-1.5 text-[10px] font-semibold text-[var(--iw-muted)]";
-}
-
-function fieldControlClassName(): string {
-  return "rounded-lg border border-[var(--iw-border)] bg-[color-mix(in_srgb,var(--iw-panel-solid)_82%,transparent)] px-3 text-xs text-[var(--iw-text)] outline-none transition focus:border-[color-mix(in_srgb,var(--iw-accent)_58%,var(--iw-border))] focus:ring-2 focus:ring-[var(--iw-accent-soft)]";
-}
-
 function renderAssetFullscreenMedia(entry: LibraryAssetEntry) {
   if (entry.item?.type === "image") {
     return <PreviewImage src={entry.item.url} alt={entry.record.title} className="h-full w-full object-contain" />;
@@ -175,6 +170,8 @@ export default function AssetLibraryModal({
   const [actionError, setActionError] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const fullscreenCloseRef = useRef<HTMLButtonElement | null>(null);
+  const onCloseRef = useRef(onClose);
 
   const filteredEntries = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -197,6 +194,23 @@ export default function AssetLibraryModal({
     return filteredEntries[0] ?? entries[0] ?? null;
   }, [activeRecordId, entries, filteredEntries]);
 
+  const activeRecord = activeEntry?.record ?? null;
+  const hasDraftChanges = activeRecord
+    ? draftTitle !== activeRecord.title ||
+      draftCategory !== activeRecord.category ||
+      draftNotes !== activeRecord.notes ||
+      draftTags !== activeRecord.tags.join(", ")
+    : false;
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!open || activeRecordId !== undefined || !activeEntry) return;
+    setActiveRecordId(activeEntry.record.id);
+  }, [activeEntry, activeRecordId, open]);
+
   useEffect(() => {
     if (!open) return;
     setActionError(null);
@@ -211,14 +225,20 @@ export default function AssetLibraryModal({
         setFullscreenEntry(null);
         return;
       }
-      onClose();
+      onCloseRef.current();
     };
     document.addEventListener("keydown", onKeyDown);
     return () => {
       window.clearTimeout(focusTimer);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [fullscreenEntry, onClose, open]);
+  }, [fullscreenEntry, open]);
+
+  useEffect(() => {
+    if (!fullscreenEntry) return;
+    const focusTimer = window.setTimeout(() => fullscreenCloseRef.current?.focus(), 0);
+    return () => window.clearTimeout(focusTimer);
+  }, [fullscreenEntry]);
 
   useEffect(() => {
     setActionError(null);
@@ -233,17 +253,9 @@ export default function AssetLibraryModal({
     setDraftCategory(activeEntry.record.category);
     setDraftNotes(activeEntry.record.notes);
     setDraftTags(activeEntry.record.tags.join(", "));
-  }, [activeEntry]);
+  }, [activeEntry?.record.id]);
 
   if (!open) return null;
-
-  const activeRecord = activeEntry?.record ?? null;
-  const hasDraftChanges = activeRecord
-    ? draftTitle !== activeRecord.title ||
-      draftCategory !== activeRecord.category ||
-      draftNotes !== activeRecord.notes ||
-      draftTags !== activeRecord.tags.join(", ")
-    : false;
 
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
@@ -262,16 +274,27 @@ export default function AssetLibraryModal({
 
   const saveDraft = async () => {
     if (!activeRecord || !hasDraftChanges || savingDraft) return;
+    const nextTitle = draftTitle.trim();
+    if (!nextTitle) {
+      setActionError("标题不能为空");
+      setDraftTitle(activeRecord.title);
+      return;
+    }
+    const nextNotes = draftNotes.trim();
+    const nextTags = draftTags.split(",").map(tag => tag.trim()).filter(tag => tag.length > 0);
     setSavingDraft(true);
     setActionError(null);
     try {
       await onUpdate({
         ...activeRecord,
-        title: draftTitle.trim() || activeRecord.title,
+        title: nextTitle,
         category: draftCategory,
-        notes: draftNotes,
-        tags: draftTags.split(",").map(tag => tag.trim()).filter(tag => tag.length > 0),
+        notes: nextNotes,
+        tags: nextTags,
       });
+      setDraftTitle(nextTitle);
+      setDraftNotes(nextNotes);
+      setDraftTags(nextTags.join(", "));
     } catch (error) {
       setActionError(actionErrorMessage(error, "保存素材信息失败"));
     } finally {
@@ -305,6 +328,50 @@ export default function AssetLibraryModal({
       setRemoving(false);
     }
   };
+
+  const selectEntry = (entry: LibraryAssetEntry) => {
+    if (activeRecord && activeRecord.id !== entry.record.id && hasDraftChanges) {
+      setActionError("请先保存当前素材信息后再切换素材");
+      return;
+    }
+    setActiveRecordId(entry.record.id);
+  };
+
+  const fullscreenOverlay = fullscreenEntry && typeof document !== "undefined"
+    ? createPortal(
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="asset-library-fullscreen-title"
+        className="fixed inset-0 z-[90] flex flex-col bg-slate-950/95 p-3 text-white backdrop-blur-md sm:p-5"
+      >
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 pb-3">
+          <div className="min-w-0">
+            <h3 id="asset-library-fullscreen-title" className="truncate text-sm font-semibold">
+              {fullscreenEntry.record.title}
+            </h3>
+            <p className="mt-1 font-mono text-[10px] text-white/45">
+              {LIBRARY_ASSET_MEDIA_TYPE_LABELS[fullscreenEntry.record.mediaType]} ·{" "}
+              {LIBRARY_ASSET_CATEGORY_LABELS[fullscreenEntry.record.category]} · {formatDate(fullscreenEntry.record.updatedAt)}
+            </p>
+          </div>
+          <button
+            ref={fullscreenCloseRef}
+            type="button"
+            onClick={() => setFullscreenEntry(null)}
+            className="imagine-secondary-action flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/10 text-white"
+            aria-label="关闭全屏预览"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="flex min-h-0 flex-1 items-center justify-center py-4">
+          {renderAssetFullscreenMedia(fullscreenEntry)}
+        </div>
+      </div>,
+      document.body,
+    )
+    : null;
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/72 p-3 backdrop-blur-md sm:p-6">
@@ -497,7 +564,7 @@ export default function AssetLibraryModal({
                         key={entry.record.id}
                         type="button"
                         data-active={selected}
-                        onClick={() => setActiveRecordId(entry.record.id)}
+                        onClick={() => selectEntry(entry)}
                         onDoubleClick={() => setFullscreenEntry(entry)}
                         className="group imagine-asset-card flex min-w-0 flex-col overflow-hidden rounded-xl border border-[color-mix(in_srgb,var(--iw-border)_82%,transparent)] bg-[color-mix(in_srgb,var(--iw-panel-solid)_76%,transparent)] text-left shadow-[0_14px_34px_rgba(0,0,0,0.10)] transition hover:-translate-y-0.5 hover:border-[color-mix(in_srgb,var(--iw-accent)_42%,var(--iw-border))] hover:shadow-[0_20px_46px_rgba(0,0,0,0.16)] data-[active=true]:border-[var(--iw-accent)] data-[active=true]:bg-[color-mix(in_srgb,var(--iw-accent)_8%,var(--iw-panel))] data-[active=true]:shadow-[0_0_0_3px_var(--iw-accent-soft),0_18px_44px_rgba(0,0,0,0.16)]"
                         title="双击全屏预览"
@@ -536,7 +603,7 @@ export default function AssetLibraryModal({
                         key={entry.record.id}
                         type="button"
                         data-active={selected}
-                        onClick={() => setActiveRecordId(entry.record.id)}
+                        onClick={() => selectEntry(entry)}
                         onDoubleClick={() => setFullscreenEntry(entry)}
                         className="imagine-asset-card grid min-w-0 grid-cols-[92px_minmax(0,1fr)_auto] items-center gap-3 overflow-hidden rounded-xl border border-[color-mix(in_srgb,var(--iw-border)_82%,transparent)] bg-[color-mix(in_srgb,var(--iw-panel-solid)_72%,transparent)] p-2 text-left shadow-[0_10px_24px_rgba(0,0,0,0.08)] transition hover:border-[color-mix(in_srgb,var(--iw-accent)_42%,var(--iw-border))] data-[active=true]:border-[var(--iw-accent)] data-[active=true]:bg-[color-mix(in_srgb,var(--iw-accent)_8%,var(--iw-panel))] data-[active=true]:shadow-[0_0_0_3px_var(--iw-accent-soft)]"
                         title="双击全屏预览"
@@ -617,42 +684,42 @@ export default function AssetLibraryModal({
                     <SlidersHorizontal className="h-3.5 w-3.5 text-[var(--iw-accent)]" />
                     素材信息
                   </div>
-                  <label className={fieldLabelClassName()}>
+                  <label className={FIELD_LABEL_CLASS_NAME}>
                     标题
                     <input
                       value={draftTitle}
                       onChange={event => setDraftTitle(event.target.value)}
-                      className={`${fieldControlClassName()} h-9`}
+                      className={`${FIELD_CONTROL_CLASS_NAME} h-9`}
                     />
                   </label>
-                  <label className={`${fieldLabelClassName()} mt-3`}>
+                  <label className={`${FIELD_LABEL_CLASS_NAME} mt-3`}>
                     分类
                     <select
                       value={draftCategory}
                       onChange={event => setDraftCategory(event.target.value as LibraryAssetCategory)}
-                      className={`${fieldControlClassName()} h-9`}
+                      className={`${FIELD_CONTROL_CLASS_NAME} h-9`}
                     >
                       {LIBRARY_ASSET_CATEGORIES.map(category => (
                         <option key={category} value={category}>{LIBRARY_ASSET_CATEGORY_LABELS[category]}</option>
                       ))}
                     </select>
                   </label>
-                  <label className={`${fieldLabelClassName()} mt-3`}>
+                  <label className={`${FIELD_LABEL_CLASS_NAME} mt-3`}>
                     标签
                     <input
                       value={draftTags}
                       onChange={event => setDraftTags(event.target.value)}
                       placeholder="逗号分隔"
-                      className={`${fieldControlClassName()} h-9`}
+                      className={`${FIELD_CONTROL_CLASS_NAME} h-9`}
                     />
                   </label>
-                  <label className={`${fieldLabelClassName()} mt-3`}>
+                  <label className={`${FIELD_LABEL_CLASS_NAME} mt-3`}>
                     备注
                     <textarea
                       value={draftNotes}
                       onChange={event => setDraftNotes(event.target.value)}
                       rows={4}
-                      className={`${fieldControlClassName()} resize-none py-2`}
+                      className={`${FIELD_CONTROL_CLASS_NAME} resize-none py-2`}
                     />
                   </label>
                 </div>
@@ -695,37 +762,7 @@ export default function AssetLibraryModal({
           </aside>
         </div>
       </div>
-      {fullscreenEntry && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="asset-library-fullscreen-title"
-          className="fixed inset-0 z-[90] flex flex-col bg-slate-950/95 p-3 text-white backdrop-blur-md sm:p-5"
-        >
-          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 pb-3">
-            <div className="min-w-0">
-              <h3 id="asset-library-fullscreen-title" className="truncate text-sm font-semibold">
-                {fullscreenEntry.record.title}
-              </h3>
-              <p className="mt-1 font-mono text-[10px] text-white/45">
-                {LIBRARY_ASSET_MEDIA_TYPE_LABELS[fullscreenEntry.record.mediaType]} ·{" "}
-                {LIBRARY_ASSET_CATEGORY_LABELS[fullscreenEntry.record.category]} · {formatDate(fullscreenEntry.record.updatedAt)}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setFullscreenEntry(null)}
-              className="imagine-secondary-action flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/10 text-white"
-              aria-label="关闭全屏预览"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-          <div className="flex min-h-0 flex-1 items-center justify-center py-4">
-            {renderAssetFullscreenMedia(fullscreenEntry)}
-          </div>
-        </div>
-      )}
+      {fullscreenOverlay}
     </div>
   );
 }

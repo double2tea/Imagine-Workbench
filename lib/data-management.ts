@@ -990,7 +990,7 @@ function parseLibraryAssetRecord(value: unknown, index: number): LibraryAssetRec
     mediaType: readLibraryAssetMediaType(value, "mediaType"),
     category: readLibraryAssetCategory(value, "category"),
     title: readString(value, "title"),
-    notes: readText(value, "notes"),
+    notes: readOptionalString(value, "notes") ?? "",
     tags: readOptionalStringArray(value, "tags") ?? [],
     favorite: readBoolean(value, "favorite"),
     createdAt: readDateString(value, "createdAt"),

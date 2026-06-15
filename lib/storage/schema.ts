@@ -1,5 +1,5 @@
 import type { BoardDocument, BoardSummary } from "@/lib/board/types";
-import type { AssetPreviewRecord, StorageItemMeta } from "@/lib/db";
+import type { AssetPreviewRecord, LibraryAssetRecord, StorageItemMeta } from "@/lib/db";
 import type { GenerationTask } from "@/lib/generation-tasks";
 import type { WorkspaceStorageTargetKind } from "@/lib/local-storage-targets";
 
@@ -42,6 +42,10 @@ export interface WorkspaceAssetPayloadRecord {
 export interface WorkspaceAssetPreviewRecord {
   preview: AssetPreviewRecord;
   ref?: WorkspaceAssetPayloadRef;
+}
+
+export interface WorkspaceAssetLibraryRecord {
+  record: LibraryAssetRecord;
 }
 
 export interface WorkspaceBoardRecord {

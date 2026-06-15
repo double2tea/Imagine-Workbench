@@ -337,6 +337,7 @@ export default function Home() {
   const [showSettings, setShowSettings] = useState(false);
   const [assetLibraryMode, setAssetLibraryMode] = useState<AssetLibraryMode>("manage");
   const [isAssetLibraryOpen, setIsAssetLibraryOpen] = useState(false);
+  const [assetLibraryTarget, setAssetLibraryTarget] = useState<Exclude<AtDropdownTarget, "agent-prompt">>("image-prompt");
 
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [imageSubmitCount, setImageSubmitCount] = useState(0);
@@ -1507,7 +1508,7 @@ export default function Home() {
       pushWorkspaceNotice("success", "本地资产库已清空");
       void assetLibrary.reload().catch(() => undefined);
     } catch (error) {
-      await assetLibrary.reload().catch(() => undefined);
+      void assetLibrary.reload().catch(() => undefined);
       pushWorkspaceNotice("error", toErrorMessage(error, "本地资产库清空失败"));
     }
   }, [assetLibrary, pushWorkspaceNotice, setCompareItemIds, setSelectedItemIds]);
@@ -1539,8 +1540,9 @@ export default function Home() {
 
   const openAssetLibrary = useCallback((mode: AssetLibraryMode) => {
     setAssetLibraryMode(mode);
+    if (mode === "reference") setAssetLibraryTarget(activePromptReferenceTarget());
     setIsAssetLibraryOpen(true);
-  }, []);
+  }, [activePromptReferenceTarget]);
 
   const handleAddItemToLibrary = useCallback(async (item: StorageItem) => {
     try {
@@ -1564,17 +1566,18 @@ export default function Home() {
   }, [assetLibrary, pushWorkspaceNotice]);
 
   const handleSelectLibraryEntry = useCallback((entry: { item: StorageItem | null }) => {
-    if (!entry.item) {
+    const item = entry.item;
+    if (!item) {
       pushWorkspaceNotice("error", "该素材缺少媒体内容");
       return;
     }
-    if (entry.item.type === "transcript") {
+    if (item.type === "transcript") {
       pushWorkspaceNotice("error", "素材库不支持转写作为参考媒体");
       return;
     }
-    handleSelectAtItem(entry.item.url, entry.item.id, activePromptReferenceTarget(), entry.item.type);
+    handleSelectAtItem(item.url, item.id, assetLibraryTarget, item.type);
     setIsAssetLibraryOpen(false);
-  }, [activePromptReferenceTarget, handleSelectAtItem, pushWorkspaceNotice]);
+  }, [assetLibraryTarget, handleSelectAtItem, pushWorkspaceNotice]);
 
   const handleDataExportWorkspace = useCallback(async (includeCredentials: boolean) => {
     try {

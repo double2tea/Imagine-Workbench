@@ -4,7 +4,6 @@ import {
   deleteLibraryAssetRecord,
   getLibraryAssetRecordBySourceAssetId,
   hydrateAsset,
-  listLibraryAssetRecords,
   saveLibraryAssetRecord,
   saveToDB,
   type LibraryAssetCategory,
@@ -156,9 +155,4 @@ export async function importFilesToLibrary(files: File[]): Promise<LibraryAssetR
     throw error;
   }
   return records;
-}
-
-export async function getLibraryAssetIds(): Promise<Set<string>> {
-  const records = await listLibraryAssetRecords();
-  return new Set(records.map(record => record.assetId));
 }

@@ -225,6 +225,8 @@ function normalizeLibraryMediaType(value: LibraryAssetMediaType): LibraryAssetMe
 }
 
 function normalizeLibraryRecord(record: LibraryAssetRecord): LibraryAssetRecord {
+  const title = typeof record.title === "string" ? record.title.trim() : "";
+  const notes = typeof record.notes === "string" ? record.notes.trim() : "";
   return {
     id: record.id,
     assetId: record.assetId,
@@ -232,8 +234,8 @@ function normalizeLibraryRecord(record: LibraryAssetRecord): LibraryAssetRecord 
     origin: record.origin === "imported" ? "imported" : "promoted",
     mediaType: normalizeLibraryMediaType(record.mediaType),
     category: normalizeLibraryCategory(record.category),
-    title: record.title.trim(),
-    notes: record.notes,
+    title: title || record.assetId || record.id,
+    notes,
     tags: record.tags.map(tag => tag.trim()).filter(tag => tag.length > 0),
     favorite: Boolean(record.favorite),
     createdAt: record.createdAt,
@@ -407,7 +409,7 @@ function ensureLibrarySourceAssetIndex(library: IDBObjectStore): void {
     cursor.continue();
   };
   request.onerror = () => {
-    throw request.error ?? new Error("IndexedDB library source index migration failed");
+    library.transaction.abort();
   };
 }
 
@@ -1052,7 +1054,7 @@ async function deleteUnreferencedHashBlobPayload(hash: string): Promise<void> {
   });
 }
 
-/** Workspace gallery: metadata only (no blob hydration). */
+/** Workspace gallery: metadata only, excluding hidden library backing assets; offset/limit apply after that workspace filter. */
 export async function listWorkspaceGalleryMetas(options?: {
   limit?: number;
   offset?: number;

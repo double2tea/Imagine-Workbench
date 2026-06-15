@@ -20,8 +20,8 @@ interface ReferenceImagePickerProps {
   references: ReferenceImageRef[];
   roleMode?: boolean;
   uploadLabel: string;
-  libraryBrowseLabel: string;
-  libraryTileLabel: string;
+  libraryBrowseLabel?: string;
+  libraryTileLabel?: string;
   onClear: () => void;
   onOpenLibrary?: () => void;
   onDropAsset?: (asset: DraggedReferenceAsset) => void;
@@ -85,8 +85,8 @@ export default function ReferenceImagePicker({
   references,
   roleMode = false,
   uploadLabel,
-  libraryBrowseLabel,
-  libraryTileLabel,
+  libraryBrowseLabel = "从素材库选择",
+  libraryTileLabel = "素材库",
   onClear,
   onOpenLibrary,
   onDropAsset,
@@ -106,6 +106,7 @@ export default function ReferenceImagePicker({
   const canAdd = maxCount > 0 && visibleReferenceItems.length < maxCount;
   const accept = acceptedMediaTypes.map(type => `${type}/*`).join(",");
   const uploadInputLabel = `${label}：${uploadLabel}`;
+  const showLibrary = Boolean(onOpenLibrary && maxCount > 0);
 
   const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
     const asset = onDropAsset && hasDraggedReferenceAsset(event.dataTransfer)
@@ -249,10 +250,11 @@ export default function ReferenceImagePicker({
                   className="hidden"
                 />
               </label>
-              {onOpenLibrary && (
+              {showLibrary && (
                 <button
                   type="button"
                   onClick={onOpenLibrary}
+                  aria-label={libraryBrowseLabel}
                   className="imagine-reference-add-tile"
                 >
                   <FolderHeart className="h-4 w-4" />
@@ -282,7 +284,7 @@ export default function ReferenceImagePicker({
               ) : (
                 <span>{uploadLabel}</span>
               )}
-              {onOpenLibrary && maxCount > 0 ? (
+              {showLibrary ? (
                 <>
                   {" / "}
                   <button type="button" onClick={onOpenLibrary} className={browseClassName}>

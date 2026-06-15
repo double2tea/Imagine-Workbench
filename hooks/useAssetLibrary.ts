@@ -49,7 +49,8 @@ export function useAssetLibrary() {
       }
     } catch (caught) {
       const nextError = normalizeError(caught);
-      if (canUpdate()) setError(nextError);
+      if (!canUpdate()) return;
+      setError(nextError);
       throw nextError;
     } finally {
       if (canUpdate()) setLoading(false);

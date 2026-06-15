@@ -3548,12 +3548,13 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   }, [assetLibrary, pushWorkspaceNotice]);
 
   const handleSelectLibraryAsset = useCallback((entry: LibraryAssetEntry) => {
-    if (!entry.item) {
+    const item = entry.item;
+    if (!item) {
       pushWorkspaceNotice("error", "该素材缺少媒体内容");
       return;
     }
     try {
-      addAssetToBoard(entry.item);
+      addAssetToBoard(item);
       setIsAssetLibraryOpen(false);
       pushWorkspaceNotice("success", "已加入当前画板");
     } catch (error) {
