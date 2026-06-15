@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import {
   Download,
+  FolderHeart,
   Grid2X2,
   Heart,
   Image as ImageIcon,
@@ -10,6 +11,7 @@ import {
   Maximize2,
   Music,
   Search,
+  SlidersHorizontal,
   Trash2,
   Upload,
   Video,
@@ -63,6 +65,10 @@ function formatDate(value: string): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
+function originLabel(origin: LibraryAssetRecord["origin"]): string {
+  return origin === "imported" ? "本机导入" : "来自作品";
+}
+
 function recordSearchText(entry: LibraryAssetEntry): string {
   const { record, item } = entry;
   return [
@@ -87,6 +93,27 @@ function renderAssetThumbnail(entry: LibraryAssetEntry) {
     return <AudioWaveformPreview src={entry.item.url} size="compact" tone="media" />;
   }
   return mediaIcon(entry.record.mediaType);
+}
+
+function renderAssetInspectorPreview(entry: LibraryAssetEntry) {
+  if (entry.item?.type === "image") {
+    return <PreviewImage src={entry.item.url} alt={entry.record.title} className="h-full w-full object-contain" />;
+  }
+  if (entry.item?.type === "video") {
+    return <video src={entry.item.url} muted preload="metadata" className="h-full w-full object-contain" />;
+  }
+  if (entry.item?.type === "audio") {
+    return <AudioWaveformPreview src={entry.item.url} size="compact" tone="media" className="h-full w-full" />;
+  }
+  return mediaIcon(entry.record.mediaType);
+}
+
+function fieldLabelClassName(): string {
+  return "flex flex-col gap-1.5 text-[10px] font-semibold text-[var(--iw-muted)]";
+}
+
+function fieldControlClassName(): string {
+  return "rounded-lg border border-[var(--iw-border)] bg-[color-mix(in_srgb,var(--iw-panel-solid)_82%,transparent)] px-3 text-xs text-[var(--iw-text)] outline-none transition focus:border-[color-mix(in_srgb,var(--iw-accent)_58%,var(--iw-border))] focus:ring-2 focus:ring-[var(--iw-accent-soft)]";
 }
 
 function renderAssetFullscreenMedia(entry: LibraryAssetEntry) {
@@ -280,20 +307,33 @@ export default function AssetLibraryModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-3 backdrop-blur-md sm:p-6">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/72 p-3 backdrop-blur-md sm:p-6">
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="asset-library-modal-title"
-        className="flex h-[min(760px,92vh)] w-[min(1120px,96vw)] min-w-0 flex-col overflow-hidden rounded-2xl border border-[var(--iw-border)] bg-[var(--iw-panel)] shadow-2xl"
+        className="flex h-[min(820px,92vh)] w-[min(1240px,96vw)] min-w-0 flex-col overflow-hidden rounded-[18px] border border-[color-mix(in_srgb,var(--iw-border)_78%,transparent)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--iw-panel-solid)_98%,transparent),color-mix(in_srgb,var(--iw-bg)_18%,var(--iw-panel)))] text-[var(--iw-text)] shadow-[0_32px_90px_rgba(0,0,0,0.34)]"
       >
-        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--iw-border)] px-4 py-3">
-          <div className="min-w-0">
-            <h2 id="asset-library-modal-title" className="truncate text-sm font-semibold text-[var(--iw-text)]">{title}</h2>
-            <p className="mt-0.5 font-mono text-[10px] text-[var(--iw-faint)]">
-              {entries.length} 项 · 图片/视频/音频
-            </p>
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[color-mix(in_srgb,var(--iw-border)_72%,transparent)] bg-[color-mix(in_srgb,var(--iw-panel-solid)_82%,transparent)] px-5 py-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[color-mix(in_srgb,var(--iw-accent)_26%,var(--iw-border))] bg-[var(--iw-accent-soft)] text-[var(--iw-accent)]">
+              <FolderHeart className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <h2 id="asset-library-modal-title" className="truncate text-[15px] font-semibold text-[var(--iw-text)]">{title}</h2>
+              <div className="mt-1 flex flex-wrap items-center gap-1.5 font-mono text-[10px] text-[var(--iw-faint)]">
+                <span>{entries.length} 项</span>
+                <span className="h-1 w-1 rounded-full bg-[var(--iw-border)]" aria-hidden="true" />
+                <span>图片 / 视频 / 音频</span>
+                {filteredEntries.length !== entries.length && (
+                  <>
+                    <span className="h-1 w-1 rounded-full bg-[var(--iw-border)]" aria-hidden="true" />
+                    <span>{filteredEntries.length} 个匹配</span>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <input
@@ -326,9 +366,10 @@ export default function AssetLibraryModal({
           </div>
         </header>
 
-        <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="grid min-h-0 flex-1 grid-cols-1 bg-[color-mix(in_srgb,var(--iw-bg)_34%,var(--iw-panel))] lg:grid-cols-[minmax(0,1fr)_340px]">
           <section className="flex min-h-0 min-w-0 flex-col border-b border-[var(--iw-border)] lg:border-b-0 lg:border-r">
-            <div className="flex shrink-0 flex-col gap-2 border-b border-[var(--iw-border)] p-3">
+            <div className="shrink-0 border-b border-[color-mix(in_srgb,var(--iw-border)_72%,transparent)] bg-[color-mix(in_srgb,var(--iw-panel)_72%,transparent)] p-4">
+              <div className="rounded-xl border border-[color-mix(in_srgb,var(--iw-border)_82%,transparent)] bg-[color-mix(in_srgb,var(--iw-panel-solid)_70%,transparent)] p-3 shadow-[0_12px_28px_rgba(0,0,0,0.08)]">
               <label className="imagine-gallery-search">
                 <Search className="h-4 w-4" />
                 <input
@@ -338,7 +379,7 @@ export default function AssetLibraryModal({
                   className="imagine-toolbar-search h-9 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] pr-4 text-xs text-[var(--iw-text)] outline-none"
                 />
               </label>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="mt-3 flex flex-wrap gap-1.5">
                 <button
                   type="button"
                   data-active={mediaFilter === "all"}
@@ -369,7 +410,7 @@ export default function AssetLibraryModal({
                   收藏
                 </button>
               </div>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="mt-2 flex flex-wrap gap-1.5">
                 <button
                   type="button"
                   data-active={categoryFilter === "all"}
@@ -390,7 +431,7 @@ export default function AssetLibraryModal({
                   </button>
                 ))}
               </div>
-              <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--iw-border)] pt-3">
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
@@ -416,7 +457,8 @@ export default function AssetLibraryModal({
                   </button>
                 </div>
                 {viewMode === "grid" && (
-                  <label className="flex items-center gap-2 text-[10px] font-semibold text-[var(--iw-muted)]">
+                  <label className="flex items-center gap-2 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2.5 py-1.5 text-[10px] font-semibold text-[var(--iw-muted)]">
+                    <SlidersHorizontal className="h-3 w-3" />
                     大小
                     <input
                       type="range"
@@ -431,15 +473,16 @@ export default function AssetLibraryModal({
                   </label>
                 )}
               </div>
+              </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto p-3">
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
               {loading ? (
-                <p className="rounded-lg border border-dashed border-[var(--iw-border)] px-3 py-8 text-center text-xs text-[var(--iw-muted)]">
+                <p className="rounded-xl border border-dashed border-[var(--iw-border)] bg-[color-mix(in_srgb,var(--iw-panel)_64%,transparent)] px-3 py-12 text-center text-xs text-[var(--iw-muted)]">
                   正在加载素材库…
                 </p>
               ) : filteredEntries.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-[var(--iw-border)] px-3 py-8 text-center text-xs text-[var(--iw-muted)]">
+                <p className="rounded-xl border border-dashed border-[var(--iw-border)] bg-[color-mix(in_srgb,var(--iw-panel)_64%,transparent)] px-3 py-12 text-center text-xs text-[var(--iw-muted)]">
                   暂无匹配素材
                 </p>
               ) : viewMode === "grid" ? (
@@ -456,25 +499,27 @@ export default function AssetLibraryModal({
                         data-active={selected}
                         onClick={() => setActiveRecordId(entry.record.id)}
                         onDoubleClick={() => setFullscreenEntry(entry)}
-                        className="group imagine-asset-card flex min-w-0 flex-col overflow-hidden rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-left transition hover:border-[var(--iw-accent)] data-[active=true]:border-[var(--iw-accent)]"
+                        className="group imagine-asset-card flex min-w-0 flex-col overflow-hidden rounded-xl border border-[color-mix(in_srgb,var(--iw-border)_82%,transparent)] bg-[color-mix(in_srgb,var(--iw-panel-solid)_76%,transparent)] text-left shadow-[0_14px_34px_rgba(0,0,0,0.10)] transition hover:-translate-y-0.5 hover:border-[color-mix(in_srgb,var(--iw-accent)_42%,var(--iw-border))] hover:shadow-[0_20px_46px_rgba(0,0,0,0.16)] data-[active=true]:border-[var(--iw-accent)] data-[active=true]:bg-[color-mix(in_srgb,var(--iw-accent)_8%,var(--iw-panel))] data-[active=true]:shadow-[0_0_0_3px_var(--iw-accent-soft),0_18px_44px_rgba(0,0,0,0.16)]"
                         title="双击全屏预览"
                       >
-                        <span className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-black/35">
+                        <span className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-[color-mix(in_srgb,var(--iw-bg)_70%,#000)]">
                           {renderAssetThumbnail(entry)}
-                          <span className="absolute bottom-2 right-2 rounded-md bg-black/55 p-1 text-white/80 opacity-0 transition group-hover:opacity-100">
+                          <span className="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/52 to-transparent opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
+                          <span className="absolute bottom-2 right-2 rounded-md border border-white/15 bg-black/55 p-1 text-white/80 opacity-0 shadow-lg transition group-hover:opacity-100">
                             <Maximize2 className="h-3 w-3" />
                           </span>
                           {entry.record.favorite && (
-                            <span className="absolute right-2 top-2 rounded-md bg-black/55 p-1 text-rose-300">
+                            <span className="absolute right-2 top-2 rounded-md border border-white/15 bg-black/55 p-1 text-rose-300 shadow-lg">
                               <Heart className="h-3 w-3 fill-current" />
                             </span>
                           )}
                         </span>
-                        <span className="flex min-h-[70px] min-w-0 flex-col gap-1 p-2">
-                          <span className="truncate text-xs font-semibold text-[var(--iw-text)]">{entry.record.title}</span>
+                        <span className="flex min-h-[76px] min-w-0 flex-col gap-1 border-t border-[color-mix(in_srgb,var(--iw-border)_68%,transparent)] p-2.5">
+                          <span className="truncate text-[13px] font-semibold text-[var(--iw-text)]">{entry.record.title}</span>
                           <span className="flex items-center gap-1.5 text-[10px] text-[var(--iw-muted)]">
                             {mediaIcon(entry.record.mediaType)}
                             <span>{LIBRARY_ASSET_CATEGORY_LABELS[entry.record.category]}</span>
+                            <span className="h-1 w-1 rounded-full bg-[var(--iw-border)]" aria-hidden="true" />
                             <span className="font-mono text-[var(--iw-faint)]">{formatDate(entry.record.updatedAt)}</span>
                           </span>
                         </span>
@@ -493,10 +538,10 @@ export default function AssetLibraryModal({
                         data-active={selected}
                         onClick={() => setActiveRecordId(entry.record.id)}
                         onDoubleClick={() => setFullscreenEntry(entry)}
-                        className="imagine-asset-card grid min-w-0 grid-cols-[88px_minmax(0,1fr)_auto] items-center gap-3 overflow-hidden rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-2 text-left transition hover:border-[var(--iw-accent)] data-[active=true]:border-[var(--iw-accent)]"
+                        className="imagine-asset-card grid min-w-0 grid-cols-[92px_minmax(0,1fr)_auto] items-center gap-3 overflow-hidden rounded-xl border border-[color-mix(in_srgb,var(--iw-border)_82%,transparent)] bg-[color-mix(in_srgb,var(--iw-panel-solid)_72%,transparent)] p-2 text-left shadow-[0_10px_24px_rgba(0,0,0,0.08)] transition hover:border-[color-mix(in_srgb,var(--iw-accent)_42%,var(--iw-border))] data-[active=true]:border-[var(--iw-accent)] data-[active=true]:bg-[color-mix(in_srgb,var(--iw-accent)_8%,var(--iw-panel))] data-[active=true]:shadow-[0_0_0_3px_var(--iw-accent-soft)]"
                         title="双击全屏预览"
                       >
-                        <span className="relative flex aspect-[4/3] items-center justify-center overflow-hidden rounded-md bg-black/35">
+                        <span className="relative flex aspect-[4/3] items-center justify-center overflow-hidden rounded-lg bg-[color-mix(in_srgb,var(--iw-bg)_70%,#000)]">
                           {renderAssetThumbnail(entry)}
                         </span>
                         <span className="flex min-w-0 flex-col gap-1">
@@ -522,7 +567,7 @@ export default function AssetLibraryModal({
             </div>
           </section>
 
-          <aside className="flex min-h-0 flex-col gap-3 overflow-y-auto p-3">
+          <aside className="flex min-h-0 flex-col gap-3 overflow-y-auto bg-[color-mix(in_srgb,var(--iw-panel-solid)_72%,transparent)] p-4">
             {actionError && (
               <p className="rounded-lg border border-[var(--iw-tone-danger-border)] bg-[var(--iw-tone-danger-surface)] px-3 py-2 text-xs text-[var(--iw-tone-danger-text)]">
                 {actionError}
@@ -530,93 +575,120 @@ export default function AssetLibraryModal({
             )}
             {activeEntry && activeRecord ? (
               <>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold text-[var(--iw-text)]">素材信息</p>
-                    <p className="mt-1 font-mono text-[10px] text-[var(--iw-faint)]">
-                      {LIBRARY_ASSET_MEDIA_TYPE_LABELS[activeRecord.mediaType]} · {activeRecord.origin === "imported" ? "本机导入" : "来自作品"}
-                    </p>
+                <div className="overflow-hidden rounded-xl border border-[color-mix(in_srgb,var(--iw-border)_82%,transparent)] bg-[color-mix(in_srgb,var(--iw-panel)_82%,transparent)] shadow-[0_16px_36px_rgba(0,0,0,0.12)]">
+                  <div className="relative flex aspect-[4/3] items-center justify-center bg-[color-mix(in_srgb,var(--iw-bg)_72%,#000)]">
+                    {renderAssetInspectorPreview(activeEntry)}
+                    <button
+                      type="button"
+                      onClick={() => setFullscreenEntry(activeEntry)}
+                      className="absolute bottom-2 right-2 flex h-8 items-center gap-1.5 rounded-lg border border-white/15 bg-black/55 px-2 text-[10px] font-semibold text-white shadow-lg backdrop-blur transition hover:bg-black/70"
+                    >
+                      <Maximize2 className="h-3.5 w-3.5" />
+                      预览
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => void toggleFavorite(activeRecord)}
-                    disabled={togglingFavorite}
-                    className="imagine-secondary-action flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--iw-border)]"
-                    aria-label={activeRecord.favorite ? "取消收藏" : "收藏素材"}
-                  >
-                    <Heart className={`h-3.5 w-3.5 ${activeRecord.favorite ? "fill-current text-rose-300" : ""}`} />
-                  </button>
+                  <div className="border-t border-[var(--iw-border)] p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-[var(--iw-text)]">{activeRecord.title}</p>
+                        <div className="mt-1 flex flex-wrap items-center gap-1.5 font-mono text-[10px] text-[var(--iw-faint)]">
+                          <span>{LIBRARY_ASSET_MEDIA_TYPE_LABELS[activeRecord.mediaType]}</span>
+                          <span className="h-1 w-1 rounded-full bg-[var(--iw-border)]" aria-hidden="true" />
+                          <span>{originLabel(activeRecord.origin)}</span>
+                          <span className="h-1 w-1 rounded-full bg-[var(--iw-border)]" aria-hidden="true" />
+                          <span>{formatDate(activeRecord.updatedAt)}</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void toggleFavorite(activeRecord)}
+                        disabled={togglingFavorite}
+                        className="imagine-secondary-action flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--iw-border)]"
+                        aria-label={activeRecord.favorite ? "取消收藏" : "收藏素材"}
+                      >
+                        <Heart className={`h-3.5 w-3.5 ${activeRecord.favorite ? "fill-current text-rose-300" : ""}`} />
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
-                <label className="flex flex-col gap-1 text-[10px] font-semibold text-[var(--iw-muted)]">
-                  标题
-                  <input
-                    value={draftTitle}
-                    onChange={event => setDraftTitle(event.target.value)}
-                    className="imagine-toolbar-search h-9 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-3 text-xs text-[var(--iw-text)] outline-none"
-                  />
-                </label>
-                <label className="flex flex-col gap-1 text-[10px] font-semibold text-[var(--iw-muted)]">
-                  分类
-                  <select
-                    value={draftCategory}
-                    onChange={event => setDraftCategory(event.target.value as LibraryAssetCategory)}
-                    className="imagine-toolbar-select h-9 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-3 text-xs text-[var(--iw-text)] outline-none"
-                  >
-                    {LIBRARY_ASSET_CATEGORIES.map(category => (
-                      <option key={category} value={category}>{LIBRARY_ASSET_CATEGORY_LABELS[category]}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="flex flex-col gap-1 text-[10px] font-semibold text-[var(--iw-muted)]">
-                  标签
-                  <input
-                    value={draftTags}
-                    onChange={event => setDraftTags(event.target.value)}
-                    placeholder="逗号分隔"
-                    className="imagine-toolbar-search h-9 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-3 text-xs text-[var(--iw-text)] outline-none"
-                  />
-                </label>
-                <label className="flex flex-col gap-1 text-[10px] font-semibold text-[var(--iw-muted)]">
-                  备注
-                  <textarea
-                    value={draftNotes}
-                    onChange={event => setDraftNotes(event.target.value)}
-                    rows={4}
-                    className="resize-none rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-3 py-2 text-xs text-[var(--iw-text)] outline-none"
-                  />
-                </label>
-                <button
-                  type="button"
-                  onClick={() => void saveDraft()}
-                  disabled={savingDraft || !hasDraftChanges}
-                  className="imagine-primary-action h-9 rounded-lg px-3 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  保存信息
-                </button>
-                {mode === "select" && (
+                <div className="rounded-xl border border-[color-mix(in_srgb,var(--iw-border)_82%,transparent)] bg-[color-mix(in_srgb,var(--iw-panel)_76%,transparent)] p-3">
+                  <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-[var(--iw-text)]">
+                    <SlidersHorizontal className="h-3.5 w-3.5 text-[var(--iw-accent)]" />
+                    素材信息
+                  </div>
+                  <label className={fieldLabelClassName()}>
+                    标题
+                    <input
+                      value={draftTitle}
+                      onChange={event => setDraftTitle(event.target.value)}
+                      className={`${fieldControlClassName()} h-9`}
+                    />
+                  </label>
+                  <label className={`${fieldLabelClassName()} mt-3`}>
+                    分类
+                    <select
+                      value={draftCategory}
+                      onChange={event => setDraftCategory(event.target.value as LibraryAssetCategory)}
+                      className={`${fieldControlClassName()} h-9`}
+                    >
+                      {LIBRARY_ASSET_CATEGORIES.map(category => (
+                        <option key={category} value={category}>{LIBRARY_ASSET_CATEGORY_LABELS[category]}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className={`${fieldLabelClassName()} mt-3`}>
+                    标签
+                    <input
+                      value={draftTags}
+                      onChange={event => setDraftTags(event.target.value)}
+                      placeholder="逗号分隔"
+                      className={`${fieldControlClassName()} h-9`}
+                    />
+                  </label>
+                  <label className={`${fieldLabelClassName()} mt-3`}>
+                    备注
+                    <textarea
+                      value={draftNotes}
+                      onChange={event => setDraftNotes(event.target.value)}
+                      rows={4}
+                      className={`${fieldControlClassName()} resize-none py-2`}
+                    />
+                  </label>
+                </div>
+                <div className="grid gap-2">
                   <button
                     type="button"
-                    onClick={() => onSelect?.(activeEntry)}
-                    disabled={!activeEntry.item}
-                    className="imagine-secondary-action flex h-9 items-center justify-center gap-1.5 rounded-lg border border-[var(--iw-border)] text-[11px] font-semibold"
+                    onClick={() => void saveDraft()}
+                    disabled={savingDraft || !hasDraftChanges}
+                    className="imagine-primary-action h-10 rounded-lg px-3 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    <Download className="h-3.5 w-3.5" />
-                    使用此素材
+                    保存信息
                   </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => void removeActive()}
-                  disabled={removing}
-                  className="imagine-danger-action flex h-9 items-center justify-center gap-1.5 rounded-lg text-[11px] font-semibold"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  移出素材库
-                </button>
+                  {mode === "select" && (
+                    <button
+                      type="button"
+                      onClick={() => onSelect?.(activeEntry)}
+                      disabled={!activeEntry.item}
+                      className="imagine-secondary-action flex h-10 items-center justify-center gap-1.5 rounded-lg border border-[var(--iw-border)] text-[11px] font-semibold"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      使用此素材
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => void removeActive()}
+                    disabled={removing}
+                    className="imagine-danger-action flex h-10 items-center justify-center gap-1.5 rounded-lg text-[11px] font-semibold"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    移出素材库
+                  </button>
+                </div>
               </>
             ) : (
-              <p className="rounded-lg border border-dashed border-[var(--iw-border)] px-3 py-8 text-center text-xs text-[var(--iw-muted)]">
+              <p className="rounded-xl border border-dashed border-[var(--iw-border)] bg-[color-mix(in_srgb,var(--iw-panel)_64%,transparent)] px-3 py-10 text-center text-xs text-[var(--iw-muted)]">
                 选择一个素材后可编辑标题、分类、标签与备注
               </p>
             )}
