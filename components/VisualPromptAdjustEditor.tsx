@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent, type WheelEvent } from "react";
+import * as THREE from "three";
 import { Box, RotateCcw, Sun, X } from "lucide-react";
 import type { CanvasMaskEditorOutput } from "@/components/CanvasMaskEditor";
 import {
@@ -19,7 +20,7 @@ import {
   type AngleAdjustmentState,
   type LightingAdjustmentState,
 } from "@/lib/image-visual-adjustment-prompts";
-import { scaleToFitSize, type CanvasSize } from "@/lib/canvas-editor";
+import type { CanvasSize } from "@/lib/canvas-editor";
 import { getImageResolutionOptions } from "@/lib/providers/model-catalog";
 import { gsap, prefersReducedWorkbenchMotion, useGSAP, WORKBENCH_GSAP_EASE } from "@/lib/workbench-gsap";
 
@@ -32,7 +33,6 @@ interface VisualPromptAdjustEditorProps {
   operation: "angle" | "lighting";
 }
 
-const PREVIEW_MAX_SIZE: CanvasSize = { width: 760, height: 520 };
 const DEFAULT_ANGLE_STATE: AngleAdjustmentState = {
   rotation: 0,
   tilt: 0,
@@ -65,23 +65,20 @@ const ANGLE_VIEW_PRESETS: Array<{
   { className: "bottom-8 left-1/2 -translate-x-1/2", label: "B", state: { rotation: 0, tilt: 50 } },
   { className: "left-[23%] top-[28%]", label: "BK", state: { rotation: 180, tilt: 0 } },
 ];
-const ANGLE_PANEL_DEPTH = 54;
+const ANGLE_PANEL_DEPTH = 0.11;
 const ANGLE_BASE_ROTATE_Y = 0;
 const ANGLE_BASE_ROTATE_X = 0;
 const ANGLE_ROTATION_SENSITIVITY = 1;
 const ANGLE_TILT_SENSITIVITY = 0.72;
 const ANGLE_POINTER_ROTATION_SENSITIVITY = 0.45;
 const ANGLE_POINTER_TILT_SENSITIVITY = 0.28;
-const ANGLE_BASE_SCALE = 0.82;
-const ANGLE_ZOOM_SCALE_DIVISOR = 180;
-const ANGLE_SHADOW_BASE_Y = 20;
-const ANGLE_SHADOW_TILT_FACTOR = 0.14;
-const ANGLE_SHADOW_BASE_SCALE = 0.78;
-const ANGLE_SHADOW_ZOOM_SCALE_DIVISOR = 420;
-const ANGLE_WIDE_LENS_INSET = 62;
-const ANGLE_NATURAL_LENS_INSET = 18;
-const ANGLE_WIDE_SIDE_GLOW_OPACITY = 0.34;
-const ANGLE_NATURAL_SIDE_GLOW_OPACITY = 0.2;
+const ANGLE_BASE_SCALE = 0.78;
+const ANGLE_ZOOM_SCALE_DIVISOR = 240;
+const ANGLE_SIDE_SCALE_REDUCTION = 0.13;
+const ANGLE_TILT_SCALE_REDUCTION = 0.05;
+const ANGLE_VISUAL_SIDE_LIMIT = 68;
+const ANGLE_VISUAL_BACK_START = 120;
+const ANGLE_VISUAL_BACK_LIMIT = 154;
 const LIGHT_GUIDE_CORE_ALPHA = 0.85;
 const LIGHT_GUIDE_MID_STOP = 0.35;
 const LIGHT_GUIDE_MID_ALPHA = 0.38;
@@ -100,9 +97,7 @@ const LIGHT_ORB_BASE_SIZE = 24;
 const LIGHT_ORB_SIZE_FACTOR = 0.42;
 const LIGHT_ORB_BACK_OPACITY = 0.45;
 const LIGHT_ORB_VISIBLE_OPACITY = 0.84;
-const LIGHT_SURFACE_CORE_ALPHA = 0.58;
-const LIGHT_RIM_OPACITY = 0.62;
-const LIGHT_PANEL_DEPTH = 34;
+const LIGHT_PANEL_DEPTH = 0.08;
 
 export default function VisualPromptAdjustEditor({
   editModel,
@@ -114,7 +109,6 @@ export default function VisualPromptAdjustEditor({
 }: VisualPromptAdjustEditorProps) {
   const imageRef = useRef<HTMLImageElement | null>(null);
   const [imageSize, setImageSize] = useState<CanvasSize>({ width: 1, height: 1 });
-  const [previewSize, setPreviewSize] = useState<CanvasSize>({ width: 360, height: 240 });
   const [imageResolution, setImageResolution] = useState("auto");
   const [isImageLoaded, setIsImageLoaded] = useState(false);
   const [isApplying, setIsApplying] = useState(false);
@@ -151,7 +145,6 @@ export default function VisualPromptAdjustEditor({
       const nextSize = { width: img.width || 1, height: img.height || 1 };
       imageRef.current = img;
       setImageSize(nextSize);
-      setPreviewSize(scaleToFitSize(nextSize, PREVIEW_MAX_SIZE));
       setIsImageLoaded(true);
     };
     img.onerror = () => {
@@ -244,7 +237,6 @@ export default function VisualPromptAdjustEditor({
             onAngleChange={setAngleState}
             onLightingChange={setLightingState}
             operation={operation}
-            previewSize={previewSize}
           />
         </div>
 
@@ -299,10 +291,9 @@ export default function VisualPromptAdjustEditor({
 }
 
 interface AngleVisualState {
-  cardTransform: string;
-  floorShadowTransform: string;
-  lensInset: number;
-  sideGlowOpacity: number;
+  scale: number;
+  tilt: number;
+  yaw: number;
 }
 
 interface LightingVisualState {
@@ -310,9 +301,6 @@ interface LightingVisualState {
   domeStyle: CSSProperties;
   markerStyle: CSSProperties;
   orbStyle: CSSProperties;
-  overlayStyle: CSSProperties;
-  panelTransform: string;
-  rimOpacity: number;
 }
 
 function PreviewStage({
@@ -324,7 +312,6 @@ function PreviewStage({
   onAngleChange,
   onLightingChange,
   operation,
-  previewSize,
 }: {
   angleState: AngleAdjustmentState;
   angleVisual: AngleVisualState;
@@ -334,15 +321,10 @@ function PreviewStage({
   onAngleChange: (state: AngleAdjustmentState) => void;
   onLightingChange: (state: LightingAdjustmentState) => void;
   operation: "angle" | "lighting";
-  previewSize: CanvasSize;
 }) {
   const scopeRef = useRef<HTMLDivElement | null>(null);
   const angleDragRef = useRef<{ x: number; y: number; state: AngleAdjustmentState } | null>(null);
   const lightingDragRef = useRef(false);
-  const panelSize = scaleToFitSize(previewSize, operation === "angle"
-    ? { width: 430, height: 300 }
-    : { width: 280, height: 200 });
-
   useGSAP(() => {
     if (prefersReducedWorkbenchMotion()) return;
     gsap.fromTo(
@@ -434,45 +416,19 @@ function PreviewStage({
             onWheel={handleAngleWheel}
             style={{ transformStyle: "preserve-3d" }}
           >
-            <div className="absolute left-1/2 top-[52%] h-[74%] max-h-[380px] w-[72%] max-w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-[28px] border border-white/10 bg-[#242424] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03),0_24px_80px_rgba(0,0,0,0.26)]" />
-            <div
-              className="absolute left-1/2 top-[68%] h-[30%] w-[56%] rounded-[999px] border border-white/10 bg-[radial-gradient(circle_at_50%_42%,rgba(255,255,255,0.1),rgba(255,255,255,0.035)_46%,rgba(0,0,0,0.28)_100%)]"
-              style={{ transform: "translateX(-50%) rotateX(66deg)" }}
+            <div className="pointer-events-none absolute left-1/2 top-1/2 h-[72%] max-h-[390px] w-[74%] max-w-[580px] -translate-x-1/2 -translate-y-1/2 rounded-[30px] border border-white/[0.055] bg-[#222]/45 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.025),0_30px_90px_rgba(0,0,0,0.22)]" />
+            <ThreeCardViewport
+              angleVisual={angleVisual}
+              imageUrl={imageUrl}
+              lightingState={lightingState}
+              operation="angle"
             />
-            <div className="absolute left-1/2 top-[53%] h-[74%] w-px -translate-x-1/2 -translate-y-1/2 bg-white/[0.07]" />
-            <div className="absolute left-1/2 top-[53%] h-px w-[62%] -translate-x-1/2 -translate-y-1/2 bg-white/[0.07]" />
-            <div className="absolute left-[17%] top-[58%] h-px w-[66%] -translate-y-1/2 rotate-[-22deg] bg-white/[0.05]" />
-            <div className="absolute left-[17%] top-[58%] h-px w-[66%] -translate-y-1/2 rotate-[22deg] bg-white/[0.05]" />
-            <div className="absolute left-1/2 top-[66%] h-20 w-[38%] -translate-x-1/2 rounded-[999px] bg-black/50 blur-2xl" />
-            <div
-              className="absolute left-1/2 top-[73%] h-16 w-[38%] -translate-x-1/2 rounded-[999px] bg-black/50 blur-2xl"
-              style={{ transform: angleVisual.floorShadowTransform }}
-            />
-            <div className="pointer-events-none absolute left-1/2 top-[53%] h-[72%] w-[72%] max-w-[540px] -translate-x-1/2 -translate-y-1/2 rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_50%_50%,transparent_0_42%,rgba(255,255,255,0.08)_43%,transparent_44%)]" />
-            <div
-              className="absolute left-1/2 top-1/2 transition-transform duration-200 ease-out"
-              style={{
-                height: panelSize.height,
-                transform: `translate(-50%, -48%) ${angleVisual.cardTransform}`,
-                transformStyle: "preserve-3d",
-                width: panelSize.width,
-              }}
-            >
-              <div
-                className="absolute -inset-4 rounded-[24px] border border-white/15"
-                style={{
-                  background: `radial-gradient(circle at 78% 12%, rgba(255,255,255,${angleVisual.sideGlowOpacity}), transparent 34%)`,
-                  transform: `translateZ(${-ANGLE_PANEL_DEPTH}px)`,
-                }}
-              />
-              <ImageSlab imageUrl={imageUrl} depth={ANGLE_PANEL_DEPTH} lensInset={angleVisual.lensInset} />
-            </div>
             {ANGLE_VIEW_PRESETS.map(preset => (
               <button
                 key={preset.label}
                 type="button"
                 aria-label={`${preset.label} 视角`}
-                className={`imagine-angle-view-button absolute ${preset.className}`}
+                className={`imagine-angle-view-button absolute z-30 ${preset.className}`}
                 data-active={isAnglePresetActive(angleState, preset.state)}
                 onPointerDown={event => event.stopPropagation()}
                 onClick={event => {
@@ -496,30 +452,16 @@ function PreviewStage({
             onWheel={handleLightingWheel}
             style={{ transformStyle: "preserve-3d" }}
           >
-            <div className="absolute left-1/2 top-[76%] h-28 w-[52%] -translate-x-1/2 rounded-[999px] bg-black/40 blur-2xl" />
-            <div className="pointer-events-none absolute left-1/2 top-1/2 aspect-square h-[84%] max-h-[430px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10 bg-[radial-gradient(circle_at_38%_34%,rgba(255,255,255,0.24),rgba(255,255,255,0.07)_34%,rgba(20,23,25,0.18)_68%,rgba(0,0,0,0.34)_100%)] shadow-[inset_0_0_82px_rgba(255,255,255,0.14),inset_34px_12px_70px_rgba(255,255,255,0.08),0_34px_100px_rgba(0,0,0,0.35)]" />
+            <div className="absolute left-1/2 top-[76%] h-28 w-[52%] -translate-x-1/2 rounded-[999px] bg-black/30 blur-2xl" />
+            <div className="pointer-events-none absolute left-1/2 top-1/2 aspect-square h-[82%] max-h-[430px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/[0.06] bg-[radial-gradient(circle_at_38%_34%,rgba(255,255,255,0.14),rgba(255,255,255,0.045)_34%,rgba(20,23,25,0.12)_68%,rgba(0,0,0,0.24)_100%)] shadow-[inset_0_0_82px_rgba(255,255,255,0.08),0_34px_100px_rgba(0,0,0,0.28)]" />
             <div className="pointer-events-none absolute left-1/2 top-1/2 aspect-square h-[84%] max-h-[430px] -translate-x-1/2 -translate-y-1/2 rounded-full" style={lightingVisual.domeStyle} />
             <div className="pointer-events-none absolute left-1/2 top-1/2 aspect-square h-[60%] max-h-[310px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10" />
             <div className="pointer-events-none absolute z-10" style={lightingVisual.beamStyle} />
-            <div
-              className="absolute left-1/2 top-1/2 z-20 transition-transform duration-200 ease-out"
-              style={{
-                height: panelSize.height,
-                transform: `translate(-50%, -52%) ${lightingVisual.panelTransform}`,
-                transformStyle: "preserve-3d",
-                width: panelSize.width,
-              }}
-            >
-              <div
-                className="absolute -inset-3 rounded-[22px] border border-white/10 bg-black/20 shadow-[0_30px_80px_rgba(0,0,0,0.42)]"
-                style={{ transform: "translateZ(-30px)" }}
-              />
-              <ImageSlab imageUrl={imageUrl} depth={LIGHT_PANEL_DEPTH} lensInset={ANGLE_NATURAL_LENS_INSET} />
-              <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[15px]" style={{ transform: `translateZ(${LIGHT_PANEL_DEPTH / 2 + 2}px)` }}>
-                <div className="pointer-events-none absolute inset-0" style={lightingVisual.overlayStyle} />
-                <div className="pointer-events-none absolute inset-0 rounded-[18px] ring-4 ring-white/70" style={{ opacity: lightingVisual.rimOpacity }} />
-              </div>
-            </div>
+            <ThreeCardViewport
+              imageUrl={imageUrl}
+              lightingState={lightingState}
+              operation="lighting"
+            />
             <div className="pointer-events-none absolute z-20 rounded-full blur-2xl" style={lightingVisual.orbStyle} />
             <div className="pointer-events-none absolute z-30 h-5 w-5 rounded-full border-2 border-white bg-white shadow-[0_0_24px_rgba(255,255,255,0.95)]" style={lightingVisual.markerStyle} />
             <LightingCompassMap imageUrl={imageUrl} state={lightingState} onChange={onLightingChange} />
@@ -531,81 +473,334 @@ function PreviewStage({
   );
 }
 
-function ImageSlab({
-  depth,
+interface ThreeCardScene {
+  ambientLight: THREE.AmbientLight;
+  camera: THREE.PerspectiveCamera;
+  cardGroup: THREE.Group;
+  guideGroup: THREE.Group;
+  keyLight: THREE.PointLight;
+  lightBeam: THREE.Mesh;
+  lightHalo: THREE.Mesh;
+  lightMarker: THREE.Mesh;
+  renderer: THREE.WebGLRenderer;
+  rimLight: THREE.DirectionalLight;
+  scene: THREE.Scene;
+}
+
+function ThreeCardViewport({
+  angleVisual,
   imageUrl,
-  lensInset,
+  lightingState,
+  operation,
 }: {
-  depth: number;
+  angleVisual?: AngleVisualState;
   imageUrl: string;
-  lensInset: number;
+  lightingState: LightingAdjustmentState;
+  operation: "angle" | "lighting";
 }) {
-  const halfDepth = depth / 2;
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const sceneRef = useRef<ThreeCardScene | null>(null);
+  const angleVisualRef = useRef(angleVisual);
+  const lightingStateRef = useRef(lightingState);
+
+  useEffect(() => {
+    angleVisualRef.current = angleVisual;
+    lightingStateRef.current = lightingState;
+  }, [angleVisual, lightingState]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return undefined;
+    let disposed = false;
+
+    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, canvas });
+    renderer.setClearColor(0x000000, 0);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 50);
+    camera.position.set(0, 0, 6.3);
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.35);
+    const keyLight = new THREE.PointLight(0xffffff, 2.2, 12, 1.6);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(1024, 1024);
+    const rimLight = new THREE.DirectionalLight(0xffffff, 0.35);
+    rimLight.position.set(-2.4, 1.8, -2.6);
+    scene.add(ambientLight, keyLight, rimLight);
+
+    const cardGroup = new THREE.Group();
+    scene.add(cardGroup);
+
+    const guideGroup = createThreeGuideGroup();
+    scene.add(guideGroup);
+
+    const floor = new THREE.Mesh(new THREE.CircleGeometry(2.45, 96), new THREE.ShadowMaterial({ color: 0x000000, opacity: 0.32 }));
+    floor.position.set(0, -1.22, 0);
+    floor.rotation.x = -Math.PI / 2;
+    floor.scale.set(1.55, 0.5, 1);
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    const lightBeam = new THREE.Mesh(
+      new THREE.ConeGeometry(0.78, 1, 64, 1, true),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        depthWrite: false,
+        opacity: 0.16,
+        side: THREE.DoubleSide,
+        transparent: true,
+      }),
+    );
+    scene.add(lightBeam);
+
+    const lightHalo = new THREE.Mesh(
+      new THREE.SphereGeometry(0.42, 32, 20),
+      new THREE.MeshBasicMaterial({
+        blending: THREE.AdditiveBlending,
+        color: 0xffffff,
+        depthWrite: false,
+        opacity: 0.2,
+        transparent: true,
+      }),
+    );
+    scene.add(lightHalo);
+
+    const lightMarker = new THREE.Mesh(
+      new THREE.SphereGeometry(0.065, 24, 16),
+      new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    );
+    scene.add(lightMarker);
+
+    let depthTexture: THREE.CanvasTexture | null = null;
+    const texture = new THREE.TextureLoader().load(imageUrl, loadedTexture => {
+      if (disposed) return;
+      loadedTexture.colorSpace = THREE.SRGBColorSpace;
+      loadedTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      const image = loadedTexture.image as HTMLImageElement | undefined;
+      const aspect = image && image.naturalHeight > 0 ? image.naturalWidth / image.naturalHeight : 1.5;
+      const width = operation === "angle" ? 3.08 : 3.18;
+      const height = width / aspect;
+      const depth = operation === "angle" ? ANGLE_PANEL_DEPTH : LIGHT_PANEL_DEPTH;
+      depthTexture = image ? createPseudoDepthTexture(image) : null;
+      const backingGeometry = new THREE.BoxGeometry(width, height, depth);
+      const sideMaterial = new THREE.MeshStandardMaterial({
+        color: 0x505050,
+        metalness: 0.08,
+        roughness: 0.78,
+      });
+      const backingMaterial = new THREE.MeshStandardMaterial({
+        color: 0x303030,
+        metalness: 0.05,
+        roughness: 0.82,
+      });
+      const backing = new THREE.Mesh(backingGeometry, [
+        sideMaterial,
+        sideMaterial,
+        sideMaterial,
+        sideMaterial,
+        backingMaterial,
+        backingMaterial,
+      ]);
+      backing.castShadow = true;
+      backing.receiveShadow = true;
+      backing.position.z = -depth / 2;
+      cardGroup.add(backing);
+
+      const reliefGeometry = new THREE.PlaneGeometry(width * 0.985, height * 0.985, 96, 64);
+      const reliefMaterial = new THREE.MeshStandardMaterial({
+        bumpMap: depthTexture ?? undefined,
+        bumpScale: operation === "angle" ? 0.025 : 0.038,
+        displacementBias: operation === "angle" ? -0.026 : -0.018,
+        displacementMap: depthTexture ?? undefined,
+        displacementScale: operation === "angle" ? 0.092 : 0.135,
+        emissive: 0xffffff,
+        emissiveIntensity: operation === "angle" ? 0.17 : 0.055,
+        emissiveMap: loadedTexture,
+        map: loadedTexture,
+        metalness: 0,
+        roughness: 0.56,
+        side: THREE.DoubleSide,
+      });
+      const relief = new THREE.Mesh(reliefGeometry, reliefMaterial);
+      relief.castShadow = true;
+      relief.receiveShadow = true;
+      relief.position.z = depth / 2 + 0.012;
+      cardGroup.add(relief);
+
+      const edges = new THREE.LineSegments(
+        new THREE.EdgesGeometry(backingGeometry),
+        new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.12, transparent: true }),
+      );
+      cardGroup.add(edges);
+      const sceneHandle = { ambientLight, camera, cardGroup, guideGroup, keyLight, lightBeam, lightHalo, lightMarker, renderer, rimLight, scene };
+      applyThreeCardState(
+        sceneHandle,
+        operation,
+        angleVisualRef.current,
+        lightingStateRef.current,
+      );
+    });
+
+    const sceneHandle: ThreeCardScene = { ambientLight, camera, cardGroup, guideGroup, keyLight, lightBeam, lightHalo, lightMarker, renderer, rimLight, scene };
+    sceneRef.current = sceneHandle;
+
+    const resize = () => {
+      const rect = canvas.getBoundingClientRect();
+      const width = Math.max(1, Math.floor(rect.width));
+      const height = Math.max(1, Math.floor(rect.height));
+      renderer.setSize(width, height, false);
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.render(scene, camera);
+    };
+    const resizeObserver = new ResizeObserver(resize);
+    resizeObserver.observe(canvas);
+    resize();
+
+    return () => {
+      disposed = true;
+      resizeObserver.disconnect();
+      scene.traverse(object => {
+        if (object instanceof THREE.Mesh || object instanceof THREE.Line || object instanceof THREE.LineSegments) {
+          object.geometry.dispose();
+          const materials = Array.isArray(object.material) ? object.material : [object.material];
+          for (const material of materials) material.dispose();
+        }
+      });
+      depthTexture?.dispose();
+      texture.dispose();
+      renderer.dispose();
+      sceneRef.current = null;
+    };
+  }, [imageUrl, operation]);
+
+  useEffect(() => {
+    const sceneHandle = sceneRef.current;
+    if (!sceneHandle) return;
+    applyThreeCardState(sceneHandle, operation, angleVisual, lightingState);
+  }, [angleVisual, lightingState, operation]);
+
   return (
-    <>
-      <div
-        className="absolute inset-0 overflow-hidden rounded-[16px] border border-white/45 bg-[#111] shadow-[0_24px_55px_rgba(0,0,0,0.44)]"
-        style={{ backfaceVisibility: "hidden", transform: `translateZ(${halfDepth}px)` }}
-      >
-        <img src={imageUrl} alt="" className="h-full w-full object-cover" draggable={false} />
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            boxShadow: `inset ${lensInset}px 0 90px rgba(15,23,42,0.16), inset ${-lensInset}px 0 90px rgba(255,255,255,0.2)`,
-          }}
-        />
-      </div>
-      <div
-        className="absolute inset-0 overflow-hidden rounded-[16px] border border-white/20 bg-[#191919]"
-        style={{ backfaceVisibility: "hidden", transform: `rotateY(180deg) translateZ(${halfDepth}px)` }}
-      >
-        <img src={imageUrl} alt="" className="h-full w-full scale-105 object-cover opacity-25 blur-[1px]" draggable={false} />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,rgba(255,255,255,0.14),rgba(20,20,20,0.86)_58%,rgba(0,0,0,0.96)_100%)]" />
-        <div className="absolute inset-5 rounded-[12px] border border-white/10" />
-      </div>
-      <div
-        className="absolute bottom-0 top-0 rounded-r-[14px] border border-white/10 bg-gradient-to-r from-[#5a5a5a] via-[#363636] to-[#171717]"
-        style={{
-          right: -halfDepth,
-          transform: "rotateY(90deg)",
-          transformOrigin: "left center",
-          width: depth,
-        }}
-      />
-      <div
-        className="absolute bottom-0 top-0 rounded-l-[14px] border border-white/10 bg-gradient-to-l from-[#5a5a5a] via-[#363636] to-[#171717]"
-        style={{
-          left: -halfDepth,
-          transform: "rotateY(-90deg)",
-          transformOrigin: "right center",
-          width: depth,
-        }}
-      />
-      <div
-        className="absolute left-0 right-0 rounded-t-[14px] border border-white/10 bg-gradient-to-t from-[#5a5a5a] via-[#363636] to-[#171717]"
-        style={{
-          height: depth,
-          top: -halfDepth,
-          transform: "rotateX(90deg)",
-          transformOrigin: "bottom center",
-        }}
-      />
-      <div
-        className="absolute left-0 right-0 rounded-b-[14px] border border-white/10 bg-gradient-to-b from-[#5a5a5a] via-[#363636] to-[#171717]"
-        style={{
-          bottom: -halfDepth,
-          height: depth,
-          transform: "rotateX(-90deg)",
-          transformOrigin: "top center",
-        }}
-      />
-      <div
-        className="pointer-events-none absolute left-1/2 top-1/2 h-px w-px rounded-full bg-white/40 shadow-[0_0_18px_rgba(255,255,255,0.5)]"
-        style={{ transform: `translate3d(-50%, -50%, ${halfDepth + 4}px)` }}
-      />
-    </>
+    <canvas ref={canvasRef} className="pointer-events-none absolute inset-0 z-20 h-full w-full" />
   );
 }
+
+function createThreeGuideGroup(): THREE.Group {
+  const group = new THREE.Group();
+  const panel = new THREE.Mesh(
+    new THREE.PlaneGeometry(4.25, 2.55),
+    new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      opacity: 0.025,
+      side: THREE.DoubleSide,
+      transparent: true,
+    }),
+  );
+  panel.position.set(0, 0, -0.55);
+  group.add(panel);
+
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(1.64, 0.01, 8, 128),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, opacity: 0.14, transparent: true }),
+  );
+  ring.position.set(0, -0.02, -0.12);
+  group.add(ring);
+
+  const lineMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.09, transparent: true });
+  const lines: Array<[THREE.Vector3, THREE.Vector3]> = [
+    [new THREE.Vector3(-2.18, 0, -0.5), new THREE.Vector3(2.18, 0, -0.5)],
+    [new THREE.Vector3(0, -1.34, -0.5), new THREE.Vector3(0, 1.34, -0.5)],
+    [new THREE.Vector3(-1.9, -1.02, -0.5), new THREE.Vector3(1.9, 1.02, -0.5)],
+    [new THREE.Vector3(-1.9, 1.02, -0.5), new THREE.Vector3(1.9, -1.02, -0.5)],
+  ];
+  for (const [from, to] of lines) {
+    const geometry = new THREE.BufferGeometry().setFromPoints([from, to]);
+    group.add(new THREE.Line(geometry, lineMaterial));
+  }
+  return group;
+}
+
+function applyThreeCardState(
+  sceneHandle: ThreeCardScene,
+  operation: "angle" | "lighting",
+  angleVisual: AngleVisualState | undefined,
+  lightingState: LightingAdjustmentState,
+): void {
+  if (operation === "angle" && angleVisual) {
+    sceneHandle.cardGroup.rotation.set(
+      THREE.MathUtils.degToRad(angleVisual.tilt),
+      THREE.MathUtils.degToRad(angleVisual.yaw),
+      0,
+    );
+    sceneHandle.cardGroup.scale.setScalar(angleVisual.scale * 1.18);
+    sceneHandle.cardGroup.position.set(0, -0.04, 0);
+    sceneHandle.guideGroup.visible = true;
+    sceneHandle.guideGroup.scale.setScalar(1);
+    sceneHandle.guideGroup.rotation.set(0, 0, 0);
+    sceneHandle.ambientLight.intensity = 1.38;
+    sceneHandle.keyLight.color.set(0xffffff);
+    sceneHandle.keyLight.intensity = 2.1;
+    sceneHandle.keyLight.position.set(2.6, 2.2, 3.2);
+    sceneHandle.rimLight.intensity = 0.45;
+    sceneHandle.lightBeam.visible = false;
+    sceneHandle.lightHalo.visible = false;
+    sceneHandle.lightMarker.visible = false;
+  } else {
+    const lightPosition = threeLightPosition(lightingState);
+    const color = threeTemperatureColor(lightingState.temperature);
+    sceneHandle.cardGroup.rotation.set(
+      THREE.MathUtils.degToRad(-8 + lightingState.height * LIGHT_HEIGHT_TILT_FACTOR),
+      THREE.MathUtils.degToRad(24),
+      0,
+    );
+    sceneHandle.cardGroup.scale.setScalar(0.96);
+    sceneHandle.cardGroup.position.set(0, -0.06, 0);
+    sceneHandle.guideGroup.visible = true;
+    sceneHandle.guideGroup.scale.setScalar(1.03);
+    sceneHandle.guideGroup.rotation.set(0, THREE.MathUtils.degToRad(6), 0);
+    sceneHandle.ambientLight.intensity = 0.88;
+    sceneHandle.keyLight.color.copy(color);
+    sceneHandle.keyLight.intensity = 1.55 + lightingState.intensity / 24;
+    sceneHandle.keyLight.position.copy(lightPosition);
+    sceneHandle.rimLight.intensity = lightingState.rimLight ? 0.75 : 0.18;
+    updateThreeLightBeam(sceneHandle.lightBeam, lightPosition, color, lightingState.intensity);
+    sceneHandle.lightHalo.visible = true;
+    sceneHandle.lightHalo.position.copy(lightPosition.clone().multiplyScalar(0.78));
+    sceneHandle.lightHalo.scale.setScalar(0.72 + lightingState.intensity / 115);
+    const haloMaterial = sceneHandle.lightHalo.material;
+    if (haloMaterial instanceof THREE.MeshBasicMaterial) {
+      haloMaterial.color.copy(color);
+      haloMaterial.opacity = 0.16 + lightingState.intensity / 420;
+    }
+    sceneHandle.lightMarker.visible = true;
+    sceneHandle.lightMarker.position.copy(lightPosition.clone().multiplyScalar(0.78));
+    const markerMaterial = sceneHandle.lightMarker.material;
+    if (markerMaterial instanceof THREE.MeshBasicMaterial) markerMaterial.color.copy(color);
+  }
+  sceneHandle.renderer.render(sceneHandle.scene, sceneHandle.camera);
+}
+
+function updateThreeLightBeam(mesh: THREE.Mesh, lightPosition: THREE.Vector3, color: THREE.Color, intensity: number): void {
+  const target = new THREE.Vector3(0, 0, 0);
+  const midpoint = lightPosition.clone().multiplyScalar(0.5);
+  const distance = lightPosition.distanceTo(target);
+  mesh.visible = true;
+  mesh.position.copy(midpoint);
+  mesh.scale.set(0.55 + intensity / 140, distance, 0.55 + intensity / 140);
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), lightPosition.clone().normalize());
+  const material = mesh.material;
+  if (material instanceof THREE.MeshBasicMaterial) {
+    material.color.copy(color);
+    material.opacity = 0.08 + intensity / 560;
+  }
+}
+
 
 function AngleOrbitMap({
   imageUrl,
@@ -728,6 +923,10 @@ function LightingCompassMap({
 
 function clampNumber(value: number, min: number, max: number): number {
   return Math.round(Math.min(max, Math.max(min, value)));
+}
+
+function clampRatio(value: number): number {
+  return Math.min(1, Math.max(0, value));
 }
 
 function orbitPointFromRotation(rotation: number): { x: number; y: number } {
@@ -859,15 +1058,26 @@ function RangeControl({
 }
 
 function angleVisualState(state: AngleAdjustmentState): AngleVisualState {
-  const rotateY = ANGLE_BASE_ROTATE_Y + state.rotation * ANGLE_ROTATION_SENSITIVITY;
+  const rotateY = ANGLE_BASE_ROTATE_Y + visualYawFromRotation(state.rotation) * ANGLE_ROTATION_SENSITIVITY;
   const rotateX = ANGLE_BASE_ROTATE_X - state.tilt * ANGLE_TILT_SENSITIVITY;
-  const scale = ANGLE_BASE_SCALE + state.zoom / ANGLE_ZOOM_SCALE_DIVISOR;
+  const sideCompression = Math.abs(Math.sin(rotateY * Math.PI / 180)) * ANGLE_SIDE_SCALE_REDUCTION;
+  const tiltCompression = Math.abs(state.tilt) / 60 * ANGLE_TILT_SCALE_REDUCTION;
+  const scale = Math.max(0.58, ANGLE_BASE_SCALE + state.zoom / ANGLE_ZOOM_SCALE_DIVISOR - sideCompression - tiltCompression);
   return {
-    cardTransform: `translateZ(${state.wideAngle ? 18 : 36}px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(${scale})`,
-    floorShadowTransform: `translateY(${ANGLE_SHADOW_BASE_Y + Math.abs(state.tilt) * ANGLE_SHADOW_TILT_FACTOR}px) scale(${ANGLE_SHADOW_BASE_SCALE + state.zoom / ANGLE_SHADOW_ZOOM_SCALE_DIVISOR}) rotateX(68deg) rotateZ(${state.rotation * 0.08}deg)`,
-    lensInset: state.wideAngle ? ANGLE_WIDE_LENS_INSET : ANGLE_NATURAL_LENS_INSET,
-    sideGlowOpacity: state.wideAngle ? ANGLE_WIDE_SIDE_GLOW_OPACITY : ANGLE_NATURAL_SIDE_GLOW_OPACITY,
+    scale: state.wideAngle ? scale * 0.94 : scale,
+    tilt: rotateX,
+    yaw: rotateY,
   };
+}
+
+function visualYawFromRotation(rotation: number): number {
+  const sign = rotation < 0 ? -1 : 1;
+  const absoluteRotation = Math.abs(rotation);
+  if (absoluteRotation <= ANGLE_VISUAL_BACK_START) {
+    return sign * Math.min(absoluteRotation, ANGLE_VISUAL_SIDE_LIMIT);
+  }
+  const backProgress = clampRatio((absoluteRotation - ANGLE_VISUAL_BACK_START) / (180 - ANGLE_VISUAL_BACK_START));
+  return sign * (ANGLE_VISUAL_SIDE_LIMIT + backProgress * (ANGLE_VISUAL_BACK_LIMIT - ANGLE_VISUAL_SIDE_LIMIT));
 }
 
 function getEditorResolutionOptions(model: string | undefined, aspectRatio: string): Array<{ value: string; label: string }> {
@@ -922,10 +1132,8 @@ function renderLightingGuide(size: CanvasSize, state: LightingAdjustmentState): 
 
 function lightingVisualState(state: LightingAdjustmentState): LightingVisualState {
   const point = lightStagePoint(state);
-  const surfacePoint = lightSurfacePoint(state);
   const color = colorStop(state.temperature, 1);
   const opacity = LIGHT_VISUAL_BASE_OPACITY + state.intensity / LIGHT_VISUAL_OPACITY_DIVISOR;
-  const heightTilt = state.height * LIGHT_HEIGHT_TILT_FACTOR;
   const beamAngle = Math.atan2(50 - point.y, 50 - point.x) * 180 / Math.PI;
   const beamWidth = LIGHT_BEAM_BASE_WIDTH + state.intensity * LIGHT_BEAM_WIDTH_FACTOR;
   const orbSize = LIGHT_ORB_BASE_SIZE + state.intensity * LIGHT_ORB_SIZE_FACTOR;
@@ -958,29 +1166,7 @@ function lightingVisualState(state: LightingAdjustmentState): LightingVisualStat
       transform: "translate(-50%, -50%)",
       width: `${orbSize}%`,
     },
-    overlayStyle: {
-      background: [
-        `radial-gradient(circle at ${surfacePoint.x}% ${surfacePoint.y}%, ${colorStop(state.temperature, LIGHT_SURFACE_CORE_ALPHA)} 0%, rgba(255,255,255,0.12) ${Math.max(16, state.intensity / 2)}%, transparent 68%)`,
-        `linear-gradient(${shadowGradientAngle(state.direction)}deg, rgba(15,23,42,0.42), transparent 48%)`,
-      ].join(", "),
-      mixBlendMode: "screen",
-    },
-    panelTransform: `translateZ(42px) rotateX(${-10 + heightTilt}deg) rotateY(24deg) scale(0.86)`,
-    rimOpacity: state.rimLight ? LIGHT_RIM_OPACITY : 0,
   };
-}
-
-function shadowGradientAngle(direction: LightingAdjustmentState["direction"]): number {
-  const angles: Record<LightingAdjustmentState["direction"], number> = {
-    // Back/front/top keep the stage gradient subtle; the visible beam and surface hotspot carry direction.
-    back: 0,
-    bottom: 180,
-    front: 0,
-    left: 90,
-    right: 270,
-    top: 0,
-  };
-  return angles[direction];
 }
 
 function lightPoint(size: CanvasSize, state: LightingAdjustmentState): { x: number; y: number } {
@@ -1010,17 +1196,23 @@ function lightStagePoint(state: LightingAdjustmentState): { x: number; y: number
   return points[state.direction];
 }
 
-function lightSurfacePoint(state: LightingAdjustmentState): { x: number; y: number } {
-  const yBase = resolveHeightBase(state.height, 20, 80, 50);
-  const points: Record<LightingAdjustmentState["direction"], { x: number; y: number }> = {
-    back: { x: 58, y: 24 },
-    bottom: { x: 50, y: 92 },
-    front: { x: 50, y: yBase },
-    left: { x: 4, y: yBase },
-    right: { x: 96, y: yBase },
-    top: { x: 50, y: 8 },
+function threeLightPosition(state: LightingAdjustmentState): THREE.Vector3 {
+  const height = state.height / 42;
+  const positions: Record<LightingAdjustmentState["direction"], THREE.Vector3> = {
+    back: new THREE.Vector3(0, 1.5 + height, -3.4),
+    bottom: new THREE.Vector3(0, -2.7, 1.4),
+    front: new THREE.Vector3(0, 1.2 + height, 3.5),
+    left: new THREE.Vector3(-3.3, 1.1 + height, 1.9),
+    right: new THREE.Vector3(3.3, 1.1 + height, 1.9),
+    top: new THREE.Vector3(0, 3.2, 1.6),
   };
-  return points[state.direction];
+  return positions[state.direction];
+}
+
+function threeTemperatureColor(temperature: number): THREE.Color {
+  if (temperature >= LIGHT_TEMPERATURE_COOL_THRESHOLD) return new THREE.Color(0xbfdcff);
+  if (temperature <= LIGHT_TEMPERATURE_WARM_THRESHOLD) return new THREE.Color(0xffbf7a);
+  return new THREE.Color(0xffffff);
 }
 
 function resolveHeightBase(height: number, high: number, low: number, middle: number): number {
