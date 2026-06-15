@@ -1118,8 +1118,8 @@ async function generate12AiGeminiImage(config: ProviderConfig, input: GenerateIm
     ...input.referenceImages.map(reference => {
       const parsed = parseDataUri(reference.dataUri);
       return {
-        inline_data: {
-          mime_type: parsed.mimeType,
+        inlineData: {
+          mimeType: parsed.mimeType,
           data: parsed.base64,
         },
       };

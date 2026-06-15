@@ -53,6 +53,70 @@ test("12AI async image generation uses the unified task submit API", async () =>
   }
 });
 
+test("12AI Gemini sync image generation uses documented native field casing", async () => {
+  const originalFetch = globalThis.fetch;
+  let requestUrl = "";
+  let requestBody: unknown;
+  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    requestUrl = input.toString();
+    requestBody = init?.body ? JSON.parse(String(init.body)) as unknown : null;
+    return Response.json({
+      candidates: [{
+        content: {
+          parts: [{
+            inlineData: {
+              mimeType: "image/png",
+              data: "aW1hZ2U=",
+            },
+          }],
+        },
+      }],
+    });
+  };
+
+  try {
+    const result = await generateImage(twelveAiConfig, {
+      prompt: "poster",
+      model: "gemini-3.1-flash-image-preview",
+      aspectRatio: "16:9",
+      imageResolution: "2K",
+      thinkingLevel: "high",
+      referenceImages: [{ dataUri: PNG_DATA_URI }],
+      async: false,
+    });
+
+    assert.equal(requestUrl, "https://cdn.12ai.org/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=twelve_ai_key");
+    assert.equal(result.imageUrl, "data:image/png;base64,aW1hZ2U=");
+    assert.deepEqual(requestBody, {
+      contents: [{
+        role: "user",
+        parts: [
+          {
+            inlineData: {
+              mimeType: "image/png",
+              data: "iVBORw0KGgo=",
+            },
+          },
+          { text: "poster" },
+        ],
+      }],
+      generationConfig: {
+        responseModalities: ["IMAGE"],
+        imageConfig: {
+          aspectRatio: "16:9",
+          imageSize: "2K",
+        },
+        thinkingConfig: {
+          thinkingLevel: "high",
+          includeThoughts: false,
+        },
+      },
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("12AI GPT async image generation maps size and quality inside task input", async () => {
   const originalFetch = globalThis.fetch;
   let requestBody: unknown;

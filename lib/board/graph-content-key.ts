@@ -1,5 +1,5 @@
 import type { BoardEdge, BoardMultiGridItem, BoardNode, BoardReferenceGroupItem } from "@/lib/board/types";
-import { cinematicProfileKey } from "@/lib/cinematic-controls";
+import { cinematicProfileKey } from "../cinematic-controls";
 
 const FNV_OFFSET_BASIS = 2_166_136_261;
 const FNV_PRIME = 16_777_619;
