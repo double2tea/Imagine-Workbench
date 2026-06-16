@@ -8,7 +8,6 @@ Imagine Workbench routes model calls through provider adapters. Most UI model li
 
 - 12AI: chat, image, async image, and video adapters.
 - grok2api: OpenAI-compatible chat, image, and video endpoints.
-- xstx: OpenAI-compatible chat, image, and model listing.
 - Agnes AI: OpenAI-compatible chat, image, video, and model listing.
 - ModelScope: API-Inference image generation and async task polling.
 - RunningHub: Standard Model APIs, AI Apps, workflows, and LLM chat.
@@ -23,7 +22,6 @@ Provider-prefixed model IDs keep routing explicit:
 12ai:gemini-3.1-flash-image-preview
 grok2api:grok-4.20-auto
 grok2api:grok-imagine-image
-xstx:gpt-image-2
 agnes:agnes-video-v2.0
 modelscope:Qwen/Qwen-Image
 runninghub:api:/openapi/v2/bytedance/jimeng-4.6/text-to-image

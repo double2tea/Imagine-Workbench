@@ -64,7 +64,7 @@ Adding a new provider:
 3. If the provider needs non-OpenAI-compatible generation endpoints, add adapter branches in `image.ts` / `video.ts` / `audio.ts`. OpenAI-compatible chat, image, and model-listing work with zero additional adapter code.
 4. No other changes required — `AiProvider` type, `PROVIDER_KEYS`, settings UI cards, localStorage, env resolution, dropdown groups all derive from the registry.
 
-Never hardcode provider strings (`"12ai"`, `"grok2api"`, `"xstx"`) in enumerations or arrays. Use `PROVIDER_KEYS`, `isKnownProvider()`, or `getProviderMeta()` from the registry.
+Never hardcode provider strings (`"12ai"`, `"grok2api"`) in enumerations or arrays. Use `PROVIDER_KEYS`, `isKnownProvider()`, or `getProviderMeta()` from the registry.
 
 ### Adapter files
 

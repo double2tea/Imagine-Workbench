@@ -101,7 +101,7 @@ test("lookupOpenRouterVisionSupport matches provider-prefixed model ids", () => 
   const visionMatch = lookupOpenRouterVisionSupport(index, "12ai:gemini-2.5-flash-preview-05-20");
   assert.equal(visionMatch?.supportsVision, true);
 
-  const textOnlyMatch = lookupOpenRouterVisionSupport(index, "xstx:deepseek-r1");
+  const textOnlyMatch = lookupOpenRouterVisionSupport(index, "custom-provider:deepseek-r1");
   assert.equal(textOnlyMatch?.supportsVision, false);
 });
 
@@ -121,7 +121,7 @@ test("token overlap matches same family across provider-specific ids", () => {
     },
   ]);
 
-  const match = lookupOpenRouterVisionSupport(index, "xstx:gemini-2.5-flash-custom-alias");
+  const match = lookupOpenRouterVisionSupport(index, "custom-provider:gemini-2.5-flash-custom-alias");
   assert.equal(match?.supportsVision, true);
   assert.ok(
     scoreOpenRouterModelTokenOverlap(

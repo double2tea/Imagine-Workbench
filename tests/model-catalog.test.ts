@@ -42,7 +42,7 @@ import {
   resolveBoardConnectionNodesWithCompatibleModel,
 } from "../lib/board/ports";
 import type { BoardNode } from "../lib/board/types";
-import { getProviderMeta } from "../lib/providers/registry";
+import { getProviderMeta, isKnownProvider, PROVIDER_KEYS } from "../lib/providers/registry";
 import {
   RUNNINGHUB_CONTROL_IMAGE_APP_LABEL,
   RUNNINGHUB_CONTROL_IMAGE_APP_MODEL,
@@ -72,6 +72,11 @@ test("parseProviderModel accepts dynamic provider prefixes", () => {
     model: "model-id",
     async: false,
   });
+});
+
+test("xstx is not a built-in provider", () => {
+  assert.equal(isKnownProvider("xstx"), false);
+  assert.equal(PROVIDER_KEYS.includes("xstx"), false);
 });
 
 test("tryParseProviderModel returns dynamic provider prefixes", () => {
@@ -549,8 +554,6 @@ test("image model selector hides duplicate async variants", () => {
 
 test("gpt image 2 exposes extended 4k-capable image sizes", () => {
   const capability = getModelCapability("12ai:gpt-image-2", "image");
-  const xstxCapability = getModelCapability("xstx:gpt-image-2", "image");
-  const xstx2kCapability = getModelCapability("xstx:gpt-image-2-2k", "image");
 
   assert.ok(capability.sizes.some(option => option.value === "512x512" && option.label === "512p"));
   assert.ok(capability.sizes.some(option => option.value === "1536x1024" && option.label === "1K"));
@@ -567,10 +570,6 @@ test("gpt image 2 exposes extended 4k-capable image sizes", () => {
   assert.ok(capability.sizes.some(option => option.value === "3840x2160" && option.label === "4K"));
   assert.ok(capability.sizes.some(option => option.value === "2160x3840" && option.label === "4K"));
   assert.deepEqual(capability.aspectRatios.map(option => option.value), ["1:1", "2:1", "1:2", "3:2", "2:3", "4:3", "3:4", "7:4", "4:7", "16:9", "9:16"]);
-  assert.deepEqual(xstxCapability.aspectRatios.map(option => option.value), capability.aspectRatios.map(option => option.value));
-  assert.equal(xstxCapability.sizes.some(option => option.value === "3840x1920"), true);
-  assert.equal(xstx2kCapability.sizes.some(option => option.value === "2048x1024"), true);
-  assert.equal(xstx2kCapability.sizes.some(option => option.value === "3840x1920"), false);
 });
 
 test("image resolution labels hide pixel dimensions while keeping request values", () => {
@@ -1005,16 +1004,6 @@ test("mimo exposes chat models and workbench TTS voice design", () => {
   assert.equal(isMimoWorkbenchTtsModel("mimo:mimo-v2.5-tts-voicedesign"), true);
   assert.equal(isMimoWorkbenchTtsModel("mimo-v2.5-tts"), false);
   assert.equal(isMimoWorkbenchTtsModel("mimo:mimo-v2.5-tts-voiceclone"), true);
-});
-
-test("xstx chat defaults use pricing model identifiers", () => {
-  assert.equal(CHAT_MODEL_OPTIONS["xstx"].some(option => option.value === "xstx:claude-opus-4-7"), true);
-  assert.equal(CHAT_MODEL_OPTIONS["xstx"].some(option => option.value === "xstx:claude-sonnet-4-6-20260217"), true);
-  assert.equal(CHAT_MODEL_OPTIONS["xstx"].some(option => option.value === "xstx:claude-haiku-4-5"), true);
-  assert.equal(CHAT_MODEL_OPTIONS["xstx"].some(option => option.value === "xstx:gpt-5.5-pro"), true);
-  assert.equal(CHAT_MODEL_OPTIONS["xstx"].some(option => option.value === "xstx:gemini-3.1-pro-high"), true);
-  assert.equal(CHAT_MODEL_OPTIONS["xstx"].some(option => option.value === "xstx:deepseek-v4-pro"), true);
-  assert.equal(CHAT_MODEL_OPTIONS["xstx"].some(option => option.value === "xstx:claude-haiku-4-5-20251001"), false);
 });
 
 test("agnes provider exposes documented chat image and video models", () => {

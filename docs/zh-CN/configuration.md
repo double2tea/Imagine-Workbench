@@ -20,9 +20,6 @@ TWELVE_AI_VIDEO_BASE_URL="https://new.12ai.org"
 GROK2API_API_KEY="your_grok2api_key"
 GROK2API_BASE_URL="http://localhost:8000"
 
-XSTX_API_KEY="sk_your_xstx_key"
-XSTX_BASE_URL="https://api.xstx.info"
-
 AGNES_AI_API_KEY="your_agnes_ai_key"
 AGNES_AI_BASE_URL="https://apihub.agnes-ai.com"
 

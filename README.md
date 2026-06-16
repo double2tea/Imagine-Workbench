@@ -18,7 +18,7 @@ Imagine Workbench is a browser-first creative workstation for AI image, video, a
 - Use Agent Mode to plan creative actions and trigger recommended generation steps.
 - Arrange assets, notes, references, and generation nodes on `/board` canvases.
 - Store generated assets locally in browser IndexedDB, with ZIP backup and restore tools.
-- Route model calls through provider adapters for 12AI, grok2api, xstx, Agnes AI, ModelScope, MiMo, and RunningHub.
+- Route model calls through provider adapters for 12AI, grok2api, Agnes AI, ModelScope, MiMo, and RunningHub.
 - Expose a small OpenAI-compatible `/v1/*` API surface for plugins and scripts.
 
 ## Quick Start
@@ -47,7 +47,6 @@ Start from [.env.example](.env.example). The most common keys are:
 ```bash
 TWELVE_AI_API_KEY="sk_your_12ai_key"
 GROK2API_API_KEY="your_grok2api_key"
-XSTX_API_KEY="sk_your_xstx_key"
 AGNES_AI_API_KEY="your_agnes_ai_key"
 MODELSCOPE_API_KEY="ms_your_modelscope_token"
 RUNNINGHUB_API_KEY="your_runninghub_api_key"
