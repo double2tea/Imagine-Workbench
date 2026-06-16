@@ -95,7 +95,7 @@ import {
   resolveBoardConnectionNodesWithCompatibleModel,
 } from "@/lib/board/ports";
 import { clampBoardTextNodeSize, estimateBoardNoteSize, estimateBoardPromptSize } from "@/lib/board/text-node-size";
-import { findResultNodeForSource, isResultSourceNode, resultNodeDefaultPosition } from "@/lib/board/utils";
+import { findResultNodeForSource, isResultSourceNode, resultNodeDefaultPosition, resultNodeIdsOwnedBySource } from "@/lib/board/utils";
 import { findAvailableBoardNodePosition } from "@/lib/board/placement";
 
 export type BoardSaveStatus = "idle" | "loading" | "saving" | "saved" | "error";
@@ -2233,11 +2233,9 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
           .filter(edge => edge.from.nodeId === nodeId && edge.to.portId === "asset-in")
           .map(edge => ({ assetId: deletedNode.asset.assetId, groupNodeId: edge.to.nodeId }))
         : [];
-      // Cascade-delete connected result nodes when deleting a generate node
+      // Cascade-delete only the auto-owned result node when deleting a generate node.
       const resultNodeIdsToDelete = isResultSourceNode(deletedNode)
-        ? currentBoard.edges
-          .filter(edge => edge.from.nodeId === nodeId && edge.from.portId === BOARD_PORT_IDS.resultOut)
-          .map(edge => edge.to.nodeId)
+        ? resultNodeIdsOwnedBySource(currentBoard.nodes, nodeId)
         : [];
       const remainingNodes = currentBoard.nodes
         .filter(node => node.id !== nodeId && !resultNodeIdsToDelete.includes(node.id));

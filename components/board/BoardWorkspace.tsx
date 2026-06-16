@@ -108,7 +108,7 @@ import {
   isValidBoardConnection as isValidBoardPortConnection,
 } from "@/lib/board/ports";
 import { BOARD_INSERT_CATALOG, type BoardInsertKind } from "@/lib/board/insert-catalog";
-import { findResultNodeForSource } from "@/lib/board/utils";
+import { findResultNodeForSource, selectedNodeIdsForContextMenu } from "@/lib/board/utils";
 import { t, useTranslations } from "@/lib/i18n";
 import { findAvailableBoardNodePosition } from "@/lib/board/placement";
 import type { GenerationTask } from "@/lib/generation-tasks";
@@ -2034,8 +2034,8 @@ export default function BoardWorkspace({
     setNodeContextMenu({ nodeId, clientX, clientY });
     selectNode(nodeId);
     selectEdge(null);
-    if (selectedNodeIds.length <= 1) updateSelectedNodeIds([nodeId]);
-  }, [closeOverlayMenus, selectEdge, selectedNodeIds.length, selectNode, updateSelectedNodeIds]);
+    updateSelectedNodeIds(selectedNodeIdsForContextMenu(selectedNodeIds, nodeId));
+  }, [closeOverlayMenus, selectEdge, selectedNodeIds, selectNode, updateSelectedNodeIds]);
 
   const handleNodeContextMenu = useCallback<NodeMouseHandler<BoardFlowNode>>((event, node) => {
     event.preventDefault();

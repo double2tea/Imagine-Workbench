@@ -16,6 +16,20 @@ export function findResultNodeForSource(
   );
 }
 
+export function resultNodeIdsOwnedBySource(nodes: readonly BoardNode[], sourceNodeId: string): string[] {
+  return nodes
+    .filter(
+      (node): node is Extract<BoardNode, { kind: "result" }> =>
+        node.kind === "result" && node.sourceNodeId === sourceNodeId,
+    )
+    .map(node => node.id);
+}
+
+export function selectedNodeIdsForContextMenu(currentNodeIds: readonly string[], contextNodeId: string): string[] {
+  if (currentNodeIds.length > 1 && currentNodeIds.includes(contextNodeId)) return [...currentNodeIds];
+  return [contextNodeId];
+}
+
 export function resultNodeDefaultPosition(sourceNode: { position: BoardPoint; size: BoardSize }): BoardPoint {
   return {
     x: sourceNode.position.x + sourceNode.size.width + 48,
