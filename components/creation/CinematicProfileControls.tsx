@@ -377,6 +377,7 @@ export default function CinematicProfileControls({
     window.requestAnimationFrame(() => openButtonRef.current?.focus());
   };
   const compactLabel = isEnabled ? "开启" : "关闭";
+  const sectionRailGridClassName = mediaType === "video" ? "xl:grid-cols-8" : "xl:grid-cols-7";
   const dialog = isOpen ? (
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/65 p-4 backdrop-blur-md"
@@ -387,7 +388,7 @@ export default function CinematicProfileControls({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="flex max-h-[86vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-[var(--iw-border)] bg-[var(--iw-panel)] shadow-2xl"
+        className="flex h-[82vh] max-h-[740px] w-[96vw] max-w-[1440px] flex-col overflow-hidden rounded-xl border border-[var(--iw-border)] bg-[var(--iw-panel)] shadow-2xl"
         onClick={event => event.stopPropagation()}
       >
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--iw-border)] px-4 py-3">
@@ -425,7 +426,7 @@ export default function CinematicProfileControls({
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <div className="shrink-0 border-b border-[var(--iw-border)] p-3">
-            <div className="flex gap-2 overflow-x-auto pb-1">
+            <div className={`grid grid-cols-2 gap-2 sm:grid-cols-4 ${sectionRailGridClassName}`}>
               {sections.map(section => {
                 const sectionValue = String(value[section.field]);
                 const sectionOption = selectedSectionOption(section, sectionValue);
@@ -439,7 +440,7 @@ export default function CinematicProfileControls({
                       setActiveField(section.field);
                       setPreviewTarget(null);
                     }}
-                    className={`flex min-w-32 shrink-0 items-center gap-2 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5 text-left transition hover:border-[var(--iw-border-strong)] sm:min-w-36 ${accentClassNames[accent].nav}`}
+                    className={`flex min-w-0 items-center gap-2 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5 text-left transition hover:border-[var(--iw-border-strong)] ${accentClassNames[accent].nav}`}
                   >
                     <span
                       className="h-8 w-11 shrink-0 rounded-md border border-white/10 bg-[var(--iw-panel)] bg-cover bg-center"
