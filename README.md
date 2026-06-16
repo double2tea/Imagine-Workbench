@@ -4,9 +4,9 @@ Imagine Workbench is a Next.js creative workstation for AI image, image-editing,
 
 ## License and Author
 
-Imagine Workbench uses a custom reciprocal open source license. Personal, internal, and commercial use are allowed.
+Imagine Workbench is licensed under the GNU Affero General Public License v3.0 or later (`AGPL-3.0-or-later`). Personal, internal, and commercial use are allowed.
 
-Software, products, services, plugins, templates, packages, or other works developed from this code must keep their source code open under the same license terms and clearly credit the original author and source project.
+Modified versions and derivative works must follow the AGPL terms. If you distribute them or provide them as a network service, you must make the corresponding source code available under the same license and clearly credit the original author and source project.
 
 - Author: double2tea
 - GitHub: https://github.com/double2tea

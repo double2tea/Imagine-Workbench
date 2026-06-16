@@ -7,7 +7,7 @@
     "email": "double_tea@foxmail.com",
     "url": "https://github.com/double2tea"
   },
-  "license": "SEE LICENSE IN LICENSE.md",
+  "license": "AGPL-3.0-or-later",
   "packageManager": "pnpm@10.27.0",
   "scripts": {
     "dev": "DISABLE_HMR=false next dev",
