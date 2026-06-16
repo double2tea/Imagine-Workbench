@@ -2,6 +2,10 @@
 
 Imagine Workbench is a Next.js creative workstation for AI image, image-editing, video, and agent-assisted visual ideation workflows.
 
+## Online Preview
+
+Use the deployed preview at [imagine-workbench.pages.dev](https://imagine-workbench.pages.dev).
+
 ## License and Author
 
 Imagine Workbench is licensed under the GNU Affero General Public License v3.0 or later (`AGPL-3.0-or-later`). Personal, internal, and commercial use are allowed.
