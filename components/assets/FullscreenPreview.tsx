@@ -234,8 +234,14 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
       });
     };
     element.addEventListener("wheel", handleImageWheel, { passive: false });
-    return () => element.removeEventListener("wheel", handleImageWheel);
-  }, [item?.type]);
+    return () => {
+      element.removeEventListener("wheel", handleImageWheel);
+      if (imageWheelFrameRef.current !== null) {
+        window.cancelAnimationFrame(imageWheelFrameRef.current);
+        imageWheelFrameRef.current = null;
+      }
+    };
+  }, [item?.id]);
 
   return (
     <AnimatePresence>

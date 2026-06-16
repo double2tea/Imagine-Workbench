@@ -131,6 +131,7 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
   const isProcessing = node.status === "processing" || taskSummary?.status === "processing" || taskSummary?.status === "pending";
   const isAudioNode = node.kind === "audio-operation";
   const isVideoNode = node.kind === "video-generate";
+  const cinematicNode = node.kind === "audio-operation" ? null : node;
   const textInputRequired = !isAudioNode || audioOperationRequiresTextInput(node.audioMode);
   const usesOptionalTextInput = isAudioNode && !textInputRequired;
   const promptPreview = inputSummary?.promptPreview ?? null;
@@ -363,13 +364,13 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
         >
           {node.errorMessage ?? compactStatusLabel}
         </span>
-        {node.kind === "image-generate" || isVideoNode ? (
+        {cinematicNode ? (
           <CinematicProfileControls
-            accent={isVideoNode ? "violet" : "blue"}
+            accent={cinematicNode.kind === "video-generate" ? "violet" : "blue"}
             className="nodrag h-8"
-            mediaType={isVideoNode ? "video" : "image"}
+            mediaType={cinematicNode.kind === "video-generate" ? "video" : "image"}
             variant="compact"
-            value={node.cinematicProfile}
+            value={cinematicNode.cinematicProfile}
             onChange={cinematicProfile => onUpdate({ cinematicProfile })}
           />
         ) : (

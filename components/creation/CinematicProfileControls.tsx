@@ -281,6 +281,7 @@ export default function CinematicProfileControls({
   const titleId = useId();
   const openButtonRef = useRef<HTMLButtonElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [activeField, setActiveField] = useState<CinematicField>("camera");
@@ -325,10 +326,37 @@ export default function CinematicProfileControls({
     closeButtonRef.current?.focus();
     const previousBodyOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    const getFocusableElements = () =>
+      dialogRef.current
+        ? Array.from(
+            dialogRef.current.querySelectorAll<HTMLElement>(
+              'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+            ),
+          )
+        : [];
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (event.key === "Escape") {
         setIsOpen(false);
         window.requestAnimationFrame(() => openButtonRef.current?.focus());
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const focusable = getFocusableElements();
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!first || !last) return;
+
+      if (event.shiftKey) {
+        if (document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        }
+        return;
+      }
+      if (document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -355,6 +383,7 @@ export default function CinematicProfileControls({
       onClick={closeDialog}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
