@@ -62,6 +62,7 @@ export interface GenerateImageInput {
   imageQuality?: string;
   thinkingLevel?: string;
   referenceImages: ReferenceImage[];
+  referenceMedia?: ReferenceMedia[];
   async: boolean;
   runningHubAccessPassword?: string;
   runningHubNodeInfoList?: RunningHubTaskNodeBinding[];

@@ -122,7 +122,7 @@ function readReferenceIndex(value: unknown): number | undefined {
   return value;
 }
 
-function isRunningHubTaskTarget(model: string, mediaKind: "image" | "video" | "audio"): boolean {
+export function isRunningHubTaskTarget(model: string, mediaKind: "image" | "video" | "audio"): boolean {
   const normalizedModel = model.startsWith("runninghub:") ? model.slice("runninghub:".length) : model;
   return normalizedModel.startsWith(`ai-app-${mediaKind}:`) || normalizedModel.startsWith(`workflow-${mediaKind}:`);
 }

@@ -4,6 +4,7 @@ import { DEFAULT_VIDEO_MODEL, getModelCapability, parseProviderModel, ProviderMo
 import { ModelCapabilityValidationError, validateInputModalityReferences } from "@/lib/providers/model-capabilities";
 import { generateVideo } from "@/lib/providers/video";
 import {
+  isRunningHubTaskTarget,
   readRunningHubNodeInfoList,
   resolveRunningHubNodeInfoListForModel,
   runningHubResolvedNodeInfoAllowsEmptyPrompt,
@@ -40,7 +41,8 @@ export async function POST(req: NextRequest) {
     const modelValue = optionalText(body.model) ?? DEFAULT_VIDEO_MODEL;
     const parsed = parseProviderModel(modelValue, "12ai");
     const config = resolveProviderConfig(req, parsed.provider);
-    const modelCapability = getModelCapability(modelValue, "video");
+    const isRunningHubVideoTask = parsed.provider === "runninghub" && isRunningHubTaskTarget(parsed.model, "video");
+    const modelCapability = isRunningHubVideoTask ? null : getModelCapability(modelValue, "video");
     const referenceMedia = readReferenceMedia(body.referenceMedia, body.images, body.image, body.lastFrame);
     const explicitRunningHubNodeInfoList = readRunningHubNodeInfoList(body.runningHubNodeInfoList);
     const runningHubNodeInfo = resolveRunningHubNodeInfoListForModel(parsed.model, explicitRunningHubNodeInfoList);
@@ -48,7 +50,7 @@ export async function POST(req: NextRequest) {
     if (formatError) return NextResponse.json({ error: formatError }, { status: 400 });
     const payloadError = getReferenceMediaPayloadError(referenceMedia.map(reference => reference.dataUri));
     if (payloadError) return NextResponse.json({ error: payloadError }, { status: 413 });
-    validateInputModalityReferences(modelCapability.inputModalities, referenceMedia);
+    if (modelCapability) validateInputModalityReferences(modelCapability.inputModalities, referenceMedia);
 
     const allowsEmptyPrompt = runningHubResolvedNodeInfoAllowsEmptyPrompt(parsed.model, "video", runningHubNodeInfo);
     const result = await generateVideo(config, {

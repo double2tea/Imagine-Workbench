@@ -33,6 +33,7 @@ import { buildPromptWithReferenceMap } from "@/hooks/useReferenceState";
 import { audioOperationMissingReferenceMessage, audioOperationRequiresTextInput, readOptionalAudioFormat } from "@/lib/audio-operation-rules";
 import { getMediaReferenceType, mediaReferenceLabel } from "@/lib/media-references";
 import { getAudioModelCapabilities, getImageModelCapabilities, getVideoModelCapabilities, imageParameterValuesFromLegacy, imageParameterValuesToRunningHubYouchuan, parseProviderModel, resolveImageModelQuality, type AudioOperationMode, type VideoReferenceMode } from "@/lib/providers/model-catalog";
+import { isRunningHubTaskTarget } from "@/lib/providers/runninghub-node-info";
 import { getProviderMeta } from "@/lib/providers/registry";
 import { runningHubAppPresetRequiresPrompt } from "@/lib/providers/runninghub";
 import { getReferenceImagePayloadError, getReferenceMediaPayloadError, prepareReferenceImageUrlForRequest, prepareReferenceMediaUrlForRequest } from "@/lib/reference-images";
@@ -431,14 +432,17 @@ export function useGenerationActions({
     const requestImageResolution = overrides.imageResolution ?? activeImageResolution;
     const requestIsCustomImageResolution = overrides.isCustomImageResolution ?? isCustomImageResolution;
     const requestThinkingLevel = overrides.thinkingLevel ?? imageThinkingLevel;
-    const requestRunningHubYouchuan = runningHubYouchuanSettingsForModel(
-      requestModel,
-      overrides.runningHubYouchuan ?? runningHubYouchuan,
-    );
+    const isRunningHubImageTask = isRunningHubTaskTarget(requestModel, "image");
+    const requestRunningHubYouchuan = isRunningHubImageTask
+      ? undefined
+      : runningHubYouchuanSettingsForModel(
+        requestModel,
+        overrides.runningHubYouchuan ?? runningHubYouchuan,
+      );
     const requestCinematicProfile = overrides.cinematicProfile ?? cinematicProfile;
-    const requestImageCapabilities = getImageModelCapabilities(requestModel);
+    const requestImageCapabilities = isRunningHubImageTask ? null : getImageModelCapabilities(requestModel);
     const requestedImageQuality = overrides.imageQuality ?? activeImageQuality;
-    const requestImageQuality = resolveImageModelQuality(requestModel, requestedImageQuality);
+    const requestImageQuality = isRunningHubImageTask ? requestedImageQuality : resolveImageModelQuality(requestModel, requestedImageQuality);
     const requestAspectRatio =
       requestIsCustomImageResolution
         ? customImageSizeAspectRatio(requestImageResolution) ?? (overrides.size ?? activeImageAspectRatio)
@@ -452,7 +456,7 @@ export function useGenerationActions({
         return false;
       }
     }
-    const unsupportedImageReference = activeReferenceImages.find(reference => getMediaReferenceType(reference) !== "image");
+    const unsupportedImageReference = isRunningHubImageTask ? undefined : activeReferenceImages.find(reference => getMediaReferenceType(reference) !== "image");
     if (unsupportedImageReference) {
       pushWorkspaceNotice("error", t("common.notices.imageGenNotSupportMediaReference", { type: mediaReferenceLabel(getMediaReferenceType(unsupportedImageReference)) }));
       return false;
@@ -461,22 +465,24 @@ export function useGenerationActions({
     if (imageReferenceUrls.length === 0 && activeReferenceImage) {
       imageReferenceUrls.push(activeReferenceImage);
     }
-    if (imageReferenceUrls.length < requestImageCapabilities.minReferenceImages) {
+    if (requestImageCapabilities && imageReferenceUrls.length < requestImageCapabilities.minReferenceImages) {
       pushWorkspaceNotice("error", t("common.notices.imageModelNeedMinReferences", { min: requestImageCapabilities.minReferenceImages }));
       return false;
     }
-    if (imageReferenceUrls.length > requestImageCapabilities.maxReferenceImages) {
+    if (requestImageCapabilities && imageReferenceUrls.length > requestImageCapabilities.maxReferenceImages) {
       pushWorkspaceNotice("error", t("common.notices.imageModelMaxReferences", { max: requestImageCapabilities.maxReferenceImages }));
       return false;
     }
     let imageReferencePayloads: string[];
     try {
-      imageReferencePayloads = await Promise.all(imageReferenceUrls.map(prepareReferenceImageUrlForRequest));
+      imageReferencePayloads = await Promise.all(imageReferenceUrls.map(isRunningHubImageTask ? prepareReferenceMediaUrlForRequest : prepareReferenceImageUrlForRequest));
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.referenceImageReadFailed")));
       return false;
     }
-    const imagePayloadError = getReferenceImagePayloadError(imageReferencePayloads);
+    const imagePayloadError = isRunningHubImageTask
+      ? getReferenceMediaPayloadError(imageReferencePayloads)
+      : getReferenceImagePayloadError(imageReferencePayloads);
     if (imagePayloadError) {
       pushWorkspaceNotice("error", imagePayloadError);
       return false;
@@ -530,6 +536,11 @@ export function useGenerationActions({
         signal: controller.signal,
         body: JSON.stringify({
           ...generationRequest,
+          referenceMedia: generationRequest.referenceMedia?.map(reference => ({
+            dataUri: reference.url,
+            type: reference.type,
+          })),
+          referenceImages: imageReferencePayloads,
           referenceImage: imageReferencePayloads[0],
         }),
       });
@@ -639,17 +650,26 @@ export function useGenerationActions({
     const requestVideoPreset = overrides.videoPreset ?? activeVideoPreset;
     const requestVideoReferenceMode = overrides.videoReferenceMode ?? activeVideoReferenceMode;
     const requestVideoResolution = overrides.videoResolution ?? activeVideoResolution;
-    const requestVideoCapabilities = getVideoModelCapabilities(requestModel);
+    const isRunningHubVideoTask = isRunningHubTaskTarget(requestModel, "video");
+    const requestVideoCapabilities = isRunningHubVideoTask ? null : getVideoModelCapabilities(requestModel);
     const requestCinematicProfile = overrides.cinematicProfile ?? cinematicProfile;
 
     if (!activePrompt.trim() && overrides.allowEmptyPrompt !== true && runningHubAppPresetRequiresPrompt(requestModel)) return false;
-    const videoReferences = selectVideoReferencesForMode(
-      activeReferenceImages,
-      activeReferenceImage,
-      requestVideoReferenceMode,
-      requestVideoCapabilities.maxReferenceImages,
-    );
-    const unsupportedReference = videoReferences.find(reference => !requestVideoCapabilities.referenceMediaTypes.includes(getMediaReferenceType(reference)));
+    const videoReferences = isRunningHubVideoTask
+      ? activeReferenceImages.length > 0
+        ? activeReferenceImages
+        : activeReferenceImage
+          ? [{ id: "legacy-reference", url: activeReferenceImage }]
+          : []
+      : selectVideoReferencesForMode(
+        activeReferenceImages,
+        activeReferenceImage,
+        requestVideoReferenceMode,
+        requestVideoCapabilities?.maxReferenceImages ?? 0,
+      );
+    const unsupportedReference = requestVideoCapabilities
+      ? videoReferences.find(reference => !requestVideoCapabilities.referenceMediaTypes.includes(getMediaReferenceType(reference)))
+      : undefined;
     if (unsupportedReference) {
       pushWorkspaceNotice("error", t("common.notices.videoGenNotSupportMediaInput", { type: mediaReferenceLabel(getMediaReferenceType(unsupportedReference)) }));
       return false;

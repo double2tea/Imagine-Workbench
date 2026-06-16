@@ -5,14 +5,16 @@ import { DEFAULT_IMAGE_MODEL, getImageModelCapabilities, getImageResolutionOptio
 import { ModelCapabilityValidationError, validateInputModalityReferences } from "@/lib/providers/model-capabilities";
 import { generateImage } from "@/lib/providers/image";
 import {
+  isRunningHubTaskTarget,
   readRunningHubNodeInfoList,
   resolveRunningHubNodeInfoListForModel,
   runningHubResolvedNodeInfoAllowsEmptyPrompt,
 } from "@/lib/providers/runninghub-node-info";
 import { dataUriToBlob, optionalText, resolveProviderConfig } from "@/lib/providers/utils";
 import { getRunningHubYouchuanCatalog } from "@/lib/providers/runninghub";
-import type { RunningHubYouchuanAdvancedSettings } from "@/lib/providers/types";
-import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, getReferenceImagePayloadError } from "@/lib/reference-images";
+import { mediaReferenceTypeFromBase64DataUri } from "@/lib/media-references";
+import type { ReferenceMedia, RunningHubYouchuanAdvancedSettings } from "@/lib/providers/types";
+import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, getReferenceImagePayloadError, getReferenceMediaPayloadError } from "@/lib/reference-images";
 
 export const runtime = "edge";
 
@@ -28,6 +30,7 @@ interface GenerateImageBody {
   runningHubYouchuan?: unknown;
   referenceImage?: unknown;
   referenceImages?: unknown;
+  referenceMedia?: unknown;
 }
 
 class ImageRequestValidationError extends Error {}
@@ -40,19 +43,27 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as GenerateImageBody;
     const modelValue = optionalText(body.model) ?? DEFAULT_IMAGE_MODEL;
     const parsed = parseProviderModel(modelValue, "12ai");
-    const modelCapability = getModelCapability(modelValue, "image");
+    const isRunningHubImageTask = parsed.provider === "runninghub" && isRunningHubTaskTarget(parsed.model, "image");
+    const modelCapability = isRunningHubImageTask ? null : getModelCapability(modelValue, "image");
     const config = resolveProviderConfig(req, parsed.provider);
     const requestImageResolution = optionalText(body.imageResolution);
     const aspectRatio = customImageSizeAspectRatio(requestImageResolution) ?? optionalText(body.aspectRatio) ?? "1:1";
-    const imageResolution = resolveImageResolution(modelValue, aspectRatio, requestImageResolution);
-    const imageQuality = resolveImageQuality(modelValue, optionalText(body.imageQuality));
+    const imageResolution = isRunningHubImageTask ? requestImageResolution ?? "auto" : resolveImageResolution(modelValue, aspectRatio, requestImageResolution);
+    const imageQuality = isRunningHubImageTask ? optionalText(body.imageQuality) : resolveImageQuality(modelValue, optionalText(body.imageQuality));
     const referenceImages = readReferenceImages(body.referenceImages, body.referenceImage);
-    const runningHubYouchuan = readRunningHubYouchuanAdvancedSettings(body.runningHubYouchuan, parsed.model);
+    const referenceMedia = isRunningHubImageTask
+      ? readReferenceMedia(body.referenceMedia, referenceImages)
+      : referenceImages.map(dataUri => ({ dataUri, type: "image" as const }));
+    const runningHubYouchuan = isRunningHubImageTask ? undefined : readRunningHubYouchuanAdvancedSettings(body.runningHubYouchuan, parsed.model);
     const explicitRunningHubNodeInfoList = readRunningHubNodeInfoList(body.runningHubNodeInfoList);
     const runningHubNodeInfo = resolveRunningHubNodeInfoListForModel(parsed.model, explicitRunningHubNodeInfoList);
-    const payloadError = getReferenceImagePayloadError([...referenceImages, ...runningHubYouchuanReferenceImages(runningHubYouchuan)]);
+    const formatError = isRunningHubImageTask ? getReferenceMediaFormatError(referenceMedia) : null;
+    if (formatError) return NextResponse.json({ error: formatError }, { status: 400 });
+    const payloadError = isRunningHubImageTask
+      ? getReferenceMediaPayloadError(referenceMedia.map(reference => reference.dataUri))
+      : getReferenceImagePayloadError([...referenceImages, ...runningHubYouchuanReferenceImages(runningHubYouchuan)]);
     if (payloadError) return NextResponse.json({ error: payloadError }, { status: 413 });
-    validateInputModalityReferences(modelCapability.inputModalities, referenceImages.map(() => ({ type: "image" })));
+    if (modelCapability) validateInputModalityReferences(modelCapability.inputModalities, referenceImages.map(() => ({ type: "image" })));
 
     const allowsEmptyPrompt = runningHubResolvedNodeInfoAllowsEmptyPrompt(parsed.model, "image", runningHubNodeInfo);
     const result = await generateImage(config, {
@@ -63,6 +74,7 @@ export async function POST(req: NextRequest) {
       imageQuality,
       thinkingLevel: optionalText(body.thinkingLevel),
       referenceImages: referenceImages.map(dataUri => ({ dataUri })),
+      referenceMedia,
       async: parsed.async,
       runningHubAccessPassword: optionalText(body.runningHubAccessPassword),
       runningHubNodeInfoList: runningHubNodeInfo.nodeInfoList,
@@ -322,4 +334,33 @@ function readReferenceImages(referenceImages: unknown, referenceImage: unknown):
     return [referenceImage];
   }
   return [];
+}
+
+function readReferenceMedia(referenceMedia: unknown, fallbackImages: string[]): ReferenceMedia[] {
+  if (Array.isArray(referenceMedia) && referenceMedia.length > 0) {
+    return referenceMedia.map(readReferenceMediaValue).filter((reference): reference is ReferenceMedia => reference !== null);
+  }
+  return fallbackImages.map(dataUri => ({ dataUri, type: "image" }));
+}
+
+function readReferenceMediaValue(value: unknown): ReferenceMedia | null {
+  if (typeof value === "string" && value.length > 0) return readReferenceMediaItem(value);
+  if (typeof value !== "object" || value === null || !("dataUri" in value)) return null;
+  const dataUri = value.dataUri;
+  if (typeof dataUri !== "string" || dataUri.length === 0) return null;
+  return readReferenceMediaItem(dataUri);
+}
+
+function readReferenceMediaItem(dataUri: string): ReferenceMedia {
+  const type = mediaReferenceTypeFromBase64DataUri(dataUri);
+  if (!type) return { dataUri, type: "image" };
+  return { dataUri, type };
+}
+
+function getReferenceMediaFormatError(referenceMedia: ReferenceMedia[]): string | null {
+  for (const reference of referenceMedia) {
+    const actualType = mediaReferenceTypeFromBase64DataUri(reference.dataUri);
+    if (!actualType) return "RunningHub reference media must be data:image/*, data:video/* or data:audio/* base64 data URIs";
+  }
+  return null;
 }
