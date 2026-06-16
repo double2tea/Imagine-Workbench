@@ -112,8 +112,11 @@ interface GenerationOverrides {
   runningHubYouchuan?: RunningHubYouchuanAdvancedSettings;
 }
 
+let generationClientIdSequence = 0;
+
 function makeClientId(prefix: string): string {
-  return `${prefix}_${Date.now()}`;
+  generationClientIdSequence += 1;
+  return `${prefix}_${Date.now()}_${generationClientIdSequence}`;
 }
 
 function runningHubYouchuanSettingsForModel(

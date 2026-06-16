@@ -1329,12 +1329,12 @@ function terminalResultUpdate(
   status: BoardGenerationStatus,
   errorMessage: string,
 ) {
-  const activeCompleteItem = status === "complete" ? latestCompleteSourceStackItem(items, sourceNode) : undefined;
-  const activeProcessingItems = status === "processing" ? activeProcessingSourceStackItems(items, tasks, sourceNode) : [];
+  const activeCompleteItem = latestCompleteSourceStackItem(items, sourceNode);
+  const activeProcessingItems = status === "processing" && !activeCompleteItem ? activeProcessingSourceStackItems(items, tasks, sourceNode) : [];
   const activeItem = activeCompleteItem ?? activeProcessingItems[activeProcessingItems.length - 1] ?? terminalItem;
   const activeProcessingIds = activeProcessingItems.map(item => item.id);
   const resultAssetIds = activeCompleteItem
-    ? appendUniqueResultAssetId(sourceStackResultAssetIds(items, sourceNode, activeCompleteItem.id), terminalItem.id)
+    ? sourceStackResultAssetIds(items, sourceNode, activeCompleteItem.id)
     : activeProcessingIds.length > 0
       ? appendUniqueResultAssetId(activeProcessingIds, terminalItem.id)
     : appendResultAssetId(sourceNode, terminalItem.id);
@@ -4016,9 +4016,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
         if (node.kind === "image-generate") {
           const nodeImageResolution = node.imageResolution === "custom" ? node.customImageResolution.trim() : node.imageResolution;
-          let didStartAny = false;
-          for (let remaining = node.variantCount; remaining > 0; remaining -= 1) {
-            const didStart = await generateManualImage({
+          const didStartResults = await Promise.all(Array.from({ length: node.variantCount }, () =>
+            generateManualImage({
               boardId: resolvedBoardId,
               boardNodeId: nodeId,
               boardResultStackKey: resultStackKey,
@@ -4034,20 +4033,17 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
               size: node.aspectRatio,
               thinkingLevel: node.thinkingLevel,
               allowEmptyPrompt: allowsEmptyPrompt,
-            });
-            if (!didStart) break;
-            didStartAny = true;
-          }
-          if (!didStartAny) {
+            }),
+          ));
+          if (!didStartResults.some(Boolean)) {
             boardController.updateGenerateNode(nodeId, {
               errorMessage: t("board.agent.imageGenRequestNotStarted"),
               status: "failed",
             });
           }
         } else if (node.kind === "video-generate") {
-          let didStartAny = false;
-          for (let remaining = node.variantCount; remaining > 0; remaining -= 1) {
-            const didStart = await generateManualVideo({
+          const didStartResults = await Promise.all(Array.from({ length: node.variantCount }, () =>
+            generateManualVideo({
               boardId: resolvedBoardId,
               boardNodeId: nodeId,
               boardResultStackKey: resultStackKey,
@@ -4061,47 +4057,42 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
               videoPreset: node.videoPreset,
               videoReferenceMode: node.videoReferenceMode ?? getVideoModelCapabilities(node.model).referenceMode,
               videoResolution: node.videoResolution,
+            }),
+          ));
+          if (!didStartResults.some(Boolean)) {
+            boardController.updateGenerateNode(nodeId, {
+              errorMessage: t("board.agent.videoGenRequestNotStarted"),
+              status: "failed",
             });
-            if (!didStart) break;
-            didStartAny = true;
           }
-        if (!didStartAny) {
-          boardController.updateGenerateNode(nodeId, {
-            errorMessage: t("board.agent.videoGenRequestNotStarted"),
-            status: "failed",
-          });
+        } else {
+          const didStartResults = await Promise.all(Array.from({ length: node.variantCount }, () =>
+            generateManualAudio({
+              audioFormat: node.audioFormat,
+              audioMode: node.audioMode,
+              audioStylePrompt: node.audioStylePrompt,
+              asrLanguage: node.asrLanguage,
+              boardId: resolvedBoardId,
+              boardNodeId: nodeId,
+              boardResultStackKey: resultStackKey,
+              model: node.model,
+              prompt: nextPrompt,
+              referenceImage: references[0]?.url ?? null,
+              referenceImages: references,
+              voiceCloneConsentAccepted: node.voiceProfileId ? true : node.voiceCloneConsentAccepted,
+              voiceProfileId: node.voiceProfileId,
+            }),
+          ));
+          if (!didStartResults.some(Boolean)) {
+            boardController.updateGenerateNode(nodeId, {
+              errorMessage: t("board.agent.audioGenRequestNotStarted"),
+              status: "failed",
+            });
+          }
         }
-      } else {
-        let didStartAny = false;
-        for (let remaining = node.variantCount; remaining > 0; remaining -= 1) {
-          const didStart = await generateManualAudio({
-            audioFormat: node.audioFormat,
-            audioMode: node.audioMode,
-            audioStylePrompt: node.audioStylePrompt,
-            asrLanguage: node.asrLanguage,
-            boardId: resolvedBoardId,
-            boardNodeId: nodeId,
-            boardResultStackKey: resultStackKey,
-            model: node.model,
-            prompt: nextPrompt,
-            referenceImage: references[0]?.url ?? null,
-            referenceImages: references,
-            voiceCloneConsentAccepted: node.voiceProfileId ? true : node.voiceCloneConsentAccepted,
-            voiceProfileId: node.voiceProfileId,
-          });
-          if (!didStart) break;
-          didStartAny = true;
-        }
-        if (!didStartAny) {
-          boardController.updateGenerateNode(nodeId, {
-            errorMessage: t("board.agent.audioGenRequestNotStarted"),
-            status: "failed",
-          });
-        }
+      } catch (error) {
+        pushWorkspaceNotice("error", toErrorMessage(error, t("common.failedTitles.default")));
       }
-    } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, t("common.failedTitles.default")));
-    }
   }, [
     boardController,
     generateManualAudio,
@@ -4189,17 +4180,20 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           const sourceNode = findExecutableNodeById(boardController.board.nodes, sourceBoardNodeId);
           if (sourceNode && !isSourceStackItem(item, sourceNode)) continue;
           if (sourceNode && item.type !== "transcript") {
-            const activeItems = activeProcessingSourceStackItems(items, generationTasks, sourceNode);
-            const activeItem = activeItems[activeItems.length - 1] ?? item;
-            boardController.completeGenerationResult(
-              sourceBoardNodeId,
-              {
-                asset: storageItemToBoardAssetReference(activeItem),
-                resultAssetId: activeItem.id,
-                resultAssetIds: activeItems.length > 0 ? activeItems.map(active => active.id) : appendResultAssetId(sourceNode, item.id),
-                status: "processing",
-              },
-            );
+            const activeCompleteItem = latestCompleteSourceStackItem(items, sourceNode);
+            if (!activeCompleteItem) {
+              const activeItems = activeProcessingSourceStackItems(items, generationTasks, sourceNode);
+              const activeItem = activeItems[activeItems.length - 1] ?? item;
+              boardController.completeGenerationResult(
+                sourceBoardNodeId,
+                {
+                  asset: storageItemToBoardAssetReference(activeItem),
+                  resultAssetId: activeItem.id,
+                  resultAssetIds: activeItems.length > 0 ? activeItems.map(active => active.id) : appendResultAssetId(sourceNode, item.id),
+                  status: "processing",
+                },
+              );
+            }
           }
           if (sourceNode && (sourceNode.status !== "processing" || sourceNode.errorMessage)) {
             const update = {
@@ -4278,7 +4272,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         if (item.type !== "transcript") {
           boardController.completeGenerationResult(
             sourceBoardNodeId,
-          terminalResultUpdate(items, generationTasks, sourceNode, item, nextStatus, item.errorMessage ?? t("common.failedTitles.default")),
+            terminalResultUpdate(items, generationTasks, sourceNode, item, nextStatus, item.errorMessage ?? t("common.failedTitles.default")),
           );
         }
         const update = {
@@ -4310,17 +4304,20 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       if (task.status === "pending" || task.status === "processing") {
         const taskItem = generationTaskToGalleryItem(task);
         if (taskItem && taskItem.type !== "transcript") {
-          const activeItems = activeProcessingSourceStackItems(items, generationTasks, sourceNode);
-          const activeItem = activeItems[activeItems.length - 1] ?? taskItem;
-          boardController.completeGenerationResult(
-            sourceBoardNodeId,
-            {
-              asset: storageItemToBoardAssetReference(activeItem),
-              resultAssetId: activeItem.id,
-              resultAssetIds: activeItems.length > 0 ? activeItems.map(active => active.id) : appendResultAssetId(sourceNode, taskItem.id),
-              status: "processing",
-            },
-          );
+          const activeCompleteItem = latestCompleteSourceStackItem(items, sourceNode);
+          if (!activeCompleteItem) {
+            const activeItems = activeProcessingSourceStackItems(items, generationTasks, sourceNode);
+            const activeItem = activeItems[activeItems.length - 1] ?? taskItem;
+            boardController.completeGenerationResult(
+              sourceBoardNodeId,
+              {
+                asset: storageItemToBoardAssetReference(activeItem),
+                resultAssetId: activeItem.id,
+                resultAssetIds: activeItems.length > 0 ? activeItems.map(active => active.id) : appendResultAssetId(sourceNode, taskItem.id),
+                status: "processing",
+              },
+            );
+          }
         }
         if (sourceNode.status !== "processing" || sourceNode.errorMessage) {
           const update = {
