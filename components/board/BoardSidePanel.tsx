@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight, ClipboardList, Images, PanelRight, SlidersHorizontal, type LucideIcon } from "lucide-react";
+import { useTranslations } from "@/lib/i18n";
 
 const BOARD_SIDE_COLLAPSED_KEY = "imagine_board_side_collapsed";
 const BOARD_SIDE_TAB_KEY = "imagine_board_side_tab";
@@ -13,11 +14,14 @@ const BOARD_SIDE_TABS: ReadonlyArray<{
   icon: LucideIcon;
   label: string;
   shortLabel: string;
-}> = [
-  { id: "inspector", icon: SlidersHorizontal, label: "检查器", shortLabel: "检查" },
-  { id: "tasks", icon: ClipboardList, label: "任务", shortLabel: "任务" },
-  { id: "assets", icon: Images, label: "本地资产", shortLabel: "资产" },
-];
+}> = (() => {
+  // Use a function to avoid hook usage at module level
+  return [
+    { id: "inspector" as const, icon: SlidersHorizontal, label: "检查器", shortLabel: "检查" },
+    { id: "tasks" as const, icon: ClipboardList, label: "任务", shortLabel: "任务" },
+    { id: "assets" as const, icon: Images, label: "本地资产", shortLabel: "资产" },
+  ];
+})();
 
 interface BoardSidePanelProps {
   assetsPanel: ReactNode;
@@ -52,11 +56,19 @@ export default function BoardSidePanel({
   taskBadgeCount = 0,
   tasksPanel,
 }: BoardSidePanelProps) {
+  const { t } = useTranslations("board");
+  const commonT = useTranslations("common");
   const [collapsedPreference, setCollapsedPreference] = useState(false);
   const [activeTab, setActiveTab] = useState<BoardSidePanelTab>("inspector");
   const [mobileOpen, setMobileOpen] = useState(false);
   const previousRevealKeyRef = useRef<string | null>(null);
   const collapsed = collapsedPreference && !(revealCanExpand && revealKey);
+
+  const tabs = [
+    { id: "inspector" as const, icon: SlidersHorizontal, label: t('inspector.title'), shortLabel: "检查" },
+    { id: "tasks" as const, icon: ClipboardList, label: t('inspector.sectionEndpoints'), shortLabel: "任务" },
+    { id: "assets" as const, icon: Images, label: t('node.types.asset'), shortLabel: t('node.types.asset') },
+  ];
 
   useEffect(() => {
     setCollapsedPreference(readCollapsedPreference());
@@ -90,7 +102,7 @@ export default function BoardSidePanel({
 
   const tabBar = (
     <div className="imagine-board-side-tabs shrink-0 grid grid-cols-3 gap-1 p-2">
-      {BOARD_SIDE_TABS.map(tab => {
+      {tabs.map(tab => {
         const Icon = tab.icon;
         const isActive = activeTab === tab.id;
         return (
@@ -130,12 +142,12 @@ export default function BoardSidePanel({
         className="imagine-board-mobile-panel-btn fixed bottom-4 right-4 z-40 flex h-11 items-center gap-2 rounded-full border border-[var(--iw-border)] bg-[var(--iw-panel)] px-4 text-xs font-semibold text-[var(--iw-text)] shadow-lg lg:hidden"
       >
         <PanelRight className="h-4 w-4" />
-        面板
+        {t('inspector.title', { fallback: "面板" }) ?? "面板"}
       </button>
       {mobileOpen ? (
         <button
           type="button"
-          aria-label="关闭侧栏"
+          aria-label={t('inspector.title', { fallback: "关闭侧栏" }) ?? "关闭侧栏"}
           className="fixed inset-0 z-40 bg-black/45 lg:hidden"
           onClick={() => setMobileOpen(false)}
         />
@@ -167,7 +179,7 @@ export default function BoardSidePanel({
             onClick={() => setMobileOpen(false)}
             className="flex h-10 items-center justify-end border-b border-[var(--iw-border)] px-3 text-xs font-semibold text-[var(--iw-muted)] lg:hidden"
           >
-            关闭
+            {commonT.t('buttons.close')}
           </button>
         ) : null}
         {panelBody}

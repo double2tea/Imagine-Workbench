@@ -2,6 +2,7 @@ import { useDeferredValue, useMemo, useState } from "react";
 import type { AssetDatePreset, AssetStatusFilter, AssetTypeFilter } from "@/components/assets/AssetToolbar";
 import type { CompareViewType } from "@/components/assets/ComparePanel";
 import type { StorageItem } from "@/lib/db";
+import { t } from "@/lib/i18n";
 
 interface AssetStats {
   dateOptions: Array<{ value: string; label: string; count: number }>;
@@ -20,7 +21,7 @@ function getAssetDateKey(createdAt: string): string {
 }
 
 function formatAssetDateLabel(value: string): string {
-  if (value === "unknown") return "未知日期";
+  if (value === "unknown") return t("common.notices.unknownDate");
   return value;
 }
 

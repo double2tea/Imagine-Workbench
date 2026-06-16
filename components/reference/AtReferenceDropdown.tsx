@@ -2,6 +2,7 @@ import AtDropdownShell, { AtDropdownHeader } from "@/components/reference/AtDrop
 import MediaReferenceThumbnail from "@/components/reference/MediaReferenceThumbnail";
 import type { StorageItem } from "@/lib/db";
 import type { MediaReferenceType } from "@/lib/media-references";
+import { useTranslations } from "@/lib/i18n";
 
 interface AtReferenceDropdownProps {
   items: StorageItem[];
@@ -10,6 +11,7 @@ interface AtReferenceDropdownProps {
 }
 
 export default function AtReferenceDropdown({ items, search, onSelect }: AtReferenceDropdownProps) {
+  const { t } = useTranslations("common");
   const query = search.toLowerCase();
   const filtered = items
     .filter((item): item is StorageItem & { type: MediaReferenceType } => item.type === "image" || item.type === "video" || item.type === "audio")
@@ -19,11 +21,11 @@ export default function AtReferenceDropdown({ items, search, onSelect }: AtRefer
     );
 
   if (filtered.length === 0) {
-    return <AtDropdownShell empty>未找到可引用媒体</AtDropdownShell>;
+    return <AtDropdownShell empty>{t("reference.noMediaFound")}</AtDropdownShell>;
   }
 
   return (
-    <AtDropdownShell header={<AtDropdownHeader title="快捷 @ 引用" count={filtered.length} />}>
+    <AtDropdownShell header={<AtDropdownHeader title={t("reference.quickAtReference")} count={filtered.length} />}>
       {filtered.map(item => (
         <button
           key={item.id}

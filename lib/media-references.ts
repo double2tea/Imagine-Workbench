@@ -1,3 +1,5 @@
+import type { TFunction } from "@/lib/i18n";
+
 export type MediaReferenceType = "image" | "video" | "audio";
 export type MediaReferenceRole = "start" | "end" | "general";
 
@@ -43,7 +45,9 @@ export function mediaReferenceTypeFromBase64DataUri(dataUri: string): MediaRefer
   return mimeType ? mediaReferenceTypeFromMime(mimeType) : null;
 }
 
-export function mediaReferenceLabel(type: MediaReferenceType): string {
+export function mediaReferenceLabel(type: MediaReferenceType, t?: TFunction): string {
+  if (t) return t(`media.referenceLabels.${type}`);
+  // Chinese fallback for AI prompt tokens and backward compatibility
   if (type === "image") return "图片";
   if (type === "video") return "视频";
   return "音频";

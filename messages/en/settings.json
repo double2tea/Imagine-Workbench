@@ -1,0 +1,88 @@
+{
+  "modal": { "title": "Settings", "closeAriaLabel": "Close Settings", "saveAndClose": "Save & Close", "dataSummaryError": "Failed to read data summary" },
+  "tabs": { "connections": "Connections", "featureModels": "Feature Models", "data": "Data" },
+  "connections": {
+    "sections": { "credentials": "Credentials", "chat": "Agent", "image": "Image", "video": "Video", "audio": "Audio" },
+    "providerSectionTitle": "Provider", "addCustomProvider": "Add Custom Provider",
+    "customProviderTitle": "Custom Provider", "closeCustomProviderAriaLabel": "Close Add Custom Provider",
+    "customProviderNamePlaceholder": "Name", "customProviderNameAriaLabel": "Custom Provider Name",
+    "customProviderBaseUrlAriaLabel": "Custom Provider Base URL", "addButton": "Add",
+    "resolveIntegrationTitle": "Local DaVinci Resolve",
+    "resolveIntegrationDescription": "When enabled, shows the workspace connection entry and syncs saved provider credentials to the local Resolve plugin.",
+    "resolveEnableLabel": "Enable", "resolveCheckRunning": "Waiting for Resolve", "resolveCheckButton": "Connection Check",
+    "providerSearchPlaceholder": "Search providers", "providerSearchAriaLabel": "Search Providers",
+    "noMatchingProvider": "No matching providers",
+    "chatModelSectionTitle": "Agent Chat Model", "chatModelSectionTitleTemplate": "{sectionLabel} Model",
+    "chatModelDescription": "Used for Agent chat and prompt optimization. When reference images are attached, the selected model is still used; whether it supports image input depends on the OpenRouter model catalog flags. Mismatches or failures are returned upstream.",
+    "fetchModelsButton": "Fetch Models", "noModels": "No models yet",
+    "supportCapabilitiesPrefix": "Supports: ", "capabilityImage": "Image", "capabilityVideo": "Video",
+    "capabilityAudio": "Audio", "capabilityChat": "Chat",
+    "fetchResultsTitle": "Fetch Results", "addSelectedButton": "Add Selected",
+    "credentialCardTitleTemplate": "{label} Connection", "deleteButton": "Delete",
+    "confirmDeleteMessage": "Delete {label}?\nThis will remove the provider config, credentials, and added models.",
+    "confirmDeleteConfirmLabel": "Delete"
+  },
+  "providers": {
+    "keySaved": "Key saved", "apiBaseUrlLabel": "Base URL",
+    "registerHint": "Enter a token to use", "registerButton": "Get Token",
+    "testButton": "Test", "clearKeyBaseUrl": "Clear Key/Base URL", "clearKey": "Clear Key",
+    "mimoCredentialHint": "sk- keys use the standard API automatically; tp- keys use the Token Plan CN endpoint. SGP/AMS Token Plans can enter the subscription page URL in Base URL."
+  },
+  "featureModels": {
+    "title": "Default Image Quick Edit Model",
+    "description": "Image quick actions in the main workspace and board will prefer the model selected here."
+  },
+  "dataManagement": {
+    "title": "Data Health Center", "description": "Local assets, board references, backups, safety snapshots, and maintenance actions",
+    "refreshButton": "Refresh", "refreshingStatsLabel": "Refreshing stats", "dataStatsError": "Failed to read data stats: {error}",
+    "healthStatus": {
+      "healthy": "Healthy", "healthyDetail": "No data issues found",
+      "critical": "Needs Repair", "criticalDetail": "Missing references or broken records found. Back up before processing.",
+      "attention": "Needs Attention", "attentionDetail": "Some items can be cleaned or repaired. Data is still usable."
+    },
+    "dataStatusLabel": "Data Status",
+    "cleanupLabels": { "failed": "Failed tasks", "staleProcessing": "Processing/queued tasks over 2 hours", "brokenComplete": "Completed records missing media content", "orphaned": "Completed assets not referenced by any board" },
+    "localStorageLabels": { "agent": "Agent session", "modelCache": "Model cache", "providerCredentials": "Provider credentials", "uiPreferences": "UI preferences" },
+    "repairSourcesMessage": "Will scan all boards and remove source links in assets that point to non-existent board nodes. Asset files, prompts, and generation results will not be deleted. Continue?",
+    "repairSourcesConfirmLabel": "Repair", "resetBoardsMessage": "Reset all boards to a single blank default board?",
+    "resetBoardsConfirmLabel": "Reset", "cleanupConfirmTemplate": "Clean up {label}?",
+    "cleanupConfirmLabel": "Clean Up", "noDetails": "No details", "moreDetailsHidden": "{count} more hidden",
+    "statCards": { "assets": "Assets", "boards": "Boards", "localSettings": "Local Settings", "browserStorage": "Browser Storage", "waitingStats": "Waiting for stats", "browserNoQuota": "Browser did not return quota" },
+    "assetsDetailTemplate": "{image} images / {video} videos / {audio} audio / {transcript} transcripts",
+    "boardsDetailTemplate": "{nodes} nodes · {bytes}",
+    "localSettingsDetailTemplate": "{agentKeys} Agent / {modelCacheKeys} model / {credentialKeys} credential",
+    "browserStorageDetailTemplate": "Quota {quota} · {percent}",
+    "integrityDiagnosis": "Integrity Diagnosis",
+    "issueGroups": {
+      "missingReferences": "Board missing asset references", "brokenComplete": "Completed but missing media content",
+      "cleanBrokenRecords": "Clean broken", "cleanBrokenRecordsBusy": "Cleaning broken...",
+      "staleSourceLinks": "Stale source node links", "repairSources": "Repair sources", "repairSourcesBusy": "Repairing sources...",
+      "staleProcessing": "Stale in-progress tasks", "cleanStale": "Clean stale", "cleanStaleBusy": "Cleaning stale...",
+      "failedAssets": "Failed records", "cleanFailed": "Clean failed", "cleanFailedBusy": "Cleaning failed..."
+    },
+    "storageStructure": "Storage Structure", "storageStructureDescription": "Asset meta, shared payload, preview cache, and legacy format migration status",
+    "backupAndSafety": "Backup & Safety", "backupSourcePrefix": "Source: {origin}",
+    "backupLastSnapshotPrefix": "Last safety snapshot: {snapshot}", "backupNone": "None",
+    "exportImportCredentialsLabel": "Export/Import provider credentials",
+    "fullBackupButton": "Full Backup", "fullBackupBusy": "Exporting full backup...",
+    "currentBoardButton": "Current Board", "currentBoardBusy": "Exporting current board...",
+    "lastSnapshotButton": "Last Snapshot", "lastSnapshotBusy": "Downloading safety snapshot...",
+    "restoreBackupButton": "Restore Backup", "restoreBackupBusy": "Restoring backup...",
+    "maintenanceActions": "Maintenance Actions", "maintenanceActionsDescription": "Import media, duplicate boards, price display, and common cleanup",
+    "showPriceLabel": "Show Prices", "importMediaButton": "Import Media", "importMediaBusy": "Importing media...",
+    "duplicateBoardButton": "Duplicate Current Board", "duplicateBoardBusy": "Duplicating board...",
+    "cleanOrphanedButton": "Clean Orphaned ({count})", "cleanOrphanedBusy": "Cleaning orphaned...",
+    "largeRecordCandidates": "Large Record Candidates", "dangerZone": "Danger Zone",
+    "clearAssetsButton": "Clear Assets", "clearAssetsBusy": "Clearing assets...",
+    "resetBoardsButton": "Reset Boards", "resetBoardsBusy": "Resetting boards...",
+    "clearAgentButton": "Clear Agent", "clearAgentBusy": "Clearing Agent...",
+    "clearModelCacheButton": "Clear Model Cache", "clearModelCacheBusy": "Clearing model cache...",
+    "clearCredentialsButton": "Clear Credentials", "clearCredentialsBusy": "Clearing credentials...",
+    "clearUiPrefsButton": "Clear UI Prefs", "clearUiPrefsBusy": "Clearing prefs...",
+    "importBackupAriaLabel": "Import workspace backup file", "importLocalAssetAriaLabel": "Import local media file"
+  },
+  "appearance": {
+    "language": "Language",
+    "languageDescription": "Switch the interface display language"
+  }
+}

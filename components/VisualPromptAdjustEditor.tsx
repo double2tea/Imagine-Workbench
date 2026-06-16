@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
+import { useTranslations } from "@/lib/i18n";
 import * as THREE from "three";
 import { Box, RotateCcw, Sun, X } from "lucide-react";
 import type { CanvasMaskEditorOutput } from "@/components/CanvasMaskEditor";
@@ -47,12 +48,12 @@ const DEFAULT_LIGHTING_STATE: LightingAdjustmentState = {
   rimLight: false,
 };
 const LIGHT_DIRECTIONS: Array<{ value: LightingAdjustmentState["direction"]; label: string }> = [
-  { value: "left", label: "左侧" },
-  { value: "top", label: "顶部" },
-  { value: "right", label: "右侧" },
-  { value: "front", label: "前方" },
-  { value: "bottom", label: "底部" },
-  { value: "back", label: "后方" },
+  { value: "left", label: "lightingControls.directionLabels.left" },
+  { value: "top", label: "lightingControls.directionLabels.top" },
+  { value: "right", label: "lightingControls.directionLabels.right" },
+  { value: "front", label: "lightingControls.directionLabels.front" },
+  { value: "bottom", label: "lightingControls.directionLabels.bottom" },
+  { value: "back", label: "lightingControls.directionLabels.back" },
 ];
 const ANGLE_VIEW_PRESETS: Array<{
   className: string;
@@ -103,6 +104,7 @@ export default function VisualPromptAdjustEditor({
   onClose,
   operation,
 }: VisualPromptAdjustEditorProps) {
+  const { t } = useTranslations("creation");
   const imageRef = useRef<HTMLImageElement | null>(null);
   const [imageSize, setImageSize] = useState<CanvasSize>({ width: 1, height: 1 });
   const [imageResolution, setImageResolution] = useState("auto");
@@ -117,7 +119,7 @@ export default function VisualPromptAdjustEditor({
   const selectedImageResolution = resolutionOptions.some(option => option.value === imageResolution)
     ? imageResolution
     : resolutionOptions[0]?.value ?? "auto";
-  const title = operation === "angle" ? "角度" : "打光";
+  const title = operation === "angle" ? t("visualAdjust.titleAngle") : t("visualAdjust.titleLighting");
   const Icon = operation === "angle" ? Box : Sun;
 
   useEffect(() => {
@@ -147,7 +149,7 @@ export default function VisualPromptAdjustEditor({
       console.error("Visual adjustment image failed to load:", imageUrl);
       imageRef.current = null;
       setIsImageLoaded(false);
-      setErrorMessage("图片加载失败，请换一张图片后重试。");
+      setErrorMessage(t("visualAdjust.errorMessageImageLoadFailed"));
     };
     img.src = imageUrl;
     return () => {
@@ -173,7 +175,7 @@ export default function VisualPromptAdjustEditor({
   const handleApply = useCallback(async () => {
     const img = imageRef.current;
     if (!img) {
-      setErrorMessage("图片尚未加载完成。");
+      setErrorMessage(t("visualAdjust.errorMessageImageNotLoaded"));
       return;
     }
     setIsApplying(true);
@@ -192,7 +194,7 @@ export default function VisualPromptAdjustEditor({
       });
     } catch (error) {
       console.error("Visual adjustment apply failed:", error);
-      setErrorMessage("视觉调整应用失败，请检查图片后重试。");
+      setErrorMessage(t("visualAdjust.errorMessageApplyFailed"));
     } finally {
       setIsApplying(false);
     }
@@ -218,7 +220,7 @@ export default function VisualPromptAdjustEditor({
               type="button"
               className="imagine-visual-adjust-close imagine-motion-interactive rounded-full p-2"
               onClick={onClose}
-              aria-label="关闭"
+              aria-label={t("visualAdjust.closeAriaLabel")}
             >
               <X className="h-4 w-4" />
             </button>
@@ -240,9 +242,9 @@ export default function VisualPromptAdjustEditor({
           ) : (
             <LightingControls state={lightingState} onChange={setLightingState} />
           )}
-          <OperationSection label="分辨率" className="mt-4">
+          <OperationSection label={t("visualAdjust.resolutionSectionLabel")} className="mt-4">
             <select
-              aria-label="分辨率"
+              aria-label={t("visualAdjust.resolutionAriaLabel")}
               className="imagine-visual-adjust-select imagine-control--sm mt-2 w-full rounded-xl border border-white/10 bg-white/[0.06] px-3 py-3 text-sm text-white outline-none focus:border-white/30"
               name="visual-adjust-resolution"
               value={selectedImageResolution}
@@ -263,7 +265,7 @@ export default function VisualPromptAdjustEditor({
               }}
             >
               <RotateCcw className="h-3.5 w-3.5" />
-              重置
+              {t("visualAdjust.resetButton")}
             </OperationActionButton>
             <OperationActionButton
               type="button"
@@ -272,7 +274,7 @@ export default function VisualPromptAdjustEditor({
               disabled={!isImageLoaded || isApplying}
               onClick={handleApply}
             >
-              {isApplying ? "提交中" : "开始生成"}
+              {isApplying ? t("visualAdjust.submittingLabel") : t("visualAdjust.applyButton")}
             </OperationActionButton>
           </div>
           {errorMessage ? (
@@ -309,6 +311,7 @@ function PreviewStage({
   onLightingChange: (state: LightingAdjustmentState) => void;
   operation: "angle" | "lighting";
 }) {
+  const { t } = useTranslations("creation");
   const scopeRef = useRef<HTMLDivElement | null>(null);
   const angleWheelRef = useRef<HTMLDivElement | null>(null);
   const lightingWheelRef = useRef<HTMLDivElement | null>(null);
@@ -424,7 +427,7 @@ function PreviewStage({
         {operation === "angle" ? (
           <div
             ref={angleWheelRef}
-            aria-label="拖拽方块调整角度"
+            aria-label={t("visualAdjust.dragAngleAriaLabel")}
             className="absolute inset-0 cursor-grab touch-none select-none active:cursor-grabbing"
             onPointerCancel={handleAnglePointerEnd}
             onPointerDown={handleAnglePointerDown}
@@ -442,7 +445,7 @@ function PreviewStage({
               <button
                 key={preset.label}
                 type="button"
-                aria-label={`${preset.label} 视角`}
+                aria-label={`${preset.label} ${t("visualAdjust.titleAngle")}`}
                 className={`imagine-angle-view-button absolute z-30 ${preset.className}`}
                 data-active={isAnglePresetActive(angleState, preset.state)}
                 onPointerDown={event => event.stopPropagation()}
@@ -459,7 +462,7 @@ function PreviewStage({
         ) : (
           <div
             ref={lightingWheelRef}
-            aria-label="拖拽光源调整打光"
+            aria-label={t("visualAdjust.dragLightingAriaLabel")}
             className="absolute inset-0 cursor-crosshair touch-none select-none"
             onPointerCancel={handleLightingPointerEnd}
             onPointerDown={handleLightingPointerDown}
@@ -473,7 +476,7 @@ function PreviewStage({
               operation="lighting"
             />
             <LightingCompassMap imageUrl={imageUrl} state={lightingState} onChange={onLightingChange} />
-            <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-white/10 bg-white/[0.07] px-4 py-1 text-xs font-semibold text-white/70">主光源</div>
+            <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-white/10 bg-white/[0.07] px-4 py-1 text-xs font-semibold text-white/70">{t("visualAdjust.mainLightLabel")}</div>
           </div>
         )}
       </div>
@@ -1274,15 +1277,16 @@ function AngleControls({
   onChange: (state: AngleAdjustmentState) => void;
   state: AngleAdjustmentState;
 }) {
+  const { t } = useTranslations("creation");
   return (
     <div className="grid gap-4">
-      <RangeControl label="旋转" max={180} min={-180} suffix="deg" value={state.rotation} onChange={rotation => onChange({ ...state, rotation })} />
-      <RangeControl label="倾斜" max={60} min={-60} suffix="deg" value={state.tilt} onChange={tilt => onChange({ ...state, tilt })} />
-      <RangeControl label="缩放" max={100} min={0} value={state.zoom} onChange={zoom => onChange({ ...state, zoom })} />
+      <RangeControl label={t("visualAdjust.angleControls.rotationLabel")} max={180} min={-180} suffix="deg" value={state.rotation} onChange={rotation => onChange({ ...state, rotation })} />
+      <RangeControl label={t("visualAdjust.angleControls.tiltLabel")} max={60} min={-60} suffix="deg" value={state.tilt} onChange={tilt => onChange({ ...state, tilt })} />
+      <RangeControl label={t("visualAdjust.angleControls.zoomLabel")} max={100} min={0} value={state.zoom} onChange={zoom => onChange({ ...state, zoom })} />
       <label className="imagine-visual-adjust-toggle-row flex items-center justify-between rounded-xl border px-4 py-3 text-sm">
-        <span className="font-medium">广角镜头</span>
+        <span className="font-medium">{t("visualAdjust.angleControls.wideAngleLabel")}</span>
         <input
-          aria-label="广角镜头"
+          aria-label={t("visualAdjust.angleControls.wideAngleLabel")}
           className="accent-blue-500"
           name="visual-adjust-wide-angle"
           type="checkbox"
@@ -1301,9 +1305,10 @@ function LightingControls({
   onChange: (state: LightingAdjustmentState) => void;
   state: LightingAdjustmentState;
 }) {
+  const { t } = useTranslations("creation");
   return (
     <div className="grid gap-4">
-      <OperationSection label="主光源">
+      <OperationSection label={t("visualAdjust.lightingControls.mainLightSectionLabel")}>
         <OperationControlGroup className="mt-2 grid grid-cols-3 gap-1 p-1">
           {LIGHT_DIRECTIONS.map(direction => (
             <OperationSegmentButton
@@ -1312,18 +1317,18 @@ function LightingControls({
               active={state.direction === direction.value}
               onClick={() => onChange({ ...state, direction: direction.value })}
             >
-              {direction.label}
+              {t(`visualAdjust.lightingControls.directionLabels.${direction.value}`)}
             </OperationSegmentButton>
           ))}
         </OperationControlGroup>
       </OperationSection>
-      <RangeControl label="高度" max={100} min={-100} value={state.height} onChange={height => onChange({ ...state, height })} />
-      <RangeControl label="强度" max={100} min={0} suffix="%" value={state.intensity} onChange={intensity => onChange({ ...state, intensity })} />
-      <RangeControl label="色温" max={7500} min={2500} step={100} suffix="K" value={state.temperature} onChange={temperature => onChange({ ...state, temperature })} />
+      <RangeControl label={t("visualAdjust.lightingControls.heightLabel")} max={100} min={-100} value={state.height} onChange={height => onChange({ ...state, height })} />
+      <RangeControl label={t("visualAdjust.lightingControls.intensityLabel")} max={100} min={0} suffix="%" value={state.intensity} onChange={intensity => onChange({ ...state, intensity })} />
+      <RangeControl label={t("visualAdjust.lightingControls.temperatureLabel")} max={7500} min={2500} step={100} suffix="K" value={state.temperature} onChange={temperature => onChange({ ...state, temperature })} />
       <label className="imagine-visual-adjust-toggle-row flex items-center justify-between rounded-xl border px-4 py-3 text-sm">
-        <span className="font-medium">轮廓光</span>
+        <span className="font-medium">{t("visualAdjust.lightingControls.rimLightLabel")}</span>
         <input
-          aria-label="轮廓光"
+          aria-label={t("visualAdjust.lightingControls.rimLightLabel")}
           className="accent-blue-500"
           name="visual-adjust-rim-light"
           type="checkbox"

@@ -123,8 +123,10 @@ import {
   type LocalStorageCleanupKind,
   type WorkspaceCleanupKind,
 } from "@/lib/data-management";
+import { useTranslations, t as translate } from "@/lib/i18n";
+import type { TFunction } from "@/lib/i18n";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
-import { CLEAR_WORKSPACE_ASSETS_MESSAGE } from "@/lib/workspace-messages";
+import { getClearWorkspaceAssetsMessage } from "@/lib/workspace-messages";
 
 type NoticeType = "error" | "info" | "success";
 type MaskDestination = "creative" | "agent";
@@ -190,12 +192,12 @@ function readFileAsDataUrl(file: File): Promise<string> {
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result !== "string") {
-        reject(new Error("文件读取结果不是 Data URL"));
+        reject(new Error(translate("common.errors.fileReadNotDataUrl")));
         return;
       }
       resolve(reader.result);
     };
-    reader.onerror = () => reject(reader.error ?? new Error("文件读取失败"));
+    reader.onerror = () => reject(reader.error ?? new Error(translate("common.errors.fileReadFailed")));
     reader.readAsDataURL(file);
   });
 }
@@ -245,6 +247,7 @@ function modelProviderIsAvailable(
 }
 
 export default function Home() {
+  const { t } = useTranslations();
   const isDesktopLayout = useDesktopLayout();
   const isMobileLayout = isDesktopLayout === false;
 
@@ -393,7 +396,7 @@ export default function Home() {
     const storedItem = items.find(entry => entry.id === item.id) ?? item;
     const originalUrl = await resolveAssetOriginalUrl(storedItem);
     if (!originalUrl.trim()) {
-      throw new Error("找不到原始媒体");
+      throw new Error(t("common.errors.originalMediaNotFound"));
     }
     return { ...storedItem, url: originalUrl };
   }, [items]);
@@ -414,15 +417,15 @@ export default function Home() {
       setFullscreenItem(null);
       return;
     }
-    openOriginalItem(item, setFullscreenItem, "原始媒体读取失败");
+    openOriginalItem(item, setFullscreenItem, t("common.notices.originalMediaReadFailed"));
   }, [openOriginalItem]);
 
   const handleOpenPanorama = useCallback((item: StorageItem): void => {
-    openOriginalItem(item, setPanoramaItem, "原始图片读取失败");
+    openOriginalItem(item, setPanoramaItem, t("common.notices.originalImageReadFailed"));
   }, [openOriginalItem]);
 
   const handleSaveVoiceProfileSource = useCallback((item: StorageItem): void => {
-    openOriginalItem(item, setVoiceProfileSourceItem, "原始音频读取失败");
+    openOriginalItem(item, setVoiceProfileSourceItem, t("common.notices.originalAudioReadFailed"));
   }, [openOriginalItem]);
 
   const promoteItemToOriginal = useCallback((item: StorageItem): void => {
@@ -497,7 +500,7 @@ export default function Home() {
       ...input,
       fallbackProvider: selectedProvider,
     });
-    pushWorkspaceNotice("success", "已保存克隆音色");
+    pushWorkspaceNotice("success", t("common.notices.voiceProfileSaved"));
   }, [pushWorkspaceNotice, selectedProvider, voiceProfileSourceItem]);
 
   const imageCapabilities = getImageModelCapabilities(selectedModel);
@@ -535,14 +538,14 @@ export default function Home() {
     : videoCapabilities.referenceMode;
   const videoReferenceLimit = videoCapabilities.maxReferenceImages;
   const isFirstLastVideoMode = activeVideoReferenceMode === "firstLast";
-  const videoReferenceLabel = isFirstLastVideoMode ? "首帧 / 尾帧" : "视频参考图";
+  const videoReferenceLabel = isFirstLastVideoMode ? t("common.videoReference.firstLastLabel") : t("common.videoReference.label");
   const videoPromptPlaceholder = isFirstLastVideoMode
-    ? "描述首帧到尾帧之间的运动、转场与镜头变化... 输入 @ 可引用作品"
-    : "描述场景的运动与镜头动作... 输入 @ 可引用作品";
+    ? t("common.videoReference.promptPlaceholderFirstLast")
+    : t("common.videoReference.promptPlaceholderReference");
   const videoReferenceHelp = isFirstLastVideoMode
-    ? "第 1 张为首帧，第 2 张为尾帧"
-    : "参考图用于主体、风格或场景引导，不作为首尾帧";
-  const videoClearReferenceLabel = isFirstLastVideoMode ? "清空关键帧" : "清空参考图";
+    ? t("common.videoReference.firstLastHelp")
+    : t("common.videoReference.referenceHelp");
+  const videoClearReferenceLabel = isFirstLastVideoMode ? t("common.videoReference.clearFirstLast") : t("common.videoReference.clearReference");
   const {
     agentReferenceId,
     agentReferences,
@@ -572,6 +575,7 @@ export default function Home() {
     imageReferenceLimit: imageCapabilities.maxReferenceImages,
     imageReferenceMediaTypes: imageCapabilities.referenceMediaTypes,
     prompt,
+    t,
     videoReferenceLimit,
     videoReferenceMediaTypes: videoCapabilities.referenceMediaTypes,
     videoReferenceMode: activeVideoReferenceMode,
@@ -585,7 +589,7 @@ export default function Home() {
       setReferenceImage(originalAsset.url);
       setReferenceImages([{ id: originalAsset.id, url: originalAsset.url, role: "start" }]);
       setTraditionalSubTab("video");
-    }, "原始媒体读取失败");
+    }, t("common.notices.originalMediaReadFailed"));
   }, [openOriginalItem, setReferenceImage, setReferenceImages]);
 
   const handleUseAgentReference = useCallback((asset: StorageItem): void => {
@@ -594,7 +598,7 @@ export default function Home() {
       setAgentReferenceUrl(originalAsset.url);
       setAgentReferences([{ id: originalAsset.id, url: originalAsset.url }]);
       setIsAgentDockOpen(true);
-    }, "原始媒体读取失败");
+    }, t("common.notices.originalMediaReadFailed"));
   }, [openOriginalItem, setAgentReferenceId, setAgentReferenceUrl, setAgentReferences]);
   const audioReferenceImages = referenceImages.filter(reference =>
     audioCapabilities.referenceMediaTypes.includes(getMediaReferenceType(reference)),
@@ -659,17 +663,17 @@ export default function Home() {
     if (!file) return;
 
     if (agentReferences.length >= IMAGE_REFERENCE_LIMIT) {
-      pushWorkspaceNotice("error", `Agent 引用已达上限：最多 ${IMAGE_REFERENCE_LIMIT} 个`);
+      pushWorkspaceNotice("error", t("common.notices.agentRefLimitReached", { limit: IMAGE_REFERENCE_LIMIT }));
       return;
     }
 
     const mediaType = mediaReferenceTypeFromMime(file.type);
     if (!mediaType) {
-      pushWorkspaceNotice("error", "Agent 只支持上传图片、视频或音频引用");
+      pushWorkspaceNotice("error", t("common.notices.agentOnlySupportImageVideoAudio"));
       return;
     }
     if (mediaType !== "image" && file.size > Math.floor(REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES * 0.75)) {
-      pushWorkspaceNotice("error", `${mediaReferenceLabel(mediaType)}引用文件过大，请压缩后重试`);
+      pushWorkspaceNotice("error", t("common.notices.agentMediaRefFileTooLarge", { type: mediaReferenceLabel(mediaType) }));
       return;
     }
 
@@ -682,10 +686,10 @@ export default function Home() {
         if (prev.length >= IMAGE_REFERENCE_LIMIT) return prev;
         return [...prev, { id: newReferenceId, type: mediaType, url: dataUrl }];
       });
-      pushWorkspaceNotice("success", `已上传 Agent ${mediaReferenceLabel(mediaType)}引用（${agentReferences.length + 1}/${IMAGE_REFERENCE_LIMIT}）`);
+      pushWorkspaceNotice("success", t("common.notices.agentMediaRefUploaded", { type: mediaReferenceLabel(mediaType), current: agentReferences.length + 1, max: IMAGE_REFERENCE_LIMIT }));
     } catch (error) {
       console.error(error);
-      pushWorkspaceNotice("error", toErrorMessage(error, "Agent 引用读取失败，请换一个文件"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.agentReferenceReadFailed")));
     }
   };
 
@@ -731,17 +735,18 @@ export default function Home() {
     setImageSubmitCount,
     setItems,
     setVideoSubmitCount,
+    t,
     videoReferenceLimit,
     videoReferenceMode: activeVideoReferenceMode,
   });
 
   const generateActiveAudio = () => {
     if (needsManualVoiceCloneConsent && !voiceCloneConsentAccepted) {
-      pushWorkspaceNotice("error", "音色克隆需要先确认参考音频授权");
+      pushWorkspaceNotice("error", t("common.notices.voiceCloneNeedsConsent"));
       return;
     }
     if (audioStylePromptRequired && !audioStylePrompt.trim()) {
-      pushWorkspaceNotice("error", "音色设计需要填写音色描述");
+      pushWorkspaceNotice("error", t("common.notices.voiceDesignNeedsDescription"));
       return;
     }
     void generateManualAudio({
@@ -787,6 +792,7 @@ export default function Home() {
     setIsCompareMode,
     setItems,
     setSelectedItemIds,
+    t,
   });
 
   const cancelGalleryItem = useCallback(async (item: StorageItem) => {
@@ -796,9 +802,9 @@ export default function Home() {
       return;
     }
     const confirmText = task.canCancelRemote
-      ? "确定要取消这个生成任务吗？"
-      : "确定要本地取消这个任务吗？远端生成可能仍会继续。";
-    if (!(await confirmAction({ message: confirmText, tone: "danger", confirmLabel: "取消任务" }))) return;
+      ? t("common.confirmDialogs.cancelVideoTask")
+      : t("common.confirmDialogs.cancelLocalTask");
+    if (!(await confirmAction({ message: confirmText, tone: "danger", confirmLabel: t("common.buttons.cancelTask") }))) return;
 
     setCancelingItemIds(prev => [...prev, task.id]);
     try {
@@ -818,16 +824,16 @@ export default function Home() {
         });
 
         if (!res.ok) {
-          throw new Error(await readFetchError(res, "任务取消失败"));
+          throw new Error(await readFetchError(res, t("common.notices.taskCancelFailed")));
         }
       }
 
       const canceledTask = await cancelGenerationTask(task.id);
       setGenerationTasks(prev => prev.map(entry => entry.id === canceledTask.id ? canceledTask : entry));
       delete pollingFailuresRef.current[task.id];
-      pushWorkspaceNotice("success", task.canCancelRemote ? "生成任务已取消" : "任务已从本地取消");
+      pushWorkspaceNotice("success", task.canCancelRemote ? t("common.notices.generationTaskCancelled") : t("common.notices.taskCancelledLocally"));
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "任务取消失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.taskCancelFailed")));
     } finally {
       setCancelingItemIds(prev => prev.filter(id => id !== task.id));
     }
@@ -873,9 +879,9 @@ export default function Home() {
   const handleGalleryBatchDelete = async () => {
     if (selectedItemIds.length === 0) return;
     if (!(await confirmAction({
-      message: `确定要彻底删除已选中的 ${selectedItemIds.length} 项创意资产或任务吗？`,
+      message: t("common.confirmDialogs.deleteSelectedItems", { count: selectedItemIds.length }),
       tone: "danger",
-      confirmLabel: "删除",
+      confirmLabel: t("common.buttons.delete"),
     }))) {
       return;
     }
@@ -883,7 +889,7 @@ export default function Home() {
   };
 
   const handleGalleryDeleteItem = async (item: StorageItem) => {
-    if (!(await confirmAction({ message: "确定要删除此创意项或任务吗？", tone: "danger", confirmLabel: "删除" }))) {
+    if (!(await confirmAction({ message: t("common.confirmDialogs.deleteSingleItem"), tone: "danger", confirmLabel: t("common.buttons.delete") }))) {
       return;
     }
     await deleteGalleryRecords([item.id]);
@@ -893,9 +899,9 @@ export default function Home() {
     const ids = workspaceGalleryItems.filter(item => statuses.includes(item.status)).map(item => item.id);
     if (ids.length === 0) return;
     if (!(await confirmAction({
-      message: `确定要删除 ${ids.length} 个 ${statuses.join("/")} 任务吗？`,
+      message: t("common.confirmDialogs.deleteTasksByStatus", { count: ids.length, statuses: statuses.join("/") }),
       tone: "danger",
-      confirmLabel: "删除",
+      confirmLabel: t("common.buttons.delete"),
     }))) {
       return;
     }
@@ -1061,7 +1067,7 @@ export default function Home() {
     }
 
     window.scrollTo({ top: 0, behavior: "smooth" });
-    pushWorkspaceNotice("success", "已回填任务参数到左侧工作面板");
+    pushWorkspaceNotice("success", t("common.notices.paramsRestoredToPanel"));
   }
 
   const retryGalleryItem = useCallback((item: StorageItem) => {
@@ -1102,7 +1108,7 @@ export default function Home() {
         }
       } catch (error) {
         console.error("IndexedDB Read Failed:", error);
-        pushWorkspaceNotice("error", `本地项目库读取失败：${toErrorMessage(error, "IndexedDB 读取失败")}`);
+        pushWorkspaceNotice("error", t("common.notices.localProjectReadFailed", { error: toErrorMessage(error, t("common.notices.indexedDbReadFailed")) }));
       }
     }
     loadWorkspace();
@@ -1124,16 +1130,16 @@ export default function Home() {
       });
 
       if (!res.ok) {
-        throw new Error(await readFetchError(res, "提示词优化失败"));
+        throw new Error(await readFetchError(res, t("common.notices.promptOptimizationFailed")));
       }
       const data: unknown = await res.json();
       const optimized = getStringField(data, "optimized");
       if (!optimized) {
-        throw new Error("提示词优化接口返回格式不正确");
+        throw new Error(t("common.notices.promptOptimizationBadFormat"));
       }
       setPrompt(optimized);
     } catch (e) {
-      const message = toErrorMessage(e, "提示词优化失败");
+      const message = toErrorMessage(e, t("common.notices.promptOptimizationFailed"));
       console.error(e);
       pushWorkspaceNotice("error", message);
     } finally {
@@ -1166,11 +1172,11 @@ export default function Home() {
     try {
       await saveToDB(item);
     } catch (error) {
-      pushWorkspaceNotice("error", `本地存储失败，未开始${label}：${toErrorMessage(error, "IndexedDB 写入失败")}`);
+      pushWorkspaceNotice("error", t("common.notices.imageQuickEditSaveFailed", { label, error: toErrorMessage(error, t("common.notices.indexedDbWriteFailed")) }));
       return null;
     }
     setItems(prev => [item, ...prev]);
-    pushWorkspaceNotice("info", `${label}已开始，结果会更新这张任务卡片`);
+    pushWorkspaceNotice("info", t("common.notices.imageQuickEditStart", { label }));
     return item;
   };
 
@@ -1189,7 +1195,7 @@ export default function Home() {
     });
     await saveToDB(nextItem);
     setItems(prev => prev.map(current => current.id === nextItem.id ? nextItem : current));
-    pushWorkspaceNotice("success", `${label}完成，已保存为新图片资产`);
+    pushWorkspaceNotice("success", t("common.notices.imageQuickEditComplete", { label }));
   };
 
   const failImageQuickEditAsset = async (
@@ -1277,11 +1283,11 @@ export default function Home() {
         clearLocallyCanceledQuickEdit(pendingTaskIds, locallyCanceledItemIdsRef.current);
         return;
       }
-      const message = toErrorMessage(error, `${imageEditFeatureLabel(operation)}失败`);
+      const message = toErrorMessage(error, t("common.notices.imageQuickEditFailed", { label: imageEditFeatureLabel(operation) }));
       try {
         await failImageQuickEditAsset(pending, message);
       } catch (storageError) {
-        pushWorkspaceNotice("error", `本地存储失败：${toErrorMessage(storageError, "IndexedDB 写入失败")}`);
+        pushWorkspaceNotice("error", t("common.notices.localSaveFailed", { error: toErrorMessage(storageError, t("common.notices.indexedDbWriteFailed")) }));
       }
       pushWorkspaceNotice("error", message);
     } finally {
@@ -1311,7 +1317,7 @@ export default function Home() {
         return;
       }
       launchMaskEditor(originalItem.url, originalItem.id, "creative", operation, originalItem);
-    }, `${imageEditFeatureLabel(operation)}原图读取失败`);
+    }, t("common.notices.imageQuickEditOriginalReadFailed", { label: imageEditFeatureLabel(operation) }));
   };
 
   // Launch mask editor layout dialog
@@ -1341,7 +1347,7 @@ export default function Home() {
     }
     openOriginalItem(sourceItem, originalItem => {
       launchMaskEditor(originalItem.url, originalItem.id, "creative");
-    }, "参考图原图读取失败");
+    }, t("common.notices.referenceImageOriginalReadFailed"));
   };
 
   const saveMaskOutput = async (output: CanvasMaskEditorOutput) => {
@@ -1370,7 +1376,7 @@ export default function Home() {
       compressedMergedImage = await compressReferenceImageDataUrl(output.mergedImageBase64);
     } catch (error) {
       console.error(error);
-      pushWorkspaceNotice("error", toErrorMessage(error, "蒙版参考图压缩失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.maskReferenceCompressionFailed")));
       return;
     }
 
@@ -1393,7 +1399,7 @@ export default function Home() {
       ));
       // Auto populate helper suggestions into Prompt box
       if (!prompt.includes("modify the marked region")) {
-        setPrompt(`In the marked region of the image, change: ${prompt || "[输入你的新修改构想...]"}`);
+        setPrompt(`In the marked region of the image, change: ${prompt || t("common.references.emptyPromptPlaceholder")}`);
       }
       // Set active model to an image editing capable endpoint
       setSelectedModel("12ai:gpt-image-2");
@@ -1406,8 +1412,8 @@ export default function Home() {
     pushWorkspaceNotice(
       "success",
       maskDestination === "agent"
-        ? "蒙版已应用到 Agent 参考图，可在对话中继续描述修改"
-        : "蒙版已写入参考图，可继续编辑提示词并生成",
+        ? t("common.notices.maskAppliedToAgent")
+        : t("common.notices.maskWrittenToReference"),
     );
   };
 
@@ -1433,7 +1439,7 @@ export default function Home() {
       id: reference.id,
       type: getMediaReferenceType(reference),
       url: reference.url,
-      prompt: `Agent 引用图 ${index + 1}`,
+      prompt: t("common.references.agentRefLabel", { n: index + 1 }),
       model: "agent-reference",
       aspectRatio: "auto",
       createdAt: "",
@@ -1458,7 +1464,7 @@ export default function Home() {
           const itemType = item.type;
           openOriginalItem(item, originalItem => {
             handleSelectAtItem(originalItem.url, originalItem.id, type, itemType);
-          }, "原始媒体读取失败");
+          }, t("common.notices.originalMediaReadFailed"));
         }}
       />
     );
@@ -1510,19 +1516,19 @@ export default function Home() {
       setItems([]);
       setSelectedItemIds([]);
       setCompareItemIds([]);
-      pushWorkspaceNotice("success", "本地资产库已清空");
+      pushWorkspaceNotice("success", t("common.dataManagement.localAssetsCleaned"));
       void assetLibrary.reload().catch(() => undefined);
     } catch (error) {
       void assetLibrary.reload().catch(() => undefined);
-      pushWorkspaceNotice("error", toErrorMessage(error, "本地资产库清空失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.localAssetsCleanFailed")));
     }
   }, [assetLibrary, pushWorkspaceNotice, setCompareItemIds, setSelectedItemIds]);
 
   const handleClearProject = async () => {
     if (!(await confirmAction({
-      message: CLEAR_WORKSPACE_ASSETS_MESSAGE,
+      message: getClearWorkspaceAssetsMessage(t),
       tone: "danger",
-      confirmLabel: "清空资产",
+      confirmLabel: t("common.confirmDialogs.clearAssetsLabel"),
     }))) {
       return;
     }
@@ -1552,9 +1558,9 @@ export default function Home() {
   const handleAddItemToLibrary = useCallback(async (item: StorageItem) => {
     try {
       const result = await assetLibrary.addSource(item);
-      pushWorkspaceNotice("success", result.created ? "已存入素材库" : "素材库中已有该作品");
+      pushWorkspaceNotice("success", result.created ? t("common.notices.addedToLibrary") : t("common.notices.alreadyInLibrary"));
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "存入素材库失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.addToLibraryFailed")));
     }
   }, [assetLibrary, pushWorkspaceNotice]);
 
@@ -1563,21 +1569,21 @@ export default function Home() {
       const imported = await assetLibrary.importFiles(files);
       pushWorkspaceNotice(
         imported.length > 0 ? "success" : "info",
-        imported.length > 0 ? `已导入 ${imported.length} 个素材` : "未导入任何素材，请检查文件格式",
+        imported.length > 0 ? t("common.notices.importedNAssets", { count: imported.length }) : t("common.notices.noAssetsImported"),
       );
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "素材导入失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.libraryImportFailed")));
     }
   }, [assetLibrary, pushWorkspaceNotice]);
 
   const handleSelectLibraryEntry = useCallback((entry: { item: StorageItem | null }) => {
     const item = entry.item;
     if (!item) {
-      pushWorkspaceNotice("error", "该素材缺少媒体内容");
+      pushWorkspaceNotice("error", t("common.notices.libraryEntryMissingMedia"));
       return;
     }
     if (item.type === "transcript") {
-      pushWorkspaceNotice("error", "素材库不支持转写作为参考媒体");
+      pushWorkspaceNotice("error", t("common.notices.libraryTranscriptNotSupported"));
       return;
     }
     handleSelectAtItem(item.url, item.id, assetLibraryTarget, item.type);
@@ -1587,18 +1593,18 @@ export default function Home() {
   const handleDataExportWorkspace = useCallback(async (includeCredentials: boolean) => {
     try {
       const result = await exportCompleteWorkspaceBackup(includeCredentials);
-      pushWorkspaceNotice("success", `已导出备份：${result.fileName}`);
+      pushWorkspaceNotice("success", t("common.dataManagement.exportComplete", { fileName: result.fileName }));
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "完整备份导出失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.exportFailed")));
     }
   }, [pushWorkspaceNotice]);
 
   const handleDataDownloadSafetySnapshot = useCallback(async () => {
     try {
       const result = await downloadLatestWorkspaceSafetySnapshot();
-      pushWorkspaceNotice("success", `已下载安全快照：${result.fileName}`);
+      pushWorkspaceNotice("success", t("common.dataManagement.snapshotDownloaded", { fileName: result.fileName }));
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "安全快照下载失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.snapshotDownloadFailed")));
     }
   }, [pushWorkspaceNotice]);
 
@@ -1606,20 +1612,20 @@ export default function Home() {
     try {
       const preview = await previewWorkspaceBackup(file);
       const credentialNote = preview.includesCredentials && !includeCredentials
-        ? "\n备份包含 provider 密钥；当前未勾选，将不会导入密钥。"
+        ? t("common.confirmDialogs.credentialNote")
         : "";
       if (!(await confirmAction({
-        message: `确认覆盖恢复此工作区？\n资产 ${preview.assetCount} 项，画板 ${preview.boardCount} 个，设置 ${preview.settingsKeyCount} 项。${credentialNote}`,
+        message: t("common.confirmDialogs.confirmImportWorkspace", { assetCount: preview.assetCount, boardCount: preview.boardCount, settingsCount: preview.settingsKeyCount, credentialNote }),
         tone: "danger",
-        confirmLabel: "恢复",
+        confirmLabel: t("common.buttons.restore"),
       }))) {
         return;
       }
       const result = await importWorkspaceBackup(file, includeCredentials);
-      pushWorkspaceNotice("success", `已恢复 ${result.assetCount} 项资产与 ${result.boardCount} 个画板`);
+      pushWorkspaceNotice("success", t("common.dataManagement.workspaceRestored", { assetCount: result.assetCount, boardCount: result.boardCount }));
       window.setTimeout(() => window.location.reload(), 300);
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "工作区恢复失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.workspaceRestoreFailed")));
     }
   }, [confirmAction, pushWorkspaceNotice]);
 
@@ -1635,7 +1641,7 @@ export default function Home() {
         await saveToDB(item);
         importedItems.push(item);
       } catch (error) {
-        pushWorkspaceNotice("error", toErrorMessage(error, `${file.name || "媒体"} 导入失败`));
+        pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.localMediaImportFailed", { name: file.name || "media" })));
       }
     }
     if (importedItems.length === 0) return;
@@ -1643,7 +1649,7 @@ export default function Home() {
       ...importedItems,
       ...prev.filter(item => !importedItems.some(importedItem => importedItem.id === item.id)),
     ]);
-    pushWorkspaceNotice("success", `已导入 ${importedItems.length} 个本地媒体`);
+    pushWorkspaceNotice("success", t("common.notices.importedLocalMedia", { count: importedItems.length }));
   }, [pushWorkspaceNotice]);
 
   const handleDataCleanupAssets = useCallback(async (kind: WorkspaceCleanupKind) => {
@@ -1652,9 +1658,9 @@ export default function Home() {
       await reloadAssetsFromDB();
       setSelectedItemIds(prev => prev.filter(id => !result.deletedIds.includes(id)));
       setCompareItemIds(prev => prev.filter(id => !result.deletedIds.includes(id)));
-      pushWorkspaceNotice("success", `已清理 ${result.deletedIds.length} 项`);
+      pushWorkspaceNotice("success", t("common.dataManagement.assetsCleanupSuccess", { count: result.deletedIds.length }));
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "资产清理失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.assetsCleanupFailed")));
     }
   }, [pushWorkspaceNotice, reloadAssetsFromDB, setCompareItemIds, setSelectedItemIds]);
 
@@ -1662,23 +1668,23 @@ export default function Home() {
     try {
       const result = await repairStaleAssetSourceLinks();
       await reloadAssetsFromDB();
-      pushWorkspaceNotice("success", `已修复 ${result.repairedIds.length} 项来源链接`);
+      pushWorkspaceNotice("success", t("common.dataManagement.sourceLinkRepairSuccess", { count: result.repairedIds.length }));
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "来源链接修复失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.sourceLinkRepairFailed")));
     }
   }, [pushWorkspaceNotice, reloadAssetsFromDB]);
 
   const handleDataClearLocalStorage = useCallback(async (kind: LocalStorageCleanupKind) => {
     const count = clearLocalStorageGroup(kind);
-    pushWorkspaceNotice("success", `已清理 ${count} 个本地键，刷新后完全生效`);
+    pushWorkspaceNotice("success", t("common.dataManagement.localKeysCleaned", { count }));
   }, [pushWorkspaceNotice]);
 
   const handleDataResetBoards = useCallback(async () => {
     try {
       await resetBoardsToDefault();
-      pushWorkspaceNotice("success", "画板已重置");
+      pushWorkspaceNotice("success", t("common.dataManagement.boardsReset"));
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "画板重置失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.boardsResetFailed")));
     }
   }, [pushWorkspaceNotice]);
 
@@ -2054,7 +2060,7 @@ export default function Home() {
         loading={assetLibrary.loading}
         mode={assetLibraryMode === "reference" ? "select" : "manage"}
         open={isAssetLibraryOpen}
-        title={assetLibraryMode === "reference" ? "从素材库选择" : "素材库"}
+        title={assetLibraryMode === "reference" ? t("common.library.selectTitle") : t("common.library.title")}
         onClose={() => setIsAssetLibraryOpen(false)}
         onImportFiles={handleImportFilesToLibrary}
         onRemove={assetLibrary.removeRecord}

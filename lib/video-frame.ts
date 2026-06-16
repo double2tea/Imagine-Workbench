@@ -1,4 +1,5 @@
 import { buildStorageItem, type StorageItem } from "@/lib/db";
+import { t } from "@/lib/i18n";
 
 export type VideoFrameCaptureMode = "first" | "current" | "last";
 
@@ -11,9 +12,9 @@ export interface CapturedVideoFrame {
 }
 
 export function getVideoFrameCaptureLabel(mode: VideoFrameCaptureMode): string {
-  if (mode === "first") return "首帧";
-  if (mode === "last") return "尾帧";
-  return "当前帧";
+  if (mode === "first") return t("media.videoFrameCapture.first");
+  if (mode === "last") return t("media.videoFrameCapture.last");
+  return t("media.videoFrameCapture.current");
 }
 
 export function createVideoFrameStorageItem(
@@ -53,14 +54,14 @@ export async function captureVideoFrame(
   const width = video.videoWidth;
   const height = video.videoHeight;
   if (width <= 0 || height <= 0) {
-    throw new Error("视频画面尺寸不可用，无法截帧");
+    throw new Error(t("media.videoFrameCapture.frameSizeUnavailable"));
   }
 
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
   const context = canvas.getContext("2d");
-  if (!context) throw new Error("当前浏览器不支持视频截帧画布");
+  if (!context) throw new Error(t("media.videoFrameCapture.browserNotSupport"));
 
   context.drawImage(video, 0, 0, width, height);
   return {
@@ -78,7 +79,7 @@ function getCaptureTime(video: HTMLVideoElement, mode: VideoFrameCaptureMode): n
 
   const duration = video.duration;
   if (!Number.isFinite(duration) || duration <= 0) {
-    throw new Error("视频时长不可用，无法截取尾帧");
+    throw new Error(t("media.videoFrameCapture.durationUnavailable"));
   }
   return Math.max(0, duration - 0.05);
 }
@@ -96,7 +97,7 @@ function ensureVideoMetadata(video: HTMLVideoElement): Promise<void> {
     };
     const handleError = () => {
       cleanup();
-      reject(new Error("视频元数据加载失败，无法截帧"));
+      reject(new Error(t("media.videoFrameCapture.metadataLoadFailed")));
     };
     video.addEventListener("loadedmetadata", handleLoaded, { once: true });
     video.addEventListener("error", handleError, { once: true });
@@ -115,7 +116,7 @@ function seekVideo(video: HTMLVideoElement, timeSeconds: number): Promise<void> 
     };
     const handleError = () => {
       cleanup();
-      reject(new Error("视频定位失败，无法截帧"));
+      reject(new Error(t("media.videoFrameCapture.seekFailed")));
     };
     video.addEventListener("seeked", handleSeeked, { once: true });
     video.addEventListener("error", handleError, { once: true });

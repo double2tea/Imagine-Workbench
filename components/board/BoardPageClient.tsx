@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { flushSync } from "react-dom";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
+import { useTranslations } from "@/lib/i18n";
 import AgentDock from "@/components/agent/AgentDock";
 import SaveVoiceProfileDialog, { type SaveVoiceProfileDialogInput } from "@/components/audio/SaveVoiceProfileDialog";
 import {
@@ -260,7 +261,7 @@ function isUnknownRecord(value: unknown): value is Record<string, unknown> {
 
 function readRunningHubAppSchemaResult(value: unknown): { name?: string; nodeInfoList: unknown[]; webappId: string } {
   if (!isUnknownRecord(value) || !Array.isArray(value.nodeInfoList)) {
-    throw new Error("RunningHub 字段响应缺少 nodeInfoList");
+    throw new Error("RunningHub field response missing nodeInfoList");
   }
   return {
     name: getStringField(value, "name") ?? undefined,
@@ -276,7 +277,7 @@ async function saveItemOrWarn(
   try {
     return await saveItemWithPreview(item);
   } catch (error) {
-    pushWorkspaceNotice("error", `本地存储失败，刷新后可能丢失：${toErrorMessage(error, "IndexedDB 写入失败")}`);
+    pushWorkspaceNotice("error", `Local storage failed, may be lost after refresh: ${toErrorMessage(error, "IndexedDB write failed")}`);
     return null;
   }
 }
@@ -286,12 +287,12 @@ function readFileAsDataUrl(file: File): Promise<string> {
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result !== "string") {
-        reject(new Error("文件读取结果不是 Data URL"));
+        reject(new Error("File read result is not a Data URL"));
         return;
       }
       resolve(reader.result);
     };
-    reader.onerror = () => reject(reader.error ?? new Error("文件读取失败"));
+    reader.onerror = () => reject(reader.error ?? new Error("File read failed"));
     reader.readAsDataURL(file);
   });
 }
@@ -303,7 +304,7 @@ async function createBoardUploadItem(
 ): Promise<StorageItem> {
   const mediaType = mediaReferenceTypeFromMime(file.type);
   if (!mediaType) {
-    throw new Error("画板只支持导入图片、视频或音频文件");
+    throw new Error("Board only supports importing image, video, or audio files");
   }
   const url = mediaType === "image" ? await compressReferenceImageFile(file) : await readFileAsDataUrl(file);
   return buildStorageItem(
@@ -411,7 +412,7 @@ function fitBoardImportImageNodeSize(size: BoardSize): BoardSize {
 async function boardImportNodeSize(item: StorageItem): Promise<BoardSize> {
   if (item.type === "audio") return DEFAULT_AUDIO_ASSET_NODE_SIZE;
   if (item.type === "video") return DEFAULT_ASSET_NODE_SIZE;
-  if (item.type !== "image") throw new Error("画板只支持导入图片、视频或音频文件");
+  if (item.type !== "image") throw new Error("Board only supports importing image, video, or audio files");
   return fitBoardImportImageNodeSize(await readImageDataUrlSize(item.url));
 }
 
@@ -1361,6 +1362,9 @@ function boardSummaryFromDocument(board: BoardDocument): BoardSummary {
 }
 
 export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps) {
+  const { t } = useTranslations();
+  const { t: bpN } = useTranslations("agent");
+  const { t: bpC } = useTranslations("board");
   const router = useRouter();
   const [resolvedBoardId, setResolvedBoardId] = useState(boardId);
   useEffect(() => {
@@ -1470,7 +1474,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         if (isActive) setBoardSummaries(summaries);
       })
       .catch(error => {
-        if (isActive) pushWorkspaceNotice("error", `画板列表读取失败：${toErrorMessage(error, "IndexedDB 读取失败")}`);
+        if (isActive) pushWorkspaceNotice("error", `Board list read failed: ${toErrorMessage(error, "IndexedDB read failed")}`);
       });
     return () => {
       isActive = false;
@@ -1521,7 +1525,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       ]);
       boardController.updateAssetReferenceUrls(updates);
     })().catch(error => {
-      if (isActive) pushWorkspaceNotice("error", toErrorMessage(error, "旧画板媒体预览迁移失败"));
+      if (isActive) pushWorkspaceNotice("error", toErrorMessage(error, "Old board media preview migration failed"));
     });
 
     return () => {
@@ -1580,7 +1584,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       ...input,
       fallbackProvider: selectedProvider,
     });
-    pushWorkspaceNotice("success", "已保存克隆音色");
+    pushWorkspaceNotice("success", "Cloned voice profile saved");
   }, [pushWorkspaceNotice, selectedProvider, voiceProfileSourceItem]);
 
   const imageCapabilities = getImageModelCapabilities(selectedModel);
@@ -1646,6 +1650,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     imageReferenceLimit: imageCapabilities.maxReferenceImages,
     imageReferenceMediaTypes: imageCapabilities.referenceMediaTypes,
     prompt,
+    t,
     videoReferenceLimit: videoCapabilities.maxReferenceImages,
     videoReferenceMediaTypes: videoCapabilities.referenceMediaTypes,
     videoReferenceMode: activeVideoReferenceMode,
@@ -1682,7 +1687,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     const storedItem = items.find(entry => entry.id === item.id) ?? item;
     const originalUrl = await resolveAssetOriginalUrl(storedItem);
     if (!originalUrl.trim()) {
-      throw new Error("找不到原始媒体");
+      throw new Error("Original media not found");
     }
     return { ...storedItem, url: originalUrl };
   }, [items]);
@@ -1716,13 +1721,13 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     }
     void resolveOriginalStorageItem(item).then(
       setFullscreenItem,
-      error => pushWorkspaceNotice("error", toErrorMessage(error, "原始媒体读取失败")),
+      error => pushWorkspaceNotice("error", toErrorMessage(error, "Original media read failed")),
     );
   }, [pushWorkspaceNotice, resolveOriginalStorageItem]);
   const handleOpenPanorama = useCallback((item: StorageItem) => {
     void resolveOriginalStorageItem(item).then(
       setPanoramaItem,
-      error => pushWorkspaceNotice("error", toErrorMessage(error, "原始图片读取失败")),
+      error => pushWorkspaceNotice("error", toErrorMessage(error, "Original image read failed")),
     );
   }, [pushWorkspaceNotice, resolveOriginalStorageItem]);
   const handleDownloadAsset = useCallback((item: StorageItem) => {
@@ -1736,13 +1741,13 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         link.click();
         link.remove();
       },
-      error => pushWorkspaceNotice("error", toErrorMessage(error, "原始媒体下载失败")),
+      error => pushWorkspaceNotice("error", toErrorMessage(error, "Original media download failed")),
     );
   }, [pushWorkspaceNotice, resolveOriginalStorageItem]);
   const handleSaveVoiceProfileSource = useCallback((item: StorageItem) => {
     void resolveOriginalStorageItem(item).then(
       setVoiceProfileSourceItem,
-      error => pushWorkspaceNotice("error", toErrorMessage(error, "原始音频读取失败")),
+      error => pushWorkspaceNotice("error", toErrorMessage(error, "Original audio read failed")),
     );
   }, [pushWorkspaceNotice, resolveOriginalStorageItem]);
   const resolveOriginalReferences = useCallback(async (references: ReferenceImageRef[]): Promise<ReferenceImageRef[]> => {
@@ -1750,7 +1755,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       const item = items.find(entry => entry.id === reference.id);
       const originalUrl = item ? await resolveAssetOriginalUrl(item) : reference.url;
       if (!originalUrl.trim()) {
-        throw new Error("找不到参考媒体原图");
+        throw new Error("Reference media original not found");
       }
       return { ...reference, url: originalUrl };
     }));
@@ -1873,6 +1878,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     setImageSubmitCount,
     setItems,
     setVideoSubmitCount,
+    t,
     videoReferenceLimit: videoCapabilities.maxReferenceImages,
     videoReferenceMode: activeVideoReferenceMode,
   });
@@ -2004,7 +2010,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     );
     boardController.selectNode(nodeId);
     boardController.selectEdge(null);
-    pushWorkspaceNotice("info", `${label}已开始，结果会在当前节点更新`);
+    pushWorkspaceNotice("info", `${label} started, result will update this node`);
     return { item: savedItem, nodeId };
   }
 
@@ -2028,7 +2034,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     setItems(prev => prev.map(current => current.id === savedItem.id ? savedItem : current));
     boardController.updateAssetNodeAsset(nodeId, storageItemToBoardAssetReference(savedItem));
     const label = imageEditFeatureLabel(operation);
-    pushWorkspaceNotice("success", `${label}完成，已保存为新画板资产`);
+    pushWorkspaceNotice("success", `${label} complete, saved as new board asset`);
   }
 
   async function failBoardQuickEditAsset(nodeId: string, item: StorageItem, errorMessage: string) {
@@ -2142,7 +2148,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         clearLocallyCanceledQuickEdit(pendingTaskIds, locallyCanceledItemIdsRef.current);
         return;
       }
-      const message = toErrorMessage(error, `${label}失败`);
+      const message = toErrorMessage(error, `${label} failed`);
       await failBoardQuickEditAsset(pendingNodeId, pendingItem, message);
       pushWorkspaceNotice("error", message);
     } finally {
@@ -2186,7 +2192,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     if (output.operation && maskEditSourceItem && maskSourceNodeId) {
       const sourceNode = boardController.board.nodes.find(node => node.id === maskSourceNodeId);
       if (!sourceNode || (sourceNode.kind !== "asset" && sourceNode.kind !== "result")) {
-        pushWorkspaceNotice("error", "未找到要编辑的图片节点");
+        pushWorkspaceNotice("error", "Image node not found for editing");
         return;
       }
       const job = await startBoardImageQuickEdit(
@@ -2216,7 +2222,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     try {
       compressedMergedImage = await compressReferenceImageDataUrl(output.mergedImageBase64);
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "蒙版参考图压缩失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, "Mask reference compression failed"));
       return;
     }
 
@@ -2232,10 +2238,10 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         ? boardController.board.nodes.find(node => node.id === maskSourceNodeId)
         : undefined;
       if (sourceNode?.kind !== "asset" || sourceNode.asset.type !== "image") {
-        pushWorkspaceNotice("error", "未找到要编辑的图片资产节点");
+        pushWorkspaceNotice("error", "Image asset node not found for editing");
         return;
       }
-      const editedTitle = `${sourceNode.title} 局部编辑`;
+      const editedTitle = `${sourceNode.title} local edit`;
       const editedPrompt = sourceNode.asset.prompt.trim()
         ? `${sourceNode.asset.prompt}\n局部编辑：${sourceNode.title}`
         : editedTitle;
@@ -2281,10 +2287,10 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     pushWorkspaceNotice(
       "success",
       maskDestination === "agent"
-        ? "蒙版已应用到 Agent 参考图，可在对话中继续描述修改"
+        ? "Mask applied to Agent reference, continue editing in conversation"
         : maskDestination === "board-asset"
-          ? "已生成局部编辑资产节点"
-          : "蒙版已写入参考图，可继续编辑提示词并生成",
+          ? "Local edit asset node created"
+          : "Mask written to reference, continue editing prompt and generate",
     );
   };
 
@@ -2314,12 +2320,12 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
   const handleAnalyzeBoardMedia = useCallback(async (nodeId: string): Promise<void> => {
     if (analyzingBoardMediaNodeIdsRef.current.has(nodeId)) {
-      pushWorkspaceNotice("info", "媒体分析正在进行");
+      pushWorkspaceNotice("info", "Media analysis in progress");
       return;
     }
     const sourceNode = boardController.board.nodes.find(node => node.id === nodeId);
     if (!sourceNode || (sourceNode.kind !== "asset" && sourceNode.kind !== "result")) {
-      pushWorkspaceNotice("error", "请选择媒体节点");
+      pushWorkspaceNotice("error", "Please select a media node");
       return;
     }
 
@@ -2330,19 +2336,19 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       resolveBoardReferenceUrl,
     );
     if (previewReferences.length === 0) {
-      pushWorkspaceNotice("error", "当前媒体节点没有可分析资产");
+      pushWorkspaceNotice("error", "Current media node has no analyzable assets");
       return;
     }
 
     const mediaType = getMediaReferenceType(previewReferences[0]);
     analyzingBoardMediaNodeIdsRef.current.add(nodeId);
     try {
-      pushWorkspaceNotice("info", `正在分析${mediaReferenceLabel(mediaType)}媒体`);
+      pushWorkspaceNotice("info", `Analyzing ${mediaReferenceLabel(mediaType)} media`);
       const supportResponse = await fetch(`/api/model-vision-support?model=${encodeURIComponent(selectedChatModel)}`);
       if (supportResponse.ok) {
         const inputSupport = readAgentInputSupportPayload(await supportResponse.json());
         if (inputSupport?.[mediaType] === false) {
-          throw new Error(`当前 Agent 模型不支持${mediaReferenceLabel(mediaType)}分析`);
+          throw new Error(`Current Agent model does not support ${mediaReferenceLabel(mediaType)} analysis`);
         }
       }
 
@@ -2350,7 +2356,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         await prepareAgentAnalysisReferences(await resolveOriginalReferences(previewReferences)),
       );
       if (references.length === 0) {
-        throw new Error("当前媒体无法发送给 Agent 分析");
+        throw new Error("Current media cannot be sent to Agent for analysis");
       }
 
       const response = await fetch(API_ROUTES.agent.respond, {
@@ -2380,18 +2386,18 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       });
 
       if (!response.ok) {
-        throw new Error(await readFetchError(response, "媒体分析失败"));
+        throw new Error(await readFetchError(response, "Media analysis failed"));
       }
 
       const payload = await response.json() as BoardMediaAnalysisResponse;
       if (payload.thought === "Agent provider request failed.") {
-        throw new Error(payload.text || "媒体分析失败");
+        throw new Error(payload.text || "Media analysis failed");
       }
       const body = payload.text?.trim();
-      if (!body) throw new Error("媒体分析没有返回内容");
+      if (!body) throw new Error("Media analysis returned no content");
 
       boardController.addNoteNodeWithConnection({
-        title: `${sourceNode.title} 分析`,
+        title: `${sourceNode.title} analysis`,
         body,
         source: {
           assetId: references[0].id,
@@ -2407,9 +2413,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         portId: BOARD_PORT_IDS.assetOut,
         portKind: "asset",
       });
-      pushWorkspaceNotice("success", "已生成媒体分析 Note");
+      pushWorkspaceNotice("success", "Media analysis Note created");
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "媒体分析失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, "Media analysis failed"));
     } finally {
       analyzingBoardMediaNodeIdsRef.current.delete(nodeId);
     }
@@ -2433,14 +2439,14 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     if (isAgentBoardPatchAction(action)) {
       const patch = action.params?.boardPatch;
       if (!patch) {
-        pushWorkspaceNotice("error", "Agent 画板补丁缺少操作");
+        pushWorkspaceNotice("error", "Agent board patch missing operations");
         return handledBoardAction(false);
       }
       flushAllBoardText();
       try {
         validateBoardPatch(patch, boardController.board.nodes);
       } catch (error) {
-        pushWorkspaceNotice("error", toErrorMessage(error, "Agent 画板补丁无效"));
+        pushWorkspaceNotice("error", toErrorMessage(error, "Agent board patch invalid"));
         return handledBoardAction(false);
       }
 
@@ -2503,6 +2509,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
                 fallbackModel: DEFAULT_AUDIO_MODEL,
                 mode: operation.audioMode,
                 model: operation.model,
+                t,
               });
               const model = selection.model;
               nodeId = boardController.addGenerateNode({
@@ -2562,6 +2569,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             fallbackModel: DEFAULT_AUDIO_MODEL,
             mode: operation.audioMode,
             model: operation.model,
+            t,
           })
           : null;
         const model = audioSelection?.model ?? operation.model ?? (
@@ -2580,13 +2588,13 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         const runReferences = await resolveOriginalReferences(runInputs.references);
         const isAsrAudioOperation = operation.kind === "audio-operation" && audioSelection?.mode === "asr";
         if (!promptValue && !isAsrAudioOperation) {
-          boardController.updateGenerateNode(item.id, { status: "failed", errorMessage: "批量生成节点缺少提示词" });
+          boardController.updateGenerateNode(item.id, { status: "failed", errorMessage: "Batch generation node missing prompt" });
           runFailureCount += 1;
           continue;
         }
         const capability = getModelCapability(model, operation.kind === "image-generate" ? "image" : operation.kind === "video-generate" ? "video" : "audio");
         if (runReferences.length > 0 && !capability.supportsReferences) {
-          boardController.updateGenerateNode(item.id, { status: "failed", errorMessage: "当前模型不支持参考图输入" });
+          boardController.updateGenerateNode(item.id, { status: "failed", errorMessage: "Current model does not support reference input" });
           runFailureCount += 1;
           continue;
         }
@@ -2620,7 +2628,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           });
           if (!didStart) {
             runFailureCount += 1;
-            boardController.updateGenerateNode(item.id, { status: "failed", errorMessage: "图片生成请求未启动" });
+            boardController.updateGenerateNode(item.id, { status: "failed", errorMessage: "Image generation request not started" });
           }
         } else if (operation.kind === "video-generate") {
           const defaults = videoActionDefaults(model, operation.aspectRatio);
@@ -2629,7 +2637,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             runFailureCount += 1;
             boardController.updateGenerateNode(item.id, {
               status: "failed",
-              errorMessage: `当前视频模型需要 ${videoCapability.minReferenceImages}-${videoCapability.maxReferenceImages} 张参考图`,
+              errorMessage: `Video model needs ${videoCapability.minReferenceImages}-${videoCapability.maxReferenceImages} reference images`,
             });
             continue;
           }
@@ -2660,7 +2668,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           });
           if (!didStart) {
             runFailureCount += 1;
-            boardController.updateGenerateNode(item.id, { status: "failed", errorMessage: "视频生成请求未启动" });
+            boardController.updateGenerateNode(item.id, { status: "failed", errorMessage: "Video generation request not started" });
           }
         } else {
           const defaults = audioActionDefaults(model);
@@ -2686,7 +2694,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             resultStackKey,
           });
           if (audioOperationRequiresStylePrompt(audioMode) && !operation.audioStylePrompt?.trim()) {
-            const message = "音色设计需要填写音色描述";
+            const message = "Voice design needs description";
             runFailureCount += 1;
             boardController.updateGenerateNode(item.id, { status: "failed", errorMessage: message });
             pushWorkspaceNotice("error", message);
@@ -2709,7 +2717,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           });
           if (!didStart) {
             runFailureCount += 1;
-            boardController.updateGenerateNode(item.id, { status: "failed", errorMessage: "音频生成请求未启动" });
+            boardController.updateGenerateNode(item.id, { status: "failed", errorMessage: "Audio generation request not started" });
           }
         }
       }
@@ -2727,16 +2735,16 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       const promptValue = action.params?.prompt?.trim();
       const model = action.params?.model?.trim();
       if (!targetNodeId) {
-        pushWorkspaceNotice("error", "请先选中要续接视频的图片节点");
+        pushWorkspaceNotice("error", "Select an image node to continue with video");
         return handledBoardAction(false);
       }
       if (!promptValue || !model) {
-        pushWorkspaceNotice("error", "图生视频续接缺少视频提示词或模型");
+        pushWorkspaceNotice("error", "Image-to-video continuation missing prompt or model");
         return handledBoardAction(false);
       }
       const sourceNode = boardController.board.nodes.find(node => node.id === targetNodeId);
       if (!sourceNode) {
-        pushWorkspaceNotice("error", "未找到要续接视频的来源节点");
+        pushWorkspaceNotice("error", "Source node for video continuation not found");
         return handledBoardAction(false);
       }
       const sourceReference = sourceNode.kind === "asset" && sourceNode.asset.type === "image"
@@ -2756,18 +2764,18 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           })()
           : null;
       if (!sourceReference) {
-        pushWorkspaceNotice("error", "来源节点没有可用的完成图片资产");
+        pushWorkspaceNotice("error", "Source node has no completed image assets");
         return handledBoardAction(false);
       }
       const defaults = videoActionDefaults(model, action.params?.aspectRatio);
       const capability = getModelCapability(model, "video");
       if (!capability.supportsReferences) {
-        pushWorkspaceNotice("error", "当前视频模型不支持参考图续接");
+        pushWorkspaceNotice("error", "Video model does not support reference continuation");
         return handledBoardAction(false);
       }
       const videoCapability = getVideoModelCapabilities(model);
       if (videoCapability.minReferenceImages > 1 || videoCapability.maxReferenceImages < 1) {
-        pushWorkspaceNotice("error", `当前视频模型需要 ${videoCapability.minReferenceImages}-${videoCapability.maxReferenceImages} 张参考图`);
+        pushWorkspaceNotice("error", `Video model needs ${videoCapability.minReferenceImages}-${videoCapability.maxReferenceImages} reference images`);
         return handledBoardAction(false);
       }
 
@@ -2852,28 +2860,28 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           videoResolution: action.params.videoResolution ?? defaults.videoResolution,
         });
         if (!didStart) {
-          boardController.updateGenerateNode(videoNodeId, { status: "failed", errorMessage: "视频生成请求未启动" });
+          boardController.updateGenerateNode(videoNodeId, { status: "failed", errorMessage: "Video generation request not started" });
           pushWorkspaceNotice("error", "已创建图生视频节点，但视频生成请求未启动");
           return handledBoardAction(false);
         }
       }
-      pushWorkspaceNotice("success", action.params?.run === true ? "已创建并启动图生视频节点" : "已创建图生视频节点");
+      pushWorkspaceNotice("success", action.params?.run === true ? "Image-to-video node created and started" : "Image-to-video node created");
       return handledBoardAction(true);
     }
 
     if (isAgentBoardUpdateAction(action)) {
       const targetNodeId = action.params?.nodeId?.trim() || boardController.selectedNodeId;
       if (!targetNodeId) {
-        pushWorkspaceNotice("error", "请先选中要更新的画板节点");
+        pushWorkspaceNotice("error", "Please select a board node to update");
         return handledBoardAction(false);
       }
       const node = boardController.board.nodes.find(item => item.id === targetNodeId);
       if (!node) {
-        pushWorkspaceNotice("error", "未找到 Agent 要更新的画板节点");
+        pushWorkspaceNotice("error", "Board node for Agent update not found");
         return handledBoardAction(false);
       }
       if ((node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation") && node.status === "processing") {
-        pushWorkspaceNotice("error", "生成中的节点不可直接改参数，请等待完成或取消任务");
+        pushWorkspaceNotice("error", "Cannot modify generating node params, wait or cancel task");
         return handledBoardAction(false);
       }
 
@@ -2886,7 +2894,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       if (node.kind === "prompt") {
         const prompt = firstTextParam(action.params);
         if (!prompt) {
-          pushWorkspaceNotice("error", "Agent 节点更新缺少提示词内容");
+          pushWorkspaceNotice("error", "Agent node update missing prompt content");
           return handledBoardAction(false);
         }
         boardController.beginUndoGesture();
@@ -2898,7 +2906,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       } else if (node.kind === "note") {
         const body = firstTextParam(action.params);
         if (!body) {
-          pushWorkspaceNotice("error", "Agent 节点更新缺少笔记内容");
+          pushWorkspaceNotice("error", "Agent node update missing note content");
           return handledBoardAction(false);
         }
         boardController.beginUndoGesture();
@@ -2910,7 +2918,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       } else if (node.kind === "agent") {
         const instruction = firstTextParam(action.params);
         if (!instruction) {
-          pushWorkspaceNotice("error", "Agent 节点更新缺少指令内容");
+          pushWorkspaceNotice("error", "Agent node update missing instruction content");
           return handledBoardAction(false);
         }
         boardController.beginUndoGesture();
@@ -2924,11 +2932,11 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         try {
           update = buildGenerateNodeUpdate(node, action.params);
         } catch (error) {
-          pushWorkspaceNotice("error", toErrorMessage(error, "Agent 生成节点参数无效"));
+          pushWorkspaceNotice("error", toErrorMessage(error, "Agent generation node params invalid"));
           return handledBoardAction(false);
         }
         if (!hasGenerateNodeUpdate(update)) {
-          pushWorkspaceNotice("error", "Agent 节点更新缺少生成参数");
+          pushWorkspaceNotice("error", "Agent node update missing generation params");
           return handledBoardAction(false);
         }
         boardController.beginUndoGesture();
@@ -2938,19 +2946,19 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           boardController.endUndoGesture();
         }
       } else {
-        pushWorkspaceNotice("error", "Agent 暂不支持更新该类型节点");
+        pushWorkspaceNotice("error", "Agent does not support updating this node type");
         return handledBoardAction(false);
       }
       boardController.selectNode(node.id);
       boardController.selectEdge(null);
-      pushWorkspaceNotice("success", "已更新画板节点");
+      pushWorkspaceNotice("success", "Board node updated");
       return handledBoardAction(true);
     }
 
     if (isAgentBoardNoteAction(action)) {
       const body = action.params?.body?.trim() || action.params?.prompt?.trim();
       if (!body) {
-        pushWorkspaceNotice("error", "Agent 画板笔记缺少内容");
+        pushWorkspaceNotice("error", "Agent board note missing content");
         return handledBoardAction(false);
       }
       boardController.addNoteNode({
@@ -2961,7 +2969,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           y: 180 + boardController.board.nodes.length * 24,
         },
       });
-      pushWorkspaceNotice("success", "已创建 Agent 画板笔记");
+      pushWorkspaceNotice("success", "Agent board note created");
       return handledBoardAction(true);
     }
 
@@ -2978,6 +2986,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         fallbackModel: DEFAULT_AUDIO_MODEL,
         mode: action.params?.audioMode,
         model: action.params?.model,
+        t,
       })
       : null;
     const model = audioSelection?.model ?? action.params?.model ?? (
@@ -2985,11 +2994,11 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     );
     const actionRequiresPrompt = kind !== "audio-operation" || !audioSelection || audioOperationRequiresTextInput(audioSelection.mode);
     if (!promptFromAgent && actionRequiresPrompt) {
-      pushWorkspaceNotice("error", "Agent 生成动作缺少提示词");
+      pushWorkspaceNotice("error", "Agent generation action missing prompt");
       return handledBoardAction(false);
     }
     if (isPlaceholderRunningHubModel(model)) {
-      pushWorkspaceNotice("error", "请先填写真实的 RunningHub webappId 或 workflowId");
+      pushWorkspaceNotice("error", "Please fill in real RunningHub webappId or workflowId");
       return handledBoardAction(false);
     }
     const shouldRun = shouldRunAgentBoardFlow(action);
@@ -3023,14 +3032,14 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
       const capability = getModelCapability(model, "image");
       if (references.length > 0 && !capability.supportsReferences) {
-        const message = "Agent 选中的图片模型不支持参考媒体输入";
+        const message = "Selected Agent image model does not support reference media input";
         boardController.updateGenerateNode(generateNodeId, { errorMessage: message, status: "failed" });
         pushWorkspaceNotice("error", message);
         return handledBoardAction(false);
       }
       const unsupportedImageReference = references.find(reference => getMediaReferenceType(reference) !== "image");
       if (unsupportedImageReference) {
-        const message = `图片生成不支持${mediaReferenceLabel(getMediaReferenceType(unsupportedImageReference))}参考`;
+        const message = `Image generation does not support ${mediaReferenceLabel(getMediaReferenceType(unsupportedImageReference))} reference`;
         boardController.updateGenerateNode(generateNodeId, { errorMessage: message, status: "failed" });
         pushWorkspaceNotice("error", message);
         return handledBoardAction(false);
@@ -3058,7 +3067,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       });
 
       if (!shouldRun) {
-        pushWorkspaceNotice("success", "已创建 Agent 图片生成节点流程");
+        pushWorkspaceNotice("success", "Agent image generation node flow created");
         return handledBoardAction(true);
       }
 
@@ -3102,7 +3111,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       });
       if (!didStart) {
         boardController.updateGenerateNode(generateNodeId, {
-          errorMessage: "图片生成请求未启动，请检查节点参数",
+          errorMessage: "Image generation request not started, check node params",
           status: "failed",
         });
         return handledBoardAction(false);
@@ -3111,7 +3120,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     }
 
     if (kind === "audio-operation") {
-      if (!audioSelection) throw new Error("音频功能解析失败");
+      if (!audioSelection) throw new Error("Audio function parse failed");
       const defaults = {
         ...audioActionDefaults(model),
         audioMode: audioSelection.mode,
@@ -3135,7 +3144,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
       const capability = getModelCapability(model, "audio");
       if (references.length > 0 && !capability.supportsReferences) {
-        const message = "Agent 选中的音频模型不支持参考媒体输入";
+        const message = "Selected Agent audio model does not support reference media input";
         boardController.updateGenerateNode(generateNodeId, { errorMessage: message, status: "failed" });
         pushWorkspaceNotice("error", message);
         return handledBoardAction(false);
@@ -3171,7 +3180,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       });
 
       if (!shouldRun) {
-        pushWorkspaceNotice("success", "已创建 Agent 音频生成节点流程");
+        pushWorkspaceNotice("success", "Agent audio generation node flow created");
         return handledBoardAction(true);
       }
 
@@ -3215,7 +3224,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       });
       if (!didStart) {
         boardController.updateGenerateNode(generateNodeId, {
-          errorMessage: "音频生成请求未启动，请检查节点参数",
+          errorMessage: "Audio generation request not started, check node params",
           status: "failed",
         });
         return handledBoardAction(false);
@@ -3245,7 +3254,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
     const capability = getModelCapability(model, "video");
     if (references.length > 0 && !capability.supportsReferences) {
-      const message = "Agent 选中的视频模型不支持参考媒体输入";
+      const message = "Selected Agent video model does not support reference media input";
       boardController.updateGenerateNode(generateNodeId, { errorMessage: message, status: "failed" });
       pushWorkspaceNotice("error", message);
       return handledBoardAction(false);
@@ -3287,7 +3296,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     });
 
     if (!shouldRun) {
-      pushWorkspaceNotice("success", "已创建 Agent 视频生成节点流程");
+      pushWorkspaceNotice("success", "Agent video generation node flow created");
       return handledBoardAction(true);
     }
 
@@ -3330,7 +3339,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     });
     if (!didStart) {
       boardController.updateGenerateNode(generateNodeId, {
-        errorMessage: "视频生成请求未启动，请检查节点参数",
+        errorMessage: "Video generation request not started, check node params",
         status: "failed",
       });
       return handledBoardAction(false);
@@ -3393,16 +3402,16 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const cancelBoardAssetTaskNode = useCallback(async (nodeId: string): Promise<void> => {
     const node = boardController.board.nodes.find(item => item.id === nodeId);
     if (node?.kind !== "asset") {
-      pushWorkspaceNotice("error", "未找到可取消的图片编辑任务");
+      pushWorkspaceNotice("error", "No cancelable image edit task found");
       return;
     }
     const item = items.find(current => current.id === node.asset.assetId);
     if (!item || (item.status !== "pending" && item.status !== "processing")) {
-      pushWorkspaceNotice("error", "未找到可取消的图片编辑任务");
+      pushWorkspaceNotice("error", "No cancelable image edit task found");
       return;
     }
     if (cancelingBoardItemIds.includes(item.id)) return;
-    if (!(await confirmAction({ message: "确定要取消这个图片编辑任务吗？", tone: "danger", confirmLabel: "取消任务" }))) return;
+    if (!(await confirmAction({ message: "Are you sure you want to cancel this image edit task?", tone: "danger", confirmLabel: "Cancel task" }))) return;
 
     setCancelingBoardItemIds(prev => [...prev, item.id]);
     try {
@@ -3413,9 +3422,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       delete pollingFailuresRef.current[item.id];
       setItems(prev => prev.filter(current => current.id !== item.id));
       boardController.deleteNode(nodeId);
-      pushWorkspaceNotice("success", "图片编辑任务已从本地取消");
+      pushWorkspaceNotice("success", "Image edit task canceled locally");
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "图片编辑任务取消失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, "Image edit task cancel failed"));
     } finally {
       setCancelingBoardItemIds(prev => prev.filter(id => id !== item.id));
     }
@@ -3435,7 +3444,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     const nodeId = task.source.boardNodeId;
     const sourceNode = nodeId ? findExecutableNodeById(boardController.board.nodes, nodeId) : undefined;
     if (!nodeId || !sourceNode) {
-      pushWorkspaceNotice("error", "任务缺少来源节点，无法从画板取消");
+      pushWorkspaceNotice("error", "Task missing source node, cannot cancel from board");
       return;
     }
     if (task.status !== "pending" && task.status !== "processing") return;
@@ -3444,9 +3453,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     if (cancelingBoardItemIds.includes(task.id)) return;
     const canCancelRemote = task.canCancelRemote && Boolean(operationName);
     const confirmText = canCancelRemote
-      ? "确定要取消这个视频生成任务吗？"
+      ? "Are you sure you want to cancel this video task?"
       : "确定要本地取消这个任务吗？远端生成可能仍会继续。";
-    if (!(await confirmAction({ message: confirmText, tone: "danger", confirmLabel: "取消任务" }))) return;
+    if (!(await confirmAction({ message: confirmText, tone: "danger", confirmLabel: "Cancel task" }))) return;
 
     setCancelingBoardItemIds(prev => [...prev, task.id]);
     try {
@@ -3457,7 +3466,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           body: JSON.stringify({ operationName }),
         });
         if (!response.ok) {
-          throw new Error(await readFetchError(response, "任务取消失败"));
+          throw new Error(await readFetchError(response, "Task cancel failed"));
         }
       }
 
@@ -3473,7 +3482,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       if (isSourceStackTask(task, sourceNode)) {
         const nextTasks = generationTasks.map(current => current.id === canceledTask.id ? canceledTask : current);
         const nextStatus = nextSourceNodeStatus(items, nextTasks, sourceNode, "failed");
-        const cancellationMessage = canCancelRemote ? "远端生成任务已取消" : "任务已从本地取消";
+        const cancellationMessage = canCancelRemote ? "Remote generation task canceled" : "任务已从本地取消";
         const update = {
           errorMessage: nextStatus === "failed" ? cancellationMessage : undefined,
           status: nextStatus,
@@ -3484,9 +3493,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           boardController.updateGenerateNode(nodeId, update);
         }
       }
-      pushWorkspaceNotice("success", canCancelRemote ? "视频生成任务已取消" : "任务已从本地取消");
+      pushWorkspaceNotice("success", canCancelRemote ? "Video generation task canceled" : "任务已从本地取消");
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "任务取消失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, "Task cancel failed"));
     } finally {
       setCancelingBoardItemIds(prev => prev.filter(id => id !== task.id));
     }
@@ -3509,7 +3518,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     const task = sourceNode ? activeSourceTaskForNode(generationTasks, sourceNode) : undefined;
     if (!sourceNode || !task) {
       const update = {
-        errorMessage: "未找到可取消的关联任务",
+        errorMessage: "No cancelable task found",
         status: "failed",
       } as const;
       if (sourceNode?.kind === "runninghub-app") {
@@ -3548,24 +3557,24 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const handleImportFilesToLibrary = useCallback(async (files: File[]) => {
     try {
       const imported = await assetLibrary.importFiles(files);
-      pushWorkspaceNotice("success", `已导入 ${imported.length} 个素材`);
+      pushWorkspaceNotice("success", `Imported ${imported.length} assets`);
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "素材导入失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, "Asset import failed"));
     }
   }, [assetLibrary, pushWorkspaceNotice]);
 
   const handleSelectLibraryAsset = useCallback((entry: LibraryAssetEntry) => {
     const item = entry.item;
     if (!item) {
-      pushWorkspaceNotice("error", "该素材缺少媒体内容");
+      pushWorkspaceNotice("error", "Asset missing media content");
       return;
     }
     try {
       addAssetToBoard(item);
       setIsAssetLibraryOpen(false);
-      pushWorkspaceNotice("success", "已加入当前画板");
+      pushWorkspaceNotice("success", "Added to current board");
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "加入画板失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, "Add to board failed"));
     }
   }, [addAssetToBoard, pushWorkspaceNotice]);
 
@@ -3573,7 +3582,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     try {
       const node = boardController.board.nodes.find(item => item.id === nodeId);
       if (node?.kind !== "multi-grid") {
-        throw new Error("目标节点不是多宫格");
+        throw new Error("Target node is not multi-grid");
       }
       const dataUrl = await composeBoardMultiGridImage(node);
       const item = buildStorageItem(
@@ -3599,9 +3608,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         x: node.position.x + node.size.width + 40,
         y: node.position.y,
       });
-      pushWorkspaceNotice("success", "多宫格已导出为图片资产");
+      pushWorkspaceNotice("success", "Multi-grid exported as image asset");
     } catch (error) {
-      pushWorkspaceNotice("error", error instanceof Error ? error.message : "多宫格导出失败");
+      pushWorkspaceNotice("error", error instanceof Error ? error.message : "Multi-grid export failed");
     }
   }, [addAssetToBoard, boardController.board, pushWorkspaceNotice]);
 
@@ -3611,7 +3620,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     frame: CapturedVideoFrame,
   ): Promise<void> => {
     if (item.type !== "video") {
-      throw new Error("只有视频资产可以截帧");
+      throw new Error("Only video assets can capture frames");
     }
 
     const frameItem = createVideoFrameStorageItem(item, frame, makeClientId("frame"));
@@ -3624,7 +3633,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       ? { x: sourceNode.position.x + sourceNode.size.width + 40, y: sourceNode.position.y }
       : undefined;
     addAssetToBoard(savedFrameItem, position);
-    pushWorkspaceNotice("success", `已保存${getVideoFrameCaptureLabel(frame.mode)}并插入画板`);
+    pushWorkspaceNotice("success", `Saved ${getVideoFrameCaptureLabel(frame.mode)} and inserted to board`);
   }, [addAssetToBoard, boardController.board.nodes, pushWorkspaceNotice]);
 
   const handleSavePanoramaScreenshots = useCallback(async (
@@ -3632,7 +3641,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     screenshots: PanoramaScreenshot[],
   ): Promise<void> => {
     if (item.type !== "image") {
-      throw new Error("只有图片资产可以进入全景查看");
+      throw new Error("Only image assets can enter panorama view");
     }
 
     const sourceNode = boardController.board.nodes.find(node => (
@@ -3668,13 +3677,13 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           : undefined,
       );
     });
-    pushWorkspaceNotice("success", `已保存 ${savedItems.length} 张全景截图并插入画板`);
+    pushWorkspaceNotice("success", `Saved ${savedItems.length} panorama screenshots and inserted to board`);
   }, [addAssetToBoard, boardController.board.nodes, pushWorkspaceNotice, resolvedBoardId]);
 
   const handleImportBoardFiles = useCallback(async (files: File[], position: BoardPoint): Promise<void> => {
     const boardFiles = files.filter(file => mediaReferenceTypeFromMime(file.type) !== null);
     if (boardFiles.length === 0) {
-      pushWorkspaceNotice("info", "画板只支持导入图片、视频或音频文件");
+      pushWorkspaceNotice("info", "Board only supports importing image, video, or audio files");
       return;
     }
 
@@ -3683,7 +3692,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       const file = boardFiles[index];
       try {
         const mediaType = mediaReferenceTypeFromMime(file.type);
-        if (!mediaType) throw new Error("不支持的媒体类型");
+        if (!mediaType) throw new Error("Unsupported media type");
         const item = await createBoardUploadItem(
           file,
           makeClientId(boardUploadIdPrefix(mediaType, index)),
@@ -3714,29 +3723,29 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       ...importedItems.map(imported => imported.item),
       ...prev.filter(item => !importedItems.some(imported => imported.item.id === item.id)),
     ]);
-    pushWorkspaceNotice("success", `已导入 ${importedItems.length} 个文件到画板`);
+    pushWorkspaceNotice("success", `Imported ${importedItems.length} files to board`);
   }, [boardController, pushWorkspaceNotice, resolvedBoardId]);
 
   const useSelectedBoardAssetAsReference = () => {
     const references = activeBoardReference(boardController.board.nodes, boardController.selectedNodeId, items, resolveBoardReferenceUrl);
     if (references.length === 0) {
-      pushWorkspaceNotice("info", "请选择一个图片资产节点");
+      pushWorkspaceNotice("info", "Please select an image asset node");
       return;
     }
     void resolveOriginalReferences(references).then(
       originalReferences => {
         setReferenceImage(originalReferences[0].url);
         setReferenceImages(originalReferences);
-        pushWorkspaceNotice("success", "已将选中节点作为生成参考图");
+        pushWorkspaceNotice("success", "Selected node set as generation reference");
       },
-      error => pushWorkspaceNotice("error", toErrorMessage(error, "参考媒体读取失败")),
+      error => pushWorkspaceNotice("error", toErrorMessage(error, "Reference media read failed")),
     );
   };
 
   const useSelectedBoardAssetForAgent = () => {
     const references = activeBoardReference(boardController.board.nodes, boardController.selectedNodeId, items, resolveBoardReferenceUrl);
     if (references.length === 0) {
-      pushWorkspaceNotice("info", "请选择一个图片资产节点");
+      pushWorkspaceNotice("info", "Please select an image asset node");
       return;
     }
     void resolveOriginalReferences(references).then(
@@ -3746,14 +3755,14 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         setAgentReferences(originalReferences);
         setIsAgentDockOpen(true);
       },
-      error => pushWorkspaceNotice("error", toErrorMessage(error, "参考媒体读取失败")),
+      error => pushWorkspaceNotice("error", toErrorMessage(error, "Reference media read failed")),
     );
   };
 
   const useBoardAssetForAgent = useCallback((nodeId: string) => {
     const references = activeBoardReference(boardController.board.nodes, nodeId, items, resolveBoardReferenceUrl);
     if (references.length === 0) {
-      pushWorkspaceNotice("info", "请选择一个图片资产节点");
+      pushWorkspaceNotice("info", "Please select an image asset node");
       return;
     }
     void resolveOriginalReferences(references).then(
@@ -3763,7 +3772,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         setAgentReferences(originalReferences);
         setIsAgentDockOpen(true);
       },
-      error => pushWorkspaceNotice("error", toErrorMessage(error, "参考媒体读取失败")),
+      error => pushWorkspaceNotice("error", toErrorMessage(error, "Reference media read failed")),
     );
   }, [
     boardController.board.nodes,
@@ -3779,7 +3788,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const editBoardAssetImage = useCallback((nodeId: string) => {
     const node = boardController.board.nodes.find(item => item.id === nodeId);
     if (node?.kind !== "asset" || node.asset.type !== "image") {
-      pushWorkspaceNotice("info", "请选择一个图片资产节点");
+      pushWorkspaceNotice("info", "Please select an image asset node");
       return;
     }
     const item = items.find(entry => entry.id === node.asset.assetId) ?? buildStorageItem(
@@ -3799,7 +3808,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     );
     void resolveOriginalStorageItem(item).then(
       originalItem => launchMaskEditor(originalItem.url, node.asset.assetId, "board-asset", node.id),
-      error => pushWorkspaceNotice("error", toErrorMessage(error, "原始图片读取失败")),
+      error => pushWorkspaceNotice("error", toErrorMessage(error, "Original image read failed")),
     );
   }, [
     boardController.board.nodes,
@@ -3836,11 +3845,11 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   }, [boardController.board.edges, boardController.board.nodes, items, resolveBoardReferenceUrl]);
 
   const resolveGenerateNodeInputs = useCallback((nodeId: string) => {
-    return resolveExecutableNodeInputs(nodeId, isGenerateBoardNode, "请选择图片、视频或音频生成节点");
+    return resolveExecutableNodeInputs(nodeId, isGenerateBoardNode, "Please select image, video, or audio generation node");
   }, [resolveExecutableNodeInputs]);
 
   const resolveRunningHubAppNodeInputs = useCallback((nodeId: string) => {
-    return resolveExecutableNodeInputs(nodeId, isRunningHubAppBoardNode, "请选择 RunningHub 应用节点");
+    return resolveExecutableNodeInputs(nodeId, isRunningHubAppBoardNode, "Please select RunningHub app node");
   }, [resolveExecutableNodeInputs]);
 
   const handleExecuteGenerateNode = useCallback(async (nodeId: string) => {
@@ -3916,7 +3925,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         }
         if (!didStart) {
           boardController.updateRunningHubAppNode(nodeId, {
-            errorMessage: "RunningHub 应用请求未启动，请检查节点参数",
+            errorMessage: "RunningHub app request not started, check node params",
             status: "failed",
           });
         }
@@ -3933,18 +3942,18 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         (node.kind === "image-generate" || node.kind === "video-generate") &&
         !runningHubAppPresetRequiresPrompt(node.model);
       if (!nextPrompt && requiresTextInput && !allowsEmptyPrompt) {
-        boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: "生成节点需要提示词输入" });
-        pushWorkspaceNotice("error", "生成节点需要提示词输入");
+        boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: "Generation node needs prompt input" });
+        pushWorkspaceNotice("error", "Generation node needs prompt input");
         return;
       }
       if (node.kind === "audio-operation" && audioOperationRequiresStylePrompt(node.audioMode) && !node.audioStylePrompt?.trim()) {
-        const message = "音色设计需要填写音色描述";
+        const message = "Voice design needs description";
         boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: message });
         pushWorkspaceNotice("error", message);
         return;
       }
       if (isPlaceholderRunningHubModel(node.model)) {
-        const message = "请先填写真实的 RunningHub webappId 或 workflowId";
+        const message = "Please fill in real RunningHub webappId or workflowId";
         boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: message });
         pushWorkspaceNotice("error", message);
         return;
@@ -3952,8 +3961,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       const capabilityKind = node.kind === "image-generate" ? "image" : node.kind === "video-generate" ? "video" : "audio";
       const capability = getModelCapability(node.model, capabilityKind);
       if (references.length > 0 && !capability.supportsReferences) {
-        boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: "当前模型不支持参考媒体输入" });
-        pushWorkspaceNotice("error", "当前模型不支持参考媒体输入");
+        boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: "Current model does not support reference media input" });
+        pushWorkspaceNotice("error", "Current model does not support reference media input");
         return;
       }
       const unsupportedReference = references.find(reference => {
@@ -3984,7 +3993,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       if (node.kind === "video-generate") {
         const videoCapability = getVideoModelCapabilities(node.model);
         if (references.length < videoCapability.minReferenceImages || references.length > videoCapability.maxReferenceImages) {
-          const message = `当前视频模型需要 ${videoCapability.minReferenceImages}-${videoCapability.maxReferenceImages} 张参考图`;
+          const message = `Video model needs ${videoCapability.minReferenceImages}-${videoCapability.maxReferenceImages} reference images`;
           boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: message });
           pushWorkspaceNotice("error", message);
           return;
@@ -4028,7 +4037,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           }
           if (!didStartAny) {
             boardController.updateGenerateNode(nodeId, {
-              errorMessage: "图片生成请求未启动，请检查节点参数",
+              errorMessage: "Image generation request not started, check node params",
               status: "failed",
             });
           }
@@ -4055,7 +4064,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           }
         if (!didStartAny) {
           boardController.updateGenerateNode(nodeId, {
-            errorMessage: "视频生成请求未启动，请检查节点参数",
+            errorMessage: "Video generation request not started, check node params",
             status: "failed",
           });
         }
@@ -4082,13 +4091,13 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         }
         if (!didStartAny) {
           boardController.updateGenerateNode(nodeId, {
-            errorMessage: "音频生成请求未启动，请检查节点参数",
+            errorMessage: "Audio generation request not started, check node params",
             status: "failed",
           });
         }
       }
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "节点生成失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, "Node generation failed"));
     }
   }, [
     boardController,
@@ -4105,7 +4114,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const handleSendAgentNode = useCallback((nodeId: string) => {
     const node = boardController.board.nodes.find(item => item.id === nodeId);
     if (node?.kind !== "agent") {
-      pushWorkspaceNotice("error", "请选择 Agent 节点");
+      pushWorkspaceNotice("error", "Please select Agent node");
       return;
     }
 
@@ -4141,16 +4150,16 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     event.target.value = "";
     if (!file) return;
     if (agentReferences.length >= IMAGE_REFERENCE_LIMIT) {
-      pushWorkspaceNotice("error", `Agent 引用已达上限：最多 ${IMAGE_REFERENCE_LIMIT} 个`);
+      pushWorkspaceNotice("error", `Agent reference limit reached: max ${IMAGE_REFERENCE_LIMIT}`);
       return;
     }
     const mediaType = mediaReferenceTypeFromMime(file.type);
     if (!mediaType) {
-      pushWorkspaceNotice("error", "Agent 只支持上传图片、视频或音频引用");
+      pushWorkspaceNotice("error", "Agent only supports image, video, or audio references");
       return;
     }
     if (mediaType !== "image" && file.size > Math.floor(REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES * 0.75)) {
-      pushWorkspaceNotice("error", `${mediaReferenceLabel(mediaType)}引用文件过大，请压缩后重试`);
+      pushWorkspaceNotice("error", `${mediaReferenceLabel(mediaType)} reference too large, compress and retry`);
       return;
     }
     try {
@@ -4159,9 +4168,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       setAgentReferenceId(newReferenceId);
       setAgentReferenceUrl(dataUrl);
       setAgentReferences(prev => [...prev, { id: newReferenceId, type: mediaType, url: dataUrl }].slice(0, IMAGE_REFERENCE_LIMIT));
-      pushWorkspaceNotice("success", `已上传 Agent ${mediaReferenceLabel(mediaType)}引用`);
+      pushWorkspaceNotice("success", `Uploaded Agent ${mediaReferenceLabel(mediaType)} reference`);
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "Agent 引用读取失败，请换一个文件"));
+      pushWorkspaceNotice("error", toErrorMessage(error, "Agent reference read failed, try a different file"));
     }
   };
 
@@ -4433,7 +4442,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       const file = files[index];
       try {
         const mediaType = mediaReferenceTypeFromMime(file.type);
-        if (!mediaType) throw new Error("不支持的媒体类型");
+        if (!mediaType) throw new Error("Unsupported media type");
         const item = await createLocalUploadAsset(
           file,
           makeClientId(boardUploadIdPrefix(mediaType, index).replace("board_", "local_")),
@@ -4451,7 +4460,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       ...importedItems,
       ...prev.filter(item => !importedItems.some(importedItem => importedItem.id === item.id)),
     ]);
-    pushWorkspaceNotice("success", `已导入 ${importedItems.length} 个本地媒体`);
+    pushWorkspaceNotice("success", `Imported ${importedItems.length} local media`);
   }, [pushWorkspaceNotice, resolvedBoardId]);
 
   const handleDataCleanupAssets = useCallback(async (kind: WorkspaceCleanupKind) => {
@@ -4796,7 +4805,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         }
         launchMaskEditor(originalItem.url, originalItem.id, "board-asset", source.node.id, operation, originalItem);
       },
-      error => pushWorkspaceNotice("error", toErrorMessage(error, "原始图片读取失败")),
+      error => pushWorkspaceNotice("error", toErrorMessage(error, "Original image read failed")),
     );
   };
   const boardSummariesForToolbar = useMemo(() => {
@@ -4916,7 +4925,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
                       originalUrl: references[0]?.url ?? selectedAssetCompareReference.url,
                       resultUrl: originalItem.url,
                     }),
-                    error => pushWorkspaceNotice("error", toErrorMessage(error, "原始媒体读取失败")),
+                    error => pushWorkspaceNotice("error", toErrorMessage(error, "Original media read failed")),
                   );
                 }
                 : undefined}

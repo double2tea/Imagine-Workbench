@@ -38,6 +38,8 @@ import {
 } from "@/lib/board/runninghub-bindings";
 import type { BoardPromptReference } from "@/lib/board/prompt-references";
 
+import { useTranslations } from "@/lib/i18n";
+
 interface RunningHubAppBoardNodeProps {
   hasResultConnection?: boolean;
   inputSummary?: BoardGenerateInputSummary;
@@ -73,18 +75,18 @@ const warningChipToneClass = "imagine-tone-chip";
 
 const sourceOptions: Array<{ value: BoardRunningHubBindingSource; label: string }> = [
   { value: "prompt", label: "Prompt" },
-  { value: "reference", label: "参考媒体" },
-  { value: "literal", label: "固定值" },
-  { value: "randomSeed", label: "随机 seed" },
+  { value: "reference", label: "Reference" },
+  { value: "literal", label: "Fixed value" },
+  { value: "randomSeed", label: "Random seed" },
 ];
 
 const valueTypeOptions: Array<{ value: BoardRunningHubBindingValueType; label: string }> = [
-  { value: "text", label: "文本" },
-  { value: "number", label: "数字" },
-  { value: "boolean", label: "开关" },
-  { value: "image", label: "图片" },
-  { value: "video", label: "视频" },
-  { value: "audio", label: "音频" },
+  { value: "text", label: "Text" },
+  { value: "number", label: "Number" },
+  { value: "boolean", label: "Toggle" },
+  { value: "image", label: "Image" },
+  { value: "video", label: "Video" },
+  { value: "audio", label: "Audio" },
   { value: "raw", label: "Raw" },
 ];
 
@@ -216,18 +218,18 @@ function savedTargetId(targetType: BoardRunningHubTargetType, targetId: string):
 }
 
 function bindingTitle(binding: BoardRunningHubNodeInfoBinding): string {
-  return binding.label?.trim() || binding.description || binding.fieldName || "未命名参数";
+  return binding.label?.trim() || binding.description || binding.fieldName || "Unnamed param";
 }
 
 function targetIdLabel(targetType: BoardRunningHubTargetType): string {
-  return targetType === "workflow" ? "workflowId / API JSON" : "应用 URL / webappId";
+  return targetType === "workflow" ? "workflowId / API JSON" : "App URL / webappId";
 }
 
 function statusLabel(status: BoardRunningHubAppNode["status"]): string {
-  if (status === "processing") return "运行中";
-  if (status === "complete") return "已完成";
-  if (status === "failed") return "失败";
-  return "待运行";
+  if (status === "processing") return "Running";
+  if (status === "complete") return "Complete";
+  if (status === "failed") return "Failed";
+  return "Idle";
 }
 
 function statusTone(status: BoardRunningHubAppNode["status"]): string {
@@ -238,8 +240,8 @@ function statusTone(status: BoardRunningHubAppNode["status"]): string {
 }
 
 function resultStatusLabel(hasResultConnection: boolean, resultCount: number): string {
-  if (resultCount > 0) return hasResultConnection ? `${resultCount} 个已上板` : `${resultCount} 个`;
-  return "未生成";
+  if (resultCount > 0) return hasResultConnection ? `${resultCount} on board` : `${resultCount}`;
+  return "Not generated";
 }
 
 const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
@@ -265,8 +267,8 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
   const hasTarget = node.targetId.trim() !== "";
   const isReady = hasTarget && readiness.missingCount === 0;
   const bindingSummary = node.bindings.length > 0
-    ? `${readiness.enabledCount}/${node.bindings.length} 字段`
-    : "未读取字段";
+    ? `${readiness.enabledCount}/${node.bindings.length} fields`
+    : "No fields read";
   const currentSavedTarget = savedTargets.find(target => target.id === savedTargetId(node.targetType, node.targetId));
   const resultTone = resultItems.length > 0 ? hasResultConnection ? "result" : "ok" : "neutral";
   const resultLabel = resultStatusLabel(hasResultConnection, resultItems.length);
@@ -302,7 +304,7 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
   const saveTargetSnapshot = (bindings: BoardRunningHubNodeInfoBinding[], name?: string, targetIdOverride?: string): void => {
     const targetId = (targetIdOverride ?? node.targetId).trim();
     if (!targetId) {
-      setImportError("请先填写 RunningHub 应用或 Workflow ID");
+      setImportError("Please fill in RunningHub app or Workflow ID first");
       return;
     }
     const id = savedTargetId(node.targetType, targetId);
@@ -367,18 +369,18 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
         setIsImportOpen(false);
         return;
       }
-      setImportError(error instanceof Error ? error.message : "导入失败");
+      setImportError(error instanceof Error ? error.message : "Import failed");
     }
   };
 
   const fetchAppSchema = async (): Promise<void> => {
     const webappId = readRunningHubTargetIdFromText(node.targetId);
     if (node.targetType !== "ai-app") {
-      setImportError("Workflow 请导入 RunningHub 导出的 API JSON");
+      setImportError("Workflow: import API JSON exported from RunningHub");
       return;
     }
     if (!webappId) {
-      setImportError("请先粘贴应用 URL 或 webappId");
+      setImportError("Please paste app URL or webappId first");
       return;
     }
     setIsFetchingSchema(true);
@@ -388,7 +390,7 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
       onUpdate({ targetId: schema.webappId, bindings: schema.bindings });
       saveTargetSnapshot(schema.bindings, schema.name, schema.webappId);
     } catch (error) {
-      setImportError(error instanceof Error ? error.message : "字段读取失败");
+      setImportError(error instanceof Error ? error.message : "Schema read failed");
     } finally {
       setIsFetchingSchema(false);
     }
@@ -419,7 +421,7 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
             type="button"
             onClick={() => setIsImportOpen(value => !value)}
             className={iconButtonClass}
-            title="粘贴导入"
+            title="Paste import"
           >
             <FileJson className="h-3.5 w-3.5" />
           </button>
@@ -429,10 +431,10 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
             disabled={isFetchingSchema || node.targetType !== "ai-app"}
             className="imagine-tone-chip nodrag flex h-8 items-center gap-1.5 rounded-md border px-3 text-[10px] font-semibold transition disabled:border-[var(--iw-border)] disabled:bg-[var(--iw-panel-soft)] disabled:text-[var(--iw-faint)]"
             data-tone="success"
-            title="从 RunningHub 官方调用示例读取 nodeInfoList"
+            title="Read nodeInfoList from RunningHub official call example"
           >
             {isFetchingSchema ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ClipboardList className="h-3.5 w-3.5" />}
-            读取字段
+            Read fields
           </button>
         </div>
         <button
@@ -442,7 +444,7 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
           className="nodrag flex h-8 items-center justify-center gap-1 rounded-md bg-emerald-600 px-4 text-[11px] font-semibold text-white transition hover:bg-emerald-500 disabled:bg-[var(--iw-panel-soft)] disabled:text-[var(--iw-faint)]"
         >
           <Play className="h-3.5 w-3.5" />
-          运行
+          Run
         </button>
       </div>
 
@@ -454,7 +456,7 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
             disabled={savedTargets.length === 0}
             className={`${inputClass} w-full`}
           >
-            <option value="">选择已保存应用</option>
+            <option value="">Select saved app</option>
             {savedTargets.map(target => (
               <option key={target.id} value={target.id}>
                 {target.label}
@@ -466,17 +468,17 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
             onClick={saveCurrentTarget}
             disabled={!hasTarget}
             className="nodrag flex h-8 items-center gap-1.5 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)] px-2 text-[10px] font-semibold text-[var(--iw-text)] transition hover:border-emerald-400/50 disabled:text-[var(--iw-faint)]"
-            title="保存当前 RunningHub 目标"
+            title="Save current RunningHub target"
           >
             <Save className="h-3.5 w-3.5" />
-            保存
+            Save
           </button>
           <button
             type="button"
             onClick={deleteCurrentSavedTarget}
             disabled={!currentSavedTarget}
             className={iconButtonClass}
-            title="删除当前保存目标"
+            title="Delete saved target"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
@@ -491,15 +493,15 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
               onChange={event => onUpdate({ outputType: readOutputType(event.target.value) })}
               className={inputClass}
             >
-              <option value="image">图片输出</option>
-              <option value="video">视频输出</option>
-              <option value="audio">音频输出</option>
+              <option value="image">Image output</option>
+              <option value="video">Video output</option>
+              <option value="audio">Audio output</option>
             </select>
             <input
               value={node.accessPassword ?? ""}
               onChange={event => onUpdate({ accessPassword: event.target.value })}
               className={`${inputClass} font-mono`}
-              placeholder="访问密码（可选）"
+              placeholder="Access password (optional)"
             />
           </div>
 
@@ -513,14 +515,14 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
             className={`nodrag nowheel min-h-[146px] flex-1 resize-none rounded-md imagine-board-input !p-2 text-xs leading-5 outline-none ${
               promptPreview !== null ? "cursor-default opacity-85" : ""
             }`}
-            placeholder={promptPreview !== null ? "已连接 Prompt 节点" : "输入 Prompt，字段可绑定到这里"}
+            placeholder={promptPreview !== null ? "Connected Prompt node" : "Enter Prompt, fields can bind here"}
           />
 
           <div className="grid grid-cols-3 gap-1.5">
             <span className={chipClass} data-tone={statusTone(node.status)}>{statusLabel(node.status)}</span>
             <span className={`${chipClass} ${isReady ? "" : warningChipToneClass}`} data-tone={isReady ? "ok" : "warning"}>
               {isReady ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
-              {!hasTarget ? "缺少目标" : isReady ? "可运行" : `${readiness.missingCount} 缺少`}
+              {!hasTarget ? "Missing target" : isReady ? "Ready" : `${readiness.missingCount} missing`}
             </span>
             {focusResultNode ? (
               <button
@@ -532,7 +534,7 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
                   focusResultNode();
                 }}
                 onPointerDown={stopBoardControlPointer}
-                title="定位结果节点"
+                title="Locate result node"
               >
                 {resultLabel}
               </button>
@@ -546,9 +548,9 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
           {isImportOpen && (
             <div className={`${softPanelClass} nodrag w-full min-w-0 p-2`}>
               <div className="mb-1 flex items-center justify-between gap-2">
-                <span className={labelClass}>粘贴导入</span>
+                <span className={labelClass}>Paste import</span>
                 <button type="button" onClick={() => setIsImportOpen(false)} className="text-[10px] text-[var(--iw-faint)] hover:text-[var(--iw-text)]">
-                  关闭
+                  Close
                 </button>
               </div>
               <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_48px] gap-1.5">
@@ -556,10 +558,10 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
                   value={importText}
                   onChange={event => setImportText(event.target.value)}
                   className="nodrag nowheel h-16 min-w-0 resize-none rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)] p-2 font-mono text-[10px] leading-4 text-[var(--iw-text)] outline-none focus:border-emerald-400/60"
-                  placeholder="应用 URL、webappId、官方 curl 或 API JSON"
+                  placeholder="App URL, webappId, official curl, or API JSON"
                 />
                 <button type="button" onClick={applyImportedText} className="nodrag h-16 rounded-md bg-emerald-600 px-2 text-[10px] font-semibold text-white transition hover:bg-emerald-500">
-                  应用
+                  Apply
                 </button>
               </div>
             </div>
@@ -575,10 +577,10 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
         <section className={`${softPanelClass} flex min-h-0 flex-col`}>
           <div className="flex items-center justify-between gap-2 border-b border-[var(--iw-border)] px-2 py-1.5">
             <div className="min-w-0">
-              <p className={labelClass}>应用参数</p>
+              <p className={labelClass}>App params</p>
               <p className="truncate text-[10px] text-[var(--iw-faint)]">{bindingSummary}</p>
             </div>
-            <button type="button" onClick={addBinding} className={iconButtonClass} title="添加参数">
+            <button type="button" onClick={addBinding} className={iconButtonClass} title="Add param">
               <Plus className="h-3.5 w-3.5" />
             </button>
           </div>
@@ -587,7 +589,7 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
             {node.bindings.length === 0 ? (
               <div className="flex h-full min-h-[160px] flex-col items-center justify-center gap-2 rounded-md border border-dashed border-[var(--iw-border)] text-center">
                 <ClipboardList className="h-5 w-5 text-[var(--iw-faint)]" />
-                <p className="text-[10px] text-[var(--iw-muted)]">未读取字段</p>
+                <p className="text-[10px] text-[var(--iw-muted)]">No fields read</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -602,7 +604,7 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
                             className="nodrag nowheel h-7 min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1 text-[11px] font-semibold text-[var(--iw-text)] outline-none focus:border-emerald-400/40"
                             placeholder={bindingTitle(binding)}
                           />
-                          {binding.required && <span className="imagine-required-chip imagine-tone-chip shrink-0 rounded border px-1 text-[9px]" data-tone="warning">必填</span>}
+                          {binding.required && <span className="imagine-required-chip imagine-tone-chip shrink-0 rounded border px-1 text-[9px]" data-tone="warning">Required</span>}
                         </div>
                       </div>
                       <select
@@ -612,7 +614,7 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
                       >
                         {sourceOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
                       </select>
-                      <button type="button" onClick={() => removeBinding(binding.id)} className={iconButtonClass} title="删除参数">
+                      <button type="button" onClick={() => removeBinding(binding.id)} className={iconButtonClass} title="Delete param">
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
@@ -628,7 +630,7 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
                           value={binding.value}
                           onChange={event => updateBinding(binding.id, { value: event.target.value })}
                           className={`${inputClass} w-full`}
-                          placeholder="固定 fieldValue"
+                          placeholder="Fixed fieldValue"
                         />
                       )}
                       {binding.source === "reference" && (
@@ -637,34 +639,34 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
                             value={String(binding.referenceIndex ?? index)}
                             onChange={event => updateBinding(binding.id, { referenceIndex: readReferenceIndexInput(event.target.value) })}
                             className={`${inputClass} font-mono`}
-                            placeholder="参考序号"
+                            placeholder="Reference index"
                           />
                           <select value={binding.referenceType ?? "image"} onChange={event => updateBinding(binding.id, { referenceType: readReferenceType(event.target.value) })} className={inputClass}>
-                            <option value="image">图片</option>
-                            <option value="video">视频</option>
-                            <option value="audio">音频</option>
+                            <option value="image">Image</option>
+                            <option value="video">Video</option>
+                            <option value="audio">Audio</option>
                           </select>
                           <select value={binding.deliveryMode} onChange={event => updateBinding(binding.id, { deliveryMode: readDelivery(event.target.value) })} className={inputClass}>
-                            <option value="fileName">文件名</option>
+                            <option value="fileName">File name</option>
                             <option value="url">URL</option>
-                            <option value="raw">原值</option>
+                            <option value="raw">Raw</option>
                           </select>
                         </div>
                       )}
                       {binding.source === "prompt" && (
                         <p className="rounded-md border border-[var(--iw-border)] px-2 py-1 text-[10px] text-[var(--iw-faint)]">
-                          使用当前 Prompt{promptPreview !== null ? " 节点" : ""}
+                          Use current Prompt{promptPreview !== null ? " node" : ""}
                         </p>
                       )}
                       {binding.source === "randomSeed" && (
-                        <p className="rounded-md border border-[var(--iw-border)] px-2 py-1 text-[10px] text-[var(--iw-faint)]">每次运行生成随机 seed</p>
+                        <p className="rounded-md border border-[var(--iw-border)] px-2 py-1 text-[10px] text-[var(--iw-faint)]">Generate random seed on each run</p>
                       )}
                     </div>
 
                     <details className="nodrag mt-1.5">
                       <summary className="flex cursor-pointer items-center gap-1 text-[10px] text-[var(--iw-faint)]">
                         <Settings2 className="h-3 w-3" />
-                        映射身份
+                        Map identity
                       </summary>
                       <div className="mt-1.5 grid grid-cols-[1fr_1fr_88px_72px] gap-1.5">
                         <input value={binding.nodeId} onChange={event => updateBinding(binding.id, { nodeId: event.target.value })} className={`${inputClass} font-mono`} placeholder="nodeId" />
@@ -679,7 +681,7 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
                             onChange={event => updateBinding(binding.id, { required: event.target.checked })}
                             className="nodrag h-3 w-3"
                           />
-                          必填
+                          Required
                         </label>
                       </div>
                     </details>

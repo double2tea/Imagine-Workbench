@@ -1,0 +1,59 @@
+{
+  "toolLabels": { "query_models": "查询模型", "get_agent_capabilities": "查询能力", "get_skill_info": "查询技能", "get_gallery_assets": "搜索资产", "get_prompt_blueprint": "获取模板", "get_prompt_templates": "查询模板库", "get_board_context": "读取画板", "get_connected_context": "读取连接" },
+  "skillLabels": { "Screenwriter": "剧本写作", "ScriptAnalyzer": "剧本分析", "ShotBreakdownPlanner": "分镜拆解", "StoryboardBoardComposer": "分镜画板", "BatchGenerationPlanner": "批量规划", "PromptEngineer": "提示词工程", "PromptTemplateLibrarian": "模板库", "BoardContextRetriever": "画板上下文", "BoardComposer": "画板编排", "ImageGenerator": "智能生图", "VideoGenerator": "视频合成", "ImageEditor": "局部重绘", "CreativePlanner": "创意规划", "SessionHistoryRetriever": "历史回退", "VariationSuggester": "变体推荐", "AsyncTaskManager": "后台跟踪", "ProjectSummarizer": "资产汇总", "ExportManager": "批量导出" },
+  "actionLabels": { "none": "无操作", "optimize_prompt": "优化提示词", "generate_image": "生成图片", "edit_image": "编辑图片", "generate_video": "生成视频", "generate_audio": "生成音频", "create_board_image_flow": "创建图片节点流程", "create_board_video_flow": "创建视频节点流程", "create_board_audio_flow": "创建音频节点流程", "create_board_note": "创建画板笔记", "update_board_node": "更新画板节点", "apply_board_patch": "应用画板补丁", "continue_image_to_video": "从图片续接视频" },
+  "chat": {
+    "userRoleLabel": "你", "agentRoleLabel": "Agent", "thoughtProcessLabel": "思考过程",
+    "suggestedActionEditable": "建议动作 · 执行前可调整", "suggestedActionSummary": "建议动作 · 参数摘要",
+    "operationLabel": "操作:", "executeButton": "执行", "declineButton": "拒绝",
+    "actionCompleted": "创意流程已触发并加载完毕", "actionDeclined": "方案已被拒绝/驳回",
+    "autoModeCountdown": "自动模式: {seconds} 秒后执行", "cancelAutoMode": "取消自动",
+    "loadingText": "正在分析画廊与技能，整理下一步建议...",
+    "referenceStatusReferencing": "引用中", "referenceStatusGallery": "画廊",
+    "clearChatTitle": "清空对话", "expandDockTitle": "展开 Agent 对话", "collapseDockTitle": "收起 Agent 对话",
+    "modelLabel": "模型", "inputPlaceholder": "问 Agent... 输入 @ 引用媒体",
+    "uploadReferenceTitle": "上传媒体到 Agent 引用", "autoExecuteLabel": "自动",
+    "maskReferenceTitle": "使用画笔抹除或标记局部涂层", "paintbrushButton": "画笔涂抹",
+    "clearReferenceTitle": "取消引用", "referenceTypeSuffix": "引用",
+    "mediaReferenceImage": "图片", "mediaReferenceVideo": "视频", "mediaReferenceAudio": "音频",
+    "referenceCountUnitImage": "张", "referenceCountUnitMedia": "段"
+  },
+  "referenceHints": {
+    "unsupportedModel": "下一条消息含 {countLabel}；目录中相近模型不支持{types}输入，失败时请更换模型",
+    "supportedModel": "下一条消息含 {countLabel}（目录显示支持{types}输入）",
+    "noMatchModel": "下一条消息含 {countLabel}（未在 OpenRouter 目录命中，仍用所选模型）"
+  },
+  "pendingActionEditor": {
+    "promptLabel": "提示词", "promptPlaceholder": "执行前可修改 Agent 规划的提示词",
+    "titleLabel": "标题", "noteContentLabel": "笔记内容",
+    "targetNodeIdLabel": "目标节点 ID", "targetNodePlaceholder": "留空则使用当前选中节点",
+    "nodeContentLabel": "提示词 / Agent 指令 / 笔记内容",
+    "nodeContentPlaceholder": "执行前可修改要写入节点的内容",
+    "boardPatchLabel": "画板补丁", "patchTitlePlaceholder": "补丁标题",
+    "autoRunAfterExecution": "执行后立即运行生成节点", "patchContentPlaceholder": "执行前可修改文本内容",
+    "modelLabel": "生成模型", "selectModelPlaceholder": "选择模型", "modelNotInList": "（未在列表）",
+    "providerLabel": "服务商", "functionLabel": "功能", "functionUnavailable": "当前功能不可用",
+    "aspectRatioLabel": "画面比例", "resolutionLabel": "分辨率", "qualityLabel": "质量",
+    "thinkingLevelLabel": "思考级别", "videoSizeLabel": "画面尺寸", "durationLabel": "时长",
+    "presetLabel": "预设", "referenceModeLabel": "参考模式",
+    "referenceModeFirstLast": "首尾帧 / 关键帧", "referenceModeAll": "全能参考",
+    "audioFormatLabel": "音频格式", "voiceDescriptionLabel": "音色描述", "voiceCloneStyleLabel": "演绎风格",
+    "voiceDescriptionPlaceholder": "温暖、年轻、自然叙事感", "voiceCloneStylePlaceholder": "平静讲述、轻松口播",
+    "asrLanguageLabel": "转写语言",
+    "voiceCloneConsentLabel": "我确认拥有参考音频的使用权，并允许用于本次音色克隆。",
+    "asrLanguageAuto": "自动识别", "asrLanguageZh": "中文", "asrLanguageEn": "英文",
+    "describePatchCreateNode": "创建 {kind}: {title}", "describePatchUpdateNode": "更新节点: {nodeId}",
+    "describePatchConnectPorts": "连接: {from.nodeId}.{from.portId} -> {to.nodeId}.{to.portId}",
+    "beatFallback": "未填写 beat"
+  },
+  "actionSummary": {
+    "titleLabel": "标题", "contentLabel": "内容",
+    "operationCount": "操作数: {count}", "shotCount": "分镜数: {count}",
+    "autoRunYes": "是", "autoRunNo": "否", "autoRunLabel": "自动运行",
+    "targetNodeLabel": "目标节点", "currentNodeFallback": "当前选中节点",
+    "modelLabel": "模型", "ratioLabel": "比例", "resolutionLabel": "分辨率",
+    "qualityLabel": "质量", "durationLabel": "时长", "presetLabel": "预设",
+    "referenceModeLabel": "参考模式", "sourceNodeLabel": "来源节点",
+    "videoPromptLabel": "视频提示词", "promptLabel": "提示词", "noParamSummary": "无参数摘要"
+  }
+}

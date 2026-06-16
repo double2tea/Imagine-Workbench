@@ -20,7 +20,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useAlert } from "@/components/confirm/ConfirmProvider";
-import { BOARD_CONNECTION_HELP } from "@/lib/workspace-messages";
+import { getBoardConnectionHelp } from "@/lib/workspace-messages";
 import type { BoardSaveStatus } from "@/hooks/useBoardState";
 import { useThemeMode } from "@/lib/theme-mode";
 import type { BoardSummary } from "@/lib/board";
@@ -29,6 +29,7 @@ import WorkspaceTopBar, {
   workspaceTopBarButtonClass,
   workspaceTopBarIconButtonClass,
 } from "@/components/workbench/WorkspaceTopBar";
+import { useTranslations } from "@/lib/i18n";
 
 interface BoardToolbarProps {
   boardId: string;
@@ -124,6 +125,8 @@ export default function BoardToolbar({
   onSelectBoard,
   onUndo,
 }: BoardToolbarProps) {
+  const { t } = useTranslations("board");
+  const commonT = useTranslations("common");
   const { themeMode, toggleThemeMode } = useThemeMode();
   const showAlert = useAlert();
   const [isBoardMenuOpen, setIsBoardMenuOpen] = useState(false);
@@ -250,7 +253,7 @@ export default function BoardToolbar({
             "imagine-board-header-menu fixed z-[60] w-[20rem] max-w-[calc(100vw-1.5rem)]",
             <>
               <div className="mb-2 flex items-center justify-between gap-2 px-1">
-                <span className="text-[11px] font-semibold text-[var(--iw-muted)]">画板</span>
+                <span className="text-[11px] font-semibold text-[var(--iw-muted)]">{t('workspace.emptyHint')}</span>
                 <button
                   type="button"
                   onClick={() => {
@@ -260,7 +263,7 @@ export default function BoardToolbar({
                   className={`${headerBtn} !h-8 !min-h-8 px-2 text-[11px]`}
                 >
                   <Plus className="h-3 w-3" />
-                  新建
+                  {commonT.t('buttons.create', { fallback: "新建" }) ?? "新建"}
                 </button>
               </div>
               <div className="max-h-[16rem] overflow-y-auto">
@@ -332,10 +335,10 @@ export default function BoardToolbar({
             type="button"
             onClick={onImportMedia}
             className={`${headerBtn} hidden shrink-0 lg:flex`}
-            title="导入图片、视频或音频到画布"
+            title={t('workspace.importMedia')}
           >
             <Upload className="imagine-tone-icon h-3.5 w-3.5" data-tone="success" />
-            <span>导入媒体</span>
+            <span>{t('workspace.importMedia')}</span>
           </button>
 
           <div className="flex items-center gap-1">
@@ -344,7 +347,7 @@ export default function BoardToolbar({
               onClick={onUndo}
               disabled={!canUndo}
               className={iconBtn}
-              title="撤销 (Ctrl+Z)"
+              title={t('workspace.undo') ?? "撤销 (Ctrl+Z)"}
             >
               <RotateCcw className="h-3.5 w-3.5" />
             </button>
@@ -353,7 +356,7 @@ export default function BoardToolbar({
               onClick={onRedo}
               disabled={!canRedo}
               className={iconBtn}
-              title="重做 (Ctrl+Shift+Z)"
+              title={t('workspace.redo') ?? "重做 (Ctrl+Shift+Z)"}
             >
               <RotateCw className="h-3.5 w-3.5" />
             </button>
@@ -366,10 +369,10 @@ export default function BoardToolbar({
             type="button"
             onClick={onBack}
             className={`${headerBtn} shrink-0`}
-            title="返回工作台"
+            title={t('workspace.backToWorkspace') ?? "返回工作台"}
           >
             <Grid2X2 className="h-3.5 w-3.5" />
-            <span className="hidden md:inline">工作台</span>
+            <span className="hidden md:inline">{t('workspace.backToWorkspace') ?? "工作台"}</span>
           </button>
 
           {trashedCount > 0 && onRestoreTrash ? (
@@ -377,10 +380,10 @@ export default function BoardToolbar({
               type="button"
               onClick={onRestoreTrash}
               className={`${headerBtn} hidden lg:flex`}
-              title="恢复最近删除的节点"
+              title={t('workspace.restoreDeleted') ?? "恢复最近删除的节点"}
             >
               <Trash2 className="h-3.5 w-3.5" />
-              <span>恢复 {trashedCount}</span>
+              <span>{t('workspace.restoreDeleted') ?? "恢复"} {trashedCount}</span>
             </button>
           ) : null}
 
@@ -398,8 +401,8 @@ export default function BoardToolbar({
             }}
             className={iconBtn}
             aria-expanded={isOverflowOpen}
-            aria-label="更多操作"
-            title="更多"
+            aria-label={commonT.t('buttons.more') ?? "更多操作"}
+            title={commonT.t('buttons.more') ?? "更多"}
           >
             <MoreHorizontal className="h-4 w-4" />
           </button>
@@ -424,7 +427,7 @@ export default function BoardToolbar({
                 type="button"
                 onClick={() => {
                   setIsOverflowOpen(false);
-                  void showAlert({ title: "连线说明", message: BOARD_CONNECTION_HELP });
+                  void showAlert({ title: "连线说明", message: getBoardConnectionHelp(t) });
                 }}
                 className="imagine-board-header-menu-action"
               >

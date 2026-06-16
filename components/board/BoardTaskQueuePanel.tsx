@@ -6,6 +6,7 @@ import type { BoardNode } from "@/lib/board";
 import { findResultNodeForSource } from "@/lib/board/utils";
 import type { StorageItem } from "@/lib/db";
 import type { GenerationTask } from "@/lib/generation-tasks";
+import { useTranslations } from "@/lib/i18n";
 
 interface BoardTaskQueuePanelProps {
   cancelingTaskIds?: readonly string[];
@@ -62,6 +63,13 @@ function TaskRow({
   onRerunTaskSource: (task: GenerationTask) => void;
   task: GenerationTask;
 }) {
+  const { t } = useTranslations("common");
+  const mediaTypeLabelValue: Record<GenerationTask["mediaType"], string> = {
+    audio: t('mediaTypeLabels.audio'),
+    image: t('mediaTypeLabels.image'),
+    transcript: t('mediaTypeLabels.transcript'),
+    video: t('mediaTypeLabels.video'),
+  };
   const sourceNode = task.source.boardNodeId
     ? nodes.find(node => node.id === task.source.boardNodeId)
     : undefined;
@@ -92,7 +100,7 @@ function TaskRow({
             </div>
             <div className="mt-1 flex min-w-0 items-center gap-1.5">
               <span className="board-task-meta-pill shrink-0 rounded-md border border-[var(--iw-border)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--iw-muted)]">
-                {mediaTypeLabels[task.mediaType]}
+                {mediaTypeLabelValue[task.mediaType]}
               </span>
               <span className="truncate font-mono text-[10px] text-[var(--iw-faint)]" title={task.model}>
                 {task.model}
@@ -123,7 +131,7 @@ function TaskRow({
           }}
         >
           <LocateFixed className="h-3 w-3" />
-          定位源
+          {t('buttons.confirm', { fallback: "定位源" }) ?? "定位源"}
         </BoardTaskActionButton>
         <BoardTaskActionButton
           type="button"
@@ -134,7 +142,7 @@ function TaskRow({
           }}
         >
           <CheckCircle2 className="h-3 w-3" />
-          查看结果
+          {t('statusLabels.complete', { fallback: "查看结果" }) ?? "查看结果"}
         </BoardTaskActionButton>
         {canCancel ? (
           <BoardTaskActionButton
@@ -145,7 +153,7 @@ function TaskRow({
             tone="danger"
           >
             {canceling ? <Loader2 className="h-3 w-3 animate-spin" /> : <Square className="h-3 w-3" />}
-            取消
+            {t('buttons.cancelTask')}
           </BoardTaskActionButton>
         ) : null}
         {canHandleFailure ? (

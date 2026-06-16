@@ -11,6 +11,7 @@ import {
 } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { WORKBENCH_DIALOG_TRANSITION, WORKBENCH_OVERLAY_TRANSITION } from "@/lib/workbench-motion";
+import { useTranslations } from "@/lib/i18n";
 
 export type ConfirmTone = "default" | "danger";
 export type ConfirmKind = "confirm" | "alert";
@@ -32,6 +33,7 @@ interface ConfirmContextValue {
 const ConfirmContext = createContext<ConfirmContextValue | null>(null);
 
 export function ConfirmProvider({ children }: { children: ReactNode }) {
+  const { t } = useTranslations("confirm");
   const [request, setRequest] = useState<ConfirmRequest | null>(null);
   const resolveRef = useRef<((value: boolean) => void) | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -68,7 +70,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
         title: next.title,
         message: next.message,
         tone: next.tone,
-        confirmLabel: next.dismissLabel ?? next.confirmLabel ?? "知道了",
+        confirmLabel: next.dismissLabel ?? next.confirmLabel ?? t('defaults.dismissAlert'),
       }).then(() => undefined),
     [confirm],
   );
@@ -76,9 +78,9 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   const kind = request?.kind ?? "confirm";
   const isAlert = kind === "alert";
   const tone = request?.tone ?? "default";
-  const title = request?.title ?? (isAlert ? "提示" : tone === "danger" ? "确认操作" : "请确认");
-  const confirmLabel = request?.confirmLabel ?? (isAlert ? "知道了" : "确认");
-  const cancelLabel = request?.cancelLabel ?? "取消";
+  const title = request?.title ?? (isAlert ? t('titles.alert') : tone === "danger" ? t('titles.dangerConfirm') : t('titles.defaultConfirm'));
+  const confirmLabel = request?.confirmLabel ?? (isAlert ? t('defaults.dismissAlert') : t('defaults.confirm'));
+  const cancelLabel = request?.cancelLabel ?? t('defaults.cancel');
 
   useEffect(() => {
     if (!request) return;

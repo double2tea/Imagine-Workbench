@@ -1,3 +1,4 @@
+import type { TFunction } from "@/lib/i18n";
 import { API_ROUTES } from "./api/routes";
 import { readFetchError } from "./client-fetch-error";
 import { readImageGenerationPayload } from "./client-image-response";
@@ -39,14 +40,21 @@ export const IMAGE_EDIT_FEATURES: readonly ImageEditFeatureMeta[] = [
   { key: "lighting", label: "打光", description: "通过灯光控件生成重打光提示词" },
 ];
 
-export function imageEditFeatureMeta(feature: ImageEditFeature): ImageEditFeatureMeta {
+export function imageEditFeatureMeta(feature: ImageEditFeature, t?: TFunction): ImageEditFeatureMeta {
   const meta = IMAGE_EDIT_FEATURES.find(item => item.key === feature);
   if (!meta) throw new Error(`Unknown image edit feature: ${feature}`);
+  if (t) {
+    return {
+      ...meta,
+      label: t(`creation.imageEdit.features.${feature}.label`) || meta.label,
+      description: t(`creation.imageEdit.features.${feature}.description`) || meta.description,
+    };
+  }
   return meta;
 }
 
-export function imageEditFeatureLabel(feature: ImageEditFeature): string {
-  return imageEditFeatureMeta(feature).label;
+export function imageEditFeatureLabel(feature: ImageEditFeature, t?: TFunction): string {
+  return imageEditFeatureMeta(feature, t).label;
 }
 
 export function imageQuickEditFallbackPrompt(feature: ImageEditFeature, sourcePromptOrId: string): string {

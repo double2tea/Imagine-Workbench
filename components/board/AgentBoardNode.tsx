@@ -3,6 +3,7 @@ import { Send } from "lucide-react";
 import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
 import DebouncedBoardTextarea from "@/components/board/DebouncedBoardTextarea";
 import type { BoardAgentNode } from "@/lib/board";
+import { useTranslations } from "@/lib/i18n";
 
 interface AgentBoardNodeProps {
   node: BoardAgentNode;
@@ -11,6 +12,7 @@ interface AgentBoardNodeProps {
 }
 
 const AgentBoardNode = memo(function AgentBoardNode({ node, onSend, onUpdate }: AgentBoardNodeProps) {
+  const { t } = useTranslations("board");
   return (
     <div className="flex h-full min-h-0 flex-col gap-2 p-3">
       <DebouncedBoardTextarea
@@ -18,7 +20,7 @@ const AgentBoardNode = memo(function AgentBoardNode({ node, onSend, onUpdate }: 
         value={node.instruction}
         onChange={onUpdate}
         className="nodrag nowheel min-h-0 flex-1 resize-none rounded-md imagine-board-input p-2 text-xs leading-5 outline-none placeholder:text-[var(--iw-faint)] focus:border-[var(--iw-border)]"
-        placeholder="给 Agent 的任务；可连接图片作为上下文"
+        placeholder={t('node.agentPlaceholder')}
       />
       <button
         type="button"

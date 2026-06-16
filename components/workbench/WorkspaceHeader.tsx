@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { FolderHeart, Github, Grid2X2, Mail, Moon, Plug, Settings, Sun, Trash2 } from "lucide-react";
+import { FolderHeart, Github, Grid2X2, Languages, Mail, Moon, Plug, Settings, Sun, Trash2 } from "lucide-react";
 import WorkspaceTopBarBrand from "@/components/workbench/WorkspaceTopBarBrand";
 import WorkspaceTopBar, {
   workspaceTopBarButtonClass,
   workspaceTopBarIconButtonClass,
 } from "@/components/workbench/WorkspaceTopBar";
 import { useThemeMode, type ThemeMode } from "@/lib/theme-mode";
+import { useTranslations } from "@/lib/i18n";
+import { useLocale } from "@/lib/i18n";
 
 export type { ThemeMode };
 
@@ -27,25 +29,27 @@ export default function WorkspaceHeader({
   onRunResolveCheck,
   resolveCheckStatus,
   showResolveCheck,
-}: WorkspaceHeaderProps) {
+  }: WorkspaceHeaderProps) {
   const { themeMode, toggleThemeMode } = useThemeMode();
+  const { t } = useTranslations("media");
+  const { locale, setLocale } = useLocale();
 
   return (
     <WorkspaceTopBar
       sticky
       start={
-        <WorkspaceTopBarBrand subtitle="智能图像、视频与音频创作工作台" />
+        <WorkspaceTopBarBrand subtitle={t('workspaceHeader.brandSubtitle')} />
       }
       end={
         <div className="z-10 flex shrink-0 items-center gap-1.5 sm:gap-2">
           <Link href="/board" className={workspaceTopBarButtonClass}>
             <Grid2X2 className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">画板</span>
+            <span className="hidden sm:inline">{t('workspaceHeader.boardLink')}</span>
           </Link>
 
           <button type="button" onClick={onOpenAssetLibrary} className={`${workspaceTopBarButtonClass} cursor-pointer`}>
             <FolderHeart className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">素材库</span>
+            <span className="hidden sm:inline">{t('workspaceHeader.assetLibraryLink')}</span>
           </button>
 
           {showResolveCheck ? (
@@ -54,16 +58,16 @@ export default function WorkspaceHeader({
               onClick={onRunResolveCheck}
               disabled={resolveCheckStatus === "running"}
               className={`${workspaceTopBarButtonClass} cursor-pointer disabled:cursor-not-allowed disabled:opacity-60`}
-              title="通过 Resolve 插件执行连接检查"
+              title={t('workspaceHeader.resolveCheckTitle')}
             >
               <Plug className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">{resolveCheckStatus === "running" ? "等待达芬奇" : "达芬奇"}</span>
+              <span className="hidden sm:inline">{resolveCheckStatus === "running" ? t('workspaceHeader.resolveRunning') : t('workspaceHeader.resolveIdle')}</span>
             </button>
           ) : null}
 
           <button onClick={onOpenSettings} className={`${workspaceTopBarButtonClass} cursor-pointer`}>
             <Settings className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">设置</span>
+            <span className="hidden sm:inline">{t('workspaceHeader.settingsLink')}</span>
           </button>
 
           <a
@@ -72,7 +76,7 @@ export default function WorkspaceHeader({
             rel="noreferrer"
             className={`${workspaceTopBarIconButtonClass} cursor-pointer`}
             title="GitHub: Imagine Workbench"
-            aria-label="打开项目 GitHub"
+            aria-label={t('workspaceHeader.githubLinkAriaLabel')}
           >
             <Github className="h-3.5 w-3.5" />
           </a>
@@ -80,8 +84,8 @@ export default function WorkspaceHeader({
           <a
             href="mailto:double_tea@foxmail.com"
             className={`${workspaceTopBarIconButtonClass} cursor-pointer`}
-            title="联系作者: double_tea@foxmail.com"
-            aria-label="给作者发送邮件"
+            title={t('workspaceHeader.contactEmailTitle')}
+            aria-label={t('workspaceHeader.contactEmailAriaLabel')}
           >
             <Mail className="h-3.5 w-3.5" />
           </a>
@@ -91,9 +95,20 @@ export default function WorkspaceHeader({
             onClick={toggleThemeMode}
             aria-pressed={themeMode === "dark"}
             className={`${workspaceTopBarIconButtonClass} cursor-pointer`}
-            title={themeMode === "light" ? "切换深色模式" : "切换浅色模式"}
+            title={themeMode === "light" ? t('workspaceHeader.toggleDarkModeTitle') : t('workspaceHeader.toggleLightModeTitle')}
           >
             {themeMode === "light" ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setLocale(locale === "zh" ? "en" : "zh")}
+            className={`${workspaceTopBarIconButtonClass} cursor-pointer`}
+            title={locale === "zh" ? "EN" : "中文"}
+            aria-label={locale === "zh" ? "Switch to English" : "切换到中文"}
+          >
+            <Languages className="h-3.5 w-3.5" />
+            <span className="text-xs font-semibold">{locale === "zh" ? "EN" : "中"}</span>
           </button>
 
           <button
@@ -101,8 +116,8 @@ export default function WorkspaceHeader({
             onClick={onClearProject}
             className={`${workspaceTopBarIconButtonClass} cursor-pointer`}
             data-action="danger"
-            title="清空本地资产"
-            aria-label="清空本地资产"
+            title={t('workspaceHeader.clearAssetsTitle')}
+            aria-label={t('workspaceHeader.clearAssetsAriaLabel')}
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>

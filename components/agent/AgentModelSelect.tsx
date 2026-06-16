@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { useTranslations } from "@/lib/i18n";
 import type { AiProvider, ModelOption } from "@/lib/providers/model-catalog";
 
 interface AgentModelGroup {
@@ -43,6 +44,8 @@ export function AgentModelSelect({
 
   if (groups.length === 0 && !missingCurrent && !value) return null;
 
+  const { t } = useTranslations("agent");
+
   return (
     <div
       className={`imagine-agent-model-select-wrap pointer-events-auto min-w-0 ${hint ? "flex flex-col gap-1" : ""}`.trim()}
@@ -55,11 +58,11 @@ export function AgentModelSelect({
       disabled={disabled}
       onChange={event => onChange(event.target.value)}
       className={`imagine-agent-model-select pointer-events-auto ${disabled ? "imagine-agent-model-select--disabled" : ""} ${className}`.trim()}
-      aria-label="Agent 对话模型"
+      aria-label={t("chat.modelLabel")}
       title={disabled ? disabledHint : hint}
     >
       {missingCurrent ? (
-        <option value={value}>{value}（未在列表）</option>
+        <option value={value}>{value}{t("pendingActionEditor.modelNotInList")}</option>
       ) : null}
       {groups.map(group => (
         <optgroup key={group.provider} label={group.label}>

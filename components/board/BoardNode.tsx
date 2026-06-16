@@ -3,6 +3,7 @@
 import { memo, useEffect, useMemo, useState } from "react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import { AudioLines, ImagePlus, Layers, LayoutGrid, Music, Video, Workflow, X } from "lucide-react";
+import { t } from "@/lib/i18n";
 import AgentIdentityMark from "@/components/agent/AgentIdentityMark";
 import MediaReferenceThumbnail from "@/components/reference/MediaReferenceThumbnail";
 import type {
@@ -23,6 +24,7 @@ import type { StorageItem } from "@/lib/db";
 import type { BoardPromptReference } from "@/lib/board/prompt-references";
 import { BOARD_PORT_IDS, getBoardNodePortDefinitions } from "@/lib/board/ports";
 import { useBoardNodeCallbacks } from "@/lib/board/callbacks";
+import { useTranslations } from "@/lib/i18n";
 
 export interface BoardFlowNodeData extends Record<string, unknown> {
   boardId: string;
@@ -145,8 +147,8 @@ function GenerateReferenceShelf({
       {visibleReferences.map((reference, index) => {
         const canManageEdge = typeof reference.sourceEdgeId === "string" && edgeUseCounts.get(reference.sourceEdgeId) === 1;
         const canReorder = canManageEdge;
-        const sourceLabel = reference.sourceTitle ?? "来源节点";
-        const roleLabel = reference.role === "start" ? "首帧" : reference.role === "end" ? "尾帧" : "参考";
+        const sourceLabel = reference.sourceTitle ?? "Source node";
+        const roleLabel = reference.role === "start" ? t("node.videoReferenceModes.firstLast") : reference.role === "end" ? t("node.videoReferenceModes.reference") : t("node.videoReferenceModes.reference");
         return (
           <div
             key={`${reference.id}:${reference.url}:${index}`}
@@ -191,7 +193,7 @@ function GenerateReferenceShelf({
                 if (reference.sourceNodeId) onFocusReferenceSource(reference.sourceNodeId);
               }}
               className="h-full w-full"
-              title={`${sourceLabel} · 跳转来源`}
+              title={`${sourceLabel} · Jump to source`}
             >
               <MediaReferenceThumbnail reference={reference} alt="" className="h-full w-full" />
             </button>
@@ -210,7 +212,7 @@ function GenerateReferenceShelf({
                 }}
                 onPointerDown={(event) => event.stopPropagation()}
                 className="absolute right-0 top-0 flex h-4 w-4 items-center justify-center rounded-bl border-b border-l border-white/25 bg-red-500/90 text-white opacity-0 transition hover:bg-red-400 focus-visible:opacity-100 group-hover/reference:opacity-100"
-                title="移除这条参考连线"
+                title="Remove this reference connection"
               >
                 <X className="h-2.5 w-2.5" />
               </button>
@@ -338,7 +340,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
           ) : (
             <h2
               className="nodrag board-group-node-title pointer-events-auto flex min-w-0 items-center gap-2 truncate"
-              title="双击重命名"
+              title="Double-click to rename"
               onDoubleClick={event => {
                 event.stopPropagation();
                 setDraftTitle(node.title);
@@ -408,7 +410,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
                 ? "gap-1 rounded px-1 py-0.5 text-[10px] font-medium text-[var(--iw-muted)] [&>svg]:h-3 [&>svg]:w-3"
                 : "gap-2 text-xs",
             ].join(" ")}
-            title="双击重命名"
+            title="Double-click to rename"
             onDoubleClick={event => {
               event.stopPropagation();
               setDraftTitle(node.title);

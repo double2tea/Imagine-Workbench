@@ -4,6 +4,7 @@ import { Mic2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { VOICE_PROFILE_TAG_GROUPS, voiceProfileDefaultNameFromAsset } from "@/lib/voice-profiles";
 import type { StorageItem } from "@/lib/db";
+import { useTranslations } from "@/lib/i18n";
 
 export interface SaveVoiceProfileDialogInput {
   name: string;
@@ -18,6 +19,7 @@ interface SaveVoiceProfileDialogProps {
 }
 
 export default function SaveVoiceProfileDialog({ item, onClose, onSave }: SaveVoiceProfileDialogProps) {
+  const { t } = useTranslations("common");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -44,11 +46,11 @@ export default function SaveVoiceProfileDialog({ item, onClose, onSave }: SaveVo
   const handleSave = async (): Promise<void> => {
     const trimmedName = name.trim();
     if (!trimmedName) {
-      setMessage("先输入音色名称");
+      setMessage(t("voiceProfile.validationEmptyName"));
       return;
     }
     if (!consentAccepted) {
-      setMessage("保存克隆音色前请确认参考音频授权");
+      setMessage(t("voiceProfile.validationNeedsConsent"));
       return;
     }
     setIsSaving(true);
@@ -61,7 +63,7 @@ export default function SaveVoiceProfileDialog({ item, onClose, onSave }: SaveVo
       });
       onClose();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "保存音色失败");
+      setMessage(error instanceof Error ? error.message : t("voiceProfile.saveFailed"));
       setIsSaving(false);
     }
   };
@@ -72,13 +74,13 @@ export default function SaveVoiceProfileDialog({ item, onClose, onSave }: SaveVo
         <div className="flex items-center justify-between border-b border-[var(--iw-border)] px-4 py-3">
           <div className="flex min-w-0 items-center gap-2">
             <Mic2 className="h-4 w-4 text-amber-600" />
-            <h2 className="truncate text-sm font-semibold">保存为克隆音色</h2>
+            <h2 className="truncate text-sm font-semibold">{t("voiceProfile.dialogTitle")}</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="imagine-header-button !h-8 !w-8 !p-0"
-            aria-label="关闭"
+            aria-label={t("voiceProfile.close")}
           >
             <X className="h-4 w-4" />
           </button>
@@ -86,7 +88,7 @@ export default function SaveVoiceProfileDialog({ item, onClose, onSave }: SaveVo
 
         <div className="grid gap-3 px-4 py-4">
           <label className="grid gap-1.5">
-            <span className="imagine-section-label">音色名称</span>
+            <span className="imagine-section-label">{t("voiceProfile.nameLabel")}</span>
             <input
               value={name}
               onChange={event => setName(event.target.value)}
@@ -96,18 +98,18 @@ export default function SaveVoiceProfileDialog({ item, onClose, onSave }: SaveVo
           </label>
 
           <label className="grid gap-1.5">
-            <span className="imagine-section-label">简短信息</span>
+            <span className="imagine-section-label">{t("voiceProfile.descriptionLabel")}</span>
             <textarea
               value={description}
               onChange={event => setDescription(event.target.value)}
               className="imagine-input min-h-20 resize-y rounded-md px-3 py-2 text-sm"
-              placeholder="例如：青年男声，自然口播，适合新闻旁白"
+              placeholder={t("voiceProfile.descriptionPlaceholder")}
               maxLength={180}
             />
           </label>
 
           <div className="grid gap-2">
-            <span className="imagine-section-label">标签</span>
+            <span className="imagine-section-label">{t("voiceProfile.tagsLabel")}</span>
             <div className="grid gap-2">
               {VOICE_PROFILE_TAG_GROUPS.map(group => (
                 <div key={group.label} className="grid gap-1.5">
@@ -141,7 +143,7 @@ export default function SaveVoiceProfileDialog({ item, onClose, onSave }: SaveVo
               onChange={event => setConsentAccepted(event.target.checked)}
               className="mt-1 h-3.5 w-3.5 rounded border-[var(--iw-border)] bg-[var(--iw-panel)] text-amber-600 focus:ring-amber-500/25"
             />
-            我确认拥有该参考音频的使用权，并允许保存为可复用克隆音色源。
+            {t("voiceProfile.consentText")}
           </label>
 
           {message && <p className="imagine-tone-icon text-[12px]" data-tone="danger">{message}</p>}
@@ -149,7 +151,7 @@ export default function SaveVoiceProfileDialog({ item, onClose, onSave }: SaveVo
 
         <div className="flex justify-end gap-2 border-t border-[var(--iw-border)] px-4 py-3">
           <button type="button" onClick={onClose} className="imagine-secondary-action h-9 rounded-md border px-3 text-xs font-semibold">
-            取消
+            {t("voiceProfile.cancel")}
           </button>
           <button
             type="button"
@@ -157,7 +159,7 @@ export default function SaveVoiceProfileDialog({ item, onClose, onSave }: SaveVo
             disabled={isSaving}
             className="imagine-primary-action h-9 rounded-md px-3 text-xs font-semibold disabled:opacity-50"
           >
-            {isSaving ? "保存中" : "保存音色"}
+            {isSaving ? t("voiceProfile.saving") : t("voiceProfile.saveButton")}
           </button>
         </div>
       </div>

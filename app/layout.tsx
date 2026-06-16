@@ -25,12 +25,14 @@ export const metadata: Metadata = {
 };
 
 const themeBootstrapScript = `(function(){try{var t=localStorage.getItem("imagine_theme_mode");if(t!=="dark"&&t!=="light"){t="dark";}document.documentElement.setAttribute("data-imagine-theme",t);document.documentElement.style.colorScheme=t;}catch(e){}})();`;
+const localeBootstrapScript = `(function(){try{var l=localStorage.getItem("imagine_language");if(l==="en"||l==="zh"){document.documentElement.lang=l;}else{var n=(navigator.language||"zh").slice(0,2);document.documentElement.lang=n==="en"?"en":"zh";}}catch(e){}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh" suppressHydrationWarning className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript }} />
+        <script dangerouslySetInnerHTML={{ __html: localeBootstrapScript }} />
       </head>
       <body suppressHydrationWarning className="imagine-root-body font-sans antialiased">
         <WorkbenchProviders>{children}</WorkbenchProviders>

@@ -13,6 +13,7 @@ import type { PanoramaScreenshot } from "@/lib/panorama/capture";
 import { transcriptFromDataUrl } from "@/lib/transcripts";
 import type { CapturedVideoFrame, VideoFrameCaptureMode } from "@/lib/video-frame";
 import { WORKBENCH_OVERLAY_TRANSITION, WORKBENCH_PANEL_TRANSITION } from "@/lib/workbench-motion";
+import { useTranslations } from "@/lib/i18n";
 
 interface FullscreenPreviewProps {
   item: StorageItem | null;
@@ -41,6 +42,7 @@ const MAX_ZOOM = 3;
 const ZOOM_STEP = 0.25;
 
 export default function FullscreenPreview({ item, items = [], onCaptureVideoFrame, onSavePanoramaScreenshots, onDownload, onSaveVoiceProfile, onClose, onSelectItem }: FullscreenPreviewProps) {
+  const { t } = useTranslations("common");
   const [copyResult, setCopyResult] = useState<CopyResult>(null);
   const [isFrameMenuOpen, setIsFrameMenuOpen] = useState(false);
   const [imageScale, setImageScale] = useState(1);
@@ -257,7 +259,7 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
           <button
             onClick={onClose}
             className="imagine-motion-interactive absolute right-4 top-4 z-10 rounded-lg border border-slate-800 bg-slate-900/90 p-2 text-slate-400 hover:text-white sm:right-6 sm:top-6"
-            aria-label="关闭全屏预览"
+            aria-label={t("fullscreen.closePreview")}
           >
             <X className="h-6 w-6" />
           </button>
@@ -329,10 +331,10 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
                   <div className="max-h-full w-full max-w-5xl overflow-auto rounded-2xl border border-slate-800 bg-slate-900/72 p-5 text-slate-100 shadow-2xl">
                     <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-cyan-100">
                       <FileText className="h-4 w-4" />
-                      转写文本
+                      {t("fullscreen.transcriptTitle")}
                     </div>
                     <p className="whitespace-pre-wrap text-sm leading-7 text-slate-200">
-                      {transcriptFromDataUrl(item.url) || "无转写文本"}
+                      {transcriptFromDataUrl(item.url) || t("fullscreen.noTranscriptText")}
                     </p>
                   </div>
                 </div>
@@ -350,7 +352,7 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
                       className={`imagine-motion-interactive relative h-14 w-20 shrink-0 overflow-hidden rounded-md border bg-slate-900 ${
                         isActive ? "border-cyan-300 ring-2 ring-cyan-400/35" : "border-slate-700 hover:border-slate-500"
                       }`}
-                      aria-label={`切换到 ${previewItem.prompt || previewItem.id}`}
+                      aria-label={t("fullscreen.switchTo", { label: previewItem.prompt || previewItem.id })}
                     >
                       {previewItem.type === "image" ? (
                         <PreviewImage src={previewItem.url} alt={previewItem.prompt} className="h-full w-full object-cover" />
@@ -377,17 +379,17 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
                 &ldquo;{item.prompt}&rdquo;
               </p>
               <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-500">
-                <span className="font-mono">模型: {item.model}</span>
-                <span className="font-mono">比例: {formatDisplayedAspectRatio(item)}</span>
+                <span className="font-mono">{t("fullscreen.modelLabel")}: {item.model}</span>
+                <span className="font-mono">{t("fullscreen.aspectRatioLabel")}: {formatDisplayedAspectRatio(item)}</span>
                 {onDownload && (
                   <button
                     type="button"
                     onClick={() => onDownload(item)}
                     className="imagine-motion-interactive inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-700 bg-slate-900 px-2.5 text-xs font-medium text-slate-200 hover:border-slate-500 hover:text-white"
-                    title="下载"
+                    title={t("fullscreen.download")}
                   >
                     <Download className="h-3.5 w-3.5" />
-                    下载
+                    {t("fullscreen.download")}
                   </button>
                 )}
                 {item.type === "image" && (
@@ -395,10 +397,10 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
                     type="button"
                     onClick={() => setPanoramaItem(item)}
                     className="imagine-panorama-action imagine-motion-interactive inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium"
-                    title="360 查看"
+                    title={t("fullscreen.panorama360")}
                   >
                     <Compass className="h-3.5 w-3.5" />
-                    360 查看
+                    {t("fullscreen.panorama360")}
                   </button>
                 )}
                 {item.type === "audio" && onSaveVoiceProfile && (
@@ -406,28 +408,28 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
                     type="button"
                     onClick={() => onSaveVoiceProfile(item)}
                     className="imagine-motion-interactive inline-flex h-8 items-center gap-1.5 rounded-md border border-cyan-400/25 bg-cyan-500/10 px-2.5 text-xs font-medium text-cyan-100 hover:border-cyan-300/45 hover:bg-cyan-500/20 hover:text-white"
-                    title="保存为克隆音色"
+                    title={t("fullscreen.saveVoiceProfile")}
                   >
                     <Mic2 className="h-3.5 w-3.5" />
-                    保存音色
+                    {t("fullscreen.saveVoice")}
                   </button>
                 )}
                 <button
                   type="button"
                   onClick={() => setIsDiagnosticsOpen(true)}
                   className="imagine-motion-interactive inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-700 bg-slate-900 px-2.5 text-xs font-medium text-slate-200 hover:border-slate-500 hover:text-white"
-                  title="查看生成诊断"
+                  title={t("fullscreen.diagnosticsTitle")}
                 >
                   <Info className="h-3.5 w-3.5" />
-                  诊断
+                  {t("fullscreen.diagnostics")}
                 </button>
                 <button
                   onClick={() => copyPrompt(item.id, item.prompt)}
                   className="imagine-motion-interactive inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-700 bg-slate-900 px-2.5 text-xs font-medium text-slate-200 hover:border-slate-500 hover:text-white"
-                  title="复制 prompt"
+                  title={t("fullscreen.copyPrompt")}
                 >
                   {copyStatus === "copied" ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                  {copyStatus === "copied" ? "已复制" : copyStatus === "failed" ? "复制失败" : "复制 Prompt"}
+                  {copyStatus === "copied" ? t("fullscreen.copied") : copyStatus === "failed" ? t("fullscreen.copyFailed") : t("fullscreen.copyPrompt")}
                 </button>
               </div>
             </div>

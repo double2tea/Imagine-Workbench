@@ -1,5 +1,6 @@
 import { Search } from "lucide-react";
 import type { StorageItem } from "@/lib/db";
+import { useTranslations } from "@/lib/i18n";
 import type { AiProvider } from "@/lib/providers/model-catalog";
 
 export type AssetTypeFilter = "all" | "images" | "videos" | "audios" | "transcripts";
@@ -33,29 +34,6 @@ interface AssetToolbarProps {
   setFilterType: (value: AssetTypeFilter) => void;
   setSearchQuery: (value: string) => void;
 }
-
-const TYPE_FILTER_OPTIONS = [
-  { value: "all", label: "全部" },
-  { value: "images", label: "图片" },
-  { value: "videos", label: "视频" },
-  { value: "audios", label: "音频" },
-  { value: "transcripts", label: "转写" },
-] as const;
-
-const STATUS_FILTER_OPTIONS = [
-  { value: "all", label: "全部" },
-  { value: "processing", label: "生成中" },
-  { value: "pending", label: "排队" },
-  { value: "failed", label: "失败" },
-  { value: "complete", label: "已完成" },
-] as const;
-
-const DATE_PRESET_OPTIONS = [
-  { value: "all", label: "不限" },
-  { value: "today", label: "今天" },
-  { value: "7d", label: "7 天" },
-  { value: "30d", label: "30 天" },
-] as const;
 
 interface FilterChipProps {
   active: boolean;
@@ -107,6 +85,31 @@ export default function AssetToolbar({
   setFilterType,
   setSearchQuery,
 }: AssetToolbarProps) {
+  const { t } = useTranslations("common");
+
+  const TYPE_FILTER_OPTIONS = [
+    { value: "all", label: t("library.all") },
+    { value: "images", label: t("mediaTypeLabels.image") },
+    { value: "videos", label: t("mediaTypeLabels.video") },
+    { value: "audios", label: t("mediaTypeLabels.audio") },
+    { value: "transcripts", label: t("mediaTypeLabels.transcript") },
+  ] as const;
+
+  const STATUS_FILTER_OPTIONS = [
+    { value: "all", label: t("library.all") },
+    { value: "processing", label: t("statusLabels.processing") },
+    { value: "pending", label: t("statusLabels.pending") },
+    { value: "failed", label: t("statusLabels.failed") },
+    { value: "complete", label: t("statusLabels.complete") },
+  ] as const;
+
+  const DATE_PRESET_OPTIONS = [
+    { value: "all", label: t("library.all") },
+    { value: "today", label: t("gallery.dayCount", { count: 1 }) },
+    { value: "7d", label: t("gallery.dayCount", { count: 7 }) },
+    { value: "30d", label: t("gallery.dayCount", { count: 30 }) },
+  ] as const;
+
   const getTypeCount = (value: AssetTypeFilter): number => {
     if (value === "images") return typeCounts.image;
     if (value === "videos") return typeCounts.video;
@@ -140,21 +143,21 @@ export default function AssetToolbar({
         <>
           <div className="imagine-toolbar-header hidden lg:flex">
             <div>
-              <h2 className="text-sm font-semibold tracking-tight text-[var(--iw-text)]">作品画廊</h2>
-              <p className="imagine-workspace-subtitle mt-0.5">按日期分组 · 悬停卡片操作</p>
+              <h2 className="text-sm font-semibold tracking-tight text-[var(--iw-text)]">{t("gallery.title")}</h2>
+              <p className="imagine-workspace-subtitle mt-0.5">{t("gallery.subtitle")}</p>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1">
               {inFlightCount > 0 && (
-                <span className="imagine-tone-icon font-mono text-[10px]" data-tone="info">{inFlightCount} 项进行中</span>
+                <span className="imagine-tone-icon font-mono text-[10px]" data-tone="info">{t("gallery.inFlightCount", { count: inFlightCount })}</span>
               )}
-              <span className="imagine-meta-chip font-mono text-[10px]">{itemsCount} 项</span>
+              <span className="imagine-meta-chip font-mono text-[10px]">{t("gallery.itemCount", { count: itemsCount })}</span>
             </div>
           </div>
           <div className="mb-3 flex items-center justify-between gap-2 lg:hidden">
-            <span className="text-sm font-semibold text-[var(--iw-text)]">画廊</span>
+            <span className="text-sm font-semibold text-[var(--iw-text)]">{t("gallery.mobileTitle")}</span>
             <span className="imagine-meta-chip font-mono text-[10px]">
-              {inFlightCount > 0 ? `${inFlightCount} 进行中 · ` : ""}
-              {itemsCount} 项
+              {inFlightCount > 0 ? `${inFlightCount} ${t("gallery.inFlightCount", { count: inFlightCount })} · ` : ""}
+              {itemsCount} {t("gallery.itemCount", { count: itemsCount })}
             </span>
           </div>
         </>
@@ -168,8 +171,8 @@ export default function AssetToolbar({
             name="asset-search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="搜索提示词、模型..."
-            aria-label="搜索提示词、模型"
+            placeholder={t("gallery.searchPlaceholder")}
+            aria-label={t("gallery.searchPlaceholder")}
             className="imagine-toolbar-search h-9 rounded-lg border border-slate-800 bg-slate-950/55 pr-4 text-xs text-slate-200 placeholder-slate-600 transition-colors duration-150 focus:border-blue-400/35 focus:outline-none"
           />
         </div>
@@ -178,9 +181,9 @@ export default function AssetToolbar({
           value={assetModelFilter}
           onChange={(e) => setAssetModelFilter(e.target.value)}
           className="imagine-toolbar-select h-9 min-w-0 rounded-lg border border-slate-800 bg-slate-950/55 px-3 font-mono text-[10px] text-slate-300 transition-colors duration-150 focus:border-blue-400/35 focus:outline-none sm:min-w-[9rem]"
-          aria-label="按模型筛选"
+          aria-label={t("gallery.allModels")}
         >
-          <option value="all">全部模型</option>
+          <option value="all">{t("gallery.allModels")}</option>
           {modelOptions.map(model => (
             <option key={model} value={model}>{formatModelLabel(model, selectedProvider)}</option>
           ))}
@@ -190,22 +193,22 @@ export default function AssetToolbar({
           onClick={exportMetadataJson}
           className="imagine-secondary-action h-9 shrink-0 rounded-lg border border-slate-800 bg-slate-950/55 px-3 text-[10px] font-semibold text-slate-300 transition-colors duration-150 hover:bg-slate-900"
         >
-          导出
+          {t("gallery.export")}
         </button>
         <button
           type="button"
           onClick={() => deleteItemsByStatus(["failed", "pending"])}
           className="imagine-danger-action h-9 shrink-0 rounded-lg px-3 text-[10px] font-semibold transition-colors duration-150"
         >
-          清失败
+          {t("gallery.clearFailed")}
         </button>
       </div>
 
       {showFilterRows ? (
       <div className="imagine-gallery-filters">
         <div className="imagine-filter-row">
-          <span className="imagine-filter-row-label">状态</span>
-          <div className="imagine-filter-track" role="group" aria-label="按状态筛选">
+          <span className="imagine-filter-row-label">{t("gallery.filterStatus")}</span>
+          <div className="imagine-filter-track" role="group" aria-label={t("gallery.filterStatus")}>
             {STATUS_FILTER_OPTIONS.map(option => {
               const count = getStatusCount(option.value);
               return (
@@ -223,8 +226,8 @@ export default function AssetToolbar({
         </div>
 
         <div className="imagine-filter-row">
-          <span className="imagine-filter-row-label">类型</span>
-          <div className="imagine-filter-track" role="group" aria-label="按媒体类型筛选">
+          <span className="imagine-filter-row-label">{t("gallery.filterType")}</span>
+          <div className="imagine-filter-track" role="group" aria-label={t("gallery.filterType")}>
             {TYPE_FILTER_OPTIONS.map(option => {
               const count = getTypeCount(option.value);
               return (
@@ -243,9 +246,9 @@ export default function AssetToolbar({
 
         <div className="imagine-filter-row">
           <span className="imagine-filter-row-label">
-            时间
+            {t("gallery.filterTime")}
             <span className="mt-1 block font-mono text-[9px] font-normal normal-case tracking-normal text-[var(--iw-faint)]">
-              {dateOptions.length} 天
+              {t("gallery.dayCount", { count: dateOptions.length })}
             </span>
           </span>
           <div className="imagine-filter-track">
@@ -265,7 +268,7 @@ export default function AssetToolbar({
             ))}
             <FilterChip
               active={showCustomDateRange}
-              label="自定义"
+              label={t("gallery.customDate")}
               onClick={() => {
                 if (!showCustomDateRange) {
                   setAssetDatePreset("custom");
@@ -280,16 +283,16 @@ export default function AssetToolbar({
                   value={assetDateStart}
                   onChange={(event) => handleDateStartChange(event.target.value)}
                   className="imagine-filter-date-input"
-                  aria-label="开始日期"
+                  aria-label={t("gallery.dateFrom")}
                 />
-                <span className="font-mono text-[10px] text-[var(--iw-faint)]">至</span>
+                <span className="font-mono text-[10px] text-[var(--iw-faint)]">{t("gallery.dateRangeSeparator")}</span>
                 <input
                   type="date"
                   name="asset-date-end"
                   value={assetDateEnd}
                   onChange={(event) => handleDateEndChange(event.target.value)}
                   className="imagine-filter-date-input"
-                  aria-label="结束日期"
+                  aria-label={t("gallery.dateTo")}
                 />
               </div>
             )}
@@ -298,7 +301,7 @@ export default function AssetToolbar({
       </div>
       ) : (
         <p className="mt-2 text-[11px] leading-5 text-[var(--iw-faint)]">
-          生成作品后，可按状态、类型与时间筛选。
+          {t("gallery.emptyFilterHint")}
         </p>
       )}
     </div>

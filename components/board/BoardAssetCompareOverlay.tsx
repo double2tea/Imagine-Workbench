@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Sliders, X } from "lucide-react";
 import PreviewImage from "@/components/PreviewImage";
+import { useTranslations } from "@/lib/i18n";
 
 interface BoardAssetCompareOverlayProps {
   originalUrl: string;
@@ -11,6 +12,7 @@ interface BoardAssetCompareOverlayProps {
 }
 
 export default function BoardAssetCompareOverlay({ originalUrl, resultUrl, onClose }: BoardAssetCompareOverlayProps) {
+  const { t } = useTranslations("board");
   const [sliderPos, setSliderPos] = useState(50);
 
   return (
@@ -19,20 +21,20 @@ export default function BoardAssetCompareOverlay({ originalUrl, resultUrl, onClo
         type="button"
         onClick={onClose}
         className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)] text-[var(--iw-muted)] transition hover:text-[var(--iw-text)]"
-        aria-label="关闭对比"
+        aria-label={t('compare.close')}
       >
         <X className="h-5 w-5" />
       </button>
       <div className="flex w-full max-w-4xl flex-col gap-3">
         <div className="text-center">
-          <h2 className="text-sm font-semibold text-[var(--iw-text)]">参考图 vs 生成结果</h2>
-          <p className="mt-1 text-[11px] text-[var(--iw-muted)]">拖动滑块对比像素差异</p>
+          <h2 className="text-sm font-semibold text-[var(--iw-text)]">{t('compare.title')}</h2>
+          <p className="mt-1 text-[11px] text-[var(--iw-muted)]">{t('compare.hint')}</p>
         </div>
         <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl border border-[var(--iw-border)] bg-[var(--iw-panel-soft)]">
-          <PreviewImage src={originalUrl} alt="参考图" className="absolute inset-0 h-full w-full object-contain" />
+          <PreviewImage src={originalUrl} alt={t('compare.referenceAlt')} className="absolute inset-0 h-full w-full object-contain" />
           <PreviewImage
             src={resultUrl}
-            alt="生成结果"
+            alt={t('compare.resultAlt')}
             className="absolute inset-0 h-full w-full object-contain"
             style={{ clipPath: `polygon(0 0, ${sliderPos}% 0, ${sliderPos}% 100%, 0 100%)` }}
           />
@@ -51,13 +53,13 @@ export default function BoardAssetCompareOverlay({ originalUrl, resultUrl, onClo
             value={sliderPos}
             onChange={(event) => setSliderPos(Number(event.target.value))}
             className="absolute inset-0 z-10 h-full w-full cursor-ew-resize opacity-0"
-            aria-label="对比滑块"
+            aria-label={t('compare.sliderAriaLabel')}
           />
           <span className="imagine-tone-chip pointer-events-none absolute bottom-2 left-2 rounded-md border px-2 py-1 text-[10px] font-semibold" data-tone="accent">
-            参考
+            {t('compare.referenceLabel')}
           </span>
           <span className="imagine-tone-chip pointer-events-none absolute bottom-2 right-2 rounded-md border px-2 py-1 text-[10px] font-semibold" data-tone="warning">
-            结果
+            {t('compare.resultLabel')}
           </span>
         </div>
       </div>

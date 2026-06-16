@@ -1,5 +1,6 @@
 import { ChevronDown, ChevronLeft, ChevronRight, Image as ImageIcon, Music, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslations } from "@/lib/i18n";
 import AssetCard from "@/components/assets/AssetCard";
 import AssetSelectionBar from "@/components/assets/AssetSelectionBar";
 import AssetToolbar, { type AssetDatePreset, type AssetStatusFilter, type AssetTypeFilter } from "@/components/assets/AssetToolbar";
@@ -135,6 +136,7 @@ export default function AssetGalleryWorkspace({
   formatModelLabel,
   providerLabelsByKey,
 }: AssetGalleryWorkspaceProps) {
+  const { t } = useTranslations("common");
   const [referencePreview, setReferencePreview] = useState<{ itemId: string; index: number } | null>(null);
   const [collapsedDateKeys, setCollapsedDateKeys] = useState<Set<string>>(() => new Set());
   const [visibleItemState, setVisibleItemState] = useState<{ filterKey: string; limit: number }>({
@@ -190,7 +192,7 @@ export default function AssetGalleryWorkspace({
     return Array.from(groups)
       .map(([dateKey, groupItems]) => ({
         dateKey,
-        label: dateKey === "unknown" ? "未知日期" : dateKey,
+        label: dateKey === "unknown" ? t("gallery.unknownDate") : dateKey,
         items: groupItems,
       }))
       .sort((a, b) => {
@@ -282,22 +284,22 @@ export default function AssetGalleryWorkspace({
             <div className="imagine-gallery-empty-icon">
               <ImageIcon className="h-6 w-6" />
             </div>
-            <p className="mt-4 text-sm font-semibold text-[var(--iw-text)]">画廊还是空的</p>
+            <p className="mt-4 text-sm font-semibold text-[var(--iw-text)]">{t("gallery.emptyTitle")}</p>
             <p className="mt-1 max-w-sm text-xs leading-5 text-[var(--iw-muted)]">
-              在左侧写下提示词并生成，作品会按日期分组出现在这里，并自动保存在本机浏览器中。
+              {t("gallery.emptyDescription")}
             </p>
             <div className="imagine-gallery-empty-steps">
               <div className="imagine-gallery-empty-step">
                 <span className="imagine-gallery-empty-step-index">1</span>
-                <span>选择图片或视频模式，填写提示词与模型参数</span>
+                <span>{t("gallery.step1")}</span>
               </div>
               <div className="imagine-gallery-empty-step">
                 <span className="imagine-gallery-empty-step-index">2</span>
-                <span>点击生成后，进度会在卡片上实时更新</span>
+                <span>{t("gallery.step2")}</span>
               </div>
               <div className="imagine-gallery-empty-step">
                 <span className="imagine-gallery-empty-step-index">3</span>
-                <span>完成后可对比、复用参数，或发送给 Agent 继续编辑</span>
+                <span>{t("gallery.step3")}</span>
               </div>
             </div>
           </div>
@@ -317,7 +319,7 @@ export default function AssetGalleryWorkspace({
                       <ChevronDown className={`h-4 w-4 text-[var(--iw-faint)] transition ${isCollapsed ? "-rotate-90" : ""}`} />
                       <span className="text-xs font-semibold text-[var(--iw-text)]">{group.label}</span>
                     </span>
-                    <span className="imagine-meta-chip rounded-md px-2 py-1 font-mono text-[10px]">{group.items.length} 项</span>
+                    <span className="imagine-meta-chip rounded-md px-2 py-1 font-mono text-[10px]">{t("gallery.itemCount", { count: group.items.length })}</span>
                   </button>
 
                   {!isCollapsed && (
@@ -368,7 +370,7 @@ export default function AssetGalleryWorkspace({
                 }
                 className="imagine-secondary-action mx-auto mb-2 rounded-lg border px-4 py-2 text-xs font-semibold transition"
               >
-                加载更多 {Math.min(visibleItemLimit, filteredItems.length)} / {filteredItems.length}
+                {t("gallery.loadMore", { current: Math.min(visibleItemLimit, filteredItems.length), total: filteredItems.length })}
               </button>
             )}
           </div>
@@ -380,7 +382,7 @@ export default function AssetGalleryWorkspace({
           <button
             type="button"
             className="absolute inset-0 cursor-zoom-out"
-            aria-label="关闭参考图预览"
+            aria-label={t("gallery.closeReferencePreview")}
             onClick={() => setReferencePreview(null)}
           />
           <div className="relative flex max-h-[92vh] w-[min(1200px,calc(100vw-32px))] flex-col overflow-hidden rounded-xl border border-white/10 bg-slate-950 shadow-2xl">
@@ -392,7 +394,7 @@ export default function AssetGalleryWorkspace({
                 type="button"
                 onClick={() => setReferencePreview(null)}
                 className="rounded-lg border border-white/10 bg-slate-900/80 p-2 text-slate-200 transition hover:bg-slate-800"
-                aria-label="关闭参考图预览"
+                aria-label={t("gallery.closeReferencePreview")}
               >
                 <X className="h-4 w-4" />
               </button>
@@ -404,7 +406,7 @@ export default function AssetGalleryWorkspace({
                   type="button"
                   onClick={showPreviousReference}
                   className="absolute left-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-slate-950/75 text-slate-100 transition hover:bg-slate-900"
-                  aria-label="上一张参考图"
+                  aria-label={t("gallery.previousReference")}
                 >
                   <ChevronLeft className="h-5 w-5" />
                 </button>
@@ -412,7 +414,7 @@ export default function AssetGalleryWorkspace({
               {selectedReferencePreview.type === "image" ? (
                 <PreviewImage
                   src={selectedReferencePreview.url}
-                  alt={`参考图 ${referencePreviewIndex + 1}`}
+                  alt={t("gallery.referenceImageAlt", { index: referencePreviewIndex + 1 })}
                   className="max-h-[72vh] w-full object-contain"
                 />
               ) : selectedReferencePreview.type === "video" ? (
@@ -428,7 +430,7 @@ export default function AssetGalleryWorkspace({
                   type="button"
                   onClick={showNextReference}
                   className="absolute right-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-slate-950/75 text-slate-100 transition hover:bg-slate-900"
-                  aria-label="下一张参考图"
+                  aria-label={t("gallery.nextReference")}
                 >
                   <ChevronRight className="h-5 w-5" />
                 </button>
@@ -446,10 +448,10 @@ export default function AssetGalleryWorkspace({
                       ? "border-cyan-300 ring-2 ring-cyan-300/30"
                       : "border-white/10 opacity-65 hover:opacity-100"
                   }`}
-                  aria-label={`查看参考图 ${index + 1}`}
+                  aria-label={`${t("gallery.viewReference")} ${index + 1}`}
                 >
                   {reference.type === "image" ? (
-                    <PreviewImage src={reference.url} alt={`参考图 ${index + 1}`} className="h-full w-full object-cover" />
+                    <PreviewImage src={reference.url} alt={t("gallery.referenceImageAlt", { index: index + 1 })} className="h-full w-full object-cover" />
                   ) : reference.type === "video" ? (
                     <video src={reference.url} muted preload="metadata" className="h-full w-full object-cover" />
                   ) : (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { useTranslations } from "@/lib/i18n";
 import { Check, CheckCircle2, ListPlus, Plug, Plus, RefreshCw, Search, Trash2, X, XCircle } from "lucide-react";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
 import { ProviderCredentialCard } from "@/components/settings/ProviderCredentialCard";
@@ -27,14 +28,6 @@ interface FetchedSelection {
   scope: string;
   values: string[];
 }
-
-const WORKSPACE_SECTIONS: { key: WorkspaceSection; label: string }[] = [
-  { key: "credentials", label: "凭证" },
-  { key: "chat", label: "Agent" },
-  { key: "image", label: "图像" },
-  { key: "video", label: "视频" },
-  { key: "audio", label: "音频" },
-];
 
 export interface ConnectionSettingsWorkspaceProps {
   audioModelGroups: ModelGroup[];
@@ -97,6 +90,7 @@ export function ConnectionSettingsWorkspace({
   refreshProviderModels,
   testProviderConnection,
 }: ConnectionSettingsWorkspaceProps) {
+  const { t } = useTranslations("settings");
   const confirmAction = useConfirm();
   const [providerQuery, setProviderQuery] = useState("");
   const [section, setSection] = useState<WorkspaceSection>("credentials");
@@ -105,6 +99,14 @@ export function ConnectionSettingsWorkspace({
   const [customProviderBaseUrl, setCustomProviderBaseUrl] = useState("");
   const [isCustomProviderFormOpen, setIsCustomProviderFormOpen] = useState(false);
   const [fetchedSelection, setFetchedSelection] = useState<FetchedSelection>({ scope: "", values: [] });
+
+  const workspaceSections = [
+    { key: "credentials", label: t("connections.sections.credentials") },
+    { key: "chat", label: t("connections.sections.chat") },
+    { key: "image", label: t("connections.sections.image") },
+    { key: "video", label: t("connections.sections.video") },
+    { key: "audio", label: t("connections.sections.audio") },
+  ] as const;
 
   const customProviderByKey = useMemo(
     () => new Map(customProviders.map(provider => [provider.key, provider])),
@@ -168,10 +170,10 @@ export function ConnectionSettingsWorkspace({
   const selectedProviderMeta = getWorkspaceProviderMeta(selectedProvider);
   const selectedProviderCreds = providerCredentials[selectedProvider] ?? { apiKey: "", baseUrl: "" };
   const selectedProviderCapabilities = [
-    selectedProviderMeta.supportsImage ? "图像" : null,
-    selectedProviderMeta.supportsVideo ? "视频" : null,
-    selectedProviderMeta.supportsAudio ? "音频" : null,
-    selectedProviderMeta.supportsChat ? "对话" : null,
+    selectedProviderMeta.supportsImage ? t("connections.capabilityImage") : null,
+    selectedProviderMeta.supportsVideo ? t("connections.capabilityVideo") : null,
+    selectedProviderMeta.supportsAudio ? t("connections.capabilityAudio") : null,
+    selectedProviderMeta.supportsChat ? t("connections.capabilityChat") : null,
   ]
     .filter((value): value is string => Boolean(value))
     .join(" · ");
@@ -215,21 +217,21 @@ export function ConnectionSettingsWorkspace({
   const confirmDeleteCustomProvider = async () => {
     if (isKnownProvider(selectedProvider)) return;
     if (!(await confirmAction({
-      message: `确认删除 ${selectedProviderMeta.label} 吗？\n这会删除该服务商配置、凭证和已添加模型。`,
+      message: t("connections.confirmDeleteMessage", { label: selectedProviderMeta.label }),
       tone: "danger",
-      confirmLabel: "删除",
+      confirmLabel: t("connections.confirmDeleteConfirmLabel"),
     }))) {
       return;
     }
     onDeleteCustomProvider(selectedProvider);
   };
 
-  const sectionLabel = WORKSPACE_SECTIONS.find(option => option.key === section)?.label ?? "";
+  const sectionLabel = workspaceSections.find(option => option.key === section)?.label ?? "";
 
   return (
     <div className="imagine-settings-workspace">
       <div className="imagine-settings-workspace-actions">
-        <div className="imagine-settings-section-title">服务商</div>
+        <div className="imagine-settings-section-title">{t("connections.providerSectionTitle")}</div>
         <button
           type="button"
           onClick={() => setIsCustomProviderFormOpen(prev => !prev)}
@@ -237,19 +239,19 @@ export function ConnectionSettingsWorkspace({
           aria-expanded={isCustomProviderFormOpen}
         >
           <Plus className="h-3.5 w-3.5" />
-          添加自定义服务商
+          {t("connections.addCustomProvider")}
         </button>
       </div>
 
       {isCustomProviderFormOpen ? (
         <div className="imagine-settings-section imagine-settings-custom-provider-panel">
           <div className="flex items-center justify-between gap-2">
-            <div className="imagine-settings-section-title">自定义服务商</div>
+            <div className="imagine-settings-section-title">{t("connections.customProviderTitle")}</div>
             <button
               type="button"
               onClick={closeCustomProviderForm}
               className="imagine-settings-toolbar-btn h-7"
-              aria-label="关闭添加自定义服务商"
+              aria-label={t("connections.closeCustomProviderAriaLabel")}
             >
               <X className="h-3 w-3" />
             </button>
@@ -259,8 +261,8 @@ export function ConnectionSettingsWorkspace({
               type="text"
               value={customProviderName}
               onChange={event => setCustomProviderName(event.target.value)}
-              placeholder="名称"
-              aria-label="自定义服务商名称"
+              placeholder={t("connections.customProviderNamePlaceholder")}
+              aria-label={t("connections.customProviderNameAriaLabel")}
               className="imagine-input h-9 text-xs"
             />
             <input
@@ -268,7 +270,7 @@ export function ConnectionSettingsWorkspace({
               value={customProviderBaseUrl}
               onChange={event => setCustomProviderBaseUrl(event.target.value)}
               placeholder="https://api.example.com"
-              aria-label="自定义服务商 Base URL"
+              aria-label={t("connections.customProviderBaseUrlAriaLabel")}
               className="imagine-input h-9 font-mono text-xs"
             />
             <button
@@ -278,7 +280,7 @@ export function ConnectionSettingsWorkspace({
               className="imagine-settings-toolbar-btn h-9 justify-center"
             >
               <Plus className="h-3.5 w-3.5" />
-              添加
+              {t("connections.addButton")}
             </button>
           </div>
         </div>
@@ -290,10 +292,10 @@ export function ConnectionSettingsWorkspace({
             <div>
               <div className="imagine-settings-section-title flex items-center gap-2">
                 <Plug className="imagine-tone-icon h-3.5 w-3.5" data-tone="success" />
-                本地 DaVinci Resolve
+                {t("connections.resolveIntegrationTitle")}
               </div>
               <p className="mt-1 text-[10px] leading-relaxed text-[var(--iw-faint)]">
-                开启后显示工作台连接入口，并同步已保存的服务商凭据给本机 Resolve 插件。
+                {t("connections.resolveIntegrationDescription")}
               </p>
             </div>
             <label className="flex shrink-0 cursor-pointer items-center gap-2 text-[11px] font-semibold text-[var(--iw-muted)]">
@@ -303,7 +305,7 @@ export function ConnectionSettingsWorkspace({
                 onChange={event => onToggleResolveIntegration(event.target.checked)}
                 className="h-3.5 w-3.5 cursor-pointer accent-emerald-500"
               />
-              启用
+              {t("connections.resolveEnableLabel")}
             </label>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -314,7 +316,7 @@ export function ConnectionSettingsWorkspace({
               className="imagine-settings-toolbar-btn h-8"
             >
               <Plug className="h-3.5 w-3.5" />
-              {resolveCheckStatus === "running" ? "等待达芬奇" : "连接检查"}
+              {resolveCheckStatus === "running" ? t("connections.resolveCheckRunning") : t("connections.resolveCheckButton")}
             </button>
           </div>
         </div>
@@ -328,14 +330,14 @@ export function ConnectionSettingsWorkspace({
               type="search"
               value={providerQuery}
               onChange={event => setProviderQuery(event.target.value)}
-              placeholder="搜索服务商"
+              placeholder={t("connections.providerSearchPlaceholder")}
               className="imagine-toolbar-input imagine-toolbar-search min-h-8 w-full text-xs"
-              aria-label="搜索服务商"
+              aria-label={t("connections.providerSearchAriaLabel")}
             />
           </div>
           <div className="imagine-settings-list imagine-settings-provider-list min-h-0 flex-1">
             {filteredProviders.length === 0 ? (
-              <div className="imagine-settings-empty">无匹配服务商</div>
+              <div className="imagine-settings-empty">{t("connections.noMatchingProvider")}</div>
             ) : (
               filteredProviders.map(provider => {
                 const meta = getWorkspaceProviderMeta(provider);
@@ -389,7 +391,7 @@ export function ConnectionSettingsWorkspace({
 
         <div className="imagine-settings-workspace-main">
         <div className="imagine-settings-workspace-segment imagine-settings-segment grid grid-cols-5">
-          {WORKSPACE_SECTIONS.map(option => (
+          {workspaceSections.map(option => (
             <button
               key={option.key}
               type="button"
@@ -413,12 +415,12 @@ export function ConnectionSettingsWorkspace({
                 className="imagine-danger-action h-7"
               >
                 <Trash2 className="h-3 w-3" />
-                删除
+                {t("connections.deleteButton")}
               </button>
             ) : null}
           </div>
           {selectedProviderCapabilities ? (
-            <p className="text-[10px] text-[var(--iw-faint)]">支持：{selectedProviderCapabilities}</p>
+            <p className="text-[10px] text-[var(--iw-faint)]">{t("connections.supportCapabilitiesPrefix")}{selectedProviderCapabilities}</p>
           ) : null}
         </div>
 
@@ -435,7 +437,7 @@ export function ConnectionSettingsWorkspace({
             providerTest={providerTest}
             registerUrl={selectedProviderMeta.registerUrl}
             showBaseUrl={selectedProviderMeta.hasEditableBaseUrl}
-            title={`${selectedProviderMeta.label} 连接`}
+            title={t("connections.credentialCardTitleTemplate", { label: selectedProviderMeta.label })}
             onClear={onClearCredentials}
             onSaveApiKey={(provider, value) => onSaveCredential(provider, "apiKey", value)}
             onSaveBaseUrl={(provider, value) => onSaveCredential(provider, "baseUrl", value)}
@@ -447,11 +449,11 @@ export function ConnectionSettingsWorkspace({
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0">
                   <div className="imagine-settings-section-title">
-                    {section === "chat" ? "Agent 对话模型" : `${sectionLabel} 模型`}
+                    {section === "chat" ? t("connections.chatModelSectionTitle") : t("connections.chatModelSectionTitleTemplate", { sectionLabel })}
                   </div>
                   {section === "chat" ? (
                     <p className="mt-1 text-[10px] leading-relaxed text-[var(--iw-faint)]">
-                      用于 Agent 对话与提示词优化。附带参考图时仍使用所选模型；是否支持图片输入参考 OpenRouter 模型目录标记，不匹配或失败时由上游返回错误。
+                      {t("connections.chatModelDescription")}
                     </p>
                   ) : null}
                 </div>
@@ -462,7 +464,7 @@ export function ConnectionSettingsWorkspace({
                   className="imagine-settings-toolbar-btn shrink-0"
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${isLoadingModels ? "animate-spin" : ""}`} />
-                  获取模型
+                  {t("connections.fetchModelsButton")}
                 </button>
               </div>
               {modelListMessage ? (
@@ -470,7 +472,7 @@ export function ConnectionSettingsWorkspace({
               ) : null}
               <div className="imagine-settings-list imagine-settings-model-list mt-3">
                 {activeModelOptions.length === 0 ? (
-                  <div className="imagine-settings-empty">暂无模型</div>
+                  <div className="imagine-settings-empty">{t("connections.noModels")}</div>
                 ) : (
                   activeModelOptions.map(option => {
                     const isSelectedAgent = section === "chat" && option.value === selectedChatModel;
@@ -502,7 +504,7 @@ export function ConnectionSettingsWorkspace({
             {fetchedOptions.length > 0 ? (
               <div className="imagine-settings-section">
                 <div className="mb-2 flex items-center justify-between gap-3">
-                  <div className="imagine-settings-section-title text-xs">获取结果</div>
+                  <div className="imagine-settings-section-title text-xs">{t("connections.fetchResultsTitle")}</div>
                   <button
                     type="button"
                     onClick={submitFetchedModels}
@@ -510,7 +512,7 @@ export function ConnectionSettingsWorkspace({
                     className="imagine-settings-toolbar-btn"
                   >
                     <ListPlus className="h-3.5 w-3.5" />
-                    添加选中
+                    {t("connections.addSelectedButton")}
                   </button>
                 </div>
                 <div className="imagine-settings-list imagine-settings-model-list max-h-40 sm:max-h-44">
@@ -552,7 +554,7 @@ export function ConnectionSettingsWorkspace({
                   className="imagine-settings-toolbar-btn h-9 md:self-start"
                 >
                   <ListPlus className="h-3.5 w-3.5" />
-                  添加
+                  {t("connections.addButton")}
                 </button>
               </div>
             </div>

@@ -2,6 +2,7 @@
 
 import { FastForward, Pause, Play, Rewind } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useTranslations } from "@/lib/i18n";
 
 interface AudioWaveformPreviewProps {
   src: string;
@@ -122,6 +123,7 @@ export default function AudioWaveformPreview({
   size = "full",
   tone = "surface",
 }: AudioWaveformPreviewProps) {
+  const { t } = useTranslations("common");
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const waveformRef = useRef<HTMLDivElement | null>(null);
   const clipPathId = useId().replace(/:/g, "");
@@ -297,7 +299,7 @@ export default function AudioWaveformPreview({
               isCompact ? "h-6 w-6" : "h-8 w-8",
             ].join(" ")}
             onClick={() => seekBy(-5)}
-            title="后退 5 秒"
+            title={t("audioWaveform.rewind")}
           >
             <Rewind className={isCompact ? "h-3.5 w-3.5" : "h-4 w-4"} />
           </button>
@@ -322,7 +324,7 @@ export default function AudioWaveformPreview({
               }
               audio.pause();
             }}
-            title={isPlaying ? "暂停" : "播放"}
+            title={isPlaying ? t("videoPlayer.pause") : t("videoPlayer.play")}
           >
             {isPlaying
               ? <Pause className={isCompact ? "h-4 w-4" : "h-5 w-5"} />
@@ -342,7 +344,7 @@ export default function AudioWaveformPreview({
               isCompact ? "h-6 w-6" : "h-8 w-8",
             ].join(" ")}
             onClick={() => seekBy(5)}
-            title="前进 5 秒"
+            title={t("audioWaveform.fastForward")}
           >
             <FastForward className={isCompact ? "h-3.5 w-3.5" : "h-4 w-4"} />
           </button>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from "react";
 import { AudioLines, Pencil, Trash2 } from "lucide-react";
+import { useTranslations } from "@/lib/i18n";
 import VoiceProfilePreviewPlayer from "@/components/audio/VoiceProfilePreviewPlayer";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
 import CreatorGenerateButton from "@/components/creation/CreatorGenerateButton";
@@ -115,6 +116,7 @@ export default function AudioGenerationPanel({
   onAsrLanguageChange,
   showGenerateButton = true,
 }: AudioGenerationPanelProps) {
+  const { t } = useTranslations("creation");
   const confirmAction = useConfirm();
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
   const promptSelectionRef = useRef<PromptComposerSelectionRange | null>(null);
@@ -157,7 +159,7 @@ export default function AudioGenerationPanel({
   const canSaveVoiceProfile = mode === "voice_design" || mode === "voice_clone";
   const canUseVoiceProfile = mode === "tts" || canSaveVoiceProfile;
   const showVoiceProfileLibrary = canUseVoiceProfile && (canSaveVoiceProfile || visibleVoiceProfiles.length > 0 || selectedVoiceProfile !== undefined);
-  const stylePromptLabel = mode === "voice_design" ? "音色描述" : mode === "voice_clone" ? "演绎风格" : "风格提示";
+  const stylePromptLabel = mode === "voice_design" ? t("audio.stylePromptLabelVoiceDesign") : mode === "voice_clone" ? t("audio.stylePromptLabelVoiceClone") : t("audio.stylePromptLabelDefault");
   const textInputRequired = audioOperationRequiresTextInput(mode);
   const stylePromptRequired = audioOperationRequiresStylePrompt(mode);
   const referenceCount = referenceImages.filter(reference => acceptedMediaTypes.includes(getMediaReferenceType(reference))).length;
@@ -167,8 +169,8 @@ export default function AudioGenerationPanel({
   const hasRequiredInput = (!textInputRequired || prompt.trim().length > 0) && (!stylePromptRequired || audioStylePrompt.trim().length > 0) && hasRequiredReferences;
   const needsCloneConsent = mode === "voice_clone" && !selectedVoiceProfileProvidesCloneReference;
   const promptPlaceholder = textInputRequired
-    ? "写下要朗读、生成音乐或音效的内容... 输入 @ 可引用作品"
-    : "文本可留空；上传或拖入所需参考媒体后执行";
+    ? t("audio.promptPlaceholderWithText")
+    : t("audio.promptPlaceholderWithoutText");
 
   const handleProviderChange = (value: string): void => {
     const provider = providerOptions.find(option => option.value === value)?.value;
@@ -311,21 +313,21 @@ export default function AudioGenerationPanel({
   const handleSaveVoiceProfile = async (): Promise<void> => {
     const name = voiceProfileName.trim();
     if (!name) {
-      setVoiceProfileMessage("先输入音色名称");
+      setVoiceProfileMessage(t("audio.validationEmptyName"));
       return;
     }
     const editingProfile = editingVoiceProfileId ? voiceProfiles.find(profile => profile.id === editingVoiceProfileId) : undefined;
     if (!editingProfile && mode === "voice_clone" && referenceAudioAssetIds.length === 0) {
-      setVoiceProfileMessage("克隆音色需要至少一个音频参考");
+      setVoiceProfileMessage(t("audio.validationCloneNeedsAudio"));
       return;
     }
     if (!editingProfile && mode === "voice_clone" && !voiceCloneConsentAccepted) {
-      setVoiceProfileMessage("保存克隆音色前请确认参考音频授权");
+      setVoiceProfileMessage(t("audio.validationCloneNeedsConsent"));
       return;
     }
     const designPrompt = audioStylePrompt.trim();
     if (!editingProfile && mode === "voice_design" && !designPrompt) {
-      setVoiceProfileMessage("设计音色需要填写音色描述");
+      setVoiceProfileMessage(t("audio.validationDesignNeedsPrompt"));
       return;
     }
     const source: VoiceProfileSource = editingProfile?.source ?? (mode === "voice_clone" ? "cloned" : "designed");
@@ -348,17 +350,17 @@ export default function AudioGenerationPanel({
     await refreshVoiceProfiles();
     onSelectVoiceProfile(profile.id);
     closeVoiceProfileEditor();
-    setVoiceProfileMessage(editingProfile ? "已更新音色" : "已保存音色");
+    setVoiceProfileMessage(editingProfile ? t("audio.profileUpdatedMessage") : t("audio.profileSavedMessage"));
   };
 
   const handleDeleteVoiceProfile = async (): Promise<void> => {
     if (!selectedVoiceProfileId) return;
-    if (!(await confirmAction({ message: "确认删除当前音色吗？", tone: "danger", confirmLabel: "删除" }))) return;
+    if (!(await confirmAction({ message: t("audio.deleteConfirmMessage"), tone: "danger", confirmLabel: t("audio.deleteConfirmLabel") }))) return;
     await deleteVoiceProfile(selectedVoiceProfileId);
     await refreshVoiceProfiles();
     onSelectVoiceProfile("");
     closeVoiceProfileEditor();
-    setVoiceProfileMessage("已删除音色");
+    setVoiceProfileMessage(t("audio.profileDeletedMessage"));
   };
 
   const toggleVoiceProfileTag = (tag: string): void => {
@@ -375,17 +377,17 @@ export default function AudioGenerationPanel({
             accent="amber"
             isOptimizing={isOptimizing}
             optimizeDisabled={isOptimizing || !prompt.trim()}
-            optimizeLabel="润色"
+            optimizeLabel={t("audio.optimizeLabel")}
             onApplyTemplate={handleApplyPromptTemplate}
             onOptimize={onOptimizePrompt}
           />
         }
         atDropdownNode={atDropdownNode}
-        desktopHint="拖入资产到此处插入 @媒体N | 参考媒体按模型能力启用"
+        desktopHint={t("audio.desktopHint")}
         headerAccent="amber"
         headerVariant="toolbar"
         icon={<AudioLines className="h-3.5 w-3.5 text-amber-600" />}
-        label="音频创作"
+        label={t("audio.panelLabel")}
         onChange={handlePromptChange}
         onDropAsset={onPromptDropAsset}
         onSelectionChange={(selection) => {
@@ -398,7 +400,7 @@ export default function AudioGenerationPanel({
 
       <div className="grid grid-cols-1 gap-3">
         <div>
-          <label className="imagine-section-label mb-1.5 block">服务商</label>
+          <label className="imagine-section-label mb-1.5 block">{t("audio.providerLabel")}</label>
           <select value={selectedProvider} onChange={(event) => handleProviderChange(event.target.value)} className="imagine-select py-2.5">
             {providerOptions.map(option => (
               <option key={option.value} value={option.value}>{option.label}</option>
@@ -406,9 +408,9 @@ export default function AudioGenerationPanel({
           </select>
         </div>
         <div>
-          <label className="imagine-section-label mb-1.5 block">功能</label>
+          <label className="imagine-section-label mb-1.5 block">{t("audio.functionLabel")}</label>
           <select value={functionOptions.some(option => option.value === selectedFunctionValue) ? selectedFunctionValue : ""} onChange={(event) => handleFunctionChange(event.target.value)} className="imagine-select py-2.5">
-            {!functionOptions.some(option => option.value === selectedFunctionValue) && <option value="" disabled>当前功能不可用</option>}
+            {!functionOptions.some(option => option.value === selectedFunctionValue) && <option value="" disabled>{t("audio.functionUnavailable")}</option>}
             {functionOptions.map(option => (
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
@@ -416,7 +418,7 @@ export default function AudioGenerationPanel({
         </div>
         {formatOptions.length > 0 && (
           <div>
-            <label className="imagine-section-label mb-1.5 block">输出格式</label>
+            <label className="imagine-section-label mb-1.5 block">{t("audio.formatLabel")}</label>
             <select value={selectedFormat} onChange={(event) => onSelectFormat(event.target.value)} className="imagine-select py-2.5">
               {formatOptions.map(option => (
                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -428,17 +430,17 @@ export default function AudioGenerationPanel({
 
       <ReferenceImagePicker
         acceptedMediaTypes={acceptedMediaTypes}
-        addLabel="加参考"
+        addLabel={t("audio.addReferenceLabel")}
         browseClassName={referenceLimit > 0 ? "cursor-pointer font-semibold text-amber-700 underline-offset-2 hover:underline" : "text-[var(--iw-faint)]"}
-        clearLabel="清空参考"
-        emptyHelp={referenceLimit > 0 ? "可拖入右侧资产或上传音频/视频/图片参考" : "当前模型不支持参考媒体"}
-        emptyLabel={referenceLimit > 0 ? "拖入参考媒体" : "无需参考媒体"}
-        label={`参考媒体 ${referenceLimit > 0 ? `${Math.min(referenceImages.length, referenceLimit)}/${referenceLimit}` : "0/0"}`}
-        libraryBrowseLabel="从素材库选择"
-        libraryTileLabel="素材库"
+        clearLabel={t("audio.clearReferenceLabel")}
+        emptyHelp={referenceLimit > 0 ? t("audio.emptyHelpWithLimit") : t("audio.emptyHelpNoLimit")}
+        emptyLabel={referenceLimit > 0 ? t("audio.emptyLabelWithLimit") : t("audio.emptyLabelNoLimit")}
+        label={`${t("audio.referenceMediaLabel")} ${referenceLimit > 0 ? `${Math.min(referenceImages.length, referenceLimit)}/${referenceLimit}` : "0/0"}`}
+        libraryBrowseLabel={t("audio.libraryBrowseLabel")}
+        libraryTileLabel={t("audio.libraryTileLabel")}
         maxCount={referenceLimit}
         references={referenceImages}
-        uploadLabel={referenceLimit > 0 ? "上传参考" : "不可上传"}
+        uploadLabel={referenceLimit > 0 ? t("audio.uploadLabelWithLimit") : t("audio.uploadLabelNoLimit")}
         onClear={onClearReferences}
         onDropAsset={onReferenceDropAsset}
         onDropFiles={onReferenceDropFiles}
@@ -453,7 +455,7 @@ export default function AudioGenerationPanel({
           <input
             value={audioStylePrompt}
             onChange={event => onAudioStylePromptChange(event.target.value)}
-            placeholder={mode === "voice_design" ? "例如：温暖、年轻、自然叙事感" : "例如：平静讲述、广告旁白、轻松口播"}
+            placeholder={mode === "voice_design" ? t("audio.stylePromptPlaceholderVoiceDesign") : t("audio.stylePromptPlaceholderVoiceClone")}
             className="imagine-input h-9 w-full rounded-md px-3 text-xs"
           />
         </div>
@@ -461,7 +463,7 @@ export default function AudioGenerationPanel({
 
       {mode === "asr" && (
         <div>
-          <label className="imagine-section-label mb-1.5 block">转写语言</label>
+          <label className="imagine-section-label mb-1.5 block">{t("audio.transcribeLanguageLabel")}</label>
           <select value={asrLanguage} onChange={event => onAsrLanguageChange(event.target.value as "auto" | "zh" | "en")} className="imagine-select py-2.5">
             {ASR_LANGUAGE_OPTIONS.map(option => (
               <option key={option.value} value={option.value}>{option.label}</option>
@@ -473,7 +475,7 @@ export default function AudioGenerationPanel({
       {showVoiceProfileLibrary && (
         <div className="rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-3 text-[var(--iw-text)]">
           <div className="mb-2 flex items-center justify-between gap-2">
-            <label className="imagine-section-label">音色库</label>
+            <label className="imagine-section-label">{t("audio.voiceLibraryLabel")}</label>
             <div className="flex items-center gap-1.5">
               {canSaveVoiceProfile && !isVoiceProfileEditorOpen && (
                 <button
@@ -482,7 +484,7 @@ export default function AudioGenerationPanel({
                   className="imagine-tone-chip flex h-7 items-center gap-1 rounded-md border px-2 text-[10px] font-semibold transition"
                   data-tone="warning"
                 >
-                  保存
+                  {t("audio.saveButton")}
                 </button>
               )}
               {selectedVoiceProfile && selectedVoiceProfile.source !== "builtin" && (
@@ -494,7 +496,7 @@ export default function AudioGenerationPanel({
                     data-tone="warning"
                   >
                     <Pencil className="h-3 w-3" />
-                    编辑
+                    {t("audio.editButton")}
                   </button>
                   <button
                     type="button"
@@ -503,7 +505,7 @@ export default function AudioGenerationPanel({
                     data-tone="danger"
                   >
                     <Trash2 className="h-3 w-3" />
-                    删除
+                    {t("audio.deleteButton")}
                   </button>
                 </>
               )}
@@ -513,7 +515,7 @@ export default function AudioGenerationPanel({
             <input
               value={voiceProfileSearch}
               onChange={event => setVoiceProfileSearch(event.target.value)}
-              placeholder="搜索音色、标签或说明"
+              placeholder={t("audio.voiceProfileSearchPlaceholder")}
               className="imagine-input h-9 rounded-md px-3 text-xs"
             />
             <select
@@ -521,9 +523,9 @@ export default function AudioGenerationPanel({
               onChange={event => onSelectVoiceProfile(event.target.value)}
               className="imagine-select h-9 py-0 text-xs"
             >
-              <option value="">使用模型默认音色</option>
+              <option value="">{t("audio.useDefaultVoice")}</option>
               {selectedVoiceProfileId && !selectedVoiceProfile && (
-                <option value={selectedVoiceProfileId}>当前音色不可用于此模式</option>
+                <option value={selectedVoiceProfileId}>{t("audio.voiceUnavailableForMode")}</option>
               )}
               {selectedVoiceProfile && !filteredVoiceProfiles.some(profile => profile.id === selectedVoiceProfile.id) && (
                 <option value={selectedVoiceProfile.id}>{selectedVoiceProfile.name}</option>
@@ -535,13 +537,13 @@ export default function AudioGenerationPanel({
             {selectedCloneVoiceProfile && (
               <div className="rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)] p-2 text-[11px] text-[var(--iw-muted)]">
                 <div className="mb-1 flex items-center justify-between gap-2">
-                  <span>参考音频已由音色库提供</span>
-                  <span>{selectedCloneVoiceProfile.referenceAudioAssetIds.length} 个源</span>
+                  <span>{t("audio.cloneReferenceProvided")}</span>
+                  <span>{selectedCloneVoiceProfile.referenceAudioAssetIds.length} {t("audio.cloneSourceCount", { count: selectedCloneVoiceProfile.referenceAudioAssetIds.length })}</span>
                 </div>
                 {voiceProfilePreviewUrl ? (
                   <VoiceProfilePreviewPlayer src={voiceProfilePreviewUrl} />
                 ) : (
-                  <p className="text-[var(--iw-muted)]">源音频不可预览或已缺失</p>
+                  <p className="text-[var(--iw-muted)]">{t("audio.sourceAudioUnavailable")}</p>
                 )}
               </div>
             )}
@@ -550,13 +552,13 @@ export default function AudioGenerationPanel({
                 <input
                   value={voiceProfileName}
                   onChange={event => setVoiceProfileName(event.target.value)}
-                  placeholder={editingVoiceProfileId ? "音色名称" : "新音色名称"}
+                  placeholder={editingVoiceProfileId ? t("audio.voiceProfileNamePlaceholderEdit") : t("audio.voiceProfileNamePlaceholderNew")}
                   className="imagine-input h-9 rounded-md px-3 text-xs"
                 />
                 <textarea
                   value={voiceProfileDescription}
                   onChange={event => setVoiceProfileDescription(event.target.value)}
-                  placeholder="简短信息，例如：青年男声，自然口播"
+                  placeholder={t("audio.voiceProfileDescriptionPlaceholder")}
                   className="imagine-input min-h-16 resize-y rounded-md px-3 py-2 text-xs"
                   maxLength={180}
                 />
@@ -590,14 +592,14 @@ export default function AudioGenerationPanel({
                     onClick={() => void handleSaveVoiceProfile()}
                     className="imagine-secondary-action h-9 rounded-md border px-3 text-xs font-semibold"
                   >
-                    {editingVoiceProfileId ? "更新音色" : "保存当前音色"}
+                    {editingVoiceProfileId ? t("audio.saveVoiceProfileButtonUpdate") : t("audio.saveVoiceProfileButtonNew")}
                   </button>
                   <button
                     type="button"
                     onClick={closeVoiceProfileEditor}
                     className="imagine-secondary-action h-9 rounded-md border px-3 text-xs font-semibold"
                   >
-                    取消
+                    {t("audio.cancelButton")}
                   </button>
                 </div>
               </>
@@ -623,7 +625,7 @@ export default function AudioGenerationPanel({
                 onChange={event => onVoiceCloneConsentChange(event.target.checked)}
                 className="mt-1 h-3.5 w-3.5 rounded border-[var(--iw-border)] bg-[var(--iw-panel)] text-amber-600 focus:ring-amber-500/25"
               />
-              我确认拥有参考音频的使用权，并允许用于本次音色克隆。
+              {t("audio.cloneConsentText")}
             </label>
           )}
           {voiceProfileMessage && <p className="mt-2 text-[11px] text-[var(--iw-text)]">{voiceProfileMessage}</p>}
@@ -635,7 +637,7 @@ export default function AudioGenerationPanel({
           mode="audio"
           disabled={isSubmitting || !hasRequiredInput || (needsCloneConsent && !voiceCloneConsentAccepted)}
           isSubmitting={isSubmitting}
-          label={mode === "asr" ? "转写音频" : "生成音频"}
+          label={mode === "asr" ? t("audio.generateLabelASR") : t("audio.generateLabelDefault")}
           submitCount={submitCount}
           onGenerate={onGenerate}
         />

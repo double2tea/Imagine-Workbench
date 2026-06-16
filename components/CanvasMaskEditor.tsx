@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from "react";
+import { useTranslations } from "@/lib/i18n";
 import {
   Check,
   Crop,
@@ -92,59 +93,26 @@ const TEXT_COLORS = ["#ffffff", "#111827", "#f97316", "#38bdf8", "#facc15"] as c
 const CROP_HANDLE_HIT_SIZE = 14;
 const CROP_MIN_SIZE = 16;
 const EDITOR_CANVAS_MAX_SIZE: CanvasSize = { width: 760, height: 560 };
+const CROP_PRESETS: Array<{ id: CropPresetId; ratio: AspectRatio | null }> = [
+  { id: "free", ratio: null },
+  { id: "original", ratio: null },
+  { id: "1:1", ratio: { width: 1, height: 1 } },
+  { id: "4:5", ratio: { width: 4, height: 5 } },
+  { id: "3:4", ratio: { width: 3, height: 4 } },
+  { id: "4:3", ratio: { width: 4, height: 3 } },
+  { id: "16:9", ratio: { width: 16, height: 9 } },
+  { id: "9:16", ratio: { width: 9, height: 16 } },
+];
+const EDITOR_MODE_OPTIONS: Array<{ mode: CanvasEditorMode; icon: React.ReactNode }> = [
+  { mode: "mask", icon: <Paintbrush className="h-3.5 w-3.5" /> },
+  { mode: "erase", icon: <Eraser className="h-3.5 w-3.5" /> },
+  { mode: "compare", icon: <ScanSearch className="h-3.5 w-3.5" /> },
+  { mode: "text", icon: <Type className="h-3.5 w-3.5" /> },
+  { mode: "crop", icon: <Crop className="h-3.5 w-3.5" /> },
+  { mode: "outpaint", icon: <SquareDashed className="h-3.5 w-3.5" /> },
+];
 const OUTPAINT_HANDLE_HIT_SIZE = 28;
 const OUTPAINT_MAX_MARGIN = 600;
-const CROP_PRESETS: Array<{ id: CropPresetId; label: string; ratio: AspectRatio | null }> = [
-  { id: "free", label: "自由", ratio: null },
-  { id: "original", label: "原图", ratio: null },
-  { id: "1:1", label: "1:1", ratio: { width: 1, height: 1 } },
-  { id: "4:5", label: "4:5", ratio: { width: 4, height: 5 } },
-  { id: "3:4", label: "3:4", ratio: { width: 3, height: 4 } },
-  { id: "4:3", label: "4:3", ratio: { width: 4, height: 3 } },
-  { id: "16:9", label: "16:9", ratio: { width: 16, height: 9 } },
-  { id: "9:16", label: "9:16", ratio: { width: 9, height: 16 } },
-];
-const EDITOR_MODE_OPTIONS: Array<{ mode: CanvasEditorMode; label: string; hint: string; icon: React.ReactNode }> = [
-  { mode: "mask", label: "遮罩", hint: "标记需要重绘的区域", icon: <Paintbrush className="h-3.5 w-3.5" /> },
-  { mode: "erase", label: "橡皮", hint: "擦除已绘制遮罩", icon: <Eraser className="h-3.5 w-3.5" /> },
-  { mode: "compare", label: "对比", hint: "左右对比原图与当前编辑状态", icon: <ScanSearch className="h-3.5 w-3.5" /> },
-  { mode: "text", label: "文字", hint: "点击画布放置文字", icon: <Type className="h-3.5 w-3.5" /> },
-  { mode: "crop", label: "裁切", hint: "拖动选框或把手调整构图", icon: <Crop className="h-3.5 w-3.5" /> },
-  { mode: "outpaint", label: "扩图", hint: "设置四周扩展像素", icon: <SquareDashed className="h-3.5 w-3.5" /> },
-];
-
-const OPERATION_COPY: Record<ImageEditFeature, { title: string; hint: string; promptPlaceholder: string }> = {
-  redraw: {
-    title: "重绘",
-    hint: "绘制蒙版并描述要替换的新内容",
-    promptPlaceholder: "例如：把杯子换成玻璃花瓶，保持原有光线",
-  },
-  erase: {
-    title: "擦除",
-    hint: "绘制要移除的区域，系统会补全背景",
-    promptPlaceholder: "可选：补全背景的要求",
-  },
-  outpaint: {
-    title: "扩图",
-    hint: "设置扩展边距并描述延展方向",
-    promptPlaceholder: "例如：向右延展厨房台面和窗外自然光",
-  },
-  cutout: {
-    title: "抠图",
-    hint: "移除背景并保留主体",
-    promptPlaceholder: "可选：主体保留要求",
-  },
-  angle: {
-    title: "角度",
-    hint: "通过视角控件调整画面角度",
-    promptPlaceholder: "例如：调整为低角度中景，保持主体一致",
-  },
-  lighting: {
-    title: "打光",
-    hint: "通过灯光控件调整画面光线",
-    promptPlaceholder: "例如：从左前方加入暖色主光",
-  },
-};
 
 function defaultOutpaintMargins() {
   return { left: 0, right: 0, top: 0, bottom: 0 };
@@ -303,6 +271,7 @@ export default function CanvasMaskEditor({
   onClose,
   onSaveMask,
 }: CanvasMaskEditorProps) {
+  const { t } = useTranslations("creation");
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const bgImgRef = useRef<HTMLImageElement | null>(null);
   const cropDragStateRef = useRef<CropDragState | null>(null);
@@ -322,7 +291,7 @@ export default function CanvasMaskEditor({
   const [hasLocalEdits, setHasLocalEdits] = useState(false);
   const [canvasSize, setCanvasSize] = useState<CanvasSize>({ width: 500, height: 500 });
   const [imgLoaded, setImgLoaded] = useState(false);
-  const [textValue, setTextValue] = useState("新文字");
+  const [textValue, setTextValue] = useState(t("canvasMaskEditor.defaultTextValue"));
   const [textSize, setTextSize] = useState(36);
   const [textColor, setTextColor] = useState<(typeof TEXT_COLORS)[number]>("#ffffff");
   const [textItems, setTextItems] = useState<TextOverlay[]>([]);
@@ -363,8 +332,10 @@ export default function CanvasMaskEditor({
     ? EDITOR_MODE_OPTIONS.filter(option => option.mode === "outpaint")
     : EDITOR_MODE_OPTIONS.filter(option => option.mode !== "outpaint");
   const activeMode = visibleModeOptions.find(option => option.mode === editorMode) ?? visibleModeOptions[0] ?? EDITOR_MODE_OPTIONS[0];
-  const operationCopy = operation ? OPERATION_COPY[operation] : null;
-  const cropSizeLabel = cropRect ? `${Math.round(cropRect.width)} x ${Math.round(cropRect.height)}` : "未选择";
+  const resolvedOperationTitle = operation ? t(`canvasMaskEditor.operations.${operation}.title`) : null;
+  const resolvedOperationHint = operation ? t(`canvasMaskEditor.operations.${operation}.hint`) : null;
+  const resolvedOperationPromptPlaceholder = operation ? t(`canvasMaskEditor.operations.${operation}.promptPlaceholder`) : null;
+  const cropSizeLabel = cropRect ? `${Math.round(cropRect.width)} x ${Math.round(cropRect.height)}` : t("canvasMaskEditor.cropSizeUnselected");
 
   useEffect(() => {
     if (!isOpen || !workingImageUrl) return;
@@ -898,7 +869,7 @@ export default function CanvasMaskEditor({
     }
   };
 
-  const renderModeButton = ({ mode, label, hint, icon }: { mode: CanvasEditorMode; label: string; hint: string; icon: React.ReactNode }) => (
+  const renderModeButton = ({ mode, icon }: { mode: CanvasEditorMode; icon: React.ReactNode }) => (
     <OperationSegmentButton
       key={mode}
       type="button"
@@ -907,10 +878,10 @@ export default function CanvasMaskEditor({
         setEditorMode(mode);
       }}
       active={editorMode === mode}
-      title={hint}
+      title={t(`canvasMaskEditor.editorModes.${mode}.hint`)}
     >
       {icon}
-      {label}
+      {t(`canvasMaskEditor.editorModes.${mode}.label`)}
     </OperationSegmentButton>
   );
 
@@ -925,17 +896,17 @@ export default function CanvasMaskEditor({
               ) : (
                 <Paintbrush className="h-4 w-4 text-[var(--iw-accent)]" />
               )}
-              {operationCopy ? operationCopy.title : "图片编辑器"}
+              {resolvedOperationTitle ?? t("canvasMaskEditor.titleDefault")}
             </h3>
             <p className="mt-1 text-xs text-[var(--iw-muted)]">
-              {operationCopy ? operationCopy.hint : `${activeMode.label}: ${activeMode.hint}`}
+              {resolvedOperationHint ?? `${t(`canvasMaskEditor.editorModes.${activeMode.mode}.label`)}: ${t(`canvasMaskEditor.editorModes.${activeMode.mode}.hint`)}`}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="imagine-icon-button rounded-lg p-1.5 text-[var(--iw-muted)] transition"
-            aria-label="关闭图片编辑器"
+            aria-label={t("canvasMaskEditor.closeAriaLabel")}
           >
             <X className="h-5 w-5" />
           </button>
@@ -946,7 +917,7 @@ export default function CanvasMaskEditor({
             {!imgLoaded ? (
               <div className="flex flex-col items-center justify-center gap-2 text-[var(--iw-muted)]">
                 <RefreshCw className="h-8 w-8 animate-spin" />
-                <span className="text-sm">正在加载工作面板像素...</span>
+                <span className="text-sm">{t("canvasMaskEditor.loadingMessage")}</span>
               </div>
             ) : (
               <div
@@ -1031,8 +1002,8 @@ export default function CanvasMaskEditor({
                 {editorMode === "compare" && (
                   <div className="pointer-events-none absolute inset-0 z-40 grid grid-cols-2 overflow-hidden">
                     {[
-                      { label: "原图", url: imageUrl },
-                      { label: "当前", url: compareCurrentUrl ?? workingImageUrl },
+                      { label: t("canvasMaskEditor.compareLabels.original"), url: imageUrl },
+                      { label: t("canvasMaskEditor.compareLabels.current"), url: compareCurrentUrl ?? workingImageUrl },
                     ].map(item => (
                       <div
                         key={item.label}
@@ -1108,26 +1079,26 @@ export default function CanvasMaskEditor({
 
           <aside className="flex min-h-0 flex-col border-t border-[var(--iw-border)] bg-[var(--iw-panel)]/72 lg:border-l lg:border-t-0">
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3 sm:p-4">
-            <OperationSection label="工具">
+            <OperationSection label={t("canvasMaskEditor.toolSectionLabel")}>
               <div className={`grid gap-1 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)]/80 p-1 ${visibleModeOptions.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
                 {visibleModeOptions.map(option => renderModeButton(option))}
               </div>
             </OperationSection>
 
-            <OperationSection label="参数">
+            <OperationSection label={t("canvasMaskEditor.paramSectionLabel")}>
               <div className="mb-1.5 flex items-center justify-between gap-3 text-[10px] text-[var(--iw-muted)]">
-                <span className="min-w-0 truncate">{activeMode.hint}</span>
+                <span className="min-w-0 truncate">{t(`canvasMaskEditor.editorModes.${activeMode.mode}.hint`)}</span>
               </div>
 
               {operation && operation !== "cutout" && (
                 <OperationControlGroup className="mb-2">
                   <label className="flex items-center gap-2 text-[10px] font-semibold text-[var(--iw-muted)]">
-                    <span>分辨率</span>
+                    <span>{t("canvasMaskEditor.resolutionLabel")}</span>
                     <select
                       value={selectedImageResolution}
                       onChange={event => setImageResolution(event.target.value)}
                       className="imagine-input h-8 w-28 text-xs"
-                      aria-label="图片编辑分辨率"
+                      aria-label={t("canvasMaskEditor.resolutionAriaLabel")}
                     >
                       {resolutionOptions.map(option => (
                         <option key={option.value} value={option.value}>{option.label}</option>
@@ -1149,16 +1120,16 @@ export default function CanvasMaskEditor({
                       value={brushSize}
                       onChange={(event) => setBrushSize(Number(event.target.value))}
                       className="h-1 w-32 cursor-pointer accent-blue-500"
-                      aria-label="笔刷大小"
+                      aria-label={t("canvasMaskEditor.brushSizeLabel")}
                     />
                   </div>
                   <button
                     type="button"
                     onClick={invertMask}
                     className="imagine-secondary-action h-8 rounded-md border border-[var(--iw-border)] px-2.5 text-xs font-semibold"
-                    title="反选遮罩区域"
+                    title={t("canvasMaskEditor.invertMaskTitle")}
                   >
-                    反选
+                    {t("canvasMaskEditor.invertMaskButton")}
                   </button>
                   <button
                     type="button"
@@ -1167,7 +1138,7 @@ export default function CanvasMaskEditor({
                     data-action="danger"
                   >
                     <Eraser className="h-3.5 w-3.5" />
-                    清蒙版
+                    {t("canvasMaskEditor.clearMaskButton")}
                   </button>
                 </OperationControlGroup>
               )}
@@ -1179,7 +1150,7 @@ export default function CanvasMaskEditor({
                     value={textValue}
                     onChange={(event) => setTextValue(event.target.value)}
                     className="h-8 w-40 rounded-md border border-[var(--iw-border)] bg-[var(--iw-bg)]/70 px-3 text-xs text-[var(--iw-text)] outline-none transition focus:border-blue-400/45"
-                    aria-label="文字内容"
+                    aria-label={t("canvasMaskEditor.textContentLabel")}
                   />
                   <div className="flex items-center gap-2">
                     <span className="w-8 font-mono text-xs text-[var(--iw-muted)]">{textSize}</span>
@@ -1190,7 +1161,7 @@ export default function CanvasMaskEditor({
                       value={textSize}
                       onChange={(event) => setTextSize(Number(event.target.value))}
                       className="h-1 w-24 cursor-pointer accent-blue-500"
-                      aria-label="文字大小"
+                      aria-label={t("canvasMaskEditor.textSizeLabel")}
                     />
                   </div>
                   <div className="flex h-8 items-center gap-1 rounded-md border border-[var(--iw-border)] bg-[var(--iw-bg)]/60 px-2">
@@ -1203,7 +1174,7 @@ export default function CanvasMaskEditor({
                           textColor === color ? "border-blue-300 ring-2 ring-blue-400/30" : "border-white/20"
                         }`}
                         style={{ backgroundColor: color }}
-                        aria-label={`选择文字颜色 ${color}`}
+                        aria-label={`${t("canvasMaskEditor.selectTextColorLabel")} ${color}`}
                       />
                     ))}
                   </div>
@@ -1213,7 +1184,7 @@ export default function CanvasMaskEditor({
                     className="imagine-secondary-action h-8 rounded-md border border-[var(--iw-border)] px-2.5 text-xs font-semibold"
                     data-action="danger"
                   >
-                    清文字
+                    {t("canvasMaskEditor.clearTextButton")}
                   </button>
                 </OperationControlGroup>
               )}
@@ -1221,15 +1192,21 @@ export default function CanvasMaskEditor({
               {editorMode === "crop" && (
                 <OperationControlGroup>
                   <label className="flex items-center gap-2 text-[10px] font-semibold text-[var(--iw-muted)]">
-                    <span>比例</span>
+                    <span>{t("canvasMaskEditor.cropRatioLabel")}</span>
                     <select
                       value={cropPresetId}
                       onChange={event => selectCropPreset(event.target.value as CropPresetId)}
                       className="imagine-input h-8 w-28 text-xs"
-                      aria-label="裁切比例"
+                      aria-label={t("canvasMaskEditor.cropRatioAriaLabel")}
                     >
-                      {CROP_PRESETS.map(preset => (
-                        <option key={preset.id} value={preset.id}>{preset.label}</option>
+                      {CROP_PRESETS.map((preset) => (
+                        <option key={preset.id} value={preset.id}>
+                          {preset.id === "free"
+                            ? t("canvasMaskEditor.cropPresets.free")
+                            : preset.id === "original"
+                              ? t("canvasMaskEditor.cropPresets.original")
+                              : preset.id}
+                        </option>
                       ))}
                     </select>
                   </label>
@@ -1247,7 +1224,7 @@ export default function CanvasMaskEditor({
                     }`}
                   >
                     <Crop className="h-3.5 w-3.5" />
-                    执行裁切
+                    {t("canvasMaskEditor.executeCropButton")}
                   </button>
                   <button
                     type="button"
@@ -1255,7 +1232,7 @@ export default function CanvasMaskEditor({
                     className="imagine-secondary-action h-8 rounded-md border border-[var(--iw-border)] px-3 text-xs font-semibold"
                     data-action="danger"
                   >
-                    清选区
+                    {t("canvasMaskEditor.clearCropButton")}
                   </button>
                 </OperationControlGroup>
               )}
@@ -1264,7 +1241,7 @@ export default function CanvasMaskEditor({
                 <OperationControlGroup>
                   {(["left", "right", "top", "bottom"] as const).map(side => (
                     <span key={side} className="rounded-md border border-[var(--iw-border)] bg-[var(--iw-bg)]/60 px-2.5 py-1.5 text-[10px] font-semibold text-[var(--iw-muted)]">
-                      <span className="w-8">{side === "left" ? "左" : side === "right" ? "右" : side === "top" ? "上" : "下"}</span>
+                      <span className="w-8">{side === "left" ? t("canvasMaskEditor.outpaintSideLabels.left") : side === "right" ? t("canvasMaskEditor.outpaintSideLabels.right") : side === "top" ? t("canvasMaskEditor.outpaintSideLabels.top") : t("canvasMaskEditor.outpaintSideLabels.bottom")}</span>
                       <span className="ml-2 font-mono">{outpaintMargins[side]}px</span>
                     </span>
                   ))}
@@ -1274,7 +1251,7 @@ export default function CanvasMaskEditor({
                     className="imagine-secondary-action h-8 rounded-md border border-[var(--iw-border)] px-2.5 text-xs font-semibold"
                     data-action="danger"
                   >
-                    清扩图
+                    {t("canvasMaskEditor.clearOutpaintButton")}
                   </button>
                 </OperationControlGroup>
               )}
@@ -1284,9 +1261,9 @@ export default function CanvasMaskEditor({
                   <textarea
                     value={editPrompt}
                     onChange={event => setEditPrompt(event.target.value)}
-                    placeholder={operationCopy?.promptPlaceholder}
+                    placeholder={resolvedOperationPromptPlaceholder ?? ""}
                     className="imagine-field-textarea h-24 resize-none text-xs"
-                    aria-label={`${operationCopy?.title ?? "图片编辑"}提示词`}
+                    aria-label={t("canvasMaskEditor.promptAriaLabel", { title: resolvedOperationTitle ?? "" })}
                   />
                 </div>
               ) : null}
@@ -1302,7 +1279,7 @@ export default function CanvasMaskEditor({
                 className="w-full"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
-                重置
+                {t("canvasMaskEditor.resetButton")}
               </OperationActionButton>
               <OperationActionButton
                 type="button"
@@ -1313,7 +1290,7 @@ export default function CanvasMaskEditor({
                 className="w-full"
               >
                 <Check className="h-4 w-4" />
-                {isSaving ? "应用中" : "应用编辑"}
+                {isSaving ? t("canvasMaskEditor.applySaving") : t("canvasMaskEditor.applyButton")}
               </OperationActionButton>
             </div>
           </aside>

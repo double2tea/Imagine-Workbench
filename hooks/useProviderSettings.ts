@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n";
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { ProviderTestState } from "@/components/settings/provider-settings-types";
 import {
@@ -131,7 +132,7 @@ async function syncResolveProviderCredential(
     }),
   });
   if (!res.ok) {
-    throw new Error(await readFetchError(res, "Resolve 插件共享配置同步失败"));
+    throw new Error(await readFetchError(res, t("common.notices.resolvePluginSyncFailed")));
   }
 }
 
@@ -145,7 +146,7 @@ function syncStoredResolveCredentials(
     const item = credentials[provider];
     if (!item?.apiKey && !item?.baseUrl) continue;
     void syncResolveProviderCredential(provider, item, getLabel(provider)).catch(error => {
-      pushWorkspaceNotice("error", toErrorMessage(error, "Resolve 插件共享配置同步失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.resolvePluginSyncFailed")));
     });
   }
 }
@@ -216,7 +217,7 @@ export function useProviderSettings({
   ): void => {
     if (!isResolveIntegrationEnabled) return;
     void syncResolveProviderCredential(provider, credentials, providerLabel).catch(error => {
-      pushWorkspaceNotice("error", toErrorMessage(error, "Resolve 插件共享配置同步失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.resolvePluginSyncFailed")));
     });
   }, [isResolveIntegrationEnabled, pushWorkspaceNotice]);
 
@@ -248,15 +249,14 @@ export function useProviderSettings({
   const addCustomProvider = useCallback((label: string, baseUrl: string): boolean => {
     const cleanLabel = label.trim();
     if (!cleanLabel || !baseUrl.trim()) {
-      const message = "请输入服务商名称和 Base URL";
-      pushWorkspaceNotice("error", message);
+      pushWorkspaceNotice("error", t("common.notices.enterProviderNameAndUrl"));
       return false;
     }
     let cleanBaseUrl: string;
     try {
       cleanBaseUrl = normalizeCustomProviderBaseUrl(baseUrl);
     } catch (error) {
-      pushWorkspaceNotice("error", error instanceof Error ? error.message : "Base URL 格式无效");
+      pushWorkspaceNotice("error", error instanceof Error ? error.message : t("common.notices.baseUrlFormatInvalid"));
       return false;
     }
     const key = createCustomProviderKey(cleanLabel, providerKeys);
@@ -282,7 +282,7 @@ export function useProviderSettings({
     }));
     setSelectedProvider(key);
     try { localStorage.setItem("imagine_ai_provider", key); } catch { /* storage unavailable */ }
-    pushWorkspaceNotice("success", `已添加 ${cleanLabel}`);
+    pushWorkspaceNotice("success", t("common.notices.providerAdded", { name: cleanLabel }));
     return true;
   }, [providerKeys, pushWorkspaceNotice, syncResolveProviderCredentialIfEnabled]);
 
@@ -320,7 +320,7 @@ export function useProviderSettings({
       setSelectedProvider("12ai");
       try { localStorage.setItem("imagine_ai_provider", "12ai"); } catch { /* storage unavailable */ }
     }
-    pushWorkspaceNotice("success", `已删除 ${customProvider.label}`);
+    pushWorkspaceNotice("success", t("common.notices.providerDeleted", { name: customProvider.label }));
   }, [customProviderByKey, pushWorkspaceNotice, selectedChatModel, selectedProvider, syncResolveProviderCredentialIfEnabled]);
 
   const handleSelectChatModel = (model: string) => {
@@ -346,7 +346,7 @@ export function useProviderSettings({
   const addManualModels = (category: ModelCategory, rawInput: string) => {
     const modelNames = parseManualModelNames(rawInput);
     if (modelNames.length === 0) {
-      const message = "请输入至少一个模型名称";
+      const message = t("common.notices.enterAtLeastOneModelName");
       setModelListMessage(message);
       pushWorkspaceNotice("error", message);
       return;
@@ -355,7 +355,7 @@ export function useProviderSettings({
     const byProvider = groupManualModels(category, selectedProvider, modelNames, getProviderLabel(selectedProvider), providerKeys);
     const manualCount = countManualModels(byProvider);
     if (manualCount === 0) {
-      const message = `没有可添加的${modelCategoryLabel(category)}模型`;
+      const message = t("common.notices.noAddableModels", { category: modelCategoryLabel(category) });
       setModelListMessage(message);
       pushWorkspaceNotice("error", message);
       return;
@@ -374,7 +374,7 @@ export function useProviderSettings({
       saveModelOptions(category, setAudioModelOptions, next);
     }
 
-    const message = `已添加 ${manualCount} 个${modelCategoryLabel(category)}模型`;
+    const message = t("common.notices.addedModels", { count: manualCount, category: modelCategoryLabel(category) });
     setModelListMessage(message);
     pushWorkspaceNotice("success", message);
   };
@@ -383,7 +383,7 @@ export function useProviderSettings({
     const valueSet = new Set(values);
     const selectedModels = (fetchedModelOptions[selectedProvider]?.[category] ?? []).filter(option => valueSet.has(option.value));
     if (selectedModels.length === 0) {
-      const message = "请选择要添加的模型";
+      const message = t("common.notices.selectModelsToAdd");
       setModelListMessage(message);
       pushWorkspaceNotice("error", message);
       return;
@@ -403,7 +403,7 @@ export function useProviderSettings({
       saveModelOptions(category, setAudioModelOptions, next);
     }
 
-    const message = `已添加 ${selectedModels.length} 个${modelCategoryLabel(category)}模型`;
+    const message = t("common.notices.addedModels", { count: selectedModels.length, category: modelCategoryLabel(category) });
     setModelListMessage(message);
     pushWorkspaceNotice("success", message);
   };
@@ -415,7 +415,7 @@ export function useProviderSettings({
       const headers = buildProviderHeaders(selectedProvider);
       const res = await fetch(`/api/models?provider=${selectedProvider}&kind=all`, { headers });
       if (!res.ok) {
-        throw new Error(await readFetchError(res, "模型列表获取失败"));
+        throw new Error(await readFetchError(res, t("common.notices.modelListFetchFailed")));
       }
       const data: unknown = await res.json();
       const models = typeof data === "object" && data !== null && "models" in data
@@ -423,7 +423,7 @@ export function useProviderSettings({
         : [];
       const fetched: ModelOption[] = Array.isArray(models) ? models.filter(isModelOption) : [];
       if (fetched.length === 0) {
-        throw new Error("服务商没有返回可用模型");
+        throw new Error(t("common.notices.modelListEmpty"));
       }
 
       const fetchedChat = fetched.filter(option => classifyModelOption(option) === "chat").filter(isSelectableChatModel);
@@ -441,7 +441,7 @@ export function useProviderSettings({
         },
       }));
 
-      setModelListMessage(`已获取 ${fetched.length} 个模型：Chat ${fetchedChat.length} / Image ${fetchedImage.length} / Video ${fetchedVideo.length} / Audio ${fetchedAudio.length}，请选择后添加`);
+      setModelListMessage(t("common.notices.modelListFetched", { count: fetched.length, chat: fetchedChat.length, image: fetchedImage.length, video: fetchedVideo.length, audio: fetchedAudio.length }));
     } catch (err) {
       const message = toErrorMessage(err, "模型列表获取失败");
       setModelListMessage(message);
@@ -452,20 +452,20 @@ export function useProviderSettings({
   };
 
   const testProviderConnection = async (provider: AiProvider) => {
-    setProviderTest({ provider, status: "testing", message: "测试中..." });
+    setProviderTest({ provider, status: "testing", message: t("common.notices.testingConnection") });
     try {
       const res = await fetch(`/api/models?provider=${provider}`, {
         headers: buildProviderHeaders(provider),
       });
       if (!res.ok) {
-        throw new Error(await readFetchError(res, `${getProviderLabel(provider)} 连接测试失败`));
+        throw new Error(await readFetchError(res, t("common.notices.providerConnectionTestFailed", { providerLabel: getProviderLabel(provider) })));
       }
-      setProviderTest({ provider, status: "success", message: `${getProviderLabel(provider)} 连接正常` });
+      setProviderTest({ provider, status: "success", message: t("common.notices.providerConnectionOk", { providerLabel: getProviderLabel(provider) }) });
     } catch (err) {
       setProviderTest({
         provider,
         status: "error",
-        message: toErrorMessage(err, `${getProviderLabel(provider)} 连接测试失败`),
+        message: toErrorMessage(err, t("common.notices.providerConnectionTestFailed", { providerLabel: getProviderLabel(provider) })),
       });
     }
   };

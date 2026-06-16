@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n";
 import { AGENT_BOARD_PATCH_MAX_OPERATIONS, type AgentGenerationParams, type AgentToolAction } from "./agent-actions";
 import { audioOperationMissingReferenceMessage, audioOperationRequiresTextInput } from "./audio-operation-rules";
 import { getMediaReferenceType, mediaReferenceLabel, type MediaReference } from "./media-references";
@@ -203,26 +204,26 @@ export function validateAgentToolAction(
   const params = action.params ?? {};
 
   if (action.type === "optimize_prompt") {
-    return params.prompt?.trim() ? null : "请先填写提示词";
+    return params.prompt?.trim() ? null : t("common.notices.promptOptimizationFailed");
   }
 
   if (action.type === "edit_image") {
-    if (!params.prompt?.trim()) return "请先填写编辑提示词";
+    if (!params.prompt?.trim()) return t("common.notices.promptOptimizationFailed");
     if (!context.hasEditReference) {
-      return "请先提供编辑参考图（@ 引用画廊资产或上传到 Agent）";
+      return t("common.notices.agentReferenceReadFailed");
     }
     return null;
   }
 
   if (action.type === "generate_audio" || action.type === "create_board_audio_flow") {
-    if (!params.model?.trim()) return "请先选择生成模型";
-    if (!isKnownAudioModel(params.model)) return "请先选择音频模型";
+    if (!params.model?.trim()) return t("common.notices.audioGenNeedModel");
+    if (!isKnownAudioModel(params.model)) return t("common.notices.audioGenNeedModel");
     const capabilities = getAudioModelCapabilities(params.model);
     const audioMode = params.audioMode && capabilities.modes.includes(params.audioMode)
       ? params.audioMode
       : capabilities.defaultMode;
-    if (audioOperationRequiresTextInput(audioMode) && !params.prompt?.trim()) return "请先填写提示词";
-    if (audioMode === "voice_clone" && params.voiceCloneConsentAccepted !== true) return "音色克隆需要先确认参考音频授权";
+    if (audioOperationRequiresTextInput(audioMode) && !params.prompt?.trim()) return t("common.notices.agentReferenceReadFailed");
+    if (audioMode === "voice_clone" && params.voiceCloneConsentAccepted !== true) return t("common.notices.voiceCloneNeedsConsent");
     const references = context.references ?? [];
     const unsupportedReference = references.find(reference => !capabilities.referenceMediaTypes.includes(getMediaReferenceType(reference)));
     if (unsupportedReference) return `当前音频模型不支持${mediaReferenceLabel(getMediaReferenceType(unsupportedReference))}参考`;

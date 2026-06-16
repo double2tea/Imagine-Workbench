@@ -1,6 +1,7 @@
 import { Clock3, ImageDown, SkipBack, SkipForward, type LucideIcon } from "lucide-react";
 import { WorkbenchPopoverMenu, WorkbenchPopoverMenuItem, type WorkbenchPopoverPlacement, type WorkbenchPopoverSurface } from "@/components/workbench/OperationControls";
 import { getVideoFrameCaptureLabel, type VideoFrameCaptureMode } from "@/lib/video-frame";
+import { useTranslations } from "@/lib/i18n";
 
 const frameCaptureActions: Array<{
   icon: LucideIcon;
@@ -32,6 +33,7 @@ export default function VideoFrameMenu({
   surface = "floating",
   variant = "compact",
 }: VideoFrameMenuProps) {
+  const { t } = useTranslations("common");
   const iconClassName = surface === "panel" ? "text-[var(--iw-accent)]" : "text-[var(--iw-tone-info-text)]";
 
   return (
@@ -40,12 +42,12 @@ export default function VideoFrameMenu({
         type="button"
         onClick={onToggle}
         className={buttonClassName}
-        title="截取视频帧"
-        aria-label="截取视频帧"
+        title={t("videoFrame.captureTitle")}
+        aria-label={t("videoFrame.captureTitle")}
         aria-expanded={isOpen}
       >
         <ImageDown className={variant === "full" ? "h-4.5 w-4.5" : "h-3 w-3"} />
-        {variant === "full" ? <span className="text-xs font-semibold">截帧</span> : <span className="text-[9px] font-bold">截帧</span>}
+        {variant === "full" ? <span className="text-xs font-semibold">{t("videoFrame.captureLabel")}</span> : <span className="text-[9px] font-bold">{t("videoFrame.captureLabel")}</span>}
       </button>
       {isOpen && (
         <WorkbenchPopoverMenu align={align} placement={placement} surface={surface}>

@@ -1,0 +1,12 @@
+{
+  "titles": {
+    "alert": "Notice",
+    "dangerConfirm": "Confirm Action",
+    "defaultConfirm": "Please Confirm"
+  },
+  "defaults": {
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "dismissAlert": "OK"
+  }
+}

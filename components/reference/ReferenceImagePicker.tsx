@@ -6,6 +6,7 @@ import {
   readDraggedReferenceAsset,
 } from "@/components/reference/referenceDrag";
 import { getMediaReferencePromptToken, getMediaReferenceType, mediaReferenceLabel, mediaReferenceTypeFromMime, type MediaReference, type MediaReferenceType } from "@/lib/media-references";
+import { t as globalT, useTranslations } from "@/lib/i18n";
 
 export interface ReferenceImageRef extends MediaReference {}
 
@@ -85,8 +86,8 @@ export default function ReferenceImagePicker({
   references,
   roleMode = false,
   uploadLabel,
-  libraryBrowseLabel = "从素材库选择",
-  libraryTileLabel = "素材库",
+  libraryBrowseLabel,
+  libraryTileLabel,
   onClear,
   onOpenLibrary,
   onDropAsset,
@@ -97,6 +98,9 @@ export default function ReferenceImagePicker({
   onUpload,
   acceptedMediaTypes = ["image"],
 }: ReferenceImagePickerProps) {
+  const { t } = useTranslations("common");
+  const browseLabel = libraryBrowseLabel ?? t("reference.libraryBrowseLabel");
+  const tileLabel = libraryTileLabel ?? t("reference.libraryTileLabel");
   const visibleReferenceItems = maxCount > 0
     ? references
       .map((reference, index) => ({ index, reference }))
@@ -180,7 +184,7 @@ export default function ReferenceImagePicker({
                 key={reference.id}
                 role={canEditReference ? "button" : undefined}
                 tabIndex={canEditReference ? 0 : undefined}
-                title={canEditReference ? "双击打开局部编辑、对比、裁切；键盘按 Enter 或 Space" : undefined}
+                title={canEditReference ? "Double-click to open local edit, compare, crop; press Enter or Space" : undefined}
                 onDoubleClick={handleReferenceDoubleClick}
                 onKeyDown={handleReferenceKeyDown}
                 className={`imagine-reference-thumb relative aspect-square rounded-lg border overflow-hidden bg-cover bg-center group transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 ${
@@ -207,7 +211,7 @@ export default function ReferenceImagePicker({
                   }}
                   onDoubleClick={event => event.stopPropagation()}
                   className="absolute top-1 right-1 bg-red-600/95 text-white rounded-md p-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition cursor-pointer hover:scale-105 z-10"
-                  title="移除该图"
+                  title={t("reference.removeImage")}
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -223,9 +227,9 @@ export default function ReferenceImagePicker({
                     className={`absolute inset-x-0 bottom-0 py-1 text-[9px] font-sans font-bold text-center text-white backdrop-blur-subtle cursor-pointer transition-colors ${
                       isStart ? "bg-emerald-600/80" : isEnd ? "bg-amber-600/80" : "bg-black/60 hover:bg-black/80"
                     }`}
-                    title="点击切换：首帧 / 尾帧 / 普通参考"
+                    title={t("reference.roleToggle")}
                   >
-                    {isStart ? `首帧 ${token}` : isEnd ? `尾帧 ${token}` : `${mediaReferenceLabel(mediaType)} ${token}`}
+                    {isStart ? `${globalT("media.videoFrameCapture.first")} ${token}` : isEnd ? `${globalT("media.videoFrameCapture.last")} ${token}` : `${mediaReferenceLabel(mediaType)} ${token}`}
                   </button>
                 ) : (
                   <div className="absolute bottom-0 inset-x-0 bg-black/65 text-[9px] font-mono text-slate-300 truncate px-1 py-0.5 text-center">
@@ -254,11 +258,11 @@ export default function ReferenceImagePicker({
                 <button
                   type="button"
                   onClick={onOpenLibrary}
-                  aria-label={libraryBrowseLabel}
+                  aria-label={browseLabel}
                   className="imagine-reference-add-tile"
                 >
                   <FolderHeart className="h-4 w-4" />
-                  <span className="mt-0.5 text-[9px] font-semibold">{libraryTileLabel}</span>
+                  <span className="mt-0.5 text-[9px] font-semibold">{tileLabel}</span>
                 </button>
               )}
             </>
@@ -268,7 +272,7 @@ export default function ReferenceImagePicker({
         <div className="imagine-upload-zone relative flex min-h-[76px] flex-col items-center justify-center rounded-lg border border-dashed p-3 text-center transition">
           <CloudUpload className="mb-1.5 h-5 w-5 text-[var(--iw-faint)]" />
           <span className="text-xs text-[var(--iw-muted)]">
-            {emptyLabel}，或{" "}
+            {emptyLabel} / {""}
               {maxCount > 0 ? (
                 <label className={browseClassName}>
                   {uploadLabel}
@@ -288,7 +292,7 @@ export default function ReferenceImagePicker({
                 <>
                   {" / "}
                   <button type="button" onClick={onOpenLibrary} className={browseClassName}>
-                    {libraryBrowseLabel}
+                    {browseLabel}
                   </button>
                 </>
               ) : null}

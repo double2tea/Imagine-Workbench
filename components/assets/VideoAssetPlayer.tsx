@@ -9,6 +9,7 @@ import {
   type CapturedVideoFrame,
   type VideoFrameCaptureMode,
 } from "@/lib/video-frame";
+import { useTranslations } from "@/lib/i18n";
 
 export type VideoFrameCaptureRequest = (mode: VideoFrameCaptureMode) => Promise<void>;
 
@@ -50,6 +51,7 @@ export default function VideoAssetPlayer({
   showFullscreenButton = true,
 }: VideoAssetPlayerProps) {
   const showAlert = useAlert();
+  const { t } = useTranslations("common");
   const containerRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
@@ -69,7 +71,7 @@ export default function VideoAssetPlayer({
       const frame = await captureVideoFrame(video, mode);
       await onCaptureFrame(item, frame);
     } catch (error) {
-      await showAlert({ message: error instanceof Error ? error.message : "视频截帧失败" });
+      await showAlert({ message: error instanceof Error ? error.message : t("videoPlayer.captureFailed") });
     }
   }, [item, onCaptureFrame, showAlert]);
 
@@ -153,7 +155,7 @@ export default function VideoAssetPlayer({
             type="button"
             onClick={togglePlay}
             className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-white transition hover:bg-white/12"
-            title={isPaused ? "播放" : "暂停"}
+            title={isPaused ? t("videoPlayer.play") : t("videoPlayer.pause")}
           >
             {isPaused ? <Play className="h-4 w-4 fill-white" /> : <Pause className="h-4 w-4 fill-white" />}
           </button>
@@ -179,14 +181,14 @@ export default function VideoAssetPlayer({
               value={rangeValue}
               onChange={event => seekTo(event.target.value)}
               className="absolute inset-0 h-3 w-full cursor-pointer opacity-0"
-              aria-label="视频进度"
+              aria-label={t("videoPlayer.progress")}
             />
           </div>
           <button
             type="button"
             onClick={toggleMuted}
             className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-white transition hover:bg-white/12"
-            title={isMuted ? "取消静音" : "静音"}
+            title={isMuted ? t("videoPlayer.unmute") : t("videoPlayer.mute")}
           >
             {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
           </button>
@@ -195,7 +197,7 @@ export default function VideoAssetPlayer({
               type="button"
               onClick={requestFullscreen}
               className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-white transition hover:bg-white/12"
-              title="全屏播放"
+              title={t("videoPlayer.fullscreen")}
             >
               <Maximize2 className="h-4 w-4" />
             </button>

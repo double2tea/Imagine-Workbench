@@ -3,6 +3,7 @@ import BoardPromptTextarea, { type BoardPromptTextareaHandle } from "@/component
 import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
 import type { BoardPromptNode } from "@/lib/board";
 import type { BoardPromptReference } from "@/lib/board/prompt-references";
+import { useTranslations } from "@/lib/i18n";
 import {
   applyPromptTemplateText,
   insertPromptTemplateText,
@@ -19,6 +20,7 @@ interface PromptBoardNodeProps {
 }
 
 const PromptBoardNode = memo(function PromptBoardNode({ node, onChange, onSelectReference, references }: PromptBoardNodeProps) {
+  const { t } = useTranslations("board");
   const textareaRef = useRef<BoardPromptTextareaHandle | null>(null);
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
   const slashCommandRef = useRef<PromptTemplateSlashCommand | null>(null);
@@ -71,7 +73,7 @@ const PromptBoardNode = memo(function PromptBoardNode({ node, onChange, onSelect
       references={references}
       headerRight={headerRight}
       className="nodrag nowheel nopan h-full w-full resize-none overflow-y-auto overscroll-contain imagine-board-input !p-3 !pr-20 text-xs leading-5 outline-none placeholder:text-[var(--iw-faint)]"
-      placeholder="写提示词，输入 @ 引用媒体"
+      placeholder={t('node.promptPlaceholder')}
     />
   );
 });

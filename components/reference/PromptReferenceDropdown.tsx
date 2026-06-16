@@ -13,6 +13,7 @@ import {
   type BoardPromptReferenceSource,
   resolveBoardPromptReferenceGroup,
 } from "@/lib/board/prompt-references";
+import { useTranslations, t as globalT } from "@/lib/i18n";
 
 interface PromptReferenceDropdownProps {
   acceptedMediaTypes?: ReadonlyArray<MediaReferenceType>;
@@ -82,7 +83,7 @@ function ReferenceRow({ item, onSelect }: { item: FilteredReferenceItem; onSelec
       <div className="min-w-0 flex-1">
         <p className="truncate font-mono text-[10px] font-bold text-[var(--iw-accent-strong)]">{item.token}</p>
         <p className="truncate text-[9px] text-[var(--iw-faint)]">
-          {mediaReferenceLabel(mediaType)} · {group ? item.reference.id : ("sourceLabel" in item.reference && item.reference.sourceLabel) || item.reference.id}
+          {mediaReferenceLabel(mediaType, globalT)} · {group ? item.reference.id : ("sourceLabel" in item.reference && item.reference.sourceLabel) || item.reference.id}
         </p>
       </div>
     </button>
@@ -127,7 +128,7 @@ function ReferenceList({
       })}
       {ungrouped.length > 0 ? (
         <section className="imagine-at-dropdown-group">
-          <p className="imagine-at-dropdown-group-label">参考媒体</p>
+          <p className="imagine-at-dropdown-group-label">{globalT("reference.referenceMedia")}</p>
           {ungrouped.map(item => (
             <ReferenceRow key={`other:${item.reference.id}:${item.index}`} item={item} onSelect={onSelect} />
           ))}
@@ -138,22 +139,23 @@ function ReferenceList({
 }
 
 export default function PromptReferenceDropdown({ acceptedMediaTypes, references, search, onSelect }: PromptReferenceDropdownProps) {
+  const { t } = useTranslations("common");
   const filtered = filterReferences(references, search, acceptedMediaTypes);
 
   if (references.length === 0) {
     return (
       <AtDropdownShell empty>
-        连接参考媒体、拖入画板资产，或从库中选取作品后，用 @图片N / @视频N / @音频N 指定引用
+        {t("reference.atReferenceHint")}
       </AtDropdownShell>
     );
   }
 
   if (filtered.length === 0) {
-    return <AtDropdownShell empty>未找到匹配的已导入参考媒体</AtDropdownShell>;
+    return <AtDropdownShell empty>{t("reference.noMatchFound")}</AtDropdownShell>;
   }
 
   return (
-    <AtDropdownShell header={<AtDropdownHeader title="选择引用对象" count={filtered.length} />}>
+    <AtDropdownShell header={<AtDropdownHeader title={t("reference.selectReference")} count={filtered.length} />}>
       <ReferenceList filtered={filtered} onSelect={onSelect} />
     </AtDropdownShell>
   );

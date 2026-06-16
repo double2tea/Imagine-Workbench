@@ -26,6 +26,7 @@ import { getProviderMeta } from "@/lib/providers/registry";
 import { transcriptFromDataUrl } from "@/lib/transcripts";
 import type { CapturedVideoFrame, VideoFrameCaptureMode } from "@/lib/video-frame";
 import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
+import { useTranslations } from "@/lib/i18n";
 import {
   IMAGE_EDIT_OPERATION_ORDER,
   WORKBENCH_OPERATION_META,
@@ -96,13 +97,13 @@ function formatCreatedAt(value: string): string {
 
 type FrameMenuPlacement = "hover";
 
-function processingTitle(item: StorageItem): string {
+function processingTitle(item: StorageItem, t: ReturnType<typeof useTranslations>["t"]): string {
   const quickEditTitle = item.type === "image" ? imageQuickEditProcessingTitleFromPrompt(item.prompt) : null;
   if (quickEditTitle) return quickEditTitle;
-  if (item.type === "video") return "视频合成中";
-  if (item.type === "audio") return "音频处理中";
-  if (item.type === "transcript") return "音频转写中";
-  return "图像生成中";
+  if (item.type === "video") return t("processingTitles.video");
+  if (item.type === "audio") return t("processingTitles.audio");
+  if (item.type === "transcript") return t("processingTitles.transcript");
+  return t("processingTitles.image");
 }
 
 function AudioProcessingWaveform() {
@@ -145,6 +146,7 @@ export default function AssetCard({
   onUseAgentReference,
   providerLabelsByKey,
 }: AssetCardProps) {
+  const { t } = useTranslations("common");
   const [isMobileActionsOpen, setIsMobileActionsOpen] = useState(false);
   const [isQuickEditMenuOpen, setIsQuickEditMenuOpen] = useState(false);
   const [frameMenuPlacement, setFrameMenuPlacement] = useState<FrameMenuPlacement | null>(null);
@@ -155,7 +157,7 @@ export default function AssetCard({
   const provider = tryParseProviderModel(item.model, selectedProvider)?.provider ?? selectedProvider;
   const providerLabel = providerLabelsByKey?.[provider] ?? getProviderMeta(provider).label;
   const isDraggableReference = item.status === "complete" && item.type !== "transcript";
-  const failedTitle = isContentSafetyError(item.errorMessage) ? "内容安全拦截" : "生成失败 / 链接中断";
+  const failedTitle = isContentSafetyError(item.errorMessage) ? t("failedTitles.contentSafety") : t("failedTitles.default");
   const referenceMedia = getGenerationReferenceMedia(item.generationRequest);
   const transcriptText = item.type === "transcript" ? transcriptFromDataUrl(item.url) : "";
   const canAddToLibrary = item.status === "complete" && (item.type === "image" || item.type === "video" || item.type === "audio");
@@ -207,21 +209,21 @@ export default function AssetCard({
           tone: WORKBENCH_OPERATION_META.panorama.tone,
         },
         {
-          ariaLabel: "以此图首帧生成视频",
+          ariaLabel: t("assetCard.toVideo"),
           icon: <WorkbenchOperationIcon operation="imageToVideo" className="h-3 w-3" />,
           id: "image-to-video",
           label: WORKBENCH_OPERATION_META.imageToVideo.label,
           onClick: () => onApplyVideoReference(item),
-          title: "以此图首帧生图动态 Veo 航拍影片",
+          title: t("assetCard.toVideo"),
           tone: WORKBENCH_OPERATION_META.imageToVideo.tone,
         },
         {
-          ariaLabel: "引用至 Agent",
+          ariaLabel: t("assetCard.referenceLabel"),
           icon: <AgentIdentityMark variant="inline" />,
           id: "agent-reference",
           label: "Agent",
           onClick: () => onUseAgentReference(item),
-          title: "引用该图片至 Agent 智能代理进行对话与分析",
+          title: t("assetCard.referenceLabel"),
           tone: WORKBENCH_OPERATION_META.analyze.tone,
         },
       ]
@@ -229,18 +231,18 @@ export default function AssetCard({
 
   const sharedHoverActions: WorkbenchActionDescriptor[] = [
     {
-      ariaLabel: "复用任务参数",
+      ariaLabel: t("buttons.reuseParams"),
       icon: <WorkbenchOperationIcon operation="reuse" className="h-3 w-3" />,
       id: "reuse",
       label: WORKBENCH_OPERATION_META.reuse.label,
       onClick: () => onReuseTask(item),
-      title: "将此任务的提示词、模型、尺寸与参考图回填到左侧工作面板",
+      title: t("buttons.reuseParams"),
       tone: WORKBENCH_OPERATION_META.reuse.tone,
     },
     ...(item.type === "audio" && item.status === "complete"
       ? [
           {
-            ariaLabel: "保存为克隆音色",
+            ariaLabel: t("assetCard.voiceProfile"),
             icon: <WorkbenchOperationIcon operation="voice" className="h-3 w-3" />,
             id: "voice-profile",
             label: WORKBENCH_OPERATION_META.voice.label,
@@ -251,18 +253,18 @@ export default function AssetCard({
         ]
       : []),
     {
-      ariaLabel: "下载文件",
+      ariaLabel: t("buttons.download"),
       icon: <WorkbenchOperationIcon operation="download" className="h-3 w-3" />,
       id: "download",
       label: WORKBENCH_OPERATION_META.download.label,
       onClick: () => onDownload(item),
-      title: "下载该文件到本地",
+      title: t("buttons.download"),
       tone: WORKBENCH_OPERATION_META.download.tone,
     },
     ...(canAddToLibrary
       ? [
           {
-            ariaLabel: "存入素材库",
+            ariaLabel: t("library.useThisAsset"),
             icon: <WorkbenchOperationIcon operation="library" className="h-3 w-3" />,
             id: "library",
             label: WORKBENCH_OPERATION_META.library.label,
@@ -273,33 +275,33 @@ export default function AssetCard({
         ]
       : []),
     {
-      ariaLabel: "全屏预览",
+      ariaLabel: t("assetCard.fullscreen"),
       icon: <WorkbenchOperationIcon operation="fullscreen" className="h-3 w-3" />,
       id: "fullscreen",
       onClick: () => onOpenFullscreen(item),
-      title: "全屏大画幅细节放大",
+      title: t("assetCard.fullscreen"),
       tone: WORKBENCH_OPERATION_META.fullscreen.tone,
     },
     ...(item.type !== "transcript"
       ? [
           {
             active: inCompare,
-            ariaLabel: inCompare ? "从对比面板移除" : "加入对比面板",
+            ariaLabel: inCompare ? t("assetCard.cancelCompare") : t("assetCard.compare"),
             icon: <WorkbenchOperationIcon operation="compare" className="h-3 w-3" />,
             id: "compare",
             label: WORKBENCH_OPERATION_META.compare.label,
             onClick: () => onToggleCompare(item.id),
-            title: "加入左右侧滑块对比面板",
+            title: t("assetCard.compare"),
             tone: WORKBENCH_OPERATION_META.compare.tone,
           },
         ]
       : []),
     {
-      ariaLabel: "删除资产",
+      ariaLabel: t("assetCard.delete"),
       icon: <WorkbenchOperationIcon operation="delete" className="h-3 w-3" />,
       id: "delete",
       onClick: () => onDelete(item),
-      title: "移除此项",
+      title: t("assetCard.delete"),
       tone: WORKBENCH_OPERATION_META.delete.tone,
     },
   ];
@@ -405,8 +407,8 @@ export default function AssetCard({
                 type="button"
                 onClick={() => setIsQuickEditMenuOpen(prev => !prev)}
                 className={workbenchCardActionClassName(WORKBENCH_OPERATION_META.brush.tone)}
-                title="选择重绘、擦除、扩图、抠图"
-                aria-label="AI 图像操作"
+                title={t("assetCard.quickEditButton")}
+                aria-label={t("assetCard.quickEditAriaLabel")}
                 aria-expanded={isQuickEditMenuOpen}
               >
                 <Sparkles className="h-3 w-3" />
@@ -450,11 +452,11 @@ export default function AssetCard({
               <RefreshCw className="h-4 w-4 animate-spin text-[var(--iw-tone-violet-text)]" />
             </div>
             <p className="imagine-generation-stage-title">
-              {item.status === "pending" ? "任务已排队" : processingTitle(item)}
+              {item.status === "pending" ? t("processingTitles.pending") : processingTitle(item, t)}
             </p>
-            <span className="imagine-generation-stage-meta">模型 {formatModelName(item.model)}</span>
+            <span className="imagine-generation-stage-meta">{t("assetCard.modelLabel")} {formatModelName(item.model)}</span>
             <span className="imagine-generation-stage-state">
-              {item.status === "pending" ? "等待执行" : "正在生成"}
+              {item.status === "pending" ? t("assetCard.waitingExecution") : t("assetCard.generating")}
             </span>
             {item.type === "audio" && <AudioProcessingWaveform />}
             <button
@@ -462,10 +464,10 @@ export default function AssetCard({
               onClick={() => onCancel(item)}
               disabled={canceling}
               className="imagine-danger-action relative z-10 mt-3 flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[10px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-55"
-              title={item.operationName?.startsWith("12ai:video:") ? "取消 12AI 视频生成任务" : "从本地取消并停止等待"}
+              title={item.operationName?.startsWith("12ai:video:") ? t("assetCard.cancelProcessing12ai") : t("assetCard.cancelLocalWait")}
             >
               <X className="h-3 w-3" />
-              {canceling ? "取消中" : "取消任务"}
+              {canceling ? t("assetCard.canceling") : t("buttons.cancelTask")}
             </button>
           </div>
         ) : item.status === "failed" ? (
@@ -473,7 +475,7 @@ export default function AssetCard({
             <X className="mb-2 h-6 w-6 shrink-0 text-[var(--iw-tone-danger-text)]" />
             <p className="text-xs font-semibold leading-5 text-[var(--iw-text)]">{failedTitle}</p>
             <p className="mt-1 line-clamp-2 max-w-full break-words text-[10px] leading-4 text-[var(--iw-muted)]">
-              {item.errorMessage ?? "请核查 API Key 或重构参数。"}
+              {item.errorMessage ?? t("failedTitles.checkApiKey")}
             </p>
             <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
               <button
@@ -483,7 +485,7 @@ export default function AssetCard({
                 className="imagine-primary-action flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-semibold"
               >
                 <RefreshCw className="h-3 w-3" />
-                重试
+                {t("assetCard.retry")}
               </button>
               <button
                 type="button"
@@ -492,7 +494,7 @@ export default function AssetCard({
                 className="imagine-secondary-action flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-semibold"
               >
                 <WorkbenchOperationIcon operation="reuse" className="h-3 w-3" />
-                复用参数
+                {t("assetCard.reuseParams")}
               </button>
             </div>
           </div>
@@ -527,7 +529,7 @@ export default function AssetCard({
               >
                 <FileText className="h-5 w-5 shrink-0 text-[var(--iw-tone-info-text)]" />
                 <p className="line-clamp-6 whitespace-pre-wrap text-xs leading-5 text-slate-200">
-                  {transcriptText || "无转写文本"}
+                  {transcriptText || t("assetCard.noTranscriptText")}
                 </p>
               </button>
             )}
@@ -536,7 +538,7 @@ export default function AssetCard({
               type="button"
               className="imagine-mobile-action-trigger hidden"
               aria-expanded={isMobileActionsOpen}
-              aria-label="打开资产操作"
+              aria-label={t("assetCard.openMobileActions")}
               onClick={() => setIsMobileActionsOpen(prev => !prev)}
             >
               <MoreHorizontal className="h-4 w-4" />
@@ -545,12 +547,12 @@ export default function AssetCard({
             {isMobileActionsOpen && (
               <div className="imagine-mobile-action-sheet">
                 <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
-                  <span className="imagine-mobile-action-sheet-title text-[11px] font-semibold">资产操作</span>
+                  <span className="imagine-mobile-action-sheet-title text-[11px] font-semibold">{t("assetCard.mobileActionsTitle")}</span>
                   <button
                     type="button"
                     onClick={() => setIsMobileActionsOpen(false)}
                     className="imagine-mobile-action-sheet-close rounded-md p-1"
-                    aria-label="关闭资产操作"
+                    aria-label={t("assetCard.mobileCloseActions")}
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -559,12 +561,12 @@ export default function AssetCard({
                 <div className="grid grid-cols-2 gap-1.5 p-2">
                   <button type="button" onClick={() => runMobileAction(() => onToggleSelect(item.id))}>
                     {selected ? <CheckSquare className="imagine-tone-icon h-3.5 w-3.5" data-tone="accent" /> : <Square className="h-3.5 w-3.5 text-slate-300" />}
-                    {selected ? "取消选择" : "选择"}
+                    {selected ? t("assetCard.cancelSelect") : t("assetCard.select")}
                   </button>
                   {item.type === "image" && (
                     <button type="button" onClick={() => runMobileAction(() => onApplyVideoReference(item))}>
                       <WorkbenchOperationIcon operation="imageToVideo" className="imagine-tone-icon h-3.5 w-3.5" />
-                      生视频
+                      {t("assetCard.toVideo")}
                     </button>
                   )}
                   {item.type === "image" && (
@@ -576,7 +578,7 @@ export default function AssetCard({
                   {item.type === "image" && (
                     <button type="button" onClick={() => runMobileAction(() => onOpenPanorama(item))}>
                       <WorkbenchOperationIcon operation="panorama" className="imagine-tone-icon h-3.5 w-3.5" />
-                      全景
+                      {t("assetCard.panorama")}
                     </button>
                   )}
                   {item.type === "image" && IMAGE_EDIT_OPERATION_ORDER.map(operation => {
@@ -591,11 +593,11 @@ export default function AssetCard({
                   })}
                   <button type="button" onClick={() => runMobileAction(() => onDownload(item))}>
                     <WorkbenchOperationIcon operation="download" className="imagine-tone-icon h-3.5 w-3.5" />
-                    下载
+                    {t("assetCard.download")}
                   </button>
                   <button type="button" onClick={() => runMobileAction(() => onReuseTask(item))}>
                     <WorkbenchOperationIcon operation="reuse" className="imagine-tone-icon h-3.5 w-3.5" />
-                    复用
+                    {t("buttons.reuse")}
                   </button>
                   {canAddToLibrary && (
                     <button type="button" onClick={() => runMobileAction(() => onAddToLibrary(item))}>
@@ -606,16 +608,16 @@ export default function AssetCard({
                   {item.type !== "transcript" && (
                     <button type="button" onClick={() => runMobileAction(() => onToggleCompare(item.id))}>
                       <WorkbenchOperationIcon operation="compare" className="imagine-tone-icon h-3.5 w-3.5" />
-                      {inCompare ? "取消对比" : "对比"}
+                      {inCompare ? t("assetCard.cancelCompare") : t("assetCard.compare")}
                     </button>
                   )}
                   <button type="button" onClick={() => runMobileAction(() => onOpenFullscreen(item))}>
                     <WorkbenchOperationIcon operation="fullscreen" className="h-3.5 w-3.5 text-slate-300" />
-                    放大
+                    {t("assetCard.fullscreen")}
                   </button>
                   <button type="button" onClick={() => runMobileAction(() => onDelete(item))}>
                     <WorkbenchOperationIcon operation="delete" className="imagine-tone-icon h-3.5 w-3.5" />
-                    删除
+                    {t("assetCard.delete")}
                   </button>
                 </div>
               </div>
@@ -632,7 +634,7 @@ export default function AssetCard({
           </p>
           {referenceMedia.length > 0 && (
             <div className="flex shrink-0 items-center gap-1">
-              <span className="font-mono text-[10px] text-[var(--iw-faint)]">参考</span>
+              <span className="font-mono text-[10px] text-[var(--iw-faint)]">{t("assetCard.referenceLabel")}</span>
               <div className="no-scrollbar flex max-w-[96px] gap-1 overflow-x-auto">
                 {referenceMedia.map((reference, index) => {
                   const mediaType = reference.type;
@@ -642,10 +644,10 @@ export default function AssetCard({
                       key={`${item.id}_reference_${index}`}
                       onClick={() => onOpenReferencePreview(item, index)}
                       className="relative h-7 w-7 overflow-hidden rounded-md border border-white/10 bg-slate-950 transition hover:border-cyan-300/70 focus:outline-none focus:ring-2 focus:ring-cyan-400/40"
-                      title={`点击放大参考${mediaReferenceLabel(mediaType)} ${index + 1}`}
+                      title={t("assetCard.referencePreviewTooltip", { type: mediaReferenceLabel(mediaType), index: index + 1 })}
                     >
                       {mediaType === "image" ? (
-                        <PreviewImage src={reference.url} alt={`参考图 ${index + 1}`} className="h-full w-full object-cover" />
+                        <PreviewImage src={reference.url} alt={t("assetCard.referenceImageAlt", { index: index + 1 })} className="h-full w-full object-cover" />
                       ) : mediaType === "video" ? (
                         <video src={reference.url} muted preload="metadata" className="h-full w-full object-cover" />
                       ) : (

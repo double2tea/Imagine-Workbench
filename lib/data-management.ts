@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n";
 import JSZip from "jszip";
 import { clearBoardsFromDB, listBoardsFromDB, saveBoardToDB } from "@/lib/board/persistence";
 import { createEmptyBoard, DEFAULT_BOARD_CONFIG, DEFAULT_BOARD_ID } from "@/lib/board/defaults";
@@ -99,6 +100,7 @@ const AGENT_STORAGE_KEYS = [
 
 const UI_PREFERENCE_KEYS = [
   "imagine_theme_mode",
+  "imagine_language",
   "imagine_board_last_insert",
   "imagine_board_handles_hint_seen",
   "imagine_board_side_collapsed",
@@ -505,10 +507,10 @@ export function clearLocalStorageGroup(kind: LocalStorageCleanupKind): number {
 }
 
 export function formatWorkspaceSafetySnapshotReason(reason: WorkspaceSafetySnapshotReason): string {
-  if (reason === "clear-assets") return "清空资产";
-  if (reason === "restore-workspace") return "恢复备份";
-  if (reason === "reset-boards") return "重置画板";
-  return "清理资产";
+  if (reason === "clear-assets") return t("common.dataManagement.clearAssetsReason");
+  if (reason === "restore-workspace") return t("common.dataManagement.restoreBackupReason");
+  if (reason === "reset-boards") return t("common.dataManagement.resetBoardsReason");
+  return t("common.dataManagement.cleanupAssetsReason");
 }
 
 export async function createWorkspaceSafetySnapshot(
@@ -545,7 +547,7 @@ export async function getLatestWorkspaceSafetySnapshotSummary(): Promise<Workspa
 
 export async function downloadLatestWorkspaceSafetySnapshot(): Promise<WorkspaceSafetySnapshotSummary> {
   const record = await getLatestWorkspaceSafetySnapshotRecord();
-  if (!record) throw new Error("没有可下载的安全快照");
+  if (!record) throw new Error(t("common.notices.noDownloadableSnapshot", { fallback: "没有可下载的安全快照" }) ?? "没有可下载的安全快照");
   downloadBlob(record.blob, record.fileName);
   return toSafetySnapshotSummary(record);
 }
@@ -556,7 +558,7 @@ export async function createLocalUploadAsset(
   options?: { boardId?: string },
 ): Promise<StorageItem> {
   const mediaType = mediaReferenceTypeFromMime(file.type);
-  if (!mediaType) throw new Error("只支持导入图片、视频或音频文件");
+  if (!mediaType) throw new Error(t("common.errors.fileReadFailed", { fallback: "只支持导入图片、视频或音频文件" }) ?? "只支持导入图片、视频或音频文件");
 
   return buildStorageItem(
     {

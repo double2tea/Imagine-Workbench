@@ -5,6 +5,7 @@ import BoardInsertIcon from "@/components/board/BoardInsertIcon";
 import { BOARD_QUICK_INSERT_IMPORT_KIND, BOARD_QUICK_INSERT_MENU_SIZE, clampFloatingMenuPosition } from "@/lib/board/interaction";
 import { BOARD_INSERT_GROUP_LABELS, boardInsertGroupLabel, isBoardInsertKind, type BoardInsertGroupLabel, type BoardInsertTone } from "@/lib/board/insert-catalog";
 import type { BoardPoint } from "@/lib/board";
+import { useTranslations } from "@/lib/i18n";
 
 export interface BoardQuickInsertMenuItem {
   icon: LucideIcon;
@@ -27,6 +28,7 @@ function quickInsertGroupLabel(kind: string): BoardInsertGroupLabel | null {
 }
 
 export default function BoardQuickInsertMenu({ clientX, clientY, items, position, onPick }: BoardQuickInsertMenuProps) {
+  const { t } = useTranslations("board");
   const anchor = clampFloatingMenuPosition(
     clientX,
     clientY,
@@ -47,7 +49,7 @@ export default function BoardQuickInsertMenu({ clientX, clientY, items, position
       onContextMenu={(event) => event.preventDefault()}
     >
       <div className="mb-2 flex items-center justify-between px-1.5">
-        <span className="text-[11px] font-semibold text-[var(--iw-muted)]">插入到画板</span>
+        <span className="text-[11px] font-semibold text-[var(--iw-muted)]">{t('workspace.emptyHint', { fallback: "插入到画板" }) ?? "插入到画板"}</span>
         <span className="font-mono text-[10px] text-[var(--iw-faint)]">{items.length}</span>
       </div>
       <div className="grid max-h-[min(420px,calc(100vh-5rem))] gap-2 overflow-y-auto pr-1">

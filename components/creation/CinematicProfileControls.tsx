@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useTranslations } from "@/lib/i18n";
 import {
   CINEMATIC_APERTURE_OPTIONS,
   CINEMATIC_CAMERA_OPTIONS,
@@ -58,107 +59,111 @@ type CinematicOptionDescriptions = {
   [Field in CinematicField]: Record<CinematicProfile[Field], string>;
 };
 
-const optionDescriptions: CinematicOptionDescriptions = {
-  camera: {
-    auto: "不额外指定拍摄设备，让模型按画面内容自行决定。",
-    "arri-alexa-35": "偏现代数字电影机质感，动态范围高，肤色和高光更稳。",
-    "arri-alexa-65": "偏大画幅电影感，空间更开阔，主体和背景分离更明显。",
-    "sony-venice-2": "偏全画幅数字电影质感，高光过渡柔和，适合写实场景。",
-    "red-v-raptor": "偏锐利高解析数字影像，细节和边缘更清晰。",
-    "imax-65mm": "强调宏大尺度和清晰细节，适合史诗感、建筑、自然大景。",
-    "bolex-16mm": "偏 16mm 胶片手作感，颗粒更明显，纪录片气质更强。",
-    "film-35mm": "偏 35mm 胶片质感，颗粒、色彩和高光更有模拟味。",
-    mirrorless: "偏现代微单拍摄质感，干净、轻便、数字感较自然。",
-    dslr: "偏单反视频/照片混合质感，对比自然，细节清楚。",
-    smartphone: "偏手机计算摄影效果，清晰、深景深，生活化更强。",
-    drone: "偏无人机航拍视角，强调高机位、开阔空间和稳定运动。",
-    "action-camera": "偏运动相机效果，超广角、动感强，适合第一视角或户外场景。",
-    camcorder: "偏手持摄像机和纪录片质感，画面更直接、更生活化。",
-    "gimbal-rig": "偏稳定器拍摄效果，运动平滑，适合跟拍和移动镜头。",
-  },
-  palette: {
-    auto: "不额外指定色彩风格，保留模型默认色彩判断。",
-    "natural-clean": "自然干净的色彩，饱和度和对比都较克制。",
-    "warm-film": "暖调胶片色彩，高光更柔，整体更有怀旧感。",
-    "bleach-bypass": "低饱和高反差，画面更冷峻、硬朗。",
-    "neon-noir": "霓虹夜景风格，深阴影和高饱和色光更明显。",
-    "teal-orange": "青橙电影调色，冷暖对比强，商业片感更明显。",
-    "pastel-air": "低对比柔和粉彩，画面更轻盈、通透。",
-    monochrome: "黑白影像风格，主要依赖明暗和轮廓表达情绪。",
-    "muted-earth": "低饱和大地色，适合自然、复古、户外或生活方式场景。",
-    cyberpunk: "高饱和赛博色彩，偏洋红、青蓝和夜景灯光。",
-    "cross-process": "交叉冲洗胶片感，色相偏移更明显，风格化更强。",
-  },
-  lighting: {
-    auto: "不额外指定光线，让模型按场景自动处理。",
-    "soft-window": "柔和窗光，阴影过渡自然，适合人物和室内写实。",
-    "overhead-fall": "顶部光源向下衰减，氛围更戏剧化。",
-    "contre-jour": "逆光和轮廓光更强，主体边缘更亮，背景更有层次。",
-    "low-key": "低调照明，阴影面积大，适合悬疑、冷峻或高级感画面。",
-    "golden-hour": "黄金时刻暖光，低角度阳光和长阴影更明显。",
-    "practical-lamps": "强调画面中可见灯具带来的实际光源，生活感更强。",
-    "volumetric-rays": "空气中可见光束和雾化层次更明显。",
-    "neon-edge": "彩色霓虹边缘光，主体轮廓更突出。",
-    "moonlight-blue": "冷蓝月光氛围，适合夜景和安静情绪。",
-    "harsh-flash": "直闪硬光，阴影锐利，画面更直接、更粗粝。",
-  },
-  lens: {
-    auto: "不额外指定镜头特性，让模型按构图自动处理。",
-    "zeiss-master-prime": "偏高解析、低炫光、干净锐利的电影镜头效果。",
-    "cooke-s4": "偏温暖柔和的 Cooke 风格，肤色和高光更圆润。",
-    "panavision-c-series": "偏经典变形镜头质感，椭圆焦外和电影感更强。",
-    anamorphic: "变形宽银幕镜头感，横向光晕和焦外更有电影味。",
-    macro: "微距细节，浅景深更明显，适合产品、材质和局部特写。",
-    "vintage-haze": "老镜头雾化感，高光更散，画面更柔。",
-    "canon-k35": "复古电影镜头暖调，反差较柔，人物更有年代感。",
-    "leica-summilux-c": "高端电影镜头质感，清晰但不过硬，焦外顺滑。",
-    "helios-44": "复古旋焦效果，背景焦外更旋转、更风格化。",
-    fisheye: "鱼眼超广角畸变，空间夸张，适合特殊视角。",
-    "telephoto-zoom": "长焦压缩空间，主体更突出，背景更贴近。",
-  },
-  focalLength: {
-    auto: "不额外指定焦段，让模型按画面内容自动选择。",
-    "12mm": "超广角视角，空间夸张，适合大场景和近距离冲击感。",
-    "24mm": "广角电影视角，环境信息多，适合建立场景。",
-    "35mm": "自然叙事视角，环境和人物比例较平衡。",
-    "50mm": "标准人像视角，主体自然，畸变较少。",
-    "75mm": "中长焦压缩，人物更突出，背景更柔。",
-    "100mm": "长焦压缩更强，适合远距离、局部和安静观察感。",
-  },
-  aperture: {
-    auto: "不额外指定光圈和景深。",
-    "f1.2": "极浅景深，背景大幅虚化，主体分离最强。",
-    "f1.4": "浅景深明显，适合人像、夜景和柔和焦外。",
-    f2: "浅景深但仍保留部分环境信息。",
-    "f2.8": "电影常用浅景深，主体清楚，背景适度虚化。",
-    f4: "中等景深，主体和部分背景都可读。",
-    "f5.6": "平衡景深，环境信息更完整。",
-    f8: "深景深，前后景都更清楚。",
-    f11: "更深景深，适合环境、建筑和群像。",
-    f16: "很深景深，画面整体更清晰。",
-    f22: "最大深景深倾向，前景和背景都尽量清楚。",
-  },
-  movement: {
-    auto: "不额外指定运动方式，让模型按视频内容自动处理。",
-    "locked-off": "固定机位，画面稳定，适合观察感和构图展示。",
-    "slow-dolly": "缓慢推轨或拉轨，空间层次和情绪推进更明显。",
-    steadicam: "平滑跟拍，适合人物行走和连续运动。",
-    handheld: "轻微手持晃动，现场感和纪录感更强。",
-    orbit: "围绕主体环绕移动，强调空间和主体轮廓。",
-    crane: "升降镜头，适合揭示场景规模或制造开阔感。",
-  },
-  effect: {
-    auto: "不额外指定后期效果。",
-    "film-grain": "增加细腻胶片颗粒，让画面更有模拟质感。",
-    halation: "高光边缘出现暖色晕染，胶片感更强。",
-    bloom: "高光柔化扩散，画面更梦幻、更柔和。",
-    vignette: "边缘轻微压暗，把注意力集中到画面中心。",
-    "chromatic-aberration": "边缘轻微色散，增加镜头瑕疵和风格化质感。",
-    "motion-blur": "方向性动态模糊，强化速度和运动感。",
-    "lens-flare": "真实镜头眩光，适合强侧光和逆光画面。",
-    "anamorphic-widescreen": "2.39:1 宽银幕感，横向光晕和变形镜头气质更明显。",
-  },
-};
+const CINEMATIC_FIELDS: readonly CinematicField[] = ["camera", "lens", "focalLength", "aperture", "palette", "lighting", "effect", "movement"];
+
+function buildOptionDescriptions(t: (key: string) => string): CinematicOptionDescriptions {
+  return {
+    camera: {
+      auto: t("cinematic.descriptions.camera.auto"),
+      "arri-alexa-35": t("cinematic.descriptions.camera.arri-alexa-35"),
+      "arri-alexa-65": t("cinematic.descriptions.camera.arri-alexa-65"),
+      "sony-venice-2": t("cinematic.descriptions.camera.sony-venice-2"),
+      "red-v-raptor": t("cinematic.descriptions.camera.red-v-raptor"),
+      "imax-65mm": t("cinematic.descriptions.camera.imax-65mm"),
+      "bolex-16mm": t("cinematic.descriptions.camera.bolex-16mm"),
+      "film-35mm": t("cinematic.descriptions.camera.film-35mm"),
+      mirrorless: t("cinematic.descriptions.camera.mirrorless"),
+      dslr: t("cinematic.descriptions.camera.dslr"),
+      smartphone: t("cinematic.descriptions.camera.smartphone"),
+      drone: t("cinematic.descriptions.camera.drone"),
+      "action-camera": t("cinematic.descriptions.camera.action-camera"),
+      camcorder: t("cinematic.descriptions.camera.camcorder"),
+      "gimbal-rig": t("cinematic.descriptions.camera.gimbal-rig"),
+    },
+    palette: {
+      auto: t("cinematic.descriptions.palette.auto"),
+      "natural-clean": t("cinematic.descriptions.palette.natural-clean"),
+      "warm-film": t("cinematic.descriptions.palette.warm-film"),
+      "bleach-bypass": t("cinematic.descriptions.palette.bleach-bypass"),
+      "neon-noir": t("cinematic.descriptions.palette.neon-noir"),
+      "teal-orange": t("cinematic.descriptions.palette.teal-orange"),
+      "pastel-air": t("cinematic.descriptions.palette.pastel-air"),
+      monochrome: t("cinematic.descriptions.palette.monochrome"),
+      "muted-earth": t("cinematic.descriptions.palette.muted-earth"),
+      cyberpunk: t("cinematic.descriptions.palette.cyberpunk"),
+      "cross-process": t("cinematic.descriptions.palette.cross-process"),
+    },
+    lighting: {
+      auto: t("cinematic.descriptions.lighting.auto"),
+      "soft-window": t("cinematic.descriptions.lighting.soft-window"),
+      "overhead-fall": t("cinematic.descriptions.lighting.overhead-fall"),
+      "contre-jour": t("cinematic.descriptions.lighting.contre-jour"),
+      "low-key": t("cinematic.descriptions.lighting.low-key"),
+      "golden-hour": t("cinematic.descriptions.lighting.golden-hour"),
+      "practical-lamps": t("cinematic.descriptions.lighting.practical-lamps"),
+      "volumetric-rays": t("cinematic.descriptions.lighting.volumetric-rays"),
+      "neon-edge": t("cinematic.descriptions.lighting.neon-edge"),
+      "moonlight-blue": t("cinematic.descriptions.lighting.moonlight-blue"),
+      "harsh-flash": t("cinematic.descriptions.lighting.harsh-flash"),
+    },
+    lens: {
+      auto: t("cinematic.descriptions.lens.auto"),
+      "zeiss-master-prime": t("cinematic.descriptions.lens.zeiss-master-prime"),
+      "cooke-s4": t("cinematic.descriptions.lens.cooke-s4"),
+      "panavision-c-series": t("cinematic.descriptions.lens.panavision-c-series"),
+      anamorphic: t("cinematic.descriptions.lens.anamorphic"),
+      macro: t("cinematic.descriptions.lens.macro"),
+      "vintage-haze": t("cinematic.descriptions.lens.vintage-haze"),
+      "canon-k35": t("cinematic.descriptions.lens.canon-k35"),
+      "leica-summilux-c": t("cinematic.descriptions.lens.leica-summilux-c"),
+      "helios-44": t("cinematic.descriptions.lens.helios-44"),
+      fisheye: t("cinematic.descriptions.lens.fisheye"),
+      "telephoto-zoom": t("cinematic.descriptions.lens.telephoto-zoom"),
+    },
+    focalLength: {
+      auto: t("cinematic.descriptions.focalLength.auto"),
+      "12mm": t("cinematic.descriptions.focalLength.12mm"),
+      "24mm": t("cinematic.descriptions.focalLength.24mm"),
+      "35mm": t("cinematic.descriptions.focalLength.35mm"),
+      "50mm": t("cinematic.descriptions.focalLength.50mm"),
+      "75mm": t("cinematic.descriptions.focalLength.75mm"),
+      "100mm": t("cinematic.descriptions.focalLength.100mm"),
+    },
+    aperture: {
+      auto: t("cinematic.descriptions.aperture.auto"),
+      "f1.2": t("cinematic.descriptions.aperture.f1.2"),
+      "f1.4": t("cinematic.descriptions.aperture.f1.4"),
+      f2: t("cinematic.descriptions.aperture.f2"),
+      "f2.8": t("cinematic.descriptions.aperture.f2.8"),
+      f4: t("cinematic.descriptions.aperture.f4"),
+      "f5.6": t("cinematic.descriptions.aperture.f5.6"),
+      f8: t("cinematic.descriptions.aperture.f8"),
+      f11: t("cinematic.descriptions.aperture.f11"),
+      f16: t("cinematic.descriptions.aperture.f16"),
+      f22: t("cinematic.descriptions.aperture.f22"),
+    },
+    movement: {
+      auto: t("cinematic.descriptions.movement.auto"),
+      "locked-off": t("cinematic.descriptions.movement.locked-off"),
+      "slow-dolly": t("cinematic.descriptions.movement.slow-dolly"),
+      steadicam: t("cinematic.descriptions.movement.steadicam"),
+      handheld: t("cinematic.descriptions.movement.handheld"),
+      orbit: t("cinematic.descriptions.movement.orbit"),
+      crane: t("cinematic.descriptions.movement.crane"),
+    },
+    effect: {
+      auto: t("cinematic.descriptions.effect.auto"),
+      "film-grain": t("cinematic.descriptions.effect.film-grain"),
+      halation: t("cinematic.descriptions.effect.halation"),
+      bloom: t("cinematic.descriptions.effect.bloom"),
+      vignette: t("cinematic.descriptions.effect.vignette"),
+      "chromatic-aberration": t("cinematic.descriptions.effect.chromatic-aberration"),
+      "motion-blur": t("cinematic.descriptions.effect.motion-blur"),
+      "lens-flare": t("cinematic.descriptions.effect.lens-flare"),
+      "anamorphic-widescreen": t("cinematic.descriptions.effect.anamorphic-widescreen"),
+    },
+  };
+}
 
 const accentClassNames: Record<NonNullable<CinematicProfileControlsProps["accent"]>, {
   active: string;
@@ -195,8 +200,9 @@ function optionVisualStyle(visual: string): CSSProperties {
   return visual ? { backgroundImage: `url(${visual})` } : {};
 }
 
-function optionDescription(field: CinematicField, value: string): string {
-  const description = (optionDescriptions[field] as Record<string, string>)[value];
+function optionDescription(t: (key: string) => string, field: CinematicField, value: string): string {
+  const descriptions = buildOptionDescriptions(t);
+  const description = (descriptions[field] as Record<string, string>)[value];
   if (!description) throw new Error(`Missing cinematic option description: ${field}:${value}`);
   return description;
 }
@@ -281,6 +287,7 @@ export default function CinematicProfileControls({
   variant = "card",
   value,
 }: CinematicProfileControlsProps) {
+  const { t } = useTranslations("creation");
   const titleId = useId();
   const openButtonRef = useRef<HTMLButtonElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -291,17 +298,17 @@ export default function CinematicProfileControls({
   const [previewTarget, setPreviewTarget] = useState<PreviewTarget | null>(null);
   const isEnabled = value.enabled;
   const sections = useMemo<Array<CinematicSection<string>>>(() => [
-    { field: "camera", icon: <Video className="h-3.5 w-3.5" />, options: CINEMATIC_CAMERA_OPTIONS, title: "摄影机" },
-    { field: "lens", icon: <Camera className="h-3.5 w-3.5" />, options: CINEMATIC_LENS_OPTIONS, title: "镜头组" },
-    { field: "focalLength", icon: <Focus className="h-3.5 w-3.5" />, options: CINEMATIC_FOCAL_LENGTH_OPTIONS, title: "焦段" },
-    { field: "aperture", icon: <Aperture className="h-3.5 w-3.5" />, options: CINEMATIC_APERTURE_OPTIONS, title: "光圈" },
-    { field: "palette", icon: <Palette className="h-3.5 w-3.5" />, options: CINEMATIC_PALETTE_OPTIONS, title: "色彩" },
-    { field: "lighting", icon: <Lightbulb className="h-3.5 w-3.5" />, options: CINEMATIC_LIGHTING_OPTIONS, title: "光线" },
-    { field: "effect", icon: <Sparkles className="h-3.5 w-3.5" />, options: CINEMATIC_EFFECT_OPTIONS, title: "效果" },
+    { field: "camera", icon: <Video className="h-3.5 w-3.5" />, options: CINEMATIC_CAMERA_OPTIONS, title: t("cinematic.sectionTitles.camera") },
+    { field: "lens", icon: <Camera className="h-3.5 w-3.5" />, options: CINEMATIC_LENS_OPTIONS, title: t("cinematic.sectionTitles.lens") },
+    { field: "focalLength", icon: <Focus className="h-3.5 w-3.5" />, options: CINEMATIC_FOCAL_LENGTH_OPTIONS, title: t("cinematic.sectionTitles.focalLength") },
+    { field: "aperture", icon: <Aperture className="h-3.5 w-3.5" />, options: CINEMATIC_APERTURE_OPTIONS, title: t("cinematic.sectionTitles.aperture") },
+    { field: "palette", icon: <Palette className="h-3.5 w-3.5" />, options: CINEMATIC_PALETTE_OPTIONS, title: t("cinematic.sectionTitles.palette") },
+    { field: "lighting", icon: <Lightbulb className="h-3.5 w-3.5" />, options: CINEMATIC_LIGHTING_OPTIONS, title: t("cinematic.sectionTitles.lighting") },
+    { field: "effect", icon: <Sparkles className="h-3.5 w-3.5" />, options: CINEMATIC_EFFECT_OPTIONS, title: t("cinematic.sectionTitles.effect") },
     ...(mediaType === "video"
-      ? [{ field: "movement" as const, icon: <Move3D className="h-3.5 w-3.5" />, options: CINEMATIC_MOVEMENT_OPTIONS, title: "运动" }]
+      ? [{ field: "movement" as const, icon: <Move3D className="h-3.5 w-3.5" />, options: CINEMATIC_MOVEMENT_OPTIONS, title: t("cinematic.sectionTitles.movement") }]
       : []),
-  ], [mediaType]);
+  ], [mediaType, t]);
   const summaryItems = sections.slice(0, mediaType === "video" ? 4 : 3);
   const summaryGridClassName = mediaType === "video" ? "grid-cols-4" : "grid-cols-3";
   const activeSection = sections.find(section => section.field === activeField) ?? sections[0];
@@ -311,7 +318,7 @@ export default function CinematicProfileControls({
     : activeSection;
   const previewValue = previewTarget?.value ?? activeValue;
   const previewOption = selectedSectionOption(previewSection, previewValue);
-  const previewDescription = optionDescription(previewSection.field, previewOption.value);
+  const previewDescription = optionDescription(t, previewSection.field, previewOption.value);
 
   useEffect(() => {
     setMounted(true);
@@ -379,7 +386,7 @@ export default function CinematicProfileControls({
     setIsOpen(false);
     window.requestAnimationFrame(() => openButtonRef.current?.focus());
   };
-  const compactLabel = isEnabled ? "开启" : "关闭";
+  const compactLabel = isEnabled ? t("cinematic.compactLabelOn") : t("cinematic.compactLabelOff");
   const sectionRailGridClassName = mediaType === "video" ? "xl:grid-cols-8" : "xl:grid-cols-7";
   const dialog = isOpen ? (
     <div
@@ -399,7 +406,7 @@ export default function CinematicProfileControls({
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)]">
               <Clapperboard className="h-4 w-4" />
             </span>
-            <h2 id={titleId} className="truncate text-sm font-semibold text-[var(--iw-text)]">影像风格</h2>
+            <h2 id={titleId} className="truncate text-sm font-semibold text-[var(--iw-text)]">{t("cinematic.dialogTitle")}</h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <button
@@ -413,14 +420,14 @@ export default function CinematicProfileControls({
               }`}
             >
               <Check className="h-3.5 w-3.5" />
-              {isEnabled ? "已开启" : "开启"}
+              {isEnabled ? t("cinematic.cardBadgeEnabled") : t("cinematic.cardBadgeDisabled")}
             </button>
             <button
               ref={closeButtonRef}
               type="button"
               onClick={closeDialog}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)] transition hover:bg-[var(--iw-panel)] hover:text-[var(--iw-text)]"
-              aria-label="关闭影像风格"
+              aria-label={t("cinematic.closeDialogAriaLabel")}
             >
               <X className="h-4 w-4" />
             </button>
@@ -478,12 +485,12 @@ export default function CinematicProfileControls({
                     <div className="truncate text-base font-semibold text-white">{previewOption.label}</div>
                   </div>
                   <span className="shrink-0 rounded-md border border-white/15 bg-black/35 px-2 py-1 text-[10px] font-semibold text-white/80">
-                    示意图
+                    {t("cinematic.previewDiagramLabel")}
                   </span>
                 </div>
               </div>
               <div className="border-t border-[var(--iw-border)] p-3">
-                <div className="mb-1 text-[10px] font-semibold text-[var(--iw-muted)]">效果说明</div>
+                <div className="mb-1 text-[10px] font-semibold text-[var(--iw-muted)]">{t("cinematic.effectDescriptionLabel")}</div>
                 <p className="text-xs leading-5 text-[var(--iw-text)]">{previewDescription}</p>
               </div>
             </section>
@@ -519,10 +526,10 @@ export default function CinematicProfileControls({
           data-active={isEnabled}
           onClick={() => setIsOpen(true)}
           className={`flex min-w-0 items-center gap-1.5 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 text-left text-[10px] font-semibold text-[var(--iw-muted)] transition hover:border-[var(--iw-border-strong)] hover:bg-[var(--iw-panel)] hover:text-[var(--iw-text)] ${accentClassNames[accent].active} ${className}`}
-          title="影像风格"
+          title={t("cinematic.cardTitle")}
         >
           <Clapperboard className="h-3.5 w-3.5 shrink-0" />
-          <span className="min-w-0 truncate">摄影风格 · {compactLabel}</span>
+          <span className="min-w-0 truncate">{t("cinematic.compactToggleLabel")} · {compactLabel}</span>
         </button>
       ) : (
         <div
@@ -540,9 +547,9 @@ export default function CinematicProfileControls({
                 <Clapperboard className="h-4 w-4" />
               </span>
               <span className="min-w-0">
-                <span className="block truncate text-xs font-semibold text-[var(--iw-text)]">摄影风格</span>
+                <span className="block truncate text-xs font-semibold text-[var(--iw-text)]">{t("cinematic.cardTitle")}</span>
                 <span className="block truncate text-[10px] text-[var(--iw-faint)]">
-                  {isEnabled ? "已启用镜头语言注入" : "关闭时不改写生成请求"}
+                  {isEnabled ? t("cinematic.cardEnabledHint") : t("cinematic.cardDisabledHint")}
                 </span>
               </span>
             </span>
@@ -551,7 +558,7 @@ export default function CinematicProfileControls({
                 ? accentClassNames[accent].badge
                 : "border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)]"
             }`}>
-              {isEnabled ? "已开启" : "点按开启"}
+              {isEnabled ? t("cinematic.enabledBadge") : t("cinematic.disabledBadge")}
             </span>
           </button>
 

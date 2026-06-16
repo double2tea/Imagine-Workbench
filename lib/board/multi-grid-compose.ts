@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n";
 import type { BoardMultiGridAspectRatio, BoardMultiGridItem, BoardMultiGridNode } from "@/lib/board/types";
 import { boardMultiGridCellCount } from "@/lib/board/multi-grid";
 
@@ -7,7 +8,7 @@ const GRID_LINE_FILL = "rgba(255, 255, 255, 0.12)";
 
 function parseAspectRatio(ratio: BoardMultiGridAspectRatio): number {
   const [width, height] = ratio.split(":").map(Number);
-  if (!width || !height) throw new Error("多宫格比例无效");
+  if (!width || !height) throw new Error(t("board.node.types.multiGrid"));
   return width / height;
 }
 
@@ -30,7 +31,7 @@ function loadImage(url: string): Promise<HTMLImageElement> {
     const image = new Image();
     image.decoding = "async";
     image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error("多宫格图片读取失败"));
+    image.onerror = () => reject(new Error(t("board.workspace.dragUrlNotImage")));
     image.src = url;
   });
 }
@@ -59,14 +60,14 @@ function drawCoverImage(
 
 export async function composeBoardMultiGridImage(node: BoardMultiGridNode): Promise<string> {
   const visibleItems = node.items.filter((item): item is BoardMultiGridItem & { cellIndex: number } => typeof item.cellIndex === "number");
-  if (visibleItems.length === 0) throw new Error("多宫格没有可导出的图片");
+  if (visibleItems.length === 0) throw new Error(t("board.workspace.noSelectableImageNode"));
 
   const size = exportCanvasSize(node.aspectRatio);
   const canvas = document.createElement("canvas");
   canvas.width = size.width;
   canvas.height = size.height;
   const context = canvas.getContext("2d");
-  if (!context) throw new Error("浏览器不支持多宫格导出");
+  if (!context) throw new Error(t("board.workspace.browserNotSupportClipboard"));
 
   context.fillStyle = EMPTY_CELL_FILL;
   context.fillRect(0, 0, canvas.width, canvas.height);
@@ -103,6 +104,6 @@ export async function composeBoardMultiGridImage(node: BoardMultiGridNode): Prom
   }
 
   const cellCount = boardMultiGridCellCount(node.gridSize);
-  if (cellCount <= 0) throw new Error("多宫格宫格数无效");
+  if (cellCount <= 0) throw new Error(t("board.node.types.multiGrid"));
   return canvas.toDataURL("image/png");
 }

@@ -13,6 +13,7 @@ import {
   firstEmptyBoardMultiGridCell,
   normalizeBoardMultiGridItems,
 } from "@/lib/board/multi-grid";
+import { useTranslations } from "@/lib/i18n";
 
 interface MultiGridBoardNodeProps {
   node: BoardMultiGridNode;
@@ -145,6 +146,7 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
   onUpdate,
   onUpdateItemTransform,
 }: MultiGridBoardNodeProps) {
+  const { t } = useTranslations("board");
   const visibleCellCount = boardMultiGridCellCount(node.gridSize);
   const itemByCellIndex = new Map(
     node.items
@@ -360,7 +362,7 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
         <div className="min-w-0 flex-1">
           <div className="truncate text-xs font-semibold text-[var(--iw-text)]">{node.title}</div>
           <div className="mt-0.5 text-[10px] font-semibold text-[var(--iw-muted)]">
-            {node.gridSize}x{node.gridSize} · {node.items.length} 张图片
+            {node.gridSize}x{node.gridSize} · {t('node.multiGridImageCount', { count: node.items.length })}
           </div>
         </div>
         <button
@@ -511,7 +513,7 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
                 data-multi-grid-cell-index={cellIndex}
                 data-multi-grid-id={node.id}
                 role="button"
-                aria-label={item ? `多宫格图片 ${cellIndex + 1}` : `空宫格 ${cellIndex + 1}，可拖入图片`}
+                aria-label={item ? t('node.multiGridCellLabel', { index: cellIndex + 1 }) : t('node.multiGridEmptyCellLabel', { index: cellIndex + 1 })}
                 aria-pressed={isSelected}
                 tabIndex={0}
                 onClick={(event) => {

@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/lib/i18n";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { BOARD_UNDO_LIMIT, cloneBoardHistory, type BoardHistorySnapshot } from "@/lib/board/history";
 import {
@@ -935,23 +936,23 @@ function defaultNodeSize(kind: BoardNode["kind"]): BoardSize {
 }
 
 function defaultNodeTitle(kind: BoardNode["kind"]): string {
-  if (kind === "asset") return "Asset";
-  if (kind === "prompt") return "Prompt";
-  if (kind === "reference-group") return "Reference Group";
-  if (kind === "group") return "新建组";
-  if (kind === "multi-grid") return "多宫格";
-  if (kind === "image-generate") return "Image Generate";
-  if (kind === "video-generate") return "Video Generate";
-  if (kind === "audio-operation") return "Audio Operation";
-  if (kind === "runninghub-app") return "RunningHub App";
-  if (kind === "agent") return "Agent";
-  return "Note";
+  if (kind === "asset") return t("board.node.types.asset");
+  if (kind === "prompt") return t("board.node.types.prompt");
+  if (kind === "reference-group") return t("board.node.types.referenceGroup");
+  if (kind === "group") return t("board.node.types.group");
+  if (kind === "multi-grid") return t("board.node.types.multiGrid");
+  if (kind === "image-generate") return t("board.node.types.imageGenerate");
+  if (kind === "video-generate") return t("board.node.types.videoGenerate");
+  if (kind === "audio-operation") return t("board.node.types.audioOperation");
+  if (kind === "runninghub-app") return t("board.node.types.runninghubApp");
+  if (kind === "agent") return t("board.node.types.agent");
+  return t("board.node.types.note");
 }
 
 function defaultAssetNodeTitle(type: BoardAssetReference["type"]): string {
-  if (type === "image") return "图片资产";
-  if (type === "video") return "视频资产";
-  return "音频资产";
+  if (type === "image") return t("board.node.types.asset");
+  if (type === "video") return t("board.node.types.asset");
+  return t("board.node.types.audioOperation");
 }
 
 function defaultAssetNodeSize(type: BoardAssetReference["type"]): BoardSize {
@@ -2571,7 +2572,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
   const updateBoardTitle = useCallback((title: string) => {
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
-      throw new Error("画板名称不能为空");
+      throw new Error(t("board.inspector.sectionBasic"));
     }
     mutateBoard(currentBoard => ({
       ...currentBoard,

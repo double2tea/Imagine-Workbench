@@ -21,6 +21,7 @@ import { getAudioModelCapabilities, getVideoModelCapabilities } from "@/lib/prov
 import { buildGenerationModelPriceOptions } from "@/lib/providers/pricing";
 import { selectVideoReferenceTypesForMode } from "@/lib/video-reference-selection";
 import { gsap, prefersReducedWorkbenchMotion, useGSAP, WORKBENCH_GSAP_EASE } from "@/lib/workbench-gsap";
+import { useTranslations } from "@/lib/i18n";
 
 type GenerateNode = BoardImageGenerateNode | BoardVideoGenerateNode | BoardAudioOperationNode;
 const variantCountOptions: BoardGenerateVariantCount[] = [1, 2, 4];
@@ -74,13 +75,15 @@ type GenerateContextItem = {
 };
 type GenerateStatusLineTone = "complete" | "failed" | "idle" | "processing";
 
-function statusText(node: GenerateNode): string {
-  if (node.status === "processing") return "处理中";
-  if (node.status === "complete") return "已完成";
-  if (node.status === "failed") return "失败";
-  if (node.kind === "image-generate") return "图片";
-  if (node.kind === "video-generate") return "视频";
-  return "音频";
+type BoardNodeT = ReturnType<typeof useTranslations>["t"];
+
+function statusText(node: GenerateNode, t: BoardNodeT): string {
+  if (node.status === "processing") return t("node.statusLabels.processing");
+  if (node.status === "complete") return t("node.statusLabels.complete");
+  if (node.status === "failed") return t("node.statusLabels.failed");
+  if (node.kind === "image-generate") return t("mediaTypeLabels.image");
+  if (node.kind === "video-generate") return t("mediaTypeLabels.video");
+  return t("mediaTypeLabels.audio");
 }
 
 function contextToneClass(tone: GenerateContextTone): string {
@@ -88,18 +91,18 @@ function contextToneClass(tone: GenerateContextTone): string {
   return "border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)]";
 }
 
-function resultContext(hasResultConnection: boolean, resultCount: number): { title: string; tone: GenerateContextTone } {
-  if (resultCount > 0) return { title: hasResultConnection ? `${resultCount} 个已上板` : `${resultCount} 个`, tone: hasResultConnection ? "result" : "ok" };
-  return { title: "未生成", tone: "neutral" };
+function resultContext(hasResultConnection: boolean, resultCount: number, t: BoardNodeT): { title: string; tone: GenerateContextTone } {
+  if (resultCount > 0) return { title: hasResultConnection ? t("node.types.result") + " " + resultCount : resultCount + " " + t("node.types.result"), tone: hasResultConnection ? "result" : "ok" };
+  return { title: "No result", tone: "neutral" };
 }
 
-function runContext(node: GenerateNode, taskSummary: BoardGenerateTaskSummary | undefined): { title: string; tone: GenerateContextTone } {
-  if (taskSummary?.status === "pending") return { title: "排队", tone: "processing" };
-  if (taskSummary?.status === "processing") return { title: "处理中", tone: "processing" };
-  if (node.status === "complete") return { title: "完成", tone: "ok" };
-  if (node.status === "failed") return { title: "失败", tone: "failed" };
-  if (node.status === "processing") return { title: "处理中", tone: "processing" };
-  return { title: "待运行", tone: "neutral" };
+function runContext(node: GenerateNode, taskSummary: BoardGenerateTaskSummary | undefined, t: BoardNodeT): { title: string; tone: GenerateContextTone } {
+  if (taskSummary?.status === "pending") return { title: t("node.statusLabels.pending"), tone: "processing" };
+  if (taskSummary?.status === "processing") return { title: t("node.statusLabels.processing"), tone: "processing" };
+  if (node.status === "complete") return { title: t("node.statusLabels.complete"), tone: "ok" };
+  if (node.status === "failed") return { title: t("node.statusLabels.failed"), tone: "failed" };
+  if (node.status === "processing") return { title: t("node.statusLabels.processing"), tone: "processing" };
+  return { title: t("node.statusLabels.idle"), tone: "neutral" };
 }
 
 function statusLineTone(node: GenerateNode, taskSummary: BoardGenerateTaskSummary | undefined): GenerateStatusLineTone {
@@ -123,6 +126,7 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
   showReferencePreviews = true,
   taskSummary,
 }: GenerateBoardNodeProps) {
+  const { t } = useTranslations("board");
   const containerRef = useRef<HTMLDivElement | null>(null);
   const previousLineToneRef = useRef<GenerateStatusLineTone | null>(null);
   const promptTextareaRef = useRef<BoardPromptTextareaHandle | null>(null);
@@ -161,18 +165,18 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
       : [],
     [activeVideoReferenceMode, isVideoNode, referencePreviews, videoCapabilities],
   );
-  const result = resultContext(hasResultConnection, resultItems.length);
-  const run = runContext(node, taskSummary);
+  const result = resultContext(hasResultConnection, resultItems.length, t);
+  const run = runContext(node, taskSummary, t);
   const lineTone = statusLineTone(node, taskSummary);
   const promptContext = usesOptionalTextInput && promptPreview === null && !node.prompt.trim()
-    ? { title: "可选", tone: "neutral" as const }
+    ? { title: "Optional", tone: "neutral" as const }
     : promptPreview !== null
-    ? { title: promptSourceTitle ?? "已连接", tone: "prompt" as const }
-    : { title: "节点内", tone: "neutral" as const };
-  const promptContextLabel = isAudioNode ? textInputRequired ? "文本" : "备注" : "Prompt";
+    ? { title: promptSourceTitle ?? "Connected", tone: "prompt" as const }
+    : { title: "Inline", tone: "neutral" as const };
+  const promptContextLabel = isAudioNode ? textInputRequired ? "Text" : "Note" : "Prompt";
   const referenceContext = referenceCount > 0
-    ? { title: `${referenceCount} 个`, tone: "reference" as const }
-    : { title: "无", tone: "neutral" as const };
+    ? { title: `${referenceCount}`, tone: "reference" as const }
+    : { title: "None", tone: "neutral" as const };
   const contextItems: GenerateContextItem[] = [
     {
       key: "prompt",
@@ -180,23 +184,23 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
       title: promptContext.title,
       tone: promptContext.tone,
       tooltip: isAudioNode
-        ? promptPreview !== null ? `${promptContextLabel}来自 ${promptSourceTitle ?? "Prompt 节点"}` : textInputRequired ? "使用节点内音频文本" : "文本可留空；连接所需参考媒体后执行"
-        : promptPreview !== null ? `来自 ${promptSourceTitle ?? "Prompt 节点"}` : "使用节点内提示词",
+        ? promptPreview !== null ? `${promptContextLabel} from ${promptSourceTitle ?? "Prompt node"}` : textInputRequired ? "Use inline audio text" : "Text optional; connect required reference media to execute"
+        : promptPreview !== null ? `From ${promptSourceTitle ?? "Prompt node"}` : "Use inline prompt",
     },
-    { key: "references", label: "参考", title: referenceContext.title, tone: referenceContext.tone },
+    { key: "references", label: "Ref", title: referenceContext.title, tone: referenceContext.tone },
     {
       key: "result",
-      label: "结果",
+      label: "Result",
       title: result.title,
       tone: result.tone,
-      ...(hasResultConnection && onFocusResultNode ? { onClick: onFocusResultNode, tooltip: "定位结果节点" } : {}),
+      ...(hasResultConnection && onFocusResultNode ? { onClick: onFocusResultNode, tooltip: "Locate result node" } : {}),
     },
     {
       key: "run",
-      label: "运行",
+      label: "Run",
       title: run.title,
       tone: run.tone,
-      tooltip: taskSummary ? `任务 ${taskSummary.id}` : undefined,
+      tooltip: taskSummary ? `Task ${taskSummary.id}` : undefined,
     },
   ];
   const paramSummary = node.kind === "image-generate"
@@ -209,9 +213,9 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
         audioOperationFormatOptions(getAudioModelCapabilities(node.model)).length > 0 ? node.audioFormat : "",
         `x${node.variantCount}`,
       ].filter(value => value.trim().length > 0).join(" / ");
-  const taskStatusText = taskSummary?.status === "pending" ? "排队中" : "处理中";
-  const statusLabel = taskSummary ? `${taskStatusText} / ${paramSummary}` : `${statusText(node)} / ${paramSummary}`;
-  const compactStatusLabel = taskSummary ? `${taskStatusText} · x${node.variantCount}` : `${statusText(node)} · x${node.variantCount}`;
+  const taskStatusText = taskSummary?.status === "pending" ? "Queued" : "Processing";
+  const statusLabel = taskSummary ? `${taskStatusText} / ${paramSummary}` : `${statusText(node, t)} / ${paramSummary}`;
+  const compactStatusLabel = taskSummary ? `${taskStatusText} · x${node.variantCount}` : `${statusText(node, t)} · x${node.variantCount}`;
 
   useGSAP(() => {
     const previousLineTone = previousLineToneRef.current;
@@ -300,8 +304,8 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
             promptPreview !== null ? "cursor-default opacity-85" : ""
           }`}
           placeholder={promptPreview !== null
-            ? isAudioNode ? `已连接${promptContextLabel}节点，请在提示节点编辑` : "已连接 Prompt 节点，请在提示节点编辑"
-            : usesOptionalTextInput ? "文本可留空；连接或拖入所需参考媒体后执行" : isAudioNode ? "输入音频操作文本，输入 @ 引用支持的参考媒体" : "可直接写提示词，输入 @ 引用参考图"}
+            ? isAudioNode ? `Connected ${promptContextLabel} node, edit in prompt node` : "Connected Prompt node, edit in prompt node"
+            : usesOptionalTextInput ? "Text optional; connect or drop required reference media to execute" : isAudioNode ? "Enter audio operation text, use @ to reference supported media" : "Write prompt directly, use @ to reference images"}
         />
       </div>
       <div className="flex min-w-0 items-center gap-1 overflow-hidden rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-1">
@@ -342,7 +346,7 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
               <div
                 key={`${reference.id}:${reference.url}`}
                 className="h-6 w-6 overflow-hidden rounded border border-blue-400/30 bg-[var(--iw-panel-soft)]"
-                title={reference.role ? `参考媒体 · ${reference.role}` : "参考媒体"}
+                title={reference.role ? `Reference · ${reference.role}` : "Reference media"}
               >
                 <MediaReferenceThumbnail reference={reference} alt="" className="h-full w-full" />
               </div>
@@ -376,7 +380,7 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
         ) : (
           <span />
         )}
-        <div className="imagine-generate-variant-group nodrag flex h-8 overflow-hidden rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)]" title="变体数量">
+        <div className="imagine-generate-variant-group nodrag flex h-8 overflow-hidden rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)]" title="Variant count">
           {variantCountOptions.map(count => (
             <button
               key={count}
@@ -400,7 +404,7 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
             onClick={onCancel}
             className="imagine-generate-run-action imagine-tone-chip nodrag flex h-8 items-center justify-center gap-1.5 rounded-md border px-3 text-xs font-semibold transition"
             data-tone="danger"
-            title="取消关联生成任务"
+            title="Cancel related generation task"
           >
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             <X className="h-3 w-3" />

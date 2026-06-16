@@ -1,5 +1,6 @@
 import { Check, ChevronDown, Search } from "lucide-react";
 import { useState } from "react";
+import { useTranslations } from "@/lib/i18n";
 import type { ModelOption } from "@/lib/providers/model-catalog";
 
 export interface ModelOptionGroup {
@@ -31,6 +32,7 @@ export default function ModelSelectCombobox({
 }: ModelSelectComboboxProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const { t } = useTranslations("creation");
   const selectedOption = groups.flatMap(group => group.options).find(option => option.value === value);
   const normalizedQuery = query.trim().toLowerCase();
   const filteredGroups = groups
@@ -79,14 +81,14 @@ export default function ModelSelectCombobox({
               onKeyDown={(event) => {
                 if (event.key === "Escape") setOpen(false);
               }}
-              placeholder="搜索模型"
+              placeholder={t("modelSelect.searchPlaceholder")}
               className="min-w-0 flex-1 bg-transparent text-[11px] text-[var(--iw-text)] outline-none placeholder:text-[var(--iw-faint)]"
               autoFocus
             />
           </label>
           <div className="max-h-60 overflow-y-auto p-1" role="listbox" aria-label={ariaLabel}>
             {filteredGroups.length === 0 ? (
-              <div className="px-2 py-3 text-center text-[11px] text-[var(--iw-muted)]">没有匹配模型</div>
+              <div className="px-2 py-3 text-center text-[11px] text-[var(--iw-muted)]">{t("modelSelect.noMatchMessage")}</div>
             ) : (
               filteredGroups.map(group => (
                 <div key={group.provider} className="py-1">

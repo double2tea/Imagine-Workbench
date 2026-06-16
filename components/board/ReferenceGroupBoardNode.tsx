@@ -5,6 +5,7 @@ import { ArrowDown, ArrowUp, X } from "lucide-react";
 import MediaReferenceThumbnail from "@/components/reference/MediaReferenceThumbnail";
 import type { BoardReferenceGroupNode, BoardReferenceRole } from "@/lib/board";
 import { getMediaReferencePromptToken, mediaReferenceLabel } from "@/lib/media-references";
+import { useTranslations } from "@/lib/i18n";
 
 interface ReferenceGroupBoardNodeProps {
   node: BoardReferenceGroupNode;
@@ -15,10 +16,10 @@ interface ReferenceGroupBoardNodeProps {
 
 const roleOrder: BoardReferenceRole[] = ["general", "start", "end"];
 
-function roleLabel(role: BoardReferenceRole): string {
-  if (role === "start") return "首帧";
-  if (role === "end") return "尾帧";
-  return "参考";
+function roleLabel(role: BoardReferenceRole, t: (key: string) => string): string {
+  if (role === "start") return t('referenceGroup.roleStart');
+  if (role === "end") return t('referenceGroup.roleEnd');
+  return t('referenceGroup.roleReference');
 }
 
 function nextRole(role: BoardReferenceRole): BoardReferenceRole {
@@ -32,10 +33,11 @@ const ReferenceGroupBoardNode = memo(function ReferenceGroupBoardNode({
   onRemove,
   onRoleChange,
 }: ReferenceGroupBoardNodeProps) {
+  const { t } = useTranslations("board");
   if (node.references.length === 0) {
     return (
       <div className="flex h-full items-center justify-center px-4 text-center text-xs leading-5 text-[var(--iw-muted)]">
-        连接媒体资产组成参考组
+        {t('referenceGroup.emptyHint')}
       </div>
     );
   }
@@ -68,7 +70,7 @@ const ReferenceGroupBoardNode = memo(function ReferenceGroupBoardNode({
                   }}
                   className="nodrag rounded border border-[var(--iw-border)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--iw-text)] transition hover:border-[var(--iw-board-accent-amber)]"
                 >
-                  {roleLabel(reference.role)}
+                  {roleLabel(reference.role, t)}
                 </button>
               </div>
               <p className="mt-1 truncate text-[10px] text-[var(--iw-muted)]">{reference.prompt || reference.model}</p>
@@ -82,7 +84,7 @@ const ReferenceGroupBoardNode = memo(function ReferenceGroupBoardNode({
                   onMove(reference.assetId, "up");
                 }}
                 className="nodrag flex h-5 w-5 items-center justify-center rounded text-[var(--iw-muted)] transition hover:bg-[var(--iw-panel)] disabled:opacity-35"
-                title="上移"
+                title={t('referenceGroup.moveUp')}
               >
                 <ArrowUp className="h-3 w-3" />
               </button>
@@ -94,7 +96,7 @@ const ReferenceGroupBoardNode = memo(function ReferenceGroupBoardNode({
                   onMove(reference.assetId, "down");
                 }}
                 className="nodrag flex h-5 w-5 items-center justify-center rounded text-[var(--iw-muted)] transition hover:bg-[var(--iw-panel)] disabled:opacity-35"
-                title="下移"
+                title={t('referenceGroup.moveDown')}
               >
                 <ArrowDown className="h-3 w-3" />
               </button>
@@ -105,7 +107,7 @@ const ReferenceGroupBoardNode = memo(function ReferenceGroupBoardNode({
                   onRemove(reference.assetId);
                 }}
                 className="nodrag flex h-5 w-5 items-center justify-center rounded text-[var(--iw-muted)] transition hover:bg-[var(--iw-tone-danger-bg)] hover:text-[var(--iw-tone-danger-text)]"
-                title="移除"
+                title={t('referenceGroup.remove')}
               >
                 <X className="h-3 w-3" />
               </button>

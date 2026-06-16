@@ -2,6 +2,7 @@
 
 import type { ChangeEvent } from "react";
 import { ImagePlus, X } from "lucide-react";
+import { useTranslations } from "@/lib/i18n";
 import {
   mediaReferenceTypeFromMime,
   type MediaReferenceType,
@@ -26,9 +27,11 @@ export default function CapabilityParameterControls({
   compact = false,
   descriptors,
   onChange,
-  title = "模型高级参数",
+  title,
   value,
 }: CapabilityParameterControlsProps) {
+  const { t } = useTranslations("creation");
+  const resolvedTitle = title ?? t("parameters.defaultTitle");
   if (descriptors.length === 0) return null;
 
   const scalarDescriptors = descriptors.filter(descriptor => descriptor.kind !== "reference");
@@ -43,7 +46,7 @@ export default function CapabilityParameterControls({
   return (
     <div className={`imagine-capability-panel${compact ? " imagine-capability-panel--compact" : ""}`}>
       <div className={`${compact ? "mb-2" : "mb-3"} flex items-center justify-between gap-2`}>
-        <span className={compact ? "imagine-capability-field-label" : "imagine-section-label"}>{title}</span>
+        <span className={compact ? "imagine-capability-field-label" : "imagine-section-label"}>{resolvedTitle}</span>
         {booleanDescriptors.length > 0 && (
           <div className="flex flex-wrap items-center justify-end gap-2">
             {booleanDescriptors.map(descriptor => (
@@ -201,6 +204,7 @@ function ReferenceParameterControl({
   onChange: (value: ModelReferenceParameterValue[] | undefined) => void;
   value: ModelReferenceParameterValue[];
 }) {
+  const { t } = useTranslations("creation");
   const reference = value[0];
   const accept = descriptor.mediaTypes.map(type => `${type}/*`).join(",");
 
@@ -225,7 +229,7 @@ function ReferenceParameterControl({
             onClick={() => onChange(undefined)}
             className="text-[10px] text-[var(--iw-tone-danger-text)] transition hover:text-[var(--iw-tone-danger-text)]"
           >
-            清空
+            {t("parameters.clearButton")}
           </button>
         )}
       </div>
@@ -243,7 +247,7 @@ function ReferenceParameterControl({
             type="button"
             onClick={() => onChange(undefined)}
             className="absolute right-1 top-1 z-10 rounded-md border border-[var(--iw-tone-danger-border)] bg-[var(--iw-tone-danger-bg)] p-1 text-[var(--iw-tone-danger-text)] transition hover:scale-105"
-            title={`清空${descriptor.label}`}
+            title={t("parameters.clearButton") + descriptor.label}
           >
             <X className="h-3 w-3" />
           </button>
@@ -254,12 +258,12 @@ function ReferenceParameterControl({
       ) : (
         <label className="imagine-reference-add-tile min-h-20">
           <ImagePlus className="h-4 w-4" />
-          <span className="mt-0.5 text-[9px] font-semibold">上传</span>
+          <span className="mt-0.5 text-[9px] font-semibold">{t("parameters.uploadLabel")}</span>
           <input
             type="file"
             name={`capability-${descriptor.key}-upload`}
             accept={accept}
-            aria-label={`上传${descriptor.label}`}
+            aria-label={t("parameters.uploadLabel") + descriptor.label}
             onChange={handleUpload}
             className="hidden"
           />

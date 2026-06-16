@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n";
 import type { BoardEdge, BoardEdgeKind, BoardNode, BoardPortDefinition, BoardPortRef } from "./types";
 import { dedupeBoardEdgesByEndpoints } from "./edge-dedupe";
 import type { MediaReferenceType } from "@/lib/media-references";
@@ -105,7 +106,7 @@ export function getBoardNodePortDefinition(
 
 function findNode(nodes: BoardNode[], nodeId: string): BoardNode {
   const node = nodes.find(item => item.id === nodeId);
-  if (!node) throw new Error("连接端点节点不存在");
+  if (!node) throw new Error(t("board.workspace.noResultAsset"));
   return node;
 }
 
@@ -390,7 +391,7 @@ export function resolveBoardConnectionKind(nodes: BoardNode[], from: BoardPortRe
     return "agent-context";
   }
 
-  throw new Error("端口类型不兼容：媒体可连派生媒体、Prompt、参考组、多宫格、Agent 或支持该类型的生成参考，Prompt 可连生成，生成结果可连资产或笔记。");
+  throw new Error(t("board.workspace.connectionIncompatible"));
 }
 
 export function isValidBoardConnection(nodes: BoardNode[], from: BoardPortRef, to: BoardPortRef): boolean {

@@ -1,3 +1,4 @@
+import type { TFunction } from "@/lib/i18n";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
 import type { CompareViewType } from "@/components/assets/ComparePanel";
@@ -62,6 +63,7 @@ interface UseAssetActionsParams {
   setIsCompareMode: Dispatch<SetStateAction<boolean>>;
   setItems: Dispatch<SetStateAction<StorageItem[]>>;
   setSelectedItemIds: Dispatch<SetStateAction<string[]>>;
+  t: TFunction;
 }
 
 function makeClientId(prefix: string): string {
@@ -75,11 +77,11 @@ function getStringField(value: unknown, field: string): string | null {
   return typeof fieldValue === "string" && fieldValue.trim() ? fieldValue : null;
 }
 
-async function resolveOriginalStorageItem(item: StorageItem, items: StorageItem[]): Promise<StorageItem> {
+async function resolveOriginalStorageItem(item: StorageItem, items: StorageItem[], t: TFunction): Promise<StorageItem> {
   const storedItem = items.find(entry => entry.id === item.id) ?? item;
   const originalUrl = await resolveAssetOriginalUrl(storedItem);
   if (!originalUrl.trim()) {
-    throw new Error("找不到原始媒体");
+    throw new Error(t("common.notices.originalMediaNotFound"));
   }
   return { ...storedItem, url: originalUrl };
 }
@@ -146,14 +148,15 @@ async function prepareRetryReferenceImages(body: RetryRequestBody): Promise<void
 async function saveItemOrWarn(
   item: StorageItem,
   pushWorkspaceNotice: (type: NoticeType, message: string) => void,
+  t: TFunction,
 ): Promise<boolean> {
   try {
     await saveToDB(item);
     return true;
   } catch (error) {
-    const message = toErrorMessage(error, "IndexedDB 写入失败");
+    const message = toErrorMessage(error, t("common.notices.indexedDbWriteFailed"));
     console.error("IndexedDB Save Failed:", error);
-    pushWorkspaceNotice("error", `本地存储失败，刷新后可能丢失：${message}`);
+    pushWorkspaceNotice("error", t("common.notices.localSaveFailed", { error: message }));
     return false;
   }
 }
@@ -177,6 +180,7 @@ export function useAssetActions({
   setIsCompareMode,
   setItems,
   setSelectedItemIds,
+  t,
 }: UseAssetActionsParams) {
   const confirmAction = useConfirm();
 
@@ -209,9 +213,9 @@ export function useAssetActions({
   const handleBatchDelete = async () => {
     if (selectedItemIds.length === 0) return;
     if (await confirmAction({
-      message: `确定要彻底删除已选中的 ${selectedItemIds.length} 项创意资产吗？`,
+      message: t("common.confirmDialogs.deleteSelectedItems", { count: selectedItemIds.length }),
       tone: "danger",
-      confirmLabel: "删除",
+      confirmLabel: t("common.buttons.delete"),
     })) {
       for (const id of selectedItemIds) {
         await deleteFromDB(id);
@@ -226,9 +230,9 @@ export function useAssetActions({
     const ids = items.filter(item => statuses.includes(item.status)).map(item => item.id);
     if (ids.length === 0) return;
     if (await confirmAction({
-      message: `确定要删除 ${ids.length} 个 ${statuses.join("/")} 任务吗？`,
+      message: t("common.confirmDialogs.deleteTasksByStatus", { count: ids.length, statuses: statuses.join("/") }),
       tone: "danger",
-      confirmLabel: "删除",
+      confirmLabel: t("common.buttons.delete"),
     })) {
       for (const id of ids) {
         await deleteFromDB(id);
@@ -243,9 +247,9 @@ export function useAssetActions({
     const operationName = item.operationName;
     const canCancelRemote = operationName?.startsWith("12ai:video:") === true;
     const confirmText = canCancelRemote
-      ? "确定要取消这个视频生成任务吗？"
-      : "确定要本地取消这个任务吗？远端生成可能仍会继续。";
-    if (!(await confirmAction({ message: confirmText, tone: "danger", confirmLabel: "取消任务" }))) return;
+      ? t("common.confirmDialogs.cancelVideoTask")
+      : t("common.confirmDialogs.cancelLocalTask");
+    if (!(await confirmAction({ message: confirmText, tone: "danger", confirmLabel: t("common.buttons.cancelTask") }))) return;
 
     setCancelingItemIds(prev => [...prev, item.id]);
     try {
@@ -266,7 +270,7 @@ export function useAssetActions({
         });
 
         if (!res.ok) {
-          throw new Error(await readFetchError(res, "任务取消失败"));
+          throw new Error(await readFetchError(res, t("common.notices.taskCancelFailed")));
         }
       }
 
@@ -275,16 +279,16 @@ export function useAssetActions({
       setItems(prev => prev.filter(current => current.id !== item.id));
       setSelectedItemIds(prev => prev.filter(id => id !== item.id));
       setCompareItemIds(prev => prev.filter(id => id !== item.id));
-      pushWorkspaceNotice("success", canCancelRemote ? "视频生成任务已取消" : "任务已从本地取消");
+      pushWorkspaceNotice("success", canCancelRemote ? t("common.notices.taskCancelFailed") : t("common.notices.taskCancelStatusUpdateFailed"));
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "任务取消失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.taskCancelFailed")));
     } finally {
       setCancelingItemIds(prev => prev.filter(id => id !== item.id));
     }
   };
 
   const handleDeleteItem = async (item: StorageItem) => {
-    if (await confirmAction({ message: "确定要删除此创意项吗？", tone: "danger", confirmLabel: "删除" })) {
+    if (await confirmAction({ message: t("common.confirmDialogs.deleteSingleItem"), tone: "danger", confirmLabel: t("common.buttons.delete") })) {
       await deleteFromDB(item.id);
       setItems(prev => prev.filter(current => current.id !== item.id));
       setSelectedItemIds(prev => prev.filter(id => id !== item.id));
@@ -294,9 +298,9 @@ export function useAssetActions({
 
   const handleResetLocalData = async () => {
     if (await confirmAction({
-      message: "这会清空所有生成的历史卡片，无法恢复！",
+      message: t("common.confirmDialogs.resetAllHistory"),
       tone: "danger",
-      confirmLabel: "清空",
+      confirmLabel: t("common.confirmDialogs.resetAllHistoryLabel"),
     })) {
       await createWorkspaceSafetySnapshot("clear-assets");
       await clearAllDB();
@@ -338,7 +342,7 @@ export function useAssetActions({
   const retryFailedItem = async (item: StorageItem) => {
     if (item.status !== "failed") return;
     if (item.type === "audio" || item.type === "transcript") {
-      pushWorkspaceNotice("error", "音频资产不支持生成重试");
+      pushWorkspaceNotice("error", t("common.notices.audioAssetNotSupportRetry"));
       return;
     }
     const retryingItem: StorageItem = {
@@ -348,7 +352,7 @@ export function useAssetActions({
       errorMessage: undefined,
       operationName: undefined,
     };
-    if (!await saveItemOrWarn(retryingItem, pushWorkspaceNotice)) return;
+    if (!await saveItemOrWarn(retryingItem, pushWorkspaceNotice, t)) return;
     setItems(prev => prev.map(current => current.id === item.id ? retryingItem : current));
 
     try {
@@ -368,7 +372,7 @@ export function useAssetActions({
       });
 
       if (!res.ok) {
-        throw new Error(await readFetchError(res, "任务重试失败"));
+        throw new Error(await readFetchError(res, t("common.notices.taskRetryFailed")));
       }
 
       const { operationName, imageUrl } = item.type === "image"
@@ -382,7 +386,7 @@ export function useAssetActions({
           progress: 15,
           operationName,
         };
-        if (!await saveItemOrWarn(processingItem, pushWorkspaceNotice)) {
+        if (!await saveItemOrWarn(processingItem, pushWorkspaceNotice, t)) {
           setItems(prev => prev.map(current => current.id === item.id ? processingItem : current));
           return;
         }
@@ -397,7 +401,7 @@ export function useAssetActions({
           status: "complete",
           progress: 100,
         };
-        if (!await saveItemOrWarn(completedItem, pushWorkspaceNotice)) {
+        if (!await saveItemOrWarn(completedItem, pushWorkspaceNotice, t)) {
           setItems(prev => prev.map(current => current.id === item.id ? completedItem : current));
           return;
         }
@@ -405,16 +409,16 @@ export function useAssetActions({
         return;
       }
 
-      throw new Error(item.type === "image" ? "图片接口返回缺少 imageUrl 或 operationName" : "视频接口返回缺少 operationName");
+      throw new Error(item.type === "image" ? t("common.notices.imageInterfaceMissingResult") : t("common.notices.videoInterfaceMissingOperation"));
     } catch (error) {
-      const message = toErrorMessage(error, "任务重试失败");
+      const message = toErrorMessage(error, t("common.notices.taskRetryFailed"));
       const failedItem: StorageItem = {
         ...retryingItem,
         status: "failed",
         progress: 100,
         errorMessage: message,
       };
-      await saveItemOrWarn(failedItem, pushWorkspaceNotice);
+      await saveItemOrWarn(failedItem, pushWorkspaceNotice, t);
       setItems(prev => prev.map(current => current.id === item.id ? failedItem : current));
       pushWorkspaceNotice("error", message);
     }
@@ -423,10 +427,10 @@ export function useAssetActions({
   const handleDownloadItem = async (item: StorageItem) => {
     let originalItem: StorageItem;
     try {
-      originalItem = await resolveOriginalStorageItem(item, items);
+      originalItem = await resolveOriginalStorageItem(item, items, t);
     } catch (error) {
       console.error("Download item failed to resolve original:", error);
-      alert("下载失败，无法读取原始媒体。");
+      alert(t("common.notices.downloadFailedNoOriginal"));
       return;
     }
 
@@ -462,19 +466,19 @@ export function useAssetActions({
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Download item failed:", error);
-      alert("下载失败，请检查网络或文件是否可访问。");
+      alert(t("common.notices.downloadFailedNetwork"));
     }
   };
 
   const handleCaptureVideoFrame = async (item: StorageItem, frame: CapturedVideoFrame): Promise<StorageItem | null> => {
     if (item.type !== "video") {
-      throw new Error("只有视频资产可以截帧");
+      throw new Error(t("common.notices.videoFrameCaptureFailed"));
     }
 
     const frameItem = createVideoFrameStorageItem(item, frame, makeClientId("frame"));
-    if (!await saveItemOrWarn(frameItem, pushWorkspaceNotice)) return null;
+    if (!await saveItemOrWarn(frameItem, pushWorkspaceNotice, t)) return null;
     setItems(prev => [frameItem, ...prev]);
-    pushWorkspaceNotice("success", `已保存${getVideoFrameCaptureLabel(frame.mode)}为图片资产`);
+    pushWorkspaceNotice("success", t("common.notices.videoFrameSaved", { label: getVideoFrameCaptureLabel(frame.mode) }));
     return frameItem;
   };
 
@@ -483,20 +487,20 @@ export function useAssetActions({
     screenshots: PanoramaScreenshot[],
   ): Promise<void> => {
     if (item.type !== "image") {
-      throw new Error("只有图片资产可以进入全景查看");
+      throw new Error(t("common.notices.panoramaViewFailed"));
     }
 
     const savedItems: StorageItem[] = [];
     for (const [index, screenshot] of screenshots.entries()) {
       const screenshotItem = createPanoramaScreenshotStorageItem(item, screenshot, makeClientId(`pano_${index}`));
-      if (await saveItemOrWarn(screenshotItem, pushWorkspaceNotice)) savedItems.push(screenshotItem);
+      if (await saveItemOrWarn(screenshotItem, pushWorkspaceNotice, t)) savedItems.push(screenshotItem);
     }
     if (savedItems.length === 0) return;
     setItems(prev => [
       ...savedItems,
       ...prev.filter(prevItem => !savedItems.some(savedItem => savedItem.id === prevItem.id)),
     ]);
-    pushWorkspaceNotice("success", `已保存 ${savedItems.length} 张全景截图`);
+    pushWorkspaceNotice("success", t("common.notices.panoramaScreenshotsSaved", { count: savedItems.length }));
   };
 
   const handleBatchDownloadZip = async () => {
@@ -506,7 +510,7 @@ export function useAssetActions({
       archiveName: makeClientId("Imagine_Workbench_Export"),
       fileNamePrefix: "creation",
       items: itemsToExport,
-      resolveOriginalItem: item => resolveOriginalStorageItem(item, items),
+      resolveOriginalItem: item => resolveOriginalStorageItem(item, items, t),
     });
   };
 

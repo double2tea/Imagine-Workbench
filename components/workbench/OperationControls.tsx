@@ -28,6 +28,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { imageEditFeatureLabel, type ImageEditFeature } from "@/lib/image-quick-edit-targets";
+import { useTranslations } from "@/lib/i18n";
 
 export type OperationTone = "accent" | "neutral" | "danger" | "media" | "success";
 
@@ -44,59 +45,59 @@ export const IMAGE_EDIT_OPERATION_META: Record<ImageEditFeature, WorkbenchOperat
   redraw: {
     Icon: WandSparkles,
     label: imageEditFeatureLabel("redraw"),
-    title: "绘制蒙版并重绘局部",
+    title: "Draw mask and repaint area",
     tone: "accent",
   },
   erase: {
     Icon: Eraser,
     label: imageEditFeatureLabel("erase"),
-    title: "绘制蒙版并擦除区域",
+    title: "Draw mask and erase area",
     tone: "accent",
   },
   outpaint: {
     Icon: SquareDashed,
     label: imageEditFeatureLabel("outpaint"),
-    title: "扩展画面边界",
+    title: "Extend canvas boundary",
     tone: "accent",
   },
   cutout: {
     Icon: Scissors,
     label: imageEditFeatureLabel("cutout"),
-    title: "移除背景并保留主体",
+    title: "Remove background, keep subject",
     tone: "accent",
   },
   angle: {
     Icon: Box,
     label: imageEditFeatureLabel("angle"),
-    title: "调整画面视角",
+    title: "Adjust camera angle",
     tone: "accent",
   },
   lighting: {
     Icon: Sun,
     label: imageEditFeatureLabel("lighting"),
-    title: "调整画面打光",
+    title: "Adjust lighting",
     tone: "accent",
   },
 };
 
 export const WORKBENCH_OPERATION_META = {
-  analyze: { Icon: Sparkles, label: "分析", title: "分析媒体", tone: "accent" },
-  apply: { Icon: Check, label: "应用", title: "应用编辑", tone: "success" },
-  brush: { Icon: Paintbrush, label: "遮罩", title: "绘制遮罩", tone: "accent" },
-  compare: { Icon: ScanSearch, label: "对比", title: "对比参考图", tone: "accent" },
-  crop: { Icon: Crop, label: "裁切", title: "裁切画面", tone: "accent" },
-  delete: { Icon: Trash2, label: "删除", title: "删除", tone: "danger" },
-  download: { Icon: Download, label: "下载", title: "下载", tone: "neutral" },
-  frame: { Icon: Frame, label: "截帧", title: "截取当前帧", tone: "media" },
-  fullscreen: { Icon: Maximize2, label: "预览", title: "全屏预览", tone: "neutral" },
-  imageToVideo: { Icon: Video, label: "生视频", title: "以此图生成视频", tone: "media" },
-  library: { Icon: FolderHeart, label: "素材", title: "存入素材库", tone: "media" },
-  localEdit: { Icon: SquarePen, label: "局部编辑", title: "打开局部编辑器", tone: "accent" },
-  panorama: { Icon: Compass, label: "360", title: "360 全景查看", tone: "media" },
-  reset: { Icon: RotateCcw, label: "重置", title: "重置", tone: "neutral" },
-  reuse: { Icon: SlidersHorizontal, label: "复用", title: "复用任务参数", tone: "neutral" },
-  text: { Icon: Type, label: "文字", title: "放置文字", tone: "accent" },
-  voice: { Icon: Mic2, label: "音色", title: "保存为克隆音色", tone: "media" },
+  analyze: { Icon: Sparkles, label: "Analyze", title: "Analyze media", tone: "accent" },
+  apply: { Icon: Check, label: "Apply", title: "Apply edit", tone: "success" },
+  brush: { Icon: Paintbrush, label: "Mask", title: "Draw mask", tone: "accent" },
+  compare: { Icon: ScanSearch, label: "Compare", title: "Compare reference", tone: "accent" },
+  crop: { Icon: Crop, label: "Crop", title: "Crop frame", tone: "accent" },
+  delete: { Icon: Trash2, label: "Delete", title: "Delete", tone: "danger" },
+  download: { Icon: Download, label: "Download", title: "Download", tone: "neutral" },
+  frame: { Icon: Frame, label: "Frame", title: "Capture current frame", tone: "media" },
+  fullscreen: { Icon: Maximize2, label: "Preview", title: "Fullscreen preview", tone: "neutral" },
+  imageToVideo: { Icon: Video, label: "To video", title: "Generate video from this image", tone: "media" },
+  library: { Icon: FolderHeart, label: "Library", title: "Save to asset library", tone: "media" },
+  localEdit: { Icon: SquarePen, label: "Local edit", title: "Open local editor", tone: "accent" },
+  panorama: { Icon: Compass, label: "360", title: "360 panorama view", tone: "media" },
+  reset: { Icon: RotateCcw, label: "Reset", title: "Reset", tone: "neutral" },
+  reuse: { Icon: SlidersHorizontal, label: "Reuse", title: "Reuse task params", tone: "neutral" },
+  text: { Icon: Type, label: "Text", title: "Place text", tone: "accent" },
+  voice: { Icon: Mic2, label: "Voice", title: "Save as cloned voice", tone: "media" },
 } satisfies Record<string, WorkbenchOperationMeta>;
 
 export type WorkbenchOperationKey = keyof typeof WORKBENCH_OPERATION_META;

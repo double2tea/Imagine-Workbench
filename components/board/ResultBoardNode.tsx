@@ -12,6 +12,7 @@ import { buildStorageItem, type StorageItem } from "@/lib/db";
 import { imageQuickEditProcessingTitleFromPrompt } from "@/lib/image-quick-edit-targets";
 import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
 import type { CapturedVideoFrame } from "@/lib/video-frame";
+import { useTranslations } from "@/lib/i18n";
 import {
   IMAGE_EDIT_OPERATION_ORDER,
   WORKBENCH_OPERATION_META,
@@ -36,7 +37,9 @@ interface ResultBoardNodeProps {
   onSelectStackAsset?: (assetId: string) => void;
 }
 
-function resultNodeToStorageItem(node: BoardResultNode, boardId: string): StorageItem {
+type ResultBoardNodeT = ReturnType<typeof useTranslations>["t"];
+
+function resultNodeToStorageItem(node: BoardResultNode, boardId: string, t: ResultBoardNodeT): StorageItem {
   const hasUrl = node.asset.url.trim().length > 0;
   return buildStorageItem(
     {
@@ -49,7 +52,7 @@ function resultNodeToStorageItem(node: BoardResultNode, boardId: string): Storag
       createdAt: node.createdAt,
       status: hasUrl ? "complete" : "failed",
       progress: hasUrl ? 100 : 0,
-      errorMessage: hasUrl ? undefined : "结果记录已不可用",
+      errorMessage: hasUrl ? undefined : t("node.statusLabels.failed"),
       sourceBoardNodeId: node.id,
       sourceBoardResultStackKey: node.resultStackKey,
     },
@@ -61,7 +64,7 @@ function LightweightMediaPreview({ type }: { type: "audio" | "image" | "video" }
   const Icon = type === "audio" ? Music : type === "image" ? ImageIcon : Video;
   return (
     <div
-      aria-label={type === "audio" ? "音频结果" : type === "image" ? "图片结果" : "视频结果"}
+      aria-label={type === "audio" ? "Audio result" : type === "image" ? "Image result" : "Video result"}
       className="board-media-preview flex h-full w-full items-center justify-center bg-[var(--iw-panel-soft)] text-[var(--iw-muted)]"
       role="img"
     >
@@ -85,7 +88,8 @@ const ResultBoardNode = memo(function ResultBoardNode({
   onSaveVoiceProfile,
   onSelectStackAsset,
 }: ResultBoardNodeProps) {
-  const fallbackItem = useMemo(() => resultNodeToStorageItem(node, boardId), [boardId, node]);
+  const { t } = useTranslations("board");
+  const fallbackItem = useMemo(() => resultNodeToStorageItem(node, boardId, t), [boardId, node, t]);
   const item = useMemo(
     () => stackItems.find(stackItem => stackItem.id === node.activeAssetId) ?? fallbackItem,
     [fallbackItem, node.activeAssetId, stackItems],
@@ -190,7 +194,7 @@ const ResultBoardNode = memo(function ResultBoardNode({
         processingLabel={imageQuickEditProcessingTitleFromPrompt(item.prompt) ?? undefined}
         stackItems={stackItems}
         status={item.status}
-        statusLabel={item.errorMessage ?? (item.status === "failed" ? "生成失败" : undefined)}
+        statusLabel={item.errorMessage ?? (item.status === "failed" ? t("node.statusLabels.failed") : undefined)}
     >
       {item.type === "image" && item.url.trim() ? (
         <PreviewImage

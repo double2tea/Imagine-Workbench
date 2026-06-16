@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n";
 import {
   getMediaReferenceType,
   mediaReferenceLabel,
@@ -170,7 +171,7 @@ export function formatAgentReferenceHint(
   const referencedTypes = collectReferencedTypes(sendableReferences);
   const unsupportedLabels = referencedTypes
     .filter(type => inputSupport[type] === false)
-    .map(mediaReferenceLabel);
+    .map(type => mediaReferenceLabel(type));
 
   if (unsupportedLabels.length > 0) {
     return `下一条消息含 ${countLabel}；目录中相近模型不支持${unsupportedLabels.join("/")}输入，失败时请更换模型`;
@@ -178,7 +179,7 @@ export function formatAgentReferenceHint(
 
   const supportedLabels = referencedTypes
     .filter(type => inputSupport[type] === true)
-    .map(mediaReferenceLabel);
+    .map(type => mediaReferenceLabel(type));
   if (supportedLabels.length === referencedTypes.length) {
     return `下一条消息含 ${countLabel}（目录显示支持${supportedLabels.join("/")}输入）`;
   }

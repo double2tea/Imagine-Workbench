@@ -9,6 +9,7 @@ import PromptComposerSurface, { type PromptComposerSelectionRange } from "@/comp
 import PromptComposerToolbarActions from "@/components/creation/PromptComposerToolbarActions";
 import ReferenceImagePicker, { type ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import { type DraggedReferenceAsset } from "@/components/reference/referenceDrag";
+import { useTranslations } from "@/lib/i18n";
 import {
   applyPromptTemplateText,
   detectPromptTemplateSlashCommand,
@@ -116,6 +117,7 @@ export default function ImageGenerationPanel({
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
   const promptSelectionRef = useRef<PromptComposerSelectionRange | null>(null);
   const [slashCommand, setSlashCommand] = useState<PromptTemplateSlashCommand | null>(null);
+  const { t } = useTranslations("creation");
   const aspectRatioId = useId();
   const negativePromptId = useId();
   const customImageSizeId = useId();
@@ -124,8 +126,8 @@ export default function ImageGenerationPanel({
   const isCustomImageResolution = imageResolution === "custom";
   const imageReferenceLimit = capabilities.maxReferenceImages;
   const imageReferenceHelp = imageReferenceLimit > 0
-    ? `支持 JPG / PNG / WEBP | 最多 ${imageReferenceLimit} 张 | 可拖入右侧资产或粘贴剪贴板`
-    : "当前模型不支持参考图";
+    ? t("imageGeneration.referenceHelpSupported", { limit: imageReferenceLimit })
+    : t("imageGeneration.referenceHelpUnsupported");
   const imageReferenceCountLabel = imageReferenceLimit > 0
     ? `${Math.min(referenceImages.length, imageReferenceLimit)}/${imageReferenceLimit}`
     : String(referenceImages.length);
@@ -176,24 +178,24 @@ export default function ImageGenerationPanel({
             accent="blue"
             isOptimizing={isOptimizing}
             optimizeDisabled={isOptimizing || !prompt.trim()}
-            optimizeLabel="优化"
+            optimizeLabel={t("imageGeneration.optimizeLabel")}
             onApplyTemplate={handleApplyPromptTemplate}
             onOptimize={onOptimizePrompt}
           />
         }
         atDropdownNode={atDropdownNode}
-        desktopHint="拖入资产到此处插入 @媒体N | 拖入下方只作为参考图"
+        desktopHint={t("imageGeneration.desktopHint")}
         headerAccent="blue"
         headerVariant="toolbar"
         icon={<Sparkles className="h-3.5 w-3.5" />}
-        label="提示词"
+        label={t("imageGeneration.promptLabel")}
         name="image-prompt"
         onChange={handlePromptChange}
         onDropAsset={onPromptDropAsset}
         onSelectionChange={(selection) => {
           promptSelectionRef.current = selection;
         }}
-        placeholder="写下你想创造的图片奇思妙想... 输入 @ 可引用作品"
+        placeholder={t("imageGeneration.promptPlaceholder")}
         prompt={prompt}
         references={referenceImages}
       />
@@ -201,7 +203,7 @@ export default function ImageGenerationPanel({
       <div className="imagine-parameter-grid grid grid-cols-1 gap-3">
         <div className="imagine-parameter-field">
           <div className="imagine-parameter-label-row">
-            <label className="imagine-section-label">图片生成模型</label>
+            <label className="imagine-section-label">{t("imageGeneration.modelLabel")}</label>
             {supportsBackgroundGeneration && (
               <label className="imagine-inline-chip-toggle shrink-0">
                 <input
@@ -211,7 +213,7 @@ export default function ImageGenerationPanel({
                   onChange={(event) => onImageBackgroundGenerationChange(event.target.checked)}
                   className="h-3 w-3 cursor-pointer accent-blue-500"
                 />
-                <span>后台</span>
+                <span>{t("imageGeneration.backgroundLabel")}</span>
               </label>
             )}
           </div>
@@ -226,7 +228,7 @@ export default function ImageGenerationPanel({
 
         <div className="imagine-parameter-field">
           <label htmlFor={aspectRatioId} className="imagine-parameter-label-row imagine-section-label">
-            画面宽高比
+            {t("imageGeneration.aspectRatioLabel")}
           </label>
           <select
             id={aspectRatioId}
@@ -237,7 +239,7 @@ export default function ImageGenerationPanel({
             className="imagine-select py-2.5"
             aria-disabled={isCustomImageResolution}
           >
-            {isCustomImageResolution && <option value="custom">自定义尺寸决定比例</option>}
+            {isCustomImageResolution && <option value="custom">{t("imageGeneration.customSizeOption")}</option>}
             {capabilities.aspectRatios.map(option => (
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
@@ -254,14 +256,14 @@ export default function ImageGenerationPanel({
         />
 
         <div>
-          <label htmlFor={negativePromptId} className="mb-1.5 block imagine-section-label">反向提示词</label>
+          <label htmlFor={negativePromptId} className="mb-1.5 block imagine-section-label">{t("imageGeneration.negativePromptLabel")}</label>
           <input
             id={negativePromptId}
             name="image-negative-prompt"
             type="text"
             value={negativePrompt}
             onChange={(event) => onNegativePromptChange(event.target.value)}
-            placeholder="不希望出现的元素，例如 blurred, text"
+            placeholder={t("imageGeneration.negativePromptPlaceholder")}
             className="imagine-input py-2.5"
           />
         </div>
@@ -270,7 +272,7 @@ export default function ImageGenerationPanel({
           {imageResolutionOptions.length > 0 && (
             <div>
               <label className="mb-1.5 block imagine-section-label">
-                输出分辨率
+                {t("imageGeneration.outputResolutionLabel")}
               </label>
               {presetResolutionOptions.length > 0 && (
                 <div className="imagine-option-group grid-cols-4">
@@ -295,7 +297,7 @@ export default function ImageGenerationPanel({
                     data-active={isCustomImageResolution}
                     className="imagine-segment-btn border border-[var(--iw-border)]"
                   >
-                    自定义尺寸
+                    {t("imageGeneration.customSizeButton")}
                   </button>
                 </div>
               )}
@@ -307,11 +309,11 @@ export default function ImageGenerationPanel({
                     type="text"
                     value={customImageSize}
                     onChange={(event) => onCustomImageSizeChange(event.target.value)}
-                    placeholder="例如 2560x1440，宽高需为 16 的倍数"
+                    placeholder={t("imageGeneration.customSizePlaceholder")}
                     className="imagine-input py-2.5 font-mono"
                   />
                   <p className="mt-1.5 font-mono text-[10px] leading-relaxed text-[var(--iw-faint)]">
-                    约束：最大边 ≤ 3840px，宽高为 16 的倍数，比例由尺寸决定且 ≤ 3:1，总像素 655,360-8,294,400。
+                    {t("imageGeneration.customSizeHint")}
                   </p>
                 </div>
               )}
@@ -321,7 +323,7 @@ export default function ImageGenerationPanel({
           {capabilities.qualities.length > 0 && (
             <div>
               <label className="mb-1.5 block imagine-section-label">
-                画质档位
+                {t("imageGeneration.qualityLabel")}
               </label>
               <div className="imagine-option-group grid-cols-4">
                 {capabilities.qualities.map((option) => (
@@ -341,7 +343,7 @@ export default function ImageGenerationPanel({
 
           {capabilities.thinkingLevels.length > 0 && (
             <div>
-              <label className="mb-1.5 block imagine-section-label">图片思考等级</label>
+              <label className="mb-1.5 block imagine-section-label">{t("imageGeneration.thinkingLevelLabel")}</label>
               <div className="imagine-option-group grid-cols-2">
                 {capabilities.thinkingLevels.map(option => (
                   <button

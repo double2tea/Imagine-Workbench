@@ -1,4 +1,5 @@
 import { Image as ImageIcon, Sparkles } from "lucide-react";
+import { useTranslations } from "@/lib/i18n";
 
 export type MobileWorkbenchPanel = "create" | "gallery";
 
@@ -15,6 +16,7 @@ export default function MobileWorkbenchTabs({
   inFlightCount,
   onChange,
 }: MobileWorkbenchTabsProps) {
+  const { t } = useTranslations("common");
   return (
     <div className="imagine-mobile-workbench-tabs flex gap-1 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-1 lg:hidden">
       <button
@@ -24,7 +26,7 @@ export default function MobileWorkbenchTabs({
         className="imagine-mobile-workbench-tab flex flex-1 items-center justify-center gap-1.5"
       >
         <Sparkles className="h-3.5 w-3.5" />
-        <span>创作</span>
+        <span>{t("gallery.createTab")}</span>
       </button>
       <button
         type="button"
@@ -33,7 +35,7 @@ export default function MobileWorkbenchTabs({
         className="imagine-mobile-workbench-tab flex flex-1 items-center justify-center gap-1.5"
       >
         <ImageIcon className="h-3.5 w-3.5" />
-        <span>画廊</span>
+        <span>{t("gallery.mobileTitle")}</span>
         <span className="font-mono text-[10px] opacity-75">{galleryCount}</span>
         {inFlightCount > 0 && (
           <span className="imagine-mobile-workbench-tab-badge font-mono text-[9px]">{inFlightCount}</span>

@@ -1,5 +1,6 @@
 import { useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from "react";
 import { Video as VideoIcon } from "lucide-react";
+import { useTranslations } from "@/lib/i18n";
 import { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
 import CinematicProfileControls from "@/components/creation/CinematicProfileControls";
 import CreatorGenerateButton from "@/components/creation/CreatorGenerateButton";
@@ -119,11 +120,12 @@ export default function VideoGenerationPanel({
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
   const promptSelectionRef = useRef<PromptComposerSelectionRange | null>(null);
   const [slashCommand, setSlashCommand] = useState<PromptTemplateSlashCommand | null>(null);
+  const { t } = useTranslations("creation");
   const acceptedReferenceText = capabilities.referenceMediaTypes.includes("audio")
-    ? "图片 / 视频 / 音频"
+    ? t("videoGeneration.referenceTypeImageVideoAudio")
     : capabilities.referenceMediaTypes.includes("video")
-      ? "图片 / 视频"
-      : "JPG / PNG / WEBP";
+      ? t("videoGeneration.referenceTypeImageVideo")
+      : t("videoGeneration.referenceTypeImage");
   const extraControlCount =
     Number(resolutionOptions.length > 0) + Number(durationOptions.length > 0) + Number(presetOptions.length > 0);
   const controlGridClass =
@@ -135,9 +137,9 @@ export default function VideoGenerationPanel({
           ? "sm:grid-cols-3"
           : "sm:grid-cols-2";
   const referenceModeLabels: Record<VideoReferenceMode, string> = {
-    none: "不使用参考",
-    reference: "全能参考",
-    firstLast: "首尾帧 / 关键帧",
+    none: t("videoGeneration.referenceModeNone"),
+    reference: t("videoGeneration.referenceModeReference"),
+    firstLast: t("videoGeneration.referenceModeFirstLast"),
   };
   const generateDisabled = promptRequired && !prompt.trim();
   const priceReferenceTypes = selectVideoReferenceTypesForMode(
@@ -189,17 +191,17 @@ export default function VideoGenerationPanel({
             accent="violet"
             isOptimizing={isOptimizing}
             optimizeDisabled={isOptimizing || !prompt.trim()}
-            optimizeLabel="润色"
+            optimizeLabel={t("videoGeneration.optimizeLabel")}
             onApplyTemplate={handleApplyPromptTemplate}
             onOptimize={onOptimizePrompt}
           />
         }
         atDropdownNode={atDropdownNode}
-        desktopHint="拖入资产到此处插入 @媒体N | 拖入下方只作为参考图"
+        desktopHint={t("videoGeneration.desktopHint")}
         headerAccent="violet"
         headerVariant="toolbar"
         icon={<VideoIcon className="h-3.5 w-3.5" />}
-        label="视频场景运动描述"
+        label={t("videoGeneration.promptLabel")}
         onChange={handlePromptChange}
         onDropAsset={onPromptDropAsset}
         onSelectionChange={(selection) => {
@@ -212,10 +214,10 @@ export default function VideoGenerationPanel({
 
       <div className="grid grid-cols-1 gap-3">
         <div>
-          <label className="imagine-section-label mb-1.5 block">视频生成模型</label>
+          <label className="imagine-section-label mb-1.5 block">{t("videoGeneration.modelLabel")}</label>
           <ModelSelectCombobox
             accent="violet"
-            ariaLabel="选择视频模型"
+            ariaLabel={t("videoGeneration.modelLabel")}
             groups={modelGroups}
             value={selectedModel}
             onChange={onSelectModel}
@@ -223,7 +225,7 @@ export default function VideoGenerationPanel({
         </div>
 
         <div>
-          <label className="imagine-section-label mb-1.5 block">画面比例</label>
+          <label className="imagine-section-label mb-1.5 block">{t("videoGeneration.aspectRatioLabel")}</label>
           <select
             value={selectedSize}
             onChange={(event) => onSelectSize(event.target.value)}
@@ -239,7 +241,7 @@ export default function VideoGenerationPanel({
 
       {referenceModeOptions.length > 1 && (
         <div>
-          <label className="imagine-section-label mb-1.5 block">参考模式</label>
+          <label className="imagine-section-label mb-1.5 block">{t("videoGeneration.referenceModeLabel")}</label>
           <select
             value={selectedReferenceMode}
             onChange={(event) => onSelectReferenceMode(event.target.value as VideoReferenceMode)}
@@ -263,7 +265,7 @@ export default function VideoGenerationPanel({
         <div className={`grid grid-cols-1 gap-3 border-t border-[var(--iw-border)] pt-3 ${controlGridClass}`}>
           {resolutionOptions.length > 0 && (
             <div>
-              <label className="mb-1.5 block imagine-section-label">分辨率</label>
+              <label className="mb-1.5 block imagine-section-label">{t("videoGeneration.resolutionLabel")}</label>
               <select
                 value={selectedResolution}
                 onChange={(event) => onSelectResolution(event.target.value)}
@@ -278,7 +280,7 @@ export default function VideoGenerationPanel({
 
           {durationOptions.length > 0 && (
             <div>
-              <label className="mb-1.5 block imagine-section-label">秒数</label>
+              <label className="mb-1.5 block imagine-section-label">{t("videoGeneration.durationLabel")}</label>
               <select
                 value={selectedDuration}
                 onChange={(event) => onSelectDuration(event.target.value)}
@@ -293,7 +295,7 @@ export default function VideoGenerationPanel({
 
           {presetOptions.length > 0 && (
             <div>
-              <label className="mb-1.5 block imagine-section-label">预设</label>
+              <label className="mb-1.5 block imagine-section-label">{t("videoGeneration.presetLabel")}</label>
               <select
                 value={selectedPreset}
                 onChange={(event) => onSelectPreset(event.target.value)}
@@ -310,18 +312,18 @@ export default function VideoGenerationPanel({
 
       <ReferenceImagePicker
         acceptedMediaTypes={capabilities.referenceMediaTypes}
-        addLabel="添加参考"
+        addLabel={t("videoGeneration.addReferenceLabel")}
         browseClassName="cursor-pointer font-medium text-[var(--iw-tone-violet-text)] underline-offset-4 hover:text-[var(--iw-tone-violet-text)] hover:underline"
         clearLabel={clearReferenceLabel}
         emptyHelp={`支持 ${acceptedReferenceText} | 最多 ${referenceLimit} 个 | ${referenceHelp}`}
         emptyLabel={`添加${referenceLabel}`}
         label={`${referenceLabel} ${referenceImages.length > 0 ? `(${Math.min(referenceImages.length, referenceLimit)}/${referenceLimit})` : ""}`}
-        libraryBrowseLabel="从素材库选择"
-        libraryTileLabel="素材库"
+        libraryBrowseLabel={t("videoGeneration.libraryBrowseLabel")}
+        libraryTileLabel={t("videoGeneration.libraryTileLabel")}
         maxCount={referenceLimit}
         references={referenceImages}
         roleMode={referenceMode === "firstLast"}
-        uploadLabel="浏览上传"
+        uploadLabel={t("videoGeneration.uploadLabel")}
         onClear={onClearReferences}
         onDropAsset={onReferenceDropAsset}
         onDropFiles={onReferenceDropFiles}

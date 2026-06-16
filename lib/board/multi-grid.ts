@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n";
 import type { BoardMultiGridAspectRatio, BoardMultiGridItem, BoardMultiGridSize } from "@/lib/board/types";
 
 export const BOARD_MULTI_GRID_ASPECT_RATIOS: readonly BoardMultiGridAspectRatio[] = ["1:1", "4:3", "3:4", "16:9", "9:16", "2:3", "3:2"];
@@ -23,10 +24,10 @@ export function boardMultiGridCoverFrame(
   cellAspectRatio: number,
 ): { heightPercent: number; widthPercent: number } {
   if (!Number.isFinite(imageAspectRatio) || imageAspectRatio <= 0) {
-    throw new Error("图片比例无效");
+    throw new Error(t("board.import.imageSizeInvalid"));
   }
   if (!Number.isFinite(cellAspectRatio) || cellAspectRatio <= 0) {
-    throw new Error("多宫格单元比例无效");
+    throw new Error(t("board.import.imageSizeInvalid"));
   }
   return imageAspectRatio >= cellAspectRatio
     ? { widthPercent: (imageAspectRatio / cellAspectRatio) * 100, heightPercent: 100 }

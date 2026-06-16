@@ -1,3 +1,4 @@
+import type { TFunction } from "@/lib/i18n";
 import { mediaReferenceLabel } from "./media-references";
 import {
   getAudioModelCapabilities,
@@ -49,6 +50,20 @@ export const AUDIO_MODE_LABELS: Record<AudioOperationMode, string> = {
   voice_design: "设计音色",
 };
 
+/** Get mode label via i18n. Falls back to Chinese constant when t is not provided. */
+export function getAudioModeLabel(mode: AudioOperationMode, t?: TFunction): string {
+  if (t) return t(`media.modeLabels.${mode}`);
+  return AUDIO_MODE_LABELS[mode];
+}
+
+/** Get ASR language options via i18n. Falls back to Chinese constants when t is not provided. */
+export function getAsrLanguageOptions(t?: TFunction): Array<{ label: string; value: "auto" | "zh" | "en" }> {
+  return ASR_LANGUAGE_OPTIONS.map(option => ({
+    value: option.value,
+    label: t ? t(`media.asrLanguageOptions.${option.value}`) : option.label,
+  }));
+}
+
 export const ASR_LANGUAGE_OPTIONS: Array<{ label: string; value: "auto" | "zh" | "en" }> = [
   { value: "auto", label: "自动识别" },
   { value: "zh", label: "中文" },
@@ -72,9 +87,10 @@ export function readOptionalAudioFormat(value: string | undefined): string | und
   return trimmed ? trimmed : undefined;
 }
 
-export function audioOperationMissingReferenceMessage(capabilities: AudioModelCapabilities): string {
-  const labels = capabilities.referenceMediaTypes.map(mediaReferenceLabel).join(" / ");
+export function audioOperationMissingReferenceMessage(capabilities: AudioModelCapabilities, t?: TFunction): string {
+  const labels = capabilities.referenceMediaTypes.map(type => mediaReferenceLabel(type, t)).join(" / ");
   const referenceLabel = labels ? `${labels}参考` : "参考媒体";
+  if (t) return t("media.missingReferenceMessage", { min: capabilities.minReferenceMedia, referenceLabel });
   return `当前音频模式需要至少 ${capabilities.minReferenceMedia} 个${referenceLabel}`;
 }
 
@@ -125,6 +141,7 @@ export function resolveAudioFunctionSelection(input: {
   fallbackModel: string;
   mode?: AudioOperationMode;
   model?: string;
+  t?: TFunction;
 }): AudioFunctionSelection {
   const requestedModel = input.model ?? input.fallbackModel;
   const requestedMode = input.mode;
@@ -143,7 +160,7 @@ export function resolveAudioFunctionSelection(input: {
   const provider = audioProviderFromModel(requestedModel);
   const providerMatch = getModelCapabilities("audio", provider).find(capability => capability.audioModes.includes(requestedMode));
   const match = providerMatch ?? getModelCapabilities("audio").find(capability => capability.audioModes.includes(requestedMode));
-  if (!match) throw new Error(`没有支持 ${AUDIO_MODE_LABELS[requestedMode]} 的音频模型`);
+  if (!match) throw new Error(`没有支持 ${getAudioModeLabel(requestedMode, input.t)} 的音频模型`);
 
   const model = match.value;
   return {

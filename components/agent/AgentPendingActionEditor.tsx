@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { useTranslations } from "@/lib/i18n";
 import type { AgentBoardPatchOperation, AgentGenerationParams, AgentToolAction } from "@/lib/agent-actions";
 import {
   patchAgentToolAction,
@@ -57,10 +58,15 @@ function firstOptionValue(options: Array<{ value: string }>, fallback: string): 
   return options[0]?.value ?? fallback;
 }
 
-function describePatchOperation(operation: AgentBoardPatchOperation): string {
-  if (operation.op === "create_node") return `创建 ${operation.kind}: ${operation.title ?? operation.tempId}`;
-  if (operation.op === "update_node") return `更新节点: ${operation.nodeId}`;
-  return `连接: ${operation.from.nodeId}.${operation.from.portId} -> ${operation.to.nodeId}.${operation.to.portId}`;
+function describePatchOperation(operation: AgentBoardPatchOperation, t: { (key: string, params?: Record<string, string>): string }): string {
+  if (operation.op === "create_node") return t("pendingActionEditor.describePatchCreateNode", { kind: operation.kind, title: operation.title ?? operation.tempId });
+  if (operation.op === "update_node") return t("pendingActionEditor.describePatchUpdateNode", { nodeId: operation.nodeId });
+  return t("pendingActionEditor.describePatchConnectPorts", {
+    from_nodeId: operation.from.nodeId,
+    from_portId: operation.from.portId,
+    to_nodeId: operation.to.nodeId,
+    to_portId: operation.to.portId,
+  });
 }
 
 function editablePatchField(operation: AgentBoardPatchOperation): { field: "prompt" | "body" | "instruction"; value: string } | null {
@@ -84,6 +90,7 @@ export function AgentPendingActionEditor({
   videoModelGroups,
   onChange,
 }: AgentPendingActionEditorProps) {
+  const { t } = useTranslations("agent");
   const params = action.params ?? {};
   const isEditImage = action.type === "edit_image";
   const isImage = isImageActionType(action.type) && !isEditImage;
@@ -216,14 +223,14 @@ export function AgentPendingActionEditor({
     <div className="imagine-agent-action-form">
       {showPrompt && (
         <label className="imagine-agent-action-field">
-          <span className="imagine-agent-action-field-label">提示词</span>
+          <span className="imagine-agent-action-field-label">{t("pendingActionEditor.promptLabel")}</span>
           <textarea
             value={params.prompt ?? ""}
             disabled={disabled}
             rows={3}
             onChange={event => updateParams({ prompt: event.target.value })}
             className="imagine-agent-action-textarea"
-            placeholder="执行前可修改 Agent 规划的提示词"
+            placeholder={t("pendingActionEditor.promptPlaceholder")}
           />
         </label>
       )}
@@ -231,7 +238,7 @@ export function AgentPendingActionEditor({
       {showNoteFields && (
         <>
           <label className="imagine-agent-action-field">
-            <span className="imagine-agent-action-field-label">标题</span>
+            <span className="imagine-agent-action-field-label">{t("pendingActionEditor.titleLabel")}</span>
             <input
               type="text"
               value={params.title ?? ""}
@@ -241,7 +248,7 @@ export function AgentPendingActionEditor({
             />
           </label>
           <label className="imagine-agent-action-field">
-            <span className="imagine-agent-action-field-label">笔记内容</span>
+            <span className="imagine-agent-action-field-label">{t("pendingActionEditor.noteContentLabel")}</span>
             <textarea
               value={params.body ?? params.prompt ?? ""}
               disabled={disabled}
@@ -256,25 +263,25 @@ export function AgentPendingActionEditor({
       {isBoardNodeUpdate && (
         <>
           <label className="imagine-agent-action-field">
-            <span className="imagine-agent-action-field-label">目标节点 ID</span>
+            <span className="imagine-agent-action-field-label">{t("pendingActionEditor.targetNodeIdLabel")}</span>
             <input
               type="text"
               value={params.nodeId ?? ""}
               disabled={disabled}
               onChange={event => updateParams({ nodeId: event.target.value })}
               className="imagine-agent-action-input"
-              placeholder="留空则使用当前选中节点"
+              placeholder={t("pendingActionEditor.targetNodePlaceholder")}
             />
           </label>
           <label className="imagine-agent-action-field">
-            <span className="imagine-agent-action-field-label">提示词 / Agent 指令 / 笔记内容</span>
+            <span className="imagine-agent-action-field-label">{t("pendingActionEditor.nodeContentLabel")}</span>
             <textarea
               value={params.prompt ?? params.instruction ?? params.body ?? ""}
               disabled={disabled}
               rows={3}
               onChange={event => updateParams({ prompt: event.target.value, instruction: event.target.value, body: event.target.value })}
               className="imagine-agent-action-textarea"
-              placeholder="执行前可修改要写入节点的内容"
+              placeholder={t("pendingActionEditor.nodeContentPlaceholder")}
             />
           </label>
         </>
@@ -282,14 +289,14 @@ export function AgentPendingActionEditor({
 
       {isBoardPatch && params.boardPatch && (
         <div className="imagine-agent-action-field">
-          <span className="imagine-agent-action-field-label">画板补丁</span>
+          <span className="imagine-agent-action-field-label">{t("pendingActionEditor.boardPatchLabel")}</span>
           <input
             type="text"
             value={params.boardPatch.title ?? ""}
             disabled={disabled}
             onChange={event => updateBoardPatchParams({ title: event.target.value })}
             className="imagine-agent-action-input"
-            placeholder="补丁标题"
+            placeholder={t("pendingActionEditor.patchTitlePlaceholder")}
           />
           <label className="mt-2 flex items-center gap-2 text-[11px] text-[var(--iw-muted)]">
             <input
@@ -298,13 +305,13 @@ export function AgentPendingActionEditor({
               disabled={disabled}
               onChange={event => updateBoardPatchParams({ run: event.target.checked })}
             />
-            执行后立即运行生成节点
+            {t("pendingActionEditor.autoRunAfterExecution")}
           </label>
           {params.boardPatch.shots?.length ? (
             <div className="mt-2 space-y-1 text-[11px] text-[var(--iw-muted)]">
               {params.boardPatch.shots.slice(0, 6).map((shot, index) => (
                 <p key={`${shot.id ?? "shot"}-${index}`}>
-                  {shot.scene ?? "Scene"} / {shot.shot ?? `Shot ${index + 1}`}: {shot.beat ?? shot.imagePrompt ?? "未填写 beat"}
+                  {shot.scene ?? "Scene"} / {shot.shot ?? `Shot ${index + 1}`}: {shot.beat ?? shot.imagePrompt ?? t("pendingActionEditor.beatFallback")}
                 </p>
               ))}
             </div>
@@ -314,7 +321,7 @@ export function AgentPendingActionEditor({
               const editable = editablePatchField(operation);
               return (
                 <div key={`${operation.op}-${index}`} className="rounded-md border border-white/10 p-2">
-                  <p className="text-[11px] font-medium text-[var(--iw-text)]">{index + 1}. {describePatchOperation(operation)}</p>
+                  <p className="text-[11px] font-medium text-[var(--iw-text)]">{index + 1}. {describePatchOperation(operation, t)}</p>
                   {editable ? (
                     <textarea
                       value={editable.value}
@@ -322,7 +329,7 @@ export function AgentPendingActionEditor({
                       rows={2}
                       onChange={event => updatePatchOperation(index, { [editable.field]: event.target.value } as Partial<AgentBoardPatchOperation>)}
                       className="imagine-agent-action-textarea mt-2"
-                      placeholder="执行前可修改文本内容"
+                      placeholder={t("pendingActionEditor.patchContentPlaceholder")}
                     />
                   ) : null}
                 </div>
@@ -334,7 +341,7 @@ export function AgentPendingActionEditor({
 
       {(isImage || isVideo) && modelGroups.length > 0 && (
         <label className="imagine-agent-action-field">
-          <span className="imagine-agent-action-field-label">生成模型</span>
+          <span className="imagine-agent-action-field-label">{t("pendingActionEditor.modelLabel")}</span>
           <select
             value={activeModel}
             disabled={disabled}
@@ -343,9 +350,9 @@ export function AgentPendingActionEditor({
             onClick={event => event.stopPropagation()}
             className="imagine-agent-model-select pointer-events-auto w-full"
           >
-            {!activeModel ? <option value="">选择模型</option> : null}
+            {!activeModel ? <option value="">{t("pendingActionEditor.selectModelPlaceholder")}</option> : null}
             {modelMissingFromList ? (
-              <option value={activeModel}>{activeModel}（未在列表）</option>
+              <option value={activeModel}>{activeModel}{t("pendingActionEditor.modelNotInList")}</option>
             ) : null}
             {modelGroups.map(group => (
               <optgroup key={group.provider} label={group.label}>
@@ -362,7 +369,7 @@ export function AgentPendingActionEditor({
 
       {isAudio && audioProviderChoices.length > 0 && (
         <label className="imagine-agent-action-field">
-          <span className="imagine-agent-action-field-label">服务商</span>
+          <span className="imagine-agent-action-field-label">{t("pendingActionEditor.providerLabel")}</span>
           <select
             value={selectedAudioProvider ?? ""}
             disabled={disabled}
@@ -378,14 +385,14 @@ export function AgentPendingActionEditor({
 
       {isAudio && audioFunctionOptions.length > 0 && (
         <label className="imagine-agent-action-field">
-          <span className="imagine-agent-action-field-label">功能</span>
+          <span className="imagine-agent-action-field-label">{t("pendingActionEditor.functionLabel")}</span>
           <select
             value={audioFunctionOptions.some(option => option.value === selectedAudioFunctionValue) ? selectedAudioFunctionValue : ""}
             disabled={disabled}
             onChange={event => handleAudioFunctionChange(event.target.value)}
             className="imagine-agent-model-select w-full"
           >
-            {!audioFunctionOptions.some(option => option.value === selectedAudioFunctionValue) && <option value="" disabled>当前功能不可用</option>}
+            {!audioFunctionOptions.some(option => option.value === selectedAudioFunctionValue) && <option value="" disabled>{t("pendingActionEditor.functionUnavailable")}</option>}
             {audioFunctionOptions.map(option => (
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
@@ -395,7 +402,7 @@ export function AgentPendingActionEditor({
 
       {isImage && imageCapabilities && imageCapabilities.aspectRatios.length > 0 && (
         <label className="imagine-agent-action-field">
-          <span className="imagine-agent-action-field-label">画面比例</span>
+          <span className="imagine-agent-action-field-label">{t("pendingActionEditor.aspectRatioLabel")}</span>
           <select
             value={params.aspectRatio ?? imageCapabilities.aspectRatios[0]?.value ?? "1:1"}
             disabled={disabled}
@@ -413,7 +420,7 @@ export function AgentPendingActionEditor({
 
       {isImage && imageResolutionOptions.length > 0 && (
         <label className="imagine-agent-action-field">
-          <span className="imagine-agent-action-field-label">分辨率</span>
+          <span className="imagine-agent-action-field-label">{t("pendingActionEditor.resolutionLabel")}</span>
           <select
             value={params.imageResolution ?? imageResolutionOptions[0]?.value ?? "1K"}
             disabled={disabled}
@@ -431,7 +438,7 @@ export function AgentPendingActionEditor({
 
       {isImage && imageCapabilities && imageCapabilities.qualities.length > 0 && (
         <label className="imagine-agent-action-field">
-          <span className="imagine-agent-action-field-label">质量</span>
+          <span className="imagine-agent-action-field-label">{t("pendingActionEditor.qualityLabel")}</span>
           <select
             value={params.imageQuality ?? imageCapabilities.qualities[0]?.value ?? ""}
             disabled={disabled}
@@ -449,7 +456,7 @@ export function AgentPendingActionEditor({
 
       {isImage && imageCapabilities && imageCapabilities.thinkingLevels.length > 0 && (
         <label className="imagine-agent-action-field">
-          <span className="imagine-agent-action-field-label">思考级别</span>
+          <span className="imagine-agent-action-field-label">{t("pendingActionEditor.thinkingLevelLabel")}</span>
           <select
             value={params.thinkingLevel ?? imageCapabilities.thinkingLevels[0]?.value ?? ""}
             disabled={disabled}
@@ -467,7 +474,7 @@ export function AgentPendingActionEditor({
 
       {isVideo && videoCapabilities && videoCapabilities.sizes.length > 0 && (
         <label className="imagine-agent-action-field">
-          <span className="imagine-agent-action-field-label">画面尺寸</span>
+          <span className="imagine-agent-action-field-label">{t("pendingActionEditor.videoSizeLabel")}</span>
           <select
             value={params.aspectRatio ?? videoCapabilities.sizes[0]?.value ?? "auto"}
             disabled={disabled}
@@ -485,7 +492,7 @@ export function AgentPendingActionEditor({
 
       {isVideo && videoCapabilities && videoCapabilities.resolutions.length > 0 && (
         <label className="imagine-agent-action-field">
-          <span className="imagine-agent-action-field-label">分辨率</span>
+          <span className="imagine-agent-action-field-label">{t("pendingActionEditor.resolutionLabel")}</span>
           <select
             value={params.videoResolution ?? videoCapabilities.resolutions[0]?.value ?? ""}
             disabled={disabled}
@@ -503,7 +510,7 @@ export function AgentPendingActionEditor({
 
       {isVideo && videoCapabilities && videoCapabilities.durations.length > 0 && (
         <label className="imagine-agent-action-field">
-          <span className="imagine-agent-action-field-label">时长</span>
+          <span className="imagine-agent-action-field-label">{t("pendingActionEditor.durationLabel")}</span>
           <select
             value={params.videoDuration ?? videoCapabilities.durations[0]?.value ?? ""}
             disabled={disabled}
@@ -521,7 +528,7 @@ export function AgentPendingActionEditor({
 
       {isVideo && videoCapabilities && videoCapabilities.presets.length > 0 && (
         <label className="imagine-agent-action-field">
-          <span className="imagine-agent-action-field-label">预设</span>
+          <span className="imagine-agent-action-field-label">{t("pendingActionEditor.presetLabel")}</span>
           <select
             value={params.videoPreset ?? videoCapabilities.presets[0]?.value ?? ""}
             disabled={disabled}
@@ -539,7 +546,7 @@ export function AgentPendingActionEditor({
 
       {isVideo && videoCapabilities && videoCapabilities.referenceModes.length > 1 && (
         <label className="imagine-agent-action-field">
-          <span className="imagine-agent-action-field-label">参考模式</span>
+          <span className="imagine-agent-action-field-label">{t("pendingActionEditor.referenceModeLabel")}</span>
           <select
             value={params.videoReferenceMode ?? videoCapabilities.referenceMode}
             disabled={disabled}
@@ -548,7 +555,7 @@ export function AgentPendingActionEditor({
           >
             {videoCapabilities.referenceModes.map(option => (
               <option key={option} value={option}>
-                {option === "firstLast" ? "首尾帧 / 关键帧" : "全能参考"}
+                {option === "firstLast" ? t("pendingActionEditor.referenceModeFirstLast") : t("pendingActionEditor.referenceModeAll")}
               </option>
             ))}
           </select>
@@ -557,7 +564,7 @@ export function AgentPendingActionEditor({
 
       {isAudio && audioCapabilities && audioFormatOptions.length > 0 && (
         <label className="imagine-agent-action-field">
-          <span className="imagine-agent-action-field-label">音频格式</span>
+          <span className="imagine-agent-action-field-label">{t("pendingActionEditor.audioFormatLabel")}</span>
           <select
             value={params.audioFormat ?? audioFormatOptions[0]?.value ?? ""}
             disabled={disabled}
@@ -575,20 +582,20 @@ export function AgentPendingActionEditor({
 
       {isAudio && (activeAudioMode === "voice_design" || activeAudioMode === "voice_clone") && (
         <label className="imagine-agent-action-field">
-          <span className="imagine-agent-action-field-label">{activeAudioMode === "voice_design" ? "音色描述" : "演绎风格"}</span>
+          <span className="imagine-agent-action-field-label">{activeAudioMode === "voice_design" ? t("pendingActionEditor.voiceDescriptionLabel") : t("pendingActionEditor.voiceCloneStyleLabel")}</span>
           <input
             value={params.audioStylePrompt ?? ""}
             disabled={disabled}
             onChange={event => updateParams({ audioStylePrompt: event.target.value })}
             className="imagine-agent-action-input"
-            placeholder={activeAudioMode === "voice_design" ? "温暖、年轻、自然叙事感" : "平静讲述、轻松口播"}
+            placeholder={activeAudioMode === "voice_design" ? t("pendingActionEditor.voiceDescriptionPlaceholder") : t("pendingActionEditor.voiceCloneStylePlaceholder")}
           />
         </label>
       )}
 
       {isAudio && activeAudioMode === "asr" && (
         <label className="imagine-agent-action-field">
-          <span className="imagine-agent-action-field-label">转写语言</span>
+          <span className="imagine-agent-action-field-label">{t("pendingActionEditor.asrLanguageLabel")}</span>
           <select
             value={params.asrLanguage ?? "auto"}
             disabled={disabled}
@@ -611,7 +618,7 @@ export function AgentPendingActionEditor({
             onChange={event => updateParams({ voiceCloneConsentAccepted: event.target.checked })}
             className="mt-1 h-3.5 w-3.5 rounded border-[var(--iw-border)] bg-transparent"
           />
-          <span>我确认拥有参考音频的使用权，并允许用于本次音色克隆。</span>
+          <span>{t("pendingActionEditor.voiceCloneConsentLabel")}</span>
         </label>
       )}
 

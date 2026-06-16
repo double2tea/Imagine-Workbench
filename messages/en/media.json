@@ -1,0 +1,31 @@
+{
+  "videoFrameCapture": {
+    "first": "First Frame",
+    "last": "Last Frame",
+    "current": "Current Frame",
+    "frameSizeUnavailable": "Video frame dimensions unavailable, cannot capture",
+    "browserNotSupport": "Browser does not support video frame capture canvas",
+    "durationUnavailable": "Video duration unavailable, cannot capture last frame",
+    "metadataLoadFailed": "Video metadata load failed, cannot capture frame",
+    "seekFailed": "Video seek failed, cannot capture frame"
+  },
+  "referenceLabels": { "image": "Image", "video": "Video", "audio": "Audio" },
+  "modeLabels": { "asr": "Transcribe", "music": "Music", "sfx": "SFX", "tts": "Text-to-Speech", "voice_clone": "Voice Clone", "voice_design": "Voice Design" },
+  "asrLanguageOptions": { "auto": "Auto Detect", "zh": "Chinese", "en": "English" },
+  "missingReferenceMessage": "Current audio mode requires at least {min} {referenceLabel}",
+  "noSupportingModelError": "No audio model supports {mode}",
+  "pricing": { "perRequest": "req", "perImage": "img", "perSecond": "sec" },
+  "customSizeLabel": "Custom Size",
+  "workspaceHeader": {
+    "brandSubtitle": "AI Image, Video & Audio Creative Studio",
+    "boardLink": "Board", "assetLibraryLink": "Library",
+    "resolveCheckTitle": "Run connection check via Resolve plugin",
+    "resolveRunning": "Waiting for Resolve", "resolveIdle": "DaVinci Resolve",
+    "settingsLink": "Settings",
+    "githubLinkAriaLabel": "Open project GitHub",
+    "contactEmailTitle": "Contact: double_tea@foxmail.com",
+    "contactEmailAriaLabel": "Send email to author",
+    "toggleDarkModeTitle": "Switch to dark mode", "toggleLightModeTitle": "Switch to light mode",
+    "clearAssetsTitle": "Clear local assets", "clearAssetsAriaLabel": "Clear local assets"
+  }
+}

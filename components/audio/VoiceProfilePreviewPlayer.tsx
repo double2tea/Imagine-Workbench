@@ -2,6 +2,7 @@
 
 import { Pause, Play } from "lucide-react";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { useTranslations } from "@/lib/i18n";
 
 interface VoiceProfilePreviewPlayerProps {
   className?: string;
@@ -16,6 +17,7 @@ function formatPlaybackTime(value: number): string {
 }
 
 export default function VoiceProfilePreviewPlayer({ className = "", src }: VoiceProfilePreviewPlayerProps) {
+  const { t } = useTranslations("common");
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -82,16 +84,16 @@ export default function VoiceProfilePreviewPlayer({ className = "", src }: Voice
         disabled={hasError}
         className="imagine-tone-chip flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition disabled:cursor-not-allowed disabled:border-[var(--iw-border)] disabled:bg-[var(--iw-panel-soft)] disabled:text-[var(--iw-faint)]"
         data-tone="warning"
-        aria-label={isPlaying ? "暂停音色预览" : "播放音色预览"}
-        title={isPlaying ? "暂停" : "播放"}
+        aria-label={isPlaying ? t("voicePreview.pauseAriaLabel") : t("voicePreview.previewAriaLabel")}
+        title={isPlaying ? t("voicePreview.pause") : t("voicePreview.play")}
       >
         {isPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="ml-0.5 h-3.5 w-3.5" />}
       </button>
       <div className="min-w-0 flex-1">
         <div className="mb-1 flex items-center justify-between gap-2 text-[10px] font-semibold text-[var(--iw-muted)]">
-          <span>试听</span>
+          <span>{t("voicePreview.preview")}</span>
           <span className="font-mono text-[var(--iw-faint)]">
-            {hasError ? "不可播放" : `${formatPlaybackTime(currentTime)} / ${formatPlaybackTime(duration)}`}
+            {hasError ? t("voicePreview.notPlayable") : `${formatPlaybackTime(currentTime)} / ${formatPlaybackTime(duration)}`}
           </span>
         </div>
         <button
@@ -99,8 +101,8 @@ export default function VoiceProfilePreviewPlayer({ className = "", src }: Voice
           onClick={seek}
           disabled={hasError || duration <= 0}
           className="relative block h-1.5 w-full overflow-hidden rounded-full bg-[var(--iw-panel-soft)] text-left disabled:cursor-not-allowed"
-          aria-label="音色预览进度"
-          title="点击跳转"
+          aria-label={t("voicePreview.progressLabel")}
+          title={t("voicePreview.seekTitle")}
         >
           <span
             className="absolute inset-y-0 left-0 rounded-full bg-amber-500"

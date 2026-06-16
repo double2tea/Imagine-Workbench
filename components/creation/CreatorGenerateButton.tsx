@@ -1,5 +1,6 @@
 import { AudioLines, RefreshCw, Sparkles, Video as VideoIcon } from "lucide-react";
 import ModelPriceBadge from "@/components/creation/ModelPriceBadge";
+import { useTranslations } from "@/lib/i18n";
 import type { ModelPriceOptions } from "@/lib/providers/pricing";
 
 export type CreatorGenerateMode = "image" | "video" | "audio";
@@ -27,11 +28,12 @@ export default function CreatorGenerateButton({
   label,
   onGenerate,
 }: CreatorGenerateButtonProps) {
+  const { t } = useTranslations("creation");
   const isImage = mode === "image";
   const isAudio = mode === "audio";
   const showPrice = !isSubmitting && priceProvider && priceModelId;
-  const defaultLabel = isImage ? "生成图片" : isAudio ? "生成音频" : "生成视频";
-  const submittingLabel = `提交中 (${submitCount})，可继续排队`;
+  const defaultLabel = isImage ? t("generateButton.defaultLabel.image") : isAudio ? t("generateButton.defaultLabel.audio") : t("generateButton.defaultLabel.video");
+  const submittingLabel = t("generateButton.submittingLabel", { count: submitCount });
 
   return (
     <button

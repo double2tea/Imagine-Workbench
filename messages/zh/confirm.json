@@ -1,0 +1,12 @@
+{
+  "titles": {
+    "alert": "提示",
+    "dangerConfirm": "确认操作",
+    "defaultConfirm": "请确认"
+  },
+  "defaults": {
+    "confirm": "确认",
+    "cancel": "取消",
+    "dismissAlert": "知道了"
+  }
+}

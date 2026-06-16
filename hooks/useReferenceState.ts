@@ -1,3 +1,4 @@
+import type { TFunction } from "@/lib/i18n";
 import { useState, type ChangeEvent, type Dispatch, type DragEvent, type SetStateAction } from "react";
 import {
   type DraggedReferenceAsset,
@@ -36,6 +37,7 @@ interface UseReferenceStateParams {
   imageReferenceLimit: number;
   imageReferenceMediaTypes: MediaReferenceType[];
   prompt: string;
+  t: TFunction;
   videoReferenceLimit: number;
   videoReferenceMediaTypes: MediaReferenceType[];
   videoReferenceMode: VideoReferenceMode;
@@ -48,26 +50,26 @@ function makeClientId(prefix: string): string {
   return `${prefix}_${Date.now()}`;
 }
 
-function readFileAsDataUrl(file: File): Promise<string> {
+function readFileAsDataUrl(file: File, t: TFunction): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result !== "string") {
-        reject(new Error("文件读取结果不是 Data URL"));
+        reject(new Error(t("common.notices.fileReadNotDataUrl")));
         return;
       }
       resolve(reader.result);
     };
-    reader.onerror = () => reject(reader.error ?? new Error("文件读取失败"));
+    reader.onerror = () => reject(reader.error ?? new Error(t("common.notices.fileReadFailed")));
     reader.readAsDataURL(file);
   });
 }
 
-function getRawMediaFileSizeError(file: File, type: MediaReferenceType): string | null {
+function getRawMediaFileSizeError(file: File, type: MediaReferenceType, t: TFunction): string | null {
   if (type === "image") return null;
   const maxRawBytes = Math.floor(REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES * 0.75);
   if (file.size <= maxRawBytes) return null;
-  return `${mediaReferenceLabel(type)}参考文件过大，请压缩到 ${Math.floor(maxRawBytes / 1024 / 1024)}MB 以内后重试`;
+  return t("common.notices.referenceMediaFileTooLarge", { type: mediaReferenceLabel(type, t), maxMB: Math.floor(maxRawBytes / 1024 / 1024) });
 }
 
 export function getReferencePromptToken(index: number, type: MediaReferenceType = "image"): string {
@@ -107,6 +109,7 @@ function insertTextAtRange(value: string, start: number, end: number, text: stri
 }
 
 function remapPromptAfterReferenceRemoval(prompt: string, removedIndex: number): string {
+  // Reference tokens like @图片1, @视频2, @音频3 use Chinese labels
   return prompt.replace(/@(图片|视频|音频)(\d+)/g, (match, label, value) => {
     const parsed = Number(value);
     if (!Number.isInteger(parsed) || parsed < 1) return match;
@@ -129,6 +132,7 @@ export function useReferenceState({
   imageReferenceLimit,
   imageReferenceMediaTypes,
   prompt,
+  t,
   videoReferenceLimit,
   videoReferenceMediaTypes,
   videoReferenceMode,
@@ -175,7 +179,7 @@ export function useReferenceState({
   const addDroppedReferenceAsset = (asset: DraggedReferenceAsset, target: PromptReferenceTarget): number | null => {
     const type = getMediaReferenceType(asset);
     if (!isAcceptedReferenceType(type, target)) {
-      pushWorkspaceNotice("error", `当前输入不支持${mediaReferenceLabel(type)}参考`);
+      pushWorkspaceNotice("error", t("common.notices.currentInputNotSupportMediaReference", { type: mediaReferenceLabel(type, t) }));
       return null;
     }
     const existingIndex = referenceImages.findIndex(reference => reference.id === asset.id);
@@ -184,7 +188,7 @@ export function useReferenceState({
     const limit = getReferenceLimitForTarget(target);
     const acceptedReferenceCount = getAcceptedReferenceCountForTarget(target);
     if (acceptedReferenceCount >= limit) {
-      pushWorkspaceNotice("error", `参考图已达上限：最多 ${limit} 张`);
+      pushWorkspaceNotice("error", t("common.notices.referenceLimitReached", { limit }));
       return null;
     }
 
@@ -212,22 +216,22 @@ export function useReferenceState({
   const addReferenceMediaFile = async (file: File, target: PromptReferenceTarget, id: string) => {
     const type = mediaReferenceTypeFromMime(file.type);
     if (!type || !isAcceptedReferenceType(type, target)) {
-      pushWorkspaceNotice("error", `当前输入不支持${type ? mediaReferenceLabel(type) : "该媒体"}参考`);
+      pushWorkspaceNotice("error", t("common.notices.currentInputNotSupportMediaReference", { type: type ? mediaReferenceLabel(type, t) : t("media.referenceLabels.image") }));
       return;
     }
     const limit = getReferenceLimitForTarget(target);
     if (getAcceptedReferenceCountForTarget(target) >= limit) {
-      pushWorkspaceNotice("error", `参考图已达上限：最多 ${limit} 张`);
+      pushWorkspaceNotice("error", t("common.notices.referenceLimitReached", { limit }));
       return;
     }
-    const fileSizeError = getRawMediaFileSizeError(file, type);
+    const fileSizeError = getRawMediaFileSizeError(file, type, t);
     if (fileSizeError) {
       pushWorkspaceNotice("error", fileSizeError);
       return;
     }
 
     try {
-      const dataUrl = type === "image" ? await compressReferenceImageFile(file) : await readFileAsDataUrl(file);
+      const dataUrl = type === "image" ? await compressReferenceImageFile(file) : await readFileAsDataUrl(file, t);
       setReferenceImages(prev => {
         if (prev.some(reference => reference.id === id)) return prev;
         const acceptedReferenceCount = getAcceptedReferenceCountForTarget(target, prev);
@@ -246,7 +250,7 @@ export function useReferenceState({
       });
     } catch (error) {
       console.error(error);
-      pushWorkspaceNotice("error", toErrorMessage(error, `${mediaReferenceLabel(type)}参考读取失败`));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.referenceMediaReadFailed")));
     }
   };
 
@@ -254,7 +258,7 @@ export function useReferenceState({
     const limit = getReferenceLimitForTarget(target);
     const availableSlots = limit - getAcceptedReferenceCountForTarget(target);
     if (availableSlots <= 0) {
-      pushWorkspaceNotice("error", `参考图已达上限：最多 ${limit} 张`);
+      pushWorkspaceNotice("error", t("common.notices.referenceLimitReached", { limit }));
       return;
     }
 
@@ -352,7 +356,7 @@ export function useReferenceState({
     const suffixStart = lastAtIndex === -1 ? prompt.length : lastAtIndex + 1 + searchLength;
     const suffix = prompt.substring(suffixStart);
     const reference = referenceImages[index];
-    if (!reference) throw new Error("选择的参考媒体不存在");
+    if (!reference) throw new Error(t("common.notices.referenceMediaNotFound"));
     setPrompt(`${base}${getReferencePromptToken(index, getMediaReferenceType(reference))} ${suffix}`);
     setAtDropdown({ visible: false, type, search: "" });
   };
@@ -360,7 +364,7 @@ export function useReferenceState({
   const handleSelectAtItem = (itemUrl: string, itemId: string, target: AtDropdownTarget, itemType: MediaReferenceType = "image") => {
     if (target === "agent-prompt") {
       if (itemType !== "image") {
-        pushWorkspaceNotice("error", `Agent 暂不支持${mediaReferenceLabel(itemType)}引用`);
+        pushWorkspaceNotice("error", t("common.notices.agentNotSupportMediaTypeRef", { type: mediaReferenceLabel(itemType, t) }));
         return;
       }
       const lastAtIndex = agentInput.lastIndexOf("@");
@@ -374,13 +378,13 @@ export function useReferenceState({
       });
     } else {
       if (!isAcceptedReferenceType(itemType, target)) {
-        pushWorkspaceNotice("error", `当前输入不支持${mediaReferenceLabel(itemType)}参考`);
+        pushWorkspaceNotice("error", t("common.notices.currentInputNotSupportMediaReference", { type: mediaReferenceLabel(itemType, t) }));
         return;
       }
       const existingIndex = referenceImages.findIndex(reference => reference.id === itemId);
       const limit = getReferenceLimitForTarget(target);
       if (existingIndex === -1 && getAcceptedReferenceCountForTarget(target) >= limit) {
-        pushWorkspaceNotice("error", `参考图已达上限：最多 ${limit} 张`);
+        pushWorkspaceNotice("error", t("common.notices.referenceLimitReached", { limit }));
         return;
       }
       const lastAtIndex = prompt.lastIndexOf("@");

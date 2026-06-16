@@ -1,4 +1,5 @@
 import { RefreshCw } from "lucide-react";
+import { useTranslations } from "@/lib/i18n";
 import type { AiProvider } from "@/lib/providers/registry";
 import type { ProviderTestState } from "@/components/settings/provider-settings-types";
 
@@ -39,13 +40,14 @@ export function ProviderCredentialCard({
   onSaveBaseUrl,
   onTest,
 }: ProviderCredentialCardProps) {
+  const { t } = useTranslations("settings");
   const isTesting = providerTest.status === "testing" && providerTest.provider === provider;
 
   return (
     <div className="imagine-settings-card">
       <div className="mb-3 flex items-center justify-between">
         <h4 className="imagine-settings-card-title">{title}</h4>
-        {apiKey ? <span className="imagine-tone-icon text-[10px] font-semibold" data-tone="success">Key 已保存</span> : null}
+        {apiKey ? <span className="imagine-tone-icon text-[10px] font-semibold" data-tone="success">{t("providers.keySaved")}</span> : null}
       </div>
       <label className="imagine-settings-label">API Key</label>
       <input
@@ -57,7 +59,7 @@ export function ProviderCredentialCard({
       />
       {showBaseUrl ? (
         <>
-          <label className="imagine-settings-label mt-3">Base URL</label>
+          <label className="imagine-settings-label mt-3">{t("providers.apiBaseUrlLabel")}</label>
           <input
             type="url"
             value={baseUrl}
@@ -79,7 +81,7 @@ export function ProviderCredentialCard({
       ) : null}
       {registerUrl ? (
         <div className="imagine-tone-surface mt-3 flex items-center justify-between gap-2 rounded-lg border px-3 py-2" data-tone="warning">
-          <span className="imagine-settings-hint">需要填入令牌后使用</span>
+          <span className="imagine-settings-hint">{t("providers.registerHint")}</span>
           <a
             href={registerUrl}
             target="_blank"
@@ -87,7 +89,7 @@ export function ProviderCredentialCard({
             className="imagine-tone-chip inline-flex h-7 items-center rounded-lg border px-2.5 text-[10px] font-semibold transition"
             data-tone="warning"
           >
-            前往获取令牌
+            {t("providers.registerButton")}
           </a>
         </div>
       ) : null}
@@ -99,7 +101,7 @@ export function ProviderCredentialCard({
           className="imagine-settings-toolbar-btn"
         >
           <RefreshCw className={`h-3 w-3 ${isTesting ? "animate-spin" : ""}`} />
-          测试
+          {t("providers.testButton")}
         </button>
         <button
           type="button"

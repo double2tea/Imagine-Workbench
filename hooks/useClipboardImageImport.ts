@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n";
 import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 import { IMAGE_REFERENCE_LIMIT } from "@/hooks/useReferenceState";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
@@ -73,11 +74,11 @@ export function useClipboardImageImport({
       const referenceLimit = isAgentPaste ? IMAGE_REFERENCE_LIMIT : imageReferenceLimitRef.current;
 
       if (referenceLimit === 0) {
-        pushWorkspaceNotice("error", "当前图片模型不支持参考图");
+        pushWorkspaceNotice("error", t("common.notices.clipboardModelNotSupportRef"));
         return;
       }
       if (currentReferenceCount >= referenceLimit) {
-        pushWorkspaceNotice("error", `参考图已达上限：最多 ${referenceLimit} 张，先移除一张再粘贴`);
+        pushWorkspaceNotice("error", t("common.notices.clipboardRefLimitReached", { limit: referenceLimit }));
         return;
       }
 
@@ -85,7 +86,7 @@ export function useClipboardImageImport({
         const compressedDataUrl = await compressReferenceImageFile(file);
         const latestReferenceCount = isAgentPaste ? agentReferenceCountRef.current : referenceImageCountRef.current;
         if (latestReferenceCount >= referenceLimit) {
-          pushWorkspaceNotice("error", `参考图已达上限：最多 ${referenceLimit} 张，先移除一张再粘贴`);
+          pushWorkspaceNotice("error", t("common.notices.clipboardRefLimitReached", { limit: referenceLimit }));
           return;
         }
 
@@ -100,7 +101,7 @@ export function useClipboardImageImport({
             if (prev.some(reference => reference.id === newReferenceId)) return prev;
             return [...prev, { id: newReferenceId, url: compressedDataUrl }];
           });
-          pushWorkspaceNotice("success", `已从剪贴板导入 Agent 参考图（${nextReferenceCount}/${referenceLimit}）`);
+          pushWorkspaceNotice("success", t("common.notices.clipboardImportedAgentRef", { current: nextReferenceCount, max: referenceLimit }));
           return;
         }
 
@@ -110,10 +111,10 @@ export function useClipboardImageImport({
           if (prev.some(reference => reference.id === newReferenceId)) return prev;
           return [...prev, { id: newReferenceId, url: compressedDataUrl, role: "general" }];
         });
-        pushWorkspaceNotice("success", `已从剪贴板导入参考图（${nextReferenceCount}/${referenceLimit}）`);
+        pushWorkspaceNotice("success", t("common.notices.clipboardImportedRef", { current: nextReferenceCount, max: referenceLimit }));
       } catch (error) {
         console.error(error);
-        pushWorkspaceNotice("error", toErrorMessage(error, "剪贴板图片压缩失败，请重新复制图片后再试"));
+        pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.clipboardImageCompressFailed")));
       }
     };
     window.addEventListener("paste", handlePaste);

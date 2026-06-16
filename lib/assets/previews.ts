@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/lib/i18n";
 import {
   getAssetPreviewRecord,
   hydrateAsset,
@@ -30,7 +31,7 @@ function isRemoteUrl(url: string): boolean {
 
 function previewSize(width: number, height: number): { width: number; height: number } {
   if (width <= 0 || height <= 0) {
-    throw new Error("预览媒体尺寸无效");
+    throw new Error(t("media.videoFrameCapture.frameSizeUnavailable"));
   }
   const scale = Math.min(1, PREVIEW_MAX_EDGE / Math.max(width, height));
   return {
@@ -46,7 +47,7 @@ function drawPreview(source: CanvasImageSource, width: number, height: number): 
   canvas.height = size.height;
   const context = canvas.getContext("2d");
   if (!context) {
-    throw new Error("无法创建媒体预览画布");
+    throw new Error(t("common.errors.referenceMediaNotFound"));
   }
   context.drawImage(source, 0, 0, size.width, size.height);
   return {
@@ -62,7 +63,7 @@ function loadImage(sourceUrl: string): Promise<HTMLImageElement> {
     const image = new Image();
     image.decoding = "async";
     image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error("图片预览加载失败"));
+    image.onerror = () => reject(new Error(t("common.errors.referenceMediaNotFound")));
     image.src = sourceUrl;
   });
 }

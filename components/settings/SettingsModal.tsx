@@ -1,4 +1,5 @@
 import { Settings, X } from "lucide-react";
+import { useLocale, useTranslations } from "@/lib/i18n";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { AiProvider, ModelOption } from "@/lib/providers/model-catalog";
@@ -78,14 +79,8 @@ interface SettingsModalProps {
 
 type SettingsTab = "connections" | "feature-models" | "data";
 
-const TABS: { key: SettingsTab; label: string }[] = [
-  { key: "connections", label: "连接" },
-  { key: "feature-models", label: "功能模型" },
-  { key: "data", label: "数据" },
-];
-
-function formatSettingsError(error: unknown): string {
-  return error instanceof Error && error.message.trim() ? error.message : "数据统计读取失败";
+function formatSettingsError(error: unknown, t: (key: string) => string): string {
+  return error instanceof Error && error.message.trim() ? error.message : t("modal.dataSummaryError");
 }
 
 export default function SettingsModal({
@@ -134,9 +129,16 @@ export default function SettingsModal({
   refreshProviderModels,
   testProviderConnection,
 }: SettingsModalProps) {
+  const { t, locale } = useTranslations("settings");
+  const { setLocale } = useLocale();
   const [tab, setTab] = useState<SettingsTab>("connections");
   const [dataSummary, setDataSummary] = useState<WorkspaceDataSummary | null>(null);
   const [dataSummaryError, setDataSummaryError] = useState<string | null>(null);
+  const tabs: Array<{ key: SettingsTab; label: string }> = [
+    { key: "connections", label: t("tabs.connections") },
+    { key: "feature-models", label: t("tabs.featureModels") },
+    { key: "data", label: t("tabs.data") },
+  ];
   const panelRef = useRef<HTMLDivElement | null>(null);
   const onCloseRef = useRef(onClose);
   const triggerRef = useRef<HTMLElement | null>(null);
@@ -151,7 +153,7 @@ export default function SettingsModal({
       setDataSummary(await getWorkspaceDataSummary());
     } catch (error) {
       setDataSummary(null);
-      setDataSummaryError(formatSettingsError(error));
+      setDataSummaryError(formatSettingsError(error, t));
     }
   }, []);
 
@@ -247,15 +249,15 @@ export default function SettingsModal({
             <div className="imagine-settings-header flex shrink-0 items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
               <h3 id="imagine-settings-title" className="imagine-settings-title flex items-center gap-2">
                 <Settings className="h-5 w-5 text-amber-500" />
-                设置
+                {t("modal.title")}
               </h3>
-              <button type="button" onClick={onClose} className="imagine-settings-close-btn" aria-label="关闭设置">
+              <button type="button" onClick={onClose} className="imagine-settings-close-btn" aria-label={t("modal.closeAriaLabel")}>
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             <div className="imagine-settings-tabs flex shrink-0 overflow-x-auto px-4 sm:px-6">
-              {TABS.map(item => (
+              {tabs.map(item => (
                 <button
                   key={item.key}
                   type="button"
@@ -332,8 +334,20 @@ export default function SettingsModal({
             </div>
 
             <div className="imagine-settings-footer sm:px-6 sm:py-4">
+              <div className="mb-2 flex items-center justify-between gap-3 rounded-lg border border-[var(--iw-border)] p-2 text-[10px] text-[var(--iw-muted)]">
+                <span>{t("appearance.language")}</span>
+                <select
+                  value={locale}
+                  onChange={event => setLocale(event.target.value === "en" ? "en" : "zh")}
+                  className="imagine-select h-7 px-1.5 py-0 text-[11px]"
+                  aria-label={t("appearance.language")}
+                >
+                  <option value="zh">中文</option>
+                  <option value="en">English</option>
+                </select>
+              </div>
               <button type="button" onClick={onClose} className="imagine-settings-save-button">
-                保存并关闭
+                {t("modal.saveAndClose")}
               </button>
             </div>
           </motion.div>

@@ -1,3 +1,4 @@
+import type { TFunction } from "@/lib/i18n";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import { isRunningHubWorkflowAudioTarget } from "@/lib/audio-generation-routing";
@@ -75,6 +76,7 @@ interface UseGenerationActionsParams {
   setImageSubmitCount: Dispatch<SetStateAction<number>>;
   setItems: Dispatch<SetStateAction<StorageItem[]>>;
   setVideoSubmitCount: Dispatch<SetStateAction<number>>;
+  t: TFunction;
   videoReferenceLimit: number;
   videoReferenceMode: VideoReferenceMode;
 }
@@ -137,7 +139,7 @@ function audioGenerationEndpoint(model: string, runningHubNodeInfoList?: Running
     : API_ROUTES.media.generateAudio;
 }
 
-async function readVoiceProfileReferences(assetIds: string[]): Promise<ReferenceImageRef[]> {
+async function readVoiceProfileReferences(assetIds: string[], t: TFunction): Promise<ReferenceImageRef[]> {
   if (assetIds.length === 0) return [];
   const metas = await getAssetMetasByIds(assetIds);
   const items = await hydrateAssets(metas);
@@ -145,7 +147,7 @@ async function readVoiceProfileReferences(assetIds: string[]): Promise<Reference
   return assetIds.map(id => {
     const item = itemsById.get(id);
     if (!item || item.type !== "audio" || !item.url) {
-      throw new Error("选中的音色参考音频已不存在");
+      throw new Error(t("common.notices.voiceProfileAudioMissing"));
     }
     return { id: item.id, type: "audio", url: item.url };
   });
@@ -162,18 +164,18 @@ function mergeReferences(
   return Array.from(merged.values());
 }
 
-async function resolveOriginalReference(reference: ReferenceImageRef): Promise<ReferenceImageRef> {
+async function resolveOriginalReference(reference: ReferenceImageRef, t: TFunction): Promise<ReferenceImageRef> {
   const meta = await getAssetMeta(reference.id);
   if (!meta) return reference;
   const originalUrl = await resolveAssetOriginalUrl(meta);
   if (!originalUrl.trim()) {
-    throw new Error("找不到参考媒体原图");
+    throw new Error(t("common.notices.referenceMediaOriginalNotFound"));
   }
   return { ...reference, url: originalUrl };
 }
 
-async function resolveOriginalReferences(references: ReferenceImageRef[]): Promise<ReferenceImageRef[]> {
-  const results = await Promise.allSettled(references.map(resolveOriginalReference));
+async function resolveOriginalReferences(references: ReferenceImageRef[], t: TFunction): Promise<ReferenceImageRef[]> {
+  const results = await Promise.allSettled(references.map(reference => resolveOriginalReference(reference, t)));
   const successful: ReferenceImageRef[] = [];
   const failedIds: string[] = [];
   results.forEach((result, index) => {
@@ -184,10 +186,10 @@ async function resolveOriginalReferences(references: ReferenceImageRef[]): Promi
     }
   });
   if (failedIds.length > 0 && failedIds.length < references.length) {
-    console.warn(`部分参考媒体解析失败: ${failedIds.join(", ")}`);
+    console.warn(t("common.notices.partialReferenceMediaParseFailed", { ids: failedIds.join(", ") }));
   }
   if (successful.length === 0 && failedIds.length > 0) {
-    throw new Error("所有参考媒体解析失败");
+    throw new Error(t("common.notices.allReferenceMediaParseFailed"));
   }
   return successful;
 }
@@ -199,13 +201,14 @@ function isAbortError(error: unknown): boolean {
 async function saveItemOrWarn(
   item: StorageItem,
   pushWorkspaceNotice: (type: NoticeType, message: string) => void,
+  t: TFunction,
 ): Promise<StorageItem | null> {
   try {
     return await saveItemWithPreview(item);
   } catch (error) {
-    const message = toErrorMessage(error, "IndexedDB 写入失败");
+    const message = toErrorMessage(error, t("common.notices.indexedDbWriteFailed"));
     console.error("IndexedDB Save Failed:", error);
-    pushWorkspaceNotice("error", `本地存储失败，刷新后可能丢失：${message}`);
+    pushWorkspaceNotice("error", t("common.notices.localSaveFailed", { error: message }));
     return null;
   }
 }
@@ -213,27 +216,29 @@ async function saveItemOrWarn(
 async function deleteItemOrWarn(
   itemId: string,
   pushWorkspaceNotice: (type: NoticeType, message: string) => void,
+  t: TFunction,
 ): Promise<void> {
   try {
     await deleteFromDB(itemId);
   } catch (error) {
-    const message = toErrorMessage(error, "IndexedDB 删除失败");
+    const message = toErrorMessage(error, t("common.notices.indexedDbDeleteFailed"));
     console.error("IndexedDB Delete Failed:", error);
-    pushWorkspaceNotice("error", `本地结果清理失败：${message}`);
+    pushWorkspaceNotice("error", t("common.notices.localResultClearFailed", { error: message }));
   }
 }
 
 async function saveDirectItemOrWarn(
   item: StorageItem,
   pushWorkspaceNotice: (type: NoticeType, message: string) => void,
+  t: TFunction,
 ): Promise<StorageItem | null> {
   try {
     await saveToDB(item);
     return item;
   } catch (error) {
-    const message = toErrorMessage(error, "IndexedDB 写入失败");
+    const message = toErrorMessage(error, t("common.notices.indexedDbWriteFailed"));
     console.error("IndexedDB Direct Asset Save Failed:", error);
-    pushWorkspaceNotice("error", `本地结果存储失败，刷新后可能丢失：${message}`);
+    pushWorkspaceNotice("error", t("common.notices.localResultSaveFailed", { error: message }));
     return null;
   }
 }
@@ -249,14 +254,15 @@ function upsertGenerationTask(tasks: GenerationTask[], task: GenerationTask): Ge
 async function saveTaskOrWarn(
   task: GenerationTask,
   pushWorkspaceNotice: (type: NoticeType, message: string) => void,
+  t: TFunction,
 ): Promise<boolean> {
   try {
     await saveGenerationTask(task);
     return true;
   } catch (error) {
-    const message = toErrorMessage(error, "任务写入失败");
+    const message = toErrorMessage(error, t("common.notices.taskWriteFailed"));
     console.error("Generation Task Save Failed:", error);
-    pushWorkspaceNotice("error", `任务存储失败，未启动远端生成：${message}`);
+    pushWorkspaceNotice("error", t("common.notices.localTaskSaveFailed", { error: message }));
     return false;
   }
 }
@@ -265,13 +271,14 @@ async function updateTaskOrWarn(
   id: string,
   update: GenerationTaskUpdate,
   pushWorkspaceNotice: (type: NoticeType, message: string) => void,
+  t: TFunction,
 ): Promise<GenerationTask | null> {
   try {
     return await updateGenerationTask(id, update);
   } catch (error) {
-    const message = toErrorMessage(error, "任务更新失败");
+    const message = toErrorMessage(error, t("common.notices.taskUpdateError"));
     console.error("Generation Task Update Failed:", error);
-    pushWorkspaceNotice("error", `任务状态更新失败：${message}`);
+    pushWorkspaceNotice("error", t("common.notices.taskUpdateFailed", { error: message }));
     return null;
   }
 }
@@ -279,30 +286,31 @@ async function updateTaskOrWarn(
 async function cancelTaskOrWarn(
   id: string,
   pushWorkspaceNotice: (type: NoticeType, message: string) => void,
+  t: TFunction,
 ): Promise<GenerationTask | null> {
   try {
     return await cancelGenerationTask(id);
   } catch (error) {
-    const message = toErrorMessage(error, "任务取消状态更新失败");
+    const message = toErrorMessage(error, t("common.notices.taskCancelStatusUpdateFailed"));
     console.error("Generation Task Cancel Failed:", error);
-    pushWorkspaceNotice("error", `任务取消状态更新失败：${message}`);
+    pushWorkspaceNotice("error", t("common.notices.taskCancelStatusUpdateFailed"));
     return null;
   }
 }
 
-function validateCustomImageSize(size: string): string | null {
+function validateCustomImageSize(size: string, t: TFunction): string | null {
   if (size === "auto") return null;
   const match = size.match(/^(\d+)x(\d+)$/);
-  if (!match) return "尺寸格式必须是 widthxheight，例如 2560x1440";
+  if (!match) return t("common.notices.imageSizeInvalid");
   const width = Number(match[1]);
   const height = Number(match[2]);
-  if (width > 3840 || height > 3840) return "最大边长不能超过 3840px";
-  if (width % 16 !== 0 || height % 16 !== 0) return "宽高都必须是 16px 的倍数";
+  if (width > 3840 || height > 3840) return t("common.notices.maxDimensionExceeded");
+  if (width % 16 !== 0 || height % 16 !== 0) return t("common.notices.dimensionMustBe16x");
   const longSide = Math.max(width, height);
   const shortSide = Math.min(width, height);
-  if (longSide / shortSide > 3) return "长短边比例不能超过 3:1";
+  if (longSide / shortSide > 3) return t("common.notices.aspectRatioExceeded");
   const pixels = width * height;
-  if (pixels < 655360 || pixels > 8294400) return "总像素必须在 655,360 到 8,294,400 之间";
+  if (pixels < 655360 || pixels > 8294400) return t("common.notices.totalPixelsInvalid");
   return null;
 }
 
@@ -383,6 +391,7 @@ export function useGenerationActions({
   setImageSubmitCount,
   setItems,
   setVideoSubmitCount,
+  t,
 }: UseGenerationActionsParams) {
   const resolveScopeBoardId = (overrides: GenerationOverrides): string | undefined =>
     overrides.boardId ?? boardId;
@@ -410,9 +419,9 @@ export function useGenerationActions({
     const selectedReferenceImages = overrides.referenceImages ?? referenceImages;
     let activeReferenceImages: ReferenceImageRef[];
     try {
-      activeReferenceImages = await resolveOriginalReferences(selectedReferenceImages);
+      activeReferenceImages = await resolveOriginalReferences(selectedReferenceImages, t);
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "参考媒体读取失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.referenceMediaReadFailed")));
       return false;
     }
     const activeReferenceImage = activeReferenceImages[0]?.url ?? selectedReferenceImage;
@@ -435,15 +444,15 @@ export function useGenerationActions({
 
     if (!activePrompt.trim() && overrides.allowEmptyPrompt !== true && runningHubAppPresetRequiresPrompt(requestModel)) return false;
     if (requestIsCustomImageResolution) {
-      const sizeError = validateCustomImageSize(requestImageResolution);
+      const sizeError = validateCustomImageSize(requestImageResolution, t);
       if (sizeError) {
-        pushWorkspaceNotice("error", `自定义图片尺寸无效：${sizeError}`);
+        pushWorkspaceNotice("error", t("common.notices.customImageSizeInvalid", { error: sizeError }));
         return false;
       }
     }
     const unsupportedImageReference = activeReferenceImages.find(reference => getMediaReferenceType(reference) !== "image");
     if (unsupportedImageReference) {
-      pushWorkspaceNotice("error", `图片生成不支持${mediaReferenceLabel(getMediaReferenceType(unsupportedImageReference))}参考`);
+      pushWorkspaceNotice("error", t("common.notices.imageGenNotSupportMediaReference", { type: mediaReferenceLabel(getMediaReferenceType(unsupportedImageReference)) }));
       return false;
     }
     const imageReferenceUrls = activeReferenceImages.map(reference => reference.url);
@@ -451,18 +460,18 @@ export function useGenerationActions({
       imageReferenceUrls.push(activeReferenceImage);
     }
     if (imageReferenceUrls.length < requestImageCapabilities.minReferenceImages) {
-      pushWorkspaceNotice("error", `当前图片模型需要至少 ${requestImageCapabilities.minReferenceImages} 张参考图`);
+      pushWorkspaceNotice("error", t("common.notices.imageModelNeedMinReferences", { min: requestImageCapabilities.minReferenceImages }));
       return false;
     }
     if (imageReferenceUrls.length > requestImageCapabilities.maxReferenceImages) {
-      pushWorkspaceNotice("error", `当前图片模型最多支持 ${requestImageCapabilities.maxReferenceImages} 张参考图`);
+      pushWorkspaceNotice("error", t("common.notices.imageModelMaxReferences", { max: requestImageCapabilities.maxReferenceImages }));
       return false;
     }
     let imageReferencePayloads: string[];
     try {
       imageReferencePayloads = await Promise.all(imageReferenceUrls.map(prepareReferenceImageUrlForRequest));
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "参考图读取失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.referenceImageReadFailed")));
       return false;
     }
     const imagePayloadError = getReferenceImagePayloadError(imageReferencePayloads);
@@ -501,7 +510,7 @@ export function useGenerationActions({
       source: resolveTaskSource(overrides),
       request: generationRequest,
     });
-    if (!await saveTaskOrWarn(task, pushWorkspaceNotice)) {
+    if (!await saveTaskOrWarn(task, pushWorkspaceNotice, t)) {
       setImageSubmitCount(prev => Math.max(0, prev - 1));
       return true;
     }
@@ -531,14 +540,14 @@ export function useGenerationActions({
             status: "processing",
             progress: 15,
             canCancelRemote: operationName.startsWith("12ai:video:"),
-          }, pushWorkspaceNotice);
+          }, pushWorkspaceNotice, t);
           if (processingTask) recordGenerationTask(processingTask);
           return true;
         }
 
         const outputUrls = imageUrls.length > 0 ? imageUrls : imageUrl ? [imageUrl] : [];
         if (outputUrls.length === 0) {
-          throw new Error("图片接口返回缺少 imageUrl 或 operationName");
+          throw new Error(t("common.notices.imageInterfaceMissingResult"));
         }
         const savedCompletedItems: StorageItem[] = [];
         for (const [index, outputUrl] of outputUrls.entries()) {
@@ -560,17 +569,17 @@ export function useGenerationActions({
             },
             { boardId: resolveScopeBoardId(overrides) },
           );
-          const savedCompletedItem = await saveItemOrWarn(completedItem, pushWorkspaceNotice);
+          const savedCompletedItem = await saveItemOrWarn(completedItem, pushWorkspaceNotice, t);
           if (savedCompletedItem) savedCompletedItems.push(savedCompletedItem);
         }
 
         if (savedCompletedItems.length !== outputUrls.length) {
-          for (const item of savedCompletedItems) await deleteItemOrWarn(item.id, pushWorkspaceNotice);
+          for (const item of savedCompletedItems) await deleteItemOrWarn(item.id, pushWorkspaceNotice, t);
           const failedTask = await updateTaskOrWarn(taskId, {
             status: "failed",
             progress: 100,
-            errorMessage: "结果资产本地存储失败",
-          }, pushWorkspaceNotice);
+            errorMessage: t("common.notices.imageResultAssetSaveFailed"),
+          }, pushWorkspaceNotice, t);
           if (failedTask) recordGenerationTask(failedTask);
           return true;
         }
@@ -581,25 +590,25 @@ export function useGenerationActions({
           resultAssetIds,
           status: "complete",
           progress: 100,
-        }, pushWorkspaceNotice);
+        }, pushWorkspaceNotice, t);
         if (completeTask) recordGenerationTask(completeTask);
       } else {
-        throw new Error(await readFetchError(res, "图片生成请求失败"));
+        throw new Error(await readFetchError(res, t("common.notices.imageGenRequestFailed")));
       }
     } catch (error) {
       if (locallyCanceledItemIdsRef.current.has(taskId) || isAbortError(error)) {
         locallyCanceledItemIdsRef.current.delete(taskId);
-        const canceledTask = await cancelTaskOrWarn(taskId, pushWorkspaceNotice);
+        const canceledTask = await cancelTaskOrWarn(taskId, pushWorkspaceNotice, t);
         if (canceledTask) recordGenerationTask(canceledTask);
         return true;
       }
       console.error(error);
-      const message = toErrorMessage(error, "图片生成失败");
+      const message = toErrorMessage(error, t("common.notices.imageGenFailed"));
       const failedTask = await updateTaskOrWarn(taskId, {
         status: "failed",
         progress: 100,
         errorMessage: message,
-      }, pushWorkspaceNotice);
+      }, pushWorkspaceNotice, t);
       if (failedTask) recordGenerationTask(failedTask);
       pushWorkspaceNotice("error", message);
       return true;
@@ -616,9 +625,9 @@ export function useGenerationActions({
     const selectedReferenceImages = overrides.referenceImages ?? referenceImages;
     let activeReferenceImages: ReferenceImageRef[];
     try {
-      activeReferenceImages = await resolveOriginalReferences(selectedReferenceImages);
+      activeReferenceImages = await resolveOriginalReferences(selectedReferenceImages, t);
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "参考媒体读取失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.referenceMediaReadFailed")));
       return false;
     }
     const activeReferenceImage = activeReferenceImages[0]?.url ?? selectedReferenceImage;
@@ -640,7 +649,7 @@ export function useGenerationActions({
     );
     const unsupportedReference = videoReferences.find(reference => !requestVideoCapabilities.referenceMediaTypes.includes(getMediaReferenceType(reference)));
     if (unsupportedReference) {
-      pushWorkspaceNotice("error", `当前视频模型不支持${mediaReferenceLabel(getMediaReferenceType(unsupportedReference))}输入`);
+      pushWorkspaceNotice("error", t("common.notices.videoGenNotSupportMediaInput", { type: mediaReferenceLabel(getMediaReferenceType(unsupportedReference)) }));
       return false;
     }
     const videoReferenceUrls = videoReferences.map(reference => reference.url);
@@ -648,7 +657,7 @@ export function useGenerationActions({
     try {
       videoReferencePayloads = await Promise.all(videoReferenceUrls.map(prepareReferenceMediaUrlForRequest));
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "参考媒体读取失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.referenceMediaReadFailed")));
       return false;
     }
     const videoPayloadError = getReferenceMediaPayloadError(videoReferencePayloads);
@@ -685,7 +694,7 @@ export function useGenerationActions({
       source: resolveTaskSource(overrides),
       request: generationRequest,
     });
-    if (!await saveTaskOrWarn(task, pushWorkspaceNotice)) {
+    if (!await saveTaskOrWarn(task, pushWorkspaceNotice, t)) {
       setVideoSubmitCount(prev => Math.max(0, prev - 1));
       return true;
     }
@@ -718,7 +727,7 @@ export function useGenerationActions({
         const data: unknown = await res.json();
         const activeOperationName = getStringField(data, "operationName");
         if (!activeOperationName) {
-          throw new Error("视频接口返回缺少 operationName");
+          throw new Error(t("common.notices.videoInterfaceMissingOperation"));
         }
 
         const processingTask = await updateTaskOrWarn(taskId, {
@@ -726,25 +735,25 @@ export function useGenerationActions({
           status: "processing",
           progress: 15,
           canCancelRemote: activeOperationName.startsWith("12ai:video:"),
-        }, pushWorkspaceNotice);
+        }, pushWorkspaceNotice, t);
         if (processingTask) recordGenerationTask(processingTask);
       } else {
-        throw new Error(await readFetchError(res, "视频生成请求失败"));
+        throw new Error(await readFetchError(res, t("common.notices.videoGenRequestFailed")));
       }
     } catch (error) {
       if (locallyCanceledItemIdsRef.current.has(taskId) || isAbortError(error)) {
         locallyCanceledItemIdsRef.current.delete(taskId);
-        const canceledTask = await cancelTaskOrWarn(taskId, pushWorkspaceNotice);
+        const canceledTask = await cancelTaskOrWarn(taskId, pushWorkspaceNotice, t);
         if (canceledTask) recordGenerationTask(canceledTask);
         return true;
       }
       console.error(error);
-      const message = toErrorMessage(error, "视频生成失败");
+      const message = toErrorMessage(error, t("common.notices.videoGenFailed"));
       const failedTask = await updateTaskOrWarn(taskId, {
         status: "failed",
         progress: 100,
         errorMessage: message,
-      }, pushWorkspaceNotice);
+      }, pushWorkspaceNotice, t);
       if (failedTask) recordGenerationTask(failedTask);
       pushWorkspaceNotice("error", message);
       return true;
@@ -761,16 +770,16 @@ export function useGenerationActions({
     const selectedReferenceImages = overrides.referenceImages ?? referenceImages;
     let activeReferenceImages: ReferenceImageRef[];
     try {
-      activeReferenceImages = await resolveOriginalReferences(selectedReferenceImages);
+      activeReferenceImages = await resolveOriginalReferences(selectedReferenceImages, t);
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "参考媒体读取失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.referenceMediaReadFailed")));
       return false;
     }
     const activeReferenceImage = activeReferenceImages[0]?.url ?? selectedReferenceImage;
     const requestModel = overrides.model?.trim();
 
     if (!requestModel) {
-      pushWorkspaceNotice("error", "音频生成需要明确音频模型");
+      pushWorkspaceNotice("error", t("common.notices.audioGenNeedModel"));
       return false;
     }
     const isRunningHubWorkflowAudio = isRunningHubWorkflowAudioTarget(requestModel, overrides.runningHubNodeInfoList);
@@ -784,21 +793,21 @@ export function useGenerationActions({
     if (overrides.voiceProfileId) {
       try {
         const profile = await getVoiceProfile(overrides.voiceProfileId);
-        if (!profile) throw new Error("找不到选中的音色");
+        if (!profile) throw new Error(t("common.notices.voiceProfileNotFound"));
         if (!audioMode || !isVoiceProfileUsableForAudioModel(profile, requestModel, audioMode)) {
-          throw new Error("当前模型不能使用选中的音色");
+          throw new Error(t("common.notices.voiceProfileNotUsableForModel"));
         }
         profileStylePrompt = profile.designPrompt;
         profileVoice = profile.providerVoiceId;
         profileCloneConsentAccepted = profile.source === "cloned" && Boolean(profile.consentAcceptedAt);
-        profileReferences = await readVoiceProfileReferences(profile.referenceAudioAssetIds);
+        profileReferences = await readVoiceProfileReferences(profile.referenceAudioAssetIds, t);
       } catch (error) {
-        pushWorkspaceNotice("error", toErrorMessage(error, "音色读取失败"));
+        pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.voiceProfileReadFailed")));
         return false;
       }
     }
     if (audioMode === "voice_clone" && overrides.voiceCloneConsentAccepted !== true && !profileCloneConsentAccepted) {
-      pushWorkspaceNotice("error", "音色克隆需要先确认参考音频授权");
+      pushWorkspaceNotice("error", t("common.notices.voiceCloneNeedsConsent"));
       return false;
     }
     const resolvedAudioStylePrompt = profileStylePrompt ?? overrides.audioStylePrompt;
@@ -811,7 +820,7 @@ export function useGenerationActions({
     try {
       audioReferencePayloads = await Promise.all(audioReferenceUrls.map(prepareReferenceMediaUrlForRequest));
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "参考媒体读取失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.referenceMediaReadFailed")));
       return false;
     }
     const audioPayloadError = getReferenceMediaPayloadError(audioReferencePayloads);
@@ -821,15 +830,15 @@ export function useGenerationActions({
     }
     const audioReferenceTypes = audioReferences.map(reference => getMediaReferenceType(reference) ?? "image");
     if (audioCapabilities && audioReferenceTypes.some(type => !audioCapabilities.referenceMediaTypes.includes(type))) {
-      pushWorkspaceNotice("error", "当前音频模型不支持所选参考媒体类型");
+      pushWorkspaceNotice("error", t("common.notices.allReferenceMediaParseFailed"));
       return false;
     }
     if (audioCapabilities && audioReferences.length < audioCapabilities.minReferenceMedia) {
-      pushWorkspaceNotice("error", audioOperationMissingReferenceMessage(audioCapabilities));
+      pushWorkspaceNotice("error", audioOperationMissingReferenceMessage(audioCapabilities, t));
       return false;
     }
     if (audioCapabilities && audioCapabilities.maxReferenceMedia >= 0 && audioReferences.length > audioCapabilities.maxReferenceMedia) {
-      pushWorkspaceNotice("error", `当前音频模型最多支持 ${audioCapabilities.maxReferenceMedia} 个参考媒体`);
+      pushWorkspaceNotice("error", t("common.notices.audioModelMaxMedia", { max: audioCapabilities.maxReferenceMedia }));
       return false;
     }
 
@@ -856,7 +865,7 @@ export function useGenerationActions({
     const task = createGenerationTask({
       id: taskId,
       mediaType: resultMediaType,
-      prompt: activePrompt.trim() || (resultMediaType === "transcript" ? "音频转写" : activePrompt),
+      prompt: activePrompt.trim() || (resultMediaType === "transcript" ? t("common.notices.audioTranscribeDefault") : activePrompt),
       model: requestModel,
       status: "pending",
       progress: 12,
@@ -864,7 +873,7 @@ export function useGenerationActions({
       source: resolveTaskSource(overrides),
       request: generationRequest,
     });
-    if (!await saveTaskOrWarn(task, pushWorkspaceNotice)) {
+    if (!await saveTaskOrWarn(task, pushWorkspaceNotice, t)) {
       setAudioSubmitCount(prev => Math.max(0, prev - 1));
       return true;
     }
@@ -906,7 +915,7 @@ export function useGenerationActions({
           if (outputKind === "transcript") {
             const transcript = getStringField(data, "transcript");
             if (!transcript) {
-              throw new Error("音频接口返回转写格式不正确");
+              throw new Error(t("common.notices.audioTranscriptFormatIncorrect"));
             }
             const completedAssetId = makeClientId("txt");
             const completedItem = buildStorageItem(
@@ -914,7 +923,7 @@ export function useGenerationActions({
                 id: completedAssetId,
                 type: "transcript",
                 url: transcriptToDataUrl(transcript),
-                prompt: activePrompt.trim() || transcriptPreview(transcript, 80) || "音频转写",
+                prompt: activePrompt.trim() || transcriptPreview(transcript, 80) || t("common.notices.audioTranscribeDefault"),
                 model: requestModel,
                 aspectRatio: "transcript",
                 createdAt: task.createdAt,
@@ -926,13 +935,13 @@ export function useGenerationActions({
               },
               { boardId: resolveScopeBoardId(overrides) },
             );
-            const savedCompletedItem = await saveDirectItemOrWarn(completedItem, pushWorkspaceNotice);
+            const savedCompletedItem = await saveDirectItemOrWarn(completedItem, pushWorkspaceNotice, t);
             if (!savedCompletedItem) {
               const failedTask = await updateTaskOrWarn(taskId, {
                 status: "failed",
                 progress: 100,
-                errorMessage: "结果资产本地存储失败",
-              }, pushWorkspaceNotice);
+                errorMessage: t("common.notices.imageResultAssetSaveFailed"),
+              }, pushWorkspaceNotice, t);
               if (failedTask) recordGenerationTask(failedTask);
               return true;
             }
@@ -941,16 +950,16 @@ export function useGenerationActions({
               resultAssetIds: [completedAssetId],
               status: "complete",
               progress: 100,
-            }, pushWorkspaceNotice);
+            }, pushWorkspaceNotice, t);
             if (completeTask) recordGenerationTask(completeTask);
             setItems(prev => [savedCompletedItem, ...prev]);
-            pushWorkspaceNotice("success", "音频转写完成");
+            pushWorkspaceNotice("success", t("common.notices.audioTranscribeComplete"));
             return true;
           }
           const audioBase64 = getStringField(data, "audioBase64");
           const mimeType = getStringField(data, "mimeType");
           if (!audioBase64 || !mimeType) {
-            throw new Error("音频接口返回格式不正确");
+            throw new Error(t("common.notices.audioFormatIncorrect"));
           }
           const completedAssetId = makeClientId("aud");
           const completedItem = buildStorageItem(
@@ -970,13 +979,13 @@ export function useGenerationActions({
             },
             { boardId: resolveScopeBoardId(overrides) },
           );
-          const savedCompletedItem = await saveDirectItemOrWarn(completedItem, pushWorkspaceNotice);
+          const savedCompletedItem = await saveDirectItemOrWarn(completedItem, pushWorkspaceNotice, t);
           if (!savedCompletedItem) {
             const failedTask = await updateTaskOrWarn(taskId, {
               status: "failed",
               progress: 100,
-              errorMessage: "结果资产本地存储失败",
-            }, pushWorkspaceNotice);
+              errorMessage: t("common.notices.imageResultAssetSaveFailed"),
+            }, pushWorkspaceNotice, t);
             if (failedTask) recordGenerationTask(failedTask);
             return true;
           }
@@ -985,15 +994,15 @@ export function useGenerationActions({
             resultAssetIds: [completedAssetId],
             status: "complete",
             progress: 100,
-          }, pushWorkspaceNotice);
+          }, pushWorkspaceNotice, t);
           if (completeTask) recordGenerationTask(completeTask);
           setItems(prev => [savedCompletedItem, ...prev]);
-          pushWorkspaceNotice("success", "音频生成完成");
+          pushWorkspaceNotice("success", t("common.notices.audioGenComplete"));
           return true;
         }
         const activeOperationName = getStringField(data, "operationName");
         if (!activeOperationName) {
-          throw new Error("音频接口返回缺少 operationName");
+          throw new Error(t("common.notices.audioInterfaceMissingOperation"));
         }
 
         const processingTask = await updateTaskOrWarn(taskId, {
@@ -1001,28 +1010,28 @@ export function useGenerationActions({
           status: "processing",
           progress: 15,
           canCancelRemote: activeOperationName.startsWith("12ai:video:"),
-        }, pushWorkspaceNotice);
+        }, pushWorkspaceNotice, t);
         if (processingTask) recordGenerationTask(processingTask);
       } else {
         const parsedModel = parseProviderModel(requestModel, "12ai");
         const providerLabel = getProviderMeta(parsedModel.provider).label;
-        const message = await readFetchError(res, "音频生成请求失败");
-        throw new Error(`${providerLabel}（${requestModel}）音频生成请求失败：${message}`);
+        const message = await readFetchError(res, t("common.notices.audioGenRequestFailed"));
+        throw new Error(t("common.notices.audioModelRequestFailed", { providerLabel, model: requestModel, error: message }));
       }
     } catch (error) {
       if (locallyCanceledItemIdsRef.current.has(taskId) || isAbortError(error)) {
         locallyCanceledItemIdsRef.current.delete(taskId);
-        const canceledTask = await cancelTaskOrWarn(taskId, pushWorkspaceNotice);
+        const canceledTask = await cancelTaskOrWarn(taskId, pushWorkspaceNotice, t);
         if (canceledTask) recordGenerationTask(canceledTask);
         return true;
       }
       console.error(error);
-      const message = toErrorMessage(error, "音频生成失败");
+      const message = toErrorMessage(error, t("common.notices.audioGenFailed"));
       const failedTask = await updateTaskOrWarn(taskId, {
         status: "failed",
         progress: 100,
         errorMessage: message,
-      }, pushWorkspaceNotice);
+      }, pushWorkspaceNotice, t);
       if (failedTask) recordGenerationTask(failedTask);
       pushWorkspaceNotice("error", message);
       return true;
@@ -1035,11 +1044,11 @@ export function useGenerationActions({
 
   const retryGenerationTask = async (task: GenerationTask) => {
     if (task.status !== "failed") {
-      pushWorkspaceNotice("error", "只能重试失败任务");
+      pushWorkspaceNotice("error", t("common.notices.onlyRetryFailedTask"));
       return false;
     }
     if (!task.request) {
-      pushWorkspaceNotice("error", "失败任务缺少生成请求快照，无法重试");
+      pushWorkspaceNotice("error", t("common.notices.retryTaskMissingRequest"));
       return false;
     }
 

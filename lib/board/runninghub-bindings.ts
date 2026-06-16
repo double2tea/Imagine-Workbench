@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n";
 import type {
   BoardAssetType,
   BoardRunningHubBindingDelivery,
@@ -33,7 +34,7 @@ export function createDefaultRunningHubBinding(): BoardRunningHubNodeInfoBinding
     id: createRunningHubBindingId(),
     nodeId: "",
     fieldName: "",
-    label: "新字段",
+    label: t("board.runninghub.bindings.newField"),
     source: "prompt",
     value: "",
     valueType: "text",
@@ -83,9 +84,9 @@ export function isRunningHubBindingMissing(
 export function parseRunningHubBindingsFromJsonText(text: string): BoardRunningHubNodeInfoBinding[] {
   const parsed = parseRunningHubSourceText(text);
   const fields = readRunningHubFieldArray(parsed);
-  if (!fields) throw new Error("JSON 中没有 nodeInfoList 或 fields 数组");
+  if (!fields) throw new Error(t("board.runninghub.missingNodeInfoList"));
   const bindings = fields.map(readRunningHubBindingFromField).filter((binding): binding is BoardRunningHubNodeInfoBinding => binding !== null);
-  if (bindings.length === 0) throw new Error("没有可导入的 RunningHub 参数字段");
+  if (bindings.length === 0) throw new Error(t("board.runninghub.fillRealId"));
   return bindings;
 }
 
@@ -113,7 +114,7 @@ function parseRunningHubSourceText(text: string): unknown {
       }
     }
   }
-  throw new Error("请粘贴 RunningHub API 示例 JSON、curl 或 nodeInfoList");
+  throw new Error(t("board.runninghub.fillRealWorkflowId"));
 }
 
 function readRunningHubFieldArray(value: unknown): unknown[] | null {

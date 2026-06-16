@@ -2,6 +2,7 @@ import { Loader2, X } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
 import type { StorageItem } from "@/lib/db";
 import { gsap, prefersReducedWorkbenchMotion, useGSAP, WORKBENCH_GSAP_EASE } from "@/lib/workbench-gsap";
+import { useTranslations } from "@/lib/i18n";
 
 interface BoardMediaNodeShellProps {
   actionBar: ReactNode;
@@ -24,12 +25,13 @@ export default function BoardMediaNodeShell({
   isSelected,
   onDoubleClick,
   onCancelProcessing,
-  processingLabel = "编辑处理中",
+  processingLabel,
   onSelectStackAsset,
   stackItems,
   status,
   statusLabel,
 }: BoardMediaNodeShellProps) {
+  const { t } = useTranslations("board");
   const containerRef = useRef<HTMLDivElement | null>(null);
   const previousStatusRef = useRef<StorageItem["status"] | undefined>(undefined);
   const [isHovered, setIsHovered] = useState(false);
@@ -40,10 +42,10 @@ export default function BoardMediaNodeShell({
   const isFailed = status === "failed";
   const visualStatus = isFailed ? "failed" : isProcessing ? "processing" : status === "complete" ? "complete" : "idle";
   const statusTitle = isFailed
-    ? statusLabel ?? "任务失败"
+    ? statusLabel ?? t('mediaNode.taskFailed')
     : status === "pending"
-      ? "任务已排队"
-      : processingLabel;
+      ? t('mediaNode.taskQueued')
+      : processingLabel ?? t('mediaNode.processing');
 
   useGSAP(() => {
     const previousStatus = previousStatusRef.current;
@@ -126,8 +128,8 @@ export default function BoardMediaNodeShell({
               <button
                 type="button"
                 className="imagine-motion-interactive nodrag pointer-events-auto absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full border border-white/18 bg-black/28 text-white/80 shadow-lg backdrop-blur transition hover:border-rose-300/50 hover:bg-rose-500/80 hover:text-white"
-                title="取消图片编辑任务"
-                aria-label="取消图片编辑任务"
+                title={t('mediaNode.cancelEditTask')}
+                aria-label={t('mediaNode.cancelEditTask')}
                 onClick={(event) => {
                   event.stopPropagation();
                   onCancelProcessing();
@@ -158,8 +160,8 @@ export default function BoardMediaNodeShell({
                 type="button"
                 data-active={isActive ? "true" : "false"}
                 className="board-media-stack-option imagine-motion-interactive nodrag flex h-5 min-w-5 items-center justify-center rounded-full px-1"
-                title={`版本 ${index + 1}`}
-                aria-label={`切换到版本 ${index + 1}`}
+                title={t('mediaNode.version', { index: index + 1 })}
+                aria-label={t('mediaNode.switchVersion', { index: index + 1 })}
                 onClick={(event) => {
                   event.stopPropagation();
                   if (!isActive) onSelectStackAsset?.(stackItem.id);

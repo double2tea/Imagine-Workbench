@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n";
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { getExecutableAction, getPendingAgentAction, type ChatMessage } from "@/components/agent/AgentDock";
 import { API_ROUTES } from "@/lib/api/routes";
@@ -122,12 +123,12 @@ function makeClientId(prefix: string): string {
 const WELCOME_MESSAGE: ChatMessage = {
   id: "welcome",
   role: "assistant",
-  content: "您好！我是您的智能创意助手。您可以一边调整左侧创作参数，一边随时交办高阶创意任务。例如：「帮我做一套3张赛博朋克风战士的相册」或「帮我把上一部图片转成16:9的微短视频」。我会给出建议，并在确认后填入参数或执行生成。",
-  thought: "初始化底部 Agent Dock，准备读取画廊资产上下文...",
+  content: t("common.notices.agentWelcomeContent"),
+  thought: t("common.notices.agentWelcomeThought"),
   suggestedFollowUps: [
-    "优化并生成一张赛博朋克飞艇",
-    "我想做一段太空科幻题材视频",
-    "根据当前画廊给我三个延展方向",
+    t("common.notices.agentFollowUp1"),
+    t("common.notices.agentFollowUp2"),
+    t("common.notices.agentFollowUp3"),
   ],
 };
 
@@ -461,8 +462,8 @@ export function useAgentController({
         const assistantMessage: ChatMessage = {
           id: assistantMsgId,
           role: "assistant",
-          content: agentResponse.text || "我已收到指令，该项目可以怎么推进？",
-          thought: agentResponse.thought || "分析场景，规划后续设计合成步骤...",
+          content: agentResponse.text || t("common.notices.agentReceivedInstruction"),
+          thought: agentResponse.thought || t("common.notices.agentAnalysisThought"),
           recommendedAction,
           boardAction,
           actionDraft,
@@ -480,12 +481,12 @@ export function useAgentController({
       }
     } catch (error) {
       console.error(error);
-      const message = error instanceof Error ? error.message : "请求过载";
+      const message = error instanceof Error ? error.message : t("common.notices.agentRequestOverloaded");
       setAgentMessages(prev => [...prev, {
         id: makeClientId("asst_err"),
         role: "assistant",
-        content: `抱歉，Agent 在网络调谐时出现异常 (${message}). 请检查网络、API Key 或重试。`,
-        suggestedFollowUps: ["重试我先前的请求", "根据当前参数重新规划"],
+        content: t("common.notices.agentNetworkError", { message }),
+        suggestedFollowUps: [t("common.notices.agentRetryFollowUp1"), t("common.notices.agentRetryFollowUp2")],
       }]);
     } finally {
       setIsAgentLoading(false);

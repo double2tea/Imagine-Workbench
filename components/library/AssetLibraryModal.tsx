@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import AudioWaveformPreview from "@/components/audio/AudioWaveformPreview";
 import PreviewImage from "@/components/PreviewImage";
+import { useTranslations } from "@/lib/i18n";
 import {
   LIBRARY_ASSET_CATEGORIES,
   LIBRARY_ASSET_CATEGORY_LABELS,
@@ -68,8 +69,8 @@ function formatDate(value: string): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-function originLabel(origin: LibraryAssetRecord["origin"]): string {
-  return origin === "imported" ? "本机导入" : "来自作品";
+function originLabel(origin: LibraryAssetRecord["origin"], t: ReturnType<typeof useTranslations>["t"]): string {
+  return origin === "imported" ? t("library.importedFromLocal") : t("library.importedFromCreation");
 }
 
 function recordSearchText(entry: LibraryAssetEntry): string {
@@ -151,6 +152,7 @@ export default function AssetLibraryModal({
   onSelect,
   onUpdate,
 }: AssetLibraryModalProps) {
+  const { t } = useTranslations("common");
   const [query, setQuery] = useState("");
   const [mediaFilter, setMediaFilter] = useState<MediaFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
@@ -266,7 +268,7 @@ export default function AssetLibraryModal({
     try {
       await onImportFiles(files);
     } catch (error) {
-      setActionError(actionErrorMessage(error, "素材导入失败"));
+      setActionError(actionErrorMessage(error, t("library.importFailed")));
     } finally {
       setImporting(false);
     }
@@ -276,7 +278,7 @@ export default function AssetLibraryModal({
     if (!activeRecord || !hasDraftChanges || savingDraft) return;
     const nextTitle = draftTitle.trim();
     if (!nextTitle) {
-      setActionError("标题不能为空");
+      setActionError(t("library.titleCannotBeEmpty"));
       setDraftTitle(activeRecord.title);
       return;
     }
@@ -296,7 +298,7 @@ export default function AssetLibraryModal({
       setDraftNotes(nextNotes);
       setDraftTags(nextTags.join(", "));
     } catch (error) {
-      setActionError(actionErrorMessage(error, "保存素材信息失败"));
+      setActionError(actionErrorMessage(error, t("library.saveAssetInfoFailed")));
     } finally {
       setSavingDraft(false);
     }
@@ -309,7 +311,7 @@ export default function AssetLibraryModal({
     try {
       await onUpdate({ ...record, favorite: !record.favorite });
     } catch (error) {
-      setActionError(actionErrorMessage(error, "更新收藏状态失败"));
+      setActionError(actionErrorMessage(error, t("library.updateFavoriteFailed")));
     } finally {
       setTogglingFavorite(false);
     }
@@ -323,7 +325,7 @@ export default function AssetLibraryModal({
       await onRemove(activeRecord);
       setActiveRecordId(null);
     } catch (error) {
-      setActionError(actionErrorMessage(error, "移出素材库失败"));
+      setActionError(actionErrorMessage(error, t("library.removeFromLibraryFailed")));
     } finally {
       setRemoving(false);
     }
@@ -331,7 +333,7 @@ export default function AssetLibraryModal({
 
   const selectEntry = (entry: LibraryAssetEntry) => {
     if (activeRecord && activeRecord.id !== entry.record.id && hasDraftChanges) {
-      setActionError("请先保存当前素材信息后再切换素材");
+      setActionError(t("library.saveBeforeSwitch"));
       return;
     }
     setActiveRecordId(entry.record.id);
@@ -360,7 +362,7 @@ export default function AssetLibraryModal({
             type="button"
             onClick={() => setFullscreenEntry(null)}
             className="imagine-secondary-action flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/10 text-white"
-            aria-label="关闭全屏预览"
+            aria-label={t("library.fullscreenPreviewLabel")}
           >
             <X className="h-4 w-4" />
           </button>
@@ -390,13 +392,13 @@ export default function AssetLibraryModal({
             <div className="min-w-0">
               <h2 id="asset-library-modal-title" className="truncate text-[15px] font-semibold text-[var(--iw-text)]">{title}</h2>
               <div className="mt-1 flex flex-wrap items-center gap-1.5 font-mono text-[10px] text-[var(--iw-faint)]">
-                <span>{entries.length} 项</span>
+                <span>{t("library.matchCount", { count: entries.length })}</span>
                 <span className="h-1 w-1 rounded-full bg-[var(--iw-border)]" aria-hidden="true" />
-                <span>图片 / 视频 / 音频</span>
+                <span>{t("library.imageVideoAudio")}</span>
                 {filteredEntries.length !== entries.length && (
                   <>
                     <span className="h-1 w-1 rounded-full bg-[var(--iw-border)]" aria-hidden="true" />
-                    <span>{filteredEntries.length} 个匹配</span>
+                    <span>{t("library.matchCount", { count: filteredEntries.length })}</span>
                   </>
                 )}
               </div>
@@ -409,7 +411,7 @@ export default function AssetLibraryModal({
               name="asset-library-import"
               multiple
               accept="image/*,video/*,audio/*"
-              aria-label="导入素材到素材库"
+              aria-label={t("library.importAriaLabel")}
               onChange={handleFileChange}
               className="hidden"
             />
@@ -420,13 +422,13 @@ export default function AssetLibraryModal({
               className="imagine-secondary-action flex h-9 items-center gap-1.5 rounded-lg border border-[var(--iw-border)] px-3 text-[11px] font-semibold"
             >
               <Upload className="h-3.5 w-3.5" />
-              导入
+              {t("library.importButton")}
             </button>
             <button
               type="button"
               onClick={onClose}
               className="imagine-secondary-action flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--iw-border)]"
-              aria-label="关闭素材库"
+              aria-label={t("library.closeLabel")}
             >
               <X className="h-4 w-4" />
             </button>
@@ -442,7 +444,7 @@ export default function AssetLibraryModal({
                 <input
                   value={query}
                   onChange={event => setQuery(event.target.value)}
-                  placeholder="搜索标题、标签、备注、模型..."
+                  placeholder={t("library.searchPlaceholder")}
                   className="imagine-toolbar-search h-9 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] pr-4 text-xs text-[var(--iw-text)] outline-none"
                 />
               </label>
@@ -453,7 +455,7 @@ export default function AssetLibraryModal({
                   onClick={() => setMediaFilter("all")}
                   className="imagine-filter-chip"
                 >
-                  全部
+                  {t("library.all")}
                 </button>
                 {LIBRARY_ASSET_MEDIA_TYPES.map(type => (
                   <button
@@ -474,7 +476,7 @@ export default function AssetLibraryModal({
                   className="imagine-filter-chip flex items-center gap-1"
                 >
                   <Heart className="h-3 w-3" />
-                  收藏
+                  {t("library.favorites")}
                 </button>
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
@@ -484,7 +486,7 @@ export default function AssetLibraryModal({
                   onClick={() => setCategoryFilter("all")}
                   className="imagine-filter-chip"
                 >
-                  全部分类
+                  {t("library.allCategories")}
                 </button>
                 {LIBRARY_ASSET_CATEGORIES.map(category => (
                   <button
@@ -505,28 +507,28 @@ export default function AssetLibraryModal({
                     data-active={viewMode === "grid"}
                     onClick={() => setViewMode("grid")}
                     className="imagine-filter-chip flex items-center gap-1"
-                    aria-label="网格显示"
-                    title="网格显示"
+                    aria-label={t("library.gridViewLabel")}
+                    title={t("library.gridViewLabel")}
                   >
                     <Grid2X2 className="h-3 w-3" />
-                    网格
+                    {t("library.gridView")}
                   </button>
                   <button
                     type="button"
                     data-active={viewMode === "list"}
                     onClick={() => setViewMode("list")}
                     className="imagine-filter-chip flex items-center gap-1"
-                    aria-label="列表显示"
-                    title="列表显示"
+                    aria-label={t("library.listViewLabel")}
+                    title={t("library.listViewLabel")}
                   >
                     <List className="h-3 w-3" />
-                    列表
+                    {t("library.listView")}
                   </button>
                 </div>
                 {viewMode === "grid" && (
                   <label className="flex items-center gap-2 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2.5 py-1.5 text-[10px] font-semibold text-[var(--iw-muted)]">
                     <SlidersHorizontal className="h-3 w-3" />
-                    大小
+                    {t("library.cardSize")}
                     <input
                       type="range"
                       min={MIN_GRID_CARD_SIZE}
@@ -535,7 +537,7 @@ export default function AssetLibraryModal({
                       value={gridCardSize}
                       onChange={event => setGridCardSize(Number(event.target.value))}
                       className="h-1 w-32 accent-[var(--iw-accent)]"
-                      aria-label="调整网格素材大小"
+                      aria-label={t("library.adjustCardSize")}
                     />
                   </label>
                 )}
@@ -546,11 +548,11 @@ export default function AssetLibraryModal({
             <div className="min-h-0 flex-1 overflow-y-auto p-4">
               {loading ? (
                 <p className="rounded-xl border border-dashed border-[var(--iw-border)] bg-[color-mix(in_srgb,var(--iw-panel)_64%,transparent)] px-3 py-12 text-center text-xs text-[var(--iw-muted)]">
-                  正在加载素材库…
+                  {t("library.loadingLibrary")}
                 </p>
               ) : filteredEntries.length === 0 ? (
                 <p className="rounded-xl border border-dashed border-[var(--iw-border)] bg-[color-mix(in_srgb,var(--iw-panel)_64%,transparent)] px-3 py-12 text-center text-xs text-[var(--iw-muted)]">
-                  暂无匹配素材
+                  {t("library.noMatchingAssets")}
                 </p>
               ) : viewMode === "grid" ? (
                 <div
@@ -567,7 +569,7 @@ export default function AssetLibraryModal({
                         onClick={() => selectEntry(entry)}
                         onDoubleClick={() => setFullscreenEntry(entry)}
                         className="group imagine-asset-card flex min-w-0 flex-col overflow-hidden rounded-xl border border-[color-mix(in_srgb,var(--iw-border)_82%,transparent)] bg-[color-mix(in_srgb,var(--iw-panel-solid)_76%,transparent)] text-left shadow-[0_14px_34px_rgba(0,0,0,0.10)] transition hover:-translate-y-0.5 hover:border-[color-mix(in_srgb,var(--iw-accent)_42%,var(--iw-border))] hover:shadow-[0_20px_46px_rgba(0,0,0,0.16)] data-[active=true]:border-[var(--iw-accent)] data-[active=true]:bg-[color-mix(in_srgb,var(--iw-accent)_8%,var(--iw-panel))] data-[active=true]:shadow-[0_0_0_3px_var(--iw-accent-soft),0_18px_44px_rgba(0,0,0,0.16)]"
-                        title="双击全屏预览"
+                        title={t("library.doubleClickFullscreen")}
                       >
                         <span className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-[color-mix(in_srgb,var(--iw-bg)_70%,#000)]">
                           {renderAssetThumbnail(entry)}
@@ -606,7 +608,7 @@ export default function AssetLibraryModal({
                         onClick={() => selectEntry(entry)}
                         onDoubleClick={() => setFullscreenEntry(entry)}
                         className="imagine-asset-card grid min-w-0 grid-cols-[92px_minmax(0,1fr)_auto] items-center gap-3 overflow-hidden rounded-xl border border-[color-mix(in_srgb,var(--iw-border)_82%,transparent)] bg-[color-mix(in_srgb,var(--iw-panel-solid)_72%,transparent)] p-2 text-left shadow-[0_10px_24px_rgba(0,0,0,0.08)] transition hover:border-[color-mix(in_srgb,var(--iw-accent)_42%,var(--iw-border))] data-[active=true]:border-[var(--iw-accent)] data-[active=true]:bg-[color-mix(in_srgb,var(--iw-accent)_8%,var(--iw-panel))] data-[active=true]:shadow-[0_0_0_3px_var(--iw-accent-soft)]"
-                        title="双击全屏预览"
+                        title={t("library.doubleClickFullscreen")}
                       >
                         <span className="relative flex aspect-[4/3] items-center justify-center overflow-hidden rounded-lg bg-[color-mix(in_srgb,var(--iw-bg)_70%,#000)]">
                           {renderAssetThumbnail(entry)}
@@ -651,7 +653,7 @@ export default function AssetLibraryModal({
                       className="absolute bottom-2 right-2 flex h-8 items-center gap-1.5 rounded-lg border border-white/15 bg-black/55 px-2 text-[10px] font-semibold text-white shadow-lg backdrop-blur transition hover:bg-black/70"
                     >
                       <Maximize2 className="h-3.5 w-3.5" />
-                      预览
+                      {t("library.preview")}
                     </button>
                   </div>
                   <div className="border-t border-[var(--iw-border)] p-3">
@@ -661,7 +663,7 @@ export default function AssetLibraryModal({
                         <div className="mt-1 flex flex-wrap items-center gap-1.5 font-mono text-[10px] text-[var(--iw-faint)]">
                           <span>{LIBRARY_ASSET_MEDIA_TYPE_LABELS[activeRecord.mediaType]}</span>
                           <span className="h-1 w-1 rounded-full bg-[var(--iw-border)]" aria-hidden="true" />
-                          <span>{originLabel(activeRecord.origin)}</span>
+                          <span>{originLabel(activeRecord.origin, t)}</span>
                           <span className="h-1 w-1 rounded-full bg-[var(--iw-border)]" aria-hidden="true" />
                           <span>{formatDate(activeRecord.updatedAt)}</span>
                         </div>
@@ -671,7 +673,7 @@ export default function AssetLibraryModal({
                         onClick={() => void toggleFavorite(activeRecord)}
                         disabled={togglingFavorite}
                         className="imagine-secondary-action flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--iw-border)]"
-                        aria-label={activeRecord.favorite ? "取消收藏" : "收藏素材"}
+                        aria-label={activeRecord.favorite ? t("library.cancelFavorite") : t("library.addFavorite")}
                       >
                         <Heart className={`h-3.5 w-3.5 ${activeRecord.favorite ? "fill-current text-rose-300" : ""}`} />
                       </button>
@@ -682,10 +684,10 @@ export default function AssetLibraryModal({
                 <div className="rounded-xl border border-[color-mix(in_srgb,var(--iw-border)_82%,transparent)] bg-[color-mix(in_srgb,var(--iw-panel)_76%,transparent)] p-3">
                   <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-[var(--iw-text)]">
                     <SlidersHorizontal className="h-3.5 w-3.5 text-[var(--iw-accent)]" />
-                    素材信息
+                    {t("library.assetInfo")}
                   </div>
                   <label className={FIELD_LABEL_CLASS_NAME}>
-                    标题
+                    {t("library.fieldTitle")}
                     <input
                       value={draftTitle}
                       onChange={event => setDraftTitle(event.target.value)}
@@ -693,7 +695,7 @@ export default function AssetLibraryModal({
                     />
                   </label>
                   <label className={`${FIELD_LABEL_CLASS_NAME} mt-3`}>
-                    分类
+                    {t("library.fieldCategory")}
                     <select
                       value={draftCategory}
                       onChange={event => setDraftCategory(event.target.value as LibraryAssetCategory)}
@@ -705,16 +707,16 @@ export default function AssetLibraryModal({
                     </select>
                   </label>
                   <label className={`${FIELD_LABEL_CLASS_NAME} mt-3`}>
-                    标签
+                    {t("library.fieldTags")}
                     <input
                       value={draftTags}
                       onChange={event => setDraftTags(event.target.value)}
-                      placeholder="逗号分隔"
+                      placeholder={t("library.fieldTagsPlaceholder")}
                       className={`${FIELD_CONTROL_CLASS_NAME} h-9`}
                     />
                   </label>
                   <label className={`${FIELD_LABEL_CLASS_NAME} mt-3`}>
-                    备注
+                    {t("library.fieldNotes")}
                     <textarea
                       value={draftNotes}
                       onChange={event => setDraftNotes(event.target.value)}
@@ -730,7 +732,7 @@ export default function AssetLibraryModal({
                     disabled={savingDraft || !hasDraftChanges}
                     className="imagine-primary-action h-10 rounded-lg px-3 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    保存信息
+                    {t("library.saveInfo")}
                   </button>
                   {mode === "select" && (
                     <button
@@ -740,7 +742,7 @@ export default function AssetLibraryModal({
                       className="imagine-secondary-action flex h-10 items-center justify-center gap-1.5 rounded-lg border border-[var(--iw-border)] text-[11px] font-semibold"
                     >
                       <Download className="h-3.5 w-3.5" />
-                      使用此素材
+                      {t("library.useThisAsset")}
                     </button>
                   )}
                   <button
@@ -750,13 +752,13 @@ export default function AssetLibraryModal({
                     className="imagine-danger-action flex h-10 items-center justify-center gap-1.5 rounded-lg text-[11px] font-semibold"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
-                    移出素材库
+                    {t("library.removeFromLibrary")}
                   </button>
                 </div>
               </>
             ) : (
               <p className="rounded-xl border border-dashed border-[var(--iw-border)] bg-[color-mix(in_srgb,var(--iw-panel)_64%,transparent)] px-3 py-10 text-center text-xs text-[var(--iw-muted)]">
-                选择一个素材后可编辑标题、分类、标签与备注
+                {t("library.noAssetsHint")}
               </p>
             )}
           </aside>

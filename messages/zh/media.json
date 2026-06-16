@@ -1,0 +1,31 @@
+{
+  "videoFrameCapture": {
+    "first": "首帧",
+    "last": "尾帧",
+    "current": "当前帧",
+    "frameSizeUnavailable": "视频画面尺寸不可用，无法截帧",
+    "browserNotSupport": "当前浏览器不支持视频截帧画布",
+    "durationUnavailable": "视频时长不可用，无法截取尾帧",
+    "metadataLoadFailed": "视频元数据加载失败，无法截帧",
+    "seekFailed": "视频定位失败，无法截帧"
+  },
+  "referenceLabels": { "image": "图片", "video": "视频", "audio": "音频" },
+  "modeLabels": { "asr": "转写", "music": "音乐", "sfx": "音效", "tts": "朗读", "voice_clone": "克隆", "voice_design": "设计音色" },
+  "asrLanguageOptions": { "auto": "自动识别", "zh": "中文", "en": "英文" },
+  "missingReferenceMessage": "当前音频模式需要至少 {min} 个{referenceLabel}",
+  "noSupportingModelError": "没有支持 {mode} 的音频模型",
+  "pricing": { "perRequest": "次", "perImage": "张", "perSecond": "秒" },
+  "customSizeLabel": "自定义尺寸",
+  "workspaceHeader": {
+    "brandSubtitle": "智能图像、视频与音频创作工作台",
+    "boardLink": "画板", "assetLibraryLink": "素材库",
+    "resolveCheckTitle": "通过 Resolve 插件执行连接检查",
+    "resolveRunning": "等待达芬奇", "resolveIdle": "达芬奇",
+    "settingsLink": "设置",
+    "githubLinkAriaLabel": "打开项目 GitHub",
+    "contactEmailTitle": "联系作者: double_tea@foxmail.com",
+    "contactEmailAriaLabel": "给作者发送邮件",
+    "toggleDarkModeTitle": "切换深色模式", "toggleLightModeTitle": "切换浅色模式",
+    "clearAssetsTitle": "清空本地资产", "clearAssetsAriaLabel": "清空本地资产"
+  }
+}

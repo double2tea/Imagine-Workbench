@@ -7,6 +7,7 @@ import {
   mediaReferenceLabel,
   type MediaReferenceType,
 } from "@/lib/media-references";
+import { t as globalT } from "@/lib/i18n";
 
 export interface PromptReferenceThumbnail {
   index: number;
@@ -49,7 +50,7 @@ function renderReferenceChip(thumbnail: PromptReferenceThumbnail): ReactNode {
     <span
       key={`${token}:${reference.id}:${reference.url}:${index}`}
       className="relative inline text-transparent"
-      title={`${token} · ${mediaReferenceLabel(type)} · ${reference.id}`}
+      title={`${token} · ${mediaReferenceLabel(type, globalT)} · ${reference.id}`}
     >
       {token}
       <span className="absolute left-1/2 top-1/2 inline-flex h-8 w-8 -translate-x-1/2 -translate-y-[42%] items-center justify-center overflow-hidden rounded-md border border-white/15 bg-slate-950 align-baseline shadow-sm">

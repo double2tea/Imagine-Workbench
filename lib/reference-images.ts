@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n";
 import { API_ROUTES } from "./api/routes";
 
 export const REFERENCE_IMAGE_MAX_EDGE = 2048;
@@ -111,13 +112,13 @@ export function getReferenceImagePayloadError(referenceUrls: string[]): string |
     const bytes = dataUriByteSize(url);
     if (bytes === null) continue;
     if (bytes > REFERENCE_IMAGE_MAX_BYTES) {
-      return `单张参考图压缩后仍超过 ${formatBytes(REFERENCE_IMAGE_MAX_BYTES)}，请换一张更小的图`;
+      return t("common.notices.referenceImageCompressOverLimit", { size: formatBytes(REFERENCE_IMAGE_MAX_BYTES) });
     }
     totalBytes += bytes;
   }
 
   if (totalBytes > REFERENCE_IMAGES_MAX_TOTAL_BYTES) {
-    return `参考图总大小超过 ${formatBytes(REFERENCE_IMAGES_MAX_TOTAL_BYTES)}，请减少参考图或降低图片尺寸`;
+    return t("common.notices.referenceImagesTotalOverLimit", { size: formatBytes(REFERENCE_IMAGES_MAX_TOTAL_BYTES) });
   }
 
   return null;
@@ -130,13 +131,13 @@ export function getReferenceMediaPayloadError(referenceUrls: string[]): string |
     const bytes = dataUriByteSize(url);
     if (bytes === null) continue;
     if (isImageDataUri(url) && bytes > REFERENCE_IMAGE_MAX_BYTES) {
-      return `单张参考图压缩后仍超过 ${formatBytes(REFERENCE_IMAGE_MAX_BYTES)}，请换一张更小的图`;
+      return t("common.notices.referenceImageCompressOverLimit", { size: formatBytes(REFERENCE_IMAGE_MAX_BYTES) });
     }
     totalBytes += bytes;
   }
 
   if (totalBytes > REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES) {
-    return `参考媒体总大小超过 ${formatBytes(REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES)}，请减少参考媒体或压缩后重试`;
+    return t("common.notices.referenceMediaTotalOverLimit", { size: formatBytes(REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES) });
   }
 
   return null;
@@ -144,7 +145,7 @@ export function getReferenceMediaPayloadError(referenceUrls: string[]): string |
 
 export async function compressReferenceImageFile(file: File): Promise<string> {
   if (!file.type.startsWith("image/")) {
-    throw new Error("参考图必须是图片文件");
+    throw new Error(t("common.notices.referenceMediaMustBeImage"));
   }
 
   return compressReferenceImageBlob(file);
@@ -158,7 +159,7 @@ export async function compressReferenceImageDataUrl(dataUrl: string): Promise<st
 
 export async function prepareReferenceImageUrlForRequest(url: string): Promise<string> {
   if (isImageDataUri(url)) return url;
-  if (url.startsWith("data:")) throw new Error("参考图必须是 data:image/* base64 图片");
+  if (url.startsWith("data:")) throw new Error(t("common.notices.referenceImageMustBeDataUri"));
 
   const response = await fetchReferenceImageUrl(url);
   if (!response.ok) {
@@ -167,7 +168,7 @@ export async function prepareReferenceImageUrlForRequest(url: string): Promise<s
 
   const blob = await response.blob();
   if (!blob.type.startsWith("image/")) {
-    throw new Error("参考图必须是图片文件");
+    throw new Error(t("common.notices.referenceMediaMustBeImage"));
   }
   return compressReferenceImageBlob(blob);
 }
@@ -175,7 +176,7 @@ export async function prepareReferenceImageUrlForRequest(url: string): Promise<s
 export async function prepareReferenceMediaUrlForRequest(url: string): Promise<string> {
   if (isImageDataUri(url)) return url;
   if (isVideoDataUri(url) || isAudioDataUri(url)) return url;
-  if (url.startsWith("data:")) throw new Error("参考媒体必须是图片、视频或音频 Data URL");
+  if (url.startsWith("data:")) throw new Error(t("common.notices.referenceMediaMustBeDataUrl"));
 
   const response = await fetchReferenceMediaUrl(url);
   if (!response.ok) {
@@ -185,7 +186,7 @@ export async function prepareReferenceMediaUrlForRequest(url: string): Promise<s
   const blob = await response.blob();
   if (blob.type.startsWith("image/")) return compressReferenceImageBlob(blob);
   if (blob.type.startsWith("video/") || blob.type.startsWith("audio/")) return readBlobAsDataUrl(blob);
-  throw new Error("参考媒体必须是图片、视频或音频文件");
+  throw new Error(t("common.notices.referenceMediaMustBeFile"));
 }
 
 async function fetchReferenceImageUrl(url: string): Promise<Response> {
@@ -197,13 +198,13 @@ async function fetchReferenceImageUrl(url: string): Promise<Response> {
       body: JSON.stringify({ url }),
     });
   }
-  throw new Error("参考图必须是 data:image/*、blob: 或受支持的图片结果地址");
+  throw new Error(t("common.notices.referenceImageMustBeSupported"));
 }
 
 async function fetchReferenceMediaUrl(url: string): Promise<Response> {
   if (url.startsWith("blob:")) return fetch(url);
   if (url.startsWith("http://") || url.startsWith("https://")) return fetch(url);
-  throw new Error("参考媒体必须是 data:*、blob: 或受支持的媒体结果地址");
+  throw new Error(t("common.notices.referenceMediaMustBeSupported"));
 }
 
 async function readReferenceImageFetchError(response: Response): Promise<string> {
@@ -215,7 +216,7 @@ async function readReferenceImageFetchError(response: Response): Promise<string>
     }
   } catch {
   }
-  return `参考图读取失败：HTTP ${response.status}`;
+  return t("common.notices.referenceImageReadFailed", { status: response.status });
 }
 
 async function compressReferenceImageBlob(blob: Blob): Promise<string> {
@@ -230,14 +231,14 @@ async function compressReferenceImageBlob(blob: Blob): Promise<string> {
       canvas.height = attempt.height;
 
       const context = canvas.getContext("2d");
-      if (!context) throw new Error("浏览器无法创建图片压缩画布");
+      if (!context) throw new Error(t("common.notices.browserCannotCreateCompressCanvas"));
       context.drawImage(bitmap, 0, 0, attempt.width, attempt.height);
 
       const compressedBlob = await canvasToBlob(canvas, attempt.outputType, attempt.quality);
       if (compressedBlob.size <= policy.maxBytes) return readBlobAsDataUrl(compressedBlob);
     }
 
-    throw new Error(`单张参考图压缩后仍超过 ${formatBytes(policy.maxBytes)}，请换一张更小的图`);
+    throw new Error(t("common.notices.referenceImageCompressOverLimit", { size: formatBytes(policy.maxBytes) }));
   } finally {
     bitmap.close();
   }
@@ -247,7 +248,7 @@ function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number):
   return new Promise((resolve, reject) => {
     canvas.toBlob(blob => {
       if (!blob) {
-        reject(new Error("图片压缩失败"));
+        reject(new Error(t("common.notices.referenceImageCompressFailed")));
         return;
       }
       resolve(blob);
@@ -260,12 +261,12 @@ function readBlobAsDataUrl(blob: Blob): Promise<string> {
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result !== "string") {
-        reject(new Error("图片压缩结果读取失败"));
+        reject(new Error(t("common.notices.referenceImageCompressResultReadFailed")));
         return;
       }
       resolve(reader.result);
     };
-    reader.onerror = () => reject(new Error("图片压缩结果读取失败"));
+    reader.onerror = () => reject(new Error(t("common.notices.referenceImageCompressResultReadFailed")));
     reader.readAsDataURL(blob);
   });
 }

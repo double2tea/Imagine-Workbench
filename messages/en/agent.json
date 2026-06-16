@@ -1,0 +1,59 @@
+{
+  "toolLabels": { "query_models": "Query Models", "get_agent_capabilities": "Query Capabilities", "get_skill_info": "Query Skills", "get_gallery_assets": "Search Assets", "get_prompt_blueprint": "Get Template", "get_prompt_templates": "Query Template Library", "get_board_context": "Read Board", "get_connected_context": "Read Connections" },
+  "skillLabels": { "Screenwriter": "Screenplay", "ScriptAnalyzer": "Script Analysis", "ShotBreakdownPlanner": "Shot Breakdown", "StoryboardBoardComposer": "Storyboard Board", "BatchGenerationPlanner": "Batch Planning", "PromptEngineer": "Prompt Engineering", "PromptTemplateLibrarian": "Template Library", "BoardContextRetriever": "Board Context", "BoardComposer": "Board Composer", "ImageGenerator": "Image Generation", "VideoGenerator": "Video Synthesis", "ImageEditor": "Image Editor", "CreativePlanner": "Creative Planning", "SessionHistoryRetriever": "Session History", "VariationSuggester": "Variation Suggestions", "AsyncTaskManager": "Background Tracking", "ProjectSummarizer": "Asset Summary", "ExportManager": "Batch Export" },
+  "actionLabels": { "none": "No Action", "optimize_prompt": "Optimize Prompt", "generate_image": "Generate Image", "edit_image": "Edit Image", "generate_video": "Generate Video", "generate_audio": "Generate Audio", "create_board_image_flow": "Create Image Node Flow", "create_board_video_flow": "Create Video Node Flow", "create_board_audio_flow": "Create Audio Node Flow", "create_board_note": "Create Board Note", "update_board_node": "Update Board Node", "apply_board_patch": "Apply Board Patch", "continue_image_to_video": "Image-to-Video Continue" },
+  "chat": {
+    "userRoleLabel": "You", "thoughtProcessLabel": "Thinking",
+    "suggestedActionEditable": "Suggested Action · Editable Before Execution", "suggestedActionSummary": "Suggested Action · Parameter Summary",
+    "operationLabel": "Action:", "executeButton": "Execute", "declineButton": "Decline",
+    "actionCompleted": "Creative flow triggered and loaded", "actionDeclined": "Proposal declined/rejected",
+    "autoModeCountdown": "Auto mode: executing in {seconds}s", "cancelAutoMode": "Cancel Auto",
+    "loadingText": "Analyzing gallery and skills, preparing next suggestion...",
+    "referenceStatusReferencing": "Referencing", "referenceStatusGallery": "Gallery",
+    "clearChatTitle": "Clear Chat", "expandDockTitle": "Expand Agent Chat", "collapseDockTitle": "Collapse Agent Chat",
+    "modelLabel": "Model", "inputPlaceholder": "Ask Agent... Type @ to reference media",
+    "uploadReferenceTitle": "Upload media to Agent references", "autoExecuteLabel": "Auto",
+    "maskReferenceTitle": "Use brush to erase or mark partial paint", "paintbrushButton": "Brush Paint",
+    "clearReferenceTitle": "Remove Reference", "referenceTypeSuffix": "Reference",
+    "mediaReferenceImage": "Image", "mediaReferenceVideo": "Video", "mediaReferenceAudio": "Audio",
+    "referenceCountUnitImage": "image(s)", "referenceCountUnitMedia": "clip(s)"
+  },
+  "referenceHints": {
+    "unsupportedModel": "Next message contains {countLabel}; similar models in catalog don't support {types} input. Switch models if it fails.",
+    "supportedModel": "Next message contains {countLabel} (catalog shows {types} input support)",
+    "noMatchModel": "Next message contains {countLabel} (not found in OpenRouter catalog, using selected model)"
+  },
+  "pendingActionEditor": {
+    "promptLabel": "Prompt", "promptPlaceholder": "Edit the Agent's planned prompt before execution",
+    "titleLabel": "Title", "noteContentLabel": "Note Content",
+    "targetNodeIdLabel": "Target Node ID", "targetNodePlaceholder": "Leave empty to use the currently selected node",
+    "nodeContentLabel": "Prompt / Agent Instruction / Note Content",
+    "nodeContentPlaceholder": "Edit the content to write to the node before execution",
+    "boardPatchLabel": "Board Patch", "patchTitlePlaceholder": "Patch Title",
+    "autoRunAfterExecution": "Run generation nodes immediately after execution", "patchContentPlaceholder": "Edit text content before execution",
+    "modelLabel": "Generation Model", "selectModelPlaceholder": "Select Model", "modelNotInList": "(not in list)",
+    "providerLabel": "Provider", "functionLabel": "Function", "functionUnavailable": "Function unavailable",
+    "aspectRatioLabel": "Aspect Ratio", "resolutionLabel": "Resolution", "qualityLabel": "Quality",
+    "thinkingLevelLabel": "Thinking Level", "videoSizeLabel": "Video Size", "durationLabel": "Duration",
+    "presetLabel": "Preset", "referenceModeLabel": "Reference Mode",
+    "referenceModeFirstLast": "First/Last Frame / Keyframe", "referenceModeAll": "Universal Reference",
+    "audioFormatLabel": "Audio Format", "voiceDescriptionLabel": "Voice Description", "voiceCloneStyleLabel": "Performance Style",
+    "voiceDescriptionPlaceholder": "Warm, young, natural narration", "voiceCloneStylePlaceholder": "Calm storytelling, casual voiceover",
+    "asrLanguageLabel": "Transcription Language",
+    "voiceCloneConsentLabel": "I confirm I have the right to use the reference audio for voice cloning.",
+    "asrLanguageAuto": "Auto Detect", "asrLanguageZh": "Chinese", "asrLanguageEn": "English",
+    "describePatchCreateNode": "Create {kind}: {title}", "describePatchUpdateNode": "Update node: {nodeId}",
+    "describePatchConnectPorts": "Connect: {from.nodeId}.{from.portId} -> {to.nodeId}.{to.portId}",
+    "beatFallback": "Beat not specified"
+  },
+  "actionSummary": {
+    "titleLabel": "Title", "contentLabel": "Content",
+    "operationCount": "Operations: {count}", "shotCount": "Shots: {count}",
+    "autoRunYes": "Yes", "autoRunNo": "No", "autoRunLabel": "Auto Run",
+    "targetNodeLabel": "Target Node", "currentNodeFallback": "Currently selected node",
+    "modelLabel": "Model", "ratioLabel": "Ratio", "resolutionLabel": "Resolution",
+    "qualityLabel": "Quality", "durationLabel": "Duration", "presetLabel": "Preset",
+    "referenceModeLabel": "Reference Mode", "sourceNodeLabel": "Source Node",
+    "videoPromptLabel": "Video Prompt", "promptLabel": "Prompt", "noParamSummary": "No parameter summary"
+  }
+}

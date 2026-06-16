@@ -2,6 +2,7 @@ import { memo, useEffect, useState } from "react";
 import { Check, Copy, FileText } from "lucide-react";
 import DebouncedBoardTextarea from "@/components/board/DebouncedBoardTextarea";
 import type { BoardNoteNode } from "@/lib/board";
+import { useTranslations } from "@/lib/i18n";
 
 interface NoteBoardNodeProps {
   node: BoardNoteNode;
@@ -9,6 +10,7 @@ interface NoteBoardNodeProps {
 }
 
 const NoteBoardNode = memo(function NoteBoardNode({ node, onChange }: NoteBoardNodeProps) {
+  const { t } = useTranslations("board");
   const [didCopy, setDidCopy] = useState(false);
 
   useEffect(() => {
@@ -26,8 +28,8 @@ const NoteBoardNode = memo(function NoteBoardNode({ node, onChange }: NoteBoardN
     <button
       type="button"
       className="nodrag nopan flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)] transition hover:border-cyan-400/45 hover:text-[var(--iw-text)]"
-      title="复制文本"
-      aria-label="复制文本"
+      title={t('note.copyText')}
+      aria-label={t('note.copyText')}
       onClick={(event) => {
         event.stopPropagation();
         void copyBody();
@@ -45,7 +47,7 @@ const NoteBoardNode = memo(function NoteBoardNode({ node, onChange }: NoteBoardN
           <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2 text-xs font-semibold text-[var(--iw-text)]">
               <FileText className="imagine-tone-icon h-3.5 w-3.5 shrink-0" data-tone="info" />
-              <span className="truncate">转写结果</span>
+              <span className="truncate">{t('note.transcriptResult')}</span>
             </div>
             {copyButton}
           </div>
@@ -61,7 +63,7 @@ const NoteBoardNode = memo(function NoteBoardNode({ node, onChange }: NoteBoardN
           value={node.body}
           onChange={onChange}
           className="nodrag nowheel nopan min-h-0 flex-1 resize-none overflow-y-auto overscroll-contain bg-transparent p-3 text-sm leading-6 text-[var(--iw-text)] outline-none placeholder:text-[var(--iw-faint)]"
-          placeholder="转写文本"
+          placeholder={t('note.transcriptPlaceholder')}
         />
       </div>
     );
@@ -75,7 +77,7 @@ const NoteBoardNode = memo(function NoteBoardNode({ node, onChange }: NoteBoardN
         value={node.body}
         onChange={onChange}
         className="nodrag nowheel nopan h-full w-full resize-none overflow-y-auto overscroll-contain bg-transparent p-3 pr-11 text-sm leading-6 text-[var(--iw-text)] outline-none placeholder:text-[var(--iw-faint)]"
-        placeholder="笔记"
+        placeholder={t('note.placeholder')}
       />
     </div>
   );

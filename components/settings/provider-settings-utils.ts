@@ -18,5 +18,5 @@ export function providerEndpointInfo(provider: AiProvider): string[] | undefined
 }
 
 export function providerClearLabel(provider: AiProvider): string {
-  return getProviderMeta(provider).hasEditableBaseUrl ? "清除 Key/Base URL" : "清除 Key";
+  return getProviderMeta(provider).hasEditableBaseUrl ? "Clear Key/Base URL" : "Clear Key";
 }

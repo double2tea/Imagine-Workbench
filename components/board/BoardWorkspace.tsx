@@ -109,6 +109,7 @@ import {
 } from "@/lib/board/ports";
 import { BOARD_INSERT_CATALOG, type BoardInsertKind } from "@/lib/board/insert-catalog";
 import { findResultNodeForSource } from "@/lib/board/utils";
+import { useTranslations } from "@/lib/i18n";
 import { findAvailableBoardNodePosition } from "@/lib/board/placement";
 import type { GenerationTask } from "@/lib/generation-tasks";
 import { DEFAULT_AUDIO_MODEL, DEFAULT_VIDEO_MODEL } from "@/lib/providers/model-catalog";
@@ -558,14 +559,14 @@ const BoardEdgeComponent = memo(function BoardEdgeComponent({
           ) : null}
           {processing ? (
             <span className="board-edge-processing-pill rounded-full border px-2 py-0.5 text-[9px] font-semibold">
-              生成中
+              Processing
             </span>
           ) : null}
           {selected ? (
             <button
               type="button"
-              aria-label="删除连接"
-              title="删除连接"
+              aria-label="Delete connection"
+              title="Delete connection"
               onClick={() => void deleteElements({ edges: [{ id }] })}
               className="flex h-6 w-6 items-center justify-center rounded-full border border-[var(--iw-border)] bg-[var(--iw-panel)] text-[var(--iw-muted)] shadow-lg transition hover:border-red-400/40 hover:bg-red-500 hover:text-white"
             >
@@ -603,7 +604,7 @@ function useCoarsePointer(): boolean {
 
 const BOARD_QUICK_INSERT_IMPORT_ITEM: BoardQuickInsertMenuItem = {
   kind: BOARD_QUICK_INSERT_IMPORT_KIND,
-  label: "导入媒体",
+  label: "Import media",
   icon: Upload,
   tone: "success",
 };
@@ -731,11 +732,11 @@ async function imageUrlToFile(url: string, index: number): Promise<File> {
 
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`图片拖入失败 (HTTP ${response.status})`);
+    throw new Error(`Image drag failed (HTTP ${response.status})`);
   }
   const blob = await response.blob();
   if (!blob.type.startsWith("image/")) {
-    throw new Error("拖入地址不是图片");
+    throw new Error("Dropped URL is not an image");
   }
   return new File([blob], `board-drag-image-${index}.${extensionFromImageType(blob.type)}`, { type: blob.type });
 }
@@ -878,12 +879,12 @@ function isResultSourceNode(node: BoardNodeModel | undefined): node is Extract<B
 
 async function copyImageUrlToClipboard(url: string): Promise<void> {
   if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) {
-    throw new Error("当前浏览器不支持复制图片到剪贴板");
+    throw new Error("Browser does not support copying image to clipboard");
   }
   const response = await fetch(url);
-  if (!response.ok) throw new Error(`图片读取失败：HTTP ${response.status}`);
+  if (!response.ok) throw new Error(`Image read failed: HTTP ${response.status}`);
   const blob = await response.blob();
-  if (!blob.type.startsWith("image/")) throw new Error("当前资产不是可复制的图片");
+  if (!blob.type.startsWith("image/")) throw new Error("Current asset is not a copyable image");
   await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
 }
 
@@ -1109,6 +1110,7 @@ export default function BoardWorkspace({
   selectedDownloadableCount = 0,
 }: BoardWorkspaceProps) {
   const themeMode = useThemeModeSnapshot();
+  const { t: tb } = useTranslations("board");
   const isCoarsePointer = useCoarsePointer();
   const flowInstanceRef = useRef<ReactFlowInstance<BoardFlowNode, BoardFlowEdge> | null>(null);
   const flowHostRef = useRef<HTMLElement | null>(null);
@@ -1516,7 +1518,7 @@ export default function BoardWorkspace({
       restoreNodeWithEdges(entry.node, entry.edges);
       setTrashedNodes(current => current.filter((_item, itemIndex) => itemIndex !== index));
     } catch (error) {
-      onConnectionError(error instanceof Error ? error.message : "恢复节点失败");
+      onConnectionError(error instanceof Error ? error.message : "Restore node failed");
     }
   }, [onConnectionError, restoreNodeWithEdges, trashedNodes]);
 
@@ -1692,7 +1694,7 @@ export default function BoardWorkspace({
     onSelectAssetStackResult: (nodeId: string, assetId: string) => {
       const item = galleryItemById.get(assetId);
       if (!item || item.status !== "complete") {
-        onConnectionError("找不到生成结果资产");
+        onConnectionError("Result asset not found");
         return;
       }
       updateResultNodeAsset(nodeId, assetId);
@@ -1937,7 +1939,7 @@ export default function BoardWorkspace({
       try {
         const references = rawRefs ? multiGridImageReferences(board.nodes, rawRefs.from, [rawRefs.from.nodeId]) : [];
         if (references.length === 0) {
-          onConnectionError("多宫格只支持图片资产");
+          onConnectionError("Multi-grid only supports image assets");
           return;
         }
         references.forEach(reference => addAssetToMultiGrid(rawTargetNode.id, reference));
@@ -1945,26 +1947,26 @@ export default function BoardWorkspace({
         selectEdge(null);
         updateSelectedNodeIds([rawTargetNode.id]);
       } catch (error) {
-        onConnectionError(error instanceof Error ? error.message : "连接失败");
+        onConnectionError(error instanceof Error ? error.message : "Connection failed");
       }
       return;
     }
 
     const refs = readValidConnectionRefs(connection);
     if (!refs) {
-      onConnectionError("端口类型不兼容：媒体可连 Prompt、参考/Agent，Prompt 可连生成，生成结果可连资产。");
+      onConnectionError("Port type incompatible");
       return;
     }
     try {
       const targetNode = board.nodes.find(node => node.id === refs.to.nodeId);
       if (refs.from.portKind === "result" && targetNode?.kind === "asset") {
-        onConnectionError("请将生成结果拖到空白处创建结果资产节点");
+        onConnectionError("Drag result to blank area to create asset node");
         return;
       }
       if (targetNode?.kind === "multi-grid") {
         const references = multiGridImageReferences(board.nodes, refs.from, [refs.from.nodeId]);
         if (references.length === 0) {
-          onConnectionError("多宫格只支持图片资产");
+          onConnectionError("Multi-grid only supports image assets");
           return;
         }
         references.forEach(reference => addAssetToMultiGrid(targetNode.id, reference));
@@ -1992,7 +1994,7 @@ export default function BoardWorkspace({
       }
       connectPorts(refs.from, refs.to);
     } catch (error) {
-      onConnectionError(error instanceof Error ? error.message : "连接失败");
+      onConnectionError(error instanceof Error ? error.message : "Connection failed");
     }
   }, [addAssetToMultiGrid, addAssetToReferenceGroup, board.nodes, connectPorts, connectPortsBatch, onConnectionError, readValidConnectionRefs, selectEdge, selectedNodeIds, selectNode, updateSelectedNodeIds]);
 
@@ -2046,7 +2048,7 @@ export default function BoardWorkspace({
       try {
         const references = rawRefs ? multiGridImageReferences(board.nodes, rawRefs.from, [rawRefs.from.nodeId]) : [];
         if (references.length === 0) {
-          onConnectionError("多宫格只支持图片资产");
+          onConnectionError("Multi-grid only supports image assets");
           return;
         }
         references.forEach(reference => addAssetToMultiGrid(rawTargetNode.id, reference));
@@ -2054,14 +2056,14 @@ export default function BoardWorkspace({
         selectNode(rawTargetNode.id);
         selectEdge(null);
       } catch (error) {
-        onConnectionError(error instanceof Error ? error.message : "重连失败");
+        onConnectionError(error instanceof Error ? error.message : "Reconnection failed");
       }
       return;
     }
 
     const refs = readValidConnectionRefs(newConnection);
     if (!refs) {
-      onConnectionError("端口类型不兼容：媒体可连 Prompt、参考/Agent，Prompt 可连生成，生成结果可连资产。");
+      onConnectionError("Port type incompatible");
       return;
     }
     try {
@@ -2069,7 +2071,7 @@ export default function BoardWorkspace({
       if (targetNode?.kind === "multi-grid") {
         const references = multiGridImageReferences(board.nodes, refs.from, [refs.from.nodeId]);
         if (references.length === 0) {
-          onConnectionError("多宫格只支持图片资产");
+          onConnectionError("Multi-grid only supports image assets");
           return;
         }
         references.forEach(reference => addAssetToMultiGrid(targetNode.id, reference));
@@ -2083,7 +2085,7 @@ export default function BoardWorkspace({
       }
       reconnectEdge(oldEdge.id, refs.from, refs.to);
     } catch (error) {
-      onConnectionError(error instanceof Error ? error.message : "重连失败");
+      onConnectionError(error instanceof Error ? error.message : "Reconnection failed");
     }
   }, [addAssetToMultiGrid, addAssetToReferenceGroup, board.nodes, deleteEdge, onConnectionError, readValidConnectionRefs, reconnectEdge, selectEdge, selectNode]);
 
@@ -2285,7 +2287,7 @@ export default function BoardWorkspace({
         );
         setQuickInsertMenu(null);
       } catch (error) {
-        onConnectionError(error instanceof Error ? error.message : "连接失败");
+        onConnectionError(error instanceof Error ? error.message : "Connection failed");
       }
       return;
     }
@@ -2300,7 +2302,7 @@ export default function BoardWorkspace({
         );
         setQuickInsertMenu(null);
       } catch (error) {
-        onConnectionError(error instanceof Error ? error.message : "连接失败");
+        onConnectionError(error instanceof Error ? error.message : "Connection failed");
       }
       return;
     }
@@ -2315,7 +2317,7 @@ export default function BoardWorkspace({
         );
         setQuickInsertMenu(null);
       } catch (error) {
-        onConnectionError(error instanceof Error ? error.message : "连接失败");
+        onConnectionError(error instanceof Error ? error.message : "Connection failed");
       }
       return;
     }
@@ -2382,7 +2384,7 @@ export default function BoardWorkspace({
         return [node.asset];
       });
       if (references.length === 0) {
-        onConnectionError("所选节点没有可加入多宫格的图片");
+        onConnectionError("Multi-grid only accepts images");
         return;
       }
       references.forEach(reference => addAssetToMultiGrid(targetNode.id, reference));
@@ -2398,7 +2400,7 @@ export default function BoardWorkspace({
       .map(sourceNode => batchConnectionToTarget(board.nodes, sourceNode, targetNode))
       .filter((connection): connection is { from: BoardPortRef; to: BoardPortRef } => connection !== null);
     if (connections.length === 0) {
-      onConnectionError("所选节点没有可连接到此节点的端口");
+      onConnectionError("Selected node has no connectable ports");
       return;
     }
     connectPortsBatch(connections);
@@ -2654,7 +2656,7 @@ export default function BoardWorkspace({
         const from: BoardPortRef = { nodeId: sourceNodeId, portId: sourceHandleId, portKind: sourceKind };
         const references = multiGridImageReferences(board.nodes, from, [sourceNodeId]);
         if (references.length === 0) {
-          onConnectionError("多宫格只支持图片资产");
+          onConnectionError("Multi-grid only supports image assets");
           return;
         }
         const dropTarget = multiGridCellDropTargetFromClient(board.nodes, clientPoint.x, clientPoint.y);
@@ -2670,7 +2672,7 @@ export default function BoardWorkspace({
       }
       const connections = batchConnectionsFromSourceToTarget(board.nodes, sourceNodeId, targetNode, selectedNodeIds);
       if (connections.length === 0) {
-        onConnectionError("所选节点没有可连接到此节点的端口");
+        onConnectionError("Selected node has no connectable ports");
         return;
       }
       connectPortsBatch(connections);
@@ -3019,7 +3021,7 @@ export default function BoardWorkspace({
         accept={BOARD_MEDIA_FILE_ACCEPT}
         multiple
         name="board-media-import"
-        aria-label="导入画板媒体文件"
+        aria-label={tb("workspace.importBoardMediaFileLabel")}
         className="hidden"
         onChange={handleMediaImportInputChange}
       />
@@ -3131,8 +3133,8 @@ export default function BoardWorkspace({
                 className="imagine-board-view-toggle"
                 data-state={board.config.showGrid ? "on" : "off"}
                 aria-pressed={board.config.showGrid}
-                aria-label={board.config.showGrid ? "隐藏网格" : "显示网格"}
-                title={board.config.showGrid ? "隐藏网格" : "显示网格"}
+                aria-label={board.config.showGrid ? tb("workspace.gridToggleHide") : tb("workspace.gridToggleShow")}
+                title={board.config.showGrid ? tb("workspace.gridToggleHide") : tb("workspace.gridToggleShow")}
               >
                 <Grid2X2 className="h-3.5 w-3.5" />
               </button>
@@ -3142,8 +3144,8 @@ export default function BoardWorkspace({
                 className="imagine-board-view-toggle"
                 data-state={board.config.snapToGrid ? "on" : "off"}
                 aria-pressed={board.config.snapToGrid}
-                aria-label={board.config.snapToGrid ? "关闭磁吸" : "开启磁吸"}
-                title={board.config.snapToGrid ? "关闭磁吸" : "开启磁吸"}
+                aria-label={board.config.snapToGrid ? tb("workspace.snapToggleOff") : tb("workspace.snapToggleOn")}
+                title={board.config.snapToGrid ? tb("workspace.snapToggleOff") : tb("workspace.snapToggleOn")}
               >
                 <Magnet className="h-3.5 w-3.5" />
               </button>
@@ -3153,8 +3155,8 @@ export default function BoardWorkspace({
                 className="imagine-board-view-toggle"
                 data-state={board.config.showMiniMap ? "on" : "off"}
                 aria-pressed={board.config.showMiniMap}
-                aria-label={board.config.showMiniMap ? "隐藏小地图" : "显示小地图"}
-                title={board.config.showMiniMap ? "隐藏小地图" : "显示小地图"}
+                aria-label={board.config.showMiniMap ? tb("workspace.miniMapToggleHide") : tb("workspace.miniMapToggleShow")}
+                title={board.config.showMiniMap ? tb("workspace.miniMapToggleHide") : tb("workspace.miniMapToggleShow")}
               >
                 <MapIcon className="h-3.5 w-3.5" />
               </button>
@@ -3180,14 +3182,14 @@ export default function BoardWorkspace({
               >
                 <div className={`pointer-events-auto flex h-10 ${selectionToolbarWidthClass} shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-slate-950/88 px-2.5 text-[11px] font-semibold text-slate-100 shadow-[0_10px_24px_rgba(2,6,23,0.28)] backdrop-blur-md ring-1 ring-white/5`}>
                   <span className="min-w-0 flex-1 truncate px-1 text-slate-300">
-                    已选 {selectedNodeIds.length} 个{selectedDownloadableCount > 0 ? ` · 可下载 ${selectedDownloadableCount} 个` : ""}
+                    已选 {selectedNodeIds.length} 个{selectedDownloadableCount > 0 ? ` · Downloadable ${selectedDownloadableCount}` : ""}
                   </span>
                   {selectedGroupNodeIds.length === 0 ? (
                     <button
                       type="button"
                       onClick={createGroupFromSelectionToolbar}
                       className="flex h-7 w-[66px] shrink-0 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/10 text-[11px] font-semibold text-slate-100 transition hover:border-emerald-300/40 hover:bg-emerald-500/20 hover:text-white"
-                      title="将所选节点打组"
+                      title={tb("workspace.groupTooltip")}
                     >
                       <Layers className="h-3.5 w-3.5" />
                       打组
@@ -3197,7 +3199,7 @@ export default function BoardWorkspace({
                       type="button"
                       onClick={ungroupSelectedGroups}
                       className="flex h-7 w-[82px] shrink-0 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/10 text-[11px] font-semibold text-slate-100 transition hover:border-amber-300/40 hover:bg-amber-500/20 hover:text-white"
-                      title="取消所选分组"
+                      title={tb("workspace.ungroupTooltip")}
                     >
                       <Ungroup className="h-3.5 w-3.5" />
                       取消分组
@@ -3208,7 +3210,7 @@ export default function BoardWorkspace({
                       type="button"
                       onClick={onDownloadSelectedAssets}
                       className="flex h-7 w-[86px] shrink-0 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/10 text-[11px] font-semibold text-slate-100 transition hover:border-blue-300/40 hover:bg-blue-500/20 hover:text-white"
-                      title="下载所选媒体为 ZIP"
+                      title={tb("workspace.downloadZipTooltip")}
                     >
                       <Download className="h-3.5 w-3.5" />
                       批量下载
@@ -3266,6 +3268,7 @@ export default function BoardWorkspace({
             }).length;
             const actions = buildBoardNodeContextMenuActions({
               node,
+              t: tb,
               onConnectSelected: selectedBatchConnectionCount > 0
                 ? () => connectSelectedNodesToTarget(node.id)
                 : undefined,

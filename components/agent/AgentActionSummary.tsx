@@ -1,4 +1,5 @@
 import type { AgentToolAction } from "@/lib/agent-actions";
+import { useTranslations } from "@/lib/i18n";
 
 function truncateText(value: string, maxLength: number): string {
   const trimmed = value.trim();
@@ -12,51 +13,52 @@ function pushLine(lines: string[], label: string, value: string | undefined): vo
 }
 
 export function AgentActionSummary({ action }: { action: AgentToolAction }) {
+  const { t } = useTranslations("agent");
   const params = action.params ?? {};
   const lines: string[] = [];
 
   if (action.type === "create_board_note") {
-    pushLine(lines, "标题", params.title);
-    pushLine(lines, "内容", params.body ?? params.prompt);
+    pushLine(lines, t("actionSummary.titleLabel"), params.title);
+    pushLine(lines, t("actionSummary.contentLabel"), params.body ?? params.prompt);
   } else if (action.type === "apply_board_patch") {
     const patch = params.boardPatch;
-    pushLine(lines, "标题", patch?.title);
-    lines.push(`操作数: ${patch?.operations.length ?? 0}`);
-    if (patch?.shots?.length) lines.push(`分镜数: ${patch.shots.length}`);
-    lines.push(`自动运行: ${patch?.run ? "是" : "否"}`);
+    pushLine(lines, t("actionSummary.titleLabel"), patch?.title);
+    lines.push(t("actionSummary.operationCount", { count: patch?.operations.length ?? 0 }));
+    if (patch?.shots?.length) lines.push(t("actionSummary.shotCount", { count: patch.shots.length }));
+    lines.push(`${t("actionSummary.autoRunLabel")}: ${patch?.run ? t("actionSummary.autoRunYes") : t("actionSummary.autoRunNo")}`);
   } else if (action.type === "update_board_node") {
-    pushLine(lines, "目标节点", params.nodeId || "当前选中节点");
-    pushLine(lines, "内容", params.prompt ?? params.instruction ?? params.body);
-    pushLine(lines, "模型", params.model);
-    pushLine(lines, "比例", params.aspectRatio);
-    pushLine(lines, "分辨率", params.imageResolution ?? params.videoResolution);
-    pushLine(lines, "质量", params.imageQuality);
-    pushLine(lines, "时长", params.videoDuration);
-    pushLine(lines, "预设", params.videoPreset);
-    pushLine(lines, "参考模式", params.videoReferenceMode);
+    pushLine(lines, t("actionSummary.targetNodeLabel"), params.nodeId || t("actionSummary.currentNodeFallback"));
+    pushLine(lines, t("actionSummary.contentLabel"), params.prompt ?? params.instruction ?? params.body);
+    pushLine(lines, t("actionSummary.modelLabel"), params.model);
+    pushLine(lines, t("actionSummary.ratioLabel"), params.aspectRatio);
+    pushLine(lines, t("actionSummary.resolutionLabel"), params.imageResolution ?? params.videoResolution);
+    pushLine(lines, t("actionSummary.qualityLabel"), params.imageQuality);
+    pushLine(lines, t("actionSummary.durationLabel"), params.videoDuration);
+    pushLine(lines, t("actionSummary.presetLabel"), params.videoPreset);
+    pushLine(lines, t("actionSummary.referenceModeLabel"), params.videoReferenceMode);
   } else if (action.type === "continue_image_to_video") {
-    pushLine(lines, "来源节点", params.nodeId || "当前选中节点");
-    pushLine(lines, "视频提示词", params.prompt);
-    pushLine(lines, "模型", params.model);
-    pushLine(lines, "比例", params.aspectRatio);
-    pushLine(lines, "分辨率", params.videoResolution);
-    pushLine(lines, "时长", params.videoDuration);
-    pushLine(lines, "预设", params.videoPreset);
-    pushLine(lines, "参考模式", params.videoReferenceMode);
-    lines.push(`自动运行: ${params.run ? "是" : "否"}`);
+    pushLine(lines, t("actionSummary.sourceNodeLabel"), params.nodeId || t("actionSummary.currentNodeFallback"));
+    pushLine(lines, t("actionSummary.videoPromptLabel"), params.prompt);
+    pushLine(lines, t("actionSummary.modelLabel"), params.model);
+    pushLine(lines, t("actionSummary.ratioLabel"), params.aspectRatio);
+    pushLine(lines, t("actionSummary.resolutionLabel"), params.videoResolution);
+    pushLine(lines, t("actionSummary.durationLabel"), params.videoDuration);
+    pushLine(lines, t("actionSummary.presetLabel"), params.videoPreset);
+    pushLine(lines, t("actionSummary.referenceModeLabel"), params.videoReferenceMode);
+    lines.push(`${t("actionSummary.autoRunLabel")}: ${params.run ? t("actionSummary.autoRunYes") : t("actionSummary.autoRunNo")}`);
   } else {
-    if (params.prompt) lines.push(`提示词: ${truncateText(params.prompt, 96)}`);
-    pushLine(lines, "模型", params.model);
-    pushLine(lines, "比例", params.aspectRatio);
-    pushLine(lines, "分辨率", params.imageResolution ?? params.videoResolution);
-    pushLine(lines, "质量", params.imageQuality);
-    pushLine(lines, "时长", params.videoDuration);
-    pushLine(lines, "预设", params.videoPreset);
-    pushLine(lines, "参考模式", params.videoReferenceMode);
+    if (params.prompt) lines.push(`${t("actionSummary.promptLabel")}: ${truncateText(params.prompt, 96)}`);
+    pushLine(lines, t("actionSummary.modelLabel"), params.model);
+    pushLine(lines, t("actionSummary.ratioLabel"), params.aspectRatio);
+    pushLine(lines, t("actionSummary.resolutionLabel"), params.imageResolution ?? params.videoResolution);
+    pushLine(lines, t("actionSummary.qualityLabel"), params.imageQuality);
+    pushLine(lines, t("actionSummary.durationLabel"), params.videoDuration);
+    pushLine(lines, t("actionSummary.presetLabel"), params.videoPreset);
+    pushLine(lines, t("actionSummary.referenceModeLabel"), params.videoReferenceMode);
   }
 
   if (lines.length === 0) {
-    return <p className="imagine-agent-action-muted text-[11px]">无参数摘要</p>;
+    return <p className="imagine-agent-action-muted text-[11px]">{t("actionSummary.noParamSummary")}</p>;
   }
 
   return (

@@ -1,17 +1,22 @@
 import { AlertTriangle, CheckCircle2, Clock3, Loader2, XCircle } from "lucide-react";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import type { GenerationTaskStatus } from "@/lib/generation-tasks";
+import { t } from "@/lib/i18n";
 
 type BoardStatusTone = "complete" | "failed" | "canceled" | "pending" | "processing" | "neutral";
 
 const iconClassName = "h-3.5 w-3.5";
 
+const STATUS_LABELS: Record<GenerationTaskStatus, string> = {
+  complete: "Complete",
+  processing: "Processing",
+  pending: "Queued",
+  failed: "Failed",
+  canceled: "Canceled",
+};
+
 export function boardStatusLabel(status: GenerationTaskStatus): string {
-  if (status === "processing") return "处理中";
-  if (status === "pending") return "排队";
-  if (status === "failed") return "失败";
-  if (status === "canceled") return "已取消";
-  return "完成";
+  return STATUS_LABELS[status] ?? STATUS_LABELS.complete;
 }
 
 function statusTone(status: GenerationTaskStatus): BoardStatusTone {

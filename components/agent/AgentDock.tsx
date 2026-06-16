@@ -1,5 +1,5 @@
 import type { ChangeEvent, CSSProperties, FormEvent, PointerEvent as ReactPointerEvent, MutableRefObject, ReactNode, Ref } from "react";
-import { forwardRef, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronRight, FileAudio, ImagePlus, Paintbrush, RefreshCw, Send, X } from "lucide-react";
 import { motion } from "motion/react";
 import PreviewImage from "@/components/PreviewImage";
@@ -18,6 +18,7 @@ import type { AiProvider, ModelOption } from "@/lib/providers/model-catalog";
 import { getMediaReferenceType, mediaReferenceLabel, type MediaReferenceType } from "@/lib/media-references";
 import { applyThemeClassesToDom, resolveThemeMode } from "@/lib/theme-mode";
 import { gsap, prefersReducedWorkbenchMotion, useGSAP, WORKBENCH_GSAP_EASE } from "@/lib/workbench-gsap";
+import { useTranslations } from "@/lib/i18n";
 
 export interface ChatMessage {
   id: string;
@@ -142,39 +143,61 @@ function getInitialAgentOrbPosition(): AgentOrbPosition | null {
   return storedPosition ? clampAgentOrbPosition(storedPosition) : getDefaultAgentOrbPosition();
 }
 
-const TOOL_LABELS: Record<string, string> = {
-  query_models: "查询模型",
-  get_agent_capabilities: "查询能力",
-  get_skill_info: "查询技能",
-  get_gallery_assets: "搜索资产",
-  get_prompt_blueprint: "获取模板",
-  get_prompt_templates: "查询模板库",
-  get_board_context: "读取画板",
-  get_connected_context: "读取连接",
-};
+function makeToolLabels(t: (key: string) => string): Record<string, string> {
+  return {
+    query_models: t("toolLabels.query_models"),
+    get_agent_capabilities: t("toolLabels.get_agent_capabilities"),
+    get_skill_info: t("toolLabels.get_skill_info"),
+    get_gallery_assets: t("toolLabels.get_gallery_assets"),
+    get_prompt_blueprint: t("toolLabels.get_prompt_blueprint"),
+    get_prompt_templates: t("toolLabels.get_prompt_templates"),
+    get_board_context: t("toolLabels.get_board_context"),
+    get_connected_context: t("toolLabels.get_connected_context"),
+  };
+}
 
 type AgentSkillTone = "accent" | "cyan" | "danger" | "fuchsia" | "lime" | "orange" | "success" | "teal" | "violet" | "warning";
 
-const SKILL_LABELS: Record<string, { label: string; tone: AgentSkillTone }> = {
-  Screenwriter: { label: "剧本写作", tone: "orange" },
-  ScriptAnalyzer: { label: "剧本分析", tone: "cyan" },
-  ShotBreakdownPlanner: { label: "分镜拆解", tone: "violet" },
-  StoryboardBoardComposer: { label: "分镜画板", tone: "fuchsia" },
-  BatchGenerationPlanner: { label: "批量规划", tone: "success" },
-  PromptEngineer: { label: "提示词工程", tone: "teal" },
-  PromptTemplateLibrarian: { label: "模板库", tone: "lime" },
-  BoardContextRetriever: { label: "画板上下文", tone: "accent" },
-  BoardComposer: { label: "画板编排", tone: "fuchsia" },
-  ImageGenerator: { label: "智能生图", tone: "danger" },
-  VideoGenerator: { label: "视频合成", tone: "violet" },
-  ImageEditor: { label: "局部重绘", tone: "warning" },
-  CreativePlanner: { label: "创意规划", tone: "violet" },
-  SessionHistoryRetriever: { label: "历史回退", tone: "accent" },
-  VariationSuggester: { label: "变体推荐", tone: "success" },
-  AsyncTaskManager: { label: "后台跟踪", tone: "cyan" },
-  ProjectSummarizer: { label: "资产汇总", tone: "violet" },
-  ExportManager: { label: "批量导出", tone: "danger" },
-};
+function makeSkillLabels(t: (key: string) => string): Record<string, { label: string; tone: AgentSkillTone }> {
+  return {
+    Screenwriter: { label: t("skillLabels.Screenwriter"), tone: "orange" },
+    ScriptAnalyzer: { label: t("skillLabels.ScriptAnalyzer"), tone: "cyan" },
+    ShotBreakdownPlanner: { label: t("skillLabels.ShotBreakdownPlanner"), tone: "violet" },
+    StoryboardBoardComposer: { label: t("skillLabels.StoryboardBoardComposer"), tone: "fuchsia" },
+    BatchGenerationPlanner: { label: t("skillLabels.BatchGenerationPlanner"), tone: "success" },
+    PromptEngineer: { label: t("skillLabels.PromptEngineer"), tone: "teal" },
+    PromptTemplateLibrarian: { label: t("skillLabels.PromptTemplateLibrarian"), tone: "lime" },
+    BoardContextRetriever: { label: t("skillLabels.BoardContextRetriever"), tone: "accent" },
+    BoardComposer: { label: t("skillLabels.BoardComposer"), tone: "fuchsia" },
+    ImageGenerator: { label: t("skillLabels.ImageGenerator"), tone: "danger" },
+    VideoGenerator: { label: t("skillLabels.VideoGenerator"), tone: "violet" },
+    ImageEditor: { label: t("skillLabels.ImageEditor"), tone: "warning" },
+    CreativePlanner: { label: t("skillLabels.CreativePlanner"), tone: "violet" },
+    SessionHistoryRetriever: { label: t("skillLabels.SessionHistoryRetriever"), tone: "accent" },
+    VariationSuggester: { label: t("skillLabels.VariationSuggester"), tone: "success" },
+    AsyncTaskManager: { label: t("skillLabels.AsyncTaskManager"), tone: "cyan" },
+    ProjectSummarizer: { label: t("skillLabels.ProjectSummarizer"), tone: "violet" },
+    ExportManager: { label: t("skillLabels.ExportManager"), tone: "danger" },
+  };
+}
+
+function makeActionLabels(t: (key: string) => string): Record<AgentToolAction["type"], string> {
+  return {
+    none: t("actionLabels.none"),
+    optimize_prompt: t("actionLabels.optimize_prompt"),
+    generate_image: t("actionLabels.generate_image"),
+    edit_image: t("actionLabels.edit_image"),
+    generate_video: t("actionLabels.generate_video"),
+    generate_audio: t("actionLabels.generate_audio"),
+    create_board_image_flow: t("actionLabels.create_board_image_flow"),
+    create_board_video_flow: t("actionLabels.create_board_video_flow"),
+    create_board_audio_flow: t("actionLabels.create_board_audio_flow"),
+    create_board_note: t("actionLabels.create_board_note"),
+    update_board_node: t("actionLabels.update_board_node"),
+    apply_board_patch: t("actionLabels.apply_board_patch"),
+    continue_image_to_video: t("actionLabels.continue_image_to_video"),
+  };
+}
 
 const AGENT_ORB_POSITION_STORAGE_KEY = "imagine_agent_orb_position";
 const AGENT_ORB_SIZE = 108;
@@ -192,19 +215,19 @@ function assignRef<T>(ref: Ref<T> | undefined, value: T | null): void {
 }
 
 const ACTION_LABELS: Record<AgentToolAction["type"], string> = {
-  none: "无操作",
-  optimize_prompt: "优化提示词",
-  generate_image: "生成图片",
-  edit_image: "编辑图片",
-  generate_video: "生成视频",
-  generate_audio: "生成音频",
-  create_board_image_flow: "创建图片节点流程",
-  create_board_video_flow: "创建视频节点流程",
-  create_board_audio_flow: "创建音频节点流程",
-  create_board_note: "创建画板笔记",
-  update_board_node: "更新画板节点",
-  apply_board_patch: "应用画板补丁",
-  continue_image_to_video: "从图片续接视频",
+  none: "",
+  optimize_prompt: "",
+  generate_image: "",
+  edit_image: "",
+  generate_video: "",
+  generate_audio: "",
+  create_board_image_flow: "",
+  create_board_video_flow: "",
+  create_board_audio_flow: "",
+  create_board_note: "",
+  update_board_node: "",
+  apply_board_patch: "",
+  continue_image_to_video: "",
 };
 
 export function getExecutableAction(message: ChatMessage): AgentToolAction | null {
@@ -320,22 +343,25 @@ function AgentMessage({
   onUpdateActionDraft: (messageId: string, action: AgentToolAction) => void;
   onSuggestedPrompt: (prompt: string) => void;
 }) {
+  const { t } = useTranslations("agent");
   const executableAction = getExecutableAction(message);
   const pendingAction = getPendingAgentAction(message);
   const canEditAction = message.interactiveState === "idle";
-
+  const toolLabels = useMemo(() => makeToolLabels(t), [t]);
+  const skillLabels = useMemo(() => makeSkillLabels(t), [t]);
+  const actionLabels = useMemo(() => makeActionLabels(t), [t]);
   return (
     <div className={`flex flex-col gap-1.5 ${message.role === "user" ? "self-end ml-10" : "self-start mr-10"}`}>
       <span className={`imagine-agent-role-label ${
         message.role === "user" ? "text-right text-[var(--iw-faint)]" : "imagine-tone-icon text-left"
       }`} data-tone={message.role === "assistant" ? "violet" : undefined}>
-        {message.role === "user" ? "你" : "Agent"}
+        {message.role === "user" ? t("chat.userRoleLabel") : t("chat.agentRoleLabel")}
       </span>
 
       {message.role === "assistant" && message.activeSkills && message.activeSkills.length > 0 && (
         <div className="flex flex-wrap items-center gap-1 mb-0.5 shadow-sm">
           {message.activeSkills.map((skillName) => {
-            const info = SKILL_LABELS[skillName] ?? {
+            const info = skillLabels[skillName] ?? {
               label: skillName,
               tone: "accent" satisfies AgentSkillTone,
             };
@@ -357,7 +383,7 @@ function AgentMessage({
       {message.role === "assistant" && message.toolCalls && message.toolCalls.length > 0 && (
         <div className="flex flex-wrap items-center gap-1 opacity-70">
           {message.toolCalls.map((toolCall, index) => {
-            const label = TOOL_LABELS[toolCall.name] || toolCall.name;
+            const label = toolLabels[toolCall.name] || toolCall.name;
             return (
               <span
                 key={`${toolCall.name}-${index}`}
@@ -382,7 +408,7 @@ function AgentMessage({
       {message.role === "assistant" && message.thought && (
         <details className="group self-start outline-none">
           <summary className="imagine-agent-thought-summary outline-none">
-            <span className="font-mono">思考过程</span>
+            <span className="font-mono">{t("chat.thoughtProcessLabel")}</span>
             <ChevronRight className="h-3 w-3 transform transition group-open:rotate-90" />
           </summary>
           <div className="imagine-agent-thought-body">
@@ -394,14 +420,14 @@ function AgentMessage({
       {message.role === "assistant" && executableAction && pendingAction && (
         <div className="imagine-agent-action-panel">
           <span className="imagine-agent-action-panel-title">
-            {canEditAction ? "建议动作 · 执行前可调整" : "建议动作 · 参数摘要"}
+            {canEditAction ? t("chat.suggestedActionEditable") : t("chat.suggestedActionSummary")}
           </span>
 
           <div className="imagine-agent-action-panel-body">
             <p>
-              <strong className="imagine-tone-icon" data-tone="accent">操作:</strong>{" "}
+              <strong className="imagine-tone-icon" data-tone="accent">{t("chat.operationLabel")}</strong>{" "}
               <code className="imagine-tone-chip rounded px-1 py-0.5 font-mono text-[10px]" data-tone="accent">
-                {ACTION_LABELS[executableAction.type]}
+                {actionLabels[executableAction.type]}
               </code>
             </p>
           </div>
@@ -431,7 +457,7 @@ function AgentMessage({
                   className="imagine-primary-action flex flex-1 cursor-pointer items-center justify-center gap-1 rounded-lg px-3 py-1.5 text-[10px] font-bold text-white transition"
                 >
                   <Check className="h-3 w-3" />
-                  执行
+                  {t("chat.executeButton")}
                 </button>
                 <button
                   type="button"
@@ -439,7 +465,7 @@ function AgentMessage({
                   className="imagine-secondary-action border border-[var(--iw-border)] hover:border-[var(--iw-muted)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)] hover:text-[var(--iw-text)] py-1.5 px-3 rounded-lg text-[10px] cursor-pointer transition"
                   data-action="danger"
                 >
-                  拒绝
+                  {t("chat.declineButton")}
                 </button>
               </>
             )}
@@ -447,12 +473,12 @@ function AgentMessage({
             {message.interactiveState === "completed" && (
               <span className="imagine-tone-chip flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[10px] font-medium" data-tone="success">
                 <Check className="h-3 w-3" />
-                创意流程已触发并加载完毕
+                {t("chat.actionCompleted")}
               </span>
             )}
 
             {message.interactiveState === "declined" && (
-              <span className="imagine-agent-action-declined">方案已被拒绝/驳回</span>
+              <span className="imagine-agent-action-declined">{t("chat.actionDeclined")}</span>
             )}
           </div>
 
@@ -467,9 +493,9 @@ function AgentMessage({
                 />
               </div>
               <div className="flex items-center justify-between text-[10px] mt-1.5 font-mono">
-                <span className="imagine-tone-icon" data-tone="accent">自动模式: {countdownSeconds} 秒后执行</span>
+                <span className="imagine-tone-icon" data-tone="accent">{t("chat.autoModeCountdown", { seconds: countdownSeconds })}</span>
                 <button onClick={onCancelCountdown} className="imagine-tone-link cursor-pointer underline" data-tone="danger">
-                  取消自动
+                  {t("chat.cancelAutoMode")}
                 </button>
               </div>
             </div>
@@ -531,6 +557,10 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
   },
   ref,
 ) {
+  const { t } = useTranslations("agent");
+  const toolLabels = useMemo(() => makeToolLabels(t), [t]);
+  const skillLabels = useMemo(() => makeSkillLabels(t), [t]);
+  const actionLabels = useMemo(() => makeActionLabels(t), [t]);
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     onSubmit();
@@ -766,8 +796,8 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
           onClick={handleOrbClick}
           onPointerDown={handleOrbPointerDown}
           className="imagine-agent-orb-button pointer-events-auto group relative flex h-[108px] w-[108px] items-center justify-center rounded-full"
-          title="展开 Agent 对话"
-          aria-label="展开 Agent 对话"
+          title={t("chat.expandDockTitle")}
+          aria-label={t("chat.expandDockTitle")}
         >
           <span className="imagine-agent-orb-aura" />
           <AgentIdentityMark variant="orb" />
@@ -779,7 +809,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
           type="button"
           onClick={onToggleOpen}
           className="imagine-agent-dock-header-btn flex min-w-0 items-center gap-2 text-left text-sm font-semibold"
-          title={isOpen ? "收起 Agent 对话" : "展开 Agent 对话"}
+          title={isOpen ? t("chat.collapseDockTitle") : t("chat.expandDockTitle")}
         >
           <AgentIdentityMark variant="header" />
           <span className="min-w-0 truncate">Agent</span>
@@ -801,7 +831,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
         <span className="ml-auto flex shrink-0 items-center gap-2">
           <span className="imagine-agent-dock-status hidden items-center gap-1.5 lg:flex">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400/70" />
-            {hasSendableAgentReferences ? "引用中" : "画廊"}
+            {hasSendableAgentReferences ? t("chat.referenceStatusReferencing") : t("chat.referenceStatusGallery")}
           </span>
           {messages.length > 1 && (
             <button
@@ -809,7 +839,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
               onClick={onClearChat}
               data-action="danger"
               className="imagine-icon-button flex h-5 w-5 items-center justify-center rounded border border-[var(--iw-border)] text-[var(--iw-faint)] transition"
-              title="清空对话"
+              title={t("chat.clearChatTitle")}
             >
               <X className="h-2.5 w-2.5" />
             </button>
@@ -846,7 +876,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
                   <span className="imagine-agent-role-label imagine-tone-icon" data-tone="violet">Agent</span>
                   <div className="imagine-agent-loading px-4 py-3 text-xs text-[var(--iw-muted)] flex items-center gap-2">
                     <RefreshCw className="imagine-tone-icon h-3.5 w-3.5 animate-spin" data-tone="violet" />
-                    <span>正在分析画廊与技能，整理下一步建议...</span>
+                    <span>{t("chat.loadingText")}</span>
                   </div>
                 </div>
               )}
@@ -866,7 +896,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="imagine-tone-icon text-[10px] font-bold" data-tone="violet">
-                  {mediaReferenceLabel(visibleAgentReferenceType)}引用
+                  {mediaReferenceLabel(visibleAgentReferenceType)}{t("chat.referenceTypeSuffix")}
                 </span>
                 <span className="max-w-[150px] truncate font-mono text-[9px] text-[var(--iw-faint)]">
                   ID: {visibleAgentReference.id.substring(0, 16)}
@@ -881,10 +911,10 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
                   onClick={onMaskReference}
                   className="imagine-tone-chip flex cursor-pointer items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-bold transition"
                   data-tone="accent"
-                  title="使用画笔抹除或标记局部涂层"
+                  title={t("chat.maskReferenceTitle")}
                 >
                   <Paintbrush className="h-3 w-3" />
-                  画笔涂抹
+                  {t("chat.paintbrushButton")}
                 </button>
               ) : null}
               <button
@@ -892,7 +922,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
                 onClick={onClearReference}
                 data-action="danger"
                 className="imagine-icon-button p-1 bg-[var(--iw-panel-soft)] text-[var(--iw-muted)] rounded-lg transition border border-[var(--iw-border)] cursor-pointer"
-                title="取消引用"
+                title={t("chat.clearReferenceTitle")}
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -904,7 +934,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
           <div className="pointer-events-auto flex flex-col gap-1.5 sm:hidden">
             <div className="flex flex-wrap items-center gap-2">
               <label htmlFor="agent-model-select-mobile" className="text-[10px] font-semibold text-[var(--iw-faint)]">
-                模型
+                {t("chat.modelLabel")}
               </label>
               <AgentModelSelect
                 id="agent-model-select-mobile"
@@ -926,14 +956,14 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
             <form onSubmit={submit} className="relative flex items-center w-full">
               <label
                 className="imagine-agent-attach-btn absolute left-2 flex h-7 w-7 cursor-pointer items-center justify-center rounded-md"
-                title="上传媒体到 Agent 引用"
+                title={t("chat.uploadReferenceTitle")}
               >
                 <ImagePlus className="h-3.5 w-3.5" />
                 <input
                   type="file"
                   accept="image/*,video/*,audio/*"
                   name="agent-reference-upload"
-                  aria-label="上传媒体到 Agent 引用"
+                  aria-label={t("chat.uploadReferenceTitle")}
                   onChange={onUploadReference}
                   className="hidden"
                 />
@@ -942,7 +972,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
                 type="text"
                 value={input}
                 onChange={(event) => onChangeInput(event.target.value)}
-                placeholder="问 Agent... 输入 @ 引用媒体"
+                placeholder={t("chat.inputPlaceholder")}
                 className="imagine-agent-input w-full py-2.5 pl-12 pr-11 text-xs text-[var(--iw-text)] placeholder:text-[var(--iw-faint)]"
               />
               <button
@@ -963,10 +993,10 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
             htmlFor="auto_trigger"
             className="imagine-agent-auto-toggle flex h-9 shrink-0 cursor-pointer select-none items-center justify-center gap-2 rounded-lg border px-3 text-[11px] font-medium transition"
             data-active={autoExecute ? "true" : "false"}
-            title="自动执行 Agent action"
+            title={t("chat.autoExecuteLabel")}
           >
             <span className={`h-2 w-2 rounded-full ${autoExecute ? "bg-emerald-300" : "bg-[var(--iw-faint)]"}`} />
-            <span>自动</span>
+            <span>{t("chat.autoExecuteLabel")}</span>
             <input
               type="checkbox"
               id="auto_trigger"

@@ -1,4 +1,5 @@
 import type { ReactNode, WheelEvent } from "react";
+import { useTranslations } from "@/lib/i18n";
 
 interface AtDropdownShellProps {
   children: ReactNode;
@@ -11,7 +12,7 @@ export function AtDropdownHeader({ count, title }: { count?: number; title: stri
     <p className="imagine-at-dropdown-header">
       <span>{title}</span>
       {count !== undefined ? (
-        <span className="imagine-at-dropdown-header-meta">{count} 张</span>
+        <span className="imagine-at-dropdown-header-meta">{count}</span>
       ) : null}
     </p>
   );

@@ -283,7 +283,7 @@ const BoardPromptTextarea = forwardRef<BoardPromptTextareaHandle, BoardPromptTex
     onChange,
     onSelectReference,
     onSlashCommand,
-    placeholder = "写提示词，输入 @ 引用连线 / 画板 / 库",
+    placeholder = "Write prompt, use @ to reference",
     readOnly = false,
     references,
     value,
@@ -476,7 +476,7 @@ const BoardPromptTextarea = forwardRef<BoardPromptTextareaHandle, BoardPromptTex
     const searchLength = atSearch?.length ?? 0;
     const start = Math.max(0, caret - searchLength - 1);
     const reference = references[index];
-    if (!reference) throw new Error("选择的参考媒体不存在");
+    if (!reference) throw new Error("Selected reference media does not exist");
     const token = getMediaReferencePromptToken(index, getMediaReferenceType(reference));
     const nextPrompt = `${displayValue.slice(0, start)}${token} ${displayValue.slice(caret)}`;
     const nextCaret = start + `${token} `.length;

@@ -1,4 +1,5 @@
 import { useId, useState, type DragEvent, type ReactNode } from "react";
+import { useTranslations } from "@/lib/i18n";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import PromptReferenceInlineOverlay, {
   resolvePromptReferenceThumbnails,
@@ -39,7 +40,7 @@ export default function PromptComposerSurface({
   headerVariant = "plain",
   icon,
   label,
-  mobileHint = "@ 可引用作品",
+  mobileHint,
   name = "prompt",
   onChange,
   onDropAsset,
@@ -50,7 +51,10 @@ export default function PromptComposerSurface({
 }: PromptComposerSurfaceProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const textareaId = useId();
+  const { t } = useTranslations("common");
   const referenceThumbnails = resolvePromptReferenceThumbnails(prompt, references, acceptedMediaTypes);
+  const resolvedMobileHint = mobileHint ?? t("promptComposer.mobileHint");
+  const charLabel = t("promptComposer.charCount");
   const emitSelection = (element: HTMLTextAreaElement): void => {
     onSelectionChange?.({ end: element.selectionEnd, start: element.selectionStart });
   };
@@ -134,8 +138,8 @@ export default function PromptComposerSurface({
         </div>
         <div className="imagine-field-shell-footer mt-2 flex items-center justify-between pt-2">
           <span className="hidden sm:inline">{desktopHint}</span>
-          <span className="sm:hidden">{mobileHint}</span>
-          <span>{prompt.length} 字符</span>
+          <span className="sm:hidden">{resolvedMobileHint}</span>
+          <span>{prompt.length} {charLabel}</span>
         </div>
       </div>
     </div>

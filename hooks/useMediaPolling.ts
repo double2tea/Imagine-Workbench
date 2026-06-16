@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n";
 import { useEffect, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import { API_ROUTES } from "@/lib/api/routes";
 import { saveItemWithPreview } from "@/lib/assets/previews";
@@ -49,9 +50,9 @@ async function saveItemOrWarn(
   try {
     return await saveItemWithPreview(item);
   } catch (error) {
-    const message = toErrorMessage(error, "IndexedDB 写入失败");
+    const message = toErrorMessage(error, t("common.notices.fileReadFailed"));
     console.error("IndexedDB Save Failed:", error);
-    pushWorkspaceNotice("error", `本地存储失败，刷新后可能丢失：${message}`);
+    pushWorkspaceNotice("error", t("common.notices.localSaveFailed", { error: message }));
     return null;
   }
 }
@@ -63,19 +64,19 @@ async function deleteItemOrWarn(
   try {
     await deleteFromDB(itemId);
   } catch (error) {
-    const message = toErrorMessage(error, "IndexedDB 删除失败");
+    const message = toErrorMessage(error, t("common.notices.originalMediaReadFailed"));
     console.error("IndexedDB Delete Failed:", error);
-    pushWorkspaceNotice("error", `本地结果清理失败：${message}`);
+    pushWorkspaceNotice("error", t("common.notices.localResultClearFailed", { error: message }));
   }
 }
 
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onerror = () => reject(new Error("结果文件读取失败"));
+    reader.onerror = () => reject(new Error(t("common.notices.fileReadFailed")));
     reader.onloadend = () => {
       if (typeof reader.result !== "string") {
-        reject(new Error("结果文件读取失败"));
+        reject(new Error(t("common.notices.fileReadFailed")));
         return;
       }
       resolve(reader.result);
@@ -100,9 +101,9 @@ async function updateTaskOrWarn(
   try {
     return await updateGenerationTask(id, update);
   } catch (error) {
-    const message = toErrorMessage(error, "任务更新失败");
+    const message = toErrorMessage(error, t("common.notices.taskUpdateFailed"));
     console.error("Generation Task Update Failed:", error);
-    pushWorkspaceNotice("error", `任务状态更新失败：${message}`);
+    pushWorkspaceNotice("error", t("common.notices.taskUpdateFailed", { error: message }));
     return null;
   }
 }
@@ -175,7 +176,7 @@ export function useMediaPolling({
 
         if (task.status === "pending") {
           if (!isProcessingTimedOut(task)) continue;
-          const timeoutMessage = "任务超过 2 小时仍未进入远端队列，已停止等待。";
+          const timeoutMessage = t("common.notices.taskTimeoutPending");
           if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
           const failedTask = await updateTaskOrWarn(task.id, {
             status: "failed",
@@ -191,7 +192,7 @@ export function useMediaPolling({
 
         if (!task.operationName) {
           if (!isProcessingTimedOut(task)) continue;
-          const timeoutMessage = "任务超过 2 小时仍缺少远端任务 ID，已停止等待。";
+          const timeoutMessage = t("common.notices.taskTimeoutOperation");
           if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
           const failedTask = await updateTaskOrWarn(task.id, {
             status: "failed",
@@ -217,12 +218,12 @@ export function useMediaPolling({
             });
 
             if (!res.ok) {
-              throw new Error(await readFetchError(res, "任务状态查询失败"));
+              throw new Error(await readFetchError(res, t("common.notices.taskStatusQueryFailed")));
             }
 
             const statusData: unknown = await res.json();
             if (typeof statusData !== "object" || statusData === null) {
-              throw new Error("任务状态接口返回格式不正确");
+              throw new Error(t("common.notices.taskStatusFormatIncorrect"));
             }
             const statusRecord = statusData as Record<string, unknown>;
             pollingFailuresRef.current[task.id] = 0;
@@ -233,13 +234,13 @@ export function useMediaPolling({
               const failedTask = await updateTaskOrWarn(task.id, {
                 status: "failed",
                 progress: 100,
-                errorMessage: getStringField(statusData, "errorMessage") ?? "异步任务失败",
+                errorMessage: getStringField(statusData, "errorMessage") ?? t("common.notices.asyncTaskFailed"),
               }, pushWorkspaceNotice);
               if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
               delete pollingFailuresRef.current[task.id];
               if (failedTask) {
                 setGenerationTasks(current => upsertGenerationTask(current, failedTask));
-                pushWorkspaceNotice("error", `异步任务失败：${failedTask.errorMessage}`);
+                pushWorkspaceNotice("error", `${t("common.notices.asyncTaskFailed")}：${failedTask.errorMessage}`);
               }
               continue;
             }
@@ -270,7 +271,7 @@ export function useMediaPolling({
                   });
 
                   if (!dlRes.ok) {
-                    throw new Error(await readFetchError(dlRes, "结果下载失败"));
+                    throw new Error(await readFetchError(dlRes, t("common.notices.resultDownloadFailed")));
                   }
 
                   const blob = await dlRes.blob();
@@ -318,13 +319,13 @@ export function useMediaPolling({
                   for (const savedItem of savedCompletedItems) await deleteItemOrWarn(savedItem.id, pushWorkspaceNotice);
                   continue;
                 }
-                if (savedCompletedItems.length !== completedItemsToSave.length) {
-                  for (const savedItem of savedCompletedItems) await deleteItemOrWarn(savedItem.id, pushWorkspaceNotice);
-                  const failedTask = await updateTaskOrWarn(task.id, {
-                    status: "failed",
-                    progress: 100,
-                    errorMessage: "结果资产本地存储失败",
-                  }, pushWorkspaceNotice);
+                  if (savedCompletedItems.length !== completedItemsToSave.length) {
+                    for (const savedItem of savedCompletedItems) await deleteItemOrWarn(savedItem.id, pushWorkspaceNotice);
+                    const failedTask = await updateTaskOrWarn(task.id, {
+                      status: "failed",
+                      progress: 100,
+                      errorMessage: t("common.notices.imageResultAssetSaveFailed"),
+                    }, pushWorkspaceNotice);
                   delete pollingFailuresRef.current[task.id];
                   if (failedTask) setGenerationTasks(current => upsertGenerationTask(current, failedTask));
                   continue;
@@ -353,7 +354,7 @@ export function useMediaPolling({
               }
             } else {
               if (isProcessingTimedOut(task)) {
-                const timeoutMessage = "任务超过 2 小时仍未完成，已停止自动轮询。";
+                const timeoutMessage = t("common.notices.taskTimeoutProcessing");
                 if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
                 const failedTask = await updateTaskOrWarn(task.id, {
                   status: "failed",
@@ -390,13 +391,13 @@ export function useMediaPolling({
               const waitingTask = await updateTaskOrWarn(task.id, {
                 status: "failed",
                 progress: 100,
-                errorMessage: toErrorMessage(error, "任务轮询失败"),
+                errorMessage: toErrorMessage(error, t("common.notices.taskPollingFailed")),
               }, pushWorkspaceNotice);
               if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
               delete pollingFailuresRef.current[task.id];
               if (waitingTask) {
                 setGenerationTasks(current => upsertGenerationTask(current, waitingTask));
-                pushWorkspaceNotice("error", `任务轮询失败：${waitingTask.errorMessage}`);
+                pushWorkspaceNotice("error", `${t("common.notices.taskPollingFailed")}：${waitingTask.errorMessage}`);
               }
             }
           }

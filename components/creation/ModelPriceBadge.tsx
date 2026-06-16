@@ -21,7 +21,7 @@ export default function ModelPriceBadge({
   if (!price) return null;
 
   const formatted = price.isCalculated
-    ? `约 ¥${formatPriceValue(price.totalPrice)}`
+    ? `~¥${formatPriceValue(price.totalPrice)}`
     : `¥${formatPriceValue(price.price)} / ${price.unit}`;
 
   return (

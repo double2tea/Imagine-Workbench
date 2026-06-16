@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n";
 import { isKnownProvider, isProviderKey, type CustomProviderDefinition } from "./registry";
 
 export const CUSTOM_PROVIDERS_STORAGE_KEY = "imagine_custom_providers";
@@ -8,10 +9,10 @@ export function normalizeCustomProviderBaseUrl(value: string): string {
   try {
     parsed = new URL(cleanValue);
   } catch {
-    throw new Error("Base URL 格式无效");
+    throw new Error(t("common.notices.baseUrlFormatInvalid"));
   }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new Error("Base URL 必须使用 http 或 https");
+    throw new Error(t("common.notices.baseUrlFormatInvalid"));
   }
   return parsed.toString().replace(/\/+$/, "");
 }

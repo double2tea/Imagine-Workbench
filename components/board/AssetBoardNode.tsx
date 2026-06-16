@@ -13,6 +13,7 @@ import { buildStorageItem, type StorageItem } from "@/lib/db";
 import { imageQuickEditProcessingTitleFromPrompt } from "@/lib/image-quick-edit-targets";
 import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
 import type { CapturedVideoFrame } from "@/lib/video-frame";
+import { useTranslations } from "@/lib/i18n";
 import {
   IMAGE_EDIT_OPERATION_ORDER,
   WORKBENCH_OPERATION_META,
@@ -65,7 +66,7 @@ function LightweightMediaPreview({ type }: { type: "audio" | "image" | "video" }
   const Icon = type === "audio" ? Music : type === "image" ? ImageIcon : Video;
   return (
     <div
-      aria-label={type === "audio" ? "音频资产" : type === "image" ? "图片资产" : "视频资产"}
+      aria-label={type === "audio" ? "Audio asset" : type === "image" ? "Image asset" : "Video asset"}
       className="board-media-preview flex h-full w-full items-center justify-center bg-[var(--iw-panel-soft)] text-[var(--iw-muted)]"
       role="img"
     >
@@ -95,6 +96,7 @@ const AssetBoardNode = memo(function AssetBoardNode({
   onSendToAgent,
   stackItems = [],
 }: AssetBoardNodeProps) {
+  const { t } = useTranslations("board");
   const fallbackItem = useMemo(() => boardAssetToStorageItem(node, boardId), [boardId, node]);
   const item = useMemo(
     () => stackItems.find(stackItem => stackItem.id === node.asset.assetId) ?? fallbackItem,
@@ -138,7 +140,7 @@ const AssetBoardNode = memo(function AssetBoardNode({
               id: "agent",
               icon: <AgentIdentityMark variant="inline" />,
               onClick: () => onSendToAgent?.(node.id),
-              title: "发送给 Agent",
+              title: "Send to Agent",
               toneClassName: operationToneClassName(WORKBENCH_OPERATION_META.analyze.tone),
             }]
           : []),
@@ -232,7 +234,7 @@ const AssetBoardNode = memo(function AssetBoardNode({
         processingLabel={imageQuickEditProcessingTitleFromPrompt(item.prompt) ?? undefined}
         stackItems={stackItems}
         status={item.status}
-        statusLabel={item.errorMessage ?? (item.status === "failed" ? "编辑失败" : undefined)}
+        statusLabel={item.errorMessage ?? (item.status === "failed" ? t("node.statusLabels.failed") : undefined)}
     >
       {node.asset.type === "image" && item.url.trim() ? (
         <PreviewImage

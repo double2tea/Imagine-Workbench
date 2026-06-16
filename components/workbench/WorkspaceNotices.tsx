@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Info, X } from "lucide-react";
+import { useTranslations } from "@/lib/i18n";
 import { AnimatePresence, motion } from "motion/react";
 
 export type WorkspaceNoticeType = "error" | "info" | "success";
@@ -18,6 +19,7 @@ interface WorkspaceNoticesProps {
 const AUTO_DISMISS_MS = 8000;
 
 export default function WorkspaceNotices({ notices, onDismiss }: WorkspaceNoticesProps) {
+  const { t } = useTranslations("common");
   const pausedRef = useRef<Set<string>>(new Set());
   const timeoutRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
@@ -102,7 +104,7 @@ export default function WorkspaceNotices({ notices, onDismiss }: WorkspaceNotice
               type="button"
               onClick={() => dismissNow(notice.id)}
               className="rounded-md p-1 text-current/60 transition hover:bg-white/10 hover:text-current"
-              title="关闭提示"
+              title={t("notices.dismissNotice")}
             >
               <X className="h-3.5 w-3.5" />
             </button>

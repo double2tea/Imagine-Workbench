@@ -16,6 +16,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
+import { useTranslations } from "@/lib/i18n";
 import { useConfirm, type ConfirmRequest } from "@/components/confirm/ConfirmProvider";
 import { usePriceDisplaySetting } from "@/hooks/usePriceDisplaySetting";
 import {
@@ -25,7 +26,7 @@ import {
   type WorkspaceCleanupKind,
   type WorkspaceDataSummary,
 } from "@/lib/data-management";
-import { CLEAR_WORKSPACE_ASSETS_MESSAGE } from "@/lib/workspace-messages";
+import { getClearWorkspaceAssetsMessage } from "@/lib/workspace-messages";
 
 interface DataManagementWorkspaceProps {
   hasCurrentBoard: boolean;
@@ -44,6 +45,8 @@ interface DataManagementWorkspaceProps {
   onRepairAssetSources: () => Promise<void>;
   onResetBoards: () => Promise<void>;
 }
+
+type TranslateFn = (key: string, params?: Record<string, string | number>) => string;
 
 interface StatCardProps {
   label: string;
@@ -77,7 +80,7 @@ function StatCard({ label, primary, secondary }: StatCardProps) {
   );
 }
 
-function healthCopy(status: WorkspaceDataSummary["integrity"]["status"] | undefined): {
+function healthCopy(status: WorkspaceDataSummary["integrity"]["status"] | undefined, t?: TranslateFn): {
   label: string;
   detail: string;
   className: string;
@@ -85,23 +88,23 @@ function healthCopy(status: WorkspaceDataSummary["integrity"]["status"] | undefi
 } {
   if (status === "healthy") {
     return {
-      label: "健康",
-      detail: "没有发现需要处理的数据问题",
+      label: t ? t("dataManagement.healthStatus.healthy") : "健康",
+      detail: t ? t("dataManagement.healthStatus.healthyDetail") : "没有发现需要处理的数据问题",
       className: "imagine-tone-surface",
       tone: "healthy",
     };
   }
   if (status === "critical") {
     return {
-      label: "需修复",
-      detail: "发现缺失引用或坏记录，建议先备份再处理",
+      label: t ? t("dataManagement.healthStatus.critical") : "需修复",
+      detail: t ? t("dataManagement.healthStatus.criticalDetail") : "发现缺失引用或坏记录，建议先备份再处理",
       className: "imagine-tone-surface",
       tone: "critical",
     };
   }
   return {
-    label: "需关注",
-    detail: "有可清理或可修复项目，当前数据仍可继续使用",
+    label: t ? t("dataManagement.healthStatus.attention") : "需关注",
+    detail: t ? t("dataManagement.healthStatus.attentionDetail") : "有可清理或可修复项目，当前数据仍可继续使用",
     className: "imagine-tone-surface",
     tone: "attention",
   };
@@ -113,43 +116,47 @@ function issueToneClassName(tone: HealthIssueGroup["tone"]): string {
 }
 
 const CLEANUP_LABEL_BY_KIND: Record<WorkspaceCleanupKind, string> = {
-  failed: "失败任务",
-  "stale-processing": "超过 2 小时的处理中/排队任务",
-  "broken-complete": "缺少媒体内容的完成记录",
-  orphaned: "未被任何画板引用的完成资产",
+  failed: "dataManagement.cleanupLabels.failed",
+  "stale-processing": "dataManagement.cleanupLabels.staleProcessing",
+  "broken-complete": "dataManagement.cleanupLabels.brokenComplete",
+  orphaned: "dataManagement.cleanupLabels.orphaned",
 };
 
 const LOCAL_STORAGE_LABEL_BY_KIND: Record<LocalStorageCleanupKind, string> = {
-  agent: "Agent 会话",
-  "model-cache": "模型缓存",
-  "provider-credentials": "provider 密钥",
-  "ui-preferences": "UI 偏好",
+  agent: "dataManagement.localStorageLabels.agent",
+  "model-cache": "dataManagement.localStorageLabels.modelCache",
+  "provider-credentials": "dataManagement.localStorageLabels.providerCredentials",
+  "ui-preferences": "dataManagement.localStorageLabels.uiPreferences",
 };
 
-const REPAIR_ASSET_SOURCES_CONFIRM_REQUEST: ConfirmRequest = {
-  message: "将扫描所有画板，并清除资产中指向已不存在画板节点的来源链接。资产文件、提示词和生成结果不会删除。确认继续？",
-  confirmLabel: "修复",
-};
-
-const RESET_BOARDS_CONFIRM_REQUEST: ConfirmRequest = {
-  message: "确认重置所有画板为一个空白默认画板吗？",
-  tone: "danger",
-  confirmLabel: "重置",
-};
-
-function buildCleanupConfirmRequest(kind: WorkspaceCleanupKind): ConfirmRequest {
+function buildRepairSourcesConfirmRequest(t: TranslateFn): ConfirmRequest {
   return {
-    message: `确认清理${CLEANUP_LABEL_BY_KIND[kind]}吗？`,
-    tone: "danger",
-    confirmLabel: "清理",
+    message: t("dataManagement.repairSourcesMessage"),
+    confirmLabel: t("dataManagement.repairSourcesConfirmLabel"),
   };
 }
 
-function buildLocalStorageConfirmRequest(kind: LocalStorageCleanupKind): ConfirmRequest {
+function buildResetBoardsConfirmRequest(t: TranslateFn): ConfirmRequest {
   return {
-    message: `确认清理${LOCAL_STORAGE_LABEL_BY_KIND[kind]}吗？`,
+    message: t("dataManagement.resetBoardsMessage"),
     tone: "danger",
-    confirmLabel: "清理",
+    confirmLabel: t("dataManagement.resetBoardsConfirmLabel"),
+  };
+}
+
+function buildCleanupConfirmRequest(kind: WorkspaceCleanupKind, t: TranslateFn): ConfirmRequest {
+  return {
+    message: t("dataManagement.cleanupConfirmTemplate", { label: t(CLEANUP_LABEL_BY_KIND[kind]) }),
+    tone: "danger",
+    confirmLabel: t("dataManagement.cleanupConfirmLabel"),
+  };
+}
+
+function buildLocalStorageConfirmRequest(kind: LocalStorageCleanupKind, t: TranslateFn): ConfirmRequest {
+  return {
+    message: t("dataManagement.cleanupConfirmTemplate", { label: t(LOCAL_STORAGE_LABEL_BY_KIND[kind]) }),
+    tone: "danger",
+    confirmLabel: t("dataManagement.cleanupConfirmLabel"),
   };
 }
 
@@ -158,9 +165,9 @@ function formatPercent(value: number | undefined): string {
   return `${Math.round(value * 100)}%`;
 }
 
-function DetailList({ details }: { details: string[] }) {
+function DetailList({ details, t }: { details: string[]; t: TranslateFn }) {
   if (details.length === 0) {
-    return <p className="mt-2 text-[11px] text-[var(--iw-muted)]">暂无明细</p>;
+    return <p className="mt-2 text-[11px] text-[var(--iw-muted)]">{t("dataManagement.noDetails")}</p>;
   }
   return (
     <ul className="mt-2 max-h-44 space-y-1 overflow-y-auto rounded-md border border-[var(--iw-border)] bg-black/10 p-2">
@@ -171,7 +178,7 @@ function DetailList({ details }: { details: string[] }) {
       ))}
       {details.length > 80 ? (
         <li className="font-mono text-[10px] leading-4 text-[var(--iw-faint)]">
-          还有 {details.length - 80} 条未显示
+          {t("dataManagement.moreDetailsHidden", { count: details.length - 80 })}
         </li>
       ) : null}
     </ul>
@@ -202,6 +209,7 @@ export default function DataManagementWorkspace({
   const [includeCredentials, setIncludeCredentials] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [showPrice, setShowPrice] = usePriceDisplaySetting();
+  const { t } = useTranslations("settings");
 
   const runAction = async (label: string, action: () => Promise<void>) => {
     setBusyLabel(label);
@@ -225,14 +233,14 @@ export default function DataManagementWorkspace({
   const handleBackupFileChange = (fileList: FileList | null) => {
     const file = fileList?.[0];
     if (!file) return;
-    void runAction("恢复备份中", () => onImportWorkspace(file, includeCredentials));
+    void runAction(t("dataManagement.restoreBackupBusy"), () => onImportWorkspace(file, includeCredentials));
     if (backupInputRef.current) backupInputRef.current.value = "";
   };
 
   const handleLocalAssetChange = (fileList: FileList | null) => {
     const files = fileList ? Array.from(fileList) : [];
     if (files.length === 0) return;
-    void runAction("导入媒体中", () => onImportLocalAssets(files));
+    void runAction(t("dataManagement.importMediaBusy"), () => onImportLocalAssets(files));
     if (localAssetInputRef.current) localAssetInputRef.current.value = "";
   };
 
@@ -245,7 +253,7 @@ export default function DataManagementWorkspace({
   const usageRatio = quota && usage !== undefined ? Math.min(1, usage / quota) : undefined;
   const assetStores = assetSummary?.stores;
   const latestSafetySnapshot = summary?.safety.latestSnapshot ?? null;
-  const health = healthCopy(integrity?.status);
+  const health = healthCopy(integrity?.status, t);
   const actionDisabled = busyLabel !== null;
 
   const issueGroups = useMemo<HealthIssueGroup[]>(() => {
@@ -253,7 +261,7 @@ export default function DataManagementWorkspace({
     return [
       {
         key: "missing-references",
-        title: "画板缺失资产引用",
+        title: t("dataManagement.issueGroups.missingReferences"),
         count: integrity.missingBoardReferences.length,
         tone: "critical",
         details: integrity.missingBoardReferences.map(reference =>
@@ -262,26 +270,26 @@ export default function DataManagementWorkspace({
       },
       {
         key: "broken-complete",
-        title: "完成但缺少媒体内容",
+        title: t("dataManagement.issueGroups.brokenComplete"),
         count: integrity.brokenCompleteAssetIds.length,
         tone: "critical",
         action: {
-          label: "清坏记录",
-          busyLabel: "清坏记录中",
-          confirmRequest: buildCleanupConfirmRequest("broken-complete"),
+          label: t("dataManagement.issueGroups.cleanBrokenRecords"),
+          busyLabel: t("dataManagement.issueGroups.cleanBrokenRecordsBusy"),
+          confirmRequest: buildCleanupConfirmRequest("broken-complete", t),
           run: () => onCleanupAssets("broken-complete"),
         },
         details: integrity.brokenCompleteAssetIds,
       },
       {
         key: "stale-source-links",
-        title: "过期来源节点链接",
+        title: t("dataManagement.issueGroups.staleSourceLinks"),
         count: integrity.staleAssetSourceLinks.length,
         tone: "attention",
         action: {
           label: "修复来源",
           busyLabel: "修复来源中",
-          confirmRequest: REPAIR_ASSET_SOURCES_CONFIRM_REQUEST,
+          confirmRequest: buildRepairSourcesConfirmRequest(t),
           run: onRepairAssetSources,
         },
         details: integrity.staleAssetSourceLinks.map(link =>
@@ -290,32 +298,32 @@ export default function DataManagementWorkspace({
       },
       {
         key: "stale-processing",
-        title: "过期进行中任务",
+        title: t("dataManagement.issueGroups.staleProcessing"),
         count: integrity.staleProcessingAssetIds.length,
         tone: "attention",
         action: {
-          label: "清过期",
-          busyLabel: "清过期中",
-          confirmRequest: buildCleanupConfirmRequest("stale-processing"),
+          label: t("dataManagement.issueGroups.cleanStale"),
+          busyLabel: t("dataManagement.issueGroups.cleanStaleBusy"),
+          confirmRequest: buildCleanupConfirmRequest("stale-processing", t),
           run: () => onCleanupAssets("stale-processing"),
         },
         details: integrity.staleProcessingAssetIds,
       },
       {
         key: "failed-assets",
-        title: "失败记录",
+        title: t("dataManagement.issueGroups.failedAssets"),
         count: integrity.failedAssetIds.length,
         tone: "attention",
         action: {
-          label: "清失败",
-          busyLabel: "清失败中",
-          confirmRequest: buildCleanupConfirmRequest("failed"),
+          label: t("dataManagement.issueGroups.cleanFailed"),
+          busyLabel: t("dataManagement.issueGroups.cleanFailedBusy"),
+          confirmRequest: buildCleanupConfirmRequest("failed", t),
           run: () => onCleanupAssets("failed"),
         },
         details: integrity.failedAssetIds,
       },
     ];
-  }, [integrity, onCleanupAssets, onRepairAssetSources]);
+  }, [integrity, onCleanupAssets, onRepairAssetSources, t]);
 
   const toggleGroup = (key: string) => {
     setExpandedGroups(current => ({ ...current, [key]: !current[key] }));
@@ -328,7 +336,7 @@ export default function DataManagementWorkspace({
         type="file"
         accept=".zip,application/zip"
         name="workspace-backup-import"
-        aria-label="导入工作区备份文件"
+        aria-label={t("dataManagement.importBackupAriaLabel")}
         className="hidden"
         onChange={event => handleBackupFileChange(event.target.files)}
       />
@@ -338,26 +346,26 @@ export default function DataManagementWorkspace({
         accept="image/*,video/*,audio/*"
         multiple
         name="workspace-local-asset-import"
-        aria-label="导入本地媒体文件"
+        aria-label={t("dataManagement.importLocalAssetAriaLabel")}
         className="hidden"
         onChange={event => handleLocalAssetChange(event.target.files)}
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-[var(--iw-text)]">数据健康中心</p>
+          <p className="text-sm font-semibold text-[var(--iw-text)]">{t("dataManagement.title")}</p>
           <p className="mt-1 text-[11px] text-[var(--iw-muted)]">
-            本地资产、画板引用、备份、安全快照与维护动作
+            {t("dataManagement.description")}
           </p>
         </div>
         <button
           type="button"
           disabled={actionDisabled}
-          onClick={() => void runAction("刷新统计中", onRefreshSummary)}
+          onClick={() => void runAction(t("dataManagement.refreshingStatsLabel"), onRefreshSummary)}
           className="imagine-secondary-action flex h-9 items-center gap-1.5 rounded-lg border border-[var(--iw-border)] px-3 text-[11px] font-semibold text-[var(--iw-text)] disabled:opacity-50"
         >
           <RefreshCw className="h-3.5 w-3.5" />
-          刷新
+          {t("dataManagement.refreshButton")}
         </button>
       </div>
 
@@ -368,7 +376,7 @@ export default function DataManagementWorkspace({
       ) : null}
       {summaryError ? (
         <div className="imagine-tone-surface rounded-lg border px-3 py-2 text-[11px] leading-5" data-tone="danger">
-          数据统计读取失败：{summaryError}
+          {t("dataManagement.dataStatsError", { error: summaryError })}
         </div>
       ) : null}
 
@@ -377,7 +385,7 @@ export default function DataManagementWorkspace({
           <div className="flex items-center gap-2">
             {integrity?.status === "healthy" ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
             <div>
-              <p className="text-xs font-semibold">数据状态：{health.label}</p>
+              <p className="text-xs font-semibold">{t("dataManagement.dataStatusLabel")}：{health.label}</p>
               <p className="mt-1 text-[11px] leading-5 opacity-85">{health.detail}</p>
             </div>
           </div>
@@ -389,26 +397,26 @@ export default function DataManagementWorkspace({
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          label="资产"
+          label={t("dataManagement.statCards.assets")}
           primary={assetSummary ? String(assetSummary.total) : "--"}
           secondary={assetSummary
-            ? `${assetSummary.image} 图 / ${assetSummary.video} 视频 / ${assetSummary.audio} 音频 / ${assetSummary.transcript} 文本`
-            : "等待统计"}
+            ? t("dataManagement.assetsDetailTemplate", { image: assetSummary.image, video: assetSummary.video, audio: assetSummary.audio, transcript: assetSummary.transcript })
+            : t("dataManagement.statCards.waitingStats")}
         />
         <StatCard
-          label="画板"
+          label={t("dataManagement.statCards.boards")}
           primary={boardSummary ? String(boardSummary.total) : "--"}
-          secondary={boardSummary ? `${boardSummary.nodes} 节点 · ${formatBytes(boardSummary.estimatedBytes)}` : "等待统计"}
+          secondary={boardSummary ? t("dataManagement.boardsDetailTemplate", { nodes: boardSummary.nodes, bytes: formatBytes(boardSummary.estimatedBytes) }) : t("dataManagement.statCards.waitingStats")}
         />
         <StatCard
-          label="本地设置"
+          label={t("dataManagement.statCards.localSettings")}
           primary={storageSummary ? String(storageSummary.agentKeys + storageSummary.modelCacheKeys + storageSummary.uiPreferenceKeys + storageSummary.credentialKeys) : "--"}
-          secondary={storageSummary ? `${storageSummary.agentKeys} Agent / ${storageSummary.modelCacheKeys} 模型 / ${storageSummary.credentialKeys} 密钥` : "等待统计"}
+          secondary={storageSummary ? t("dataManagement.localSettingsDetailTemplate", { agentKeys: storageSummary.agentKeys, modelCacheKeys: storageSummary.modelCacheKeys, credentialKeys: storageSummary.credentialKeys }) : t("dataManagement.statCards.waitingStats")}
         />
         <StatCard
-          label="浏览器空间"
+          label={t("dataManagement.statCards.browserStorage")}
           primary={usage !== undefined ? formatBytes(usage) : "--"}
-          secondary={quota !== undefined ? `配额 ${formatBytes(quota)} · ${formatPercent(usageRatio)}` : "浏览器未返回配额"}
+          secondary={quota !== undefined ? t("dataManagement.browserStorageDetailTemplate", { quota: formatBytes(quota), percent: formatPercent(usageRatio) }) : t("dataManagement.statCards.browserNoQuota")}
         />
       </div>
 
@@ -416,7 +424,7 @@ export default function DataManagementWorkspace({
         <div className="flex items-center justify-between gap-3">
           <p className="flex items-center gap-2 text-xs font-semibold text-[var(--iw-text)]">
             <ListChecks className="imagine-tone-icon h-3.5 w-3.5" data-tone="success" />
-            完整性诊断
+            {t("dataManagement.integrityDiagnosis")}
           </p>
           <p className="font-mono text-[11px] text-[var(--iw-muted)]">
             {integrity ? `${integrity.issueCount} total` : "waiting"}
@@ -454,7 +462,7 @@ export default function DataManagementWorkspace({
                     </button>
                   ) : null}
                 </div>
-                {expanded ? <DetailList details={group.details} /> : null}
+                {expanded ? <DetailList details={group.details} t={t} /> : null}
               </div>
             );
           })}
@@ -466,10 +474,10 @@ export default function DataManagementWorkspace({
           <div>
             <p className="flex items-center gap-2 text-xs font-semibold text-[var(--iw-text)]">
               <Database className="imagine-tone-icon h-3.5 w-3.5" data-tone="accent" />
-              存储结构
+              {t("dataManagement.storageStructure")}
             </p>
             <p className="mt-1 text-[11px] leading-5 text-[var(--iw-muted)]">
-              资产 meta、共享 payload、预览缓存与旧格式迁移状态
+              {t("dataManagement.storageStructureDescription")}
             </p>
           </div>
           <p className="font-mono text-[11px] text-[var(--iw-muted)]">
@@ -504,12 +512,13 @@ export default function DataManagementWorkspace({
           <div>
             <p className="flex items-center gap-2 text-xs font-semibold text-[var(--iw-text)]">
               <FileArchive className="imagine-tone-icon h-3.5 w-3.5" data-tone="accent" />
-              备份与安全
+              {t("dataManagement.backupAndSafety")}
             </p>
             <p className="mt-1 text-[11px] leading-5 text-[var(--iw-muted)]">
-              来源 {summary?.safety.origin || "--"}；最后安全快照 {latestSafetySnapshot
+              {t("dataManagement.backupSourcePrefix", { origin: summary?.safety.origin || "--" })}；{t("dataManagement.backupLastSnapshotPrefix", { snapshot: latestSafetySnapshot
                 ? `${formatWorkspaceSafetySnapshotReason(latestSafetySnapshot.reason)} · ${new Date(latestSafetySnapshot.createdAt).toLocaleString()} · ${formatBytes(latestSafetySnapshot.sizeBytes)}`
-                : "无"}
+                : t("dataManagement.backupNone")
+              })}
             </p>
             <label className="mt-2 flex items-center gap-2 text-[11px] text-[var(--iw-muted)]">
               <input
@@ -517,39 +526,39 @@ export default function DataManagementWorkspace({
                 checked={includeCredentials}
                 onChange={event => setIncludeCredentials(event.target.checked)}
               />
-              导出/导入 provider 密钥
+              {t("dataManagement.exportImportCredentialsLabel")}
             </label>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
               disabled={actionDisabled}
-              onClick={() => void runAction("导出完整备份中", () => onExportWorkspace(includeCredentials))}
+              onClick={() => void runAction(t("dataManagement.fullBackupBusy"), () => onExportWorkspace(includeCredentials))}
               className="imagine-secondary-action flex h-9 items-center gap-1.5 rounded-lg border border-[var(--iw-border)] px-3 text-[11px] font-semibold text-[var(--iw-text)] disabled:opacity-50"
             >
               <Download className="h-3.5 w-3.5" />
-              完整备份
+              {t("dataManagement.fullBackupButton")}
             </button>
             {hasCurrentBoard && onExportCurrentBoard ? (
               <button
                 type="button"
                 disabled={actionDisabled}
-                onClick={() => void runAction("导出当前画板中", () => onExportCurrentBoard(includeCredentials))}
+                onClick={() => void runAction(t("dataManagement.currentBoardBusy"), () => onExportCurrentBoard(includeCredentials))}
                 className="imagine-secondary-action flex h-9 items-center gap-1.5 rounded-lg border border-[var(--iw-border)] px-3 text-[11px] font-semibold text-[var(--iw-text)] disabled:opacity-50"
               >
                 <HardDrive className="h-3.5 w-3.5" />
-                当前画板
+                {t("dataManagement.currentBoardButton")}
               </button>
             ) : null}
             {latestSafetySnapshot ? (
               <button
                 type="button"
                 disabled={actionDisabled}
-                onClick={() => void runAction("下载安全快照中", onDownloadSafetySnapshot)}
+                onClick={() => void runAction(t("dataManagement.lastSnapshotBusy"), onDownloadSafetySnapshot)}
                 className="imagine-secondary-action flex h-9 items-center gap-1.5 rounded-lg border border-[var(--iw-border)] px-3 text-[11px] font-semibold text-[var(--iw-text)] disabled:opacity-50"
               >
                 <Archive className="h-3.5 w-3.5" />
-                最后快照
+                {t("dataManagement.lastSnapshotButton")}
               </button>
             ) : null}
             <button
@@ -603,26 +612,26 @@ export default function DataManagementWorkspace({
             <button
               type="button"
               disabled={actionDisabled}
-              onClick={() => void runAction("复制画板中", onDuplicateCurrentBoard)}
+              onClick={() => void runAction(t("dataManagement.duplicateBoardBusy"), onDuplicateCurrentBoard)}
               className="imagine-secondary-action h-9 rounded-lg border border-[var(--iw-border)] px-3 text-[11px] font-semibold text-[var(--iw-text)] disabled:opacity-50"
             >
-              复制当前画板
+              {t("dataManagement.duplicateBoardButton")}
             </button>
           ) : null}
           {assetSummary && assetSummary.orphaned > 0 ? (
             <button
               type="button"
               disabled={actionDisabled}
-              onClick={() => void runConfirmedAction("清孤立中", buildCleanupConfirmRequest("orphaned"), () => onCleanupAssets("orphaned"))}
+              onClick={() => void runConfirmedAction(t("dataManagement.cleanOrphanedBusy"), buildCleanupConfirmRequest("orphaned", t), () => onCleanupAssets("orphaned"))}
               className="imagine-secondary-action h-9 rounded-lg border border-[var(--iw-border)] px-3 text-[11px] font-semibold text-[var(--iw-text)] disabled:opacity-50"
             >
-              清孤立资产 ({assetSummary.orphaned})
+              {t("dataManagement.cleanOrphanedButton", { count: assetSummary.orphaned })}
             </button>
           ) : null}
         </div>
         {assetSummary && assetSummary.largest.length > 0 ? (
           <div className="mt-3">
-            <p className="text-[10px] font-semibold uppercase text-[var(--iw-faint)]">大记录候选</p>
+            <p className="text-[10px] font-semibold uppercase text-[var(--iw-faint)]">{t("dataManagement.largeRecordCandidates")}</p>
             <ul className="mt-2 grid gap-1 sm:grid-cols-2">
               {assetSummary.largest.map(item => (
                 <li key={item.id} className="flex items-center justify-between gap-3 rounded-md border border-[var(--iw-border)] px-2 py-1 text-[11px] text-[var(--iw-muted)]">
@@ -638,27 +647,27 @@ export default function DataManagementWorkspace({
       <section className="imagine-data-danger-zone imagine-tone-surface rounded-lg border p-3" data-tone="danger">
         <p className="flex items-center gap-2 text-xs font-semibold">
           <Shield className="h-3.5 w-3.5" />
-          危险区
+          {t("dataManagement.dangerZone")}
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" disabled={actionDisabled} onClick={() => void runConfirmedAction("清空资产中", { message: CLEAR_WORKSPACE_ASSETS_MESSAGE, tone: "danger", confirmLabel: "清空资产" }, onClearAssets)} className="imagine-danger-action h-9 rounded-lg px-3 text-[11px] font-semibold disabled:opacity-50">
+          <button type="button" disabled={actionDisabled} onClick={() => void runConfirmedAction(t("dataManagement.clearAssetsBusy"), { message: getClearWorkspaceAssetsMessage(t), tone: "danger", confirmLabel: t("dataManagement.clearAssetsButton") }, onClearAssets)} className="imagine-danger-action h-9 rounded-lg px-3 text-[11px] font-semibold disabled:opacity-50">
             <Trash2 className="mr-1 inline h-3.5 w-3.5" />
-            清空资产
+            {t("dataManagement.clearAssetsButton")}
           </button>
-          <button type="button" disabled={actionDisabled} onClick={() => void runConfirmedAction("重置画板中", RESET_BOARDS_CONFIRM_REQUEST, onResetBoards)} className="imagine-danger-action h-9 rounded-lg px-3 text-[11px] font-semibold disabled:opacity-50">
-            重置画板
+          <button type="button" disabled={actionDisabled} onClick={() => void runConfirmedAction(t("dataManagement.resetBoardsBusy"), buildResetBoardsConfirmRequest(t), onResetBoards)} className="imagine-danger-action h-9 rounded-lg px-3 text-[11px] font-semibold disabled:opacity-50">
+            {t("dataManagement.resetBoardsButton")}
           </button>
-          <button type="button" disabled={actionDisabled} onClick={() => void runConfirmedAction("清 Agent 中", buildLocalStorageConfirmRequest("agent"), () => onClearLocalStorage("agent"))} className="imagine-danger-action h-9 rounded-lg px-3 text-[11px] font-semibold disabled:opacity-50">
-            清 Agent
+          <button type="button" disabled={actionDisabled} onClick={() => void runConfirmedAction(t("dataManagement.clearAgentBusy"), buildLocalStorageConfirmRequest("agent", t), () => onClearLocalStorage("agent"))} className="imagine-danger-action h-9 rounded-lg px-3 text-[11px] font-semibold disabled:opacity-50">
+            {t("dataManagement.clearAgentButton")}
           </button>
-          <button type="button" disabled={actionDisabled} onClick={() => void runConfirmedAction("清模型缓存中", buildLocalStorageConfirmRequest("model-cache"), () => onClearLocalStorage("model-cache"))} className="imagine-danger-action h-9 rounded-lg px-3 text-[11px] font-semibold disabled:opacity-50">
-            清模型缓存
+          <button type="button" disabled={actionDisabled} onClick={() => void runConfirmedAction(t("dataManagement.clearModelCacheBusy"), buildLocalStorageConfirmRequest("model-cache", t), () => onClearLocalStorage("model-cache"))} className="imagine-danger-action h-9 rounded-lg px-3 text-[11px] font-semibold disabled:opacity-50">
+            {t("dataManagement.clearModelCacheButton")}
           </button>
-          <button type="button" disabled={actionDisabled} onClick={() => void runConfirmedAction("清密钥中", buildLocalStorageConfirmRequest("provider-credentials"), () => onClearLocalStorage("provider-credentials"))} className="imagine-danger-action h-9 rounded-lg px-3 text-[11px] font-semibold disabled:opacity-50">
-            清密钥
+          <button type="button" disabled={actionDisabled} onClick={() => void runConfirmedAction(t("dataManagement.clearCredentialsBusy"), buildLocalStorageConfirmRequest("provider-credentials", t), () => onClearLocalStorage("provider-credentials"))} className="imagine-danger-action h-9 rounded-lg px-3 text-[11px] font-semibold disabled:opacity-50">
+            {t("dataManagement.clearCredentialsButton")}
           </button>
-          <button type="button" disabled={actionDisabled} onClick={() => void runConfirmedAction("清偏好中", buildLocalStorageConfirmRequest("ui-preferences"), () => onClearLocalStorage("ui-preferences"))} className="imagine-danger-action h-9 rounded-lg px-3 text-[11px] font-semibold disabled:opacity-50">
-            清 UI 偏好
+          <button type="button" disabled={actionDisabled} onClick={() => void runConfirmedAction(t("dataManagement.clearUiPrefsBusy"), buildLocalStorageConfirmRequest("ui-preferences", t), () => onClearLocalStorage("ui-preferences"))} className="imagine-danger-action h-9 rounded-lg px-3 text-[11px] font-semibold disabled:opacity-50">
+            {t("dataManagement.clearUiPrefsButton")}
           </button>
         </div>
       </section>

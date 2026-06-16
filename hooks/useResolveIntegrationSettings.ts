@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/lib/i18n";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { API_ROUTES } from "@/lib/api/routes";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
@@ -41,17 +42,17 @@ function delay(ms: number): Promise<void> {
 
 function readResolveCommandPayload(value: unknown): ResolveCommandPayload {
   if (typeof value !== "object" || value === null || !("command" in value)) {
-    throw new Error("Resolve 命令响应格式无效");
+    throw new Error(t("common.notices.resolveResponseFormatInvalid"));
   }
   const command = (value as Record<string, unknown>).command;
   if (typeof command !== "object" || command === null) {
-    throw new Error("Resolve 命令响应格式无效");
+    throw new Error(t("common.notices.resolveResponseFormatInvalid"));
   }
   const record = command as Record<string, unknown>;
   const id = typeof record.id === "string" ? record.id : "";
   const status = typeof record.status === "string" ? record.status : "";
   if (!id || !isResolveCommandStatus(status)) {
-    throw new Error("Resolve 命令状态格式无效");
+    throw new Error(t("common.notices.resolveStatusFormatInvalid"));
   }
   return {
     id,
@@ -121,29 +122,29 @@ export function useResolveConnectionCheck({
         body: JSON.stringify({ kind: "doctor" }),
       });
       if (!createResponse.ok) {
-        throw new Error(await readFetchError(createResponse, "Resolve 命令创建失败"));
+        throw new Error(await readFetchError(createResponse, t("common.notices.resolveCommandCreateFailed")));
       }
       const created = readResolveCommandPayload(await createResponse.json() as unknown);
-      pushWorkspaceNotice("info", "已发送达芬奇连接检查，请保持 Resolve 插件窗口打开");
+      pushWorkspaceNotice("info", t("common.notices.resolveCommandSent"));
       for (let attempt = 0; attempt < 60; attempt += 1) {
         await delay(1000);
         if (!enabledRef.current) return;
         const statusResponse = await fetch(`${API_ROUTES.resolve.commands}?id=${encodeURIComponent(created.id)}`);
         if (!statusResponse.ok) {
-          throw new Error(await readFetchError(statusResponse, "Resolve 命令状态读取失败"));
+          throw new Error(await readFetchError(statusResponse, t("common.notices.resolveCommandStatusReadFailed")));
         }
         const current = readResolveCommandPayload(await statusResponse.json() as unknown);
         if (current.status === "complete") {
-          pushWorkspaceNotice("success", current.result ?? "达芬奇连接检查完成");
+          pushWorkspaceNotice("success", current.result ?? t("common.notices.resolveCheckComplete"));
           return;
         }
         if (current.status === "error") {
-          throw new Error(current.error ?? "达芬奇连接检查失败");
+          throw new Error(current.error ?? t("common.notices.resolveCheckFailed"));
         }
       }
-      throw new Error("等待 Resolve 插件响应超时，请确认 Workflow Integration 插件窗口已打开");
+      throw new Error(t("common.notices.resolveTimeout"));
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "达芬奇连接检查失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.resolveCheckFailed")));
     } finally {
       setStatus("idle");
     }

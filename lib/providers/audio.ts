@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n";
 import { generateRunningHubMedia, getRunningHubMediaStatus, downloadRunningHubMedia } from "./image";
 import { getRunningHubStandardModel } from "./runninghub";
 import {
@@ -53,7 +54,7 @@ export async function generateAudioOperation(
   input: GenerateAudioOperationInput,
 ): Promise<GenerateAudioOperationResult> {
   if (input.mode === "voice_clone" && input.voiceCloneConsentAccepted !== true) {
-    throw new Error("音色克隆需要先确认参考音频授权");
+    throw new Error(t("common.notices.voiceCloneNeedsConsent"));
   }
   if (input.voiceProfileId) {
     throw new Error("Voice profile IDs must be resolved before audio operation");

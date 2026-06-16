@@ -4,6 +4,7 @@ import {
   type GenerationRequestSnapshot,
   type StorageItem,
 } from "./db";
+import { t } from "@/lib/i18n";
 
 export type GenerationTaskStatus = "pending" | "processing" | "complete" | "failed" | "canceled";
 export type GenerationTaskSourceSurface = "workspace" | "board" | "agent";
@@ -166,7 +167,7 @@ export function generationTaskToGalleryItem(task: GenerationTask): StorageItem |
     scope: task.source.boardId ? "board" : "workspace",
     boardId: task.source.boardId ?? "",
     operationName: task.operationName,
-    errorMessage: task.errorMessage ?? (task.status === "canceled" ? "任务已取消" : undefined),
+    errorMessage: task.errorMessage ?? (task.status === "canceled" ? t("common.notices.generationTaskCancelled") : undefined),
     generationRequest: task.request,
     sourceBoardNodeId: task.source.boardNodeId,
     sourceBoardResultStackKey: task.source.resultStackKey,

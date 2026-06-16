@@ -1,3 +1,5 @@
+import { t } from "@/lib/i18n";
+
 export interface ImageGenerationPayload {
   imageUrl: string | null;
   imageUrls: string[];
@@ -45,12 +47,12 @@ function readBlobAsDataUrl(blob: Blob): Promise<string> {
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result !== "string") {
-        reject(new Error("图片响应读取失败"));
+        reject(new Error(t("common.errors.fileReadFailed")));
         return;
       }
       resolve(reader.result);
     };
-    reader.onerror = () => reject(new Error("图片响应读取失败"));
+    reader.onerror = () => reject(new Error(t("common.errors.fileReadFailed")));
     reader.readAsDataURL(blob);
   });
 }

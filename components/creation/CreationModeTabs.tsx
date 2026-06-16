@@ -1,4 +1,5 @@
 import { AudioLines, Image as ImageIcon, Video as VideoIcon } from "lucide-react";
+import { useTranslations } from "@/lib/i18n";
 
 export type CreationMode = "image" | "video" | "audio";
 
@@ -8,10 +9,11 @@ interface CreationModeTabsProps {
 }
 
 export default function CreationModeTabs({ value, onChange }: CreationModeTabsProps) {
+  const { t } = useTranslations("creation");
   const tabs: Array<{ Icon: typeof ImageIcon; label: string; value: CreationMode }> = [
-    { Icon: ImageIcon, label: "智能绘图", value: "image" },
-    { Icon: VideoIcon, label: "视频合成", value: "video" },
-    { Icon: AudioLines, label: "音频创作", value: "audio" },
+    { Icon: ImageIcon, label: t("tabs.image"), value: "image" },
+    { Icon: VideoIcon, label: t("tabs.video"), value: "video" },
+    { Icon: AudioLines, label: t("tabs.audio"), value: "audio" },
   ];
 
   return (

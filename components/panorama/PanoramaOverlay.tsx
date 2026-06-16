@@ -12,6 +12,7 @@ import {
   type PanoramaCamera,
   type PanoramaScreenshot,
 } from "@/lib/panorama/capture";
+import { useTranslations } from "@/lib/i18n";
 
 interface PanoramaOverlayProps {
   item: StorageItem;
@@ -58,25 +59,25 @@ function renderPanoramaImage(renderer: Pannellum.Renderer, camera: PanoramaCamer
     { returnImage: true },
   );
   if (typeof result !== "string" || !result.startsWith("data:image/")) {
-    throw new Error("全景截图渲染失败");
+    throw new Error("renderFailed");
   }
   return result;
 }
 
 function getCaptureSize(id: PanoramaCaptureSizeId): PanoramaCaptureSize {
   const size = PANORAMA_CAPTURE_SIZES.find(option => option.id === id);
-  if (!size) throw new Error("未知全景截图尺寸");
+  if (!size) throw new Error("unknownSize");
   return size;
 }
 
 function readCaptureSizeId(value: string): PanoramaCaptureSizeId {
   const size = PANORAMA_CAPTURE_SIZES.find(option => option.id === value);
-  if (!size) throw new Error("未知全景截图尺寸");
+  if (!size) throw new Error("unknownSize");
   return size.id;
 }
 
 function readErrorMessage(error: unknown): string {
-  return error instanceof Error && error.message.trim() ? error.message : "全景查看器加载失败";
+  return error instanceof Error && error.message.trim() ? error.message : "loadFailed";
 }
 
 async function preparePanoramaUrl(sourceUrl: string): Promise<{ url: string; revoke: (() => void) | null }> {
@@ -160,6 +161,7 @@ async function renderSizedPanoramaImage(panoramaUrl: string, camera: PanoramaCam
 }
 
 export default function PanoramaOverlay({ item, onClose, onSaveScreenshots }: PanoramaOverlayProps) {
+  const { t } = useTranslations("common");
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<Pannellum.Viewer | null>(null);
   const panoramaUrlRef = useRef<string | null>(null);
@@ -197,7 +199,7 @@ export default function PanoramaOverlay({ item, onClose, onSaveScreenshots }: Pa
     }
 
     void buildViewer().catch(error => {
-      if (isActive) setErrorMessage(readErrorMessage(error));
+      if (isActive) setErrorMessage(t("panorama.loadFailed"));
     });
 
     return () => {
@@ -212,7 +214,7 @@ export default function PanoramaOverlay({ item, onClose, onSaveScreenshots }: Pa
 
   const captureCamera = useCallback(async (camera: PanoramaCamera): Promise<PanoramaScreenshot> => {
     const panoramaUrl = panoramaUrlRef.current;
-    if (!panoramaUrl) throw new Error("全景查看器尚未就绪");
+    if (!panoramaUrl) throw new Error("notReady");
     const dataUrl = await renderSizedPanoramaImage(panoramaUrl, camera, getCaptureSize(captureSizeId));
     const size = await imageSizeFromDataUrl(dataUrl);
     return { camera, dataUrl, ...size };
@@ -220,9 +222,9 @@ export default function PanoramaOverlay({ item, onClose, onSaveScreenshots }: Pa
 
   const captureCurrent = useCallback(async (): Promise<PanoramaScreenshot> => {
     const viewer = viewerRef.current;
-    if (!viewer) throw new Error("全景查看器尚未就绪");
+    if (!viewer) throw new Error("notReady");
     return captureCamera({
-      label: "当前视角",
+      label: t("panorama.currentView"),
       yaw: viewer.getYaw(),
       pitch: viewer.getPitch(),
       hfov: viewer.getHfov(),
@@ -245,7 +247,8 @@ export default function PanoramaOverlay({ item, onClose, onSaveScreenshots }: Pa
       }
       await onSaveScreenshots(item, screenshots);
     } catch (error) {
-      setErrorMessage(readErrorMessage(error));
+      const msg = readErrorMessage(error);
+      setErrorMessage(msg === "loadFailed" ? t("panorama.loadFailed") : msg === "renderFailed" ? t("panorama.renderFailed") : msg === "unknownSize" ? t("panorama.unknownSize") : msg === "notReady" ? t("panorama.viewerNotReady") : msg);
     } finally {
       setSavingMode(null);
     }
@@ -265,7 +268,7 @@ export default function PanoramaOverlay({ item, onClose, onSaveScreenshots }: Pa
         {!isReady && !errorMessage && (
           <div className="absolute inset-0 flex items-center justify-center bg-slate-950/70 text-sm font-semibold text-slate-200">
             <Loader2 className="mr-2 h-4 w-4 animate-spin text-cyan-200" />
-            正在加载全景
+            {t("panorama.loading")}
           </div>
         )}
 
@@ -281,41 +284,41 @@ export default function PanoramaOverlay({ item, onClose, onSaveScreenshots }: Pa
             onClick={() => void saveScreenshots("current")}
             disabled={!isReady || savingMode !== null}
             className={actionButtonClass}
-            title="保存当前视角截图"
+            title={t("panorama.captureCurrent")}
           >
             {savingMode === "current" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-            <span>截图</span>
+            <span>{t("panorama.capture")}</span>
           </button>
           <button
             type="button"
             onClick={() => void saveScreenshots("four")}
             disabled={!isReady || savingMode !== null}
             className={actionButtonClass}
-            title="保存 4 个方向截图"
+            title={t("panorama.captureFour")}
           >
             {savingMode === "four" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Columns4 className="h-4 w-4" />}
-            <span>4视角</span>
+            <span>{t("panorama.fourView")}</span>
           </button>
           <button
             type="button"
             onClick={() => void saveScreenshots("twelve")}
             disabled={!isReady || savingMode !== null}
             className={actionButtonClass}
-            title="保存 12 个方向截图"
+            title={t("panorama.captureTwelve")}
           >
             {savingMode === "twelve" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Grid3X3 className="h-4 w-4" />}
-            <span>12视角</span>
+            <span>{t("panorama.twelveView")}</span>
           </button>
-          <button type="button" onClick={resetView} disabled={!isReady} className={iconButtonClass} title="重置视角">
+          <button type="button" onClick={resetView} disabled={!isReady} className={iconButtonClass} title={t("panorama.resetView")}>
             <RotateCcw className="h-4 w-4" />
           </button>
           <label className="flex h-9 items-center gap-1.5 rounded-md border border-white/12 bg-slate-950/86 px-2 text-xs font-semibold text-slate-200 shadow-lg backdrop-blur">
-            <span>尺寸</span>
+            <span>{t("panorama.sizeLabel")}</span>
             <select
               value={captureSizeId}
               onChange={event => setCaptureSizeId(readCaptureSizeId(event.target.value))}
               className={sizeSelectClass}
-              title="全景截图尺寸"
+              title={t("panorama.sizeTitle")}
             >
               {PANORAMA_CAPTURE_SIZES.map(size => (
                 <option key={size.id} value={size.id}>
@@ -326,7 +329,7 @@ export default function PanoramaOverlay({ item, onClose, onSaveScreenshots }: Pa
           </label>
         </div>
 
-        <button type="button" onClick={onClose} className={`absolute right-3 top-3 sm:right-4 sm:top-4 ${iconButtonClass}`} aria-label="退出全景查看">
+        <button type="button" onClick={onClose} className={`absolute right-3 top-3 sm:right-4 sm:top-4 ${iconButtonClass}`} aria-label={t("panorama.exitPanorama")}>
           <X className="h-4.5 w-4.5" />
         </button>
       </div>

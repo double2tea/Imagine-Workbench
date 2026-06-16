@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useTranslations } from "@/lib/i18n";
 
 export interface BoardMediaAction {
   id: string;
@@ -20,20 +21,21 @@ interface BoardMediaActionBarProps {
   visible?: boolean;
 }
 
-const BOARD_MEDIA_ACTION_GROUP_LABELS = {
-  assist: "辅助操作",
-  edit: "编辑操作",
-  media: "媒体操作",
-  view: "查看与导出",
-} satisfies Record<BoardMediaActionGroupId, string>;
-
 export default function BoardMediaActionBar({ groups, visible = false }: BoardMediaActionBarProps) {
+  const { t } = useTranslations("board");
   const visibleGroups = groups.filter(group => group.actions.length > 0);
   if (visibleGroups.length === 0) return null;
   const actionCount = visibleGroups.reduce((count, group) => count + group.actions.length, 0);
   const visibilityClass = visible
     ? "pointer-events-auto opacity-100"
     : "pointer-events-none opacity-0 group-hover/board-video:pointer-events-auto group-hover/board-video:opacity-100";
+
+  const groupLabels: Record<BoardMediaActionGroupId, string> = {
+    assist: t('mediaActionBar.assist'),
+    edit: t('mediaActionBar.edit'),
+    media: t('mediaActionBar.media'),
+    view: t('mediaActionBar.view'),
+  };
 
   return (
     <div
@@ -47,7 +49,7 @@ export default function BoardMediaActionBar({ groups, visible = false }: BoardMe
       {visibleGroups.map(group => (
         <div
           key={group.id}
-          aria-label={BOARD_MEDIA_ACTION_GROUP_LABELS[group.id]}
+          aria-label={groupLabels[group.id]}
           className="board-media-action-group flex items-center gap-0.5 px-1"
           data-group={group.id}
           role="group"

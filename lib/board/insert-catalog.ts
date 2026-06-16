@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n";
 import type { LucideIcon } from "lucide-react";
 import {
   Bot,
@@ -32,7 +33,7 @@ export type BoardInsertKind =
   | "agent"
   | "note";
 
-export type BoardInsertGroupLabel = "开始" | "生成" | "组织";
+export type BoardInsertGroupLabel = string;
 export type BoardInsertTone = "accent" | "info" | "success" | "teal" | "violet" | "warning";
 
 export interface BoardInsertCatalogItem {
@@ -109,22 +110,26 @@ export const BOARD_INSERT_CATALOG: BoardInsertCatalogItem[] = [
   },
 ];
 
-export const BOARD_INSERT_GROUP_LABELS: readonly BoardInsertGroupLabel[] = ["开始", "生成", "组织"];
+export const BOARD_INSERT_GROUP_LABELS: readonly BoardInsertGroupLabel[] = [
+  t("creation.promptTemplates.categories.custom"),
+  t("board.node.types.imageGenerate"),
+  t("board.node.types.multiGrid"),
+];
 
 export function boardInsertGroupLabel(kind: BoardInsertKind): BoardInsertGroupLabel {
   switch (kind) {
     case "prompt":
     case "reference-group":
-      return "开始";
+      return t("creation.promptTemplates.categories.custom");
     case "image-generate":
     case "video-generate":
     case "audio-operation":
     case "runninghub-app":
-      return "生成";
+      return t("board.node.types.imageGenerate");
     case "agent":
     case "multi-grid":
     case "note":
-      return "组织";
+      return t("board.node.types.multiGrid");
   }
 }
 

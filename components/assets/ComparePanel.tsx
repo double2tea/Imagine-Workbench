@@ -1,6 +1,7 @@
 import { FileText, Music, Sliders } from "lucide-react";
 import PreviewImage from "@/components/PreviewImage";
 import type { StorageItem } from "@/lib/db";
+import { useTranslations } from "@/lib/i18n";
 import { transcriptFromDataUrl } from "@/lib/transcripts";
 
 export type CompareViewType = "side-by-side" | "wipe-slider";
@@ -20,7 +21,7 @@ function formatModelName(model: string): string {
   return model.replace("-preview", "").replace("lite-", "").replace("imagen-", "Imagen");
 }
 
-function CompareFrame({ item, tone }: { item: StorageItem; tone: "blue" | "amber" }) {
+function CompareFrame({ item, tone, t }: { item: StorageItem; tone: "blue" | "amber"; t: ReturnType<typeof useTranslations>["t"] }) {
   const isBlue = tone === "blue";
 
   return (
@@ -38,7 +39,7 @@ function CompareFrame({ item, tone }: { item: StorageItem; tone: "blue" | "amber
 
         <div className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)]">
           {item.type === "image" ? (
-            <PreviewImage src={item.url} alt={isBlue ? "对比 A" : "对比 B"} className="h-full w-full object-cover" />
+            <PreviewImage src={item.url} alt={isBlue ? t("compare.compareA") : t("compare.compareB")} className="h-full w-full object-cover" />
           ) : item.type === "video" ? (
             <video src={item.url} controls loop preload="metadata" className="h-full w-full object-cover" />
           ) : item.type === "audio" ? (
@@ -50,7 +51,7 @@ function CompareFrame({ item, tone }: { item: StorageItem; tone: "blue" | "amber
             <div className="flex h-full w-full flex-col gap-2 p-3">
               <FileText className="imagine-tone-icon h-4 w-4 shrink-0" data-tone="info" />
               <p className="line-clamp-6 whitespace-pre-wrap text-xs leading-5 text-[var(--iw-muted)]">
-                {transcriptFromDataUrl(item.url) || "无转写文本"}
+                {transcriptFromDataUrl(item.url) || t("compare.noTranscriptText")}
               </p>
             </div>
           )}
@@ -74,6 +75,7 @@ export default function ComparePanel({
   onSliderPosChange,
   onViewTypeChange,
 }: ComparePanelProps) {
+  const { t } = useTranslations("common");
   const isBothImages = first?.type === "image" && second?.type === "image";
 
   return (
@@ -82,9 +84,9 @@ export default function ComparePanel({
         <div>
           <h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--iw-text)]">
             <Sliders className="h-4 w-4 text-[var(--iw-accent)]" aria-hidden />
-            作品对比
+            {t("compare.title")}
           </h3>
-          <p className="mt-0.5 text-[10px] text-[var(--iw-muted)]">在画廊勾选 2 项后，可分屏或滑块对比。</p>
+          <p className="mt-0.5 text-[10px] text-[var(--iw-muted)]">{t("compare.hint")}</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -99,7 +101,7 @@ export default function ComparePanel({
                     : "text-[var(--iw-muted)] hover:text-[var(--iw-text)]"
                 }`}
               >
-                滑块
+                {t("compare.slider")}
               </button>
               <button
                 type="button"
@@ -110,7 +112,7 @@ export default function ComparePanel({
                     : "text-[var(--iw-muted)] hover:text-[var(--iw-text)]"
                 }`}
               >
-                分屏
+                {t("compare.splitView")}
               </button>
             </div>
           )}
@@ -120,26 +122,26 @@ export default function ComparePanel({
             onClick={onReset}
             className="imagine-secondary-action cursor-pointer rounded-lg border border-[var(--iw-border)] px-2 py-1 text-xs font-medium text-[var(--iw-muted)] transition hover:text-[var(--iw-text)]"
           >
-            重置
+            {t("compare.reset")}
           </button>
         </div>
       </div>
 
       {compareItemIds.length !== 2 ? (
         <div className="flex flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-[var(--iw-border)] p-8 text-center text-xs text-[var(--iw-muted)]">
-          <span>请在画廊中为 2 个作品开启「对比」。</span>
-          <span className="font-mono text-[10px]">已选 {compareItemIds.length}/2</span>
+          <span>{t("compare.selectTwoHint")}</span>
+          <span className="font-mono text-[10px]">{t("compare.selected", { count: compareItemIds.length })}</span>
         </div>
       ) : !first || !second ? (
         <div className="rounded-xl border border-dashed border-[var(--iw-border)] p-4 text-center text-xs text-[var(--iw-muted)]">
-          对比素材加载失败，请重新勾选。
+          {t("compare.loadFailed")}
         </div>
       ) : viewType === "wipe-slider" && isBothImages ? (
         <div className="flex flex-col gap-3">
           <div className="relative aspect-[4/3] w-full select-none overflow-hidden rounded-xl border border-[var(--iw-border)] bg-[var(--iw-panel)] shadow-lg">
             <PreviewImage
               src={first.url}
-              alt="对比 A"
+              alt={t("compare.compareA")}
               className="pointer-events-none absolute inset-0 h-full w-full object-cover"
             />
             <div className="pointer-events-none absolute bottom-3 left-3 z-20 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)]/90 px-2.5 py-1 text-[10px] text-[var(--iw-muted)] backdrop-blur-md">
@@ -149,7 +151,7 @@ export default function ComparePanel({
 
             <PreviewImage
               src={second.url}
-              alt="对比 B"
+              alt={t("compare.compareB")}
               className="pointer-events-none absolute inset-0 h-full w-full object-cover"
               style={{ clipPath: `polygon(0 0, ${sliderPos}% 0, ${sliderPos}% 100%, 0 100%)` }}
             />
@@ -172,7 +174,7 @@ export default function ComparePanel({
               min="0"
               max="100"
               value={sliderPos}
-              aria-label="对比滑块位置"
+              aria-label={t("compare.dragSlider")}
               onChange={event => onSliderPosChange(Number(event.target.value))}
               className="absolute inset-0 z-30 h-full w-full cursor-ew-resize opacity-0"
             />
@@ -182,7 +184,7 @@ export default function ComparePanel({
             <span className="max-w-[45%] truncate" title={first.prompt}>
               A: {first.prompt}
             </span>
-            <span className="text-[var(--iw-accent)]">拖动滑块</span>
+            <span className="text-[var(--iw-accent)]">{t("compare.dragSlider")}</span>
             <span className="max-w-[45%] truncate text-right" title={second.prompt}>
               B: {second.prompt}
             </span>
@@ -190,8 +192,8 @@ export default function ComparePanel({
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <CompareFrame item={first} tone="blue" />
-          <CompareFrame item={second} tone="amber" />
+          <CompareFrame item={first} tone="blue" t={t} />
+          <CompareFrame item={second} tone="amber" t={t} />
         </div>
       )}
     </div>

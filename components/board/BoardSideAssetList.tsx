@@ -7,6 +7,7 @@ import PreviewImage from "@/components/PreviewImage";
 import { ensureHydratedStorageItem } from "@/lib/assets/ensure-hydrated";
 import { IMAGINE_BOARD_ASSET_DRAG_TYPE } from "@/lib/board/interaction";
 import type { StorageItem } from "@/lib/db";
+import { useTranslations } from "@/lib/i18n";
 
 const PAGE_SIZE = 36;
 const SIDE_ACTION_BUTTON_CLASS =
@@ -48,11 +49,18 @@ function BoardSideAssetRow({
   item: StorageItem;
   onAddToBoard: (item: StorageItem) => void;
 }) {
+  const { t } = useTranslations("board");
+  const commonT = useTranslations("common");
   const [adding, setAdding] = useState(false);
-  const typeLabel = item.type === "audio" || item.type === "image" || item.type === "video"
-    ? mediaTypeLabels[item.type]
+  const typeLabel: Record<BoardSideMediaType, string> = {
+    audio: commonT.t('mediaTypeLabels.audio'),
+    image: commonT.t('mediaTypeLabels.image'),
+    video: commonT.t('mediaTypeLabels.video'),
+  };
+  const typeLabelValue = item.type === "audio" || item.type === "image" || item.type === "video"
+    ? typeLabel[item.type]
     : item.type;
-  const statusLabel = alreadyOnCanvas ? "已在画布" : storageStatusLabels[item.status];
+  const statusLabel = alreadyOnCanvas ? commonT.t("statusLabels.complete") : (item.status === "complete" ? "可放入" : item.status === "failed" ? commonT.t('statusLabels.failed') : item.status === "pending" ? commonT.t('statusLabels.pending') : commonT.t('statusLabels.processing'));
 
   const handleAdd = async () => {
     if (adding || alreadyOnCanvas) return;
@@ -112,7 +120,7 @@ function BoardSideAssetRow({
         <span className="block truncate text-xs font-semibold text-[var(--iw-text)]">{item.prompt || item.model}</span>
         <span className="flex min-w-0 items-center gap-1.5">
           <span className="board-side-asset-type shrink-0 rounded-md border border-[var(--iw-border)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--iw-muted)]">
-            {typeLabel}
+            {typeLabelValue}
           </span>
           <span className="imagine-status-chip block truncate font-mono text-[10px]" data-status={item.status}>
             {statusLabel}
@@ -120,7 +128,7 @@ function BoardSideAssetRow({
         </span>
         <span className="flex items-center gap-1 text-[10px] font-medium text-[var(--iw-faint)]">
           {alreadyOnCanvas ? <CheckCircle2 className="h-3 w-3" /> : <PlusCircle className="h-3 w-3" />}
-          <span className="truncate">{alreadyOnCanvas ? "画布中已有实例" : item.model}</span>
+          <span className="truncate">{alreadyOnCanvas ? t("node.types.asset") : item.model}</span>
         </span>
       </span>
     </button>
@@ -128,6 +136,7 @@ function BoardSideAssetRow({
 }
 
 function ImportMediaButton({ className = "" }: { className?: string }) {
+  const { t } = useTranslations("board");
   const openImport = useBoardMediaImport();
   if (!openImport) return null;
   return (
@@ -137,7 +146,7 @@ function ImportMediaButton({ className = "" }: { className?: string }) {
       className={`${SIDE_ACTION_BUTTON_CLASS} ${className}`}
     >
       <Upload className="imagine-tone-icon h-3.5 w-3.5" data-tone="success" />
-      从本机导入图片/视频/音频
+      {t('workspace.importMedia')}
     </button>
   );
 }
@@ -164,6 +173,7 @@ export default function BoardSideAssetList({
   onAddToBoard,
   onOpenAssetLibrary,
 }: BoardSideAssetListProps) {
+  const { t } = useTranslations("common");
   const [visibleLimit, setVisibleLimit] = useState(PAGE_SIZE);
   const [filter, setFilter] = useState<AssetFilter>("all");
   const mediaItems = useMemo(
@@ -181,10 +191,10 @@ export default function BoardSideAssetList({
   const visibleItems = filteredItems.slice(0, visibleLimit);
 
   const filterChips: Array<{ id: AssetFilter; label: string }> = [
-    { id: "all", label: "全部" },
-    { id: "image", label: "图片" },
-    { id: "video", label: "视频" },
-    { id: "audio", label: "音频" },
+    { id: "all", label: t("gallery.allModels") },
+    { id: "image", label: t('mediaTypeLabels.image') },
+    { id: "video", label: t('mediaTypeLabels.video') },
+    { id: "audio", label: t('mediaTypeLabels.audio') },
   ];
 
   if (loading) {
