@@ -120,11 +120,24 @@ export function dataUriToBlob(dataUri: string): Blob {
 }
 
 export function parseDataUri(dataUri: string): { mimeType: string; base64: string } {
-  const match = dataUri.match(/^data:([^;]+);base64,(.+)$/);
-  if (!match) {
+  const prefix = "data:";
+  const marker = ";base64,";
+  if (!dataUri.startsWith(prefix)) {
     throw new Error("Reference images must be data URI base64 strings");
   }
-  return { mimeType: match[1], base64: match[2] };
+  const markerIndex = dataUri.indexOf(marker, prefix.length);
+  const base64Start = markerIndex + marker.length;
+  if (
+    markerIndex <= prefix.length ||
+    dataUri.slice(prefix.length, markerIndex).includes(";") ||
+    base64Start >= dataUri.length
+  ) {
+    throw new Error("Reference images must be data URI base64 strings");
+  }
+  return {
+    mimeType: dataUri.slice(prefix.length, markerIndex),
+    base64: dataUri.slice(base64Start),
+  };
 }
 
 export function aspectRatioToOpenAiSize(aspectRatio: string): string {

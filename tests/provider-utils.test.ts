@@ -8,6 +8,7 @@ import {
   aspectRatioToVideoSize,
   authHeaders,
   openAiCompatibleUrl,
+  parseDataUri,
   parseProviderResponseBody,
   resolveProviderConfig,
 } from "../lib/providers/utils";
@@ -18,6 +19,14 @@ test("parseProviderResponseBody parses JSON response text", () => {
 
 test("parseProviderResponseBody converts plain text provider errors", () => {
   assert.deepEqual(parseProviderResponseBody("error code: 502"), { error: "error code: 502" });
+});
+
+test("parseDataUri handles large base64 payloads without regex matching", () => {
+  const base64 = "a".repeat(8 * 1024 * 1024);
+  assert.deepEqual(parseDataUri(`data:image/png;base64,${base64}`), {
+    mimeType: "image/png",
+    base64,
+  });
 });
 
 test("authHeaders uses MiMo api-key header", () => {
