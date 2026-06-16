@@ -22,13 +22,6 @@ interface BoardTaskQueuePanelProps {
 
 const iconClassName = "h-3.5 w-3.5";
 
-const mediaTypeLabels: Record<GenerationTask["mediaType"], string> = {
-  audio: "音频",
-  image: "图片",
-  transcript: "文本",
-  video: "视频",
-};
-
 function mediaIcon(task: GenerationTask) {
   if (task.mediaType === "image") return <ImageIcon className={`imagine-tone-icon ${iconClassName}`} data-tone="accent" />;
   if (task.mediaType === "video") return <Video className={`imagine-tone-icon ${iconClassName}`} data-tone="violet" />;
@@ -131,7 +124,7 @@ function TaskRow({
           }}
         >
           <LocateFixed className="h-3 w-3" />
-          {t('buttons.confirm', { fallback: "定位源" }) ?? "定位源"}
+          {t("buttons.locateSource")}
         </BoardTaskActionButton>
         <BoardTaskActionButton
           type="button"
@@ -142,7 +135,7 @@ function TaskRow({
           }}
         >
           <CheckCircle2 className="h-3 w-3" />
-          {t('statusLabels.complete', { fallback: "查看结果" }) ?? "查看结果"}
+          {t("buttons.viewResult")}
         </BoardTaskActionButton>
         {canCancel ? (
           <BoardTaskActionButton
@@ -165,7 +158,7 @@ function TaskRow({
               onClick={() => onRerunTaskSource(task)}
             >
               <RotateCcw className="h-3 w-3" />
-              重跑源
+              {t("buttons.rerun")}
             </BoardTaskActionButton>
             <BoardTaskActionButton
               type="button"
@@ -174,7 +167,7 @@ function TaskRow({
               tone="danger"
             >
               <Trash2 className="h-3 w-3" />
-              忽略
+              {t("buttons.ignore")}
             </BoardTaskActionButton>
           </>
         ) : null}
@@ -242,6 +235,7 @@ export default function BoardTaskQueuePanel({
   onRerunTaskSource,
   tasks,
 }: BoardTaskQueuePanelProps) {
+  const { t } = useTranslations("board");
   const activeTasks = tasks.filter(task => task.status === "pending" || task.status === "processing");
   const failedTasks = tasks.filter(task => task.status === "failed");
   const recentTasks = tasks.filter(task => task.status === "complete" || task.status === "canceled").slice(0, 5);
@@ -251,7 +245,7 @@ export default function BoardTaskQueuePanel({
     return (
       <div className="flex flex-col gap-2 px-3 pb-3 pt-1">
         <p className="rounded-lg border border-dashed border-[var(--iw-border)] px-3 py-6 text-center text-xs leading-5 text-[var(--iw-muted)]">
-          当前画板暂无生成任务。运行生成节点后，进度、失败和取消操作会出现在这里。
+          {t("tasks.emptyHint")}
         </p>
       </div>
     );
@@ -261,13 +255,13 @@ export default function BoardTaskQueuePanel({
     <div className="flex flex-col gap-3 px-3 pb-3 pt-1">
       <div className="grid grid-cols-3 gap-1.5">
         <BoardStatusBadge status="processing" className="justify-center rounded-lg py-1.5 text-center">
-          运行 {activeTasks.length}
+          {t("tasks.activeBadge", { count: activeTasks.length })}
         </BoardStatusBadge>
         <BoardStatusBadge status="failed" className="justify-center rounded-lg py-1.5 text-center">
-          失败 {failedTasks.length}
+          {t("tasks.failedBadge", { count: failedTasks.length })}
         </BoardStatusBadge>
         <BoardStatusBadge status="pending" className="justify-center rounded-lg py-1.5 text-center">
-          需关注 {badgeCount}
+          {t("tasks.attentionBadge", { count: badgeCount })}
         </BoardStatusBadge>
       </div>
       <TaskSection
@@ -280,7 +274,7 @@ export default function BoardTaskQueuePanel({
         onFocusNode={onFocusNode}
         onRerunTaskSource={onRerunTaskSource}
         tasks={activeTasks}
-        title="运行中"
+        title={t("tasks.activeSection")}
       />
       <TaskSection
         cancelingTaskIds={cancelingTaskIds}
@@ -292,7 +286,7 @@ export default function BoardTaskQueuePanel({
         onFocusNode={onFocusNode}
         onRerunTaskSource={onRerunTaskSource}
         tasks={failedTasks}
-        title="需要处理"
+        title={t("tasks.failedSection")}
       />
       <TaskSection
         cancelingTaskIds={cancelingTaskIds}
@@ -304,7 +298,7 @@ export default function BoardTaskQueuePanel({
         onFocusNode={onFocusNode}
         onRerunTaskSource={onRerunTaskSource}
         tasks={recentTasks}
-        title="最近完成"
+        title={t("tasks.recentSection")}
       />
     </div>
   );

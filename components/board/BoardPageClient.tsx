@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { flushSync } from "react-dom";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
-import { useTranslations } from "@/lib/i18n";
+import { t as i18nT, useTranslations } from "@/lib/i18n";
 import AgentDock from "@/components/agent/AgentDock";
 import SaveVoiceProfileDialog, { type SaveVoiceProfileDialogInput } from "@/components/audio/SaveVoiceProfileDialog";
 import {
@@ -382,18 +382,18 @@ function readImageDataUrlSize(url: string): Promise<BoardSize> {
     const image = new Image();
     image.onload = () => {
       if (image.naturalWidth <= 0 || image.naturalHeight <= 0) {
-        reject(new Error("图片尺寸无效"));
+        reject(new Error(i18nT("board.import.imageSizeInvalid")));
         return;
       }
       resolve({ width: image.naturalWidth, height: image.naturalHeight });
     };
-    image.onerror = () => reject(new Error("图片尺寸读取失败"));
+    image.onerror = () => reject(new Error(i18nT("board.import.imageSizeReadFailed")));
     image.src = url;
   });
 }
 
 function fitBoardImportImageNodeSize(size: BoardSize): BoardSize {
-  if (size.width <= 0 || size.height <= 0) throw new Error("图片尺寸无效");
+  if (size.width <= 0 || size.height <= 0) throw new Error(i18nT("board.import.imageSizeInvalid"));
   const aspectRatio = size.width / size.height;
   let width = BOARD_IMPORT_IMAGE_MAX_SIZE.width;
   let height = width / aspectRatio;
@@ -650,10 +650,10 @@ function runningHubNodeInfoBindings(node: BoardRunningHubAppNode): RunningHubTas
 
 function runningHubAppNodeError(node: BoardRunningHubAppNode, prompt: string, referenceCount: number): string | null {
   if (!node.targetId.trim() || node.targetId.includes("<")) {
-    return node.targetType === "workflow" ? "请填写真实的 workflowId" : "请填写真实的 webappId";
+    return i18nT("board.runninghubFillRealId");
   }
   const readiness = analyzeRunningHubBindings(node.bindings, prompt, referenceCount);
-  if (readiness.missingCount > 0) return `RunningHub 应用还有 ${readiness.missingCount} 个必填字段缺少输入`;
+  if (readiness.missingCount > 0) return i18nT("board.runninghub.missingFieldCount", { count: readiness.missingCount });
   return null;
 }
 
@@ -905,41 +905,41 @@ function updatePreviewNode(node: BoardNode, operation: AgentBoardPatchOperation)
   if (operation.op !== "update_node") return node;
   const updatedAt = new Date().toISOString();
   if (node.kind === "prompt") {
-    if (!operation.prompt?.trim()) throw new Error("Prompt 节点更新缺少 prompt");
+    if (!operation.prompt?.trim()) throw new Error(i18nT("board.agent.promptContentMissing"));
     return { ...node, prompt: operation.prompt, updatedAt };
   }
   if (node.kind === "note") {
     const body = operation.body ?? operation.prompt;
-    if (!body?.trim()) throw new Error("Note 节点更新缺少 body");
+    if (!body?.trim()) throw new Error(i18nT("board.agent.noteContentMissing"));
     return { ...node, body, updatedAt };
   }
   if (node.kind === "agent") {
     const instruction = operation.instruction ?? operation.prompt;
-    if (!instruction?.trim()) throw new Error("Agent 节点更新缺少 instruction");
+    if (!instruction?.trim()) throw new Error(i18nT("board.agent.instructionContentMissing"));
     return { ...node, instruction, updatedAt };
   }
   if (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation") {
-    if (node.status === "processing") throw new Error("生成中的节点不可直接更新");
+    if (node.status === "processing") throw new Error(i18nT("board.agent.nodeProcessingCannotUpdate"));
     const update = buildGenerateNodeUpdate(node, operation);
-    if (!hasGenerateNodeUpdate(update)) throw new Error("生成节点更新缺少参数");
+    if (!hasGenerateNodeUpdate(update)) throw new Error(i18nT("board.agent.generationParamsMissing"));
     return { ...node, ...update, updatedAt };
   }
-  throw new Error("画板补丁不支持更新该类型节点");
+  throw new Error(i18nT("board.agent.unsupportedNodeType"));
 }
 
 function validateBoardPatch(patch: AgentBoardPatch, currentNodes: BoardNode[]): void {
-  if (patch.operations.length === 0) throw new Error("画板补丁没有操作");
+  if (patch.operations.length === 0) throw new Error(i18nT("board.agent.patchMissingOperations"));
   if (patch.operations.length > AGENT_BOARD_PATCH_MAX_OPERATIONS) {
-    throw new Error(`画板补丁最多支持 ${AGENT_BOARD_PATCH_MAX_OPERATIONS} 个操作`);
+    throw new Error(i18nT("board.agent.patchInvalid"));
   }
 
   const previewNodes = [...currentNodes];
   const tempIds = new Set<string>();
   patch.operations.forEach((operation, index) => {
     if (operation.op === "create_node") {
-      if (!operation.tempId.trim()) throw new Error("创建节点缺少 tempId");
+      if (!operation.tempId.trim()) throw new Error(i18nT("board.agent.patchInvalid"));
       if (tempIds.has(operation.tempId) || currentNodes.some(node => node.id === operation.tempId)) {
-        throw new Error(`重复的临时节点 ID: ${operation.tempId}`);
+        throw new Error(i18nT("board.agent.patchInvalid"));
       }
       tempIds.add(operation.tempId);
       previewNodes.push(createPreviewBoardNode(operation, index));
@@ -947,10 +947,10 @@ function validateBoardPatch(patch: AgentBoardPatch, currentNodes: BoardNode[]): 
     }
     if (operation.op === "update_node") {
       if (tempIds.has(operation.nodeId)) {
-        throw new Error("同一补丁内不能更新临时节点；请在 create_node 中填完整字段");
+        throw new Error(i18nT("board.agent.patchInvalid"));
       }
       const indexToUpdate = previewNodes.findIndex(node => node.id === operation.nodeId);
-      if (indexToUpdate < 0) throw new Error(`未找到要更新的节点: ${operation.nodeId}`);
+      if (indexToUpdate < 0) throw new Error(i18nT("board.agent.nodeNotFoundForUpdate"));
       previewNodes[indexToUpdate] = updatePreviewNode(previewNodes[indexToUpdate], operation);
       return;
     }
@@ -1259,7 +1259,7 @@ function patchInputEdgesForNode(
 function patchGenerateNodeForStackKey(operation: AgentBoardPatchCreateNodeOperation, generatedNodeId: string): GenerateBoardNode {
   const previewNode = createPreviewBoardNode(operation, 0);
   if (!isGenerateBoardNode(previewNode)) {
-    throw new Error("画板补丁运行目标不是生成节点");
+    throw new Error(i18nT("board.agent.unsupportedNodeType"));
   }
   return { ...previewNode, id: generatedNodeId };
 }
@@ -1363,8 +1363,6 @@ function boardSummaryFromDocument(board: BoardDocument): BoardSummary {
 
 export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps) {
   const { t } = useTranslations();
-  const { t: bpN } = useTranslations("agent");
-  const { t: bpC } = useTranslations("board");
   const router = useRouter();
   const [resolvedBoardId, setResolvedBoardId] = useState(boardId);
   useEffect(() => {
@@ -1479,7 +1477,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     return () => {
       isActive = false;
     };
-  }, [pushWorkspaceNotice]);
+  }, [pushWorkspaceNotice, t]);
 
   useEffect(() => {
     const legacyItemsById = new Map<string, StorageItem>();
@@ -1613,7 +1611,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       },
       body: JSON.stringify({ webappId }),
     });
-    if (!response.ok) throw new Error(await readFetchError(response, "RunningHub 应用字段读取失败"));
+    if (!response.ok) throw new Error(await readFetchError(response, t("board.runninghub.schemaReadFailed")));
     const data = await response.json() as unknown;
     const schema = readRunningHubAppSchemaResult(data);
     return {
@@ -1721,15 +1719,15 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     }
     void resolveOriginalStorageItem(item).then(
       setFullscreenItem,
-      error => pushWorkspaceNotice("error", toErrorMessage(error, "Original media read failed")),
+      error => pushWorkspaceNotice("error", toErrorMessage(error, t("common.originalMediaReadFailed"))),
     );
-  }, [pushWorkspaceNotice, resolveOriginalStorageItem]);
+  }, [pushWorkspaceNotice, resolveOriginalStorageItem, t]);
   const handleOpenPanorama = useCallback((item: StorageItem) => {
     void resolveOriginalStorageItem(item).then(
       setPanoramaItem,
-      error => pushWorkspaceNotice("error", toErrorMessage(error, "Original image read failed")),
+      error => pushWorkspaceNotice("error", toErrorMessage(error, t("common.originalImageReadFailed"))),
     );
-  }, [pushWorkspaceNotice, resolveOriginalStorageItem]);
+  }, [pushWorkspaceNotice, resolveOriginalStorageItem, t]);
   const handleDownloadAsset = useCallback((item: StorageItem) => {
     void resolveOriginalStorageItem(item).then(
       originalItem => {
@@ -1743,13 +1741,13 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       },
       error => pushWorkspaceNotice("error", toErrorMessage(error, "Original media download failed")),
     );
-  }, [pushWorkspaceNotice, resolveOriginalStorageItem]);
+  }, [pushWorkspaceNotice, resolveOriginalStorageItem, t]);
   const handleSaveVoiceProfileSource = useCallback((item: StorageItem) => {
     void resolveOriginalStorageItem(item).then(
       setVoiceProfileSourceItem,
       error => pushWorkspaceNotice("error", toErrorMessage(error, "Original audio read failed")),
     );
-  }, [pushWorkspaceNotice, resolveOriginalStorageItem]);
+  }, [pushWorkspaceNotice, resolveOriginalStorageItem, t]);
   const resolveOriginalReferences = useCallback(async (references: ReferenceImageRef[]): Promise<ReferenceImageRef[]> => {
     return Promise.all(references.map(async reference => {
       const item = items.find(entry => entry.id === reference.id);
@@ -1773,7 +1771,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       id: reference.id,
       type: getMediaReferenceType(reference),
       url: reference.url,
-      prompt: `Agent 引用图 ${index + 1}`,
+      prompt: t("common.agentRefLabel", { n: index + 1 }),
       model: "agent-reference",
       aspectRatio: "auto",
       createdAt: "",
@@ -1935,13 +1933,13 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         headers: { "Content-Type": "application/json", ...buildProviderHeaders(selectedChatModel) },
         body: JSON.stringify({ prompt: promptToOptimize, model: selectedChatModel }),
       });
-      if (!res.ok) throw new Error(await readFetchError(res, "提示词优化失败"));
+      if (!res.ok) throw new Error(await readFetchError(res, t("common.notices.promptOptimizationFailed")));
       const data: unknown = await res.json();
       const optimized = getStringField(data, "optimized");
-      if (!optimized) throw new Error("提示词优化接口返回格式不正确");
+      if (!optimized) throw new Error(t("common.notices.promptOptimizationBadFormat"));
       setPrompt(optimized);
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "提示词优化失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.promptOptimizationFailed")));
     } finally {
       setIsOptimizing(false);
     }
@@ -2243,7 +2241,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       }
       const editedTitle = `${sourceNode.title} local edit`;
       const editedPrompt = sourceNode.asset.prompt.trim()
-        ? `${sourceNode.asset.prompt}\n局部编辑：${sourceNode.title}`
+        ? `${sourceNode.asset.prompt}\n${t("board.localEditPrompt", { title: sourceNode.title })}`
         : editedTitle;
       const editedItem = buildStorageItem(
         {
@@ -2276,7 +2274,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     } else {
       setReferenceImage(compressedMergedImage);
       setReferenceImages([{ id: nextReferenceId, url: compressedMergedImage, role: "general" }]);
-      setPrompt(prev => `In the marked region of the image, change: ${prev || "[输入你的新修改构想...]"}`);
+      setPrompt(prev => `${t("common.references.promptPrefix")}${prev || t("common.references.emptyPromptPlaceholder")}`);
       handleSelectImageModel("12ai:gpt-image-2");
       setMode("image");
     }
@@ -2679,7 +2677,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             runFailureCount += 1;
             boardController.updateGenerateNode(item.id, {
               status: "failed",
-              errorMessage: `当前音频模型不支持${mediaReferenceLabel(getMediaReferenceType(unsupportedAudioReference))}输入`,
+              errorMessage: t("board.agent.audioModelNotSupportMediaTypeInput", { type: mediaReferenceLabel(getMediaReferenceType(unsupportedAudioReference)) }),
             });
             continue;
           }
@@ -2723,10 +2721,10 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       }
 
       if (runFailureCount > 0) {
-        pushWorkspaceNotice("error", `已应用画板补丁，但 ${runFailureCount} 个生成节点未启动`);
+        pushWorkspaceNotice("error", t("board.agent.patchAppliedWithFailures", { count: runFailureCount }));
         return handledBoardAction(false);
       }
-      pushWorkspaceNotice("success", `已应用画板补丁：${patch.operations.length} 个操作`);
+      pushWorkspaceNotice("success", t("board.agent.patchApplied", { count: patch.operations.length }));
       return handledBoardAction(true);
     }
 
@@ -2861,7 +2859,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         });
         if (!didStart) {
           boardController.updateGenerateNode(videoNodeId, { status: "failed", errorMessage: "Video generation request not started" });
-          pushWorkspaceNotice("error", "已创建图生视频节点，但视频生成请求未启动");
+          pushWorkspaceNotice("error", t("board.agent.imageToVideoCreated"));
           return handledBoardAction(false);
         }
       }
@@ -3152,7 +3150,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       const audioCapability = getAudioModelCapabilities(model);
       const unsupportedAudioReference = references.find(reference => !audioCapability.referenceMediaTypes.includes(getMediaReferenceType(reference)));
       if (unsupportedAudioReference) {
-        const message = `当前音频模型不支持${mediaReferenceLabel(getMediaReferenceType(unsupportedAudioReference))}输入`;
+        const message = t("board.agent.audioModelNotSupportMediaTypeInput", { type: mediaReferenceLabel(getMediaReferenceType(unsupportedAudioReference)) });
         boardController.updateGenerateNode(generateNodeId, { errorMessage: message, status: "failed" });
         pushWorkspaceNotice("error", message);
         return handledBoardAction(false);
@@ -3180,7 +3178,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       });
 
       if (!shouldRun) {
-        pushWorkspaceNotice("success", "Agent audio generation node flow created");
+        pushWorkspaceNotice("success", t("board.agent.audioGenFlowCreated"));
         return handledBoardAction(true);
       }
 
@@ -3262,13 +3260,13 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     const videoCapability = getVideoModelCapabilities(model);
     const unsupportedVideoReference = references.find(reference => !videoCapability.referenceMediaTypes.includes(getMediaReferenceType(reference)));
     if (unsupportedVideoReference) {
-      const message = `当前视频模型不支持${mediaReferenceLabel(getMediaReferenceType(unsupportedVideoReference))}输入`;
+      const message = t("board.agent.agentVideoModelNotSupportReference");
       boardController.updateGenerateNode(generateNodeId, { errorMessage: message, status: "failed" });
       pushWorkspaceNotice("error", message);
       return handledBoardAction(false);
     }
     if (references.length < videoCapability.minReferenceImages || references.length > videoCapability.maxReferenceImages) {
-      const message = `当前视频模型需要 ${videoCapability.minReferenceImages}-${videoCapability.maxReferenceImages} 个参考媒体`;
+      const message = t("board.agent.videoModelNeedsReferenceRange", { min: videoCapability.minReferenceImages, max: videoCapability.maxReferenceImages });
       boardController.updateGenerateNode(generateNodeId, { errorMessage: message, status: "failed" });
       pushWorkspaceNotice("error", message);
       return handledBoardAction(false);
@@ -3402,16 +3400,20 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const cancelBoardAssetTaskNode = useCallback(async (nodeId: string): Promise<void> => {
     const node = boardController.board.nodes.find(item => item.id === nodeId);
     if (node?.kind !== "asset") {
-      pushWorkspaceNotice("error", "No cancelable image edit task found");
+      pushWorkspaceNotice("error", t("board.agent.noLocalImageEditTask"));
       return;
     }
     const item = items.find(current => current.id === node.asset.assetId);
     if (!item || (item.status !== "pending" && item.status !== "processing")) {
-      pushWorkspaceNotice("error", "No cancelable image edit task found");
+      pushWorkspaceNotice("error", t("board.agent.noLocalImageEditTask"));
       return;
     }
     if (cancelingBoardItemIds.includes(item.id)) return;
-    if (!(await confirmAction({ message: "Are you sure you want to cancel this image edit task?", tone: "danger", confirmLabel: "Cancel task" }))) return;
+    if (!(await confirmAction({
+      message: t("board.agent.confirmCancelImageEditTask"),
+      tone: "danger",
+      confirmLabel: t("cancelTask"),
+    }))) return;
 
     setCancelingBoardItemIds(prev => [...prev, item.id]);
     try {
@@ -3422,9 +3424,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       delete pollingFailuresRef.current[item.id];
       setItems(prev => prev.filter(current => current.id !== item.id));
       boardController.deleteNode(nodeId);
-      pushWorkspaceNotice("success", "Image edit task canceled locally");
+      pushWorkspaceNotice("success", t("board.agent.imageEditTaskCanceledLocally"));
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "Image edit task cancel failed"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("board.agent.imageEditTaskCancelFailed")));
     } finally {
       setCancelingBoardItemIds(prev => prev.filter(id => id !== item.id));
     }
@@ -3444,7 +3446,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     const nodeId = task.source.boardNodeId;
     const sourceNode = nodeId ? findExecutableNodeById(boardController.board.nodes, nodeId) : undefined;
     if (!nodeId || !sourceNode) {
-      pushWorkspaceNotice("error", "Task missing source node, cannot cancel from board");
+      pushWorkspaceNotice("error", t("board.agent.noSourceNodeToCancel"));
       return;
     }
     if (task.status !== "pending" && task.status !== "processing") return;
@@ -3453,9 +3455,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     if (cancelingBoardItemIds.includes(task.id)) return;
     const canCancelRemote = task.canCancelRemote && Boolean(operationName);
     const confirmText = canCancelRemote
-      ? "Are you sure you want to cancel this video task?"
-      : "确定要本地取消这个任务吗？远端生成可能仍会继续。";
-    if (!(await confirmAction({ message: confirmText, tone: "danger", confirmLabel: "Cancel task" }))) return;
+      ? t("common.confirmDialogs.cancelVideoTask")
+      : t("common.confirmDialogs.cancelLocalTask");
+    if (!(await confirmAction({ message: confirmText, tone: "danger", confirmLabel: t("cancelTask") }))) return;
 
     setCancelingBoardItemIds(prev => [...prev, task.id]);
     try {
@@ -3465,10 +3467,10 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           headers: { "Content-Type": "application/json", ...buildProviderHeaders(operationName) },
           body: JSON.stringify({ operationName }),
         });
-        if (!response.ok) {
-          throw new Error(await readFetchError(response, "Task cancel failed"));
-        }
+      if (!response.ok) {
+        throw new Error(await readFetchError(response, t("board.agent.taskCancelFailed")));
       }
+    }
 
       const controller = generationAbortControllersRef.current[task.id];
       if (controller) {
@@ -3482,20 +3484,20 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       if (isSourceStackTask(task, sourceNode)) {
         const nextTasks = generationTasks.map(current => current.id === canceledTask.id ? canceledTask : current);
         const nextStatus = nextSourceNodeStatus(items, nextTasks, sourceNode, "failed");
-        const cancellationMessage = canCancelRemote ? "Remote generation task canceled" : "任务已从本地取消";
+        const cancellationMessage = canCancelRemote ? t("common.notices.generationTaskCancelled") : t("board.agent.taskCanceledLocally");
         const update = {
           errorMessage: nextStatus === "failed" ? cancellationMessage : undefined,
           status: nextStatus,
         } as const;
-        if (sourceNode.kind === "runninghub-app") {
+      if (sourceNode.kind === "runninghub-app") {
           boardController.updateRunningHubAppNode(nodeId, update);
         } else {
           boardController.updateGenerateNode(nodeId, update);
         }
       }
-      pushWorkspaceNotice("success", canCancelRemote ? "Video generation task canceled" : "任务已从本地取消");
+      pushWorkspaceNotice("success", canCancelRemote ? t("common.notices.generationTaskCancelled") : t("board.agent.taskCanceledLocally"));
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "Task cancel failed"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("board.agent.taskCancelFailed")));
     } finally {
       setCancelingBoardItemIds(prev => prev.filter(id => id !== task.id));
     }
@@ -3703,7 +3705,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         if (!savedItem) continue;
         importedItems.push({ item: savedItem, nodeSize });
       } catch (error) {
-        pushWorkspaceNotice("error", toErrorMessage(error, `${file.name || "文件"} 导入失败`));
+        pushWorkspaceNotice("error", toErrorMessage(error, t("board.import.fileImportFailed")));
       }
     }
 
@@ -3738,7 +3740,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         setReferenceImages(originalReferences);
         pushWorkspaceNotice("success", "Selected node set as generation reference");
       },
-      error => pushWorkspaceNotice("error", toErrorMessage(error, "Reference media read failed")),
+      error => pushWorkspaceNotice("error", toErrorMessage(error, t("board.agent.referenceMediaReadFailed"))),
     );
   };
 
@@ -3755,7 +3757,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         setAgentReferences(originalReferences);
         setIsAgentDockOpen(true);
       },
-      error => pushWorkspaceNotice("error", toErrorMessage(error, "Reference media read failed")),
+      error => pushWorkspaceNotice("error", toErrorMessage(error, t("board.agent.referenceMediaReadFailed"))),
     );
   };
 
@@ -3772,7 +3774,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         setAgentReferences(originalReferences);
         setIsAgentDockOpen(true);
       },
-      error => pushWorkspaceNotice("error", toErrorMessage(error, "Reference media read failed")),
+      error => pushWorkspaceNotice("error", toErrorMessage(error, t("board.agent.referenceMediaReadFailed"))),
     );
   }, [
     boardController.board.nodes,
@@ -3783,6 +3785,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     setAgentReferenceId,
     setAgentReferenceUrl,
     setAgentReferences,
+    t,
   ]);
 
   const editBoardAssetImage = useCallback((nodeId: string) => {
@@ -3808,7 +3811,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     );
     void resolveOriginalStorageItem(item).then(
       originalItem => launchMaskEditor(originalItem.url, node.asset.assetId, "board-asset", node.id),
-      error => pushWorkspaceNotice("error", toErrorMessage(error, "Original image read failed")),
+      error => pushWorkspaceNotice("error", toErrorMessage(error, t("common.originalImageReadFailed"))),
     );
   }, [
     boardController.board.nodes,
@@ -3925,7 +3928,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         }
         if (!didStart) {
           boardController.updateRunningHubAppNode(nodeId, {
-            errorMessage: "RunningHub app request not started, check node params",
+            errorMessage: t("board.agent.runninghubAppRequestNotStarted"),
             status: "failed",
           });
         }
@@ -3942,18 +3945,18 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         (node.kind === "image-generate" || node.kind === "video-generate") &&
         !runningHubAppPresetRequiresPrompt(node.model);
       if (!nextPrompt && requiresTextInput && !allowsEmptyPrompt) {
-        boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: "Generation node needs prompt input" });
-        pushWorkspaceNotice("error", "Generation node needs prompt input");
+        boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: t("board.agent.genNodeNeedPrompt") });
+        pushWorkspaceNotice("error", t("board.agent.genNodeNeedPrompt"));
         return;
       }
       if (node.kind === "audio-operation" && audioOperationRequiresStylePrompt(node.audioMode) && !node.audioStylePrompt?.trim()) {
-        const message = "Voice design needs description";
+        const message = t("board.agent.audioDesignNeedsDescription");
         boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: message });
         pushWorkspaceNotice("error", message);
         return;
       }
       if (isPlaceholderRunningHubModel(node.model)) {
-        const message = "Please fill in real RunningHub webappId or workflowId";
+        const message = t("board.agent.runninghubFillRealId");
         boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: message });
         pushWorkspaceNotice("error", message);
         return;
@@ -3961,8 +3964,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       const capabilityKind = node.kind === "image-generate" ? "image" : node.kind === "video-generate" ? "video" : "audio";
       const capability = getModelCapability(node.model, capabilityKind);
       if (references.length > 0 && !capability.supportsReferences) {
-        boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: "Current model does not support reference media input" });
-        pushWorkspaceNotice("error", "Current model does not support reference media input");
+        boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: t("board.agent.modelNotSupportMediaReference") });
+        pushWorkspaceNotice("error", t("board.agent.modelNotSupportMediaReference"));
         return;
       }
       const unsupportedReference = references.find(reference => {
@@ -3972,7 +3975,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         return !getAudioModelCapabilities(node.model).referenceMediaTypes.includes(type);
       });
       if (unsupportedReference) {
-        const message = `当前模型不支持${mediaReferenceLabel(getMediaReferenceType(unsupportedReference))}输入`;
+        const message = t("board.agent.modelNotSupportMediaTypeInput", { type: mediaReferenceLabel(getMediaReferenceType(unsupportedReference)) });
         boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: message });
         pushWorkspaceNotice("error", message);
         return;
@@ -3985,7 +3988,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         return;
       }
       if (audioCapabilities && audioCapabilities.maxReferenceMedia > 0 && references.length > audioCapabilities.maxReferenceMedia) {
-        const message = `当前音频模式最多支持 ${audioCapabilities.maxReferenceMedia} 个参考媒体`;
+        const message = t("board.agent.audioModelMaxReference", { maxCount: audioCapabilities.maxReferenceMedia });
         boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: message });
         pushWorkspaceNotice("error", message);
         return;
@@ -3993,7 +3996,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       if (node.kind === "video-generate") {
         const videoCapability = getVideoModelCapabilities(node.model);
         if (references.length < videoCapability.minReferenceImages || references.length > videoCapability.maxReferenceImages) {
-          const message = `Video model needs ${videoCapability.minReferenceImages}-${videoCapability.maxReferenceImages} reference images`;
+          const message = t("board.agent.videoModelNeedsReferenceRange", { min: videoCapability.minReferenceImages, max: videoCapability.maxReferenceImages });
           boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: message });
           pushWorkspaceNotice("error", message);
           return;
@@ -4037,7 +4040,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           }
           if (!didStartAny) {
             boardController.updateGenerateNode(nodeId, {
-              errorMessage: "Image generation request not started, check node params",
+              errorMessage: t("board.agent.imageGenRequestNotStarted"),
               status: "failed",
             });
           }
@@ -4064,7 +4067,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           }
         if (!didStartAny) {
           boardController.updateGenerateNode(nodeId, {
-            errorMessage: "Video generation request not started, check node params",
+            errorMessage: t("board.agent.videoGenRequestNotStarted"),
             status: "failed",
           });
         }
@@ -4091,13 +4094,13 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         }
         if (!didStartAny) {
           boardController.updateGenerateNode(nodeId, {
-            errorMessage: "Audio generation request not started, check node params",
+            errorMessage: t("board.agent.audioGenRequestNotStarted"),
             status: "failed",
           });
         }
       }
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "Node generation failed"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.failedTitles.default")));
     }
   }, [
     boardController,
@@ -4109,6 +4112,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     resolveOriginalReferences,
     resolveRunningHubAppNodeInputs,
     resolvedBoardId,
+    t,
   ]);
 
   const handleSendAgentNode = useCallback((nodeId: string) => {
@@ -4241,7 +4245,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
                   model: item.model,
                   sourceNodeId: sourceBoardNodeId,
                 },
-                title: "转写结果",
+                title: t("common.mediaTypeLabels.transcript"),
                 variant: "transcript",
               },
               { nodeId: sourceBoardNodeId, portId: BOARD_PORT_IDS.resultOut, portKind: "result" },
@@ -4274,11 +4278,11 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         if (item.type !== "transcript") {
           boardController.completeGenerationResult(
             sourceBoardNodeId,
-            terminalResultUpdate(items, generationTasks, sourceNode, item, nextStatus, item.errorMessage ?? "生成失败"),
+          terminalResultUpdate(items, generationTasks, sourceNode, item, nextStatus, item.errorMessage ?? t("common.failedTitles.default")),
           );
         }
         const update = {
-          errorMessage: nextStatus === "failed" ? item.errorMessage ?? "生成失败" : undefined,
+          errorMessage: nextStatus === "failed" ? item.errorMessage ?? t("common.failedTitles.default") : undefined,
           status: nextStatus,
         };
         if (sourceNode.kind === "runninghub-app") {
@@ -4352,12 +4356,12 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             sourceNode,
             taskItem,
             nextStatus,
-            task.errorMessage ?? (task.status === "canceled" ? "任务已取消" : "生成失败"),
+            task.errorMessage ?? (task.status === "canceled" ? t("board.agent.taskCanceledLocally") : t("common.failedTitles.default")),
           ),
         );
       }
       const update = {
-        errorMessage: nextStatus === "failed" ? task.errorMessage ?? (task.status === "canceled" ? "任务已取消" : "生成失败") : undefined,
+        errorMessage: nextStatus === "failed" ? task.errorMessage ?? (task.status === "canceled" ? t("board.agent.taskCanceledLocally") : t("common.failedTitles.default")) : undefined,
         status: nextStatus,
       };
       if (sourceNode.kind === "runninghub-app") {
@@ -4376,9 +4380,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       handledBoardTaskIdsRef.current = new Set();
       setItems([]);
       setGenerationTasks([]);
-      pushWorkspaceNotice("success", "本地资产库已清空");
+      pushWorkspaceNotice("success", t("common.dataManagement.localAssetsCleaned"));
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "本地资产库清空失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.localAssetsCleanFailed")));
     }
   }, [pushWorkspaceNotice]);
 
@@ -4389,9 +4393,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const handleDataExportWorkspace = useCallback(async (includeCredentials: boolean) => {
     try {
       const result = await exportCompleteWorkspaceBackup(includeCredentials);
-      pushWorkspaceNotice("success", `已导出备份：${result.fileName}`);
+      pushWorkspaceNotice("success", t("common.dataManagement.exportComplete", { fileName: result.fileName }));
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "完整备份导出失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.boardRenameFailed")));
     }
   }, [pushWorkspaceNotice]);
 
@@ -4400,18 +4404,18 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       flushSync(() => flushAllBoardText());
       await boardController.saveNow();
       const result = await exportBoardWorkspaceBackup(boardController.board, includeCredentials);
-      pushWorkspaceNotice("success", `已导出当前画板：${result.fileName}`);
+      pushWorkspaceNotice("success", t("common.dataManagement.exportComplete", { fileName: result.fileName }));
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "当前画板导出失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.exportFailed")));
     }
-  }, [boardController, pushWorkspaceNotice]);
+  }, [boardController, pushWorkspaceNotice, t]);
 
   const handleDataDownloadSafetySnapshot = useCallback(async () => {
     try {
       const result = await downloadLatestWorkspaceSafetySnapshot();
-      pushWorkspaceNotice("success", `已下载安全快照：${result.fileName}`);
+      pushWorkspaceNotice("success", t("common.dataManagement.snapshotDownloaded", { fileName: result.fileName }));
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "安全快照下载失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.snapshotDownloadFailed")));
     }
   }, [pushWorkspaceNotice]);
 
@@ -4419,22 +4423,22 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     try {
       const preview = await previewWorkspaceBackup(file);
       const credentialNote = preview.includesCredentials && !includeCredentials
-        ? "\n备份包含 provider 密钥；当前未勾选，将不会导入密钥。"
+        ? `\n${t("common.confirmDialogs.credentialNote")}`
         : "";
       if (!(await confirmAction({
-        message: `确认覆盖恢复此工作区？\n资产 ${preview.assetCount} 项，画板 ${preview.boardCount} 个，设置 ${preview.settingsKeyCount} 项。${credentialNote}`,
+        message: t("common.confirmDialogs.confirmImportWorkspace", { assetCount: preview.assetCount, boardCount: preview.boardCount, settingsCount: preview.settingsKeyCount, credentialNote }),
         tone: "danger",
-        confirmLabel: "恢复",
+        confirmLabel: t("common.buttons.restore"),
       }))) {
         return;
       }
       const result = await importWorkspaceBackup(file, includeCredentials);
-      pushWorkspaceNotice("success", `已恢复 ${result.assetCount} 项资产与 ${result.boardCount} 个画板`);
+      pushWorkspaceNotice("success", t("common.dataManagement.workspaceRestored", { assetCount: result.assetCount, boardCount: result.boardCount }));
       window.setTimeout(() => window.location.reload(), 300);
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "工作区恢复失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.workspaceRestoreFailed")));
     }
-  }, [confirmAction, pushWorkspaceNotice]);
+  }, [confirmAction, pushWorkspaceNotice, t]);
 
   const handleDataImportLocalAssets = useCallback(async (files: File[]) => {
     const importedItems: StorageItem[] = [];
@@ -4452,7 +4456,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         if (!savedItem) continue;
         importedItems.push(savedItem);
       } catch (error) {
-        pushWorkspaceNotice("error", toErrorMessage(error, `${file.name || "媒体"} 导入失败`));
+        pushWorkspaceNotice("error", toErrorMessage(error, t("board.import.fileImportFailed")));
       }
     }
     if (importedItems.length === 0) return;
@@ -4461,15 +4465,15 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       ...prev.filter(item => !importedItems.some(importedItem => importedItem.id === item.id)),
     ]);
     pushWorkspaceNotice("success", `Imported ${importedItems.length} local media`);
-  }, [pushWorkspaceNotice, resolvedBoardId]);
+  }, [pushWorkspaceNotice, resolvedBoardId, t]);
 
   const handleDataCleanupAssets = useCallback(async (kind: WorkspaceCleanupKind) => {
     try {
       const result = await cleanupWorkspaceAssets(kind);
       await reloadBoardAssetsFromDB();
-      pushWorkspaceNotice("success", `已清理 ${result.deletedIds.length} 项`);
+      pushWorkspaceNotice("success", t("common.dataManagement.assetsCleanupSuccess", { count: result.deletedIds.length }));
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "资产清理失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.assetsCleanupFailed")));
     }
   }, [pushWorkspaceNotice, reloadBoardAssetsFromDB]);
 
@@ -4477,24 +4481,24 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     try {
       const result = await repairStaleAssetSourceLinks();
       await reloadBoardAssetsFromDB();
-      pushWorkspaceNotice("success", `已修复 ${result.repairedIds.length} 项来源链接`);
+      pushWorkspaceNotice("success", t("common.dataManagement.sourceLinkRepairSuccess", { count: result.repairedIds.length }));
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "来源链接修复失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.sourceLinkRepairFailed")));
     }
   }, [pushWorkspaceNotice, reloadBoardAssetsFromDB]);
 
   const handleDataClearLocalStorage = useCallback(async (kind: LocalStorageCleanupKind) => {
     const count = clearLocalStorageGroup(kind);
-    pushWorkspaceNotice("success", `已清理 ${count} 个本地键，刷新后完全生效`);
-  }, [pushWorkspaceNotice]);
+    pushWorkspaceNotice("success", t("common.dataManagement.localKeysCleaned", { count }));
+  }, [pushWorkspaceNotice, t]);
 
   const handleDataResetBoards = useCallback(async () => {
     try {
       await resetBoardsToDefault();
-      pushWorkspaceNotice("success", "画板已重置");
+      pushWorkspaceNotice("success", t("common.dataManagement.boardsReset"));
       window.setTimeout(() => window.location.assign("/board"), 300);
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "画板重置失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.boardsResetFailed")));
     }
   }, [pushWorkspaceNotice]);
 
@@ -4506,7 +4510,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       const nextBoard: BoardDocument = {
         ...boardController.board,
         id: makeClientId("board"),
-        title: `${boardController.board.title} 副本`,
+        title: `${boardController.board.title} ${t("board.contextMenu.duplicate")}`,
         createdAt: now,
         updatedAt: now,
       };
@@ -4514,18 +4518,18 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       setBoardSummaries(prev => [boardSummaryFromDocument(nextBoard), ...prev]);
       setResolvedBoardId(nextBoard.id);
       router.push(boardRoute(nextBoard.id));
-      pushWorkspaceNotice("success", "已复制当前画板");
+      pushWorkspaceNotice("success", t("common.dataManagement.boardCopied"));
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "画板复制失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.boardCopyFailed")));
     }
-  }, [boardController, pushWorkspaceNotice, router]);
+  }, [boardController, pushWorkspaceNotice, router, t]);
 
   const createBoardPage = useCallback(async () => {
     flushSync(() => flushAllBoardText());
     await boardController.saveNow();
     const nextIndex = boardSummaries.length + 1;
     const nextId = makeClientId("board");
-    const nextBoard = createEmptyBoard(nextId, `画板 ${nextIndex}`);
+    const nextBoard = createEmptyBoard(nextId, `${t("board.boardLabel")} ${nextIndex}`);
     await saveBoardToDB(nextBoard);
     setBoardSummaries(prev => [boardSummaryFromDocument(nextBoard), ...prev]);
     setResolvedBoardId(nextId);
@@ -4553,19 +4557,19 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       boardController.updateBoardTitle(renameDialogDraft);
       setRenameDialogDraft(null);
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "画板重命名失败"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.exportFailed")));
     }
-  }, [boardController, pushWorkspaceNotice, renameDialogDraft]);
+  }, [boardController, pushWorkspaceNotice, renameDialogDraft, t]);
 
   const deleteBoardPage = useCallback(async () => {
     if (boardSummaries.length <= 1) {
-      pushWorkspaceNotice("info", "至少保留一个画板");
+      pushWorkspaceNotice("info", t("common.dataManagement.atLeastOneBoard"));
       return;
     }
     if (!(await confirmAction({
-      message: `确认删除「${boardController.board.title}」吗？`,
+      message: t("common.confirmDialogs.deleteSingleItem"),
       tone: "danger",
-      confirmLabel: "删除",
+      confirmLabel: t("common.buttons.delete"),
     }))) return;
     flushSync(() => flushAllBoardText());
     const deletedBoardId = boardController.board.id;
@@ -4575,7 +4579,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     router.push(boardRoute(nextBoardId));
     await deleteBoardFromDB(deletedBoardId);
     setBoardSummaries(prev => prev.filter(item => item.id !== deletedBoardId));
-  }, [boardController.board.id, boardController.board.title, boardSummaries, confirmAction, pushWorkspaceNotice, router]);
+  }, [boardController.board.id, boardController.board.title, boardSummaries, confirmAction, pushWorkspaceNotice, router, t]);
 
   const saveBoardNow = boardController.saveNow;
 
@@ -4583,8 +4587,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     flushSync(() => flushAllBoardText());
     void saveBoardNow()
       .then(() => router.push("/"))
-      .catch(error => pushWorkspaceNotice("error", toErrorMessage(error, "画板保存失败")));
-  }, [pushWorkspaceNotice, router, saveBoardNow]);
+      .catch(error => pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.boardSaveFailed"))));
+  }, [pushWorkspaceNotice, router, saveBoardNow, t]);
 
   const handleCancelGenerateNode = useCallback((nodeId: string) => {
     void cancelBoardGenerationNode(nodeId);
@@ -4597,7 +4601,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const handleFocusBoardTaskResult = useCallback((task: GenerationTask) => {
     const sourceNodeId = task.source.boardNodeId;
     if (!sourceNodeId) {
-      pushWorkspaceNotice("error", "任务缺少来源节点，无法定位结果");
+      pushWorkspaceNotice("error", t("common.dataManagement.focusTaskResultMissingSourceNode"));
       return;
     }
     const resultAssetId = task.activeResultAssetId ?? task.resultAssetIds.at(-1);
@@ -4610,7 +4614,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       return;
     }
     if (!resultNode) {
-      pushWorkspaceNotice("error", "未找到任务对应的结果节点");
+      pushWorkspaceNotice("error", t("common.dataManagement.focusTaskResultMissingResultNode"));
       return;
     }
     if (resultAssetId && resultNode.resultAssetIds.includes(resultAssetId)) {
@@ -4623,49 +4627,49 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       return;
     }
     requestTaskQueueFocusNode(resultNode.id);
-  }, [boardController, handleOpenFullscreen, items, pushWorkspaceNotice, requestTaskQueueFocusNode]);
+  }, [boardController, handleOpenFullscreen, items, pushWorkspaceNotice, requestTaskQueueFocusNode, t]);
 
   const handleRerunBoardTaskSource = useCallback((task: GenerationTask) => {
     const sourceNodeId = task.source.boardNodeId;
     if (!sourceNodeId) {
-      pushWorkspaceNotice("error", "任务缺少来源节点，无法重跑");
+      pushWorkspaceNotice("error", t("common.dataManagement.rerunTaskMissingSourceNode"));
       return;
     }
     void handleExecuteGenerateNode(sourceNodeId);
-  }, [handleExecuteGenerateNode, pushWorkspaceNotice]);
+  }, [handleExecuteGenerateNode, pushWorkspaceNotice, t]);
 
   const handleDismissBoardTask = useCallback((task: GenerationTask) => {
     void (async () => {
       if (!(await confirmAction({
-        message: "忽略这个失败任务吗？这只会从任务队列移除记录，不会删除已生成资产或画板节点。",
-        confirmLabel: "忽略",
+        message: t("common.dataManagement.ignoreFailedTaskConfirm"),
+        confirmLabel: t("common.buttons.ignore"),
       }))) return;
       await deleteGenerationTask(task.id);
       setGenerationTasks(prev => prev.filter(current => current.id !== task.id));
       delete pollingFailuresRef.current[task.id];
-      pushWorkspaceNotice("success", "已忽略任务记录");
-    })().catch(error => pushWorkspaceNotice("error", toErrorMessage(error, "任务忽略失败")));
-  }, [confirmAction, pollingFailuresRef, pushWorkspaceNotice, setGenerationTasks]);
+      pushWorkspaceNotice("success", t("common.dataManagement.taskIgnored"));
+    })().catch(error => pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.taskIgnoreFailed"))));
+  }, [confirmAction, pollingFailuresRef, pushWorkspaceNotice, setGenerationTasks, t]);
 
   const handleBoardConnectionError = useCallback((message: string) => {
     pushWorkspaceNotice("error", message);
   }, [pushWorkspaceNotice]);
 
   const handleCreateBoard = useCallback(() => {
-    void createBoardPage().catch(error => pushWorkspaceNotice("error", toErrorMessage(error, "新建画板失败")));
-  }, [createBoardPage, pushWorkspaceNotice]);
+    void createBoardPage().catch(error => pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.newBoardFailed"))));
+  }, [createBoardPage, pushWorkspaceNotice, t]);
 
   const handleDeleteBoard = useCallback(() => {
-    void deleteBoardPage().catch(error => pushWorkspaceNotice("error", toErrorMessage(error, "删除画板失败")));
-  }, [deleteBoardPage, pushWorkspaceNotice]);
+    void deleteBoardPage().catch(error => pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.deleteBoardFailed"))));
+  }, [deleteBoardPage, pushWorkspaceNotice, t]);
 
   const handleOpenSettings = useCallback(() => {
     setShowSettings(true);
   }, []);
 
   const handleSelectBoard = useCallback((nextBoardId: string) => {
-    void selectBoardPage(nextBoardId).catch(error => pushWorkspaceNotice("error", toErrorMessage(error, "画板切换失败")));
-  }, [pushWorkspaceNotice, selectBoardPage]);
+    void selectBoardPage(nextBoardId).catch(error => pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.switchBoardFailed"))));
+  }, [pushWorkspaceNotice, selectBoardPage, t]);
 
   const selectedBoardNode = boardController.board.nodes.find(node => node.id === boardController.selectedNodeId);
   const selectedBoardEdge = boardController.board.edges.find(edge => edge.id === boardController.selectedEdgeId);
@@ -4734,8 +4738,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       fileNamePrefix: "board_creation",
       items: selectedDownloadableBoardItems,
       resolveOriginalItem: resolveOriginalStorageItem,
-    }).catch(error => pushWorkspaceNotice("error", toErrorMessage(error, "批量下载失败")));
-  }, [pushWorkspaceNotice, resolveOriginalStorageItem, selectedDownloadableBoardItems]);
+    }).catch(error => pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.batchDownloadFailed"))));
+  }, [pushWorkspaceNotice, resolveOriginalStorageItem, selectedDownloadableBoardItems, t]);
   const imageModelGroups = getProviderModelGroups(imageModelOptions, providerKeys, customProviders);
   const videoModelGroups = getProviderModelGroups(videoModelOptions, providerKeys, customProviders);
   const audioModelGroups = getProviderModelGroups(audioModelOptions, providerKeys, customProviders);
@@ -4781,7 +4785,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const handleBoardImageQuickEdit = (nodeId: string, operation: ImageEditFeature) => {
     const source = resolveBoardQuickEditSource(nodeId);
     if (!source) {
-      pushWorkspaceNotice("info", "请选择一个图片节点");
+      pushWorkspaceNotice("info", t("common.dataManagement.selectImageNode"));
       return;
     }
 
@@ -4805,7 +4809,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         }
         launchMaskEditor(originalItem.url, originalItem.id, "board-asset", source.node.id, operation, originalItem);
       },
-      error => pushWorkspaceNotice("error", toErrorMessage(error, "Original image read failed")),
+      error => pushWorkspaceNotice("error", toErrorMessage(error, t("common.originalImageReadFailed"))),
     );
   };
   const boardSummariesForToolbar = useMemo(() => {
@@ -4836,7 +4840,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             }}
           >
             <h2 id="board-rename-title" className="text-sm font-semibold text-[var(--iw-text)]">
-              重命名画板
+              {t("board.renameCurrentBoard")}
             </h2>
             <input
               autoFocus
@@ -4850,10 +4854,10 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
                 className="imagine-secondary-action h-9 rounded-lg border border-[var(--iw-border)] px-3 text-[11px] font-semibold text-[var(--iw-text)]"
                 onClick={closeRenameDialog}
               >
-                取消
+                {t("common.buttons.cancel")}
               </button>
               <button type="submit" className="imagine-primary-action h-9 rounded-lg px-3 text-[11px] font-semibold">
-                保存
+                {t("common.buttons.save")}
               </button>
             </div>
           </form>
@@ -4976,7 +4980,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         loading={assetLibrary.loading}
         mode="select"
         open={isAssetLibraryOpen}
-        title="从素材库加入画板"
+        title={t("common.selectTitle")}
         onClose={() => setIsAssetLibraryOpen(false)}
         onImportFiles={handleImportFilesToLibrary}
         onRemove={assetLibrary.removeRecord}

@@ -124,7 +124,6 @@ import {
   type WorkspaceCleanupKind,
 } from "@/lib/data-management";
 import { useTranslations, t as translate } from "@/lib/i18n";
-import type { TFunction } from "@/lib/i18n";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 import { getClearWorkspaceAssetsMessage } from "@/lib/workspace-messages";
 

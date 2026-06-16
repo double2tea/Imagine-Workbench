@@ -547,7 +547,7 @@ export async function getLatestWorkspaceSafetySnapshotSummary(): Promise<Workspa
 
 export async function downloadLatestWorkspaceSafetySnapshot(): Promise<WorkspaceSafetySnapshotSummary> {
   const record = await getLatestWorkspaceSafetySnapshotRecord();
-  if (!record) throw new Error(t("common.notices.noDownloadableSnapshot", { fallback: "没有可下载的安全快照" }) ?? "没有可下载的安全快照");
+  if (!record) throw new Error(t("common.notices.noDownloadableSnapshot"));
   downloadBlob(record.blob, record.fileName);
   return toSafetySnapshotSummary(record);
 }
@@ -558,7 +558,7 @@ export async function createLocalUploadAsset(
   options?: { boardId?: string },
 ): Promise<StorageItem> {
   const mediaType = mediaReferenceTypeFromMime(file.type);
-  if (!mediaType) throw new Error(t("common.errors.fileReadFailed", { fallback: "只支持导入图片、视频或音频文件" }) ?? "只支持导入图片、视频或音频文件");
+  if (!mediaType) throw new Error(t("common.errors.fileReadFailed"));
 
   return buildStorageItem(
     {

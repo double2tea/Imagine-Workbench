@@ -1,27 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ChevronLeft, ChevronRight, ClipboardList, Images, PanelRight, SlidersHorizontal, type LucideIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, ClipboardList, Images, PanelRight, SlidersHorizontal } from "lucide-react";
 import { useTranslations } from "@/lib/i18n";
 
 const BOARD_SIDE_COLLAPSED_KEY = "imagine_board_side_collapsed";
 const BOARD_SIDE_TAB_KEY = "imagine_board_side_tab";
 
 export type BoardSidePanelTab = "inspector" | "tasks" | "assets";
-
-const BOARD_SIDE_TABS: ReadonlyArray<{
-  id: BoardSidePanelTab;
-  icon: LucideIcon;
-  label: string;
-  shortLabel: string;
-}> = (() => {
-  // Use a function to avoid hook usage at module level
-  return [
-    { id: "inspector" as const, icon: SlidersHorizontal, label: "检查器", shortLabel: "检查" },
-    { id: "tasks" as const, icon: ClipboardList, label: "任务", shortLabel: "任务" },
-    { id: "assets" as const, icon: Images, label: "本地资产", shortLabel: "资产" },
-  ];
-})();
 
 interface BoardSidePanelProps {
   assetsPanel: ReactNode;
@@ -65,8 +51,8 @@ export default function BoardSidePanel({
   const collapsed = collapsedPreference && !(revealCanExpand && revealKey);
 
   const tabs = [
-    { id: "inspector" as const, icon: SlidersHorizontal, label: t('inspector.title'), shortLabel: "检查" },
-    { id: "tasks" as const, icon: ClipboardList, label: t('inspector.sectionEndpoints'), shortLabel: "任务" },
+    { id: "inspector" as const, icon: SlidersHorizontal, label: t('inspector.title'), shortLabel: t('inspector.titleShort') },
+    { id: "tasks" as const, icon: ClipboardList, label: t('tasks.title'), shortLabel: t('tasks.titleShort') },
     { id: "assets" as const, icon: Images, label: t('node.types.asset'), shortLabel: t('node.types.asset') },
   ];
 
@@ -142,12 +128,12 @@ export default function BoardSidePanel({
         className="imagine-board-mobile-panel-btn fixed bottom-4 right-4 z-40 flex h-11 items-center gap-2 rounded-full border border-[var(--iw-border)] bg-[var(--iw-panel)] px-4 text-xs font-semibold text-[var(--iw-text)] shadow-lg lg:hidden"
       >
         <PanelRight className="h-4 w-4" />
-        {t('inspector.title', { fallback: "面板" }) ?? "面板"}
+        {t('inspector.title')}
       </button>
       {mobileOpen ? (
         <button
           type="button"
-          aria-label={t('inspector.title', { fallback: "关闭侧栏" }) ?? "关闭侧栏"}
+          aria-label={commonT.t("close")}
           className="fixed inset-0 z-40 bg-black/45 lg:hidden"
           onClick={() => setMobileOpen(false)}
         />
@@ -166,11 +152,11 @@ export default function BoardSidePanel({
           type="button"
           onClick={toggleCollapsed}
           className="imagine-board-side-collapse-btn hidden lg:flex"
-          title={collapsed ? "展开侧栏" : "收起侧栏"}
+          title={collapsed ? t("sidePanel.expandTooltip") : t("sidePanel.collapseTooltip")}
           aria-expanded={!collapsed}
         >
           <PanelRight className="h-4 w-4" />
-          <span className="imagine-board-side-collapse-label">{collapsed ? "面板" : "收起"}</span>
+          <span className="imagine-board-side-collapse-label">{collapsed ? t("sidePanel.collapsedLabel") : t("sidePanel.collapseLabel")}</span>
           {collapsed ? <ChevronLeft className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
         </button>
         {mobileOpen ? (

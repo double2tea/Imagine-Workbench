@@ -214,22 +214,6 @@ function assignRef<T>(ref: Ref<T> | undefined, value: T | null): void {
   }
 }
 
-const ACTION_LABELS: Record<AgentToolAction["type"], string> = {
-  none: "",
-  optimize_prompt: "",
-  generate_image: "",
-  edit_image: "",
-  generate_video: "",
-  generate_audio: "",
-  create_board_image_flow: "",
-  create_board_video_flow: "",
-  create_board_audio_flow: "",
-  create_board_note: "",
-  update_board_node: "",
-  apply_board_patch: "",
-  continue_image_to_video: "",
-};
-
 export function getExecutableAction(message: ChatMessage): AgentToolAction | null {
   if (message.boardAction && message.boardAction.type !== "none") return message.boardAction;
   if (message.recommendedAction && message.recommendedAction.type !== "none") return message.recommendedAction;
@@ -558,9 +542,6 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
   ref,
 ) {
   const { t } = useTranslations("agent");
-  const toolLabels = useMemo(() => makeToolLabels(t), [t]);
-  const skillLabels = useMemo(() => makeSkillLabels(t), [t]);
-  const actionLabels = useMemo(() => makeActionLabels(t), [t]);
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     onSubmit();

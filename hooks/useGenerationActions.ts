@@ -291,7 +291,6 @@ async function cancelTaskOrWarn(
   try {
     return await cancelGenerationTask(id);
   } catch (error) {
-    const message = toErrorMessage(error, t("common.notices.taskCancelStatusUpdateFailed"));
     console.error("Generation Task Cancel Failed:", error);
     pushWorkspaceNotice("error", t("common.notices.taskCancelStatusUpdateFailed"));
     return null;

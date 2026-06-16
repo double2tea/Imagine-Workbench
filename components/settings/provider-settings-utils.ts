@@ -1,5 +1,6 @@
 import type { AiProvider } from "@/lib/providers/registry";
 import { getProviderMeta } from "@/lib/providers/registry";
+import { t } from "@/lib/i18n";
 
 export function providerEndpointInfo(provider: AiProvider): string[] | undefined {
   const meta = getProviderMeta(provider);
@@ -18,5 +19,7 @@ export function providerEndpointInfo(provider: AiProvider): string[] | undefined
 }
 
 export function providerClearLabel(provider: AiProvider): string {
-  return getProviderMeta(provider).hasEditableBaseUrl ? "Clear Key/Base URL" : "Clear Key";
+  return getProviderMeta(provider).hasEditableBaseUrl
+    ? t("settings.providers.clearKeyBaseUrl")
+    : t("settings.providers.clearKey");
 }

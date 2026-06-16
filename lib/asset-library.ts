@@ -92,8 +92,8 @@ export async function addSourceAssetToLibrary(
   source: StorageItem,
   category: LibraryAssetCategory = "other",
 ): Promise<{ record: LibraryAssetRecord; created: boolean }> {
-  if (source.status !== "complete") throw new Error(t("common.notices.addToLibraryFailed", { fallback: "只有已完成的图片、视频或音频可加入素材库" }) ?? "只有已完成的图片、视频或音频可加入素材库");
-  if (!isLibraryMediaType(source.type)) throw new Error(t("common.notices.libraryImportFailed", { fallback: "素材库只支持图片、视频和音频" }) ?? "素材库只支持图片、视频和音频");
+  if (source.status !== "complete") throw new Error(t("common.notices.addToLibraryFailed"));
+  if (!isLibraryMediaType(source.type)) throw new Error(t("common.notices.libraryImportFailed"));
 
   const existing = await getLibraryAssetRecordBySourceAssetId(source.id);
   if (existing) return { record: existing, created: false };
@@ -125,10 +125,10 @@ export async function importFilesToLibrary(files: File[]): Promise<LibraryAssetR
   const backingAssetIds: string[] = [];
   try {
     for (const file of files) {
-      if (!isLibraryFileType(file)) throw new Error(t("common.notices.libraryImportFailed", { fallback: "素材库只支持图片、视频和音频" }) ?? "素材库只支持图片、视频和音频");
+      if (!isLibraryFileType(file)) throw new Error(t("common.notices.libraryImportFailed"));
       const recordId = makeClientId("library_item");
       const asset = await createLocalUploadAsset(file, makeClientId("library_asset"));
-      if (!isLibraryMediaType(asset.type)) throw new Error(t("common.notices.libraryImportFailed", { fallback: "素材库只支持图片、视频和音频" }) ?? "素材库只支持图片、视频和音频");
+      if (!isLibraryMediaType(asset.type)) throw new Error(t("common.notices.libraryImportFailed"));
       const mediaType = asset.type;
       const now = new Date().toISOString();
       const backing = buildStorageItem({

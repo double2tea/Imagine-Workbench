@@ -54,18 +54,18 @@ interface BoardToolbarProps {
   onUndo: () => void;
 }
 
-function saveStatusMeta(status: BoardSaveStatus, error: string | null): {
+function saveStatusMeta(status: BoardSaveStatus, error: string | null, t: (key: string) => string): {
   label: string;
   tone: "idle" | "busy" | "ok" | "error";
   title?: string;
 } {
-  if (status === "loading") return { label: "加载中", tone: "busy" };
-  if (status === "saving") return { label: "保存中", tone: "busy" };
-  if (status === "saved") return { label: "已保存", tone: "ok" };
+  if (status === "loading") return { label: t("workspace.saveStatusLoading"), tone: "busy" };
+  if (status === "saving") return { label: t("workspace.saveStatusSaving"), tone: "busy" };
+  if (status === "saved") return { label: t("workspace.saveStatusSaved"), tone: "ok" };
   if (status === "error") {
-    return { label: "保存失败", tone: "error", title: error ?? undefined };
+    return { label: t("workspace.saveStatusError"), tone: "error", title: error ?? undefined };
   }
-  return { label: "就绪", tone: "idle" };
+  return { label: t("workspace.saveStatusReady"), tone: "idle" };
 }
 
 const headerBtn = workspaceTopBarButtonClass;
@@ -139,7 +139,7 @@ export default function BoardToolbar({
   const boardMenuPanelRef = useRef<HTMLDivElement>(null);
   const overflowMenuPanelRef = useRef<HTMLDivElement>(null);
 
-  const saveMeta = saveStatusMeta(saveStatus, saveError);
+  const saveMeta = saveStatusMeta(saveStatus, saveError, t);
 
   const visibleBoardSummaries = boardSummaries.some(board => board.id === boardId)
     ? boardSummaries
@@ -252,8 +252,8 @@ export default function BoardToolbar({
             boardMenuPosition,
             "imagine-board-header-menu fixed z-[60] w-[20rem] max-w-[calc(100vw-1.5rem)]",
             <>
-              <div className="mb-2 flex items-center justify-between gap-2 px-1">
-                <span className="text-[11px] font-semibold text-[var(--iw-muted)]">{t('workspace.emptyHint')}</span>
+                  <div className="mb-2 flex items-center justify-between gap-2 px-1">
+                <span className="text-[11px] font-semibold text-[var(--iw-muted)]">{t('workspace.boardLabel')}</span>
                 <button
                   type="button"
                   onClick={() => {
@@ -263,7 +263,7 @@ export default function BoardToolbar({
                   className={`${headerBtn} !h-8 !min-h-8 px-2 text-[11px]`}
                 >
                   <Plus className="h-3 w-3" />
-                  {commonT.t('buttons.create', { fallback: "新建" }) ?? "新建"}
+                  {commonT.t("buttons.create")}
                 </button>
               </div>
               <div className="max-h-[16rem] overflow-y-auto">
@@ -280,9 +280,9 @@ export default function BoardToolbar({
                   >
                     <span className="min-w-0">
                       <span className="block truncate text-xs font-semibold">{board.title}</span>
-                      <span className="mt-0.5 block font-mono text-[10px] text-[var(--iw-muted)]">
-                        {board.nodeCount} 节点
-                      </span>
+                          <span className="mt-0.5 block font-mono text-[10px] text-[var(--iw-muted)]">
+                            {t('workspace.nodeCountLabel', { count: board.nodeCount })}
+                          </span>
                     </span>
                     {board.id === boardId ? (
                       <Check className="h-3.5 w-3.5 shrink-0 text-[var(--iw-board-accent-amber)]" />
@@ -300,7 +300,7 @@ export default function BoardToolbar({
                   className="imagine-board-header-menu-action"
                 >
                   <Pencil className="h-3.5 w-3.5" />
-                  重命名当前画板
+                  {t('workspace.renameCurrentBoard')}
                 </button>
                 <button
                   type="button"
@@ -312,7 +312,7 @@ export default function BoardToolbar({
                   data-action="danger"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                  删除当前画板
+                  {t('workspace.deleteCurrentBoard')}
                 </button>
               </div>
             </>,
@@ -326,7 +326,7 @@ export default function BoardToolbar({
           <span className="imagine-board-save-status-dot" aria-hidden />
           <span className="truncate">{saveMeta.label}</span>
         </span>
-        <span className="hidden font-mono text-[10px] text-[var(--iw-faint)] lg:inline">{nodeCount} 节点</span>
+        <span className="hidden font-mono text-[10px] text-[var(--iw-faint)] lg:inline">{t('workspace.nodeCountLabel', { count: nodeCount })}</span>
         </div>
       }
       center={
@@ -347,7 +347,7 @@ export default function BoardToolbar({
               onClick={onUndo}
               disabled={!canUndo}
               className={iconBtn}
-              title={t('workspace.undo') ?? "撤销 (Ctrl+Z)"}
+              title={t("workspace.undo")}
             >
               <RotateCcw className="h-3.5 w-3.5" />
             </button>
@@ -356,7 +356,7 @@ export default function BoardToolbar({
               onClick={onRedo}
               disabled={!canRedo}
               className={iconBtn}
-              title={t('workspace.redo') ?? "重做 (Ctrl+Shift+Z)"}
+              title={t("workspace.redo")}
             >
               <RotateCw className="h-3.5 w-3.5" />
             </button>
@@ -369,10 +369,10 @@ export default function BoardToolbar({
             type="button"
             onClick={onBack}
             className={`${headerBtn} shrink-0`}
-            title={t('workspace.backToWorkspace') ?? "返回工作台"}
+            title={t("workspace.backToWorkspace")}
           >
             <Grid2X2 className="h-3.5 w-3.5" />
-            <span className="hidden md:inline">{t('workspace.backToWorkspace') ?? "工作台"}</span>
+            <span className="hidden md:inline">{t("workspace.backToWorkspace")}</span>
           </button>
 
           {trashedCount > 0 && onRestoreTrash ? (
@@ -380,10 +380,10 @@ export default function BoardToolbar({
               type="button"
               onClick={onRestoreTrash}
               className={`${headerBtn} hidden lg:flex`}
-              title={t('workspace.restoreDeleted') ?? "恢复最近删除的节点"}
+              title={t("workspace.restoreDeleted")}
             >
               <Trash2 className="h-3.5 w-3.5" />
-              <span>{t('workspace.restoreDeleted') ?? "恢复"} {trashedCount}</span>
+              <span>{commonT.t("buttons.restore")} {trashedCount}</span>
             </button>
           ) : null}
 
@@ -401,8 +401,8 @@ export default function BoardToolbar({
             }}
             className={iconBtn}
             aria-expanded={isOverflowOpen}
-            aria-label={commonT.t('buttons.more') ?? "更多操作"}
-            title={commonT.t('buttons.more') ?? "更多"}
+            aria-label={commonT.t("buttons.more")}
+            title={commonT.t("buttons.more")}
           >
             <MoreHorizontal className="h-4 w-4" />
           </button>
@@ -421,18 +421,18 @@ export default function BoardToolbar({
                 className="imagine-board-header-menu-action lg:hidden"
               >
                 <Upload className="h-3.5 w-3.5" />
-                导入媒体
+                {t("workspace.importMedia")}
               </button>
               <button
                 type="button"
                 onClick={() => {
                   setIsOverflowOpen(false);
-                  void showAlert({ title: "连线说明", message: getBoardConnectionHelp(t) });
+                  void showAlert({ title: t("connectionHelp"), message: getBoardConnectionHelp(t) });
                 }}
                 className="imagine-board-header-menu-action"
               >
                 <CircleHelp className="h-3.5 w-3.5" />
-                连线说明
+                {t("connectionHelp")}
               </button>
               {trashedCount > 0 && onRestoreTrash ? (
                 <button
@@ -444,7 +444,7 @@ export default function BoardToolbar({
                   className="imagine-board-header-menu-action lg:hidden"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                  恢复删除 ({trashedCount})
+                  {`${t("workspace.restoreDeleted")} (${trashedCount})`}
                 </button>
               ) : null}
               <div className="my-1 border-t border-[var(--iw-border)]" />
@@ -455,9 +455,9 @@ export default function BoardToolbar({
                   onOpenSettings();
                 }}
                 className="imagine-board-header-menu-action"
-              >
-                <Settings className="h-3.5 w-3.5" />
-                设置
+                >
+                  <Settings className="h-3.5 w-3.5" />
+                  {t('workspace.openSettings')}
               </button>
               <button
                 type="button"
@@ -468,7 +468,7 @@ export default function BoardToolbar({
                 className="imagine-board-header-menu-action"
               >
                 {themeMode === "light" ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
-                {themeMode === "light" ? "深色模式" : "浅色模式"}
+                {themeMode === "light" ? t('workspace.switchDarkMode') : t('workspace.switchLightMode')}
               </button>
               <div className="my-1 border-t border-[var(--iw-border)]" />
               <button
@@ -481,7 +481,7 @@ export default function BoardToolbar({
                 data-action="danger"
               >
                 <Trash2 className="h-3.5 w-3.5" />
-                清空画板节点
+                {t('workspace.clearBoardNodes')}
               </button>
             </>,
           )}

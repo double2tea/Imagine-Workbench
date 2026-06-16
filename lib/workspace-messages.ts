@@ -7,5 +7,5 @@ export function getClearWorkspaceAssetsMessage(t: TFunction): string {
 
 /** Help text for board connection (shown in board workspace). */
 export function getBoardConnectionHelp(t: TFunction): string {
-  return t("media.boardConnectionHelp");
+  return t("connectionHelp");
 }

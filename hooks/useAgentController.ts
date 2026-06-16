@@ -120,17 +120,19 @@ function makeClientId(prefix: string): string {
   return `${prefix}_${Date.now()}`;
 }
 
-const WELCOME_MESSAGE: ChatMessage = {
-  id: "welcome",
-  role: "assistant",
-  content: t("common.notices.agentWelcomeContent"),
-  thought: t("common.notices.agentWelcomeThought"),
-  suggestedFollowUps: [
-    t("common.notices.agentFollowUp1"),
-    t("common.notices.agentFollowUp2"),
-    t("common.notices.agentFollowUp3"),
-  ],
-};
+function buildWelcomeMessage(): ChatMessage {
+  return {
+    id: "welcome",
+    role: "assistant",
+    content: t("common.notices.agentWelcomeContent"),
+    thought: t("common.notices.agentWelcomeThought"),
+    suggestedFollowUps: [
+      t("common.notices.agentFollowUp1"),
+      t("common.notices.agentFollowUp2"),
+      t("common.notices.agentFollowUp3"),
+    ],
+  };
+}
 
 export function useAgentController({
   agentInput,
@@ -160,7 +162,7 @@ export function useAgentController({
   setTraditionalSubTab,
   onActionValidationError,
 }: UseAgentControllerParams) {
-  const [agentMessages, setAgentMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
+  const [agentMessages, setAgentMessages] = useState<ChatMessage[]>(() => [buildWelcomeMessage()]);
   const [isAgentLoading, setIsAgentLoading] = useState(false);
   const [autoExecute, setAutoExecute] = useState(false);
   const [activeCountdownId, setActiveCountdownId] = useState<string | null>(null);
@@ -178,17 +180,17 @@ export function useAgentController({
     const restoreAgentState = window.setTimeout(() => {
       const storedChat = localStorage.getItem(chatStorageKey);
       if (!storedChat) {
-        setAgentMessages([WELCOME_MESSAGE]);
+        setAgentMessages([buildWelcomeMessage()]);
       } else {
         try {
           const parsed: unknown = JSON.parse(storedChat);
           if (Array.isArray(parsed) && parsed.length > 0) {
             setAgentMessages(normalizeRestoredAgentMessages(parsed as ChatMessage[]));
           } else {
-            setAgentMessages([WELCOME_MESSAGE]);
+            setAgentMessages([buildWelcomeMessage()]);
           }
         } catch {
-          setAgentMessages([WELCOME_MESSAGE]);
+          setAgentMessages([buildWelcomeMessage()]);
         }
       }
 
@@ -505,7 +507,7 @@ export function useAgentController({
   };
 
   const handleClearChat = () => {
-    setAgentMessages([WELCOME_MESSAGE]);
+    setAgentMessages([buildWelcomeMessage()]);
     try { localStorage.removeItem(chatStorageKey); } catch { /* storage unavailable */ }
   };
 

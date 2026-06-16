@@ -950,9 +950,9 @@ function defaultNodeTitle(kind: BoardNode["kind"]): string {
 }
 
 function defaultAssetNodeTitle(type: BoardAssetReference["type"]): string {
-  if (type === "image") return t("board.node.types.asset");
-  if (type === "video") return t("board.node.types.asset");
-  return t("board.node.types.audioOperation");
+  if (type === "image") return t("board.node.types.imageAsset");
+  if (type === "video") return t("board.node.types.videoAsset");
+  return t("board.node.types.audioAsset");
 }
 
 function defaultAssetNodeSize(type: BoardAssetReference["type"]): BoardSize {
@@ -2572,7 +2572,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
   const updateBoardTitle = useCallback((title: string) => {
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
-      throw new Error(t("board.inspector.sectionBasic"));
+      throw new Error(t("board.workspace.boardNameEmpty"));
     }
     mutateBoard(currentBoard => ({
       ...currentBoard,

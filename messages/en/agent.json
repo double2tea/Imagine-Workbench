@@ -4,6 +4,7 @@
   "actionLabels": { "none": "No Action", "optimize_prompt": "Optimize Prompt", "generate_image": "Generate Image", "edit_image": "Edit Image", "generate_video": "Generate Video", "generate_audio": "Generate Audio", "create_board_image_flow": "Create Image Node Flow", "create_board_video_flow": "Create Video Node Flow", "create_board_audio_flow": "Create Audio Node Flow", "create_board_note": "Create Board Note", "update_board_node": "Update Board Node", "apply_board_patch": "Apply Board Patch", "continue_image_to_video": "Image-to-Video Continue" },
   "chat": {
     "userRoleLabel": "You", "thoughtProcessLabel": "Thinking",
+    "agentRoleLabel": "Agent",
     "suggestedActionEditable": "Suggested Action · Editable Before Execution", "suggestedActionSummary": "Suggested Action · Parameter Summary",
     "operationLabel": "Action:", "executeButton": "Execute", "declineButton": "Decline",
     "actionCompleted": "Creative flow triggered and loaded", "actionDeclined": "Proposal declined/rejected",

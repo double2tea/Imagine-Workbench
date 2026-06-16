@@ -26,6 +26,12 @@
     "contactEmailTitle": "联系作者: double_tea@foxmail.com",
     "contactEmailAriaLabel": "给作者发送邮件",
     "toggleDarkModeTitle": "切换深色模式", "toggleLightModeTitle": "切换浅色模式",
-    "clearAssetsTitle": "清空本地资产", "clearAssetsAriaLabel": "清空本地资产"
+    "clearAssetsTitle": "清空本地资产", "clearAssetsAriaLabel": "清空本地资产",
+    "language": {
+      "en": "切换到英文",
+      "zh": "切换到中文",
+      "enShort": "EN",
+      "zhShort": "中"
+    }
   }
 }

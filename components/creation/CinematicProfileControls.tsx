@@ -59,8 +59,6 @@ type CinematicOptionDescriptions = {
   [Field in CinematicField]: Record<CinematicProfile[Field], string>;
 };
 
-const CINEMATIC_FIELDS: readonly CinematicField[] = ["camera", "lens", "focalLength", "aperture", "palette", "lighting", "effect", "movement"];
-
 function buildOptionDescriptions(t: (key: string) => string): CinematicOptionDescriptions {
   return {
     camera: {

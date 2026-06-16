@@ -28,7 +28,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { imageEditFeatureLabel, type ImageEditFeature } from "@/lib/image-quick-edit-targets";
-import { useTranslations } from "@/lib/i18n";
 
 export type OperationTone = "accent" | "neutral" | "danger" | "media" | "success";
 

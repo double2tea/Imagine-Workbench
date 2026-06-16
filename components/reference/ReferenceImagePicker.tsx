@@ -184,7 +184,7 @@ export default function ReferenceImagePicker({
                 key={reference.id}
                 role={canEditReference ? "button" : undefined}
                 tabIndex={canEditReference ? 0 : undefined}
-                title={canEditReference ? "Double-click to open local edit, compare, crop; press Enter or Space" : undefined}
+                title={canEditReference ? t("reference.doubleClickHint") : undefined}
                 onDoubleClick={handleReferenceDoubleClick}
                 onKeyDown={handleReferenceKeyDown}
                 className={`imagine-reference-thumb relative aspect-square rounded-lg border overflow-hidden bg-cover bg-center group transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 ${
@@ -272,7 +272,7 @@ export default function ReferenceImagePicker({
         <div className="imagine-upload-zone relative flex min-h-[76px] flex-col items-center justify-center rounded-lg border border-dashed p-3 text-center transition">
           <CloudUpload className="mb-1.5 h-5 w-5 text-[var(--iw-faint)]" />
           <span className="text-xs text-[var(--iw-muted)]">
-            {emptyLabel} / {""}
+            {emptyLabel} /{" "}
               {maxCount > 0 ? (
                 <label className={browseClassName}>
                   {uploadLabel}

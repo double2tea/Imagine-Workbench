@@ -61,10 +61,17 @@ function resultNodeToStorageItem(node: BoardResultNode, boardId: string, t: Resu
 }
 
 function LightweightMediaPreview({ type }: { type: "audio" | "image" | "video" }) {
+  const { t } = useTranslations("board");
   const Icon = type === "audio" ? Music : type === "image" ? ImageIcon : Video;
   return (
     <div
-      aria-label={type === "audio" ? "Audio result" : type === "image" ? "Image result" : "Video result"}
+      aria-label={
+        type === "audio"
+          ? t("node.types.audioAsset")
+          : type === "image"
+            ? t("node.types.imageAsset")
+            : t("node.types.videoAsset")
+      }
       className="board-media-preview flex h-full w-full items-center justify-center bg-[var(--iw-panel-soft)] text-[var(--iw-muted)]"
       role="img"
     >

@@ -30,7 +30,8 @@
   },
   "featureModels": {
     "title": "Default Image Quick Edit Model",
-    "description": "Image quick actions in the main workspace and board will prefer the model selected here."
+    "description": "Image quick actions in the main workspace and board will prefer the model selected here.",
+    "defaultModelSuffix": "Default Model"
   },
   "dataManagement": {
     "title": "Data Health Center", "description": "Local assets, board references, backups, safety snapshots, and maintenance actions",

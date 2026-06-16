@@ -26,6 +26,12 @@
     "contactEmailTitle": "Contact: double_tea@foxmail.com",
     "contactEmailAriaLabel": "Send email to author",
     "toggleDarkModeTitle": "Switch to dark mode", "toggleLightModeTitle": "Switch to light mode",
-    "clearAssetsTitle": "Clear local assets", "clearAssetsAriaLabel": "Clear local assets"
+    "clearAssetsTitle": "Clear local assets", "clearAssetsAriaLabel": "Clear local assets",
+    "language": {
+      "en": "Switch to English",
+      "zh": "Switch to Chinese",
+      "enShort": "EN",
+      "zhShort": "中"
+    }
   }
 }

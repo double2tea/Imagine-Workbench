@@ -1,3 +1,5 @@
+"use client";
+
 import { AudioLines, Image as ImageIcon, Video as VideoIcon } from "lucide-react";
 import { useTranslations } from "@/lib/i18n";
 

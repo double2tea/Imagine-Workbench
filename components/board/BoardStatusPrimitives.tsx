@@ -7,16 +7,8 @@ type BoardStatusTone = "complete" | "failed" | "canceled" | "pending" | "process
 
 const iconClassName = "h-3.5 w-3.5";
 
-const STATUS_LABELS: Record<GenerationTaskStatus, string> = {
-  complete: "Complete",
-  processing: "Processing",
-  pending: "Queued",
-  failed: "Failed",
-  canceled: "Canceled",
-};
-
 export function boardStatusLabel(status: GenerationTaskStatus): string {
-  return STATUS_LABELS[status] ?? STATUS_LABELS.complete;
+  return t(`statusLabels.${status}`);
 }
 
 function statusTone(status: GenerationTaskStatus): BoardStatusTone {

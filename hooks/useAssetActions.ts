@@ -215,7 +215,7 @@ export function useAssetActions({
     if (await confirmAction({
       message: t("common.confirmDialogs.deleteSelectedItems", { count: selectedItemIds.length }),
       tone: "danger",
-      confirmLabel: t("common.buttons.delete"),
+      confirmLabel: t("delete"),
     })) {
       for (const id of selectedItemIds) {
         await deleteFromDB(id);
@@ -232,7 +232,7 @@ export function useAssetActions({
     if (await confirmAction({
       message: t("common.confirmDialogs.deleteTasksByStatus", { count: ids.length, statuses: statuses.join("/") }),
       tone: "danger",
-      confirmLabel: t("common.buttons.delete"),
+      confirmLabel: t("delete"),
     })) {
       for (const id of ids) {
         await deleteFromDB(id);
@@ -249,7 +249,7 @@ export function useAssetActions({
     const confirmText = canCancelRemote
       ? t("common.confirmDialogs.cancelVideoTask")
       : t("common.confirmDialogs.cancelLocalTask");
-    if (!(await confirmAction({ message: confirmText, tone: "danger", confirmLabel: t("common.buttons.cancelTask") }))) return;
+    if (!(await confirmAction({ message: confirmText, tone: "danger", confirmLabel: t("cancelTask") }))) return;
 
     setCancelingItemIds(prev => [...prev, item.id]);
     try {
@@ -279,7 +279,7 @@ export function useAssetActions({
       setItems(prev => prev.filter(current => current.id !== item.id));
       setSelectedItemIds(prev => prev.filter(id => id !== item.id));
       setCompareItemIds(prev => prev.filter(id => id !== item.id));
-      pushWorkspaceNotice("success", canCancelRemote ? t("common.notices.taskCancelFailed") : t("common.notices.taskCancelStatusUpdateFailed"));
+      pushWorkspaceNotice("success", canCancelRemote ? t("common.notices.generationTaskCancelled") : t("common.notices.taskCancelledLocally"));
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.taskCancelFailed")));
     } finally {
@@ -288,7 +288,7 @@ export function useAssetActions({
   };
 
   const handleDeleteItem = async (item: StorageItem) => {
-    if (await confirmAction({ message: t("common.confirmDialogs.deleteSingleItem"), tone: "danger", confirmLabel: t("common.buttons.delete") })) {
+    if (await confirmAction({ message: t("common.confirmDialogs.deleteSingleItem"), tone: "danger", confirmLabel: t("delete") })) {
       await deleteFromDB(item.id);
       setItems(prev => prev.filter(current => current.id !== item.id));
       setSelectedItemIds(prev => prev.filter(id => id !== item.id));

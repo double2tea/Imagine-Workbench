@@ -16,19 +16,6 @@ const SIDE_ACTION_BUTTON_CLASS =
 type AssetFilter = "all" | "image" | "video" | "audio";
 type BoardSideMediaType = Extract<StorageItem["type"], "image" | "video" | "audio">;
 
-const mediaTypeLabels: Record<BoardSideMediaType, string> = {
-  audio: "音频",
-  image: "图片",
-  video: "视频",
-};
-
-const storageStatusLabels: Record<StorageItem["status"], string> = {
-  complete: "可放入",
-  failed: "失败",
-  pending: "排队中",
-  processing: "生成中",
-};
-
 interface BoardSideAssetListProps {
   canvasAssetIds: ReadonlySet<string>;
   highlightAssetId?: string;
@@ -60,7 +47,13 @@ function BoardSideAssetRow({
   const typeLabelValue = item.type === "audio" || item.type === "image" || item.type === "video"
     ? typeLabel[item.type]
     : item.type;
-  const statusLabel = alreadyOnCanvas ? commonT.t("statusLabels.complete") : (item.status === "complete" ? "可放入" : item.status === "failed" ? commonT.t('statusLabels.failed') : item.status === "pending" ? commonT.t('statusLabels.pending') : commonT.t('statusLabels.processing'));
+  const statusLabelMap: Record<StorageItem["status"], string> = {
+    complete: commonT.t("statusLabels.complete"),
+    failed: commonT.t('statusLabels.failed'),
+    pending: commonT.t('statusLabels.pending'),
+    processing: commonT.t('statusLabels.processing'),
+  };
+  const statusLabel = alreadyOnCanvas ? commonT.t("statusLabels.complete") : statusLabelMap[item.status];
 
   const handleAdd = async () => {
     if (adding || alreadyOnCanvas) return;
@@ -152,6 +145,7 @@ function ImportMediaButton({ className = "" }: { className?: string }) {
 }
 
 function AssetLibraryButton({ onOpen }: { onOpen?: () => void }) {
+  const { t } = useTranslations("common");
   if (!onOpen) return null;
   return (
     <button
@@ -160,7 +154,7 @@ function AssetLibraryButton({ onOpen }: { onOpen?: () => void }) {
       className={SIDE_ACTION_BUTTON_CLASS}
     >
       <FolderHeart className="imagine-tone-icon h-3.5 w-3.5" data-tone="accent" />
-      打开素材库
+      {t("library.title")}
     </button>
   );
 }
@@ -191,7 +185,7 @@ export default function BoardSideAssetList({
   const visibleItems = filteredItems.slice(0, visibleLimit);
 
   const filterChips: Array<{ id: AssetFilter; label: string }> = [
-    { id: "all", label: t("gallery.allModels") },
+    { id: "all", label: t("library.all") },
     { id: "image", label: t('mediaTypeLabels.image') },
     { id: "video", label: t('mediaTypeLabels.video') },
     { id: "audio", label: t('mediaTypeLabels.audio') },
@@ -203,7 +197,7 @@ export default function BoardSideAssetList({
         <AssetLibraryButton onOpen={onOpenAssetLibrary} />
         <ImportMediaButton />
         <p className="rounded-lg border border-dashed border-[var(--iw-border)] px-3 py-6 text-center text-xs text-[var(--iw-muted)]">
-          正在加载本画板资产…
+          {t("library.loadingLibrary")}
         </p>
       </div>
     );
@@ -215,7 +209,7 @@ export default function BoardSideAssetList({
         <AssetLibraryButton onOpen={onOpenAssetLibrary} />
         <ImportMediaButton />
         <p className="rounded-lg border border-dashed border-[var(--iw-border)] px-3 py-6 text-center text-xs text-[var(--iw-muted)]">
-          本画板暂无关联资产。使用上方导入，或在此画板生成后出现在列表中。
+          {t("gallery.emptySearch")}
         </p>
       </div>
     );
@@ -243,7 +237,7 @@ export default function BoardSideAssetList({
       </div>
       {filteredItems.length === 0 ? (
         <p className="rounded-lg border border-dashed border-[var(--iw-border)] px-3 py-6 text-center text-xs text-[var(--iw-muted)]">
-          当前筛选无匹配资产
+          {t("library.noMatchingAssets")}
         </p>
       ) : (
         <>
@@ -262,7 +256,7 @@ export default function BoardSideAssetList({
               onClick={() => setVisibleLimit(limit => limit + PAGE_SIZE)}
               className="imagine-secondary-action h-9 w-full rounded-lg border border-[var(--iw-border)] text-[11px] font-semibold text-[var(--iw-text)]"
             >
-              加载更多（{visibleLimit}/{filteredItems.length}）
+              {t("gallery.loadMore", { current: visibleLimit, total: filteredItems.length })}
             </button>
           ) : null}
         </>

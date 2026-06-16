@@ -109,7 +109,7 @@ import {
 } from "@/lib/board/ports";
 import { BOARD_INSERT_CATALOG, type BoardInsertKind } from "@/lib/board/insert-catalog";
 import { findResultNodeForSource } from "@/lib/board/utils";
-import { useTranslations } from "@/lib/i18n";
+import { t, useTranslations } from "@/lib/i18n";
 import { findAvailableBoardNodePosition } from "@/lib/board/placement";
 import type { GenerationTask } from "@/lib/generation-tasks";
 import { DEFAULT_AUDIO_MODEL, DEFAULT_VIDEO_MODEL } from "@/lib/providers/model-catalog";
@@ -559,14 +559,14 @@ const BoardEdgeComponent = memo(function BoardEdgeComponent({
           ) : null}
           {processing ? (
             <span className="board-edge-processing-pill rounded-full border px-2 py-0.5 text-[9px] font-semibold">
-              Processing
+              {t("board.workspace.processing")}
             </span>
           ) : null}
           {selected ? (
             <button
               type="button"
-              aria-label="Delete connection"
-              title="Delete connection"
+              aria-label={t("board.workspace.deleteConnection")}
+              title={t("board.workspace.deleteConnection")}
               onClick={() => void deleteElements({ edges: [{ id }] })}
               className="flex h-6 w-6 items-center justify-center rounded-full border border-[var(--iw-border)] bg-[var(--iw-panel)] text-[var(--iw-muted)] shadow-lg transition hover:border-red-400/40 hover:bg-red-500 hover:text-white"
             >
@@ -1111,6 +1111,7 @@ export default function BoardWorkspace({
 }: BoardWorkspaceProps) {
   const themeMode = useThemeModeSnapshot();
   const { t: tb } = useTranslations("board");
+  const { t: tc } = useTranslations("common");
   const isCoarsePointer = useCoarsePointer();
   const flowInstanceRef = useRef<ReactFlowInstance<BoardFlowNode, BoardFlowEdge> | null>(null);
   const flowHostRef = useRef<HTMLElement | null>(null);
@@ -1518,7 +1519,7 @@ export default function BoardWorkspace({
       restoreNodeWithEdges(entry.node, entry.edges);
       setTrashedNodes(current => current.filter((_item, itemIndex) => itemIndex !== index));
     } catch (error) {
-      onConnectionError(error instanceof Error ? error.message : "Restore node failed");
+      onConnectionError(error instanceof Error ? error.message : tb("workspace.restoreNodeFailed"));
     }
   }, [onConnectionError, restoreNodeWithEdges, trashedNodes]);
 
@@ -1688,13 +1689,13 @@ export default function BoardWorkspace({
       if (!item) return;
       void Promise.all([resolveCompareReferenceUrl(compareReference), onResolveOriginalAsset(item)]).then(
         ([originalUrl, originalItem]) => setAssetCompare({ originalUrl, resultUrl: originalItem.url }),
-        error => onWorkspaceNotice("error", error instanceof Error ? error.message : "原始媒体读取失败"),
+        error => onWorkspaceNotice("error", error instanceof Error ? error.message : tc("notices.originalMediaReadFailed")),
       );
     },
     onSelectAssetStackResult: (nodeId: string, assetId: string) => {
       const item = galleryItemById.get(assetId);
       if (!item || item.status !== "complete") {
-        onConnectionError("Result asset not found");
+        onConnectionError(tb("workspace.noResultAsset"));
         return;
       }
       updateResultNodeAsset(nodeId, assetId);
@@ -1934,39 +1935,39 @@ export default function BoardWorkspace({
 
   const handleConnect = useCallback<OnConnect>((connection) => {
     const rawRefs = connectionPortRefs(connection);
-    const rawTargetNode = rawRefs ? board.nodes.find(node => node.id === rawRefs.to.nodeId) : undefined;
-    if (rawTargetNode?.kind === "multi-grid") {
-      try {
-        const references = rawRefs ? multiGridImageReferences(board.nodes, rawRefs.from, [rawRefs.from.nodeId]) : [];
-        if (references.length === 0) {
-          onConnectionError("Multi-grid only supports image assets");
-          return;
-        }
+      const rawTargetNode = rawRefs ? board.nodes.find(node => node.id === rawRefs.to.nodeId) : undefined;
+      if (rawTargetNode?.kind === "multi-grid") {
+        try {
+          const references = rawRefs ? multiGridImageReferences(board.nodes, rawRefs.from, [rawRefs.from.nodeId]) : [];
+          if (references.length === 0) {
+            onConnectionError(tb("workspace.multiGridOnlyImage"));
+            return;
+          }
         references.forEach(reference => addAssetToMultiGrid(rawTargetNode.id, reference));
         selectNode(rawTargetNode.id);
         selectEdge(null);
         updateSelectedNodeIds([rawTargetNode.id]);
       } catch (error) {
-        onConnectionError(error instanceof Error ? error.message : "Connection failed");
+        onConnectionError(error instanceof Error ? error.message : tb("workspace.connectFailed"));
       }
       return;
     }
 
     const refs = readValidConnectionRefs(connection);
     if (!refs) {
-      onConnectionError("Port type incompatible");
+      onConnectionError(tb("workspace.connectionIncompatible"));
       return;
     }
     try {
       const targetNode = board.nodes.find(node => node.id === refs.to.nodeId);
       if (refs.from.portKind === "result" && targetNode?.kind === "asset") {
-        onConnectionError("Drag result to blank area to create asset node");
+        onConnectionError(tb("workspace.dragResultToBlank"));
         return;
       }
       if (targetNode?.kind === "multi-grid") {
         const references = multiGridImageReferences(board.nodes, refs.from, [refs.from.nodeId]);
         if (references.length === 0) {
-          onConnectionError("Multi-grid only supports image assets");
+          onConnectionError(tb("workspace.multiGridOnlyImage"));
           return;
         }
         references.forEach(reference => addAssetToMultiGrid(targetNode.id, reference));
@@ -1994,7 +1995,7 @@ export default function BoardWorkspace({
       }
       connectPorts(refs.from, refs.to);
     } catch (error) {
-      onConnectionError(error instanceof Error ? error.message : "Connection failed");
+      onConnectionError(error instanceof Error ? error.message : tb("workspace.connectFailed"));
     }
   }, [addAssetToMultiGrid, addAssetToReferenceGroup, board.nodes, connectPorts, connectPortsBatch, onConnectionError, readValidConnectionRefs, selectEdge, selectedNodeIds, selectNode, updateSelectedNodeIds]);
 
@@ -2048,7 +2049,7 @@ export default function BoardWorkspace({
       try {
         const references = rawRefs ? multiGridImageReferences(board.nodes, rawRefs.from, [rawRefs.from.nodeId]) : [];
         if (references.length === 0) {
-          onConnectionError("Multi-grid only supports image assets");
+          onConnectionError(tb("workspace.multiGridOnlyImage"));
           return;
         }
         references.forEach(reference => addAssetToMultiGrid(rawTargetNode.id, reference));
@@ -2056,14 +2057,14 @@ export default function BoardWorkspace({
         selectNode(rawTargetNode.id);
         selectEdge(null);
       } catch (error) {
-        onConnectionError(error instanceof Error ? error.message : "Reconnection failed");
+        onConnectionError(error instanceof Error ? error.message : tb("workspace.reconnectFailed"));
       }
       return;
     }
 
     const refs = readValidConnectionRefs(newConnection);
     if (!refs) {
-      onConnectionError("Port type incompatible");
+      onConnectionError(tb("workspace.connectionIncompatible"));
       return;
     }
     try {
@@ -2071,7 +2072,7 @@ export default function BoardWorkspace({
       if (targetNode?.kind === "multi-grid") {
         const references = multiGridImageReferences(board.nodes, refs.from, [refs.from.nodeId]);
         if (references.length === 0) {
-          onConnectionError("Multi-grid only supports image assets");
+          onConnectionError(tb("workspace.multiGridOnlyImage"));
           return;
         }
         references.forEach(reference => addAssetToMultiGrid(targetNode.id, reference));
@@ -2085,7 +2086,7 @@ export default function BoardWorkspace({
       }
       reconnectEdge(oldEdge.id, refs.from, refs.to);
     } catch (error) {
-      onConnectionError(error instanceof Error ? error.message : "Reconnection failed");
+      onConnectionError(error instanceof Error ? error.message : tb("workspace.reconnectFailed"));
     }
   }, [addAssetToMultiGrid, addAssetToReferenceGroup, board.nodes, deleteEdge, onConnectionError, readValidConnectionRefs, reconnectEdge, selectEdge, selectNode]);
 
@@ -2287,7 +2288,7 @@ export default function BoardWorkspace({
         );
         setQuickInsertMenu(null);
       } catch (error) {
-        onConnectionError(error instanceof Error ? error.message : "Connection failed");
+        onConnectionError(error instanceof Error ? error.message : tb("workspace.connectFailed"));
       }
       return;
     }
@@ -2302,7 +2303,7 @@ export default function BoardWorkspace({
         );
         setQuickInsertMenu(null);
       } catch (error) {
-        onConnectionError(error instanceof Error ? error.message : "Connection failed");
+        onConnectionError(error instanceof Error ? error.message : tb("workspace.connectFailed"));
       }
       return;
     }
@@ -2317,7 +2318,7 @@ export default function BoardWorkspace({
         );
         setQuickInsertMenu(null);
       } catch (error) {
-        onConnectionError(error instanceof Error ? error.message : "Connection failed");
+        onConnectionError(error instanceof Error ? error.message : tb("workspace.connectFailed"));
       }
       return;
     }
@@ -2384,7 +2385,7 @@ export default function BoardWorkspace({
         return [node.asset];
       });
       if (references.length === 0) {
-        onConnectionError("Multi-grid only accepts images");
+        onConnectionError(tb("workspace.noMultiGridImages"));
         return;
       }
       references.forEach(reference => addAssetToMultiGrid(targetNode.id, reference));
@@ -2400,7 +2401,7 @@ export default function BoardWorkspace({
       .map(sourceNode => batchConnectionToTarget(board.nodes, sourceNode, targetNode))
       .filter((connection): connection is { from: BoardPortRef; to: BoardPortRef } => connection !== null);
     if (connections.length === 0) {
-      onConnectionError("Selected node has no connectable ports");
+      onConnectionError(tb("workspace.noConnectablePorts"));
       return;
     }
     connectPortsBatch(connections);
@@ -2415,7 +2416,7 @@ export default function BoardWorkspace({
     if (!contextNode) return;
     const assetNodeIds = selectedReferenceGroupAssetNodeIds(board.nodes, contextNodeId, selectedNodeIds);
     if (assetNodeIds.length === 0) {
-      onConnectionError("请选择图片资产节点");
+      onConnectionError(tb("workspace.selectImageAssetNodes"));
       return;
     }
     const contextPosition = boardNodeAbsolutePosition(board.nodes, contextNode.id) ?? contextNode.position;
@@ -2434,7 +2435,7 @@ export default function BoardWorkspace({
       : [...selectedNodeIds, contextNodeId];
     const groupId = groupNodes(nodeIds);
     if (!groupId) {
-      onConnectionError("至少选择两个节点才能打组");
+      onConnectionError(tb("workspace.atLeastTwoNodesToGroup"));
       return;
     }
     updateSelectedNodeIds([groupId]);
@@ -2442,9 +2443,9 @@ export default function BoardWorkspace({
   }, [closeOverlayMenus, groupNodes, onConnectionError, selectedNodeIds, updateSelectedNodeIds]);
 
   const createGroupFromSelectionToolbar = useCallback((): void => {
-    const groupId = groupNodes(selectedNodeIds);
+  const groupId = groupNodes(selectedNodeIds);
     if (!groupId) {
-      onConnectionError("至少选择两个节点才能打组");
+      onConnectionError(tb("workspace.atLeastTwoNodesToGroup"));
       return;
     }
     updateSelectedNodeIds([groupId]);
@@ -2656,7 +2657,7 @@ export default function BoardWorkspace({
         const from: BoardPortRef = { nodeId: sourceNodeId, portId: sourceHandleId, portKind: sourceKind };
         const references = multiGridImageReferences(board.nodes, from, [sourceNodeId]);
         if (references.length === 0) {
-          onConnectionError("Multi-grid only supports image assets");
+          onConnectionError(tb("workspace.multiGridOnlyImage"));
           return;
         }
         const dropTarget = multiGridCellDropTargetFromClient(board.nodes, clientPoint.x, clientPoint.y);
@@ -2672,7 +2673,7 @@ export default function BoardWorkspace({
       }
       const connections = batchConnectionsFromSourceToTarget(board.nodes, sourceNodeId, targetNode, selectedNodeIds);
       if (connections.length === 0) {
-        onConnectionError("Selected node has no connectable ports");
+        onConnectionError(tb("workspace.noConnectablePorts"));
         return;
       }
       connectPortsBatch(connections);
@@ -2732,7 +2733,7 @@ export default function BoardWorkspace({
     if (sourceKind === "result") {
       const sourceNode = board.nodes.find(node => node.id === sourceNodeId);
       if (!isResultSourceNode(sourceNode) || sourceNode.status !== "complete") {
-        onConnectionError("生成结果尚未就绪");
+        onConnectionError(tb("workspace.resultNotReady"));
         return;
       }
       const connectedResultNode = findResultNodeForSource(board.nodes, sourceNode.id);
@@ -2757,7 +2758,7 @@ export default function BoardWorkspace({
       selectEdge(null);
       return;
     }
-  }, [addAssetToMultiGrid, addResultNodeWithConnection, board.nodes, centeredNodePosition, connectPortsBatch, flowPositionFromClient, onConnectionError, selectEdge, selectedNodeIds, selectNode, updateSelectedNodeIds]);
+  }, [addAssetToMultiGrid, addResultNodeWithConnection, board.nodes, centeredNodePosition, connectPortsBatch, flowPositionFromClient, onConnectionError, selectEdge, selectedNodeIds, selectNode, tb, updateSelectedNodeIds]);
 
   const openQuickInsertMenu = useCallback((event: ReactMouseEvent | MouseEvent): void => {
     event.preventDefault();
@@ -2776,7 +2777,7 @@ export default function BoardWorkspace({
   const openEmptyStateQuickInsertMenu = useCallback((): void => {
     const rect = flowHostRef.current?.getBoundingClientRect();
     if (!rect) {
-      onWorkspaceNotice("info", "无法确定插入位置，请先双击画布");
+      onWorkspaceNotice("info", tb("workspace.cannotDetermineInsertPosition"));
       return;
     }
     const clientX = rect.left + rect.width / 2;
@@ -2791,7 +2792,7 @@ export default function BoardWorkspace({
       position: flowPositionFromClient(clientX, clientY),
       selectedNodeIds: [],
     });
-  }, [flowPositionFromClient, onWorkspaceNotice, selectEdge, selectNode, updateSelectedNodeIds]);
+  }, [flowPositionFromClient, onWorkspaceNotice, selectEdge, selectNode, tb, updateSelectedNodeIds]);
 
   const handleCanvasContextMenu = useCallback((event: ReactMouseEvent<HTMLElement>): void => {
     if (event.defaultPrevented || isTextEntryTarget(event.target)) return;
@@ -2831,12 +2832,12 @@ export default function BoardWorkspace({
     flowHostRef.current?.focus();
     const resolved = point ?? visibleCenterPosition(DEFAULT_ASSET_NODE_SIZE);
     if (!resolved) {
-      onWorkspaceNotice("info", "无法确定导入位置，请先点击画布再试");
+      onWorkspaceNotice("info", tb("workspace.cannotDetermineImportPosition"));
       return;
     }
     pendingImportPointRef.current = resolved;
     mediaImportInputRef.current?.click();
-  }, [onWorkspaceNotice, visibleCenterPosition]);
+  }, [onWorkspaceNotice, visibleCenterPosition, tb]);
 
   const handleMediaImportInputChange = useCallback((event: ChangeEvent<HTMLInputElement>): void => {
     const files = event.target.files ? Array.from(event.target.files) : [];
@@ -2851,9 +2852,9 @@ export default function BoardWorkspace({
     if (urls.length === 0) return;
     void Promise.all(urls.map((url, index) => imageUrlToFile(url, index)))
       .then(files => onImportBoardFiles(files, centeredNodePosition(point, DEFAULT_ASSET_NODE_SIZE)))
-      .catch(error => onConnectionError(error instanceof Error ? error.message : "图片拖入失败"));
+      .catch(error => onConnectionError(error instanceof Error ? error.message : tb("workspace.imageDragFailed")));
     setQuickInsertMenu(null);
-  }, [centeredNodePosition, onConnectionError, onImportBoardFiles]);
+  }, [centeredNodePosition, onConnectionError, onImportBoardFiles, tb]);
 
   const handleBoardDrop = useCallback((event: ReactDragEvent<HTMLElement>): void => {
     const point = flowPositionFromClient(event.clientX, event.clientY);
@@ -3182,7 +3183,8 @@ export default function BoardWorkspace({
               >
                 <div className={`pointer-events-auto flex h-10 ${selectionToolbarWidthClass} shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-slate-950/88 px-2.5 text-[11px] font-semibold text-slate-100 shadow-[0_10px_24px_rgba(2,6,23,0.28)] backdrop-blur-md ring-1 ring-white/5`}>
                   <span className="min-w-0 flex-1 truncate px-1 text-slate-300">
-                    已选 {selectedNodeIds.length} 个{selectedDownloadableCount > 0 ? ` · Downloadable ${selectedDownloadableCount}` : ""}
+                    {tb("workspace.selectedCount", { count: selectedNodeIds.length })}
+                    {selectedDownloadableCount > 0 ? ` · ${tb("workspace.downloadableCount", { count: selectedDownloadableCount })}` : ""}
                   </span>
                   {selectedGroupNodeIds.length === 0 ? (
                     <button
@@ -3192,7 +3194,7 @@ export default function BoardWorkspace({
                       title={tb("workspace.groupTooltip")}
                     >
                       <Layers className="h-3.5 w-3.5" />
-                      打组
+                      {tb("workspace.groupNodes")}
                     </button>
                   ) : (
                     <button
@@ -3202,7 +3204,7 @@ export default function BoardWorkspace({
                       title={tb("workspace.ungroupTooltip")}
                     >
                       <Ungroup className="h-3.5 w-3.5" />
-                      取消分组
+                      {tb("workspace.ungroupNodes")}
                     </button>
                   )}
                   {canDownloadSelectedAssets ? (
@@ -3213,7 +3215,7 @@ export default function BoardWorkspace({
                       title={tb("workspace.downloadZipTooltip")}
                     >
                       <Download className="h-3.5 w-3.5" />
-                      批量下载
+                      {tb("workspace.batchDownload")}
                     </button>
                   ) : null}
                 </div>
@@ -3286,7 +3288,7 @@ export default function BoardWorkspace({
                   if (!mediaItem) return;
                   void Promise.all([resolveCompareReferenceUrl(compareReference), onResolveOriginalAsset(mediaItem)]).then(
                     ([originalUrl, originalItem]) => setAssetCompare({ originalUrl, resultUrl: originalItem.url }),
-                    error => onWorkspaceNotice("error", error instanceof Error ? error.message : "原始媒体读取失败"),
+                    error => onWorkspaceNotice("error", error instanceof Error ? error.message : tb("notices.originalMediaReadFailed")),
                   );
                   closeOverlayMenus();
                 }
@@ -3296,8 +3298,8 @@ export default function BoardWorkspace({
                   void onResolveOriginalAsset(copyableImageItem).then(
                     originalItem => copyImageUrlToClipboard(originalItem.url),
                   ).then(
-                    () => onWorkspaceNotice("success", "图片已复制到剪贴板"),
-                    error => onWorkspaceNotice("error", error instanceof Error ? error.message : "复制图片失败"),
+                    () => onWorkspaceNotice("success", tb("workspace.imageCopiedToClipboard")),
+                    error => onWorkspaceNotice("error", error instanceof Error ? error.message : tb("workspace.imageCopyFailed")),
                   );
                   closeOverlayMenus();
                 }

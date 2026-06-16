@@ -31,7 +31,7 @@ function isRemoteUrl(url: string): boolean {
 
 function previewSize(width: number, height: number): { width: number; height: number } {
   if (width <= 0 || height <= 0) {
-    throw new Error(t("media.videoFrameCapture.frameSizeUnavailable"));
+    throw new Error(t("common.errors.previewMediaSizeInvalid"));
   }
   const scale = Math.min(1, PREVIEW_MAX_EDGE / Math.max(width, height));
   return {
@@ -47,7 +47,7 @@ function drawPreview(source: CanvasImageSource, width: number, height: number): 
   canvas.height = size.height;
   const context = canvas.getContext("2d");
   if (!context) {
-    throw new Error(t("common.errors.referenceMediaNotFound"));
+    throw new Error(t("common.errors.canvasContextCreationFailed"));
   }
   context.drawImage(source, 0, 0, size.width, size.height);
   return {
@@ -63,7 +63,7 @@ function loadImage(sourceUrl: string): Promise<HTMLImageElement> {
     const image = new Image();
     image.decoding = "async";
     image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error(t("common.errors.referenceMediaNotFound")));
+  image.onerror = () => reject(new Error(t("common.errors.referenceMediaNotFound")));
     image.src = sourceUrl;
   });
 }
@@ -117,9 +117,9 @@ function createVideoPreview(item: StorageItem): Promise<AssetPreviewRecord> {
       }
     };
 
-    timeout = window.setTimeout(() => fail(new Error("视频预览生成超时")), 8000);
+    timeout = window.setTimeout(() => fail(new Error(t("common.notices.videoPreviewTimeout"))), 8000);
     video.onerror = () => {
-      fail(new Error("视频预览加载失败"));
+      fail(new Error(t("common.errors.videoPreviewLoadFailed")));
     };
     video.onloadeddata = finish;
     video.src = item.url;

@@ -1,5 +1,4 @@
 import type { ReactNode, WheelEvent } from "react";
-import { useTranslations } from "@/lib/i18n";
 
 interface AtDropdownShellProps {
   children: ReactNode;

@@ -24,7 +24,6 @@ import type { StorageItem } from "@/lib/db";
 import type { BoardPromptReference } from "@/lib/board/prompt-references";
 import { BOARD_PORT_IDS, getBoardNodePortDefinitions } from "@/lib/board/ports";
 import { useBoardNodeCallbacks } from "@/lib/board/callbacks";
-import { useTranslations } from "@/lib/i18n";
 
 export interface BoardFlowNodeData extends Record<string, unknown> {
   boardId: string;
@@ -147,8 +146,12 @@ function GenerateReferenceShelf({
       {visibleReferences.map((reference, index) => {
         const canManageEdge = typeof reference.sourceEdgeId === "string" && edgeUseCounts.get(reference.sourceEdgeId) === 1;
         const canReorder = canManageEdge;
-        const sourceLabel = reference.sourceTitle ?? "Source node";
-        const roleLabel = reference.role === "start" ? t("node.videoReferenceModes.firstLast") : reference.role === "end" ? t("node.videoReferenceModes.reference") : t("node.videoReferenceModes.reference");
+        const sourceLabel = reference.sourceTitle ?? t("board.node.sourceNode");
+        const roleLabel = reference.role === "start"
+          ? t("board.node.videoReferenceModes.firstLast")
+          : reference.role === "end"
+            ? t("board.node.videoReferenceModes.reference")
+            : t("board.node.videoReferenceModes.reference");
         return (
           <div
             key={`${reference.id}:${reference.url}:${index}`}
@@ -193,7 +196,7 @@ function GenerateReferenceShelf({
                 if (reference.sourceNodeId) onFocusReferenceSource(reference.sourceNodeId);
               }}
               className="h-full w-full"
-              title={`${sourceLabel} · Jump to source`}
+              title={`${sourceLabel} · ${t("board.node.jumpToSource")}`}
             >
               <MediaReferenceThumbnail reference={reference} alt="" className="h-full w-full" />
             </button>
@@ -212,7 +215,7 @@ function GenerateReferenceShelf({
                 }}
                 onPointerDown={(event) => event.stopPropagation()}
                 className="absolute right-0 top-0 flex h-4 w-4 items-center justify-center rounded-bl border-b border-l border-white/25 bg-red-500/90 text-white opacity-0 transition hover:bg-red-400 focus-visible:opacity-100 group-hover/reference:opacity-100"
-                title="Remove this reference connection"
+                title={t("board.node.removeReferenceConnection")}
               >
                 <X className="h-2.5 w-2.5" />
               </button>

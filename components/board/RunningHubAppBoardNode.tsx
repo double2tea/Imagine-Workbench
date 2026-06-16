@@ -38,7 +38,6 @@ import {
 } from "@/lib/board/runninghub-bindings";
 import type { BoardPromptReference } from "@/lib/board/prompt-references";
 
-import { useTranslations } from "@/lib/i18n";
 
 interface RunningHubAppBoardNodeProps {
   hasResultConnection?: boolean;

@@ -792,7 +792,6 @@ function AudioOperationInspector({
   const { t } = useTranslations("board");
   const capabilities = getAudioModelCapabilities(node.model);
   const formatOptions = audioOperationFormatOptions(capabilities);
-  const supportsReferences = modelSupportsReferences(node);
   const requiredReferenceTypes = getInputReferenceTypes(inputSummary);
   const selectableAudioModelGroups = filterModelGroupsForReferenceTypes(audioModelGroups, "audio", requiredReferenceTypes);
   const selectedProvider = audioProviderFromModel(node.model);

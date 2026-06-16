@@ -49,7 +49,7 @@ export default function BoardQuickInsertMenu({ clientX, clientY, items, position
       onContextMenu={(event) => event.preventDefault()}
     >
       <div className="mb-2 flex items-center justify-between px-1.5">
-        <span className="text-[11px] font-semibold text-[var(--iw-muted)]">{t('workspace.emptyHint', { fallback: "插入到画板" }) ?? "插入到画板"}</span>
+        <span className="text-[11px] font-semibold text-[var(--iw-muted)]">{t('workspace.emptyHint')}</span>
         <span className="font-mono text-[10px] text-[var(--iw-faint)]">{items.length}</span>
       </div>
       <div className="grid max-h-[min(420px,calc(100vh-5rem))] gap-2 overflow-y-auto pr-1">

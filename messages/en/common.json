@@ -14,6 +14,8 @@
     "apply": "Apply",
     "confirm": "Confirm",
     "restore": "Restore",
+    "create": "Create",
+    "ignore": "Ignore",
     "generate": "Generate"
   },
   "aria": {
@@ -252,6 +254,22 @@
     "sourceLinkRepairSuccess": "Repaired {count} source link(s)",
     "sourceLinkRepairFailed": "Source link repair failed",
     "localKeysCleaned": "Cleaned {count} local key(s), fully effective after refresh",
+    "boardCopied": "Current board duplicated",
+    "boardCopyFailed": "Failed to duplicate board",
+    "boardRenameFailed": "Failed to rename board",
+    "boardSaveFailed": "Failed to save board",
+    "newBoardFailed": "Failed to create board",
+    "deleteBoardFailed": "Failed to delete board",
+    "switchBoardFailed": "Failed to switch board",
+    "batchDownloadFailed": "Batch download failed",
+    "atLeastOneBoard": "At least one board must remain",
+    "focusTaskResultMissingSourceNode": "Task is missing a source node and cannot focus the result",
+    "focusTaskResultMissingResultNode": "Task result node was not found",
+    "rerunTaskMissingSourceNode": "Task is missing a source node and cannot be rerun",
+    "ignoreFailedTaskConfirm": "Ignore this failed task? This only removes the record from the queue and does not delete generated assets or board nodes.",
+    "taskIgnored": "Task record ignored",
+    "taskIgnoreFailed": "Failed to ignore task",
+    "selectImageNode": "Please select an image node",
     "boardsReset": "Boards reset",
     "boardsResetFailed": "Board reset failed"
   },
@@ -274,7 +292,8 @@
     "dateTo": "End date",
     "dateRangeSeparator": "to",
     "emptyFilterHint": "After generating works, you can filter by status, type, and time.",
-    "emptySearch": "No matching assets found"
+    "emptySearch": "No matching assets found",
+    "loadMore": "Load more {current} / {total}"
   },
   "library": {
     "title": "Library",
@@ -346,6 +365,7 @@
     "imageToken": "@图片{n}",
     "videoToken": "@视频{n}",
     "audioToken": "@音频{n}",
+    "promptPrefix": "In the marked region of the image, change: ",
     "emptyPromptPlaceholder": "[Enter your new modification idea...]",
     "agentRefLabel": "Agent reference {n}"
   }

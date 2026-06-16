@@ -198,7 +198,7 @@ export default function PanoramaOverlay({ item, onClose, onSaveScreenshots }: Pa
       });
     }
 
-    void buildViewer().catch(error => {
+    void buildViewer().catch(() => {
       if (isActive) setErrorMessage(t("panorama.loadFailed"));
     });
 
@@ -229,7 +229,7 @@ export default function PanoramaOverlay({ item, onClose, onSaveScreenshots }: Pa
       pitch: viewer.getPitch(),
       hfov: viewer.getHfov(),
     });
-  }, [captureCamera]);
+  }, [captureCamera, t]);
 
   const saveScreenshots = useCallback(async (mode: PanoramaSaveMode) => {
     if (savingMode !== null || !isReady) return;
@@ -248,11 +248,17 @@ export default function PanoramaOverlay({ item, onClose, onSaveScreenshots }: Pa
       await onSaveScreenshots(item, screenshots);
     } catch (error) {
       const msg = readErrorMessage(error);
-      setErrorMessage(msg === "loadFailed" ? t("panorama.loadFailed") : msg === "renderFailed" ? t("panorama.renderFailed") : msg === "unknownSize" ? t("panorama.unknownSize") : msg === "notReady" ? t("panorama.viewerNotReady") : msg);
+      const panoramaErrorMessageMap: Record<string, string> = {
+        loadFailed: t("panorama.loadFailed"),
+        renderFailed: t("panorama.renderFailed"),
+        unknownSize: t("panorama.unknownSize"),
+        notReady: t("panorama.viewerNotReady"),
+      };
+      setErrorMessage(panoramaErrorMessageMap[msg] ?? msg);
     } finally {
       setSavingMode(null);
     }
-  }, [captureCamera, captureCurrent, isReady, item, onSaveScreenshots, savingMode]);
+  }, [captureCamera, captureCurrent, isReady, item, onSaveScreenshots, savingMode, t]);
 
   const resetView = useCallback(() => {
     const viewer = viewerRef.current;
