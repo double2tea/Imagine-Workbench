@@ -73,7 +73,7 @@ export default function VideoAssetPlayer({
     } catch (error) {
       await showAlert({ message: error instanceof Error ? error.message : t("videoPlayer.captureFailed") });
     }
-  }, [item, onCaptureFrame, showAlert]);
+  }, [item, onCaptureFrame, showAlert, t]);
 
   useEffect(() => {
     if (!onCaptureFrame || !onCaptureFrameRequestReady) return undefined;

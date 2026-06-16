@@ -156,8 +156,8 @@ export default function AssetToolbar({
           <div className="mb-3 flex items-center justify-between gap-2 lg:hidden">
             <span className="text-sm font-semibold text-[var(--iw-text)]">{t("gallery.mobileTitle")}</span>
             <span className="imagine-meta-chip font-mono text-[10px]">
-              {inFlightCount > 0 ? `${inFlightCount} ${t("gallery.inFlightCount", { count: inFlightCount })} · ` : ""}
-              {itemsCount} {t("gallery.itemCount", { count: itemsCount })}
+              {inFlightCount > 0 ? `${t("gallery.inFlightCount", { count: inFlightCount })} · ` : ""}
+              {t("gallery.itemCount", { count: itemsCount })}
             </span>
           </div>
         </>
@@ -181,7 +181,7 @@ export default function AssetToolbar({
           value={assetModelFilter}
           onChange={(e) => setAssetModelFilter(e.target.value)}
           className="imagine-toolbar-select h-9 min-w-0 rounded-lg border border-slate-800 bg-slate-950/55 px-3 font-mono text-[10px] text-slate-300 transition-colors duration-150 focus:border-blue-400/35 focus:outline-none sm:min-w-[9rem]"
-          aria-label={t("gallery.allModels")}
+          aria-label={t("gallery.filterByModel")}
         >
           <option value="all">{t("gallery.allModels")}</option>
           {modelOptions.map(model => (

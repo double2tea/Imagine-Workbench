@@ -131,9 +131,20 @@ function readLocaleChangeEvent(event: Event): Locale | null {
 /** Resolve a dotted key path against a nested object. */
 function resolveKey(root: Record<string, unknown>, key: string): string | undefined {
   let current: unknown = root;
-  for (const segment of key.split(".")) {
+  const segments = key.split(".");
+  for (let i = 0; i < segments.length; i += 1) {
+    const segment = segments[i];
     if (typeof current !== "object" || current === null) return undefined;
-    current = (current as Record<string, unknown>)[segment];
+    const maybeNested = (current as Record<string, unknown>)[segment];
+    if (maybeNested === undefined) {
+      if (typeof current === "object" && current !== null) {
+        const flatKey = segments.slice(i).join(".");
+        const flatValue = (current as Record<string, unknown>)[flatKey];
+        if (typeof flatValue === "string") return flatValue;
+      }
+      return undefined;
+    }
+    current = maybeNested;
   }
   return typeof current === "string" ? current : undefined;
 }

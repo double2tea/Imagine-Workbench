@@ -41,10 +41,9 @@ export function AgentModelSelect({
   );
   const hasKnownValue = knownValues.has(value);
   const missingCurrent = Boolean(value) && !hasKnownValue;
+  const { t } = useTranslations("agent");
 
   if (groups.length === 0 && !missingCurrent && !value) return null;
-
-  const { t } = useTranslations("agent");
 
   return (
     <div

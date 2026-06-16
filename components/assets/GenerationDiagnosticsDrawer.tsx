@@ -52,6 +52,11 @@ export default function GenerationDiagnosticsDrawer({ item, onClose }: Generatio
   const [copyState, setCopyState] = useState<CopyState>("idle");
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const rows = useMemo(() => diagnosticRows(item, t), [item, t]);
+  const copyLabels: Record<CopyState, string> = {
+    idle: t("diagnostics.copyDiagnostics"),
+    copied: t("diagnostics.copiedDiagnostics"),
+    failed: t("diagnostics.copyFailed"),
+  };
   const prompt = item.generationRequest?.prompt.trim() || item.prompt.trim();
   const references = getGenerationReferenceMedia(item.generationRequest);
 
@@ -61,7 +66,7 @@ export default function GenerationDiagnosticsDrawer({ item, onClose }: Generatio
 
   const buildSummary = (): string => {
     const request = item.generationRequest;
-    const sbRows = diagnosticRows(item, t);
+    const sbRows = rows;
     const sbPrompt = request?.prompt.trim() || item.prompt.trim();
     const lines = [
       t("diagnostics.summaryTitle"),
@@ -160,7 +165,7 @@ export default function GenerationDiagnosticsDrawer({ item, onClose }: Generatio
             className="imagine-motion-interactive inline-flex h-9 w-full items-center justify-center gap-2 rounded-md border border-slate-700 bg-slate-900 px-3 text-xs font-medium text-slate-100 hover:border-slate-500 hover:text-white"
           >
             {copyState === "copied" ? <Check className="h-4 w-4" /> : <Clipboard className="h-4 w-4" />}
-            {copyState === "copied" ? t("diagnostics.copiedDiagnostics") : copyState === "failed" ? t("diagnostics.copyFailed") : t("diagnostics.copyDiagnostics")}
+            {copyLabels[copyState]}
           </button>
         </div>
       </div>

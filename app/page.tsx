@@ -804,7 +804,7 @@ export default function Home() {
     const confirmText = task.canCancelRemote
       ? t("common.confirmDialogs.cancelVideoTask")
       : t("common.confirmDialogs.cancelLocalTask");
-    if (!(await confirmAction({ message: confirmText, tone: "danger", confirmLabel: t("common.buttons.cancelTask") }))) return;
+    if (!(await confirmAction({ message: confirmText, tone: "danger", confirmLabel: t("cancelTask") }))) return;
 
     setCancelingItemIds(prev => [...prev, task.id]);
     try {
@@ -881,7 +881,7 @@ export default function Home() {
     if (!(await confirmAction({
       message: t("common.confirmDialogs.deleteSelectedItems", { count: selectedItemIds.length }),
       tone: "danger",
-      confirmLabel: t("common.buttons.delete"),
+      confirmLabel: t("delete"),
     }))) {
       return;
     }
@@ -889,7 +889,7 @@ export default function Home() {
   };
 
   const handleGalleryDeleteItem = async (item: StorageItem) => {
-    if (!(await confirmAction({ message: t("common.confirmDialogs.deleteSingleItem"), tone: "danger", confirmLabel: t("common.buttons.delete") }))) {
+    if (!(await confirmAction({ message: t("common.confirmDialogs.deleteSingleItem"), tone: "danger", confirmLabel: t("delete") }))) {
       return;
     }
     await deleteGalleryRecords([item.id]);
@@ -901,7 +901,7 @@ export default function Home() {
     if (!(await confirmAction({
       message: t("common.confirmDialogs.deleteTasksByStatus", { count: ids.length, statuses: statuses.join("/") }),
       tone: "danger",
-      confirmLabel: t("common.buttons.delete"),
+      confirmLabel: t("delete"),
     }))) {
       return;
     }
@@ -1386,7 +1386,7 @@ export default function Home() {
       setAgentReferenceId(nextReferenceId);
       setAgentReferences([{ id: nextReferenceId, url: compressedMergedImage }]);
       if (!agentInput.includes("modify the marked region")) {
-        setAgentInput(`In the marked region, change: `);
+        setAgentInput(t("common.maskEditor.promptPrefix"));
       }
       setIsAgentDockOpen(true);
     } else {
@@ -1399,7 +1399,7 @@ export default function Home() {
       ));
       // Auto populate helper suggestions into Prompt box
       if (!prompt.includes("modify the marked region")) {
-        setPrompt(`In the marked region of the image, change: ${prompt || t("common.references.emptyPromptPlaceholder")}`);
+        setPrompt(`${t("common.maskEditor.promptPrefix")} ${prompt || t("common.references.emptyPromptPlaceholder")}`);
       }
       // Set active model to an image editing capable endpoint
       setSelectedModel("12ai:gpt-image-2");
@@ -1617,7 +1617,7 @@ export default function Home() {
       if (!(await confirmAction({
         message: t("common.confirmDialogs.confirmImportWorkspace", { assetCount: preview.assetCount, boardCount: preview.boardCount, settingsCount: preview.settingsKeyCount, credentialNote }),
         tone: "danger",
-        confirmLabel: t("common.buttons.restore"),
+        confirmLabel: t("restore"),
       }))) {
         return;
       }

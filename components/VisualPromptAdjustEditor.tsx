@@ -47,13 +47,13 @@ const DEFAULT_LIGHTING_STATE: LightingAdjustmentState = {
   temperature: 5600,
   rimLight: false,
 };
-const LIGHT_DIRECTIONS: Array<{ value: LightingAdjustmentState["direction"]; label: string }> = [
-  { value: "left", label: "lightingControls.directionLabels.left" },
-  { value: "top", label: "lightingControls.directionLabels.top" },
-  { value: "right", label: "lightingControls.directionLabels.right" },
-  { value: "front", label: "lightingControls.directionLabels.front" },
-  { value: "bottom", label: "lightingControls.directionLabels.bottom" },
-  { value: "back", label: "lightingControls.directionLabels.back" },
+const LIGHT_DIRECTIONS: Array<{ value: LightingAdjustmentState["direction"] }> = [
+  { value: "left" },
+  { value: "top" },
+  { value: "right" },
+  { value: "front" },
+  { value: "bottom" },
+  { value: "back" },
 ];
 const ANGLE_VIEW_PRESETS: Array<{
   className: string;

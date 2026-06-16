@@ -1199,15 +1199,19 @@ export default function CanvasMaskEditor({
                       className="imagine-input h-8 w-28 text-xs"
                       aria-label={t("canvasMaskEditor.cropRatioAriaLabel")}
                     >
-                      {CROP_PRESETS.map((preset) => (
-                        <option key={preset.id} value={preset.id}>
-                          {preset.id === "free"
-                            ? t("canvasMaskEditor.cropPresets.free")
-                            : preset.id === "original"
-                              ? t("canvasMaskEditor.cropPresets.original")
-                              : preset.id}
-                        </option>
-                      ))}
+                  {CROP_PRESETS.map((preset) => {
+                    const presetLabels: Record<CropPresetId, string> = {
+                      free: t("canvasMaskEditor.cropPresets.free"),
+                      original: t("canvasMaskEditor.cropPresets.original"),
+                      "1:1": "1:1",
+                      "4:5": "4:5",
+                      "3:4": "3:4",
+                      "4:3": "4:3",
+                      "16:9": "16:9",
+                      "9:16": "9:16",
+                    };
+                    return <option key={preset.id} value={preset.id}>{presetLabels[preset.id]}</option>;
+                  })}
                     </select>
                   </label>
                   <span className="rounded-md border border-[var(--iw-border)] bg-[var(--iw-bg)]/60 px-2.5 py-1.5 font-mono text-[10px] text-[var(--iw-muted)]">
@@ -1241,7 +1245,7 @@ export default function CanvasMaskEditor({
                 <OperationControlGroup>
                   {(["left", "right", "top", "bottom"] as const).map(side => (
                     <span key={side} className="rounded-md border border-[var(--iw-border)] bg-[var(--iw-bg)]/60 px-2.5 py-1.5 text-[10px] font-semibold text-[var(--iw-muted)]">
-                      <span className="w-8">{side === "left" ? t("canvasMaskEditor.outpaintSideLabels.left") : side === "right" ? t("canvasMaskEditor.outpaintSideLabels.right") : side === "top" ? t("canvasMaskEditor.outpaintSideLabels.top") : t("canvasMaskEditor.outpaintSideLabels.bottom")}</span>
+                      <span className="w-8">{t(`canvasMaskEditor.outpaintSideLabels.${side}`)}</span>
                       <span className="ml-2 font-mono">{outpaintMargins[side]}px</span>
                     </span>
                   ))}
