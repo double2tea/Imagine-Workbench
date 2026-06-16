@@ -7,6 +7,31 @@ export const REFERENCE_IMAGE_MAX_BYTES = 8 * 1024 * 1024;
 export const REFERENCE_IMAGES_MAX_TOTAL_BYTES = 15 * 1024 * 1024;
 export const REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES = 24 * 1024 * 1024;
 
+export interface ReferenceImageCompressionPolicy {
+  maxBytes: number;
+  outputType: string;
+  initialMaxEdge: number;
+  minMaxEdge: number;
+  qualitySteps: readonly number[];
+  edgeScaleSteps: readonly number[];
+}
+
+export interface ReferenceImageCompressionAttempt {
+  width: number;
+  height: number;
+  outputType: string;
+  quality: number;
+}
+
+export const REFERENCE_IMAGE_COMPRESSION_POLICY: ReferenceImageCompressionPolicy = {
+  maxBytes: REFERENCE_IMAGE_MAX_BYTES,
+  outputType: REFERENCE_IMAGE_OUTPUT_TYPE,
+  initialMaxEdge: REFERENCE_IMAGE_MAX_EDGE,
+  minMaxEdge: 1024,
+  qualitySteps: [REFERENCE_IMAGE_OUTPUT_QUALITY, 0.75, 0.65, 0.55],
+  edgeScaleSteps: [1, 0.8, 0.625, 0.5],
+};
+
 export function isImageDataUri(value: string): boolean {
   return /^data:image\/[a-z0-9.+-]+;base64,/i.test(value);
 }
@@ -42,6 +67,41 @@ export function dataUriByteSize(dataUri: string): number | null {
   const base64 = match[1];
   const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
   return Math.floor((base64.length * 3) / 4) - padding;
+}
+
+export function buildReferenceImageCompressionAttempts(
+  width: number,
+  height: number,
+  policy: ReferenceImageCompressionPolicy = REFERENCE_IMAGE_COMPRESSION_POLICY,
+): ReferenceImageCompressionAttempt[] {
+  if (policy.maxBytes <= 0) throw new Error("Reference image max bytes must be positive");
+  if (policy.initialMaxEdge <= 0 || policy.minMaxEdge <= 0) throw new Error("Reference image max edge values must be positive");
+  if (policy.qualitySteps.length === 0) throw new Error("Reference image compression quality steps must not be empty");
+  if (policy.edgeScaleSteps.length === 0) throw new Error("Reference image compression edge scale steps must not be empty");
+
+  const attempts: ReferenceImageCompressionAttempt[] = [];
+  const seen = new Set<string>();
+
+  for (const edgeScale of policy.edgeScaleSteps) {
+    if (edgeScale <= 0) throw new Error("Reference image compression edge scale steps must be positive");
+    const maxEdge = Math.max(policy.minMaxEdge, Math.round(policy.initialMaxEdge * edgeScale));
+    const dimensions = scaleImageDimensions(width, height, maxEdge);
+
+    for (const quality of policy.qualitySteps) {
+      if (quality <= 0 || quality > 1) throw new Error("Reference image compression quality steps must be between 0 and 1");
+      const key = `${dimensions.width}x${dimensions.height}:${quality}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      attempts.push({
+        width: dimensions.width,
+        height: dimensions.height,
+        outputType: policy.outputType,
+        quality,
+      });
+    }
+  }
+
+  return attempts;
 }
 
 export function getReferenceImagePayloadError(referenceUrls: string[]): string | null {
@@ -161,21 +221,23 @@ async function readReferenceImageFetchError(response: Response): Promise<string>
 async function compressReferenceImageBlob(blob: Blob): Promise<string> {
   const bitmap = await createImageBitmap(blob);
   try {
-    const dimensions = scaleImageDimensions(bitmap.width, bitmap.height, REFERENCE_IMAGE_MAX_EDGE);
     const canvas = document.createElement("canvas");
-    canvas.width = dimensions.width;
-    canvas.height = dimensions.height;
+    const policy = REFERENCE_IMAGE_COMPRESSION_POLICY;
+    const attempts = buildReferenceImageCompressionAttempts(bitmap.width, bitmap.height, policy);
 
-    const context = canvas.getContext("2d");
-    if (!context) throw new Error("浏览器无法创建图片压缩画布");
-    context.drawImage(bitmap, 0, 0, dimensions.width, dimensions.height);
+    for (const attempt of attempts) {
+      canvas.width = attempt.width;
+      canvas.height = attempt.height;
 
-    const compressedBlob = await canvasToBlob(canvas, REFERENCE_IMAGE_OUTPUT_TYPE, REFERENCE_IMAGE_OUTPUT_QUALITY);
-    if (compressedBlob.size > REFERENCE_IMAGE_MAX_BYTES) {
-      throw new Error(`单张参考图压缩后仍超过 ${formatBytes(REFERENCE_IMAGE_MAX_BYTES)}，请换一张更小的图`);
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("浏览器无法创建图片压缩画布");
+      context.drawImage(bitmap, 0, 0, attempt.width, attempt.height);
+
+      const compressedBlob = await canvasToBlob(canvas, attempt.outputType, attempt.quality);
+      if (compressedBlob.size <= policy.maxBytes) return readBlobAsDataUrl(compressedBlob);
     }
 
-    return readBlobAsDataUrl(compressedBlob);
+    throw new Error(`单张参考图压缩后仍超过 ${formatBytes(policy.maxBytes)}，请换一张更小的图`);
   } finally {
     bitmap.close();
   }

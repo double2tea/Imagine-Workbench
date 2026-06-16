@@ -6,10 +6,12 @@ import {
   mediaReferenceTypeFromBase64DataUri,
 } from "../lib/media-references";
 import {
+  REFERENCE_IMAGE_COMPRESSION_POLICY,
   REFERENCE_IMAGE_MAX_BYTES,
   REFERENCE_IMAGE_MAX_EDGE,
   REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES,
   REFERENCE_IMAGES_MAX_TOTAL_BYTES,
+  buildReferenceImageCompressionAttempts,
   dataUriByteSize,
   getReferenceImagePayloadError,
   getReferenceMediaPayloadError,
@@ -32,6 +34,25 @@ test("scaleImageDimensions constrains the longest edge", () => {
     width: REFERENCE_IMAGE_MAX_EDGE,
     height: 1024,
   });
+});
+
+test("reference image compression attempts lower quality before dimensions", () => {
+  const attempts = buildReferenceImageCompressionAttempts(6000, 3000);
+
+  assert.deepEqual(attempts.slice(0, 4), [
+    { width: 2048, height: 1024, outputType: "image/webp", quality: 0.85 },
+    { width: 2048, height: 1024, outputType: "image/webp", quality: 0.75 },
+    { width: 2048, height: 1024, outputType: "image/webp", quality: 0.65 },
+    { width: 2048, height: 1024, outputType: "image/webp", quality: 0.55 },
+  ]);
+  assert.deepEqual(attempts[4], { width: 1638, height: 819, outputType: "image/webp", quality: 0.85 });
+});
+
+test("reference image compression attempts dedupe unchanged small dimensions", () => {
+  const attempts = buildReferenceImageCompressionAttempts(800, 600);
+
+  assert.equal(attempts.length, REFERENCE_IMAGE_COMPRESSION_POLICY.qualitySteps.length);
+  assert.deepEqual(attempts.map(attempt => `${attempt.width}x${attempt.height}`), ["800x600", "800x600", "800x600", "800x600"]);
 });
 
 test("dataUriByteSize reads base64 payload bytes", () => {
