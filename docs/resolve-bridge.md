@@ -1,5 +1,7 @@
 # DaVinci Resolve Bridge
 
+[English](resolve-bridge.md) | [简体中文](zh-CN/resolve-bridge.md)
+
 Imagine Resolve Bridge lets DaVinci Resolve call Imagine Workbench for image generation/editing, video generation, TTS, and transcription/subtitle preparation.
 
 The Resolve plugin runtime is the Workflow Integration panel:

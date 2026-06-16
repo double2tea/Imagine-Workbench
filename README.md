@@ -1,5 +1,7 @@
 # Imagine Workbench
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 Imagine Workbench is a browser-first creative workstation for AI image, video, audio, and agent-assisted visual ideation workflows.
 
 - **Online Preview:** [imagine-workbench.pages.dev](https://imagine-workbench.pages.dev)
@@ -58,13 +60,16 @@ More details: [Configuration](docs/configuration.md).
 
 ## Documentation
 
-- [Provider and model guide](docs/providers.md)
-- [OpenAI-compatible API](docs/openai-compatible-api.md)
-- [RunningHub API](docs/runninghub-api.md)
-- [DaVinci Resolve Bridge](docs/resolve-bridge.md)
-- [Development guide](docs/development.md)
-- [Security policy](SECURITY.md)
-- [Contributing guide](CONTRIBUTING.md)
+| English | 简体中文 |
+| --- | --- |
+| [Configuration](docs/configuration.md) | [配置说明](docs/zh-CN/configuration.md) |
+| [Provider and model guide](docs/providers.md) | [供应商与模型指南](docs/zh-CN/providers.md) |
+| [OpenAI-compatible API](docs/openai-compatible-api.md) | [OpenAI 兼容 API](docs/zh-CN/openai-compatible-api.md) |
+| [RunningHub API](docs/runninghub-api.md) | [RunningHub API](docs/zh-CN/runninghub-api.md) |
+| [DaVinci Resolve Bridge](docs/resolve-bridge.md) | [DaVinci Resolve Bridge](docs/zh-CN/resolve-bridge.md) |
+| [Development guide](docs/development.md) | [开发指南](docs/zh-CN/development.md) |
+| [Security policy](SECURITY.md) | [安全策略](SECURITY.zh-CN.md) |
+| [Contributing guide](CONTRIBUTING.md) | [贡献指南](CONTRIBUTING.zh-CN.md) |
 
 ## Common Commands
 

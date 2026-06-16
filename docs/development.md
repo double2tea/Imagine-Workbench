@@ -1,5 +1,7 @@
 # Development Guide
 
+[English](development.md) | [简体中文](zh-CN/development.md)
+
 ## Project Layout
 
 ```text

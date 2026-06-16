@@ -1,5 +1,7 @@
 # RunningHub API
 
+[English](runninghub-api.md) | [简体中文](zh-CN/runninghub-api.md)
+
 Reviewed against RunningHub API docs on 2026-06-10.
 
 Imagine Workbench treats RunningHub as a task-oriented provider, not as a single OpenAI-compatible media provider. RunningHub LLM chat can use OpenAI-compatible endpoints, while image, video, audio AI Apps, workflows, and Standard Model APIs remain Workbench-native async media operations.

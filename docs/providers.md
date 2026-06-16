@@ -1,5 +1,7 @@
 # Provider and Model Guide
 
+[English](providers.md) | [简体中文](zh-CN/providers.md)
+
 Imagine Workbench routes model calls through provider adapters. Most UI model lists are driven by the model capability catalog, while provider credentials and default URLs are centralized in the provider registry.
 
 ## Built-In Provider Families

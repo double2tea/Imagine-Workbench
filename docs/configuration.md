@@ -1,5 +1,7 @@
 # Configuration
 
+[English](configuration.md) | [简体中文](zh-CN/configuration.md)
+
 Imagine Workbench can read provider credentials from `.env.local` or from the in-app Settings panel. Environment variables are useful for local development, server deployments, and plugin-facing API routes.
 
 Copy the example file first:

@@ -1,5 +1,7 @@
 # OpenAI-Compatible API
 
+[English](openai-compatible-api.md) | [简体中文](zh-CN/openai-compatible-api.md)
+
 Imagine Workbench exposes a small OpenAI-shaped API surface for plugins and external scripts. It is not a full OpenAI or 12AI API clone. Workbench-specific async media workflows, downloads, cancellation, and RunningHub workflow execution stay under `/api/media/*`.
 
 RunningHub-specific async tasks, AI Apps, workflows, uploads, and audio AI App targets are documented separately in [RunningHub API](runninghub-api.md).
