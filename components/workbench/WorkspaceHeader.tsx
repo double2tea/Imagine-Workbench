@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FolderHeart, Grid2X2, Moon, Plug, Settings, Sun, Trash2 } from "lucide-react";
+import { FolderHeart, Github, Grid2X2, Mail, Moon, Plug, Settings, Sun, Trash2 } from "lucide-react";
 import WorkspaceTopBarBrand from "@/components/workbench/WorkspaceTopBarBrand";
 import WorkspaceTopBar, {
   workspaceTopBarButtonClass,
@@ -65,6 +65,26 @@ export default function WorkspaceHeader({
             <Settings className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">设置</span>
           </button>
+
+          <a
+            href="https://github.com/double2tea"
+            target="_blank"
+            rel="noreferrer"
+            className={`${workspaceTopBarIconButtonClass} cursor-pointer`}
+            title="GitHub: double2tea"
+            aria-label="打开作者 GitHub"
+          >
+            <Github className="h-3.5 w-3.5" />
+          </a>
+
+          <a
+            href="mailto:double_tea@foxmail.com"
+            className={`${workspaceTopBarIconButtonClass} cursor-pointer`}
+            title="联系作者: double_tea@foxmail.com"
+            aria-label="给作者发送邮件"
+          >
+            <Mail className="h-3.5 w-3.5" />
+          </a>
 
           <button
             type="button"
