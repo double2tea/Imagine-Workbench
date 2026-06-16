@@ -67,12 +67,12 @@ export default function WorkspaceHeader({
           </button>
 
           <a
-            href="https://github.com/double2tea"
+            href="https://github.com/double2tea/Imagine-Workbench"
             target="_blank"
             rel="noreferrer"
             className={`${workspaceTopBarIconButtonClass} cursor-pointer`}
-            title="GitHub: double2tea"
-            aria-label="打开作者 GitHub"
+            title="GitHub: Imagine Workbench"
+            aria-label="打开项目 GitHub"
           >
             <Github className="h-3.5 w-3.5" />
           </a>
