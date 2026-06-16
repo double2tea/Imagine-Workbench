@@ -61,3 +61,13 @@ The Settings panel has:
 - `数据`: local workspace backup, restore, cleanup, and import actions.
 
 Generated media and boards are stored in browser IndexedDB. Optional provider credential export is explicit and off by default.
+
+## Storage Target
+
+The supported default workspace storage is browser storage:
+
+- generated media, media metadata, library items, generation tasks, and boards use IndexedDB;
+- provider credentials, model caches, UI preferences, and agent chat snapshots use browser `localStorage`;
+- workspace backup and restore use explicit ZIP export/import.
+
+The codebase contains early storage-target metadata for a future local SQLite workspace, but it is not the default production storage path. See [Data storage](data-storage.md).

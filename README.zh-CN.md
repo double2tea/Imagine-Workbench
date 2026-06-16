@@ -63,6 +63,8 @@ MIMO_API_KEY="your_mimo_api_key"
 | English | 简体中文 |
 | --- | --- |
 | [Configuration](docs/configuration.md) | [配置说明](docs/zh-CN/configuration.md) |
+| [API routes](docs/api-routes.md) | [API 路由](docs/zh-CN/api-routes.md) |
+| [Data storage](docs/data-storage.md) | [数据存储](docs/zh-CN/data-storage.md) |
 | [Provider and model guide](docs/providers.md) | [供应商与模型指南](docs/zh-CN/providers.md) |
 | [OpenAI-compatible API](docs/openai-compatible-api.md) | [OpenAI 兼容 API](docs/zh-CN/openai-compatible-api.md) |
 | [RunningHub API](docs/runninghub-api.md) | [RunningHub API](docs/zh-CN/runninghub-api.md) |
