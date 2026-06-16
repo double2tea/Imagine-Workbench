@@ -162,21 +162,24 @@ const optionDescriptions: CinematicOptionDescriptions = {
 
 const accentClassNames: Record<NonNullable<CinematicProfileControlsProps["accent"]>, {
   active: string;
+  badge: string;
   button: string;
   nav: string;
   ring: string;
 }> = {
   blue: {
-    active: "data-[active=true]:border-blue-400/60 data-[active=true]:bg-blue-500/10",
-    button: "border-blue-400/40 bg-blue-500/15 text-blue-100 hover:bg-blue-500/25",
-    nav: "data-[selected=true]:border-blue-400/70 data-[selected=true]:bg-blue-500/10",
-    ring: "data-[selected=true]:border-blue-400 data-[selected=true]:shadow-[0_0_0_1px_rgba(96,165,250,0.45)]",
+    active: "data-[active=true]:border-[var(--iw-tone-accent-border)] data-[active=true]:bg-[var(--iw-tone-accent-bg)]",
+    badge: "border-[var(--iw-tone-accent-border)] bg-[var(--iw-tone-accent-bg)] text-[var(--iw-tone-accent-text)]",
+    button: "border-[var(--iw-tone-accent-border)] bg-[var(--iw-tone-accent-bg)] text-[var(--iw-tone-accent-text)] hover:border-[var(--iw-accent)] hover:bg-[var(--iw-accent-soft)]",
+    nav: "data-[selected=true]:border-[var(--iw-tone-accent-border)] data-[selected=true]:bg-[var(--iw-tone-accent-bg)]",
+    ring: "data-[selected=true]:border-[var(--iw-accent)] data-[selected=true]:shadow-[0_0_0_1px_var(--iw-accent-glow)]",
   },
   violet: {
-    active: "data-[active=true]:border-violet-400/60 data-[active=true]:bg-violet-500/10",
-    button: "border-violet-400/40 bg-violet-500/15 text-violet-100 hover:bg-violet-500/25",
-    nav: "data-[selected=true]:border-violet-400/70 data-[selected=true]:bg-violet-500/10",
-    ring: "data-[selected=true]:border-violet-400 data-[selected=true]:shadow-[0_0_0_1px_rgba(167,139,250,0.45)]",
+    active: "data-[active=true]:border-[var(--iw-tone-violet-border)] data-[active=true]:bg-[var(--iw-tone-violet-bg)]",
+    badge: "border-[var(--iw-tone-violet-border)] bg-[var(--iw-tone-violet-bg)] text-[var(--iw-tone-violet-text)]",
+    button: "border-[var(--iw-tone-violet-border)] bg-[var(--iw-tone-violet-bg)] text-[var(--iw-tone-violet-text)] hover:border-[var(--iw-tone-violet-text)] hover:bg-[var(--iw-tone-violet-bg)]",
+    nav: "data-[selected=true]:border-[var(--iw-tone-violet-border)] data-[selected=true]:bg-[var(--iw-tone-violet-bg)]",
+    ring: "data-[selected=true]:border-[var(--iw-tone-violet-border)] data-[selected=true]:shadow-[0_0_0_1px_var(--iw-tone-violet-border)]",
   },
 };
 
@@ -405,7 +408,7 @@ export default function CinematicProfileControls({
               onClick={() => updateProfile({ enabled: !isEnabled })}
               className={`flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition ${
                 isEnabled
-                  ? "border-blue-400/45 bg-blue-500/15 text-blue-100 hover:bg-blue-500/25"
+                  ? accentClassNames[accent].button
                   : "border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)] hover:bg-[var(--iw-panel)] hover:text-[var(--iw-text)]"
               }`}
             >
@@ -545,7 +548,7 @@ export default function CinematicProfileControls({
             </span>
             <span className={`shrink-0 rounded-md border px-2 py-1 text-[10px] font-semibold ${
               isEnabled
-                ? "border-blue-400/45 bg-blue-500/15 text-blue-100"
+                ? accentClassNames[accent].badge
                 : "border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)]"
             }`}>
               {isEnabled ? "已开启" : "点按开启"}
