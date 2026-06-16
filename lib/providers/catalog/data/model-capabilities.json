@@ -16278,7 +16278,7 @@
       "payloadMapping": {
         "provider": "runninghub",
         "endpoint": "/openapi/v2/rhart-image/z-image/turbo",
-        "operation": "nodeFields",
+        "operation": "providerSpecific",
         "fields": [
           {
             "target": "prompt",
@@ -16286,25 +16286,48 @@
             "valueType": "string"
           },
           {
-            "target": "28##select",
-            "source": "literal",
-            "literal": "8"
-          },
-          {
-            "target": "29##file_type",
-            "source": "literal",
-            "literal": "PNG"
+            "target": "aspectRatio",
+            "source": "aspectRatio",
+            "valueType": "string",
+            "defaultValue": "1:1",
+            "allowedValues": [
+              "1:1",
+              "16:9",
+              "9:16",
+              "4:3",
+              "3:4"
+            ]
           }
         ],
         "logic": [
-          "mediaUpload",
-          "dimensionDerivation"
+          "mediaUpload"
         ]
       },
       "minReferenceImages": 0,
       "maxReferenceImages": 0,
       "kind": "image",
-      "aspectRatios": [],
+      "aspectRatios": [
+        {
+          "value": "1:1",
+          "label": "1:1"
+        },
+        {
+          "value": "16:9",
+          "label": "16:9"
+        },
+        {
+          "value": "9:16",
+          "label": "9:16"
+        },
+        {
+          "value": "4:3",
+          "label": "4:3"
+        },
+        {
+          "value": "3:4",
+          "label": "3:4"
+        }
+      ],
       "sizes": [
         {
           "value": "auto",

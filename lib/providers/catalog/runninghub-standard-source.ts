@@ -73,6 +73,7 @@ const VEO_31_4K_RESOLUTIONS = ["720p", "1080p", "4k"] as const;
 const VEO_31_HD_RESOLUTIONS = ["720p", "1080p"] as const;
 const SEEDREAM_V5_LITE_IMAGE_RESOLUTIONS = ["2k", "3k"] as const;
 const RUNNINGHUB_GROK_IMAGE_ASPECT_RATIOS = ["960x960", "720x1280", "1280x720", "1168x784", "784x1168"] as const;
+const RUNNINGHUB_Z_IMAGE_ASPECT_RATIOS = ["1:1", "16:9", "9:16", "4:3", "3:4"] as const;
 
 type RunningHubStandardRequest =
   | {
@@ -1081,13 +1082,12 @@ export const RUNNINGHUB_STANDARD_MODELS: readonly RunningHubStandardModelSource[
     minReferenceImages: 0,
     maxReferenceImages: 0,
     request: {
-      type: "node-dimensions",
+      type: "mapped-fields",
       endpoint: "/openapi/v2/rhart-image/z-image/turbo",
-      promptField: "prompt",
-      extra: {
-        "28##select": "8",
-        "29##file_type": "PNG",
-      },
+      fields: [
+        promptField(),
+        optionField("aspectRatio", "aspectRatio", "1:1", RUNNINGHUB_Z_IMAGE_ASPECT_RATIOS),
+      ],
     },
   },
   {

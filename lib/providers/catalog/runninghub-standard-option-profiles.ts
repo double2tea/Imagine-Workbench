@@ -306,6 +306,7 @@ export const RUNNINGHUB_STANDARD_OPTION_PROFILES = {
     sizes: [{"value":"960x960","label":"1K"},{"value":"720x1280","label":"720p"},{"value":"1280x720","label":"720p"},{"value":"1168x784","label":"784p"},{"value":"784x1168","label":"784p"}],
   },
   "api:/openapi/v2/rhart-image/z-image/turbo": {
+    aspectRatios: [{"value":"1:1","label":"1:1"},{"value":"16:9","label":"16:9"},{"value":"9:16","label":"9:16"},{"value":"4:3","label":"4:3"},{"value":"3:4","label":"3:4"}],
     sizes: [{"value":"auto","label":"Auto"},{"value":"1024x1024","label":"1K"},{"value":"1280x720","label":"720p"},{"value":"720x1280","label":"720p"},{"value":"1536x1024","label":"1K"},{"value":"1024x1536","label":"1K"},{"value":"1536x1536","label":"1K"},{"value":"2048x2048","label":"2K"},{"value":"custom","label":"自定义尺寸"}],
   },
   "api:/openapi/v2/rhart-image/f-2-dev/text-to-image": {

@@ -52,19 +52,19 @@ test("runninghub standard image model builds documented node field body", () => 
   );
 });
 
-test("runninghub z-image turbo uses documented prompt field", () => {
+test("runninghub z-image turbo uses standard aspect ratio field", () => {
   const model = getRunningHubStandardModel("api:/openapi/v2/rhart-image/z-image/turbo", "image");
   assert.ok(model);
 
   assert.deepEqual(
     buildRunningHubStandardBody(model, {
       prompt: "minimal product render",
+      aspectRatio: "16:9",
       referenceImages: [],
     }),
     {
       prompt: "minimal product render",
-      "28##select": "8",
-      "29##file_type": "PNG",
+      aspectRatio: "16:9",
     },
   );
 });
