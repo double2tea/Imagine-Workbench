@@ -95,7 +95,7 @@ Video reference image API/provider boundaries accept `data:image/*` base64 data 
 - Board nodes store spatial layout and references to generated assets. The asset store remains the source of truth for media URLs, prompts, model IDs, statuses, operation names, and generation snapshots.
 - When executing board generation, resolve connected asset/reference nodes against the current asset store before using their URLs.
 - Board loading must normalize persisted IndexedDB documents before passing nodes/edges to React Flow. Drop invalid or duplicate nodes, validate port refs, recompute edge kinds from `resolveBoardConnectionKind`, clamp viewport/size values, and clear stale selections after switching boards.
-- Board React Flow: the board document is the source of truth; `BoardWorkspace` projects it to React Flow via `useNodesState` and `syncReactFlowNodesFromBoard` (see `.trellis/spec/frontend/board-react-flow.md`). Only use transient RF state for active drag, then persist settled positions through `useBoardState`.
+- Board React Flow: the board document is the source of truth; `BoardWorkspace` projects it to React Flow via `useNodesState` and `syncReactFlowNodesFromBoard`. Only use transient React Flow state for active drag, then persist settled positions through `useBoardState`.
 - Repairs for asset `sourceBoardNodeId` links must be explicit user-triggered data actions. Do not run source-link cleanup automatically during board/page load.
 - Flush pending board text edits and save the board before leaving or switching boards.
 - Keep board logic in `components/board/*`, `hooks/useBoardState.ts`, and `lib/board/*`. Do not add board-specific state to `app/page.tsx`.
