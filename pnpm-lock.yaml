@@ -65,7 +65,7 @@ importers:
         version: 4.1.11
       '@tailwindcss/typography':
         specifier: ^0.5.19
-        version: 0.5.19(tailwindcss@4.1.11)
+        version: 0.5.19(tailwindcss@4.3.1)
       '@types/jszip':
         specifier: ^3.4.0
         version: 3.4.0
@@ -100,8 +100,8 @@ importers:
         specifier: ^1.68.0
         version: 1.68.0
       tailwindcss:
-        specifier: 4.1.11
-        version: 4.1.11
+        specifier: 4.3.1
+        version: 4.3.1
       tw-animate-css:
         specifier: ^1.4.0
         version: 1.4.0
@@ -4060,6 +4060,9 @@ packages:
   tailwindcss@4.1.11:
     resolution: {integrity: sha512-2E9TBm6MDD/xKYe+dvJZAmg3yxIEDNRc0jwlNyDg/4Fil2QcSLjFKGVff0lAf1jjeaArlG/M75Ey/EYr/OJtBA==}
 
+  tailwindcss@4.3.1:
+    resolution: {integrity: sha512-hk+TB1m+K8CYNrP6rjQaq/Y+4Zylwpa87mLYBKCunwnnQ9p+fHb7kmSfGqyEJoxF/O6CDyABWVFEafNSYKll+Q==}
+
   tapable@2.3.3:
     resolution: {integrity: sha512-uxc/zpqFg6x7C8vOE7lh6Lbda8eEL9zmVm/PLeTPBRhh1xCgdWaQ+J1CUieGpIfm2HdtsUpRv+HshiasBMcc6A==}
     engines: {node: '>=6'}
@@ -5251,10 +5254,10 @@ snapshots:
       postcss: 8.5.15
       tailwindcss: 4.1.11
 
-  '@tailwindcss/typography@0.5.19(tailwindcss@4.1.11)':
+  '@tailwindcss/typography@0.5.19(tailwindcss@4.3.1)':
     dependencies:
       postcss-selector-parser: 6.0.10
-      tailwindcss: 4.1.11
+      tailwindcss: 4.3.1
 
   '@tootallnate/quickjs-emscripten@0.23.0': {}
 
@@ -8801,6 +8804,8 @@ snapshots:
   tailwind-merge@3.6.0: {}
 
   tailwindcss@4.1.11: {}
+
+  tailwindcss@4.3.1: {}
 
   tapable@2.3.3: {}
 
