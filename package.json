@@ -72,7 +72,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "4.1.11",
     "@tailwindcss/typography": "^0.5.19",
-    "@types/jszip": "^3.4.0",
+    "@types/jszip": "^3.4.1",
     "@types/node": "^20",
     "@types/pannellum": "^2.5.0",
     "@types/react": "^19",
