@@ -1,7 +1,25 @@
 {
-  "name": "ai-studio-applet",
+  "name": "imagine-workbench",
   "version": "0.1.0",
+  "description": "Browser-first AI creative workstation for image, video, audio, and agent-assisted visual workflows.",
   "private": true,
+  "homepage": "https://imagine-workbench.pages.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/double2tea/Imagine-Workbench.git"
+  },
+  "bugs": {
+    "url": "https://github.com/double2tea/Imagine-Workbench/issues"
+  },
+  "keywords": [
+    "ai",
+    "creative-tools",
+    "image-generation",
+    "video-generation",
+    "audio-generation",
+    "nextjs",
+    "workflow"
+  ],
   "author": {
     "name": "double2tea",
     "email": "double_tea@foxmail.com",
@@ -29,7 +47,6 @@
     "pages:preview": "pnpm run pages:build && pnpm dlx wrangler pages dev .vercel/output/static",
     "pages:deploy": "pnpm run pages:build && pnpm dlx wrangler pages deploy .vercel/output/static --project-name=imagine-workbench --commit-dirty=true",
     "test:providers": "tsc -p tests/tsconfig.json && node --test .tmp/provider-tests/tests/*.test.js",
-    "trellis": "trellis",
     "clean": "rm -rf .next/types",
     "local": "bash scripts/run-local.sh"
   },
@@ -53,7 +70,6 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@mindfoldhq/trellis": "^0.5.19",
     "@tailwindcss/postcss": "4.1.11",
     "@tailwindcss/typography": "^0.5.19",
     "@types/jszip": "^3.4.0",
