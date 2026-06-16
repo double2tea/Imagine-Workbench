@@ -2,6 +2,17 @@
 
 Imagine Workbench is a Next.js creative workstation for AI image, image-editing, video, and agent-assisted visual ideation workflows.
 
+## License and Author
+
+Imagine Workbench uses a custom reciprocal open source license. Personal, internal, and commercial use are allowed.
+
+Software, products, services, plugins, templates, packages, or other works developed from this code must keep their source code open under the same license terms and clearly credit the original author and source project.
+
+- Author: double2tea
+- GitHub: https://github.com/double2tea
+- Contact: double_tea@foxmail.com
+- License: see [LICENSE.md](LICENSE.md)
+
 The current app focuses on a browser-first creative loop:
 
 - Generate images from prompts, reference images, or masked edits.

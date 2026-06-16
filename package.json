@@ -2,6 +2,12 @@
   "name": "ai-studio-applet",
   "version": "0.1.0",
   "private": true,
+  "author": {
+    "name": "double2tea",
+    "email": "double_tea@foxmail.com",
+    "url": "https://github.com/double2tea"
+  },
+  "license": "SEE LICENSE IN LICENSE.md",
   "packageManager": "pnpm@10.27.0",
   "scripts": {
     "dev": "DISABLE_HMR=false next dev",
