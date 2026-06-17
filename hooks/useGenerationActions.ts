@@ -544,8 +544,6 @@ export function useGenerationActions({
             type: getMediaReferenceType(reference),
             ...(reference.role ? { role: reference.role } : {}),
           })),
-          referenceImages: imageReferencePayloads,
-          referenceImage: imageReferencePayloads[0],
         }),
       });
 
