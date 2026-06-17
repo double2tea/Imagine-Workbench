@@ -222,7 +222,10 @@ async function imageUrlResponse(imageUrl: string, source: string): Promise<Respo
 }
 
 async function imageUrlsJsonResponse(imageUrls: string[], source: string): Promise<Response> {
-  const localizedImageUrls = await Promise.all(imageUrls.map(localizeImageResultUrl));
+  const localizedImageUrls: string[] = [];
+  for (const imageUrl of imageUrls) {
+    localizedImageUrls.push(await localizeImageResultUrl(imageUrl));
+  }
   return NextResponse.json({
     imageUrl: localizedImageUrls[0],
     imageUrls: localizedImageUrls,

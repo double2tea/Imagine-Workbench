@@ -230,6 +230,14 @@ function clearLocallyCanceledQuickEdit(ids: string[], canceledIds: Set<string>):
   for (const id of ids) canceledIds.delete(id);
 }
 
+async function runSequentialGenerationVariants(variantCount: number, run: () => Promise<boolean>): Promise<boolean[]> {
+  const results: boolean[] = [];
+  for (let index = 0; index < variantCount; index += 1) {
+    results.push(await run());
+  }
+  return results;
+}
+
 const BOARD_MEDIA_ANALYSIS_INSTRUCTION =
   "请分析这段媒体素材，只输出中文结构化分析。必须严格使用以下小标题，并保持顺序：\n" +
   "画面主体\n风格\n镜头\n光线\n色彩\n动作\n可生成提示词\n" +
@@ -4017,7 +4025,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
         if (node.kind === "image-generate") {
           const nodeImageResolution = node.imageResolution === "custom" ? node.customImageResolution.trim() : node.imageResolution;
-          const didStartResults = await Promise.all(Array.from({ length: node.variantCount }, () =>
+          const didStartResults = await runSequentialGenerationVariants(node.variantCount, () =>
             generateManualImage({
               boardId: resolvedBoardId,
               boardNodeId: nodeId,
@@ -4035,7 +4043,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
               thinkingLevel: node.thinkingLevel,
               allowEmptyPrompt: allowsEmptyPrompt,
             }),
-          ));
+          );
           if (!didStartResults.some(Boolean)) {
             boardController.updateGenerateNode(nodeId, {
               errorMessage: t("board.agent.imageGenRequestNotStarted"),
@@ -4043,7 +4051,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             });
           }
         } else if (node.kind === "video-generate") {
-          const didStartResults = await Promise.all(Array.from({ length: node.variantCount }, () =>
+          const didStartResults = await runSequentialGenerationVariants(node.variantCount, () =>
             generateManualVideo({
               boardId: resolvedBoardId,
               boardNodeId: nodeId,
@@ -4059,7 +4067,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
               videoReferenceMode: node.videoReferenceMode ?? getVideoModelCapabilities(node.model).referenceMode,
               videoResolution: node.videoResolution,
             }),
-          ));
+          );
           if (!didStartResults.some(Boolean)) {
             boardController.updateGenerateNode(nodeId, {
               errorMessage: t("board.agent.videoGenRequestNotStarted"),
@@ -4067,7 +4075,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             });
           }
         } else {
-          const didStartResults = await Promise.all(Array.from({ length: node.variantCount }, () =>
+          const didStartResults = await runSequentialGenerationVariants(node.variantCount, () =>
             generateManualAudio({
               audioFormat: node.audioFormat,
               audioMode: node.audioMode,
@@ -4083,7 +4091,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
               voiceCloneConsentAccepted: node.voiceProfileId ? true : node.voiceCloneConsentAccepted,
               voiceProfileId: node.voiceProfileId,
             }),
-          ));
+          );
           if (!didStartResults.some(Boolean)) {
             boardController.updateGenerateNode(nodeId, {
               errorMessage: t("board.agent.audioGenRequestNotStarted"),
