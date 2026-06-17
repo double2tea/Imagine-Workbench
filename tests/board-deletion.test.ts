@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  findConnectedResultNodeForSourceStack,
+  findResultNodeForSourceStack,
   resultNodeIdsOwnedBySource,
   selectedNodeIdsForContextMenu,
 } from "../lib/board/utils";
-import type { BoardNode } from "../lib/board/types";
+import type { BoardEdge, BoardNode } from "../lib/board/types";
 
 const timestamp = "2026-06-16T00:00:00.000Z";
 
@@ -17,13 +19,13 @@ const imageAsset = {
   model: "model",
 };
 
-function resultNode(input: { id: string; sourceNodeId: string }): BoardNode {
+function resultNode(input: { id: string; sourceNodeId: string; resultStackKey?: string }): BoardNode {
   return {
     id: input.id,
     kind: "result",
     title: input.id,
     sourceNodeId: input.sourceNodeId,
-    resultStackKey: "stack",
+    resultStackKey: input.resultStackKey ?? "stack",
     activeAssetId: imageAsset.assetId,
     resultAssetIds: [imageAsset.assetId],
     asset: imageAsset,
@@ -31,6 +33,16 @@ function resultNode(input: { id: string; sourceNodeId: string }): BoardNode {
     size: { width: 220, height: 180 },
     createdAt: timestamp,
     updatedAt: timestamp,
+  };
+}
+
+function resultEdge(input: { id: string; sourceNodeId: string; resultNodeId: string }): BoardEdge {
+  return {
+    id: input.id,
+    kind: "result",
+    from: { nodeId: input.sourceNodeId, portId: "result-out", portKind: "result" },
+    to: { nodeId: input.resultNodeId, portId: "asset-in", portKind: "asset" },
+    createdAt: timestamp,
   };
 }
 
@@ -70,6 +82,41 @@ test("resultNodeIdsOwnedBySource returns only auto-owned result nodes", () => {
     ], "generate_1"),
     ["result_owned"],
   );
+});
+
+test("findResultNodeForSourceStack matches source and stack identity", () => {
+  const nodes = [
+    resultNode({ id: "result_current", sourceNodeId: "generate_1", resultStackKey: "stack_a" }),
+    resultNode({ id: "result_old", sourceNodeId: "generate_1", resultStackKey: "stack_b" }),
+  ];
+
+  assert.equal(findResultNodeForSourceStack(nodes, "generate_1", "stack_a")?.id, "result_current");
+  assert.equal(findResultNodeForSourceStack(nodes, "generate_1", "stack_missing"), undefined);
+});
+
+test("findConnectedResultNodeForSourceStack ignores detached result nodes", () => {
+  const nodes = [
+    resultNode({ id: "result_detached", sourceNodeId: "generate_1", resultStackKey: "stack_a" }),
+    resultNode({ id: "result_connected", sourceNodeId: "generate_1", resultStackKey: "stack_b" }),
+  ];
+  const edges = [
+    resultEdge({ id: "edge_1", sourceNodeId: "generate_1", resultNodeId: "result_connected" }),
+  ];
+
+  assert.equal(findConnectedResultNodeForSourceStack(nodes, edges, "generate_1", "stack_a"), undefined);
+  assert.equal(findConnectedResultNodeForSourceStack(nodes, edges, "generate_1", "stack_b")?.id, "result_connected");
+});
+
+test("findConnectedResultNodeForSourceStack skips earlier detached nodes in the same stack", () => {
+  const nodes = [
+    resultNode({ id: "result_detached", sourceNodeId: "generate_1", resultStackKey: "stack_a" }),
+    resultNode({ id: "result_connected", sourceNodeId: "generate_1", resultStackKey: "stack_a" }),
+  ];
+  const edges = [
+    resultEdge({ id: "edge_1", sourceNodeId: "generate_1", resultNodeId: "result_connected" }),
+  ];
+
+  assert.equal(findConnectedResultNodeForSourceStack(nodes, edges, "generate_1", "stack_a")?.id, "result_connected");
 });
 
 test("selectedNodeIdsForContextMenu preserves multi-select when opening a selected node", () => {

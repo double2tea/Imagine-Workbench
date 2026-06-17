@@ -95,7 +95,7 @@ import {
   resolveBoardConnectionNodesWithCompatibleModel,
 } from "@/lib/board/ports";
 import { clampBoardTextNodeSize, estimateBoardNoteSize, estimateBoardPromptSize } from "@/lib/board/text-node-size";
-import { findResultNodeForSource, isResultSourceNode, resultNodeDefaultPosition, resultNodeIdsOwnedBySource } from "@/lib/board/utils";
+import { findConnectedResultNodeForSourceStack, isResultSourceNode, resultNodeDefaultPosition, resultNodeIdsOwnedBySource } from "@/lib/board/utils";
 import { findAvailableBoardNodePosition } from "@/lib/board/placement";
 
 export type BoardSaveStatus = "idle" | "loading" | "saving" | "saved" | "error";
@@ -247,7 +247,7 @@ function duplicateNodeIdPrefix(kind: BoardNode["kind"]): string {
   if (kind === "audio-operation") return "audio_op";
   if (kind === "runninghub-app") return "rh_app";
   if (kind === "agent") return "agent";
-  if (kind === "result") return "result";
+  if (kind === "result") return "asset";
   return "note";
 }
 
@@ -344,11 +344,7 @@ function cloneBoardNodeForDuplicate(source: BoardNode, position: BoardPoint): Bo
     case "result":
       return {
         ...shell,
-        kind: "result",
-        sourceNodeId: source.sourceNodeId,
-        resultStackKey: source.resultStackKey,
-        activeAssetId: source.activeAssetId,
-        resultAssetIds: source.resultAssetIds,
+        kind: "asset",
         asset: source.asset,
       };
     case "note":
@@ -1216,13 +1212,15 @@ function touchBoard(board: BoardDocument, nodes: BoardNode[] = board.nodes, edge
 
 function createAssetBoardNode(input: CreateAssetNodeInput, nodes: BoardNode[]): BoardNode {
   const createdAt = nowIso();
+  const size = input.size ?? defaultAssetNodeSize(input.asset.type);
+  const preferredPosition = input.position ?? moveDefaultPosition(nodes);
   return {
     id: createBoardId("asset"),
     kind: "asset",
     title: input.title ?? defaultAssetNodeTitle(input.asset.type),
     asset: input.asset,
-    position: input.position ?? moveDefaultPosition(nodes),
-    size: input.size ?? defaultAssetNodeSize(input.asset.type),
+    position: findAvailableBoardNodePosition(boardNodesWithAbsolutePositions(nodes), preferredPosition, size),
+    size,
     createdAt,
     updatedAt: createdAt,
   };
@@ -1240,6 +1238,8 @@ function boardAssetReferenceFromMultiGridItem(item: BoardMultiGridItem): BoardAs
 
 function createResultBoardNode(input: CreateResultNodeInput, nodes: BoardNode[]): BoardResultNode {
   const createdAt = nowIso();
+  const size = input.size ?? defaultAssetNodeSize(input.asset.type);
+  const preferredPosition = input.position ?? moveDefaultPosition(nodes);
   return {
     id: createBoardId("result"),
     kind: "result",
@@ -1249,8 +1249,8 @@ function createResultBoardNode(input: CreateResultNodeInput, nodes: BoardNode[])
     activeAssetId: input.activeAssetId,
     resultAssetIds: input.resultAssetIds,
     asset: input.asset,
-    position: input.position ?? moveDefaultPosition(nodes),
-    size: input.size ?? defaultAssetNodeSize(input.asset.type),
+    position: findAvailableBoardNodePosition(boardNodesWithAbsolutePositions(nodes), preferredPosition, size),
+    size,
     createdAt,
     updatedAt: createdAt,
   };
@@ -1857,7 +1857,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       const updatedAt = nowIso();
       const resultStackKey = sourceNode.resultStackKey ?? "";
       const from: BoardPortRef = { nodeId: sourceNodeId, portId: BOARD_PORT_IDS.resultOut, portKind: "result" };
-      const existingResultNode = findResultNodeForSource(currentBoard.nodes, sourceNodeId);
+      const existingResultNode = findConnectedResultNodeForSourceStack(currentBoard.nodes, currentBoard.edges, sourceNodeId, resultStackKey);
       const existingResultEdge = existingResultNode
         ? findMatchingEdge(currentBoard.edges, from, { nodeId: existingResultNode.id, portId: BOARD_PORT_IDS.assetIn, portKind: "asset" })
         : undefined;
@@ -2294,7 +2294,32 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
         );
         return touchBoard(currentBoard, nextBoard.nodes, nextBoard.edges);
       }
-      return touchBoard(currentBoard, currentBoard.nodes, currentBoard.edges.filter(boardEdge => boardEdge.id !== edgeId));
+      const nextEdges = currentBoard.edges.filter(boardEdge => boardEdge.id !== edgeId);
+      if (
+        isResultSourceNode(sourceNode) &&
+        targetNode?.kind === "result" &&
+        edge.from.portId === BOARD_PORT_IDS.resultOut &&
+        edge.to.portId === BOARD_PORT_IDS.assetIn
+      ) {
+        const updatedAt = nowIso();
+        const nextNodes = currentBoard.nodes.map(node =>
+          node.id === targetNode.id
+            ? {
+              id: targetNode.id,
+              kind: "asset" as const,
+              title: targetNode.title,
+              parentId: targetNode.parentId,
+              asset: targetNode.asset,
+              position: targetNode.position,
+              size: targetNode.size,
+              createdAt: targetNode.createdAt,
+              updatedAt,
+            }
+            : node,
+        );
+        return touchBoard(currentBoard, nextNodes, nextEdges);
+      }
+      return touchBoard(currentBoard, currentBoard.nodes, nextEdges);
     });
     setSelectedEdgeId(currentId => (currentId === edgeId ? null : currentId));
   }, [mutateBoard]);

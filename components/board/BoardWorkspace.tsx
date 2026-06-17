@@ -108,7 +108,7 @@ import {
   isValidBoardConnection as isValidBoardPortConnection,
 } from "@/lib/board/ports";
 import { BOARD_INSERT_CATALOG, type BoardInsertKind } from "@/lib/board/insert-catalog";
-import { findResultNodeForSource, selectedNodeIdsForContextMenu } from "@/lib/board/utils";
+import { findConnectedResultNodeForSourceStack, selectedNodeIdsForContextMenu } from "@/lib/board/utils";
 import { t, useTranslations } from "@/lib/i18n";
 import { findAvailableBoardNodePosition } from "@/lib/board/placement";
 import type { GenerationTask } from "@/lib/generation-tasks";
@@ -853,6 +853,10 @@ function isCurrentGenerateStackItem(item: StorageItem, node: BoardNodeModel): bo
   );
 }
 
+function resultSourceStackMapKey(sourceNodeId: string, resultStackKey: string): string {
+  return `${sourceNodeId}\t${resultStackKey}`;
+}
+
 function isCurrentGenerateStackTask(task: GenerationTask, node: BoardNodeModel): boolean {
   return (
     (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation" || node.kind === "runninghub-app") &&
@@ -1548,15 +1552,22 @@ export default function BoardWorkspace({
     connectPorts(from, to);
   }, [board.edges, board.nodes, connectPorts]);
 
-  const resultNodeBySourceId = useMemo(() => {
-    const resultNodeBySourceId = new Map<string, BoardNodeModel & { kind: "result" }>();
+  const resultNodeBySourceStack = useMemo(() => {
+    const resultNodeBySourceStack = new Map<string, BoardNodeModel & { kind: "result" }>();
     for (const node of board.nodes) {
-      if (node.kind === "result") resultNodeBySourceId.set(node.sourceNodeId, node);
+      if (node.kind !== "result") continue;
+      const hasLiveEdge = board.edges.some(edge =>
+        edge.from.nodeId === node.sourceNodeId &&
+        edge.from.portId === BOARD_PORT_IDS.resultOut &&
+        edge.to.nodeId === node.id &&
+        edge.to.portId === BOARD_PORT_IDS.assetIn
+      );
+      if (hasLiveEdge) resultNodeBySourceStack.set(resultSourceStackMapKey(node.sourceNodeId, node.resultStackKey), node);
     }
-    return resultNodeBySourceId;
+    return resultNodeBySourceStack;
     // board.nodes read inside; graph content key gates source/result stack changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [boardGraphContentKey]);
+  }, [boardGraphContentKey, board.edges]);
 
   const resultSourceNodes = useMemo(() => {
     const sourceIds = new Set<string>();
@@ -1602,7 +1613,11 @@ export default function BoardWorkspace({
   const mediaFlowDataByNodeId = useMemo(() => {
     const dataById = new Map<string, BoardMediaFlowData>();
     for (const node of board.nodes) {
-      const connectedResultNode = node.kind === "result" ? node : resultNodeBySourceId.get(node.id);
+      const connectedResultNode = node.kind === "result"
+        ? node
+        : isResultSourceNode(node)
+          ? resultNodeBySourceStack.get(resultSourceStackMapKey(node.id, node.resultStackKey ?? ""))
+          : undefined;
       const hasResultConnection = Boolean(connectedResultNode) || resultSourceNodes.has(node.id);
       const data: BoardMediaFlowData = {};
       if (node.kind === "asset") {
@@ -1629,7 +1644,7 @@ export default function BoardWorkspace({
     galleryReferenceFingerprint,
     galleryTaskFingerprint,
     galleryItemById,
-    resultNodeBySourceId,
+    resultNodeBySourceStack,
     resultSourceNodes,
   ]);
 
@@ -2610,25 +2625,13 @@ export default function BoardWorkspace({
       return;
     }
     if (node.kind === "result") {
-      addResultNodeWithConnection(
-        {
-          sourceNodeId: node.sourceNodeId,
-          resultStackKey: node.resultStackKey,
-          activeAssetId: node.activeAssetId,
-          resultAssetIds: node.resultAssetIds,
-          asset: node.asset,
-          position,
-          size: node.size,
-          title: node.title,
-        },
-        { nodeId: node.sourceNodeId, portId: BOARD_PORT_IDS.resultOut, portKind: "result" },
-      );
+      addAssetNode({ asset: node.asset, position, size: node.size, title: node.title });
       rememberPastedPosition();
       return;
     }
     addNoteNode({ body: node.body, position, size: node.size, source: node.source, title: node.title, variant: node.variant });
     rememberPastedPosition();
-  }, [addAgentNode, addAssetNode, addGenerateNode, addGenerateNodeWithConnections, addGroupNode, addMultiGridNode, addNoteNode, addPromptNode, addReferenceGroupNode, addResultNodeWithConnection, addRunningHubAppNode, board.nodes]);
+  }, [addAgentNode, addAssetNode, addGenerateNode, addGenerateNodeWithConnections, addGroupNode, addMultiGridNode, addNoteNode, addPromptNode, addReferenceGroupNode, addRunningHubAppNode, board.nodes]);
 
   const handleConnectStart = useCallback<OnConnectStart>(() => {
     setIsConnectionActive(true);
@@ -2725,7 +2728,7 @@ export default function BoardWorkspace({
         onConnectionError(tb("workspace.resultNotReady"));
         return;
       }
-      const connectedResultNode = findResultNodeForSource(board.nodes, sourceNode.id);
+      const connectedResultNode = findConnectedResultNodeForSourceStack(board.nodes, board.edges, sourceNode.id, sourceNode.resultStackKey ?? "");
       if (connectedResultNode) {
         selectNode(connectedResultNode.id);
         selectEdge(null);
@@ -2747,7 +2750,7 @@ export default function BoardWorkspace({
       selectEdge(null);
       return;
     }
-  }, [addAssetToMultiGrid, addResultNodeWithConnection, board.nodes, centeredNodePosition, connectPortsBatch, flowPositionFromClient, onConnectionError, selectEdge, selectedNodeIds, selectNode, tb, updateSelectedNodeIds]);
+  }, [addAssetToMultiGrid, addResultNodeWithConnection, board.edges, board.nodes, centeredNodePosition, connectPortsBatch, flowPositionFromClient, onConnectionError, selectEdge, selectedNodeIds, selectNode, tb, updateSelectedNodeIds]);
 
   const openQuickInsertMenu = useCallback((event: ReactMouseEvent | MouseEvent): void => {
     event.preventDefault();

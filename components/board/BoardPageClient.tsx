@@ -42,7 +42,8 @@ import { downloadStorageItemsZip, storageItemDownloadExtension } from "@/lib/ass
 import { saveItemWithPreview } from "@/lib/assets/previews";
 import { resolveAssetOriginalUrl } from "@/lib/assets/resolve-url";
 import { estimateBoardNoteSize, estimateBoardPromptSize } from "@/lib/board/text-node-size";
-import { findResultNodeForSource } from "@/lib/board/utils";
+import { findConnectedResultNodeForSourceStack, findResultNodeForSourceStack } from "@/lib/board/utils";
+import { buildBoardResultStackKey, type BoardResultStackValue } from "@/lib/board/result-stack";
 import { generateReferenceCandidates } from "@/lib/board/prompt-references";
 import { useBoardState } from "@/hooks/useBoardState";
 import { useClipboardImageImport } from "@/hooks/useClipboardImageImport";
@@ -115,7 +116,7 @@ import {
   prepareReferenceImageUrlForRequest,
   prepareReferenceMediaUrlForRequest,
 } from "@/lib/reference-images";
-import { DEFAULT_CINEMATIC_PROFILE, cinematicProfileKey } from "@/lib/cinematic-controls";
+import { DEFAULT_CINEMATIC_PROFILE, type CinematicProfile } from "@/lib/cinematic-controls";
 import { transcriptFromDataUrl } from "@/lib/transcripts";
 import {
   DEFAULT_AUDIO_ASSET_NODE_SIZE,
@@ -499,10 +500,11 @@ type BoardReferenceUrlResolver = (assetId: string, fallbackUrl: string) => strin
 
 function activeExecutableResultItem(
   nodes: BoardDocument["nodes"],
+  edges: BoardDocument["edges"],
   node: ExecutableBoardNode,
   items: StorageItem[],
 ): StorageItem | undefined {
-  const resultNode = findResultNodeForSource(nodes, node.id);
+  const resultNode = findConnectedResultNodeForSourceStack(nodes, edges, node.id, node.resultStackKey ?? "");
   if (resultNode) {
     const resultItem = items.find(item => item.id === resultNode.activeAssetId && item.status === "complete");
     if (resultItem) return resultItem;
@@ -561,6 +563,7 @@ function downloadableBoardNodeStorageItem(
 
 function activeBoardReference(
   nodes: ReturnType<typeof useBoardState>["board"]["nodes"],
+  edges: ReturnType<typeof useBoardState>["board"]["edges"],
   selectedNodeId: string | null,
   items: StorageItem[],
   resolveUrl: BoardReferenceUrlResolver,
@@ -568,7 +571,7 @@ function activeBoardReference(
   const node = nodes.find(item => item.id === selectedNodeId);
   if (!node) return [];
   if (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation" || node.kind === "runninghub-app") {
-    const item = activeExecutableResultItem(nodes, node, items);
+    const item = activeExecutableResultItem(nodes, edges, node, items);
     return item && isMediaStorageItem(item) ? [{ id: item.id, type: item.type, url: resolveUrl(item.id, item.url), role: "general" }] : [];
   }
   if (node.kind !== "asset") return [];
@@ -578,6 +581,7 @@ function activeBoardReference(
 function boardNodeReferences(
   node: BoardDocument["nodes"][number] | undefined,
   nodes: BoardDocument["nodes"],
+  edges: BoardDocument["edges"],
   items: StorageItem[],
   resolveUrl: BoardReferenceUrlResolver,
 ): ReferenceImageRef[] {
@@ -593,7 +597,7 @@ function boardNodeReferences(
     }));
   }
   if (node?.kind === "image-generate" || node?.kind === "video-generate" || node?.kind === "audio-operation" || node?.kind === "runninghub-app") {
-    const item = activeExecutableResultItem(nodes, node, items);
+    const item = activeExecutableResultItem(nodes, edges, node, items);
     return item && isMediaStorageItem(item) ? [{ id: item.id, type: item.type, url: resolveUrl(item.id, item.url), role: "general" }] : [];
   }
   if (node?.kind === "result") {
@@ -974,6 +978,7 @@ function resolveBoardPatchRunInputs(
   generatedNodeId: string,
   tempToRealIds: Map<string, string>,
   currentNodes: BoardNode[],
+  currentEdges: BoardDocument["edges"],
   items: StorageItem[],
   resolveUrl: BoardReferenceUrlResolver,
 ): { prompt: string; references: ReferenceImageRef[] } {
@@ -1003,7 +1008,7 @@ function resolveBoardPatchRunInputs(
     if (operation.to.portId === BOARD_PORT_IDS.referenceIn) {
       const sourceNodeId = resolvePatchNodeId(operation.from.nodeId, tempToRealIds);
       const sourceNode = currentNodes.find(node => node.id === sourceNodeId);
-      references.push(...boardNodeReferences(sourceNode, currentNodes, items, resolveUrl));
+      references.push(...boardNodeReferences(sourceNode, currentNodes, currentEdges, items, resolveUrl));
     }
   });
   return { prompt, references };
@@ -1193,75 +1198,112 @@ function activeProcessingSourceStackItems(
 }
 
 function resultStackKeyForConfig({
-  edges,
   kind,
   model,
-  nodeId,
-  sizeKey,
+  params,
+  prompt,
+  references,
 }: {
-  edges: BoardDocument["edges"];
   kind: ExecutableBoardNode["kind"];
   model: string;
-  nodeId: string;
-  sizeKey: string;
+  params: BoardResultStackValue;
+  prompt: string;
+  references: readonly ReferenceImageRef[];
 }): string {
-  const wiringKey = edges
-    .filter(edge => edge.to.nodeId === nodeId && (edge.to.portId === BOARD_PORT_IDS.promptIn || edge.to.portId === BOARD_PORT_IDS.referenceIn))
-    .map(edge => `${edge.kind}:${edge.from.nodeId}:${edge.from.portId}>${edge.to.nodeId}:${edge.to.portId}`)
-    .sort()
-    .join(",");
-  return `${kind}|${model}|${sizeKey}|${wiringKey}`;
+  return buildBoardResultStackKey({ kind, model, params, prompt, references });
 }
 
-function resultStackKeyForNode(node: ExecutableBoardNode, edges: BoardDocument["edges"]): string {
-  const sizeKey = node.kind === "image-generate"
-    ? `${node.aspectRatio}|${node.imageResolution}|${node.customImageResolution}|${cinematicProfileKey(node.cinematicProfile)}`
-      : node.kind === "video-generate"
-        ? `${node.aspectRatio}|${node.videoResolution ?? ""}|${cinematicProfileKey(node.cinematicProfile)}`
-        : node.kind === "audio-operation"
-          ? `${node.audioMode}|${node.audioFormat}|${node.voiceCloneConsentAccepted === true ? "clone-consent" : ""}|${node.voiceProfileId ?? ""}`
-      : `${node.targetType}|${node.outputType}|${node.targetId}|${node.bindings.map(binding => [
-        binding.nodeId,
-        binding.fieldName,
-        binding.source,
-        binding.deliveryMode,
-        binding.valueType ?? "",
-        binding.enabled === false ? "off" : "on",
-        binding.required === true ? "required" : "",
-        binding.referenceIndex ?? "",
-        binding.referenceType ?? "",
-        binding.value,
-      ].join(":")).join(",")}`;
+function cinematicProfileStackValue(profile: CinematicProfile): BoardResultStackValue {
+  return {
+    aperture: profile.aperture,
+    camera: profile.camera,
+    effect: profile.effect,
+    enabled: profile.enabled,
+    focalLength: profile.focalLength,
+    lens: profile.lens,
+    lighting: profile.lighting,
+    movement: profile.movement,
+    palette: profile.palette,
+  };
+}
+
+function runningHubYouchuanStackValue(settings: RunningHubYouchuanAdvancedSettings | undefined): BoardResultStackValue {
+  if (!settings) return null;
+  return {
+    chaos: settings.chaos,
+    hd: settings.hd === true,
+    iw: settings.iw,
+    oref: settings.oref ?? "",
+    ow: settings.ow ?? "",
+    raw: settings.raw,
+    sref: settings.sref ?? "",
+    stylize: settings.stylize,
+    sw: settings.sw,
+    tile: settings.tile === true,
+    weird: settings.weird ?? "",
+  };
+}
+
+function resultStackParamsForNode(node: ExecutableBoardNode): BoardResultStackValue {
+  if (node.kind === "image-generate") {
+    return {
+      aspectRatio: node.aspectRatio,
+      cinematicProfile: cinematicProfileStackValue(node.cinematicProfile),
+      customImageResolution: node.customImageResolution,
+      imageQuality: node.imageQuality ?? "",
+      imageResolution: node.imageResolution,
+      runningHubYouchuan: runningHubYouchuanStackValue(node.runningHubYouchuan),
+      thinkingLevel: node.thinkingLevel ?? "",
+    };
+  }
+  if (node.kind === "video-generate") {
+    return {
+      aspectRatio: node.aspectRatio,
+      cinematicProfile: cinematicProfileStackValue(node.cinematicProfile),
+      videoDuration: node.videoDuration ?? "",
+      videoPreset: node.videoPreset ?? "",
+      videoReferenceMode: node.videoReferenceMode ?? "",
+      videoResolution: node.videoResolution ?? "",
+    };
+  }
+  if (node.kind === "audio-operation") {
+    return {
+      asrLanguage: node.asrLanguage ?? "",
+      audioFormat: node.audioFormat,
+      audioMode: node.audioMode,
+      audioStylePrompt: node.audioStylePrompt ?? "",
+      voiceCloneConsentAccepted: node.voiceCloneConsentAccepted === true,
+      voiceProfileId: node.voiceProfileId ?? "",
+    };
+  }
+  return {
+    accessPassword: node.accessPassword ?? "",
+    bindings: node.bindings.map(binding => ({
+      deliveryMode: binding.deliveryMode,
+      enabled: binding.enabled !== false,
+      fieldName: binding.fieldName,
+      nodeId: binding.nodeId,
+      referenceIndex: binding.referenceIndex ?? "",
+      referenceType: binding.referenceType ?? "",
+      required: binding.required === true,
+      source: binding.source,
+      value: binding.value,
+      valueType: binding.valueType ?? "",
+    })),
+    outputType: node.outputType,
+    targetId: node.targetId,
+    targetType: node.targetType,
+  };
+}
+
+function resultStackKeyForNode(node: ExecutableBoardNode, input: { prompt: string; references: readonly ReferenceImageRef[] }): string {
   return resultStackKeyForConfig({
-    edges,
     kind: node.kind,
     model: node.kind === "runninghub-app" ? runningHubAppModelValue(node) : node.model,
-    nodeId: node.id,
-    sizeKey,
+    params: resultStackParamsForNode(node),
+    prompt: input.prompt,
+    references: input.references,
   });
-}
-
-function patchInputEdgesForNode(
-  patch: AgentBoardPatch,
-  generatedNodeId: string,
-  tempToRealIds: Map<string, string>,
-): BoardDocument["edges"] {
-  return patch.operations
-    .filter((operation): operation is AgentBoardPatchOperation & { op: "connect_ports" } => operation.op === "connect_ports")
-    .filter(operation => {
-      const targetNodeId = resolvePatchNodeId(operation.to.nodeId, tempToRealIds);
-      return targetNodeId === generatedNodeId && (operation.to.portId === BOARD_PORT_IDS.promptIn || operation.to.portId === BOARD_PORT_IDS.referenceIn);
-    })
-    .map((operation, index) => {
-      const toPortId = operation.to.portId;
-      return {
-        id: `patch-edge-${index}`,
-        kind: toPortId === BOARD_PORT_IDS.promptIn ? "prompt" : "reference",
-        from: resolvePatchPortRef(operation.from, tempToRealIds),
-        to: resolvePatchPortRef(operation.to, tempToRealIds),
-        createdAt: "",
-      };
-    });
 }
 
 function patchGenerateNodeForStackKey(operation: AgentBoardPatchCreateNodeOperation, generatedNodeId: string): GenerateBoardNode {
@@ -2339,6 +2381,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     const previewReferences = boardNodeReferences(
       sourceNode,
       boardController.board.nodes,
+      boardController.board.edges,
       items,
       resolveBoardReferenceUrl,
     );
@@ -2588,6 +2631,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           item.id,
           tempToRealIds,
           boardController.board.nodes,
+          boardController.board.edges,
           items,
           resolveBoardReferenceUrl,
         );
@@ -2609,7 +2653,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           const defaults = imageActionDefaults(model, operation.aspectRatio);
           const resultStackKey = resultStackKeyForNode(
             patchGenerateNodeForStackKey(operation, item.id),
-            patchInputEdgesForNode(patch, item.id, tempToRealIds),
+            { prompt: promptValue, references: runReferences },
           );
           boardController.updateGenerateNode(item.id, {
             status: "processing",
@@ -2650,7 +2694,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           }
           const resultStackKey = resultStackKeyForNode(
             patchGenerateNodeForStackKey(operation, item.id),
-            patchInputEdgesForNode(patch, item.id, tempToRealIds),
+            { prompt: promptValue, references: runReferences },
           );
           boardController.updateGenerateNode(item.id, {
             status: "processing",
@@ -2692,7 +2736,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           }
           const resultStackKey = resultStackKeyForNode(
             patchGenerateNodeForStackKey(operation, item.id),
-            patchInputEdgesForNode(patch, item.id, tempToRealIds),
+            { prompt: promptValue, references: runReferences },
           );
           boardController.updateGenerateNode(item.id, {
             status: "processing",
@@ -2763,7 +2807,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         }
         : sourceNode.kind === "image-generate"
           ? (() => {
-            const item = activeExecutableResultItem(boardController.board.nodes, sourceNode, items);
+            const item = activeExecutableResultItem(boardController.board.nodes, boardController.board.edges, sourceNode, items);
             if (item?.type !== "image") return null;
             return item
               ? { assetId: item.id, model: item.model, prompt: item.prompt, url: resolveBoardReferenceUrl(item.id, item.url) }
@@ -2838,17 +2882,17 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       }
       if (action.params?.run === true) {
         const resultStackKey = resultStackKeyForConfig({
-          edges: [{
-            id: "image-to-video-reference-edge",
-            kind: "reference",
-            from: { nodeId: assetNodeId, portId: BOARD_PORT_IDS.assetOut, portKind: "asset" },
-            to: { nodeId: videoNodeId, portId: BOARD_PORT_IDS.referenceIn, portKind: "asset" },
-            createdAt: "",
-          }],
           kind: "video-generate",
           model,
-          nodeId: videoNodeId,
-          sizeKey: `${action.params.aspectRatio ?? defaults.aspectRatio}|${action.params.videoResolution ?? defaults.videoResolution ?? ""}`,
+          params: {
+            aspectRatio: action.params.aspectRatio ?? defaults.aspectRatio,
+            videoDuration: action.params.videoDuration ?? defaults.videoDuration ?? "",
+            videoPreset: action.params.videoPreset ?? defaults.videoPreset ?? "",
+            videoReferenceMode: action.params.videoReferenceMode ?? defaults.videoReferenceMode ?? "",
+            videoResolution: action.params.videoResolution ?? defaults.videoResolution ?? "",
+          },
+          prompt: promptValue,
+          references: [{ id: sourceReference.assetId, url: sourceReference.url, role: "general" }],
         });
         boardController.updateGenerateNode(videoNodeId, { status: "processing", errorMessage: undefined, resultStackKey });
         const reference = { id: sourceReference.assetId, url: sourceReference.url, role: "general" as const };
@@ -3079,26 +3123,18 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       }
 
       const resultStackKey = resultStackKeyForConfig({
-        edges: [
-          {
-            id: "agent-prompt-edge",
-            kind: "prompt",
-            from: { nodeId: promptNodeId, portId: BOARD_PORT_IDS.promptOut, portKind: "prompt" },
-            to: { nodeId: generateNodeId, portId: BOARD_PORT_IDS.promptIn, portKind: "prompt" },
-            createdAt: "",
-          },
-          ...referenceNodeIds.map((assetNodeId, index) => ({
-            id: `agent-reference-edge-${index}`,
-            kind: "reference" as const,
-            from: { nodeId: assetNodeId, portId: BOARD_PORT_IDS.assetOut, portKind: "asset" as const },
-            to: { nodeId: generateNodeId, portId: BOARD_PORT_IDS.referenceIn, portKind: "asset" as const },
-            createdAt: "",
-          })),
-        ],
         kind: "image-generate",
         model,
-        nodeId: generateNodeId,
-        sizeKey: `${defaults.aspectRatio}|${defaults.imageResolution}|${defaults.customImageResolution}`,
+        params: {
+          aspectRatio: defaults.aspectRatio,
+          customImageResolution: defaults.customImageResolution,
+          imageQuality: defaults.imageQuality ?? "",
+          imageResolution: defaults.imageResolution,
+          runningHubYouchuan: runningHubYouchuanStackValue(defaults.runningHubYouchuan),
+          thinkingLevel: defaults.thinkingLevel ?? "",
+        },
+        prompt: promptFromAgent,
+        references,
       });
       boardController.updateGenerateNode(generateNodeId, { errorMessage: undefined, resultStackKey, status: "processing" });
       const didStart = await generateManualImage({
@@ -3192,26 +3228,18 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       }
 
       const resultStackKey = resultStackKeyForConfig({
-        edges: [
-          {
-            id: "agent-prompt-edge",
-            kind: "prompt",
-            from: { nodeId: promptNodeId, portId: BOARD_PORT_IDS.promptOut, portKind: "prompt" },
-            to: { nodeId: generateNodeId, portId: BOARD_PORT_IDS.promptIn, portKind: "prompt" },
-            createdAt: "",
-          },
-          ...referenceNodeIds.map((assetNodeId, index) => ({
-            id: `agent-reference-edge-${index}`,
-            kind: "reference" as const,
-            from: { nodeId: assetNodeId, portId: BOARD_PORT_IDS.assetOut, portKind: "asset" as const },
-            to: { nodeId: generateNodeId, portId: BOARD_PORT_IDS.referenceIn, portKind: "asset" as const },
-            createdAt: "",
-          })),
-        ],
         kind: "audio-operation",
         model,
-        nodeId: generateNodeId,
-        sizeKey: `${defaults.audioMode}|${defaults.audioFormat}|${defaults.asrLanguage ?? ""}|${defaults.voiceCloneConsentAccepted === true ? "clone-consent" : ""}|${defaults.voiceProfileId ?? ""}`,
+        params: {
+          asrLanguage: defaults.asrLanguage ?? "",
+          audioFormat: defaults.audioFormat,
+          audioMode: defaults.audioMode,
+          audioStylePrompt: defaults.audioStylePrompt ?? "",
+          voiceCloneConsentAccepted: defaults.voiceCloneConsentAccepted === true,
+          voiceProfileId: defaults.voiceProfileId ?? "",
+        },
+        prompt: promptFromAgent,
+        references,
       });
       boardController.updateGenerateNode(generateNodeId, { errorMessage: undefined, resultStackKey, status: "processing" });
       const didStart = await generateManualAudio({
@@ -3308,26 +3336,17 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     }
 
     const resultStackKey = resultStackKeyForConfig({
-      edges: [
-        {
-          id: "agent-prompt-edge",
-          kind: "prompt",
-          from: { nodeId: promptNodeId, portId: BOARD_PORT_IDS.promptOut, portKind: "prompt" },
-          to: { nodeId: generateNodeId, portId: BOARD_PORT_IDS.promptIn, portKind: "prompt" },
-          createdAt: "",
-        },
-        ...referenceNodeIds.map((assetNodeId, index) => ({
-          id: `agent-reference-edge-${index}`,
-          kind: "reference" as const,
-          from: { nodeId: assetNodeId, portId: BOARD_PORT_IDS.assetOut, portKind: "asset" as const },
-          to: { nodeId: generateNodeId, portId: BOARD_PORT_IDS.referenceIn, portKind: "asset" as const },
-          createdAt: "",
-        })),
-      ],
       kind: "video-generate",
       model,
-      nodeId: generateNodeId,
-      sizeKey: `${defaults.aspectRatio}|${defaults.videoResolution ?? ""}`,
+      params: {
+        aspectRatio: defaults.aspectRatio,
+        videoDuration: defaults.videoDuration ?? "",
+        videoPreset: defaults.videoPreset ?? "",
+        videoReferenceMode: defaults.videoReferenceMode ?? "",
+        videoResolution: defaults.videoResolution ?? "",
+      },
+      prompt: promptFromAgent,
+      references,
     });
     boardController.updateGenerateNode(generateNodeId, { errorMessage: undefined, resultStackKey, status: "processing" });
     const didStart = await generateManualVideo({
@@ -3552,7 +3571,11 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       const sourceNode = findExecutableNodeById(boardController.board.nodes, asset.sourceBoardNodeId);
       if (
         sourceNode &&
-        findResultNodeForSource(boardController.board.nodes, sourceNode.id)?.resultAssetIds.includes(asset.id) &&
+        findResultNodeForSourceStack(
+          boardController.board.nodes,
+          sourceNode.id,
+          asset.sourceBoardResultStackKey ?? sourceNode.resultStackKey ?? "",
+        )?.resultAssetIds.includes(asset.id) &&
         !hasResultAssetConnection(boardController.board.edges, sourceNode.id, assetNodeId)
       ) {
         boardController.connectPorts(
@@ -3738,7 +3761,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   }, [boardController, pushWorkspaceNotice, resolvedBoardId]);
 
   const useSelectedBoardAssetAsReference = () => {
-    const references = activeBoardReference(boardController.board.nodes, boardController.selectedNodeId, items, resolveBoardReferenceUrl);
+    const references = activeBoardReference(boardController.board.nodes, boardController.board.edges, boardController.selectedNodeId, items, resolveBoardReferenceUrl);
     if (references.length === 0) {
       pushWorkspaceNotice("info", "Please select an image asset node");
       return;
@@ -3754,7 +3777,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   };
 
   const useSelectedBoardAssetForAgent = () => {
-    const references = activeBoardReference(boardController.board.nodes, boardController.selectedNodeId, items, resolveBoardReferenceUrl);
+    const references = activeBoardReference(boardController.board.nodes, boardController.board.edges, boardController.selectedNodeId, items, resolveBoardReferenceUrl);
     if (references.length === 0) {
       pushWorkspaceNotice("info", "Please select an image asset node");
       return;
@@ -3771,7 +3794,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   };
 
   const useBoardAssetForAgent = useCallback((nodeId: string) => {
-    const references = activeBoardReference(boardController.board.nodes, nodeId, items, resolveBoardReferenceUrl);
+    const references = activeBoardReference(boardController.board.nodes, boardController.board.edges, nodeId, items, resolveBoardReferenceUrl);
     if (references.length === 0) {
       pushWorkspaceNotice("info", "Please select an image asset node");
       return;
@@ -3786,6 +3809,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       error => pushWorkspaceNotice("error", toErrorMessage(error, t("board.agent.referenceMediaReadFailed"))),
     );
   }, [
+    boardController.board.edges,
     boardController.board.nodes,
     items,
     pushWorkspaceNotice,
@@ -3851,7 +3875,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     const references: ReferenceImageRef[] = boardController.board.edges
       .filter(edge => edge.to.nodeId === nodeId && edge.to.portId === "reference-in")
       .map(edge => boardController.board.nodes.find(item => item.id === edge.from.nodeId))
-      .flatMap(item => boardNodeReferences(item, boardController.board.nodes, items, resolveBoardReferenceUrl));
+      .flatMap(item => boardNodeReferences(item, boardController.board.nodes, boardController.board.edges, items, resolveBoardReferenceUrl));
 
     return { node, prompt: resolvedPrompt, references };
   }, [boardController.board.edges, boardController.board.nodes, items, resolveBoardReferenceUrl]);
@@ -3878,7 +3902,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           return;
         }
 
-        const resultStackKey = resultStackKeyForNode(node, boardController.board.edges);
+        const resultStackKey = resultStackKeyForNode(node, { prompt: nodePrompt, references });
         const shouldStartNewStack = node.resultStackKey !== resultStackKey;
         boardController.updateRunningHubAppNode(nodeId, {
           errorMessage: undefined,
@@ -4012,7 +4036,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         }
       }
 
-        const resultStackKey = resultStackKeyForNode(node, boardController.board.edges);
+        const resultStackKey = resultStackKeyForNode(node, { prompt: nextPrompt, references });
         const shouldStartNewStack = node.resultStackKey !== resultStackKey;
         boardController.updateGenerateNode(nodeId, {
           errorMessage: undefined,
@@ -4128,7 +4152,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     const references = boardController.board.edges
       .filter(edge => edge.to.nodeId === nodeId && edge.to.portId === "agent-context-in")
       .map(edge => boardController.board.nodes.find(item => item.id === edge.from.nodeId))
-      .flatMap(item => boardNodeReferences(item, boardController.board.nodes, items, resolveBoardReferenceUrl))
+      .flatMap(item => boardNodeReferences(item, boardController.board.nodes, boardController.board.edges, items, resolveBoardReferenceUrl))
       .slice(0, IMAGE_REFERENCE_LIMIT);
 
     setAgentReferences(references);
@@ -4614,7 +4638,15 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     const resultItem = resultAssetId
       ? items.find(item => item.id === resultAssetId && item.status === "complete")
       : undefined;
-    const resultNode = findResultNodeForSource(boardController.board.nodes, sourceNodeId);
+    const sourceNode = findExecutableNodeById(boardController.board.nodes, sourceNodeId);
+    const resultNode = sourceNode
+      ? findConnectedResultNodeForSourceStack(
+        boardController.board.nodes,
+        boardController.board.edges,
+        sourceNodeId,
+        task.source.resultStackKey ?? sourceNode.resultStackKey ?? "",
+      )
+      : undefined;
     if (!resultNode && resultItem) {
       handleOpenFullscreen(resultItem);
       return;
@@ -4968,6 +5000,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           tasksPanel={(
             <BoardTaskQueuePanel
               cancelingTaskIds={cancelingBoardItemIds}
+              edges={boardController.board.edges}
               items={items}
               nodes={boardController.board.nodes}
               tasks={generationTasks}

@@ -598,7 +598,6 @@ export function useGenerationActions({
           if (failedTask) recordGenerationTask(failedTask);
           return true;
         }
-        setItems(prev => [...savedCompletedItems, ...prev]);
         const resultAssetIds = savedCompletedItems.map(item => item.id);
         const completeTask = await updateTaskOrWarn(taskId, {
           activeResultAssetId: resultAssetIds[0],
@@ -607,6 +606,7 @@ export function useGenerationActions({
           progress: 100,
         }, pushWorkspaceNotice, t);
         if (completeTask) recordGenerationTask(completeTask);
+        setItems(prev => [...savedCompletedItems, ...prev]);
       } else {
         throw new Error(await readFetchError(res, t("common.notices.imageGenRequestFailed")));
       }

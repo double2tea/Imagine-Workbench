@@ -2,14 +2,15 @@
 
 import { CheckCircle2, FileText, ImageIcon, Loader2, LocateFixed, Music, RotateCcw, Square, Trash2, Video } from "lucide-react";
 import { BoardStatusBadge, BoardStatusIcon, BoardTaskActionButton, BoardTaskProgressBar } from "@/components/board/BoardStatusPrimitives";
-import type { BoardNode } from "@/lib/board";
-import { findResultNodeForSource } from "@/lib/board/utils";
+import type { BoardEdge, BoardNode } from "@/lib/board";
+import { findConnectedResultNodeForSourceStack, isResultSourceNode } from "@/lib/board/utils";
 import type { StorageItem } from "@/lib/db";
 import type { GenerationTask } from "@/lib/generation-tasks";
 import { useTranslations } from "@/lib/i18n";
 
 interface BoardTaskQueuePanelProps {
   cancelingTaskIds?: readonly string[];
+  edges: BoardEdge[];
   items: StorageItem[];
   nodes: BoardNode[];
   onCancelTask: (task: GenerationTask) => void;
@@ -37,6 +38,7 @@ function taskTitle(task: GenerationTask, sourceNode: BoardNode | undefined): str
 
 function TaskRow({
   canceling,
+  edges,
   items,
   nodes,
   onCancelTask,
@@ -47,6 +49,7 @@ function TaskRow({
   task,
 }: {
   canceling: boolean;
+  edges: BoardEdge[];
   items: StorageItem[];
   nodes: BoardNode[];
   onCancelTask: (task: GenerationTask) => void;
@@ -66,7 +69,9 @@ function TaskRow({
   const sourceNode = task.source.boardNodeId
     ? nodes.find(node => node.id === task.source.boardNodeId)
     : undefined;
-  const resultNode = sourceNode ? findResultNodeForSource(nodes, sourceNode.id) : undefined;
+  const resultNode = isResultSourceNode(sourceNode)
+    ? findConnectedResultNodeForSourceStack(nodes, edges, sourceNode.id, task.source.resultStackKey ?? sourceNode.resultStackKey ?? "")
+    : undefined;
   const resultAssetId = task.activeResultAssetId ?? task.resultAssetIds.at(-1);
   const resultItem = resultAssetId
     ? items.find(item => item.id === resultAssetId && item.status === "complete")
@@ -178,6 +183,7 @@ function TaskRow({
 
 function TaskSection({
   cancelingTaskIds,
+  edges,
   items,
   nodes,
   onCancelTask,
@@ -189,6 +195,7 @@ function TaskSection({
   title,
 }: {
   cancelingTaskIds: readonly string[];
+  edges: BoardEdge[];
   items: StorageItem[];
   nodes: BoardNode[];
   onCancelTask: (task: GenerationTask) => void;
@@ -210,6 +217,7 @@ function TaskSection({
         <TaskRow
           key={task.id}
           canceling={cancelingTaskIds.includes(task.id)}
+          edges={edges}
           items={items}
           nodes={nodes}
           onCancelTask={onCancelTask}
@@ -226,6 +234,7 @@ function TaskSection({
 
 export default function BoardTaskQueuePanel({
   cancelingTaskIds = [],
+  edges,
   items,
   nodes,
   onCancelTask,
@@ -266,6 +275,7 @@ export default function BoardTaskQueuePanel({
       </div>
       <TaskSection
         cancelingTaskIds={cancelingTaskIds}
+        edges={edges}
         items={items}
         nodes={nodes}
         onCancelTask={onCancelTask}
@@ -278,6 +288,7 @@ export default function BoardTaskQueuePanel({
       />
       <TaskSection
         cancelingTaskIds={cancelingTaskIds}
+        edges={edges}
         items={items}
         nodes={nodes}
         onCancelTask={onCancelTask}
@@ -290,6 +301,7 @@ export default function BoardTaskQueuePanel({
       />
       <TaskSection
         cancelingTaskIds={cancelingTaskIds}
+        edges={edges}
         items={items}
         nodes={nodes}
         onCancelTask={onCancelTask}

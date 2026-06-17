@@ -1,5 +1,8 @@
 import type { BoardNode, BoardPoint, BoardSize } from "@/lib/board/types";
 
+const RESULT_OUT_PORT_ID = "result-out";
+const ASSET_IN_PORT_ID = "asset-in";
+
 export function isResultSourceNode(
   node: BoardNode | undefined,
 ): node is Extract<BoardNode, { kind: "image-generate" | "video-generate" | "audio-operation" | "runninghub-app" }> {
@@ -13,6 +16,37 @@ export function findResultNodeForSource(
   return nodes.find(
     (node): node is Extract<BoardNode, { kind: "result" }> =>
       node.kind === "result" && node.sourceNodeId === sourceNodeId,
+  );
+}
+
+export function findResultNodeForSourceStack(
+  nodes: readonly BoardNode[],
+  sourceNodeId: string,
+  resultStackKey: string,
+): Extract<BoardNode, { kind: "result" }> | undefined {
+  return nodes.find(
+    (node): node is Extract<BoardNode, { kind: "result" }> =>
+      node.kind === "result" && node.sourceNodeId === sourceNodeId && node.resultStackKey === resultStackKey,
+  );
+}
+
+export function findConnectedResultNodeForSourceStack(
+  nodes: readonly BoardNode[],
+  edges: readonly { from: { nodeId: string; portId: string }; to: { nodeId: string; portId: string } }[],
+  sourceNodeId: string,
+  resultStackKey: string,
+): Extract<BoardNode, { kind: "result" }> | undefined {
+  return nodes.find(
+    (node): node is Extract<BoardNode, { kind: "result" }> =>
+      node.kind === "result" &&
+      node.sourceNodeId === sourceNodeId &&
+      node.resultStackKey === resultStackKey &&
+      edges.some(edge =>
+        edge.from.nodeId === sourceNodeId &&
+        edge.from.portId === RESULT_OUT_PORT_ID &&
+        edge.to.nodeId === node.id &&
+        edge.to.portId === ASSET_IN_PORT_ID
+      ),
   );
 }
 

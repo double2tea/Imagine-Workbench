@@ -6,7 +6,7 @@ interface BoardPlacementNode {
 }
 
 const BOARD_PLACEMENT_GAP = 48;
-const BOARD_PLACEMENT_SEARCH_LIMIT = 240;
+const BOARD_PLACEMENT_SEARCH_RADIUS = 24;
 
 function overlaps(leftPosition: BoardPoint, leftSize: BoardSize, right: BoardPlacementNode): boolean {
   return (
@@ -17,10 +17,24 @@ function overlaps(leftPosition: BoardPoint, leftSize: BoardSize, right: BoardPla
   );
 }
 
-function rowOffset(index: number): number {
-  if (index === 0) return 0;
-  const distance = Math.ceil(index / 2);
-  return index % 2 === 1 ? distance : -distance;
+function placementOffsets(radius: number): Array<[number, number]> {
+  if (radius === 0) return [[0, 0]];
+  const offsets: Array<[number, number]> = [];
+  for (let x = -radius; x <= radius; x += 1) {
+    offsets.push([x, -radius], [x, radius]);
+  }
+  for (let y = -radius + 1; y < radius; y += 1) {
+    offsets.push([-radius, y], [radius, y]);
+  }
+  return offsets.sort((left, right) => {
+    const leftDistance = Math.abs(left[0]) + Math.abs(left[1]);
+    const rightDistance = Math.abs(right[0]) + Math.abs(right[1]);
+    if (leftDistance !== rightDistance) return leftDistance - rightDistance;
+    const leftSide = left[0] < 0 ? 1 : 0;
+    const rightSide = right[0] < 0 ? 1 : 0;
+    if (leftSide !== rightSide) return leftSide - rightSide;
+    return Math.abs(left[1]) - Math.abs(right[1]);
+  });
 }
 
 export function findAvailableBoardNodePosition(
@@ -30,14 +44,14 @@ export function findAvailableBoardNodePosition(
 ): BoardPoint {
   const columnStep = size.width + BOARD_PLACEMENT_GAP;
   const rowStep = size.height + BOARD_PLACEMENT_GAP;
-  for (let index = 0; index < BOARD_PLACEMENT_SEARCH_LIMIT; index += 1) {
-    const column = Math.floor(index / 9);
-    const row = rowOffset(index % 9);
-    const position = {
-      x: Math.round(preferredPosition.x + column * columnStep),
-      y: Math.round(preferredPosition.y + row * rowStep),
-    };
-    if (!nodes.some(node => overlaps(position, size, node))) return position;
+  for (let radius = 0; radius <= BOARD_PLACEMENT_SEARCH_RADIUS; radius += 1) {
+    for (const [column, row] of placementOffsets(radius)) {
+      const position = {
+        x: Math.round(preferredPosition.x + column * columnStep),
+        y: Math.round(preferredPosition.y + row * rowStep),
+      };
+      if (!nodes.some(node => overlaps(position, size, node))) return position;
+    }
   }
   return {
     x: Math.round(preferredPosition.x + columnStep),
