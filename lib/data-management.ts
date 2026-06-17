@@ -964,11 +964,19 @@ function selectGenerationTasksForBackup(
 ): GenerationTask[] {
   if (includeAllWorkspaceData) return tasks;
   return tasks.filter(task => {
+    const taskAssetIds = generationTaskAssetIds(task);
+    if (!taskAssetIds.every(assetId => assetIds.has(assetId))) return false;
     if (task.source.boardId && boardIds.has(task.source.boardId)) return true;
-    if (task.activeResultAssetId && assetIds.has(task.activeResultAssetId)) return true;
-    if (task.resultAssetIds.some(assetId => assetIds.has(assetId))) return true;
-    return generationRequestAssetIds(task.request).some(assetId => assetIds.has(assetId));
+    return taskAssetIds.length > 0;
   });
+}
+
+function generationTaskAssetIds(task: GenerationTask): string[] {
+  return [
+    ...(task.activeResultAssetId ? [task.activeResultAssetId] : []),
+    ...task.resultAssetIds,
+    ...generationRequestAssetIds(task.request),
+  ];
 }
 
 function selectVoiceProfilesForBackup(
@@ -1182,6 +1190,7 @@ function parseGenerationTask(value: unknown, index: number): GenerationTask {
   if (!isRecord(value)) throw new Error(`生成任务 ${index + 1} 格式无效`);
   const progress = readNumber(value, "progress");
   if (progress < 0 || progress > 100) throw new Error(`生成任务 ${index + 1} 进度无效`);
+  const createdAt = readDateString(value, "createdAt");
   return {
     id: readString(value, "id"),
     mediaType: readAssetType(value, "mediaType"),
@@ -1189,8 +1198,8 @@ function parseGenerationTask(value: unknown, index: number): GenerationTask {
     model: readString(value, "model"),
     status: readGenerationTaskStatus(value, "status"),
     progress,
-    createdAt: readDateString(value, "createdAt"),
-    updatedAt: readDateString(value, "updatedAt"),
+    createdAt,
+    updatedAt: readOptionalDateString(value, "updatedAt") ?? createdAt,
     source: parseGenerationTaskSource(value.source),
     resultAssetIds: readOptionalStringArray(value, "resultAssetIds") ?? [],
     activeResultAssetId: readOptionalString(value, "activeResultAssetId"),
@@ -1198,7 +1207,7 @@ function parseGenerationTask(value: unknown, index: number): GenerationTask {
     errorMessage: readOptionalString(value, "errorMessage"),
     request: parseGenerationRequest(value.request),
     legacyAssetId: readOptionalString(value, "legacyAssetId"),
-    canCancelRemote: readBoolean(value, "canCancelRemote"),
+    canCancelRemote: readOptionalBoolean(value, "canCancelRemote") ?? false,
   };
 }
 
@@ -1860,6 +1869,13 @@ function readText(record: Record<string, unknown>, field: string): string {
 
 function readDateString(record: Record<string, unknown>, field: string): string {
   const value = readString(record, field);
+  if (!Number.isFinite(Date.parse(value))) throw new Error(`${field} 日期无效`);
+  return value;
+}
+
+function readOptionalDateString(record: Record<string, unknown>, field: string): string | undefined {
+  const value = readOptionalString(record, field);
+  if (value === undefined) return undefined;
   if (!Number.isFinite(Date.parse(value))) throw new Error(`${field} 日期无效`);
   return value;
 }

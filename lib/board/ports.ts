@@ -329,7 +329,7 @@ export function resolveBoardConnectionKind(nodes: BoardNode[], from: BoardPortRe
   }
 
   if (
-    source.node.kind === "asset" &&
+    (source.node.kind === "asset" || source.node.kind === "result") &&
     (target.node.kind === "reference-group" || target.node.kind === "prompt") &&
     source.port.id === BOARD_PORT_IDS.assetOut &&
     target.port.id === BOARD_PORT_IDS.assetIn
