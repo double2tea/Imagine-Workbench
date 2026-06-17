@@ -50,20 +50,21 @@ export async function POST(req: NextRequest) {
     const aspectRatio = customImageSizeAspectRatio(requestImageResolution) ?? optionalText(body.aspectRatio) ?? "1:1";
     const imageResolution = isRunningHubImageTask ? requestImageResolution ?? "auto" : resolveImageResolution(modelValue, aspectRatio, requestImageResolution);
     const imageQuality = isRunningHubImageTask ? optionalText(body.imageQuality) : resolveImageQuality(modelValue, optionalText(body.imageQuality));
-    const referenceImages = readReferenceImages(body.referenceImages, body.referenceImage);
-    const referenceMedia = isRunningHubImageTask
-      ? readReferenceMedia(body.referenceMedia, referenceImages)
-      : referenceImages.map(dataUri => ({ dataUri, type: "image" as const }));
+    const legacyReferenceImages = readReferenceImages(body.referenceImages, body.referenceImage);
+    const referenceMedia = readReferenceMedia(body.referenceMedia, legacyReferenceImages);
+    const referenceImages = referenceMedia
+      .filter(reference => reference.type === "image")
+      .map(reference => reference.dataUri);
     const runningHubYouchuan = isRunningHubImageTask ? undefined : readRunningHubYouchuanAdvancedSettings(body.runningHubYouchuan, parsed.model);
     const explicitRunningHubNodeInfoList = readRunningHubNodeInfoList(body.runningHubNodeInfoList);
     const runningHubNodeInfo = resolveRunningHubNodeInfoListForModel(parsed.model, explicitRunningHubNodeInfoList);
-    const formatError = isRunningHubImageTask ? getReferenceMediaFormatError(referenceMedia) : null;
+    const formatError = getReferenceMediaFormatError(referenceMedia);
     if (formatError) return NextResponse.json({ error: formatError }, { status: 400 });
     const payloadError = isRunningHubImageTask
       ? getReferenceMediaPayloadError(referenceMedia.map(reference => reference.dataUri))
       : getReferenceImagePayloadError([...referenceImages, ...runningHubYouchuanReferenceImages(runningHubYouchuan)]);
     if (payloadError) return NextResponse.json({ error: payloadError }, { status: 413 });
-    if (modelCapability) validateInputModalityReferences(modelCapability.inputModalities, referenceImages.map(() => ({ type: "image" })));
+    if (modelCapability) validateInputModalityReferences(modelCapability.inputModalities, referenceMedia);
 
     const allowsEmptyPrompt = runningHubResolvedNodeInfoAllowsEmptyPrompt(parsed.model, "image", runningHubNodeInfo);
     const result = await generateImage(config, {
@@ -360,7 +361,7 @@ function readReferenceMediaItem(dataUri: string): ReferenceMedia {
 function getReferenceMediaFormatError(referenceMedia: ReferenceMedia[]): string | null {
   for (const reference of referenceMedia) {
     const actualType = mediaReferenceTypeFromBase64DataUri(reference.dataUri);
-    if (!actualType) return "RunningHub reference media must be data:image/*, data:video/* or data:audio/* base64 data URIs";
+    if (!actualType) return "Reference media must be data:image/*, data:video/* or data:audio/* base64 data URIs";
   }
   return null;
 }

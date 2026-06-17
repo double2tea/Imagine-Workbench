@@ -9,8 +9,10 @@ import { readImageGenerationPayload } from "@/lib/client-image-response";
 import {
   clearAllDB,
   deleteFromDB,
+  getAssetMeta,
   getGenerationReferenceMedia,
   saveToDB,
+  type GenerationReferenceMediaSnapshot,
   type StorageItem,
 } from "@/lib/db";
 import { createWorkspaceSafetySnapshot } from "@/lib/data-management";
@@ -19,7 +21,7 @@ import { createPanoramaScreenshotStorageItem, type PanoramaScreenshot } from "@/
 import { tryParseProviderModel, type AiProvider } from "@/lib/providers/model-catalog";
 import type { RunningHubTaskNodeBinding, RunningHubYouchuanAdvancedSettings } from "@/lib/providers/types";
 import { resolveAssetOriginalUrl } from "@/lib/assets/resolve-url";
-import { getReferenceImagePayloadError, getReferenceMediaPayloadError, prepareReferenceImageUrlForRequest, prepareReferenceMediaUrlForRequest } from "@/lib/reference-images";
+import { getReferenceImagePayloadError, getReferenceMediaPayloadError, prepareReferenceMediaUrlForRequest } from "@/lib/reference-images";
 import { createVideoFrameStorageItem, getVideoFrameCaptureLabel, type CapturedVideoFrame } from "@/lib/video-frame";
 
 type NoticeType = "error" | "info" | "success";
@@ -93,10 +95,30 @@ function readVideoGenerationPayload(data: unknown): { imageUrl: string | null; o
   };
 }
 
-function buildRetryRequestBody(item: StorageItem): RetryRequestBody {
+async function retryReferenceMediaPayloads(
+  referenceMedia: GenerationReferenceMediaSnapshot[],
+  t: TFunction,
+): Promise<Array<{ dataUri: string; type: MediaReferenceType; role?: MediaReferenceRole }>> {
+  return Promise.all(referenceMedia.map(async reference => {
+    let dataUri = reference.url;
+    if (reference.sourceAssetId) {
+      const meta = await getAssetMeta(reference.sourceAssetId);
+      if (!meta) throw new Error(t("common.notices.referenceMediaOriginalNotFound"));
+      dataUri = await resolveAssetOriginalUrl(meta);
+    }
+    if (!dataUri.trim()) throw new Error(t("common.notices.referenceMediaOriginalNotFound"));
+    return {
+      dataUri,
+      type: reference.type,
+      ...(reference.role ? { role: reference.role } : {}),
+    };
+  }));
+}
+
+async function buildRetryRequestBody(item: StorageItem, t: TFunction): Promise<RetryRequestBody> {
   const request = item.generationRequest;
   const referenceMedia = getGenerationReferenceMedia(request);
-  const referenceUrls = referenceMedia.map(reference => reference.url);
+  const typedReferenceMedia = await retryReferenceMediaPayloads(referenceMedia, t);
   const body: RetryRequestBody = {
     prompt: request?.prompt ?? item.prompt,
     model: request?.model ?? item.model,
@@ -110,29 +132,24 @@ function buildRetryRequestBody(item: StorageItem): RetryRequestBody {
     body.imageQuality = request?.imageQuality;
     body.imageResolution = request?.imageResolution ?? request?.aspectRatio ?? item.aspectRatio;
     body.thinkingLevel = request?.thinkingLevel;
-    body.referenceImage = referenceUrls[0];
-    body.referenceImages = referenceUrls;
+    body.referenceMedia = typedReferenceMedia;
+    const imageReferenceUrls = referenceMedia
+      .filter(reference => reference.type === "image")
+      .map(reference => reference.url);
+    body.referenceImage = imageReferenceUrls[0];
+    body.referenceImages = imageReferenceUrls;
   } else {
     body.durationSeconds = request?.videoDurationSeconds;
     body.preset = request?.videoPreset;
     body.referenceMode = request?.videoReferenceMode;
     body.resolutionName = request?.videoResolution;
-    body.referenceMedia = referenceMedia.map(reference => ({
-      dataUri: reference.url,
-      type: reference.type,
-      ...(reference.role ? { role: reference.role } : {}),
-    }));
+    body.referenceMedia = typedReferenceMedia;
   }
 
   return body;
 }
 
 async function prepareRetryReferenceImages(body: RetryRequestBody): Promise<void> {
-  if (body.referenceImages) {
-    const referenceImages = await Promise.all(body.referenceImages.map(prepareReferenceImageUrlForRequest));
-    body.referenceImages = referenceImages;
-    body.referenceImage = referenceImages[0];
-  }
   if (body.images) {
     body.images = await Promise.all(body.images.map(prepareReferenceMediaUrlForRequest));
   }
@@ -142,6 +159,9 @@ async function prepareRetryReferenceImages(body: RetryRequestBody): Promise<void
       dataUri: await prepareReferenceMediaUrlForRequest(reference.dataUri),
     })));
     body.referenceMedia = prepared;
+    const imageReferences = prepared.filter(reference => reference.type === "image").map(reference => reference.dataUri);
+    body.referenceImages = imageReferences;
+    body.referenceImage = imageReferences[0];
   }
 }
 
@@ -356,7 +376,7 @@ export function useAssetActions({
     setItems(prev => prev.map(current => current.id === item.id ? retryingItem : current));
 
     try {
-      const retryRequestBody = buildRetryRequestBody(item);
+      const retryRequestBody = await buildRetryRequestBody(item, t);
       await prepareRetryReferenceImages(retryRequestBody);
       const retryPayloadError = retryRequestBody.referenceMedia
         ? getReferenceMediaPayloadError(retryRequestBody.referenceMedia.map(reference => reference.dataUri))

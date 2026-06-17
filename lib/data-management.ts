@@ -54,15 +54,32 @@ import {
 import { isMediaReferenceType, mediaReferenceTypeFromDataUri, mediaReferenceTypeFromMime } from "@/lib/media-references";
 import { compressReferenceImageFile } from "@/lib/reference-images";
 import { normalizeCinematicProfile } from "@/lib/cinematic-controls";
+import {
+  listGenerationTasks,
+  saveGenerationTask,
+  type GenerationTask,
+  type GenerationTaskSource,
+  type GenerationTaskStatus,
+} from "@/lib/generation-tasks";
+import { isKnownProvider } from "@/lib/providers/registry";
+import {
+  deleteVoiceProfile,
+  listVoiceProfiles,
+  saveVoiceProfile,
+  type VoiceProfile,
+  type VoiceProfileSource,
+} from "@/lib/voice-profiles";
 
-export const WORKSPACE_BACKUP_SCHEMA_VERSION = 2;
-const SUPPORTED_WORKSPACE_BACKUP_SCHEMA_VERSIONS = new Set([1, WORKSPACE_BACKUP_SCHEMA_VERSION]);
+export const WORKSPACE_BACKUP_SCHEMA_VERSION = 3;
+const SUPPORTED_WORKSPACE_BACKUP_SCHEMA_VERSIONS = new Set([1, 2, WORKSPACE_BACKUP_SCHEMA_VERSION]);
 
 const BACKUP_APP_NAME = "Imagine Workbench";
 const MANIFEST_FILE = "manifest.json";
 const ASSET_INDEX_FILE = "assets/index.json";
 const LIBRARY_INDEX_FILE = "library/index.json";
 const BOARD_INDEX_FILE = "boards/index.json";
+const GENERATION_TASK_INDEX_FILE = "generation-tasks/index.json";
+const VOICE_PROFILE_INDEX_FILE = "voice-profiles/index.json";
 const SETTINGS_FILE = "settings/local-storage.json";
 const MAX_BACKUP_FILE_COUNT = 10000;
 const STALE_PROCESSING_MS = 2 * 60 * 60 * 1000;
@@ -142,12 +159,16 @@ export interface WorkspaceBackupManifest {
   assetsFile: typeof ASSET_INDEX_FILE;
   libraryFile?: typeof LIBRARY_INDEX_FILE;
   boardsFile: typeof BOARD_INDEX_FILE;
+  generationTasksFile?: typeof GENERATION_TASK_INDEX_FILE;
+  voiceProfilesFile?: typeof VOICE_PROFILE_INDEX_FILE;
   settingsFile?: typeof SETTINGS_FILE;
   counts: {
     assets: number;
     boards: number;
+    generationTasks?: number;
     libraryAssets?: number;
     settingsKeys: number;
+    voiceProfiles?: number;
   };
 }
 
@@ -155,8 +176,10 @@ export interface WorkspaceExportResult {
   assetCount: number;
   boardCount: number;
   fileName: string;
+  generationTaskCount: number;
   libraryAssetCount: number;
   settingsKeyCount: number;
+  voiceProfileCount: number;
 }
 
 export interface WorkspaceSafetySnapshotSummary {
@@ -164,12 +187,14 @@ export interface WorkspaceSafetySnapshotSummary {
   boardCount: number;
   createdAt: string;
   fileName: string;
+  generationTaskCount: number;
   id: string;
   libraryAssetCount: number;
   origin: string;
   reason: WorkspaceSafetySnapshotReason;
   settingsKeyCount: number;
   sizeBytes: number;
+  voiceProfileCount: number;
 }
 
 export interface WorkspaceImportPreview {
@@ -178,16 +203,20 @@ export interface WorkspaceImportPreview {
   exportedAt: string;
   includesCredentials: boolean;
   includesMediaFiles: boolean;
+  generationTaskCount: number;
   libraryAssetCount: number;
   schemaVersion: number;
   settingsKeyCount: number;
+  voiceProfileCount: number;
 }
 
 export interface WorkspaceImportResult {
   assetCount: number;
   boardCount: number;
+  generationTaskCount: number;
   libraryAssetCount: number;
   settingsKeyCount: number;
+  voiceProfileCount: number;
 }
 
 export interface WorkspaceCleanupResult {
@@ -285,8 +314,10 @@ interface WorkspaceBackupSettings {
 interface ParsedBackup {
   assets: StorageItem[];
   boards: BoardDocument[];
+  generationTasks: GenerationTask[];
   libraryAssets: LibraryAssetRecord[];
   settings: WorkspaceBackupSettings;
+  voiceProfiles: VoiceProfile[];
 }
 
 interface DataUriParts {
@@ -305,10 +336,14 @@ interface WorkspaceSafetySnapshotRecord extends WorkspaceSafetySnapshotSummary {
 
 export async function getWorkspaceDataSummary(items: StorageItem[] = []): Promise<WorkspaceDataSummary> {
   const assetMetas: StorageItemMeta[] = items.length > 0 ? items : await listAllAssetMetas();
-  const boards = await listBoardsFromDB();
+  const [boards, libraryRecords, voiceProfiles, generationTasks] = await Promise.all([
+    listBoardsFromDB(),
+    listLibraryAssetRecords(),
+    listVoiceProfiles(),
+    listGenerationTasks(),
+  ]);
+  const protectedAssetIds = collectWorkspaceProtectedAssetIds({ boards, generationTasks, libraryRecords, voiceProfiles });
   const boardAssetIds = collectBoardAssetIds(boards);
-  const libraryAssetIds = new Set((await listLibraryAssetRecords()).map(record => record.assetId));
-  const protectedAssetIds = new Set([...boardAssetIds, ...libraryAssetIds]);
   const assetIds = new Set(assetMetas.map(item => item.id));
   const stores = await getAssetDatabaseDiagnostics();
   const latestSnapshot = await getLatestWorkspaceSafetySnapshotSummary();
@@ -379,6 +414,7 @@ export async function exportCompleteWorkspaceBackup(includeCredentials: boolean)
     boards: await listBoardsFromDB(),
     filePrefix: "Imagine_Workbench_Backup",
     includeCredentials,
+    includeAllWorkspaceData: true,
     includeSettings: true,
   });
 }
@@ -395,6 +431,7 @@ export async function exportBoardWorkspaceBackup(
     boards: [board],
     filePrefix: `Imagine_Board_${safeFileSegment(board.title)}`,
     includeCredentials,
+    includeAllWorkspaceData: false,
     includeSettings: true,
   });
 }
@@ -408,21 +445,31 @@ export async function previewWorkspaceBackup(file: File): Promise<WorkspaceImpor
     ? parseLibraryAssetRecords(await readRequiredZipText(zip, manifest.libraryFile))
     : [];
   const boards = parseBoardDocuments(await readRequiredZipText(zip, manifest.boardsFile));
+  const generationTasks = manifest.generationTasksFile
+    ? parseGenerationTasks(await readRequiredZipText(zip, manifest.generationTasksFile))
+    : [];
+  const voiceProfiles = manifest.voiceProfilesFile
+    ? parseVoiceProfiles(await readRequiredZipText(zip, manifest.voiceProfilesFile))
+    : [];
   const settings = manifest.settingsFile
     ? parseSettings(await readRequiredZipText(zip, manifest.settingsFile))
     : { localStorage: {} };
 
   validateBoardAssetReferences(boards, new Set(assetRecords.map(asset => asset.id)));
   validateLibraryAssetReferences(libraryRecords, new Set(assetRecords.map(asset => asset.id)));
+  validateGenerationTaskAssetReferences(generationTasks, new Set(assetRecords.map(asset => asset.id)));
+  validateVoiceProfileAssetReferences(voiceProfiles, new Set(assetRecords.map(asset => asset.id)));
   return {
     assetCount: assetRecords.length,
     boardCount: boards.length,
     exportedAt: manifest.exportedAt,
+    generationTaskCount: generationTasks.length,
     includesCredentials: Object.keys(settings.localStorage).some(isProviderCredentialKey),
     includesMediaFiles: assetRecords.some(asset => Boolean(asset.mediaFile)),
     libraryAssetCount: libraryRecords.length,
     schemaVersion: manifest.schemaVersion,
     settingsKeyCount: Object.keys(settings.localStorage).length,
+    voiceProfileCount: voiceProfiles.length,
   };
 }
 
@@ -445,15 +492,26 @@ export async function importWorkspaceBackup(
   for (const record of parsed.libraryAssets) {
     await saveLibraryAssetRecord(record);
   }
+  for (const task of parsed.generationTasks) {
+    await saveGenerationTask(task);
+  }
+  for (const profile of await listVoiceProfiles()) {
+    await deleteVoiceProfile(profile.id);
+  }
+  for (const profile of parsed.voiceProfiles) {
+    await saveVoiceProfile(profile);
+  }
   writeManagedLocalStorage(parsed.settings.localStorage, includeCredentials);
 
   return {
     assetCount: parsed.assets.length,
     boardCount: parsed.boards.length,
+    generationTaskCount: parsed.generationTasks.length,
     libraryAssetCount: parsed.libraryAssets.length,
     settingsKeyCount: Object.keys(parsed.settings.localStorage).filter(key =>
       includeCredentials || !isProviderCredentialKey(key),
     ).length,
+    voiceProfileCount: parsed.voiceProfiles.length,
   };
 }
 
@@ -463,15 +521,48 @@ export async function resetBoardsToDefault(): Promise<void> {
   await saveBoardToDB(createEmptyBoard(DEFAULT_BOARD_ID));
 }
 
+function generationRequestAssetIds(request: GenerationRequestSnapshot | undefined): string[] {
+  if (!request?.referenceMedia) return [];
+  return request.referenceMedia
+    .map(reference => reference.sourceAssetId)
+    .filter((id): id is string => typeof id === "string" && id.trim().length > 0);
+}
+
+function collectWorkspaceProtectedAssetIds(input: {
+  boards: BoardDocument[];
+  generationTasks: Awaited<ReturnType<typeof listGenerationTasks>>;
+  libraryRecords: LibraryAssetRecord[];
+  voiceProfiles: Awaited<ReturnType<typeof listVoiceProfiles>>;
+}): Set<string> {
+  const boardAssetIds = collectBoardAssetIds(input.boards);
+  const libraryAssetIds = input.libraryRecords.map(record => record.assetId);
+  const voiceProfileAssetIds = input.voiceProfiles.flatMap(profile => [
+    ...profile.referenceAudioAssetIds,
+    ...(profile.sourceAssetIds ?? []),
+    ...(profile.previewAudioAssetId ? [profile.previewAudioAssetId] : []),
+  ]);
+  const generationTaskAssetIds = input.generationTasks.flatMap(task => [
+    ...task.resultAssetIds,
+    ...(task.activeResultAssetId ? [task.activeResultAssetId] : []),
+    ...generationRequestAssetIds(task.request),
+  ]);
+  return new Set([
+    ...boardAssetIds,
+    ...libraryAssetIds,
+    ...voiceProfileAssetIds,
+    ...generationTaskAssetIds,
+  ]);
+}
+
 export async function cleanupWorkspaceAssets(kind: WorkspaceCleanupKind): Promise<WorkspaceCleanupResult> {
-  const [assets, boards, libraryRecords] = await Promise.all([
+  const [assets, boards, libraryRecords, voiceProfiles, generationTasks] = await Promise.all([
     listAllAssetMetas(),
     listBoardsFromDB(),
     listLibraryAssetRecords(),
+    listVoiceProfiles(),
+    listGenerationTasks(),
   ]);
-  const boardAssetIds = collectBoardAssetIds(boards);
-  const libraryAssetIds = new Set(libraryRecords.map(record => record.assetId));
-  const protectedAssetIds = new Set([...boardAssetIds, ...libraryAssetIds]);
+  const protectedAssetIds = collectWorkspaceProtectedAssetIds({ boards, generationTasks, libraryRecords, voiceProfiles });
   const ids = await cleanupTargetIds(kind, assets, protectedAssetIds);
   if (ids.length > 0) {
     await createWorkspaceSafetySnapshot("cleanup-assets");
@@ -521,6 +612,7 @@ export async function createWorkspaceSafetySnapshot(
     boards: await listBoardsFromDB(),
     filePrefix: `Imagine_Workbench_Safety_${reason}`,
     includeCredentials: false,
+    includeAllWorkspaceData: true,
     includeSettings: true,
   });
   const record: WorkspaceSafetySnapshotRecord = {
@@ -529,12 +621,14 @@ export async function createWorkspaceSafetySnapshot(
     boardCount: archive.boardCount,
     createdAt: archive.exportedAt,
     fileName: archive.fileName,
+    generationTaskCount: archive.generationTaskCount,
     id: LATEST_SAFETY_SNAPSHOT_ID,
     libraryAssetCount: archive.libraryAssetCount,
     origin: currentWorkspaceOrigin(),
     reason,
     settingsKeyCount: archive.settingsKeyCount,
     sizeBytes: archive.blob.size,
+    voiceProfileCount: archive.voiceProfileCount,
   };
   await saveWorkspaceSafetySnapshotRecord(record);
   return toSafetySnapshotSummary(record);
@@ -770,6 +864,7 @@ async function exportWorkspaceBackup(input: {
   boards: BoardDocument[];
   filePrefix: string;
   includeCredentials: boolean;
+  includeAllWorkspaceData: boolean;
   includeSettings: boolean;
 }): Promise<WorkspaceExportResult> {
   const archive = await createWorkspaceBackupArchive(input);
@@ -778,8 +873,10 @@ async function exportWorkspaceBackup(input: {
     assetCount: archive.assetCount,
     boardCount: archive.boardCount,
     fileName: archive.fileName,
+    generationTaskCount: archive.generationTaskCount,
     libraryAssetCount: archive.libraryAssetCount,
     settingsKeyCount: archive.settingsKeyCount,
+    voiceProfileCount: archive.voiceProfileCount,
   };
 }
 
@@ -788,6 +885,7 @@ async function createWorkspaceBackupArchive(input: {
   boards: BoardDocument[];
   filePrefix: string;
   includeCredentials: boolean;
+  includeAllWorkspaceData: boolean;
   includeSettings: boolean;
 }): Promise<WorkspaceBackupArchive> {
   const zip = new JSZip();
@@ -796,8 +894,20 @@ async function createWorkspaceBackupArchive(input: {
     assetRecords.push(addAssetToZip(zip, asset));
   }
   const exportedAssetIds = new Set(input.assets.map(asset => asset.id));
+  const exportedBoardIds = new Set(input.boards.map(board => board.id));
   const libraryRecords = (await listLibraryAssetRecords())
     .filter(record => exportedAssetIds.has(record.assetId));
+  const generationTasks = selectGenerationTasksForBackup(
+    await listGenerationTasks(),
+    exportedAssetIds,
+    exportedBoardIds,
+    input.includeAllWorkspaceData,
+  );
+  const voiceProfiles = selectVoiceProfilesForBackup(
+    await listVoiceProfiles(),
+    exportedAssetIds,
+    input.includeAllWorkspaceData,
+  );
 
   const settings = input.includeSettings
     ? { localStorage: readManagedLocalStorage(input.includeCredentials) }
@@ -810,12 +920,16 @@ async function createWorkspaceBackupArchive(input: {
     assetsFile: ASSET_INDEX_FILE,
     libraryFile: LIBRARY_INDEX_FILE,
     boardsFile: BOARD_INDEX_FILE,
+    generationTasksFile: GENERATION_TASK_INDEX_FILE,
+    voiceProfilesFile: VOICE_PROFILE_INDEX_FILE,
     settingsFile: input.includeSettings ? SETTINGS_FILE : undefined,
     counts: {
       assets: assetRecords.length,
       boards: input.boards.length,
+      generationTasks: generationTasks.length,
       libraryAssets: libraryRecords.length,
       settingsKeys: Object.keys(settings.localStorage).length,
+      voiceProfiles: voiceProfiles.length,
     },
   };
 
@@ -823,6 +937,8 @@ async function createWorkspaceBackupArchive(input: {
   zip.file(ASSET_INDEX_FILE, JSON.stringify(assetRecords, null, 2));
   zip.file(LIBRARY_INDEX_FILE, JSON.stringify(libraryRecords, null, 2));
   zip.file(BOARD_INDEX_FILE, JSON.stringify(input.boards, null, 2));
+  zip.file(GENERATION_TASK_INDEX_FILE, JSON.stringify(generationTasks, null, 2));
+  zip.file(VOICE_PROFILE_INDEX_FILE, JSON.stringify(voiceProfiles, null, 2));
   if (input.includeSettings) zip.file(SETTINGS_FILE, JSON.stringify(settings, null, 2));
 
   const fileName = `${input.filePrefix}_${compactTimestamp(exportedAt)}.zip`;
@@ -833,9 +949,39 @@ async function createWorkspaceBackupArchive(input: {
     boardCount: input.boards.length,
     exportedAt,
     fileName,
+    generationTaskCount: generationTasks.length,
     libraryAssetCount: libraryRecords.length,
     settingsKeyCount: Object.keys(settings.localStorage).length,
+    voiceProfileCount: voiceProfiles.length,
   };
+}
+
+function selectGenerationTasksForBackup(
+  tasks: GenerationTask[],
+  assetIds: ReadonlySet<string>,
+  boardIds: ReadonlySet<string>,
+  includeAllWorkspaceData: boolean,
+): GenerationTask[] {
+  if (includeAllWorkspaceData) return tasks;
+  return tasks.filter(task => {
+    if (task.source.boardId && boardIds.has(task.source.boardId)) return true;
+    if (task.activeResultAssetId && assetIds.has(task.activeResultAssetId)) return true;
+    if (task.resultAssetIds.some(assetId => assetIds.has(assetId))) return true;
+    return generationRequestAssetIds(task.request).some(assetId => assetIds.has(assetId));
+  });
+}
+
+function selectVoiceProfilesForBackup(
+  profiles: VoiceProfile[],
+  assetIds: ReadonlySet<string>,
+  includeAllWorkspaceData: boolean,
+): VoiceProfile[] {
+  if (includeAllWorkspaceData) return profiles;
+  return profiles.filter(profile => {
+    if (profile.referenceAudioAssetIds.some(assetId => assetIds.has(assetId))) return true;
+    if (profile.sourceAssetIds?.some(assetId => assetIds.has(assetId))) return true;
+    return Boolean(profile.previewAudioAssetId && assetIds.has(profile.previewAudioAssetId));
+  });
 }
 
 function addAssetToZip(zip: JSZip, asset: StorageItem): WorkspaceBackupAssetRecord {
@@ -863,6 +1009,12 @@ async function parseWorkspaceBackup(file: File): Promise<ParsedBackup> {
     ? parseLibraryAssetRecords(await readRequiredZipText(zip, manifest.libraryFile))
     : [];
   const boards = parseBoardDocuments(await readRequiredZipText(zip, manifest.boardsFile));
+  const generationTasks = manifest.generationTasksFile
+    ? parseGenerationTasks(await readRequiredZipText(zip, manifest.generationTasksFile))
+    : [];
+  const voiceProfiles = manifest.voiceProfilesFile
+    ? parseVoiceProfiles(await readRequiredZipText(zip, manifest.voiceProfilesFile))
+    : [];
   const settings = manifest.settingsFile
     ? parseSettings(await readRequiredZipText(zip, manifest.settingsFile))
     : { localStorage: {} };
@@ -870,11 +1022,15 @@ async function parseWorkspaceBackup(file: File): Promise<ParsedBackup> {
 
   if (manifest.counts.assets !== assets.length) throw new Error("备份资产数量与 manifest 不一致");
   if (manifest.counts.boards !== boards.length) throw new Error("备份画板数量与 manifest 不一致");
+  if ((manifest.counts.generationTasks ?? 0) !== generationTasks.length) throw new Error("备份任务数量与 manifest 不一致");
   if ((manifest.counts.libraryAssets ?? 0) !== libraryRecords.length) throw new Error("备份素材库数量与 manifest 不一致");
+  if ((manifest.counts.voiceProfiles ?? 0) !== voiceProfiles.length) throw new Error("备份音色数量与 manifest 不一致");
   validateBoardAssetReferences(boards, new Set(assets.map(asset => asset.id)));
   validateLibraryAssetReferences(libraryRecords, new Set(assets.map(asset => asset.id)));
+  validateGenerationTaskAssetReferences(generationTasks, new Set(assets.map(asset => asset.id)));
+  validateVoiceProfileAssetReferences(voiceProfiles, new Set(assets.map(asset => asset.id)));
 
-  return { assets, boards, libraryAssets: libraryRecords, settings };
+  return { assets, boards, generationTasks, libraryAssets: libraryRecords, settings, voiceProfiles };
 }
 
 function validateZipFileCount(zip: JSZip): void {
@@ -920,12 +1076,16 @@ function parseManifest(text: string): WorkspaceBackupManifest {
     assetsFile: readLiteral(value, "assetsFile", ASSET_INDEX_FILE),
     libraryFile: readOptionalLiteral(value, "libraryFile", LIBRARY_INDEX_FILE),
     boardsFile: readLiteral(value, "boardsFile", BOARD_INDEX_FILE),
+    generationTasksFile: readOptionalLiteral(value, "generationTasksFile", GENERATION_TASK_INDEX_FILE),
+    voiceProfilesFile: readOptionalLiteral(value, "voiceProfilesFile", VOICE_PROFILE_INDEX_FILE),
     settingsFile: readOptionalLiteral(value, "settingsFile", SETTINGS_FILE),
     counts: {
       assets: readNumber(counts, "assets"),
       boards: readNumber(counts, "boards"),
+      generationTasks: readOptionalNumber(counts, "generationTasks"),
       libraryAssets: readOptionalNumber(counts, "libraryAssets"),
       settingsKeys: readNumber(counts, "settingsKeys"),
+      voiceProfiles: readOptionalNumber(counts, "voiceProfiles"),
     },
   };
 }
@@ -1006,6 +1166,85 @@ function parseLibraryAssetRecord(value: unknown, index: number): LibraryAssetRec
   };
 }
 
+function parseGenerationTasks(text: string): GenerationTask[] {
+  const value: unknown = JSON.parse(text);
+  if (!Array.isArray(value)) throw new Error("生成任务索引必须是数组");
+  const seenIds = new Set<string>();
+  return value.map((task, index) => {
+    const parsed = parseGenerationTask(task, index);
+    if (seenIds.has(parsed.id)) throw new Error(`生成任务 ID 重复：${parsed.id}`);
+    seenIds.add(parsed.id);
+    return parsed;
+  });
+}
+
+function parseGenerationTask(value: unknown, index: number): GenerationTask {
+  if (!isRecord(value)) throw new Error(`生成任务 ${index + 1} 格式无效`);
+  const progress = readNumber(value, "progress");
+  if (progress < 0 || progress > 100) throw new Error(`生成任务 ${index + 1} 进度无效`);
+  return {
+    id: readString(value, "id"),
+    mediaType: readAssetType(value, "mediaType"),
+    prompt: readString(value, "prompt"),
+    model: readString(value, "model"),
+    status: readGenerationTaskStatus(value, "status"),
+    progress,
+    createdAt: readDateString(value, "createdAt"),
+    updatedAt: readDateString(value, "updatedAt"),
+    source: parseGenerationTaskSource(value.source),
+    resultAssetIds: readOptionalStringArray(value, "resultAssetIds") ?? [],
+    activeResultAssetId: readOptionalString(value, "activeResultAssetId"),
+    operationName: readOptionalString(value, "operationName"),
+    errorMessage: readOptionalString(value, "errorMessage"),
+    request: parseGenerationRequest(value.request),
+    legacyAssetId: readOptionalString(value, "legacyAssetId"),
+    canCancelRemote: readBoolean(value, "canCancelRemote"),
+  };
+}
+
+function parseGenerationTaskSource(value: unknown): GenerationTaskSource {
+  if (!isRecord(value)) throw new Error("生成任务来源格式无效");
+  return {
+    surface: readGenerationTaskSourceSurface(value, "surface"),
+    boardId: readOptionalString(value, "boardId"),
+    boardNodeId: readOptionalString(value, "boardNodeId"),
+    resultStackKey: readOptionalString(value, "resultStackKey"),
+  };
+}
+
+function parseVoiceProfiles(text: string): VoiceProfile[] {
+  const value: unknown = JSON.parse(text);
+  if (!Array.isArray(value)) throw new Error("音色索引必须是数组");
+  const seenIds = new Set<string>();
+  return value.map((profile, index) => {
+    const parsed = parseVoiceProfile(profile, index);
+    if (seenIds.has(parsed.id)) throw new Error(`音色 ID 重复：${parsed.id}`);
+    seenIds.add(parsed.id);
+    return parsed;
+  });
+}
+
+function parseVoiceProfile(value: unknown, index: number): VoiceProfile {
+  if (!isRecord(value)) throw new Error(`音色 ${index + 1} 格式无效`);
+  const provider = readProvider(value, "provider");
+  return {
+    id: readString(value, "id"),
+    name: readString(value, "name"),
+    provider,
+    source: readVoiceProfileSource(value, "source"),
+    description: readOptionalString(value, "description"),
+    tags: readOptionalStringArray(value, "tags") ?? [],
+    providerVoiceId: readOptionalString(value, "providerVoiceId"),
+    designPrompt: readOptionalString(value, "designPrompt"),
+    referenceAudioAssetIds: readOptionalStringArray(value, "referenceAudioAssetIds") ?? [],
+    sourceAssetIds: readOptionalStringArray(value, "sourceAssetIds"),
+    consentAcceptedAt: readOptionalString(value, "consentAcceptedAt"),
+    previewAudioAssetId: readOptionalString(value, "previewAudioAssetId"),
+    createdAt: readDateString(value, "createdAt"),
+    updatedAt: readDateString(value, "updatedAt"),
+  };
+}
+
 function parseGenerationRequest(value: unknown): GenerationRequestSnapshot | undefined {
   if (value === undefined) return undefined;
   if (!isRecord(value)) throw new Error("generationRequest 格式无效");
@@ -1056,11 +1295,14 @@ function parseGenerationReferenceMedia(value: unknown): GenerationReferenceMedia
   if (!Array.isArray(value)) throw new Error("referenceMedia 格式无效");
   return value.map(item => {
     if (!isRecord(item)) throw new Error("referenceMedia 条目格式无效");
-    const url = readString(item, "url");
+    const sourceAssetId = readOptionalString(item, "sourceAssetId");
+    const url = readOptionalString(item, "url") ?? "";
+    if (!sourceAssetId && !url) throw new Error("referenceMedia.url 必须是非空字符串");
     const typeValue = item.type;
     const type = isMediaReferenceType(typeValue) ? typeValue : mediaReferenceTypeFromDataUri(url) ?? "image";
     const roleValue = item.role;
     return {
+      ...(sourceAssetId ? { sourceAssetId } : {}),
       url,
       type,
       ...(roleValue === "start" || roleValue === "end" || roleValue === "general" ? { role: roleValue } : {}),
@@ -1344,6 +1586,29 @@ function validateBoardAssetReferences(boards: BoardDocument[], assetIds: Readonl
 function validateLibraryAssetReferences(records: LibraryAssetRecord[], assetIds: ReadonlySet<string>): void {
   const missing = records.find(record => !assetIds.has(record.assetId));
   if (missing) throw new Error(`素材库 ${missing.title} 引用缺失资产 ${missing.assetId}`);
+}
+
+function validateGenerationTaskAssetReferences(tasks: GenerationTask[], assetIds: ReadonlySet<string>): void {
+  for (const task of tasks) {
+    if (task.activeResultAssetId && !assetIds.has(task.activeResultAssetId)) {
+      throw new Error(`生成任务 ${task.id} 引用缺失资产 ${task.activeResultAssetId}`);
+    }
+    const resultMissing = task.resultAssetIds.find(assetId => !assetIds.has(assetId));
+    if (resultMissing) throw new Error(`生成任务 ${task.id} 引用缺失资产 ${resultMissing}`);
+    const requestMissing = generationRequestAssetIds(task.request).find(assetId => !assetIds.has(assetId));
+    if (requestMissing) throw new Error(`生成任务 ${task.id} 引用缺失资产 ${requestMissing}`);
+  }
+}
+
+function validateVoiceProfileAssetReferences(profiles: VoiceProfile[], assetIds: ReadonlySet<string>): void {
+  for (const profile of profiles) {
+    const missing = [
+      ...profile.referenceAudioAssetIds,
+      ...(profile.sourceAssetIds ?? []),
+      ...(profile.previewAudioAssetId ? [profile.previewAudioAssetId] : []),
+    ].find(assetId => !assetIds.has(assetId));
+    if (missing) throw new Error(`音色 ${profile.name} 引用缺失资产 ${missing}`);
+  }
 }
 
 function parseSettings(text: string): WorkspaceBackupSettings {
@@ -1756,6 +2021,34 @@ function readAssetStatus(record: Record<string, unknown>, field: string): Storag
   const value = record[field];
   if (value !== "complete" && value !== "processing" && value !== "pending" && value !== "failed") {
     throw new Error(`${field} 状态无效`);
+  }
+  return value;
+}
+
+function readGenerationTaskStatus(record: Record<string, unknown>, field: string): GenerationTaskStatus {
+  const value = record[field];
+  if (value !== "pending" && value !== "processing" && value !== "complete" && value !== "failed" && value !== "canceled") {
+    throw new Error(`${field} 状态无效`);
+  }
+  return value;
+}
+
+function readGenerationTaskSourceSurface(record: Record<string, unknown>, field: string): GenerationTaskSource["surface"] {
+  const value = record[field];
+  if (value !== "workspace" && value !== "board" && value !== "agent") throw new Error(`${field} 来源无效`);
+  return value;
+}
+
+function readProvider(record: Record<string, unknown>, field: string): VoiceProfile["provider"] {
+  const value = readString(record, field);
+  if (!isKnownProvider(value)) throw new Error(`${field} 服务商无效`);
+  return value;
+}
+
+function readVoiceProfileSource(record: Record<string, unknown>, field: string): VoiceProfileSource {
+  const value = record[field];
+  if (value !== "builtin" && value !== "designed" && value !== "cloned" && value !== "imported") {
+    throw new Error(`${field} 来源无效`);
   }
   return value;
 }

@@ -1094,23 +1094,27 @@ function normalizeMultiGridItems(items: unknown[], gridSize: BoardMultiGridNode[
   return normalizeBoardMultiGridItems(normalizedItems, gridSize);
 }
 
-function referenceGroupItemFromAssetNode(assetNode: BoardNode & { kind: "asset" }): BoardReferenceGroupItem {
+function isMediaReferenceSourceNode(node: BoardNode | undefined): node is BoardNode & { kind: "asset" | "result" } {
+  return node?.kind === "asset" || node?.kind === "result";
+}
+
+function referenceGroupItemFromMediaNode(node: BoardNode & { kind: "asset" | "result" }): BoardReferenceGroupItem {
   return {
-    assetId: assetNode.asset.assetId,
-    model: assetNode.asset.model,
-    prompt: assetNode.asset.prompt,
+    assetId: node.asset.assetId,
+    model: node.asset.model,
+    prompt: node.asset.prompt,
     role: "general",
-    type: assetNode.asset.type,
-    url: assetNode.asset.url,
+    type: node.asset.type,
+    url: node.asset.url,
   };
 }
 
-function referenceGroupItemsFromAssetNodes(assetNodes: Array<BoardNode & { kind: "asset" }>): BoardReferenceGroupItem[] {
+function referenceGroupItemsFromMediaNodes(nodes: Array<BoardNode & { kind: "asset" | "result" }>): BoardReferenceGroupItem[] {
   const seenAssetIds = new Set<string>();
-  return assetNodes.flatMap(assetNode => {
-    if (seenAssetIds.has(assetNode.asset.assetId)) return [];
-    seenAssetIds.add(assetNode.asset.assetId);
-    return [referenceGroupItemFromAssetNode(assetNode)];
+  return nodes.flatMap(node => {
+    if (seenAssetIds.has(node.asset.assetId)) return [];
+    seenAssetIds.add(node.asset.assetId);
+    return [referenceGroupItemFromMediaNode(node)];
   });
 }
 
@@ -2034,10 +2038,10 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     mutateBoard(currentBoard => {
       const assetNodes = assetNodeIds.map(assetNodeId => {
         const assetNode = currentBoard.nodes.find(currentNode => currentNode.id === assetNodeId);
-        if (assetNode?.kind !== "asset") throw new Error("参考组只支持媒体资产");
+        if (!isMediaReferenceSourceNode(assetNode)) throw new Error("参考组只支持媒体资产");
         return assetNode;
       });
-      const references = referenceGroupItemsFromAssetNodes(assetNodes);
+      const references = referenceGroupItemsFromMediaNodes(assetNodes);
       const nextNode: BoardReferenceGroupNode = { ...node, references: [...references, ...node.references] };
       const nextNodes = [...currentBoard.nodes, nextNode];
       const nextEdges = assetNodes.reduce((edges, assetNode, index) => {
@@ -2261,7 +2265,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
                 return remainingEdges.some(edge => {
                   if (edge.to.nodeId !== node.id || edge.to.portId !== "asset-in") return false;
                   const sourceNode = remainingNodes.find(item => item.id === edge.from.nodeId);
-                  return sourceNode?.kind === "asset" && sourceNode.asset.assetId === reference.assetId;
+                  return isMediaReferenceSourceNode(sourceNode) && sourceNode.asset.assetId === reference.assetId;
                 });
               }),
               updatedAt,
@@ -2279,7 +2283,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       if (!edge) return currentBoard;
       const targetNode = currentBoard.nodes.find(node => node.id === edge.to.nodeId);
       const sourceNode = currentBoard.nodes.find(node => node.id === edge.from.nodeId);
-      if (targetNode?.kind === "reference-group" && sourceNode?.kind === "asset") {
+      if (targetNode?.kind === "reference-group" && isMediaReferenceSourceNode(sourceNode)) {
         const updatedAt = nowIso();
         const nextBoard = removeReferenceGroupAsset(
           currentBoard.nodes,
@@ -2317,11 +2321,11 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       );
       const oldSourceNode = currentBoard.nodes.find(node => node.id === oldEdge.from.nodeId);
       const nextSourceNode = compatibleNodes.find(node => node.id === from.nodeId);
-      const oldReference: BoardReferenceGroupItem | null = oldSourceNode?.kind === "asset"
-        ? referenceGroupItemFromAssetNode(oldSourceNode)
+      const oldReference: BoardReferenceGroupItem | null = isMediaReferenceSourceNode(oldSourceNode)
+        ? referenceGroupItemFromMediaNode(oldSourceNode)
         : null;
-      const nextReference: BoardReferenceGroupItem | null = nextSourceNode?.kind === "asset"
-        ? referenceGroupItemFromAssetNode(nextSourceNode)
+      const nextReference: BoardReferenceGroupItem | null = isMediaReferenceSourceNode(nextSourceNode)
+        ? referenceGroupItemFromMediaNode(nextSourceNode)
         : null;
       if (!oldReference && !nextReference) return touchBoard(currentBoard, compatibleNodes, nextEdges);
 
@@ -2441,8 +2445,8 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
         didChange = true;
 
         const sourceNode = nextNodes.find(node => node.id === connection.from.nodeId);
-        if (sourceNode?.kind === "asset" && connection.to.portId === BOARD_PORT_IDS.assetIn) {
-          const reference = referenceGroupItemFromAssetNode(sourceNode);
+        if (isMediaReferenceSourceNode(sourceNode) && connection.to.portId === BOARD_PORT_IDS.assetIn) {
+          const reference = referenceGroupItemFromMediaNode(sourceNode);
           nextNodes = nextNodes.map(node =>
             node.id === connection.to.nodeId && node.kind === "reference-group"
               ? appendReferenceGroupItem(node, reference, updatedAt)
@@ -2461,10 +2465,10 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     const updatedAt = nowIso();
     mutateBoard(currentBoard => {
       const assetNode = currentBoard.nodes.find(node => node.id === assetNodeId);
-      if (assetNode?.kind !== "asset") {
+      if (!isMediaReferenceSourceNode(assetNode)) {
         throw new Error("参考组只支持媒体资产");
       }
-      const reference = referenceGroupItemFromAssetNode(assetNode);
+      const reference = referenceGroupItemFromMediaNode(assetNode);
       return touchBoard(
         currentBoard,
         currentBoard.nodes.map(node => {

@@ -153,7 +153,7 @@ async function readVoiceProfileReferences(assetIds: string[], t: TFunction): Pro
     if (!item || item.type !== "audio" || !item.url) {
       throw new Error(t("common.notices.voiceProfileAudioMissing"));
     }
-    return { id: item.id, type: "audio", url: item.url };
+    return { id: item.id, sourceAssetId: item.id, type: "audio", url: item.url };
   });
 }
 
@@ -175,7 +175,7 @@ async function resolveOriginalReference(reference: ReferenceImageRef, t: TFuncti
   if (!originalUrl.trim()) {
     throw new Error(t("common.notices.referenceMediaOriginalNotFound"));
   }
-  return { ...reference, url: originalUrl };
+  return { ...reference, sourceAssetId: meta.id, url: originalUrl };
 }
 
 async function resolveOriginalReferences(references: ReferenceImageRef[], t: TFunction): Promise<ReferenceImageRef[]> {
@@ -323,8 +323,10 @@ function buildReferenceMediaSnapshot(
 ): GenerationReferenceMediaSnapshot[] {
   return payloads.map((url, index) => {
     const reference = references[index];
+    const sourceAssetId = reference?.sourceAssetId?.trim();
     return {
-      url,
+      ...(sourceAssetId ? { sourceAssetId } : {}),
+      url: sourceAssetId ? "" : url,
       type: reference ? getMediaReferenceType(reference) : "image",
       ...(reference?.role ? { role: reference.role } : {}),
     };
@@ -333,7 +335,8 @@ function buildReferenceMediaSnapshot(
 
 function taskRequestReferences(request: GenerationRequestSnapshot): ReferenceImageRef[] {
   return getGenerationReferenceMedia(request).map((reference, index) => ({
-    id: `retry_reference_${index + 1}`,
+    id: reference.sourceAssetId ?? `retry_reference_${index + 1}`,
+    ...(reference.sourceAssetId ? { sourceAssetId: reference.sourceAssetId } : {}),
     type: reference.type,
     url: reference.url,
     ...(reference.role ? { role: reference.role } : {}),
@@ -536,9 +539,10 @@ export function useGenerationActions({
         signal: controller.signal,
         body: JSON.stringify({
           ...generationRequest,
-          referenceMedia: generationRequest.referenceMedia?.map(reference => ({
-            dataUri: reference.url,
-            type: reference.type,
+          referenceMedia: activeReferenceImages.map((reference, index) => ({
+            dataUri: imageReferencePayloads[index] ?? "",
+            type: getMediaReferenceType(reference),
+            ...(reference.role ? { role: reference.role } : {}),
           })),
           referenceImages: imageReferencePayloads,
           referenceImage: imageReferencePayloads[0],
@@ -733,6 +737,11 @@ export function useGenerationActions({
         signal: controller.signal,
         body: JSON.stringify({
           prompt: generationRequest.prompt,
+          referenceMedia: videoReferences.map((reference, index) => ({
+            dataUri: videoReferencePayloads[index] ?? "",
+            type: getMediaReferenceType(reference),
+            ...(reference.role ? { role: reference.role } : {}),
+          })),
           images: videoReferencePayloads,
           aspectRatio: generationRequest.aspectRatio,
           durationSeconds: generationRequest.videoDurationSeconds,
@@ -920,9 +929,10 @@ export function useGenerationActions({
           voice: profileVoice,
           voiceCloneConsentAccepted: overrides.voiceCloneConsentAccepted,
           optimizeTextPreview: overrides.optimizeTextPreview,
-          referenceMedia: generationRequest.referenceMedia?.map(reference => ({
-            dataUri: reference.url,
-            type: reference.type,
+          referenceMedia: audioReferences.map((reference, index) => ({
+            dataUri: audioReferencePayloads[index] ?? "",
+            type: getMediaReferenceType(reference),
+            ...(reference.role ? { role: reference.role } : {}),
           })),
           runningHubAccessPassword: generationRequest.runningHubAccessPassword,
           runningHubNodeInfoList: generationRequest.runningHubNodeInfoList,

@@ -5,6 +5,7 @@ export type MediaReferenceRole = "start" | "end" | "general";
 
 export interface MediaReference {
   id: string;
+  sourceAssetId?: string;
   url: string;
   role?: MediaReferenceRole;
   type?: MediaReferenceType;

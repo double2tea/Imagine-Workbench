@@ -798,7 +798,7 @@ function generateInputSummaryForNode(
     .filter(edge => edge.to.portId === BOARD_PORT_IDS.referenceIn)
     .flatMap(edge => {
       const sourceNode = index.nodeById.get(edge.from.nodeId);
-      if (sourceNode?.kind === "asset") {
+      if (isBoardMediaSourceNode(sourceNode)) {
         return [{
           id: sourceNode.asset.assetId,
           role: "general" as const,
@@ -938,6 +938,10 @@ function batchConnectionToTarget(
   return isValidBoardPortConnection(nodes, connection.from, connection.to) ? connection : null;
 }
 
+function isBoardMediaSourceNode(node: BoardNodeModel | undefined): node is BoardNodeModel & { kind: "asset" | "result" } {
+  return node?.kind === "asset" || node?.kind === "result";
+}
+
 function multiGridImageReferences(
   nodes: BoardNodeModel[],
   from: BoardPortRef,
@@ -950,20 +954,20 @@ function multiGridImageReferences(
   const seenAssetIds = new Set<string>();
   return nodeIds.flatMap(nodeId => {
     const node = nodes.find(item => item.id === nodeId);
-    if ((node?.kind !== "asset" && node?.kind !== "result") || node.asset.type !== "image") return [];
+    if (!isBoardMediaSourceNode(node) || node.asset.type !== "image") return [];
     if (seenAssetIds.has(node.asset.assetId)) return [];
     seenAssetIds.add(node.asset.assetId);
     return [node.asset];
   });
 }
 
-function referenceGroupAssetNodeIds(
+function referenceGroupMediaNodeIds(
   nodes: BoardNodeModel[],
   sourceNodeId: string,
   selectedNodeIds: string[],
 ): string[] {
   const sourceNode = nodes.find(node => node.id === sourceNodeId);
-  if (sourceNode?.kind !== "asset" || sourceNode.asset.type !== "image") return [];
+  if (!isBoardMediaSourceNode(sourceNode)) return [];
   const nodeIds = selectedNodeIds.length > 1 && selectedNodeIds.includes(sourceNodeId)
     ? selectedNodeIds
     : [sourceNodeId];
@@ -972,17 +976,17 @@ function referenceGroupAssetNodeIds(
     if (seenNodeIds.has(nodeId)) return false;
     seenNodeIds.add(nodeId);
     const node = nodes.find(item => item.id === nodeId);
-    return node?.kind === "asset" && node.asset.type === "image";
+    return isBoardMediaSourceNode(node);
   });
 }
 
-function selectedReferenceGroupAssetNodeIds(
+function selectedReferenceGroupMediaNodeIds(
   nodes: BoardNodeModel[],
   contextNodeId: string,
   selectedNodeIds: string[],
 ): string[] {
   const nodeIds = selectedNodeIds.includes(contextNodeId) ? selectedNodeIds : [contextNodeId];
-  return referenceGroupAssetNodeIds(nodes, contextNodeId, nodeIds);
+  return referenceGroupMediaNodeIds(nodes, contextNodeId, nodeIds);
 }
 
 function quickInsertSourceRefs(
@@ -2323,7 +2327,7 @@ export default function BoardWorkspace({
       return;
     }
     if (kind === "reference-group") {
-      const assetNodeIds = referenceGroupAssetNodeIds(board.nodes, from.nodeId, selectionSnapshot);
+      const assetNodeIds = referenceGroupMediaNodeIds(board.nodes, from.nodeId, selectionSnapshot);
       if (assetNodeIds.length === 0) return;
       addReferenceGroupNodeWithAssets({ position: centeredNodePosition(point, DEFAULT_REFERENCE_GROUP_NODE_SIZE) }, assetNodeIds);
       setQuickInsertMenu(null);
@@ -2356,7 +2360,7 @@ export default function BoardWorkspace({
       return BOARD_INSERT_CATALOG.filter(item => item.kind === "image-generate" || item.kind === "video-generate" || item.kind === "audio-operation" || item.kind === "runninghub-app");
     }
     if (from.portKind !== "asset") return [];
-    if (sourceNode?.kind === "asset") {
+    if (isBoardMediaSourceNode(sourceNode)) {
       return BOARD_INSERT_CATALOG.filter(item =>
         item.kind === "image-generate" ||
         item.kind === "video-generate" ||
@@ -2365,9 +2369,6 @@ export default function BoardWorkspace({
         (sourceNode.asset.type === "image" && item.kind === "multi-grid") ||
         item.kind === "runninghub-app",
       );
-    }
-    if (sourceNode?.kind === "result") {
-      return BOARD_INSERT_CATALOG.filter(item => sourceNode.asset.type === "image" && item.kind === "multi-grid");
     }
     if (sourceNode?.kind === "reference-group") {
       return BOARD_INSERT_CATALOG.filter(item => item.kind === "image-generate" || item.kind === "video-generate" || item.kind === "audio-operation" || item.kind === "runninghub-app");
@@ -2414,7 +2415,7 @@ export default function BoardWorkspace({
   const createReferenceGroupFromSelected = useCallback((contextNodeId: string): void => {
     const contextNode = board.nodes.find(node => node.id === contextNodeId);
     if (!contextNode) return;
-    const assetNodeIds = selectedReferenceGroupAssetNodeIds(board.nodes, contextNodeId, selectedNodeIds);
+    const assetNodeIds = selectedReferenceGroupMediaNodeIds(board.nodes, contextNodeId, selectedNodeIds);
     if (assetNodeIds.length === 0) {
       onConnectionError(tb("workspace.selectImageAssetNodes"));
       return;
@@ -2695,7 +2696,7 @@ export default function BoardWorkspace({
     }
     if (sourceKind === "asset") {
       const sourceNode = board.nodes.find(node => node.id === sourceNodeId);
-      if (sourceNode?.kind === "asset") {
+      if (isBoardMediaSourceNode(sourceNode)) {
         if (sourceHandleId === "asset-out") {
           setQuickInsertMenu({
             clientX: clientPoint.x,
@@ -2705,18 +2706,6 @@ export default function BoardWorkspace({
             selectedNodeIds,
           });
           return;
-        }
-        return;
-      }
-      if (sourceNode?.kind === "result") {
-        if (sourceNode.asset.type === "image" && sourceHandleId === "asset-out") {
-          setQuickInsertMenu({
-            clientX: clientPoint.x,
-            clientY: clientPoint.y,
-            connectionFrom: { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "asset" },
-            position: flowPoint,
-            selectedNodeIds,
-          });
         }
         return;
       }
@@ -3280,7 +3269,7 @@ export default function BoardWorkspace({
               onUngroup: node.kind === "group"
                 ? () => ungroupSelectedNode(node.id)
                 : undefined,
-              onCreateReferenceGroup: node.kind === "asset" && node.asset.type === "image"
+              onCreateReferenceGroup: isBoardMediaSourceNode(node)
                 ? () => createReferenceGroupFromSelected(node.id)
                 : undefined,
               onCompare: compareReference && node.kind === "asset"

@@ -12,6 +12,7 @@ import type { AgentBoardContext, AgentSurface } from "@/lib/agent-context";
 import type { CreationMode } from "@/components/creation/CreationModeTabs";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import type { StorageItem } from "@/lib/db";
+import { resolveAssetOriginalUrl } from "@/lib/assets/resolve-url";
 import { getSendableAgentMediaReferences } from "@/lib/agent-chat-model";
 import type { AudioOperationMode } from "@/lib/providers/model-catalog";
 
@@ -118,6 +119,25 @@ function canAutoExecuteAgentAction(action: AgentToolAction): boolean {
 
 function makeClientId(prefix: string): string {
   return `${prefix}_${Date.now()}`;
+}
+
+async function resolveAgentReferenceOriginals(
+  references: ReferenceImageRef[],
+  items: StorageItem[],
+): Promise<ReferenceImageRef[]> {
+  return Promise.all(references.map(async reference => {
+    const item = items.find(entry => entry.id === reference.id);
+    if (!item || item.type === "transcript") return reference;
+    const originalUrl = await resolveAssetOriginalUrl(item);
+    if (!originalUrl.trim()) {
+      throw new Error(t("common.notices.referenceMediaOriginalNotFound"));
+    }
+    return {
+      ...reference,
+      type: reference.type ?? item.type,
+      url: originalUrl,
+    };
+  }));
 }
 
 function buildWelcomeMessage(): ChatMessage {
@@ -418,10 +438,11 @@ export function useAgentController({
           : agentReferenceId && agentReferenceUrl
             ? [{ id: agentReferenceId, url: agentReferenceUrl }]
             : []);
+      const originalAgentReferences = await resolveAgentReferenceOriginals(activeAgentReferences, items);
       const sendableAgentReferences = getSendableAgentMediaReferences(
-        activeAgentReferences,
+        originalAgentReferences,
         agentReferenceId,
-        agentReferenceUrl,
+        originalAgentReferences[0]?.url ?? agentReferenceUrl,
       );
       const headers = buildProviderHeaders(selectedChatModel);
 
