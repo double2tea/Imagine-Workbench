@@ -658,7 +658,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
 
   const dockShellClass = isIdleOrb
     ? "imagine-agent-dock imagine-agent-dock-idle-orb imagine-theme-dark pointer-events-none fixed bottom-12 right-4 z-40 flex h-[108px] w-[108px] sm:bottom-16 sm:right-10"
-    : "imagine-agent-dock imagine-agent-dock-panel imagine-theme-dark pointer-events-auto fixed inset-x-4 bottom-12 z-50 mx-auto w-[calc(100vw-32px)] max-w-5xl rounded-lg p-3 sm:bottom-16 sm:w-[min(1040px,calc(100vw-40px))]";
+    : "imagine-agent-dock imagine-agent-dock-panel imagine-theme-dark pointer-events-auto fixed inset-x-4 bottom-12 z-50 mx-auto w-[calc(100vw-32px)] max-w-5xl rounded-2xl p-3 sm:bottom-16 sm:w-[min(1040px,calc(100vw-40px))]";
   const dockStateClass = [
     isIdleOrb && isOrbDragging ? "is-dragging" : "",
   ].filter(Boolean).join(" ");
@@ -936,7 +936,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
             {atDropdownNode}
             <form onSubmit={submit} className="relative flex items-center w-full">
               <label
-                className="imagine-agent-attach-btn absolute left-2 flex h-7 w-7 cursor-pointer items-center justify-center rounded-md"
+                className="imagine-agent-attach-btn absolute left-2.5 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full"
                 title={t("chat.uploadReferenceTitle")}
               >
                 <ImagePlus className="h-3.5 w-3.5" />
@@ -954,14 +954,14 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
                 value={input}
                 onChange={(event) => onChangeInput(event.target.value)}
                 placeholder={t("chat.inputPlaceholder")}
-                className="imagine-agent-input w-full py-2.5 pl-12 pr-11 text-xs text-[var(--iw-text)] placeholder:text-[var(--iw-faint)]"
+                className="imagine-agent-input w-full py-2.5 pl-11 pr-12 text-xs rounded-full text-[var(--iw-text)] placeholder:text-[var(--iw-faint)]"
               />
               <button
                 type="submit"
                 disabled={isLoading || !input.trim()}
                 data-tone="accent"
                 data-size="compact"
-                className={`imagine-primary-action absolute right-2 flex items-center justify-center rounded-lg px-3 py-1.5 font-bold text-white transition ${
+                className={`imagine-primary-action absolute right-2 flex items-center justify-center rounded-full h-7 w-7 font-bold text-white transition ${
                   isLoading || !input.trim() ? "cursor-not-allowed" : "cursor-pointer active:scale-95"
                 }`}
               >

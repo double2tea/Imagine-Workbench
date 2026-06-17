@@ -36,12 +36,12 @@
 
 html,
 .imagine-workbench-shell {
-  --iw-bg: #07080b;
-  --iw-header: rgba(7, 8, 11, 0.86);
-  --iw-panel: rgba(14, 18, 27, 0.94);
-  --iw-panel-solid: #0e121b;
-  --iw-panel-soft: rgba(15, 23, 42, 0.7);
-  --iw-border: rgba(148, 163, 184, 0.14);
+  --iw-bg: #07090e;
+  --iw-header: rgba(7, 9, 14, 0.88);
+  --iw-panel: rgba(12, 16, 26, 0.88);
+  --iw-panel-solid: #0c101a;
+  --iw-panel-soft: rgba(15, 23, 42, 0.5);
+  --iw-border: rgba(148, 163, 184, 0.12);
   --iw-text: #e5e7eb;
   --iw-muted: #94a3b8;
   --iw-faint: #64748b;
@@ -320,10 +320,11 @@ html::-webkit-scrollbar-thumb:hover {
 
 .imagine-board-node {
   background: var(--iw-board-node-bg);
-  border: 1px solid var(--iw-board-border);
+  border: 1.5px solid var(--iw-board-border);
   box-shadow: var(--iw-card-shadow);
-  border-radius: 8px;
+  border-radius: 12px;
   overflow: hidden;
+  transition: border-color var(--iw-motion-base) var(--iw-motion-ease), box-shadow var(--iw-motion-base) var(--iw-motion-ease);
 }
 
 .imagine-board-node-header {
@@ -338,7 +339,7 @@ html::-webkit-scrollbar-thumb:hover {
 .imagine-board-node-selected,
 .imagine-board-node[data-selected="true"] {
   border-color: var(--iw-board-accent-amber);
-  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25), var(--iw-card-shadow);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.22), var(--iw-card-shadow);
 }
 
 .board-group-node-shell {
@@ -3730,11 +3731,21 @@ html[data-imagine-theme="light"] .imagine-root-body {
 .imagine-header-button {
   border-radius: 10px !important;
   min-height: 38px;
+  transition: border-color 160ms var(--iw-ease-out), background-color 160ms var(--iw-ease-out), color 160ms var(--iw-ease-out), transform 120ms var(--iw-ease-out);
+}
+
+.imagine-header-button:active {
+  transform: scale(0.96);
 }
 
 .imagine-icon-button {
   min-width: 38px;
   padding-inline: 0 !important;
+  transition: border-color 160ms var(--iw-ease-out), background-color 160ms var(--iw-ease-out), color 160ms var(--iw-ease-out), transform 120ms var(--iw-ease-out);
+}
+
+.imagine-icon-button:active {
+  transform: scale(0.96);
 }
 
 /* Centralized adaptive hovers for imagine-* primitives + data- attrs (U-PR1 design CSS Note + KD6).
@@ -3744,9 +3755,10 @@ html[data-imagine-theme="light"] .imagine-root-body {
    Allows listed files to drop per-JSX hover:hex and rely on data- (shortest, central). */
 .imagine-header-button:hover,
 .imagine-icon-button:hover {
-  border-color: var(--iw-border);
-  background: var(--iw-panel);
+  border-color: var(--iw-accent);
+  background: var(--iw-panel-soft);
   color: var(--iw-text);
+  transform: translateY(-1px);
 }
 .imagine-theme-light .imagine-header-button:hover,
 .imagine-theme-light .imagine-icon-button:hover {
@@ -4927,13 +4939,14 @@ html[data-imagine-theme="light"] .imagine-required-chip,
 .imagine-select {
   width: 100%;
   min-height: var(--iw-control-h);
-  border: 1px solid var(--iw-border);
+  border: 1.5px solid var(--iw-border);
   border-radius: var(--iw-radius-md);
   background: color-mix(in srgb, var(--iw-bg) 32%, var(--iw-panel));
   padding: 0 12px;
   font-size: 12px;
   color: var(--iw-text);
-  transition: border-color 160ms var(--iw-ease-out);
+  box-shadow: inset 0 1.5px 3px rgba(0, 0, 0, 0.2);
+  transition: border-color 160ms var(--iw-ease-out), box-shadow 160ms var(--iw-ease-out);
 }
 
 .imagine-select {
@@ -4952,7 +4965,8 @@ html[data-imagine-theme="light"] .imagine-required-chip,
 .imagine-input:focus,
 .imagine-select:focus {
   outline: none;
-  border-color: color-mix(in srgb, var(--iw-accent) 40%, var(--iw-border));
+  border-color: var(--iw-accent) !important;
+  box-shadow: 0 0 0 3px var(--iw-accent-soft), inset 0 1.5px 3px rgba(0, 0, 0, 0.2);
 }
 
 .imagine-input:disabled,
@@ -5400,7 +5414,7 @@ html[data-imagine-theme="light"] .imagine-required-chip,
 .imagine-asset-card {
   content-visibility: auto;
   contain-intrinsic-size: 390px;
-  border-radius: 10px !important;
+  border-radius: 12px !important;
   min-width: 0;
 }
 
@@ -5522,6 +5536,8 @@ html[data-imagine-theme="light"] .imagine-required-chip,
 }
 
 .imagine-card-actions-shell {
+  opacity: 0;
+  pointer-events: none;
   transform: translateY(3px) scale(0.99);
   transition:
     opacity var(--iw-motion-surface) var(--iw-motion-ease),
@@ -5573,18 +5589,18 @@ html[data-imagine-theme="light"] .imagine-required-chip,
 }
 
 .imagine-asset-controlbar .imagine-card-actions-shell {
-  opacity: 1 !important;
   overflow-x: auto;
   overflow-y: visible;
   overscroll-behavior-inline: contain;
-  pointer-events: auto !important;
   scrollbar-width: none;
-  transform: none !important;
 }
 
 .imagine-asset-controlbar .imagine-card-actions-shell:focus-within,
 .imagine-asset-controlbar .imagine-card-actions-shell[data-popover-open="true"] {
+  opacity: 1 !important;
   overflow: visible;
+  pointer-events: auto !important;
+  transform: translateY(0) scale(1);
   z-index: 2;
 }
 
@@ -5594,6 +5610,20 @@ html[data-imagine-theme="light"] .imagine-required-chip,
 
 .imagine-asset-quick-edit-anchor {
   z-index: 3;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(3px) scale(0.99);
+  transition:
+    opacity var(--iw-motion-surface) var(--iw-motion-ease),
+    transform var(--iw-motion-surface) var(--iw-motion-ease);
+}
+
+.imagine-asset-card:hover .imagine-asset-quick-edit-anchor,
+.imagine-asset-quick-edit-anchor:focus-within,
+.imagine-asset-card[data-selected="true"] .imagine-asset-quick-edit-anchor {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
 }
 
 .imagine-asset-quick-edit-anchor .imagine-card-action {
@@ -5606,7 +5636,7 @@ html[data-imagine-theme="light"] .imagine-required-chip,
   flex: 0 0 auto;
 }
 
-.imagine-asset-card .imagine-card-actions.imagine-floating-card-actions .imagine-card-action span {
+.imagine-asset-card .imagine-card-actions.imagine-floating-card-actions .imagine-card-action > span:not(.imagine-mark) {
   display: none;
 }
 
@@ -6074,11 +6104,14 @@ html[data-imagine-theme="light"] .imagine-gallery-scroll .imagine-asset-controlb
 
 .imagine-agent-dock-panel {
   transform-origin: calc(100% - 36px) 100%;
-  background: rgba(9, 13, 22, 0.99) !important;
-  border-color: rgba(148, 163, 184, 0.2) !important;
+  background: rgba(9, 13, 22, 0.76) !important;
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border-color: rgba(148, 163, 184, 0.22) !important;
+  border-radius: 16px !important;
   box-shadow:
     0 24px 64px rgba(0, 0, 0, 0.52),
-    0 0 0 1px rgba(255, 255, 255, 0.04) inset !important;
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset !important;
   opacity: 1 !important;
 }
 
@@ -6087,9 +6120,11 @@ html[data-imagine-theme="light"] .imagine-gallery-scroll .imagine-asset-controlb
 }
 
 .imagine-agent-dock-panel.imagine-theme-light {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96)) !important;
+  background: rgba(255, 255, 255, 0.82) !important;
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
   border-color: rgba(15, 23, 42, 0.16) !important;
+  border-radius: 16px !important;
   box-shadow:
     0 24px 64px rgba(15, 23, 42, 0.18),
     0 0 0 1px rgba(255, 255, 255, 0.86) inset !important;

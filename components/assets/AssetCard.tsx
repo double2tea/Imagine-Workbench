@@ -378,7 +378,7 @@ export default function AssetCard({
       onPointerLeave={clearLongPressTimer}
       onPointerMove={handleCardPointerMove}
       onPointerUp={clearLongPressTimer}
-      className={`imagine-asset-card relative flex h-full flex-col overflow-hidden rounded-[10px] group border bg-slate-900 shadow-xl transition-all duration-300 ${
+      className={`imagine-asset-card relative flex h-full flex-col overflow-hidden rounded-xl group border bg-slate-900 shadow-xl transition-all duration-300 ${
         selected ? "border-blue-500 ring-2 ring-blue-500/20" : "border-slate-850 hover:border-slate-750"
       }`}
     >
@@ -632,9 +632,9 @@ export default function AssetCard({
         )}
       </div>
 
-      <div className="imagine-asset-meta flex min-h-[88px] flex-col gap-1.5 bg-[#0e0e12] p-2">
+      <div className="imagine-asset-meta flex min-h-[88px] flex-col gap-1 bg-[var(--iw-panel-solid)] p-2">
         <div className="flex items-center gap-2">
-          <p className="min-w-0 flex-1 truncate font-sans text-[11px] font-medium text-slate-300" title={item.prompt}>
+          <p className="min-w-0 flex-1 truncate font-sans text-[11px] font-medium text-[var(--iw-text)] opacity-90" title={item.prompt}>
             {item.prompt}
           </p>
           {referenceMedia.length > 0 && (
