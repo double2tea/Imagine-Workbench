@@ -246,7 +246,8 @@ function modelProviderIsAvailable(
 }
 
 export default function Home() {
-  const { t } = useTranslations();
+  const { t, locale } = useTranslations();
+  const { t: creationT } = useTranslations("creation");
   const isDesktopLayout = useDesktopLayout();
   const isMobileLayout = isDesktopLayout === false;
 
@@ -1153,12 +1154,12 @@ export default function Home() {
     model: string,
     editPrompt: string,
   ): Promise<StorageItem | null> => {
-    const label = imageEditFeatureLabel(operation);
+    const label = imageEditFeatureLabel(operation, creationT);
     const item = buildStorageItem({
       id: makeClientId("img_edit"),
       type: "image",
       url: previewUrl,
-      prompt: editPrompt || imageQuickEditFallbackPrompt(operation, sourceItem.prompt || sourceItem.id),
+      prompt: editPrompt || imageQuickEditFallbackPrompt(operation, sourceItem.prompt || sourceItem.id, creationT),
       model,
       aspectRatio: "auto",
       createdAt: new Date().toISOString(),
@@ -1184,7 +1185,7 @@ export default function Home() {
     operation: ImageEditFeature,
     imageUrl: string,
   ) => {
-    const label = imageEditFeatureLabel(operation);
+    const label = imageEditFeatureLabel(operation, creationT);
     const nextItem = buildStorageItem({
       ...item,
       url: imageUrl,
@@ -1282,7 +1283,7 @@ export default function Home() {
         clearLocallyCanceledQuickEdit(pendingTaskIds, locallyCanceledItemIdsRef.current);
         return;
       }
-      const message = toErrorMessage(error, t("common.notices.imageQuickEditFailed", { label: imageEditFeatureLabel(operation) }));
+      const message = toErrorMessage(error, t("common.notices.imageQuickEditFailed", { label: imageEditFeatureLabel(operation, creationT) }));
       try {
         await failImageQuickEditAsset(pending, message);
       } catch (storageError) {
@@ -1316,7 +1317,7 @@ export default function Home() {
         return;
       }
       launchMaskEditor(originalItem.url, originalItem.id, "creative", operation, originalItem);
-    }, t("common.notices.imageQuickEditOriginalReadFailed", { label: imageEditFeatureLabel(operation) }));
+    }, t("common.notices.imageQuickEditOriginalReadFailed", { label: imageEditFeatureLabel(operation, creationT) }));
   };
 
   // Launch mask editor layout dialog
@@ -2068,6 +2069,7 @@ export default function Home() {
       />
 
       <SettingsModal
+        key={`settings-${locale}`}
         audioModelGroups={audioModelGroups}
         chatModelGroups={chatModelGroups}
         fetchedModelOptions={fetchedModelOptions}

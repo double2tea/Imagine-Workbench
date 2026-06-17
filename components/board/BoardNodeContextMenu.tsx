@@ -97,7 +97,7 @@ export function buildBoardNodeContextMenuActions(input: {
   }
   if (input.node.kind === "asset" && input.node.asset.type === "image") {
     if (input.onCompare) actions.push({ id: "compare", label: t('contextMenu.compare'), onSelect: input.onCompare });
-    if (input.onEditImage) actions.push({ id: "edit", label: WORKBENCH_OPERATION_META.localEdit.label, onSelect: input.onEditImage });
+    if (input.onEditImage) actions.push({ id: "edit", label: t("quickEdit.localEdit"), onSelect: input.onEditImage });
   }
   if (input.node.kind === "asset") {
     if (input.node.asset.type === "audio" && input.onSaveVoiceProfile) {

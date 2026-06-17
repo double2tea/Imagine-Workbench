@@ -46,8 +46,8 @@ export function imageEditFeatureMeta(feature: ImageEditFeature, t?: TFunction): 
   if (t) {
     return {
       ...meta,
-      label: t(`creation.imageEdit.features.${feature}.label`) || meta.label,
-      description: t(`creation.imageEdit.features.${feature}.description`) || meta.description,
+      label: t(`imageEdit.features.${feature}.label`) || meta.label,
+      description: t(`imageEdit.features.${feature}.description`) || meta.description,
     };
   }
   return meta;
@@ -57,13 +57,21 @@ export function imageEditFeatureLabel(feature: ImageEditFeature, t?: TFunction):
   return imageEditFeatureMeta(feature, t).label;
 }
 
-export function imageQuickEditFallbackPrompt(feature: ImageEditFeature, sourcePromptOrId: string): string {
-  return `${imageEditFeatureLabel(feature)}：${sourcePromptOrId}`;
+export function imageQuickEditFallbackPrompt(
+  feature: ImageEditFeature,
+  sourcePromptOrId: string,
+  t?: TFunction,
+): string {
+  return `${imageEditFeatureLabel(feature, t)}：${sourcePromptOrId}`;
 }
 
-export function imageQuickEditProcessingTitleFromPrompt(prompt: string): string | null {
-  const feature = IMAGE_EDIT_FEATURES.find(item => prompt.startsWith(`${item.label}：`));
-  return feature ? `${feature.label}处理中` : null;
+export function imageQuickEditProcessingTitleFromPrompt(prompt: string, t?: TFunction): string | null {
+  const feature =
+    IMAGE_EDIT_FEATURES.find(item => prompt.startsWith(`${item.label}：`)) ??
+    (t ? IMAGE_EDIT_FEATURES.find(item => prompt.startsWith(`${imageEditFeatureLabel(item.key, t)}：`)) : undefined);
+  if (!feature) return null;
+  const label = imageEditFeatureLabel(feature.key, t);
+  return t ? t("imageEdit.processingTitle", { label }) : `${label}处理中`;
 }
 
 const NANO_BANANA_PRO_MODEL = "12ai:gemini-3-pro-image-preview";
@@ -93,6 +101,14 @@ const DEDICATED_TARGETS: readonly ImageQuickEditTarget[] = [
   },
 ];
 
+function resolveDedicatedTargetLabel(target: ImageQuickEditTarget, t?: TFunction): ImageQuickEditTarget {
+  if (target.id !== RUNNINGHUB_CUTOUT_TARGET_ID || !t) return target;
+  return {
+    ...target,
+    label: t("imageEdit.targets.runningHubCutout"),
+  };
+}
+
 export function isImageEditFeature(value: string): value is ImageEditFeature {
   return IMAGE_EDIT_FEATURES.some(feature => feature.key === value);
 }
@@ -109,19 +125,20 @@ export function normalizeImageQuickEditTargetId(feature: ImageEditFeature, value
 export function getImageQuickEditTargetOptions(
   feature: ImageEditFeature,
   imageModelOptions: readonly ModelOption[],
+  t?: TFunction,
 ): ImageQuickEditTarget[] {
   return [
-    ...DEDICATED_TARGETS.filter(target => target.feature === feature),
+    ...DEDICATED_TARGETS.filter(target => target.feature === feature).map(target => resolveDedicatedTargetLabel(target, t)),
     ...imageModelOptions
       .filter(option => isGenericImageEditModel(option.value))
       .map(option => genericImageEditTarget(feature, option.value, option.label)),
   ];
 }
 
-export function resolveImageQuickEditTarget(feature: ImageEditFeature, targetId: string): ImageQuickEditTarget {
+export function resolveImageQuickEditTarget(feature: ImageEditFeature, targetId: string, t?: TFunction): ImageQuickEditTarget {
   const normalizedTargetId = normalizeImageQuickEditTargetId(feature, targetId);
   const dedicatedTarget = getDedicatedTarget(feature, normalizedTargetId);
-  if (dedicatedTarget) return dedicatedTarget;
+  if (dedicatedTarget) return resolveDedicatedTargetLabel(dedicatedTarget, t);
 
   const model = readGenericTargetModel(normalizedTargetId);
   return genericImageEditTarget(feature, model, model);

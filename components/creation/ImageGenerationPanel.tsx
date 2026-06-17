@@ -219,7 +219,7 @@ export default function ImageGenerationPanel({
           </div>
           <ModelSelectCombobox
             accent="blue"
-            ariaLabel="选择图片模型"
+            ariaLabel={t("imageGeneration.modelLabel")}
             groups={modelGroups}
             value={selectedModel}
             onChange={onSelectModel}
@@ -370,17 +370,17 @@ export default function ImageGenerationPanel({
       />
 
       <ReferenceImagePicker
-        addLabel="多图垫"
+        addLabel={t("imageGeneration.referenceAddLabel")}
         browseClassName="cursor-pointer font-medium text-[var(--iw-tone-accent-text)] underline-offset-4 hover:text-[var(--iw-tone-accent-text)] hover:underline"
-        clearLabel="清空所有垫图"
+        clearLabel={t("imageGeneration.referenceClearLabel")}
         emptyHelp={imageReferenceHelp}
-        emptyLabel={imageReferenceLimit > 0 ? "添加图片" : "当前模型不支持参考图"}
-        label={`创意参考图 / 多图垫图 ${referenceImages.length > 0 ? `(${imageReferenceCountLabel})` : ""}`}
-        libraryBrowseLabel="从素材库选择"
-        libraryTileLabel="素材库"
+        emptyLabel={imageReferenceLimit > 0 ? t("imageGeneration.referenceEmptySupported") : t("imageGeneration.referenceEmptyUnsupported")}
+        label={`${t("imageGeneration.referenceTitle")}${referenceImages.length > 0 ? ` (${imageReferenceCountLabel})` : ""}`}
+        libraryBrowseLabel={t("imageGeneration.referenceLibraryLabel")}
+        libraryTileLabel={t("imageGeneration.referenceLibraryTile")}
         maxCount={imageReferenceLimit}
         references={referenceImages}
-        uploadLabel={imageReferenceLimit > 0 ? "浏览上传" : "不可上传"}
+        uploadLabel={imageReferenceLimit > 0 ? t("imageGeneration.referenceUploadSupported") : t("imageGeneration.referenceUploadUnsupported")}
         acceptedMediaTypes={capabilities.referenceMediaTypes}
         onClear={onClearReferences}
         onDropAsset={onReferenceDropAsset}

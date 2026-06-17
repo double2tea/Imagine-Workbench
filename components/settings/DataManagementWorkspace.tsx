@@ -287,8 +287,8 @@ export default function DataManagementWorkspace({
         count: integrity.staleAssetSourceLinks.length,
         tone: "attention",
         action: {
-          label: "修复来源",
-          busyLabel: "修复来源中",
+          label: t("dataManagement.issueGroups.repairSources"),
+          busyLabel: t("dataManagement.issueGroups.repairSourcesBusy"),
           confirmRequest: buildRepairSourcesConfirmRequest(t),
           run: onRepairAssetSources,
         },
@@ -390,7 +390,7 @@ export default function DataManagementWorkspace({
             </div>
           </div>
           <div className="font-mono text-sm font-semibold">
-            {integrity ? `${integrity.issueCount} issues` : "--"}
+            {integrity ? t("dataManagement.issueCount", { count: integrity.issueCount }) : "--"}
           </div>
         </div>
       </section>
@@ -427,7 +427,7 @@ export default function DataManagementWorkspace({
             {t("dataManagement.integrityDiagnosis")}
           </p>
           <p className="font-mono text-[11px] text-[var(--iw-muted)]">
-            {integrity ? `${integrity.issueCount} total` : "waiting"}
+            {integrity ? t("dataManagement.issueCount", { count: integrity.issueCount }) : t("dataManagement.statCards.waitingStats")}
           </p>
         </div>
         <div className="mt-3 grid gap-2">
@@ -481,7 +481,7 @@ export default function DataManagementWorkspace({
             </p>
           </div>
           <p className="font-mono text-[11px] text-[var(--iw-muted)]">
-            {assetSummary ? formatBytes(assetSummary.estimatedBytes) : "--"} metadata estimate
+            {assetSummary ? formatBytes(assetSummary.estimatedBytes) : "--"} {t("dataManagement.metadataEstimate")}
           </p>
         </div>
         {usageRatio !== undefined ? (
@@ -492,11 +492,11 @@ export default function DataManagementWorkspace({
         {assetStores ? (
           <div className="mt-3 grid gap-2 sm:grid-cols-5">
             {[
-              ["meta", assetStores.metaRecords],
-              ["hash", assetStores.sharedBlobRecords],
-              ["preview", assetStores.previewRecords],
-              ["legacy blob", assetStores.legacyBlobRecords],
-              ["legacy assets", assetStores.legacyAssetRecords],
+              [t("dataManagement.storageSlots.meta"), assetStores.metaRecords],
+              [t("dataManagement.storageSlots.hash"), assetStores.sharedBlobRecords],
+              [t("dataManagement.storageSlots.preview"), assetStores.previewRecords],
+              [t("dataManagement.storageSlots.legacyBlob"), assetStores.legacyBlobRecords],
+              [t("dataManagement.storageSlots.legacyAssets"), assetStores.legacyAssetRecords],
             ].map(([label, value]) => (
               <div key={label} className="rounded-md border border-[var(--iw-border)] px-2 py-2">
                 <p className="text-[10px] uppercase text-[var(--iw-faint)]">{label}</p>
@@ -568,7 +568,7 @@ export default function DataManagementWorkspace({
               className="imagine-secondary-action flex h-9 items-center gap-1.5 rounded-lg border border-[var(--iw-border)] px-3 text-[11px] font-semibold text-[var(--iw-text)] disabled:opacity-50"
             >
               <Upload className="h-3.5 w-3.5" />
-              恢复备份
+              {t("dataManagement.restoreBackupButton")}
             </button>
           </div>
         </div>
@@ -579,14 +579,14 @@ export default function DataManagementWorkspace({
           <div>
             <p className="flex items-center gap-2 text-xs font-semibold text-[var(--iw-text)]">
               <Wrench className="imagine-tone-icon h-3.5 w-3.5" data-tone="warning" />
-              维护动作
+              {t("dataManagement.maintenanceActions")}
             </p>
             <p className="mt-1 text-[11px] leading-5 text-[var(--iw-muted)]">
-              导入媒体、复制画板、价格显示与常用清理入口
+              {t("dataManagement.maintenanceActionsDescription")}
             </p>
           </div>
           <label className="flex items-center gap-2 text-[11px] text-[var(--iw-muted)]">
-            显示价格
+            {t("dataManagement.showPriceLabel")}
             <span className="relative inline-flex cursor-pointer items-center">
               <input
                 type="checkbox"
@@ -606,7 +606,7 @@ export default function DataManagementWorkspace({
             className="imagine-secondary-action flex h-9 items-center gap-1.5 rounded-lg border border-[var(--iw-border)] px-3 text-[11px] font-semibold text-[var(--iw-text)] disabled:opacity-50"
           >
             <FileInput className="h-3.5 w-3.5" />
-            导入媒体
+            {t("dataManagement.importMediaButton")}
           </button>
           {hasCurrentBoard && onDuplicateCurrentBoard ? (
             <button

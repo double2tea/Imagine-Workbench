@@ -60,8 +60,6 @@ import { selectVideoReferenceTypesForMode } from "@/lib/video-reference-selectio
 import { hasActiveCinematicProfile } from "@/lib/cinematic-controls";
 import { VOICE_PROFILES_CHANGED_EVENT, getVisibleVoiceProfilesForAudioModel, isBuiltInVoiceProfileId, listVoiceProfiles, type VoiceProfile } from "@/lib/voice-profiles";
 
-const CINEMATIC_PROFILE_SUMMARY_LABEL = "电影风格";
-
 interface BoardInspectorProps {
   audioModelGroups: BoardModelOptionGroup[];
   edge: BoardEdge | undefined;
@@ -138,13 +136,13 @@ function describePortEndpoint(nodes: BoardNode[], ref: BoardPortRef): string {
   return `${nodeLabel} · ${portLabel}`;
 }
 
-function generateParamSummary(node: BoardGenerateNode): string {
+function generateParamSummary(node: BoardGenerateNode, cinematicProfileSummaryLabel: string): string {
   if (node.kind === "image-generate") {
     const resolution = node.imageResolution === "custom" ? node.customImageResolution : node.imageResolution;
-    return `${node.model} / ${resolution}${hasActiveCinematicProfile(node.cinematicProfile, "image") ? ` / ${CINEMATIC_PROFILE_SUMMARY_LABEL}` : ""} / x${node.variantCount}`;
+    return `${node.model} / ${resolution}${hasActiveCinematicProfile(node.cinematicProfile, "image") ? ` / ${cinematicProfileSummaryLabel}` : ""} / x${node.variantCount}`;
   }
   if (node.kind === "video-generate") {
-    return `${node.model} / ${node.aspectRatio}${node.videoDuration ? ` / ${node.videoDuration}s` : ""}${hasActiveCinematicProfile(node.cinematicProfile, "video") ? ` / ${CINEMATIC_PROFILE_SUMMARY_LABEL}` : ""} / x${node.variantCount}`;
+    return `${node.model} / ${node.aspectRatio}${node.videoDuration ? ` / ${node.videoDuration}s` : ""}${hasActiveCinematicProfile(node.cinematicProfile, "video") ? ` / ${cinematicProfileSummaryLabel}` : ""} / x${node.variantCount}`;
   }
   return [
     node.model,
@@ -603,7 +601,7 @@ function ImageGenerateInspector({
   return (
     <div className="space-y-3">
       <div className={inspectorSummaryClass}>
-        <p className={infoChipClass}>{generateParamSummary(node)}</p>
+        <p className={infoChipClass}>{generateParamSummary(node, t("inspector.cinematicProfileSummaryLabel"))}</p>
         <p className="mt-1 text-[10px] leading-5 text-[var(--iw-faint)]">{t('inspector.execEntryHint')}</p>
       </div>
       <InspectorFocusButton nodeId={node.id} onFocusNode={onFocusNode} />
@@ -745,7 +743,7 @@ function VideoGenerateInspector({
   return (
     <div className="space-y-3">
       <div className={inspectorSummaryClass}>
-        <p className={infoChipClass}>{generateParamSummary(node)}</p>
+        <p className={infoChipClass}>{generateParamSummary(node, t("inspector.cinematicProfileSummaryLabel"))}</p>
         <p className="mt-1 text-[10px] leading-5 text-[var(--iw-faint)]">{t('inspector.execEntryHint')}</p>
       </div>
       <InspectorFocusButton nodeId={node.id} onFocusNode={onFocusNode} />
@@ -992,7 +990,7 @@ function AudioOperationInspector({
   return (
     <div className="space-y-3">
       <div className={inspectorSummaryClass}>
-        <p className={infoChipClass}>{generateParamSummary(node)}</p>
+        <p className={infoChipClass}>{generateParamSummary(node, t("inspector.cinematicProfileSummaryLabel"))}</p>
         <p className="mt-1 text-[10px] leading-5 text-[var(--iw-faint)]">{t('inspector.execEntryHint')}</p>
       </div>
       <InspectorFocusButton nodeId={node.id} onFocusNode={onFocusNode} />

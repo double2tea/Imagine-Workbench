@@ -44,15 +44,18 @@
     "dataStatusLabel": "Data Status",
     "cleanupLabels": { "failed": "Failed tasks", "staleProcessing": "Processing/queued tasks over 2 hours", "brokenComplete": "Completed records missing media content", "orphaned": "Completed assets not referenced by any board" },
     "localStorageLabels": { "agent": "Agent session", "modelCache": "Model cache", "providerCredentials": "Provider credentials", "uiPreferences": "UI preferences" },
+    "storageSlots": { "meta": "Meta", "hash": "Hash", "preview": "Preview", "legacyBlob": "Legacy Blob", "legacyAssets": "Legacy Assets" },
     "repairSourcesMessage": "Will scan all boards and remove source links in assets that point to non-existent board nodes. Asset files, prompts, and generation results will not be deleted. Continue?",
     "repairSourcesConfirmLabel": "Repair", "resetBoardsMessage": "Reset all boards to a single blank default board?",
     "resetBoardsConfirmLabel": "Reset", "cleanupConfirmTemplate": "Clean up {label}?",
     "cleanupConfirmLabel": "Clean Up", "noDetails": "No details", "moreDetailsHidden": "{count} more hidden",
+    "issueCount": "{count} issues",
     "statCards": { "assets": "Assets", "boards": "Boards", "localSettings": "Local Settings", "browserStorage": "Browser Storage", "waitingStats": "Waiting for stats", "browserNoQuota": "Browser did not return quota" },
     "assetsDetailTemplate": "{image} images / {video} videos / {audio} audio / {transcript} transcripts",
     "boardsDetailTemplate": "{nodes} nodes · {bytes}",
     "localSettingsDetailTemplate": "{agentKeys} Agent / {modelCacheKeys} model / {credentialKeys} credential",
     "browserStorageDetailTemplate": "Quota {quota} · {percent}",
+    "metadataEstimate": "metadata estimate",
     "integrityDiagnosis": "Integrity Diagnosis",
     "issueGroups": {
       "missingReferences": "Board missing asset references", "brokenComplete": "Completed but missing media content",
@@ -84,6 +87,7 @@
   },
   "appearance": {
     "language": "Language",
-    "languageDescription": "Switch the interface display language"
+    "languageDescription": "Switch the interface display language",
+    "languageOptions": { "zh": "Chinese", "en": "English" }
   }
 }

@@ -96,6 +96,7 @@ const ResultBoardNode = memo(function ResultBoardNode({
   onSelectStackAsset,
 }: ResultBoardNodeProps) {
   const { t } = useTranslations("board");
+  const { t: creationT } = useTranslations("creation");
   const fallbackItem = useMemo(() => resultNodeToStorageItem(node, boardId, t), [boardId, node, t]);
   const item = useMemo(
     () => stackItems.find(stackItem => stackItem.id === node.activeAssetId) ?? fallbackItem,
@@ -113,7 +114,7 @@ const ResultBoardNode = memo(function ResultBoardNode({
       id: "edit",
       actions: item.type === "image" && isComplete
         ? IMAGE_EDIT_OPERATION_ORDER.map(operation => {
-            const meta = imageEditOperationMeta(operation);
+            const meta = imageEditOperationMeta(operation, creationT);
             const Icon = meta.Icon;
             return {
               id: operation,
@@ -198,7 +199,7 @@ const ResultBoardNode = memo(function ResultBoardNode({
         isSelected={isSelected}
         onSelectStackAsset={onSelectStackAsset}
         onDoubleClick={item.status === "complete" && onOpenFullscreen ? () => onOpenFullscreen(item) : undefined}
-        processingLabel={imageQuickEditProcessingTitleFromPrompt(item.prompt) ?? undefined}
+        processingLabel={imageQuickEditProcessingTitleFromPrompt(item.prompt, creationT) ?? undefined}
         stackItems={stackItems}
         status={item.status}
         statusLabel={item.errorMessage ?? (item.status === "failed" ? t("node.statusLabels.failed") : undefined)}

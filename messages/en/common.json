@@ -271,7 +271,18 @@
     "taskIgnoreFailed": "Failed to ignore task",
     "selectImageNode": "Please select an image node",
     "boardsReset": "Boards reset",
-    "boardsResetFailed": "Board reset failed"
+    "boardsResetFailed": "Board reset failed",
+    "imageQuickEditStart": "{label} started, the result will update this task card",
+    "imageQuickEditComplete": "{label} complete, saved as a new image asset",
+    "imageQuickEditSaveFailed": "Local save failed, did not start {label}: {error}",
+    "imageQuickEditFailed": "{label} failed",
+    "imageQuickEditOriginalReadFailed": "{label} original image read failed"
+  },
+  "imageEdit": {
+    "processingTitle": "{label} in progress",
+    "targets": {
+      "runningHubCutout": "RunningHub Cutout AI App"
+    }
   },
   "gallery": {
     "title": "Gallery",

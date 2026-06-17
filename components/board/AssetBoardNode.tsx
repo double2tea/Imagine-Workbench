@@ -97,6 +97,7 @@ const AssetBoardNode = memo(function AssetBoardNode({
   stackItems = [],
 }: AssetBoardNodeProps) {
   const { t } = useTranslations("board");
+  const { t: creationT } = useTranslations("creation");
   const fallbackItem = useMemo(() => boardAssetToStorageItem(node, boardId), [boardId, node]);
   const item = useMemo(
     () => stackItems.find(stackItem => stackItem.id === node.asset.assetId) ?? fallbackItem,
@@ -176,7 +177,7 @@ const AssetBoardNode = memo(function AssetBoardNode({
               toneClassName: operationToneClassName(WORKBENCH_OPERATION_META.localEdit.tone),
             },
             ...IMAGE_EDIT_OPERATION_ORDER.map(operation => {
-              const meta = imageEditOperationMeta(operation);
+              const meta = imageEditOperationMeta(operation, creationT);
               const Icon = meta.Icon;
               return {
                 id: operation,
@@ -231,7 +232,7 @@ const AssetBoardNode = memo(function AssetBoardNode({
         onCancelProcessing={onCancelProcessing ? () => onCancelProcessing(node.id) : undefined}
         onDoubleClick={isComplete && onOpenFullscreen ? () => onOpenFullscreen(item) : undefined}
         onSelectStackAsset={onSelectStackAsset}
-        processingLabel={imageQuickEditProcessingTitleFromPrompt(item.prompt) ?? undefined}
+        processingLabel={imageQuickEditProcessingTitleFromPrompt(item.prompt, creationT) ?? undefined}
         stackItems={stackItems}
         status={item.status}
         statusLabel={item.errorMessage ?? (item.status === "failed" ? t("node.statusLabels.failed") : undefined)}

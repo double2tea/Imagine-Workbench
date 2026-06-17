@@ -103,12 +103,12 @@ export default function WorkspaceHeader({
           <button
             type="button"
             onClick={() => setLocale(locale === "zh" ? "en" : "zh")}
-            className={`${workspaceTopBarIconButtonClass} cursor-pointer`}
+            className={`${workspaceTopBarButtonClass} cursor-pointer`}
             title={locale === "zh" ? t("workspaceHeader.language.en") : t("workspaceHeader.language.zh")}
             aria-label={locale === "zh" ? t("workspaceHeader.language.en") : t("workspaceHeader.language.zh")}
           >
             <Languages className="h-3.5 w-3.5" />
-            <span className="text-xs font-semibold">{locale === "zh" ? t("workspaceHeader.language.enShort") : t("workspaceHeader.language.zhShort")}</span>
+            <span className="text-[11px] font-semibold leading-none">{locale === "zh" ? t("workspaceHeader.language.enShort") : t("workspaceHeader.language.zhShort")}</span>
           </button>
 
           <button

@@ -4,6 +4,7 @@ import { Sparkles } from "lucide-react";
 import { useTranslations } from "@/lib/i18n";
 import { IMAGE_EDIT_FEATURES, type ImageEditFeature, type ImageEditFeatureModels } from "@/hooks/useImageEditFeatureModels";
 import {
+  imageEditFeatureMeta,
   getImageQuickEditTargetOptions,
   resolveImageQuickEditTarget,
 } from "@/lib/image-quick-edit-targets";
@@ -41,6 +42,8 @@ export function FeatureModelSettingsWorkspace({
 }: FeatureModelSettingsWorkspaceProps) {
   const imageModelOptions = flattenImageModelOptions(imageModelGroups);
   const { t } = useTranslations("settings");
+  const { t: commonT } = useTranslations("common");
+  const { t: creationT } = useTranslations("creation");
 
   return (
     <div className="flex flex-col gap-3">
@@ -58,20 +61,21 @@ export function FeatureModelSettingsWorkspace({
         <div className="grid grid-cols-1 gap-3">
           {IMAGE_EDIT_FEATURES.map(feature => {
             const value = featureModels[feature.key];
-            const targetOptions = getImageQuickEditTargetOptions(feature.key, imageModelOptions);
+            const targetOptions = getImageQuickEditTargetOptions(feature.key, imageModelOptions, commonT);
             const hasCurrentOption = targetOptions.some(option => option.id === value);
-            const currentTarget = resolveImageQuickEditTarget(feature.key, value);
+            const currentTarget = resolveImageQuickEditTarget(feature.key, value, commonT);
+            const featureMeta = imageEditFeatureMeta(feature.key, creationT);
             return (
               <div key={feature.key} className="grid gap-2 md:grid-cols-[minmax(0,180px)_1fr] md:items-center">
                 <div className="min-w-0">
-                  <div className="text-xs font-semibold text-[var(--iw-text)]">{feature.label}</div>
-                  <div className="text-[10px] leading-relaxed text-[var(--iw-faint)]">{feature.description}</div>
+                  <div className="text-xs font-semibold text-[var(--iw-text)]">{featureMeta.label}</div>
+                  <div className="text-[10px] leading-relaxed text-[var(--iw-faint)]">{featureMeta.description}</div>
                 </div>
                 <select
                   value={value}
                   onChange={event => onSelectFeatureModel(feature.key, event.target.value)}
                   className="imagine-input h-9 min-w-0 text-xs"
-                  aria-label={`${feature.label}${t("featureModels.defaultModelSuffix")}`}
+                  aria-label={`${featureMeta.label} ${t("featureModels.defaultModelSuffix")}`}
                 >
                   {!hasCurrentOption ? <option value={value}>{currentTarget.label}</option> : null}
                   {targetOptions.map(option => (

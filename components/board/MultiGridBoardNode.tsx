@@ -372,11 +372,11 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
             void onExport();
           }}
           className={toolbarButtonClassName}
-          title="合成多宫格"
-          aria-label="合成多宫格"
+          title={t("multiGridNode.exportTitle")}
+          aria-label={t("multiGridNode.exportTitle")}
         >
           <Download className="h-3.5 w-3.5" />
-          合成
+          {t("multiGridNode.exportButton")}
         </button>
         <button
           type="button"
@@ -385,11 +385,11 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
             toggleCollapsed(false);
           }}
           className={toolbarButtonClassName}
-          title="展开多宫格"
-          aria-label="展开多宫格"
+          title={t("multiGridNode.expandTitle")}
+          aria-label={t("multiGridNode.expandTitle")}
         >
           <Maximize2 className="h-3.5 w-3.5" />
-          展开
+          {t("multiGridNode.expandButton")}
         </button>
       </div>
     );
@@ -403,10 +403,10 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
           value={node.aspectRatio}
           onChange={event => onUpdate({ aspectRatio: event.target.value as BoardMultiGridAspectRatio })}
           className="h-7 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 text-[11px] font-semibold text-[var(--iw-text)] outline-none"
-          title="比例"
+          title={t("multiGridNode.aspectRatioLabel")}
         >
           {BOARD_MULTI_GRID_ASPECT_RATIOS.map(ratio => (
-            <option key={ratio} value={ratio}>比例 {ratio}</option>
+            <option key={ratio} value={ratio}>{t("multiGridNode.aspectRatioOption", { ratio })}</option>
           ))}
         </select>
         <select
@@ -414,10 +414,10 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
           value={node.gridSize}
           onChange={event => onUpdate({ gridSize: Number(event.target.value) as BoardMultiGridSize })}
           className="h-7 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 text-[11px] font-semibold text-[var(--iw-text)] outline-none"
-          title="宫格"
+          title={t("multiGridNode.gridSizeLabel")}
         >
           {BOARD_MULTI_GRID_SIZES.map(size => (
-            <option key={size} value={size}>宫格 {size}x{size}</option>
+            <option key={size} value={size}>{t("multiGridNode.gridSizeOption", { size })}</option>
           ))}
         </select>
         <button
@@ -428,11 +428,11 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
           }}
           className={`${toolbarButtonClassName} ml-auto ${isEditingLayout ? activeToolbarButtonClassName : ""}`}
           data-tone="success"
-          title="编辑排序"
-          aria-label="编辑排序"
+          title={t("multiGridNode.editTitle")}
+          aria-label={t("multiGridNode.editTitle")}
         >
           <Pencil className="h-3.5 w-3.5" />
-          编辑
+          {t("multiGridNode.editButton")}
         </button>
         <button
           type="button"
@@ -441,11 +441,11 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
             void onExport();
           }}
           className={toolbarButtonClassName}
-          title="合成多宫格"
-          aria-label="合成多宫格"
+          title={t("multiGridNode.exportTitle")}
+          aria-label={t("multiGridNode.exportTitle")}
         >
           <Download className="h-3.5 w-3.5" />
-          合成
+          {t("multiGridNode.exportButton")}
         </button>
         <button
           type="button"
@@ -457,11 +457,11 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
             onUpdate({ items: clearItems(node), selectedItemId: undefined });
           }}
           className={toolbarButtonClassName}
-          title="清空多宫格"
-          aria-label="清空多宫格"
+          title={t("multiGridNode.clearTitle")}
+          aria-label={t("multiGridNode.clearTitle")}
         >
           <Eraser className="h-3.5 w-3.5" />
-          清空
+          {t("multiGridNode.clearButton")}
         </button>
         <button
           type="button"
@@ -470,11 +470,11 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
             toggleCollapsed(true);
           }}
           className={toolbarButtonClassName}
-          title="折叠多宫格"
-          aria-label="折叠多宫格"
+          title={t("multiGridNode.collapseTitle")}
+          aria-label={t("multiGridNode.collapseTitle")}
         >
           <Minimize2 className="h-3.5 w-3.5" />
-          折叠
+          {t("multiGridNode.collapseButton")}
         </button>
       </div>
 
@@ -584,7 +584,7 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
                 ) : (
                   <span className="flex h-full w-full flex-col items-center justify-center gap-1 text-[var(--iw-muted)]/65 transition group-hover/cell:text-[var(--iw-tone-success-text)]">
                     <Plus className="h-5 w-5" />
-                    <span className="text-[10px] font-semibold">拖入图片</span>
+                    <span className="text-[10px] font-semibold">{t("multiGridNode.dragImage")}</span>
                   </span>
                 )}
                 {isExtractDragItem ? (
@@ -607,8 +607,8 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
                         }}
                         onPointerDown={event => event.stopPropagation()}
                         className={cellToolButtonClassName}
-                        title="缩小"
-                        aria-label="缩小多宫格图片"
+                        title={t("multiGridNode.zoomOut")}
+                        aria-label={`${t("multiGridNode.zoomOut")} ${t("node.types.multiGrid")}`}
                       >
                         <Minus className="h-3 w-3" />
                       </button>
@@ -620,8 +620,8 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
                         }}
                         onPointerDown={event => event.stopPropagation()}
                         className={cellToolButtonClassName}
-                        title="放大"
-                        aria-label="放大多宫格图片"
+                        title={t("multiGridNode.zoomIn")}
+                        aria-label={`${t("multiGridNode.zoomIn")} ${t("node.types.multiGrid")}`}
                       >
                         <Plus className="h-3 w-3" />
                       </button>
@@ -633,8 +633,8 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
                         }}
                         onPointerDown={event => event.stopPropagation()}
                         className={cellToolButtonClassName}
-                        title="复位"
-                        aria-label="复位多宫格图片"
+                        title={t("multiGridNode.reset")}
+                        aria-label={`${t("multiGridNode.reset")} ${t("node.types.multiGrid")}`}
                       >
                         <RotateCcw className="h-3 w-3" />
                       </button>
@@ -646,8 +646,8 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
                         }}
                         onPointerDown={event => event.stopPropagation()}
                         className={cellToolButtonClassName}
-                        title="暂存"
-                        aria-label="暂存多宫格图片"
+                        title={t("multiGridNode.stash")}
+                        aria-label={`${t("multiGridNode.stash")} ${t("node.types.multiGrid")}`}
                       >
                         <Archive className="h-3 w-3" />
                       </button>
@@ -659,8 +659,8 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
                         }}
                         onPointerDown={event => event.stopPropagation()}
                         className={destructiveCellToolButtonClassName}
-                        title="移除"
-                        aria-label="移除多宫格图片"
+                        title={t("multiGridNode.remove")}
+                        aria-label={`${t("multiGridNode.remove")} ${t("node.types.multiGrid")}`}
                       >
                         <Trash2 className="h-3 w-3" />
                       </button>
@@ -695,7 +695,7 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
 
       <div className="nodrag flex min-h-[34px] shrink-0 items-center gap-2 border-t border-[var(--iw-border)] px-2 py-1">
         <span className="truncate text-[10px] font-semibold text-[var(--iw-muted)]">
-          {isEditingLayout ? "拖动图片格子调整顺序" : selectedItem ? selectedItem.prompt || selectedItem.model : `${node.items.length} 张图片 · 双击进入分镜编辑排序`}
+          {isEditingLayout ? t("multiGridNode.editLayoutHint") : selectedItem ? selectedItem.prompt || selectedItem.model : t("multiGridNode.summary", { count: node.items.length })}
         </span>
         {stashedItems.length > 0 ? (
           <button
@@ -710,9 +710,9 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
               });
             }}
             className="ml-auto h-6 rounded-md border border-[var(--iw-border)] px-2 text-[10px] font-semibold text-[var(--iw-muted)] transition hover:border-[var(--iw-tone-success-border)] hover:text-[var(--iw-tone-success-text)]"
-            title="恢复一张暂存图片到空格"
+            title={t("multiGridNode.restoreStashed")}
           >
-            暂存 {stashedItems.length}
+            {t("multiGridNode.stash")} {stashedItems.length}
           </button>
         ) : null}
       </div>

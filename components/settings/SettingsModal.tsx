@@ -342,8 +342,8 @@ export default function SettingsModal({
                   className="imagine-select h-7 px-1.5 py-0 text-[11px]"
                   aria-label={t("appearance.language")}
                 >
-                  <option value="zh">中文</option>
-                  <option value="en">English</option>
+                  <option value="zh">{t("appearance.languageOptions.zh")}</option>
+                  <option value="en">{t("appearance.languageOptions.en")}</option>
                 </select>
               </div>
               <button type="button" onClick={onClose} className="imagine-settings-save-button">

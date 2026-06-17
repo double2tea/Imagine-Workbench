@@ -97,8 +97,12 @@ function formatCreatedAt(value: string): string {
 
 type FrameMenuPlacement = "hover";
 
-function processingTitle(item: StorageItem, t: ReturnType<typeof useTranslations>["t"]): string {
-  const quickEditTitle = item.type === "image" ? imageQuickEditProcessingTitleFromPrompt(item.prompt) : null;
+function processingTitle(
+  item: StorageItem,
+  t: ReturnType<typeof useTranslations>["t"],
+  creationT: ReturnType<typeof useTranslations>["t"],
+): string {
+  const quickEditTitle = item.type === "image" ? imageQuickEditProcessingTitleFromPrompt(item.prompt, creationT) : null;
   if (quickEditTitle) return quickEditTitle;
   if (item.type === "video") return t("processingTitles.video");
   if (item.type === "audio") return t("processingTitles.audio");
@@ -147,6 +151,7 @@ export default function AssetCard({
   providerLabelsByKey,
 }: AssetCardProps) {
   const { t } = useTranslations("common");
+  const { t: creationT } = useTranslations("creation");
   const [isMobileActionsOpen, setIsMobileActionsOpen] = useState(false);
   const [isQuickEditMenuOpen, setIsQuickEditMenuOpen] = useState(false);
   const [frameMenuPlacement, setFrameMenuPlacement] = useState<FrameMenuPlacement | null>(null);
@@ -418,7 +423,7 @@ export default function AssetCard({
               {isQuickEditMenuOpen && (
                 <WorkbenchPopoverMenu align="right" placement="below">
                   {IMAGE_EDIT_OPERATION_ORDER.map(operation => {
-                    const action = imageEditOperationMeta(operation);
+                    const action = imageEditOperationMeta(operation, creationT);
                     const Icon = action.Icon;
                     return (
                       <WorkbenchPopoverMenuItem
@@ -452,7 +457,7 @@ export default function AssetCard({
               <RefreshCw className="h-4 w-4 animate-spin text-[var(--iw-tone-violet-text)]" />
             </div>
             <p className="imagine-generation-stage-title">
-              {item.status === "pending" ? t("processingTitles.pending") : processingTitle(item, t)}
+              {item.status === "pending" ? t("processingTitles.pending") : processingTitle(item, t, creationT)}
             </p>
             <span className="imagine-generation-stage-meta">{t("assetCard.modelLabel")} {formatModelName(item.model)}</span>
             <span className="imagine-generation-stage-state">
@@ -582,7 +587,7 @@ export default function AssetCard({
                     </button>
                   )}
                   {item.type === "image" && IMAGE_EDIT_OPERATION_ORDER.map(operation => {
-                    const meta = imageEditOperationMeta(operation);
+                    const meta = imageEditOperationMeta(operation, creationT);
                     const Icon = meta.Icon;
                     return (
                       <button key={operation} type="button" onClick={() => runMobileAction(() => onImageQuickEdit(item, operation))}>

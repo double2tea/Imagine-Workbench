@@ -1362,7 +1362,8 @@ function boardSummaryFromDocument(board: BoardDocument): BoardSummary {
 }
 
 export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps) {
-  const { t } = useTranslations();
+  const { t, locale } = useTranslations();
+  const { t: creationT } = useTranslations("creation");
   const router = useRouter();
   const [resolvedBoardId, setResolvedBoardId] = useState(boardId);
   useEffect(() => {
@@ -1974,13 +1975,13 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     model: string,
     editPrompt: string,
   ): Promise<{ item: StorageItem; nodeId: string } | null> {
-    const label = imageEditFeatureLabel(operation);
+    const label = imageEditFeatureLabel(operation, creationT);
     const item = buildStorageItem(
       {
         id: makeClientId("img_edit"),
         type: "image",
         url: previewUrl,
-        prompt: editPrompt || imageQuickEditFallbackPrompt(operation, sourceItem.prompt || sourceItem.id),
+      prompt: editPrompt || imageQuickEditFallbackPrompt(operation, sourceItem.prompt || sourceItem.id, creationT),
         model,
         aspectRatio: "auto",
         createdAt: new Date().toISOString(),
@@ -2031,7 +2032,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     if (!savedItem) return;
     setItems(prev => prev.map(current => current.id === savedItem.id ? savedItem : current));
     boardController.updateAssetNodeAsset(nodeId, storageItemToBoardAssetReference(savedItem));
-    const label = imageEditFeatureLabel(operation);
+    const label = imageEditFeatureLabel(operation, creationT);
     pushWorkspaceNotice("success", `${label} complete, saved as new board asset`);
   }
 
@@ -2111,7 +2112,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       pendingTaskIds,
       target,
     } = job;
-    const label = imageEditFeatureLabel(operation);
+    const label = imageEditFeatureLabel(operation, creationT);
     try {
       const image = await prepareReferenceImageUrlForRequest(editImageUrl);
       const mask = maskUrl ? await prepareReferenceImageUrlForRequest(maskUrl) : undefined;
@@ -5029,6 +5030,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       )}
 
       <SettingsModal
+        key={`settings-${locale}`}
         audioModelGroups={audioModelGroups}
         chatModelGroups={chatModelGroups}
         fetchedModelOptions={fetchedModelOptions}

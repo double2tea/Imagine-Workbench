@@ -27,7 +27,8 @@ import {
   WandSparkles,
   type LucideIcon,
 } from "lucide-react";
-import { imageEditFeatureLabel, type ImageEditFeature } from "@/lib/image-quick-edit-targets";
+import { imageEditFeatureMeta, type ImageEditFeature } from "@/lib/image-quick-edit-targets";
+import type { TFunction } from "@/lib/i18n";
 
 export type OperationTone = "accent" | "neutral" | "danger" | "media" | "success";
 
@@ -43,37 +44,37 @@ export const IMAGE_EDIT_OPERATION_ORDER: readonly ImageEditFeature[] = ["redraw"
 export const IMAGE_EDIT_OPERATION_META: Record<ImageEditFeature, WorkbenchOperationMeta> = {
   redraw: {
     Icon: WandSparkles,
-    label: imageEditFeatureLabel("redraw"),
+    label: "重绘",
     title: "Draw mask and repaint area",
     tone: "accent",
   },
   erase: {
     Icon: Eraser,
-    label: imageEditFeatureLabel("erase"),
+    label: "擦除",
     title: "Draw mask and erase area",
     tone: "accent",
   },
   outpaint: {
     Icon: SquareDashed,
-    label: imageEditFeatureLabel("outpaint"),
+    label: "扩图",
     title: "Extend canvas boundary",
     tone: "accent",
   },
   cutout: {
     Icon: Scissors,
-    label: imageEditFeatureLabel("cutout"),
+    label: "抠图",
     title: "Remove background, keep subject",
     tone: "accent",
   },
   angle: {
     Icon: Box,
-    label: imageEditFeatureLabel("angle"),
+    label: "角度",
     title: "Adjust camera angle",
     tone: "accent",
   },
   lighting: {
     Icon: Sun,
-    label: imageEditFeatureLabel("lighting"),
+    label: "打光",
     title: "Adjust lighting",
     tone: "accent",
   },
@@ -105,8 +106,14 @@ export function operationToneClassName(tone: OperationTone): string {
   return `imagine-operation-tone-${tone}`;
 }
 
-export function imageEditOperationMeta(operation: ImageEditFeature): WorkbenchOperationMeta {
-  return IMAGE_EDIT_OPERATION_META[operation];
+export function imageEditOperationMeta(operation: ImageEditFeature, t?: TFunction): WorkbenchOperationMeta {
+  if (!t) return IMAGE_EDIT_OPERATION_META[operation];
+  const meta = imageEditFeatureMeta(operation, t);
+  return {
+    ...IMAGE_EDIT_OPERATION_META[operation],
+    label: meta.label,
+    title: meta.description,
+  };
 }
 
 export function ImageEditOperationIcon({

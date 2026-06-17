@@ -221,6 +221,12 @@
     "imageQuickEditFailed": "{label}失败",
     "imageQuickEditOriginalReadFailed": "{label}原图读取失败"
   },
+  "imageEdit": {
+    "processingTitle": "{label}处理中",
+    "targets": {
+      "runningHubCutout": "RunningHub 抠图 AI App"
+    }
+  },
   "selectionBar": {
     "selectedItems": "已选中 {count} 项创意作品",
     "selectedHint": "可批量打包为 ZIP，或移除所选资产。",
