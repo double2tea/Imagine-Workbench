@@ -1,0 +1,1178 @@
+# Journal - chacha (Part 3)
+
+> Continuation from `journal-2.md` (archived at ~2000 lines)
+> Started: 2026-06-13
+
+---
+
+
+
+## Session 119: Improve RunningHub Youchuan adapter
+
+**Date**: 2026-06-13
+**Task**: Improve RunningHub Youchuan adapter
+**Branch**: `main`
+
+### Summary
+
+Optimized RunningHub Youchuan v7/v8.1 image generation support with typed advanced parameters, reference image handling, theme-aware controls, board persistence, provider tests, and v7/v8.1 pricing.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `21e2b0dd` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 120: Model capability driven form
+
+**Date**: 2026-06-13
+**Task**: Model capability driven form
+**Branch**: `main`
+
+### Summary
+
+Implemented typed model parameter descriptors, shared capability controls, and RunningHub Youchuan descriptor-driven advanced/reference handling across main and board surfaces with provider/API validation and tests.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `31a8767a` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 121: Complete model capability catalog migration
+
+**Date**: 2026-06-13
+**Task**: Complete model capability catalog migration
+**Branch**: `main`
+
+### Summary
+
+Migrated image, video, and audio generation metadata to a reusable JSON capability catalog; unified pricing, multimodal validation, provider payload mapping, public catalog API, tests, and docs; fixed catalog route prerendering for Cloudflare Pages.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `827c7212` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 122: Fix multi-grid drag-out interaction
+
+**Date**: 2026-06-13
+**Task**: Fix multi-grid drag-out interaction
+**Branch**: `main`
+
+### Summary
+
+Fixed multi-grid image drag-out by using grid bounds instead of DOM hit testing, added clear extraction feedback, hid in-cell controls during drag, and refined the drag ghost visual hierarchy.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `81b9041e` | (see git log) |
+| `34989166` | (see git log) |
+| `e6d94c95` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 123: Standardize app version
+
+**Date**: 2026-06-13
+**Task**: Standardize app version
+**Branch**: `codex/improve-board-pan-drag-responsiveness`
+
+### Summary
+
+Unified the visible app version with package.json, added check:version to the quality gate, documented the version contract, and archived the standardize-app-version task.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `539dae5c` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 124: Simplify capability catalog reference metadata
+
+**Date**: 2026-06-13
+**Task**: Simplify capability catalog reference metadata
+**Branch**: `codex/improve-board-pan-drag-responsiveness`
+
+### Summary
+
+Derived legacy reference metadata from inputModalities, fixed multimodal total reference limits, and unified reference validation messaging.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `df664418` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 125: Board interaction performance and flicker fixes
+
+**Date**: 2026-06-13
+**Task**: Board interaction performance and flicker fixes
+**Branch**: `codex/improve-board-pan-drag-responsiveness`
+
+### Summary
+
+Tested and improved board interaction responsiveness, clarified view toggles, restored native minimap, and fixed the root CSS causes of minimap and media-title flicker during selection and viewport interaction.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `36749868` | (see git log) |
+| `f18ea462` | (see git log) |
+| `36955ac3` | (see git log) |
+| `3f06db32` | (see git log) |
+| `b906bb2a` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 126: Align model advanced params theme
+
+**Date**: 2026-06-13
+**Task**: Align model advanced params theme
+**Branch**: `main`
+
+### Summary
+
+Aligned the model advanced params panel with the workbench theme by tightening the shared capability controls styling and updating the task records.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `09451663` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 127: Add RunningHub priority model families
+
+**Date**: 2026-06-13
+**Task**: Add RunningHub priority model families
+**Branch**: `main`
+
+### Summary
+
+Added requested RunningHub Standard Model image, video, and audio families; fixed review findings for Hailuo routing, mixed reference validation, and numeric mapped defaults; verified with provider tests and project check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f9a1d8e6` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 128: Archive completed RunningHub tasks
+
+**Date**: 2026-06-14
+**Task**: Archive completed RunningHub tasks
+**Branch**: `main`
+
+### Summary
+
+Archived completed RunningHub/provider tasks after recent catalog, gating, and omni reference routing work.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e4ef41c2` | (see git log) |
+| `97bdf617` | (see git log) |
+| `345aa271` | (see git log) |
+| `88adf569` | (see git log) |
+| `4843e5f0` | (see git log) |
+| `8eb31064` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 129: Prompt template picker interactions
+
+**Date**: 2026-06-14
+**Task**: Prompt template picker interactions
+**Branch**: `main`
+
+### Summary
+
+Fixed prompt template picker internal-click closing, stale picker filters, and main prompt insertion caret behavior.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1c1874e5` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 130: Fix board grid toggle light mode
+
+**Date**: 2026-06-14
+**Task**: Fix board grid toggle light mode
+**Branch**: `main`
+
+### Summary
+
+Removed the fixed light-mode React Flow pane grid so the board grid toggle controls the only visible grid source; documented the board canvas grid contract.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4a9618cc` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 131: Fix mobile workbench audio and density
+
+**Date**: 2026-06-15
+**Task**: Fix mobile workbench audio and density
+**Branch**: `main`
+
+### Summary
+
+Added mobile audio mode visibility, tightened mobile creation/settings density, preserved iOS-safe form sizing, and scoped generate button mobile styles.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f08ece94` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 132: Fix board media toolbar hover
+
+**Date**: 2026-06-15
+**Task**: Fix board media toolbar hover
+**Branch**: `main`
+
+### Summary
+
+Kept board media action docks clickable for selected and hover-revealed nodes by preserving toolbar mount state and adding a hover bridge across the dock gap.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e8239d8a` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 133: Generation diagnostics drawer
+
+**Date**: 2026-06-15
+**Task**: Generation diagnostics drawer
+**Branch**: `main`
+
+### Summary
+
+Added a read-only generation diagnostics drawer in fullscreen preview, with request summary, prompt, references, failure details, and copyable diagnostics text.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `53e2d8ee` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 134: Fix Resolve credential write race
+
+**Date**: 2026-06-15
+**Task**: Fix Resolve credential write race
+**Branch**: `main`
+
+### Summary
+
+Fixed frequent Resolve provider credentials ENOENT by serializing local credential read-modify-write updates, using unique temp files, adding a concurrent-write regression test, and documenting the persistence contract.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `bff5a2f4` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 135: Fix image generation provider payloads
+
+**Date**: 2026-06-16
+**Task**: Fix image generation provider payloads
+**Branch**: `main`
+
+### Summary
+
+Fixed RunningHub Z-Image prompt payload mapping, omitted unsupported 12AI Gemini async image_size, and made the image background toggle the only trigger for 12AI async image generation on the main workstation.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `94b6e03d` | (see git log) |
+| `42d56c2d` | (see git log) |
+| `5bfbedc6` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 136: Fix fullscreen passive wheel warning
+
+**Date**: 2026-06-16
+**Task**: Fix fullscreen passive wheel warning
+**Branch**: `main`
+
+### Summary
+
+Moved fullscreen image preview wheel zoom from React onWheel to a native non-passive wheel listener, preserving zoom behavior while eliminating passive preventDefault warnings.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `bff165a9` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 137: Fix cinematic parameter reuse
+
+**Date**: 2026-06-16
+**Task**: Fix cinematic parameter reuse
+**Branch**: `main`
+
+### Summary
+
+Restored cinematic camera profile when reusing generation parameters and committed cinematic control snapshot support.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `0456dcc2` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 138: Fix 12AI Gemini image request casing
+
+**Date**: 2026-06-16
+**Task**: Fix 12AI Gemini image request casing
+**Branch**: `main`
+
+### Summary
+
+Fixed 12AI Gemini synchronous image generation to send reference images with documented inlineData/mimeType casing, added provider regression coverage, repaired the provider test suite import path, and recorded the provider contract.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `72f84142` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 139: Fix large image data URI parsing
+
+**Date**: 2026-06-16
+**Task**: Fix large image data URI parsing
+**Branch**: `main`
+
+### Summary
+
+Replaced regex data URI parsing with delimiter parsing to avoid Edge stack overflow on large 12AI Gemini inline image results; added regression coverage and updated provider notes.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `05d6fae3` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 140: Fix RunningHub Z-Image aspect ratio mapping
+
+**Date**: 2026-06-16
+**Task**: Fix RunningHub Z-Image aspect ratio mapping
+**Branch**: `main`
+
+### Summary
+
+Updated RunningHub Z-Image Turbo Standard Model mapping to send aspectRatio instead of legacy ComfyUI node fields; regenerated catalog, added regression coverage, and documented the provider contract.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `84d5431e` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 141: Refine cinematic profile modal sizing
+
+**Date**: 2026-06-16
+**Task**: Refine cinematic profile modal sizing
+**Branch**: `main`
+
+### Summary
+
+Adjusted the cinematic profile modal to use a wider stable layout with a fixed but smaller height, keeping category tabs from scrolling horizontally and preventing page-to-page size jumps.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `88fdd612` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 142: Adopt AGPL licensing and author shortcuts
+
+**Date**: 2026-06-16
+**Task**: Adopt AGPL licensing and author shortcuts
+**Branch**: `main`
+
+### Summary
+
+Documented project licensing under AGPL-3.0-or-later, added author metadata and README license guidance, and exposed compact top-bar GitHub/email shortcuts pointing to the project repository and author contact.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `43c76d65` | (see git log) |
+| `d5180e5a` | (see git log) |
+| `5c63dff5` | (see git log) |
+| `f567f5cd` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 143: Fix reference image compression
+
+**Date**: 2026-06-16
+**Task**: Fix reference image compression
+**Branch**: `main`
+
+### Summary
+
+Made browser-side reference image compression policy-driven with bounded quality and dimension attempts, added attempt-order tests, and documented the compression contract.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `80855fd2` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 144: Fix cinematic style light theme contrast
+
+**Date**: 2026-06-16
+**Task**: Fix cinematic style light theme contrast
+**Branch**: `main`
+
+### Summary
+
+Tokenized the cinematic profile enabled controls so the top-right style switch remains readable in light theme. Verification was limited by pre-existing SettingsModal syntax errors, while theme color scan and contrast checks passed.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `832b60a` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 145: Finish i18n zh/en rollout
+
+**Date**: 2026-06-16
+**Task**: Finish i18n zh/en rollout
+**Branch**: `main`
+
+### Summary
+
+Archived the i18n rollout task after finishing board-page cleanup, spec note, and successful lint/typecheck/build verification.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `01b220c` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 146: Fix board node deletion misdelete bugs
+
+**Date**: 2026-06-16
+**Task**: Fix board node deletion misdelete bugs
+**Branch**: `main`
+
+### Summary
+
+Fixed board deletion so executable nodes only cascade-delete owned result nodes, corrected context-menu multi-select behavior, and added focused board deletion regression tests.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `56d5546` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 147: Optimize board variant generation
+
+**Date**: 2026-06-16
+**Task**: Optimize board variant generation
+**Branch**: `main`
+
+### Summary
+
+Made board variant generation start image/video/audio variants concurrently and kept completed result versions selectable while newer variants remain active.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `556b16e` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 148: Fix RunningHub app workflow references
+
+**Date**: 2026-06-16
+**Task**: Fix RunningHub app workflow references
+**Branch**: `main`
+
+### Summary
+
+Fixed RunningHub AI App and Workflow reference media execution by bypassing static capability validation for virtual task targets and preserving typed reference media through image/video request paths.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9afc34f` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 149: Unify asset reference handling
+
+**Date**: 2026-06-17
+**Task**: Unify asset reference handling
+**Branch**: `main`
+
+### Summary
+
+Unified generated result and imported asset reference behavior, switched generation snapshots to sourceAssetId-backed reference media, and extended cleanup/backup protection for tasks and voice profiles.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a9a55b4` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 150: Fix asset reference review findings
+
+**Date**: 2026-06-17
+**Task**: Fix asset reference review findings
+**Branch**: `main`
+
+### Summary
+
+Fixed result-node reference-group port validation, made board-only task backup selection self-contained, and allowed generation task backup parsing to use explicit legacy defaults.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4a2f9d0` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 151: Clean up legacy asset reference logic
+
+**Date**: 2026-06-17
+**Task**: Clean up legacy asset reference logic
+**Branch**: `main`
+
+### Summary
+
+Removed duplicate internal legacy referenceImage/referenceImages emission now that typed referenceMedia is the request source of truth, while preserving route and persisted-data compatibility readers.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e4f1e22` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 152: Optimize image generation worker pressure
+
+**Date**: 2026-06-17
+**Task**: Optimize image generation worker pressure
+**Branch**: `main`
+
+### Summary
+
+Reduced Cloudflare Worker pressure by serializing board variant generation starts and sequentializing multi-output image localization in the Edge image route. Verified lint and typecheck; production build remains blocked by local Next dependency package config resolution.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8cf2cbe` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 153: Board visual polish review fixes
+
+**Date**: 2026-06-18
+**Task**: Board visual polish review fixes
+**Branch**: `main`
+
+### Summary
+
+Recorded and committed the existing board/workbench visual polish batch, confirmed OCR follow-up fixes for screenshot cleanup and asset popover controls, and verified lint/typecheck.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f9cd597c` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
