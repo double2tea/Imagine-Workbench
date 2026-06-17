@@ -1562,7 +1562,7 @@ export default function BoardWorkspace({
         edge.to.nodeId === node.id &&
         edge.to.portId === BOARD_PORT_IDS.assetIn
       );
-      if (hasLiveEdge) resultNodeBySourceStack.set(resultSourceStackMapKey(node.sourceNodeId, node.resultStackKey), node);
+      if (hasLiveEdge) resultNodeBySourceStack.set(resultSourceStackMapKey(node.sourceNodeId, node.resultStackKey ?? ""), node);
     }
     return resultNodeBySourceStack;
     // board.nodes read inside; graph content key gates source/result stack changes

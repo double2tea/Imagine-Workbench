@@ -28,6 +28,17 @@ test("board result stack key is stable for equivalent object field order", () =>
   assert.equal(left, right);
 });
 
+test("board result stack key ignores undefined object fields", () => {
+  const left = imageStackKey({
+    params: { aspectRatio: "1:1", imageQuality: "auto", lighting: "soft-window" },
+  });
+  const right = imageStackKey({
+    params: { aspectRatio: "1:1", imageQuality: "auto", lighting: "soft-window", optional: undefined },
+  });
+
+  assert.equal(left, right);
+});
+
 test("board result stack key changes when prompt, references, or params change", () => {
   const base = imageStackKey({});
 

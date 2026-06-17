@@ -7,6 +7,7 @@ interface BoardPlacementNode {
 
 const BOARD_PLACEMENT_GAP = 48;
 const BOARD_PLACEMENT_SEARCH_RADIUS = 24;
+const OFFSETS_CACHE = new Map<number, Array<[number, number]>>();
 
 function overlaps(leftPosition: BoardPoint, leftSize: BoardSize, right: BoardPlacementNode): boolean {
   return (
@@ -18,7 +19,13 @@ function overlaps(leftPosition: BoardPoint, leftSize: BoardSize, right: BoardPla
 }
 
 function placementOffsets(radius: number): Array<[number, number]> {
-  if (radius === 0) return [[0, 0]];
+  const cached = OFFSETS_CACHE.get(radius);
+  if (cached) return cached;
+  if (radius === 0) {
+    const result: Array<[number, number]> = [[0, 0]];
+    OFFSETS_CACHE.set(radius, result);
+    return result;
+  }
   const offsets: Array<[number, number]> = [];
   for (let x = -radius; x <= radius; x += 1) {
     offsets.push([x, -radius], [x, radius]);
@@ -26,7 +33,7 @@ function placementOffsets(radius: number): Array<[number, number]> {
   for (let y = -radius + 1; y < radius; y += 1) {
     offsets.push([-radius, y], [radius, y]);
   }
-  return offsets.sort((left, right) => {
+  const result = offsets.sort((left, right) => {
     const leftDistance = Math.abs(left[0]) + Math.abs(left[1]);
     const rightDistance = Math.abs(right[0]) + Math.abs(right[1]);
     if (leftDistance !== rightDistance) return leftDistance - rightDistance;
@@ -35,6 +42,8 @@ function placementOffsets(radius: number): Array<[number, number]> {
     if (leftSide !== rightSide) return leftSide - rightSide;
     return Math.abs(left[1]) - Math.abs(right[1]);
   });
+  OFFSETS_CACHE.set(radius, result);
+  return result;
 }
 
 export function findAvailableBoardNodePosition(

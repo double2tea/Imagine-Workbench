@@ -19,7 +19,8 @@ export interface BoardResultStackIdentityInput {
   references: readonly BoardResultStackReference[];
 }
 
-function stableStringify(value: BoardResultStackValue): string {
+function stableStringify(value: BoardResultStackValue | undefined): string {
+  if (value === undefined) return "null";
   if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
     return JSON.stringify(value);
   }
@@ -28,7 +29,7 @@ function stableStringify(value: BoardResultStackValue): string {
   }
   const entries = Object.entries(value)
     .filter((entry): entry is [string, BoardResultStackValue] => entry[1] !== undefined)
-    .sort(([left], [right]) => left.localeCompare(right));
+    .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
   return `{${entries.map(([key, entryValue]) => `${JSON.stringify(key)}:${stableStringify(entryValue)}`).join(",")}}`;
 }
 
