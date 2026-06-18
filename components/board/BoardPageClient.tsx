@@ -2866,6 +2866,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           position: { x: sourcePosition.x + 720, y: sourcePosition.y },
           ...defaults,
           ...(action.params?.aspectRatio ? { aspectRatio: action.params.aspectRatio } : {}),
+          ...(action.params?.cinematicProfile ? { cinematicProfile: action.params.cinematicProfile } : {}),
           ...(action.params?.videoResolution ? { videoResolution: action.params.videoResolution } : {}),
           ...(action.params?.videoDuration ? { videoDuration: action.params.videoDuration } : {}),
           ...(action.params?.videoPreset ? { videoPreset: action.params.videoPreset } : {}),
@@ -2881,11 +2882,13 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         boardController.endUndoGesture();
       }
       if (action.params?.run === true) {
+        const cinematicProfile = action.params.cinematicProfile ?? DEFAULT_CINEMATIC_PROFILE;
         const resultStackKey = resultStackKeyForConfig({
           kind: "video-generate",
           model,
           params: {
             aspectRatio: action.params.aspectRatio ?? defaults.aspectRatio,
+            cinematicProfile: cinematicProfileStackValue(cinematicProfile),
             videoDuration: action.params.videoDuration ?? defaults.videoDuration ?? "",
             videoPreset: action.params.videoPreset ?? defaults.videoPreset ?? "",
             videoReferenceMode: action.params.videoReferenceMode ?? defaults.videoReferenceMode ?? "",
@@ -2900,6 +2903,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           boardId: resolvedBoardId,
           boardNodeId: videoNodeId,
           boardResultStackKey: resultStackKey,
+          cinematicProfile,
           model,
           prompt: promptValue,
           referenceImage: reference.url,
@@ -3065,10 +3069,12 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       const defaults = {
         ...imageActionDefaults(model, action.params?.aspectRatio),
         ...(action.params?.aspectRatio ? { aspectRatio: action.params.aspectRatio } : {}),
+        ...(action.params?.cinematicProfile ? { cinematicProfile: action.params.cinematicProfile } : {}),
         ...(action.params?.imageResolution ? { imageResolution: action.params.imageResolution } : {}),
         ...(action.params?.imageQuality ? { imageQuality: action.params.imageQuality } : {}),
         ...(action.params?.thinkingLevel ? { thinkingLevel: action.params.thinkingLevel } : {}),
       };
+      const cinematicProfile = defaults.cinematicProfile ?? DEFAULT_CINEMATIC_PROFILE;
       const generateNodeId = boardController.addGenerateNode({
         kind,
         model,
@@ -3130,6 +3136,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           customImageResolution: defaults.customImageResolution,
           imageQuality: defaults.imageQuality ?? "",
           imageResolution: defaults.imageResolution,
+          cinematicProfile: cinematicProfileStackValue(cinematicProfile),
           runningHubYouchuan: runningHubYouchuanStackValue(defaults.runningHubYouchuan),
           thinkingLevel: defaults.thinkingLevel ?? "",
         },
@@ -3144,6 +3151,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         imageQuality: defaults.imageQuality,
         imageResolution: defaults.imageResolution,
         isCustomImageResolution: isCustomImageResolutionValue(defaults.imageResolution),
+        cinematicProfile,
         model,
         prompt: promptFromAgent,
         referenceImage: references[0]?.url ?? null,
@@ -3270,11 +3278,13 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     const defaults = {
       ...videoActionDefaults(model, action.params?.aspectRatio),
       ...(action.params?.aspectRatio ? { aspectRatio: action.params.aspectRatio } : {}),
+      ...(action.params?.cinematicProfile ? { cinematicProfile: action.params.cinematicProfile } : {}),
       ...(action.params?.videoResolution ? { videoResolution: action.params.videoResolution } : {}),
       ...(action.params?.videoDuration ? { videoDuration: action.params.videoDuration } : {}),
       ...(action.params?.videoPreset ? { videoPreset: action.params.videoPreset } : {}),
       ...(action.params?.videoReferenceMode ? { videoReferenceMode: action.params.videoReferenceMode } : {}),
     };
+    const cinematicProfile = defaults.cinematicProfile ?? DEFAULT_CINEMATIC_PROFILE;
     const generateNodeId = boardController.addGenerateNode({
       kind,
       model,
@@ -3340,6 +3350,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       model,
       params: {
         aspectRatio: defaults.aspectRatio,
+        cinematicProfile: cinematicProfileStackValue(cinematicProfile),
         videoDuration: defaults.videoDuration ?? "",
         videoPreset: defaults.videoPreset ?? "",
         videoReferenceMode: defaults.videoReferenceMode ?? "",
@@ -3353,6 +3364,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       boardId: resolvedBoardId,
       boardNodeId: generateNodeId,
       boardResultStackKey: resultStackKey,
+      cinematicProfile,
       model,
       prompt: promptFromAgent,
       referenceImage: references[0]?.url ?? null,

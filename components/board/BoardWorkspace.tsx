@@ -100,6 +100,7 @@ import {
   type BoardSummary,
   type BoardViewport,
   type CreateAssetNodeInput,
+  type CreateResultNodeInput,
 } from "@/lib/board";
 import { BoardNodeCallbacksContext, type BoardNodeCallbacks } from "@/lib/board/callbacks";
 import {
@@ -944,6 +945,33 @@ function batchConnectionToTarget(
 
 function isBoardMediaSourceNode(node: BoardNodeModel | undefined): node is BoardNodeModel & { kind: "asset" | "result" } {
   return node?.kind === "asset" || node?.kind === "result";
+}
+
+type ResultSourceNodeModel = Extract<BoardNodeModel, { kind: "image-generate" | "video-generate" | "audio-operation" | "runninghub-app" }>;
+
+function resultNodeSnapshotForSource(
+  sourceNode: ResultSourceNodeModel,
+  galleryItemById: ReadonlyMap<string, StorageItem>,
+): Pick<CreateResultNodeInput, "activeAssetId" | "asset" | "resultAssetIds"> | null {
+  const currentResultAssetIds = sourceNode.resultAssetIds ?? (sourceNode.resultAssetId ? [sourceNode.resultAssetId] : []);
+  const activeAssetId = sourceNode.resultAssetId ?? currentResultAssetIds.at(-1);
+  if (!activeAssetId) return null;
+  const item = galleryItemById.get(activeAssetId);
+  if (!isMediaReferenceItem(item)) return null;
+  const resultAssetIds = currentResultAssetIds.includes(activeAssetId)
+    ? currentResultAssetIds
+    : [...currentResultAssetIds, activeAssetId];
+  return {
+    activeAssetId,
+    resultAssetIds,
+    asset: {
+      assetId: item.id,
+      type: item.type,
+      url: item.url,
+      prompt: item.prompt,
+      model: item.model,
+    },
+  };
 }
 
 function multiGridImageReferences(
@@ -2735,13 +2763,16 @@ export default function BoardWorkspace({
         return;
       }
       const from: BoardPortRef = { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "result" };
+      const resultSnapshot = resultNodeSnapshotForSource(sourceNode, galleryItemById);
+      if (!resultSnapshot) {
+        onConnectionError(tb("workspace.resultNotReady"));
+        return;
+      }
       const resultNodeId = addResultNodeWithConnection(
         {
           sourceNodeId: sourceNode.id,
           resultStackKey: sourceNode.resultStackKey ?? "",
-          activeAssetId: "",
-          resultAssetIds: [],
-          asset: { assetId: "", type: "image", url: "", prompt: "", model: "" },
+          ...resultSnapshot,
           position: centeredNodePosition(flowPoint, DEFAULT_ASSET_NODE_SIZE),
         },
         from,
@@ -2750,7 +2781,7 @@ export default function BoardWorkspace({
       selectEdge(null);
       return;
     }
-  }, [addAssetToMultiGrid, addResultNodeWithConnection, board.edges, board.nodes, centeredNodePosition, connectPortsBatch, flowPositionFromClient, onConnectionError, selectEdge, selectedNodeIds, selectNode, tb, updateSelectedNodeIds]);
+  }, [addAssetToMultiGrid, addResultNodeWithConnection, board.edges, board.nodes, centeredNodePosition, connectPortsBatch, flowPositionFromClient, galleryItemById, onConnectionError, selectEdge, selectedNodeIds, selectNode, tb, updateSelectedNodeIds]);
 
   const openQuickInsertMenu = useCallback((event: ReactMouseEvent | MouseEvent): void => {
     event.preventDefault();
