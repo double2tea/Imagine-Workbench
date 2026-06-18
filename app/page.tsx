@@ -611,10 +611,12 @@ export default function Home() {
   const needsManualVoiceCloneConsent = activeAudioMode === "voice_clone" && !selectedVoiceProfileProvidesCloneReference;
   const imagePromptRequired = runningHubAppPresetRequiresPrompt(selectedModel);
   const videoPromptRequired = runningHubAppPresetRequiresPrompt(selectedVideoModel);
-  const isCreatorGenerateDisabled =
+  const isCreatorSubmitting = traditionalSubTab === "image" ? isSubmittingImage : traditionalSubTab === "audio" ? isSubmittingAudio : isSubmittingVideo;
+  const isCreatorInputDisabled =
     traditionalSubTab === "audio"
       ? (audioTextInputRequired && !prompt.trim()) || (audioStylePromptRequired && !audioStylePrompt.trim()) || !hasRequiredAudioReferences || (needsManualVoiceCloneConsent && !voiceCloneConsentAccepted)
       : (traditionalSubTab === "image" ? imagePromptRequired : videoPromptRequired) && !prompt.trim();
+  const isCreatorGenerateDisabled = isCreatorSubmitting || isCreatorInputDisabled;
 
   const asyncImageModel = resolveAsyncImageModelValue(selectedModel, referenceImages.length);
   const canUseBackgroundImageGeneration = asyncImageModel !== null;
@@ -1979,7 +1981,7 @@ export default function Home() {
               <CreatorGenerateButton
                 mode={traditionalSubTab}
                 disabled={isCreatorGenerateDisabled}
-                isSubmitting={traditionalSubTab === "image" ? isSubmittingImage : traditionalSubTab === "audio" ? isSubmittingAudio : isSubmittingVideo}
+                isSubmitting={isCreatorSubmitting}
                 submitCount={traditionalSubTab === "image" ? imageSubmitCount : traditionalSubTab === "audio" ? audioSubmitCount : videoSubmitCount}
                 priceProvider={traditionalSubTab === "image" ? selectedModel.split(":")[0] : traditionalSubTab === "audio" ? selectedAudioModel.split(":")[0] : selectedVideoModel.split(":")[0]}
                 priceModelId={traditionalSubTab === "image" ? selectedModel : traditionalSubTab === "audio" ? selectedAudioModel : selectedVideoModel}
