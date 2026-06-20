@@ -349,7 +349,14 @@
     "cancelFavorite": "Remove from favorites",
     "addFavorite": "Add to favorites",
     "imageVideoAudio": "Image / Video / Audio",
-    "matchCount": "{count} match(es)"
+    "matchCount": "{count} match(es)",
+    "category": {
+      "character": "Character",
+      "scene": "Scene",
+      "prop": "Prop",
+      "style": "Style",
+      "other": "Other"
+    }
   },
   "assetCard": {
     "select": "Select",

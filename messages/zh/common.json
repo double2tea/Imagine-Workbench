@@ -546,7 +546,14 @@
     "cancelFavorite": "取消收藏",
     "addFavorite": "收藏素材",
     "imageVideoAudio": "图片 / 视频 / 音频",
-    "matchCount": "{count} 个匹配"
+    "matchCount": "{count} 个匹配",
+    "category": {
+      "character": "角色",
+      "scene": "场景",
+      "prop": "道具",
+      "style": "风格",
+      "other": "其他"
+    }
   },
   "assetCard": {
     "select": "选择",

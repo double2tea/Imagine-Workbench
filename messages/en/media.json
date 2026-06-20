@@ -10,6 +10,21 @@
     "seekFailed": "Video seek failed, cannot capture frame"
   },
   "referenceLabels": { "image": "Image", "video": "Video", "audio": "Audio" },
+  "panoramaCameras": {
+    "front": "Front",
+    "right": "Right",
+    "back": "Back",
+    "left": "Left",
+    "frontRight": "Front Right",
+    "backRight": "Back Right",
+    "backLeft": "Back Left",
+    "frontLeft": "Front Left",
+    "upFront": "Up Front",
+    "upBack": "Up Back",
+    "downFront": "Down Front",
+    "downBack": "Down Back"
+  },
+  "panoramaScreenshotLabel": "Panorama Screenshot",
   "modeLabels": { "asr": "Transcribe", "music": "Music", "sfx": "SFX", "tts": "Text-to-Speech", "voice_clone": "Voice Clone", "voice_design": "Voice Design" },
   "asrLanguageOptions": { "auto": "Auto Detect", "zh": "Chinese", "en": "English" },
   "missingReferenceMessage": "Current audio mode requires at least {min} {referenceLabel}",
