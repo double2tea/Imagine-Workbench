@@ -49,6 +49,7 @@ export interface GenerationRequestSnapshot {
   audioStylePrompt?: string;
   asrLanguage?: "auto" | "zh" | "en";
   optimizeTextPreview?: boolean;
+  voiceCloneConsentAccepted?: boolean;
   voiceProfileId?: string;
   runningHubAccessPassword?: string;
   runningHubNodeInfoList?: RunningHubTaskNodeBinding[];

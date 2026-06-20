@@ -1,4 +1,5 @@
 import type { TFunction } from "@/lib/i18n";
+import { useRef } from "react";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import { isRunningHubWorkflowAudioTarget } from "@/lib/audio-generation-routing";
@@ -399,6 +400,8 @@ export function useGenerationActions({
   setVideoSubmitCount,
   t,
 }: UseGenerationActionsParams) {
+  const audioSubmissionKeysInFlightRef = useRef<Set<string>>(new Set());
+
   const resolveScopeBoardId = (overrides: GenerationOverrides): string | undefined =>
     overrides.boardId ?? boardId;
 
@@ -797,14 +800,6 @@ export function useGenerationActions({
     const activePrompt = overrides.prompt ?? prompt;
     const selectedReferenceImage = overrides.referenceImage ?? referenceImage;
     const selectedReferenceImages = overrides.referenceImages ?? referenceImages;
-    let activeReferenceImages: ReferenceImageRef[];
-    try {
-      activeReferenceImages = await resolveOriginalReferences(selectedReferenceImages, t);
-    } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.referenceMediaReadFailed")));
-      return false;
-    }
-    const activeReferenceImage = activeReferenceImages[0]?.url ?? selectedReferenceImage;
     const requestModel = overrides.model?.trim();
 
     if (!requestModel) {
@@ -815,127 +810,161 @@ export function useGenerationActions({
     const audioCapabilities = isRunningHubWorkflowAudio ? null : getAudioModelCapabilities(requestModel);
     const audioMode = overrides.audioMode ?? audioCapabilities?.defaultMode;
     if (!activePrompt.trim() && audioMode !== undefined && audioOperationRequiresTextInput(audioMode) && overrides.allowEmptyPrompt !== true) return false;
-    let profileStylePrompt: string | undefined;
-    let profileVoice: string | undefined;
-    let profileReferences: ReferenceImageRef[] = [];
-    let profileCloneConsentAccepted = false;
-    if (overrides.voiceProfileId) {
-      try {
-        const profile = await getVoiceProfile(overrides.voiceProfileId);
-        if (!profile) throw new Error(t("common.notices.voiceProfileNotFound"));
-        if (!audioMode || !isVoiceProfileUsableForAudioModel(profile, requestModel, audioMode)) {
-          throw new Error(t("common.notices.voiceProfileNotUsableForModel"));
-        }
-        profileStylePrompt = profile.designPrompt;
-        profileVoice = profile.providerVoiceId;
-        profileCloneConsentAccepted = profile.source === "cloned" && Boolean(profile.consentAcceptedAt);
-        profileReferences = await readVoiceProfileReferences(profile.referenceAudioAssetIds, t);
-      } catch (error) {
-        pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.voiceProfileReadFailed")));
-        return false;
-      }
-    }
-    if (audioMode === "voice_clone" && overrides.voiceCloneConsentAccepted !== true && !profileCloneConsentAccepted) {
-      pushWorkspaceNotice("error", t("common.notices.voiceCloneNeedsConsent"));
-      return false;
-    }
-    const resolvedAudioStylePrompt = profileStylePrompt ?? overrides.audioStylePrompt;
-    const audioReferences = mergeReferences(activeReferenceImages, profileReferences);
-    if (audioReferences.length === 0 && activeReferenceImage) {
-      audioReferences.push({ id: "legacy-reference", url: activeReferenceImage });
-    }
-    const audioReferenceUrls = audioReferences.map(reference => reference.url);
-    let audioReferencePayloads: string[];
-    try {
-      audioReferencePayloads = await Promise.all(audioReferenceUrls.map(prepareReferenceMediaUrlForRequest));
-    } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.referenceMediaReadFailed")));
-      return false;
-    }
-    const audioPayloadError = getReferenceMediaPayloadError(audioReferencePayloads);
-    if (audioPayloadError) {
-      pushWorkspaceNotice("error", audioPayloadError);
-      return false;
-    }
-    const audioReferenceTypes = audioReferences.map(reference => getMediaReferenceType(reference) ?? "image");
-    if (audioCapabilities && audioReferenceTypes.some(type => !audioCapabilities.referenceMediaTypes.includes(type))) {
-      pushWorkspaceNotice("error", t("common.notices.allReferenceMediaParseFailed"));
-      return false;
-    }
-    if (audioCapabilities && audioReferences.length < audioCapabilities.minReferenceMedia) {
-      pushWorkspaceNotice("error", audioOperationMissingReferenceMessage(audioCapabilities, t));
-      return false;
-    }
-    if (audioCapabilities && audioCapabilities.maxReferenceMedia >= 0 && audioReferences.length > audioCapabilities.maxReferenceMedia) {
-      pushWorkspaceNotice("error", t("common.notices.audioModelMaxMedia", { max: audioCapabilities.maxReferenceMedia }));
-      return false;
-    }
 
-    setAudioSubmitCount(prev => prev + 1);
-    const generationPrompt = buildPromptWithReferenceMap(activePrompt, audioReferences, audioReferenceUrls);
-    const resultMediaType: StorageItem["type"] = audioMode === "asr" ? "transcript" : "audio";
-    const requestAudioFormat = readOptionalAudioFormat(overrides.audioFormat);
-    const generationRequest: GenerationRequestSnapshot = {
-      prompt: generationPrompt,
+    const audioSubmissionKey = JSON.stringify({
+      allowEmptyPrompt: overrides.allowEmptyPrompt === true,
+      asrLanguage: overrides.asrLanguage,
+      audioFormat: overrides.audioFormat,
+      audioMode,
+      audioStylePrompt: overrides.audioStylePrompt,
+      boardId: resolveScopeBoardId(overrides),
+      boardNodeId: overrides.boardNodeId,
+      boardResultStackKey: overrides.boardResultStackKey,
       model: requestModel,
-      aspectRatio: resultMediaType === "transcript" ? "transcript" : "audio",
+      optimizeTextPreview: overrides.optimizeTextPreview,
+      prompt: activePrompt,
+      referenceImage: selectedReferenceImage,
+      referenceImages: selectedReferenceImages.map(({ id, role, url }) => ({ id, role, url })),
       runningHubAccessPassword: overrides.runningHubAccessPassword,
       runningHubNodeInfoList: overrides.runningHubNodeInfoList,
-      referenceMedia: buildReferenceMediaSnapshot(audioReferences, audioReferencePayloads),
-      audioFormat: requestAudioFormat,
-      audioMode,
-      audioStylePrompt: resolvedAudioStylePrompt,
-      asrLanguage: overrides.asrLanguage,
-      optimizeTextPreview: overrides.optimizeTextPreview,
+      voiceCloneConsentAccepted: overrides.voiceCloneConsentAccepted === true,
       voiceProfileId: overrides.voiceProfileId,
-    };
-
-    const taskId = makeClientId(resultMediaType === "transcript" ? "task_txt" : "task_aud");
-    const task = createGenerationTask({
-      id: taskId,
-      mediaType: resultMediaType,
-      prompt: activePrompt.trim() || (resultMediaType === "transcript" ? t("common.notices.audioTranscribeDefault") : activePrompt),
-      model: requestModel,
-      status: "pending",
-      progress: 12,
-      createdAt: new Date().toISOString(),
-      source: resolveTaskSource(overrides),
-      request: generationRequest,
     });
-    if (!await saveTaskOrWarn(task, pushWorkspaceNotice, t)) {
-      setAudioSubmitCount(prev => Math.max(0, prev - 1));
-      return true;
-    }
-    recordGenerationTask(task);
-
-    const controller = new AbortController();
-    generationAbortControllersRef.current[taskId] = controller;
+    const audioSubmissionKeysInFlight = audioSubmissionKeysInFlightRef.current;
+    if (audioSubmissionKeysInFlight.has(audioSubmissionKey)) return true;
+    audioSubmissionKeysInFlight.add(audioSubmissionKey);
 
     try {
-      const headers = buildProviderHeaders(requestModel);
-      const res = await fetch(audioGenerationEndpoint(requestModel, generationRequest.runningHubNodeInfoList), {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...headers },
-        signal: controller.signal,
-        body: JSON.stringify({
-          mode: audioMode,
-          prompt: generationRequest.prompt,
-          model: generationRequest.model,
-          format: requestAudioFormat,
-          stylePrompt: resolvedAudioStylePrompt,
-          asrLanguage: overrides.asrLanguage,
-          voice: profileVoice,
-          voiceCloneConsentAccepted: overrides.voiceCloneConsentAccepted,
-          optimizeTextPreview: overrides.optimizeTextPreview,
-          referenceMedia: audioReferences.map((reference, index) => ({
-            dataUri: audioReferencePayloads[index] ?? "",
-            type: getMediaReferenceType(reference),
-            ...(reference.role ? { role: reference.role } : {}),
-          })),
-          runningHubAccessPassword: generationRequest.runningHubAccessPassword,
-          runningHubNodeInfoList: generationRequest.runningHubNodeInfoList,
-        }),
+      let activeReferenceImages: ReferenceImageRef[];
+      try {
+        activeReferenceImages = await resolveOriginalReferences(selectedReferenceImages, t);
+      } catch (error) {
+        pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.referenceMediaReadFailed")));
+        return false;
+      }
+      const activeReferenceImage = activeReferenceImages[0]?.url ?? selectedReferenceImage;
+      let profileStylePrompt: string | undefined;
+      let profileVoice: string | undefined;
+      let profileReferences: ReferenceImageRef[] = [];
+      let profileCloneConsentAccepted = false;
+      if (overrides.voiceProfileId) {
+        try {
+          const profile = await getVoiceProfile(overrides.voiceProfileId);
+          if (!profile) throw new Error(t("common.notices.voiceProfileNotFound"));
+          if (!audioMode || !isVoiceProfileUsableForAudioModel(profile, requestModel, audioMode)) {
+            throw new Error(t("common.notices.voiceProfileNotUsableForModel"));
+          }
+          profileStylePrompt = profile.designPrompt;
+          profileVoice = profile.providerVoiceId;
+          profileCloneConsentAccepted = profile.source === "cloned" && Boolean(profile.consentAcceptedAt);
+          profileReferences = await readVoiceProfileReferences(profile.referenceAudioAssetIds, t);
+        } catch (error) {
+          pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.voiceProfileReadFailed")));
+          return false;
+        }
+      }
+      if (audioMode === "voice_clone" && overrides.voiceCloneConsentAccepted !== true && !profileCloneConsentAccepted) {
+        pushWorkspaceNotice("error", t("common.notices.voiceCloneNeedsConsent"));
+        return false;
+      }
+      const resolvedAudioStylePrompt = profileStylePrompt ?? overrides.audioStylePrompt;
+      const audioReferences = mergeReferences(activeReferenceImages, profileReferences);
+      if (audioReferences.length === 0 && activeReferenceImage) {
+        audioReferences.push({ id: "legacy-reference", url: activeReferenceImage });
+      }
+      const audioReferenceUrls = audioReferences.map(reference => reference.url);
+      let audioReferencePayloads: string[];
+      try {
+        audioReferencePayloads = await Promise.all(audioReferenceUrls.map(prepareReferenceMediaUrlForRequest));
+      } catch (error) {
+        pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.referenceMediaReadFailed")));
+        return false;
+      }
+      const audioPayloadError = getReferenceMediaPayloadError(audioReferencePayloads);
+      if (audioPayloadError) {
+        pushWorkspaceNotice("error", audioPayloadError);
+        return false;
+      }
+      const audioReferenceTypes = audioReferences.map(reference => getMediaReferenceType(reference) ?? "image");
+      if (audioCapabilities && audioReferenceTypes.some(type => !audioCapabilities.referenceMediaTypes.includes(type))) {
+        pushWorkspaceNotice("error", t("common.notices.allReferenceMediaParseFailed"));
+        return false;
+      }
+      if (audioCapabilities && audioReferences.length < audioCapabilities.minReferenceMedia) {
+        pushWorkspaceNotice("error", audioOperationMissingReferenceMessage(audioCapabilities, t));
+        return false;
+      }
+      if (audioCapabilities && audioCapabilities.maxReferenceMedia >= 0 && audioReferences.length > audioCapabilities.maxReferenceMedia) {
+        pushWorkspaceNotice("error", t("common.notices.audioModelMaxMedia", { max: audioCapabilities.maxReferenceMedia }));
+        return false;
+      }
+
+      setAudioSubmitCount(prev => prev + 1);
+      const generationPrompt = buildPromptWithReferenceMap(activePrompt, audioReferences, audioReferenceUrls);
+      const resultMediaType: StorageItem["type"] = audioMode === "asr" ? "transcript" : "audio";
+      const requestAudioFormat = readOptionalAudioFormat(overrides.audioFormat);
+      const generationRequest: GenerationRequestSnapshot = {
+        prompt: generationPrompt,
+        model: requestModel,
+        aspectRatio: resultMediaType === "transcript" ? "transcript" : "audio",
+        runningHubAccessPassword: overrides.runningHubAccessPassword,
+        runningHubNodeInfoList: overrides.runningHubNodeInfoList,
+        referenceMedia: buildReferenceMediaSnapshot(audioReferences, audioReferencePayloads),
+        audioFormat: requestAudioFormat,
+        audioMode,
+        audioStylePrompt: resolvedAudioStylePrompt,
+        asrLanguage: overrides.asrLanguage,
+        optimizeTextPreview: overrides.optimizeTextPreview,
+        voiceCloneConsentAccepted: overrides.voiceCloneConsentAccepted,
+        voiceProfileId: overrides.voiceProfileId,
+      };
+
+      const taskId = makeClientId(resultMediaType === "transcript" ? "task_txt" : "task_aud");
+      const task = createGenerationTask({
+        id: taskId,
+        mediaType: resultMediaType,
+        prompt: activePrompt.trim() || (resultMediaType === "transcript" ? t("common.notices.audioTranscribeDefault") : activePrompt),
+        model: requestModel,
+        status: "pending",
+        progress: 12,
+        createdAt: new Date().toISOString(),
+        source: resolveTaskSource(overrides),
+        request: generationRequest,
       });
+      if (!await saveTaskOrWarn(task, pushWorkspaceNotice, t)) {
+        setAudioSubmitCount(prev => Math.max(0, prev - 1));
+        return true;
+      }
+      recordGenerationTask(task);
+
+      const controller = new AbortController();
+      generationAbortControllersRef.current[taskId] = controller;
+
+      try {
+        const headers = buildProviderHeaders(requestModel);
+        const res = await fetch(audioGenerationEndpoint(requestModel, generationRequest.runningHubNodeInfoList), {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...headers },
+          signal: controller.signal,
+          body: JSON.stringify({
+            mode: audioMode,
+            prompt: generationRequest.prompt,
+            model: generationRequest.model,
+            format: requestAudioFormat,
+            stylePrompt: resolvedAudioStylePrompt,
+            asrLanguage: overrides.asrLanguage,
+            voice: profileVoice,
+            voiceCloneConsentAccepted: overrides.voiceCloneConsentAccepted,
+            optimizeTextPreview: overrides.optimizeTextPreview,
+            referenceMedia: audioReferences.map((reference, index) => ({
+              dataUri: audioReferencePayloads[index] ?? "",
+              type: getMediaReferenceType(reference),
+              ...(reference.role ? { role: reference.role } : {}),
+            })),
+            runningHubAccessPassword: generationRequest.runningHubAccessPassword,
+            runningHubNodeInfoList: generationRequest.runningHubNodeInfoList,
+          }),
+        });
 
       if (res.ok) {
         const data: unknown = await res.json();
@@ -1048,28 +1077,31 @@ export function useGenerationActions({
         const message = await readFetchError(res, t("common.notices.audioGenRequestFailed"));
         throw new Error(t("common.notices.audioModelRequestFailed", { providerLabel, model: requestModel, error: message }));
       }
-    } catch (error) {
-      if (locallyCanceledItemIdsRef.current.has(taskId) || isAbortError(error)) {
-        locallyCanceledItemIdsRef.current.delete(taskId);
-        const canceledTask = await cancelTaskOrWarn(taskId, pushWorkspaceNotice, t);
-        if (canceledTask) recordGenerationTask(canceledTask);
+      } catch (error) {
+        if (locallyCanceledItemIdsRef.current.has(taskId) || isAbortError(error)) {
+          locallyCanceledItemIdsRef.current.delete(taskId);
+          const canceledTask = await cancelTaskOrWarn(taskId, pushWorkspaceNotice, t);
+          if (canceledTask) recordGenerationTask(canceledTask);
+          return true;
+        }
+        console.error(error);
+        const message = toErrorMessage(error, t("common.notices.audioGenFailed"));
+        const failedTask = await updateTaskOrWarn(taskId, {
+          status: "failed",
+          progress: 100,
+          errorMessage: message,
+        }, pushWorkspaceNotice, t);
+        if (failedTask) recordGenerationTask(failedTask);
+        pushWorkspaceNotice("error", message);
         return true;
+      } finally {
+        delete generationAbortControllersRef.current[taskId];
+        setAudioSubmitCount(prev => Math.max(0, prev - 1));
       }
-      console.error(error);
-      const message = toErrorMessage(error, t("common.notices.audioGenFailed"));
-      const failedTask = await updateTaskOrWarn(taskId, {
-        status: "failed",
-        progress: 100,
-        errorMessage: message,
-      }, pushWorkspaceNotice, t);
-      if (failedTask) recordGenerationTask(failedTask);
-      pushWorkspaceNotice("error", message);
       return true;
     } finally {
-      delete generationAbortControllersRef.current[taskId];
-      setAudioSubmitCount(prev => Math.max(0, prev - 1));
+      audioSubmissionKeysInFlight.delete(audioSubmissionKey);
     }
-    return true;
   };
 
   const retryGenerationTask = async (task: GenerationTask) => {
@@ -1130,6 +1162,7 @@ export function useGenerationActions({
       prompt: task.mediaType === "transcript" ? request.prompt : task.prompt,
       referenceImages: retryReferences,
       runningHubNodeInfoList: request.runningHubNodeInfoList,
+      voiceCloneConsentAccepted: request.voiceCloneConsentAccepted,
       voiceProfileId: request.voiceProfileId,
     });
   };
