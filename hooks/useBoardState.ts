@@ -866,7 +866,7 @@ function normalizeBoardNode(node: unknown, index: number): BoardNode | null {
       prompt: typeof node.prompt === "string" ? node.prompt : "",
       resultStackKey: readOptionalString(node.resultStackKey),
       status: normalizeGenerationStatus(node.status),
-      variantCount: normalizeVariantCount(node.variantCount),
+      variantCount: 1,
       voiceCloneConsentAccepted: node.voiceCloneConsentAccepted === true,
       voiceProfileId: readOptionalString(node.voiceProfileId),
       errorMessage: typeof node.errorMessage === "string" ? node.errorMessage : undefined,
@@ -1315,7 +1315,7 @@ function createGenerateBoardNode(input: CreateGenerateNodeInput, nodes: BoardNod
     prompt: input.prompt ?? "",
     model: input.model,
     status: "idle" as BoardGenerationStatus,
-    variantCount: input.variantCount ?? DEFAULT_VARIANT_COUNT,
+    variantCount: input.kind === "audio-operation" ? 1 : input.variantCount ?? DEFAULT_VARIANT_COUNT,
     position: input.position ?? moveDefaultPosition(nodes),
     size: input.size ?? DEFAULT_GENERATE_NODE_SIZE,
     createdAt,
@@ -1485,6 +1485,13 @@ function sameGenerateUpdate(node: BoardImageGenerateNode | BoardVideoGenerateNod
   }
 
   return true;
+}
+
+function normalizeGenerateUpdateForNode(
+  node: BoardImageGenerateNode | BoardVideoGenerateNode | BoardAudioOperationNode,
+  input: BoardGenerateNodeUpdate,
+): BoardGenerateNodeUpdate {
+  return node.kind === "audio-operation" && "variantCount" in input ? { ...input, variantCount: 1 } : input;
 }
 
 function sameRunningHubYouchuan(
@@ -2810,16 +2817,15 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     mutateBoard(
       currentBoard => {
         let didChange = false;
-        const nextNodes = currentBoard.nodes.map(node =>
-          node.id === nodeId && (node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation")
-            ? sameGenerateUpdate(node, input)
-              ? node
-              : (() => {
-                didChange = true;
-                return { ...node, ...input, updatedAt };
-              })()
-            : node
-        );
+        const nextNodes = currentBoard.nodes.map(node => {
+          if (node.id !== nodeId || (node.kind !== "image-generate" && node.kind !== "video-generate" && node.kind !== "audio-operation")) {
+            return node;
+          }
+          const normalizedInput = normalizeGenerateUpdateForNode(node, input);
+          if (sameGenerateUpdate(node, normalizedInput)) return node;
+          didChange = true;
+          return { ...node, ...normalizedInput, updatedAt };
+        });
         if (!didChange) return currentBoard;
         return touchBoard(currentBoard, nextNodes, filterValidBoardEdges(nextNodes, currentBoard.edges));
       },

@@ -148,7 +148,7 @@ function generateParamSummary(node: BoardGenerateNode, cinematicProfileSummaryLa
     node.model,
     node.audioMode,
     audioOperationFormatOptions(getAudioModelCapabilities(node.model)).length > 0 ? node.audioFormat : "",
-    `x${node.variantCount}`,
+    "x1",
   ].filter(value => value.trim().length > 0).join(" / ");
 }
 
@@ -908,9 +908,6 @@ function AudioOperationInspector({
           </InspectorField>
         )}
       </div>
-      <InspectorField title={t('inspector.variantCount')}>
-        <VariantCountSelect value={node.variantCount} onChange={variantCount => onUpdateGenerate(node.id, { variantCount })} />
-      </InspectorField>
       {(node.audioMode === "voice_design" || node.audioMode === "voice_clone") && (
         <InspectorField title={stylePromptLabel}>
           <input

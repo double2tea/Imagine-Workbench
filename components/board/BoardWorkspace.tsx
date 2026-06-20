@@ -2623,7 +2623,7 @@ export default function BoardWorkspace({
         prompt: node.prompt,
         size: node.size,
         title: node.title,
-        variantCount: node.variantCount,
+        variantCount: 1,
         voiceCloneConsentAccepted: node.voiceCloneConsentAccepted,
         voiceProfileId: node.voiceProfileId,
       } as const;

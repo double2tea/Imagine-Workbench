@@ -4111,7 +4111,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             });
           }
         } else {
-          const didStartResults = await runSequentialGenerationVariants(node.variantCount, () =>
+          const didStartResults = await runSequentialGenerationVariants(1, () =>
             generateManualAudio({
               audioFormat: node.audioFormat,
               audioMode: node.audioMode,

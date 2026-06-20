@@ -26,6 +26,10 @@ import { useTranslations } from "@/lib/i18n";
 type GenerateNode = BoardImageGenerateNode | BoardVideoGenerateNode | BoardAudioOperationNode;
 const variantCountOptions: BoardGenerateVariantCount[] = [1, 2, 4];
 
+function effectiveVariantCount(node: GenerateNode): BoardGenerateVariantCount {
+  return node.kind === "audio-operation" ? 1 : node.variantCount;
+}
+
 export interface BoardGenerateReferencePreview {
   id: string;
   role?: string;
@@ -203,19 +207,20 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
       tooltip: taskSummary ? `Task ${taskSummary.id}` : undefined,
     },
   ];
+  const displayedVariantCount = effectiveVariantCount(node);
   const paramSummary = node.kind === "image-generate"
-    ? `${node.model} / ${node.imageResolution === "custom" ? node.customImageResolution : node.imageResolution} / x${node.variantCount}`
+    ? `${node.model} / ${node.imageResolution === "custom" ? node.customImageResolution : node.imageResolution} / x${displayedVariantCount}`
     : node.kind === "video-generate"
-      ? `${node.model} / ${node.aspectRatio}${node.videoDuration ? ` / ${node.videoDuration}s` : ""} / x${node.variantCount}`
+      ? `${node.model} / ${node.aspectRatio}${node.videoDuration ? ` / ${node.videoDuration}s` : ""} / x${displayedVariantCount}`
       : [
         node.model,
         AUDIO_MODE_LABELS[node.audioMode],
         audioOperationFormatOptions(getAudioModelCapabilities(node.model)).length > 0 ? node.audioFormat : "",
-        `x${node.variantCount}`,
+        `x${displayedVariantCount}`,
       ].filter(value => value.trim().length > 0).join(" / ");
   const taskStatusText = taskSummary?.status === "pending" ? "Queued" : "Processing";
   const statusLabel = taskSummary ? `${taskStatusText} / ${paramSummary}` : `${statusText(node, t)} / ${paramSummary}`;
-  const compactStatusLabel = taskSummary ? `${taskStatusText} · x${node.variantCount}` : `${statusText(node, t)} · x${node.variantCount}`;
+  const compactStatusLabel = taskSummary ? `${taskStatusText} · x${displayedVariantCount}` : `${statusText(node, t)} · x${displayedVariantCount}`;
 
   useGSAP(() => {
     const previousLineTone = previousLineToneRef.current;
@@ -380,24 +385,26 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
         ) : (
           <span />
         )}
-        <div className="imagine-generate-variant-group nodrag flex h-8 overflow-hidden rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)]" title="Variant count">
-          {variantCountOptions.map(count => (
-            <button
-              key={count}
-              type="button"
-              onClick={(event) => updateVariantCount(event, count)}
-              onPointerDown={stopBoardControlPointer}
-              disabled={isProcessing}
-              className={`w-7 text-[10px] font-semibold transition ${
-                node.variantCount === count
-                  ? "bg-blue-600 text-white"
-                  : "text-[var(--iw-muted)] hover:bg-[var(--iw-panel)] hover:text-[var(--iw-text)]"
-              }`}
-            >
-              {count}
-            </button>
-          ))}
-        </div>
+        {node.kind === "audio-operation" ? <span /> : (
+          <div className="imagine-generate-variant-group nodrag flex h-8 overflow-hidden rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)]" title="Variant count">
+            {variantCountOptions.map(count => (
+              <button
+                key={count}
+                type="button"
+                onClick={(event) => updateVariantCount(event, count)}
+                onPointerDown={stopBoardControlPointer}
+                disabled={isProcessing}
+                className={`w-7 text-[10px] font-semibold transition ${
+                  node.variantCount === count
+                    ? "bg-blue-600 text-white"
+                    : "text-[var(--iw-muted)] hover:bg-[var(--iw-panel)] hover:text-[var(--iw-text)]"
+                }`}
+              >
+                {count}
+              </button>
+            ))}
+          </div>
+        )}
         {isProcessing && onCancel ? (
           <button
             type="button"
