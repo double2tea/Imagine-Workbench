@@ -1,4 +1,4 @@
-import type { TFunction } from "@/lib/i18n";
+import { t as globalT, type TFunction } from "@/lib/i18n";
 import { API_ROUTES } from "./api/routes";
 import { readFetchError } from "./client-fetch-error";
 import { readImageGenerationPayload } from "./client-image-response";
@@ -32,25 +32,23 @@ export interface ImageQuickEditTarget {
 export type ImageEditFeatureTargets = Record<ImageEditFeature, string>;
 
 export const IMAGE_EDIT_FEATURES: readonly ImageEditFeatureMeta[] = [
-  { key: "redraw", label: "重绘", description: "遮罩区域按提示词重新生成" },
-  { key: "erase", label: "擦除", description: "遮罩区域移除并补全背景" },
-  { key: "outpaint", label: "扩图", description: "向画面外延展内容" },
-  { key: "cutout", label: "抠图", description: "移除背景并保留主体" },
-  { key: "angle", label: "角度", description: "通过视角控件生成镜头调整提示词" },
-  { key: "lighting", label: "打光", description: "通过灯光控件生成重打光提示词" },
+  { key: "redraw", label: "Redraw", description: "Regenerate masked area from prompt" },
+  { key: "erase", label: "Erase", description: "Clear masked area and fill the background" },
+  { key: "outpaint", label: "Outpaint", description: "Extend content outside the frame" },
+  { key: "cutout", label: "Cutout", description: "Remove background while keeping the subject" },
+  { key: "angle", label: "Angle", description: "Generate camera-angle prompts through angle controls" },
+  { key: "lighting", label: "Relight", description: "Generate relighting prompts through lighting controls" },
 ];
 
 export function imageEditFeatureMeta(feature: ImageEditFeature, t?: TFunction): ImageEditFeatureMeta {
   const meta = IMAGE_EDIT_FEATURES.find(item => item.key === feature);
   if (!meta) throw new Error(`Unknown image edit feature: ${feature}`);
-  if (t) {
-    return {
-      ...meta,
-      label: t(`imageEdit.features.${feature}.label`) || meta.label,
-      description: t(`imageEdit.features.${feature}.description`) || meta.description,
-    };
-  }
-  return meta;
+  const translator = t ?? globalT;
+  return {
+    ...meta,
+    label: translator(`creation.imageEdit.features.${feature}.label`) || meta.label,
+    description: translator(`creation.imageEdit.features.${feature}.description`) || meta.description,
+  };
 }
 
 export function imageEditFeatureLabel(feature: ImageEditFeature, t?: TFunction): string {
@@ -62,7 +60,11 @@ export function imageQuickEditFallbackPrompt(
   sourcePromptOrId: string,
   t?: TFunction,
 ): string {
-  return `${imageEditFeatureLabel(feature, t)}：${sourcePromptOrId}`;
+  const translator = t ?? globalT;
+  return translator("creation.imageEdit.fallbackPrompt", {
+    label: imageEditFeatureLabel(feature, translator),
+    prompt: sourcePromptOrId,
+  });
 }
 
 export function imageQuickEditProcessingTitleFromPrompt(prompt: string, t?: TFunction): string | null {
@@ -70,8 +72,9 @@ export function imageQuickEditProcessingTitleFromPrompt(prompt: string, t?: TFun
     IMAGE_EDIT_FEATURES.find(item => prompt.startsWith(`${item.label}：`)) ??
     (t ? IMAGE_EDIT_FEATURES.find(item => prompt.startsWith(`${imageEditFeatureLabel(item.key, t)}：`)) : undefined);
   if (!feature) return null;
-  const label = imageEditFeatureLabel(feature.key, t);
-  return t ? t("imageEdit.processingTitle", { label }) : `${label}处理中`;
+  const translator = t ?? globalT;
+  const label = imageEditFeatureLabel(feature.key, translator);
+  return translator("creation.imageEdit.processingTitle", { label });
 }
 
 const NANO_BANANA_PRO_MODEL = "12ai:gemini-3-pro-image-preview";
@@ -92,7 +95,7 @@ const DEDICATED_TARGETS: readonly ImageQuickEditTarget[] = [
   {
     id: RUNNINGHUB_CUTOUT_TARGET_ID,
     feature: "cutout",
-    label: "RunningHub 抠图 AI App",
+    label: "RunningHub Cutout AI App",
     model: RUNNINGHUB_CONTROL_IMAGE_APP_VALUE,
     executionMode: "generate-image-route",
     promptRequired: false,
@@ -165,7 +168,7 @@ export async function submitImageQuickEdit(input: SubmitImageQuickEditInput): Pr
     body: JSON.stringify(request.body),
   });
   if (!response.ok) {
-    throw new Error(await readFetchError(response, "图片编辑失败"));
+    throw new Error(await readFetchError(response, globalT("creation.imageEdit.errors.editFailed")));
   }
 
   const payload = await readImageGenerationPayload(response);
@@ -173,7 +176,7 @@ export async function submitImageQuickEdit(input: SubmitImageQuickEditInput): Pr
   if (payload.operationName) {
     return waitForImageOperation(payload.operationName, input.buildProviderHeaders, input.signal);
   }
-  throw new Error("图片编辑接口没有返回图片");
+  throw new Error(globalT("creation.imageEdit.errors.noReturnedImage"));
 }
 
 function imageQuickEditRequest(input: SubmitImageQuickEditInput): {
@@ -210,7 +213,7 @@ function imageQuickEditRequest(input: SubmitImageQuickEditInput): {
   };
 }
 
-async function waitForImageOperation(
+  async function waitForImageOperation(
   operationName: string,
   buildProviderHeaders: (target?: string) => Record<string, string>,
   signal: AbortSignal | undefined,
@@ -224,7 +227,7 @@ async function waitForImageOperation(
       body: JSON.stringify({ operationName }),
     });
     if (!statusResponse.ok) {
-      throw new Error(await readFetchError(statusResponse, "图片编辑状态查询失败"));
+      throw new Error(await readFetchError(statusResponse, globalT("creation.imageEdit.errors.statusQueryFailed")));
     }
 
     const status = await readImageStatus(statusResponse);
@@ -232,7 +235,7 @@ async function waitForImageOperation(
     if (status.errorMessage) throw new Error(status.errorMessage);
     return downloadImageOperation(operationName, buildProviderHeaders, signal);
   }
-  throw new Error("图片编辑任务超时");
+  throw new Error(globalT("creation.imageEdit.errors.taskTimeout"));
 }
 
 async function downloadImageOperation(
@@ -247,10 +250,10 @@ async function downloadImageOperation(
     body: JSON.stringify({ operationName }),
   });
   if (!response.ok) {
-    throw new Error(await readFetchError(response, "图片编辑结果下载失败"));
+    throw new Error(await readFetchError(response, globalT("creation.imageEdit.errors.downloadFailed")));
   }
   const payload = await readImageGenerationPayload(response);
-  if (!payload.imageUrl) throw new Error("图片编辑下载接口没有返回图片");
+  if (!payload.imageUrl) throw new Error(globalT("creation.imageEdit.errors.downloadNoImage"));
   return payload.imageUrl;
 }
 

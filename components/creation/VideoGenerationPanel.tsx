@@ -315,8 +315,8 @@ export default function VideoGenerationPanel({
         addLabel={t("videoGeneration.addReferenceLabel")}
         browseClassName="cursor-pointer font-medium text-[var(--iw-tone-violet-text)] underline-offset-4 hover:text-[var(--iw-tone-violet-text)] hover:underline"
         clearLabel={clearReferenceLabel}
-        emptyHelp={`支持 ${acceptedReferenceText} | 最多 ${referenceLimit} 个 | ${referenceHelp}`}
-        emptyLabel={`添加${referenceLabel}`}
+        emptyHelp={t("videoGeneration.emptyHelp", { referenceTypes: acceptedReferenceText, limit: referenceLimit, referenceHelp })}
+        emptyLabel={t("videoGeneration.emptyLabel", { label: referenceLabel })}
         label={`${referenceLabel} ${referenceImages.length > 0 ? `(${Math.min(referenceImages.length, referenceLimit)}/${referenceLimit})` : ""}`}
         libraryBrowseLabel={t("videoGeneration.libraryBrowseLabel")}
         libraryTileLabel={t("videoGeneration.libraryTileLabel")}

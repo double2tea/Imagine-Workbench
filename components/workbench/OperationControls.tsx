@@ -44,37 +44,37 @@ export const IMAGE_EDIT_OPERATION_ORDER: readonly ImageEditFeature[] = ["redraw"
 export const IMAGE_EDIT_OPERATION_META: Record<ImageEditFeature, WorkbenchOperationMeta> = {
   redraw: {
     Icon: WandSparkles,
-    label: "重绘",
+    label: "Redraw",
     title: "Draw mask and repaint area",
     tone: "accent",
   },
   erase: {
     Icon: Eraser,
-    label: "擦除",
+    label: "Erase",
     title: "Draw mask and erase area",
     tone: "accent",
   },
   outpaint: {
     Icon: SquareDashed,
-    label: "扩图",
+    label: "Outpaint",
     title: "Extend canvas boundary",
     tone: "accent",
   },
   cutout: {
     Icon: Scissors,
-    label: "抠图",
+    label: "Cutout",
     title: "Remove background, keep subject",
     tone: "accent",
   },
   angle: {
     Icon: Box,
-    label: "角度",
+    label: "Angle",
     title: "Adjust camera angle",
     tone: "accent",
   },
   lighting: {
     Icon: Sun,
-    label: "打光",
+    label: "Relight",
     title: "Adjust lighting",
     tone: "accent",
   },

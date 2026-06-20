@@ -124,6 +124,8 @@
     "functionUnavailable": "This function is currently unavailable",
     "formatLabel": "Output Format",
     "addReferenceLabel": "Add Reference",
+    "emptyHelp": "Supports {referenceTypes} | up to {limit} | {referenceHelp}",
+    "emptyLabel": "Add {label}",
     "clearReferenceLabel": "Clear Reference",
     "emptyHelpWithLimit": "Drag in assets from the right panel or upload audio / video / image references",
     "emptyHelpNoLimit": "The current model does not support reference media",
@@ -245,54 +247,206 @@
       "custom": "Custom"
     },
     "templates": {
-      "view-close-editorial": { "title": "Close-Up Editorial", "scene": "Characters, products, detail close-ups", "parameterHint": "Best at 1:1, 4:3, or 3:4" },
-      "view-wide-establishing": { "title": "Wide Establishing Shot", "scene": "Spaces, scenes, world-building", "parameterHint": "Best at 16:9, 21:9" },
-      "view-dynamic-low-angle": { "title": "Dynamic Low Angle", "scene": "Heroic feel, action, product impact", "parameterHint": "Best at 3:4, 4:5, 16:9" },
-      "view-top-down-layout": { "title": "Top-Down Flat Lay", "scene": "Food, tabletops, props, product arrangements", "parameterHint": "Best at 1:1, 4:3" },
-      "view-camera-contact-sheet": { "title": "Multi-Angle Exploration", "scene": "Camera angle exploration for the same subject", "parameterHint": "Best at 16:9, 4:3" },
-      "view-spatial-depth-rebuild": { "title": "Spatial Depth Enhancement", "scene": "Empty backgrounds, weak depth, scenes lacking layers" },
-      "storyboard-keyframe": { "title": "Keyframe Storyboard", "scene": "Video frames, ad storyboards, story beats" },
-      "storyboard-three-beat": { "title": "Three-Beat Storyboard", "scene": "Short videos, ads, narrative progression", "parameterHint": "Best at 16:9 or landscape" },
-      "storyboard-camera-move": { "title": "Camera Move Planning", "scene": "Image-to-video, camera prompts, dynamic scenes", "parameterHint": "Best for video generation prompts" },
-      "storyboard-shot-grid": { "title": "Shot Comparison Grid", "scene": "Quick comparison of composition, angles, and shot sizes", "parameterHint": "Best on a landscape canvas" },
-      "storyboard-action-continuity": { "title": "Action Continuity Board", "scene": "Action breakdowns, transitions, video references", "parameterHint": "Best at 16:9 or wide landscape" },
-      "storyboard-before-moment": { "title": "Before the Moment", "scene": "Working backward from the current frame to what happened seconds earlier", "parameterHint": "Useful for filling in video openings" },
-      "storyboard-after-moment": { "title": "After the Moment", "scene": "Extending the current frame forward by a few seconds", "parameterHint": "Useful for filling in video endings" },
-      "storyboard-camera-orbit": { "title": "Orbital Camera Move", "scene": "Product showcases, character reveals, spatial exploration", "parameterHint": "Best for video generation prompts" },
-      "storyboard-camera-follow": { "title": "Follow Camera Move", "scene": "Character movement, product usage, action scenes", "parameterHint": "Best for video generation prompts" },
-      "character-consistency": { "title": "Character Consistency", "scene": "Character design, IP extension, multi-image consistency" },
-      "character-turnaround": { "title": "Character Turnaround Sheet", "scene": "Design sheets, modeling references, IP characters", "parameterHint": "Best at 16:9, 4:3" },
-      "character-expression-sheet": { "title": "Expression Sheet", "scene": "Character expressions, comics, animation assets", "parameterHint": "Best at 1:1, 4:3" },
-      "character-performance-shift": { "title": "Performance Mood Shift", "scene": "Keep the character, change the emotion and performance state" },
-      "product-hero": { "title": "Product Hero Shot", "scene": "E-commerce, posters, brand showcases", "parameterHint": "For text-heavy images, prefer an image model with stronger text capabilities" },
-      "product-packshot-clean": { "title": "Clean White Background Product", "scene": "E-commerce hero images, detail pages, product shots", "parameterHint": "Best at 1:1, 4:3" },
-      "product-lifestyle-context": { "title": "Lifestyle Context", "scene": "Brand mood, social media, e-commerce scene images", "parameterHint": "Best at 4:5, 16:9" },
-      "lighting-soft-studio": { "title": "Soft Studio Light", "scene": "Portraits, products, still life" },
-      "lighting-cinematic-night": { "title": "Cinematic Night Light", "scene": "Characters, street scenes, sci-fi, moody shots", "parameterHint": "Best at 16:9, 21:9" },
-      "lighting-golden-hour": { "title": "Golden Hour", "scene": "Outdoors, portraits, travel, warm moods" },
-      "lighting-key-fill-rim": { "title": "Three-Point Light Calibration", "scene": "Characters, products, commercial studio shots" },
-      "lighting-back-rim-glow": { "title": "Back Rim Glow", "scene": "Subject edges, product texture, atmospheric posters" },
-      "lighting-rembrandt-portrait": { "title": "Rembrandt Portrait Light", "scene": "Portraits, character design, dramatic shots" },
-      "lighting-top-stage": { "title": "Top Stage Light", "scene": "Dramatic characters, stage, suspenseful atmosphere" },
-      "lighting-high-key-clean": { "title": "High-Key Clean Light", "scene": "Beauty, baby care, fresh product visuals" },
-      "lighting-flat-reference": { "title": "Flat Reference Light", "scene": "Design sheets, material references, reduced dramatic shadows" },
-      "lighting-volumetric-beams": { "title": "Volumetric Light Beams", "scene": "Forests, window-side, stage, dusty atmospheres" },
-      "custom-atmosphere-weather": { "title": "Weather Atmosphere Enhancement", "scene": "Rain, snow, fog, dust — environmental mood effects" },
-      "custom-biome-glow": { "title": "Bioluminescence Effect", "scene": "Fantasy, underwater, forest, sci-fi atmospheres" },
-      "custom-surreal-afterimage": { "title": "Surreal Afterimage", "scene": "Dreams, memory, surreal dynamic feel" },
-      "custom-structured-brief": { "title": "Structured Creative Brief", "scene": "Organize ideas into generation-ready descriptions" },
-      "custom-text-poster-brief": { "title": "Text Poster Brief", "scene": "Posters, infographics, event visuals", "parameterHint": "For text-heavy designs, prefer an image model with stronger text capabilities" },
-      "custom-reference-remix": { "title": "Reference Remix", "scene": "Image-to-image, style continuation, subject preservation" }
+      "view-close-editorial": {
+        "title": "Close-Up Editorial",
+        "scene": "Characters, products, detail close-ups",
+        "parameterHint": "Best at 1:1, 4:3, or 3:4"
+      },
+      "view-wide-establishing": {
+        "title": "Wide Establishing Shot",
+        "scene": "Spaces, scenes, world-building",
+        "parameterHint": "Best at 16:9, 21:9"
+      },
+      "view-dynamic-low-angle": {
+        "title": "Dynamic Low Angle",
+        "scene": "Heroic feel, action, product impact",
+        "parameterHint": "Best at 3:4, 4:5, 16:9"
+      },
+      "view-top-down-layout": {
+        "title": "Top-Down Flat Lay",
+        "scene": "Food, tabletops, props, product arrangements",
+        "parameterHint": "Best at 1:1, 4:3"
+      },
+      "view-camera-contact-sheet": {
+        "title": "Multi-Angle Exploration",
+        "scene": "Camera angle exploration for the same subject",
+        "parameterHint": "Best at 16:9, 4:3"
+      },
+      "view-spatial-depth-rebuild": {
+        "title": "Spatial Depth Enhancement",
+        "scene": "Empty backgrounds, weak depth, scenes lacking layers"
+      },
+      "storyboard-keyframe": {
+        "title": "Keyframe Storyboard",
+        "scene": "Video frames, ad storyboards, story beats"
+      },
+      "storyboard-three-beat": {
+        "title": "Three-Beat Storyboard",
+        "scene": "Short videos, ads, narrative progression",
+        "parameterHint": "Best at 16:9 or landscape"
+      },
+      "storyboard-camera-move": {
+        "title": "Camera Move Planning",
+        "scene": "Image-to-video, camera prompts, dynamic scenes",
+        "parameterHint": "Best for video generation prompts"
+      },
+      "storyboard-shot-grid": {
+        "title": "Shot Comparison Grid",
+        "scene": "Quick comparison of composition, angles, and shot sizes",
+        "parameterHint": "Best on a landscape canvas"
+      },
+      "storyboard-action-continuity": {
+        "title": "Action Continuity Board",
+        "scene": "Action breakdowns, transitions, video references",
+        "parameterHint": "Best at 16:9 or wide landscape"
+      },
+      "storyboard-before-moment": {
+        "title": "Before the Moment",
+        "scene": "Working backward from the current frame to what happened seconds earlier",
+        "parameterHint": "Useful for filling in video openings"
+      },
+      "storyboard-after-moment": {
+        "title": "After the Moment",
+        "scene": "Extending the current frame forward by a few seconds",
+        "parameterHint": "Useful for filling in video endings"
+      },
+      "storyboard-camera-orbit": {
+        "title": "Orbital Camera Move",
+        "scene": "Product showcases, character reveals, spatial exploration",
+        "parameterHint": "Best for video generation prompts"
+      },
+      "storyboard-camera-follow": {
+        "title": "Follow Camera Move",
+        "scene": "Character movement, product usage, action scenes",
+        "parameterHint": "Best for video generation prompts"
+      },
+      "character-consistency": {
+        "title": "Character Consistency",
+        "scene": "Character design, IP extension, multi-image consistency"
+      },
+      "character-turnaround": {
+        "title": "Character Turnaround Sheet",
+        "scene": "Design sheets, modeling references, IP characters",
+        "parameterHint": "Best at 16:9, 4:3"
+      },
+      "character-expression-sheet": {
+        "title": "Expression Sheet",
+        "scene": "Character expressions, comics, animation assets",
+        "parameterHint": "Best at 1:1, 4:3"
+      },
+      "character-performance-shift": {
+        "title": "Performance Mood Shift",
+        "scene": "Keep the character, change the emotion and performance state"
+      },
+      "product-hero": {
+        "title": "Product Hero Shot",
+        "scene": "E-commerce, posters, brand showcases",
+        "parameterHint": "For text-heavy images, prefer an image model with stronger text capabilities"
+      },
+      "product-packshot-clean": {
+        "title": "Clean White Background Product",
+        "scene": "E-commerce hero images, detail pages, product shots",
+        "parameterHint": "Best at 1:1, 4:3"
+      },
+      "product-lifestyle-context": {
+        "title": "Lifestyle Context",
+        "scene": "Brand mood, social media, e-commerce scene images",
+        "parameterHint": "Best at 4:5, 16:9"
+      },
+      "lighting-soft-studio": {
+        "title": "Soft Studio Light",
+        "scene": "Portraits, products, still life"
+      },
+      "lighting-cinematic-night": {
+        "title": "Cinematic Night Light",
+        "scene": "Characters, street scenes, sci-fi, moody shots",
+        "parameterHint": "Best at 16:9, 21:9"
+      },
+      "lighting-golden-hour": {
+        "title": "Golden Hour",
+        "scene": "Outdoors, portraits, travel, warm moods"
+      },
+      "lighting-key-fill-rim": {
+        "title": "Three-Point Light Calibration",
+        "scene": "Characters, products, commercial studio shots"
+      },
+      "lighting-back-rim-glow": {
+        "title": "Back Rim Glow",
+        "scene": "Subject edges, product texture, atmospheric posters"
+      },
+      "lighting-rembrandt-portrait": {
+        "title": "Rembrandt Portrait Light",
+        "scene": "Portraits, character design, dramatic shots"
+      },
+      "lighting-top-stage": {
+        "title": "Top Stage Light",
+        "scene": "Dramatic characters, stage, suspenseful atmosphere"
+      },
+      "lighting-high-key-clean": {
+        "title": "High-Key Clean Light",
+        "scene": "Beauty, baby care, fresh product visuals"
+      },
+      "lighting-flat-reference": {
+        "title": "Flat Reference Light",
+        "scene": "Design sheets, material references, reduced dramatic shadows"
+      },
+      "lighting-volumetric-beams": {
+        "title": "Volumetric Light Beams",
+        "scene": "Forests, window-side, stage, dusty atmospheres"
+      },
+      "custom-atmosphere-weather": {
+        "title": "Weather Atmosphere Enhancement",
+        "scene": "Rain, snow, fog, dust — environmental mood effects"
+      },
+      "custom-biome-glow": {
+        "title": "Bioluminescence Effect",
+        "scene": "Fantasy, underwater, forest, sci-fi atmospheres"
+      },
+      "custom-surreal-afterimage": {
+        "title": "Surreal Afterimage",
+        "scene": "Dreams, memory, surreal dynamic feel"
+      },
+      "custom-structured-brief": {
+        "title": "Structured Creative Brief",
+        "scene": "Organize ideas into generation-ready descriptions"
+      },
+      "custom-text-poster-brief": {
+        "title": "Text Poster Brief",
+        "scene": "Posters, infographics, event visuals",
+        "parameterHint": "For text-heavy designs, prefer an image model with stronger text capabilities"
+      },
+      "custom-reference-remix": {
+        "title": "Reference Remix",
+        "scene": "Image-to-image, style continuation, subject preservation"
+      }
     }
   },
   "imageEdit": {
     "features": {
-      "redraw": { "label": "Redraw", "description": "Regenerate the masked area based on your prompt" },
-      "erase": { "label": "Erase", "description": "Remove the masked area and fill the background" },
-      "outpaint": { "label": "Outpaint", "description": "Extend content beyond the image boundary" },
-      "cutout": { "label": "Cutout", "description": "Remove the background and keep the subject" },
-      "angle": { "label": "Angle", "description": "Generate a camera-angle adjustment prompt via angle controls" },
-      "lighting": { "label": "Relight", "description": "Generate a relighting prompt via lighting controls" }
+      "redraw": {
+        "label": "Redraw",
+        "description": "Regenerate the masked area based on your prompt"
+      },
+      "erase": {
+        "label": "Erase",
+        "description": "Remove the masked area and fill the background"
+      },
+      "outpaint": {
+        "label": "Outpaint",
+        "description": "Extend content beyond the image boundary"
+      },
+      "cutout": {
+        "label": "Cutout",
+        "description": "Remove the background and keep the subject"
+      },
+      "angle": {
+        "label": "Angle",
+        "description": "Generate a camera-angle adjustment prompt via angle controls"
+      },
+      "lighting": {
+        "label": "Relight",
+        "description": "Generate a relighting prompt via lighting controls"
+      }
     },
     "processingTitle": "{label} in progress",
     "fallbackPrompt": "{label}: {prompt}",
@@ -309,24 +463,72 @@
     "titleDefault": "Image Editor",
     "closeAriaLabel": "Close image editor",
     "loadingMessage": "Loading workspace pixels...",
-    "cropPresets": { "free": "Free", "original": "Original" },
+    "cropPresets": {
+      "free": "Free",
+      "original": "Original"
+    },
     "editorModes": {
-      "mask": { "label": "Mask", "hint": "Paint to mark areas for redraw" },
-      "erase": { "label": "Eraser", "hint": "Erase painted mask areas" },
-      "compare": { "label": "Compare", "hint": "Side-by-side comparison of the original and current edit" },
-      "text": { "label": "Text", "hint": "Click the canvas to place text" },
-      "crop": { "label": "Crop", "hint": "Drag the selection box or handles to adjust the framing" },
-      "outpaint": { "label": "Outpaint", "hint": "Set the pixel expansion on each side" }
+      "mask": {
+        "label": "Mask",
+        "hint": "Paint to mark areas for redraw"
+      },
+      "erase": {
+        "label": "Eraser",
+        "hint": "Erase painted mask areas"
+      },
+      "compare": {
+        "label": "Compare",
+        "hint": "Side-by-side comparison of the original and current edit"
+      },
+      "text": {
+        "label": "Text",
+        "hint": "Click the canvas to place text"
+      },
+      "crop": {
+        "label": "Crop",
+        "hint": "Drag the selection box or handles to adjust the framing"
+      },
+      "outpaint": {
+        "label": "Outpaint",
+        "hint": "Set the pixel expansion on each side"
+      }
     },
     "operations": {
-      "redraw": { "title": "Redraw", "hint": "Paint a mask and describe the new content to replace it with", "promptPlaceholder": "e.g. Replace the cup with a glass vase, keep the original lighting" },
-      "erase": { "title": "Erase", "hint": "Paint the area to remove; the system will fill in the background", "promptPlaceholder": "Optional: describe the background fill" },
-      "outpaint": { "title": "Outpaint", "hint": "Set expansion margins and describe the extended direction", "promptPlaceholder": "e.g. Extend the kitchen counter and natural window light to the right" },
-      "cutout": { "title": "Cutout", "hint": "Remove the background and keep the subject", "promptPlaceholder": "Optional: subject preservation requirements" },
-      "angle": { "title": "Angle", "hint": "Adjust the viewing angle via angle controls", "promptPlaceholder": "e.g. Switch to a low-angle mid-shot, keep the subject consistent" },
-      "lighting": { "title": "Relight", "hint": "Adjust the lighting via light controls", "promptPlaceholder": "e.g. Add a warm key light from the front-left" }
+      "redraw": {
+        "title": "Redraw",
+        "hint": "Paint a mask and describe the new content to replace it with",
+        "promptPlaceholder": "e.g. Replace the cup with a glass vase, keep the original lighting"
+      },
+      "erase": {
+        "title": "Erase",
+        "hint": "Paint the area to remove; the system will fill in the background",
+        "promptPlaceholder": "Optional: describe the background fill"
+      },
+      "outpaint": {
+        "title": "Outpaint",
+        "hint": "Set expansion margins and describe the extended direction",
+        "promptPlaceholder": "e.g. Extend the kitchen counter and natural window light to the right"
+      },
+      "cutout": {
+        "title": "Cutout",
+        "hint": "Remove the background and keep the subject",
+        "promptPlaceholder": "Optional: subject preservation requirements"
+      },
+      "angle": {
+        "title": "Angle",
+        "hint": "Adjust the viewing angle via angle controls",
+        "promptPlaceholder": "e.g. Switch to a low-angle mid-shot, keep the subject consistent"
+      },
+      "lighting": {
+        "title": "Relight",
+        "hint": "Adjust the lighting via light controls",
+        "promptPlaceholder": "e.g. Add a warm key light from the front-left"
+      }
     },
-    "compareLabels": { "original": "Original", "current": "Current" },
+    "compareLabels": {
+      "original": "Original",
+      "current": "Current"
+    },
     "toolSectionLabel": "Tools",
     "paramSectionLabel": "Parameters",
     "resolutionLabel": "Resolution",
@@ -344,7 +546,12 @@
     "cropSizeUnselected": "None",
     "executeCropButton": "Apply Crop",
     "clearCropButton": "Clear Selection",
-    "outpaintSideLabels": { "left": "Left", "right": "Right", "top": "Top", "bottom": "Bottom" },
+    "outpaintSideLabels": {
+      "left": "Left",
+      "right": "Right",
+      "top": "Top",
+      "bottom": "Bottom"
+    },
     "clearOutpaintButton": "Clear Outpaint",
     "resetButton": "Reset",
     "applySaving": "Applying",
@@ -375,7 +582,14 @@
     },
     "lightingControls": {
       "mainLightSectionLabel": "Key Light",
-      "directionLabels": { "left": "Left", "top": "Top", "right": "Right", "front": "Front", "bottom": "Bottom", "back": "Back" },
+      "directionLabels": {
+        "left": "Left",
+        "top": "Top",
+        "right": "Right",
+        "front": "Front",
+        "bottom": "Bottom",
+        "back": "Back"
+      },
       "heightLabel": "Height",
       "intensityLabel": "Intensity",
       "temperatureLabel": "Temperature",

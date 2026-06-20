@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
-import { useTranslations } from "@/lib/i18n";
+import { useTranslations, type TFunction } from "@/lib/i18n";
 import * as THREE from "three";
 import { Box, RotateCcw, Sun, X } from "lucide-react";
 import type { CanvasMaskEditorOutput } from "@/components/CanvasMaskEditor";
@@ -181,8 +181,8 @@ export default function VisualPromptAdjustEditor({
     setIsApplying(true);
     setErrorMessage("");
     try {
-      const imageBase64 = renderImageDataUrl(img, imageSize);
-      const guide = operation === "lighting" ? renderLightingGuide(imageSize, lightingState) : "";
+      const imageBase64 = renderImageDataUrl(img, imageSize, t);
+      const guide = operation === "lighting" ? renderLightingGuide(imageSize, lightingState, t) : "";
       await onApply({
         imageBase64,
         imageResolution: selectedImageResolution,
@@ -198,7 +198,7 @@ export default function VisualPromptAdjustEditor({
     } finally {
       setIsApplying(false);
     }
-  }, [imageSize, lightingState, onApply, operation, prompt, selectedImageResolution]);
+  }, [imageSize, lightingState, onApply, operation, prompt, selectedImageResolution, t]);
 
   if (!isOpen) return null;
 
@@ -522,6 +522,7 @@ function ThreeCardViewport({
   lightingState: LightingAdjustmentState;
   operation: "angle" | "lighting";
 }) {
+  const { t } = useTranslations("creation");
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const sceneRef = useRef<ThreeCardScene | null>(null);
   const angleVisualRef = useRef(angleVisual);
@@ -667,8 +668,8 @@ function ThreeCardViewport({
       const width = operation === "angle" ? 3.08 : 3.18;
       const height = width / aspect;
       const depth = operation === "angle" ? ANGLE_PANEL_DEPTH : LIGHT_PANEL_DEPTH;
-      reliefDepth = image ? createReliefDepthData(image) : null;
-      depthTexture = reliefDepth ? createDepthTexture(reliefDepth) : null;
+      reliefDepth = image ? createReliefDepthData(image, t) : null;
+      depthTexture = reliefDepth ? createDepthTexture(reliefDepth, t) : null;
       const backingGeometry = new THREE.BoxGeometry(width, height, depth);
       const sideMaterial = new THREE.MeshStandardMaterial({
         color: 0x505050,
@@ -786,7 +787,7 @@ function ThreeCardViewport({
       renderer.dispose();
       sceneRef.current = null;
     };
-  }, [imageUrl, operation]);
+  }, [imageUrl, operation, t]);
 
   useEffect(() => {
     const sceneHandle = sceneRef.current;
@@ -902,13 +903,13 @@ interface ReliefDepthData {
   size: number;
 }
 
-function createReliefDepthData(image: HTMLImageElement): ReliefDepthData {
+function createReliefDepthData(image: HTMLImageElement, t: TFunction): ReliefDepthData {
   const size = RELIEF_PREVIEW_TEXTURE_SIZE;
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
   const context = canvas.getContext("2d", { willReadFrequently: true });
-  if (!context) throw new Error("无法创建深度预览画布");
+  if (!context) throw new Error(t("visualAdjust.errorMessages.depthPreviewFailed"));
   context.drawImage(image, 0, 0, size, size);
   const imageData = context.getImageData(0, 0, size, size);
   const pixels = imageData.data;
@@ -941,12 +942,12 @@ function createReliefDepthData(image: HTMLImageElement): ReliefDepthData {
   return { data: depthData, size };
 }
 
-function createDepthTexture(depth: ReliefDepthData): THREE.CanvasTexture {
+function createDepthTexture(depth: ReliefDepthData, t: TFunction): THREE.CanvasTexture {
   const canvas = document.createElement("canvas");
   canvas.width = depth.size;
   canvas.height = depth.size;
   const context = canvas.getContext("2d");
-  if (!context) throw new Error("无法创建深度纹理");
+  if (!context) throw new Error(t("visualAdjust.errorMessages.depthTextureFailed"));
   const imageData = context.createImageData(depth.size, depth.size);
   for (let index = 0; index < depth.data.length; index += 1) {
     const value = Math.round(depth.data[index] * 255);
@@ -1423,22 +1424,22 @@ function gcd(left: number, right: number): number {
   return a || 1;
 }
 
-function renderImageDataUrl(img: HTMLImageElement, size: CanvasSize): string {
+function renderImageDataUrl(img: HTMLImageElement, size: CanvasSize, t: TFunction): string {
   const canvas = document.createElement("canvas");
   canvas.width = size.width;
   canvas.height = size.height;
   const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("无法创建图片编辑画布");
+  if (!ctx) throw new Error(t("visualAdjust.errorMessages.canvasCreationFailed"));
   ctx.drawImage(img, 0, 0, size.width, size.height);
   return canvas.toDataURL("image/png");
 }
 
-function renderLightingGuide(size: CanvasSize, state: LightingAdjustmentState): string {
+function renderLightingGuide(size: CanvasSize, state: LightingAdjustmentState, t: TFunction): string {
   const canvas = document.createElement("canvas");
   canvas.width = size.width;
   canvas.height = size.height;
   const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("无法创建打光参考图");
+  if (!ctx) throw new Error(t("visualAdjust.errorMessages.lightingGuideFailed"));
   const point = lightPoint(size, state);
   const radius = Math.max(size.width, size.height) * 0.75;
   const gradient = ctx.createRadialGradient(point.x, point.y, 0, point.x, point.y, radius);

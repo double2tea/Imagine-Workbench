@@ -229,6 +229,8 @@
     "durationLabel": "秒数",
     "presetLabel": "预设",
     "addReferenceLabel": "添加参考",
+    "emptyHelp": "支持 {referenceTypes} | 最多 {limit} 个 | {referenceHelp}",
+    "emptyLabel": "添加{label}",
     "libraryBrowseLabel": "从素材库选择",
     "libraryTileLabel": "素材库",
     "uploadLabel": "浏览上传"
@@ -274,54 +276,206 @@
       "custom": "自定义"
     },
     "templates": {
-      "view-close-editorial": { "title": "近景编辑感", "scene": "人物、产品、细节特写", "parameterHint": "适合 1:1、4:3 或 3:4" },
-      "view-wide-establishing": { "title": "宽幅环境镜头", "scene": "空间、场景、世界观建立", "parameterHint": "适合 16:9、21:9" },
-      "view-dynamic-low-angle": { "title": "低机位动势", "scene": "英雄感、动作、产品冲击力", "parameterHint": "适合 3:4、4:5、16:9" },
-      "view-top-down-layout": { "title": "俯拍陈列", "scene": "食物、桌面、道具、产品组合", "parameterHint": "适合 1:1、4:3" },
-      "view-camera-contact-sheet": { "title": "多机位探索", "scene": "同一主体的镜头角度筛选", "parameterHint": "适合 16:9、4:3" },
-      "view-spatial-depth-rebuild": { "title": "空间层次补强", "scene": "背景空、纵深弱、场景缺层次" },
-      "storyboard-keyframe": { "title": "关键帧分镜", "scene": "视频画面、广告分镜、故事节点" },
-      "storyboard-three-beat": { "title": "三段式分镜", "scene": "短视频、广告、剧情推进", "parameterHint": "适合 16:9 或横向画面" },
-      "storyboard-camera-move": { "title": "镜头运动规划", "scene": "图生视频、镜头提示、动态画面", "parameterHint": "适合视频生成提示词" },
-      "storyboard-shot-grid": { "title": "镜头组宫格", "scene": "快速比较构图、机位、景别", "parameterHint": "适合横向画布" },
-      "storyboard-action-continuity": { "title": "连续动作分镜", "scene": "动作拆解、转场、视频参考", "parameterHint": "适合 16:9 或长横图" },
-      "storyboard-before-moment": { "title": "前因画面推演", "scene": "从当前画面反推前几秒", "parameterHint": "适合补齐视频开头" },
-      "storyboard-after-moment": { "title": "后续画面推演", "scene": "从当前画面延展后几秒", "parameterHint": "适合补齐视频结尾" },
-      "storyboard-camera-orbit": { "title": "环绕运镜", "scene": "产品展示、角色展示、空间揭示", "parameterHint": "适合视频生成提示词" },
-      "storyboard-camera-follow": { "title": "跟随运镜", "scene": "人物移动、产品使用、动作场景", "parameterHint": "适合视频生成提示词" },
-      "character-consistency": { "title": "角色一致性", "scene": "角色设定、IP 延展、多图统一" },
-      "character-turnaround": { "title": "角色三视图", "scene": "设定集、建模参考、IP 角色", "parameterHint": "适合 16:9、4:3" },
-      "character-expression-sheet": { "title": "表情设定表", "scene": "角色表情、漫画、动画资产", "parameterHint": "适合 1:1、4:3" },
-      "character-performance-shift": { "title": "表演情绪重塑", "scene": "保留角色，改变情绪与表演状态" },
-      "product-hero": { "title": "产品主视觉", "scene": "电商、海报、品牌展示", "parameterHint": "需要文字时优先选择文本能力更强的图像模型" },
-      "product-packshot-clean": { "title": "干净白底产品", "scene": "电商主图、详情页、商品图", "parameterHint": "适合 1:1、4:3" },
-      "product-lifestyle-context": { "title": "生活方式场景", "scene": "品牌氛围、社媒、电商场景图", "parameterHint": "适合 4:5、16:9" },
-      "lighting-soft-studio": { "title": "柔和棚拍光", "scene": "肖像、产品、静物" },
-      "lighting-cinematic-night": { "title": "电影夜景光", "scene": "人物、街景、科幻、情绪画面", "parameterHint": "适合 16:9、21:9" },
-      "lighting-golden-hour": { "title": "黄金时刻", "scene": "户外、人像、旅行、温暖情绪" },
-      "lighting-key-fill-rim": { "title": "三点光校准", "scene": "人物、产品、商业棚拍" },
-      "lighting-back-rim-glow": { "title": "逆光轮廓", "scene": "人物边缘、产品质感、氛围海报" },
-      "lighting-rembrandt-portrait": { "title": "伦勃朗肖像光", "scene": "人像、角色设定、戏剧感画面" },
-      "lighting-top-stage": { "title": "顶光舞台感", "scene": "戏剧人物、舞台、悬疑氛围" },
-      "lighting-high-key-clean": { "title": "高调明亮光", "scene": "美妆、母婴、清爽产品视觉" },
-      "lighting-flat-reference": { "title": "平光参考", "scene": "设定图、材质参考、减少戏剧阴影" },
-      "lighting-volumetric-beams": { "title": "体积光束", "scene": "森林、窗边、舞台、尘雾空间" },
-      "custom-atmosphere-weather": { "title": "天气气氛增强", "scene": "雨、雪、雾、沙尘等环境情绪" },
-      "custom-biome-glow": { "title": "生物荧光场效", "scene": "奇幻、海底、森林、科幻氛围" },
-      "custom-surreal-afterimage": { "title": "超现实残影", "scene": "梦境、记忆、超现实动态感" },
-      "custom-structured-brief": { "title": "结构化创意简报", "scene": "把想法整理成可生成描述" },
-      "custom-text-poster-brief": { "title": "文字海报简报", "scene": "海报、信息图、活动视觉", "parameterHint": "文字较多时优先选择文本能力更强的图像模型" },
-      "custom-reference-remix": { "title": "参考图再创作", "scene": "图生图、风格延续、主体保持" }
+      "view-close-editorial": {
+        "title": "近景编辑感",
+        "scene": "人物、产品、细节特写",
+        "parameterHint": "适合 1:1、4:3 或 3:4"
+      },
+      "view-wide-establishing": {
+        "title": "宽幅环境镜头",
+        "scene": "空间、场景、世界观建立",
+        "parameterHint": "适合 16:9、21:9"
+      },
+      "view-dynamic-low-angle": {
+        "title": "低机位动势",
+        "scene": "英雄感、动作、产品冲击力",
+        "parameterHint": "适合 3:4、4:5、16:9"
+      },
+      "view-top-down-layout": {
+        "title": "俯拍陈列",
+        "scene": "食物、桌面、道具、产品组合",
+        "parameterHint": "适合 1:1、4:3"
+      },
+      "view-camera-contact-sheet": {
+        "title": "多机位探索",
+        "scene": "同一主体的镜头角度筛选",
+        "parameterHint": "适合 16:9、4:3"
+      },
+      "view-spatial-depth-rebuild": {
+        "title": "空间层次补强",
+        "scene": "背景空、纵深弱、场景缺层次"
+      },
+      "storyboard-keyframe": {
+        "title": "关键帧分镜",
+        "scene": "视频画面、广告分镜、故事节点"
+      },
+      "storyboard-three-beat": {
+        "title": "三段式分镜",
+        "scene": "短视频、广告、剧情推进",
+        "parameterHint": "适合 16:9 或横向画面"
+      },
+      "storyboard-camera-move": {
+        "title": "镜头运动规划",
+        "scene": "图生视频、镜头提示、动态画面",
+        "parameterHint": "适合视频生成提示词"
+      },
+      "storyboard-shot-grid": {
+        "title": "镜头组宫格",
+        "scene": "快速比较构图、机位、景别",
+        "parameterHint": "适合横向画布"
+      },
+      "storyboard-action-continuity": {
+        "title": "连续动作分镜",
+        "scene": "动作拆解、转场、视频参考",
+        "parameterHint": "适合 16:9 或长横图"
+      },
+      "storyboard-before-moment": {
+        "title": "前因画面推演",
+        "scene": "从当前画面反推前几秒",
+        "parameterHint": "适合补齐视频开头"
+      },
+      "storyboard-after-moment": {
+        "title": "后续画面推演",
+        "scene": "从当前画面延展后几秒",
+        "parameterHint": "适合补齐视频结尾"
+      },
+      "storyboard-camera-orbit": {
+        "title": "环绕运镜",
+        "scene": "产品展示、角色展示、空间揭示",
+        "parameterHint": "适合视频生成提示词"
+      },
+      "storyboard-camera-follow": {
+        "title": "跟随运镜",
+        "scene": "人物移动、产品使用、动作场景",
+        "parameterHint": "适合视频生成提示词"
+      },
+      "character-consistency": {
+        "title": "角色一致性",
+        "scene": "角色设定、IP 延展、多图统一"
+      },
+      "character-turnaround": {
+        "title": "角色三视图",
+        "scene": "设定集、建模参考、IP 角色",
+        "parameterHint": "适合 16:9、4:3"
+      },
+      "character-expression-sheet": {
+        "title": "表情设定表",
+        "scene": "角色表情、漫画、动画资产",
+        "parameterHint": "适合 1:1、4:3"
+      },
+      "character-performance-shift": {
+        "title": "表演情绪重塑",
+        "scene": "保留角色，改变情绪与表演状态"
+      },
+      "product-hero": {
+        "title": "产品主视觉",
+        "scene": "电商、海报、品牌展示",
+        "parameterHint": "需要文字时优先选择文本能力更强的图像模型"
+      },
+      "product-packshot-clean": {
+        "title": "干净白底产品",
+        "scene": "电商主图、详情页、商品图",
+        "parameterHint": "适合 1:1、4:3"
+      },
+      "product-lifestyle-context": {
+        "title": "生活方式场景",
+        "scene": "品牌氛围、社媒、电商场景图",
+        "parameterHint": "适合 4:5、16:9"
+      },
+      "lighting-soft-studio": {
+        "title": "柔和棚拍光",
+        "scene": "肖像、产品、静物"
+      },
+      "lighting-cinematic-night": {
+        "title": "电影夜景光",
+        "scene": "人物、街景、科幻、情绪画面",
+        "parameterHint": "适合 16:9、21:9"
+      },
+      "lighting-golden-hour": {
+        "title": "黄金时刻",
+        "scene": "户外、人像、旅行、温暖情绪"
+      },
+      "lighting-key-fill-rim": {
+        "title": "三点光校准",
+        "scene": "人物、产品、商业棚拍"
+      },
+      "lighting-back-rim-glow": {
+        "title": "逆光轮廓",
+        "scene": "人物边缘、产品质感、氛围海报"
+      },
+      "lighting-rembrandt-portrait": {
+        "title": "伦勃朗肖像光",
+        "scene": "人像、角色设定、戏剧感画面"
+      },
+      "lighting-top-stage": {
+        "title": "顶光舞台感",
+        "scene": "戏剧人物、舞台、悬疑氛围"
+      },
+      "lighting-high-key-clean": {
+        "title": "高调明亮光",
+        "scene": "美妆、母婴、清爽产品视觉"
+      },
+      "lighting-flat-reference": {
+        "title": "平光参考",
+        "scene": "设定图、材质参考、减少戏剧阴影"
+      },
+      "lighting-volumetric-beams": {
+        "title": "体积光束",
+        "scene": "森林、窗边、舞台、尘雾空间"
+      },
+      "custom-atmosphere-weather": {
+        "title": "天气气氛增强",
+        "scene": "雨、雪、雾、沙尘等环境情绪"
+      },
+      "custom-biome-glow": {
+        "title": "生物荧光场效",
+        "scene": "奇幻、海底、森林、科幻氛围"
+      },
+      "custom-surreal-afterimage": {
+        "title": "超现实残影",
+        "scene": "梦境、记忆、超现实动态感"
+      },
+      "custom-structured-brief": {
+        "title": "结构化创意简报",
+        "scene": "把想法整理成可生成描述"
+      },
+      "custom-text-poster-brief": {
+        "title": "文字海报简报",
+        "scene": "海报、信息图、活动视觉",
+        "parameterHint": "文字较多时优先选择文本能力更强的图像模型"
+      },
+      "custom-reference-remix": {
+        "title": "参考图再创作",
+        "scene": "图生图、风格延续、主体保持"
+      }
     }
   },
   "imageEdit": {
     "features": {
-      "redraw": { "label": "重绘", "description": "遮罩区域按提示词重新生成" },
-      "erase": { "label": "擦除", "description": "遮罩区域移除并补全背景" },
-      "outpaint": { "label": "扩图", "description": "向画面外延展内容" },
-      "cutout": { "label": "抠图", "description": "移除背景并保留主体" },
-      "angle": { "label": "角度", "description": "通过视角控件生成镜头调整提示词" },
-      "lighting": { "label": "打光", "description": "通过灯光控件生成重打光提示词" }
+      "redraw": {
+        "label": "重绘",
+        "description": "遮罩区域按提示词重新生成"
+      },
+      "erase": {
+        "label": "擦除",
+        "description": "遮罩区域移除并补全背景"
+      },
+      "outpaint": {
+        "label": "扩图",
+        "description": "向画面外延展内容"
+      },
+      "cutout": {
+        "label": "抠图",
+        "description": "移除背景并保留主体"
+      },
+      "angle": {
+        "label": "角度",
+        "description": "通过视角控件生成镜头调整提示词"
+      },
+      "lighting": {
+        "label": "打光",
+        "description": "通过灯光控件生成重打光提示词"
+      }
     },
     "processingTitle": "{label}处理中",
     "fallbackPrompt": "{label}：{prompt}",
@@ -338,24 +492,72 @@
     "titleDefault": "图片编辑器",
     "closeAriaLabel": "关闭图片编辑器",
     "loadingMessage": "正在加载工作面板像素...",
-    "cropPresets": { "free": "自由", "original": "原图" },
+    "cropPresets": {
+      "free": "自由",
+      "original": "原图"
+    },
     "editorModes": {
-      "mask": { "label": "遮罩", "hint": "标记需要重绘的区域" },
-      "erase": { "label": "橡皮", "hint": "擦除已绘制遮罩" },
-      "compare": { "label": "对比", "hint": "左右对比原图与当前编辑状态" },
-      "text": { "label": "文字", "hint": "点击画布放置文字" },
-      "crop": { "label": "裁切", "hint": "拖动选框或把手调整构图" },
-      "outpaint": { "label": "扩图", "hint": "设置四周扩展像素" }
+      "mask": {
+        "label": "遮罩",
+        "hint": "标记需要重绘的区域"
+      },
+      "erase": {
+        "label": "橡皮",
+        "hint": "擦除已绘制遮罩"
+      },
+      "compare": {
+        "label": "对比",
+        "hint": "左右对比原图与当前编辑状态"
+      },
+      "text": {
+        "label": "文字",
+        "hint": "点击画布放置文字"
+      },
+      "crop": {
+        "label": "裁切",
+        "hint": "拖动选框或把手调整构图"
+      },
+      "outpaint": {
+        "label": "扩图",
+        "hint": "设置四周扩展像素"
+      }
     },
     "operations": {
-      "redraw": { "title": "重绘", "hint": "绘制蒙版并描述要替换的新内容", "promptPlaceholder": "例如：把杯子换成玻璃花瓶，保持原有光线" },
-      "erase": { "title": "擦除", "hint": "绘制要移除的区域，系统会补全背景", "promptPlaceholder": "可选：补全背景的要求" },
-      "outpaint": { "title": "扩图", "hint": "设置扩展边距并描述延展方向", "promptPlaceholder": "例如：向右延展厨房台面和窗外自然光" },
-      "cutout": { "title": "抠图", "hint": "移除背景并保留主体", "promptPlaceholder": "可选：主体保留要求" },
-      "angle": { "title": "角度", "hint": "通过视角控件调整画面角度", "promptPlaceholder": "例如：调整为低角度中景，保持主体一致" },
-      "lighting": { "title": "打光", "hint": "通过灯光控件调整画面光线", "promptPlaceholder": "例如：从左前方加入暖色主光" }
+      "redraw": {
+        "title": "重绘",
+        "hint": "绘制蒙版并描述要替换的新内容",
+        "promptPlaceholder": "例如：把杯子换成玻璃花瓶，保持原有光线"
+      },
+      "erase": {
+        "title": "擦除",
+        "hint": "绘制要移除的区域，系统会补全背景",
+        "promptPlaceholder": "可选：补全背景的要求"
+      },
+      "outpaint": {
+        "title": "扩图",
+        "hint": "设置扩展边距并描述延展方向",
+        "promptPlaceholder": "例如：向右延展厨房台面和窗外自然光"
+      },
+      "cutout": {
+        "title": "抠图",
+        "hint": "移除背景并保留主体",
+        "promptPlaceholder": "可选：主体保留要求"
+      },
+      "angle": {
+        "title": "角度",
+        "hint": "通过视角控件调整画面角度",
+        "promptPlaceholder": "例如：调整为低角度中景，保持主体一致"
+      },
+      "lighting": {
+        "title": "打光",
+        "hint": "通过灯光控件调整画面光线",
+        "promptPlaceholder": "例如：从左前方加入暖色主光"
+      }
     },
-    "compareLabels": { "original": "原图", "current": "当前" },
+    "compareLabels": {
+      "original": "原图",
+      "current": "当前"
+    },
     "toolSectionLabel": "工具",
     "paramSectionLabel": "参数",
     "resolutionLabel": "分辨率",
@@ -373,7 +575,12 @@
     "cropSizeUnselected": "未选择",
     "executeCropButton": "执行裁切",
     "clearCropButton": "清选区",
-    "outpaintSideLabels": { "left": "左", "right": "右", "top": "上", "bottom": "下" },
+    "outpaintSideLabels": {
+      "left": "左",
+      "right": "右",
+      "top": "上",
+      "bottom": "下"
+    },
     "clearOutpaintButton": "清扩图",
     "resetButton": "重置",
     "applySaving": "应用中",
@@ -404,7 +611,14 @@
     },
     "lightingControls": {
       "mainLightSectionLabel": "主光源",
-      "directionLabels": { "left": "左侧", "top": "顶部", "right": "右侧", "front": "前方", "bottom": "底部", "back": "后方" },
+      "directionLabels": {
+        "left": "左侧",
+        "top": "顶部",
+        "right": "右侧",
+        "front": "前方",
+        "bottom": "底部",
+        "back": "后方"
+      },
       "heightLabel": "高度",
       "intensityLabel": "强度",
       "temperatureLabel": "色温",

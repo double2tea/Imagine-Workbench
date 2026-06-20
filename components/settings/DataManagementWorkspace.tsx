@@ -80,7 +80,7 @@ function StatCard({ label, primary, secondary }: StatCardProps) {
   );
 }
 
-function healthCopy(status: WorkspaceDataSummary["integrity"]["status"] | undefined, t?: TranslateFn): {
+function healthCopy(status: WorkspaceDataSummary["integrity"]["status"] | undefined, t: TranslateFn): {
   label: string;
   detail: string;
   className: string;
@@ -88,23 +88,23 @@ function healthCopy(status: WorkspaceDataSummary["integrity"]["status"] | undefi
 } {
   if (status === "healthy") {
     return {
-      label: t ? t("dataManagement.healthStatus.healthy") : "健康",
-      detail: t ? t("dataManagement.healthStatus.healthyDetail") : "没有发现需要处理的数据问题",
+      label: t("dataManagement.healthStatus.healthy"),
+      detail: t("dataManagement.healthStatus.healthyDetail"),
       className: "imagine-tone-surface",
       tone: "healthy",
     };
   }
   if (status === "critical") {
     return {
-      label: t ? t("dataManagement.healthStatus.critical") : "需修复",
-      detail: t ? t("dataManagement.healthStatus.criticalDetail") : "发现缺失引用或坏记录，建议先备份再处理",
+      label: t("dataManagement.healthStatus.critical"),
+      detail: t("dataManagement.healthStatus.criticalDetail"),
       className: "imagine-tone-surface",
       tone: "critical",
     };
   }
   return {
-    label: t ? t("dataManagement.healthStatus.attention") : "需关注",
-    detail: t ? t("dataManagement.healthStatus.attentionDetail") : "有可清理或可修复项目，当前数据仍可继续使用",
+    label: t("dataManagement.healthStatus.attention"),
+    detail: t("dataManagement.healthStatus.attentionDetail"),
     className: "imagine-tone-surface",
     tone: "attention",
   };
