@@ -108,7 +108,7 @@ function resolveDedicatedTargetLabel(target: ImageQuickEditTarget, t?: TFunction
   if (target.id !== RUNNINGHUB_CUTOUT_TARGET_ID || !t) return target;
   return {
     ...target,
-    label: t("imageEdit.targets.runningHubCutout"),
+    label: t("common.imageEdit.targets.runningHubCutout"),
   };
 }
 

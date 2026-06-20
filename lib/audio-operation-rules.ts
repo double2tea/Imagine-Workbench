@@ -50,12 +50,12 @@ const AUDIO_MODE_LABELS_FALLBACK: Record<AudioOperationMode, string> = {
   voice_design: "Voice Design",
 };
 
-/** Get mode label via i18n. Falls back to Chinese constant when t is not provided. */
+/** Get mode label via i18n. Falls back to English constant when t is not provided. */
 export function getAudioModeLabel(mode: AudioOperationMode, t?: TFunction): string {
   return (t ?? globalT)(`media.modeLabels.${mode}`) || (t ?? globalT)(`common.media.modeLabels.${mode}`) || AUDIO_MODE_LABELS_FALLBACK[mode];
 }
 
-/** Get ASR language options via i18n. Falls back to Chinese constants when t is not provided. */
+/** Get ASR language options via i18n. Falls back to English constants when t is not provided. */
 export function getAsrLanguageOptions(t?: TFunction): Array<{ label: string; value: "auto" | "zh" | "en" }> {
   return ASR_LANGUAGE_OPTIONS.map(option => ({
     value: option.value,
