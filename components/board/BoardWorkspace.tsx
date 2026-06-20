@@ -221,6 +221,12 @@ interface BoardNodeContextMenuState {
   nodeId: string;
 }
 
+function clientPointFromMouseOrTouchEvent(event: MouseEvent | TouchEvent): { clientX: number; clientY: number } | null {
+  if ("clientX" in event) return { clientX: event.clientX, clientY: event.clientY };
+  const touch = event.changedTouches[0] ?? event.touches[0];
+  return touch ? { clientX: touch.clientX, clientY: touch.clientY } : null;
+}
+
 const nodeTypes = { board: BoardNode };
 const DEFAULT_BOARD_IMAGE_MODEL = "modelscope:Qwen/Qwen-Image";
 const DEFAULT_BOARD_REFERENCE_IMAGE_MODEL = "modelscope:Qwen/Qwen-Image-Edit";
@@ -2164,7 +2170,9 @@ export default function BoardWorkspace({
       clearActiveMultiGridDropTarget();
       return;
     }
-    scheduleActiveMultiGridDropTarget(event.clientX, event.clientY);
+    const clientPoint = clientPointFromMouseOrTouchEvent(event);
+    if (!clientPoint) return;
+    scheduleActiveMultiGridDropTarget(clientPoint.clientX, clientPoint.clientY);
   }, [clearActiveMultiGridDropTarget, hasMultiGridNodes, scheduleActiveMultiGridDropTarget]);
 
   const handleNodeDragStop = useCallback<OnNodeDrag<BoardFlowNode>>((event, node, nodes) => {
@@ -2174,8 +2182,9 @@ export default function BoardWorkspace({
     const positionById = new Map(pendingDragPositionByIdRef.current);
     const draggedNodes = nodes.length > 0 ? nodes : [node];
     const source = node.data.node;
+    const clientPoint = clientPointFromMouseOrTouchEvent(event);
     const dropTarget = draggedNodes.length === 1
-      ? multiGridCellDropTargetFromClient(board.nodes, event.clientX, event.clientY)
+      ? clientPoint ? multiGridCellDropTargetFromClient(board.nodes, clientPoint.clientX, clientPoint.clientY) : null
       : null;
     if (
       dropTarget &&
