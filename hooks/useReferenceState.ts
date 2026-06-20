@@ -1,4 +1,4 @@
-import type { TFunction } from "@/lib/i18n";
+import { t as globalT, type TFunction } from "@/lib/i18n";
 import { useState, type ChangeEvent, type Dispatch, type DragEvent, type SetStateAction } from "react";
 import {
   type DraggedReferenceAsset,
@@ -108,21 +108,36 @@ function insertTextAtRange(value: string, start: number, end: number, text: stri
   return `${value.slice(0, start)}${text}${value.slice(end)}`;
 }
 
-function remapPromptAfterReferenceRemoval(prompt: string, removedIndex: number): string {
-  // Reference tokens like @图片1, @视频2, @音频3 use Chinese labels
-  return prompt.replace(/@(图片|视频|音频)(\d+)/g, (match, label, value) => {
+const REFERENCE_TOKEN_LABELS_ENGLISH_FALLBACK = ["Image", "Video", "Audio"] as const;
+
+function referencePromptTokenRegex(translate: TFunction): RegExp {
+  const labels = [
+    ...(["image", "video", "audio"] as const).map(type => escapeRegExp(mediaReferenceLabel(type, translate))),
+    ...REFERENCE_TOKEN_LABELS_ENGLISH_FALLBACK,
+  ];
+  const uniqueLabels = Array.from(new Set(labels.map(label => label.toLowerCase())));
+  const labelPattern = uniqueLabels.map(escapeRegExp).join("|");
+  return new RegExp(`@(${labelPattern})(\\d+)`, "g");
+}
+
+function remapPromptAfterReferenceRemoval(prompt: string, removedIndex: number, t: TFunction): string {
+  const regex = referencePromptTokenRegex(t);
+  return prompt.replace(regex, (match, label, value) => {
     const parsed = Number(value);
     if (!Number.isInteger(parsed) || parsed < 1) return match;
 
     const index = parsed - 1;
     if (index === removedIndex) return "";
-    if (index > removedIndex) return getReferencePromptToken(index - 1, mediaReferenceTypeFromLabel(label) ?? "image");
+    if (index > removedIndex) {
+      return getReferencePromptToken(index - 1, mediaReferenceTypeFromLabel(label, t) ?? "image");
+    }
     return match;
   });
 }
 
-export function removePromptReferenceTokens(prompt: string): string {
-  return prompt.replace(/@(图片|视频|音频)\d+/g, "");
+export function removePromptReferenceTokens(prompt: string, t?: TFunction): string {
+  const translator = t ?? globalT;
+  return prompt.replace(referencePromptTokenRegex(translator), "");
 }
 
 export function useReferenceState({
@@ -309,7 +324,7 @@ export function useReferenceState({
   const removeReferenceImage = (id: string) => {
     const removedIndex = referenceImages.findIndex(reference => reference.id === id);
     if (removedIndex !== -1) {
-      setPrompt(current => remapPromptAfterReferenceRemoval(current, removedIndex));
+      setPrompt(current => remapPromptAfterReferenceRemoval(current, removedIndex, t));
     }
 
     setReferenceImages(prev => {

@@ -295,7 +295,7 @@ function audioFunctionPatch(model: string, audioMode: BoardAudioOperationNode["a
 function ModelSelect({
   allowUnknownCurrent = true,
   groups,
-  placeholder = "选择可用模型",
+  placeholder,
   value,
   onChange,
 }: {
@@ -305,6 +305,8 @@ function ModelSelect({
   value: string;
   onChange: (value: string) => void;
 }) {
+  const { t } = useTranslations("board");
+  const resolvedPlaceholder = placeholder ?? t("inspector.modelSelectPlaceholder");
   const modelGroups = allowUnknownCurrent ? includeCurrentModelOption(groups, value) : groups;
   const hasSelectedValue = hasModelOptionValue(modelGroups, value);
   const isEmpty = modelGroups.length === 0;
@@ -315,7 +317,7 @@ function ModelSelect({
       disabled={isEmpty}
       className={`${inputClass} ${isEmpty ? "cursor-not-allowed opacity-70" : ""}`}
     >
-      {!hasSelectedValue && <option value="" disabled>{placeholder}</option>}
+      {!hasSelectedValue && <option value="" disabled>{resolvedPlaceholder}</option>}
       {modelGroups.map(group => (
         <optgroup key={group.provider} label={group.label}>
           {group.options.map(option => (
@@ -913,7 +915,7 @@ function AudioOperationInspector({
           <input
             value={node.audioStylePrompt ?? ""}
             onChange={event => onUpdateGenerate(node.id, { audioStylePrompt: event.target.value })}
-            placeholder={node.audioMode === "voice_design" ? "例如：温暖、年轻、自然叙事感" : "例如：平静讲述、广告旁白、轻松口播"}
+            placeholder={node.audioMode === "voice_design" ? t("inspector.voiceProfilePlaceholderVoiceDesign") : t("inspector.voiceProfilePlaceholderVoiceClone")}
             className={inputClass}
           />
         </InspectorField>

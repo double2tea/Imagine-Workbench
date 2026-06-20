@@ -1,4 +1,4 @@
-import { t } from "@/lib/i18n";
+import { t, type TFunction } from "@/lib/i18n";
 import type { BoardEdge, BoardEdgeKind, BoardNode, BoardPortDefinition, BoardPortRef } from "./types";
 import { dedupeBoardEdgesByEndpoints } from "./edge-dedupe";
 import type { MediaReferenceType } from "@/lib/media-references";
@@ -56,44 +56,56 @@ export function getBoardNodePortDefinitions(
 ): BoardPortDefinition[] {
   if (node.kind === "asset" || node.kind === "result") {
     return [
-      { id: BOARD_PORT_IDS.assetIn, label: "资产输入", kind: "asset", direction: "input" },
-      { id: BOARD_PORT_IDS.assetOut, label: "资产输出", kind: "asset", direction: "output" },
+      { id: BOARD_PORT_IDS.assetIn, label: boardPortLabel(BOARD_PORT_IDS.assetIn), kind: "asset", direction: "input" },
+      { id: BOARD_PORT_IDS.assetOut, label: boardPortLabel(BOARD_PORT_IDS.assetOut), kind: "asset", direction: "output" },
     ];
   }
   if (node.kind === "prompt") {
     return [
-      { id: BOARD_PORT_IDS.assetIn, label: "媒体输入", kind: "asset", direction: "input" },
-      { id: BOARD_PORT_IDS.promptOut, label: "提示输出", kind: "prompt", direction: "output" },
+      { id: BOARD_PORT_IDS.assetIn, label: boardPortLabel(BOARD_PORT_IDS.assetIn), kind: "asset", direction: "input" },
+      { id: BOARD_PORT_IDS.promptOut, label: boardPortLabel(BOARD_PORT_IDS.promptOut), kind: "prompt", direction: "output" },
     ];
   }
   if (node.kind === "reference-group") {
     return [
-      { id: BOARD_PORT_IDS.assetIn, label: "媒体输入", kind: "asset", direction: "input" },
-      { id: BOARD_PORT_IDS.assetOut, label: "参考组输出", kind: "asset", direction: "output" },
+      { id: BOARD_PORT_IDS.assetIn, label: boardPortLabel(BOARD_PORT_IDS.assetIn), kind: "asset", direction: "input" },
+      { id: BOARD_PORT_IDS.assetOut, label: boardPortLabel(BOARD_PORT_IDS.assetOut), kind: "asset", direction: "output" },
     ];
   }
   if (node.kind === "multi-grid") {
-    return [{ id: BOARD_PORT_IDS.assetIn, label: "图片输入", kind: "asset", direction: "input" }];
+    return [{ id: BOARD_PORT_IDS.assetIn, label: boardPortLabel(BOARD_PORT_IDS.assetIn), kind: "asset", direction: "input" }];
   }
   if (isGenerateNode(node) || node.kind === "runninghub-app") {
     const ports: BoardPortDefinition[] = [
-      { id: BOARD_PORT_IDS.promptIn, label: "提示输入", kind: "prompt", direction: "input" },
+      { id: BOARD_PORT_IDS.promptIn, label: boardPortLabel(BOARD_PORT_IDS.promptIn), kind: "prompt", direction: "input" },
     ];
     if (boardNodeSupportsReferenceInput(node)) {
-      ports.push({ id: BOARD_PORT_IDS.referenceIn, label: "参考输入", kind: "asset", direction: "input" });
+      ports.push({ id: BOARD_PORT_IDS.referenceIn, label: boardPortLabel(BOARD_PORT_IDS.referenceIn), kind: "asset", direction: "input" });
     }
     if (node.status === "complete" || options.hasResultConnection) {
-      ports.push({ id: BOARD_PORT_IDS.resultOut, label: "结果输出", kind: "result", direction: "output" });
+      ports.push({ id: BOARD_PORT_IDS.resultOut, label: boardPortLabel(BOARD_PORT_IDS.resultOut), kind: "result", direction: "output" });
     }
     return ports;
   }
   if (node.kind === "agent") {
-    return [{ id: BOARD_PORT_IDS.agentContextIn, label: "Agent 上下文输入", kind: "agent", direction: "input" }];
+    return [{ id: BOARD_PORT_IDS.agentContextIn, label: boardPortLabel(BOARD_PORT_IDS.agentContextIn), kind: "agent", direction: "input" }];
   }
   if (node.kind === "note") {
-    return [{ id: BOARD_PORT_IDS.noteIn, label: "结果输入", kind: "result", direction: "input" }];
+    return [{ id: BOARD_PORT_IDS.noteIn, label: boardPortLabel(BOARD_PORT_IDS.noteIn), kind: "result", direction: "input" }];
   }
   return [];
+}
+
+function boardPortLabel(portId: string, translator: TFunction = t): string {
+  if (portId === BOARD_PORT_IDS.assetIn) return translator("board.ports.assetIn");
+  if (portId === BOARD_PORT_IDS.assetOut) return translator("board.ports.assetOut");
+  if (portId === BOARD_PORT_IDS.promptIn) return translator("board.ports.promptIn");
+  if (portId === BOARD_PORT_IDS.promptOut) return translator("board.ports.promptOut");
+  if (portId === BOARD_PORT_IDS.referenceIn) return translator("board.ports.referenceIn");
+  if (portId === BOARD_PORT_IDS.resultOut) return translator("board.ports.resultOut");
+  if (portId === BOARD_PORT_IDS.agentContextIn) return translator("board.ports.agentContextIn");
+  if (portId === BOARD_PORT_IDS.noteIn) return translator("board.ports.noteIn");
+  return portId;
 }
 
 export function getBoardNodePortDefinition(
@@ -117,8 +129,8 @@ function findPort(
 ): { node: BoardNode; port: BoardPortDefinition } {
   const node = findNode(nodes, ref.nodeId);
   const port = getBoardNodePortDefinition(node, ref.portId, options);
-  if (!port) throw new Error("连接端点不存在或当前模型不支持该端口");
-  if (port.kind !== ref.portKind) throw new Error("连接端口类型不一致");
+  if (!port) throw new Error(t("board.ports.errors.noPortOrUnsupported"));
+  if (port.kind !== ref.portKind) throw new Error(t("board.ports.errors.portTypeMismatch"));
   return { node, port };
 }
 
@@ -306,9 +318,9 @@ export function resolveBoardConnectionKind(nodes: BoardNode[], from: BoardPortRe
   const source = findPort(nodes, from, sourceOptions);
   const target = findPort(nodes, to, targetOptions);
   if (source.port.direction !== "output" || target.port.direction !== "input") {
-    throw new Error("连接方向不正确");
+    throw new Error(t("board.ports.errors.invalidDirection"));
   }
-  if (source.node.id === target.node.id) throw new Error("不能连接同一个节点");
+  if (source.node.id === target.node.id) throw new Error(t("board.ports.errors.sameNode"));
 
   if (
     source.node.kind === "prompt" &&

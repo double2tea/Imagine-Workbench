@@ -22,8 +22,8 @@ interface BoardQuickInsertMenuProps {
   onPick: (kind: string, position: BoardPoint) => void;
 }
 
-function quickInsertGroupLabel(kind: string): BoardInsertGroupLabel | null {
-  if (kind === BOARD_QUICK_INSERT_IMPORT_KIND) return "开始";
+function quickInsertGroupLabel(kind: string, t: (key: string) => string): BoardInsertGroupLabel | null {
+  if (kind === BOARD_QUICK_INSERT_IMPORT_KIND) return t("quickInsertStartLabel");
   return isBoardInsertKind(kind) ? boardInsertGroupLabel(kind) : null;
 }
 
@@ -37,7 +37,7 @@ export default function BoardQuickInsertMenu({ clientX, clientY, items, position
   );
   const itemCountByGroup = new Map<BoardInsertGroupLabel, number>();
   for (const item of items) {
-    const groupLabel = quickInsertGroupLabel(item.kind);
+    const groupLabel = quickInsertGroupLabel(item.kind, t);
     if (!groupLabel) continue;
     itemCountByGroup.set(groupLabel, (itemCountByGroup.get(groupLabel) ?? 0) + 1);
   }
@@ -54,7 +54,7 @@ export default function BoardQuickInsertMenu({ clientX, clientY, items, position
       </div>
       <div className="grid max-h-[min(420px,calc(100vh-5rem))] gap-2 overflow-y-auto pr-1">
         {BOARD_INSERT_GROUP_LABELS.map(groupLabel => {
-          const groupItems = items.filter(item => quickInsertGroupLabel(item.kind) === groupLabel);
+          const groupItems = items.filter(item => quickInsertGroupLabel(item.kind, t) === groupLabel);
           if (groupItems.length === 0) return null;
           return (
             <div key={groupLabel} className="board-quick-insert-group grid gap-1" data-group={groupLabel}>

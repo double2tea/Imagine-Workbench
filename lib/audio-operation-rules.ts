@@ -1,4 +1,4 @@
-import type { TFunction } from "@/lib/i18n";
+import { t as globalT, type TFunction } from "@/lib/i18n";
 import { mediaReferenceLabel } from "./media-references";
 import {
   getAudioModelCapabilities,
@@ -41,33 +41,38 @@ export interface AudioFunctionSelection {
   model: string;
 }
 
-export const AUDIO_MODE_LABELS: Record<AudioOperationMode, string> = {
-  asr: "转写",
-  music: "音乐",
-  sfx: "音效",
-  tts: "朗读",
-  voice_clone: "克隆",
-  voice_design: "设计音色",
+const AUDIO_MODE_LABELS_FALLBACK: Record<AudioOperationMode, string> = {
+  asr: "Transcribe",
+  music: "Music",
+  sfx: "SFX",
+  tts: "Text-to-Speech",
+  voice_clone: "Voice Clone",
+  voice_design: "Voice Design",
 };
 
 /** Get mode label via i18n. Falls back to Chinese constant when t is not provided. */
 export function getAudioModeLabel(mode: AudioOperationMode, t?: TFunction): string {
-  if (t) return t(`media.modeLabels.${mode}`);
-  return AUDIO_MODE_LABELS[mode];
+  return (t ?? globalT)(`media.modeLabels.${mode}`) || (t ?? globalT)(`common.media.modeLabels.${mode}`) || AUDIO_MODE_LABELS_FALLBACK[mode];
 }
 
 /** Get ASR language options via i18n. Falls back to Chinese constants when t is not provided. */
 export function getAsrLanguageOptions(t?: TFunction): Array<{ label: string; value: "auto" | "zh" | "en" }> {
   return ASR_LANGUAGE_OPTIONS.map(option => ({
     value: option.value,
-    label: t ? t(`media.asrLanguageOptions.${option.value}`) : option.label,
+    label: (t ?? globalT)(`media.asrLanguageOptions.${option.value}`) || option.label,
   }));
 }
 
+const ASR_LANGUAGE_OPTION_LABELS_FALLBACK: Record<"auto" | "zh" | "en", string> = {
+  auto: "Auto Detect",
+  zh: "Chinese",
+  en: "English",
+};
+
 export const ASR_LANGUAGE_OPTIONS: Array<{ label: string; value: "auto" | "zh" | "en" }> = [
-  { value: "auto", label: "自动识别" },
-  { value: "zh", label: "中文" },
-  { value: "en", label: "英文" },
+  { value: "auto", label: ASR_LANGUAGE_OPTION_LABELS_FALLBACK.auto },
+  { value: "zh", label: ASR_LANGUAGE_OPTION_LABELS_FALLBACK.zh },
+  { value: "en", label: ASR_LANGUAGE_OPTION_LABELS_FALLBACK.en },
 ];
 
 export function audioOperationRequiresTextInput(mode: AudioOperationMode): boolean {
@@ -88,10 +93,10 @@ export function readOptionalAudioFormat(value: string | undefined): string | und
 }
 
 export function audioOperationMissingReferenceMessage(capabilities: AudioModelCapabilities, t?: TFunction): string {
-  const labels = capabilities.referenceMediaTypes.map(type => mediaReferenceLabel(type, t)).join(" / ");
-  const referenceLabel = labels ? `${labels}参考` : "参考媒体";
-  if (t) return t("media.missingReferenceMessage", { min: capabilities.minReferenceMedia, referenceLabel });
-  return `当前音频模式需要至少 ${capabilities.minReferenceMedia} 个${referenceLabel}`;
+  const translator = t ?? globalT;
+  const labels = capabilities.referenceMediaTypes.map(type => mediaReferenceLabel(type, translator)).join(" / ");
+  const referenceLabel = labels || translator("media.referenceLabels.audio");
+  return translator("media.missingReferenceMessage", { min: capabilities.minReferenceMedia, referenceLabel });
 }
 
 export function audioFunctionValue(model: string, mode: AudioOperationMode): AudioFunctionValue {
@@ -160,7 +165,8 @@ export function resolveAudioFunctionSelection(input: {
   const provider = audioProviderFromModel(requestedModel);
   const providerMatch = getModelCapabilities("audio", provider).find(capability => capability.audioModes.includes(requestedMode));
   const match = providerMatch ?? getModelCapabilities("audio").find(capability => capability.audioModes.includes(requestedMode));
-  if (!match) throw new Error(`没有支持 ${getAudioModeLabel(requestedMode, input.t)} 的音频模型`);
+  const translator = input.t ?? globalT;
+  if (!match) throw new Error(translator("media.noSupportingModelError", { mode: getAudioModeLabel(requestedMode, translator) }));
 
   const model = match.value;
   return {
@@ -171,8 +177,9 @@ export function resolveAudioFunctionSelection(input: {
 }
 
 function audioFunctionLabel(modelLabel: string, mode: AudioOperationMode, modeCount: number): string {
-  if (modeCount === 1) return AUDIO_MODE_LABELS[mode];
-  return `${AUDIO_MODE_LABELS[mode]} · ${modelLabel}`;
+  const modeLabel = getAudioModeLabel(mode);
+  if (modeCount === 1) return modeLabel;
+  return `${modeLabel} · ${modelLabel}`;
 }
 
 function readAudioOperationModeValue(value: string): AudioOperationMode | null {

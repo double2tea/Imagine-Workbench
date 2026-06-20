@@ -68,7 +68,7 @@
     "dismissNotice": "关闭提示",
     "localProjectReadFailed": "本地项目库读取失败：{error}",
     "referenceMediaReadFailed": "参考媒体读取失败",
-    "referenceImageReadFailed": "参考图读取失败",
+    "referenceImageReadFailed": "参考图读取失败：HTTP {status}",
     "imageSizeInvalid": "尺寸格式必须是 widthxheight，例如 2560x1440",
     "maxDimensionExceeded": "最大边长不能超过 3840px",
     "dimensionMustBe16x": "宽高都必须是 16px 的倍数",
@@ -181,7 +181,6 @@
     "referenceMediaMustBeFile": "参考媒体必须是图片、视频或音频文件",
     "referenceImageMustBeSupported": "参考图必须是 data:image/*、blob: 或受支持的图片结果地址",
     "referenceMediaMustBeSupported": "参考媒体必须是 data:*、blob: 或受支持的媒体结果地址",
-    "referenceImageReadFailed": "参考图读取失败：HTTP {status}",
     "browserCannotCreateCompressCanvas": "浏览器无法创建图片压缩画布",
     "referenceImageCompressOverLimit": "单张参考图压缩后仍超过 {size}，请换一张更小的图",
     "referenceImageCompressFailed": "图片压缩失败",
@@ -202,7 +201,6 @@
     "agentRetryFollowUp2": "根据当前参数重新规划",
     "voiceProfileAudioMissing": "选中的音色参考音频已不存在",
     "referenceMediaOriginalNotFound": "找不到参考媒体原图",
-    "voiceCloneNeedsConsent": "音色克隆需要先确认参考音频授权",
     "paramsRestoredToPanel": "已回填任务参数到左侧工作面板",
     "maskAppliedToAgent": "蒙版已应用到 Agent 参考图，可在对话中继续描述修改",
     "maskWrittenToReference": "蒙版已写入参考图，可继续编辑提示词并生成",
@@ -363,7 +361,10 @@
     "currentView": "当前视角",
     "exitPanorama": "退出全景查看",
     "sizeLabel": "尺寸",
-    "sizeTitle": "全景截图尺寸"
+    "sizeTitle": "全景截图尺寸",
+    "loadingLabel": "正在加载全景",
+    "genericWebGLError": "当前浏览器无法加载 WebGL 全景视图",
+    "textureSizeError": "全景图尺寸超过当前设备支持范围"
   },
   "reference": {
     "noMediaFound": "未找到可引用媒体",

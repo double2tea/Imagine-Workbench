@@ -1,4 +1,4 @@
-import type { TFunction } from "@/lib/i18n";
+import { t, type TFunction } from "@/lib/i18n";
 
 export type MediaReferenceType = "image" | "video" | "audio";
 export type MediaReferenceRole = "start" | "end" | "general";
@@ -36,6 +36,12 @@ export function mediaReferenceMimeFromBase64DataUri(dataUri: string): string | n
   return match ? match[1].toLowerCase() : null;
 }
 
+const FALLBACK_MEDIA_REFERENCE_LABELS: Record<MediaReferenceType, string> = {
+  audio: "Audio",
+  image: "Image",
+  video: "Video",
+};
+
 export function mediaReferenceTypeFromDataUri(dataUri: string): MediaReferenceType | null {
   const mimeType = mediaReferenceMimeFromDataUri(dataUri);
   return mimeType ? mediaReferenceTypeFromMime(mimeType) : null;
@@ -46,18 +52,24 @@ export function mediaReferenceTypeFromBase64DataUri(dataUri: string): MediaRefer
   return mimeType ? mediaReferenceTypeFromMime(mimeType) : null;
 }
 
-export function mediaReferenceLabel(type: MediaReferenceType, t?: TFunction): string {
-  if (t) return t(`media.referenceLabels.${type}`);
-  // Chinese fallback for AI prompt tokens and backward compatibility
-  if (type === "image") return "图片";
-  if (type === "video") return "视频";
-  return "音频";
+export function mediaReferenceLabel(type: MediaReferenceType, labelT?: TFunction): string {
+  return (labelT ?? t)(`media.referenceLabels.${type}`);
 }
 
-export function mediaReferenceTypeFromLabel(label: string): MediaReferenceType | null {
-  if (label === "图片") return "image";
-  if (label === "视频") return "video";
-  if (label === "音频") return "audio";
+export function mediaReferenceTypeFromLabel(
+  label: string,
+  labelT?: TFunction,
+): MediaReferenceType | null {
+  const mediaLabel = label.trim();
+  if (!mediaLabel) return null;
+  const normalizedMediaLabel = mediaLabel.toLowerCase();
+  const candidates: readonly MediaReferenceType[] = ["image", "video", "audio"];
+  for (const candidate of candidates) {
+    if (normalizedMediaLabel === mediaReferenceLabel(candidate, labelT).toLowerCase()) return candidate;
+  }
+  for (const candidate of candidates) {
+    if (normalizedMediaLabel === FALLBACK_MEDIA_REFERENCE_LABELS[candidate].toLowerCase()) return candidate;
+  }
   return null;
 }
 

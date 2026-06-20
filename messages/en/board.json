@@ -149,7 +149,10 @@
       "outputAudio": "Audio",
       "params": "{count} parameter(s)"
     },
-    "titleShort": "Inspector"
+    "titleShort": "Inspector",
+    "modelSelectPlaceholder": "Select available model",
+    "voiceProfilePlaceholderVoiceDesign": "e.g. warm, young, natural narration",
+    "voiceProfilePlaceholderVoiceClone": "e.g. calm narration, ad narration, casual read"
   },
   "workspace": {
     "undo": "Undo (Ctrl+Z)",
@@ -430,5 +433,6 @@
     "activeSection": "Running",
     "failedSection": "Needs handling",
     "recentSection": "Recently completed"
-  }
+  },
+  "quickInsertStartLabel": "Start"
 }

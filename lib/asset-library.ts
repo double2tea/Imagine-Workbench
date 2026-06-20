@@ -18,17 +18,17 @@ export const LIBRARY_ASSET_CATEGORIES: readonly LibraryAssetCategory[] = ["chara
 export const LIBRARY_ASSET_MEDIA_TYPES: readonly LibraryAssetMediaType[] = ["image", "video", "audio"];
 
 export const LIBRARY_ASSET_CATEGORY_LABELS: Record<LibraryAssetCategory, string> = {
-  character: "角色",
-  scene: "场景",
-  prop: "道具",
-  style: "风格",
-  other: "其他",
+  character: t("common.library.category.character"),
+  scene: t("common.library.category.scene"),
+  prop: t("common.library.category.prop"),
+  style: t("common.library.category.style"),
+  other: t("common.library.category.other"),
 };
 
 export const LIBRARY_ASSET_MEDIA_TYPE_LABELS: Record<LibraryAssetMediaType, string> = {
-  audio: "音频",
-  image: "图片",
-  video: "视频",
+  audio: t("media.referenceLabels.audio"),
+  image: t("media.referenceLabels.image"),
+  video: t("media.referenceLabels.video"),
 };
 
 function makeClientId(prefix: string): string {

@@ -545,7 +545,7 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
                   isExtractDragItem ? "border-sky-300/70 bg-sky-50/70 opacity-45 ring-2 ring-sky-300/50" : "",
                   isSelected && !isExtractDragItem ? "z-10 ring-2 ring-emerald-400" : "",
                 ].join(" ")}
-                title={item ? item.prompt || item.model : "拖入图片"}
+                title={item ? item.prompt || item.model : t("multiGridNode.dragImage")}
               >
                 {item ? (
                   (() => {

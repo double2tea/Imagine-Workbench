@@ -12,7 +12,7 @@ import {
   type PanoramaCamera,
   type PanoramaScreenshot,
 } from "@/lib/panorama/capture";
-import { useTranslations } from "@/lib/i18n";
+import { useTranslations, type TFunction } from "@/lib/i18n";
 
 interface PanoramaOverlayProps {
   item: StorageItem;
@@ -89,7 +89,7 @@ async function preparePanoramaUrl(sourceUrl: string): Promise<{ url: string; rev
   };
 }
 
-function createPanoramaViewer(container: HTMLElement, panoramaUrl: string, camera?: PanoramaCamera): Pannellum.Viewer {
+function createPanoramaViewer(container: HTMLElement, panoramaUrl: string, t: TFunction, camera?: PanoramaCamera): Pannellum.Viewer {
   return window.pannellum.viewer(container, {
     type: "equirectangular",
     panorama: panoramaUrl,
@@ -106,9 +106,9 @@ function createPanoramaViewer(container: HTMLElement, panoramaUrl: string, camer
     minHfov: 45,
     maxHfov: 120,
     strings: {
-      loadingLabel: "正在加载全景",
-      genericWebGLError: "当前浏览器无法加载 WebGL 全景视图",
-      textureSizeError: "全景图尺寸超过当前设备支持范围",
+      loadingLabel: t("panorama.loadingLabel"),
+      genericWebGLError: t("panorama.genericWebGLError"),
+      textureSizeError: t("panorama.textureSizeError"),
     },
   });
 }
@@ -136,7 +136,12 @@ function waitForPaintFrame(): Promise<void> {
   });
 }
 
-async function renderSizedPanoramaImage(panoramaUrl: string, camera: PanoramaCamera, size: PanoramaCaptureSize): Promise<string> {
+async function renderSizedPanoramaImage(
+  panoramaUrl: string,
+  camera: PanoramaCamera,
+  size: PanoramaCaptureSize,
+  t: TFunction,
+): Promise<string> {
   const captureContainer = document.createElement("div");
   captureContainer.setAttribute("aria-hidden", "true");
   captureContainer.style.position = "fixed";
@@ -148,7 +153,7 @@ async function renderSizedPanoramaImage(panoramaUrl: string, camera: PanoramaCam
   captureContainer.style.opacity = "0";
   document.body.appendChild(captureContainer);
 
-  const captureViewer = createPanoramaViewer(captureContainer, panoramaUrl, camera);
+  const captureViewer = createPanoramaViewer(captureContainer, panoramaUrl, t, camera);
   try {
     await waitForPanoramaLoad(captureViewer);
     captureViewer.lookAt(camera.pitch, camera.yaw, camera.hfov, false);
@@ -189,7 +194,7 @@ export default function PanoramaOverlay({ item, onClose, onSaveScreenshots }: Pa
       }
       revokeUrlRef.current = prepared.revoke;
       panoramaUrlRef.current = prepared.url;
-      viewerRef.current = createPanoramaViewer(container, prepared.url);
+      viewerRef.current = createPanoramaViewer(container, prepared.url, t);
       viewerRef.current.on("load", () => {
         if (isActive) setIsReady(true);
       });
@@ -210,15 +215,15 @@ export default function PanoramaOverlay({ item, onClose, onSaveScreenshots }: Pa
       revokeUrlRef.current?.();
       revokeUrlRef.current = null;
     };
-  }, [item.url]);
+  }, [item.url, t]);
 
   const captureCamera = useCallback(async (camera: PanoramaCamera): Promise<PanoramaScreenshot> => {
     const panoramaUrl = panoramaUrlRef.current;
     if (!panoramaUrl) throw new Error("notReady");
-    const dataUrl = await renderSizedPanoramaImage(panoramaUrl, camera, getCaptureSize(captureSizeId));
+    const dataUrl = await renderSizedPanoramaImage(panoramaUrl, camera, getCaptureSize(captureSizeId), t);
     const size = await imageSizeFromDataUrl(dataUrl);
     return { camera, dataUrl, ...size };
-  }, [captureSizeId]);
+  }, [captureSizeId, t]);
 
   const captureCurrent = useCallback(async (): Promise<PanoramaScreenshot> => {
     const viewer = viewerRef.current;

@@ -149,7 +149,10 @@
       "outputAudio": "音频",
       "params": "{count} 参数"
     },
-    "titleShort": "检查"
+    "titleShort": "检查",
+    "modelSelectPlaceholder": "选择可用模型",
+    "voiceProfilePlaceholderVoiceDesign": "例如：温暖、年轻、自然叙事感",
+    "voiceProfilePlaceholderVoiceClone": "例如：平静讲述、广告旁白、轻松口播"
   },
   "workspace": {
     "undo": "撤销 (Ctrl+Z)",
@@ -430,5 +433,6 @@
     "activeSection": "运行中",
     "failedSection": "需要处理",
     "recentSection": "最近完成"
-  }
+  },
+  "quickInsertStartLabel": "开始"
 }

@@ -443,7 +443,7 @@ export function useProviderSettings({
 
       setModelListMessage(t("common.notices.modelListFetched", { count: fetched.length, chat: fetchedChat.length, image: fetchedImage.length, video: fetchedVideo.length, audio: fetchedAudio.length }));
     } catch (err) {
-      const message = toErrorMessage(err, "模型列表获取失败");
+      const message = toErrorMessage(err, t("common.notices.modelListFetchFailed"));
       setModelListMessage(message);
       pushWorkspaceNotice("error", message);
     } finally {

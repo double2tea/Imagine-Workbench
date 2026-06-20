@@ -45,7 +45,7 @@
     "voiceProfileSaved": "Voice profile saved",
     "localProjectReadFailed": "Local project library read failed: {error}",
     "referenceMediaReadFailed": "Reference media read failed",
-    "referenceImageReadFailed": "Reference image read failed",
+    "referenceImageReadFailed": "Reference image read failed: HTTP {status}",
     "imageSizeInvalid": "Size must be in widthxheight format, e.g. 2560x1440",
     "maxDimensionExceeded": "Maximum side length cannot exceed 3840px",
     "dimensionMustBe16x": "Both width and height must be multiples of 16px",
@@ -158,7 +158,6 @@
     "referenceMediaMustBeFile": "Reference media must be an image, video, or audio file",
     "referenceImageMustBeSupported": "Reference image must be a data:image/*, blob:, or supported image result URL",
     "referenceMediaMustBeSupported": "Reference media must be a data:*, blob:, or supported media result URL",
-    "referenceImageReadFailed": "Reference image read failed: HTTP {status}",
     "browserCannotCreateCompressCanvas": "Browser cannot create image compression canvas",
     "referenceImageCompressOverLimit": "Single reference image still exceeds {size} after compression, please use a smaller image",
     "referenceImageCompressFailed": "Image compression failed",
@@ -381,5 +380,10 @@
     "promptPrefix": "In the marked region of the image, change: ",
     "emptyPromptPlaceholder": "[Enter your new modification idea...]",
     "agentRefLabel": "Agent reference {n}"
+  },
+  "panorama": {
+    "loadingLabel": "Loading panorama",
+    "genericWebGLError": "Your browser cannot load the panorama WebGL view",
+    "textureSizeError": "Panorama image size exceeds the supported range on this device"
   }
 }

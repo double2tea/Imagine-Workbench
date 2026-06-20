@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n";
 import { buildStorageItem, type StorageItem } from "@/lib/db";
 
 export interface PanoramaCamera {
@@ -31,25 +32,25 @@ export const PANORAMA_CAPTURE_SIZES: PanoramaCaptureSize[] = [
 ];
 
 export const PANORAMA_FOUR_VIEW_CAMERAS: PanoramaCamera[] = [
-  { label: "前方", yaw: 0, pitch: 0, hfov: 90 },
-  { label: "右侧", yaw: 90, pitch: 0, hfov: 90 },
-  { label: "后方", yaw: 180, pitch: 0, hfov: 90 },
-  { label: "左侧", yaw: -90, pitch: 0, hfov: 90 },
+  { label: t("media.panoramaCameras.front"), yaw: 0, pitch: 0, hfov: 90 },
+  { label: t("media.panoramaCameras.right"), yaw: 90, pitch: 0, hfov: 90 },
+  { label: t("media.panoramaCameras.back"), yaw: 180, pitch: 0, hfov: 90 },
+  { label: t("media.panoramaCameras.left"), yaw: -90, pitch: 0, hfov: 90 },
 ];
 
 export const PANORAMA_TWELVE_VIEW_CAMERAS: PanoramaCamera[] = [
-  { label: "前方", yaw: 0, pitch: 0, hfov: 80 },
-  { label: "前右", yaw: 45, pitch: 0, hfov: 80 },
-  { label: "右侧", yaw: 90, pitch: 0, hfov: 80 },
-  { label: "后右", yaw: 135, pitch: 0, hfov: 80 },
-  { label: "后方", yaw: 180, pitch: 0, hfov: 80 },
-  { label: "后左", yaw: -135, pitch: 0, hfov: 80 },
-  { label: "左侧", yaw: -90, pitch: 0, hfov: 80 },
-  { label: "前左", yaw: -45, pitch: 0, hfov: 80 },
-  { label: "上前", yaw: 0, pitch: 42, hfov: 80 },
-  { label: "上后", yaw: 180, pitch: 42, hfov: 80 },
-  { label: "下前", yaw: 0, pitch: -36, hfov: 80 },
-  { label: "下后", yaw: 180, pitch: -36, hfov: 80 },
+  { label: t("media.panoramaCameras.front"), yaw: 0, pitch: 0, hfov: 80 },
+  { label: t("media.panoramaCameras.frontRight"), yaw: 45, pitch: 0, hfov: 80 },
+  { label: t("media.panoramaCameras.right"), yaw: 90, pitch: 0, hfov: 80 },
+  { label: t("media.panoramaCameras.backRight"), yaw: 135, pitch: 0, hfov: 80 },
+  { label: t("media.panoramaCameras.back"), yaw: 180, pitch: 0, hfov: 80 },
+  { label: t("media.panoramaCameras.backLeft"), yaw: -135, pitch: 0, hfov: 80 },
+  { label: t("media.panoramaCameras.left"), yaw: -90, pitch: 0, hfov: 80 },
+  { label: t("media.panoramaCameras.frontLeft"), yaw: -45, pitch: 0, hfov: 80 },
+  { label: t("media.panoramaCameras.upFront"), yaw: 0, pitch: 42, hfov: 80 },
+  { label: t("media.panoramaCameras.upBack"), yaw: 180, pitch: 42, hfov: 80 },
+  { label: t("media.panoramaCameras.downFront"), yaw: 0, pitch: -36, hfov: 80 },
+  { label: t("media.panoramaCameras.downBack"), yaw: 180, pitch: -36, hfov: 80 },
 ];
 
 export function createPanoramaScreenshotStorageItem(
@@ -63,7 +64,7 @@ export function createPanoramaScreenshotStorageItem(
       id,
       type: "image",
       url: screenshot.dataUrl,
-      prompt: `${source.prompt} (全景截图-${screenshot.camera.label})`,
+      prompt: `${source.prompt} (${t("media.panoramaScreenshotLabel")}-${screenshot.camera.label})`,
       model: source.model,
       aspectRatio: `${screenshot.width}x${screenshot.height}`,
       createdAt: new Date().toISOString(),
