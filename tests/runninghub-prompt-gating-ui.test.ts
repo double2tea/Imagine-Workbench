@@ -4,6 +4,7 @@ import path from "node:path";
 import test, { after } from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { ConfirmProvider } from "../components/confirm/ConfirmProvider";
 import { DEFAULT_CINEMATIC_PROFILE } from "../lib/cinematic-controls";
 import type { ImageModelCapabilities, VideoModelCapabilities } from "../lib/providers/model-catalog";
 
@@ -82,9 +83,9 @@ test("image generation panel generate button follows promptRequired", async () =
     onThinkingLevelChange: noop,
   };
 
-  assert.match(generateButtonMarkup(renderToStaticMarkup(React.createElement(ImageGenerationPanel, baseProps)), "生成图片"), /\sdisabled=""/);
+  assert.match(generateButtonMarkup(renderPanelToStaticMarkup(ImageGenerationPanel, baseProps), "生成图片"), /\sdisabled=""/);
   assert.doesNotMatch(
-    generateButtonMarkup(renderToStaticMarkup(React.createElement(ImageGenerationPanel, { ...baseProps, promptRequired: false })), "生成图片"),
+    generateButtonMarkup(renderPanelToStaticMarkup(ImageGenerationPanel, { ...baseProps, promptRequired: false }), "生成图片"),
     /\sdisabled=""/,
   );
 });
@@ -139,12 +140,16 @@ test("video generation panel generate button follows promptRequired", async () =
     onSelectSize: noop,
   };
 
-  assert.match(generateButtonMarkup(renderToStaticMarkup(React.createElement(VideoGenerationPanel, baseProps)), "生成视频"), /\sdisabled=""/);
+  assert.match(generateButtonMarkup(renderPanelToStaticMarkup(VideoGenerationPanel, baseProps), "生成视频"), /\sdisabled=""/);
   assert.doesNotMatch(
-    generateButtonMarkup(renderToStaticMarkup(React.createElement(VideoGenerationPanel, { ...baseProps, promptRequired: false })), "生成视频"),
+    generateButtonMarkup(renderPanelToStaticMarkup(VideoGenerationPanel, { ...baseProps, promptRequired: false }), "生成视频"),
     /\sdisabled=""/,
   );
 });
+
+function renderPanelToStaticMarkup<P extends object>(component: React.ComponentType<P>, props: P): string {
+  return renderToStaticMarkup(React.createElement(ConfirmProvider, null, React.createElement(component, props)));
+}
 
 function generateButtonMarkup(html: string, label: string): string {
   const labelIndex = html.indexOf(label);
@@ -182,7 +187,7 @@ function registerCompiledPathAlias(): void {
 
   moduleWithResolver._resolveFilename = (request, parent, isMain, options) => {
     if (request.startsWith("@/")) {
-      return path.join(compiledRoot, `${request.slice(2)}.js`);
+      return originalResolveFilename(path.join(compiledRoot, request.slice(2)), parent, isMain, options);
     }
     return originalResolveFilename(request, parent, isMain, options);
   };

@@ -186,7 +186,7 @@ function registerCompiledPathAlias(): void {
 
   moduleWithResolver._resolveFilename = (request, parent, isMain, options) => {
     if (request.startsWith("@/")) {
-      return path.join(compiledRoot, `${request.slice(2)}.js`);
+      return originalResolveFilename(path.join(compiledRoot, request.slice(2)), parent, isMain, options);
     }
     return originalResolveFilename(request, parent, isMain, options);
   };

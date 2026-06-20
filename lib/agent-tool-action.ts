@@ -222,7 +222,7 @@ export function validateAgentToolAction(
     const audioMode = params.audioMode && capabilities.modes.includes(params.audioMode)
       ? params.audioMode
       : capabilities.defaultMode;
-    if (audioOperationRequiresTextInput(audioMode) && !params.prompt?.trim()) return t("common.notices.agentReferenceReadFailed");
+    if (audioOperationRequiresTextInput(audioMode) && !params.prompt?.trim()) return "请先填写提示词";
     if (audioMode === "voice_clone" && params.voiceCloneConsentAccepted !== true) return t("common.notices.voiceCloneNeedsConsent");
     const references = context.references ?? [];
     const unsupportedReference = references.find(reference => !capabilities.referenceMediaTypes.includes(getMediaReferenceType(reference)));

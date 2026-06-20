@@ -250,8 +250,11 @@ export function validateInputModalityReferences(
   if (unsupported) throw new ModelCapabilityValidationError(t("common.notices.currentInputNotSupportMediaReference", { type: mediaReferenceLabel(unsupported.type) }));
 
   const range = inputModalitiesReferenceCountRange(profile);
-  if (references.length < range.minCount || references.length > range.maxCount) {
+  if (references.length < range.minCount) {
     throw new ModelCapabilityValidationError(t("common.notices.imageModelNeedMinReferences", { min: range.minCount }));
+  }
+  if (references.length > range.maxCount) {
+    throw new ModelCapabilityValidationError(t("common.notices.currentModelReferenceRange", { min: range.minCount, max: range.maxCount }));
   }
 
   validateInputModalityTypeCount("image", profile.images, references, profile.mixed !== undefined);

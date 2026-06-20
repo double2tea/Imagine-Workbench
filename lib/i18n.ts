@@ -100,7 +100,7 @@ export function readDocumentLocale(): Locale | null {
 
 /** Detect preferred locale from browser language settings. */
 export function detectBrowserLocale(): Locale {
-  if (typeof navigator === "undefined") return DEFAULT_LOCALE;
+  if (typeof window === "undefined" || typeof navigator === "undefined") return DEFAULT_LOCALE;
   const lang = navigator.language || "";
   return lang.startsWith("en") ? "en" : "zh";
 }

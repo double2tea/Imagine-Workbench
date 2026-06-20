@@ -12,7 +12,7 @@ export function normalizeCustomProviderBaseUrl(value: string): string {
     throw new Error(t("common.notices.baseUrlFormatInvalid"));
   }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new Error(t("common.notices.baseUrlFormatInvalid"));
+    throw new Error(t("common.notices.baseUrlProtocolInvalid"));
   }
   return parsed.toString().replace(/\/+$/, "");
 }

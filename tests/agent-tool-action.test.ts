@@ -40,7 +40,7 @@ test("agent audio action validation rejects non-audio models", () => {
       model: "12ai:gemini-3.1-flash-image-preview",
       prompt: "Read this line",
     },
-  }), "请先选择音频模型");
+  }), "音频生成需要明确音频模型");
 });
 
 test("agent audio action validation requires voice clone consent", () => {
