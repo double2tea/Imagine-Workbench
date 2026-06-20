@@ -1,3 +1,4 @@
+import { ApiError } from "../api/errors";
 import type { AiProvider } from "./model-catalog";
 import type { ProviderConfig, ProviderMediaType } from "./types";
 import {
@@ -224,7 +225,12 @@ async function parseJsonResponse<T>(res: Response): Promise<T> {
   const text = await res.text();
   const data = parseProviderResponseBody(text);
   if (!res.ok) {
-    throw new Error(readErrorMessage(data) ?? `HTTP ${res.status}`);
+    throw new ApiError(
+      res.status,
+      providerErrorCode(res.status),
+      readErrorMessage(data) ?? `HTTP ${res.status}`,
+      { providerStatus: res.status },
+    );
   }
   return data as T;
 }
@@ -245,6 +251,11 @@ function readErrorMessage(value: unknown): string | undefined {
   if (isRecord(error) && typeof error.message === "string") return error.message;
   if (typeof value.message === "string") return value.message;
   return undefined;
+}
+
+function providerErrorCode(status: number): string {
+  if (status === 429) return "provider_rate_limited";
+  return "provider_request_failed";
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {

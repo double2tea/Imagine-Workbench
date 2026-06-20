@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { audioOperationApiError } from "../lib/api/audio-errors";
 import { ApiError, apiErrorResponse, badRequest, requireApiText } from "../lib/api/errors";
+import { postJson } from "../lib/providers/utils";
 
 test("requireApiText maps missing values to a structured 400 error", () => {
   assert.throws(
@@ -39,6 +40,36 @@ test("apiErrorResponse converts unknown failures to internal errors", () => {
     error: "Provider failed",
     code: "internal_error",
   });
+});
+
+test("provider JSON requests preserve rate limit status", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (): Promise<Response> => Response.json(
+    { error: { message: "Too many requests" } },
+    { status: 429 },
+  );
+
+  try {
+    await assert.rejects(
+      postJson("https://provider.test/v1/chat/completions", {
+        provider: "mimo",
+        apiKey: "mimo_key",
+        baseUrl: "https://provider.test",
+        videoBaseUrl: "https://provider.test",
+      }, { model: "mimo-v2.5-tts-voiceclone" }),
+      (error: unknown) => {
+        assert.equal(error instanceof ApiError, true);
+        if (!(error instanceof ApiError)) return false;
+        assert.equal(error.status, 429);
+        assert.equal(error.code, "provider_rate_limited");
+        assert.equal(error.message, "Too many requests");
+        assert.deepEqual(error.details, { providerStatus: 429 });
+        return true;
+      },
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("audioOperationApiError maps audio operation request errors to structured 400s", () => {
