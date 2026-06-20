@@ -154,6 +154,22 @@
     "voiceProfilePlaceholderVoiceDesign": "例如：温暖、年轻、自然叙事感",
     "voiceProfilePlaceholderVoiceClone": "例如：平静讲述、广告旁白、轻松口播"
   },
+  "ports": {
+    "assetIn": "媒体输入",
+    "assetOut": "媒体输出",
+    "promptIn": "提示输入",
+    "promptOut": "提示输出",
+    "referenceIn": "参考输入",
+    "resultOut": "结果输出",
+    "agentContextIn": "Agent 上下文",
+    "noteIn": "备注输入",
+    "errors": {
+      "noPortOrUnsupported": "未找到端口或端口不支持该连接",
+      "portTypeMismatch": "端口类型不匹配",
+      "invalidDirection": "端口方向不合法",
+      "sameNode": "不能连接到同一节点"
+    }
+  },
   "workspace": {
     "undo": "撤销 (Ctrl+Z)",
     "redo": "重做 (Ctrl+Shift+Z)",

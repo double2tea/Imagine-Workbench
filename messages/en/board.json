@@ -154,6 +154,22 @@
     "voiceProfilePlaceholderVoiceDesign": "e.g. warm, young, natural narration",
     "voiceProfilePlaceholderVoiceClone": "e.g. calm narration, ad narration, casual read"
   },
+  "ports": {
+    "assetIn": "Media Input",
+    "assetOut": "Media Output",
+    "promptIn": "Prompt Input",
+    "promptOut": "Prompt Output",
+    "referenceIn": "Reference Input",
+    "resultOut": "Result Output",
+    "agentContextIn": "Agent Context",
+    "noteIn": "Note Input",
+    "errors": {
+      "noPortOrUnsupported": "Port not found or unsupported for this node",
+      "portTypeMismatch": "Port type is incompatible",
+      "invalidDirection": "Invalid port connection direction",
+      "sameNode": "Cannot connect a node to itself"
+    }
+  },
   "workspace": {
     "undo": "Undo (Ctrl+Z)",
     "redo": "Redo (Ctrl+Shift+Z)",
