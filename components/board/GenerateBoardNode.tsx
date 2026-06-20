@@ -16,7 +16,7 @@ import {
   type PromptTemplateApplyMode,
   type PromptTemplateSlashCommand,
 } from "@/lib/prompt-templates";
-import { AUDIO_MODE_LABELS, audioOperationFormatOptions, audioOperationRequiresTextInput } from "@/lib/audio-operation-rules";
+import { audioOperationFormatOptions, audioOperationRequiresTextInput, getAudioModeLabel } from "@/lib/audio-operation-rules";
 import { getAudioModelCapabilities, getVideoModelCapabilities } from "@/lib/providers/model-catalog";
 import { buildGenerationModelPriceOptions } from "@/lib/providers/pricing";
 import { selectVideoReferenceTypesForMode } from "@/lib/video-reference-selection";
@@ -214,7 +214,7 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
       ? `${node.model} / ${node.aspectRatio}${node.videoDuration ? ` / ${node.videoDuration}s` : ""} / x${displayedVariantCount}`
       : [
         node.model,
-        AUDIO_MODE_LABELS[node.audioMode],
+        getAudioModeLabel(node.audioMode, t),
         audioOperationFormatOptions(getAudioModelCapabilities(node.model)).length > 0 ? node.audioFormat : "",
         `x${displayedVariantCount}`,
       ].filter(value => value.trim().length > 0).join(" / ");
