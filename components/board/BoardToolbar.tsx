@@ -395,12 +395,17 @@ export default function BoardToolbar({
           <button
             type="button"
             onClick={() => setLocale(nextLocale)}
-            className={`${headerBtn} shrink-0 px-2`}
+            className={`${iconBtn} relative shrink-0 overflow-visible`}
             title={languageToggleLabel}
             aria-label={languageToggleLabel}
           >
             <Globe className="h-3.5 w-3.5" />
-            <span className="text-[11px] font-semibold leading-none">{languageToggleShort}</span>
+            <span
+              className="pointer-events-none absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-[5px] border border-[var(--iw-border)] bg-[var(--iw-panel)] px-1 text-[8px] font-bold leading-none text-[var(--iw-text)] shadow-sm"
+              aria-hidden="true"
+            >
+              {languageToggleShort}
+            </span>
           </button>
 
         <div className="relative">
