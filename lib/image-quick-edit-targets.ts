@@ -2,7 +2,7 @@ import { t as globalT, type TFunction } from "@/lib/i18n";
 import { API_ROUTES } from "./api/routes";
 import { readFetchError } from "./client-fetch-error";
 import { readImageGenerationPayload } from "./client-image-response";
-import { normalizeImageEditAspectRatio } from "./image-edit-geometry";
+import { normalizeImageEditAspectRatio, resolveImageEditResolutionForAspect } from "./image-edit-geometry";
 import { formatProviderModel, tryParseProviderModel, type ModelOption } from "./providers/model-catalog";
 import {
   RUNNINGHUB_CONTROL_IMAGE_APP_LABEL,
@@ -211,6 +211,8 @@ function imageQuickEditRequest(input: SubmitImageQuickEditInput): {
   headerTarget: string;
   body: Record<string, unknown>;
 } {
+  const aspectRatio = normalizeImageEditAspectRatio(input.aspectRatio);
+  const imageResolution = resolveImageEditResolutionForAspect(input.target.model, input.imageResolution, aspectRatio);
   if (input.target.executionMode === "image-edit-route") {
     return {
       route: "/api/image/edit",
@@ -222,7 +224,7 @@ function imageQuickEditRequest(input: SubmitImageQuickEditInput): {
         mask: input.mask,
         guide: input.guide,
         prompt: input.prompt,
-        imageResolution: input.imageResolution,
+        imageResolution,
       },
     };
   }
@@ -234,8 +236,8 @@ function imageQuickEditRequest(input: SubmitImageQuickEditInput): {
       model: input.target.model,
       prompt: input.prompt,
       referenceImages: [input.image],
-      aspectRatio: normalizeImageEditAspectRatio(input.aspectRatio),
-      imageResolution: input.imageResolution,
+      aspectRatio,
+      imageResolution,
     },
   };
 }

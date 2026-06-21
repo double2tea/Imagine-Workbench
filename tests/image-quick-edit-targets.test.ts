@@ -15,7 +15,10 @@ import {
   buildAngleAdjustmentPrompt,
   buildLightingAdjustmentPrompt,
 } from "../lib/image-visual-adjustment-prompts";
-import { getImageEditResolutionOptions } from "../lib/image-edit-geometry";
+import {
+  getImageEditResolutionOptions,
+  resolveImageEditResolutionForAspect,
+} from "../lib/image-edit-geometry";
 import { formatProviderModel } from "../lib/providers/model-catalog";
 import { RUNNINGHUB_CONTROL_IMAGE_APP_MODEL } from "../lib/providers/runninghub";
 
@@ -163,12 +166,68 @@ test("quick edit resolution options expose model tiers without source aspect fil
   assert.equal(options.some(option => option.value === "auto"), false);
 });
 
-test("quick edit resolution options keep pixel sizes available for nonstandard source aspects", () => {
+test("quick edit resolution options collapse repeated labels for pixel-size models", () => {
   const options = getImageEditResolutionOptions("12ai:gpt-image-2");
 
-  assert.equal(options.some(option => option.value === "1024x1024"), true);
-  assert.equal(options.some(option => option.value === "1024x1536"), true);
+  assert.deepEqual(options.map(option => option.value), ["512p", "1K", "2K", "4K", "2.5K"]);
+  assert.deepEqual(options.map(option => option.label), ["512p", "1K", "2K", "4K", "2.5K"]);
   assert.equal(options.some(option => option.value === "auto"), false);
+});
+
+test("quick edit resolution options use auto for unknown edit models instead of fallback size catalogs", () => {
+  const options = getImageEditResolutionOptions("12ai:not-in-catalog");
+
+  assert.deepEqual(options, [{ value: "auto", label: "Auto" }]);
+});
+
+test("quick edit resolution tiers resolve to matching pixel sizes before submit", () => {
+  assert.equal(
+    resolveImageEditResolutionForAspect("12ai:gpt-image-2", "1K", "2:3"),
+    "1024x1536",
+  );
+  assert.equal(
+    resolveImageEditResolutionForAspect("12ai:gpt-image-2", "1K", "7:4"),
+    "1792x1024",
+  );
+  assert.equal(
+    resolveImageEditResolutionForAspect("12ai:gemini-3-pro-image-preview", "2K", "2:3"),
+    "2K",
+  );
+});
+
+test("generic quick edit targets submit tier resolutions as aspect-matched pixel sizes", async () => {
+  const calls: Array<{ url: string; body: unknown; providerHeader: string | null }> = [];
+  const restore = mockFetch(async (url, init) => {
+    calls.push(readCall(url, init));
+    return Response.json({ imageUrl: "data:image/png;base64,abc" });
+  });
+
+  try {
+    await submitImageQuickEdit({
+      target: resolveImageQuickEditTarget("erase", "model:12ai:gpt-image-2"),
+      operation: "erase",
+      aspectRatio: "2:3",
+      image: "data:image/png;base64,source",
+      mask: "data:image/png;base64,mask",
+      guide: "data:image/png;base64,guide",
+      prompt: "",
+      imageResolution: "1K",
+      buildProviderHeaders: target => ({ "x-provider-target": target ?? "" }),
+    });
+
+    assert.equal(calls[0]?.url, "/api/image/edit");
+    assert.deepEqual(calls[0]?.body, {
+      operation: "erase",
+      model: "12ai:gpt-image-2",
+      image: "data:image/png;base64,source",
+      mask: "data:image/png;base64,mask",
+      guide: "data:image/png;base64,guide",
+      prompt: "",
+      imageResolution: "1024x1536",
+    });
+  } finally {
+    restore();
+  }
 });
 
 test("visual adjustment prompt compiler branches by model family", () => {
