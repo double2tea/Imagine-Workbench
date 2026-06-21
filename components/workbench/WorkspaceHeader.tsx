@@ -33,6 +33,9 @@ export default function WorkspaceHeader({
   const { themeMode, toggleThemeMode } = useThemeMode();
   const { t } = useTranslations("media");
   const { locale, setLocale } = useLocale();
+  const nextLocale = locale === "zh" ? "en" : "zh";
+  const languageToggleLabel = t(`workspaceHeader.language.${nextLocale}`);
+  const languageToggleShort = t(`workspaceHeader.language.${nextLocale}Short`);
 
   return (
     <WorkspaceTopBar
@@ -102,13 +105,18 @@ export default function WorkspaceHeader({
 
           <button
             type="button"
-            onClick={() => setLocale(locale === "zh" ? "en" : "zh")}
-            className={`${workspaceTopBarButtonClass} cursor-pointer`}
-            title={locale === "zh" ? t("workspaceHeader.language.en") : t("workspaceHeader.language.zh")}
-            aria-label={locale === "zh" ? t("workspaceHeader.language.en") : t("workspaceHeader.language.zh")}
+            onClick={() => setLocale(nextLocale)}
+            className={`${workspaceTopBarIconButtonClass} relative shrink-0 overflow-visible cursor-pointer`}
+            title={languageToggleLabel}
+            aria-label={languageToggleLabel}
           >
             <Globe className="h-3.5 w-3.5" />
-            <span className="text-[11px] font-semibold leading-none">{locale === "zh" ? t("workspaceHeader.language.enShort") : t("workspaceHeader.language.zhShort")}</span>
+            <span
+              className="pointer-events-none absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-[5px] border border-[var(--iw-border)] bg-[var(--iw-panel)] px-1 text-[8px] font-bold leading-none text-[var(--iw-text)] shadow-sm"
+              aria-hidden="true"
+            >
+              {languageToggleShort}
+            </span>
           </button>
 
           <button
