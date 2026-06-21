@@ -1243,3 +1243,36 @@ Fixed board media nodes staying on placeholders after refresh by including asset
 ### Next Steps
 
 - None - task complete
+
+
+## Session 156: Align language toggle sizing
+
+**Date**: 2026-06-21
+**Task**: Align language toggle sizing
+**Branch**: `main`
+
+### Summary
+
+Aligned the main workbench language toggle with the board toolbar language toggle by using the same fixed-size icon button and badge treatment; verified with pnpm run check and pnpm run build.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ae0126f2` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
