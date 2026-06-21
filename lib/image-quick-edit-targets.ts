@@ -2,6 +2,7 @@ import { t as globalT, type TFunction } from "@/lib/i18n";
 import { API_ROUTES } from "./api/routes";
 import { readFetchError } from "./client-fetch-error";
 import { readImageGenerationPayload } from "./client-image-response";
+import { normalizeImageEditAspectRatio } from "./image-edit-geometry";
 import { formatProviderModel, tryParseProviderModel, type ModelOption } from "./providers/model-catalog";
 import {
   RUNNINGHUB_CONTROL_IMAGE_APP_LABEL,
@@ -150,6 +151,7 @@ export function resolveImageQuickEditTarget(feature: ImageEditFeature, targetId:
 export interface SubmitImageQuickEditInput {
   target: ImageQuickEditTarget;
   operation: ImageEditFeature;
+  aspectRatio: string;
   image: string;
   mask?: string;
   guide?: string;
@@ -207,7 +209,7 @@ function imageQuickEditRequest(input: SubmitImageQuickEditInput): {
       model: input.target.model,
       prompt: input.prompt,
       referenceImages: [input.image],
-      aspectRatio: "1:1",
+      aspectRatio: normalizeImageEditAspectRatio(input.aspectRatio),
       imageResolution: input.imageResolution,
     },
   };

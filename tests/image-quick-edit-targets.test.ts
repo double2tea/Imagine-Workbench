@@ -12,6 +12,7 @@ import {
   buildAngleAdjustmentPrompt,
   buildLightingAdjustmentPrompt,
 } from "../lib/image-visual-adjustment-prompts";
+import { getImageEditResolutionOptions } from "../lib/image-edit-geometry";
 import { formatProviderModel } from "../lib/providers/model-catalog";
 import { RUNNINGHUB_CONTROL_IMAGE_APP_MODEL } from "../lib/providers/runninghub";
 
@@ -82,6 +83,7 @@ test("generic quick edit targets submit through image edit route", async () => {
     const imageUrl = await submitImageQuickEdit({
       target: resolveImageQuickEditTarget("erase", "model:12ai:gemini-3-pro-image-preview"),
       operation: "erase",
+      aspectRatio: "auto",
       image: "data:image/png;base64,source",
       mask: "data:image/png;base64,mask",
       guide: "data:image/png;base64,guide",
@@ -105,6 +107,19 @@ test("generic quick edit targets submit through image edit route", async () => {
   } finally {
     restore();
   }
+});
+
+test("quick edit resolution options prefer concrete source-aspect sizes over auto", () => {
+  const options = getImageEditResolutionOptions("12ai:gpt-image-2", { width: 1792, height: 1024 });
+
+  assert.equal(options[0]?.value, "1792x1024");
+  assert.equal(options.some(option => option.value === "auto"), false);
+});
+
+test("quick edit resolution options keep auto only when no concrete size matches", () => {
+  const options = getImageEditResolutionOptions("12ai:gpt-image-2", { width: 123, height: 456 });
+
+  assert.deepEqual(options, [{ value: "auto", label: "Auto" }]);
 });
 
 test("visual adjustment prompt compiler branches by model family", () => {
@@ -145,6 +160,7 @@ test("RunningHub cutout target submits through generate image route and download
     const imageUrl = await submitImageQuickEdit({
       target: resolveImageQuickEditTarget("cutout", RUNNINGHUB_CUTOUT_TARGET_ID),
       operation: "cutout",
+      aspectRatio: "1792x1024",
       image: "data:image/png;base64,source",
       prompt: "",
       imageResolution: "auto",
@@ -157,7 +173,7 @@ test("RunningHub cutout target submits through generate image route and download
       model: RUNNINGHUB_CONTROL_IMAGE_MODEL_VALUE,
       prompt: "",
       referenceImages: ["data:image/png;base64,source"],
-      aspectRatio: "1:1",
+      aspectRatio: "7:4",
       imageResolution: "auto",
     });
     assert.equal(calls[0]?.providerHeader, RUNNINGHUB_CONTROL_IMAGE_MODEL_VALUE);
@@ -187,6 +203,7 @@ test("RunningHub cutout target stops async polling when aborted", async () => {
       () => submitImageQuickEdit({
         target: resolveImageQuickEditTarget("cutout", RUNNINGHUB_CUTOUT_TARGET_ID),
         operation: "cutout",
+        aspectRatio: "auto",
         image: "data:image/png;base64,source",
         prompt: "",
         imageResolution: "auto",

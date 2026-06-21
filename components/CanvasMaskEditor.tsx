@@ -31,7 +31,7 @@ import {
   type CropResizeHandle,
 } from "@/lib/canvas-editor";
 import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
-import { getImageResolutionOptions } from "@/lib/providers/model-catalog";
+import { getImageEditResolutionOptions, imageEditAspectRatioFromSize, type ImageEditSize } from "@/lib/image-edit-geometry";
 import {
   ImageEditOperationIcon,
   OperationActionButton,
@@ -41,6 +41,7 @@ import {
 } from "@/components/workbench/OperationControls";
 
 export interface CanvasMaskEditorOutput {
+  aspectRatio: string;
   imageBase64: string;
   imageResolution: string;
   maskBase64: string;
@@ -118,22 +119,6 @@ function defaultOutpaintMargins() {
   return { left: 0, right: 0, top: 0, bottom: 0 };
 }
 
-function gcd(left: number, right: number): number {
-  let a = Math.abs(Math.round(left));
-  let b = Math.abs(Math.round(right));
-  while (b !== 0) {
-    const next = a % b;
-    a = b;
-    b = next;
-  }
-  return a || 1;
-}
-
-function aspectRatioFromSize(size: CanvasSize): string {
-  const divisor = gcd(size.width, size.height);
-  return `${Math.round(size.width / divisor)}:${Math.round(size.height / divisor)}`;
-}
-
 function clampOutpaintMargin(value: number): number {
   return Math.max(0, Math.min(OUTPAINT_MAX_MARGIN, Math.round(value)));
 }
@@ -143,12 +128,6 @@ function outpaintPreviewSize(canvasSize: CanvasSize, margins: ReturnType<typeof 
     width: canvasSize.width + margins.left + margins.right,
     height: canvasSize.height + margins.top + margins.bottom,
   };
-}
-
-function getEditorResolutionOptions(model: string | undefined, aspectRatio: string): Array<{ value: string; label: string }> {
-  if (!model) return [{ value: "auto", label: "Auto" }];
-  const options = getImageResolutionOptions(model, aspectRatio).filter(option => option.value !== "custom");
-  return options.length > 0 ? options : [{ value: "auto", label: "Auto" }];
 }
 
 function getEditorCanvasBounds(): CanvasSize {
@@ -220,6 +199,27 @@ function outpaintCursor(side: OutpaintSide | null): string {
   if (side === "left" || side === "right") return "ew-resize";
   if (side === "top" || side === "bottom") return "ns-resize";
   return "default";
+}
+
+function naturalImageSize(img: HTMLImageElement | null, fallback: CanvasSize): ImageEditSize {
+  if (!img) return fallback;
+  return {
+    width: img.naturalWidth || img.width,
+    height: img.naturalHeight || img.height,
+  };
+}
+
+function naturalOutpaintSize(
+  naturalSize: ImageEditSize,
+  displaySize: CanvasSize,
+  margins: ReturnType<typeof defaultOutpaintMargins>,
+): ImageEditSize {
+  const scaleX = naturalSize.width / displaySize.width;
+  const scaleY = naturalSize.height / displaySize.height;
+  return {
+    width: naturalSize.width + Math.round(margins.left * scaleX) + Math.round(margins.right * scaleX),
+    height: naturalSize.height + Math.round(margins.top * scaleY) + Math.round(margins.bottom * scaleY),
+  };
 }
 
 function drawTextOverlay(ctx: CanvasRenderingContext2D, item: TextOverlay): void {
@@ -315,8 +315,12 @@ export default function CanvasMaskEditor({
     width: Math.max(1, Math.round(editorStageSize.width * editorStageScale)),
     height: Math.max(1, Math.round(editorStageSize.height * editorStageScale)),
   };
-  const resolutionAspectRatio = aspectRatioFromSize(editorStageSize);
-  const resolutionOptions = getEditorResolutionOptions(editModel, resolutionAspectRatio);
+  const sourceNaturalSize = naturalImageSize(bgImgRef.current, canvasSize);
+  const resolutionOutputSize = isOutpaintMode
+    ? naturalOutpaintSize(sourceNaturalSize, canvasSize, outpaintMargins)
+    : sourceNaturalSize;
+  const resolutionAspectRatio = imageEditAspectRatioFromSize(resolutionOutputSize);
+  const resolutionOptions = getImageEditResolutionOptions(editModel, resolutionOutputSize);
   const selectedImageResolution = resolutionOptions.some(option => option.value === imageResolution)
     ? imageResolution
     : resolutionOptions[0]?.value ?? "auto";
@@ -806,6 +810,7 @@ export default function CanvasMaskEditor({
     setIsSaving(true);
     try {
       await onSaveMask({
+        aspectRatio: resolutionAspectRatio,
         imageBase64: baseCanvas.toDataURL("image/png"),
         imageResolution: selectedImageResolution,
         maskBase64: maskCanvas.toDataURL("image/png"),
@@ -856,6 +861,7 @@ export default function CanvasMaskEditor({
     setIsSaving(true);
     try {
       await onSaveMask({
+        aspectRatio: resolutionAspectRatio,
         imageBase64: baseCanvas.toDataURL("image/png"),
         imageResolution: selectedImageResolution,
         maskBase64: maskCanvas.toDataURL("image/png"),

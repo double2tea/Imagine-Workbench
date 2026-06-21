@@ -22,7 +22,7 @@ import {
   type LightingAdjustmentState,
 } from "@/lib/image-visual-adjustment-prompts";
 import type { CanvasSize } from "@/lib/canvas-editor";
-import { getImageResolutionOptions } from "@/lib/providers/model-catalog";
+import { getImageEditResolutionOptions, imageEditAspectRatioFromSize } from "@/lib/image-edit-geometry";
 import { gsap, prefersReducedWorkbenchMotion, useGSAP, WORKBENCH_GSAP_EASE } from "@/lib/workbench-gsap";
 
 interface VisualPromptAdjustEditorProps {
@@ -114,8 +114,8 @@ export default function VisualPromptAdjustEditor({
   const [angleState, setAngleState] = useState<AngleAdjustmentState>(DEFAULT_ANGLE_STATE);
   const [lightingState, setLightingState] = useState<LightingAdjustmentState>(DEFAULT_LIGHTING_STATE);
 
-  const aspectRatio = aspectRatioFromSize(imageSize);
-  const resolutionOptions = useMemo(() => getEditorResolutionOptions(editModel, aspectRatio), [aspectRatio, editModel]);
+  const aspectRatio = imageEditAspectRatioFromSize(imageSize);
+  const resolutionOptions = useMemo(() => getImageEditResolutionOptions(editModel, imageSize), [editModel, imageSize]);
   const selectedImageResolution = resolutionOptions.some(option => option.value === imageResolution)
     ? imageResolution
     : resolutionOptions[0]?.value ?? "auto";
@@ -184,6 +184,7 @@ export default function VisualPromptAdjustEditor({
       const imageBase64 = renderImageDataUrl(img, imageSize, t);
       const guide = operation === "lighting" ? renderLightingGuide(imageSize, lightingState, t) : "";
       await onApply({
+        aspectRatio,
         imageBase64,
         imageResolution: selectedImageResolution,
         maskBase64: "",
@@ -1402,27 +1403,6 @@ function visualYawFromRotation(rotation: number): number {
   return sign * (ANGLE_VISUAL_SIDE_LIMIT + backProgress * (ANGLE_VISUAL_BACK_LIMIT - ANGLE_VISUAL_SIDE_LIMIT));
 }
 
-function getEditorResolutionOptions(model: string | undefined, aspectRatio: string): Array<{ value: string; label: string }> {
-  if (!model) return [{ value: "auto", label: "Auto" }];
-  const options = getImageResolutionOptions(model, aspectRatio).filter(option => option.value !== "custom");
-  return options.length > 0 ? options : [{ value: "auto", label: "Auto" }];
-}
-
-function aspectRatioFromSize(size: CanvasSize): string {
-  const divisor = gcd(size.width, size.height);
-  return `${Math.round(size.width / divisor)}:${Math.round(size.height / divisor)}`;
-}
-
-function gcd(left: number, right: number): number {
-  let a = Math.abs(Math.round(left));
-  let b = Math.abs(Math.round(right));
-  while (b !== 0) {
-    const next = a % b;
-    a = b;
-    b = next;
-  }
-  return a || 1;
-}
 
 function renderImageDataUrl(img: HTMLImageElement, size: CanvasSize, t: TFunction): string {
   const canvas = document.createElement("canvas");

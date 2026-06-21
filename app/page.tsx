@@ -133,6 +133,7 @@ type AssetLibraryMode = "manage" | "reference";
 
 interface WorkspaceImageQuickEditJob {
   controller: AbortController;
+  editAspectRatio: string;
   editImageResolution: string;
   editImageUrl: string;
   editPrompt: string;
@@ -1222,6 +1223,7 @@ export default function Home() {
     guideUrl: string | undefined,
     editPrompt: string,
     editImageResolution: string,
+    editAspectRatio: string,
   ) => {
     const target = resolveImageQuickEditTarget(operation, imageEditFeatureTargets[operation]);
     const pending = await createImageQuickEditProcessingAsset(sourceItem, operation, editImageUrl, target.model, editPrompt);
@@ -1231,6 +1233,7 @@ export default function Home() {
     for (const id of pendingTaskIds) generationAbortControllersRef.current[id] = controller;
     return {
       controller,
+      editAspectRatio,
       editImageResolution,
       editImageUrl,
       editPrompt,
@@ -1246,6 +1249,7 @@ export default function Home() {
   const finishImageQuickEdit = async (job: WorkspaceImageQuickEditJob) => {
     const {
       controller,
+      editAspectRatio,
       editImageResolution,
       editImageUrl,
       editPrompt,
@@ -1267,6 +1271,7 @@ export default function Home() {
       const imageUrl = await submitImageQuickEdit({
         target,
         operation,
+        aspectRatio: editAspectRatio,
         image,
         mask,
         guide,
@@ -1305,8 +1310,9 @@ export default function Home() {
     guideUrl: string | undefined,
     editPrompt: string,
     editImageResolution: string,
+    editAspectRatio: string,
   ) => {
-    const job = await startImageQuickEdit(sourceItem, operation, editImageUrl, maskUrl, guideUrl, editPrompt, editImageResolution);
+    const job = await startImageQuickEdit(sourceItem, operation, editImageUrl, maskUrl, guideUrl, editPrompt, editImageResolution, editAspectRatio);
     if (!job) return;
     await finishImageQuickEdit(job);
   };
@@ -1315,7 +1321,7 @@ export default function Home() {
     if (item.type !== "image") return;
     openOriginalItem(item, originalItem => {
       if (operation === "cutout") {
-        void runImageQuickEdit(originalItem, operation, originalItem.url, undefined, undefined, "", "auto");
+        void runImageQuickEdit(originalItem, operation, originalItem.url, undefined, undefined, "", "auto", originalItem.aspectRatio);
         return;
       }
       launchMaskEditor(originalItem.url, originalItem.id, "creative", operation, originalItem);
@@ -1362,6 +1368,7 @@ export default function Home() {
         output.mergedImageBase64,
         output.prompt,
         output.imageResolution,
+        output.aspectRatio,
       );
       if (!job) return;
       setIsMaskOpen(false);

@@ -200,6 +200,7 @@ type BoardAgentActionResult = boolean | { handled: true; success: boolean };
 
 interface BoardImageQuickEditJob {
   controller: AbortController;
+  editAspectRatio: string;
   editImageResolution: string;
   editImageUrl: string;
   editPrompt: string;
@@ -2114,6 +2115,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     guideUrl: string | undefined,
     editPrompt: string,
     editImageResolution: string,
+    editAspectRatio: string,
     outputSize?: BoardSize,
   ) {
     const target = resolveImageQuickEditTarget(operation, imageEditFeatureTargets[operation]);
@@ -2135,6 +2137,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     for (const id of pendingTaskIds) generationAbortControllersRef.current[id] = controller;
     return {
       controller,
+      editAspectRatio,
       editImageResolution,
       editImageUrl,
       editPrompt,
@@ -2151,6 +2154,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   async function finishBoardImageQuickEdit(job: BoardImageQuickEditJob) {
     const {
       controller,
+      editAspectRatio,
       editImageResolution,
       editImageUrl,
       editPrompt,
@@ -2174,6 +2178,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       const imageUrl = await submitImageQuickEdit({
         target,
         operation,
+        aspectRatio: editAspectRatio,
         image,
         mask,
         guide,
@@ -2217,6 +2222,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     guideUrl: string | undefined,
     editPrompt: string,
     editImageResolution: string,
+    editAspectRatio: string,
     outputSize?: BoardSize,
   ) {
     const job = await startBoardImageQuickEdit(
@@ -2231,6 +2237,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       guideUrl,
       editPrompt,
       editImageResolution,
+      editAspectRatio,
       outputSize,
     );
     if (!job) return;
@@ -2256,6 +2263,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         output.mergedImageBase64,
         output.prompt,
         output.imageResolution,
+        output.aspectRatio,
         output.outputSize,
       );
       if (!job) return;
@@ -4854,6 +4862,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             undefined,
             "",
             "auto",
+            originalItem.aspectRatio,
           );
           return;
         }
