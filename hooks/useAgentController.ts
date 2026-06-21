@@ -8,7 +8,7 @@ import {
   prepareAgentActionDraft,
   validateAgentToolAction,
 } from "@/lib/agent-tool-action";
-import type { AgentBoardContext, AgentSurface } from "@/lib/agent-context";
+import type { AgentBoardContext, AgentBoardContextSnapshot, AgentSurface } from "@/lib/agent-context";
 import type { CreationMode } from "@/components/creation/CreationModeTabs";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import type { StorageItem } from "@/lib/db";
@@ -25,6 +25,8 @@ interface UseAgentControllerParams {
   chatStorageKey?: string;
   executeToolActionOverride?: (input: ExecuteToolActionOverrideInput) => Promise<ExecuteToolActionOverrideReturn> | ExecuteToolActionOverrideReturn;
   getBoardContext?: () => AgentBoardContext;
+  getBoardContextReferences?: () => Promise<ReferenceImageRef[]> | ReferenceImageRef[];
+  getBoardContextSnapshot?: () => AgentBoardContextSnapshot | null;
   generateManualAudio: (overrides?: GenerationOverrides) => Promise<boolean>;
   generateManualImage: (overrides?: GenerationOverrides) => Promise<boolean>;
   generateManualVideo: (overrides?: GenerationOverrides) => Promise<boolean>;
@@ -164,6 +166,8 @@ export function useAgentController({
   chatStorageKey = "imagine_agent_chat",
   executeToolActionOverride,
   getBoardContext,
+  getBoardContextReferences,
+  getBoardContextSnapshot,
   generateManualAudio,
   generateManualImage,
   generateManualVideo,
@@ -415,11 +419,13 @@ export function useAgentController({
 
     clearActiveCountdown();
     setIsAgentDockOpen(true);
+    const boardContextSnapshot = getBoardContextSnapshot?.() ?? null;
 
     const userMessage: ChatMessage = {
       id: makeClientId("usr"),
       role: "user",
       content: activeText,
+      ...(boardContextSnapshot ? { boardContextSnapshot } : {}),
     };
 
     setAgentMessages(prev => [...prev, userMessage]);
@@ -434,13 +440,13 @@ export function useAgentController({
         aspectRatio: item.aspectRatio,
       }));
 
-      const activeAgentReferences = forcedReferences ??
-        (agentReferences.length > 0
-          ? agentReferences
-          : agentReferenceId && agentReferenceUrl
-            ? [{ id: agentReferenceId, url: agentReferenceUrl }]
-            : []);
-      const originalAgentReferences = await resolveAgentReferenceOriginals(activeAgentReferences, items);
+      const boardContext = getBoardContext?.();
+      const activeAgentReferences = forcedReferences ?? getActiveAgentReferences();
+      const boardContextReferences = forcedReferences ? [] : await Promise.resolve(getBoardContextReferences?.() ?? []);
+      const originalAgentReferences = await resolveAgentReferenceOriginals(
+        [...activeAgentReferences, ...boardContextReferences],
+        items,
+      );
       const sendableAgentReferences = getSendableAgentMediaReferences(
         originalAgentReferences,
         agentReferenceId,
@@ -462,7 +468,7 @@ export function useAgentController({
         body: JSON.stringify({
           messages: requestHistory,
           surface,
-          boardContext: getBoardContext?.(),
+          boardContext,
           gallerySummary,
           agentReferences: sendableAgentReferences.map(reference => ({
             id: reference.id,

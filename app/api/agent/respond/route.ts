@@ -41,25 +41,30 @@ const boardPortRefSchema = z.object({
 const audioOperationModeSchema = z.enum(["tts", "voice_design", "voice_clone", "music", "sfx", "asr"]);
 const asrLanguageSchema = z.enum(["auto", "zh", "en"]);
 
+const boardNodeSummarySchema = z.object({
+  id: z.string(),
+  kind: z.enum(["asset", "prompt", "reference-group", "group", "multi-grid", "image-generate", "video-generate", "audio-operation", "runninghub-app", "agent", "note", "result"]),
+  title: z.string(),
+  prompt: z.string().optional(),
+  model: z.string().optional(),
+  aspectRatio: z.string().optional(),
+  status: z.string().optional(),
+  resultAssetId: z.string().optional(),
+  assetId: z.string().optional(),
+  assetType: z.string().optional(),
+  body: z.string().optional(),
+  instruction: z.string().optional(),
+});
+
 const boardContextSchema = z.object({
   boardId: z.string(),
   title: z.string(),
   selectedNodeId: z.string().nullable(),
+  selectedNodeIds: z.array(z.string()).optional().default([]),
   selectedEdgeId: z.string().nullable(),
-  nodes: z.array(z.object({
-    id: z.string(),
-    kind: z.enum(["asset", "prompt", "reference-group", "group", "image-generate", "video-generate", "audio-operation", "runninghub-app", "agent", "note", "result"]),
-    title: z.string(),
-    prompt: z.string().optional(),
-    model: z.string().optional(),
-    aspectRatio: z.string().optional(),
-    status: z.string().optional(),
-    resultAssetId: z.string().optional(),
-    assetId: z.string().optional(),
-    assetType: z.string().optional(),
-    body: z.string().optional(),
-    instruction: z.string().optional(),
-  })),
+  selectedNodes: z.array(boardNodeSummarySchema).optional().default([]),
+  selectedAssetReferenceCount: z.number().int().nonnegative().optional().default(0),
+  nodes: z.array(boardNodeSummarySchema),
   edges: z.array(z.object({
     id: z.string(),
     kind: z.enum(["reference", "prompt", "result", "agent-context"]),
@@ -316,6 +321,7 @@ export async function POST(req: NextRequest) {
         "The user is operating a spatial board. Read board details progressively: call get_board_context(summary) for broad board questions and get_connected_context for selected-node work.\n" +
         "For board mutations, prefer boardAction over recommendedAction. Do not invent a general DAG or ComfyUI workflow.\n" +
         "Allowed boardAction.type values: none, create_board_image_flow, create_board_video_flow, create_board_audio_flow, create_board_note, update_board_node, apply_board_patch, continue_image_to_video.\n" +
+        "When selectedNodeIds/selectedNodes are present, treat them as the current board context and default target. Do not pull connected nodes into scope unless the user asks or a tool result explicitly shows them.\n" +
         "create_board_image_flow/create_board_video_flow/create_board_audio_flow should include params.prompt except ASR transcription, and may include params.model, params.aspectRatio, params.referenceImageId, params.run. Audio actions may include params.audioMode, params.audioFormat, params.audioStylePrompt, params.voiceProfileId, params.voiceCloneConsentAccepted, params.asrLanguage.\n" +
         "For audio board planning, only use audio-operation functions returned by query_models({kind:\"audio\"}). MiMo currently supports tts, voice_design, voice_clone, and asr; RunningHub audio belongs to RunningHub AI App / Workflow nodes, not audio-operation nodes.\n" +
         "Use update_board_node when the user asks to revise the selected/current board node or a specific node. Include params.nodeId when known; otherwise omit it to target the current selection. Use params.prompt for Prompt and generation nodes, params.body for Note nodes, and params.instruction for Agent nodes. If no target can be resolved, return boardAction.type none and ask the user to select a node.\n" +
@@ -482,8 +488,11 @@ function formatAgentRuntimeSummary(
         edgeCount: boardContext.edges.length,
         nodeCount: boardContext.nodes.length,
         nodeKinds: countValues(boardContext.nodes.map(node => node.kind)),
+        selectedAssetReferenceCount: boardContext.selectedAssetReferenceCount,
         selectedEdgeId: boardContext.selectedEdgeId,
         selectedNodeId: boardContext.selectedNodeId,
+        selectedNodeIds: boardContext.selectedNodeIds,
+        selectedNodeKinds: countValues(boardContext.selectedNodes.map(node => node.kind)),
         title: boardContext.title,
       }
     : null;

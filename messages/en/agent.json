@@ -17,7 +17,10 @@
     "maskReferenceTitle": "Use brush to erase or mark partial paint", "paintbrushButton": "Brush Paint",
     "clearReferenceTitle": "Remove Reference", "referenceTypeSuffix": "Reference",
     "mediaReferenceImage": "Image", "mediaReferenceVideo": "Video", "mediaReferenceAudio": "Audio",
-    "referenceCountUnitImage": "image(s)", "referenceCountUnitMedia": "clip(s)"
+    "referenceCountUnitImage": "image(s)", "referenceCountUnitMedia": "clip(s)",
+    "contextStripTitle": "Selection Context",
+    "contextNodeCount": "{count} node(s)",
+    "contextAssetCount": "{count} asset(s)"
   },
   "referenceHints": {
     "unsupportedModel": "Next message contains {countLabel}; similar models in catalog don't support {types} input. Switch models if it fails.",

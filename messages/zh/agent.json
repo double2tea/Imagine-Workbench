@@ -16,7 +16,10 @@
     "maskReferenceTitle": "使用画笔抹除或标记局部涂层", "paintbrushButton": "画笔涂抹",
     "clearReferenceTitle": "取消引用", "referenceTypeSuffix": "引用",
     "mediaReferenceImage": "图片", "mediaReferenceVideo": "视频", "mediaReferenceAudio": "音频",
-    "referenceCountUnitImage": "张", "referenceCountUnitMedia": "段"
+    "referenceCountUnitImage": "张", "referenceCountUnitMedia": "段",
+    "contextStripTitle": "选区上下文",
+    "contextNodeCount": "{count} 个节点",
+    "contextAssetCount": "{count} 个资产"
   },
   "referenceHints": {
     "unsupportedModel": "下一条消息含 {countLabel}；目录中相近模型不支持{types}输入，失败时请更换模型",

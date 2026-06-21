@@ -28,7 +28,16 @@ export interface AgentBoardContext {
   boardId: string;
   title: string;
   selectedNodeId: string | null;
+  selectedNodeIds: string[];
   selectedEdgeId: string | null;
+  selectedNodes: AgentBoardNodeSummary[];
+  selectedAssetReferenceCount: number;
   nodes: AgentBoardNodeSummary[];
   edges: AgentBoardEdgeSummary[];
+}
+
+export interface AgentBoardContextSnapshot {
+  boardTitle: string;
+  nodeCount: number;
+  assetCount: number;
 }

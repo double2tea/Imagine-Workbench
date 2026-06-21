@@ -14,6 +14,7 @@ import { AgentModelSelect } from "@/components/agent/AgentModelSelect";
 import { AgentActionSummary } from "@/components/agent/AgentActionSummary";
 import { AgentPendingActionEditor } from "@/components/agent/AgentPendingActionEditor";
 import type { AgentBoardAction, AgentToolAction, AgentWorkbenchAction } from "@/lib/agent-actions";
+import type { AgentBoardContextSnapshot } from "@/lib/agent-context";
 import type { AiProvider, ModelOption } from "@/lib/providers/model-catalog";
 import { getMediaReferenceType, mediaReferenceLabel, type MediaReferenceType } from "@/lib/media-references";
 import { applyThemeClassesToDom, resolveThemeMode } from "@/lib/theme-mode";
@@ -32,6 +33,7 @@ export interface ChatMessage {
   interactiveState?: "idle" | "executing" | "completed" | "declined";
   activeSkills?: string[];
   toolCalls?: Array<{ name: string; args: Record<string, unknown> }>;
+  boardContextSnapshot?: AgentBoardContextSnapshot;
 }
 
 export type { AgentBoardAction, AgentToolAction, AgentWorkbenchAction };
@@ -53,6 +55,7 @@ interface AgentDockProps {
   chatBottomRef: Ref<HTMLDivElement>;
   chatModelGroups: AgentModelGroup[];
   countdownSeconds: number;
+  boardContextSnapshot?: AgentBoardContextSnapshot | null;
   imageModelGroups: AgentModelGroup[];
   input: string;
   isLoading: boolean;
@@ -309,6 +312,30 @@ function renderAgentReferencePreview(type: MediaReferenceType, url: string): Rea
   );
 }
 
+function renderAgentBoardContextSnapshot(
+  snapshot: AgentBoardContextSnapshot,
+  t: (key: string, params?: Record<string, string | number>) => string,
+): ReactNode {
+  return (
+    <div
+      className="flex max-w-full flex-wrap items-center gap-1.5 text-[10px] text-[var(--iw-muted)]"
+      title={`${t("chat.contextStripTitle")} · ${snapshot.boardTitle}`}
+    >
+      <span className="imagine-tone-chip max-w-[160px] truncate rounded-md border px-2 py-0.5 font-medium" data-tone="violet">
+        {t("chat.contextStripTitle")}
+      </span>
+      <span className="imagine-tone-chip rounded-md border px-2 py-0.5 font-medium" data-tone="accent">
+        {t("chat.contextNodeCount", { count: snapshot.nodeCount })}
+      </span>
+      {snapshot.assetCount > 0 ? (
+        <span className="imagine-tone-chip rounded-md border px-2 py-0.5 font-medium" data-tone="teal">
+          {t("chat.contextAssetCount", { count: snapshot.assetCount })}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 function renderAgentContent(content: string): ReactNode {
   const lines = parseAgentContent(content);
 
@@ -428,6 +455,12 @@ function AgentMessage({
       }`}>
         {message.role === "assistant" ? renderAgentContent(message.content) : message.content}
       </div>
+
+      {message.role === "user" && message.boardContextSnapshot ? (
+        <div className="self-end">
+          {renderAgentBoardContextSnapshot(message.boardContextSnapshot, t)}
+        </div>
+      ) : null}
 
       {message.role === "assistant" && message.thought && (
         <details className="group self-start outline-none">
@@ -575,6 +608,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
     chatBottomRef,
     chatModelGroups,
     countdownSeconds,
+    boardContextSnapshot,
     input,
     isLoading,
     isOpen,
@@ -948,6 +982,12 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
       </div>
 
       <div className={`imagine-agent-motion-item ${isOpen ? "imagine-agent-dock-input-divider pt-3 mt-2" : ""} flex flex-col gap-3`}>
+        {boardContextSnapshot ? (
+          <div className="imagine-agent-reference-strip flex items-center justify-between gap-3 p-2 animate-fade-in">
+            {renderAgentBoardContextSnapshot(boardContextSnapshot, t)}
+          </div>
+        ) : null}
+
         {hasVisibleAgentReference && (
           <div className="imagine-agent-reference-strip flex items-center justify-between gap-3 p-2 animate-fade-in mb-1">
             <div className="flex items-center gap-2.5 min-w-0">

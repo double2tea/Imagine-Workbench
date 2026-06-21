@@ -30,7 +30,7 @@ import BoardTaskQueuePanel from "@/components/board/BoardTaskQueuePanel";
 import BoardWorkspace from "@/components/board/BoardWorkspace";
 import SettingsModal from "@/components/settings/SettingsModal";
 import WorkspaceNotices, { type WorkspaceNotice } from "@/components/workbench/WorkspaceNotices";
-import type { AgentBoardContext, AgentBoardNodeSummary } from "@/lib/agent-context";
+import type { AgentBoardContext, AgentBoardContextSnapshot, AgentBoardNodeSummary } from "@/lib/agent-context";
 import { getSendableAgentMediaReferences, type AgentReferenceInputSupport } from "@/lib/agent-chat-model";
 
 import { useAgentController } from "@/hooks/useAgentController";
@@ -614,6 +614,39 @@ function boardNodeReferences(
     return item && isMediaStorageItem(item) ? [{ id: item.id, type: item.type, url: resolveUrl(item.id, item.url), role: "general" }] : [];
   }
   return [];
+}
+
+function resolveAgentSelectedNodeIds(selectedNodeIds: string[], selectedNodeId: string | null): string[] {
+  const ids = selectedNodeIds.length > 0 ? selectedNodeIds : selectedNodeId ? [selectedNodeId] : [];
+  return Array.from(new Set(ids));
+}
+
+function selectedBoardNodes(
+  nodes: BoardDocument["nodes"],
+  selectedNodeIds: string[],
+): BoardDocument["nodes"] {
+  const nodeById = new Map(nodes.map(node => [node.id, node]));
+  return selectedNodeIds
+    .map(nodeId => nodeById.get(nodeId))
+    .filter((node): node is BoardDocument["nodes"][number] => node !== undefined);
+}
+
+function selectedBoardNodeReferences(
+  selectedNodes: BoardDocument["nodes"],
+  nodes: BoardDocument["nodes"],
+  edges: BoardDocument["edges"],
+  items: StorageItem[],
+  resolveUrl: BoardReferenceUrlResolver,
+): ReferenceImageRef[] {
+  const referenceById = new Map<string, ReferenceImageRef>();
+  for (const node of selectedNodes) {
+    for (const reference of boardNodeReferences(node, nodes, edges, items, resolveUrl)) {
+      if (!referenceById.has(reference.id)) {
+        referenceById.set(reference.id, reference);
+      }
+    }
+  }
+  return Array.from(referenceById.values());
 }
 
 function readAgentInputSupportPayload(payload: unknown): AgentReferenceInputSupport | null {
@@ -2393,11 +2426,24 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
   const buildAgentBoardContext = useCallback((): AgentBoardContext => {
     flushAllBoardText();
+    const selectedIds = resolveAgentSelectedNodeIds(selectedNodeIds, boardController.selectedNodeId);
+    const agentSelectedNodes = selectedBoardNodes(boardController.board.nodes, selectedIds);
+    const agentSelectedNodeIds = agentSelectedNodes.map(node => node.id);
+    const selectedReferences = selectedBoardNodeReferences(
+      agentSelectedNodes,
+      boardController.board.nodes,
+      boardController.board.edges,
+      items,
+      resolveBoardReferenceUrl,
+    );
     return {
       boardId: boardController.board.id,
       title: boardController.board.title,
       selectedNodeId: boardController.selectedNodeId,
+      selectedNodeIds: agentSelectedNodeIds,
       selectedEdgeId: boardController.selectedEdgeId,
+      selectedNodes: agentSelectedNodes.map(node => summarizeBoardNodeForAgent(node, getBoardTextDraft(node.id))),
+      selectedAssetReferenceCount: selectedReferences.length,
       nodes: boardController.board.nodes.slice(0, 60).map(node => summarizeBoardNodeForAgent(node, getBoardTextDraft(node.id))),
       edges: boardController.board.edges.slice(0, 100).map(edge => ({
         id: edge.id,
@@ -2413,6 +2459,56 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     boardController.board.title,
     boardController.selectedEdgeId,
     boardController.selectedNodeId,
+    items,
+    resolveBoardReferenceUrl,
+    selectedNodeIds,
+  ]);
+
+  const getAgentBoardContextReferences = useCallback(async (): Promise<ReferenceImageRef[]> => {
+    const selectedIds = resolveAgentSelectedNodeIds(selectedNodeIds, boardController.selectedNodeId);
+    const agentSelectedNodes = selectedBoardNodes(boardController.board.nodes, selectedIds);
+    const references = selectedBoardNodeReferences(
+      agentSelectedNodes,
+      boardController.board.nodes,
+      boardController.board.edges,
+      items,
+      resolveBoardReferenceUrl,
+    );
+    return prepareAgentAnalysisReferences(await resolveOriginalReferences(references));
+  }, [
+    boardController.board.edges,
+    boardController.board.nodes,
+    boardController.selectedNodeId,
+    items,
+    resolveBoardReferenceUrl,
+    resolveOriginalReferences,
+    selectedNodeIds,
+  ]);
+
+  const getAgentBoardContextSnapshot = useCallback((): AgentBoardContextSnapshot | null => {
+    const selectedIds = resolveAgentSelectedNodeIds(selectedNodeIds, boardController.selectedNodeId);
+    const agentSelectedNodes = selectedBoardNodes(boardController.board.nodes, selectedIds);
+    if (agentSelectedNodes.length === 0) return null;
+    const selectedReferences = selectedBoardNodeReferences(
+      agentSelectedNodes,
+      boardController.board.nodes,
+      boardController.board.edges,
+      items,
+      resolveBoardReferenceUrl,
+    );
+    return {
+      assetCount: selectedReferences.length,
+      boardTitle: boardController.board.title,
+      nodeCount: agentSelectedNodes.length,
+    };
+  }, [
+    boardController.board.edges,
+    boardController.board.nodes,
+    boardController.board.title,
+    boardController.selectedNodeId,
+    items,
+    resolveBoardReferenceUrl,
+    selectedNodeIds,
   ]);
 
   const handleAnalyzeBoardMedia = useCallback(async (nodeId: string): Promise<void> => {
@@ -3464,6 +3560,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     chatStorageKey: `imagine_agent_chat:${boardController.board.id}`,
     executeToolActionOverride: executeBoardAgentToolAction,
     getBoardContext: buildAgentBoardContext,
+    getBoardContextReferences: getAgentBoardContextReferences,
+    getBoardContextSnapshot: getAgentBoardContextSnapshot,
     generateManualAudio,
     generateManualImage,
     generateManualVideo,
@@ -5101,6 +5199,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           chatBottomRef={chatBottomRef}
           chatModelGroups={chatModelGroups}
           countdownSeconds={countdownSeconds}
+          boardContextSnapshot={getAgentBoardContextSnapshot()}
           input={agentInput}
           isLoading={isAgentLoading}
           isOpen={isAgentDockOpen}

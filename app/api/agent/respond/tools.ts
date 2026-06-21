@@ -336,10 +336,15 @@ export function executeToolCall(name: string, args: string, ctx: ToolContext): s
           boardId: ctx.boardContext.boardId,
           title: ctx.boardContext.title,
           selectedNodeId: ctx.boardContext.selectedNodeId,
+          selectedNodeIds: ctx.boardContext.selectedNodeIds,
+          selectedNodeCount: ctx.boardContext.selectedNodes.length,
+          selectedAssetReferenceCount: ctx.boardContext.selectedAssetReferenceCount,
           selectedEdgeId: ctx.boardContext.selectedEdgeId,
           nodeCount: ctx.boardContext.nodes.length,
           edgeCount: ctx.boardContext.edges.length,
           nodeKinds: countBy(ctx.boardContext.nodes.map(node => node.kind)),
+          selectedNodeKinds: countBy(ctx.boardContext.selectedNodes.map(node => node.kind)),
+          selectedNodes: ctx.boardContext.selectedNodes,
         });
       }
       return JSON.stringify(ctx.boardContext);
@@ -347,7 +352,7 @@ export function executeToolCall(name: string, args: string, ctx: ToolContext): s
     case "get_connected_context": {
       const { nodeId } = getConnectedContextSchema.parse(JSON.parse(args));
       if (!ctx.boardContext) return JSON.stringify({ error: "No board context in this request" });
-      const targetNodeId = nodeId ?? ctx.boardContext.selectedNodeId;
+      const targetNodeId = nodeId ?? ctx.boardContext.selectedNodeId ?? ctx.boardContext.selectedNodeIds[0];
       if (!targetNodeId) return JSON.stringify({ error: "No node selected" });
       const edges = ctx.boardContext.edges.filter(edge => edge.from.nodeId === targetNodeId || edge.to.nodeId === targetNodeId);
       const connectedNodeIds = new Set(edges.flatMap(edge => [edge.from.nodeId, edge.to.nodeId]));
