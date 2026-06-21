@@ -17,19 +17,22 @@ test("board edges keep a large clickable interaction path and protected click se
   assert.match(selectionHandler, /ids\.length === 0 && !edgeId && protectedEdgeSelectionRef\.current/);
 });
 
-test("board blank connection drop creates a default target instead of only opening a picker", () => {
+test("board blank connection drop opens the typed quick-insert menu", () => {
   const source = readWorkspaceFile("components/board/BoardWorkspace.tsx");
   const connectEndHandler = sourceBetween(source, "const handleConnectEnd", "const openQuickInsertMenu");
   const promptBranch = sourceBetween(connectEndHandler, "if (sourceKind === \"prompt\")", "if (sourceKind === \"asset\")");
   const assetBranch = sourceBetween(connectEndHandler, "if (isBoardMediaSourceNode(sourceNode))", "if (sourceNode?.kind !== \"reference-group\")");
   const referenceGroupBranch = sourceBetween(connectEndHandler, "if (sourceNode?.kind !== \"reference-group\") return;", "if (sourceKind === \"result\")");
 
-  assert.match(promptBranch, /addConnectedQuickNodeAtPoint\(\s*"image-generate"/);
-  assert.match(assetBranch, /sourceNode\.asset\.type === "audio" \? "audio-operation" : sourceNode\.asset\.type === "video" \? "video-generate" : "image-generate"/);
-  assert.match(referenceGroupBranch, /addConnectedQuickNodeAtPoint\(\s*"image-generate"/);
-  assert.doesNotMatch(promptBranch, /setQuickInsertMenu/);
-  assert.doesNotMatch(assetBranch, /setQuickInsertMenu/);
-  assert.doesNotMatch(referenceGroupBranch, /setQuickInsertMenu/);
+  assert.match(promptBranch, /setQuickInsertMenu\(\{/);
+  assert.match(promptBranch, /connectionFrom:\s*\{ nodeId: sourceNodeId, portId: sourceHandleId, portKind: "prompt" \}/);
+  assert.match(assetBranch, /setQuickInsertMenu\(\{/);
+  assert.match(assetBranch, /connectionFrom:\s*\{ nodeId: sourceNodeId, portId: sourceHandleId, portKind: "asset" \}/);
+  assert.match(referenceGroupBranch, /setQuickInsertMenu\(\{/);
+  assert.match(referenceGroupBranch, /connectionFrom:\s*\{ nodeId: sourceNodeId, portId: sourceHandleId, portKind: "asset" \}/);
+  assert.doesNotMatch(promptBranch, /addConnectedQuickNodeAtPoint/);
+  assert.doesNotMatch(assetBranch, /addConnectedQuickNodeAtPoint/);
+  assert.doesNotMatch(referenceGroupBranch, /addConnectedQuickNodeAtPoint/);
 });
 
 test("board node titles remain draggable while edit fields stay nodrag", () => {

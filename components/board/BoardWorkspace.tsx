@@ -2759,35 +2759,38 @@ export default function BoardWorkspace({
     }
 
     if (sourceKind === "prompt") {
-      addConnectedQuickNodeAtPoint(
-        "image-generate",
-        flowPoint,
-        { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "prompt" },
+      setQuickInsertMenu({
+        clientX: clientPoint.x,
+        clientY: clientPoint.y,
+        connectionFrom: { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "prompt" },
+        position: flowPoint,
         selectedNodeIds,
-      );
+      });
       return;
     }
     if (sourceKind === "asset") {
       const sourceNode = board.nodes.find(node => node.id === sourceNodeId);
       if (isBoardMediaSourceNode(sourceNode)) {
         if (sourceHandleId === "asset-out") {
-          addConnectedQuickNodeAtPoint(
-            sourceNode.asset.type === "audio" ? "audio-operation" : sourceNode.asset.type === "video" ? "video-generate" : "image-generate",
-            flowPoint,
-            { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "asset" },
+          setQuickInsertMenu({
+            clientX: clientPoint.x,
+            clientY: clientPoint.y,
+            connectionFrom: { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "asset" },
+            position: flowPoint,
             selectedNodeIds,
-          );
+          });
           return;
         }
         return;
       }
       if (sourceNode?.kind !== "reference-group") return;
-      addConnectedQuickNodeAtPoint(
-        "image-generate",
-        flowPoint,
-        { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "asset" },
+      setQuickInsertMenu({
+        clientX: clientPoint.x,
+        clientY: clientPoint.y,
+        connectionFrom: { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "asset" },
+        position: flowPoint,
         selectedNodeIds,
-      );
+      });
       return;
     }
     if (sourceKind === "result") {
@@ -2821,7 +2824,7 @@ export default function BoardWorkspace({
       selectEdge(null);
       return;
     }
-  }, [addAssetToMultiGrid, addConnectedQuickNodeAtPoint, addResultNodeWithConnection, board.edges, board.nodes, centeredNodePosition, connectPortsBatch, flowPositionFromClient, galleryItemById, onConnectionError, selectEdge, selectedNodeIds, selectNode, tb, updateSelectedNodeIds]);
+  }, [addAssetToMultiGrid, addResultNodeWithConnection, board.edges, board.nodes, centeredNodePosition, connectPortsBatch, flowPositionFromClient, galleryItemById, onConnectionError, selectEdge, selectedNodeIds, selectNode, tb, updateSelectedNodeIds]);
 
   const openQuickInsertMenu = useCallback((event: ReactMouseEvent | MouseEvent): void => {
     event.preventDefault();
