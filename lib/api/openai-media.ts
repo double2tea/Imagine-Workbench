@@ -9,7 +9,7 @@ import { audioOperationApiError } from "./audio-errors";
 import { ApiError, apiErrorResponse, badRequest, requireApiText } from "./errors";
 import { assertOpenAiCompatibleGatewayAccess } from "./openai-auth";
 import { assertPublicHttpUrl } from "./url-safety";
-import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, dataUriByteSize } from "../reference-images";
+import { REFERENCE_IMAGE_MAX_BYTES, REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, dataUriByteSize } from "../reference-images";
 
 const IMAGE_EDIT_OPERATIONS = new Set<ImageEditOperation>(["redraw", "erase", "outpaint", "cutout", "angle", "lighting"]);
 const PROMPT_REQUIRED_IMAGE_EDIT_OPERATIONS = new Set<ImageEditOperation>(["redraw", "outpaint", "angle", "lighting"]);
@@ -97,7 +97,7 @@ export async function postOpenAiImageEdits(req: Request): Promise<Response> {
     assertImmediateOpenAiImageTarget(parsed.provider, parsed.async, "/v1/images/edits");
     const config = resolveProviderConfig(req, parsed.provider, { ignoredBearerToken: gatewayKey });
     const images = await readRequiredImageEditDataUris(form);
-    const mask = await readOptionalFileDataUri(form, "mask", "image/png");
+    const mask = await readOptionalFileDataUri(form, "mask", "image/png", REFERENCE_IMAGE_MAX_BYTES);
     const imageResolution = readOptionalFormText(form, "size") ?? "1024x1024";
     const result = await editImage(config, {
       operation,
@@ -179,7 +179,7 @@ export async function postOpenAiAudioTranscriptions(req: Request): Promise<Respo
     }
 
     const config = resolveProviderConfig(req, parsed.provider, { ignoredBearerToken: gatewayKey });
-    const audio = await readRequiredFileDataUri(form, "file", "audio/mpeg");
+    const audio = await readRequiredFileDataUri(form, "file", "audio/mpeg", REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES);
     const result = await generateAudioOperation(config, {
       mode: "asr",
       prompt: readOptionalFormText(form, "prompt") ?? "",
@@ -310,36 +310,36 @@ function assertAllowedFormFields(form: FormData, allowedFields: Set<string>): vo
   }
 }
 
-async function readRequiredFileDataUri(form: FormData, fieldName: string, fallbackMimeType: string): Promise<string> {
+async function readRequiredFileDataUri(form: FormData, fieldName: string, fallbackMimeType: string, maxBytes: number): Promise<string> {
   const values = form.getAll(fieldName);
   if (values.length !== 1) throw badRequest(`${fieldName} must contain exactly one file`, "invalid_file_count");
-  return formValueToDataUri(values[0], fieldName, fallbackMimeType);
+  return formValueToDataUri(values[0], fieldName, fallbackMimeType, maxBytes);
 }
 
-async function readOptionalFileDataUri(form: FormData, fieldName: string, fallbackMimeType: string): Promise<string | undefined> {
+async function readOptionalFileDataUri(form: FormData, fieldName: string, fallbackMimeType: string, maxBytes: number): Promise<string | undefined> {
   const values = form.getAll(fieldName);
   if (values.length === 0) return undefined;
   if (values.length !== 1) throw badRequest(`${fieldName} must contain exactly one file`, "invalid_file_count");
-  return formValueToDataUri(values[0], fieldName, fallbackMimeType);
+  return formValueToDataUri(values[0], fieldName, fallbackMimeType, maxBytes);
 }
 
 async function readRequiredImageEditDataUris(form: FormData): Promise<string[]> {
   const values = [...form.getAll("image"), ...form.getAll("image[]")];
   if (values.length === 0) throw badRequest("image must contain at least one file", "missing_required_field");
-  return Promise.all(values.map((value, index) => formValueToDataUri(value, `image[${index}]`, "image/png")));
+  return Promise.all(values.map((value, index) => formValueToDataUri(value, `image[${index}]`, "image/png", REFERENCE_IMAGE_MAX_BYTES)));
 }
 
-async function formValueToDataUri(value: FormDataEntryValue, fieldName: string, fallbackMimeType: string): Promise<string> {
+async function formValueToDataUri(value: FormDataEntryValue, fieldName: string, fallbackMimeType: string, maxBytes: number): Promise<string> {
   if (typeof value === "string") {
     if (value.startsWith("data:")) {
-      assertDataUriSize(value, `${fieldName} is too large`);
+      assertDataUriSize(value, maxBytes, `${fieldName} is too large`);
       return value;
     }
     throw badRequest(`${fieldName} must be a file or base64 data URI`, "invalid_file");
   }
   const mimeType = value.type || fallbackMimeType;
   const buffer = await value.arrayBuffer();
-  assertFileSize(buffer.byteLength, `${fieldName} is too large`);
+  assertFileSize(buffer.byteLength, maxBytes, `${fieldName} is too large`);
   return `data:${mimeType};base64,${arrayBufferToBase64(buffer)}`;
 }
 
@@ -364,14 +364,14 @@ function assertRequestBodySize(req: Request, message: string): void {
   }
 }
 
-function assertDataUriSize(dataUri: string, message: string): void {
+function assertDataUriSize(dataUri: string, maxBytes: number, message: string): void {
   const bytes = dataUriByteSize(dataUri);
   if (bytes === null) throw badRequest("file must be a base64 data URI", "invalid_file");
-  assertFileSize(bytes, message);
+  assertFileSize(bytes, maxBytes, message);
 }
 
-function assertFileSize(bytes: number, message: string): void {
-  if (bytes > REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES) {
+function assertFileSize(bytes: number, maxBytes: number, message: string): void {
+  if (bytes > maxBytes) {
     throw new ApiError(413, "payload_too_large", message);
   }
 }

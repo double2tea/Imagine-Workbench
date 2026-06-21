@@ -4,9 +4,11 @@ import { API_ROUTES } from "./api/routes";
 export const REFERENCE_IMAGE_MAX_EDGE = 2048;
 export const REFERENCE_IMAGE_OUTPUT_TYPE = "image/webp";
 export const REFERENCE_IMAGE_OUTPUT_QUALITY = 0.85;
-export const REFERENCE_IMAGE_MAX_BYTES = 8 * 1024 * 1024;
-export const REFERENCE_IMAGES_MAX_TOTAL_BYTES = 15 * 1024 * 1024;
-export const REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES = 24 * 1024 * 1024;
+export const REFERENCE_IMAGE_MAX_BYTES = 20 * 1024 * 1024;
+export const REFERENCE_IMAGES_MAX_TOTAL_BYTES = 64 * 1024 * 1024;
+export const REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES = 90 * 1024 * 1024;
+export const REFERENCE_IMAGE_MAX_ORIGINAL_TRANSCODE_EDGE = 4096;
+export const REFERENCE_IMAGE_MAX_ORIGINAL_TRANSCODE_PIXELS = 16 * 1024 * 1024;
 
 export interface ReferenceImageCompressionPolicy {
   maxBytes: number;
@@ -83,6 +85,19 @@ export function buildReferenceImageCompressionAttempts(
   const attempts: ReferenceImageCompressionAttempt[] = [];
   const seen = new Set<string>();
 
+  if (canAttemptOriginalDimensionTranscode(width, height)) {
+    for (const quality of policy.qualitySteps) {
+      if (quality <= 0 || quality > 1) throw new Error("Reference image compression quality steps must be between 0 and 1");
+      attempts.push({
+        width,
+        height,
+        outputType: policy.outputType,
+        quality,
+      });
+      seen.add(`${width}x${height}:${quality}`);
+    }
+  }
+
   for (const edgeScale of policy.edgeScaleSteps) {
     if (edgeScale <= 0) throw new Error("Reference image compression edge scale steps must be positive");
     const maxEdge = Math.max(policy.minMaxEdge, Math.round(policy.initialMaxEdge * edgeScale));
@@ -103,6 +118,14 @@ export function buildReferenceImageCompressionAttempts(
   }
 
   return attempts;
+}
+
+function canAttemptOriginalDimensionTranscode(width: number, height: number): boolean {
+  return (
+    width <= REFERENCE_IMAGE_MAX_ORIGINAL_TRANSCODE_EDGE &&
+    height <= REFERENCE_IMAGE_MAX_ORIGINAL_TRANSCODE_EDGE &&
+    width * height <= REFERENCE_IMAGE_MAX_ORIGINAL_TRANSCODE_PIXELS
+  );
 }
 
 export function getReferenceImagePayloadError(referenceUrls: string[]): string | null {

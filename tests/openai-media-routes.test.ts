@@ -8,7 +8,7 @@ import {
   postOpenAiImageGenerations,
 } from "../lib/api/openai-media";
 import { assertPublicHttpUrl } from "../lib/api/url-safety";
-import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES } from "../lib/reference-images";
+import { REFERENCE_IMAGE_MAX_BYTES, REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES } from "../lib/reference-images";
 
 test("OpenAI-compatible image generations maps JSON to provider image adapter", async () => {
   const mock = withFetchMock(async (url, init) => {
@@ -265,7 +265,7 @@ test("OpenAI-compatible image edits rejects oversized data URI form fields witho
     const form = new FormData();
     form.set("model", "newapi:image-edit-model");
     form.set("prompt", "make it blue");
-    form.set("image", makeDataUri(REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES + 1));
+    form.set("image", makeDataUri(REFERENCE_IMAGE_MAX_BYTES + 1));
 
     const response = await postOpenAiImageEdits(formRequest("/v1/images/edits", form, {
       "x-ai-api-key": "image_key",
@@ -469,6 +469,28 @@ test("OpenAI-compatible audio transcriptions rejects oversized multipart bodies 
 
   assert.equal(response.status, 413);
   assert.match(await response.text(), /too large/);
+});
+
+test("OpenAI-compatible audio transcriptions does not use the image file size cap", async () => {
+  const mock = withFetchMock(async () => {
+    throw new Error("Oversized MiMo ASR audio must be rejected before fetch");
+  });
+
+  try {
+    const form = new FormData();
+    form.set("model", "mimo-v2.5-asr");
+    form.set("file", new Blob([new Uint8Array(REFERENCE_IMAGE_MAX_BYTES + 1)], { type: "audio/wav" }), "audio.wav");
+
+    const response = await postOpenAiAudioTranscriptions(formRequest("/v1/audio/transcriptions", form, {
+      Authorization: "Bearer mimo_key",
+    }));
+
+    assert.equal(response.status, 400);
+    assert.match(await response.text(), /base64 payload exceeds 10MB/);
+    assert.equal(mock.calls.count, 0);
+  } finally {
+    mock.restore();
+  }
 });
 
 test("OpenAI-compatible audio transcriptions rejects unsupported languages", async () => {
