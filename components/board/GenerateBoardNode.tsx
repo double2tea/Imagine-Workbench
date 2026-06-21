@@ -85,9 +85,9 @@ function statusText(node: GenerateNode, t: BoardNodeT): string {
   if (node.status === "processing") return t("node.statusLabels.processing");
   if (node.status === "complete") return t("node.statusLabels.complete");
   if (node.status === "failed") return t("node.statusLabels.failed");
-  if (node.kind === "image-generate") return t("mediaTypeLabels.image");
-  if (node.kind === "video-generate") return t("mediaTypeLabels.video");
-  return t("mediaTypeLabels.audio");
+  if (node.kind === "image-generate") return t("node.types.imageGenerate");
+  if (node.kind === "video-generate") return t("node.types.videoGenerate");
+  return t("node.types.audioOperation");
 }
 
 function contextToneClass(tone: GenerateContextTone): string {
@@ -97,7 +97,7 @@ function contextToneClass(tone: GenerateContextTone): string {
 
 function resultContext(hasResultConnection: boolean, resultCount: number, t: BoardNodeT): { title: string; tone: GenerateContextTone } {
   if (resultCount > 0) return { title: hasResultConnection ? t("node.types.result") + " " + resultCount : resultCount + " " + t("node.types.result"), tone: hasResultConnection ? "result" : "ok" };
-  return { title: "No result", tone: "neutral" };
+  return { title: t("node.generateNode.noResult"), tone: "neutral" };
 }
 
 function runContext(node: GenerateNode, taskSummary: BoardGenerateTaskSummary | undefined, t: BoardNodeT): { title: string; tone: GenerateContextTone } {
@@ -173,14 +173,16 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
   const run = runContext(node, taskSummary, t);
   const lineTone = statusLineTone(node, taskSummary);
   const promptContext = usesOptionalTextInput && promptPreview === null && !node.prompt.trim()
-    ? { title: "Optional", tone: "neutral" as const }
+    ? { title: t("node.generateNode.optional"), tone: "neutral" as const }
     : promptPreview !== null
-    ? { title: promptSourceTitle ?? "Connected", tone: "prompt" as const }
-    : { title: "Inline", tone: "neutral" as const };
-  const promptContextLabel = isAudioNode ? textInputRequired ? "Text" : "Note" : "Prompt";
+    ? { title: promptSourceTitle ?? t("node.generateNode.connected"), tone: "prompt" as const }
+    : { title: t("node.generateNode.inline"), tone: "neutral" as const };
+  const promptContextLabel = isAudioNode
+    ? textInputRequired ? t("node.generateNode.text") : t("node.generateNode.note")
+    : t("node.generateNode.prompt");
   const referenceContext = referenceCount > 0
     ? { title: `${referenceCount}`, tone: "reference" as const }
-    : { title: "None", tone: "neutral" as const };
+    : { title: t("node.generateNode.none"), tone: "neutral" as const };
   const contextItems: GenerateContextItem[] = [
     {
       key: "prompt",
@@ -188,23 +190,27 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
       title: promptContext.title,
       tone: promptContext.tone,
       tooltip: isAudioNode
-        ? promptPreview !== null ? `${promptContextLabel} from ${promptSourceTitle ?? "Prompt node"}` : textInputRequired ? "Use inline audio text" : "Text optional; connect required reference media to execute"
-        : promptPreview !== null ? `From ${promptSourceTitle ?? "Prompt node"}` : "Use inline prompt",
+        ? promptPreview !== null
+          ? t("node.generateNode.promptFrom", { label: promptContextLabel, source: promptSourceTitle ?? t("node.generateNode.promptNode") })
+          : textInputRequired ? t("node.generateNode.useInlineAudioText") : t("node.generateNode.optionalTextHint")
+        : promptPreview !== null
+          ? t("node.generateNode.fromPromptNode", { source: promptSourceTitle ?? t("node.generateNode.promptNode") })
+          : t("node.generateNode.useInlinePrompt"),
     },
-    { key: "references", label: "Ref", title: referenceContext.title, tone: referenceContext.tone },
+    { key: "references", label: t("node.generateNode.reference"), title: referenceContext.title, tone: referenceContext.tone },
     {
       key: "result",
-      label: "Result",
+      label: t("node.generateNode.result"),
       title: result.title,
       tone: result.tone,
-      ...(hasResultConnection && onFocusResultNode ? { onClick: onFocusResultNode, tooltip: "Locate result node" } : {}),
+      ...(hasResultConnection && onFocusResultNode ? { onClick: onFocusResultNode, tooltip: t("node.generateNode.locateResultNode") } : {}),
     },
     {
       key: "run",
-      label: "Run",
+      label: t("node.generateNode.run"),
       title: run.title,
       tone: run.tone,
-      tooltip: taskSummary ? `Task ${taskSummary.id}` : undefined,
+      tooltip: taskSummary ? t("node.generateNode.taskLabel", { id: taskSummary.id }) : undefined,
     },
   ];
   const displayedVariantCount = effectiveVariantCount(node);
@@ -218,7 +224,7 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
         audioOperationFormatOptions(getAudioModelCapabilities(node.model)).length > 0 ? node.audioFormat : "",
         `x${displayedVariantCount}`,
       ].filter(value => value.trim().length > 0).join(" / ");
-  const taskStatusText = taskSummary?.status === "pending" ? "Queued" : "Processing";
+  const taskStatusText = taskSummary?.status === "pending" ? t("node.statusLabels.pending") : t("node.statusLabels.processing");
   const statusLabel = taskSummary ? `${taskStatusText} / ${paramSummary}` : `${statusText(node, t)} / ${paramSummary}`;
   const compactStatusLabel = taskSummary ? `${taskStatusText} · x${displayedVariantCount}` : `${statusText(node, t)} · x${displayedVariantCount}`;
 
@@ -309,8 +315,8 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
             promptPreview !== null ? "cursor-default opacity-85" : ""
           }`}
           placeholder={promptPreview !== null
-            ? isAudioNode ? `Connected ${promptContextLabel} node, edit in prompt node` : "Connected Prompt node, edit in prompt node"
-            : usesOptionalTextInput ? "Text optional; connect or drop required reference media to execute" : isAudioNode ? "Enter audio operation text, use @ to reference supported media" : "Write prompt directly, use @ to reference images"}
+            ? isAudioNode ? t("node.generateNode.connectedTextPlaceholder", { label: promptContextLabel }) : t("node.generateNode.connectedPromptPlaceholder")
+            : usesOptionalTextInput ? t("node.generateNode.optionalPlaceholder") : isAudioNode ? t("node.generateNode.audioPlaceholder") : t("node.generateNode.imagePromptPlaceholder")}
         />
       </div>
       <div className="flex min-w-0 items-center gap-1 overflow-hidden rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-1">
@@ -351,7 +357,7 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
               <div
                 key={`${reference.id}:${reference.url}`}
                 className="h-6 w-6 overflow-hidden rounded border border-blue-400/30 bg-[var(--iw-panel-soft)]"
-                title={reference.role ? `Reference · ${reference.role}` : "Reference media"}
+                title={reference.role ? t("node.generateNode.referenceRole", { role: reference.role }) : t("node.generateNode.referenceMedia")}
               >
                 <MediaReferenceThumbnail reference={reference} alt="" className="h-full w-full" />
               </div>
@@ -386,7 +392,7 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
           <span />
         )}
         {node.kind === "audio-operation" ? <span /> : (
-          <div className="imagine-generate-variant-group nodrag flex h-8 overflow-hidden rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)]" title="Variant count">
+          <div className="imagine-generate-variant-group nodrag flex h-8 overflow-hidden rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)]" title={t("node.generateNode.variantCount")}>
             {variantCountOptions.map(count => (
               <button
                 key={count}
@@ -411,7 +417,7 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
             onClick={onCancel}
             className="imagine-generate-run-action imagine-tone-chip nodrag flex h-8 items-center justify-center gap-1.5 rounded-md border px-3 text-xs font-semibold transition"
             data-tone="danger"
-            title="Cancel related generation task"
+            title={t("node.generateNode.cancelTask")}
           >
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             <X className="h-3 w-3" />

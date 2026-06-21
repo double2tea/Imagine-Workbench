@@ -385,7 +385,7 @@ function normalizeBoard(board: unknown, fallbackId: string = DEFAULT_BOARD_ID): 
   return {
     ...boardRecord,
     id: fallbackId,
-    title: readNonEmptyString(boardRecord.title, "Board"),
+    title: localizeLegacyDefaultBoardTitle(readNonEmptyString(boardRecord.title, t("board.workspace.boardLabel"))),
     config: normalizeBoardConfig(boardRecord.config),
     nodes,
     edges: Array.isArray(boardRecord.edges) ? normalizeBoardEdges(nodes, boardRecord.edges) : [],
@@ -724,7 +724,7 @@ function normalizeBoardNode(node: unknown, index: number): BoardNode | null {
     parentId: readOptionalString(node.parentId),
     position: normalizeBoardPoint(node.position, index),
     size: node.kind === "runninghub-app" ? minimumBoardSize(normalizedSize, DEFAULT_RUNNINGHUB_APP_NODE_SIZE) : normalizedSize,
-    title: readNonEmptyString(node.title, defaultNodeTitle(node.kind)),
+    title: localizeLegacyDefaultNodeTitle(node.kind, readNonEmptyString(node.title, defaultNodeTitle(node.kind))),
     createdAt: readNonEmptyString(node.createdAt, nowIso()),
     updatedAt: readNonEmptyString(node.updatedAt, nowIso()),
   };
@@ -943,6 +943,24 @@ function defaultNodeTitle(kind: BoardNode["kind"]): string {
   if (kind === "runninghub-app") return t("board.node.types.runninghubApp");
   if (kind === "agent") return t("board.node.types.agent");
   return t("board.node.types.note");
+}
+
+function localizeLegacyDefaultBoardTitle(title: string): string {
+  return title === "Board" ? t("board.workspace.boardLabel") : title;
+}
+
+function localizeLegacyDefaultNodeTitle(kind: BoardNode["kind"], title: string): string {
+  if (kind === "prompt" && title === "Prompt") return t("board.node.types.prompt");
+  if (kind === "reference-group" && title === "Reference Group") return t("board.node.types.referenceGroup");
+  if (kind === "image-generate" && title === "Image Generate") return t("board.node.types.imageGenerate");
+  if (kind === "video-generate" && title === "Video Generate") return t("board.node.types.videoGenerate");
+  if (kind === "audio-operation" && title === "Audio Operation") return t("board.node.types.audioOperation");
+  if (kind === "runninghub-app" && title === "RunningHub App") return t("board.node.types.runninghubApp");
+  if (kind === "note" && title === "Note") return t("board.node.types.note");
+  if ((kind === "asset" || kind === "result") && title === "Image Asset") return t("board.node.types.imageAsset");
+  if ((kind === "asset" || kind === "result") && title === "Video Asset") return t("board.node.types.videoAsset");
+  if ((kind === "asset" || kind === "result") && title === "Audio Asset") return t("board.node.types.audioAsset");
+  return title;
 }
 
 function defaultAssetNodeTitle(type: BoardAssetReference["type"]): string {
@@ -1266,7 +1284,7 @@ function createReferenceGroupBoardNode(
   return {
     id: createBoardId("ref_group"),
     kind: "reference-group",
-    title: input.title ?? "Reference Group",
+    title: input.title ?? t("board.node.types.referenceGroup"),
     references: input.references ?? [],
     position: findAvailableBoardNodePosition(boardNodesWithAbsolutePositions(nodes), preferredPosition, size),
     size,
@@ -1311,7 +1329,7 @@ function createGenerateBoardNode(input: CreateGenerateNodeInput, nodes: BoardNod
   const nodeId = createBoardId(input.kind === "image-generate" ? "image_gen" : input.kind === "audio-operation" ? "audio_op" : "video_gen");
   const baseNode = {
     id: nodeId,
-    title: input.title ?? (input.kind === "image-generate" ? "Image Generate" : input.kind === "audio-operation" ? "Audio Operation" : "Video Generate"),
+    title: input.title ?? defaultNodeTitle(input.kind),
     prompt: input.prompt ?? "",
     model: input.model,
     status: "idle" as BoardGenerationStatus,
@@ -1371,7 +1389,7 @@ function createRunningHubAppBoardNode(input: CreateRunningHubAppNodeInput, nodes
   return {
     id: createBoardId("rh_app"),
     kind: "runninghub-app",
-    title: input.title ?? "RunningHub App",
+    title: input.title ?? t("board.node.types.runninghubApp"),
     targetType: input.targetType ?? "ai-app",
     outputType: input.outputType ?? "image",
     targetId: input.targetId ?? "",
@@ -1535,7 +1553,7 @@ function clampMultiGridScale(value: number): number {
 }
 
 export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateController {
-  const [board, setBoardState] = useState<BoardDocument>(() => createEmptyBoard(boardId));
+  const [board, setBoardState] = useState<BoardDocument>(() => createEmptyBoard(boardId, t("board.workspace.boardLabel")));
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<BoardSaveStatus>("loading");
@@ -1652,7 +1670,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       if (!isActive) return;
 
       clearUndoHistory();
-      setBoardState(storedBoard ? normalizeBoard(storedBoard, boardId) : createEmptyBoard(boardId));
+      setBoardState(storedBoard ? normalizeBoard(storedBoard, boardId) : createEmptyBoard(boardId, t("board.workspace.boardLabel")));
       setSelectedNodeId(null);
       setSelectedEdgeId(null);
       setSaveError(null);
@@ -1932,7 +1950,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     const node: BoardPromptNode = {
       id: nodeId,
       kind: "prompt",
-      title: input.title ?? "Prompt",
+      title: input.title ?? t("board.node.types.prompt"),
       prompt,
       position: input.position ?? moveDefaultPosition(board.nodes),
       size: input.size ? clampBoardTextNodeSize(input.size, DEFAULT_PROMPT_NODE_SIZE) : estimateBoardPromptSize(prompt),
@@ -2145,7 +2163,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     const node: BoardAgentNode = {
       id: nodeId,
       kind: "agent",
-      title: input.title ?? "Agent",
+      title: input.title ?? t("board.node.types.agent"),
       instruction: input.instruction ?? "",
       position: input.position ?? moveDefaultPosition(board.nodes),
       size: input.size ?? DEFAULT_AGENT_NODE_SIZE,
@@ -2167,7 +2185,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     const node: BoardNode = {
       id: nodeId,
       kind: "note",
-      title: input.title ?? "Note",
+      title: input.title ?? t("board.node.types.note"),
       body,
       source: input.source,
       variant,
