@@ -130,6 +130,7 @@ export default function ImageGenerationPanel({
   const presetResolutionOptions = imageResolutionOptions.filter(option => option.value !== "custom");
   const supportsCustomImageSize = imageResolutionOptions.some(option => option.value === "custom");
   const isCustomImageSize = imageSizeMode === "custom";
+  const priceImageResolution = isCustomImageSize ? customImageSize.trim() : imageResolution;
   const imageReferenceLimit = capabilities.maxReferenceImages;
   const imageReferenceHelp = imageReferenceLimit > 0
     ? t("imageGeneration.referenceHelpSupported", { limit: imageReferenceLimit })
@@ -409,7 +410,7 @@ export default function ImageGenerationPanel({
           priceOptions={buildGenerationModelPriceOptions({
             kind: "image",
             imageQuality,
-            resolution: imageResolution,
+            resolution: priceImageResolution,
             thinkingLevel: imageThinkingLevel,
           })}
           submitCount={submitCount}
