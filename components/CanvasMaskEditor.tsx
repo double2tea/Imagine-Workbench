@@ -320,7 +320,7 @@ export default function CanvasMaskEditor({
     ? naturalOutpaintSize(sourceNaturalSize, canvasSize, outpaintMargins)
     : sourceNaturalSize;
   const resolutionAspectRatio = imageEditAspectRatioFromSize(resolutionOutputSize);
-  const resolutionOptions = getImageEditResolutionOptions(editModel, resolutionOutputSize);
+  const resolutionOptions = getImageEditResolutionOptions(editModel);
   const selectedImageResolution = resolutionOptions.some(option => option.value === imageResolution)
     ? imageResolution
     : resolutionOptions[0]?.value ?? "auto";

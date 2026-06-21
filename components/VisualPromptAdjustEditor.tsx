@@ -115,7 +115,7 @@ export default function VisualPromptAdjustEditor({
   const [lightingState, setLightingState] = useState<LightingAdjustmentState>(DEFAULT_LIGHTING_STATE);
 
   const aspectRatio = imageEditAspectRatioFromSize(imageSize);
-  const resolutionOptions = useMemo(() => getImageEditResolutionOptions(editModel, imageSize), [editModel, imageSize]);
+  const resolutionOptions = useMemo(() => getImageEditResolutionOptions(editModel), [editModel]);
   const selectedImageResolution = resolutionOptions.some(option => option.value === imageResolution)
     ? imageResolution
     : resolutionOptions[0]?.value ?? "auto";

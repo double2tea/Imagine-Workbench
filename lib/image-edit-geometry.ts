@@ -1,4 +1,4 @@
-import { getImageResolutionOptions, type ParameterOption } from "@/lib/providers/model-catalog";
+import { getImageModelCapabilities, type ParameterOption } from "@/lib/providers/model-catalog";
 
 export interface ImageEditSize {
   width: number;
@@ -22,10 +22,9 @@ export function normalizeImageEditAspectRatio(value: string): string {
   });
 }
 
-export function getImageEditResolutionOptions(model: string | undefined, size: ImageEditSize): ParameterOption[] {
+export function getImageEditResolutionOptions(model: string | undefined): ParameterOption[] {
   if (!model) return [AUTO_RESOLUTION_OPTION];
-  const aspectRatio = imageEditAspectRatioFromSize(size);
-  const options = getImageResolutionOptions(model, aspectRatio)
+  const options = getImageModelCapabilities(model).resolutions
     .filter(option => option.value !== "auto" && option.value !== "custom");
   return options.length > 0 ? options : [AUTO_RESOLUTION_OPTION];
 }

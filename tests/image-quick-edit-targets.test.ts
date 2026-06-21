@@ -156,17 +156,19 @@ test("generic quick edit targets submit through image edit route", async () => {
   }
 });
 
-test("quick edit resolution options prefer concrete source-aspect sizes over auto", () => {
-  const options = getImageEditResolutionOptions("12ai:gpt-image-2", { width: 1792, height: 1024 });
+test("quick edit resolution options expose model tiers without source aspect filtering", () => {
+  const options = getImageEditResolutionOptions("12ai:gemini-3-pro-image-preview");
 
-  assert.equal(options[0]?.value, "1792x1024");
+  assert.deepEqual(options.map(option => option.value), ["1K", "2K", "4K"]);
   assert.equal(options.some(option => option.value === "auto"), false);
 });
 
-test("quick edit resolution options keep auto only when no concrete size matches", () => {
-  const options = getImageEditResolutionOptions("12ai:gpt-image-2", { width: 123, height: 456 });
+test("quick edit resolution options keep pixel sizes available for nonstandard source aspects", () => {
+  const options = getImageEditResolutionOptions("12ai:gpt-image-2");
 
-  assert.deepEqual(options, [{ value: "auto", label: "Auto" }]);
+  assert.equal(options.some(option => option.value === "1024x1024"), true);
+  assert.equal(options.some(option => option.value === "1024x1536"), true);
+  assert.equal(options.some(option => option.value === "auto"), false);
 });
 
 test("visual adjustment prompt compiler branches by model family", () => {
