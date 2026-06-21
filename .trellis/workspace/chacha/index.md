@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-3.md`
-- **Total Sessions**: 156
-- **Last Active**: 2026-06-21
+- **Total Sessions**: 157
+- **Last Active**: 2026-06-22
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-3.md` | ~1278 | Active |
+| `journal-3.md` | ~1311 | Active |
 | `journal-2.md` | ~1973 | Archived |
 | `journal-1.md` | ~1988 | Archived |
 <!-- @@@/auto:active-documents -->
@@ -31,6 +31,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 157 | 2026-06-22 | Fix board selection refresh drift | `5b9cec18` | `main` |
 | 156 | 2026-06-21 | Align language toggle sizing | `ae0126f2` | `main` |
 | 155 | 2026-06-21 | Fix board image preview hydration | `c8b24ca8` | `main` |
 | 154 | 2026-06-21 | Fix quick edit resolution handling | `6e0cc2b9`, `52d17fd5` | `main` |

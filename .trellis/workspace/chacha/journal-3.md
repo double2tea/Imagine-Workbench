@@ -1276,3 +1276,36 @@ Aligned the main workbench language toggle with the board toolbar language toggl
 ### Next Steps
 
 - None - task complete
+
+
+## Session 157: Fix board selection refresh drift
+
+**Date**: 2026-06-22
+**Task**: Fix board selection refresh drift
+**Branch**: `main`
+
+### Summary
+
+Stabilized board selection during node add, duplicate, delete, and query-board loading; removed stale selection drift and verified lint/typecheck.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5b9cec18` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
