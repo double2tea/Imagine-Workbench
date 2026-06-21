@@ -144,7 +144,7 @@ export default function BoardToolbar({
   const saveMeta = saveStatusMeta(saveStatus, saveError, t);
   const nextLocale = locale === "zh" ? "en" : "zh";
   const languageToggleLabel = t(`workspace.language.${nextLocale}`);
-  const languageToggleShort = t(`workspace.language.${nextLocale}Short`);
+  const languageToggleShort = t(`workspace.language.${locale}Short`);
 
   const visibleBoardSummaries = boardSummaries.some(board => board.id === boardId)
     ? boardSummaries

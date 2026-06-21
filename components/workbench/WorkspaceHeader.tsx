@@ -35,7 +35,7 @@ export default function WorkspaceHeader({
   const { locale, setLocale } = useLocale();
   const nextLocale = locale === "zh" ? "en" : "zh";
   const languageToggleLabel = t(`workspaceHeader.language.${nextLocale}`);
-  const languageToggleShort = t(`workspaceHeader.language.${nextLocale}Short`);
+  const languageToggleShort = t(`workspaceHeader.language.${locale}Short`);
 
   return (
     <WorkspaceTopBar
