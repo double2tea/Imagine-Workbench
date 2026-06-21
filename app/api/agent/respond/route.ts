@@ -370,6 +370,9 @@ export async function POST(req: NextRequest) {
     const parsedResponse = agentResponseSchema.parse(payload);
     parsedResponse.thought ??= defaultAgentThought(body.locale);
     parsedResponse.text ??= defaultAgentText(body.locale);
+    if (toolCalls.length === 0 && mentionsKnownToolName(parsedResponse, tools)) {
+      parsedResponse.thought = missingToolCallThought(body.locale);
+    }
     validateActionModel(parsedResponse.recommendedAction);
     validateActionModel(parsedResponse.boardAction);
     if (surface === "board") {
@@ -444,6 +447,20 @@ function agentServiceFailureFollowUps(locale: AgentLocale): string[] {
     : ["Check API Key and Base URL", "Switch to classic creation mode"];
 }
 
+function missingToolCallThought(locale: AgentLocale): string {
+  return locale === "zh"
+    ? "模型提到了工具名，但没有返回正式工具调用；本轮没有执行工具。"
+    : "The model mentioned a tool name but did not return a formal tool call; no tool was executed.";
+}
+
+function mentionsKnownToolName(
+  response: z.infer<typeof agentResponseSchema>,
+  tools: ReturnType<typeof getAgentTools>,
+): boolean {
+  const content = `${response.thought ?? ""}\n${response.text ?? ""}`;
+  return tools.some(tool => content.includes(tool.function.name));
+}
+
 function hasExecutableAgentAction(
   recommendedAction: z.infer<typeof agentActionSchema>,
   boardAction: z.infer<typeof agentBoardActionSchema>,
@@ -506,6 +523,7 @@ async function runAgentLoop(
     ...userMessages,
   ];
   const toolCallLog: AgentToolCallSummary[] = [];
+  const toolResultCache = new Map<string, string>();
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
     const completion = await createChatCompletionWithTools(
@@ -520,15 +538,20 @@ async function runAgentLoop(
     if (!choice) throw new Error("Chat completion returned no choices");
 
     const requestedCalls = choice.message.tool_calls;
-    if (choice.finish_reason === "tool_calls" && requestedCalls && requestedCalls.length > 0) {
+    if (requestedCalls && requestedCalls.length > 0) {
       conversation.push({ role: "assistant", content: null, tool_calls: requestedCalls });
       for (const toolCall of requestedCalls) {
-        const result = executeToolCall(toolCall.function.name, toolCall.function.arguments, toolCtx);
+        const signature = toolCallSignature(toolCall.function.name, toolCall.function.arguments);
+        const cachedResult = toolResultCache.get(signature);
+        const result = cachedResult ?? executeToolCall(toolCall.function.name, toolCall.function.arguments, toolCtx);
+        if (!cachedResult) {
+          toolResultCache.set(signature, result);
+          toolCallLog.push({
+            name: toolCall.function.name,
+            args: JSON.parse(toolCall.function.arguments),
+          });
+        }
         conversation.push({ role: "tool", tool_call_id: toolCall.id, content: result });
-        toolCallLog.push({
-          name: toolCall.function.name,
-          args: JSON.parse(toolCall.function.arguments),
-        });
       }
       continue;
     }
@@ -538,6 +561,10 @@ async function runAgentLoop(
 
   const final = await createChatCompletionText(config, model, conversation, 0.75, AGENT_CHAT_RESPONSE_OPTIONS);
   return { payload: parseAgentPayloadText(final, locale), toolCalls: toolCallLog };
+}
+
+function toolCallSignature(name: string, args: string): string {
+  return `${name}\n${args}`;
 }
 
 function parseAgentPayloadText(text: string, locale: AgentLocale): unknown {
