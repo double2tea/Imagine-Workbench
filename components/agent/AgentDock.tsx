@@ -1,4 +1,4 @@
-import type { ChangeEvent, CSSProperties, FormEvent, PointerEvent as ReactPointerEvent, MutableRefObject, ReactNode, Ref } from "react";
+import type { ChangeEvent, CSSProperties, FormEvent, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, MutableRefObject, ReactNode, Ref } from "react";
 import { forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronRight, FileAudio, ImagePlus, Paintbrush, RefreshCw, Send, X } from "lucide-react";
 import { motion } from "motion/react";
@@ -98,8 +98,9 @@ interface AgentOrbDragState {
 }
 
 function clampAgentOrbPosition(position: AgentOrbPosition): AgentOrbPosition {
-  const maxX = Math.max(AGENT_ORB_MARGIN, window.innerWidth - AGENT_ORB_SIZE - AGENT_ORB_MARGIN);
-  const maxY = Math.max(AGENT_ORB_MARGIN, window.innerHeight - AGENT_ORB_SIZE - AGENT_ORB_MARGIN);
+  const orbSize = getAgentOrbSize();
+  const maxX = Math.max(AGENT_ORB_MARGIN, window.innerWidth - orbSize - AGENT_ORB_MARGIN);
+  const maxY = Math.max(AGENT_ORB_MARGIN, window.innerHeight - orbSize - AGENT_ORB_MARGIN);
   return {
     x: Math.min(Math.max(position.x, AGENT_ORB_MARGIN), maxX),
     y: Math.min(Math.max(position.y, AGENT_ORB_MARGIN), maxY),
@@ -107,9 +108,10 @@ function clampAgentOrbPosition(position: AgentOrbPosition): AgentOrbPosition {
 }
 
 function getDefaultAgentOrbPosition(): AgentOrbPosition {
+  const orbSize = getAgentOrbSize();
   return clampAgentOrbPosition({
-    x: window.innerWidth - AGENT_ORB_SIZE - 48,
-    y: window.innerHeight - AGENT_ORB_SIZE - 56,
+    x: window.innerWidth - orbSize - (isMobileAgentViewport() ? 12 : 40),
+    y: Math.round(window.innerHeight * (isMobileAgentViewport() ? 0.58 : 0.56) - orbSize / 2),
   });
 }
 
@@ -139,6 +141,7 @@ function persistAgentOrbPosition(position: AgentOrbPosition) {
 
 function getInitialAgentOrbPosition(): AgentOrbPosition | null {
   if (typeof window === "undefined") return null;
+  if (isMobileAgentViewport()) return getDefaultAgentOrbPosition();
   const storedPosition = parseStoredAgentOrbPosition(localStorage.getItem(AGENT_ORB_POSITION_STORAGE_KEY));
   return storedPosition ? clampAgentOrbPosition(storedPosition) : getDefaultAgentOrbPosition();
 }
@@ -200,9 +203,21 @@ function makeActionLabels(t: (key: string) => string): Record<AgentToolAction["t
 }
 
 const AGENT_ORB_POSITION_STORAGE_KEY = "imagine_agent_orb_position";
-const AGENT_ORB_SIZE = 108;
+const AGENT_ORB_DESKTOP_SIZE = 108;
+const AGENT_ORB_MOBILE_SIZE = 76;
+const AGENT_ORB_MOBILE_BREAKPOINT = 640;
 const AGENT_ORB_MARGIN = 12;
 const AGENT_ORB_DRAG_THRESHOLD = 4;
+
+function isMobileAgentViewport(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.innerWidth < AGENT_ORB_MOBILE_BREAKPOINT;
+}
+
+function getAgentOrbSize(): number {
+  if (typeof window === "undefined") return AGENT_ORB_DESKTOP_SIZE;
+  return isMobileAgentViewport() ? AGENT_ORB_MOBILE_SIZE : AGENT_ORB_DESKTOP_SIZE;
+}
 
 function assignRef<T>(ref: Ref<T> | undefined, value: T | null): void {
   if (typeof ref === "function") {
@@ -334,6 +349,12 @@ function AgentMessage({
   const toolLabels = useMemo(() => makeToolLabels(t), [t]);
   const skillLabels = useMemo(() => makeSkillLabels(t), [t]);
   const actionLabels = useMemo(() => makeActionLabels(t), [t]);
+  const suppressExecuteClickRef = useRef(false);
+
+  const executePendingAction = (action: AgentToolAction) => {
+    onExecuteAction(message.id, action);
+  };
+
   return (
     <div className={`flex flex-col gap-1.5 ${message.role === "user" ? "self-end ml-10" : "self-start mr-10"}`}>
       <span className={`imagine-agent-role-label ${
@@ -381,7 +402,7 @@ function AgentMessage({
         </div>
       )}
 
-      <div className={`overflow-y-auto px-3 py-2 text-xs inline-block leading-relaxed ${
+      <div className={`px-3 py-2 text-xs inline-block leading-relaxed ${
         message.role === "user"
           ? "imagine-agent-bubble-user font-medium"
           : "imagine-agent-bubble-assistant"
@@ -433,12 +454,22 @@ function AgentMessage({
               <>
                 <button
                   type="button"
+                  onPointerUp={(event) => {
+                    if (event.button !== 0) return;
+                    suppressExecuteClickRef.current = true;
+                    executePendingAction(pendingAction);
+                    window.setTimeout(() => {
+                      suppressExecuteClickRef.current = false;
+                    }, 0);
+                  }}
                   onClick={() => {
-                    onExecuteAction(message.id, pendingAction);
+                    if (suppressExecuteClickRef.current) return;
+                    executePendingAction(pendingAction);
                   }}
                   data-tone="accent"
                   data-size="compact"
                   className="imagine-primary-action flex flex-1 cursor-pointer items-center justify-center gap-1 rounded-lg px-3 py-1.5 text-[10px] font-bold text-white transition"
+                  title={t("chat.executeButton")}
                 >
                   <Check className="h-3 w-3" />
                   {t("chat.executeButton")}
@@ -448,6 +479,7 @@ function AgentMessage({
                   onClick={() => onDeclineAction(message.id)}
                   className="imagine-secondary-action border border-[var(--iw-border)] hover:border-[var(--iw-muted)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)] hover:text-[var(--iw-text)] py-1.5 px-3 rounded-lg text-[10px] cursor-pointer transition"
                   data-action="danger"
+                  title={t("chat.declineButton")}
                 >
                   {t("chat.declineButton")}
                 </button>
@@ -478,7 +510,13 @@ function AgentMessage({
               </div>
               <div className="flex items-center justify-between text-[10px] mt-1.5 font-mono">
                 <span className="imagine-tone-icon" data-tone="accent">{t("chat.autoModeCountdown", { seconds: countdownSeconds })}</span>
-                <button onClick={onCancelCountdown} className="imagine-tone-link cursor-pointer underline" data-tone="danger">
+                <button
+                  type="button"
+                  onClick={onCancelCountdown}
+                  className="imagine-tone-link cursor-pointer underline"
+                  data-tone="danger"
+                  title={t("chat.cancelAutoMode")}
+                >
                   {t("chat.cancelAutoMode")}
                 </button>
               </div>
@@ -491,9 +529,11 @@ function AgentMessage({
         <div className="flex flex-wrap gap-1.5 mt-1.5 self-start">
           {message.suggestedFollowUps.map((prompt, index) => (
             <button
+              type="button"
               key={`${prompt}-${index}`}
               onClick={() => onSuggestedPrompt(prompt)}
               className="imagine-agent-follow-up"
+              title={prompt}
             >
               {prompt}
             </button>
@@ -545,6 +585,12 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     onSubmit();
+  };
+  const handleInputKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
+    event.preventDefault();
+    if (event.shiftKey) return;
+    if (!isLoading && input.trim()) onSubmit();
   };
   const sendableAgentReferences = getSendableAgentMediaReferences(
     agentReferences,
@@ -647,17 +693,21 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
     applyThemeClassesToDom(resolveThemeMode());
   }, [isIdleOrb]);
 
-  const idleOrbStyle = isIdleOrb && orbPosition
+  const idleOrbSize = isIdleOrb && orbPosition ? getAgentOrbSize() : null;
+  const idleOrbStyle = idleOrbSize !== null && orbPosition
     ? {
+      "--imagine-agent-orb-size": `${idleOrbSize}px`,
       bottom: "auto",
+      height: idleOrbSize,
       left: orbPosition.x,
       right: "auto",
       top: orbPosition.y,
-    } satisfies CSSProperties
+      width: idleOrbSize,
+    } satisfies CSSProperties & Record<"--imagine-agent-orb-size", string>
     : undefined;
 
   const dockShellClass = isIdleOrb
-    ? "imagine-agent-dock imagine-agent-dock-idle-orb imagine-theme-dark pointer-events-none fixed bottom-12 right-4 z-40 flex h-[108px] w-[108px] sm:bottom-16 sm:right-10"
+    ? "imagine-agent-dock imagine-agent-dock-idle-orb imagine-theme-dark pointer-events-none fixed bottom-12 right-4 z-40 flex sm:bottom-16 sm:right-10"
     : "imagine-agent-dock imagine-agent-dock-panel imagine-theme-dark pointer-events-auto fixed inset-x-4 bottom-12 z-50 mx-auto w-[calc(100vw-32px)] max-w-5xl rounded-2xl p-3 sm:bottom-16 sm:w-[min(1040px,calc(100vw-40px))]";
   const dockStateClass = [
     isIdleOrb && isOrbDragging ? "is-dragging" : "",
@@ -751,7 +801,6 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
       startX: event.clientX,
       startY: event.clientY,
     };
-    event.preventDefault();
     setIsOrbDragging(true);
   };
 
@@ -776,12 +825,14 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
           type="button"
           onClick={handleOrbClick}
           onPointerDown={handleOrbPointerDown}
-          className="imagine-agent-orb-button pointer-events-auto group relative flex h-[108px] w-[108px] items-center justify-center rounded-full"
+          className="imagine-agent-orb-button pointer-events-auto group relative flex h-full w-full items-center justify-center rounded-full"
           title={t("chat.expandDockTitle")}
           aria-label={t("chat.expandDockTitle")}
         >
           <span className="imagine-agent-orb-aura" />
-          <AgentIdentityMark variant="orb" />
+          <span className="scale-[0.7] sm:scale-100">
+            <AgentIdentityMark variant="orb" />
+          </span>
         </button>
       ) : (
         <>
@@ -791,6 +842,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
           onClick={onToggleOpen}
           className="imagine-agent-dock-header-btn flex min-w-0 items-center gap-2 text-left text-sm font-semibold"
           title={isOpen ? t("chat.collapseDockTitle") : t("chat.expandDockTitle")}
+          aria-label={isOpen ? t("chat.collapseDockTitle") : t("chat.expandDockTitle")}
         >
           <AgentIdentityMark variant="header" />
           <span className="min-w-0 truncate">Agent</span>
@@ -821,6 +873,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
               data-action="danger"
               className="imagine-icon-button flex h-5 w-5 items-center justify-center rounded border border-[var(--iw-border)] text-[var(--iw-faint)] transition"
               title={t("chat.clearChatTitle")}
+              aria-label={t("chat.clearChatTitle")}
             >
               <X className="h-2.5 w-2.5" />
             </button>
@@ -832,7 +885,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
         className={`imagine-agent-motion-item imagine-agent-message-stream max-h-[min(46vh,440px)] pr-1 ${isOpen ? "is-open" : ""}`}
         aria-hidden={!isOpen}
       >
-        <div className="imagine-agent-message-stream-inner max-h-[min(46vh,440px)] overflow-y-auto flex flex-col gap-3 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+        <div className="imagine-agent-message-stream-inner max-h-[min(46vh,440px)] flex flex-col gap-3 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
           {isOpen ? (
             <>
               {messages.map((message) => (
@@ -893,6 +946,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
                   className="imagine-tone-chip flex cursor-pointer items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-bold transition"
                   data-tone="accent"
                   title={t("chat.maskReferenceTitle")}
+                  aria-label={t("chat.maskReferenceTitle")}
                 >
                   <Paintbrush className="h-3 w-3" />
                   {t("chat.paintbrushButton")}
@@ -904,6 +958,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
                 data-action="danger"
                 className="imagine-icon-button p-1 bg-[var(--iw-panel-soft)] text-[var(--iw-muted)] rounded-lg transition border border-[var(--iw-border)] cursor-pointer"
                 title={t("chat.clearReferenceTitle")}
+                aria-label={t("chat.clearReferenceTitle")}
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -938,6 +993,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
               <label
                 className="imagine-agent-attach-btn absolute left-2.5 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full"
                 title={t("chat.uploadReferenceTitle")}
+                aria-label={t("chat.uploadReferenceTitle")}
               >
                 <ImagePlus className="h-3.5 w-3.5" />
                 <input
@@ -953,14 +1009,18 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
                 type="text"
                 value={input}
                 onChange={(event) => onChangeInput(event.target.value)}
+                onKeyDown={handleInputKeyDown}
                 placeholder={t("chat.inputPlaceholder")}
                 className="imagine-agent-input w-full py-2.5 pl-11 pr-12 text-xs rounded-full text-[var(--iw-text)] placeholder:text-[var(--iw-faint)]"
+                aria-label={t("chat.inputPlaceholder")}
               />
               <button
                 type="submit"
                 disabled={isLoading || !input.trim()}
                 data-tone="accent"
                 data-size="compact"
+                title={t("chat.sendButton")}
+                aria-label={t("chat.sendButton")}
                 className={`imagine-primary-action absolute right-2 flex items-center justify-center rounded-full h-7 w-7 font-bold text-white transition ${
                   isLoading || !input.trim() ? "cursor-not-allowed" : "cursor-pointer active:scale-95"
                 }`}

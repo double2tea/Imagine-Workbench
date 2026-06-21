@@ -516,10 +516,12 @@
   "gallery": {
     "title": "Gallery",
     "subtitle": "Grouped by date · Hover cards for actions",
+    "createTab": "Create",
     "mobileTitle": "Gallery",
     "inFlightCount": "{count} in progress",
     "itemCount": "{count} items",
     "searchPlaceholder": "Search prompts, models...",
+    "filterByModel": "Filter by model",
     "allModels": "All models",
     "export": "Export",
     "clearFailed": "Clear failed",

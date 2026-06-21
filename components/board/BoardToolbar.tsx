@@ -245,6 +245,7 @@ export default function BoardToolbar({
             }}
             className={`${headerBtn} min-w-0 max-w-[min(14rem,42vw)]`}
             title={boardTitle}
+            aria-label={boardTitle}
             aria-expanded={isBoardMenuOpen}
           >
             <Layers className="h-3.5 w-3.5 shrink-0 text-[var(--iw-board-accent-amber)]" />
@@ -341,6 +342,7 @@ export default function BoardToolbar({
             onClick={onImportMedia}
             className={`${headerBtn} hidden shrink-0 lg:flex`}
             title={t('workspace.importMedia')}
+            aria-label={t('workspace.importMedia')}
           >
             <Upload className="imagine-tone-icon h-3.5 w-3.5" data-tone="success" />
             <span>{t('workspace.importMedia')}</span>
@@ -353,6 +355,7 @@ export default function BoardToolbar({
               disabled={!canUndo}
               className={iconBtn}
               title={t("workspace.undo")}
+              aria-label={t("workspace.undo")}
             >
               <RotateCcw className="h-3.5 w-3.5" />
             </button>
@@ -362,6 +365,7 @@ export default function BoardToolbar({
               disabled={!canRedo}
               className={iconBtn}
               title={t("workspace.redo")}
+              aria-label={t("workspace.redo")}
             >
               <RotateCw className="h-3.5 w-3.5" />
             </button>
@@ -375,6 +379,7 @@ export default function BoardToolbar({
             onClick={onBack}
             className={`${headerBtn} shrink-0`}
             title={t("workspace.backToWorkspace")}
+            aria-label={t("workspace.backToWorkspace")}
           >
             <Grid2X2 className="h-3.5 w-3.5" />
             <span className="hidden md:inline">{t("workspace.backToWorkspace")}</span>
@@ -386,6 +391,7 @@ export default function BoardToolbar({
               onClick={onRestoreTrash}
               className={`${headerBtn} hidden lg:flex`}
               title={t("workspace.restoreDeleted")}
+              aria-label={t("workspace.restoreDeleted")}
             >
               <Trash2 className="h-3.5 w-3.5" />
               <span>{commonT.t("buttons.restore")} {trashedCount}</span>

@@ -537,10 +537,12 @@
   "gallery": {
     "title": "作品画廊",
     "subtitle": "按日期分组 · 悬停卡片操作",
+    "createTab": "创作",
     "mobileTitle": "画廊",
     "inFlightCount": "{count} 项进行中",
     "itemCount": "{count} 项",
     "searchPlaceholder": "搜索提示词、模型...",
+    "filterByModel": "按模型筛选",
     "allModels": "全部模型",
     "export": "导出",
     "clearFailed": "清失败",

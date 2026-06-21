@@ -45,12 +45,18 @@ export default function WorkspaceHeader({
       }
       end={
         <div className="z-10 flex shrink-0 items-center gap-1.5 sm:gap-2">
-          <Link href="/board" className={workspaceTopBarButtonClass}>
+          <Link href="/board" className={workspaceTopBarButtonClass} title={t('workspaceHeader.boardLink')} aria-label={t('workspaceHeader.boardLink')}>
             <Grid2X2 className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">{t('workspaceHeader.boardLink')}</span>
           </Link>
 
-          <button type="button" onClick={onOpenAssetLibrary} className={`${workspaceTopBarButtonClass} cursor-pointer`}>
+          <button
+            type="button"
+            onClick={onOpenAssetLibrary}
+            className={`${workspaceTopBarButtonClass} cursor-pointer`}
+            title={t('workspaceHeader.assetLibraryLink')}
+            aria-label={t('workspaceHeader.assetLibraryLink')}
+          >
             <FolderHeart className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">{t('workspaceHeader.assetLibraryLink')}</span>
           </button>
@@ -62,13 +68,20 @@ export default function WorkspaceHeader({
               disabled={resolveCheckStatus === "running"}
               className={`${workspaceTopBarButtonClass} cursor-pointer disabled:cursor-not-allowed disabled:opacity-60`}
               title={t('workspaceHeader.resolveCheckTitle')}
+              aria-label={t('workspaceHeader.resolveCheckTitle')}
             >
               <Plug className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">{resolveCheckStatus === "running" ? t('workspaceHeader.resolveRunning') : t('workspaceHeader.resolveIdle')}</span>
             </button>
           ) : null}
 
-          <button onClick={onOpenSettings} className={`${workspaceTopBarButtonClass} cursor-pointer`}>
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            className={`${workspaceTopBarButtonClass} cursor-pointer`}
+            title={t('workspaceHeader.settingsLink')}
+            aria-label={t('workspaceHeader.settingsLink')}
+          >
             <Settings className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">{t('workspaceHeader.settingsLink')}</span>
           </button>
@@ -99,6 +112,7 @@ export default function WorkspaceHeader({
             aria-pressed={themeMode === "dark"}
             className={`${workspaceTopBarIconButtonClass} cursor-pointer`}
             title={themeMode === "light" ? t('workspaceHeader.toggleDarkModeTitle') : t('workspaceHeader.toggleLightModeTitle')}
+            aria-label={themeMode === "light" ? t('workspaceHeader.toggleDarkModeTitle') : t('workspaceHeader.toggleLightModeTitle')}
           >
             {themeMode === "light" ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
           </button>

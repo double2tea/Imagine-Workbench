@@ -11,7 +11,7 @@
     "loadingText": "正在分析画廊与技能，整理下一步建议...",
     "referenceStatusReferencing": "引用中", "referenceStatusGallery": "画廊",
     "clearChatTitle": "清空对话", "expandDockTitle": "展开 Agent 对话", "collapseDockTitle": "收起 Agent 对话",
-    "modelLabel": "模型", "inputPlaceholder": "问 Agent... 输入 @ 引用媒体",
+    "modelLabel": "模型", "inputPlaceholder": "问 Agent... 输入 @ 引用媒体", "sendButton": "发送",
     "uploadReferenceTitle": "上传媒体到 Agent 引用", "autoExecuteLabel": "自动",
     "maskReferenceTitle": "使用画笔抹除或标记局部涂层", "paintbrushButton": "画笔涂抹",
     "clearReferenceTitle": "取消引用", "referenceTypeSuffix": "引用",

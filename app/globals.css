@@ -1462,7 +1462,6 @@ html::-webkit-scrollbar-thumb:hover {
 }
 
 .imagine-agent-bubble-assistant {
-  max-height: 16rem;
   width: min(760px, calc(100vw - 72px));
   border-radius: var(--iw-radius-lg) var(--iw-radius-lg) var(--iw-radius-lg) 4px !important;
   border: 1px solid var(--iw-border) !important;
@@ -6100,10 +6099,10 @@ html[data-imagine-theme="light"] .imagine-gallery-scroll .imagine-asset-controlb
   border: 0 !important;
   border-radius: 999px !important;
   box-shadow: none !important;
-  height: 108px !important;
+  height: var(--imagine-agent-orb-size, 108px) !important;
   max-width: none !important;
   padding: 0 !important;
-  width: 108px !important;
+  width: var(--imagine-agent-orb-size, 108px) !important;
 }
 
 .imagine-agent-dock-panel {
@@ -6164,7 +6163,10 @@ html[data-imagine-theme="light"] .imagine-gallery-scroll .imagine-asset-controlb
 
 .imagine-agent-message-stream > .imagine-agent-message-stream-inner {
   min-height: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .imagine-agent-dock-panel.imagine-theme-light .imagine-agent-message-stream {
@@ -7454,8 +7456,8 @@ html[data-imagine-theme="light"] .imagine-mark-xs,
 
 @media (max-width: 860px) {
   .imagine-agent-dock.imagine-agent-dock-idle-orb {
-    width: 108px !important;
-    height: 108px !important;
+    width: var(--imagine-agent-orb-size, 108px) !important;
+    height: var(--imagine-agent-orb-size, 108px) !important;
     max-width: none !important;
     border: 0 !important;
     border-radius: 999px !important;

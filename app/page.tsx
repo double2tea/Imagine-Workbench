@@ -1654,6 +1654,7 @@ export default function Home() {
   const openAssetLibrary = useCallback((mode: AssetLibraryMode) => {
     setAssetLibraryMode(mode);
     if (mode === "reference") setAssetLibraryTarget(activePromptReferenceTarget());
+    setShowSettings(false);
     setIsAssetLibraryOpen(true);
   }, [activePromptReferenceTarget]);
 
@@ -2034,7 +2035,10 @@ export default function Home() {
       <WorkspaceHeader
         onClearProject={handleClearProject}
         onOpenAssetLibrary={() => openAssetLibrary("manage")}
-        onOpenSettings={() => setShowSettings(prev => !prev)}
+        onOpenSettings={() => {
+          setIsAssetLibraryOpen(false);
+          setShowSettings(prev => !prev);
+        }}
         onRunResolveCheck={() => void runResolveCheck()}
         resolveCheckStatus={resolveCheckStatus}
         showResolveCheck={resolveIntegrationEnabled}
