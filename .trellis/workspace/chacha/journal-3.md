@@ -1342,3 +1342,36 @@ Stabilized Agent tool-call execution across compatible providers, added diagnost
 ### Next Steps
 
 - None - task complete
+
+
+## Session 159: Fix asset node refresh flicker
+
+**Date**: 2026-06-22
+**Task**: Fix asset node refresh flicker
+**Branch**: `main`
+
+### Summary
+
+Stabilized board flow data reuse so semantically unchanged asset/result media lists do not replace asset node props during unrelated board mutations; verified with lint, typecheck, OCR review, and ego-browser asset-node duplicate/delete checks.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1b1ce10c` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
