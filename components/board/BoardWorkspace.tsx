@@ -153,6 +153,7 @@ interface BoardWorkspaceProps {
   onAssetCompareRequestHandled?: () => void;
   onFocusNodeRequestHandled?: () => void;
   onSelectedNodeIdsChange?: (nodeIds: string[]) => void;
+  externalSelectedNodeIds?: string[];
   selectedDownloadableCount?: number;
 }
 
@@ -1154,6 +1155,7 @@ export default function BoardWorkspace({
   onAssetCompareRequestHandled,
   onFocusNodeRequestHandled,
   onSelectedNodeIdsChange,
+  externalSelectedNodeIds,
   selectedDownloadableCount = 0,
 }: BoardWorkspaceProps) {
   const themeMode = useThemeModeSnapshot();
@@ -1258,6 +1260,10 @@ export default function BoardWorkspace({
     });
   }, []);
   useEffect(() => {
+    if (!externalSelectedNodeIds) return;
+    updateSelectedNodeIds(externalSelectedNodeIds);
+  }, [externalSelectedNodeIds, updateSelectedNodeIds]);
+  useEffect(() => {
     onSelectedNodeIdsChange?.(selectedNodeIds);
   }, [onSelectedNodeIdsChange, selectedNodeIds]);
   const galleryReferenceFingerprint = useMemo(
@@ -1314,7 +1320,7 @@ export default function BoardWorkspace({
     connectPorts,
     connectPortsBatch,
     deleteEdge,
-    deleteNode,
+    deleteNodes,
     moveGenerateReferenceEdge,
     moveReferenceGroupItem,
     removeReferenceGroupItem,
@@ -1340,6 +1346,26 @@ export default function BoardWorkspace({
     () => board.nodes.some(node => node.kind === "multi-grid"),
     [board.nodes],
   );
+  const selectOnlyNodeIds = useCallback((nodeIds: string[]): void => {
+    selectEdge(null);
+    selectNode(nodeIds[0] ?? null);
+    updateSelectedNodeIds(nodeIds);
+  }, [selectEdge, selectNode, updateSelectedNodeIds]);
+  const clearSelection = useCallback((): void => {
+    selectOnlyNodeIds([]);
+  }, [selectOnlyNodeIds]);
+  useEffect(() => {
+    const liveNodeIds = new Set(board.nodes.map(node => node.id));
+    setSelectedNodeIds(currentIds => {
+      const nextIds = currentIds.filter(nodeId => liveNodeIds.has(nodeId));
+      return sameStringList(currentIds, nextIds) ? currentIds : nextIds;
+    });
+  }, [board.nodes]);
+  useEffect(() => {
+    if (!selectedNodeId || selectedNodeIds.length > 1) return;
+    if (!board.nodes.some(node => node.id === selectedNodeId)) return;
+    updateSelectedNodeIds([selectedNodeId]);
+  }, [board.nodes, selectedNodeId, selectedNodeIds.length, updateSelectedNodeIds]);
   const selectedGroupNodeIds = useMemo(
     () => selectedNodeIds.filter(nodeId => board.nodes.some(node => node.id === nodeId && node.kind === "group")),
     [board.nodes, selectedNodeIds],
@@ -1496,9 +1522,7 @@ export default function BoardWorkspace({
     const position = centeredNodePosition(flowPositionFromClient(clientX, clientY), DEFAULT_ASSET_NODE_SIZE);
     const extractedNodeId = extractMultiGridItemToAssetNode(nodeId, assetId, position);
     if (!extractedNodeId) return;
-    selectNode(extractedNodeId);
-    selectEdge(null);
-    updateSelectedNodeIds([extractedNodeId]);
+    selectOnlyNodeIds([extractedNodeId]);
     closeOverlayMenus();
   }, [
     centeredNodePosition,
@@ -1506,9 +1530,7 @@ export default function BoardWorkspace({
     extractMultiGridItemToAssetNode,
     flowPositionFromClient,
     isPointInsideFlowHost,
-    selectEdge,
-    selectNode,
-    updateSelectedNodeIds,
+    selectOnlyNodeIds,
   ]);
 
   useEffect(() => {
@@ -1530,8 +1552,7 @@ export default function BoardWorkspace({
   const focusReferenceSourceNode = useCallback((nodeId: string): void => {
     const node = board.nodes.find(entry => entry.id === nodeId);
     if (!node) return;
-    selectNode(node.id);
-    updateSelectedNodeIds([node.id]);
+    selectOnlyNodeIds([node.id]);
     const instance = flowInstanceRef.current;
     if (!flowReady || !instance) return;
     const centerX = node.position.x + node.size.width / 2;
@@ -1540,7 +1561,7 @@ export default function BoardWorkspace({
       zoom: Math.max(instance.getZoom(), 0.85),
       duration: 240,
     });
-  }, [board.nodes, flowReady, selectNode, updateSelectedNodeIds]);
+  }, [board.nodes, flowReady, selectOnlyNodeIds]);
 
   useEffect(() => {
     if (!assetCompareRequest) return;
@@ -1561,23 +1582,24 @@ export default function BoardWorkspace({
       const edges = board.edges.filter(edge => edge.from.nodeId === nodeId || edge.to.nodeId === nodeId);
       setTrashedNodes(current => [{ node: structuredClone(node), edges: structuredClone(edges) }, ...current].slice(0, BOARD_TRASH_LIMIT));
     }
-    deleteNode(nodeId);
+    deleteNodes([nodeId]);
     setSelectedNodeIds(current => {
       const next = current.filter(id => id !== nodeId);
       return sameStringList(current, next) ? current : next;
     });
-  }, [board.edges, board.nodes, deleteNode, galleryItemById, onCancelAssetTask]);
+  }, [board.edges, board.nodes, deleteNodes, galleryItemById, onCancelAssetTask]);
 
   const restoreTrashedNode = useCallback((index: number) => {
     const entry = trashedNodes[index];
     if (!entry) return;
     try {
       restoreNodeWithEdges(entry.node, entry.edges);
+      selectOnlyNodeIds([entry.node.id]);
       setTrashedNodes(current => current.filter((_item, itemIndex) => itemIndex !== index));
     } catch (error) {
       onConnectionError(error instanceof Error ? error.message : tb("workspace.restoreNodeFailed"));
     }
-  }, [onConnectionError, restoreNodeWithEdges, trashedNodes]);
+  }, [onConnectionError, restoreNodeWithEdges, selectOnlyNodeIds, trashedNodes]);
 
   const connectSelectedBoardPromptReference = useCallback((nodeId: string, reference: BoardPromptReference): void => {
     if (resolveBoardPromptReferenceGroup(reference) !== "board") return;
@@ -2003,18 +2025,16 @@ export default function BoardWorkspace({
 
   const handleConnect = useCallback<OnConnect>((connection) => {
     const rawRefs = connectionPortRefs(connection);
-      const rawTargetNode = rawRefs ? board.nodes.find(node => node.id === rawRefs.to.nodeId) : undefined;
-      if (rawTargetNode?.kind === "multi-grid") {
-        try {
-          const references = rawRefs ? multiGridImageReferences(board.nodes, rawRefs.from, [rawRefs.from.nodeId]) : [];
-          if (references.length === 0) {
-            onConnectionError(tb("workspace.multiGridOnlyImage"));
-            return;
-          }
+    const rawTargetNode = rawRefs ? board.nodes.find(node => node.id === rawRefs.to.nodeId) : undefined;
+    if (rawTargetNode?.kind === "multi-grid") {
+      try {
+        const references = rawRefs ? multiGridImageReferences(board.nodes, rawRefs.from, [rawRefs.from.nodeId]) : [];
+        if (references.length === 0) {
+          onConnectionError(tb("workspace.multiGridOnlyImage"));
+          return;
+        }
         references.forEach(reference => addAssetToMultiGrid(rawTargetNode.id, reference));
-        selectNode(rawTargetNode.id);
-        selectEdge(null);
-        updateSelectedNodeIds([rawTargetNode.id]);
+        selectOnlyNodeIds([rawTargetNode.id]);
       } catch (error) {
         onConnectionError(error instanceof Error ? error.message : tb("workspace.connectFailed"));
       }
@@ -2039,9 +2059,7 @@ export default function BoardWorkspace({
           return;
         }
         references.forEach(reference => addAssetToMultiGrid(targetNode.id, reference));
-        selectNode(targetNode.id);
-        selectEdge(null);
-        updateSelectedNodeIds([targetNode.id]);
+        selectOnlyNodeIds([targetNode.id]);
         return;
       }
       if (selectedNodeIds.length > 1 && selectedNodeIds.includes(refs.from.nodeId) && targetNode) {
@@ -2052,9 +2070,7 @@ export default function BoardWorkspace({
           .filter((connection): connection is { from: BoardPortRef; to: BoardPortRef } => connection !== null);
         if (connections.length > 1) {
           connectPortsBatch(connections);
-          selectNode(targetNode.id);
-          selectEdge(null);
-          updateSelectedNodeIds([targetNode.id]);
+          selectOnlyNodeIds([targetNode.id]);
           return;
         }
       }
@@ -2065,7 +2081,7 @@ export default function BoardWorkspace({
     } catch (error) {
       onConnectionError(error instanceof Error ? error.message : tb("workspace.connectFailed"));
     }
-  }, [addAssetToMultiGrid, addAssetToReferenceGroup, board.nodes, connectPorts, connectPortsBatch, onConnectionError, readValidConnectionRefs, selectEdge, selectedNodeIds, selectNode, updateSelectedNodeIds]);
+  }, [addAssetToMultiGrid, addAssetToReferenceGroup, board.nodes, connectPorts, connectPortsBatch, onConnectionError, readValidConnectionRefs, selectOnlyNodeIds, selectedNodeIds]);
 
   const handleSelectionChange = useCallback<OnSelectionChangeFunc<BoardFlowNode, BoardFlowEdge>>(({ nodes, edges }) => {
     if (isSyncingFlowNodesRef.current) return;
@@ -2129,8 +2145,7 @@ export default function BoardWorkspace({
         }
         references.forEach(reference => addAssetToMultiGrid(rawTargetNode.id, reference));
         deleteEdge(oldEdge.id);
-        selectNode(rawTargetNode.id);
-        selectEdge(null);
+        selectOnlyNodeIds([rawTargetNode.id]);
       } catch (error) {
         onConnectionError(error instanceof Error ? error.message : tb("workspace.reconnectFailed"));
       }
@@ -2152,8 +2167,7 @@ export default function BoardWorkspace({
         }
         references.forEach(reference => addAssetToMultiGrid(targetNode.id, reference));
         deleteEdge(oldEdge.id);
-        selectNode(targetNode.id);
-        selectEdge(null);
+        selectOnlyNodeIds([targetNode.id]);
         return;
       }
       if (targetNode?.kind === "reference-group") {
@@ -2163,7 +2177,7 @@ export default function BoardWorkspace({
     } catch (error) {
       onConnectionError(error instanceof Error ? error.message : tb("workspace.reconnectFailed"));
     }
-  }, [addAssetToMultiGrid, addAssetToReferenceGroup, board.nodes, deleteEdge, onConnectionError, readValidConnectionRefs, reconnectEdge, selectEdge, selectNode]);
+  }, [addAssetToMultiGrid, addAssetToReferenceGroup, board.nodes, deleteEdge, onConnectionError, readValidConnectionRefs, reconnectEdge, selectOnlyNodeIds]);
 
   const handleReconnectStart = useCallback<BoardReconnectStartHandler>(() => {
     setIsConnectionActive(true);
@@ -2220,9 +2234,7 @@ export default function BoardWorkspace({
     ) {
       pendingDragPositionByIdRef.current.clear();
       addAssetToMultiGrid(dropTarget.nodeId, source.asset, dropTarget.cellIndex);
-      selectNode(dropTarget.nodeId);
-      selectEdge(null);
-      updateSelectedNodeIds([dropTarget.nodeId]);
+      selectOnlyNodeIds([dropTarget.nodeId]);
       skipPositionSyncRef.current = false;
       return;
     }
@@ -2234,7 +2246,7 @@ export default function BoardWorkspace({
     updateNodesPositions(Array.from(positionById, ([nodeId, position]) => ({ nodeId, position })));
     endUndoGesture();
     skipPositionSyncRef.current = false;
-  }, [addAssetToMultiGrid, beginUndoGesture, board.nodes, clearActiveMultiGridDropTarget, endUndoGesture, selectEdge, selectNode, setCanvasInteractionClass, updateNodesPositions, updateSelectedNodeIds]);
+  }, [addAssetToMultiGrid, beginUndoGesture, board.nodes, clearActiveMultiGridDropTarget, endUndoGesture, selectOnlyNodeIds, setCanvasInteractionClass, updateNodesPositions]);
 
   const skipPositionSyncRef = useRef(false);
   const handleNodesChange = useCallback<OnNodesChange<BoardFlowNode>>((changes) => {
@@ -2284,9 +2296,34 @@ export default function BoardWorkspace({
   }, [scheduleSelectionMoveEnd]);
 
   const handleNodesDelete = useCallback<OnNodesDelete<BoardFlowNode>>(nodes => {
-    for (const node of nodes) trashAndDeleteNode(node.id);
-    updateSelectedNodeIds([]);
-  }, [trashAndDeleteNode, updateSelectedNodeIds]);
+    const deletableNodeIds: string[] = [];
+    const nextTrashEntries: BoardTrashEntry[] = [];
+    for (const flowNode of nodes) {
+      const node = board.nodes.find(item => item.id === flowNode.id);
+      if (!node) continue;
+      if (node.kind === "asset") {
+        const item = galleryItemById.get(node.asset.assetId);
+        if (item && isActiveGenerateTask(item)) {
+          onCancelAssetTask(node.id);
+          continue;
+        }
+      }
+      deletableNodeIds.push(node.id);
+      nextTrashEntries.push({
+        node: structuredClone(node),
+        edges: structuredClone(board.edges.filter(edge => edge.from.nodeId === node.id || edge.to.nodeId === node.id)),
+      });
+    }
+    if (nextTrashEntries.length > 0) {
+      setTrashedNodes(current => [...nextTrashEntries, ...current].slice(0, BOARD_TRASH_LIMIT));
+    }
+    deleteNodes(deletableNodeIds);
+    const deletableNodeIdSet = new Set(deletableNodeIds);
+    setSelectedNodeIds(current => {
+      const next = current.filter(nodeId => !deletableNodeIdSet.has(nodeId));
+      return sameStringList(current, next) ? current : next;
+    });
+  }, [board.edges, board.nodes, deleteNodes, galleryItemById, onCancelAssetTask]);
 
   const deleteBoardEdge = useCallback((edgeId: string): void => {
     deleteEdge(edgeId);
@@ -2309,10 +2346,8 @@ export default function BoardWorkspace({
     flowHostRef.current?.focus();
     closeOverlayMenus();
     protectedEdgeSelectionRef.current = null;
-    selectNode(null);
-    selectEdge(null);
-    updateSelectedNodeIds([]);
-  }, [closeOverlayMenus, selectEdge, selectNode, updateSelectedNodeIds]);
+    clearSelection();
+  }, [clearSelection, closeOverlayMenus]);
 
   const onlyRenderVisibleBoardElements = board.nodes.length >= BOARD_VISIBLE_RENDER_NODE_THRESHOLD;
   const shouldRenderMiniMap = board.config.showMiniMap;
@@ -2349,9 +2384,10 @@ export default function BoardWorkspace({
   const addQuickNodeAtPoint = useCallback((kind: BoardInsertKind, point: BoardPoint): void => {
     const item = BOARD_INSERT_CATALOG.find(current => current.kind === kind);
     if (!item) return;
-    addQuickNode(kind, availableCenteredNodePosition(point, item.size));
+    const nodeId = addQuickNode(kind, availableCenteredNodePosition(point, item.size));
+    selectOnlyNodeIds([nodeId]);
     setQuickInsertMenu(null);
-  }, [addQuickNode, availableCenteredNodePosition]);
+  }, [addQuickNode, availableCenteredNodePosition, selectOnlyNodeIds]);
 
   const addConnectedQuickNodeAtPoint = useCallback((kind: BoardInsertKind, point: BoardPoint, from: BoardPortRef, selectionSnapshot: string[]): void => {
     if (kind === "image-generate") {
@@ -2359,7 +2395,7 @@ export default function BoardWorkspace({
         const targetPortId = from.portKind === "prompt" ? BOARD_PORT_IDS.promptIn : BOARD_PORT_IDS.referenceIn;
         const connections = quickInsertSourceRefs(board.nodes, from, selectionSnapshot)
           .map(sourceRef => ({ from: sourceRef, targetPortId }));
-        addGenerateNodeWithConnections(
+        const nodeId = addGenerateNodeWithConnections(
           {
             kind: "image-generate",
             model: from.portKind === "asset" ? DEFAULT_BOARD_REFERENCE_IMAGE_MODEL : DEFAULT_BOARD_IMAGE_MODEL,
@@ -2369,6 +2405,7 @@ export default function BoardWorkspace({
           },
           connections,
         );
+        selectOnlyNodeIds([nodeId]);
         setQuickInsertMenu(null);
       } catch (error) {
         onConnectionError(error instanceof Error ? error.message : tb("workspace.connectFailed"));
@@ -2380,10 +2417,11 @@ export default function BoardWorkspace({
         const targetPortId = from.portKind === "prompt" ? BOARD_PORT_IDS.promptIn : BOARD_PORT_IDS.referenceIn;
         const connections = quickInsertSourceRefs(board.nodes, from, selectionSnapshot)
           .map(sourceRef => ({ from: sourceRef, targetPortId }));
-        addGenerateNodeWithConnections(
+        const nodeId = addGenerateNodeWithConnections(
           { kind: "video-generate", model: DEFAULT_VIDEO_MODEL, aspectRatio: "auto", position: availableCenteredNodePosition(point, DEFAULT_GENERATE_NODE_SIZE) },
           connections,
         );
+        selectOnlyNodeIds([nodeId]);
         setQuickInsertMenu(null);
       } catch (error) {
         onConnectionError(error instanceof Error ? error.message : tb("workspace.connectFailed"));
@@ -2395,10 +2433,11 @@ export default function BoardWorkspace({
         const targetPortId = from.portKind === "prompt" ? BOARD_PORT_IDS.promptIn : BOARD_PORT_IDS.referenceIn;
         const connections = quickInsertSourceRefs(board.nodes, from, selectionSnapshot)
           .map(sourceRef => ({ from: sourceRef, targetPortId }));
-        addGenerateNodeWithConnections(
+        const nodeId = addGenerateNodeWithConnections(
           { kind: "audio-operation", model: DEFAULT_AUDIO_MODEL, position: availableCenteredNodePosition(point, DEFAULT_GENERATE_NODE_SIZE) },
           connections,
         );
+        selectOnlyNodeIds([nodeId]);
         setQuickInsertMenu(null);
       } catch (error) {
         onConnectionError(error instanceof Error ? error.message : tb("workspace.connectFailed"));
@@ -2408,7 +2447,8 @@ export default function BoardWorkspace({
     if (kind === "reference-group") {
       const assetNodeIds = referenceGroupMediaNodeIds(board.nodes, from.nodeId, selectionSnapshot);
       if (assetNodeIds.length === 0) return;
-      addReferenceGroupNodeWithAssets({ position: availableCenteredNodePosition(point, DEFAULT_REFERENCE_GROUP_NODE_SIZE) }, assetNodeIds);
+      const nodeId = addReferenceGroupNodeWithAssets({ position: availableCenteredNodePosition(point, DEFAULT_REFERENCE_GROUP_NODE_SIZE) }, assetNodeIds);
+      selectOnlyNodeIds([nodeId]);
       setQuickInsertMenu(null);
       return;
     }
@@ -2417,6 +2457,7 @@ export default function BoardWorkspace({
       if (references.length === 0) return;
       const nodeId = addMultiGridNode({ position: availableCenteredNodePosition(point, DEFAULT_MULTI_GRID_NODE_SIZE) });
       references.forEach(reference => addAssetToMultiGrid(nodeId, reference));
+      selectOnlyNodeIds([nodeId]);
       setQuickInsertMenu(null);
       return;
     }
@@ -2427,9 +2468,10 @@ export default function BoardWorkspace({
         portId: from.portKind === "prompt" ? BOARD_PORT_IDS.promptIn : BOARD_PORT_IDS.referenceIn,
         portKind: from.portKind === "prompt" ? "prompt" : "asset",
       });
+      selectOnlyNodeIds([nodeId]);
       setQuickInsertMenu(null);
     }
-  }, [addAssetToMultiGrid, addGenerateNodeWithConnections, addMultiGridNode, addReferenceGroupNodeWithAssets, addRunningHubAppNode, availableCenteredNodePosition, board.nodes, connectPorts, onConnectionError]);
+  }, [addAssetToMultiGrid, addGenerateNodeWithConnections, addMultiGridNode, addReferenceGroupNodeWithAssets, addRunningHubAppNode, availableCenteredNodePosition, board.nodes, connectPorts, onConnectionError, selectOnlyNodeIds]);
 
   const quickInsertMenuItems = useMemo(() => {
     const from = quickInsertMenu?.connectionFrom;
@@ -2469,9 +2511,7 @@ export default function BoardWorkspace({
         return;
       }
       references.forEach(reference => addAssetToMultiGrid(targetNode.id, reference));
-      selectNode(targetNode.id);
-      selectEdge(null);
-      updateSelectedNodeIds([targetNode.id]);
+      selectOnlyNodeIds([targetNode.id]);
       closeOverlayMenus();
       return;
     }
@@ -2485,11 +2525,9 @@ export default function BoardWorkspace({
       return;
     }
     connectPortsBatch(connections);
-    selectNode(targetNode.id);
-    selectEdge(null);
-    updateSelectedNodeIds([targetNode.id]);
+    selectOnlyNodeIds([targetNode.id]);
     closeOverlayMenus();
-  }, [addAssetToMultiGrid, board.nodes, closeOverlayMenus, connectPortsBatch, onConnectionError, selectEdge, selectedNodeIds, selectNode, updateSelectedNodeIds]);
+  }, [addAssetToMultiGrid, board.nodes, closeOverlayMenus, connectPortsBatch, onConnectionError, selectOnlyNodeIds, selectedNodeIds]);
 
   const createReferenceGroupFromSelected = useCallback((contextNodeId: string): void => {
     const contextNode = board.nodes.find(node => node.id === contextNodeId);
@@ -2500,14 +2538,15 @@ export default function BoardWorkspace({
       return;
     }
     const contextPosition = boardNodeAbsolutePosition(board.nodes, contextNode.id) ?? contextNode.position;
-    addReferenceGroupNodeWithAssets({
+    const groupId = addReferenceGroupNodeWithAssets({
       position: {
         x: contextPosition.x + contextNode.size.width + 72,
         y: contextPosition.y,
       },
     }, assetNodeIds);
+    selectOnlyNodeIds([groupId]);
     closeOverlayMenus();
-  }, [addReferenceGroupNodeWithAssets, board.nodes, closeOverlayMenus, onConnectionError, selectedNodeIds]);
+  }, [addReferenceGroupNodeWithAssets, board.nodes, closeOverlayMenus, onConnectionError, selectOnlyNodeIds, selectedNodeIds]);
 
   const createGroupFromSelected = useCallback((contextNodeId: string): void => {
     const nodeIds = selectedNodeIds.includes(contextNodeId)
@@ -2518,32 +2557,32 @@ export default function BoardWorkspace({
       onConnectionError(tb("workspace.atLeastTwoNodesToGroup"));
       return;
     }
-    updateSelectedNodeIds([groupId]);
+    selectOnlyNodeIds([groupId]);
     closeOverlayMenus();
-  }, [closeOverlayMenus, groupNodes, onConnectionError, selectedNodeIds, updateSelectedNodeIds]);
+  }, [closeOverlayMenus, groupNodes, onConnectionError, selectOnlyNodeIds, selectedNodeIds]);
 
   const createGroupFromSelectionToolbar = useCallback((): void => {
-  const groupId = groupNodes(selectedNodeIds);
+    const groupId = groupNodes(selectedNodeIds);
     if (!groupId) {
       onConnectionError(tb("workspace.atLeastTwoNodesToGroup"));
       return;
     }
-    updateSelectedNodeIds([groupId]);
+    selectOnlyNodeIds([groupId]);
     closeOverlayMenus();
-  }, [closeOverlayMenus, groupNodes, onConnectionError, selectedNodeIds, updateSelectedNodeIds]);
+  }, [closeOverlayMenus, groupNodes, onConnectionError, selectOnlyNodeIds, selectedNodeIds]);
 
   const ungroupSelectedGroups = useCallback((): void => {
     if (selectedGroupNodeIds.length === 0) return;
     selectedGroupNodeIds.forEach(ungroupNode);
-    updateSelectedNodeIds([]);
+    clearSelection();
     closeOverlayMenus();
-  }, [closeOverlayMenus, selectedGroupNodeIds, ungroupNode, updateSelectedNodeIds]);
+  }, [clearSelection, closeOverlayMenus, selectedGroupNodeIds, ungroupNode]);
 
   const ungroupSelectedNode = useCallback((nodeId: string): void => {
     ungroupNode(nodeId);
-    updateSelectedNodeIds([]);
+    clearSelection();
     closeOverlayMenus();
-  }, [closeOverlayMenus, ungroupNode, updateSelectedNodeIds]);
+  }, [clearSelection, closeOverlayMenus, ungroupNode]);
 
   const pasteCopiedNode = useCallback((): void => {
     const copied = copiedNodeRef.current;
@@ -2552,7 +2591,7 @@ export default function BoardWorkspace({
       const pastedIds = duplicateNodes(copied.nodeIds);
       if (pastedIds.length === 0) return;
       copiedNodeRef.current = { nodeIds: pastedIds };
-      updateSelectedNodeIds(pastedIds);
+      selectOnlyNodeIds(pastedIds);
       return;
     }
     const { inputEdges, node } = copied;
@@ -2568,27 +2607,31 @@ export default function BoardWorkspace({
       };
     };
     if (node.kind === "asset") {
-      addAssetNode({ asset: node.asset, position, size: node.size, title: node.title });
+      const nodeId = addAssetNode({ asset: node.asset, position, size: node.size, title: node.title });
+      selectOnlyNodeIds([nodeId]);
       rememberPastedPosition();
       return;
     }
     if (node.kind === "prompt") {
-      addPromptNode({ position, prompt: node.prompt, size: node.size, title: node.title });
+      const nodeId = addPromptNode({ position, prompt: node.prompt, size: node.size, title: node.title });
+      selectOnlyNodeIds([nodeId]);
       rememberPastedPosition();
       return;
     }
     if (node.kind === "reference-group") {
-      addReferenceGroupNode({ position, references: node.references, size: node.size, title: node.title });
+      const nodeId = addReferenceGroupNode({ position, references: node.references, size: node.size, title: node.title });
+      selectOnlyNodeIds([nodeId]);
       rememberPastedPosition();
       return;
     }
     if (node.kind === "group") {
-      addGroupNode({ position, size: node.size, title: node.title });
+      const nodeId = addGroupNode({ position, size: node.size, title: node.title });
+      selectOnlyNodeIds([nodeId]);
       rememberPastedPosition();
       return;
     }
     if (node.kind === "multi-grid") {
-      addMultiGridNode({
+      const nodeId = addMultiGridNode({
         aspectRatio: node.aspectRatio,
         gridSize: node.gridSize,
         items: structuredClone(node.items),
@@ -2596,6 +2639,7 @@ export default function BoardWorkspace({
         size: node.size,
         title: node.title,
       });
+      selectOnlyNodeIds([nodeId]);
       rememberPastedPosition();
       return;
     }
@@ -2619,8 +2663,10 @@ export default function BoardWorkspace({
         title: node.title,
         variantCount: node.variantCount,
       } as const;
-      if (inputConnections.length > 0) addGenerateNodeWithConnections(input, inputConnections);
-      else addGenerateNode(input);
+      const nodeId = inputConnections.length > 0
+        ? addGenerateNodeWithConnections(input, inputConnections)
+        : addGenerateNode(input);
+      selectOnlyNodeIds([nodeId]);
       rememberPastedPosition();
       return;
     }
@@ -2644,8 +2690,10 @@ export default function BoardWorkspace({
         videoReferenceMode: node.videoReferenceMode,
         videoResolution: node.videoResolution,
       } as const;
-      if (inputConnections.length > 0) addGenerateNodeWithConnections(input, inputConnections);
-      else addGenerateNode(input);
+      const nodeId = inputConnections.length > 0
+        ? addGenerateNodeWithConnections(input, inputConnections)
+        : addGenerateNode(input);
+      selectOnlyNodeIds([nodeId]);
       rememberPastedPosition();
       return;
     }
@@ -2670,13 +2718,15 @@ export default function BoardWorkspace({
         voiceCloneConsentAccepted: node.voiceCloneConsentAccepted,
         voiceProfileId: node.voiceProfileId,
       } as const;
-      if (inputConnections.length > 0) addGenerateNodeWithConnections(input, inputConnections);
-      else addGenerateNode(input);
+      const nodeId = inputConnections.length > 0
+        ? addGenerateNodeWithConnections(input, inputConnections)
+        : addGenerateNode(input);
+      selectOnlyNodeIds([nodeId]);
       rememberPastedPosition();
       return;
     }
     if (node.kind === "runninghub-app") {
-      addRunningHubAppNode({
+      const nodeId = addRunningHubAppNode({
         accessPassword: node.accessPassword,
         bindings: node.bindings,
         outputType: node.outputType,
@@ -2687,22 +2737,26 @@ export default function BoardWorkspace({
         targetType: node.targetType,
         title: node.title,
       });
+      selectOnlyNodeIds([nodeId]);
       rememberPastedPosition();
       return;
     }
     if (node.kind === "agent") {
-      addAgentNode({ instruction: node.instruction, position, size: node.size, title: node.title });
+      const nodeId = addAgentNode({ instruction: node.instruction, position, size: node.size, title: node.title });
+      selectOnlyNodeIds([nodeId]);
       rememberPastedPosition();
       return;
     }
     if (node.kind === "result") {
-      addAssetNode({ asset: node.asset, position, size: node.size, title: node.title });
+      const nodeId = addAssetNode({ asset: node.asset, position, size: node.size, title: node.title });
+      selectOnlyNodeIds([nodeId]);
       rememberPastedPosition();
       return;
     }
-    addNoteNode({ body: node.body, position, size: node.size, source: node.source, title: node.title, variant: node.variant });
+    const nodeId = addNoteNode({ body: node.body, position, size: node.size, source: node.source, title: node.title, variant: node.variant });
+    selectOnlyNodeIds([nodeId]);
     rememberPastedPosition();
-  }, [addAgentNode, addAssetNode, addGenerateNode, addGenerateNodeWithConnections, addGroupNode, addMultiGridNode, addNoteNode, addPromptNode, addReferenceGroupNode, addRunningHubAppNode, board.nodes, duplicateNodes, updateSelectedNodeIds]);
+  }, [addAgentNode, addAssetNode, addGenerateNode, addGenerateNodeWithConnections, addGroupNode, addMultiGridNode, addNoteNode, addPromptNode, addReferenceGroupNode, addRunningHubAppNode, board.nodes, duplicateNodes, selectOnlyNodeIds]);
 
   const handleConnectStart = useCallback<OnConnectStart>(() => {
     setIsConnectionActive(true);
@@ -2741,9 +2795,7 @@ export default function BoardWorkspace({
           reference,
           dropTarget?.nodeId === targetNode.id ? dropTarget.cellIndex : undefined,
         ));
-        selectNode(targetNode.id);
-        selectEdge(null);
-        updateSelectedNodeIds([targetNode.id]);
+        selectOnlyNodeIds([targetNode.id]);
         return;
       }
       const connections = batchConnectionsFromSourceToTarget(board.nodes, sourceNodeId, targetNode, selectedNodeIds);
@@ -2752,9 +2804,7 @@ export default function BoardWorkspace({
         return;
       }
       connectPortsBatch(connections);
-      selectNode(targetNode.id);
-      selectEdge(null);
-      updateSelectedNodeIds([targetNode.id]);
+      selectOnlyNodeIds([targetNode.id]);
       return;
     }
 
@@ -2801,8 +2851,7 @@ export default function BoardWorkspace({
       }
       const connectedResultNode = findConnectedResultNodeForSourceStack(board.nodes, board.edges, sourceNode.id, sourceNode.resultStackKey ?? "");
       if (connectedResultNode) {
-        selectNode(connectedResultNode.id);
-        selectEdge(null);
+        selectOnlyNodeIds([connectedResultNode.id]);
         return;
       }
       const from: BoardPortRef = { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "result" };
@@ -2820,25 +2869,22 @@ export default function BoardWorkspace({
         },
         from,
       );
-      selectNode(resultNodeId);
-      selectEdge(null);
+      selectOnlyNodeIds([resultNodeId]);
       return;
     }
-  }, [addAssetToMultiGrid, addResultNodeWithConnection, board.edges, board.nodes, centeredNodePosition, connectPortsBatch, flowPositionFromClient, galleryItemById, onConnectionError, selectEdge, selectedNodeIds, selectNode, tb, updateSelectedNodeIds]);
+  }, [addAssetToMultiGrid, addResultNodeWithConnection, board.edges, board.nodes, centeredNodePosition, connectPortsBatch, flowPositionFromClient, galleryItemById, onConnectionError, selectOnlyNodeIds, selectedNodeIds, tb]);
 
   const openQuickInsertMenu = useCallback((event: ReactMouseEvent | MouseEvent): void => {
     event.preventDefault();
     setNodeContextMenu(null);
-    selectNode(null);
-    selectEdge(null);
-    updateSelectedNodeIds([]);
+    clearSelection();
     setQuickInsertMenu({
       clientX: event.clientX,
       clientY: event.clientY,
       position: flowPositionFromClient(event.clientX, event.clientY),
       selectedNodeIds: [],
     });
-  }, [flowPositionFromClient, selectEdge, selectNode, updateSelectedNodeIds]);
+  }, [clearSelection, flowPositionFromClient]);
 
   const openEmptyStateQuickInsertMenu = useCallback((): void => {
     const rect = flowHostRef.current?.getBoundingClientRect();
@@ -2849,16 +2895,14 @@ export default function BoardWorkspace({
     const clientX = rect.left + rect.width / 2;
     const clientY = rect.top + rect.height / 2;
     setNodeContextMenu(null);
-    selectNode(null);
-    selectEdge(null);
-    updateSelectedNodeIds([]);
+    clearSelection();
     setQuickInsertMenu({
       clientX,
       clientY,
       position: flowPositionFromClient(clientX, clientY),
       selectedNodeIds: [],
     });
-  }, [flowPositionFromClient, onWorkspaceNotice, selectEdge, selectNode, tb, updateSelectedNodeIds]);
+  }, [clearSelection, flowPositionFromClient, onWorkspaceNotice, tb]);
 
   const handleCanvasContextMenu = useCallback((event: ReactMouseEvent<HTMLElement>): void => {
     if (event.defaultPrevented || isTextEntryTarget(event.target)) return;
@@ -2935,16 +2979,15 @@ export default function BoardWorkspace({
           const asset = storageItemToBoardAsset(hydrated);
           if (dropTarget && asset.type === "image") {
             addAssetToMultiGrid(dropTarget.nodeId, asset, dropTarget.cellIndex);
-            selectNode(dropTarget.nodeId);
-            selectEdge(null);
-            updateSelectedNodeIds([dropTarget.nodeId]);
+            selectOnlyNodeIds([dropTarget.nodeId]);
             closeOverlayMenus();
             return;
           }
-          addAssetNode({
+          const nodeId = addAssetNode({
             position: centeredNodePosition(point, DEFAULT_ASSET_NODE_SIZE),
             asset,
           });
+          selectOnlyNodeIds([nodeId]);
           closeOverlayMenus();
         });
       }
@@ -2962,7 +3005,7 @@ export default function BoardWorkspace({
     if (urls.length === 0) return;
     event.preventDefault();
     importImageUrlsAtPoint(urls, point);
-  }, [addAssetNode, addAssetToMultiGrid, board.nodes, centeredNodePosition, clearActiveMultiGridDropTarget, closeOverlayMenus, flowPositionFromClient, galleryItems, importFilesAtPoint, importImageUrlsAtPoint, selectEdge, selectNode, updateSelectedNodeIds]);
+  }, [addAssetNode, addAssetToMultiGrid, board.nodes, centeredNodePosition, clearActiveMultiGridDropTarget, closeOverlayMenus, flowPositionFromClient, galleryItems, importFilesAtPoint, importImageUrlsAtPoint, selectOnlyNodeIds]);
 
   const handleBoardDragOver = useCallback((event: ReactDragEvent<HTMLElement>): void => {
     if (
@@ -3043,7 +3086,8 @@ export default function BoardWorkspace({
       }
       if (key === "d") {
         if (selectedNodeIds.length === 0) return;
-        duplicateNodes(selectedNodeIds);
+        const duplicatedNodeIds = duplicateNodes(selectedNodeIds);
+        if (duplicatedNodeIds.length > 0) selectOnlyNodeIds(duplicatedNodeIds);
         event.preventDefault();
         return;
       }
@@ -3072,6 +3116,7 @@ export default function BoardWorkspace({
     duplicateNodes,
     pasteCopiedNode,
     redo,
+    selectOnlyNodeIds,
     selectedNodeIds,
     undo,
   ]);
@@ -3382,7 +3427,8 @@ export default function BoardWorkspace({
                 closeOverlayMenus();
               },
               onDuplicate: () => {
-                duplicateNode(node.id);
+                const duplicatedNodeId = duplicateNode(node.id);
+                if (duplicatedNodeId) selectOnlyNodeIds([duplicatedNodeId]);
                 closeOverlayMenus();
               },
               onEditImage: node.kind === "asset" ? () => {

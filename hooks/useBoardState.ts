@@ -191,6 +191,7 @@ export interface BoardStateController {
   connectPortsBatch: (connections: Array<{ from: BoardPortRef; to: BoardPortRef }>) => void;
   deleteEdge: (edgeId: string) => void;
   deleteNode: (nodeId: string) => void;
+  deleteNodes: (nodeIds: string[]) => void;
   moveReferenceGroupItem: (groupNodeId: string, assetId: string, direction: "up" | "down") => void;
   moveGenerateReferenceEdge: (nodeId: string, sourceEdgeId: string, targetEdgeId: string) => void;
   removeReferenceGroupItem: (groupNodeId: string, assetId: string) => void;
@@ -1228,6 +1229,90 @@ function touchBoard(board: BoardDocument, nodes: BoardNode[] = board.nodes, edge
   };
 }
 
+interface DeleteBoardNodesPlan {
+  deletedEdgeIds: string[];
+  deletedNodeIds: string[];
+  edges: BoardEdge[];
+  nodes: BoardNode[];
+}
+
+function planDeleteBoardNodes(board: BoardDocument, nodeIds: string[]): DeleteBoardNodesPlan | null {
+  const requestedNodeIds = new Set(nodeIds);
+  if (requestedNodeIds.size === 0) return null;
+
+  const deletedNodes = board.nodes.filter(node => requestedNodeIds.has(node.id));
+  if (deletedNodes.length === 0) return null;
+
+  const deletedNodeIds = new Set(deletedNodes.map(node => node.id));
+  for (const node of deletedNodes) {
+    if (!isResultSourceNode(node)) continue;
+    resultNodeIdsOwnedBySource(board.nodes, node.id).forEach(resultNodeId => deletedNodeIds.add(resultNodeId));
+  }
+
+  const deletedGroupsById = new Map(
+    deletedNodes
+      .filter((node): node is BoardGroupNode => node.kind === "group")
+      .map(node => [node.id, node]),
+  );
+  const updatedAt = nowIso();
+  const allDeletedNodes = board.nodes.filter(node => deletedNodeIds.has(node.id));
+  const removedGroupReferences = allDeletedNodes.flatMap(node => {
+    if (!isMediaReferenceSourceNode(node)) return [];
+    return board.edges
+      .filter(edge => edge.from.nodeId === node.id && edge.to.portId === "asset-in")
+      .map(edge => ({ assetId: node.asset.assetId, groupNodeId: edge.to.nodeId }));
+  });
+
+  const remainingNodes = board.nodes.flatMap(node => {
+    if (deletedNodeIds.has(node.id)) return [];
+    const deletedParent = node.parentId ? deletedGroupsById.get(node.parentId) : undefined;
+    if (!deletedParent) return [node];
+    const position = childPositionAfterUngroup(board.nodes, deletedParent, node);
+    if (!position) return [node];
+    return [{
+      ...node,
+      parentId: deletedParent.parentId && !deletedNodeIds.has(deletedParent.parentId)
+        ? deletedParent.parentId
+        : undefined,
+      position,
+      updatedAt,
+    }];
+  });
+
+  const remainingEdges = board.edges.filter(edge =>
+    !deletedNodeIds.has(edge.from.nodeId) &&
+    !deletedNodeIds.has(edge.to.nodeId)
+  );
+  const remainingEdgeIds = new Set(remainingEdges.map(edge => edge.id));
+  const deletedEdgeIds = board.edges.flatMap(edge => remainingEdgeIds.has(edge.id) ? [] : [edge.id]);
+  const nextNodes = remainingNodes.map(node => {
+    if (node.kind !== "reference-group") return node;
+    const removedAssetIds = removedGroupReferences
+      .filter(reference => reference.groupNodeId === node.id)
+      .map(reference => reference.assetId);
+    if (removedAssetIds.length === 0) return node;
+    return {
+      ...node,
+      references: node.references.filter(reference => {
+        if (!removedAssetIds.includes(reference.assetId)) return true;
+        return remainingEdges.some(edge => {
+          if (edge.to.nodeId !== node.id || edge.to.portId !== "asset-in") return false;
+          const sourceNode = remainingNodes.find(item => item.id === edge.from.nodeId);
+          return isMediaReferenceSourceNode(sourceNode) && sourceNode.asset.assetId === reference.assetId;
+        });
+      }),
+      updatedAt,
+    };
+  });
+
+  return {
+    deletedEdgeIds,
+    deletedNodeIds: Array.from(deletedNodeIds),
+    edges: remainingEdges,
+    nodes: nextNodes,
+  };
+}
+
 function createAssetBoardNode(input: CreateAssetNodeInput, nodes: BoardNode[]): BoardNode {
   const createdAt = nowIso();
   const size = input.size ?? defaultAssetNodeSize(input.asset.type);
@@ -1689,6 +1774,15 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       isActive = false;
     };
   }, [boardId, clearUndoHistory]);
+
+  useEffect(() => {
+    if (selectedNodeId && !board.nodes.some(node => node.id === selectedNodeId)) {
+      setSelectedNodeId(null);
+    }
+    if (selectedEdgeId && !board.edges.some(edge => edge.id === selectedEdgeId)) {
+      setSelectedEdgeId(null);
+    }
+  }, [board.edges, board.nodes, selectedEdgeId, selectedNodeId]);
 
   useEffect(() => {
     if (!hasLoaded) return;
@@ -2243,65 +2337,23 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     setSelectedEdgeId(null);
   }, [mutateBoard]);
 
-  const deleteNode = useCallback((nodeId: string) => {
+  const deleteNodes = useCallback((nodeIds: string[]): void => {
+    const requestedNodeIds = Array.from(new Set(nodeIds));
+    if (requestedNodeIds.length === 0) return;
+
     mutateBoard(currentBoard => {
-      const deletedNode = currentBoard.nodes.find(node => node.id === nodeId);
-      const updatedAt = nowIso();
-      if (deletedNode?.kind === "group") {
-        const remainingNodes = currentBoard.nodes.flatMap(node => {
-          if (node.id === deletedNode.id) return [];
-          if (node.parentId !== deletedNode.id) return [node];
-          const position = childPositionAfterUngroup(currentBoard.nodes, deletedNode, node);
-          if (!position) return [node];
-          return [{ ...node, parentId: deletedNode.parentId, position, updatedAt }];
-        });
-        const remainingEdges = currentBoard.edges.filter(edge => edge.from.nodeId !== nodeId && edge.to.nodeId !== nodeId);
-        return touchBoard(currentBoard, remainingNodes, remainingEdges);
-      }
-      const removedGroupReferences = deletedNode?.kind === "asset"
-        ? currentBoard.edges
-          .filter(edge => edge.from.nodeId === nodeId && edge.to.portId === "asset-in")
-          .map(edge => ({ assetId: deletedNode.asset.assetId, groupNodeId: edge.to.nodeId }))
-        : [];
-      // Cascade-delete only the auto-owned result node when deleting a generate node.
-      const resultNodeIdsToDelete = isResultSourceNode(deletedNode)
-        ? resultNodeIdsOwnedBySource(currentBoard.nodes, nodeId)
-        : [];
-      const remainingNodes = currentBoard.nodes
-        .filter(node => node.id !== nodeId && !resultNodeIdsToDelete.includes(node.id));
-      const remainingEdges = currentBoard.edges.filter(edge =>
-        edge.from.nodeId !== nodeId &&
-        edge.to.nodeId !== nodeId &&
-        !resultNodeIdsToDelete.includes(edge.from.nodeId) &&
-        !resultNodeIdsToDelete.includes(edge.to.nodeId)
-      );
-      return touchBoard(
-        currentBoard,
-        remainingNodes
-          .map(node => {
-            if (node.kind !== "reference-group") return node;
-            const removedAssetIds = removedGroupReferences
-              .filter(reference => reference.groupNodeId === node.id)
-              .map(reference => reference.assetId);
-            if (removedAssetIds.length === 0) return node;
-            return {
-              ...node,
-              references: node.references.filter(reference => {
-                if (!removedAssetIds.includes(reference.assetId)) return true;
-                return remainingEdges.some(edge => {
-                  if (edge.to.nodeId !== node.id || edge.to.portId !== "asset-in") return false;
-                  const sourceNode = remainingNodes.find(item => item.id === edge.from.nodeId);
-                  return isMediaReferenceSourceNode(sourceNode) && sourceNode.asset.assetId === reference.assetId;
-                });
-              }),
-              updatedAt,
-            };
-          }),
-        remainingEdges,
-      );
+      const plan = planDeleteBoardNodes(currentBoard, requestedNodeIds);
+      if (!plan) return currentBoard;
+      return touchBoard(currentBoard, plan.nodes, plan.edges);
     });
-    setSelectedNodeId(currentId => (currentId === nodeId ? null : currentId));
+
+    const requestedNodeIdSet = new Set(requestedNodeIds);
+    setSelectedNodeId(currentId => (currentId && requestedNodeIdSet.has(currentId) ? null : currentId));
   }, [mutateBoard]);
+
+  const deleteNode = useCallback((nodeId: string) => {
+    deleteNodes([nodeId]);
+  }, [deleteNodes]);
 
   const deleteEdge = useCallback((edgeId: string) => {
     mutateBoard(currentBoard => {
@@ -3024,6 +3076,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       connectPortsBatch,
       deleteEdge,
       deleteNode,
+      deleteNodes,
       moveReferenceGroupItem,
       moveGenerateReferenceEdge,
       removeReferenceGroupItem,
@@ -3083,6 +3136,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       connectPortsBatch,
       deleteEdge,
       deleteNode,
+      deleteNodes,
       duplicateNode,
       duplicateNodes,
       moveReferenceGroupItem,

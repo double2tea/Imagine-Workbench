@@ -1415,6 +1415,12 @@ function boardRoute(id: string): string {
   return id === DEFAULT_BOARD_ID ? "/board" : `/board?boardId=${encodeURIComponent(id)}`;
 }
 
+function initialResolvedBoardId(boardId: string): string {
+  if (boardId !== DEFAULT_BOARD_ID) return boardId;
+  if (typeof window === "undefined") return boardId;
+  return new URLSearchParams(window.location.search).get("boardId")?.trim() || boardId;
+}
+
 function boardSummaryFromDocument(board: BoardDocument): BoardSummary {
   return {
     id: board.id,
@@ -1429,7 +1435,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const { t, locale } = useTranslations();
   const { t: creationT } = useTranslations("creation");
   const router = useRouter();
-  const [resolvedBoardId, setResolvedBoardId] = useState(boardId);
+  const [resolvedBoardId, setResolvedBoardId] = useState(() => initialResolvedBoardId(boardId));
   useEffect(() => {
     const queryBoardId = new URLSearchParams(window.location.search).get("boardId");
     const nextBoardId = boardId !== DEFAULT_BOARD_ID ? boardId : queryBoardId?.trim() || DEFAULT_BOARD_ID;
@@ -1484,6 +1490,11 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const [panoramaItem, setPanoramaItem] = useState<StorageItem | null>(null);
   const [voiceProfileSourceItem, setVoiceProfileSourceItem] = useState<StorageItem | null>(null);
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
+  const selectOnlyBoardNode = useCallback((nodeId: string): void => {
+    boardController.selectNode(nodeId);
+    boardController.selectEdge(null);
+    setSelectedNodeIds([nodeId]);
+  }, [boardController]);
   const focusNodeSeqRef = useRef(0);
   const originalAssetPromoteIdsRef = useRef<Set<string>>(new Set());
   const [focusNodeRequest, setFocusNodeRequest] = useState<{ nodeId: string; seq: number } | null>(null);
@@ -2092,8 +2103,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       },
       { nodeId: sourceNodeId, portId: BOARD_PORT_IDS.assetOut, portKind: "asset" },
     );
-    boardController.selectNode(nodeId);
-    boardController.selectEdge(null);
+    selectOnlyBoardNode(nodeId);
     pushWorkspaceNotice("info", `${label} started, result will update this node`);
     return { item: savedItem, nodeId };
   }
@@ -2359,8 +2369,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         title: editedTitle,
         position: boardNodeAdjacentPosition(boardController.board.nodes, sourceNode),
       });
-      boardController.selectNode(editedNodeId);
-      boardController.selectEdge(null);
+      selectOnlyBoardNode(editedNodeId);
     } else {
       setReferenceImage(compressedMergedImage);
       setReferenceImages([{ id: nextReferenceId, url: compressedMergedImage, role: "general" }]);
@@ -2912,8 +2921,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           { nodeId: assetNodeId, portId: BOARD_PORT_IDS.assetOut, portKind: "asset" },
           { nodeId: videoNodeId, portId: BOARD_PORT_IDS.referenceIn, portKind: "asset" },
         );
-        boardController.selectNode(videoNodeId);
-        boardController.selectEdge(null);
+        selectOnlyBoardNode(videoNodeId);
       } finally {
         boardController.endUndoGesture();
       }
@@ -3040,8 +3048,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         pushWorkspaceNotice("error", t("board.agent.unsupportedNodeType"));
         return handledBoardAction(false);
       }
-      boardController.selectNode(node.id);
-      boardController.selectEdge(null);
+      selectOnlyBoardNode(node.id);
       pushWorkspaceNotice("success", t("board.agent.boardNodeUpdated"));
       return handledBoardAction(true);
     }
@@ -4965,6 +4972,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onAssetCompareRequestHandled={() => setAssetCompareRequest(null)}
         onFocusNodeRequestHandled={() => setFocusNodeRequest(null)}
         onSelectedNodeIdsChange={setSelectedNodeIds}
+        externalSelectedNodeIds={selectedNodeIds}
         onBack={handleBackToWorkbench}
         onCancelAssetTask={nodeId => void cancelBoardAssetTaskNode(nodeId)}
         onCancelGenerateNode={handleCancelGenerateNode}
