@@ -233,6 +233,7 @@ const MODELSCOPE_IMAGE_SIZES: ParameterOption[] = [
   imageResolutionOption("1104x1472"),
   imageResolutionOption("1584x1056"),
   imageResolutionOption("1056x1584"),
+  imageResolutionOption("custom"),
 ];
 
 const DOCUMENTED_IMAGE_SIZE_RATIOS: Record<string, string> = {

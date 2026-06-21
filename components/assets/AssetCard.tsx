@@ -19,7 +19,7 @@ import PreviewImage from "@/components/PreviewImage";
 import { makeReferenceDropToken, REFERENCE_ASSET_MIME } from "@/components/reference/referenceDrag";
 import { getGenerationReferenceMedia, type StorageItem } from "@/lib/db";
 import { imageQuickEditProcessingTitleFromPrompt } from "@/lib/image-quick-edit-targets";
-import { mediaReferenceLabel } from "@/lib/media-references";
+import { mediaReferenceLabel, parseMediaReferenceDimensions } from "@/lib/media-references";
 import { formatDisplayedAspectRatio } from "@/lib/media-display";
 import { tryParseProviderModel, type AiProvider } from "@/lib/providers/model-catalog";
 import { getProviderMeta } from "@/lib/providers/registry";
@@ -174,7 +174,11 @@ export default function AssetCard({
     }
 
     event.dataTransfer.effectAllowed = "copy";
-    event.dataTransfer.setData(REFERENCE_ASSET_MIME, JSON.stringify({ id: item.id, type: item.type, url: item.url }));
+    const dimensions = parseMediaReferenceDimensions(item.generationRequest?.imageResolution) ?? parseMediaReferenceDimensions(item.aspectRatio);
+    const payload = dimensions
+      ? { ...dimensions, id: item.id, type: item.type, url: item.url }
+      : { id: item.id, type: item.type, url: item.url };
+    event.dataTransfer.setData(REFERENCE_ASSET_MIME, JSON.stringify(payload));
     event.dataTransfer.setData("text/plain", makeReferenceDropToken(item.id));
   };
 

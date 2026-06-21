@@ -2,7 +2,7 @@ import { t } from "@/lib/i18n";
 import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 import { IMAGE_REFERENCE_LIMIT } from "@/hooks/useReferenceState";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
-import { compressReferenceImageFile } from "@/lib/reference-images";
+import { compressReferenceImageFile, readImageBlobDimensions } from "@/lib/reference-images";
 import { toErrorMessage } from "@/lib/client-fetch-error";
 
 type NoticeType = "error" | "info" | "success";
@@ -83,6 +83,7 @@ export function useClipboardImageImport({
       }
 
       try {
+        const dimensions = await readImageBlobDimensions(file);
         const compressedDataUrl = await compressReferenceImageFile(file);
         const latestReferenceCount = isAgentPaste ? agentReferenceCountRef.current : referenceImageCountRef.current;
         if (latestReferenceCount >= referenceLimit) {
@@ -99,7 +100,7 @@ export function useClipboardImageImport({
           setAgentReferenceUrl(compressedDataUrl);
           setAgentReferences(prev => {
             if (prev.some(reference => reference.id === newReferenceId)) return prev;
-            return [...prev, { id: newReferenceId, url: compressedDataUrl }];
+            return [...prev, { ...dimensions, id: newReferenceId, url: compressedDataUrl }];
           });
           pushWorkspaceNotice("success", t("common.notices.clipboardImportedAgentRef", { current: nextReferenceCount, max: referenceLimit }));
           return;
@@ -109,7 +110,7 @@ export function useClipboardImageImport({
         setReferenceImage(compressedDataUrl);
         setReferenceImages(prev => {
           if (prev.some(reference => reference.id === newReferenceId)) return prev;
-          return [...prev, { id: newReferenceId, url: compressedDataUrl, role: "general" }];
+          return [...prev, { ...dimensions, id: newReferenceId, url: compressedDataUrl, role: "general" }];
         });
         pushWorkspaceNotice("success", t("common.notices.clipboardImportedRef", { current: nextReferenceCount, max: referenceLimit }));
       } catch (error) {

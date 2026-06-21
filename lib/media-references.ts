@@ -4,11 +4,18 @@ export type MediaReferenceType = "image" | "video" | "audio";
 export type MediaReferenceRole = "start" | "end" | "general";
 
 export interface MediaReference {
+  height?: number;
   id: string;
   sourceAssetId?: string;
   url: string;
   role?: MediaReferenceRole;
   type?: MediaReferenceType;
+  width?: number;
+}
+
+export interface MediaReferenceDimensions {
+  height: number;
+  width: number;
 }
 
 export function getMediaReferenceType(reference: Pick<MediaReference, "type">): MediaReferenceType {
@@ -60,6 +67,15 @@ export function mediaReferenceTypeFromDataUri(dataUri: string): MediaReferenceTy
 export function mediaReferenceTypeFromBase64DataUri(dataUri: string): MediaReferenceType | null {
   const mimeType = mediaReferenceMimeFromBase64DataUri(dataUri);
   return mimeType ? mediaReferenceTypeFromMime(mimeType) : null;
+}
+
+export function parseMediaReferenceDimensions(value: string | undefined): MediaReferenceDimensions | null {
+  const match = value?.match(/^(\d+)x(\d+)$/);
+  if (!match) return null;
+  const width = Number(match[1]);
+  const height = Number(match[2]);
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) return null;
+  return { width, height };
 }
 
 export function buildPromptReferenceTokenPattern(labelT: TFunction = t): RegExp {

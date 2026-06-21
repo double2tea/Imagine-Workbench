@@ -26,10 +26,12 @@ export type LibraryAssetCategory = "character" | "scene" | "prop" | "style" | "o
 export type LibraryAssetOrigin = "promoted" | "imported";
 
 export interface GenerationReferenceMediaSnapshot {
+  height?: number;
   sourceAssetId?: string;
   url: string;
   type: MediaReferenceType;
   role?: MediaReferenceRole;
+  width?: number;
 }
 
 export interface GenerationRequestSnapshot {

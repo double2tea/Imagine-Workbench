@@ -99,7 +99,7 @@ import { RUNNINGHUB_YOUCHUAN_ADVANCED_DEFAULTS, runningHubAppPresetRequiresPromp
 import { buildGenerationModelPriceOptions } from "@/lib/providers/pricing";
 import type { RunningHubYouchuanAdvancedSettings } from "@/lib/providers/types";
 import { saveClonedVoiceProfileFromAsset } from "@/lib/voice-profiles";
-import { getMediaReferenceType, mediaReferenceLabel, mediaReferenceTypeFromMime } from "@/lib/media-references";
+import { getMediaReferenceType, mediaReferenceLabel, mediaReferenceTypeFromMime, parseMediaReferenceDimensions } from "@/lib/media-references";
 import { API_ROUTES } from "@/lib/api/routes";
 import {
   REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES,
@@ -200,6 +200,13 @@ function readFileAsDataUrl(file: File): Promise<string> {
     reader.onerror = () => reject(reader.error ?? new Error(translate("common.errors.fileReadFailed")));
     reader.readAsDataURL(file);
   });
+}
+
+function referenceImagePixelSize(reference: ReferenceImageRef): string | null {
+  const { height, width } = reference;
+  if (typeof width !== "number" || typeof height !== "number") return null;
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) return null;
+  return `${width}x${height}`;
 }
 
 function getProviderLabel(provider: AiProvider, customProviders: readonly CustomProviderDefinition[] = []): string {
@@ -371,6 +378,7 @@ export default function Home() {
   const locallyCanceledItemIdsRef = useRef<Set<string>>(new Set());
   const originalAssetPromoteIdsRef = useRef<Set<string>>(new Set());
   const workspaceNoticeSequenceRef = useRef(0);
+  const previousImageReferenceCountRef = useRef(0);
   const isAgentDockSuppressed = showSettings || isMaskOpen || fullscreenItem !== null || panoramaItem !== null || voiceProfileSourceItem !== null;
 
   const dismissWorkspaceNotice = useCallback((id: string) => {
@@ -585,10 +593,44 @@ export default function Home() {
     setPrompt,
   });
 
+  useEffect(() => {
+    const imageReferences = referenceImages.filter(reference => getMediaReferenceType(reference) === "image");
+    const previousImageReferenceCount = previousImageReferenceCountRef.current;
+    previousImageReferenceCountRef.current = imageReferences.length;
+    if (previousImageReferenceCount > 0 || imageReferences.length === 0) return;
+
+    const nextSize = referenceImagePixelSize(imageReferences[0]);
+    if (!nextSize) return;
+
+    const nextAspectRatio = getImageAspectRatioFromResolution(nextSize);
+    const supportedAspectRatio = nextAspectRatio && imageCapabilities.aspectRatios.some(option => option.value === nextAspectRatio)
+      ? nextAspectRatio
+      : aspectRatio;
+    const nextResolutionOptions = getImageResolutionOptions(selectedModel, supportedAspectRatio);
+
+    setCustomImageSize(nextSize);
+    if (supportedAspectRatio !== aspectRatio) setAspectRatio(supportedAspectRatio);
+    if (nextResolutionOptions.some(option => option.value === "custom")) {
+      setImageResolution("custom");
+      return;
+    }
+    if (nextResolutionOptions.some(option => option.value === nextSize)) {
+      setImageResolution(nextSize);
+      return;
+    }
+    if (nextResolutionOptions.length > 0 && !nextResolutionOptions.some(option => option.value === imageResolution)) {
+      setImageResolution(nextResolutionOptions[0].value);
+    }
+  }, [aspectRatio, imageCapabilities.aspectRatios, imageResolution, referenceImages, selectedModel]);
+
   const applyAsVideoReference = useCallback((asset: StorageItem): void => {
     openOriginalItem(asset, originalAsset => {
+      const dimensions = parseMediaReferenceDimensions(originalAsset.generationRequest?.imageResolution) ?? parseMediaReferenceDimensions(originalAsset.aspectRatio);
+      const nextReference: ReferenceImageRef = dimensions
+        ? { ...dimensions, id: originalAsset.id, url: originalAsset.url, role: "start" }
+        : { id: originalAsset.id, url: originalAsset.url, role: "start" };
       setReferenceImage(originalAsset.url);
-      setReferenceImages([{ id: originalAsset.id, url: originalAsset.url, role: "start" }]);
+      setReferenceImages([nextReference]);
       setTraditionalSubTab("video");
     }, t("common.notices.originalMediaReadFailed"));
   }, [openOriginalItem, setReferenceImage, setReferenceImages]);
@@ -941,11 +983,12 @@ export default function Home() {
       ? aspectRatio
       : nextAspectRatio;
     const nextResolutionOptions = getImageResolutionOptions(model, resolvedAspectRatio);
+    const canKeepCustomImageResolution = imageResolution === "custom" && nextResolutionOptions.some(option => option.value === "custom");
     setSelectedModel(model);
     if (!capabilities.aspectRatios.some(option => option.value === aspectRatio)) {
       setAspectRatio(resolvedAspectRatio);
     }
-    if (nextResolutionOptions.length > 0 && !nextResolutionOptions.some(option => option.value === imageResolution)) {
+    if (!canKeepCustomImageResolution && nextResolutionOptions.length > 0 && !nextResolutionOptions.some(option => option.value === imageResolution)) {
       setImageResolution(nextResolutionOptions[0].value);
     }
     if (capabilities.qualities.length > 0 && !capabilities.qualities.some(option => option.value === imageQuality)) {
@@ -1021,7 +1064,14 @@ export default function Home() {
             ? "end"
             : "general"
         : "general");
-      return { id: `${item.id}_reference_${index + 1}`, type: reference.type, url: reference.url, role };
+      return {
+        height: reference.height,
+        id: `${item.id}_reference_${index + 1}`,
+        type: reference.type,
+        url: reference.url,
+        role,
+        width: reference.width,
+      };
     });
 
     setPrompt(item.type === "transcript" ? request?.prompt ?? "" : item.prompt);

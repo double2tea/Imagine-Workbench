@@ -174,6 +174,15 @@ export async function compressReferenceImageFile(file: File): Promise<string> {
   return compressReferenceImageBlob(file);
 }
 
+export async function readImageBlobDimensions(blob: Blob): Promise<{ height: number; width: number }> {
+  const bitmap = await createImageBitmap(blob);
+  try {
+    return { width: bitmap.width, height: bitmap.height };
+  } finally {
+    bitmap.close();
+  }
+}
+
 export async function compressReferenceImageDataUrl(dataUrl: string): Promise<string> {
   const response = await fetch(dataUrl);
   const blob = await response.blob();

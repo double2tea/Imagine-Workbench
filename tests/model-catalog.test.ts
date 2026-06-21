@@ -326,6 +326,11 @@ test("unknown model capability fails fast", () => {
   );
 });
 
+test("ModelScope virtual image models expose custom pixel sizes", () => {
+  assert.ok(getImageModelCapabilities("modelscope:Qwen/Qwen-Image").resolutions.some(option => option.value === "custom"));
+  assert.ok(getImageResolutionOptions("modelscope:Qwen/Qwen-Image", "16:9").some(option => option.value === "custom"));
+});
+
 test("generation request reference media migrates legacy reference images", () => {
   assert.deepEqual(
     getGenerationReferenceMedia({
@@ -615,15 +620,19 @@ test("image resolution labels hide pixel dimensions while keeping request values
 test("modelscope qwen image exposes documented aspect ratio sizes", () => {
   assert.deepEqual(getImageResolutionOptions("modelscope:Qwen/Qwen-Image", "4:3"), [
     { value: "1472x1104", label: "1K" },
+    { value: "custom", label: "自定义尺寸" },
   ]);
   assert.deepEqual(getImageResolutionOptions("modelscope:Qwen/Qwen-Image", "3:4"), [
     { value: "1104x1472", label: "1K" },
+    { value: "custom", label: "自定义尺寸" },
   ]);
   assert.deepEqual(getImageResolutionOptions("modelscope:Qwen/Qwen-Image", "3:2"), [
     { value: "1584x1056", label: "1K" },
+    { value: "custom", label: "自定义尺寸" },
   ]);
   assert.deepEqual(getImageResolutionOptions("modelscope:Qwen/Qwen-Image", "2:3"), [
     { value: "1056x1584", label: "1K" },
+    { value: "custom", label: "自定义尺寸" },
   ]);
 });
 

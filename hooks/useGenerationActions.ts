@@ -326,10 +326,12 @@ function buildReferenceMediaSnapshot(
     const reference = references[index];
     const sourceAssetId = reference?.sourceAssetId?.trim();
     return {
+      height: reference?.height,
       ...(sourceAssetId ? { sourceAssetId } : {}),
       url: sourceAssetId ? "" : url,
       type: reference ? getMediaReferenceType(reference) : "image",
       ...(reference?.role ? { role: reference.role } : {}),
+      width: reference?.width,
     };
   });
 }

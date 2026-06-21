@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   mediaReferenceFileExtension,
   mediaReferenceTypeFromBase64DataUri,
+  parseMediaReferenceDimensions,
 } from "../lib/media-references";
 import {
   REFERENCE_IMAGE_COMPRESSION_POLICY,
@@ -28,6 +29,12 @@ function makeDataUri(byteCount: number, mimeType = "image/webp"): string {
 
 test("scaleImageDimensions keeps smaller images unchanged", () => {
   assert.deepEqual(scaleImageDimensions(1024, 768, REFERENCE_IMAGE_MAX_EDGE), { width: 1024, height: 768 });
+});
+
+test("parseMediaReferenceDimensions reads positive pixel dimensions", () => {
+  assert.deepEqual(parseMediaReferenceDimensions("1536x1024"), { width: 1536, height: 1024 });
+  assert.equal(parseMediaReferenceDimensions("16:9"), null);
+  assert.equal(parseMediaReferenceDimensions("0x1024"), null);
 });
 
 test("scaleImageDimensions constrains the longest edge", () => {
