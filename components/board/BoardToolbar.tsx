@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import {
   Check,
   ChevronDown,
+  Globe,
   Grid2X2,
   Layers,
   MoreHorizontal,
@@ -29,7 +30,7 @@ import WorkspaceTopBar, {
   workspaceTopBarButtonClass,
   workspaceTopBarIconButtonClass,
 } from "@/components/workbench/WorkspaceTopBar";
-import { useTranslations } from "@/lib/i18n";
+import { useLocale, useTranslations } from "@/lib/i18n";
 
 interface BoardToolbarProps {
   boardId: string;
@@ -128,6 +129,7 @@ export default function BoardToolbar({
   const { t } = useTranslations("board");
   const commonT = useTranslations("common");
   const { themeMode, toggleThemeMode } = useThemeMode();
+  const { locale, setLocale } = useLocale();
   const showAlert = useAlert();
   const [isBoardMenuOpen, setIsBoardMenuOpen] = useState(false);
   const [isOverflowOpen, setIsOverflowOpen] = useState(false);
@@ -140,6 +142,9 @@ export default function BoardToolbar({
   const overflowMenuPanelRef = useRef<HTMLDivElement>(null);
 
   const saveMeta = saveStatusMeta(saveStatus, saveError, t);
+  const nextLocale = locale === "zh" ? "en" : "zh";
+  const languageToggleLabel = t(`workspace.language.${nextLocale}`);
+  const languageToggleShort = t(`workspace.language.${nextLocale}Short`);
 
   const visibleBoardSummaries = boardSummaries.some(board => board.id === boardId)
     ? boardSummaries
@@ -386,6 +391,17 @@ export default function BoardToolbar({
               <span>{commonT.t("buttons.restore")} {trashedCount}</span>
             </button>
           ) : null}
+
+          <button
+            type="button"
+            onClick={() => setLocale(nextLocale)}
+            className={`${headerBtn} shrink-0 px-2`}
+            title={languageToggleLabel}
+            aria-label={languageToggleLabel}
+          >
+            <Globe className="h-3.5 w-3.5" />
+            <span className="text-[11px] font-semibold leading-none">{languageToggleShort}</span>
+          </button>
 
         <div className="relative">
           <button
