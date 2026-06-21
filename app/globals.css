@@ -453,6 +453,10 @@ html::-webkit-scrollbar-thumb:hover {
   overflow: hidden;
 }
 
+.board-canvas .react-flow__minimap.imagine-board-minimap {
+  margin-bottom: 124px;
+}
+
 .imagine-board-view-toggle {
   position: relative;
   isolation: isolate;

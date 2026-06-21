@@ -60,6 +60,7 @@ const NoteBoardNode = memo(function NoteBoardNode({ node, onChange }: NoteBoardN
         </div>
         <DebouncedBoardTextarea
           commitId={node.id}
+          name={`board-note-body-${node.id}`}
           value={node.body}
           onChange={onChange}
           className="nodrag nowheel nopan min-h-0 flex-1 resize-none overflow-y-auto overscroll-contain bg-transparent p-3 text-sm leading-6 text-[var(--iw-text)] outline-none placeholder:text-[var(--iw-faint)]"
@@ -74,6 +75,7 @@ const NoteBoardNode = memo(function NoteBoardNode({ node, onChange }: NoteBoardN
       <div className="absolute right-2 top-2 z-10">{copyButton}</div>
       <DebouncedBoardTextarea
         commitId={node.id}
+        name={`board-note-body-${node.id}`}
         value={node.body}
         onChange={onChange}
         className="nodrag nowheel nopan h-full w-full resize-none overflow-y-auto overscroll-contain bg-transparent p-3 pr-11 text-sm leading-6 text-[var(--iw-text)] outline-none placeholder:text-[var(--iw-faint)]"

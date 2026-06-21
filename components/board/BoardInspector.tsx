@@ -295,12 +295,14 @@ function audioFunctionPatch(model: string, audioMode: BoardAudioOperationNode["a
 function ModelSelect({
   allowUnknownCurrent = true,
   groups,
+  name,
   placeholder,
   value,
   onChange,
 }: {
   allowUnknownCurrent?: boolean;
   groups: BoardModelOptionGroup[];
+  name?: string;
   placeholder?: string;
   value: string;
   onChange: (value: string) => void;
@@ -312,6 +314,7 @@ function ModelSelect({
   const isEmpty = modelGroups.length === 0;
   return (
     <select
+      name={name}
       value={hasSelectedValue ? value : ""}
       onChange={event => onChange(event.target.value)}
       disabled={isEmpty}
@@ -350,15 +353,17 @@ function isBoardVideoReferenceMode(value: string): value is BoardVideoReferenceM
 }
 
 function VariantCountSelect({
+  name,
   value,
   onChange,
 }: {
+  name: string;
   value: BoardGenerateVariantCount;
   onChange: (value: BoardGenerateVariantCount) => void;
 }) {
   const { t } = useTranslations("board");
   return (
-    <select value={value} onChange={event => onChange(parseVariantCount(event.target.value))} className={inputClass}>
+    <select name={name} value={value} onChange={event => onChange(parseVariantCount(event.target.value))} className={inputClass}>
       {variantCountOptions.map(option => <option key={option} value={option}>{t('inspector.variantCountOption', { count: option })}</option>)}
     </select>
   );
@@ -511,6 +516,7 @@ function ImageGenerateInspector({
         <ModelSelect
           allowUnknownCurrent={requiredReferenceTypes.length === 0}
           groups={selectableImageModelGroups}
+          name={`board-image-model-${node.id}`}
           value={node.model}
           onChange={model => onUpdateGenerate(node.id, imageModelPatch(model, node))}
         />
@@ -518,6 +524,7 @@ function ImageGenerateInspector({
       {node.model.startsWith("runninghub:") && (
         <InspectorField title={t('inspector.runningHubModelId')}>
           <input
+            name={`board-image-runninghub-model-${node.id}`}
             value={node.model}
             onChange={event => onUpdateGenerate(node.id, imageModelPatch(event.target.value, node))}
             className={monoInputClass}
@@ -527,6 +534,7 @@ function ImageGenerateInspector({
       <div className="grid grid-cols-2 gap-2">
         <InspectorField title={t('inspector.aspectRatio')}>
           <select
+            name={`board-image-aspect-ratio-${node.id}`}
             value={node.imageResolution === "custom" ? "custom" : node.aspectRatio}
             onChange={event => onUpdateGenerate(node.id, imageAspectPatch(node.model, event.target.value, node))}
             disabled={node.imageResolution === "custom"}
@@ -537,7 +545,7 @@ function ImageGenerateInspector({
           </select>
         </InspectorField>
         <InspectorField title={t('inspector.resolution')}>
-          <select value={presetResolutionOptions.some(option => option.value === node.imageResolution) ? node.imageResolution : ""} onChange={event => onUpdateGenerate(node.id, { imageResolution: event.target.value })} className={inputClass}>
+          <select name={`board-image-resolution-${node.id}`} value={presetResolutionOptions.some(option => option.value === node.imageResolution) ? node.imageResolution : ""} onChange={event => onUpdateGenerate(node.id, { imageResolution: event.target.value })} className={inputClass}>
             {!presetResolutionOptions.some(option => option.value === node.imageResolution) && <option value="">{t('inspector.customSize')}</option>}
             {presetResolutionOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
@@ -560,6 +568,7 @@ function ImageGenerateInspector({
       {node.imageResolution === "custom" && (
         <InspectorField title={t('inspector.customSizeResolution')}>
           <input
+            name={`board-image-custom-resolution-${node.id}`}
             value={node.customImageResolution}
             onChange={event => onUpdateGenerate(node.id, { customImageResolution: event.target.value })}
             className={monoInputClass}
@@ -570,14 +579,14 @@ function ImageGenerateInspector({
         <div className="grid grid-cols-2 gap-2">
           {capabilities.qualities.length > 0 && (
             <InspectorField title={t('inspector.quality')}>
-              <select value={node.imageQuality ?? ""} onChange={event => onUpdateGenerate(node.id, { imageQuality: event.target.value })} className={inputClass}>
+              <select name={`board-image-quality-${node.id}`} value={node.imageQuality ?? ""} onChange={event => onUpdateGenerate(node.id, { imageQuality: event.target.value })} className={inputClass}>
                 {capabilities.qualities.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </InspectorField>
           )}
           {capabilities.thinkingLevels.length > 0 && (
             <InspectorField title={t('inspector.thinking')}>
-              <select value={node.thinkingLevel ?? ""} onChange={event => onUpdateGenerate(node.id, { thinkingLevel: event.target.value })} className={inputClass}>
+              <select name={`board-image-thinking-${node.id}`} value={node.thinkingLevel ?? ""} onChange={event => onUpdateGenerate(node.id, { thinkingLevel: event.target.value })} className={inputClass}>
                 {capabilities.thinkingLevels.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </InspectorField>
@@ -594,7 +603,7 @@ function ImageGenerateInspector({
         }}
       />
       <InspectorField title={t('inspector.variantCount')}>
-        <VariantCountSelect value={node.variantCount} onChange={variantCount => onUpdateGenerate(node.id, { variantCount })} />
+        <VariantCountSelect name={`board-image-variant-count-${node.id}`} value={node.variantCount} onChange={variantCount => onUpdateGenerate(node.id, { variantCount })} />
       </InspectorField>
       <p className={infoChipClass}>{t('inspector.referenceSupport', { support: supportsReferences ? t('inspector.referenceSupportEnabled') : t('inspector.referenceSupportDisabled') })}</p>
     </div>
@@ -677,6 +686,7 @@ function VideoGenerateInspector({
         <ModelSelect
           allowUnknownCurrent={requiredReferenceTypes.length === 0}
           groups={selectableVideoModelGroups}
+          name={`board-video-model-${node.id}`}
           value={node.model}
           onChange={model => onUpdateGenerate(node.id, videoModelPatch(model, node))}
         />
@@ -684,6 +694,7 @@ function VideoGenerateInspector({
       {node.model.startsWith("runninghub:") && (
         <InspectorField title={t('inspector.runningHubModelId')}>
           <input
+            name={`board-video-runninghub-model-${node.id}`}
             value={node.model}
             onChange={event => onUpdateGenerate(node.id, videoModelPatch(event.target.value, node))}
             className={monoInputClass}
@@ -691,7 +702,7 @@ function VideoGenerateInspector({
         </InspectorField>
       )}
       <InspectorField title={t('inspector.size')}>
-        <select value={node.aspectRatio} onChange={event => onUpdateGenerate(node.id, { aspectRatio: event.target.value })} className={inputClass}>
+        <select name={`board-video-size-${node.id}`} value={node.aspectRatio} onChange={event => onUpdateGenerate(node.id, { aspectRatio: event.target.value })} className={inputClass}>
           {capabilities.sizes.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
         </select>
       </InspectorField>
@@ -699,21 +710,21 @@ function VideoGenerateInspector({
         <div className="grid grid-cols-2 gap-2">
           {capabilities.durations.length > 0 && (
             <InspectorField title={t('inspector.duration')}>
-              <select value={node.videoDuration ?? ""} onChange={event => onUpdateGenerate(node.id, { videoDuration: event.target.value })} className={inputClass}>
+              <select name={`board-video-duration-${node.id}`} value={node.videoDuration ?? ""} onChange={event => onUpdateGenerate(node.id, { videoDuration: event.target.value })} className={inputClass}>
                 {capabilities.durations.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </InspectorField>
           )}
           {capabilities.resolutions.length > 0 && (
             <InspectorField title={t('inspector.clarity')}>
-              <select value={node.videoResolution ?? ""} onChange={event => onUpdateGenerate(node.id, { videoResolution: event.target.value })} className={inputClass}>
+              <select name={`board-video-resolution-${node.id}`} value={node.videoResolution ?? ""} onChange={event => onUpdateGenerate(node.id, { videoResolution: event.target.value })} className={inputClass}>
                 {capabilities.resolutions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </InspectorField>
           )}
           {capabilities.presets.length > 0 && (
             <InspectorField title={t('inspector.preset')}>
-              <select value={node.videoPreset ?? ""} onChange={event => onUpdateGenerate(node.id, { videoPreset: event.target.value })} className={inputClass}>
+              <select name={`board-video-preset-${node.id}`} value={node.videoPreset ?? ""} onChange={event => onUpdateGenerate(node.id, { videoPreset: event.target.value })} className={inputClass}>
                 {capabilities.presets.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </InspectorField>
@@ -721,6 +732,7 @@ function VideoGenerateInspector({
           {referenceModeOptions.length > 1 && activeReferenceMode && (
             <InspectorField title={t('inspector.referenceMode')}>
               <select
+                name={`board-video-reference-mode-${node.id}`}
                 value={activeReferenceMode}
                 onChange={event => onUpdateGenerate(node.id, { videoReferenceMode: event.target.value as BoardVideoReferenceMode })}
                 className={inputClass}
@@ -734,7 +746,7 @@ function VideoGenerateInspector({
         </div>
       )}
       <InspectorField title={t('inspector.variantCount')}>
-        <VariantCountSelect value={node.variantCount} onChange={variantCount => onUpdateGenerate(node.id, { variantCount })} />
+        <VariantCountSelect name={`board-video-variant-count-${node.id}`} value={node.variantCount} onChange={variantCount => onUpdateGenerate(node.id, { variantCount })} />
       </InspectorField>
       <p className={infoChipClass}>
         {t('inspector.referenceSupport', {
@@ -891,12 +903,13 @@ function AudioOperationInspector({
   const advancedFields = (
     <div className="imagine-panel-disclosure-body">
       <InspectorField title={t('inspector.provider')}>
-        <select value={selectedProvider} onChange={event => handleProviderChange(event.target.value)} className={inputClass}>
+        <select name={`board-audio-provider-${node.id}`} value={selectedProvider} onChange={event => handleProviderChange(event.target.value)} className={inputClass}>
           {providerOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
         </select>
       </InspectorField>
       <InspectorField title={t('inspector.function')}>
         <select
+          name={`board-audio-function-${node.id}`}
           value={functionOptions.some(option => option.value === selectedFunctionValue) ? selectedFunctionValue : ""}
           onChange={event => handleFunctionChange(event.target.value)}
           className={inputClass}
@@ -908,7 +921,7 @@ function AudioOperationInspector({
       <div className={`grid gap-2 ${showAudioFormat ? "grid-cols-2" : "grid-cols-1"}`}>
         {showAudioFormat && (
           <InspectorField title={t('inspector.format')}>
-            <select value={node.audioFormat} onChange={event => onUpdateGenerate(node.id, { audioFormat: event.target.value })} className={inputClass}>
+            <select name={`board-audio-format-${node.id}`} value={node.audioFormat} onChange={event => onUpdateGenerate(node.id, { audioFormat: event.target.value })} className={inputClass}>
               {formatOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
           </InspectorField>
@@ -917,6 +930,7 @@ function AudioOperationInspector({
       {(node.audioMode === "voice_design" || node.audioMode === "voice_clone") && (
         <InspectorField title={stylePromptLabel}>
           <input
+            name={`board-audio-style-prompt-${node.id}`}
             value={node.audioStylePrompt ?? ""}
             onChange={event => onUpdateGenerate(node.id, { audioStylePrompt: event.target.value })}
             placeholder={node.audioMode === "voice_design" ? t("inspector.voiceProfilePlaceholderVoiceDesign") : t("inspector.voiceProfilePlaceholderVoiceClone")}
@@ -926,7 +940,7 @@ function AudioOperationInspector({
       )}
       {node.audioMode === "asr" && (
         <InspectorField title={t('inspector.asrLanguage')}>
-          <select value={node.asrLanguage ?? "auto"} onChange={event => onUpdateGenerate(node.id, { asrLanguage: event.target.value as "auto" | "zh" | "en" })} className={inputClass}>
+          <select name={`board-audio-asr-language-${node.id}`} value={node.asrLanguage ?? "auto"} onChange={event => onUpdateGenerate(node.id, { asrLanguage: event.target.value as "auto" | "zh" | "en" })} className={inputClass}>
             {ASR_LANGUAGE_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </InspectorField>
@@ -934,6 +948,7 @@ function AudioOperationInspector({
       {showVoiceProfile && (
         <InspectorField title={t('inspector.voiceProfile')}>
           <select
+            name={`board-audio-voice-profile-${node.id}`}
             value={node.voiceProfileId ?? ""}
             onChange={event => onUpdateGenerate(node.id, { voiceProfileId: event.target.value || undefined })}
             className={inputClass}
@@ -1044,13 +1059,13 @@ function RunningHubAppInspector({
         <div className="imagine-panel-disclosure-body">
           <div className="grid grid-cols-2 gap-2">
             <InspectorField title={t('inspector.runninghubApp.type')}>
-              <select value={node.targetType} onChange={event => onUpdateRunningHubApp(node.id, { targetType: event.target.value === "workflow" ? "workflow" : "ai-app" })} className={inputClass}>
+              <select name={`board-runninghub-target-type-${node.id}`} value={node.targetType} onChange={event => onUpdateRunningHubApp(node.id, { targetType: event.target.value === "workflow" ? "workflow" : "ai-app" })} className={inputClass}>
                 <option value="ai-app">{t("runninghub.targetAiApp")}</option>
                 <option value="workflow">{t("runninghub.targetWorkflow")}</option>
               </select>
             </InspectorField>
             <InspectorField title={t('inspector.runninghubApp.output')}>
-              <select value={node.outputType} onChange={event => onUpdateRunningHubApp(node.id, { outputType: event.target.value === "audio" ? "audio" : event.target.value === "video" ? "video" : "image" })} className={inputClass}>
+              <select name={`board-runninghub-output-type-${node.id}`} value={node.outputType} onChange={event => onUpdateRunningHubApp(node.id, { outputType: event.target.value === "audio" ? "audio" : event.target.value === "video" ? "video" : "image" })} className={inputClass}>
                 <option value="image">{t('inspector.runninghubApp.outputImage')}</option>
                 <option value="video">{t('inspector.runninghubApp.outputVideo')}</option>
                 <option value="audio">{t('inspector.runninghubApp.outputAudio')}</option>
@@ -1058,10 +1073,10 @@ function RunningHubAppInspector({
             </InspectorField>
           </div>
           <InspectorField title={node.targetType === "workflow" ? "workflowId" : "webappId"}>
-            <input value={node.targetId} onChange={event => onUpdateRunningHubApp(node.id, { targetId: event.target.value })} className={monoInputClass} />
+            <input name={`board-runninghub-target-id-${node.id}`} value={node.targetId} onChange={event => onUpdateRunningHubApp(node.id, { targetId: event.target.value })} className={monoInputClass} />
           </InspectorField>
           <InspectorField title={t('inspector.runninghubApp.accessPassword')}>
-            <input value={node.accessPassword ?? ""} onChange={event => onUpdateRunningHubApp(node.id, { accessPassword: event.target.value })} className={monoInputClass} />
+            <input name={`board-runninghub-access-password-${node.id}`} value={node.accessPassword ?? ""} onChange={event => onUpdateRunningHubApp(node.id, { accessPassword: event.target.value })} className={monoInputClass} />
           </InspectorField>
         </div>
       </details>
@@ -1153,6 +1168,7 @@ export default function BoardInspector({
           <InspectorSection title={t('inspector.sectionBasic')}>
             <InspectorField title={t('inspector.fieldName')}>
               <input
+                name={`board-node-title-${node.id}`}
                 value={node.title}
                 onChange={event => onUpdateNodeTitle(node.id, event.target.value)}
                 className={inputClass}

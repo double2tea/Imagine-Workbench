@@ -127,6 +127,7 @@ import {
   BOARD_PORT_IDS,
   composeBoardMultiGridImage,
   createEmptyBoard,
+  boardNodeAbsolutePosition,
   deleteBoardFromDB,
   listBoardSummariesFromDB,
   resolveBoardConnectionKind,
@@ -1139,15 +1140,20 @@ function quickEditNodeSize(sourceSize: BoardSize, operation: ImageEditFeature, o
   };
 }
 
-function hasTranscriptNoteForAsset(nodes: BoardDocument["nodes"], assetId: string): boolean {
-  return nodes.some(node => node.kind === "note" && node.source?.assetId === assetId);
+function boardNodeAdjacentPosition(
+  nodes: BoardDocument["nodes"],
+  sourceNode: Pick<BoardNode, "id" | "position" | "size">,
+  gap: number = 40,
+): BoardPoint {
+  const position = boardNodeAbsolutePosition(nodes, sourceNode.id) ?? sourceNode.position;
+  return {
+    x: position.x + sourceNode.size.width + gap,
+    y: position.y,
+  };
 }
 
-function transcriptNotePosition(sourceNode: ExecutableBoardNode): BoardPoint {
-  return {
-    x: sourceNode.position.x + sourceNode.size.width + 48,
-    y: sourceNode.position.y,
-  };
+function hasTranscriptNoteForAsset(nodes: BoardDocument["nodes"], assetId: string): boolean {
+  return nodes.some(node => node.kind === "note" && node.source?.assetId === assetId);
 }
 
 function findExecutableNodeById(nodes: BoardDocument["nodes"], nodeId: string): ExecutableBoardNode | undefined {
@@ -2260,7 +2266,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       const job = await startBoardImageQuickEdit(
         sourceNode.id,
         sourceNode.title,
-        sourceNode.position,
+        boardNodeAbsolutePosition(boardController.board.nodes, sourceNode.id) ?? sourceNode.position,
         sourceNode.size,
         maskEditSourceItem,
         output.operation,
@@ -2329,10 +2335,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       const editedNodeId = boardController.addAssetNode({
         asset: storageItemToBoardAssetReference(savedEditedItem),
         title: editedTitle,
-        position: {
-          x: sourceNode.position.x + sourceNode.size.width + 40,
-          y: sourceNode.position.y,
-        },
+        position: boardNodeAdjacentPosition(boardController.board.nodes, sourceNode),
       });
       boardController.selectNode(editedNodeId);
       boardController.selectEdge(null);
@@ -2468,10 +2471,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           model: selectedChatModel,
           sourceNodeId: sourceNode.id,
         },
-        position: {
-          x: sourceNode.position.x + sourceNode.size.width + 48,
-          y: sourceNode.position.y,
-        },
+        position: boardNodeAdjacentPosition(boardController.board.nodes, sourceNode, 48),
       }, {
         nodeId: sourceNode.id,
         portId: BOARD_PORT_IDS.assetOut,
@@ -2844,7 +2844,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         return handledBoardAction(false);
       }
 
-      const sourcePosition = sourceNode.position;
+      const sourcePosition = boardNodeAbsolutePosition(boardController.board.nodes, sourceNode.id) ?? sourceNode.position;
       boardController.beginUndoGesture();
       let assetNodeId = sourceNode.kind === "asset"
         ? sourceNode.id
@@ -3691,7 +3691,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
     const sourceNode = boardController.board.nodes.find(node => node.id === sourceNodeId);
     const position = sourceNode
-      ? { x: sourceNode.position.x + sourceNode.size.width + 40, y: sourceNode.position.y }
+      ? boardNodeAdjacentPosition(boardController.board.nodes, sourceNode)
       : undefined;
     addAssetToBoard(savedFrameItem, position);
     pushWorkspaceNotice("success", `Saved ${getVideoFrameCaptureLabel(frame.mode)} and inserted to board`);
@@ -3728,7 +3728,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       ...prev.filter(prevItem => !savedItems.some(savedItem => savedItem.id === prevItem.id)),
     ]);
     const anchorPosition = sourceNode
-      ? { x: sourceNode.position.x + sourceNode.size.width + 40, y: sourceNode.position.y }
+      ? boardNodeAdjacentPosition(boardController.board.nodes, sourceNode)
       : undefined;
     savedItems.forEach((savedItem, index) => {
       addAssetToBoard(
@@ -4292,7 +4292,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             boardController.addNoteNodeWithConnection(
               {
                 body: transcriptFromDataUrl(item.url),
-                position: transcriptNotePosition(sourceNode),
+                position: boardNodeAdjacentPosition(boardController.board.nodes, sourceNode, 48),
                 size: { width: 360, height: 260 },
                 source: {
                   assetId: item.id,
@@ -4860,7 +4860,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           void runBoardImageQuickEdit(
             source.node.id,
             source.node.title,
-            source.node.position,
+            boardNodeAbsolutePosition(boardController.board.nodes, source.node.id) ?? source.node.position,
             source.node.size,
             originalItem,
             operation,

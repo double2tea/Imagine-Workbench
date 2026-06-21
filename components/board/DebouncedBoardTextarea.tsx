@@ -7,12 +7,13 @@ import { registerBoardTextCommit, unregisterBoardTextCommit } from "@/lib/board/
 interface DebouncedBoardTextareaProps {
   className: string;
   commitId: string;
+  name?: string;
   onChange: (value: string) => void;
   placeholder: string;
   value: string;
 }
 
-export default function DebouncedBoardTextarea({ className, commitId, onChange, placeholder, value }: DebouncedBoardTextareaProps) {
+export default function DebouncedBoardTextarea({ className, commitId, name, onChange, placeholder, value }: DebouncedBoardTextareaProps) {
   const { flush, getValue, setValue, value: draftValue } = useDebouncedTextCommit(value, onChange);
 
   useEffect(() => {
@@ -22,6 +23,7 @@ export default function DebouncedBoardTextarea({ className, commitId, onChange, 
 
   return (
     <textarea
+      name={name}
       value={draftValue}
       onChange={(event) => setValue(event.target.value)}
       onBlur={() => flush()}

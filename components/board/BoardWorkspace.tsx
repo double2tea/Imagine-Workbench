@@ -210,6 +210,10 @@ interface CopiedBoardNode {
   node: BoardNodeModel;
 }
 
+interface CopiedBoardNodeSelection {
+  nodeIds: string[];
+}
+
 interface BoardTrashEntry {
   edges: BoardEdge[];
   node: BoardNodeModel;
@@ -1160,7 +1164,7 @@ export default function BoardWorkspace({
   const flowHostRef = useRef<HTMLElement | null>(null);
   const mediaImportInputRef = useRef<HTMLInputElement>(null);
   const pendingImportPointRef = useRef<BoardPoint | null>(null);
-  const copiedNodeRef = useRef<CopiedBoardNode | null>(null);
+  const copiedNodeRef = useRef<CopiedBoardNode | CopiedBoardNodeSelection | null>(null);
   const isNodeDragActiveRef = useRef(false);
   const isViewportMoveActiveRef = useRef(false);
   const viewportMoveEndTimerRef = useRef<number | null>(null);
@@ -1466,6 +1470,14 @@ export default function BoardWorkspace({
       y: Math.round(centered.y),
     };
   }, [snapToGrid]);
+
+  const availableCenteredNodePosition = useCallback((point: BoardPoint, size: BoardSize): BoardPoint => {
+    return findAvailableBoardNodePosition(
+      boardNodesWithAbsolutePositions(board.nodes),
+      centeredNodePosition(point, size),
+      size,
+    );
+  }, [board.nodes, centeredNodePosition]);
 
   const isPointInsideFlowHost = useCallback((clientX: number, clientY: number): boolean => {
     const rect = flowHostRef.current?.getBoundingClientRect();
@@ -2295,8 +2307,8 @@ export default function BoardWorkspace({
     const rect = flowHostRef.current?.getBoundingClientRect();
     if (!rect) return undefined;
     const center = flowPositionFromClient(rect.left + rect.width / 2, rect.top + rect.height / 2);
-    return centeredNodePosition(center, size);
-  }, [centeredNodePosition, flowPositionFromClient]);
+    return availableCenteredNodePosition(center, size);
+  }, [availableCenteredNodePosition, flowPositionFromClient]);
 
   const addQuickNode = useCallback((kind: BoardInsertKind, position: BoardPoint): string => {
     if (kind === "prompt") return addPromptNode({ position });
@@ -2323,9 +2335,9 @@ export default function BoardWorkspace({
   const addQuickNodeAtPoint = useCallback((kind: BoardInsertKind, point: BoardPoint): void => {
     const item = BOARD_INSERT_CATALOG.find(current => current.kind === kind);
     if (!item) return;
-    addQuickNode(kind, centeredNodePosition(point, item.size));
+    addQuickNode(kind, availableCenteredNodePosition(point, item.size));
     setQuickInsertMenu(null);
-  }, [addQuickNode, centeredNodePosition]);
+  }, [addQuickNode, availableCenteredNodePosition]);
 
   const addConnectedQuickNodeAtPoint = useCallback((kind: BoardInsertKind, point: BoardPoint, from: BoardPortRef, selectionSnapshot: string[]): void => {
     if (kind === "image-generate") {
@@ -2339,7 +2351,7 @@ export default function BoardWorkspace({
             model: from.portKind === "asset" ? DEFAULT_BOARD_REFERENCE_IMAGE_MODEL : DEFAULT_BOARD_IMAGE_MODEL,
             aspectRatio: "1:1",
             imageResolution: "1024x1024",
-            position: centeredNodePosition(point, DEFAULT_GENERATE_NODE_SIZE),
+            position: availableCenteredNodePosition(point, DEFAULT_GENERATE_NODE_SIZE),
           },
           connections,
         );
@@ -2355,7 +2367,7 @@ export default function BoardWorkspace({
         const connections = quickInsertSourceRefs(board.nodes, from, selectionSnapshot)
           .map(sourceRef => ({ from: sourceRef, targetPortId }));
         addGenerateNodeWithConnections(
-          { kind: "video-generate", model: DEFAULT_VIDEO_MODEL, aspectRatio: "auto", position: centeredNodePosition(point, DEFAULT_GENERATE_NODE_SIZE) },
+          { kind: "video-generate", model: DEFAULT_VIDEO_MODEL, aspectRatio: "auto", position: availableCenteredNodePosition(point, DEFAULT_GENERATE_NODE_SIZE) },
           connections,
         );
         setQuickInsertMenu(null);
@@ -2370,7 +2382,7 @@ export default function BoardWorkspace({
         const connections = quickInsertSourceRefs(board.nodes, from, selectionSnapshot)
           .map(sourceRef => ({ from: sourceRef, targetPortId }));
         addGenerateNodeWithConnections(
-          { kind: "audio-operation", model: DEFAULT_AUDIO_MODEL, position: centeredNodePosition(point, DEFAULT_GENERATE_NODE_SIZE) },
+          { kind: "audio-operation", model: DEFAULT_AUDIO_MODEL, position: availableCenteredNodePosition(point, DEFAULT_GENERATE_NODE_SIZE) },
           connections,
         );
         setQuickInsertMenu(null);
@@ -2382,20 +2394,20 @@ export default function BoardWorkspace({
     if (kind === "reference-group") {
       const assetNodeIds = referenceGroupMediaNodeIds(board.nodes, from.nodeId, selectionSnapshot);
       if (assetNodeIds.length === 0) return;
-      addReferenceGroupNodeWithAssets({ position: centeredNodePosition(point, DEFAULT_REFERENCE_GROUP_NODE_SIZE) }, assetNodeIds);
+      addReferenceGroupNodeWithAssets({ position: availableCenteredNodePosition(point, DEFAULT_REFERENCE_GROUP_NODE_SIZE) }, assetNodeIds);
       setQuickInsertMenu(null);
       return;
     }
     if (kind === "multi-grid") {
       const references = multiGridImageReferences(board.nodes, from, selectionSnapshot);
       if (references.length === 0) return;
-      const nodeId = addMultiGridNode({ position: centeredNodePosition(point, DEFAULT_MULTI_GRID_NODE_SIZE) });
+      const nodeId = addMultiGridNode({ position: availableCenteredNodePosition(point, DEFAULT_MULTI_GRID_NODE_SIZE) });
       references.forEach(reference => addAssetToMultiGrid(nodeId, reference));
       setQuickInsertMenu(null);
       return;
     }
     if (kind === "runninghub-app") {
-      const nodeId = addRunningHubAppNode({ position: centeredNodePosition(point, DEFAULT_RUNNINGHUB_APP_NODE_SIZE) });
+      const nodeId = addRunningHubAppNode({ position: availableCenteredNodePosition(point, DEFAULT_RUNNINGHUB_APP_NODE_SIZE) });
       connectPorts(from, {
         nodeId,
         portId: from.portKind === "prompt" ? BOARD_PORT_IDS.promptIn : BOARD_PORT_IDS.referenceIn,
@@ -2403,7 +2415,7 @@ export default function BoardWorkspace({
       });
       setQuickInsertMenu(null);
     }
-  }, [addAssetToMultiGrid, addGenerateNodeWithConnections, addMultiGridNode, addReferenceGroupNodeWithAssets, addRunningHubAppNode, board.nodes, centeredNodePosition, connectPorts, onConnectionError]);
+  }, [addAssetToMultiGrid, addGenerateNodeWithConnections, addMultiGridNode, addReferenceGroupNodeWithAssets, addRunningHubAppNode, availableCenteredNodePosition, board.nodes, connectPorts, onConnectionError]);
 
   const quickInsertMenuItems = useMemo(() => {
     const from = quickInsertMenu?.connectionFrom;
@@ -2522,6 +2534,13 @@ export default function BoardWorkspace({
   const pasteCopiedNode = useCallback((): void => {
     const copied = copiedNodeRef.current;
     if (!copied) return;
+    if ("nodeIds" in copied) {
+      const pastedIds = duplicateNodes(copied.nodeIds);
+      if (pastedIds.length === 0) return;
+      copiedNodeRef.current = { nodeIds: pastedIds };
+      updateSelectedNodeIds(pastedIds);
+      return;
+    }
     const { inputEdges, node } = copied;
     const position = pastedNodePosition(board.nodes, node);
     const rememberPastedPosition = (): void => {
@@ -2669,7 +2688,7 @@ export default function BoardWorkspace({
     }
     addNoteNode({ body: node.body, position, size: node.size, source: node.source, title: node.title, variant: node.variant });
     rememberPastedPosition();
-  }, [addAgentNode, addAssetNode, addGenerateNode, addGenerateNodeWithConnections, addGroupNode, addMultiGridNode, addNoteNode, addPromptNode, addReferenceGroupNode, addRunningHubAppNode, board.nodes]);
+  }, [addAgentNode, addAssetNode, addGenerateNode, addGenerateNodeWithConnections, addGroupNode, addMultiGridNode, addNoteNode, addPromptNode, addReferenceGroupNode, addRunningHubAppNode, board.nodes, duplicateNodes, updateSelectedNodeIds]);
 
   const handleConnectStart = useCallback<OnConnectStart>(() => {
     setIsConnectionActive(true);
@@ -2983,6 +3002,13 @@ export default function BoardWorkspace({
       if (!usesModifier) return;
       const key = event.key.toLowerCase();
       if (key === "c") {
+        if (selectedNodeIds.length > 1) {
+          const nodeIds = selectedNodeIds.filter(nodeId => board.nodes.some(node => node.id === nodeId));
+          if (nodeIds.length === 0) return;
+          copiedNodeRef.current = { nodeIds };
+          event.preventDefault();
+          return;
+        }
         const selectedNode = board.nodes.find(node => node.id === selectedNodeIds[0]);
         if (!selectedNode) return;
         copiedNodeRef.current = {

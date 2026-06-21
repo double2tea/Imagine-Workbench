@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  boardNodeAbsolutePosition,
   childPositionAfterUngroup,
   createBoardGroupLayout,
   resolveMovedBoardNodeParent,
@@ -69,6 +70,14 @@ test("childPositionAfterUngroup restores a direct child to absolute coordinates"
   const child = noteNode({ id: "note_a", parentId: group.id, position: { x: 48, y: 72 } });
 
   assert.deepEqual(childPositionAfterUngroup([group, child], group, child), { x: 100, y: 200 });
+});
+
+test("boardNodeAbsolutePosition resolves nested group-relative coordinates", () => {
+  const outer = groupNode({ id: "group_outer", position: { x: 100, y: 120 } });
+  const inner = groupNode({ id: "group_inner", parentId: outer.id, position: { x: 40, y: 50 } });
+  const child = noteNode({ id: "note_nested", parentId: inner.id, position: { x: 12, y: 18 } });
+
+  assert.deepEqual(boardNodeAbsolutePosition([outer, inner, child], child.id), { x: 152, y: 188 });
 });
 
 test("sortBoardNodesForReactFlow puts parent groups before children", () => {

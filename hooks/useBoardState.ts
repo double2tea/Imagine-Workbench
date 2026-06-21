@@ -1904,6 +1904,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
         node.id === sourceNodeId ? { ...node, ...input, resultAssetIds, updatedAt } : node,
       );
       let nextEdges = currentBoard.edges;
+      const sourcePosition = boardNodeAbsolutePosition(currentBoard.nodes, sourceNodeId) ?? sourceNode.position;
 
       const resultNode: BoardResultNode = existingResultNode
         ? {
@@ -1921,7 +1922,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
             activeAssetId: input.resultAssetId,
             resultAssetIds,
             asset: input.asset,
-            position: resultNodeDefaultPosition(sourceNode),
+            position: resultNodeDefaultPosition({ position: sourcePosition, size: sourceNode.size }),
           },
           nextNodes,
         );
