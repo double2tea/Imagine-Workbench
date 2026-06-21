@@ -1309,3 +1309,36 @@ Stabilized board selection during node add, duplicate, delete, and query-board l
 ### Next Steps
 
 - None - task complete
+
+
+## Session 158: Fix Agent tool calling across models
+
+**Date**: 2026-06-22
+**Task**: Fix Agent tool calling across models
+**Branch**: `main`
+
+### Summary
+
+Stabilized Agent tool-call execution across compatible providers, added diagnostics for text-only tool mentions, deduped repeated tool calls, and verified with provider tests plus browser model matrix.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `27edd546` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
