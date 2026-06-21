@@ -4,6 +4,7 @@ import {
   mediaReferenceMimeFromBase64DataUri,
   type MediaReferenceType,
 } from "./media-references";
+import { t } from "./i18n";
 
 export interface AgentReferenceInput {
   id: string;
@@ -144,11 +145,14 @@ function formatReferenceCountLabel(sendableReferences: AgentReferenceInput[]): s
     .map(type => {
       const count = counts.get(type) ?? 0;
       if (count === 0) return null;
-      const unit = type === "image" ? "张" : "段";
-      return `${count} ${unit}${mediaReferenceLabel(type)}`;
+      return t("common.agentReference.countItem", {
+        count,
+        type: mediaReferenceLabel(type, t),
+        unit: t(`common.agentReference.units.${type}`),
+      });
     })
     .filter((label): label is string => label !== null)
-    .join("、");
+    .join(t("common.agentReference.separator"));
 }
 
 function collectReferencedTypes(sendableReferences: AgentReferenceInput[]): MediaReferenceType[] {
@@ -170,17 +174,23 @@ export function formatAgentReferenceHint(
   const referencedTypes = collectReferencedTypes(sendableReferences);
   const unsupportedLabels = referencedTypes
     .filter(type => inputSupport[type] === false)
-    .map(type => mediaReferenceLabel(type));
+    .map(type => mediaReferenceLabel(type, t));
 
   if (unsupportedLabels.length > 0) {
-    return `下一条消息含 ${countLabel}；目录中相近模型不支持${unsupportedLabels.join("/")}输入，失败时请更换模型`;
+    return t("common.agentReference.unsupportedHint", {
+      countLabel,
+      unsupported: unsupportedLabels.join("/"),
+    });
   }
 
   const supportedLabels = referencedTypes
     .filter(type => inputSupport[type] === true)
-    .map(type => mediaReferenceLabel(type));
+    .map(type => mediaReferenceLabel(type, t));
   if (supportedLabels.length === referencedTypes.length) {
-    return `下一条消息含 ${countLabel}（目录显示支持${supportedLabels.join("/")}输入）`;
+    return t("common.agentReference.supportedHint", {
+      countLabel,
+      supported: supportedLabels.join("/"),
+    });
   }
-  return `下一条消息含 ${countLabel}（未在 OpenRouter 目录命中，仍用所选模型）`;
+  return t("common.agentReference.unknownHint", { countLabel });
 }

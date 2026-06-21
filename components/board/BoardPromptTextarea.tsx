@@ -17,7 +17,12 @@ import { createPortal } from "react-dom";
 import PromptReferenceDropdown from "@/components/reference/PromptReferenceDropdown";
 import { useDebouncedTextCommit } from "@/hooks/useDebouncedTextCommit";
 import type { BoardPromptReference } from "@/lib/board/prompt-references";
-import { getMediaReferencePromptToken, getMediaReferenceType, mediaReferenceLabel } from "@/lib/media-references";
+import {
+  buildPromptReferenceTokenPattern,
+  getMediaReferencePromptToken,
+  getMediaReferenceType,
+  mediaReferenceLabel,
+} from "@/lib/media-references";
 import { registerBoardTextCommit, unregisterBoardTextCommit } from "@/lib/board/text-flush-registry";
 import { detectPromptTemplateSlashCommand, type PromptTemplateSlashCommand } from "@/lib/prompt-templates";
 import { isPromptTemplatePickerInteractionActive } from "@/lib/prompt-template-picker-dom";
@@ -27,8 +32,6 @@ function detectAtSearch(value: string, caret: number): string | null {
   const match = beforeCaret.match(/@([^\s@]*)$/);
   return match ? match[1] : null;
 }
-
-const promptReferenceTokenPattern = /@(图片|视频|音频)(\d+)/g;
 
 type PromptEditorPart =
   | { kind: "text"; text: string }
@@ -41,6 +44,7 @@ interface PromptReferenceTokenRange {
 
 function getPromptEditorParts(prompt: string, references: readonly BoardPromptReference[]): PromptEditorPart[] {
   const parts: PromptEditorPart[] = [];
+  const promptReferenceTokenPattern = buildPromptReferenceTokenPattern();
   let lastIndex = 0;
   for (const match of prompt.matchAll(promptReferenceTokenPattern)) {
     const matchText = match[0];
@@ -66,6 +70,7 @@ function findReferenceTokenBoundaryRange(
   direction: "backward" | "forward",
   references: readonly BoardPromptReference[],
 ): PromptReferenceTokenRange | null {
+  const promptReferenceTokenPattern = buildPromptReferenceTokenPattern();
   for (const match of prompt.matchAll(promptReferenceTokenPattern)) {
     const parsed = Number(match[2]);
     if (!Number.isInteger(parsed) || parsed < 1 || !references[parsed - 1]) continue;

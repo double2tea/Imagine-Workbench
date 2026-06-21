@@ -1125,7 +1125,7 @@ function appendReferenceGroupItem(
 
 function multiGridItemFromAssetReference(asset: BoardAssetReference, cellIndex?: number): BoardMultiGridItem {
   if (asset.type !== "image") {
-    throw new Error("多宫格只支持图片资产");
+    throw new Error(t("board.workspace.multiGridOnlyImage"));
   }
   return {
     assetId: asset.assetId,
@@ -1280,7 +1280,7 @@ function createGroupBoardNode(input: CreateGroupNodeInput, nodes: BoardNode[]): 
   return {
     id: createBoardId("group"),
     kind: "group",
-    title: input.title ?? "新建组",
+    title: input.title ?? t("board.node.types.group"),
     parentId: input.parentId,
     position: input.position ?? moveDefaultPosition(nodes),
     size: input.size ?? DEFAULT_GROUP_NODE_SIZE,
@@ -1295,7 +1295,7 @@ function createMultiGridBoardNode(input: CreateMultiGridNodeInput, nodes: BoardN
   return {
     id: createBoardId("multi_grid"),
     kind: "multi-grid",
-    title: input.title ?? "多宫格",
+    title: input.title ?? t("board.node.types.multiGrid"),
     aspectRatio: input.aspectRatio ?? DEFAULT_BOARD_MULTI_GRID_ASPECT_RATIO,
     gridSize,
     items: normalizeBoardMultiGridItems(input.items ?? [], gridSize),
@@ -1736,7 +1736,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
   }, [board.nodes, mutateBoard]);
 
   const addAssetNodesInGroup = useCallback((inputs: CreateAssetNodeInput[]): AddAssetNodesInGroupResult => {
-    if (inputs.length < 2) throw new Error("至少需要两个资产节点才能自动打组");
+    if (inputs.length < 2) throw new Error(t("board.workspace.atLeastTwoNodesToGroup"));
     const nodesToAdd: BoardNode[] = [];
     for (const input of inputs) {
       const node = createAssetBoardNode(input, [...board.nodes, ...nodesToAdd]);
@@ -1747,12 +1747,12 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     mutateBoard(currentBoard => {
       const combinedNodes = [...currentBoard.nodes, ...nodesToAdd];
       const layout = createBoardGroupLayout(combinedNodes, nodeIds);
-      if (!layout) throw new Error("无法为导入资产创建分组布局");
+      if (!layout) throw new Error(t("board.workspace.importGroupLayoutFailed"));
       const updatedAt = nowIso();
       const groupNode: BoardGroupNode = {
         id: groupId,
         kind: "group",
-        title: "导入媒体组",
+        title: t("board.workspace.importMediaGroup"),
         parentId: layout.parentId,
         position: layout.position,
         size: layout.size,
@@ -1978,7 +1978,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
         currentBoard,
         currentBoard.nodes.map(node => {
           if (node.id !== nodeId) return node;
-          if (node.kind !== "multi-grid") throw new Error("目标节点不是多宫格");
+          if (node.kind !== "multi-grid") throw new Error(t("board.workspace.targetNotMultiGrid"));
           return appendMultiGridItem(node, item, updatedAt);
         }),
       ),
@@ -1995,7 +1995,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       const groupNode: BoardGroupNode = {
         id: groupId,
         kind: "group",
-        title: "新建组",
+        title: t("board.node.types.group"),
         parentId: layout.parentId,
         position: layout.position,
         size: layout.size,
@@ -2038,14 +2038,14 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
   }, [mutateBoard]);
 
   const addReferenceGroupNodeWithAssets = useCallback((input: CreateReferenceGroupNodeInput, assetNodeIds: string[]): string => {
-    if (assetNodeIds.length === 0) throw new Error("参考组至少需要一个媒体资产");
+    if (assetNodeIds.length === 0) throw new Error(t("board.workspace.referenceGroupNeedsMedia"));
     const node = createReferenceGroupBoardNode(input, board.nodes);
     const to: BoardPortRef = { nodeId: node.id, portId: BOARD_PORT_IDS.assetIn, portKind: "asset" };
     const edgeIds = assetNodeIds.map(() => createBoardId("edge"));
     mutateBoard(currentBoard => {
       const assetNodes = assetNodeIds.map(assetNodeId => {
         const assetNode = currentBoard.nodes.find(currentNode => currentNode.id === assetNodeId);
-        if (!isMediaReferenceSourceNode(assetNode)) throw new Error("参考组只支持媒体资产");
+        if (!isMediaReferenceSourceNode(assetNode)) throw new Error(t("board.workspace.referenceGroupOnlyMedia"));
         return assetNode;
       });
       const references = referenceGroupItemsFromMediaNodes(assetNodes);
@@ -2093,7 +2093,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     input: CreateGenerateNodeInput,
     connections: Array<{ from: BoardPortRef; targetPortId: typeof BOARD_PORT_IDS.promptIn | typeof BOARD_PORT_IDS.referenceIn }>,
   ): string => {
-    if (connections.length === 0) throw new Error("新建生成节点至少需要一个连接来源");
+    if (connections.length === 0) throw new Error(t("board.workspace.newGenerateNodeNeedsSource"));
     const node = createGenerateBoardNode(input, board.nodes);
     const edgeIds = connections.map(() => createBoardId("edge"));
     mutateBoard(currentBoard => {
@@ -2123,7 +2123,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
           // Incompatible selected nodes are ignored for batch quick-insert.
         }
       }
-      if (!firstEdgeId) throw new Error("所选节点没有可连接到新生成节点的端口");
+      if (!firstEdgeId) throw new Error(t("board.workspace.noConnectablePorts"));
       return touchBoard(currentBoard, nextNodes, nextEdges);
     });
     setSelectedNodeId(null);
@@ -2335,7 +2335,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     mutateBoard(currentBoard => {
       const oldEdge = currentBoard.edges.find(edge => edge.id === edgeId);
       if (!oldEdge) {
-        throw new Error("连接不存在");
+        throw new Error(t("board.workspace.reconnectFailed"));
       }
       const compatibleNodes = resolveBoardConnectionNodesWithCompatibleModel(currentBoard.nodes, from, to);
       const kind = resolveBoardConnectionKind(compatibleNodes, from, to);
@@ -2382,7 +2382,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
   const restoreNodeWithEdges = useCallback((node: BoardNode, edges: BoardEdge[]) => {
     mutateBoard(currentBoard => {
       if (currentBoard.nodes.some(item => item.id === node.id)) {
-        throw new Error("节点已存在");
+        throw new Error(t("board.workspace.nodeAlreadyExists"));
       }
       const nodeIds = new Set([...currentBoard.nodes.map(item => item.id), node.id]);
       const possibleEdges = edges.filter(
@@ -2498,14 +2498,14 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     mutateBoard(currentBoard => {
       const assetNode = currentBoard.nodes.find(node => node.id === assetNodeId);
       if (!isMediaReferenceSourceNode(assetNode)) {
-        throw new Error("参考组只支持媒体资产");
+        throw new Error(t("board.workspace.referenceGroupOnlyMedia"));
       }
       const reference = referenceGroupItemFromMediaNode(assetNode);
       return touchBoard(
         currentBoard,
         currentBoard.nodes.map(node => {
           if (node.id !== groupNodeId) return node;
-          if (node.kind !== "reference-group") throw new Error("目标节点不是参考组");
+          if (node.kind !== "reference-group") throw new Error(t("board.workspace.targetNotReferenceGroup"));
           return appendReferenceGroupItem(node, reference, updatedAt);
         }),
       );

@@ -3,27 +3,39 @@ import type { BoardEdge, BoardNode } from "@/lib/board/types";
 import type { MediaReferenceType } from "@/lib/media-references";
 import { getAudioModelCapabilities, getVideoModelCapabilities } from "@/lib/providers/model-catalog";
 
-export type BoardPromptReferenceSource = "连线" | "画板" | "库";
+export type BoardPromptReferenceSource = "connection" | "board" | "library";
+export type BoardPromptReferenceSourceLabel = BoardPromptReferenceSource | "画廊" | "画板" | "连线" | "库";
 
 export const BOARD_PROMPT_REFERENCE_GROUP_ORDER: readonly BoardPromptReferenceSource[] = [
-  "连线",
-  "画板",
-  "库",
+  "connection",
+  "board",
+  "library",
 ];
 
 export interface BoardPromptReference extends ReferenceImageRef {
-  sourceLabel?: BoardPromptReferenceSource | "画廊";
+  sourceLabel?: BoardPromptReferenceSourceLabel;
+}
+
+const BOARD_PROMPT_REFERENCE_SOURCE_ALIASES: Record<string, BoardPromptReferenceSource> = {
+  连线: "connection",
+  画板: "board",
+  库: "library",
+  画廊: "library",
+};
+
+function normalizeBoardPromptReferenceSource(value?: string): BoardPromptReferenceSource | null {
+  if (!value) return null;
+  if (value === "connection" || value === "board" || value === "library") return value;
+  return BOARD_PROMPT_REFERENCE_SOURCE_ALIASES[value] ?? null;
 }
 
 export function resolveBoardPromptReferenceGroup(
   reference: BoardPromptReference | ReferenceImageRef,
 ): BoardPromptReferenceSource | null {
-  if (!("sourceLabel" in reference) || !reference.sourceLabel) return null;
-  if (reference.sourceLabel === "画廊") return "库";
-  if (reference.sourceLabel === "连线" || reference.sourceLabel === "画板" || reference.sourceLabel === "库") {
-    return reference.sourceLabel;
-  }
-  return null;
+  if (!("sourceLabel" in reference) || typeof reference.sourceLabel !== "string") return null;
+  const sourceLabel = normalizeBoardPromptReferenceSource(reference.sourceLabel);
+  if (!sourceLabel) return null;
+  return sourceLabel;
 }
 
 export interface BoardGalleryReferenceItem {
@@ -68,7 +80,7 @@ export function buildBoardPromptReferenceGraphIndex(
         role: "general",
         type: node.asset.type,
         url: node.asset.url,
-        sourceLabel: "画板",
+        sourceLabel: "board",
       });
     }
   }
@@ -216,7 +228,7 @@ function galleryReferences(
       role: "general" as const,
       type: item.type === "video" || item.type === "audio" ? item.type : "image",
       url: item.url,
-      sourceLabel: "库",
+      sourceLabel: "library",
     }));
 }
 
@@ -247,7 +259,7 @@ export function buildBoardPromptReferences(input: {
 
   const wired: BoardPromptReference[] = wiredRaw
     .filter(reference => referenceMatchesTypes(reference, acceptedTypes))
-    .map(reference => ({ ...reference, sourceLabel: "连线" }));
+    .map(reference => ({ ...reference, sourceLabel: "connection" }));
   const seen = new Set(wired.map(reference => `${reference.id}:${reference.url}`));
 
   const board = boardMediaAssetReferences(index, acceptedTypes).filter(reference => {

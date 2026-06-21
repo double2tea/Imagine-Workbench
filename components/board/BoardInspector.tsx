@@ -737,7 +737,11 @@ function VideoGenerateInspector({
         <VariantCountSelect value={node.variantCount} onChange={variantCount => onUpdateGenerate(node.id, { variantCount })} />
       </InspectorField>
       <p className={infoChipClass}>
-         参考图：{supportsReferences && activeReferenceMode ? `${videoReferenceModeLabels[activeReferenceMode]} / ${capabilities.maxReferenceImages}` : t('inspector.referenceSupportDisabled')}
+        {t('inspector.referenceSupport', {
+          support: supportsReferences && activeReferenceMode
+            ? `${videoReferenceModeLabels[activeReferenceMode]} / ${capabilities.maxReferenceImages}`
+            : t('inspector.referenceSupportDisabled'),
+        })}
       </p>
     </div>
   );

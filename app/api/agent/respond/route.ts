@@ -29,6 +29,9 @@ const agentMessageSchema = z.object({
   content: z.string(),
 });
 
+const localeSchema = z.enum(["zh", "en"]);
+type AgentLocale = z.infer<typeof localeSchema>;
+
 const boardPortRefSchema = z.object({
   nodeId: z.string(),
   portId: z.string(),
@@ -67,6 +70,7 @@ const boardContextSchema = z.object({
 
 const agentBodySchema = z.object({
   messages: z.array(agentMessageSchema).min(1),
+  locale: localeSchema.optional().default("zh"),
   surface: z.enum(["workbench", "board"]).optional().default("workbench"),
   boardContext: boardContextSchema.optional(),
   gallerySummary: z
@@ -237,8 +241,8 @@ const agentBoardActionSchema = z.object({
 });
 
 const agentResponseSchema = z.object({
-  thought: z.string().default("已分析当前创作上下文。"),
-  text: z.string().default("我已整理好下一步建议。"),
+  thought: z.string().optional(),
+  text: z.string().optional(),
   activeSkills: z.array(z.string()).default([]),
   recommendedAction: agentActionSchema.default({ type: "none" }),
   boardAction: agentBoardActionSchema.default({ type: "none" }),
@@ -273,9 +277,13 @@ interface AgentToolCallSummary {
 }
 
 export async function POST(req: NextRequest) {
+  let requestLocale: AgentLocale = "zh";
+
   try {
     const raw = await req.json();
+    requestLocale = readAgentRequestLocale(raw);
     const body = agentBodySchema.parse(raw);
+    requestLocale = body.locale;
 
     const messages: ChatMessageInput[] = body.messages.map(m => ({
       role: m.role,
@@ -285,6 +293,7 @@ export async function POST(req: NextRequest) {
     const agentReferences = body.agentReferences;
     const agentReferenceId = body.agentReferenceId;
     const surface: AgentSurface = body.surface;
+    const responseLanguage = agentResponseLanguage(body.locale);
 
     const sendableAgentRefs = getSendableAgentMediaReferences(
       agentReferences,
@@ -333,13 +342,17 @@ export async function POST(req: NextRequest) {
       "- On board surface, call get_board_context or get_connected_context before returning boardAction.\n" +
       "- Call get_prompt_blueprint with screenplay-draft, script-analysis, shot-breakdown, or storyboard-board-patch when the user asks for script/storyboard workflow planning.\n" +
       "- Call get_prompt_templates when the user asks for reusable prompt templates.\n\n" +
+      "## Language Policy\n" +
+      `Write user-facing reply fields in ${responseLanguage}: thought, text, suggestedFollowUps, boardPatch.title, note body, and Agent/node instructions meant for the user.\n` +
+      "Keep generation prompt fields in English by default: params.prompt, imagePrompt, videoPrompt, audioStylePrompt, and prompt fields inside boardPatch operations.\n" +
+      "Only include non-English words inside generation prompt fields when the user explicitly asks for exact text to appear in generated media.\n\n" +
       boardMsg +
       "\n" +
       "## Runtime Summary\n" +
       `${contextSummary}\n\n` +
       "## Output\n" +
       "Return ONLY valid JSON:\n" +
-      '{"thought":"...","text":"Chinese user-facing reply","activeSkills":["..."],"recommendedAction":{"type":"none|optimize_prompt|generate_image|edit_image|generate_video|generate_audio","params":{"prompt":"...","model":"...","aspectRatio":"...","referenceImageId":"...","imageResolution":"...","imageQuality":"...","thinkingLevel":"...","videoResolution":"...","videoDuration":"...","videoPreset":"...","videoReferenceMode":"reference|firstLast","audioMode":"tts|voice_design|voice_clone|music|sfx|asr","audioFormat":"wav","audioStylePrompt":"...","voiceProfileId":"...","voiceCloneConsentAccepted":true}},"boardAction":{"type":"none|create_board_image_flow|create_board_video_flow|create_board_audio_flow|create_board_note|update_board_node|apply_board_patch|continue_image_to_video","params":{"nodeId":"...","prompt":"...","model":"...","aspectRatio":"...","referenceImageId":"...","imageResolution":"...","imageQuality":"...","thinkingLevel":"...","videoResolution":"...","videoDuration":"...","videoPreset":"...","videoReferenceMode":"reference|firstLast","audioMode":"tts|voice_design|voice_clone|music|sfx|asr","audioFormat":"wav","audioStylePrompt":"...","voiceProfileId":"...","voiceCloneConsentAccepted":true,"title":"...","body":"...","instruction":"...","boardPatch":{"title":"...","run":false,"shots":[{"id":"S1","scene":"...","shot":"...","beat":"...","imagePrompt":"...","videoPrompt":"...","run":false}],"operations":[{"op":"create_node","tempId":"shot1_prompt","kind":"prompt","title":"S1 Prompt","prompt":"...","position":{"x":120,"y":160}},{"op":"create_node","tempId":"shot1_audio","kind":"audio-operation","title":"S1 Audio","prompt":"...","model":"...","audioMode":"tts","audioFormat":"wav","run":false,"position":{"x":520,"y":160}},{"op":"connect_ports","from":{"nodeId":"shot1_prompt","portId":"prompt-out","portKind":"prompt"},"to":{"nodeId":"shot1_audio","portId":"prompt-in","portKind":"prompt"}}]},"run":true}},"suggestedFollowUps":["...","..."]}\n\n' +
+      '{"thought":"...","text":"User-facing reply","activeSkills":["..."],"recommendedAction":{"type":"none|optimize_prompt|generate_image|edit_image|generate_video|generate_audio","params":{"prompt":"...","model":"...","aspectRatio":"...","referenceImageId":"...","imageResolution":"...","imageQuality":"...","thinkingLevel":"...","videoResolution":"...","videoDuration":"...","videoPreset":"...","videoReferenceMode":"reference|firstLast","audioMode":"tts|voice_design|voice_clone|music|sfx|asr","audioFormat":"wav","audioStylePrompt":"...","voiceProfileId":"...","voiceCloneConsentAccepted":true}},"boardAction":{"type":"none|create_board_image_flow|create_board_video_flow|create_board_audio_flow|create_board_note|update_board_node|apply_board_patch|continue_image_to_video","params":{"nodeId":"...","prompt":"...","model":"...","aspectRatio":"...","referenceImageId":"...","imageResolution":"...","imageQuality":"...","thinkingLevel":"...","videoResolution":"...","videoDuration":"...","videoPreset":"...","videoReferenceMode":"reference|firstLast","audioMode":"tts|voice_design|voice_clone|music|sfx|asr","audioFormat":"wav","audioStylePrompt":"...","voiceProfileId":"...","voiceCloneConsentAccepted":true,"title":"...","body":"...","instruction":"...","boardPatch":{"title":"...","run":false,"shots":[{"id":"S1","scene":"...","shot":"...","beat":"...","imagePrompt":"...","videoPrompt":"...","run":false}],"operations":[{"op":"create_node","tempId":"shot1_prompt","kind":"prompt","title":"S1 Prompt","prompt":"...","position":{"x":120,"y":160}},{"op":"create_node","tempId":"shot1_audio","kind":"audio-operation","title":"S1 Audio","prompt":"...","model":"...","audioMode":"tts","audioFormat":"wav","run":false,"position":{"x":520,"y":160}},{"op":"connect_ports","from":{"nodeId":"shot1_prompt","portId":"prompt-out","portKind":"prompt"},"to":{"nodeId":"shot1_audio","portId":"prompt-in","portKind":"prompt"}}]},"run":true}},"suggestedFollowUps":["...","..."]}\n\n' +
       referenceMsg;
 
     const tools = getAgentTools();
@@ -351,9 +364,12 @@ export async function POST(req: NextRequest) {
       buildAgentMessages(messages, sendableAgentRefs),
       tools,
       toolCtx,
+      body.locale,
     );
 
     const parsedResponse = agentResponseSchema.parse(payload);
+    parsedResponse.thought ??= defaultAgentThought(body.locale);
+    parsedResponse.text ??= defaultAgentText(body.locale);
     validateActionModel(parsedResponse.recommendedAction);
     validateActionModel(parsedResponse.boardAction);
     if (surface === "board") {
@@ -376,7 +392,10 @@ export async function POST(req: NextRequest) {
 
     if (err instanceof z.ZodError) {
       console.error("Zod validation error:", JSON.stringify(err.issues, null, 2));
-      return NextResponse.json({ error: "Invalid agent request", details: err.issues }, { status: 400 });
+      return NextResponse.json({
+        error: requestLocale === "zh" ? "无效的 Agent 请求" : "Invalid agent request",
+        details: err.issues,
+      }, { status: 400 });
     }
 
     if (err instanceof ProviderModelParseError) {
@@ -384,13 +403,45 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({
-      thought: "Agent provider request failed.",
-      text: `抱歉，Agent 调用第三方服务失败：${message}`,
+      thought: agentServiceFailureThought(requestLocale),
+      text: agentServiceFailureText(message, requestLocale),
       activeSkills: ["PromptEngineer"],
       recommendedAction: { type: "none" as const },
-      suggestedFollowUps: ["检查 API Key 和 Base URL", "切换到传统创作模式"],
+      suggestedFollowUps: agentServiceFailureFollowUps(requestLocale),
     });
   }
+}
+
+function readAgentRequestLocale(value: unknown): AgentLocale {
+  if (typeof value !== "object" || value === null) return "zh";
+  const locale = (value as { locale?: unknown }).locale;
+  return locale === "en" ? "en" : "zh";
+}
+
+function agentResponseLanguage(locale: AgentLocale): string {
+  return locale === "zh" ? "Simplified Chinese" : "English";
+}
+
+function defaultAgentThought(locale: AgentLocale): string {
+  return locale === "zh" ? "已分析当前创作上下文。" : "Analyzed the current creative context.";
+}
+
+function defaultAgentText(locale: AgentLocale): string {
+  return locale === "zh" ? "我已准备好下一步建议操作。" : "I have prepared the next recommended action.";
+}
+
+function agentServiceFailureThought(locale: AgentLocale): string {
+  return locale === "zh" ? "Agent 服务请求失败。" : "Agent provider request failed.";
+}
+
+function agentServiceFailureText(message: string, locale: AgentLocale): string {
+  return locale === "zh" ? `Agent 服务请求失败：${message}` : `Agent service request failed: ${message}`;
+}
+
+function agentServiceFailureFollowUps(locale: AgentLocale): string[] {
+  return locale === "zh"
+    ? ["检查 API Key 和 Base URL", "切换到经典创作模式"]
+    : ["Check API Key and Base URL", "Switch to classic creation mode"];
 }
 
 function hasExecutableAgentAction(
@@ -448,6 +499,7 @@ async function runAgentLoop(
   userMessages: ChatMessageInput[],
   tools: ReturnType<typeof getAgentTools>,
   toolCtx: ToolContext,
+  locale: AgentLocale,
 ): Promise<{ payload: unknown; toolCalls: AgentToolCallSummary[] }> {
   const conversation: ChatMessageInput[] = [
     { role: "system", content: systemInstruction },
@@ -481,14 +533,14 @@ async function runAgentLoop(
       continue;
     }
 
-    return { payload: parseAgentPayloadText(readContent(choice.message.content)), toolCalls: toolCallLog };
+    return { payload: parseAgentPayloadText(readContent(choice.message.content), locale), toolCalls: toolCallLog };
   }
 
   const final = await createChatCompletionText(config, model, conversation, 0.75, AGENT_CHAT_RESPONSE_OPTIONS);
-  return { payload: parseAgentPayloadText(final), toolCalls: toolCallLog };
+  return { payload: parseAgentPayloadText(final, locale), toolCalls: toolCallLog };
 }
 
-function parseAgentPayloadText(text: string): unknown {
+function parseAgentPayloadText(text: string, locale: AgentLocale): unknown {
   try {
     return parseJsonObjectText(text);
   } catch (error) {
@@ -496,8 +548,12 @@ function parseAgentPayloadText(text: string): unknown {
     if (error.kind !== "missing") throw error;
     const fallbackText = text.trim();
     return {
-      thought: "Provider returned plain text instead of Agent JSON.",
-      text: fallbackText || "我收到了模型回复，但它没有返回可执行的 Agent JSON。",
+      thought: locale === "zh" ? "模型返回了纯文本，而不是 Agent JSON。" : "Provider returned plain text instead of Agent JSON.",
+      text: fallbackText || (
+        locale === "zh"
+          ? "我收到了模型回复，但它没有返回可执行的 Agent JSON。"
+          : "I received the model response, but it did not return executable Agent JSON."
+      ),
       activeSkills: [],
       recommendedAction: { type: "none" },
       boardAction: { type: "none" },

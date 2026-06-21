@@ -1566,7 +1566,7 @@ export default function BoardWorkspace({
   }, [onConnectionError, restoreNodeWithEdges, trashedNodes]);
 
   const connectSelectedBoardPromptReference = useCallback((nodeId: string, reference: BoardPromptReference): void => {
-    if (resolveBoardPromptReferenceGroup(reference) !== "画板") return;
+    if (resolveBoardPromptReferenceGroup(reference) !== "board") return;
     const assetNode = board.nodes.find(item => item.kind === "asset" && item.asset.assetId === reference.id);
     if (!assetNode) return;
     const targetNodeId = findPromptReferenceTargetNodeId(nodeId, board.nodes, board.edges);

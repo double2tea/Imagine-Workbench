@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { flushSync } from "react-dom";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
-import { t as i18nT, useTranslations } from "@/lib/i18n";
+import { t as i18nT, useTranslations, type Locale } from "@/lib/i18n";
 import AgentDock from "@/components/agent/AgentDock";
 import SaveVoiceProfileDialog, { type SaveVoiceProfileDialogInput } from "@/components/audio/SaveVoiceProfileDialog";
 import {
@@ -240,11 +240,17 @@ async function runSequentialGenerationVariants(variantCount: number, run: () => 
   return results;
 }
 
-const BOARD_MEDIA_ANALYSIS_INSTRUCTION =
-  "请分析这段媒体素材，只输出中文结构化分析。必须严格使用以下小标题，并保持顺序：\n" +
-  "画面主体\n风格\n镜头\n光线\n色彩\n动作\n可生成提示词\n" +
-  "如果素材是音频或包含音频，请在相关小标题中概括声音内容、节奏、情绪或可转化为画面/视频提示词的信息；没有画面的项目写“无画面”。\n" +
-  "不要返回 boardAction 或 recommendedAction；把可直接写入 Note 的分析正文放在 text 字段。";
+function boardMediaAnalysisInstruction(locale: Locale): string {
+  const outputLanguage = locale === "zh" ? "Simplified Chinese" : "English";
+  return [
+    `Analyze the attached media and write a structured note in ${outputLanguage}.`,
+    "Use these sections in order, translating section headings naturally into the output language: Subject, Style, Camera, Lighting, Color, Motion, Generation Prompt.",
+    "If the media is audio or includes audio, summarize sound content, rhythm, emotion, or visual/video prompt implications in the relevant sections.",
+    "If there is no visual content, state that clearly in the Subject section.",
+    "Keep the Generation Prompt section in English even when the rest of the note is not English.",
+    "Do not return boardAction or recommendedAction. Put the note-ready analysis body in the text field.",
+  ].join("\n");
+}
 
 interface BoardPageProps {
   boardId?: string;
@@ -2423,7 +2429,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         body: JSON.stringify({
           messages: [{
             role: "user",
-            content: BOARD_MEDIA_ANALYSIS_INSTRUCTION,
+            content: boardMediaAnalysisInstruction(locale),
           }],
           surface: "board",
           boardContext: buildAgentBoardContext(),
@@ -3432,6 +3438,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     handleSelectVideoModel,
     items,
     launchMaskEditor,
+    locale,
     optimizeActivePrompt,
     selectedChatModel,
     surface: "board",

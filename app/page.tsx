@@ -1506,6 +1506,7 @@ export default function Home() {
     handleSelectVideoModel,
     items,
     launchMaskEditor,
+    locale,
     optimizeActivePrompt,
     selectedChatModel,
     setAgentInput,

@@ -222,13 +222,15 @@ export function validateAgentToolAction(
     const audioMode = params.audioMode && capabilities.modes.includes(params.audioMode)
       ? params.audioMode
       : capabilities.defaultMode;
-    if (audioOperationRequiresTextInput(audioMode) && !params.prompt?.trim()) return "请先填写提示词";
+    if (audioOperationRequiresTextInput(audioMode) && !params.prompt?.trim()) return t("common.notices.agentPromptRequired");
     if (audioMode === "voice_clone" && params.voiceCloneConsentAccepted !== true) return t("common.notices.voiceCloneNeedsConsent");
     const references = context.references ?? [];
     const unsupportedReference = references.find(reference => !capabilities.referenceMediaTypes.includes(getMediaReferenceType(reference)));
-    if (unsupportedReference) return `当前音频模型不支持${mediaReferenceLabel(getMediaReferenceType(unsupportedReference))}参考`;
+    if (unsupportedReference) return t("common.notices.currentInputNotSupportMediaReference", {
+      type: mediaReferenceLabel(getMediaReferenceType(unsupportedReference), t),
+    });
     if (references.length < capabilities.minReferenceMedia) return audioOperationMissingReferenceMessage(capabilities);
-    if (references.length > capabilities.maxReferenceMedia) return `当前音频模型最多支持 ${capabilities.maxReferenceMedia} 个参考媒体`;
+    if (references.length > capabilities.maxReferenceMedia) return t("common.notices.audioModelMaxMedia", { max: capabilities.maxReferenceMedia });
     return null;
   }
 
@@ -238,27 +240,27 @@ export function validateAgentToolAction(
     action.type === "create_board_image_flow" ||
     action.type === "create_board_video_flow"
   ) {
-    if (!params.prompt?.trim()) return "请先填写提示词";
-    if (!params.model?.trim()) return "请先选择生成模型";
+    if (!params.prompt?.trim()) return t("common.notices.promptRequired");
+    if (!params.model?.trim()) return t("common.notices.modelRequired");
     return null;
   }
 
   if (action.type === "create_board_note") {
-    return params.body?.trim() || params.prompt?.trim() ? null : "请先填写笔记内容";
+    return params.body?.trim() || params.prompt?.trim() ? null : t("common.notices.noteContentRequired");
   }
 
   if (action.type === "apply_board_patch") {
     const operationCount = params.boardPatch?.operations.length ?? 0;
-    if (operationCount === 0) return "请先提供画板补丁操作";
+    if (operationCount === 0) return t("common.notices.boardPatchRequiresOperations");
     if (operationCount > AGENT_BOARD_PATCH_MAX_OPERATIONS) {
-      return `画板补丁最多支持 ${AGENT_BOARD_PATCH_MAX_OPERATIONS} 个操作`;
+      return t("common.notices.boardPatchMaxOperations", { max: AGENT_BOARD_PATCH_MAX_OPERATIONS });
     }
     return null;
   }
 
   if (action.type === "continue_image_to_video") {
-    if (!params.prompt?.trim()) return "请先填写视频提示词";
-    if (!params.model?.trim()) return "请先选择视频模型";
+    if (!params.prompt?.trim()) return t("common.notices.videoPromptRequired");
+    if (!params.model?.trim()) return t("common.notices.videoModelRequired");
     return null;
   }
 
@@ -282,7 +284,7 @@ export function validateAgentToolAction(
       typeof params.voiceCloneConsentAccepted === "boolean" ||
       params.voiceProfileId?.trim()
       ? null
-      : "请先填写要更新的节点内容";
+      : t("common.notices.boardNodeUpdateContentRequired");
   }
 
   return null;

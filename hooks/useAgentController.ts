@@ -1,4 +1,4 @@
-import { t } from "@/lib/i18n";
+import { t, type Locale } from "@/lib/i18n";
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { getExecutableAction, getPendingAgentAction, type ChatMessage } from "@/components/agent/AgentDock";
 import { API_ROUTES } from "@/lib/api/routes";
@@ -32,6 +32,7 @@ interface UseAgentControllerParams {
   handleSelectVideoModel: (model: string) => void;
   items: StorageItem[];
   launchMaskEditor: (imageUrl: string, id: string, destination?: "creative" | "agent") => void;
+  locale: Locale;
   optimizeActivePrompt: (promptOverride?: string) => Promise<void>;
   selectedChatModel: string;
   surface?: AgentSurface;
@@ -170,6 +171,7 @@ export function useAgentController({
   handleSelectVideoModel,
   items,
   launchMaskEditor,
+  locale,
   optimizeActivePrompt,
   selectedChatModel,
   surface = "workbench",
@@ -468,6 +470,7 @@ export function useAgentController({
             url: reference.url,
           })),
           agentReferenceId: sendableAgentReferences[0]?.id || undefined,
+          locale,
           model: selectedChatModel,
         }),
       });
