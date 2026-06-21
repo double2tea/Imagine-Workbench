@@ -22,6 +22,7 @@
     "./asset-content-hash.test.ts",
     "./board-asset-scope.test.ts",
     "./board-deletion.test.ts",
+    "./board-interaction-regression.test.ts",
     "./board-model-options.test.ts",
     "./board-result-stack.test.ts",
     "./board-text-node-size.test.ts",

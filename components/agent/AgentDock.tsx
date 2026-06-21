@@ -100,7 +100,7 @@ interface AgentOrbDragState {
 function clampAgentOrbPosition(position: AgentOrbPosition): AgentOrbPosition {
   const orbSize = getAgentOrbSize();
   const maxX = Math.max(AGENT_ORB_MARGIN, window.innerWidth - orbSize - AGENT_ORB_MARGIN);
-  const maxY = Math.max(AGENT_ORB_MARGIN, window.innerHeight - orbSize - AGENT_ORB_MARGIN);
+  const maxY = Math.max(AGENT_ORB_MARGIN, window.innerHeight - orbSize - AGENT_ORB_BOTTOM_SAFE_MARGIN);
   return {
     x: Math.min(Math.max(position.x, AGENT_ORB_MARGIN), maxX),
     y: Math.min(Math.max(position.y, AGENT_ORB_MARGIN), maxY),
@@ -207,6 +207,7 @@ const AGENT_ORB_DESKTOP_SIZE = 108;
 const AGENT_ORB_MOBILE_SIZE = 76;
 const AGENT_ORB_MOBILE_BREAKPOINT = 640;
 const AGENT_ORB_MARGIN = 12;
+const AGENT_ORB_BOTTOM_SAFE_MARGIN = 140;
 const AGENT_ORB_DRAG_THRESHOLD = 4;
 
 function isMobileAgentViewport(): boolean {

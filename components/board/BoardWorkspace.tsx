@@ -559,7 +559,7 @@ const BoardEdgeComponent = memo(function BoardEdgeComponent({
         markerEnd={markerEnd}
         markerStart={markerStart}
         style={style}
-        interactionWidth={18}
+        interactionWidth={36}
         className={`imagine-board-edge-path imagine-board-edge-path-${kind}`}
       />
       {showLabel ? (
@@ -1175,6 +1175,7 @@ export default function BoardWorkspace({
   const pendingMultiGridDropPointRef = useRef<{ clientX: number; clientY: number } | null>(null);
   const pendingDragPositionByIdRef = useRef<Map<string, BoardPoint>>(new Map());
   const selectionRef = useRef<BoardSelectionSnapshot>({ edgeId: null, nodeId: null, nodeIds: [] });
+  const protectedEdgeSelectionRef = useRef<string | null>(null);
   const isSyncingFlowNodesRef = useRef(false);
   const prevFlowDataRef = useRef<Map<string, BoardFlowNode["data"]>>(new Map());
   const prevFlowNodesRef = useRef<BoardFlowNode[] | null>(null);
@@ -1981,6 +1982,7 @@ export default function BoardWorkspace({
           className: `imagine-board-edge imagine-board-edge-${edge.kind}`,
           markerEnd: { type: MarkerType.ArrowClosed, color: flowEdgeColorByKind[edge.kind], width: 18, height: 18 },
           style: { strokeWidth: selectedEdgeId === edge.id ? 3 : 2 },
+          zIndex: selectedEdgeId === edge.id ? 20 : 8,
         });
       }
       return result;
@@ -2070,6 +2072,12 @@ export default function BoardWorkspace({
     const ids = nodes.map(node => node.id);
     const edgeId = edges[0]?.id ?? null;
     const nodeId = ids[0] ?? null;
+    if (ids.length === 0 && !edgeId && protectedEdgeSelectionRef.current) {
+      return;
+    }
+    if (edgeId || nodeId) {
+      protectedEdgeSelectionRef.current = null;
+    }
     if (
       ids.length === 0 &&
       !edgeId &&
@@ -2093,6 +2101,7 @@ export default function BoardWorkspace({
 
   const handleNodeClick = useCallback<NodeMouseHandler<BoardFlowNode>>(() => {
     closeOverlayMenus();
+    protectedEdgeSelectionRef.current = null;
   }, [closeOverlayMenus]);
 
   const openNodeContextMenu = useCallback((nodeId: string, clientX: number, clientY: number): void => {
@@ -2164,8 +2173,12 @@ export default function BoardWorkspace({
     setIsConnectionActive(false);
   }, []);
 
-  const handleEdgeClick = useCallback<EdgeMouseHandler<BoardFlowEdge>>((_event, edge) => {
+  const handleEdgeClick = useCallback<EdgeMouseHandler<BoardFlowEdge>>((event, edge) => {
+    event.preventDefault();
+    event.stopPropagation();
     closeOverlayMenus();
+    protectedEdgeSelectionRef.current = edge.id;
+    selectionRef.current = { edgeId: edge.id, nodeId: null, nodeIds: [] };
     selectEdge(edge.id);
     selectNode(null);
     updateSelectedNodeIds([]);
@@ -2295,6 +2308,7 @@ export default function BoardWorkspace({
   const handlePaneClick = useCallback((): void => {
     flowHostRef.current?.focus();
     closeOverlayMenus();
+    protectedEdgeSelectionRef.current = null;
     selectNode(null);
     selectEdge(null);
     updateSelectedNodeIds([]);
@@ -2745,38 +2759,35 @@ export default function BoardWorkspace({
     }
 
     if (sourceKind === "prompt") {
-      setQuickInsertMenu({
-        clientX: clientPoint.x,
-        clientY: clientPoint.y,
-        connectionFrom: { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "prompt" },
-        position: flowPoint,
+      addConnectedQuickNodeAtPoint(
+        "image-generate",
+        flowPoint,
+        { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "prompt" },
         selectedNodeIds,
-      });
+      );
       return;
     }
     if (sourceKind === "asset") {
       const sourceNode = board.nodes.find(node => node.id === sourceNodeId);
       if (isBoardMediaSourceNode(sourceNode)) {
         if (sourceHandleId === "asset-out") {
-          setQuickInsertMenu({
-            clientX: clientPoint.x,
-            clientY: clientPoint.y,
-            connectionFrom: { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "asset" },
-            position: flowPoint,
+          addConnectedQuickNodeAtPoint(
+            sourceNode.asset.type === "audio" ? "audio-operation" : sourceNode.asset.type === "video" ? "video-generate" : "image-generate",
+            flowPoint,
+            { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "asset" },
             selectedNodeIds,
-          });
+          );
           return;
         }
         return;
       }
       if (sourceNode?.kind !== "reference-group") return;
-      setQuickInsertMenu({
-        clientX: clientPoint.x,
-        clientY: clientPoint.y,
-        connectionFrom: { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "asset" },
-        position: flowPoint,
+      addConnectedQuickNodeAtPoint(
+        "image-generate",
+        flowPoint,
+        { nodeId: sourceNodeId, portId: sourceHandleId, portKind: "asset" },
         selectedNodeIds,
-      });
+      );
       return;
     }
     if (sourceKind === "result") {
@@ -2810,7 +2821,7 @@ export default function BoardWorkspace({
       selectEdge(null);
       return;
     }
-  }, [addAssetToMultiGrid, addResultNodeWithConnection, board.edges, board.nodes, centeredNodePosition, connectPortsBatch, flowPositionFromClient, galleryItemById, onConnectionError, selectEdge, selectedNodeIds, selectNode, tb, updateSelectedNodeIds]);
+  }, [addAssetToMultiGrid, addConnectedQuickNodeAtPoint, addResultNodeWithConnection, board.edges, board.nodes, centeredNodePosition, connectPortsBatch, flowPositionFromClient, galleryItemById, onConnectionError, selectEdge, selectedNodeIds, selectNode, tb, updateSelectedNodeIds]);
 
   const openQuickInsertMenu = useCallback((event: ReactMouseEvent | MouseEvent): void => {
     event.preventDefault();

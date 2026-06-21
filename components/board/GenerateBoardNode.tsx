@@ -418,6 +418,7 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
             className="imagine-generate-run-action imagine-tone-chip nodrag flex h-8 items-center justify-center gap-1.5 rounded-md border px-3 text-xs font-semibold transition"
             data-tone="danger"
             title={t("node.generateNode.cancelTask")}
+            aria-label={t("node.generateNode.cancelTask")}
           >
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             <X className="h-3 w-3" />
@@ -428,6 +429,8 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
             onClick={onExecute}
             disabled={isProcessing}
             className="imagine-generate-run-action nodrag flex h-8 items-center justify-center gap-1.5 rounded-md bg-blue-600 px-3 text-xs font-semibold text-white transition hover:bg-blue-500 disabled:bg-[var(--iw-panel-soft)] disabled:text-[var(--iw-faint)]"
+            title={t("node.generateNode.run")}
+            aria-label={t("node.generateNode.run")}
           >
             {node.kind === "image-generate" ? (
               <ImagePlus className="h-3.5 w-3.5" />

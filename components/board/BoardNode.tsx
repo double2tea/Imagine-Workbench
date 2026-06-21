@@ -342,7 +342,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             />
           ) : (
             <h2
-              className="nodrag board-group-node-title pointer-events-auto flex min-w-0 items-center gap-2 truncate"
+              className="board-group-node-title pointer-events-auto flex min-w-0 items-center gap-2 truncate"
               title="Double-click to rename"
               onDoubleClick={event => {
                 event.stopPropagation();
@@ -408,7 +408,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
         ) : (
           <h2
             className={[
-              "nodrag pointer-events-auto flex min-w-0 items-center truncate font-semibold text-[var(--iw-text)]",
+              "pointer-events-auto flex min-w-0 items-center truncate font-semibold text-[var(--iw-text)]",
               isMediaNode
                 ? "gap-1 rounded px-1 py-0.5 text-[10px] font-medium text-[var(--iw-muted)] [&>svg]:h-3 [&>svg]:w-3"
                 : "gap-2 text-xs",
