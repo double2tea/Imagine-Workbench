@@ -4,7 +4,7 @@ import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, u
 import { createPortal } from "react-dom";
 import { BookOpenText, CornerDownLeft, Pencil, Plus, Search, Trash2, WandSparkles, X } from "lucide-react";
 import { useAlert, useConfirm } from "@/components/confirm/ConfirmProvider";
-import { useTranslations } from "@/lib/i18n";
+import { useTranslations, type TFunction } from "@/lib/i18n";
 import {
   CUSTOM_PROMPT_TEMPLATES_CHANGE_EVENT,
   createCustomPromptTemplate,
@@ -43,6 +43,23 @@ const toolbarClass =
 
 const panelWidth = 420;
 const panelGap = 8;
+
+function translatedTemplateField(
+  template: PromptTemplate,
+  field: "parameterHint" | "scene" | "title",
+  t: TFunction,
+): string {
+  if (isUserPromptTemplate(template)) return template[field] ?? "";
+  const key = `promptTemplates.templates.${template.id}.${field}`;
+  const value = t(key);
+  return value === key ? template[field] ?? "" : value;
+}
+
+function translatedCategoryLabel(categoryId: PromptTemplateCategoryId, t: TFunction): string {
+  const key = `promptTemplates.categories.${categoryId}`;
+  const value = t(key);
+  return value === key ? categoryId : value;
+}
 const panelMaxHeight = 440;
 
 type TemplateEditorMode = "create" | "edit";
@@ -147,14 +164,14 @@ const PromptTemplatePicker = forwardRef<PromptTemplatePickerHandle, PromptTempla
       if (categoryId !== "all" && template.category !== categoryId) return false;
       if (!normalizedQuery) return true;
       return [
-        template.title,
-        template.scene,
+        translatedTemplateField(template, "title", t),
+        translatedTemplateField(template, "scene", t),
         template.positivePrompt,
         template.negativePrompt ?? "",
-        template.parameterHint ?? "",
+        translatedTemplateField(template, "parameterHint", t),
       ].join(" ").toLowerCase().includes(normalizedQuery);
     });
-  }, [categoryId, query, templates]);
+  }, [categoryId, query, t, templates]);
 
   const selectedTemplate =
     visibleTemplates.find(template => template.id === selectedId) ?? visibleTemplates[0] ?? null;
@@ -294,7 +311,7 @@ const PromptTemplatePicker = forwardRef<PromptTemplatePickerHandle, PromptTempla
                 className="imagine-motion-interactive h-7 shrink-0 rounded-md border border-transparent px-2.5 text-[11px] font-semibold text-[var(--iw-muted)] hover:bg-[var(--iw-panel-soft)] data-[active=true]:border-[var(--iw-tone-accent-border)] data-[active=true]:bg-[var(--iw-tone-accent-bg)] data-[active=true]:text-[var(--iw-tone-accent-text)]"
                 data-tone="accent"
               >
-                {category.label}
+                {translatedCategoryLabel(category.id, t)}
               </button>
             ))}
           </div>
@@ -347,18 +364,22 @@ const PromptTemplatePicker = forwardRef<PromptTemplatePickerHandle, PromptTempla
           ) : (
             <div className="grid min-h-0 grid-cols-[9.5rem_minmax(0,1fr)] gap-2">
               <div className="no-scrollbar min-h-0 overflow-auto rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-1">
-                {visibleTemplates.map(template => (
-                  <button
-                    key={template.id}
-                    type="button"
-                    onClick={() => setSelectedId(template.id)}
-                    data-active={selectedTemplate?.id === template.id}
-                    className="imagine-motion-interactive w-full rounded-md px-2 py-1.5 text-left hover:bg-[var(--iw-panel)] data-[active=true]:bg-[var(--iw-tone-accent-bg)]"
-                  >
-                    <span className="block truncate text-[11px] font-semibold text-[var(--iw-text)]">{template.title}</span>
-                    <span className="mt-0.5 block truncate text-[9px] text-[var(--iw-muted)]">{template.scene}</span>
-                  </button>
-                ))}
+                {visibleTemplates.map(template => {
+                  const title = translatedTemplateField(template, "title", t);
+                  const scene = translatedTemplateField(template, "scene", t);
+                  return (
+                    <button
+                      key={template.id}
+                      type="button"
+                      onClick={() => setSelectedId(template.id)}
+                      data-active={selectedTemplate?.id === template.id}
+                      className="imagine-motion-interactive w-full rounded-md px-2 py-1.5 text-left hover:bg-[var(--iw-panel)] data-[active=true]:bg-[var(--iw-tone-accent-bg)]"
+                    >
+                      <span className="block truncate text-[11px] font-semibold text-[var(--iw-text)]">{title}</span>
+                      <span className="mt-0.5 block truncate text-[9px] text-[var(--iw-muted)]">{scene}</span>
+                    </button>
+                  );
+                })}
                 {visibleTemplates.length === 0 && (
                   <div className="rounded-md border border-dashed border-[var(--iw-border)] p-3 text-center text-[11px] text-[var(--iw-muted)]">
                     {t("promptTemplates.noMatchMessage")}
@@ -370,11 +391,11 @@ const PromptTemplatePicker = forwardRef<PromptTemplatePickerHandle, PromptTempla
                 <div className="flex items-start justify-between gap-2 border-b border-[var(--iw-border)] px-3 py-2">
                   <div className="min-w-0">
                     <p className="truncate text-xs font-semibold text-[var(--iw-text)]">
-                      {selectedTemplate?.title ?? t("promptTemplates.selectTemplatePlaceholder")}
+                      {selectedTemplate ? translatedTemplateField(selectedTemplate, "title", t) : t("promptTemplates.selectTemplatePlaceholder")}
                     </p>
-                    {selectedTemplate?.parameterHint && (
-                      <p className="mt-0.5 truncate text-[9px] text-[var(--iw-muted)]">{selectedTemplate.parameterHint}</p>
-                    )}
+                    {selectedTemplate && translatedTemplateField(selectedTemplate, "parameterHint", t) ? (
+                      <p className="mt-0.5 truncate text-[9px] text-[var(--iw-muted)]">{translatedTemplateField(selectedTemplate, "parameterHint", t)}</p>
+                    ) : null}
                   </div>
                   {selectedUserTemplate && (
                     <div className="flex shrink-0 items-center gap-1">

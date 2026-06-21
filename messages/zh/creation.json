@@ -124,6 +124,8 @@
     "functionUnavailable": "当前功能不可用",
     "formatLabel": "输出格式",
     "addReferenceLabel": "加参考",
+    "emptyHelp": "支持 {referenceTypes} | 最多 {limit} 个 | {referenceHelp}",
+    "emptyLabel": "添加{label}",
     "clearReferenceLabel": "清空参考",
     "emptyHelpWithLimit": "可拖入右侧资产或上传音频/视频/图片参考",
     "emptyHelpNoLimit": "当前模型不支持参考媒体",

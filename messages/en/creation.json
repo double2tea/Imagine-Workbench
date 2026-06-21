@@ -202,9 +202,40 @@
     "referenceUploadSupported": "Browse uploads",
     "referenceUploadUnsupported": "Upload unavailable"
   },
+  "videoGeneration": {
+    "optimizeLabel": "Polish",
+    "desktopHint": "Drag assets here to insert @mediaN | Drop below as reference only",
+    "promptLabel": "Video scene and motion description",
+    "modelLabel": "Video generation model",
+    "aspectRatioLabel": "Aspect ratio",
+    "referenceTypeImage": "JPG / PNG / WEBP",
+    "referenceTypeImageVideo": "Image / Video",
+    "referenceTypeImageVideoAudio": "Image / Video / Audio",
+    "referenceModeLabel": "Reference mode",
+    "referenceModeNone": "No reference",
+    "referenceModeReference": "Reference",
+    "referenceModeFirstLast": "First / Last frame",
+    "resolutionLabel": "Resolution",
+    "durationLabel": "Duration",
+    "presetLabel": "Preset",
+    "addReferenceLabel": "Add reference",
+    "emptyHelp": "Supports {referenceTypes} | up to {limit} | {referenceHelp}",
+    "emptyLabel": "Add {label}",
+    "libraryBrowseLabel": "Choose from Library",
+    "libraryTileLabel": "Library",
+    "uploadLabel": "Browse uploads"
+  },
   "modelSelect": {
     "searchPlaceholder": "Search models",
     "noMatchMessage": "No matching models"
+  },
+  "generateButton": {
+    "defaultLabel": {
+      "image": "Generate Image",
+      "video": "Generate Video",
+      "audio": "Generate Audio"
+    },
+    "submittingLabel": "Submitting ({count}); you can keep queueing"
   },
   "parameters": {
     "defaultTitle": "Advanced Model Parameters",

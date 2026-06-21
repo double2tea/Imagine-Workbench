@@ -33,7 +33,8 @@
     "locateSource": "定位源",
     "viewResult": "查看结果",
     "rerun": "重试执行",
-    "ignore": "忽略"
+    "ignore": "忽略",
+    "generate": "生成"
   },
   "close": "关闭",
   "apply": "应用",
@@ -79,7 +80,9 @@
     "imageModelNeedMinReferences": "当前图片模型需要至少 {min} 张参考图",
     "imageModelMaxReferences": "当前图片模型最多支持 {max} 张参考图",
     "videoGenNotSupportMediaInput": "当前视频模型不支持{type}输入",
+    "modelRequired": "请先选择模型",
     "audioModelNeedMoreReferences": "当前音频模型需要更多参考媒体",
+    "promptRequired": "请先填写提示词",
     "audioModelMaxMedia": "当前音频模型最多支持 {max} 个参考媒体",
     "audioGenNeedModel": "音频生成需要明确音频模型",
     "audioGenComplete": "音频生成完成",
@@ -97,6 +100,7 @@
     "agentOnlySupportImageVideoAudio": "Agent 只支持上传图片、视频或音频引用",
     "agentMediaRefFileTooLarge": "{type}引用文件过大，请压缩后重试",
     "agentMediaRefUploaded": "已上传 Agent {type}引用（{current}/{max}）",
+    "agentPromptRequired": "请先填写提示词",
     "voiceProfileReadFailed": "音色读取失败",
     "voiceProfileNotFound": "找不到选中的音色",
     "voiceProfileNotUsableForModel": "当前模型不能使用选中的音色",
@@ -116,6 +120,8 @@
     "imageGenRequestFailed": "图片生成请求失败",
     "videoGenRequestFailed": "视频生成请求失败",
     "audioGenRequestFailed": "音频生成请求失败",
+    "boardNodeUpdateContentRequired": "请先填写要更新的节点内容",
+    "noteContentRequired": "请先填写笔记内容",
     "taskRetryFailed": "任务重试失败",
     "audioModelRequestFailed": "{providerLabel}（{model}）音频生成请求失败：{error}",
     "originalMediaReadFailed": "原始媒体读取失败",
@@ -154,6 +160,8 @@
     "downloadFailedNetwork": "下载失败，请检查网络或文件是否可访问。",
     "videoFrameCaptureFailed": "只有视频资产可以截帧",
     "videoFrameSaved": "已保存{label}为图片资产",
+    "boardPatchMaxOperations": "画板补丁最多支持 {max} 个操作",
+    "boardPatchRequiresOperations": "请先提供画板补丁操作",
     "panoramaViewFailed": "只有图片资产可以进入全景查看",
     "panoramaScreenshotsSaved": "已保存 {count} 张全景截图",
     "modelListFetchFailed": "模型列表获取失败",
@@ -194,6 +202,8 @@
     "agentFollowUp2": "我想做一段太空科幻题材视频",
     "agentFollowUp3": "根据当前画廊给我三个延展方向",
     "agentReceivedInstruction": "我已收到指令，该项目可以怎么推进？",
+    "videoPromptRequired": "请先填写视频提示词",
+    "videoModelRequired": "请先选择视频模型",
     "agentAnalysisThought": "分析场景，规划后续设计合成步骤...",
     "agentRequestOverloaded": "请求过载",
     "agentNetworkError": "抱歉，Agent 在网络调谐时出现异常 ({message}). 请检查网络、API Key 或重试。",
@@ -333,7 +343,38 @@
     "saveButton": "保存音色",
     "validationEmptyName": "先输入音色名称",
     "validationNeedsConsent": "保存克隆音色前请确认参考音频授权",
-    "saveFailed": "保存音色失败"
+    "saveFailed": "保存音色失败",
+    "defaultCloneName": "克隆音色",
+    "audioAssetRequired": "只能将音频资产保存为克隆音色",
+    "tagGroups": {
+      "gender": { "label": "性别" },
+      "age": { "label": "年龄" },
+      "scene": { "label": "场景" },
+      "texture": { "label": "质感" }
+    },
+    "tags": {
+      "male": "男声",
+      "female": "女声",
+      "neutral": "中性",
+      "child": "儿童",
+      "young": "青年",
+      "middleAged": "中年",
+      "elder": "老人",
+      "ad": "广告",
+      "natural": "自然",
+      "documentary": "纪录",
+      "variety": "综艺",
+      "news": "新闻",
+      "narration": "旁白",
+      "podcast": "播客",
+      "character": "角色",
+      "clear": "清亮",
+      "magnetic": "磁性",
+      "raspy": "沙哑",
+      "sweet": "甜美",
+      "calm": "沉稳",
+      "lively": "活泼"
+    }
   },
   "voicePreview": {
     "play": "播放",
@@ -371,10 +412,26 @@
     "quickAtReference": "快捷 @ 引用",
     "selectReference": "选择引用对象",
     "referenceMedia": "参考媒体",
+    "sourceConnection": "连接",
+    "sourceBoard": "画板",
+    "sourceLibrary": "库",
     "noMatchFound": "未找到匹配的已导入参考媒体",
     "atReferenceHint": "连接参考媒体、拖入画板资产，或从库中选取作品后，用 @图片N / @视频N / @音频N 指定引用",
     "removeImage": "移除该图",
-    "roleToggle": "点击切换：首帧 / 尾帧 / 普通参考"
+    "roleToggle": "点击切换：首帧 / 尾帧 / 普通参考",
+    "uploadInputLabel": "{label}：{uploadLabel}"
+  },
+  "agentReference": {
+    "separator": "、",
+    "countItem": "{count} {unit}{type}",
+    "units": {
+      "image": "张",
+      "video": "段",
+      "audio": "段"
+    },
+    "unsupportedHint": "下一条消息含 {countLabel}；目录中相近模型不支持{unsupported}输入，失败时请更换模型",
+    "supportedHint": "下一条消息含 {countLabel}（目录显示支持{supported}输入）",
+    "unknownHint": "下一条消息含 {countLabel}（未在 OpenRouter 目录命中，仍用所选模型）"
   },
   "confirmDialogs": {
     "clearAssets": "将清空本地 IndexedDB 中的全部资产（图片、视频、音频与转写）。已下载到本地的文件不受影响；画板节点与布局不会自动清空。确认继续？",
@@ -395,7 +452,8 @@
     "originalMediaNotFound": "找不到原始媒体",
     "downloadFailedNoOriginal": "下载失败，无法读取原始媒体。",
     "downloadFailedNetwork": "下载失败，请检查网络或文件是否可访问。",
-    "referenceMediaNotFound": "找不到参考媒体原图"
+    "referenceMediaNotFound": "找不到参考媒体原图",
+    "videoPreviewDrawFailed": "视频预览绘制失败"
   },
   "statusLabels": {
     "pending": "排队",
@@ -469,7 +527,12 @@
     "taskIgnoreFailed": "任务忽略失败",
     "selectImageNode": "请选择一个图片节点",
     "boardsReset": "画板已重置",
-    "boardsResetFailed": "画板重置失败"
+    "boardsResetFailed": "画板重置失败",
+    "imageQuickEditStart": "{label}已开始，结果会更新这张任务卡片",
+    "imageQuickEditComplete": "{label}完成，已保存为新图片资产",
+    "imageQuickEditSaveFailed": "本地存储失败，未开始{label}：{error}",
+    "imageQuickEditFailed": "{label}失败",
+    "imageQuickEditOriginalReadFailed": "{label}原图读取失败"
   },
   "gallery": {
     "title": "作品画廊",

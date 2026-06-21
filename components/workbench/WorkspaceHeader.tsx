@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FolderHeart, Github, Grid2X2, Languages, Mail, Moon, Plug, Settings, Sun, Trash2 } from "lucide-react";
+import { FolderHeart, Github, Globe, Grid2X2, Mail, Moon, Plug, Settings, Sun, Trash2 } from "lucide-react";
 import WorkspaceTopBarBrand from "@/components/workbench/WorkspaceTopBarBrand";
 import WorkspaceTopBar, {
   workspaceTopBarButtonClass,
@@ -107,7 +107,7 @@ export default function WorkspaceHeader({
             title={locale === "zh" ? t("workspaceHeader.language.en") : t("workspaceHeader.language.zh")}
             aria-label={locale === "zh" ? t("workspaceHeader.language.en") : t("workspaceHeader.language.zh")}
           >
-            <Languages className="h-3.5 w-3.5" />
+            <Globe className="h-3.5 w-3.5" />
             <span className="text-[11px] font-semibold leading-none">{locale === "zh" ? t("workspaceHeader.language.enShort") : t("workspaceHeader.language.zhShort")}</span>
           </button>
 

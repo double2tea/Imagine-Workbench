@@ -1,4 +1,5 @@
 import type { StorageItem } from "./db";
+import { t as globalT, type TFunction } from "./i18n";
 import type { AiProvider } from "./providers/model-catalog";
 import { getAudioModelCapabilities, tryParseProviderModel, type AudioOperationMode } from "./providers/model-catalog";
 import { MIMO_BUILT_IN_VOICES } from "./providers/mimo-voices";
@@ -35,13 +36,49 @@ export type VoiceProfileInput = Omit<VoiceProfile, "createdAt" | "updatedAt"> & 
 const BUILT_IN_PROFILE_TIMESTAMP = "2026-06-07T00:00:00.000Z";
 
 export const VOICE_PROFILE_TAG_GROUPS = [
-  { label: "性别", tags: ["男声", "女声", "中性"] },
-  { label: "年龄", tags: ["儿童", "青年", "中年", "老人"] },
-  { label: "场景", tags: ["广告", "自然", "纪录", "综艺", "新闻", "旁白", "播客", "角色"] },
-  { label: "质感", tags: ["清亮", "磁性", "沙哑", "甜美", "沉稳", "活泼"] },
+  { key: "gender", label: "性别", tags: ["男声", "女声", "中性"] },
+  { key: "age", label: "年龄", tags: ["儿童", "青年", "中年", "老人"] },
+  { key: "scene", label: "场景", tags: ["广告", "自然", "纪录", "综艺", "新闻", "旁白", "播客", "角色"] },
+  { key: "texture", label: "质感", tags: ["清亮", "磁性", "沙哑", "甜美", "沉稳", "活泼"] },
 ] as const;
 
 export const VOICE_PROFILE_TAG_OPTIONS = VOICE_PROFILE_TAG_GROUPS.flatMap(group => group.tags);
+type VoiceProfileTagGroup = (typeof VOICE_PROFILE_TAG_GROUPS)[number];
+type VoiceProfileTag = (typeof VOICE_PROFILE_TAG_OPTIONS)[number];
+
+const VOICE_PROFILE_TAG_KEYS: Record<VoiceProfileTag, string> = {
+  儿童: "child",
+  中年: "middleAged",
+  中性: "neutral",
+  旁白: "narration",
+  新闻: "news",
+  沙哑: "raspy",
+  沉稳: "calm",
+  活泼: "lively",
+  清亮: "clear",
+  甜美: "sweet",
+  男声: "male",
+  磁性: "magnetic",
+  女声: "female",
+  老人: "elder",
+  自然: "natural",
+  纪录: "documentary",
+  综艺: "variety",
+  角色: "character",
+  青年: "young",
+  广告: "ad",
+  播客: "podcast",
+};
+
+export function voiceProfileTagGroupLabel(group: VoiceProfileTagGroup, labelT: TFunction): string {
+  return labelT(`voiceProfile.tagGroups.${group.key}.label`);
+}
+
+export function voiceProfileTagLabel(tag: string, labelT: TFunction): string {
+  return tag in VOICE_PROFILE_TAG_KEYS
+    ? labelT(`voiceProfile.tags.${VOICE_PROFILE_TAG_KEYS[tag as VoiceProfileTag]}`)
+    : tag;
+}
 
 export interface SaveClonedVoiceProfileInput {
   name: string;
@@ -52,7 +89,7 @@ export interface SaveClonedVoiceProfileInput {
 
 export const BUILT_IN_VOICE_PROFILES: VoiceProfile[] = MIMO_BUILT_IN_VOICES.map(voice => ({
   id: `mimo_builtin_${voice}`,
-  name: voice === "mimo_default" ? "MiMo 默认" : voice,
+  name: voice === "mimo_default" ? "MiMo Default" : voice,
   provider: "mimo",
   source: "builtin",
   tags: [],
@@ -105,21 +142,22 @@ export function isVoiceProfileUsableForAudioModel(
   return profile.provider === parsedModel.provider;
 }
 
-export function voiceProfileDefaultNameFromAsset(item: Pick<StorageItem, "prompt" | "createdAt">): string {
+export function voiceProfileDefaultNameFromAsset(item: Pick<StorageItem, "prompt" | "createdAt">, labelT: TFunction = globalT): string {
   const prompt = item.prompt.trim();
   if (prompt) return prompt.slice(0, 24);
   const date = new Date(item.createdAt);
-  if (!Number.isFinite(date.getTime())) return "克隆音色";
-  return `克隆音色 ${date.toLocaleDateString("zh-CN")}`;
+  const defaultName = labelT("voiceProfile.defaultCloneName");
+  if (!Number.isFinite(date.getTime())) return defaultName;
+  return `${defaultName} ${date.toLocaleDateString()}`;
 }
 
 export async function saveClonedVoiceProfileFromAsset(
   item: Pick<StorageItem, "id" | "type" | "prompt" | "model" | "createdAt">,
   input: SaveClonedVoiceProfileInput,
 ): Promise<VoiceProfile> {
-  if (item.type !== "audio") throw new Error("只能将音频资产保存为克隆音色");
+  if (item.type !== "audio") throw new Error(globalT("common.voiceProfile.audioAssetRequired"));
   const name = input.name.trim();
-  if (!name) throw new Error("先输入音色名称");
+  if (!name) throw new Error(globalT("common.voiceProfile.validationEmptyName"));
   const parsedProvider = tryParseProviderModel(item.model, input.fallbackProvider)?.provider ?? input.fallbackProvider;
   const now = new Date().toISOString();
   return saveVoiceProfile({

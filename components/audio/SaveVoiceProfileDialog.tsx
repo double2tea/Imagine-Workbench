@@ -2,7 +2,12 @@
 
 import { Mic2, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { VOICE_PROFILE_TAG_GROUPS, voiceProfileDefaultNameFromAsset } from "@/lib/voice-profiles";
+import {
+  VOICE_PROFILE_TAG_GROUPS,
+  voiceProfileDefaultNameFromAsset,
+  voiceProfileTagGroupLabel,
+  voiceProfileTagLabel,
+} from "@/lib/voice-profiles";
 import type { StorageItem } from "@/lib/db";
 import { useTranslations } from "@/lib/i18n";
 
@@ -29,13 +34,13 @@ export default function SaveVoiceProfileDialog({ item, onClose, onSave }: SaveVo
 
   useEffect(() => {
     if (!item) return;
-    setName(voiceProfileDefaultNameFromAsset(item));
+    setName(voiceProfileDefaultNameFromAsset(item, t));
     setDescription("");
     setSelectedTags([]);
     setConsentAccepted(false);
     setMessage("");
     setIsSaving(false);
-  }, [item]);
+  }, [item, t]);
 
   if (!item) return null;
 
@@ -113,7 +118,7 @@ export default function SaveVoiceProfileDialog({ item, onClose, onSave }: SaveVo
             <div className="grid gap-2">
               {VOICE_PROFILE_TAG_GROUPS.map(group => (
                 <div key={group.label} className="grid gap-1.5">
-                  <span className="text-[10px] font-semibold text-[var(--iw-muted)]">{group.label}</span>
+                  <span className="text-[10px] font-semibold text-[var(--iw-muted)]">{voiceProfileTagGroupLabel(group, t)}</span>
                   <div className="flex flex-wrap gap-1.5">
                     {group.tags.map(tag => (
                       <button
@@ -127,7 +132,7 @@ export default function SaveVoiceProfileDialog({ item, onClose, onSave }: SaveVo
                         }`}
                         data-tone="warning"
                       >
-                        {tag}
+                        {voiceProfileTagLabel(tag, t)}
                       </button>
                     ))}
                   </div>

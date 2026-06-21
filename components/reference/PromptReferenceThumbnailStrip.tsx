@@ -5,6 +5,7 @@ import {
   getMediaReferencePromptToken,
   getMediaReferenceType,
   mediaReferenceLabel,
+  buildPromptReferenceTokenPattern,
   type MediaReferenceType,
 } from "@/lib/media-references";
 import { t as globalT } from "@/lib/i18n";
@@ -15,8 +16,6 @@ export interface PromptReferenceThumbnail {
   token: string;
 }
 
-const promptReferenceTokenPattern = /@(图片|视频|音频)(\d+)/g;
-
 export function resolvePromptReferenceThumbnails(
   prompt: string,
   references: ReadonlyArray<ReferenceImageRef>,
@@ -24,6 +23,7 @@ export function resolvePromptReferenceThumbnails(
 ): PromptReferenceThumbnail[] {
   const seen = new Set<number>();
   const matches: PromptReferenceThumbnail[] = [];
+  const promptReferenceTokenPattern = buildPromptReferenceTokenPattern();
   const acceptedTypeSet = acceptedMediaTypes ? new Set(acceptedMediaTypes) : null;
   for (const match of prompt.matchAll(promptReferenceTokenPattern)) {
     const parsed = Number(match[2]);
@@ -80,6 +80,8 @@ export default function PromptReferenceInlineOverlay({
     resolvePromptReferenceThumbnails(prompt, references, acceptedMediaTypes).map(thumbnail => [thumbnail.index, thumbnail]),
   );
   if (thumbnailByIndex.size === 0) return null;
+
+  const promptReferenceTokenPattern = buildPromptReferenceTokenPattern();
 
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;

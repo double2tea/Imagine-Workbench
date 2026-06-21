@@ -109,7 +109,7 @@ export default function ReferenceImagePicker({
     : [];
   const canAdd = maxCount > 0 && visibleReferenceItems.length < maxCount;
   const accept = acceptedMediaTypes.map(type => `${type}/*`).join(",");
-  const uploadInputLabel = `${label}：${uploadLabel}`;
+  const uploadInputLabel = t("reference.uploadInputLabel", { label, uploadLabel });
   const showLibrary = Boolean(onOpenLibrary && maxCount > 0);
 
   const handleDragOver = (event: DragEvent<HTMLDivElement>) => {

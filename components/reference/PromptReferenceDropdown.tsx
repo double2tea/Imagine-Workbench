@@ -28,6 +28,15 @@ interface FilteredReferenceItem {
   token: string;
 }
 
+function boardPromptReferenceGroupLabel(group: BoardPromptReferenceSource, label: (key: string) => string): string {
+  const keys: Record<BoardPromptReferenceSource, string> = {
+    connection: "common.reference.sourceConnection",
+    board: "common.reference.sourceBoard",
+    library: "common.reference.sourceLibrary",
+  };
+  return label(keys[group]);
+}
+
 function filterReferences(
   references: Array<ReferenceImageRef | BoardPromptReference>,
   search: string,
@@ -42,13 +51,15 @@ function filterReferences(
       token: getMediaReferencePromptToken(index, getMediaReferenceType(reference)),
     }))
     .filter(item => !acceptedTypeSet || acceptedTypeSet.has(getMediaReferenceType(item.reference)))
-    .filter(
-      item =>
+    .filter(item => {
+      const group = resolveBoardPromptReferenceGroup(item.reference);
+      return (
         query.length === 0 ||
         item.token.toLowerCase().includes(query) ||
         item.reference.id.toLowerCase().includes(query) ||
-        (resolveBoardPromptReferenceGroup(item.reference)?.includes(query) ?? false),
-    );
+        (group ? boardPromptReferenceGroupLabel(group, globalT).toLowerCase().includes(query) : false)
+      );
+    });
 }
 
 function groupFilteredReferences(items: FilteredReferenceItem[]): Map<BoardPromptReferenceSource, FilteredReferenceItem[]> {
@@ -83,7 +94,9 @@ function ReferenceRow({ item, onSelect }: { item: FilteredReferenceItem; onSelec
       <div className="min-w-0 flex-1">
         <p className="truncate font-mono text-[10px] font-bold text-[var(--iw-accent-strong)]">{item.token}</p>
         <p className="truncate text-[9px] text-[var(--iw-faint)]">
-          {mediaReferenceLabel(mediaType, globalT)} · {group ? item.reference.id : ("sourceLabel" in item.reference && item.reference.sourceLabel) || item.reference.id}
+          {mediaReferenceLabel(mediaType, globalT)} · {group
+            ? boardPromptReferenceGroupLabel(group, globalT)
+            : ("sourceLabel" in item.reference && item.reference.sourceLabel) || item.reference.id}
         </p>
       </div>
     </button>
@@ -119,7 +132,7 @@ function ReferenceList({
         if (!items?.length) return null;
         return (
           <section key={group} className="imagine-at-dropdown-group">
-            <p className="imagine-at-dropdown-group-label">{group}</p>
+            <p className="imagine-at-dropdown-group-label">{boardPromptReferenceGroupLabel(group, globalT)}</p>
             {items.map(item => (
               <ReferenceRow key={`${group}:${item.reference.id}:${item.index}`} item={item} onSelect={onSelect} />
             ))}

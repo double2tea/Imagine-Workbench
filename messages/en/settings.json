@@ -41,7 +41,7 @@
       "critical": "Needs Repair", "criticalDetail": "Missing references or broken records found. Back up before processing.",
       "attention": "Needs Attention", "attentionDetail": "Some items can be cleaned or repaired. Data is still usable."
     },
-    "dataStatusLabel": "Data Status",
+    "dataStatusLabel": "Data Status", "dataStatusTemplate": "Data Status: {label}",
     "cleanupLabels": { "failed": "Failed tasks", "staleProcessing": "Processing/queued tasks over 2 hours", "brokenComplete": "Completed records missing media content", "orphaned": "Completed assets not referenced by any board" },
     "localStorageLabels": { "agent": "Agent session", "modelCache": "Model cache", "providerCredentials": "Provider credentials", "uiPreferences": "UI preferences" },
     "storageSlots": { "meta": "Meta", "hash": "Hash", "preview": "Preview", "legacyBlob": "Legacy Blob", "legacyAssets": "Legacy Assets" },
@@ -66,7 +66,7 @@
     },
     "storageStructure": "Storage Structure", "storageStructureDescription": "Asset meta, shared payload, preview cache, and legacy format migration status",
     "backupAndSafety": "Backup & Safety", "backupSourcePrefix": "Source: {origin}",
-    "backupLastSnapshotPrefix": "Last safety snapshot: {snapshot}", "backupNone": "None",
+    "backupLastSnapshotPrefix": "Last safety snapshot: {snapshot}", "backupSummaryTemplate": "Source: {origin}; Last safety snapshot: {snapshot}", "backupNone": "None",
     "exportImportCredentialsLabel": "Export/Import provider credentials",
     "fullBackupButton": "Full Backup", "fullBackupBusy": "Exporting full backup...",
     "currentBoardButton": "Current Board", "currentBoardBusy": "Exporting current board...",

@@ -385,7 +385,7 @@ export default function DataManagementWorkspace({
           <div className="flex items-center gap-2">
             {integrity?.status === "healthy" ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
             <div>
-              <p className="text-xs font-semibold">{t("dataManagement.dataStatusLabel")}：{health.label}</p>
+              <p className="text-xs font-semibold">{t("dataManagement.dataStatusTemplate", { label: health.label })}</p>
               <p className="mt-1 text-[11px] leading-5 opacity-85">{health.detail}</p>
             </div>
           </div>
@@ -515,9 +515,11 @@ export default function DataManagementWorkspace({
               {t("dataManagement.backupAndSafety")}
             </p>
             <p className="mt-1 text-[11px] leading-5 text-[var(--iw-muted)]">
-              {t("dataManagement.backupSourcePrefix", { origin: summary?.safety.origin || "--" })}；{t("dataManagement.backupLastSnapshotPrefix", { snapshot: latestSafetySnapshot
-                ? `${formatWorkspaceSafetySnapshotReason(latestSafetySnapshot.reason)} · ${new Date(latestSafetySnapshot.createdAt).toLocaleString()} · ${formatBytes(latestSafetySnapshot.sizeBytes)}`
-                : t("dataManagement.backupNone")
+              {t("dataManagement.backupSummaryTemplate", {
+                origin: summary?.safety.origin || "--",
+                snapshot: latestSafetySnapshot
+                  ? `${formatWorkspaceSafetySnapshotReason(latestSafetySnapshot.reason)} · ${new Date(latestSafetySnapshot.createdAt).toLocaleString()} · ${formatBytes(latestSafetySnapshot.sizeBytes)}`
+                  : t("dataManagement.backupNone"),
               })}
             </p>
             <label className="mt-2 flex items-center gap-2 text-[11px] text-[var(--iw-muted)]">

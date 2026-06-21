@@ -39,6 +39,8 @@ import {
   isBuiltInVoiceProfileId,
   listVoiceProfiles,
   saveVoiceProfile,
+  voiceProfileTagGroupLabel,
+  voiceProfileTagLabel,
   type VoiceProfile,
   type VoiceProfileSource,
 } from "@/lib/voice-profiles";
@@ -117,6 +119,7 @@ export default function AudioGenerationPanel({
   showGenerateButton = true,
 }: AudioGenerationPanelProps) {
   const { t } = useTranslations("creation");
+  const { t: commonT } = useTranslations("common");
   const confirmAction = useConfirm();
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
   const promptSelectionRef = useRef<PromptComposerSelectionRange | null>(null);
@@ -144,10 +147,15 @@ export default function AudioGenerationPanel({
     const search = voiceProfileSearch.trim().toLowerCase();
     if (!search) return visibleVoiceProfiles;
     return visibleVoiceProfiles.filter(profile => {
-      const haystack = [profile.name, profile.description ?? "", ...profile.tags].join(" ").toLowerCase();
+      const haystack = [
+        profile.name,
+        profile.description ?? "",
+        ...profile.tags,
+        ...profile.tags.map(tag => voiceProfileTagLabel(tag, commonT)),
+      ].join(" ").toLowerCase();
       return haystack.includes(search);
     });
-  }, [visibleVoiceProfiles, voiceProfileSearch]);
+  }, [commonT, visibleVoiceProfiles, voiceProfileSearch]);
   const selectedVoiceProfile = visibleVoiceProfiles.find(profile => profile.id === selectedVoiceProfileId);
   const defaultBuiltInVoiceProfile = visibleVoiceProfiles.find(
     profile => profile.source === "builtin" && profile.providerVoiceId === "mimo_default",
@@ -531,7 +539,9 @@ export default function AudioGenerationPanel({
                 <option value={selectedVoiceProfile.id}>{selectedVoiceProfile.name}</option>
               )}
               {filteredVoiceProfiles.map(profile => (
-                <option key={profile.id} value={profile.id}>{profile.name}{profile.tags.length > 0 ? ` · ${profile.tags.slice(0, 2).join("/")}` : ""}</option>
+                <option key={profile.id} value={profile.id}>
+                  {profile.name}{profile.tags.length > 0 ? ` · ${profile.tags.slice(0, 2).map(tag => voiceProfileTagLabel(tag, commonT)).join("/")}` : ""}
+                </option>
               ))}
             </select>
             {selectedCloneVoiceProfile && (
@@ -565,7 +575,7 @@ export default function AudioGenerationPanel({
                 <div className="grid gap-2">
                   {VOICE_PROFILE_TAG_GROUPS.map(group => (
                     <div key={group.label} className="grid gap-1.5">
-                      <span className="text-[10px] font-semibold text-[var(--iw-muted)]">{group.label}</span>
+                      <span className="text-[10px] font-semibold text-[var(--iw-muted)]">{voiceProfileTagGroupLabel(group, commonT)}</span>
                       <div className="flex flex-wrap gap-1.5">
                         {group.tags.map(tag => (
                           <button
@@ -579,7 +589,7 @@ export default function AudioGenerationPanel({
                             }`}
                             data-tone="warning"
                           >
-                            {tag}
+                            {voiceProfileTagLabel(tag, commonT)}
                           </button>
                         ))}
                       </div>

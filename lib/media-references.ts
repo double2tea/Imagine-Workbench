@@ -42,6 +42,16 @@ const FALLBACK_MEDIA_REFERENCE_LABELS: Record<MediaReferenceType, string> = {
   video: "Video",
 };
 
+const PROMPT_REFERENCE_TOKEN_LABELS: Record<MediaReferenceType, readonly string[]> = {
+  audio: ["音频", "Audio"],
+  image: ["图片", "Image"],
+  video: ["视频", "Video"],
+};
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 export function mediaReferenceTypeFromDataUri(dataUri: string): MediaReferenceType | null {
   const mimeType = mediaReferenceMimeFromDataUri(dataUri);
   return mimeType ? mediaReferenceTypeFromMime(mimeType) : null;
@@ -50,6 +60,15 @@ export function mediaReferenceTypeFromDataUri(dataUri: string): MediaReferenceTy
 export function mediaReferenceTypeFromBase64DataUri(dataUri: string): MediaReferenceType | null {
   const mimeType = mediaReferenceMimeFromBase64DataUri(dataUri);
   return mimeType ? mediaReferenceTypeFromMime(mimeType) : null;
+}
+
+export function buildPromptReferenceTokenPattern(labelT: TFunction = t): RegExp {
+  const labels = (["image", "video", "audio"] as const).flatMap(type => [
+    mediaReferenceLabel(type, labelT),
+    ...PROMPT_REFERENCE_TOKEN_LABELS[type],
+  ]);
+  const uniqueLabels = [...new Set(labels)].map(escapeRegExp);
+  return new RegExp(`@(${uniqueLabels.join("|")})(\\d+)`, "g");
 }
 
 export function mediaReferenceLabel(type: MediaReferenceType, labelT?: TFunction): string {
