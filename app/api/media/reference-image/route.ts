@@ -15,29 +15,29 @@ export async function POST(req: NextRequest) {
     }
 
     const imageUrl = parseReferenceImageUrl(body.url);
-    if (!imageUrl) return NextResponse.json({ error: "参考图地址无效" }, { status: 400 });
+    if (!imageUrl) return NextResponse.json({ error: "Reference image URL is invalid" }, { status: 400 });
     const allowError = getAllowedReferenceImageError(imageUrl);
     if (allowError) return NextResponse.json({ error: allowError }, { status: 400 });
 
     const response = await fetch(imageUrl.href, { headers: { Accept: "image/*" } });
     if (!response.ok) {
-      return NextResponse.json({ error: `参考图下载失败：HTTP ${response.status}` }, { status: 502 });
+      return NextResponse.json({ error: `Reference image download failed: HTTP ${response.status}` }, { status: 502 });
     }
 
     const contentType = response.headers.get("Content-Type") ?? "image/png";
     if (!contentType.startsWith("image/")) {
-      return NextResponse.json({ error: "参考图地址不是图片响应" }, { status: 400 });
+      return NextResponse.json({ error: "Reference image URL did not return an image response" }, { status: 400 });
     }
 
     const contentLength = response.headers.get("Content-Length");
     const bytes = contentLength ? Number(contentLength) : null;
     if (bytes !== null && Number.isFinite(bytes) && bytes > REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES) {
-      return NextResponse.json({ error: "参考图文件过大" }, { status: 413 });
+      return NextResponse.json({ error: "Reference image file is too large" }, { status: 413 });
     }
 
     const imageBlob = await readLimitedImageBlob(response, contentType);
     if (!imageBlob) {
-      return NextResponse.json({ error: "参考图文件过大" }, { status: 413 });
+      return NextResponse.json({ error: "Reference image file is too large" }, { status: 413 });
     }
 
     return new Response(imageBlob, {
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "参考图下载失败";
+    const message = error instanceof Error ? error.message : "Reference image download failed";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
@@ -87,8 +87,8 @@ async function readLimitedImageBlob(response: Response, contentType: string): Pr
 }
 
 function getAllowedReferenceImageError(url: URL): string | null {
-  if (url.protocol !== "https:") return "参考图地址必须是 HTTPS";
-  if (url.hostname !== "storage.googleapis.com") return "参考图来源不受支持";
-  if (!url.pathname.startsWith("/agnes-aigc-test/images/")) return "参考图路径不受支持";
+  if (url.protocol !== "https:") return "Reference image URL must use HTTPS";
+  if (url.hostname !== "storage.googleapis.com") return "Reference image source is not supported";
+  if (!url.pathname.startsWith("/agnes-aigc-test/images/")) return "Reference image path is not supported";
   return null;
 }

@@ -63,7 +63,7 @@ function loadImage(sourceUrl: string): Promise<HTMLImageElement> {
     const image = new Image();
     image.decoding = "async";
     image.onload = () => resolve(image);
-  image.onerror = () => reject(new Error(t("common.errors.referenceMediaNotFound")));
+    image.onerror = () => reject(new Error(t("common.errors.referenceMediaNotFound")));
     image.src = sourceUrl;
   });
 }
@@ -113,7 +113,7 @@ function createVideoPreview(item: StorageItem): Promise<AssetPreviewRecord> {
           ...record,
         });
       } catch (error) {
-        fail(error instanceof Error ? error : new Error("视频预览绘制失败"));
+        fail(error instanceof Error ? error : new Error(t("common.errors.videoPreviewDrawFailed")));
       }
     };
 

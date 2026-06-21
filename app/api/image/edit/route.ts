@@ -90,12 +90,12 @@ export async function POST(req: NextRequest) {
 async function imageUrlResponse(imageUrl: string, source: string): Promise<Response> {
   const response = await fetch(assertPublicHttpUrl(imageUrl, "unsafe_image_result_url"));
   if (!response.ok) {
-    throw new Error(`图片编辑结果下载失败：HTTP ${response.status}`);
+    throw new Error(`Image edit result download failed: HTTP ${response.status}`);
   }
 
   const contentType = response.headers.get("Content-Type") ?? "image/png";
   if (!contentType.startsWith("image/")) {
-    throw new Error("图片编辑结果不是图片响应");
+    throw new Error("Image edit result is not an image response");
   }
 
   return new Response(response.body, {
@@ -126,5 +126,5 @@ function getRequestBodySizeError(req: NextRequest): string | null {
 
   const bytes = Number(contentLength);
   if (!Number.isFinite(bytes) || bytes <= REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES) return null;
-  return "图片编辑请求体过大，请压缩图片后重试";
+  return "Image edit request body is too large, please compress the image and retry";
 }

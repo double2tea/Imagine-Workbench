@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
 
     const body = audioGenerateBodySchema.parse(await req.json());
     if (body.mode === "voice_clone" && body.voiceCloneConsentAccepted !== true) {
-      throw badRequest("音色克隆需要先确认参考音频授权", "voice_clone_consent_required");
+      throw badRequest("Voice cloning requires confirming reference audio authorization first", "voice_clone_consent_required");
     }
     if (body.voiceProfileId) {
       throw badRequest("Voice profile IDs must be resolved before calling audio generation", "unresolved_voice_profile");
@@ -104,7 +104,7 @@ function getRequestBodySizeError(req: NextRequest): string | null {
 
   const bytes = Number(contentLength);
   if (!Number.isFinite(bytes) || bytes <= REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES) return null;
-  return "参考媒体请求体过大，请压缩或减少参考媒体后重试";
+  return "Reference media request body is too large, please compress or remove reference media and retry";
 }
 
 function readReferenceMedia(referenceMedia: unknown): ReferenceMedia[] {

@@ -4,7 +4,7 @@ export function audioOperationApiError(error: unknown): ApiError | null {
   if (!(error instanceof Error)) return null;
 
   switch (error.message) {
-    case "音色克隆需要先确认参考音频授权":
+    case "Voice cloning requires confirming reference audio authorization first":
       return badRequest(error.message, "voice_clone_consent_required");
     case "Voice profile IDs must be resolved before audio operation":
       return badRequest(error.message, "unresolved_voice_profile");

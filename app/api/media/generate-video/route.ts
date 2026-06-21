@@ -94,7 +94,7 @@ function getRequestBodySizeError(req: NextRequest): string | null {
 
   const bytes = Number(contentLength);
   if (!Number.isFinite(bytes) || bytes <= REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES) return null;
-  return "参考媒体请求体过大，请压缩或减少参考媒体后重试";
+  return "Reference media request body is too large, please compress or remove reference media and retry";
 }
 
 function readReferenceMedia(referenceMedia: unknown, images: unknown, image: unknown, lastFrame: unknown): ReferenceMedia[] {

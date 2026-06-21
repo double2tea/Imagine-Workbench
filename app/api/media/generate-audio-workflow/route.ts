@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiErrorResponse, badRequest, requireApiText } from "@/lib/api/errors";
 import { isRunningHubWorkflowAudioTarget } from "@/lib/audio-generation-routing";
-import { mediaReferenceLabel, mediaReferenceTypeFromBase64DataUri, type MediaReferenceType } from "@/lib/media-references";
+import { mediaReferenceTypeFromBase64DataUri, type MediaReferenceType } from "@/lib/media-references";
 import { getReferenceMediaPayloadError, REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES } from "@/lib/reference-images";
 import { generateAudio } from "@/lib/providers/audio";
 import { parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
@@ -74,7 +74,7 @@ function getRequestBodySizeError(req: NextRequest): string | null {
 
   const bytes = Number(contentLength);
   if (!Number.isFinite(bytes) || bytes <= REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES) return null;
-  return "参考媒体请求体过大，请压缩或减少参考媒体后重试";
+  return "Reference media request body is too large, please compress or remove reference media and retry";
 }
 
 function readReferenceMedia(referenceMedia: unknown): ReferenceMedia[] {
@@ -101,7 +101,7 @@ function getReferenceMediaFormatError(referenceMedia: ReferenceMedia[]): string 
   for (const reference of referenceMedia) {
     const actualType = mediaReferenceTypeFromBase64DataUri(reference.dataUri);
     if (!actualType) return "RunningHub reference media must be data:image/*, data:video/* or data:audio/* base64 data URIs";
-    if (!acceptedTypes.includes(actualType)) return `RunningHub 音频应用不支持${mediaReferenceLabel(actualType)}输入`;
+    if (!acceptedTypes.includes(actualType)) return `RunningHub audio app does not support ${actualType} input`;
   }
   return null;
 }

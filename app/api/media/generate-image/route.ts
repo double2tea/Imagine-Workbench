@@ -204,12 +204,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 async function imageUrlResponse(imageUrl: string, source: string): Promise<Response> {
   const response = await fetch(assertPublicHttpUrl(imageUrl, "unsafe_image_result_url"));
   if (!response.ok) {
-    throw new Error(`图片结果下载失败：HTTP ${response.status}`);
+    throw new Error(`Image result download failed: HTTP ${response.status}`);
   }
 
   const contentType = response.headers.get("Content-Type") ?? "image/png";
   if (!contentType.startsWith("image/")) {
-    throw new Error("图片结果不是图片响应");
+    throw new Error("Image result is not an image response");
   }
 
   return new Response(response.body, {
@@ -236,17 +236,17 @@ async function imageUrlsJsonResponse(imageUrls: string[], source: string): Promi
 async function localizeImageResultUrl(imageUrl: string): Promise<string> {
   if (imageUrl.startsWith("data:")) return imageUrl;
   if (!imageUrl.startsWith("http://") && !imageUrl.startsWith("https://")) {
-    throw new Error("图片结果 URL 格式不支持");
+    throw new Error("Image result URL format is not supported");
   }
 
   const response = await fetch(assertPublicHttpUrl(imageUrl, "unsafe_image_result_url"));
   if (!response.ok) {
-    throw new Error(`图片结果下载失败：HTTP ${response.status}`);
+    throw new Error(`Image result download failed: HTTP ${response.status}`);
   }
 
   const contentType = response.headers.get("Content-Type") ?? "image/png";
   if (!contentType.startsWith("image/")) {
-    throw new Error("图片结果不是图片响应");
+    throw new Error("Image result is not an image response");
   }
 
   return `data:${contentType};base64,${arrayBufferToBase64(await response.arrayBuffer())}`;
@@ -327,7 +327,7 @@ function getRequestBodySizeError(req: NextRequest): string | null {
 
   const bytes = Number(contentLength);
   if (!Number.isFinite(bytes) || bytes <= REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES) return null;
-  return "参考图请求体过大，请压缩或减少参考图后重试";
+  return "Reference image request body is too large, please compress or remove reference images and retry";
 }
 
 function readReferenceImages(referenceImages: unknown, referenceImage: unknown): string[] {
