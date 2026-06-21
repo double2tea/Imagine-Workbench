@@ -46,6 +46,9 @@ interface SettingsModalProps {
   resolveIntegrationAvailable?: boolean;
   resolveIntegrationEnabled?: boolean;
   selectedChatModel: string;
+  selectedDefaultAudioModel: string;
+  selectedDefaultImageModel: string;
+  selectedDefaultVideoModel: string;
   selectedProvider: AiProvider;
   imageEditFeatureModels: ImageEditFeatureModels;
   videoModelGroups: ModelGroup[];
@@ -69,6 +72,9 @@ interface SettingsModalProps {
   onAddManualModels: (category: ModelCategory, value: string) => void;
   onSaveCredential: (provider: AiProvider, field: keyof ProviderCredentials, value: string) => void;
   onSelectChatModel: (value: string) => void;
+  onSelectDefaultAudioModel: (value: string) => void;
+  onSelectDefaultImageModel: (value: string) => void;
+  onSelectDefaultVideoModel: (value: string) => void;
   onSelectImageEditFeatureModel: (feature: ImageEditFeature, model: string) => void;
   onSelectProvider: (value: AiProvider) => void;
   onToggleResolveIntegration?: (enabled: boolean) => void;
@@ -99,6 +105,9 @@ export default function SettingsModal({
   resolveIntegrationAvailable = false,
   resolveIntegrationEnabled = false,
   selectedChatModel,
+  selectedDefaultAudioModel,
+  selectedDefaultImageModel,
+  selectedDefaultVideoModel,
   selectedProvider,
   imageEditFeatureModels,
   videoModelGroups,
@@ -122,6 +131,9 @@ export default function SettingsModal({
   onAddManualModels,
   onSaveCredential,
   onSelectChatModel,
+  onSelectDefaultAudioModel,
+  onSelectDefaultImageModel,
+  onSelectDefaultVideoModel,
   onSelectImageEditFeatureModel,
   onSelectProvider,
   onToggleResolveIntegration,
@@ -287,6 +299,9 @@ export default function SettingsModal({
                   resolveIntegrationAvailable={resolveIntegrationAvailable}
                   resolveIntegrationEnabled={resolveIntegrationEnabled}
                   selectedChatModel={selectedChatModel}
+                  selectedDefaultAudioModel={selectedDefaultAudioModel}
+                  selectedDefaultImageModel={selectedDefaultImageModel}
+                  selectedDefaultVideoModel={selectedDefaultVideoModel}
                   selectedProvider={selectedProvider}
                   videoModelGroups={videoModelGroups}
                   onAddCustomProvider={onAddCustomProvider}
@@ -295,6 +310,9 @@ export default function SettingsModal({
                   onClearCredentials={onClearCredentials}
                   onSaveCredential={onSaveCredential}
                   onSelectChatModel={onSelectChatModel}
+                  onSelectDefaultAudioModel={onSelectDefaultAudioModel}
+                  onSelectDefaultImageModel={onSelectDefaultImageModel}
+                  onSelectDefaultVideoModel={onSelectDefaultVideoModel}
                   onSelectProvider={onSelectProvider}
                   onDeleteCustomProvider={onDeleteCustomProvider}
                   onRunResolveCheck={onRunResolveCheck}

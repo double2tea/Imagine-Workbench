@@ -23,6 +23,8 @@ import type { ModelParameterValues } from "@/lib/providers/model-capabilities";
 import { buildGenerationModelPriceOptions } from "@/lib/providers/pricing";
 import type { CinematicProfile } from "@/lib/cinematic-controls";
 
+type ImageSizeMode = "preset" | "custom";
+
 interface ImageGenerationPanelProps {
   atDropdownNode: ReactNode;
   capabilities: ImageModelCapabilities;
@@ -32,6 +34,7 @@ interface ImageGenerationPanelProps {
   imageBackgroundGeneration: boolean;
   imageResolution: string;
   imageResolutionOptions: ImageModelCapabilities["resolutions"];
+  imageSizeMode: ImageSizeMode;
   imageThinkingLevel: string;
   isOptimizing: boolean;
   isSubmitting: boolean;
@@ -52,6 +55,7 @@ interface ImageGenerationPanelProps {
   onImageBackgroundGenerationChange: (value: boolean) => void;
   onImageQualityChange: (value: string) => void;
   onImageResolutionChange: (value: string) => void;
+  onImageSizeModeChange: (value: ImageSizeMode) => void;
   onNegativePromptChange: (value: string) => void;
   onOptimizePrompt: () => void;
   onParameterValuesChange: (value: ModelParameterValues) => void;
@@ -78,6 +82,7 @@ export default function ImageGenerationPanel({
   imageBackgroundGeneration,
   imageResolution,
   imageResolutionOptions,
+  imageSizeMode,
   imageThinkingLevel,
   isOptimizing,
   isSubmitting,
@@ -98,6 +103,7 @@ export default function ImageGenerationPanel({
   onImageBackgroundGenerationChange,
   onImageQualityChange,
   onImageResolutionChange,
+  onImageSizeModeChange,
   onNegativePromptChange,
   onOptimizePrompt,
   onParameterValuesChange,
@@ -123,7 +129,7 @@ export default function ImageGenerationPanel({
   const customImageSizeId = useId();
   const presetResolutionOptions = imageResolutionOptions.filter(option => option.value !== "custom");
   const supportsCustomImageSize = imageResolutionOptions.some(option => option.value === "custom");
-  const isCustomImageResolution = imageResolution === "custom";
+  const isCustomImageSize = imageSizeMode === "custom";
   const imageReferenceLimit = capabilities.maxReferenceImages;
   const imageReferenceHelp = imageReferenceLimit > 0
     ? t("imageGeneration.referenceHelpSupported", { limit: imageReferenceLimit })
@@ -233,13 +239,13 @@ export default function ImageGenerationPanel({
           <select
             id={aspectRatioId}
             name="image-aspect-ratio"
-            value={isCustomImageResolution ? "custom" : selectedAspectRatio}
+            value={isCustomImageSize ? "custom" : selectedAspectRatio}
             onChange={(event) => onSelectAspectRatio(event.target.value)}
-            disabled={isCustomImageResolution}
+            disabled={isCustomImageSize}
             className="imagine-select py-2.5"
-            aria-disabled={isCustomImageResolution}
+            aria-disabled={isCustomImageSize}
           >
-            {isCustomImageResolution && <option value="custom">{t("imageGeneration.customSizeOption")}</option>}
+            {isCustomImageSize && <option value="custom">{t("imageGeneration.customSizeOption")}</option>}
             {capabilities.aspectRatios.map(option => (
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
@@ -269,39 +275,41 @@ export default function ImageGenerationPanel({
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {imageResolutionOptions.length > 0 && (
+          {presetResolutionOptions.length > 0 && (
             <div>
               <label className="mb-1.5 block imagine-section-label">
                 {t("imageGeneration.outputResolutionLabel")}
               </label>
-              {presetResolutionOptions.length > 0 && (
-                <div className="imagine-option-group grid-cols-4">
-                  {presetResolutionOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      data-active={!isCustomImageResolution && imageResolution === option.value}
-                      onClick={() => onImageResolutionChange(option.value)}
-                      className="imagine-segment-btn"
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-              {supportsCustomImageSize && (
-                <div className="mt-2">
+              <div className="imagine-option-group grid-cols-4">
+                {presetResolutionOptions.map((option) => (
                   <button
+                    key={option.value}
                     type="button"
-                    onClick={() => onImageResolutionChange("custom")}
-                    data-active={isCustomImageResolution}
-                    className="imagine-segment-btn border border-[var(--iw-border)]"
+                    data-active={!isCustomImageSize && imageResolution === option.value}
+                    onClick={() => onImageResolutionChange(option.value)}
+                    className="imagine-segment-btn"
                   >
-                    {t("imageGeneration.customSizeButton")}
+                    {option.label}
                   </button>
-                </div>
-              )}
-              {isCustomImageResolution && (
+                ))}
+              </div>
+            </div>
+          )}
+
+          {supportsCustomImageSize && (
+            <div>
+              <label htmlFor={customImageSizeId} className="mb-1.5 block imagine-section-label">
+                {t("imageGeneration.outputSizeLabel")}
+              </label>
+              <button
+                type="button"
+                onClick={() => onImageSizeModeChange("custom")}
+                data-active={isCustomImageSize}
+                className="imagine-segment-btn border border-[var(--iw-border)]"
+              >
+                {t("imageGeneration.customSizeButton")}
+              </button>
+              {isCustomImageSize && (
                 <div className="mt-2">
                   <input
                     id={customImageSizeId}

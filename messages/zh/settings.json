@@ -15,6 +15,7 @@
     "chatModelSectionTitle": "Agent 对话模型", "chatModelSectionTitleTemplate": "{sectionLabel} 模型",
     "chatModelDescription": "用于 Agent 对话与提示词优化。附带参考图时仍使用所选模型；是否支持图片输入参考 OpenRouter 模型目录标记，不匹配或失败时由上游返回错误。",
     "fetchModelsButton": "获取模型", "noModels": "暂无模型",
+    "selectedModelLabel": "已选择", "defaultModelLabel": "默认",
     "supportCapabilitiesPrefix": "支持：", "capabilityImage": "图像", "capabilityVideo": "视频",
     "capabilityAudio": "音频", "capabilityChat": "对话",
     "fetchResultsTitle": "获取结果", "addSelectedButton": "添加选中",

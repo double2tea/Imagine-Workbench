@@ -44,6 +44,9 @@ export interface ConnectionSettingsWorkspaceProps {
   resolveIntegrationAvailable: boolean;
   resolveIntegrationEnabled: boolean;
   selectedChatModel: string;
+  selectedDefaultAudioModel: string;
+  selectedDefaultImageModel: string;
+  selectedDefaultVideoModel: string;
   selectedProvider: AiProvider;
   videoModelGroups: ModelGroup[];
   onAddCustomProvider: (label: string, baseUrl: string) => boolean;
@@ -53,6 +56,9 @@ export interface ConnectionSettingsWorkspaceProps {
   onRunResolveCheck?: () => void;
   onSaveCredential: (provider: AiProvider, field: keyof ProviderCredentials, value: string) => void;
   onSelectChatModel: (value: string) => void;
+  onSelectDefaultAudioModel: (value: string) => void;
+  onSelectDefaultImageModel: (value: string) => void;
+  onSelectDefaultVideoModel: (value: string) => void;
   onSelectProvider: (value: AiProvider) => void;
   onToggleResolveIntegration?: (enabled: boolean) => void;
   onDeleteCustomProvider: (provider: AiProvider) => void;
@@ -75,6 +81,9 @@ export function ConnectionSettingsWorkspace({
   resolveIntegrationAvailable,
   resolveIntegrationEnabled,
   selectedChatModel,
+  selectedDefaultAudioModel,
+  selectedDefaultImageModel,
+  selectedDefaultVideoModel,
   selectedProvider,
   videoModelGroups,
   onAddCustomProvider,
@@ -84,6 +93,9 @@ export function ConnectionSettingsWorkspace({
   onRunResolveCheck,
   onSaveCredential,
   onSelectChatModel,
+  onSelectDefaultAudioModel,
+  onSelectDefaultImageModel,
+  onSelectDefaultVideoModel,
   onSelectProvider,
   onToggleResolveIntegration,
   onDeleteCustomProvider,
@@ -166,6 +178,14 @@ export function ConnectionSettingsWorkspace({
   const fetchedSelectionScope = `${selectedProvider}:${modelCategory}`;
   const selectedFetchedModels =
     fetchedSelection.scope === fetchedSelectionScope ? fetchedSelection.values : [];
+  const selectedGenerationModel =
+    section === "image"
+      ? selectedDefaultImageModel
+      : section === "video"
+        ? selectedDefaultVideoModel
+        : section === "audio"
+          ? selectedDefaultAudioModel
+          : "";
 
   const selectedProviderMeta = getWorkspaceProviderMeta(selectedProvider);
   const selectedProviderCreds = providerCredentials[selectedProvider] ?? { apiKey: "", baseUrl: "" };
@@ -198,6 +218,24 @@ export function ConnectionSettingsWorkspace({
   const submitManualModels = () => {
     onAddManualModels(modelCategory, manualModels);
     setManualModels("");
+  };
+
+  const selectSectionModel = (value: string): void => {
+    if (section === "chat") {
+      onSelectChatModel(value);
+      return;
+    }
+    if (section === "image") {
+      onSelectDefaultImageModel(value);
+      return;
+    }
+    if (section === "video") {
+      onSelectDefaultVideoModel(value);
+      return;
+    }
+    if (section === "audio") {
+      onSelectDefaultAudioModel(value);
+    }
   };
 
   const submitCustomProvider = () => {
@@ -476,24 +514,29 @@ export function ConnectionSettingsWorkspace({
                 ) : (
                   activeModelOptions.map(option => {
                     const isSelectedAgent = section === "chat" && option.value === selectedChatModel;
+                    const isSelectedDefault = section !== "chat" && option.value === selectedGenerationModel;
+                    const isSelected = isSelectedAgent || isSelectedDefault;
                     return (
                       <button
                         key={option.value}
                         type="button"
-                        data-interactive={section === "chat" ? "true" : "false"}
-                        data-selected={isSelectedAgent ? "true" : "false"}
-                        onClick={() => {
-                          if (section === "chat") onSelectChatModel(option.value);
-                        }}
-                        className={`imagine-settings-list-row ${
-                          section === "chat" ? "" : "cursor-default"
-                        }`}
+                        data-interactive="true"
+                        data-selected={isSelected ? "true" : "false"}
+                        onClick={() => selectSectionModel(option.value)}
+                        className="imagine-settings-list-row"
                       >
                         <span className="min-w-0">
                           <span className="imagine-settings-list-label">{option.label}</span>
                           <span className="imagine-settings-list-value">{option.value}</span>
                         </span>
-                        {isSelectedAgent ? <Check className="imagine-tone-icon h-4 w-4 shrink-0" data-tone="warning" /> : null}
+                        {isSelected ? (
+                          <span className="flex shrink-0 items-center gap-1.5">
+                            <span className="imagine-settings-provider-count">
+                              {section === "chat" ? t("connections.selectedModelLabel") : t("connections.defaultModelLabel")}
+                            </span>
+                            <Check className="imagine-tone-icon h-4 w-4" data-tone="warning" />
+                          </span>
+                        ) : null}
                       </button>
                     );
                   })

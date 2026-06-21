@@ -74,6 +74,7 @@ import {
   resolveImageQuickEditTarget,
   submitImageQuickEdit,
 } from "@/lib/image-quick-edit-targets";
+import { persistDefaultGenerationModel, readDefaultGenerationModel } from "@/lib/default-generation-models";
 import { isVisualAdjustmentFeature } from "@/lib/image-visual-adjustment-prompts";
 import {
   DEFAULT_AUDIO_MODEL,
@@ -138,6 +139,7 @@ import { getClearWorkspaceAssetsMessage } from "@/lib/workspace-messages";
 type NoticeType = "error" | "info" | "success";
 type MaskDestination = "creative" | "agent";
 type AssetLibraryMode = "manage" | "reference";
+type ImageSizeMode = "preset" | "custom";
 
 interface WorkspaceImageQuickEditJob {
   controller: AbortController;
@@ -274,9 +276,9 @@ export default function Home() {
   // Traditional Form States
   const [prompt, setPrompt] = useState("");
   const [negativePrompt, setNegativePrompt] = useState("");
-  const [selectedModel, setSelectedModel] = useState(DEFAULT_IMAGE_MODEL);
-  const [selectedVideoModel, setSelectedVideoModel] = useState(DEFAULT_VIDEO_MODEL);
-  const [selectedAudioModel, setSelectedAudioModel] = useState(DEFAULT_AUDIO_MODEL);
+  const [selectedModel, setSelectedModel] = useState(() => readDefaultGenerationModel("image"));
+  const [selectedVideoModel, setSelectedVideoModel] = useState(() => readDefaultGenerationModel("video"));
+  const [selectedAudioModel, setSelectedAudioModel] = useState(() => readDefaultGenerationModel("audio"));
   const [selectedAudioMode, setSelectedAudioMode] = useState<AudioOperationMode>("tts");
   const [audioFormat, setAudioFormat] = useState("wav");
   const [audioStylePrompt, setAudioStylePrompt] = useState("");
@@ -284,7 +286,8 @@ export default function Home() {
   const [selectedVoiceProfileId, setSelectedVoiceProfileId] = useState("");
   const [voiceCloneConsentAccepted, setVoiceCloneConsentAccepted] = useState(false);
   const [aspectRatio, setAspectRatio] = useState("1:1");
-  const [imageResolution, setImageResolution] = useState("1K");
+  const [imageResolution, setImageResolution] = useState("2K");
+  const [imageSizeMode, setImageSizeMode] = useState<ImageSizeMode>("preset");
   const [imageQuality, setImageQuality] = useState("auto");
   const [imageThinkingLevel, setImageThinkingLevel] = useState("minimal");
   const [runningHubYouchuan, setRunningHubYouchuan] = useState<RunningHubYouchuanAdvancedSettings>(RUNNINGHUB_YOUCHUAN_ADVANCED_DEFAULTS);
@@ -483,6 +486,7 @@ export default function Home() {
     handleSelectChatModel,
     handleSelectProvider,
     fetchedModelOptions,
+    hasRestoredSettings,
     imageModelOptions,
     isLoadingModels,
     modelListMessage,
@@ -500,6 +504,7 @@ export default function Home() {
   });
 
   useEffect(() => {
+    if (!hasRestoredSettings) return;
     if (!modelProviderIsAvailable(selectedModel, selectedProvider, providerKeys)) {
       setSelectedModel(DEFAULT_IMAGE_MODEL);
     }
@@ -509,7 +514,7 @@ export default function Home() {
     if (!modelProviderIsAvailable(selectedAudioModel, selectedProvider, providerKeys)) {
       setSelectedAudioModel(DEFAULT_AUDIO_MODEL);
     }
-  }, [providerKeys, selectedAudioModel, selectedModel, selectedProvider, selectedVideoModel]);
+  }, [hasRestoredSettings, providerKeys, selectedAudioModel, selectedModel, selectedProvider, selectedVideoModel]);
 
   const handleSaveVoiceProfileFromAsset = useCallback(async (input: SaveVoiceProfileDialogInput): Promise<void> => {
     if (!voiceProfileSourceItem) return;
@@ -522,7 +527,8 @@ export default function Home() {
 
   const imageCapabilities = getImageModelCapabilities(selectedModel);
   const audioCapabilities = getAudioModelCapabilities(selectedAudioModel);
-  const customImageAspectRatio = imageResolution === "custom"
+  const isCustomImageSize = imageSizeMode === "custom";
+  const customImageAspectRatio = isCustomImageSize
     ? getImageAspectRatioFromResolution(customImageSize.trim())
     : null;
   const activeImageAspectRatio = customImageAspectRatio ?? aspectRatio;
@@ -538,7 +544,7 @@ export default function Home() {
   const activeAudioFormat = audioFormatOptions.some(option => option.value === audioFormat)
     ? audioFormat
     : audioFormatOptions[0]?.value ?? "";
-  const activeImageResolution = imageResolution === "custom" ? customImageSize.trim() : imageResolution;
+  const activeImageResolution = isCustomImageSize ? customImageSize.trim() : imageResolution;
   const activeImageQuality = imageCapabilities.qualities.some(option => option.value === imageQuality) ? imageQuality : undefined;
   const activeVideoSize = videoCapabilities.sizes.some(option => option.value === aspectRatio) ? aspectRatio : "auto";
   const activeVideoResolution = videoCapabilities.resolutions.some(option => option.value === videoResolution)
@@ -621,10 +627,11 @@ export default function Home() {
     setCustomImageSize(nextSize);
     if (supportedAspectRatio !== aspectRatio) setAspectRatio(supportedAspectRatio);
     if (nextResolutionOptions.some(option => option.value === "custom")) {
-      setImageResolution("custom");
+      setImageSizeMode("custom");
       return;
     }
     if (nextResolutionOptions.some(option => option.value === nextSize)) {
+      setImageSizeMode("preset");
       setImageResolution(nextSize);
       return;
     }
@@ -776,7 +783,7 @@ export default function Home() {
     cinematicProfile,
     generationAbortControllersRef,
     imageThinkingLevel,
-    isCustomImageResolution: imageResolution === "custom",
+    isCustomImageResolution: isCustomImageSize,
     locallyCanceledItemIdsRef,
     prompt,
     pushWorkspaceNotice,
@@ -993,13 +1000,16 @@ export default function Home() {
       ? aspectRatio
       : nextAspectRatio;
     const nextResolutionOptions = getImageResolutionOptions(model, resolvedAspectRatio);
-    const canKeepCustomImageResolution = imageResolution === "custom" && nextResolutionOptions.some(option => option.value === "custom");
+    const canKeepCustomImageSize = isCustomImageSize && nextResolutionOptions.some(option => option.value === "custom");
     setSelectedModel(model);
     if (!capabilities.aspectRatios.some(option => option.value === aspectRatio)) {
       setAspectRatio(resolvedAspectRatio);
     }
-    if (!canKeepCustomImageResolution && nextResolutionOptions.length > 0 && !nextResolutionOptions.some(option => option.value === imageResolution)) {
-      setImageResolution(nextResolutionOptions[0].value);
+    if (!canKeepCustomImageSize) {
+      setImageSizeMode("preset");
+    }
+    if (!canKeepCustomImageSize && nextResolutionOptions.length > 0 && !nextResolutionOptions.some(option => option.value === imageResolution)) {
+      setImageResolution(nextResolutionOptions.find(option => option.value !== "custom")?.value ?? nextResolutionOptions[0].value);
     }
     if (capabilities.qualities.length > 0 && !capabilities.qualities.some(option => option.value === imageQuality)) {
       setImageQuality(capabilities.qualities[0].value);
@@ -1018,6 +1028,7 @@ export default function Home() {
   };
 
   const handleSelectImageAspectRatio = (value: string) => {
+    setImageSizeMode("preset");
     setAspectRatio(value);
     const nextResolutionOptions = getImageResolutionOptions(selectedModel, value);
     if (nextResolutionOptions.length > 0 && !nextResolutionOptions.some(option => option.value === imageResolution)) {
@@ -1055,6 +1066,26 @@ export default function Home() {
     if (capabilities.formats.length > 0 && !capabilities.formats.some(option => option.value === audioFormat)) {
       setAudioFormat(capabilities.formats[0].value);
     }
+  };
+
+  const handleImageResolutionChange = (value: string) => {
+    setImageSizeMode("preset");
+    setImageResolution(value);
+  };
+
+  const handleDefaultImageModelChange = (model: string) => {
+    persistDefaultGenerationModel("image", model);
+    handleSelectImageModel(model);
+  };
+
+  const handleDefaultVideoModelChange = (model: string) => {
+    persistDefaultGenerationModel("video", model);
+    handleSelectVideoModel(model);
+  };
+
+  const handleDefaultAudioModelChange = (model: string) => {
+    persistDefaultGenerationModel("audio", model);
+    handleSelectAudioModel(model);
   };
 
   const handleSelectAudioMode = (mode: AudioOperationMode) => {
@@ -1110,9 +1141,10 @@ export default function Home() {
       }
       const nextResolutionOptions = getImageResolutionOptions(imageModel, resolvedAspectRatio);
       if (nextResolutionOptions.some(option => option.value === nextResolution)) {
+        setImageSizeMode("preset");
         setImageResolution(nextResolution);
       } else if (/^\d+x\d+$/.test(nextResolution) && nextResolutionOptions.some(option => option.value === "custom")) {
-        setImageResolution("custom");
+        setImageSizeMode("custom");
         setCustomImageSize(nextResolution);
       }
       if (request?.imageQuality) setImageQuality(request.imageQuality);
@@ -1885,6 +1917,7 @@ export default function Home() {
         capabilities={imageCapabilities}
         cinematicProfile={cinematicProfile}
         customImageSize={customImageSize}
+        imageSizeMode={imageSizeMode}
         imageBackgroundGeneration={imageBackgroundGeneration}
         imageQuality={imageQuality}
         imageResolution={imageResolution}
@@ -1912,7 +1945,8 @@ export default function Home() {
         onGenerate={generateManualImage}
         onImageBackgroundGenerationChange={setImageBackgroundGeneration}
         onImageQualityChange={setImageQuality}
-        onImageResolutionChange={setImageResolution}
+        onImageResolutionChange={handleImageResolutionChange}
+        onImageSizeModeChange={setImageSizeMode}
         onNegativePromptChange={setNegativePrompt}
         onOptimizePrompt={optimizeActivePrompt}
         onParameterValuesChange={handleImageParameterValuesChange}
@@ -2155,6 +2189,9 @@ export default function Home() {
         resolveIntegrationAvailable={resolveIntegrationAvailable}
         resolveIntegrationEnabled={resolveIntegrationEnabled}
         selectedChatModel={selectedChatModel}
+        selectedDefaultAudioModel={selectedAudioModel}
+        selectedDefaultImageModel={selectedModel}
+        selectedDefaultVideoModel={selectedVideoModel}
         selectedProvider={selectedProvider}
         imageEditFeatureModels={imageEditFeatureTargets}
         videoModelGroups={videoModelGroups}
@@ -2175,6 +2212,9 @@ export default function Home() {
         onAddManualModels={addManualModels}
         onSaveCredential={handleSaveCredential}
         onSelectChatModel={handleSelectChatModel}
+        onSelectDefaultAudioModel={handleDefaultAudioModelChange}
+        onSelectDefaultImageModel={handleDefaultImageModelChange}
+        onSelectDefaultVideoModel={handleDefaultVideoModelChange}
         onSelectImageEditFeatureModel={selectImageEditFeatureTarget}
         onSelectProvider={handleSelectProvider}
         onToggleResolveIntegration={setResolveIntegrationEnabled}

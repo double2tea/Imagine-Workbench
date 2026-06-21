@@ -67,6 +67,7 @@ import {
 } from "@/hooks/useResolveIntegrationSettings";
 import { useImageEditFeatureModels } from "@/hooks/useImageEditFeatureModels";
 import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
+import { persistDefaultGenerationModel, readDefaultGenerationModel } from "@/lib/default-generation-models";
 import {
   imageEditFeatureLabel,
   imageQuickEditFallbackPrompt,
@@ -1449,10 +1450,11 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const [boardSummaries, setBoardSummaries] = useState<BoardSummary[]>([]);
   const [, setMode] = useState<BoardMode>("image");
   const [prompt, setPrompt] = useState("");
-  const [selectedModel, setSelectedModel] = useState(DEFAULT_IMAGE_MODEL);
-  const [selectedVideoModel, setSelectedVideoModel] = useState(DEFAULT_VIDEO_MODEL);
+  const [selectedModel, setSelectedModel] = useState(() => readDefaultGenerationModel("image"));
+  const [selectedVideoModel, setSelectedVideoModel] = useState(() => readDefaultGenerationModel("video"));
+  const [selectedAudioModel, setSelectedAudioModel] = useState(() => readDefaultGenerationModel("audio"));
   const [aspectRatio, setAspectRatio] = useState("1:1");
-  const [imageResolution, setImageResolution] = useState("1K");
+  const [imageResolution, setImageResolution] = useState("2K");
   const [imageQuality, setImageQuality] = useState("auto");
   const [imageThinkingLevel, setImageThinkingLevel] = useState("minimal");
   const [videoDuration, setVideoDuration] = useState("10");
@@ -1615,6 +1617,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     handleSelectChatModel,
     handleSelectProvider,
     fetchedModelOptions,
+    hasRestoredSettings,
     imageModelOptions,
     isLoadingModels,
     modelListMessage,
@@ -1632,13 +1635,17 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   });
 
   useEffect(() => {
+    if (!hasRestoredSettings) return;
     if (!modelProviderIsAvailable(selectedModel, selectedProvider, providerKeys)) {
       setSelectedModel(DEFAULT_IMAGE_MODEL);
     }
     if (!modelProviderIsAvailable(selectedVideoModel, selectedProvider, providerKeys)) {
       setSelectedVideoModel(DEFAULT_VIDEO_MODEL);
     }
-  }, [providerKeys, selectedModel, selectedProvider, selectedVideoModel]);
+    if (!modelProviderIsAvailable(selectedAudioModel, selectedProvider, providerKeys)) {
+      setSelectedAudioModel(DEFAULT_AUDIO_MODEL);
+    }
+  }, [hasRestoredSettings, providerKeys, selectedAudioModel, selectedModel, selectedProvider, selectedVideoModel]);
 
   const handleSaveVoiceProfileFromAsset = useCallback(async (input: SaveVoiceProfileDialogInput): Promise<void> => {
     if (!voiceProfileSourceItem) return;
@@ -1651,7 +1658,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
   const imageCapabilities = getImageModelCapabilities(selectedModel);
   const videoCapabilities = getVideoModelCapabilities(selectedVideoModel);
-  const audioCapabilities = getAudioModelCapabilities(DEFAULT_AUDIO_MODEL);
+  const audioCapabilities = getAudioModelCapabilities(selectedAudioModel);
   const activeImageResolution = imageResolution === "custom" ? customImageSize.trim() : imageResolution;
   const customImageAspectRatio = imageResolution === "custom"
     ? getImageAspectRatioFromResolution(customImageSize.trim())
@@ -1986,6 +1993,21 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       setSelectedVideoReferenceMode(capabilities.referenceMode);
     }
   }, [aspectRatio, selectedVideoReferenceMode, videoDuration, videoPreset, videoResolution]);
+
+  const handleDefaultImageModelChange = useCallback((model: string) => {
+    persistDefaultGenerationModel("image", model);
+    handleSelectImageModel(model);
+  }, [handleSelectImageModel]);
+
+  const handleDefaultVideoModelChange = useCallback((model: string) => {
+    persistDefaultGenerationModel("video", model);
+    handleSelectVideoModel(model);
+  }, [handleSelectVideoModel]);
+
+  const handleDefaultAudioModelChange = useCallback((model: string) => {
+    persistDefaultGenerationModel("audio", model);
+    setSelectedAudioModel(model);
+  }, []);
 
   const optimizeActivePrompt = async (promptOverride?: string) => {
     const promptToOptimize = promptOverride ?? prompt;
@@ -2540,7 +2562,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
                 position: operation.position,
               });
             } else if (operation.kind === "image-generate") {
-              const model = operation.model ?? DEFAULT_IMAGE_MODEL;
+              const model = operation.model ?? selectedModel;
               nodeId = boardController.addGenerateNode({
                 kind: operation.kind,
                 title: operation.title,
@@ -2554,7 +2576,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
                 ...(operation.thinkingLevel ? { thinkingLevel: operation.thinkingLevel } : {}),
               });
             } else if (operation.kind === "video-generate") {
-              const model = operation.model ?? DEFAULT_VIDEO_MODEL;
+              const model = operation.model ?? selectedVideoModel;
               nodeId = boardController.addGenerateNode({
                 kind: operation.kind,
                 title: operation.title,
@@ -2570,7 +2592,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
               });
             } else {
               const selection = resolveAudioFunctionSelection({
-                fallbackModel: DEFAULT_AUDIO_MODEL,
+                fallbackModel: selectedAudioModel,
                 mode: operation.audioMode,
                 model: operation.model,
                 t,
@@ -2630,14 +2652,14 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         const operation = item.operation;
         const audioSelection = operation.kind === "audio-operation"
           ? resolveAudioFunctionSelection({
-            fallbackModel: DEFAULT_AUDIO_MODEL,
+            fallbackModel: selectedAudioModel,
             mode: operation.audioMode,
             model: operation.model,
             t,
           })
           : null;
         const model = audioSelection?.model ?? operation.model ?? (
-          operation.kind === "image-generate" ? DEFAULT_IMAGE_MODEL : DEFAULT_VIDEO_MODEL
+          operation.kind === "image-generate" ? selectedModel : selectedVideoModel
         );
         const runInputs = resolveBoardPatchRunInputs(
           patch,
@@ -3052,14 +3074,14 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         : "audio-operation";
     const audioSelection = kind === "audio-operation"
       ? resolveAudioFunctionSelection({
-        fallbackModel: DEFAULT_AUDIO_MODEL,
+        fallbackModel: selectedAudioModel,
         mode: action.params?.audioMode,
         model: action.params?.model,
         t,
       })
       : null;
     const model = audioSelection?.model ?? action.params?.model ?? (
-      kind === "image-generate" ? DEFAULT_IMAGE_MODEL : DEFAULT_VIDEO_MODEL
+      kind === "image-generate" ? selectedModel : selectedVideoModel
     );
     const actionRequiresPrompt = kind !== "audio-operation" || !audioSelection || audioOperationRequiresTextInput(audioSelection.mode);
     if (!promptFromAgent && actionRequiresPrompt) {
@@ -3406,6 +3428,10 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     pushWorkspaceNotice,
     resolveOriginalReferences,
     resolvedBoardId,
+    selectedAudioModel,
+    selectedModel,
+    selectedVideoModel,
+    t,
   ]);
 
   const {
@@ -5115,6 +5141,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         resolveIntegrationAvailable={resolveIntegrationAvailable}
         resolveIntegrationEnabled={resolveIntegrationEnabled}
         selectedChatModel={selectedChatModel}
+        selectedDefaultAudioModel={selectedAudioModel}
+        selectedDefaultImageModel={selectedModel}
+        selectedDefaultVideoModel={selectedVideoModel}
         selectedProvider={selectedProvider}
         imageEditFeatureModels={imageEditFeatureTargets}
         videoModelGroups={videoModelGroups}
@@ -5139,6 +5168,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onSaveCredential={handleSaveCredential}
         onSelectImageEditFeatureModel={selectImageEditFeatureTarget}
         onSelectChatModel={handleSelectChatModel}
+        onSelectDefaultAudioModel={handleDefaultAudioModelChange}
+        onSelectDefaultImageModel={handleDefaultImageModelChange}
+        onSelectDefaultVideoModel={handleDefaultVideoModelChange}
         onSelectProvider={handleSelectProvider}
         onToggleResolveIntegration={setResolveIntegrationEnabled}
         onDeleteCustomProvider={deleteCustomProvider}

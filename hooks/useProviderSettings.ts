@@ -589,6 +589,7 @@ export function useProviderSettings({
     handleSelectChatModel,
     handleSelectProvider,
     fetchedModelOptions,
+    hasRestoredSettings,
     imageModelOptions,
     isLoadingModels,
     modelListMessage,

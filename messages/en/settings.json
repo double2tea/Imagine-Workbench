@@ -15,6 +15,7 @@
     "chatModelSectionTitle": "Agent Chat Model", "chatModelSectionTitleTemplate": "{sectionLabel} Model",
     "chatModelDescription": "Used for Agent chat and prompt optimization. When reference images are attached, the selected model is still used; whether it supports image input depends on the OpenRouter model catalog flags. Mismatches or failures are returned upstream.",
     "fetchModelsButton": "Fetch Models", "noModels": "No models yet",
+    "selectedModelLabel": "Selected", "defaultModelLabel": "Default",
     "supportCapabilitiesPrefix": "Supports: ", "capabilityImage": "Image", "capabilityVideo": "Video",
     "capabilityAudio": "Audio", "capabilityChat": "Chat",
     "fetchResultsTitle": "Fetch Results", "addSelectedButton": "Add Selected",
