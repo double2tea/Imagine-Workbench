@@ -219,6 +219,24 @@ function getAgentOrbSize(): number {
   return isMobileAgentViewport() ? AGENT_ORB_MOBILE_SIZE : AGENT_ORB_DESKTOP_SIZE;
 }
 
+interface AgentInputKeyDownState {
+  input: string;
+  isComposing: boolean;
+  isLoading: boolean;
+  key: string;
+  shiftKey: boolean;
+}
+
+export function shouldSubmitAgentInputOnKeyDown({
+  input,
+  isComposing,
+  isLoading,
+  key,
+  shiftKey,
+}: AgentInputKeyDownState): boolean {
+  return key === "Enter" && !isComposing && !shiftKey && !isLoading && input.trim().length > 0;
+}
+
 function assignRef<T>(ref: Ref<T> | undefined, value: T | null): void {
   if (typeof ref === "function") {
     ref(value);
@@ -589,8 +607,15 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
   const handleInputKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
     if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
     event.preventDefault();
-    if (event.shiftKey) return;
-    if (!isLoading && input.trim()) onSubmit();
+    if (shouldSubmitAgentInputOnKeyDown({
+      input,
+      isComposing: event.nativeEvent.isComposing,
+      isLoading,
+      key: event.key,
+      shiftKey: event.shiftKey,
+    })) {
+      onSubmit();
+    }
   };
   const sendableAgentReferences = getSendableAgentMediaReferences(
     agentReferences,

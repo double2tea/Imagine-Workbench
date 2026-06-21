@@ -13,6 +13,7 @@
   "include": [
     "./canvas-editor.test.ts",
     "./agent-chat-model.test.ts",
+    "./agent-dock-regression.test.ts",
     "./agent-tool-action.test.ts",
     "./api-errors.test.ts",
     "./audio-generation-routing.test.ts",
