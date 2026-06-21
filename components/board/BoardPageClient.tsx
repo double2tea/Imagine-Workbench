@@ -2874,7 +2874,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         }
         videoNodeId = boardController.addGenerateNode({
           kind: "video-generate",
-          title: action.params?.title ?? "Image to Video",
+          title: action.params?.title ?? t("board.agent.imageToVideoTitle"),
           prompt: promptValue,
           model,
           position: { x: sourcePosition.x + 720, y: sourcePosition.y },
@@ -2929,28 +2929,28 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           videoResolution: action.params.videoResolution ?? defaults.videoResolution,
         });
         if (!didStart) {
-          boardController.updateGenerateNode(videoNodeId, { status: "failed", errorMessage: "Video generation request not started" });
+          boardController.updateGenerateNode(videoNodeId, { status: "failed", errorMessage: t("board.agent.videoGenRequestNotStarted") });
           pushWorkspaceNotice("error", t("board.agent.imageToVideoCreated"));
           return handledBoardAction(false);
         }
       }
-      pushWorkspaceNotice("success", action.params?.run === true ? "Image-to-video node created and started" : "Image-to-video node created");
+      pushWorkspaceNotice("success", action.params?.run === true ? t("board.agent.imageToVideoCreatedAndStarted") : t("board.agent.imageToVideoCreated"));
       return handledBoardAction(true);
     }
 
     if (isAgentBoardUpdateAction(action)) {
       const targetNodeId = action.params?.nodeId?.trim() || boardController.selectedNodeId;
       if (!targetNodeId) {
-        pushWorkspaceNotice("error", "Please select a board node to update");
+        pushWorkspaceNotice("error", t("board.agent.selectNodeForUpdate"));
         return handledBoardAction(false);
       }
       const node = boardController.board.nodes.find(item => item.id === targetNodeId);
       if (!node) {
-        pushWorkspaceNotice("error", "Board node for Agent update not found");
+        pushWorkspaceNotice("error", t("board.agent.nodeNotFoundForUpdate"));
         return handledBoardAction(false);
       }
       if ((node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation") && node.status === "processing") {
-        pushWorkspaceNotice("error", "Cannot modify generating node params, wait or cancel task");
+        pushWorkspaceNotice("error", t("board.agent.nodeProcessingCannotUpdate"));
         return handledBoardAction(false);
       }
 
@@ -2963,7 +2963,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       if (node.kind === "prompt") {
         const prompt = firstTextParam(action.params);
         if (!prompt) {
-          pushWorkspaceNotice("error", "Agent node update missing prompt content");
+          pushWorkspaceNotice("error", t("board.agent.promptContentMissing"));
           return handledBoardAction(false);
         }
         boardController.beginUndoGesture();
@@ -2975,7 +2975,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       } else if (node.kind === "note") {
         const body = firstTextParam(action.params);
         if (!body) {
-          pushWorkspaceNotice("error", "Agent node update missing note content");
+          pushWorkspaceNotice("error", t("board.agent.noteContentMissing"));
           return handledBoardAction(false);
         }
         boardController.beginUndoGesture();
@@ -2987,7 +2987,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       } else if (node.kind === "agent") {
         const instruction = firstTextParam(action.params);
         if (!instruction) {
-          pushWorkspaceNotice("error", "Agent node update missing instruction content");
+          pushWorkspaceNotice("error", t("board.agent.instructionContentMissing"));
           return handledBoardAction(false);
         }
         boardController.beginUndoGesture();
@@ -3001,11 +3001,11 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         try {
           update = buildGenerateNodeUpdate(node, action.params);
         } catch (error) {
-          pushWorkspaceNotice("error", toErrorMessage(error, "Agent generation node params invalid"));
+          pushWorkspaceNotice("error", toErrorMessage(error, t("board.agent.invalidGenerationParams")));
           return handledBoardAction(false);
         }
         if (!hasGenerateNodeUpdate(update)) {
-          pushWorkspaceNotice("error", "Agent node update missing generation params");
+          pushWorkspaceNotice("error", t("board.agent.generationParamsMissing"));
           return handledBoardAction(false);
         }
         boardController.beginUndoGesture();
@@ -3015,30 +3015,30 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           boardController.endUndoGesture();
         }
       } else {
-        pushWorkspaceNotice("error", "Agent does not support updating this node type");
+        pushWorkspaceNotice("error", t("board.agent.unsupportedNodeType"));
         return handledBoardAction(false);
       }
       boardController.selectNode(node.id);
       boardController.selectEdge(null);
-      pushWorkspaceNotice("success", "Board node updated");
+      pushWorkspaceNotice("success", t("board.agent.boardNodeUpdated"));
       return handledBoardAction(true);
     }
 
     if (isAgentBoardNoteAction(action)) {
       const body = action.params?.body?.trim() || action.params?.prompt?.trim();
       if (!body) {
-        pushWorkspaceNotice("error", "Agent board note missing content");
+        pushWorkspaceNotice("error", t("board.agent.boardNoteContentMissing"));
         return handledBoardAction(false);
       }
       boardController.addNoteNode({
         body,
-        title: action.params?.title || "Agent Note",
+        title: action.params?.title || t("board.agent.agentNoteTitle"),
         position: {
           x: 160 + boardController.board.nodes.length * 28,
           y: 180 + boardController.board.nodes.length * 24,
         },
       });
-      pushWorkspaceNotice("success", "Agent board note created");
+      pushWorkspaceNotice("success", t("board.agent.boardNoteCreated"));
       return handledBoardAction(true);
     }
 
@@ -3063,11 +3063,11 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     );
     const actionRequiresPrompt = kind !== "audio-operation" || !audioSelection || audioOperationRequiresTextInput(audioSelection.mode);
     if (!promptFromAgent && actionRequiresPrompt) {
-      pushWorkspaceNotice("error", "Agent generation action missing prompt");
+      pushWorkspaceNotice("error", t("board.agent.generationPromptMissing"));
       return handledBoardAction(false);
     }
     if (isPlaceholderRunningHubModel(model)) {
-      pushWorkspaceNotice("error", "Please fill in real RunningHub webappId or workflowId");
+      pushWorkspaceNotice("error", t("board.agent.runninghubFillRealId"));
       return handledBoardAction(false);
     }
     const shouldRun = shouldRunAgentBoardFlow(action);
@@ -3075,7 +3075,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     const promptNodeId = boardController.addPromptNode({
       prompt: promptFromAgent,
       position: { x: 120 + baseIndex * 32, y: 120 + baseIndex * 24 },
-      title: "Agent Prompt",
+      title: t("board.agent.agentPromptTitle"),
     });
     const generatePosition = { x: 520 + baseIndex * 32, y: 120 + baseIndex * 24 };
 
@@ -3908,12 +3908,12 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   }, [boardController.board.edges, boardController.board.nodes, items, resolveBoardReferenceUrl]);
 
   const resolveGenerateNodeInputs = useCallback((nodeId: string) => {
-    return resolveExecutableNodeInputs(nodeId, isGenerateBoardNode, "Please select image, video, or audio generation node");
-  }, [resolveExecutableNodeInputs]);
+    return resolveExecutableNodeInputs(nodeId, isGenerateBoardNode, t("board.agent.noImageNodeForVideoContinue"));
+  }, [resolveExecutableNodeInputs, t]);
 
   const resolveRunningHubAppNodeInputs = useCallback((nodeId: string) => {
-    return resolveExecutableNodeInputs(nodeId, isRunningHubAppBoardNode, "Please select RunningHub app node");
-  }, [resolveExecutableNodeInputs]);
+    return resolveExecutableNodeInputs(nodeId, isRunningHubAppBoardNode, t("board.agent.noRunninghubAppNode"));
+  }, [resolveExecutableNodeInputs, t]);
 
   const handleExecuteGenerateNode = useCallback(async (nodeId: string) => {
     try {

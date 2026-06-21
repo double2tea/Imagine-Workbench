@@ -1029,12 +1029,13 @@ function RunningHubAppInspector({
 }) {
   const { t } = useTranslations("board");
   const isProcessing = node.status === "processing";
+  const targetLabel = node.targetType === "workflow" ? t("runninghub.targetWorkflow") : t("runninghub.targetAiApp");
   const outputLabel = node.outputType === "audio" ? t('inspector.runninghubApp.outputAudio') : node.outputType === "video" ? t('inspector.runninghubApp.outputVideo') : t('inspector.runninghubApp.outputImage');
   return (
     <div className="space-y-3">
       <div className={inspectorSummaryClass}>
         <p className={infoChipClass}>
-          {node.targetType === "workflow" ? "Workflow" : "AI App"} / {outputLabel} / {t('inspector.runninghubApp.params', { count: node.bindings.length })}
+          {targetLabel} / {outputLabel} / {t('inspector.runninghubApp.params', { count: node.bindings.length })}
         </p>
       </div>
       <InspectorFocusButton nodeId={node.id} onFocusNode={onFocusNode} />
@@ -1044,8 +1045,8 @@ function RunningHubAppInspector({
           <div className="grid grid-cols-2 gap-2">
             <InspectorField title={t('inspector.runninghubApp.type')}>
               <select value={node.targetType} onChange={event => onUpdateRunningHubApp(node.id, { targetType: event.target.value === "workflow" ? "workflow" : "ai-app" })} className={inputClass}>
-                <option value="ai-app">AI App</option>
-                <option value="workflow">Workflow</option>
+                <option value="ai-app">{t("runninghub.targetAiApp")}</option>
+                <option value="workflow">{t("runninghub.targetWorkflow")}</option>
               </select>
             </InspectorField>
             <InspectorField title={t('inspector.runninghubApp.output')}>

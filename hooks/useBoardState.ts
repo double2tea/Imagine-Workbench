@@ -1078,7 +1078,7 @@ function normalizeReferenceGroupItems(items: unknown[]): BoardReferenceGroupItem
     normalizedItems.push({
       assetId: item.assetId,
       model: readNonEmptyString(item.model, "unknown"),
-      prompt: readNonEmptyString(item.prompt, "Reference"),
+      prompt: readNonEmptyString(item.prompt, t("board.compare.referenceLabel")),
       role: item.role === "start" || item.role === "end" ? item.role : "general",
       type: item.type === "video" || item.type === "audio" ? item.type : "image",
       url: readNonEmptyString(item.url, ""),
@@ -1100,7 +1100,7 @@ function normalizeMultiGridItems(items: unknown[], gridSize: BoardMultiGridNode[
       model: readNonEmptyString(item.model, "unknown"),
       offsetX: readFiniteNumber(item.offsetX, 0),
       offsetY: readFiniteNumber(item.offsetY, 0),
-      prompt: readNonEmptyString(item.prompt, "Image"),
+      prompt: readNonEmptyString(item.prompt, t("common.mediaTypeLabels.image")),
       scale: Math.max(0.25, readFiniteNumber(item.scale, 1)),
       url: readNonEmptyString(item.url, ""),
     });
@@ -1680,7 +1680,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
 
     loadBoard().catch((error: unknown) => {
       if (!isActive) return;
-      setSaveError(error instanceof Error ? error.message : "Board load failed");
+      setSaveError(error instanceof Error ? error.message : t("board.workspace.loadFailed"));
       setSaveStatus("error");
       setHasLoaded(true);
     });
@@ -1705,7 +1705,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
         })
         .catch((error: unknown) => {
           if (!isActive) return;
-          setSaveError(error instanceof Error ? error.message : "Board save failed");
+          setSaveError(error instanceof Error ? error.message : t("board.workspace.saveFailed"));
           setSaveStatus("error");
         });
     }, 450);
@@ -1725,7 +1725,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       setSaveError(null);
       setSaveStatus("saved");
     } catch (error: unknown) {
-      setSaveError(error instanceof Error ? error.message : "Board save failed");
+      setSaveError(error instanceof Error ? error.message : t("board.workspace.saveFailed"));
       setSaveStatus("error");
       throw error;
     }

@@ -37,6 +37,7 @@ import {
   readRunningHubTargetIdFromText,
 } from "@/lib/board/runninghub-bindings";
 import type { BoardPromptReference } from "@/lib/board/prompt-references";
+import { useTranslations, type TFunction } from "@/lib/i18n";
 
 
 interface RunningHubAppBoardNodeProps {
@@ -72,21 +73,21 @@ const chipClass = "imagine-generate-context-chip inline-flex h-6 min-w-0 items-c
 const iconButtonClass = "nodrag flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)] text-[var(--iw-muted)] transition hover:border-[var(--iw-tone-success-border)] hover:text-[var(--iw-tone-success-text)]";
 const warningChipToneClass = "imagine-tone-chip";
 
-const sourceOptions: Array<{ value: BoardRunningHubBindingSource; label: string }> = [
-  { value: "prompt", label: "Prompt" },
-  { value: "reference", label: "Reference" },
-  { value: "literal", label: "Fixed value" },
-  { value: "randomSeed", label: "Random seed" },
+const sourceOptions: Array<{ value: BoardRunningHubBindingSource; labelKey: string }> = [
+  { value: "prompt", labelKey: "runninghub.bindingSourcePrompt" },
+  { value: "reference", labelKey: "runninghub.bindingSourceReference" },
+  { value: "literal", labelKey: "runninghub.bindingSourceFixed" },
+  { value: "randomSeed", labelKey: "runninghub.bindingSourceRandomSeed" },
 ];
 
-const valueTypeOptions: Array<{ value: BoardRunningHubBindingValueType; label: string }> = [
-  { value: "text", label: "Text" },
-  { value: "number", label: "Number" },
-  { value: "boolean", label: "Toggle" },
-  { value: "image", label: "Image" },
-  { value: "video", label: "Video" },
-  { value: "audio", label: "Audio" },
-  { value: "raw", label: "Raw" },
+const valueTypeOptions: Array<{ value: BoardRunningHubBindingValueType; labelKey: string }> = [
+  { value: "text", labelKey: "runninghub.valueTypeText" },
+  { value: "number", labelKey: "runninghub.valueTypeNumber" },
+  { value: "boolean", labelKey: "runninghub.valueTypeBoolean" },
+  { value: "image", labelKey: "runninghub.valueTypeImage" },
+  { value: "video", labelKey: "runninghub.valueTypeVideo" },
+  { value: "audio", labelKey: "runninghub.valueTypeAudio" },
+  { value: "raw", labelKey: "runninghub.valueTypeRaw" },
 ];
 
 function readTargetType(value: string): BoardRunningHubTargetType {
@@ -216,19 +217,19 @@ function savedTargetId(targetType: BoardRunningHubTargetType, targetId: string):
   return `${targetType}:${targetId.trim()}`;
 }
 
-function bindingTitle(binding: BoardRunningHubNodeInfoBinding): string {
-  return binding.label?.trim() || binding.description || binding.fieldName || "Unnamed param";
+function bindingTitle(binding: BoardRunningHubNodeInfoBinding, t: TFunction): string {
+  return binding.label?.trim() || binding.description || binding.fieldName || t("runninghub.targetUnnamedParam");
 }
 
-function targetIdLabel(targetType: BoardRunningHubTargetType): string {
-  return targetType === "workflow" ? "workflowId / API JSON" : "App URL / webappId";
+function targetIdLabel(targetType: BoardRunningHubTargetType, t: TFunction): string {
+  return targetType === "workflow" ? t("runninghub.targetWorkflowPlaceholder") : t("runninghub.targetAiAppPlaceholder");
 }
 
-function statusLabel(status: BoardRunningHubAppNode["status"]): string {
-  if (status === "processing") return "Running";
-  if (status === "complete") return "Complete";
-  if (status === "failed") return "Failed";
-  return "Idle";
+function statusLabel(status: BoardRunningHubAppNode["status"], t: TFunction): string {
+  if (status === "processing") return t("runninghub.running");
+  if (status === "complete") return t("node.statusLabels.complete");
+  if (status === "failed") return t("node.statusLabels.failed");
+  return t("node.statusLabels.idle");
 }
 
 function statusTone(status: BoardRunningHubAppNode["status"]): string {
@@ -238,9 +239,11 @@ function statusTone(status: BoardRunningHubAppNode["status"]): string {
   return "neutral";
 }
 
-function resultStatusLabel(hasResultConnection: boolean, resultCount: number): string {
-  if (resultCount > 0) return hasResultConnection ? `${resultCount} on board` : `${resultCount}`;
-  return "Not generated";
+function resultStatusLabel(hasResultConnection: boolean, resultCount: number, t: TFunction): string {
+  if (resultCount > 0) return hasResultConnection
+    ? t("runninghub.onBoardResult", { count: resultCount })
+    : t("runninghub.resultCount", { count: resultCount });
+  return t("runninghub.noResult");
 }
 
 const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
@@ -255,6 +258,7 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
   references,
   resultItems,
 }: RunningHubAppBoardNodeProps) {
+  const { t } = useTranslations("board");
   const [importText, setImportText] = useState("");
   const [importError, setImportError] = useState<string | null>(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -266,11 +270,11 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
   const hasTarget = node.targetId.trim() !== "";
   const isReady = hasTarget && readiness.missingCount === 0;
   const bindingSummary = node.bindings.length > 0
-    ? `${readiness.enabledCount}/${node.bindings.length} fields`
-    : "No fields read";
+    ? t("runninghub.fieldsRead", { enabled: readiness.enabledCount, total: node.bindings.length })
+    : t("runninghub.noFieldsRead");
   const currentSavedTarget = savedTargets.find(target => target.id === savedTargetId(node.targetType, node.targetId));
   const resultTone = resultItems.length > 0 ? hasResultConnection ? "result" : "ok" : "neutral";
-  const resultLabel = resultStatusLabel(hasResultConnection, resultItems.length);
+  const resultLabel = resultStatusLabel(hasResultConnection, resultItems.length, t);
   const focusResultNode = hasResultConnection ? onFocusResultNode : undefined;
   const stopBoardControlPointer = (event: ReactPointerEvent<HTMLButtonElement>): void => {
     event.stopPropagation();
@@ -303,11 +307,11 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
   const saveTargetSnapshot = (bindings: BoardRunningHubNodeInfoBinding[], name?: string, targetIdOverride?: string): void => {
     const targetId = (targetIdOverride ?? node.targetId).trim();
     if (!targetId) {
-      setImportError("Please fill in RunningHub app or Workflow ID first");
+      setImportError(t("runninghub.targetRequired"));
       return;
     }
     const id = savedTargetId(node.targetType, targetId);
-    const label = name?.trim() || currentSavedTarget?.label || `${node.targetType === "workflow" ? "Workflow" : "AI App"} ${targetId}`;
+    const label = name?.trim() || currentSavedTarget?.label || `${node.targetType === "workflow" ? t("runninghub.targetWorkflow") : t("runninghub.targetAiApp")} ${targetId}`;
     const target: RunningHubSavedTarget = {
       accessPassword: node.accessPassword?.trim() || undefined,
       bindings,
@@ -368,18 +372,18 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
         setIsImportOpen(false);
         return;
       }
-      setImportError(error instanceof Error ? error.message : "Import failed");
+      setImportError(error instanceof Error ? error.message : t("runninghub.importFailed"));
     }
   };
 
   const fetchAppSchema = async (): Promise<void> => {
     const webappId = readRunningHubTargetIdFromText(node.targetId);
     if (node.targetType !== "ai-app") {
-      setImportError("Workflow: import API JSON exported from RunningHub");
+      setImportError(t("runninghub.targetWorkflowImportOnly"));
       return;
     }
     if (!webappId) {
-      setImportError("Please paste app URL or webappId first");
+      setImportError(t("runninghub.fetchAppSchemaFirst"));
       return;
     }
     setIsFetchingSchema(true);
@@ -389,7 +393,7 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
       onUpdate({ targetId: schema.webappId, bindings: schema.bindings });
       saveTargetSnapshot(schema.bindings, schema.name, schema.webappId);
     } catch (error) {
-      setImportError(error instanceof Error ? error.message : "Schema read failed");
+      setImportError(error instanceof Error ? error.message : t("runninghub.fieldReadFailed"));
     } finally {
       setIsFetchingSchema(false);
     }
@@ -404,8 +408,8 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
             onChange={event => onUpdate({ targetType: readTargetType(event.target.value) })}
             className={inputClass}
           >
-            <option value="ai-app">AI App</option>
-            <option value="workflow">Workflow</option>
+            <option value="ai-app">{t("runninghub.targetAiApp")}</option>
+            <option value="workflow">{t("runninghub.targetWorkflow")}</option>
           </select>
           <div className="relative min-w-0">
             <LinkIcon className="pointer-events-none absolute left-2 top-2 h-3.5 w-3.5 text-[var(--iw-faint)]" />
@@ -413,14 +417,14 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
               value={node.targetId}
               onChange={event => updateTargetText(event.target.value)}
               className={`${inputClass} w-full pl-7 font-mono`}
-              placeholder={targetIdLabel(node.targetType)}
+              placeholder={targetIdLabel(node.targetType, t)}
             />
           </div>
           <button
             type="button"
             onClick={() => setIsImportOpen(value => !value)}
             className={iconButtonClass}
-            title="Paste import"
+            title={t("runninghub.pasteImport")}
           >
             <FileJson className="h-3.5 w-3.5" />
           </button>
@@ -430,10 +434,10 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
             disabled={isFetchingSchema || node.targetType !== "ai-app"}
             className="imagine-tone-chip nodrag flex h-8 items-center gap-1.5 rounded-md border px-3 text-[10px] font-semibold transition disabled:border-[var(--iw-border)] disabled:bg-[var(--iw-panel-soft)] disabled:text-[var(--iw-faint)]"
             data-tone="success"
-            title="Read nodeInfoList from RunningHub official call example"
+            title={t("runninghub.readFieldsTitle")}
           >
             {isFetchingSchema ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ClipboardList className="h-3.5 w-3.5" />}
-            Read fields
+            {t("runninghub.readFields")}
           </button>
         </div>
         <button
@@ -443,7 +447,7 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
           className="nodrag flex h-8 items-center justify-center gap-1 rounded-md bg-emerald-600 px-4 text-[11px] font-semibold text-white transition hover:bg-emerald-500 disabled:bg-[var(--iw-panel-soft)] disabled:text-[var(--iw-faint)]"
         >
           <Play className="h-3.5 w-3.5" />
-          Run
+          {t("runninghub.run")}
         </button>
       </div>
 
@@ -455,7 +459,7 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
             disabled={savedTargets.length === 0}
             className={`${inputClass} w-full`}
           >
-            <option value="">Select saved app</option>
+            <option value="">{t("runninghub.selectSavedApp")}</option>
             {savedTargets.map(target => (
               <option key={target.id} value={target.id}>
                 {target.label}
@@ -467,17 +471,17 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
             onClick={saveCurrentTarget}
             disabled={!hasTarget}
             className="nodrag flex h-8 items-center gap-1.5 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)] px-2 text-[10px] font-semibold text-[var(--iw-text)] transition hover:border-emerald-400/50 disabled:text-[var(--iw-faint)]"
-            title="Save current RunningHub target"
+            title={t("runninghub.saveCurrentTarget")}
           >
             <Save className="h-3.5 w-3.5" />
-            Save
+            {t("runninghub.save")}
           </button>
           <button
             type="button"
             onClick={deleteCurrentSavedTarget}
             disabled={!currentSavedTarget}
             className={iconButtonClass}
-            title="Delete saved target"
+            title={t("runninghub.deleteSavedTarget")}
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
@@ -492,15 +496,15 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
               onChange={event => onUpdate({ outputType: readOutputType(event.target.value) })}
               className={inputClass}
             >
-              <option value="image">Image output</option>
-              <option value="video">Video output</option>
-              <option value="audio">Audio output</option>
+              <option value="image">{t("runninghub.outputImage")}</option>
+              <option value="video">{t("runninghub.outputVideo")}</option>
+              <option value="audio">{t("runninghub.outputAudio")}</option>
             </select>
             <input
               value={node.accessPassword ?? ""}
               onChange={event => onUpdate({ accessPassword: event.target.value })}
               className={`${inputClass} font-mono`}
-              placeholder="Access password (optional)"
+              placeholder={t("runninghub.accessPasswordPlaceholder")}
             />
           </div>
 
@@ -514,14 +518,14 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
             className={`nodrag nowheel min-h-[146px] flex-1 resize-none rounded-md imagine-board-input !p-2 text-xs leading-5 outline-none ${
               promptPreview !== null ? "cursor-default opacity-85" : ""
             }`}
-            placeholder={promptPreview !== null ? "Connected Prompt node" : "Enter Prompt, fields can bind here"}
+            placeholder={promptPreview !== null ? t("runninghub.connectedPromptPlaceholder") : t("node.generateNode.imagePromptPlaceholder")}
           />
 
           <div className="grid grid-cols-3 gap-1.5">
-            <span className={chipClass} data-tone={statusTone(node.status)}>{statusLabel(node.status)}</span>
+            <span className={chipClass} data-tone={statusTone(node.status)}>{statusLabel(node.status, t)}</span>
             <span className={`${chipClass} ${isReady ? "" : warningChipToneClass}`} data-tone={isReady ? "ok" : "warning"}>
               {isReady ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
-              {!hasTarget ? "Missing target" : isReady ? "Ready" : `${readiness.missingCount} missing`}
+              {!hasTarget ? t("runninghub.missingTarget") : isReady ? t("runninghub.ready") : t("runninghub.missingCount", { count: readiness.missingCount })}
             </span>
             {focusResultNode ? (
               <button
@@ -533,7 +537,7 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
                   focusResultNode();
                 }}
                 onPointerDown={stopBoardControlPointer}
-                title="Locate result node"
+                title={t("node.generateNode.locateResultNode")}
               >
                 {resultLabel}
               </button>
@@ -547,9 +551,9 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
           {isImportOpen && (
             <div className={`${softPanelClass} nodrag w-full min-w-0 p-2`}>
               <div className="mb-1 flex items-center justify-between gap-2">
-                <span className={labelClass}>Paste import</span>
+                <span className={labelClass}>{t("runninghub.pasteImport")}</span>
                 <button type="button" onClick={() => setIsImportOpen(false)} className="text-[10px] text-[var(--iw-faint)] hover:text-[var(--iw-text)]">
-                  Close
+                  {t("runninghub.close")}
                 </button>
               </div>
               <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_48px] gap-1.5">
@@ -557,10 +561,10 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
                   value={importText}
                   onChange={event => setImportText(event.target.value)}
                   className="nodrag nowheel h-16 min-w-0 resize-none rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)] p-2 font-mono text-[10px] leading-4 text-[var(--iw-text)] outline-none focus:border-emerald-400/60"
-                  placeholder="App URL, webappId, official curl, or API JSON"
+                  placeholder={t("runninghub.importPlaceholder")}
                 />
                 <button type="button" onClick={applyImportedText} className="nodrag h-16 rounded-md bg-emerald-600 px-2 text-[10px] font-semibold text-white transition hover:bg-emerald-500">
-                  Apply
+                  {t("runninghub.apply")}
                 </button>
               </div>
             </div>
@@ -576,10 +580,10 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
         <section className={`${softPanelClass} flex min-h-0 flex-col`}>
           <div className="flex items-center justify-between gap-2 border-b border-[var(--iw-border)] px-2 py-1.5">
             <div className="min-w-0">
-              <p className={labelClass}>App params</p>
+              <p className={labelClass}>{t("runninghub.appParams")}</p>
               <p className="truncate text-[10px] text-[var(--iw-faint)]">{bindingSummary}</p>
             </div>
-            <button type="button" onClick={addBinding} className={iconButtonClass} title="Add param">
+            <button type="button" onClick={addBinding} className={iconButtonClass} title={t("runninghub.addParam")}>
               <Plus className="h-3.5 w-3.5" />
             </button>
           </div>
@@ -588,7 +592,7 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
             {node.bindings.length === 0 ? (
               <div className="flex h-full min-h-[160px] flex-col items-center justify-center gap-2 rounded-md border border-dashed border-[var(--iw-border)] text-center">
                 <ClipboardList className="h-5 w-5 text-[var(--iw-faint)]" />
-                <p className="text-[10px] text-[var(--iw-muted)]">No fields read</p>
+                <p className="text-[10px] text-[var(--iw-muted)]">{t("runninghub.noFieldsRead")}</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -601,9 +605,9 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
                             value={binding.label ?? ""}
                             onChange={event => updateBinding(binding.id, { label: event.target.value })}
                             className="nodrag nowheel h-7 min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1 text-[11px] font-semibold text-[var(--iw-text)] outline-none focus:border-emerald-400/40"
-                            placeholder={bindingTitle(binding)}
+                            placeholder={bindingTitle(binding, t)}
                           />
-                          {binding.required && <span className="imagine-required-chip imagine-tone-chip shrink-0 rounded border px-1 text-[9px]" data-tone="warning">Required</span>}
+                          {binding.required && <span className="imagine-required-chip imagine-tone-chip shrink-0 rounded border px-1 text-[9px]" data-tone="warning">{t("runninghub.required")}</span>}
                         </div>
                       </div>
                       <select
@@ -611,9 +615,9 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
                         onChange={event => updateBinding(binding.id, { source: readSource(event.target.value) })}
                         className={inputClass}
                       >
-                        {sourceOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                        {sourceOptions.map(option => <option key={option.value} value={option.value}>{t(option.labelKey)}</option>)}
                       </select>
-                      <button type="button" onClick={() => removeBinding(binding.id)} className={iconButtonClass} title="Delete param">
+                      <button type="button" onClick={() => removeBinding(binding.id)} className={iconButtonClass} title={t("runninghub.deleteParam")}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
@@ -629,7 +633,7 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
                           value={binding.value}
                           onChange={event => updateBinding(binding.id, { value: event.target.value })}
                           className={`${inputClass} w-full`}
-                          placeholder="Fixed fieldValue"
+                          placeholder={t("runninghub.fieldValuePlaceholder")}
                         />
                       )}
                       {binding.source === "reference" && (
@@ -638,40 +642,40 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
                             value={String(binding.referenceIndex ?? index)}
                             onChange={event => updateBinding(binding.id, { referenceIndex: readReferenceIndexInput(event.target.value) })}
                             className={`${inputClass} font-mono`}
-                            placeholder="Reference index"
+                            placeholder={t("runninghub.referenceIndex")}
                           />
                           <select value={binding.referenceType ?? "image"} onChange={event => updateBinding(binding.id, { referenceType: readReferenceType(event.target.value) })} className={inputClass}>
-                            <option value="image">Image</option>
-                            <option value="video">Video</option>
-                            <option value="audio">Audio</option>
+                            <option value="image">{t("runninghub.valueTypeImage")}</option>
+                            <option value="video">{t("runninghub.valueTypeVideo")}</option>
+                            <option value="audio">{t("runninghub.valueTypeAudio")}</option>
                           </select>
                           <select value={binding.deliveryMode} onChange={event => updateBinding(binding.id, { deliveryMode: readDelivery(event.target.value) })} className={inputClass}>
-                            <option value="fileName">File name</option>
+                            <option value="fileName">{t("runninghub.deliveryFileName")}</option>
                             <option value="url">URL</option>
-                            <option value="raw">Raw</option>
+                            <option value="raw">{t("runninghub.valueTypeRaw")}</option>
                           </select>
                         </div>
                       )}
                       {binding.source === "prompt" && (
                         <p className="rounded-md border border-[var(--iw-border)] px-2 py-1 text-[10px] text-[var(--iw-faint)]">
-                          Use current Prompt{promptPreview !== null ? " node" : ""}
+                          {t("runninghub.useCurrentPrompt", { suffix: promptPreview !== null ? t("runninghub.useCurrentPromptNodeSuffix") : "" })}
                         </p>
                       )}
                       {binding.source === "randomSeed" && (
-                        <p className="rounded-md border border-[var(--iw-border)] px-2 py-1 text-[10px] text-[var(--iw-faint)]">Generate random seed on each run</p>
+                        <p className="rounded-md border border-[var(--iw-border)] px-2 py-1 text-[10px] text-[var(--iw-faint)]">{t("runninghub.bindingSourceRandomSeed")}</p>
                       )}
                     </div>
 
                     <details className="nodrag mt-1.5">
                       <summary className="flex cursor-pointer items-center gap-1 text-[10px] text-[var(--iw-faint)]">
                         <Settings2 className="h-3 w-3" />
-                        Map identity
+                        {t("runninghub.mapIdentity")}
                       </summary>
                       <div className="mt-1.5 grid grid-cols-[1fr_1fr_88px_72px] gap-1.5">
                         <input value={binding.nodeId} onChange={event => updateBinding(binding.id, { nodeId: event.target.value })} className={`${inputClass} font-mono`} placeholder="nodeId" />
                         <input value={binding.fieldName} onChange={event => updateBinding(binding.id, { fieldName: event.target.value })} className={`${inputClass} font-mono`} placeholder="fieldName" />
                         <select value={binding.valueType ?? "text"} onChange={event => updateBinding(binding.id, { valueType: readValueType(event.target.value) })} className={inputClass}>
-                          {valueTypeOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                          {valueTypeOptions.map(option => <option key={option.value} value={option.value}>{t(option.labelKey)}</option>)}
                         </select>
                         <label className="flex h-8 items-center gap-1 rounded-md border border-[var(--iw-border)] px-2 text-[10px] text-[var(--iw-muted)]">
                           <input
@@ -680,7 +684,7 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
                             onChange={event => updateBinding(binding.id, { required: event.target.checked })}
                             className="nodrag h-3 w-3"
                           />
-                          Required
+                          {t("runninghub.required")}
                         </label>
                       </div>
                     </details>
