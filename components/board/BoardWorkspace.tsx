@@ -410,6 +410,7 @@ function sameFlowNodeDataModel(left: BoardFlowNode["data"], right: BoardFlowNode
     sameGenerateInputSummary(left.generateInputSummary, right.generateInputSummary) &&
     sameGenerateTaskSummary(left.generateTaskSummary, right.generateTaskSummary) &&
     sameResultItemList(left.resultItems, right.resultItems) &&
+    sameResultItemList(left.assetStackItems, right.assetStackItems) &&
     sameReferenceList(left.generateReferences, right.generateReferences) &&
     sameReferenceList(left.promptReferences, right.promptReferences)
   );
