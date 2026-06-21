@@ -1176,3 +1176,70 @@ Recorded and committed the existing board/workbench visual polish batch, confirm
 ### Next Steps
 
 - None - task complete
+
+
+## Session 154: Fix quick edit resolution handling
+
+**Date**: 2026-06-21
+**Task**: Fix quick edit resolution handling
+**Branch**: `main`
+
+### Summary
+
+Fixed image quick edit geometry so redraw/erase keep source aspect instead of forcing 1:1, outpaint uses expanded canvas aspect, and resolution options remain independently selectable from model capabilities.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6e0cc2b9` | (see git log) |
+| `52d17fd5` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 155: Fix board image preview hydration
+
+**Date**: 2026-06-21
+**Task**: Fix board image preview hydration
+**Branch**: `main`
+
+### Summary
+
+Fixed board media nodes staying on placeholders after refresh by including assetStackItems in React Flow node data equality so hydrated preview URLs trigger rerender.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c8b24ca8` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-3.md`
-- **Total Sessions**: 153
-- **Last Active**: 2026-06-18
+- **Total Sessions**: 155
+- **Last Active**: 2026-06-21
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-3.md` | ~1178 | Active |
+| `journal-3.md` | ~1245 | Active |
 | `journal-2.md` | ~1973 | Archived |
 | `journal-1.md` | ~1988 | Archived |
 <!-- @@@/auto:active-documents -->
@@ -31,6 +31,8 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 155 | 2026-06-21 | Fix board image preview hydration | `c8b24ca8` | `main` |
+| 154 | 2026-06-21 | Fix quick edit resolution handling | `6e0cc2b9`, `52d17fd5` | `main` |
 | 153 | 2026-06-18 | Board visual polish review fixes | `f9cd597c` | `main` |
 | 152 | 2026-06-17 | Optimize image generation worker pressure | `8cf2cbe` | `main` |
 | 151 | 2026-06-17 | Clean up legacy asset reference logic | `e4f1e22` | `main` |
