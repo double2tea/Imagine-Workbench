@@ -59,6 +59,19 @@ test("quick edit labels resolve scoped translation functions", () => {
   assert.equal(resolveImageQuickEditTarget("cutout", RUNNINGHUB_CUTOUT_TARGET_ID, commonT).label, "RunningHub 抠图");
 });
 
+test("quick edit processing titles resolve English fallback prompt separators", () => {
+  const creationT = scopedT("creation", {
+    "imageEdit.features.redraw.label": "Redraw",
+    "imageEdit.fallbackPrompt": "{label}: {prompt}",
+    "imageEdit.processingTitle": "{label} in progress",
+  });
+
+  const prompt = imageQuickEditFallbackPrompt("redraw", "source", creationT);
+
+  assert.equal(prompt, "Redraw: source");
+  assert.equal(imageQuickEditProcessingTitleFromPrompt(prompt, creationT), "Redraw in progress");
+});
+
 test("angle and lighting targets use prompt-only image edit route", () => {
   const angle = resolveImageQuickEditTarget("angle", "model:12ai:gpt-image-2");
   const lighting = resolveImageQuickEditTarget("lighting", "model:12ai:gemini-3-pro-image-preview");

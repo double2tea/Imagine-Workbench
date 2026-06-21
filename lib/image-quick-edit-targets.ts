@@ -89,9 +89,11 @@ export function imageQuickEditFallbackPrompt(
 }
 
 export function imageQuickEditProcessingTitleFromPrompt(prompt: string, t?: TFunction): string | null {
+  const hasFeaturePrefix = (label: string): boolean =>
+    prompt.startsWith(`${label}:`) || prompt.startsWith(`${label}：`);
   const feature =
-    IMAGE_EDIT_FEATURES.find(item => prompt.startsWith(`${item.label}：`)) ??
-    (t ? IMAGE_EDIT_FEATURES.find(item => prompt.startsWith(`${imageEditFeatureLabel(item.key, t)}：`)) : undefined);
+    IMAGE_EDIT_FEATURES.find(item => hasFeaturePrefix(item.label)) ??
+    (t ? IMAGE_EDIT_FEATURES.find(item => hasFeaturePrefix(imageEditFeatureLabel(item.key, t))) : undefined);
   if (!feature) return null;
   const translator = t ?? globalT;
   const label = imageEditFeatureLabel(feature.key, translator);
