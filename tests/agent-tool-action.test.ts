@@ -10,7 +10,7 @@ test("agent audio action validation allows ASR without prompt", () => {
       audioMode: "asr",
       model: "mimo:mimo-v2.5-asr",
     },
-  }), "当前音频模式需要至少 1 个音频参考");
+  }), "当前音频模式需要至少 1 个音频");
 
   assert.equal(validateAgentToolAction({
     type: "generate_audio",
@@ -61,7 +61,7 @@ test("agent audio action validation requires voice clone consent", () => {
       prompt: "Read this line",
       voiceCloneConsentAccepted: true,
     },
-  }), "当前音频模式需要至少 1 个音频参考");
+  }), "当前音频模式需要至少 1 个音频");
 
   assert.equal(validateAgentToolAction({
     type: "create_board_audio_flow",
@@ -73,7 +73,7 @@ test("agent audio action validation requires voice clone consent", () => {
     },
   }, {
     references: [{ id: "image-ref", type: "image", url: "data:image/png;base64,AAA=" }],
-  }), "当前音频模型不支持图片参考");
+  }), "当前输入不支持图片参考");
 
   assert.equal(validateAgentToolAction({
     type: "create_board_audio_flow",

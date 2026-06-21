@@ -4,6 +4,9 @@ import {
   DEFAULT_IMAGE_EDIT_FEATURE_TARGETS,
   RUNNINGHUB_CUTOUT_TARGET_ID,
   getImageQuickEditTargetOptions,
+  imageEditFeatureMeta,
+  imageQuickEditFallbackPrompt,
+  imageQuickEditProcessingTitleFromPrompt,
   normalizeImageQuickEditTargetId,
   resolveImageQuickEditTarget,
   submitImageQuickEdit,
@@ -18,11 +21,42 @@ import { RUNNINGHUB_CONTROL_IMAGE_APP_MODEL } from "../lib/providers/runninghub"
 
 const RUNNINGHUB_CONTROL_IMAGE_MODEL_VALUE = formatProviderModel("runninghub", RUNNINGHUB_CONTROL_IMAGE_APP_MODEL);
 
+function scopedT(namespace: string, messages: Record<string, string>) {
+  return (key: string, params?: Record<string, string | number>) => {
+    const value = messages[key];
+    if (!value) return `${namespace}.${key}`;
+    if (!params) return value;
+    return value.replace(/\{(\w+)\}/g, (_, name: string) =>
+      name in params ? String(params[name]) : `{${name}}`,
+    );
+  };
+}
+
 test("quick edit defaults cutout to RunningHub dedicated target", () => {
   assert.equal(DEFAULT_IMAGE_EDIT_FEATURE_TARGETS.cutout, RUNNINGHUB_CUTOUT_TARGET_ID);
   assert.equal(resolveImageQuickEditTarget("cutout", RUNNINGHUB_CUTOUT_TARGET_ID).model, RUNNINGHUB_CONTROL_IMAGE_MODEL_VALUE);
   assert.equal(DEFAULT_IMAGE_EDIT_FEATURE_TARGETS.angle, "model:12ai:gemini-3-pro-image-preview");
   assert.equal(DEFAULT_IMAGE_EDIT_FEATURE_TARGETS.lighting, "model:12ai:gemini-3-pro-image-preview");
+});
+
+test("quick edit labels resolve scoped translation functions", () => {
+  const creationT = scopedT("creation", {
+    "imageEdit.features.redraw.label": "重绘",
+    "imageEdit.features.redraw.description": "局部重绘",
+    "imageEdit.fallbackPrompt": "{label}：{prompt}",
+    "imageEdit.processingTitle": "{label}处理中",
+  });
+  const commonT = scopedT("common", {
+    "imageEdit.targets.runningHubCutout": "RunningHub 抠图",
+  });
+
+  const meta = imageEditFeatureMeta("redraw", creationT);
+
+  assert.equal(meta.label, "重绘");
+  assert.equal(meta.description, "局部重绘");
+  assert.equal(imageQuickEditFallbackPrompt("redraw", "source", creationT), "重绘：source");
+  assert.equal(imageQuickEditProcessingTitleFromPrompt("重绘：source", creationT), "重绘处理中");
+  assert.equal(resolveImageQuickEditTarget("cutout", RUNNINGHUB_CUTOUT_TARGET_ID, commonT).label, "RunningHub 抠图");
 });
 
 test("angle and lighting targets use prompt-only image edit route", () => {

@@ -41,14 +41,30 @@ export const IMAGE_EDIT_FEATURES: readonly ImageEditFeatureMeta[] = [
   { key: "lighting", label: "Relight", description: "Generate relighting prompts through lighting controls" },
 ];
 
+function readTranslatedKey(
+  translator: TFunction,
+  namespace: "common" | "creation",
+  key: string,
+  params?: Record<string, string | number>,
+): string | undefined {
+  const scoped = translator(key, params);
+  if (scoped !== key && scoped !== `${namespace}.${key}`) return scoped;
+  const fullKey = `${namespace}.${key}`;
+  const full = translator(fullKey, params);
+  if (full !== key && full !== fullKey && full !== `${namespace}.${fullKey}`) return full;
+  return undefined;
+}
+
 export function imageEditFeatureMeta(feature: ImageEditFeature, t?: TFunction): ImageEditFeatureMeta {
   const meta = IMAGE_EDIT_FEATURES.find(item => item.key === feature);
   if (!meta) throw new Error(`Unknown image edit feature: ${feature}`);
   const translator = t ?? globalT;
+  const labelKey = `imageEdit.features.${feature}.label`;
+  const descriptionKey = `imageEdit.features.${feature}.description`;
   return {
     ...meta,
-    label: translator(`creation.imageEdit.features.${feature}.label`) || meta.label,
-    description: translator(`creation.imageEdit.features.${feature}.description`) || meta.description,
+    label: readTranslatedKey(translator, "creation", labelKey) ?? meta.label,
+    description: readTranslatedKey(translator, "creation", descriptionKey) ?? meta.description,
   };
 }
 
@@ -62,10 +78,14 @@ export function imageQuickEditFallbackPrompt(
   t?: TFunction,
 ): string {
   const translator = t ?? globalT;
-  return translator("creation.imageEdit.fallbackPrompt", {
+  const params = {
     label: imageEditFeatureLabel(feature, translator),
     prompt: sourcePromptOrId,
-  });
+  };
+  return (
+    readTranslatedKey(translator, "creation", "imageEdit.fallbackPrompt", params) ??
+    globalT("creation.imageEdit.fallbackPrompt", params)
+  );
 }
 
 export function imageQuickEditProcessingTitleFromPrompt(prompt: string, t?: TFunction): string | null {
@@ -75,7 +95,10 @@ export function imageQuickEditProcessingTitleFromPrompt(prompt: string, t?: TFun
   if (!feature) return null;
   const translator = t ?? globalT;
   const label = imageEditFeatureLabel(feature.key, translator);
-  return translator("creation.imageEdit.processingTitle", { label });
+  return (
+    readTranslatedKey(translator, "creation", "imageEdit.processingTitle", { label }) ??
+    globalT("creation.imageEdit.processingTitle", { label })
+  );
 }
 
 const NANO_BANANA_PRO_MODEL = "12ai:gemini-3-pro-image-preview";
@@ -109,7 +132,7 @@ function resolveDedicatedTargetLabel(target: ImageQuickEditTarget, t?: TFunction
   if (target.id !== RUNNINGHUB_CUTOUT_TARGET_ID || !t) return target;
   return {
     ...target,
-    label: t("common.imageEdit.targets.runningHubCutout"),
+    label: readTranslatedKey(t, "common", "imageEdit.targets.runningHubCutout") ?? target.label,
   };
 }
 
