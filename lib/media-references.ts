@@ -18,6 +18,12 @@ export interface MediaReferenceDimensions {
   width: number;
 }
 
+export const CUSTOM_IMAGE_SIZE_GRID = 16;
+export const CUSTOM_IMAGE_SIZE_MAX_EDGE = 3840;
+export const CUSTOM_IMAGE_SIZE_MAX_ASPECT_RATIO = 3;
+export const CUSTOM_IMAGE_SIZE_MIN_PIXELS = 655360;
+export const CUSTOM_IMAGE_SIZE_MAX_PIXELS = 8294400;
+
 export function getMediaReferenceType(reference: Pick<MediaReference, "type">): MediaReferenceType {
   return reference.type ?? "image";
 }
@@ -76,6 +82,51 @@ export function parseMediaReferenceDimensions(value: string | undefined): MediaR
   const height = Number(match[2]);
   if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) return null;
   return { width, height };
+}
+
+export function formatMediaReferenceDimensions(dimensions: MediaReferenceDimensions): string {
+  return `${dimensions.width}x${dimensions.height}`;
+}
+
+export function isValidCustomImageDimensions(dimensions: MediaReferenceDimensions): boolean {
+  const { height, width } = dimensions;
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) return false;
+  if (width > CUSTOM_IMAGE_SIZE_MAX_EDGE || height > CUSTOM_IMAGE_SIZE_MAX_EDGE) return false;
+  if (width % CUSTOM_IMAGE_SIZE_GRID !== 0 || height % CUSTOM_IMAGE_SIZE_GRID !== 0) return false;
+  if (Math.max(width, height) / Math.min(width, height) > CUSTOM_IMAGE_SIZE_MAX_ASPECT_RATIO) return false;
+  const pixels = width * height;
+  return pixels >= CUSTOM_IMAGE_SIZE_MIN_PIXELS && pixels <= CUSTOM_IMAGE_SIZE_MAX_PIXELS;
+}
+
+export function closestValidCustomImageDimensions(dimensions: MediaReferenceDimensions): MediaReferenceDimensions | null {
+  if (!Number.isInteger(dimensions.width) || !Number.isInteger(dimensions.height) || dimensions.width <= 0 || dimensions.height <= 0) {
+    return null;
+  }
+  if (isValidCustomImageDimensions(dimensions)) return dimensions;
+
+  const targetAspectRatio = dimensions.width / dimensions.height;
+  let bestDimensions: MediaReferenceDimensions | null = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  let bestAspectDistance = Number.POSITIVE_INFINITY;
+
+  for (let width = CUSTOM_IMAGE_SIZE_GRID; width <= CUSTOM_IMAGE_SIZE_MAX_EDGE; width += CUSTOM_IMAGE_SIZE_GRID) {
+    for (let height = CUSTOM_IMAGE_SIZE_GRID; height <= CUSTOM_IMAGE_SIZE_MAX_EDGE; height += CUSTOM_IMAGE_SIZE_GRID) {
+      const candidate = { width, height };
+      if (!isValidCustomImageDimensions(candidate)) continue;
+
+      const widthDistance = width - dimensions.width;
+      const heightDistance = height - dimensions.height;
+      const distance = widthDistance * widthDistance + heightDistance * heightDistance;
+      const aspectDistance = Math.abs(width / height - targetAspectRatio);
+      if (distance < bestDistance || (distance === bestDistance && aspectDistance < bestAspectDistance)) {
+        bestDimensions = candidate;
+        bestDistance = distance;
+        bestAspectDistance = aspectDistance;
+      }
+    }
+  }
+
+  return bestDimensions;
 }
 
 export function buildPromptReferenceTokenPattern(labelT: TFunction = t): RegExp {

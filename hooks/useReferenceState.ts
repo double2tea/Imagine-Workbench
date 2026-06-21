@@ -15,7 +15,7 @@ import {
   type MediaReferenceType,
 } from "@/lib/media-references";
 import type { VideoReferenceMode } from "@/lib/providers/model-catalog";
-import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, compressReferenceImageFile, readImageBlobDimensions } from "@/lib/reference-images";
+import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, compressReferenceImageFileWithDimensions } from "@/lib/reference-images";
 import { toErrorMessage } from "@/lib/client-fetch-error";
 
 export type AtDropdownTarget = "image-prompt" | "video-prompt" | "audio-prompt" | "agent-prompt";
@@ -248,16 +248,16 @@ export function useReferenceState({
     }
 
     try {
-      const dimensions = type === "image" ? await readImageBlobDimensions(file) : null;
-      const dataUrl = type === "image" ? await compressReferenceImageFile(file) : await readFileAsDataUrl(file, t);
+      const compressedImage = type === "image" ? await compressReferenceImageFileWithDimensions(file) : null;
+      const dataUrl = compressedImage ? compressedImage.dataUrl : await readFileAsDataUrl(file, t);
       setReferenceImages(prev => {
         if (prev.some(reference => reference.id === id)) return prev;
         const acceptedReferenceCount = getAcceptedReferenceCountForTarget(target, prev);
         if (acceptedReferenceCount >= limit) return prev;
 
         const role = getDroppedReferenceRole(target, acceptedReferenceCount);
-        const nextReference: ReferenceImageRef = dimensions
-          ? { ...dimensions, id, type, url: dataUrl, role }
+        const nextReference: ReferenceImageRef = compressedImage
+          ? { height: compressedImage.height, id, type, url: dataUrl, role, width: compressedImage.width }
           : { id, type, url: dataUrl, role };
         if (prev.length === 0) {
           setReferenceImage(dataUrl);

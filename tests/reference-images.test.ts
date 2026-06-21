@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  closestValidCustomImageDimensions,
+  formatMediaReferenceDimensions,
+  isValidCustomImageDimensions,
   mediaReferenceFileExtension,
   mediaReferenceTypeFromBase64DataUri,
   parseMediaReferenceDimensions,
@@ -35,6 +38,28 @@ test("parseMediaReferenceDimensions reads positive pixel dimensions", () => {
   assert.deepEqual(parseMediaReferenceDimensions("1536x1024"), { width: 1536, height: 1024 });
   assert.equal(parseMediaReferenceDimensions("16:9"), null);
   assert.equal(parseMediaReferenceDimensions("0x1024"), null);
+});
+
+test("closestValidCustomImageDimensions keeps valid custom sizes unchanged", () => {
+  const dimensions = { width: 1536, height: 1024 };
+
+  assert.deepEqual(closestValidCustomImageDimensions(dimensions), dimensions);
+  assert.equal(formatMediaReferenceDimensions(dimensions), "1536x1024");
+});
+
+test("closestValidCustomImageDimensions snaps near sizes to valid generation dimensions", () => {
+  assert.deepEqual(closestValidCustomImageDimensions({ width: 1000, height: 1000 }), { width: 992, height: 992 });
+});
+
+test("closestValidCustomImageDimensions constrains oversized and extreme reference sizes", () => {
+  const oversized = closestValidCustomImageDimensions({ width: 4032, height: 3024 });
+  const wide = closestValidCustomImageDimensions({ width: 4096, height: 512 });
+
+  assert.ok(oversized);
+  assert.ok(wide);
+  assert.equal(isValidCustomImageDimensions(oversized), true);
+  assert.equal(isValidCustomImageDimensions(wide), true);
+  assert.equal(Math.max(wide.width, wide.height) / Math.min(wide.width, wide.height), 3);
 });
 
 test("scaleImageDimensions constrains the longest edge", () => {

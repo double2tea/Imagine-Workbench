@@ -26,6 +26,12 @@ export interface ReferenceImageCompressionAttempt {
   quality: number;
 }
 
+export interface CompressedReferenceImage {
+  dataUrl: string;
+  height: number;
+  width: number;
+}
+
 export const REFERENCE_IMAGE_COMPRESSION_POLICY: ReferenceImageCompressionPolicy = {
   maxBytes: REFERENCE_IMAGE_MAX_BYTES,
   outputType: REFERENCE_IMAGE_OUTPUT_TYPE,
@@ -167,20 +173,15 @@ export function getReferenceMediaPayloadError(referenceUrls: string[]): string |
 }
 
 export async function compressReferenceImageFile(file: File): Promise<string> {
+  return (await compressReferenceImageFileWithDimensions(file)).dataUrl;
+}
+
+export async function compressReferenceImageFileWithDimensions(file: File): Promise<CompressedReferenceImage> {
   if (!file.type.startsWith("image/")) {
     throw new Error(t("common.notices.referenceMediaMustBeImage"));
   }
 
-  return compressReferenceImageBlob(file);
-}
-
-export async function readImageBlobDimensions(blob: Blob): Promise<{ height: number; width: number }> {
-  const bitmap = await createImageBitmap(blob);
-  try {
-    return { width: bitmap.width, height: bitmap.height };
-  } finally {
-    bitmap.close();
-  }
+  return compressReferenceImageBlobWithDimensions(file);
 }
 
 export async function compressReferenceImageDataUrl(dataUrl: string): Promise<string> {
@@ -252,6 +253,10 @@ async function readReferenceImageFetchError(response: Response): Promise<string>
 }
 
 async function compressReferenceImageBlob(blob: Blob): Promise<string> {
+  return (await compressReferenceImageBlobWithDimensions(blob)).dataUrl;
+}
+
+async function compressReferenceImageBlobWithDimensions(blob: Blob): Promise<CompressedReferenceImage> {
   const bitmap = await createImageBitmap(blob);
   try {
     const canvas = document.createElement("canvas");
@@ -267,7 +272,13 @@ async function compressReferenceImageBlob(blob: Blob): Promise<string> {
       context.drawImage(bitmap, 0, 0, attempt.width, attempt.height);
 
       const compressedBlob = await canvasToBlob(canvas, attempt.outputType, attempt.quality);
-      if (compressedBlob.size <= policy.maxBytes) return readBlobAsDataUrl(compressedBlob);
+      if (compressedBlob.size <= policy.maxBytes) {
+        return {
+          dataUrl: await readBlobAsDataUrl(compressedBlob),
+          height: attempt.height,
+          width: attempt.width,
+        };
+      }
     }
 
     throw new Error(t("common.notices.referenceImageCompressOverLimit", { size: formatBytes(policy.maxBytes) }));

@@ -99,7 +99,15 @@ import { RUNNINGHUB_YOUCHUAN_ADVANCED_DEFAULTS, runningHubAppPresetRequiresPromp
 import { buildGenerationModelPriceOptions } from "@/lib/providers/pricing";
 import type { RunningHubYouchuanAdvancedSettings } from "@/lib/providers/types";
 import { saveClonedVoiceProfileFromAsset } from "@/lib/voice-profiles";
-import { getMediaReferenceType, mediaReferenceLabel, mediaReferenceTypeFromMime, parseMediaReferenceDimensions } from "@/lib/media-references";
+import {
+  closestValidCustomImageDimensions,
+  formatMediaReferenceDimensions,
+  getMediaReferenceType,
+  mediaReferenceLabel,
+  mediaReferenceTypeFromMime,
+  parseMediaReferenceDimensions,
+  type MediaReferenceDimensions,
+} from "@/lib/media-references";
 import { API_ROUTES } from "@/lib/api/routes";
 import {
   REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES,
@@ -202,11 +210,11 @@ function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
-function referenceImagePixelSize(reference: ReferenceImageRef): string | null {
+function referenceImagePixelDimensions(reference: ReferenceImageRef): MediaReferenceDimensions | null {
   const { height, width } = reference;
   if (typeof width !== "number" || typeof height !== "number") return null;
   if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) return null;
-  return `${width}x${height}`;
+  return { width, height };
 }
 
 function getProviderLabel(provider: AiProvider, customProviders: readonly CustomProviderDefinition[] = []): string {
@@ -599,9 +607,11 @@ export default function Home() {
     previousImageReferenceCountRef.current = imageReferences.length;
     if (previousImageReferenceCount > 0 || imageReferences.length === 0) return;
 
-    const nextSize = referenceImagePixelSize(imageReferences[0]);
-    if (!nextSize) return;
+    const referenceDimensions = referenceImagePixelDimensions(imageReferences[0]);
+    const nextDimensions = referenceDimensions ? closestValidCustomImageDimensions(referenceDimensions) : null;
+    if (!nextDimensions) return;
 
+    const nextSize = formatMediaReferenceDimensions(nextDimensions);
     const nextAspectRatio = getImageAspectRatioFromResolution(nextSize);
     const supportedAspectRatio = nextAspectRatio && imageCapabilities.aspectRatios.some(option => option.value === nextAspectRatio)
       ? nextAspectRatio

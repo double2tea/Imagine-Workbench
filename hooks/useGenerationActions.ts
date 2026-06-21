@@ -32,7 +32,16 @@ import {
 import type { RunningHubTaskNodeBinding, RunningHubYouchuanAdvancedSettings } from "@/lib/providers/types";
 import { buildPromptWithReferenceMap } from "@/hooks/useReferenceState";
 import { audioOperationMissingReferenceMessage, audioOperationRequiresTextInput, readOptionalAudioFormat } from "@/lib/audio-operation-rules";
-import { getMediaReferenceType, mediaReferenceLabel } from "@/lib/media-references";
+import {
+  CUSTOM_IMAGE_SIZE_GRID,
+  CUSTOM_IMAGE_SIZE_MAX_ASPECT_RATIO,
+  CUSTOM_IMAGE_SIZE_MAX_EDGE,
+  CUSTOM_IMAGE_SIZE_MAX_PIXELS,
+  CUSTOM_IMAGE_SIZE_MIN_PIXELS,
+  getMediaReferenceType,
+  mediaReferenceLabel,
+  parseMediaReferenceDimensions,
+} from "@/lib/media-references";
 import { getAudioModelCapabilities, getImageModelCapabilities, getVideoModelCapabilities, imageParameterValuesFromLegacy, imageParameterValuesToRunningHubYouchuan, parseProviderModel, resolveImageModelQuality, type AudioOperationMode, type VideoReferenceMode } from "@/lib/providers/model-catalog";
 import { isRunningHubTaskTarget } from "@/lib/providers/runninghub-node-info";
 import { getProviderMeta } from "@/lib/providers/registry";
@@ -304,17 +313,16 @@ async function cancelTaskOrWarn(
 
 function validateCustomImageSize(size: string, t: TFunction): string | null {
   if (size === "auto") return null;
-  const match = size.match(/^(\d+)x(\d+)$/);
-  if (!match) return t("common.notices.imageSizeInvalid");
-  const width = Number(match[1]);
-  const height = Number(match[2]);
-  if (width > 3840 || height > 3840) return t("common.notices.maxDimensionExceeded");
-  if (width % 16 !== 0 || height % 16 !== 0) return t("common.notices.dimensionMustBe16x");
+  const dimensions = parseMediaReferenceDimensions(size);
+  if (!dimensions) return t("common.notices.imageSizeInvalid");
+  const { height, width } = dimensions;
+  if (width > CUSTOM_IMAGE_SIZE_MAX_EDGE || height > CUSTOM_IMAGE_SIZE_MAX_EDGE) return t("common.notices.maxDimensionExceeded");
+  if (width % CUSTOM_IMAGE_SIZE_GRID !== 0 || height % CUSTOM_IMAGE_SIZE_GRID !== 0) return t("common.notices.dimensionMustBe16x");
   const longSide = Math.max(width, height);
   const shortSide = Math.min(width, height);
-  if (longSide / shortSide > 3) return t("common.notices.aspectRatioExceeded");
+  if (longSide / shortSide > CUSTOM_IMAGE_SIZE_MAX_ASPECT_RATIO) return t("common.notices.aspectRatioExceeded");
   const pixels = width * height;
-  if (pixels < 655360 || pixels > 8294400) return t("common.notices.totalPixelsInvalid");
+  if (pixels < CUSTOM_IMAGE_SIZE_MIN_PIXELS || pixels > CUSTOM_IMAGE_SIZE_MAX_PIXELS) return t("common.notices.totalPixelsInvalid");
   return null;
 }
 
@@ -338,11 +346,13 @@ function buildReferenceMediaSnapshot(
 
 function taskRequestReferences(request: GenerationRequestSnapshot): ReferenceImageRef[] {
   return getGenerationReferenceMedia(request).map((reference, index) => ({
+    height: reference.height,
     id: reference.sourceAssetId ?? `retry_reference_${index + 1}`,
     ...(reference.sourceAssetId ? { sourceAssetId: reference.sourceAssetId } : {}),
     type: reference.type,
     url: reference.url,
     ...(reference.role ? { role: reference.role } : {}),
+    width: reference.width,
   }));
 }
 
