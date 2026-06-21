@@ -421,6 +421,27 @@ function sameFlowNodeDataModel(left: BoardFlowNode["data"], right: BoardFlowNode
   );
 }
 
+function sameReusableFlowNodeData(
+  existing: BoardFlowNode["data"],
+  cachedData: BoardFlowNode["data"],
+  node: BoardNodeModel,
+  taskSummary: BoardGenerateTaskSummary | undefined,
+): boolean {
+  return (
+    existing.node === node &&
+    sameGenerateTaskSummary(existing.generateTaskSummary, taskSummary) &&
+    sameReferenceList(existing.generateReferences, cachedData.generateReferences) &&
+    sameReferenceList(existing.promptReferences, cachedData.promptReferences) &&
+    sameGenerateInputSummary(existing.generateInputSummary, cachedData.generateInputSummary) &&
+    existing.connectedResultNodeId === cachedData.connectedResultNodeId &&
+    existing.hasResultConnection === cachedData.hasResultConnection &&
+    sameResultItemList(existing.resultItems, cachedData.resultItems) &&
+    sameResultItemList(existing.assetStackItems, cachedData.assetStackItems) &&
+    existing.compareReferenceUrl === cachedData.compareReferenceUrl &&
+    existing.boardId === cachedData.boardId
+  );
+}
+
 function sameFlowNodeModel(left: BoardFlowNode, right: BoardFlowNode): boolean {
   return (
     left.id === right.id &&
@@ -1869,20 +1890,7 @@ export default function BoardWorkspace({
             : undefined;
         const existing = prevData.get(node.id);
         let data: BoardFlowNode["data"];
-        if (
-          existing &&
-          existing.node === node &&
-          existing.generateTaskSummary === taskSummary &&
-          existing.generateReferences === cachedData.generateReferences &&
-          existing.promptReferences === cachedData.promptReferences &&
-          existing.generateInputSummary === cachedData.generateInputSummary &&
-          existing.connectedResultNodeId === cachedData.connectedResultNodeId &&
-          existing.hasResultConnection === cachedData.hasResultConnection &&
-          existing.resultItems === cachedData.resultItems &&
-          existing.assetStackItems === cachedData.assetStackItems &&
-          existing.compareReferenceUrl === cachedData.compareReferenceUrl &&
-          existing.boardId === cachedData.boardId
-        ) {
+        if (existing && sameReusableFlowNodeData(existing, cachedData, node, taskSummary)) {
           data = existing;
         } else {
           data = {
