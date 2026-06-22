@@ -1,4 +1,4 @@
-import { t as globalT, type TFunction } from "@/lib/i18n";
+import { t as globalT, type TFunction } from "@/lib/i18n-core";
 import { mediaReferenceLabel } from "./media-references";
 import {
   getAudioModelCapabilities,

@@ -1,4 +1,4 @@
-import { t } from "@/lib/i18n";
+import { t } from "@/lib/i18n-core";
 import JSZip from "jszip";
 import { clearBoardsFromDB, listBoardsFromDB, saveBoardToDB } from "@/lib/board/persistence";
 import { createEmptyBoard, DEFAULT_BOARD_CONFIG, DEFAULT_BOARD_ID } from "@/lib/board/defaults";

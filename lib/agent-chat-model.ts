@@ -4,7 +4,7 @@ import {
   mediaReferenceMimeFromBase64DataUri,
   type MediaReferenceType,
 } from "./media-references";
-import { t } from "./i18n";
+import { t } from "./i18n-core";
 
 export interface AgentReferenceInput {
   id: string;

@@ -1,4 +1,4 @@
-import { t } from "@/lib/i18n";
+import { t } from "@/lib/i18n-core";
 import type { BoardMultiGridAspectRatio, BoardMultiGridItem, BoardMultiGridSize } from "@/lib/board/types";
 
 export const BOARD_MULTI_GRID_ASPECT_RATIOS: readonly BoardMultiGridAspectRatio[] = ["1:1", "4:3", "3:4", "16:9", "9:16", "2:3", "3:2"];

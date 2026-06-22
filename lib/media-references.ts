@@ -1,4 +1,4 @@
-import { t, type TFunction } from "@/lib/i18n";
+import { t, type TFunction } from "@/lib/i18n-core";
 
 export type MediaReferenceType = "image" | "video" | "audio";
 export type MediaReferenceRole = "start" | "end" | "general";

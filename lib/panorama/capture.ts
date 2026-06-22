@@ -1,4 +1,4 @@
-import { t } from "@/lib/i18n";
+import { t } from "@/lib/i18n-core";
 import { buildStorageItem, type StorageItem } from "@/lib/db";
 
 export interface PanoramaCamera {

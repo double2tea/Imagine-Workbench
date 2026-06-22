@@ -1,4 +1,4 @@
-import { t as globalT, type TFunction } from "@/lib/i18n";
+import { t as globalT, type TFunction } from "@/lib/i18n-core";
 import { API_ROUTES } from "./api/routes";
 import { readFetchError } from "./client-fetch-error";
 import { readImageGenerationPayload } from "./client-image-response";

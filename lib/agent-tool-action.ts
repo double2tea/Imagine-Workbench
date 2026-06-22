@@ -1,4 +1,4 @@
-import { t } from "@/lib/i18n";
+import { t } from "@/lib/i18n-core";
 import { AGENT_BOARD_PATCH_MAX_OPERATIONS, type AgentGenerationParams, type AgentToolAction } from "./agent-actions";
 import { audioOperationMissingReferenceMessage, audioOperationRequiresTextInput } from "./audio-operation-rules";
 import { getMediaReferenceType, mediaReferenceLabel, type MediaReference } from "./media-references";

@@ -1,5 +1,5 @@
 import { buildStorageItem, type StorageItem } from "@/lib/db";
-import { t } from "@/lib/i18n";
+import { t } from "@/lib/i18n-core";
 
 export type VideoFrameCaptureMode = "first" | "current" | "last";
 

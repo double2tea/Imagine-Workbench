@@ -1,4 +1,4 @@
-import { t } from "@/lib/i18n";
+import { t } from "@/lib/i18n-core";
 import { mediaReferenceLabel, type MediaReferenceType } from "../media-references";
 
 export type ModelParameterGroup = "core" | "references" | "advanced" | "provider";

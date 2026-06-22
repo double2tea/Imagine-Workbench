@@ -4,7 +4,7 @@ import {
   type GenerationRequestSnapshot,
   type StorageItem,
 } from "./db";
-import { t } from "@/lib/i18n";
+import { t } from "@/lib/i18n-core";
 
 export type GenerationTaskStatus = "pending" | "processing" | "complete" | "failed" | "canceled";
 export type GenerationTaskSourceSurface = "workspace" | "board" | "agent";

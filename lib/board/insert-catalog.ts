@@ -1,4 +1,4 @@
-import { t } from "@/lib/i18n";
+import { t } from "@/lib/i18n-core";
 import type { LucideIcon } from "lucide-react";
 import {
   Bot,

@@ -1,4 +1,4 @@
-import { t } from "@/lib/i18n";
+import { t } from "@/lib/i18n-core";
 import { API_ROUTES } from "./api/routes";
 
 export const REFERENCE_IMAGE_MAX_EDGE = 2048;

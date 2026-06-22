@@ -12,7 +12,7 @@ import {
   type StorageItem,
 } from "@/lib/db";
 import { createLocalUploadAsset } from "@/lib/data-management";
-import { t } from "@/lib/i18n";
+import { t } from "@/lib/i18n-core";
 
 export const LIBRARY_ASSET_CATEGORIES: readonly LibraryAssetCategory[] = ["character", "scene", "prop", "style", "other"];
 export const LIBRARY_ASSET_MEDIA_TYPES: readonly LibraryAssetMediaType[] = ["image", "video", "audio"];

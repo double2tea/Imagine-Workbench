@@ -1,5 +1,5 @@
 import type { StorageItem } from "./db";
-import { t as globalT, type TFunction } from "./i18n";
+import { t as globalT, type TFunction } from "./i18n-core";
 import type { AiProvider } from "./providers/model-catalog";
 import { getAudioModelCapabilities, tryParseProviderModel, type AudioOperationMode } from "./providers/model-catalog";
 import { MIMO_BUILT_IN_VOICES } from "./providers/mimo-voices";

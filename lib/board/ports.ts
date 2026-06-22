@@ -1,4 +1,4 @@
-import { t, type TFunction } from "@/lib/i18n";
+import { t, type TFunction } from "@/lib/i18n-core";
 import type { BoardEdge, BoardEdgeKind, BoardNode, BoardPortDefinition, BoardPortRef } from "./types";
 import { dedupeBoardEdgesByEndpoints } from "./edge-dedupe";
 import type { MediaReferenceType } from "@/lib/media-references";

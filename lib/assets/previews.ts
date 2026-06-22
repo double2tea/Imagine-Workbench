@@ -1,6 +1,6 @@
 "use client";
 
-import { t } from "@/lib/i18n";
+import { t } from "@/lib/i18n-core";
 import {
   getAssetPreviewRecord,
   hydrateAsset,

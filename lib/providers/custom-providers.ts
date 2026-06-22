@@ -1,4 +1,4 @@
-import { t } from "@/lib/i18n";
+import { t } from "@/lib/i18n-core";
 import { isKnownProvider, isProviderKey, type CustomProviderDefinition } from "./registry";
 
 export const CUSTOM_PROVIDERS_STORAGE_KEY = "imagine_custom_providers";
