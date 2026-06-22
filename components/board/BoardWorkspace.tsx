@@ -134,6 +134,7 @@ interface BoardWorkspaceProps {
   onExecuteGenerateNode: (nodeId: string) => void;
   onFetchRunningHubAppSchema: (webappId: string) => Promise<BoardRunningHubAppSchemaResult>;
   onImportBoardFiles: (files: File[], position: BoardPoint) => void | Promise<void>;
+  onMarkGeneratedAssetsViewed?: (assetIds: string[]) => void;
   onCreateBoard: () => void;
   onDeleteBoard: () => void;
   onDownloadAsset: (item: StorageItem) => void;
@@ -155,6 +156,7 @@ interface BoardWorkspaceProps {
   onSelectedNodeIdsChange?: (nodeIds: string[]) => void;
   externalSelectedNodeIds?: string[];
   selectedDownloadableCount?: number;
+  viewedGeneratedAssetIds?: ReadonlySet<string>;
 }
 
 type BoardFlowEdge = Edge<{ kind: BoardEdgeKind; processing?: boolean }, "smoothstep">;
@@ -247,7 +249,7 @@ interface BoardSelectionSnapshot {
 }
 
 type BoardReferenceFlowData = Pick<BoardFlowNode["data"], "generateInputSummary" | "generateReferences" | "promptReferences">;
-type BoardMediaFlowData = Pick<BoardFlowNode["data"], "assetStackItems" | "compareReferenceUrl" | "connectedResultNodeId" | "hasResultConnection" | "resultItems">;
+type BoardMediaFlowData = Pick<BoardFlowNode["data"], "assetStackItems" | "compareReferenceUrl" | "connectedResultNodeId" | "hasResultConnection" | "isUnviewedGeneratedAsset" | "resultItems">;
 
 interface MultiGridCellDropTarget {
   cellIndex: number;
@@ -257,6 +259,7 @@ interface MultiGridCellDropTarget {
 
 const SELECTION_TOOLBAR_GAP = 44;
 const EMPTY_STORAGE_ITEMS: StorageItem[] = [];
+const EMPTY_STRING_SET: ReadonlySet<string> = new Set();
 
 function sameStringList(left: string[], right: string[]): boolean {
   if (left.length !== right.length) return false;
@@ -343,6 +346,19 @@ function storageItemStackForAssetId(
   return item ? [item] : EMPTY_STORAGE_ITEMS;
 }
 
+function isGeneratedCompleteMediaItem(item: StorageItem | undefined): item is StorageItem & { type: "audio" | "image" | "video" } {
+  return (
+    item !== undefined &&
+    (item.type === "audio" || item.type === "image" || item.type === "video") &&
+    item.status === "complete" &&
+    Boolean(item.sourceBoardNodeId)
+  );
+}
+
+function isUnviewedGeneratedMediaItem(item: StorageItem | undefined, viewedAssetIds: ReadonlySet<string>): boolean {
+  return isGeneratedCompleteMediaItem(item) && !viewedAssetIds.has(item.id);
+}
+
 function sameResultItemList(left: StorageItem[] | undefined, right: StorageItem[] | undefined): boolean {
   if (left === right) return true;
   if (!left || !right) return false;
@@ -411,6 +427,7 @@ function sameFlowNodeDataModel(left: BoardFlowNode["data"], right: BoardFlowNode
     sameBoardNodeRenderModel(left.node, right.node) &&
     left.connectedResultNodeId === right.connectedResultNodeId &&
     left.hasResultConnection === right.hasResultConnection &&
+    left.isUnviewedGeneratedAsset === right.isUnviewedGeneratedAsset &&
     left.compareReferenceUrl === right.compareReferenceUrl &&
     sameGenerateInputSummary(left.generateInputSummary, right.generateInputSummary) &&
     sameGenerateTaskSummary(left.generateTaskSummary, right.generateTaskSummary) &&
@@ -435,6 +452,7 @@ function sameReusableFlowNodeData(
     sameGenerateInputSummary(existing.generateInputSummary, cachedData.generateInputSummary) &&
     existing.connectedResultNodeId === cachedData.connectedResultNodeId &&
     existing.hasResultConnection === cachedData.hasResultConnection &&
+    existing.isUnviewedGeneratedAsset === cachedData.isUnviewedGeneratedAsset &&
     sameResultItemList(existing.resultItems, cachedData.resultItems) &&
     sameResultItemList(existing.assetStackItems, cachedData.assetStackItems) &&
     existing.compareReferenceUrl === cachedData.compareReferenceUrl &&
@@ -1157,6 +1175,7 @@ export default function BoardWorkspace({
   onExecuteGenerateNode,
   onFetchRunningHubAppSchema,
   onImportBoardFiles,
+  onMarkGeneratedAssetsViewed,
   onCreateBoard,
   onDeleteBoard,
   onDownloadAsset,
@@ -1178,6 +1197,7 @@ export default function BoardWorkspace({
   onSelectedNodeIdsChange,
   externalSelectedNodeIds,
   selectedDownloadableCount = 0,
+  viewedGeneratedAssetIds = EMPTY_STRING_SET,
 }: BoardWorkspaceProps) {
   const themeMode = useThemeModeSnapshot();
   const { t: tb } = useTranslations("board");
@@ -1742,8 +1762,12 @@ export default function BoardWorkspace({
         data.compareReferenceUrl = node.asset.type === "image"
           ? assetCompareReferenceUrl(node.id, board.nodes, board.edges, boardPromptReferenceGraphIndex)
           : null;
+        const item = galleryItemById.get(node.asset.assetId);
+        if (isUnviewedGeneratedMediaItem(item, viewedGeneratedAssetIds)) data.isUnviewedGeneratedAsset = true;
       } else if (node.kind === "result") {
         data.assetStackItems = storageItemsForAssetIds(node.resultAssetIds, galleryItemById);
+        const item = galleryItemById.get(node.activeAssetId);
+        if (isUnviewedGeneratedMediaItem(item, viewedGeneratedAssetIds)) data.isUnviewedGeneratedAsset = true;
       }
       if (connectedResultNode) {
         data.connectedResultNodeId = connectedResultNode.id;
@@ -1763,6 +1787,7 @@ export default function BoardWorkspace({
     galleryItemById,
     resultNodeBySourceStack,
     resultSourceNodes,
+    viewedGeneratedAssetIds,
   ]);
 
   const flowNodeDataById = useMemo(() => {
@@ -1834,7 +1859,8 @@ export default function BoardWorkspace({
         onConnectionError(tb("workspace.noResultAsset"));
         return;
       }
-      updateResultNodeAsset(nodeId, assetId);
+      onMarkGeneratedAssetsViewed?.([assetId]);
+      updateResultNodeAsset(nodeId, storageItemToBoardAsset(item));
     },
   }), [
     onCancelAssetTask, onCancelGenerateNode, onCaptureVideoFrame, trashAndDeleteNode, onDownloadAsset, onEditAssetImage, onImageQuickEdit,
@@ -1846,7 +1872,7 @@ export default function BoardWorkspace({
     updateNodeSize,
     updateNodeTitle, updateRunningHubAppNode, updateNoteBody, updatePromptNode,
     assetCompareReferenceForNode, board.nodes, board.edges, boardPromptReferenceGraphIndex, galleryItemById, onConnectionError,
-    onResolveOriginalAsset, onWorkspaceNotice, promotableItemForNode, resolveCompareReferenceUrl, updateResultNodeAsset,
+    onMarkGeneratedAssetsViewed, onResolveOriginalAsset, onWorkspaceNotice, promotableItemForNode, resolveCompareReferenceUrl, updateResultNodeAsset,
   ]);
 
   const generateTaskByNodeId = useMemo(() => {

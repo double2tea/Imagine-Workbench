@@ -1,21 +1,37 @@
-import { Loader2, X } from "lucide-react";
-import { useRef, useState, type ReactNode } from "react";
+import { Image as ImageIcon, Layers, Loader2, Music, Video, X } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import PreviewImage from "@/components/PreviewImage";
 import type { StorageItem } from "@/lib/db";
 import { gsap, prefersReducedWorkbenchMotion, useGSAP, WORKBENCH_GSAP_EASE } from "@/lib/workbench-gsap";
 import { useTranslations } from "@/lib/i18n";
+
+type BoardMediaStackItem = Pick<StorageItem, "id" | "type" | "url">;
 
 interface BoardMediaNodeShellProps {
   actionBar: ReactNode;
   activeStackAssetId: string;
   children: ReactNode;
   isSelected: boolean;
+  isUnviewed?: boolean;
   onDoubleClick?: () => void;
   onCancelProcessing?: () => void;
   processingLabel?: string;
   onSelectStackAsset?: (assetId: string) => void;
-  stackItems: ReadonlyArray<Pick<StorageItem, "id">>;
+  stackItems: ReadonlyArray<BoardMediaStackItem>;
   status?: StorageItem["status"];
   statusLabel?: string;
+}
+
+function stackItemPreviewImageUrl(item: BoardMediaStackItem): string {
+  if (item.type === "image") return item.url;
+  if (item.type === "video" && item.url.startsWith("data:image/")) return item.url;
+  return "";
+}
+
+function stackItemFallbackIcon(item: BoardMediaStackItem) {
+  if (item.type === "image") return ImageIcon;
+  if (item.type === "video") return Video;
+  return Music;
 }
 
 export default function BoardMediaNodeShell({
@@ -23,6 +39,7 @@ export default function BoardMediaNodeShell({
   activeStackAssetId,
   children,
   isSelected,
+  isUnviewed = false,
   onDoubleClick,
   onCancelProcessing,
   processingLabel,
@@ -36,6 +53,7 @@ export default function BoardMediaNodeShell({
   const previousStatusRef = useRef<StorageItem["status"] | undefined>(undefined);
   const [isHovered, setIsHovered] = useState(false);
   const [hasFocusWithin, setHasFocusWithin] = useState(false);
+  const [isStackExpanded, setIsStackExpanded] = useState(false);
   const hasStackSwitcher = stackItems.length > 1;
   const shouldMountActionBar = isSelected || isHovered || hasFocusWithin;
   const isProcessing = status === "pending" || status === "processing";
@@ -46,6 +64,15 @@ export default function BoardMediaNodeShell({
     : status === "pending"
       ? t('mediaNode.taskQueued')
       : processingLabel ?? t('mediaNode.processing');
+
+  useEffect(() => {
+    if (!hasStackSwitcher || (!isSelected && !isHovered && !hasFocusWithin)) setIsStackExpanded(false);
+  }, [hasFocusWithin, hasStackSwitcher, isHovered, isSelected]);
+
+  const handleSelectStackAsset = (assetId: string) => {
+    if (assetId !== activeStackAssetId) onSelectStackAsset?.(assetId);
+    setIsStackExpanded(false);
+  };
 
   useGSAP(() => {
     const previousStatus = previousStatusRef.current;
@@ -88,6 +115,7 @@ export default function BoardMediaNodeShell({
       data-has-stack={hasStackSwitcher ? "true" : "false"}
       data-selected={isSelected ? "true" : "false"}
       data-status={visualStatus}
+      data-unviewed={isUnviewed && visualStatus === "complete" ? "true" : "false"}
     >
       {shouldMountActionBar ? (
         <>
@@ -103,9 +131,23 @@ export default function BoardMediaNodeShell({
       <div className="board-media-commit-surface imagine-motion-media-reveal relative flex h-full min-h-0 items-center justify-center overflow-hidden bg-[var(--iw-panel-soft)]">
         <span className="board-media-commit-flash pointer-events-none absolute inset-0 z-30 opacity-0" />
         {hasStackSwitcher && (
-          <div className="board-media-stack-badge pointer-events-none absolute right-2 top-2 z-30 rounded-md bg-slate-950/45 px-2 py-1 text-xs font-semibold text-white/90 opacity-80 shadow-lg backdrop-blur transition-opacity duration-200 group-hover/board-video:opacity-100">
+          <button
+            type="button"
+            aria-expanded={isStackExpanded}
+            aria-label={isStackExpanded ? t('mediaNode.collapseVersions') : t('mediaNode.expandVersions')}
+            className="board-media-stack-badge imagine-motion-interactive nodrag pointer-events-auto absolute right-2 top-2 z-30 flex items-center gap-1 rounded-md bg-slate-950/45 px-2 py-1 text-xs font-semibold text-white/90 opacity-80 shadow-lg backdrop-blur transition-opacity duration-200 group-hover/board-video:opacity-100"
+            data-expanded={isStackExpanded ? "true" : "false"}
+            title={isStackExpanded ? t('mediaNode.collapseVersions') : t('mediaNode.expandVersions')}
+            onClick={(event) => {
+              event.stopPropagation();
+              setIsStackExpanded(current => !current);
+            }}
+            onDoubleClick={event => event.stopPropagation()}
+            onPointerDown={event => event.stopPropagation()}
+          >
+            <Layers className="h-3 w-3" />
             {stackItems.length}
-          </div>
+          </button>
         )}
         <div className={`h-full w-full transition duration-300 ${isProcessing ? "scale-[1.03] opacity-70 blur-sm saturate-75" : ""}`}>
           {children}
@@ -141,6 +183,58 @@ export default function BoardMediaNodeShell({
           </div>
         )}
       </div>
+      {hasStackSwitcher && isStackExpanded && (
+        <div
+          aria-label={t('mediaNode.versions')}
+          className="board-media-stack-panel nodrag nopan absolute bottom-full right-0 z-50 mb-2 grid gap-1.5 rounded-lg p-2 shadow-xl backdrop-blur"
+          onDoubleClick={event => event.stopPropagation()}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.stopPropagation();
+              setIsStackExpanded(false);
+            }
+          }}
+          onPointerDown={event => event.stopPropagation()}
+          role="listbox"
+        >
+          {stackItems.map((stackItem, index) => {
+            const isActive = stackItem.id === activeStackAssetId;
+            const previewUrl = stackItemPreviewImageUrl(stackItem);
+            const FallbackIcon = stackItemFallbackIcon(stackItem);
+            return (
+              <button
+                key={stackItem.id}
+                type="button"
+                aria-label={t('mediaNode.switchVersion', { index: index + 1 })}
+                aria-selected={isActive}
+                className="board-media-stack-card imagine-motion-interactive relative flex aspect-square min-h-14 items-center justify-center overflow-hidden rounded-md"
+                data-active={isActive ? "true" : "false"}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  handleSelectStackAsset(stackItem.id);
+                }}
+                role="option"
+                title={t('mediaNode.version', { index: index + 1 })}
+              >
+                {previewUrl ? (
+                  <PreviewImage
+                    src={previewUrl}
+                    alt={t('mediaNode.version', { index: index + 1 })}
+                    draggable={false}
+                    loading="eager"
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                ) : (
+                  <FallbackIcon className="h-5 w-5 opacity-70" />
+                )}
+                <span className="board-media-stack-card-index absolute bottom-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold">
+                  {index + 1}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
       {hasStackSwitcher && (
         <div
           data-visible={isSelected ? "true" : "false"}
@@ -164,7 +258,7 @@ export default function BoardMediaNodeShell({
                 aria-label={t('mediaNode.switchVersion', { index: index + 1 })}
                 onClick={(event) => {
                   event.stopPropagation();
-                  if (!isActive) onSelectStackAsset?.(stackItem.id);
+                  handleSelectStackAsset(stackItem.id);
                 }}
               >
                 {isSelected ? index + 1 : <span className="h-1.5 w-1.5 rounded-full bg-current" />}

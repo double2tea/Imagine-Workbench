@@ -4085,6 +4085,19 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
   --board-media-frame-glow: rgba(248, 113, 113, 0.16);
 }
 
+.board-media-node[data-unviewed="true"] {
+  --board-media-frame-border: color-mix(in srgb, var(--iw-tone-success-text) 48%, var(--iw-border));
+  --board-media-frame-glow: color-mix(in srgb, var(--iw-tone-success-text) 24%, transparent);
+}
+
+.board-media-node[data-unviewed="true"] .board-media-commit-surface::after {
+  opacity: 0.92;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--iw-tone-success-text) 54%, transparent),
+    0 0 0 3px color-mix(in srgb, var(--iw-tone-success-text) 14%, transparent),
+    0 0 28px color-mix(in srgb, var(--iw-tone-success-text) 18%, transparent);
+}
+
 .board-node-shell[data-kind="asset"] .board-asset-node-chrome > h2,
 .board-node-shell[data-kind="result"] .board-asset-node-chrome > h2 {
   min-height: 1.25rem;
@@ -4193,6 +4206,10 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
   .board-media-processing-sheen {
     animation: board-media-processing-sheen 2.8s var(--iw-ease-out) infinite;
   }
+
+  .board-media-node[data-unviewed="true"] .board-media-commit-surface::after {
+    animation: board-media-unviewed-breathe 2.7s var(--iw-ease-out) infinite;
+  }
 }
 
 @keyframes imagine-processing-breathe {
@@ -4227,6 +4244,19 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
   58%,
   100% {
     transform: translateX(420%);
+  }
+}
+
+@keyframes board-media-unviewed-breathe {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(0.992);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.012);
   }
 }
 
@@ -4291,7 +4321,8 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
   transform: translateY(-1px);
 }
 
-.board-media-stack-switcher {
+.board-media-stack-switcher,
+.board-media-stack-panel {
   --board-media-stack-bg: color-mix(in srgb, var(--iw-panel-solid) 82%, transparent);
   --board-media-stack-border: color-mix(in srgb, var(--iw-border) 72%, transparent);
   --board-media-stack-muted: var(--iw-muted);
@@ -4311,8 +4342,21 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
     transform var(--iw-motion-surface) var(--iw-motion-ease);
 }
 
+.board-media-stack-panel {
+  width: min(18rem, 72vw);
+  grid-template-columns: repeat(auto-fit, minmax(3.5rem, 1fr));
+  transform: translateY(4px);
+}
+
+.board-media-stack-panel:focus-within,
+.board-media-node:hover .board-media-stack-panel {
+  transform: translateY(0);
+}
+
 .imagine-workbench-shell.imagine-theme-light .board-media-stack-switcher,
-html[data-imagine-theme="light"] .board-media-stack-switcher {
+.imagine-workbench-shell.imagine-theme-light .board-media-stack-panel,
+html[data-imagine-theme="light"] .board-media-stack-switcher,
+html[data-imagine-theme="light"] .board-media-stack-panel {
   --board-media-stack-bg: color-mix(in srgb, var(--iw-panel-solid) 88%, transparent);
   --board-media-stack-border: color-mix(in srgb, var(--iw-border) 82%, transparent);
   --board-media-stack-option-bg: transparent;
@@ -4340,6 +4384,37 @@ html[data-imagine-theme="light"] .board-media-stack-switcher {
   background: var(--board-media-stack-option-active-bg);
   color: var(--board-media-stack-option-active-text);
   box-shadow: none;
+}
+
+.board-media-stack-card {
+  border: 1px solid color-mix(in srgb, var(--iw-border) 68%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--iw-panel-soft) 94%, transparent), color-mix(in srgb, var(--iw-panel-solid) 92%, transparent));
+  color: var(--board-media-stack-muted);
+  transition:
+    border-color var(--iw-motion-base) var(--iw-motion-ease),
+    box-shadow var(--iw-motion-base) var(--iw-motion-ease),
+    color var(--iw-motion-base) var(--iw-motion-ease),
+    transform var(--iw-motion-base) var(--iw-motion-ease);
+}
+
+.board-media-stack-card:hover {
+  border-color: color-mix(in srgb, var(--iw-accent) 42%, var(--iw-border));
+  color: var(--iw-text);
+  transform: translateY(-1px);
+}
+
+.board-media-stack-card[data-active="true"] {
+  border-color: color-mix(in srgb, var(--iw-accent) 70%, transparent);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--iw-accent) 18%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--iw-accent) 34%, transparent);
+}
+
+.board-media-stack-card-index {
+  background: rgba(15, 23, 42, 0.72);
+  color: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 4px 12px rgba(2, 6, 23, 0.22);
 }
 
 .board-media-node:hover .board-media-controls,
@@ -4374,6 +4449,11 @@ html[data-imagine-theme="light"] .board-media-stack-switcher {
   box-shadow:
     0 8px 20px rgba(2, 6, 23, 0.22),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.board-media-stack-badge[data-expanded="true"] {
+  background: color-mix(in srgb, var(--iw-accent) 72%, rgba(15, 23, 42, 0.52)) !important;
+  color: white !important;
 }
 
 .board-media-node[data-selected="true"] .board-media-stack-badge,
@@ -4421,6 +4501,12 @@ html[data-imagine-theme="light"] .board-media-stack-switcher {
   transform: translate(-50%, 0) !important;
 }
 
+.board-canvas.is-node-dragging .board-media-stack-panel {
+  filter: none !important;
+  transition: none !important;
+  transform: translateY(0) !important;
+}
+
 .board-canvas.is-node-dragging .board-node-handle {
   filter: none !important;
   transition: none !important;
@@ -4460,6 +4546,7 @@ html[data-imagine-theme="light"] .board-media-stack-switcher {
 
 .board-canvas.is-node-dragging .board-media-controls,
 .board-canvas.is-node-dragging .board-media-stack-badge,
+.board-canvas.is-node-dragging .board-media-stack-panel,
 .board-canvas.is-node-dragging .board-media-stack-switcher {
   backdrop-filter: none !important;
   box-shadow: none !important;
@@ -4553,9 +4640,11 @@ html[data-imagine-theme="light"] .board-media-stack-switcher {
 
 .board-canvas.is-viewport-moving .board-media-controls,
 .board-canvas.is-viewport-moving .board-media-stack-badge,
+.board-canvas.is-viewport-moving .board-media-stack-panel,
 .board-canvas.is-viewport-moving .board-media-stack-switcher,
 .board-canvas.is-selection-moving .board-media-controls,
 .board-canvas.is-selection-moving .board-media-stack-badge,
+.board-canvas.is-selection-moving .board-media-stack-panel,
 .board-canvas.is-selection-moving .board-media-stack-switcher {
   backdrop-filter: none !important;
   box-shadow: none !important;

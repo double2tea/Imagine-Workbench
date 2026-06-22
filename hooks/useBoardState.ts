@@ -161,7 +161,7 @@ export interface BoardStateController {
   completeGenerationResult: (sourceNodeId: string, update: CompleteGenerationResultUpdate) => void;
   updateAssetNodeAsset: (nodeId: string, asset: BoardAssetReference, resultAssetIds?: string[]) => void;
   updateAssetReferenceUrls: (updates: Array<{ assetId: string; url: string }>) => void;
-  updateResultNodeAsset: (nodeId: string, assetId: string) => void;
+  updateResultNodeAsset: (nodeId: string, asset: BoardAssetReference) => void;
   addGenerateNode: (input: CreateGenerateNodeInput) => string;
   addGroupNode: (input?: CreateGroupNodeInput) => string;
   addMultiGridNode: (input?: CreateMultiGridNodeInput) => string;
@@ -2798,16 +2798,34 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     );
   }, [mutateBoard]);
 
-  const updateResultNodeAsset = useCallback((nodeId: string, assetId: string) => {
+  const updateResultNodeAsset = useCallback((nodeId: string, asset: BoardAssetReference) => {
     const updatedAt = nowIso();
     mutateBoard(
       currentBoard => {
+        const resultNode = currentBoard.nodes.find(
+          (node): node is BoardResultNode => node.id === nodeId && node.kind === "result",
+        );
+        if (!resultNode) return currentBoard;
         let didChange = false;
         const nextNodes = currentBoard.nodes.map(node => {
-          if (node.id !== nodeId || node.kind !== "result") return node;
-          if (node.activeAssetId === assetId) return node;
-          didChange = true;
-          return { ...node, activeAssetId: assetId, updatedAt };
+          if (node.id === nodeId && node.kind === "result") {
+            if (node.activeAssetId === asset.assetId && sameBoardAssetReference(node.asset, asset)) return node;
+            didChange = true;
+            return { ...node, activeAssetId: asset.assetId, asset, updatedAt };
+          }
+          if (
+            isResultSourceNode(node) &&
+            node.id === resultNode.sourceNodeId &&
+            (node.resultStackKey ?? "") === resultNode.resultStackKey
+          ) {
+            const resultAssetIds = sameIdList(node.resultAssetIds, resultNode.resultAssetIds)
+              ? node.resultAssetIds
+              : resultNode.resultAssetIds;
+            if (node.resultAssetId === asset.assetId && resultAssetIds === node.resultAssetIds) return node;
+            didChange = true;
+            return { ...node, resultAssetId: asset.assetId, resultAssetIds, updatedAt };
+          }
+          return node;
         });
         return didChange ? touchBoard(currentBoard, nextNodes) : currentBoard;
       },
