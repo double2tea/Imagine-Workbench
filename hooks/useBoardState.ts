@@ -95,7 +95,7 @@ import {
   resolveBoardConnectionNodesWithCompatibleModel,
 } from "@/lib/board/ports";
 import { clampBoardTextNodeSize, estimateBoardNoteSize, estimateBoardPromptSize } from "@/lib/board/text-node-size";
-import { findConnectedResultNodeForSourceStack, isResultSourceNode, resultNodeDefaultPosition, resultNodeIdsOwnedBySource } from "@/lib/board/utils";
+import { findConnectedResultNodeForSourceStack, findResultNodeForSourceStack, isResultSourceNode, resultNodeDefaultPosition, resultNodeIdsOwnedBySource } from "@/lib/board/utils";
 import { findAvailableBoardNodePosition } from "@/lib/board/placement";
 
 export type BoardSaveStatus = "idle" | "loading" | "saving" | "saved" | "error";
@@ -1976,7 +1976,9 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       const updatedAt = nowIso();
       const resultStackKey = sourceNode.resultStackKey ?? "";
       const from: BoardPortRef = { nodeId: sourceNodeId, portId: BOARD_PORT_IDS.resultOut, portKind: "result" };
-      const existingResultNode = findConnectedResultNodeForSourceStack(currentBoard.nodes, currentBoard.edges, sourceNodeId, resultStackKey);
+      const existingResultNode =
+        findConnectedResultNodeForSourceStack(currentBoard.nodes, currentBoard.edges, sourceNodeId, resultStackKey) ??
+        findResultNodeForSourceStack(currentBoard.nodes, sourceNodeId, resultStackKey);
       const existingResultEdge = existingResultNode
         ? findMatchingEdge(currentBoard.edges, from, { nodeId: existingResultNode.id, portId: BOARD_PORT_IDS.assetIn, portKind: "asset" })
         : undefined;
