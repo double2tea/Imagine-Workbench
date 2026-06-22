@@ -1194,6 +1194,8 @@ export default function BoardWorkspace({
   const isSelectionMoveActiveRef = useRef(false);
   const selectionMoveEndTimerRef = useRef<number | null>(null);
   const selectionMoveEndCleanupRef = useRef<(() => void) | null>(null);
+  const structureMutationEndTimerRef = useRef<number | null>(null);
+  const structureMutationSignatureRef = useRef<{ boardId: string; nodeIds: string } | null>(null);
   const multiGridDropFrameRef = useRef<number | null>(null);
   const pendingMultiGridDropPointRef = useRef<{ clientX: number; clientY: number } | null>(null);
   const pendingDragPositionByIdRef = useRef<Map<string, BoardPoint>>(new Map());
@@ -1222,6 +1224,14 @@ export default function BoardWorkspace({
     if (isSelectionMoveActiveRef.current === isActive) return;
     isSelectionMoveActiveRef.current = isActive;
     setCanvasInteractionClass("is-selection-moving", isActive);
+  }, [setCanvasInteractionClass]);
+  const beginStructureMutation = useCallback((): void => {
+    setCanvasInteractionClass("is-structure-mutating", true);
+    if (structureMutationEndTimerRef.current !== null) window.clearTimeout(structureMutationEndTimerRef.current);
+    structureMutationEndTimerRef.current = window.setTimeout(() => {
+      structureMutationEndTimerRef.current = null;
+      setCanvasInteractionClass("is-structure-mutating", false);
+    }, 180);
   }, [setCanvasInteractionClass]);
   const beginViewportMove = useCallback((): void => {
     if (viewportMoveEndTimerRef.current !== null) {
@@ -1267,12 +1277,14 @@ export default function BoardWorkspace({
     setSelectionMoveActive(true);
   }, [clearSelectionMoveEndListeners, scheduleSelectionMoveEnd, setSelectionMoveActive]);
   useEffect(() => () => {
+    if (structureMutationEndTimerRef.current !== null) window.clearTimeout(structureMutationEndTimerRef.current);
     if (viewportMoveEndTimerRef.current !== null) window.clearTimeout(viewportMoveEndTimerRef.current);
     if (selectionMoveEndTimerRef.current !== null) window.clearTimeout(selectionMoveEndTimerRef.current);
     clearSelectionMoveEndListeners();
     setCanvasInteractionClass("is-node-dragging", false);
     setCanvasInteractionClass("is-viewport-moving", false);
     setCanvasInteractionClass("is-selection-moving", false);
+    setCanvasInteractionClass("is-structure-mutating", false);
   }, [clearSelectionMoveEndListeners, setCanvasInteractionClass]);
   const updateSelectedNodeIds = useCallback((nextIds: string[]): void => {
     setSelectedNodeIds(currentIds => {
@@ -1363,6 +1375,19 @@ export default function BoardWorkspace({
     updateNoteBody,
     updatePromptNode,
   } = controller;
+  const boardStructureNodeIds = useMemo(
+    () => board.nodes.map(node => node.id).join("\u001f"),
+    [board.nodes],
+  );
+  useLayoutEffect(() => {
+    if (saveStatus === "loading") return;
+    const previousSignature = structureMutationSignatureRef.current;
+    const nextSignature = { boardId: board.id, nodeIds: boardStructureNodeIds };
+    structureMutationSignatureRef.current = nextSignature;
+    if (!previousSignature || previousSignature.boardId !== nextSignature.boardId) return;
+    if (previousSignature.nodeIds === nextSignature.nodeIds) return;
+    beginStructureMutation();
+  }, [beginStructureMutation, board.id, boardStructureNodeIds, saveStatus]);
   const hasMultiGridNodes = useMemo(
     () => board.nodes.some(node => node.kind === "multi-grid"),
     [board.nodes],
@@ -1620,7 +1645,7 @@ export default function BoardWorkspace({
     } catch (error) {
       onConnectionError(error instanceof Error ? error.message : tb("workspace.restoreNodeFailed"));
     }
-  }, [onConnectionError, restoreNodeWithEdges, selectOnlyNodeIds, trashedNodes]);
+  }, [onConnectionError, restoreNodeWithEdges, selectOnlyNodeIds, tb, trashedNodes]);
 
   const connectSelectedBoardPromptReference = useCallback((nodeId: string, reference: BoardPromptReference): void => {
     if (resolveBoardPromptReferenceGroup(reference) !== "board") return;
@@ -2322,6 +2347,7 @@ export default function BoardWorkspace({
         edges: structuredClone(board.edges.filter(edge => edge.from.nodeId === node.id || edge.to.nodeId === node.id)),
       });
     }
+    if (deletableNodeIds.length === 0) return;
     if (nextTrashEntries.length > 0) {
       setTrashedNodes(current => [...nextTrashEntries, ...current].slice(0, BOARD_TRASH_LIMIT));
     }
@@ -2560,6 +2586,10 @@ export default function BoardWorkspace({
     const nodeIds = selectedNodeIds.includes(contextNodeId)
       ? selectedNodeIds
       : [...selectedNodeIds, contextNodeId];
+    if (nodeIds.length < 2) {
+      onConnectionError(tb("workspace.atLeastTwoNodesToGroup"));
+      return;
+    }
     const groupId = groupNodes(nodeIds);
     if (!groupId) {
       onConnectionError(tb("workspace.atLeastTwoNodesToGroup"));
@@ -2567,9 +2597,13 @@ export default function BoardWorkspace({
     }
     selectOnlyNodeIds([groupId]);
     closeOverlayMenus();
-  }, [closeOverlayMenus, groupNodes, onConnectionError, selectOnlyNodeIds, selectedNodeIds]);
+  }, [closeOverlayMenus, groupNodes, onConnectionError, selectOnlyNodeIds, selectedNodeIds, tb]);
 
   const createGroupFromSelectionToolbar = useCallback((): void => {
+    if (selectedNodeIds.length < 2) {
+      onConnectionError(tb("workspace.atLeastTwoNodesToGroup"));
+      return;
+    }
     const groupId = groupNodes(selectedNodeIds);
     if (!groupId) {
       onConnectionError(tb("workspace.atLeastTwoNodesToGroup"));
@@ -2577,7 +2611,7 @@ export default function BoardWorkspace({
     }
     selectOnlyNodeIds([groupId]);
     closeOverlayMenus();
-  }, [closeOverlayMenus, groupNodes, onConnectionError, selectOnlyNodeIds, selectedNodeIds]);
+  }, [closeOverlayMenus, groupNodes, onConnectionError, selectOnlyNodeIds, selectedNodeIds, tb]);
 
   const ungroupSelectedGroups = useCallback((): void => {
     if (selectedGroupNodeIds.length === 0) return;

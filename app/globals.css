@@ -4563,6 +4563,27 @@ html[data-imagine-theme="light"] .board-media-stack-switcher {
   pointer-events: none !important;
 }
 
+.board-canvas.is-structure-mutating .react-flow__node *,
+.board-canvas.is-structure-mutating .react-flow__node *::before,
+.board-canvas.is-structure-mutating .react-flow__node *::after,
+.board-canvas.is-structure-mutating .react-flow__edge *,
+.board-canvas.is-structure-mutating .react-flow__edge *::before,
+.board-canvas.is-structure-mutating .react-flow__edge *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+.board-canvas.is-structure-mutating .board-node-shell,
+.board-canvas.is-structure-mutating .board-media-controls,
+.board-canvas.is-structure-mutating .imagine-mark {
+  filter: none !important;
+  transition: none !important;
+}
+
+.board-canvas.is-structure-mutating .board-media-commit-surface {
+  isolation: auto;
+}
+
 .multi-grid-drop-cell-overlay {
   background: rgba(16, 185, 129, 0.14);
   border: 2px solid rgba(110, 231, 183, 0.92);
