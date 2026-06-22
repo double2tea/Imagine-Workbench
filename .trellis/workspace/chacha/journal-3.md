@@ -19,7 +19,8 @@ Optimized RunningHub Youchuan v7/v8.1 image generation support with typed advanc
 
 ### Main Changes
 
-(Add details)
+- Updated `completeGenerationResult()` to prefer the existing connected result node, then fall back to a matching same-source/same-stack result node when the edge is missing.
+- This lets image, video, audio, and RunningHub board writebacks repair missing generated-result edges through their shared board state path.
 
 ### Git Commits
 
@@ -29,7 +30,8 @@ Optimized RunningHub Youchuan v7/v8.1 image generation support with typed advanc
 
 ### Testing
 
-- [OK] (Add test results)
+- [OK] `pnpm run lint`
+- [OK] `pnpm run typecheck`
 
 ### Status
 
@@ -1529,6 +1531,39 @@ Fixed review findings so edge-only board connect/reconnect/delete mutations trig
 | Hash | Message |
 |------|---------|
 | `77b50c0f` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 165: Fix board generated result edges
+
+**Date**: 2026-06-22
+**Task**: Fix board generated result edges
+**Branch**: `main`
+
+### Summary
+
+Repaired board generation writeback so matching result nodes without edges are reused and reconnected for image, video, audio, and RunningHub assets.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `cef8dd94` | (see git log) |
 
 ### Testing
 
