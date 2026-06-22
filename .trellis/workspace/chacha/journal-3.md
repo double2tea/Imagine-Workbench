@@ -1475,3 +1475,36 @@ Kept video board nodes rendering preview covers after original video URL promoti
 ### Next Steps
 
 - None - task complete
+
+
+## Session 163: Board node mutation visual stability
+
+**Date**: 2026-06-22
+**Task**: Board node mutation visual stability
+**Branch**: `main`
+
+### Summary
+
+Centralized board structure mutation smoothing with node-id signature observation; verified load does not trigger smoothing and add/delete preserves existing asset media DOM without reload.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `119f5df4` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
