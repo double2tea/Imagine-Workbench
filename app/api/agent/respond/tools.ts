@@ -50,7 +50,7 @@ const getPromptTemplatesSchema = z.object({
 });
 
 const getBoardContextSchema = z.object({
-  scope: z.enum(["summary", "full"]).optional(),
+  scope: z.enum(["summary", "full", "selected_full"]).optional(),
 });
 
 const getConnectedContextSchema = z.object({
@@ -212,8 +212,8 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         properties: {
           scope: {
             type: "string",
-            enum: ["summary", "full"],
-            description: "summary 返回计数与选中项；full 返回节点和连线摘要",
+            enum: ["summary", "full", "selected_full"],
+            description: "summary 返回计数与选中项；full 返回节点和连线摘要；selected_full 只返回选中节点的完整参数详情",
           },
         },
         additionalProperties: false,
@@ -331,6 +331,15 @@ export function executeToolCall(name: string, args: string, ctx: ToolContext): s
     case "get_board_context": {
       const { scope } = getBoardContextSchema.parse(JSON.parse(args));
       if (!ctx.boardContext) return JSON.stringify({ error: "No board context in this request" });
+      if (scope === "selected_full") {
+        return JSON.stringify({
+          boardId: ctx.boardContext.boardId,
+          title: ctx.boardContext.title,
+          selectedNodeIds: ctx.boardContext.selectedNodeIds,
+          selectedNodeDetails: ctx.boardContext.selectedNodeDetails,
+          selectedAssetReferenceCount: ctx.boardContext.selectedAssetReferenceCount,
+        });
+      }
       if (scope === "summary") {
         return JSON.stringify({
           boardId: ctx.boardContext.boardId,
@@ -347,7 +356,17 @@ export function executeToolCall(name: string, args: string, ctx: ToolContext): s
           selectedNodes: ctx.boardContext.selectedNodes,
         });
       }
-      return JSON.stringify(ctx.boardContext);
+      return JSON.stringify({
+        boardId: ctx.boardContext.boardId,
+        title: ctx.boardContext.title,
+        selectedNodeId: ctx.boardContext.selectedNodeId,
+        selectedNodeIds: ctx.boardContext.selectedNodeIds,
+        selectedEdgeId: ctx.boardContext.selectedEdgeId,
+        selectedNodes: ctx.boardContext.selectedNodes,
+        selectedAssetReferenceCount: ctx.boardContext.selectedAssetReferenceCount,
+        nodes: ctx.boardContext.nodes,
+        edges: ctx.boardContext.edges,
+      });
     }
     case "get_connected_context": {
       const { nodeId } = getConnectedContextSchema.parse(JSON.parse(args));

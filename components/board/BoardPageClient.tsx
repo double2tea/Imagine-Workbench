@@ -30,7 +30,7 @@ import BoardTaskQueuePanel from "@/components/board/BoardTaskQueuePanel";
 import BoardWorkspace from "@/components/board/BoardWorkspace";
 import SettingsModal from "@/components/settings/SettingsModal";
 import WorkspaceNotices, { type WorkspaceNotice } from "@/components/workbench/WorkspaceNotices";
-import type { AgentBoardContext, AgentBoardContextSnapshot, AgentBoardNodeSummary } from "@/lib/agent-context";
+import type { AgentBoardContext, AgentBoardContextSnapshot, AgentBoardNodeDetail, AgentBoardNodeParams, AgentBoardNodeSummary } from "@/lib/agent-context";
 import { getSendableAgentMediaReferences, type AgentReferenceInputSupport } from "@/lib/agent-chat-model";
 
 import { useAgentController } from "@/hooks/useAgentController";
@@ -1057,6 +1057,7 @@ function resolveBoardPatchRunInputs(
 }
 
 function summarizeBoardNodeForAgent(node: BoardDocument["nodes"][number], draftText?: string): AgentBoardNodeSummary {
+  const params = summarizeBoardNodeParamsForAgent(node);
   switch (node.kind) {
     case "asset":
       return {
@@ -1106,6 +1107,7 @@ function summarizeBoardNodeForAgent(node: BoardDocument["nodes"][number], draftT
         prompt: sliceAgentText(draftText ?? node.prompt),
         model: node.model,
         aspectRatio: node.kind === "audio-operation" ? undefined : node.aspectRatio,
+        params,
         status: node.status,
       };
     case "runninghub-app":
@@ -1115,6 +1117,7 @@ function summarizeBoardNodeForAgent(node: BoardDocument["nodes"][number], draftT
         title: node.title,
         prompt: sliceAgentText(draftText ?? node.prompt),
         model: runningHubAppModelValue(node),
+        params,
         status: node.status,
       };
     case "agent":
@@ -1141,6 +1144,107 @@ function summarizeBoardNodeForAgent(node: BoardDocument["nodes"][number], draftT
         title: node.title,
         body: sliceAgentText(draftText ?? node.body),
       };
+  }
+}
+
+function summarizeBoardNodeParamsForAgent(node: BoardDocument["nodes"][number]): AgentBoardNodeParams | undefined {
+  switch (node.kind) {
+    case "image-generate":
+      return {
+        customImageResolution: node.customImageResolution,
+        errorMessage: node.errorMessage,
+        imageQuality: node.imageQuality,
+        imageResolution: node.imageResolution,
+        resultAssetId: node.resultAssetId,
+        resultAssetIds: node.resultAssetIds,
+        resultStackKey: node.resultStackKey,
+        thinkingLevel: node.thinkingLevel,
+        variantCount: node.variantCount,
+      };
+    case "video-generate":
+      return {
+        errorMessage: node.errorMessage,
+        resultAssetId: node.resultAssetId,
+        resultAssetIds: node.resultAssetIds,
+        resultStackKey: node.resultStackKey,
+        variantCount: node.variantCount,
+        videoDuration: node.videoDuration,
+        videoPreset: node.videoPreset,
+        videoReferenceMode: node.videoReferenceMode,
+        videoResolution: node.videoResolution,
+      };
+    case "audio-operation":
+      return {
+        asrLanguage: node.asrLanguage,
+        audioFormat: node.audioFormat,
+        audioMode: node.audioMode,
+        audioStylePrompt: node.audioStylePrompt,
+        errorMessage: node.errorMessage,
+        resultAssetId: node.resultAssetId,
+        resultAssetIds: node.resultAssetIds,
+        resultStackKey: node.resultStackKey,
+        variantCount: node.variantCount,
+        voiceCloneConsentAccepted: node.voiceCloneConsentAccepted,
+        voiceProfileId: node.voiceProfileId,
+      };
+    case "runninghub-app":
+      return {
+        bindingCount: node.bindings.length,
+        errorMessage: node.errorMessage,
+        outputType: node.outputType,
+        resultAssetId: node.resultAssetId,
+        resultAssetIds: node.resultAssetIds,
+        resultStackKey: node.resultStackKey,
+        targetId: node.targetId,
+        targetType: node.targetType,
+      };
+    default:
+      return undefined;
+  }
+}
+
+function detailBoardNodeForAgent(node: BoardDocument["nodes"][number], draftText?: string): AgentBoardNodeDetail {
+  const summary = summarizeBoardNodeForAgent(node, draftText);
+  switch (node.kind) {
+    case "image-generate":
+    case "video-generate":
+      return {
+        ...summary,
+        details: {
+          cinematicProfile: node.cinematicProfile,
+          ...(node.kind === "image-generate" && node.runningHubYouchuan ? { runningHubYouchuan: node.runningHubYouchuan } : {}),
+        },
+      };
+    case "audio-operation":
+      return {
+        ...summary,
+        details: {
+          audioFormat: node.audioFormat,
+          audioMode: node.audioMode,
+          audioStylePrompt: node.audioStylePrompt,
+          asrLanguage: node.asrLanguage,
+          voiceCloneConsentAccepted: node.voiceCloneConsentAccepted,
+          voiceProfileId: node.voiceProfileId,
+        },
+      };
+    case "runninghub-app":
+      return {
+        ...summary,
+        details: {
+          bindings: node.bindings,
+          outputType: node.outputType,
+          targetId: node.targetId,
+          targetType: node.targetType,
+        },
+      };
+    case "reference-group":
+      return { ...summary, details: { references: node.references } };
+    case "multi-grid":
+      return { ...summary, details: { aspectRatio: node.aspectRatio, gridSize: node.gridSize, items: node.items } };
+    case "result":
+      return { ...summary, details: { activeAssetId: node.activeAssetId, resultAssetIds: node.resultAssetIds, resultStackKey: node.resultStackKey, sourceNodeId: node.sourceNodeId } };
+    default:
+      return summary;
   }
 }
 
@@ -2443,6 +2547,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       selectedNodeIds: agentSelectedNodeIds,
       selectedEdgeId: boardController.selectedEdgeId,
       selectedNodes: agentSelectedNodes.map(node => summarizeBoardNodeForAgent(node, getBoardTextDraft(node.id))),
+      selectedNodeDetails: agentSelectedNodes.map(node => detailBoardNodeForAgent(node, getBoardTextDraft(node.id))),
       selectedAssetReferenceCount: selectedReferences.length,
       nodes: boardController.board.nodes.slice(0, 60).map(node => summarizeBoardNodeForAgent(node, getBoardTextDraft(node.id))),
       edges: boardController.board.edges.slice(0, 100).map(edge => ({
