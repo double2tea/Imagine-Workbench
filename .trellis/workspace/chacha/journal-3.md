@@ -1508,3 +1508,36 @@ Centralized board structure mutation smoothing with node-id signature observatio
 ### Next Steps
 
 - None - task complete
+
+
+## Session 164: Fix board structure mutation review findings
+
+**Date**: 2026-06-22
+**Task**: Fix board structure mutation review findings
+**Branch**: `main`
+
+### Summary
+
+Fixed review findings so edge-only board connect/reconnect/delete mutations trigger the structure mutation marker and updated hook dependencies.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `77b50c0f` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
