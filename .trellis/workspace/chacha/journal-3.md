@@ -1442,3 +1442,36 @@ Split pure translation helpers into server-safe i18n-core and moved lib modules 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 162: Fix board video cover previews
+
+**Date**: 2026-06-22
+**Task**: Fix board video cover previews
+**Branch**: `main`
+
+### Summary
+
+Kept video board nodes rendering preview covers after original video URL promotion by falling back to persisted node preview URLs; confirmed audio uses playable original resolution and needs no cover fallback.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `dc8e2930` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
