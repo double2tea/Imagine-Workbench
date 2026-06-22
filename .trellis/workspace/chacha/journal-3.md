@@ -1375,3 +1375,37 @@ Stabilized board flow data reuse so semantically unchanged asset/result media li
 ### Next Steps
 
 - None - task complete
+
+
+## Session 160: Board Agent selection context
+
+**Date**: 2026-06-22
+**Task**: Board Agent selection context
+**Branch**: `main`
+
+### Summary
+
+Implemented board Agent selection context with visible snapshots, selected media references, lightweight selected-node params, and selected_full tool details; verified with check, build, and ego-browser smoke test.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d8b4679a` | (see git log) |
+| `b4441412` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
