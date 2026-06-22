@@ -1409,3 +1409,36 @@ Implemented board Agent selection context with visible snapshots, selected media
 ### Next Steps
 
 - None - task complete
+
+
+## Session 161: Fix Agent server i18n boundary
+
+**Date**: 2026-06-22
+**Task**: Fix Agent server i18n boundary
+**Branch**: `main`
+
+### Summary
+
+Split pure translation helpers into server-safe i18n-core and moved lib modules off client i18n so Agent route can process references without invoking a client function.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e0b13077` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
