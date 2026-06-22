@@ -70,7 +70,7 @@ export default function BoardMediaNodeShell({
   }, [hasFocusWithin, hasStackSwitcher, isHovered, isSelected]);
 
   const handleSelectStackAsset = (assetId: string) => {
-    if (assetId !== activeStackAssetId) onSelectStackAsset?.(assetId);
+    onSelectStackAsset?.(assetId);
     setIsStackExpanded(false);
   };
 
@@ -186,7 +186,7 @@ export default function BoardMediaNodeShell({
       {hasStackSwitcher && isStackExpanded && (
         <div
           aria-label={t('mediaNode.versions')}
-          className="board-media-stack-panel nodrag nopan absolute bottom-full right-0 z-50 mb-2 grid gap-1.5 rounded-lg p-2 shadow-xl backdrop-blur"
+          className="board-media-stack-panel nodrag nopan absolute bottom-full right-0 z-50 mb-2 rounded-xl p-1.5 shadow-xl backdrop-blur"
           onDoubleClick={event => event.stopPropagation()}
           onKeyDown={(event) => {
             if (event.key === "Escape") {
@@ -195,44 +195,52 @@ export default function BoardMediaNodeShell({
             }
           }}
           onPointerDown={event => event.stopPropagation()}
-          role="listbox"
+          role="group"
         >
-          {stackItems.map((stackItem, index) => {
-            const isActive = stackItem.id === activeStackAssetId;
-            const previewUrl = stackItemPreviewImageUrl(stackItem);
-            const FallbackIcon = stackItemFallbackIcon(stackItem);
-            return (
-              <button
-                key={stackItem.id}
-                type="button"
-                aria-label={t('mediaNode.switchVersion', { index: index + 1 })}
-                aria-selected={isActive}
-                className="board-media-stack-card imagine-motion-interactive relative flex aspect-square min-h-14 items-center justify-center overflow-hidden rounded-md"
-                data-active={isActive ? "true" : "false"}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  handleSelectStackAsset(stackItem.id);
-                }}
-                role="option"
-                title={t('mediaNode.version', { index: index + 1 })}
-              >
-                {previewUrl ? (
-                  <PreviewImage
-                    src={previewUrl}
-                    alt={t('mediaNode.version', { index: index + 1 })}
-                    draggable={false}
-                    loading="eager"
-                    className="absolute inset-0 h-full w-full object-cover"
-                  />
-                ) : (
-                  <FallbackIcon className="h-5 w-5 opacity-70" />
-                )}
-                <span className="board-media-stack-card-index absolute bottom-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold">
-                  {index + 1}
-                </span>
-              </button>
-            );
-          })}
+          <div className="board-media-stack-panel-header flex items-center justify-between gap-3 px-1 pb-1">
+            <span className="truncate text-[10px] font-semibold">{t('mediaNode.versions')}</span>
+            <span className="board-media-stack-panel-count flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold">
+              {stackItems.length}
+            </span>
+          </div>
+          <div className="board-media-stack-panel-grid grid gap-1.5" role="listbox">
+            {stackItems.map((stackItem, index) => {
+              const isActive = stackItem.id === activeStackAssetId;
+              const previewUrl = stackItemPreviewImageUrl(stackItem);
+              const FallbackIcon = stackItemFallbackIcon(stackItem);
+              return (
+                <button
+                  key={stackItem.id}
+                  type="button"
+                  aria-label={t('mediaNode.switchVersion', { index: index + 1 })}
+                  aria-selected={isActive}
+                  className="board-media-stack-card imagine-motion-interactive relative flex aspect-[4/3] min-h-11 items-center justify-center overflow-hidden rounded-lg"
+                  data-active={isActive ? "true" : "false"}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleSelectStackAsset(stackItem.id);
+                  }}
+                  role="option"
+                  title={t('mediaNode.version', { index: index + 1 })}
+                >
+                  {previewUrl ? (
+                    <PreviewImage
+                      src={previewUrl}
+                      alt={t('mediaNode.version', { index: index + 1 })}
+                      draggable={false}
+                      loading="eager"
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                  ) : (
+                    <FallbackIcon className="h-5 w-5 opacity-70" />
+                  )}
+                  <span className="board-media-stack-card-index absolute bottom-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold">
+                    {index + 1}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
       {hasStackSwitcher && (
