@@ -75,6 +75,11 @@ function LightweightMediaPreview({ type }: { type: "audio" | "image" | "video" }
   );
 }
 
+function resolveVideoCoverPreviewUrl(itemUrl: string, nodeUrl: string): string {
+  if (itemUrl.startsWith("data:image/")) return itemUrl;
+  return nodeUrl.startsWith("data:image/") ? nodeUrl : "";
+}
+
 const AssetBoardNode = memo(function AssetBoardNode({
   activeStackAssetId,
   boardId,
@@ -108,7 +113,7 @@ const AssetBoardNode = memo(function AssetBoardNode({
   const voiceProfileSourceItem = node.asset.type === "audio"
     ? stackItems.find(stackItem => stackItem.id === node.asset.assetId && stackItem.type === "audio")
     : undefined;
-  const isImagePreviewUrl = item.url.startsWith("data:image/");
+  const videoCoverPreviewUrl = node.asset.type === "video" ? resolveVideoCoverPreviewUrl(item.url, node.asset.url) : "";
   const audioItem = useBoardAudioItem(item);
   const playableAudioItem = audioItem ?? (item.type === "audio" && item.url.trim() ? item : null);
   const videoItem = useSelectedBoardVideoItem(item, isSelected);
@@ -270,9 +275,9 @@ const AssetBoardNode = memo(function AssetBoardNode({
             showFullscreenButton={false}
           />
         </div>
-      ) : node.asset.type === "video" && isImagePreviewUrl ? (
+      ) : node.asset.type === "video" && videoCoverPreviewUrl ? (
         <PreviewImage
-          src={item.url}
+          src={videoCoverPreviewUrl}
           alt={node.title}
           draggable={false}
           loading="eager"

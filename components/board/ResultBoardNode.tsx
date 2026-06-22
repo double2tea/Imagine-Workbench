@@ -80,6 +80,11 @@ function LightweightMediaPreview({ type }: { type: "audio" | "image" | "video" }
   );
 }
 
+function resolveVideoCoverPreviewUrl(itemUrl: string, nodeUrl: string): string {
+  if (itemUrl.startsWith("data:image/")) return itemUrl;
+  return nodeUrl.startsWith("data:image/") ? nodeUrl : "";
+}
+
 const ResultBoardNode = memo(function ResultBoardNode({
   boardId,
   isSelected = false,
@@ -103,7 +108,7 @@ const ResultBoardNode = memo(function ResultBoardNode({
     [fallbackItem, node.activeAssetId, stackItems],
   );
   const isComplete = item.status === "complete";
-  const isImagePreviewUrl = item.url.startsWith("data:image/");
+  const videoCoverPreviewUrl = item.type === "video" ? resolveVideoCoverPreviewUrl(item.url, node.asset.url) : "";
   const audioItem = useBoardAudioItem(item);
   const playableAudioItem = audioItem ?? (item.type === "audio" && item.url.trim() ? item : null);
   const videoItem = useSelectedBoardVideoItem(item, isSelected);
@@ -237,9 +242,9 @@ const ResultBoardNode = memo(function ResultBoardNode({
             showFullscreenButton={false}
           />
         </div>
-      ) : item.type === "video" && isImagePreviewUrl ? (
+      ) : item.type === "video" && videoCoverPreviewUrl ? (
         <PreviewImage
-          src={item.url}
+          src={videoCoverPreviewUrl}
           alt={node.title}
           draggable={false}
           loading="eager"
