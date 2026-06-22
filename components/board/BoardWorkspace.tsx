@@ -1665,8 +1665,9 @@ export default function BoardWorkspace({
       portKind: "asset",
     };
     if (!isValidBoardPortConnection(board.nodes, from, to)) return;
+    beginStructureMutation();
     connectPorts(from, to);
-  }, [board.edges, board.nodes, connectPorts]);
+  }, [beginStructureMutation, board.edges, board.nodes, connectPorts]);
 
   const resultNodeBySourceStack = useMemo(() => {
     const resultNodeBySourceStack = new Map<string, BoardNodeModel & { kind: "result" }>();
@@ -2102,11 +2103,13 @@ export default function BoardWorkspace({
           .map(sourceNode => batchConnectionToTarget(board.nodes, sourceNode, targetNode))
           .filter((connection): connection is { from: BoardPortRef; to: BoardPortRef } => connection !== null);
         if (connections.length > 1) {
+          beginStructureMutation();
           connectPortsBatch(connections);
           selectOnlyNodeIds([targetNode.id]);
           return;
         }
       }
+      beginStructureMutation();
       if (targetNode?.kind === "reference-group") {
         addAssetToReferenceGroup(refs.from.nodeId, refs.to.nodeId);
       }
@@ -2114,7 +2117,7 @@ export default function BoardWorkspace({
     } catch (error) {
       onConnectionError(error instanceof Error ? error.message : tb("workspace.connectFailed"));
     }
-  }, [addAssetToMultiGrid, addAssetToReferenceGroup, board.nodes, connectPorts, connectPortsBatch, onConnectionError, readValidConnectionRefs, selectOnlyNodeIds, selectedNodeIds]);
+  }, [addAssetToMultiGrid, addAssetToReferenceGroup, beginStructureMutation, board.nodes, connectPorts, connectPortsBatch, onConnectionError, readValidConnectionRefs, selectOnlyNodeIds, selectedNodeIds, tb]);
 
   const handleSelectionChange = useCallback<OnSelectionChangeFunc<BoardFlowNode, BoardFlowEdge>>(({ nodes, edges }) => {
     if (isSyncingFlowNodesRef.current) return;
@@ -2176,6 +2179,7 @@ export default function BoardWorkspace({
           onConnectionError(tb("workspace.multiGridOnlyImage"));
           return;
         }
+        beginStructureMutation();
         references.forEach(reference => addAssetToMultiGrid(rawTargetNode.id, reference));
         deleteEdge(oldEdge.id);
         selectOnlyNodeIds([rawTargetNode.id]);
@@ -2198,11 +2202,13 @@ export default function BoardWorkspace({
           onConnectionError(tb("workspace.multiGridOnlyImage"));
           return;
         }
+        beginStructureMutation();
         references.forEach(reference => addAssetToMultiGrid(targetNode.id, reference));
         deleteEdge(oldEdge.id);
         selectOnlyNodeIds([targetNode.id]);
         return;
       }
+      beginStructureMutation();
       if (targetNode?.kind === "reference-group") {
         addAssetToReferenceGroup(refs.from.nodeId, refs.to.nodeId);
       }
@@ -2210,7 +2216,7 @@ export default function BoardWorkspace({
     } catch (error) {
       onConnectionError(error instanceof Error ? error.message : tb("workspace.reconnectFailed"));
     }
-  }, [addAssetToMultiGrid, addAssetToReferenceGroup, board.nodes, deleteEdge, onConnectionError, readValidConnectionRefs, reconnectEdge, selectOnlyNodeIds]);
+  }, [addAssetToMultiGrid, addAssetToReferenceGroup, beginStructureMutation, board.nodes, deleteEdge, onConnectionError, readValidConnectionRefs, reconnectEdge, selectOnlyNodeIds, tb]);
 
   const handleReconnectStart = useCallback<BoardReconnectStartHandler>(() => {
     setIsConnectionActive(true);
@@ -2360,8 +2366,9 @@ export default function BoardWorkspace({
   }, [board.edges, board.nodes, deleteNodes, galleryItemById, onCancelAssetTask]);
 
   const deleteBoardEdge = useCallback((edgeId: string): void => {
+    beginStructureMutation();
     deleteEdge(edgeId);
-  }, [deleteEdge]);
+  }, [beginStructureMutation, deleteEdge]);
 
   const handleEdgesDelete = useCallback<OnEdgesDelete<BoardFlowEdge>>(edges => {
     for (const edge of edges) deleteBoardEdge(edge.id);
@@ -2558,10 +2565,11 @@ export default function BoardWorkspace({
       onConnectionError(tb("workspace.noConnectablePorts"));
       return;
     }
+    beginStructureMutation();
     connectPortsBatch(connections);
     selectOnlyNodeIds([targetNode.id]);
     closeOverlayMenus();
-  }, [addAssetToMultiGrid, board.nodes, closeOverlayMenus, connectPortsBatch, onConnectionError, selectOnlyNodeIds, selectedNodeIds]);
+  }, [addAssetToMultiGrid, beginStructureMutation, board.nodes, closeOverlayMenus, connectPortsBatch, onConnectionError, selectOnlyNodeIds, selectedNodeIds, tb]);
 
   const createReferenceGroupFromSelected = useCallback((contextNodeId: string): void => {
     const contextNode = board.nodes.find(node => node.id === contextNodeId);
@@ -2580,7 +2588,7 @@ export default function BoardWorkspace({
     }, assetNodeIds);
     selectOnlyNodeIds([groupId]);
     closeOverlayMenus();
-  }, [addReferenceGroupNodeWithAssets, board.nodes, closeOverlayMenus, onConnectionError, selectOnlyNodeIds, selectedNodeIds]);
+  }, [addReferenceGroupNodeWithAssets, board.nodes, closeOverlayMenus, onConnectionError, selectOnlyNodeIds, selectedNodeIds, tb]);
 
   const createGroupFromSelected = useCallback((contextNodeId: string): void => {
     const nodeIds = selectedNodeIds.includes(contextNodeId)
@@ -2845,6 +2853,7 @@ export default function BoardWorkspace({
         onConnectionError(tb("workspace.noConnectablePorts"));
         return;
       }
+      beginStructureMutation();
       connectPortsBatch(connections);
       selectOnlyNodeIds([targetNode.id]);
       return;
@@ -2914,7 +2923,7 @@ export default function BoardWorkspace({
       selectOnlyNodeIds([resultNodeId]);
       return;
     }
-  }, [addAssetToMultiGrid, addResultNodeWithConnection, board.edges, board.nodes, centeredNodePosition, connectPortsBatch, flowPositionFromClient, galleryItemById, onConnectionError, selectOnlyNodeIds, selectedNodeIds, tb]);
+  }, [addAssetToMultiGrid, addResultNodeWithConnection, beginStructureMutation, board.edges, board.nodes, centeredNodePosition, connectPortsBatch, flowPositionFromClient, galleryItemById, onConnectionError, selectOnlyNodeIds, selectedNodeIds, tb]);
 
   const openQuickInsertMenu = useCallback((event: ReactMouseEvent | MouseEvent): void => {
     event.preventDefault();
