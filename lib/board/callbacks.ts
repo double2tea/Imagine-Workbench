@@ -18,7 +18,7 @@ export interface BoardNodeCallbacks {
   onCancelAssetTask: (nodeId: string) => void;
   onCancelGenerate: (nodeId: string) => void;
   onOpenAssetCompare?: (nodeId: string) => void;
-  onDownloadAsset: (item: StorageItem) => void;
+  onDownloadAsset: (item: StorageItem, fileNameLabel?: string) => void;
   onOpenFullscreen: (item: StorageItem) => void;
   onOpenPanorama: (item: StorageItem) => void;
   onSaveVoiceProfile: (item: StorageItem) => void;

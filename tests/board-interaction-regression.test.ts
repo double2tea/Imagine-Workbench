@@ -10,7 +10,8 @@ test("board edges keep a large clickable interaction path and protected click se
   const selectionHandler = sourceBetween(source, "const handleSelectionChange", "const handleNodeClick");
 
   assert.match(edgeComponent, /interactionWidth=\{36\}/);
-  assert.match(source, /zIndex:\s*selectedEdgeId === edge\.id \? 20 : 8/);
+  assert.match(edgeComponent, /imagine-board-edge-selection-path/);
+  assert.match(source, /data:\s*\{ kind: edge\.kind, processing, selected: isSelected \}/);
   assert.match(edgeClickHandler, /event\.preventDefault\(\)/);
   assert.match(edgeClickHandler, /event\.stopPropagation\(\)/);
   assert.match(edgeClickHandler, /protectedEdgeSelectionRef\.current = edge\.id/);
@@ -44,6 +45,27 @@ test("board node titles remain draggable while edit fields stay nodrag", () => {
   assert.doesNotMatch(groupTitle, /nodrag/);
   assert.doesNotMatch(standardTitle, /nodrag/);
   assert.match(titleInput, /nodrag/);
+});
+
+test("media node title chrome stays above the hover bridge for double-click rename", () => {
+  const nodeSource = readWorkspaceFile("components/board/BoardNode.tsx");
+  const shellSource = readWorkspaceFile("components/board/BoardMediaNodeShell.tsx");
+
+  assert.match(nodeSource, /absolute -top-5 left-1 z-30 h-5/);
+  assert.match(shellSource, /absolute bottom-full left-0 right-0 z-20 h-12/);
+});
+
+test("downloaded media filenames include a label and timestamp", () => {
+  const downloadSource = readWorkspaceFile("lib/assets/download-zip.ts");
+  const boardPageSource = readWorkspaceFile("components/board/BoardPageClient.tsx");
+  const boardNodeSource = readWorkspaceFile("components/board/BoardNode.tsx");
+
+  assert.match(downloadSource, /export function storageItemDownloadFileName/);
+  assert.match(downloadSource, /\$\{name\}_\$\{storageItemDownloadTimestamp\(item\)\}\.\$\{extension\}/);
+  assert.match(downloadSource, /fileNameLabel\?: \(item: StorageItem\) => string \| undefined/);
+  assert.match(boardNodeSource, /onDownload=\{item => c\.onDownloadAsset\(item, node\.title\)\}/);
+  assert.match(boardPageSource, /storageItemDownloadFileName\(originalItem, \{ label: fileNameLabel, prefix: "board_creation" \}\)/);
+  assert.match(boardPageSource, /fileNameLabel: item => selectedDownloadableBoardItemLabels\.get\(item\.id\)/);
 });
 
 test("generate node run controls expose accessible labels", () => {

@@ -7,6 +7,7 @@ type ResolveOriginalStorageItem = (item: StorageItem) => Promise<StorageItem>;
 interface DownloadStorageItemsZipOptions {
   archiveName: string;
   fileNamePrefix: string;
+  fileNameLabel?: (item: StorageItem) => string | undefined;
   items: StorageItem[];
   resolveOriginalItem: ResolveOriginalStorageItem;
 }
@@ -35,6 +36,46 @@ export function storageItemDownloadExtension(item: StorageItem): string {
 
 export function storageItemDownloadMimeType(item: StorageItem): string {
   return mediaReferenceMimeFromDataUri(item.url) ?? defaultDownloadMimeType(item.type);
+}
+
+function sanitizeDownloadNamePart(value: string): string {
+  return value
+    .trim()
+    .replace(/\p{Cc}+/gu, "_")
+    .replace(/[<>:"/\\|?*]+/g, "_")
+    .replace(/\s+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^[._-]+|[._-]+$/g, "");
+}
+
+function storageItemDownloadTimestamp(item: StorageItem): string {
+  const time = new Date(item.createdAt).getTime();
+  const date = Number.isFinite(time) ? new Date(time) : new Date();
+  return date.toISOString().replace(/[-:]/g, "").replace(".", "_");
+}
+
+export function storageItemDownloadFileName(
+  item: StorageItem,
+  options: { extension?: string; label?: string; prefix: string },
+): string {
+  const name = sanitizeDownloadNamePart(options.label ?? "") || sanitizeDownloadNamePart(options.prefix);
+  const extension = options.extension ?? storageItemDownloadExtension(item);
+  return `${name}_${storageItemDownloadTimestamp(item)}.${extension}`;
+}
+
+function uniqueFileName(fileName: string, usedFileNames: Set<string>): string {
+  if (!usedFileNames.has(fileName)) {
+    usedFileNames.add(fileName);
+    return fileName;
+  }
+  const dotIndex = fileName.lastIndexOf(".");
+  const baseName = dotIndex === -1 ? fileName : fileName.slice(0, dotIndex);
+  const extension = dotIndex === -1 ? "" : fileName.slice(dotIndex);
+  let index = 2;
+  while (usedFileNames.has(`${baseName}_${index}${extension}`)) index += 1;
+  const nextFileName = `${baseName}_${index}${extension}`;
+  usedFileNames.add(nextFileName);
+  return nextFileName;
 }
 
 function downloadBlob(blob: Blob, fileName: string): void {
@@ -71,6 +112,7 @@ async function addStorageItemFileToZip(zip: JSZip, fileName: string, item: Stora
 
 export async function downloadStorageItemsZip({
   archiveName,
+  fileNameLabel,
   fileNamePrefix,
   items,
   resolveOriginalItem,
@@ -79,11 +121,18 @@ export async function downloadStorageItemsZip({
 
   const zip = new JSZip();
   const metadataList: ExportMetadata[] = [];
+  const usedFileNames = new Set<string>();
 
   await Promise.all(items.map(async item => {
     try {
       const originalItem = await resolveOriginalItem(item);
-      const fileName = `${fileNamePrefix}_${originalItem.id}.${storageItemDownloadExtension(originalItem)}`;
+      const fileName = uniqueFileName(
+        storageItemDownloadFileName(originalItem, {
+          label: fileNameLabel?.(item) ?? fileNameLabel?.(originalItem),
+          prefix: fileNamePrefix,
+        }),
+        usedFileNames,
+      );
       metadataList.push({
         id: originalItem.id,
         fileName,

@@ -38,7 +38,7 @@ import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
 import { useAssetLibrary, type LibraryAssetEntry } from "@/hooks/useAssetLibrary";
 import { useBoardAssetStore } from "@/hooks/useBoardAssetStore";
 import { collectPlacedBoardAssetIdsFromNodes } from "@/lib/assets/board-scope";
-import { downloadStorageItemsZip, storageItemDownloadExtension } from "@/lib/assets/download-zip";
+import { downloadStorageItemsZip, storageItemDownloadFileName } from "@/lib/assets/download-zip";
 import { saveItemWithPreview } from "@/lib/assets/previews";
 import { resolveAssetOriginalUrl } from "@/lib/assets/resolve-url";
 import { estimateBoardNoteSize, estimateBoardPromptSize } from "@/lib/board/text-node-size";
@@ -2023,13 +2023,12 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       error => pushWorkspaceNotice("error", toErrorMessage(error, t("common.originalImageReadFailed"))),
     );
   }, [markGeneratedAssetsViewed, pushWorkspaceNotice, resolveOriginalStorageItem, t]);
-  const handleDownloadAsset = useCallback((item: StorageItem) => {
+  const handleDownloadAsset = useCallback((item: StorageItem, fileNameLabel?: string) => {
     void resolveOriginalStorageItem(item).then(
       originalItem => {
         const link = document.createElement("a");
-        const extension = storageItemDownloadExtension(originalItem);
         link.href = originalItem.url;
-        link.download = `${originalItem.id}.${extension}`;
+        link.download = storageItemDownloadFileName(originalItem, { label: fileNameLabel, prefix: "board_creation" });
         document.body.appendChild(link);
         link.click();
         link.remove();
@@ -5114,15 +5113,25 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     }
     return Array.from(itemById.values());
   }, [boardController.board.nodes, items, resolvedBoardId, selectedNodeIds]);
+  const selectedDownloadableBoardItemLabels = useMemo(() => {
+    const labelsByAssetId = new Map<string, string>();
+    for (const nodeId of selectedNodeIds) {
+      const node = boardController.board.nodes.find(candidate => candidate.id === nodeId);
+      if (node?.kind === "asset") labelsByAssetId.set(node.asset.assetId, node.title);
+      if (node?.kind === "result") labelsByAssetId.set(node.activeAssetId, node.title);
+    }
+    return labelsByAssetId;
+  }, [boardController.board.nodes, selectedNodeIds]);
   const handleDownloadSelectedBoardAssets = useCallback(() => {
     if (selectedDownloadableBoardItems.length === 0) return;
     void downloadStorageItemsZip({
       archiveName: makeClientId("Imagine_Board_Export"),
       fileNamePrefix: "board_creation",
+      fileNameLabel: item => selectedDownloadableBoardItemLabels.get(item.id),
       items: selectedDownloadableBoardItems,
       resolveOriginalItem: resolveOriginalStorageItem,
     }).catch(error => pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.batchDownloadFailed"))));
-  }, [pushWorkspaceNotice, resolveOriginalStorageItem, selectedDownloadableBoardItems, t]);
+  }, [pushWorkspaceNotice, resolveOriginalStorageItem, selectedDownloadableBoardItemLabels, selectedDownloadableBoardItems, t]);
   const imageModelGroups = getProviderModelGroups(imageModelOptions, providerKeys, customProviders);
   const videoModelGroups = getProviderModelGroups(videoModelOptions, providerKeys, customProviders);
   const audioModelGroups = getProviderModelGroups(audioModelOptions, providerKeys, customProviders);

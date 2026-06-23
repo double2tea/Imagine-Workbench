@@ -136,7 +136,7 @@ interface BoardWorkspaceProps {
   onMarkGeneratedAssetsViewed?: (assetIds: string[]) => void;
   onCreateBoard: () => void;
   onDeleteBoard: () => void;
-  onDownloadAsset: (item: StorageItem) => void;
+  onDownloadAsset: (item: StorageItem, fileNameLabel?: string) => void;
   onDownloadSelectedAssets?: () => void;
   onExportMultiGrid: (nodeId: string) => void | Promise<void>;
   onOpenSettings: () => void;

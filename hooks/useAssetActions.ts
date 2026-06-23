@@ -3,7 +3,7 @@ import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
 import type { CompareViewType } from "@/components/assets/ComparePanel";
 import { API_ROUTES } from "@/lib/api/routes";
-import { downloadStorageItemsZip, storageItemDownloadExtension, storageItemDownloadMimeType } from "@/lib/assets/download-zip";
+import { downloadStorageItemsZip, storageItemDownloadFileName, storageItemDownloadMimeType } from "@/lib/assets/download-zip";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 import { readImageGenerationPayload } from "@/lib/client-image-response";
 import {
@@ -445,8 +445,7 @@ export function useAssetActions({
     }
 
     try {
-      const extension = storageItemDownloadExtension(originalItem);
-      const fileName = `imagine_${originalItem.id}.${extension}`;
+      const fileName = storageItemDownloadFileName(originalItem, { prefix: "imagine" });
       let blob: Blob;
       if (originalItem.url && originalItem.url.startsWith("data:")) {
         const parts = originalItem.url.split(";base64,");

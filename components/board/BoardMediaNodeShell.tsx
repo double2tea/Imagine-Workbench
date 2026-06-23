@@ -121,7 +121,7 @@ export default function BoardMediaNodeShell({
         <>
           <div
             aria-hidden="true"
-            className="nodrag nopan pointer-events-auto absolute bottom-full left-0 right-0 z-30 h-12"
+            className="nodrag nopan pointer-events-auto absolute bottom-full left-0 right-0 z-20 h-12"
             onDoubleClick={event => event.stopPropagation()}
             onPointerDown={event => event.stopPropagation()}
           />

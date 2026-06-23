@@ -448,7 +448,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             onCompare={c.onOpenAssetCompare ? () => c.onOpenAssetCompare?.(node.id) : undefined}
             onEditImage={c.onEditAssetImage}
             onImageQuickEdit={c.onImageQuickEdit}
-            onDownload={c.onDownloadAsset}
+            onDownload={item => c.onDownloadAsset(item, node.title)}
             onMeasureAspectRatio={c.onMeasureAssetAspectRatio}
             onOpenFullscreen={c.onOpenFullscreen}
             onOpenPanorama={c.onOpenPanorama}
@@ -467,7 +467,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             onAnalyzeMedia={c.onAnalyzeBoardMedia}
             onCaptureVideoFrame={c.onCaptureVideoFrame}
             onImageQuickEdit={c.onImageQuickEdit}
-            onDownload={c.onDownloadAsset}
+            onDownload={item => c.onDownloadAsset(item, node.title)}
             onMeasureAspectRatio={c.onMeasureAssetAspectRatio}
             onOpenFullscreen={c.onOpenFullscreen}
             onOpenPanorama={c.onOpenPanorama}
