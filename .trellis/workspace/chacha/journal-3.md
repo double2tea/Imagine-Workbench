@@ -1576,3 +1576,36 @@ Repaired board generation writeback so matching result nodes without edges are r
 ### Next Steps
 
 - None - task complete
+
+
+## Session 166: Fix board title editing downloads
+
+**Date**: 2026-06-24
+**Task**: Fix board title editing downloads
+**Branch**: `main`
+
+### Summary
+
+Restored board media node title double-click editing by keeping hover bridge below title chrome; added node-title timestamped download filenames for board and gallery exports.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3aa4dd3d` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

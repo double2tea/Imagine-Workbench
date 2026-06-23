@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-3.md`
-- **Total Sessions**: 165
-- **Last Active**: 2026-06-22
+- **Total Sessions**: 166
+- **Last Active**: 2026-06-24
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-3.md` | ~1576 | Active |
+| `journal-3.md` | ~1611 | Active |
 | `journal-2.md` | ~1973 | Archived |
 | `journal-1.md` | ~1988 | Archived |
 <!-- @@@/auto:active-documents -->
@@ -31,6 +31,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 166 | 2026-06-24 | Fix board title editing downloads | `3aa4dd3d` | `main` |
 | 165 | 2026-06-22 | Fix board generated result edges | `cef8dd94` | `main` |
 | 164 | 2026-06-22 | Fix board structure mutation review findings | `77b50c0f` | `main` |
 | 163 | 2026-06-22 | Board node mutation visual stability | `119f5df4` | `main` |
