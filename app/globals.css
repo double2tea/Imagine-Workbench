@@ -526,22 +526,50 @@ html::-webkit-scrollbar-thumb:hover {
 }
 
 .board-canvas .react-flow__edge.imagine-board-edge .react-flow__edge-path {
-  opacity: 0.74;
+  opacity: 0.56;
   transition:
     opacity var(--iw-motion-base) var(--iw-motion-ease),
     stroke-width var(--iw-motion-base) var(--iw-motion-ease),
     filter var(--iw-motion-base) var(--iw-motion-ease);
 }
 
-.board-canvas .react-flow__edge.imagine-board-edge:hover .react-flow__edge-path,
-.board-canvas .react-flow__edge.selected.imagine-board-edge .react-flow__edge-path {
-  opacity: 1;
-  filter: drop-shadow(0 0 8px color-mix(in srgb, currentColor 24%, transparent));
+.board-canvas .react-flow__edge.imagine-board-edge .imagine-board-edge-selection-path {
+  opacity: 0.1;
+  pointer-events: none;
+  filter:
+    drop-shadow(0 0 4px color-mix(in srgb, currentColor 16%, transparent))
+    drop-shadow(0 0 9px color-mix(in srgb, currentColor 12%, transparent));
+}
+
+.board-canvas .react-flow__edge.imagine-board-edge:hover .imagine-board-edge-path,
+.board-canvas .react-flow__edge.selected.imagine-board-edge .imagine-board-edge-path,
+.board-canvas .react-flow__edge.imagine-board-edge .imagine-board-edge-path-selected {
+  opacity: 0.92;
+  filter:
+    drop-shadow(0 0 1px color-mix(in srgb, var(--iw-bg) 34%, transparent))
+    drop-shadow(0 0 5px color-mix(in srgb, currentColor 18%, transparent));
+}
+
+.board-canvas .react-flow__edge.imagine-board-edge:not(.selected):hover .imagine-board-edge-path {
+  opacity: 0.78;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, currentColor 12%, transparent));
+}
+
+.board-canvas .react-flow__edge.imagine-board-edge-processing .imagine-board-edge-path {
+  opacity: 0.78;
+  stroke-dasharray: 8 7;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, currentColor 12%, transparent));
 }
 
 .board-edge-toolbar {
   border-radius: 999px;
-  filter: drop-shadow(0 12px 22px color-mix(in srgb, var(--iw-bg) 28%, transparent));
+  padding: 2px;
+  background: color-mix(in srgb, var(--iw-panel-solid) 84%, transparent);
+  border: 1px solid color-mix(in srgb, var(--iw-border) 54%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--iw-text) 6%, transparent),
+    0 8px 16px color-mix(in srgb, var(--iw-bg) 22%, transparent);
+  backdrop-filter: blur(10px);
   pointer-events: none;
 }
 
@@ -551,10 +579,27 @@ html::-webkit-scrollbar-thumb:hover {
 
 .board-edge-kind-pill,
 .board-edge-processing-pill {
-  border-color: color-mix(in srgb, var(--iw-border) 62%, transparent);
-  background: color-mix(in srgb, var(--iw-panel-solid) 88%, transparent);
+  border-color: color-mix(in srgb, currentColor 20%, var(--iw-border));
+  background: color-mix(in srgb, var(--iw-panel-solid) 92%, transparent);
   color: var(--iw-text);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--iw-text) 8%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--iw-text) 6%, transparent);
+}
+
+.board-edge-toolbar-selected .board-edge-kind-pill {
+  padding-inline: 9px;
+}
+
+.board-edge-delete-button {
+  border-color: color-mix(in srgb, var(--iw-border) 62%, transparent);
+  background: color-mix(in srgb, var(--iw-panel-solid) 86%, transparent);
+  color: color-mix(in srgb, var(--iw-muted) 82%, transparent);
+  box-shadow: none;
+}
+
+.board-edge-delete-button:hover {
+  border-color: color-mix(in srgb, var(--iw-tone-danger-border) 70%, var(--iw-border));
+  background: color-mix(in srgb, var(--iw-tone-danger-bg) 86%, var(--iw-panel-solid));
+  color: var(--iw-tone-danger-text);
 }
 
 .board-edge-toolbar-prompt .board-edge-kind-pill {
@@ -4012,17 +4057,22 @@ html[data-imagine-theme="light"] .imagine-confirm-overlay {
 
 .board-canvas .react-flow__connection-path {
   animation: none;
-  filter: none;
+  opacity: 0.78;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, currentColor 16%, transparent));
+  stroke-dasharray: 7 6;
+  transition:
+    opacity var(--iw-motion-base) var(--iw-motion-ease),
+    stroke var(--iw-motion-base) var(--iw-motion-ease);
 }
 
 .board-canvas .react-flow__connection.valid .react-flow__connection-path {
   stroke: var(--iw-board-edge-prompt) !important;
-  filter: none;
+  opacity: 0.92;
 }
 
 .board-canvas .react-flow__connection.invalid .react-flow__connection-path {
   stroke: #f87171 !important;
-  filter: none;
+  opacity: 0.7;
 }
 
 .board-media-node {
@@ -5030,8 +5080,7 @@ html[data-imagine-theme="light"] .imagine-required-chip,
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06) !important;
 }
 
-/* Edge kind CSS var hooks (foundational; supports PR5 edgeColor migration path; paths via CSS vars,
-   markerEnd arrows retain tiny getComputedStyle JS per Key Decision #2 & design doc). */
+/* Edge kind CSS var hooks: paths carry edge color; board edges intentionally avoid arrow markers for a quieter canvas. */
 .board-canvas .react-flow__edge.imagine-board-edge-prompt .react-flow__edge-path {
   stroke: var(--iw-board-edge-prompt) !important;
 }

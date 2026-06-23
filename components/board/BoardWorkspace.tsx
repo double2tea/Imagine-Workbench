@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, Grid2X2, Layers, Magnet, Map as MapIcon, Ungroup, Upload } from "lucide-react";
+import { Download, Grid2X2, Layers, Magnet, Map as MapIcon, Trash2, Ungroup, Upload } from "lucide-react";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ChangeEvent, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import {
   BaseEdge,
@@ -11,7 +11,6 @@ import {
   ConnectionMode,
   Controls,
   EdgeToolbar,
-  MarkerType,
   MiniMap,
   NodeToolbar,
   Panel,
@@ -159,7 +158,7 @@ interface BoardWorkspaceProps {
   viewedGeneratedAssetIds?: ReadonlySet<string>;
 }
 
-type BoardFlowEdge = Edge<{ kind: BoardEdgeKind; processing?: boolean }, "smoothstep">;
+type BoardFlowEdge = Edge<{ kind: BoardEdgeKind; processing?: boolean; selected?: boolean }, "smoothstep">;
 type BoardMoveHandler = NonNullable<ReactFlowProps<BoardFlowNode, BoardFlowEdge>["onMove"]>;
 type BoardReconnectStartHandler = NonNullable<ReactFlowProps<BoardFlowNode, BoardFlowEdge>["onReconnectStart"]>;
 type BoardReconnectEndHandler = NonNullable<ReactFlowProps<BoardFlowNode, BoardFlowEdge>["onReconnectEnd"]>;
@@ -589,10 +588,21 @@ const BoardEdgeComponent = memo(function BoardEdgeComponent({
   });
   const kind = data?.kind ?? "reference";
   const processing = data?.processing === true;
-  const showLabel = processing || selected;
+  const visuallySelected = selected || data?.selected === true;
+  const showLabel = processing || visuallySelected;
+  const selectionHaloStyle: CSSProperties = { ...style, strokeWidth: 7 };
 
   return (
     <>
+      {visuallySelected ? (
+        <BaseEdge
+          id={`${id}-selection`}
+          path={edgePath}
+          style={selectionHaloStyle}
+          interactionWidth={0}
+          className={`imagine-board-edge-selection-path imagine-board-edge-selection-path-${kind}`}
+        />
+      ) : null}
       <BaseEdge
         id={id}
         path={edgePath}
@@ -600,11 +610,26 @@ const BoardEdgeComponent = memo(function BoardEdgeComponent({
         markerStart={markerStart}
         style={style}
         interactionWidth={36}
-        className={`imagine-board-edge-path imagine-board-edge-path-${kind}`}
+        className={[
+          "imagine-board-edge-path",
+          `imagine-board-edge-path-${kind}`,
+          visuallySelected ? "imagine-board-edge-path-selected" : "",
+        ].filter(Boolean).join(" ")}
       />
       {showLabel ? (
-        <EdgeToolbar edgeId={id} x={labelX} y={labelY} isVisible className={`board-edge-toolbar board-edge-toolbar-${kind} nodrag nopan flex items-center gap-1`}>
-          {selected ? (
+        <EdgeToolbar
+          edgeId={id}
+          x={labelX}
+          y={labelY}
+          isVisible
+          className={[
+            "board-edge-toolbar nodrag nopan flex items-center gap-1",
+            `board-edge-toolbar-${kind}`,
+            visuallySelected ? "board-edge-toolbar-selected" : "",
+            processing ? "board-edge-toolbar-processing" : "",
+          ].filter(Boolean).join(" ")}
+        >
+          {visuallySelected ? (
             <span className="board-edge-kind-pill rounded-full border px-2 py-0.5 text-[9px] font-semibold">
               {boardEdgeKindLabels[kind]}
             </span>
@@ -614,15 +639,15 @@ const BoardEdgeComponent = memo(function BoardEdgeComponent({
               {t("board.workspace.processing")}
             </span>
           ) : null}
-          {selected ? (
+          {visuallySelected ? (
             <button
               type="button"
               aria-label={t("board.workspace.deleteConnection")}
               title={t("board.workspace.deleteConnection")}
               onClick={() => void deleteElements({ edges: [{ id }] })}
-              className="flex h-6 w-6 items-center justify-center rounded-full border border-[var(--iw-border)] bg-[var(--iw-panel)] text-[var(--iw-muted)] shadow-lg transition hover:border-red-400/40 hover:bg-red-500 hover:text-white"
+              className="board-edge-delete-button flex h-5 w-5 items-center justify-center rounded-full border transition"
             >
-              <span className="text-sm leading-none">×</span>
+              <Trash2 className="h-3 w-3" aria-hidden="true" />
             </button>
           ) : null}
         </EdgeToolbar>
@@ -632,7 +657,7 @@ const BoardEdgeComponent = memo(function BoardEdgeComponent({
 });
 
 const edgeTypes = { smoothstep: BoardEdgeComponent };
-const reactFlowConnectionLineStyle = { stroke: "#60a5fa", strokeDasharray: "7 5", strokeWidth: 2.5 };
+const reactFlowConnectionLineStyle = { stroke: "#60a5fa", strokeDasharray: "7 5", strokeWidth: 2 };
 const reactFlowDefaultEdgeOptions = { type: "smoothstep" };
 const reactFlowDeleteKeyCode = ["Backspace", "Delete"];
 const reactFlowPanOnDrag = [1, 2];
@@ -818,21 +843,6 @@ function getBoardVar(varName: string, fallback: string): string {
   const cs = getComputedStyle(document.querySelector(".imagine-workbench-shell") || document.documentElement);
   const val = cs.getPropertyValue(varName).trim();
   return val || fallback;
-}
-
-function edgeColor(kind: BoardEdge["kind"]): string {
-  const varNames: Record<BoardEdge["kind"], string> = { prompt: "--iw-board-edge-prompt", reference: "--iw-board-edge-reference", "agent-context": "--iw-board-edge-agent-context", result: "--iw-board-edge-result" };
-  const fallbacks: Record<BoardEdge["kind"], string> = { prompt: "#2dd4bf", reference: "#60a5fa", "agent-context": "#a78bfa", result: "#34d399" };
-  return getBoardVar(varNames[kind], fallbacks[kind]);
-}
-
-function boardEdgeColors(): Record<BoardEdgeKind, string> {
-  return {
-    "agent-context": edgeColor("agent-context"),
-    prompt: edgeColor("prompt"),
-    reference: edgeColor("reference"),
-    result: edgeColor("result"),
-  };
 }
 
 function generateInputSummaryForNode(
@@ -2011,11 +2021,6 @@ export default function BoardWorkspace({
       skipPositionSyncRef.current = false;
     });
   }, [flowNodes, selectedNodeId, selectedNodeIds, setReactFlowNodes]);
-  const flowEdgeColorByKind = useMemo(
-    () => boardEdgeColors(),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- theme mode is the only supported edge-token invalidator
-    [themeMode],
-  );
   const flowEdges = useMemo<BoardFlowEdge[]>(
     () => {
       const nodePortIdsById = new Map<string, Set<string>>();
@@ -2052,6 +2057,7 @@ export default function BoardWorkspace({
           })
         ) continue;
         const processing = isResultSourceNode(sourceNode) && sourceNode.status === "processing";
+        const isSelected = selectedEdgeId === edge.id;
         result.push({
           id: edge.id,
           source: edge.from.nodeId,
@@ -2060,17 +2066,15 @@ export default function BoardWorkspace({
           targetHandle: edge.to.portId,
           type: "smoothstep",
           animated: edge.kind === "result" || processing,
-          data: { kind: edge.kind, processing },
-          className: `imagine-board-edge imagine-board-edge-${edge.kind}`,
-          markerEnd: { type: MarkerType.ArrowClosed, color: flowEdgeColorByKind[edge.kind], width: 18, height: 18 },
-          style: { strokeWidth: selectedEdgeId === edge.id ? 3 : 2 },
-          zIndex: selectedEdgeId === edge.id ? 20 : 8,
+          data: { kind: edge.kind, processing, selected: isSelected },
+          className: `imagine-board-edge imagine-board-edge-${edge.kind}${processing ? " imagine-board-edge-processing" : ""}`,
+          style: { strokeWidth: isSelected ? 2.4 : 1.8 },
         });
       }
       return result;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- graph key gates processing animation without position churn
-    [board.nodes, boardGraphContentKey, boardPromptReferenceGraphIndex, flowEdgeColorByKind, resultSourceNodes, selectedEdgeId],
+    [board.nodes, boardGraphContentKey, boardPromptReferenceGraphIndex, resultSourceNodes, selectedEdgeId],
   );
 
   const isValidBoardConnection = useCallback<IsValidConnection<BoardFlowEdge>>((connection) => {
@@ -3268,7 +3272,6 @@ export default function BoardWorkspace({
             minZoom={0.25}
             maxZoom={1.8}
             onlyRenderVisibleElements={onlyRenderVisibleBoardElements}
-            elevateEdgesOnSelect
             connectOnClick={false}
             connectionMode={ConnectionMode.Loose}
             connectionRadius={48}
