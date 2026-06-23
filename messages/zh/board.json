@@ -512,7 +512,10 @@
     "processing": "编辑处理中",
     "cancelEditTask": "取消图片编辑任务",
     "version": "版本 {index}",
-    "switchVersion": "切换到版本 {index}"
+    "switchVersion": "切换到版本 {index}",
+    "versions": "全部版本",
+    "expandVersions": "展开全部版本",
+    "collapseVersions": "收起全部版本"
   },
   "referenceGroup": {
     "roleStart": "首帧",

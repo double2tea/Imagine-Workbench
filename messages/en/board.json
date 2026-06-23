@@ -512,7 +512,10 @@
     "processing": "Processing",
     "cancelEditTask": "Cancel image edit task",
     "version": "Version {index}",
-    "switchVersion": "Switch to version {index}"
+    "switchVersion": "Switch to version {index}",
+    "versions": "All versions",
+    "expandVersions": "Expand all versions",
+    "collapseVersions": "Collapse all versions"
   },
   "referenceGroup": {
     "roleStart": "Start frame",

@@ -24,6 +24,7 @@ import {
 interface ResultBoardNodeProps {
   boardId: string;
   isSelected?: boolean;
+  isUnviewed?: boolean;
   node: BoardResultNode;
   stackItems: StorageItem[];
   onAnalyzeMedia?: (nodeId: string) => void | Promise<void>;
@@ -88,6 +89,7 @@ function resolveVideoCoverPreviewUrl(itemUrl: string, nodeUrl: string): string {
 const ResultBoardNode = memo(function ResultBoardNode({
   boardId,
   isSelected = false,
+  isUnviewed = false,
   node,
   onAnalyzeMedia,
   stackItems,
@@ -202,6 +204,7 @@ const ResultBoardNode = memo(function ResultBoardNode({
         actionBar={<BoardMediaActionBar groups={actionGroups} visible={isSelected} />}
         activeStackAssetId={node.activeAssetId}
         isSelected={isSelected}
+        isUnviewed={isUnviewed}
         onSelectStackAsset={onSelectStackAsset}
         onDoubleClick={item.status === "complete" && onOpenFullscreen ? () => onOpenFullscreen(item) : undefined}
         processingLabel={imageQuickEditProcessingTitleFromPrompt(item.prompt, creationT) ?? undefined}

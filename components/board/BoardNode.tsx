@@ -33,6 +33,7 @@ export interface BoardFlowNodeData extends Record<string, unknown> {
   generateTaskSummary?: BoardGenerateTaskSummary;
   connectedResultNodeId?: string;
   hasResultConnection?: boolean;
+  isUnviewedGeneratedAsset?: boolean;
   node: BoardNodeModel;
   promptReferences?: BoardPromptReference[];
   assetStackItems?: StorageItem[];
@@ -436,6 +437,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
           <AssetBoardNode
             boardId={data.boardId}
             isSelected={selected === true}
+            isUnviewed={data.isUnviewedGeneratedAsset === true}
             node={node}
             activeStackAssetId={node.asset.assetId}
             stackItems={data.assetStackItems ?? EMPTY_STORAGE_ITEMS}
@@ -459,6 +461,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
           <ResultBoardNode
             boardId={data.boardId}
             isSelected={selected === true}
+            isUnviewed={data.isUnviewedGeneratedAsset === true}
             node={node}
             stackItems={data.assetStackItems ?? EMPTY_STORAGE_ITEMS}
             onAnalyzeMedia={c.onAnalyzeBoardMedia}

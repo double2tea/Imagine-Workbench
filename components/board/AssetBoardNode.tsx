@@ -27,6 +27,7 @@ interface AssetBoardNodeProps {
   boardId: string;
   compareReferenceUrl?: string | null;
   isSelected?: boolean;
+  isUnviewed?: boolean;
   node: BoardAssetNode;
   onCaptureVideoFrame?: (nodeId: string, item: StorageItem, frame: CapturedVideoFrame) => void | Promise<void>;
   onAnalyzeMedia?: (nodeId: string) => void | Promise<void>;
@@ -85,6 +86,7 @@ const AssetBoardNode = memo(function AssetBoardNode({
   boardId,
   compareReferenceUrl,
   isSelected = false,
+  isUnviewed = false,
   node,
   onAnalyzeMedia,
   onCancelProcessing,
@@ -234,6 +236,7 @@ const AssetBoardNode = memo(function AssetBoardNode({
         actionBar={<BoardMediaActionBar groups={actionGroups} visible={isSelected} />}
         activeStackAssetId={activeStackAssetId ?? node.asset.assetId}
         isSelected={isSelected}
+        isUnviewed={isUnviewed}
         onCancelProcessing={onCancelProcessing ? () => onCancelProcessing(node.id) : undefined}
         onDoubleClick={isComplete && onOpenFullscreen ? () => onOpenFullscreen(item) : undefined}
         onSelectStackAsset={onSelectStackAsset}

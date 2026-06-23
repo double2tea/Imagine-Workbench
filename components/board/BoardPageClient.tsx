@@ -262,6 +262,42 @@ function makeClientId(prefix: string): string {
   return `${prefix}_${Date.now()}`;
 }
 
+const VIEWED_GENERATED_ASSET_IDS_STORAGE_PREFIX = "imagine_board_viewed_generated_asset_ids";
+
+function viewedGeneratedAssetIdsStorageKey(boardId: string): string {
+  return `${VIEWED_GENERATED_ASSET_IDS_STORAGE_PREFIX}:${boardId}`;
+}
+
+function readViewedGeneratedAssetIds(boardId: string): Set<string> | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const stored = window.localStorage.getItem(viewedGeneratedAssetIdsStorageKey(boardId));
+    if (stored === null) return null;
+    const parsed: unknown = JSON.parse(stored);
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((value): value is string => typeof value === "string" && value.trim().length > 0));
+  } catch {
+    return null;
+  }
+}
+
+function persistViewedGeneratedAssetIds(boardId: string, assetIds: ReadonlySet<string>): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(viewedGeneratedAssetIdsStorageKey(boardId), JSON.stringify(Array.from(assetIds).sort()));
+  } catch {
+    // localStorage can be unavailable in restricted browser contexts.
+  }
+}
+
+function isGeneratedBoardMediaItem(item: StorageItem): boolean {
+  return (
+    (item.type === "audio" || item.type === "image" || item.type === "video") &&
+    item.status === "complete" &&
+    Boolean(item.sourceBoardNodeId)
+  );
+}
+
 function getStringField(value: unknown, field: string): string | null {
   if (typeof value !== "object" || value === null || !(field in value)) return null;
   const record = value as Record<string, unknown>;
@@ -1627,6 +1663,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const [panoramaItem, setPanoramaItem] = useState<StorageItem | null>(null);
   const [voiceProfileSourceItem, setVoiceProfileSourceItem] = useState<StorageItem | null>(null);
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
+  const [viewedGeneratedAssetIds, setViewedGeneratedAssetIds] = useState<Set<string>>(() => new Set());
   const selectOnlyBoardNode = useCallback((nodeId: string): void => {
     boardController.selectNode(nodeId);
     boardController.selectEdge(null);
@@ -1634,6 +1671,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   }, [boardController]);
   const focusNodeSeqRef = useRef(0);
   const originalAssetPromoteIdsRef = useRef<Set<string>>(new Set());
+  const viewedGeneratedAssetBoardIdRef = useRef<string | null>(null);
   const [focusNodeRequest, setFocusNodeRequest] = useState<{ nodeId: string; seq: number } | null>(null);
   const [preserveTasksRevealKey, setPreserveTasksRevealKey] = useState<string | null>(null);
   const requestFocusNode = useCallback((nodeId: string) => {
@@ -1657,6 +1695,42 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const analyzingBoardMediaNodeIdsRef = useRef<Set<string>>(new Set());
   const workspaceNoticeSequenceRef = useRef(0);
   const confirmAction = useConfirm();
+  const generatedBoardAssetIds = useMemo(
+    () => new Set(items.filter(isGeneratedBoardMediaItem).map(item => item.id)),
+    [items],
+  );
+
+  useEffect(() => {
+    viewedGeneratedAssetBoardIdRef.current = null;
+    setViewedGeneratedAssetIds(new Set());
+  }, [resolvedBoardId]);
+
+  useEffect(() => {
+    if (boardAssetsLoading || !isBoardAssetScopeLoaded) return;
+    if (viewedGeneratedAssetBoardIdRef.current === resolvedBoardId) return;
+    const stored = readViewedGeneratedAssetIds(resolvedBoardId);
+    const initialViewedAssetIds = stored ?? new Set(generatedBoardAssetIds);
+    viewedGeneratedAssetBoardIdRef.current = resolvedBoardId;
+    setViewedGeneratedAssetIds(initialViewedAssetIds);
+    if (stored === null) persistViewedGeneratedAssetIds(resolvedBoardId, initialViewedAssetIds);
+  }, [boardAssetsLoading, generatedBoardAssetIds, isBoardAssetScopeLoaded, resolvedBoardId]);
+
+  const markGeneratedAssetsViewed = useCallback((assetIds: readonly string[]) => {
+    const nextAssetIds = assetIds.filter(assetId => assetId.trim().length > 0 && generatedBoardAssetIds.has(assetId));
+    if (nextAssetIds.length === 0) return;
+    setViewedGeneratedAssetIds(current => {
+      let didChange = false;
+      const next = new Set(current);
+      for (const assetId of nextAssetIds) {
+        if (next.has(assetId)) continue;
+        next.add(assetId);
+        didChange = true;
+      }
+      if (!didChange) return current;
+      persistViewedGeneratedAssetIds(resolvedBoardId, next);
+      return next;
+    });
+  }, [generatedBoardAssetIds, resolvedBoardId]);
 
   const dismissWorkspaceNotice = useCallback((id: string) => {
     setWorkspaceNotices(prev => prev.filter(notice => notice.id !== id));
@@ -1936,17 +2010,19 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       setFullscreenItem(null);
       return;
     }
+    markGeneratedAssetsViewed([item.id]);
     void resolveOriginalStorageItem(item).then(
       setFullscreenItem,
       error => pushWorkspaceNotice("error", toErrorMessage(error, t("common.originalMediaReadFailed"))),
     );
-  }, [pushWorkspaceNotice, resolveOriginalStorageItem, t]);
+  }, [markGeneratedAssetsViewed, pushWorkspaceNotice, resolveOriginalStorageItem, t]);
   const handleOpenPanorama = useCallback((item: StorageItem) => {
+    markGeneratedAssetsViewed([item.id]);
     void resolveOriginalStorageItem(item).then(
       setPanoramaItem,
       error => pushWorkspaceNotice("error", toErrorMessage(error, t("common.originalImageReadFailed"))),
     );
-  }, [pushWorkspaceNotice, resolveOriginalStorageItem, t]);
+  }, [markGeneratedAssetsViewed, pushWorkspaceNotice, resolveOriginalStorageItem, t]);
   const handleDownloadAsset = useCallback((item: StorageItem) => {
     void resolveOriginalStorageItem(item).then(
       originalItem => {
@@ -4919,7 +4995,10 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       return;
     }
     if (resultAssetId && resultNode.resultAssetIds.includes(resultAssetId)) {
-      boardController.updateResultNodeAsset(resultNode.id, resultAssetId);
+      if (resultItem) {
+        markGeneratedAssetsViewed([resultAssetId]);
+        boardController.updateResultNodeAsset(resultNode.id, storageItemToBoardAssetReference(resultItem));
+      }
       requestTaskQueueFocusNode(resultNode.id);
       return;
     }
@@ -4928,7 +5007,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       return;
     }
     requestTaskQueueFocusNode(resultNode.id);
-  }, [boardController, handleOpenFullscreen, items, pushWorkspaceNotice, requestTaskQueueFocusNode, t]);
+  }, [boardController, handleOpenFullscreen, items, markGeneratedAssetsViewed, pushWorkspaceNotice, requestTaskQueueFocusNode, t]);
 
   const handleRerunBoardTaskSource = useCallback((task: GenerationTask) => {
     const sourceNodeId = task.source.boardNodeId;
@@ -5012,6 +5091,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     return generateReferenceCandidates(boardController.board.nodes, boardController.board.edges, resultEdge.from.nodeId)[0] ?? null;
   }, [boardController.board.edges, boardController.board.nodes, selectedBoardNode]);
   useEffect(() => {
+    const selectedAssetIds: string[] = [];
     for (const nodeId of selectedNodeIds) {
       const node = boardController.board.nodes.find(candidate => candidate.id === nodeId);
       const assetId = node?.kind === "asset"
@@ -5019,10 +5099,12 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         : node?.kind === "result"
           ? node.activeAssetId
           : undefined;
+      if (assetId) selectedAssetIds.push(assetId);
       const item = assetId ? items.find(candidate => candidate.id === assetId) : undefined;
       if (item) promoteItemToOriginal(item);
     }
-  }, [boardController.board.nodes, items, promoteItemToOriginal, selectedNodeIds]);
+    markGeneratedAssetsViewed(selectedAssetIds);
+  }, [boardController.board.nodes, items, markGeneratedAssetsViewed, promoteItemToOriginal, selectedNodeIds]);
   const selectedDownloadableBoardItems = useMemo(() => {
     const itemById = new Map<string, StorageItem>();
     for (const nodeId of selectedNodeIds) {
@@ -5193,6 +5275,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onExportMultiGrid={handleExportMultiGrid}
         onFetchRunningHubAppSchema={fetchRunningHubAppSchema}
         onImportBoardFiles={handleImportBoardFiles}
+        onMarkGeneratedAssetsViewed={markGeneratedAssetsViewed}
         onOpenFullscreen={handleOpenFullscreen}
         onOpenPanorama={handleOpenPanorama}
         onResolveOriginalAsset={resolveOriginalStorageItem}
@@ -5203,6 +5286,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onSendAssetToAgent={useBoardAssetForAgent}
         onSendAgentNode={handleSendAgentNode}
         selectedDownloadableCount={selectedDownloadableBoardItems.length}
+        viewedGeneratedAssetIds={viewedGeneratedAssetIds}
       >
         <BoardSidePanel
           preserveTasksRevealKey={preserveTasksRevealKey}
