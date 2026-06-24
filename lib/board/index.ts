@@ -36,6 +36,16 @@ export {
 } from "@/lib/board/multi-grid";
 export { composeBoardMultiGridImage } from "@/lib/board/multi-grid-compose";
 export {
+  BOARD_IMAGE_GRID_SPLIT_MAX_CROPS,
+  BOARD_IMAGE_GRID_SPLIT_PRESETS,
+  splitBoardImageGrid,
+  type BoardImageGridSplitMode,
+  type BoardImageGridSplitPreset,
+  type BoardImageSplitCrop,
+  type BoardImageSplitRect,
+  type BoardImageSplitResult,
+} from "@/lib/board/image-grid-split";
+export {
   boardNodeAbsolutePosition,
   boardNodesWithAbsolutePositions,
   childPositionAfterUngroup,

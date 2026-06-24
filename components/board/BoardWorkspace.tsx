@@ -57,7 +57,7 @@ import BoardAssetCompareOverlay from "@/components/board/BoardAssetCompareOverla
 import type { WorkspaceNoticeType } from "@/components/workbench/WorkspaceNotices";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import { ensureHydratedStorageItem } from "@/lib/assets/ensure-hydrated";
-import type { StorageItem } from "@/lib/db";
+import { buildStorageItem, type StorageItem } from "@/lib/db";
 import {
   buildGalleryReferenceFingerprint,
   buildGalleryTaskFingerprint,
@@ -86,10 +86,12 @@ import {
   boardNodeAbsolutePosition,
   boardNodesWithAbsolutePositions,
   snapBoardPoint,
+  splitBoardImageGrid,
   sortBoardNodesForReactFlow,
   type BoardEdge,
   type BoardEdgeKind,
   type BoardAssetReference,
+  type BoardImageGridSplitMode,
   type BoardNode as BoardNodeModel,
   type BoardPoint,
   type BoardPortKind,
@@ -143,6 +145,7 @@ interface BoardWorkspaceProps {
   onOpenFullscreen: (item: StorageItem) => void;
   onOpenPanorama: (item: StorageItem) => void;
   onResolveOriginalAsset: (item: StorageItem) => Promise<StorageItem>;
+  onSaveDerivedAsset: (item: StorageItem) => Promise<StorageItem | null>;
   onSaveVoiceProfile: (item: StorageItem) => void;
   onRenameBoard: () => void;
   onSelectBoard: (boardId: string) => void;
@@ -240,6 +243,8 @@ const BOARD_VIEWPORT_POSITION_EPSILON = 0.5;
 const BOARD_VIEWPORT_ZOOM_EPSILON = 0.001;
 const BOARD_VIEWPORT_MOVE_SETTLE_MS = 140;
 const BOARD_VISIBLE_RENDER_NODE_THRESHOLD = 120;
+const SPLIT_ASSET_GRID_GAP = 72;
+const SPLIT_ASSET_GENERATE_GAP = 96;
 
 interface BoardSelectionSnapshot {
   edgeId: string | null;
@@ -818,6 +823,34 @@ async function imageUrlToFile(url: string, index: number): Promise<File> {
   return new File([blob], `board-drag-image-${index}.${extensionFromImageType(blob.type)}`, { type: blob.type });
 }
 
+function readBlobAsDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== "string") {
+        reject(new Error("Image read result is not a Data URL"));
+        return;
+      }
+      resolve(reader.result);
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("Image read failed"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function imageUrlToDataUrl(url: string): Promise<string> {
+  if (url.startsWith("data:image/")) return url;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Image split failed to read source (HTTP ${response.status})`);
+  }
+  const blob = await response.blob();
+  if (!blob.type.startsWith("image/")) {
+    throw new Error("Split source URL is not an image");
+  }
+  return readBlobAsDataUrl(blob);
+}
+
 function pasteMediaFiles(dataTransfer: DataTransfer): File[] {
   return Array.from(dataTransfer.items)
     .filter(item => item.kind === "file" && isBoardImportableMediaType(item.type))
@@ -836,6 +869,84 @@ function storageItemToBoardAsset(item: StorageItem): CreateAssetNodeInput["asset
     model: item.model,
     prompt: item.prompt,
   };
+}
+
+function makeClientId(prefix: string): string {
+  return `${prefix}_${Date.now()}_${crypto.randomUUID()}`;
+}
+
+function splitAssetTitle(sourceTitle: string, index: number): string {
+  return `${sourceTitle} - ${String(index + 1).padStart(2, "0")}`;
+}
+
+function aspectRatioFromSize(width: number, height: number): string {
+  const divisor = gcd(width, height);
+  return `${Math.round(width / divisor)}:${Math.round(height / divisor)}`;
+}
+
+function gcd(left: number, right: number): number {
+  let a = Math.abs(Math.round(left));
+  let b = Math.abs(Math.round(right));
+  while (b !== 0) {
+    const next = a % b;
+    a = b;
+    b = next;
+  }
+  return a || 1;
+}
+
+interface SplitAssetGridLayout {
+  bounds: BoardSize;
+  positions: BoardPoint[];
+}
+
+function splitAssetGridLayout(
+  nodes: BoardNodeModel[],
+  sourcePosition: BoardPoint,
+  sourceSize: BoardSize,
+  sizes: BoardSize[],
+): SplitAssetGridLayout {
+  const count = sizes.length;
+  const columns = Math.min(4, Math.max(1, Math.ceil(Math.sqrt(count))));
+  const rows = Math.ceil(count / columns);
+  const columnWidths = Array.from({ length: columns }, (_, column) =>
+    Math.max(...sizes.filter((_, index) => index % columns === column).map(size => size.width)),
+  );
+  const rowHeights = Array.from({ length: rows }, (_, row) =>
+    Math.max(...sizes.filter((_, index) => Math.floor(index / columns) === row).map(size => size.height)),
+  );
+  const bounds = {
+    width: columnWidths.reduce((sum, width) => sum + width, 0) + Math.max(0, columns - 1) * SPLIT_ASSET_GRID_GAP,
+    height: rowHeights.reduce((sum, height) => sum + height, 0) + Math.max(0, rows - 1) * SPLIT_ASSET_GRID_GAP,
+  };
+  const origin = findAvailableBoardNodePosition(
+    boardNodesWithAbsolutePositions(nodes),
+    { x: sourcePosition.x + sourceSize.width + SPLIT_ASSET_GENERATE_GAP, y: sourcePosition.y },
+    bounds,
+  );
+  const positions = sizes.map((_, index) => {
+    const column = index % columns;
+    const row = Math.floor(index / columns);
+    const x = origin.x + columnWidths.slice(0, column).reduce((sum, width) => sum + width + SPLIT_ASSET_GRID_GAP, 0);
+    const y = origin.y + rowHeights.slice(0, row).reduce((sum, height) => sum + height + SPLIT_ASSET_GRID_GAP, 0);
+    return { x: Math.round(x), y: Math.round(y) };
+  });
+  return { bounds, positions };
+}
+
+function selectedImageGenerateNodeId(
+  nodes: readonly BoardNodeModel[],
+  selectedNodeId: string | null,
+  selectedNodeIds: readonly string[],
+  sourceNodeId: string,
+): string | null {
+  const candidates = [...selectedNodeIds, ...(selectedNodeId ? [selectedNodeId] : [])];
+  for (const nodeId of candidates) {
+    if (nodeId === sourceNodeId) continue;
+    const node = nodes.find(candidate => candidate.id === nodeId);
+    if (node?.kind === "image-generate") return node.id;
+  }
+  return null;
 }
 
 function getBoardVar(varName: string, fallback: string): string {
@@ -1195,6 +1306,7 @@ export default function BoardWorkspace({
   onOpenFullscreen,
   onOpenPanorama,
   onResolveOriginalAsset,
+  onSaveDerivedAsset,
   onSaveVoiceProfile,
   onRenameBoard,
   onSelectBoard,
@@ -1366,6 +1478,7 @@ export default function BoardWorkspace({
     restoreNodeWithEdges,
     addAgentNode,
     addAssetNode,
+    addAssetNodes,
     addAssetToMultiGrid,
     addAssetToReferenceGroup,
     extractMultiGridItemToAssetNode,
@@ -1506,6 +1619,131 @@ export default function BoardWorkspace({
     if (!item) return reference.url;
     return (await onResolveOriginalAsset(item)).url;
   }, [galleryItemById, onResolveOriginalAsset]);
+
+  const handleSplitImageGrid = useCallback((nodeId: string, mode: BoardImageGridSplitMode): void => {
+    const sourceNode = board.nodes.find(node => node.id === nodeId);
+    if (!sourceNode || (sourceNode.kind !== "asset" && sourceNode.kind !== "result") || sourceNode.asset.type !== "image") {
+      onWorkspaceNotice("error", tb("workspace.selectImageNode"));
+      return;
+    }
+    const sourceAssetId = sourceNode.kind === "result" ? sourceNode.activeAssetId : sourceNode.asset.assetId;
+    const storedItem = promotableItemForNode(sourceNode);
+    const sourceItem = storedItem ?? (
+      sourceAssetId === sourceNode.asset.assetId
+        ? buildStorageItem(
+          {
+            id: sourceNode.asset.assetId,
+            type: "image",
+            url: sourceNode.asset.url,
+            prompt: sourceNode.asset.prompt,
+            model: sourceNode.asset.model,
+            aspectRatio: "auto",
+            createdAt: sourceNode.createdAt,
+            status: "complete",
+            progress: 100,
+            sourceBoardNodeId: sourceNode.id,
+            ...(sourceNode.kind === "result" ? { sourceBoardResultStackKey: sourceNode.resultStackKey } : {}),
+          },
+          { boardId: board.id },
+        )
+        : null
+    );
+    if (!sourceItem) {
+      onWorkspaceNotice("error", tb("workspace.originalImageReadFailed"));
+      return;
+    }
+
+    void (async () => {
+      const originalItem = await onResolveOriginalAsset(sourceItem);
+      const sourceUrl = await imageUrlToDataUrl(originalItem.url);
+      const split = await splitBoardImageGrid(sourceUrl, mode);
+      const splitCount = split.crops.length;
+      const createdAt = new Date().toISOString();
+      const sourceTitle = sourceNode.title || sourceItem.prompt || sourceItem.id;
+      const pendingItems = split.crops.map(crop => buildStorageItem(
+        {
+          id: makeClientId(`grid_split_${crop.index}`),
+          type: "image",
+          url: crop.url,
+          prompt: splitAssetTitle(sourceTitle, crop.index),
+          model: "grid-split",
+          aspectRatio: aspectRatioFromSize(crop.rect.width, crop.rect.height),
+          createdAt,
+          status: "complete",
+          progress: 100,
+          operationName: "grid-split",
+          sourceBoardNodeId: sourceNode.id,
+          cropDerivative: {
+            sourceAssetId: sourceItem.id,
+            sourceWidth: split.sourceWidth,
+            sourceHeight: split.sourceHeight,
+            splitIndex: crop.index,
+            splitCount,
+            cropRect: crop.rect,
+          },
+        },
+        { boardId: board.id },
+      ));
+      const savedItems: StorageItem[] = [];
+      for (const pendingItem of pendingItems) {
+        const savedItem = await onSaveDerivedAsset(pendingItem);
+        if (!savedItem) throw new Error(tb("workspace.gridSplitFailed"));
+        savedItems.push(savedItem);
+      }
+
+      const sourcePosition = boardNodeAbsolutePosition(board.nodes, sourceNode.id) ?? sourceNode.position;
+      const splitSizes = split.crops.map(crop => mediaNodeSizeForAspectRatio(crop.rect.width / crop.rect.height));
+      const splitLayout = splitAssetGridLayout(board.nodes, sourcePosition, sourceNode.size, splitSizes);
+      const assetNodeIds = addAssetNodes(savedItems.map((item, index) => ({
+        asset: storageItemToBoardAsset(item),
+        position: splitLayout.positions[index],
+        size: splitSizes[index],
+        title: splitAssetTitle(sourceTitle, index),
+      })));
+      const targetNodeId = selectedImageGenerateNodeId(board.nodes, selectedNodeId, selectedNodeIds, sourceNode.id);
+      beginStructureMutation();
+      if (targetNodeId) {
+        const sourceRefs = assetNodeIds.map(assetNodeId => ({
+          nodeId: assetNodeId,
+          portId: BOARD_PORT_IDS.assetOut,
+          portKind: "asset" as const,
+        }));
+        connectPortsBatch(sourceRefs.map(from => ({
+          from,
+          to: {
+            nodeId: targetNodeId,
+            portId: BOARD_PORT_IDS.referenceIn,
+            portKind: "asset" as const,
+          },
+        })));
+        selectOnlyNodeIds([targetNodeId]);
+      } else {
+        selectOnlyNodeIds(assetNodeIds);
+      }
+      onWorkspaceNotice(
+        "success",
+        tb(targetNodeId ? "workspace.gridSplitCreatedAndConnected" : "workspace.gridSplitCreated", {
+          count: savedItems.length,
+        }),
+      );
+    })().catch(error => {
+      onWorkspaceNotice("error", error instanceof Error ? error.message : tb("workspace.gridSplitFailed"));
+    });
+  }, [
+    addAssetNodes,
+    beginStructureMutation,
+    board.id,
+    board.nodes,
+    connectPortsBatch,
+    onResolveOriginalAsset,
+    onSaveDerivedAsset,
+    onWorkspaceNotice,
+    promotableItemForNode,
+    selectOnlyNodeIds,
+    selectedNodeId,
+    selectedNodeIds,
+    tb,
+  ]);
 
   const measureAssetAspectRatio = useCallback((nodeId: string, aspectRatio: number): void => {
     if (!Number.isFinite(aspectRatio) || aspectRatio <= 0) return;
@@ -1828,6 +2066,7 @@ export default function BoardWorkspace({
     onFocusNode: focusReferenceSourceNode,
     onFocusReferenceSource: focusReferenceSourceNode,
     onAnalyzeBoardMedia,
+    onSplitImageGrid: handleSplitImageGrid,
     onOpenFullscreen,
     onOpenPanorama,
     onSaveVoiceProfile,
@@ -1874,7 +2113,7 @@ export default function BoardWorkspace({
     },
   }), [
     onCancelAssetTask, onCancelGenerateNode, onCaptureVideoFrame, trashAndDeleteNode, onDownloadAsset, onEditAssetImage, onImageQuickEdit,
-    onExecuteGenerateNode, onFetchRunningHubAppSchema, focusReferenceSourceNode, onAnalyzeBoardMedia, onOpenFullscreen,
+    onExecuteGenerateNode, onFetchRunningHubAppSchema, focusReferenceSourceNode, onAnalyzeBoardMedia, handleSplitImageGrid, onOpenFullscreen,
     onOpenPanorama, onSaveVoiceProfile, moveGenerateReferenceEdge, moveReferenceGroupItem,
     deleteEdge, removeReferenceGroupItem, onSendAgentNode, onSendAssetToAgent, connectSelectedBoardPromptReference,
     updateReferenceGroupItemRole, updateAgentInstruction, updateGenerateNode, handleExtractMultiGridItem, updateMultiGridNode,

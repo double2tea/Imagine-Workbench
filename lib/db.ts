@@ -61,6 +61,22 @@ export interface GenerationRequestSnapshot {
   referenceImages?: string[];
 }
 
+export interface AssetCropDerivativeRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface AssetCropDerivative {
+  cropRect: AssetCropDerivativeRect;
+  sourceAssetId: string;
+  sourceHeight: number;
+  sourceWidth: number;
+  splitCount: number;
+  splitIndex: number;
+}
+
 export interface StorageItemMeta {
   id: string;
   type: StorageItemType;
@@ -81,6 +97,8 @@ export interface StorageItemMeta {
   sourceBoardResultStackKey?: string;
   /** Present only for hidden media records backing persistent library items. */
   libraryItemId?: string;
+  /** Present when this asset is a crop derived from another image asset. */
+  cropDerivative?: AssetCropDerivative;
   /** Remote http(s) URL only when hasBlob is false. */
   url?: string;
   hasBlob: boolean;
@@ -263,9 +281,44 @@ function normalizeMeta(meta: StorageItemMeta): StorageItemMeta {
     hasBlob,
     contentHash: hasBlob ? normalizeContentHash(meta.contentHash) : undefined,
     libraryItemId: normalizeOptionalString(meta.libraryItemId),
+    cropDerivative: normalizeCropDerivative(meta.cropDerivative),
     url: !hasBlob && meta.url && isRemoteUrl(meta.url) ? meta.url : undefined,
     previewStatus,
     previewUpdatedAt: meta.previewUpdatedAt,
+  };
+}
+
+function normalizeCropDerivative(value: AssetCropDerivative | undefined): AssetCropDerivative | undefined {
+  if (!value) return undefined;
+  const sourceAssetId = normalizeOptionalString(value.sourceAssetId);
+  if (!sourceAssetId) return undefined;
+  const sourceWidth = Math.round(value.sourceWidth);
+  const sourceHeight = Math.round(value.sourceHeight);
+  const splitIndex = Math.round(value.splitIndex);
+  const splitCount = Math.round(value.splitCount);
+  const cropRect: AssetCropDerivativeRect = {
+    x: Math.round(value.cropRect.x),
+    y: Math.round(value.cropRect.y),
+    width: Math.round(value.cropRect.width),
+    height: Math.round(value.cropRect.height),
+  };
+  if (
+    sourceWidth <= 0 ||
+    sourceHeight <= 0 ||
+    splitIndex < 0 ||
+    splitCount <= 0 ||
+    cropRect.width <= 0 ||
+    cropRect.height <= 0
+  ) {
+    return undefined;
+  }
+  return {
+    cropRect,
+    sourceAssetId,
+    sourceHeight,
+    sourceWidth,
+    splitCount,
+    splitIndex,
   };
 }
 
@@ -298,6 +351,7 @@ function splitIncomingItem(item: StorageItem): { meta: StorageItemMeta; blob: st
     sourceBoardNodeId: item.sourceBoardNodeId,
     sourceBoardResultStackKey: item.sourceBoardResultStackKey,
     libraryItemId: normalizeOptionalString(item.libraryItemId),
+    cropDerivative: normalizeCropDerivative(item.cropDerivative),
     url: blob ? undefined : url || undefined,
     hasBlob: Boolean(blob),
   });

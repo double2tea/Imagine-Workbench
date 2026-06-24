@@ -381,6 +381,9 @@
     "selectImageNode": "Please select an image asset node",
     "useAsGenerationReference": "Selected node has been set as the generation reference image",
     "referenceMediaReadFailed": "Failed to read reference media",
+    "gridSplitCreated": "Split {count} image(s)",
+    "gridSplitCreatedAndConnected": "Split {count} image(s) and connected them to the selected generation node",
+    "gridSplitFailed": "Grid split failed",
     "multiGridExportSuccess": "Multi-grid exported as an image asset",
     "multiGridExportFailed": "Failed to export multi-grid",
     "onlyVideoCanCapture": "Only video assets can capture frames",
@@ -515,7 +518,10 @@
     "switchVersion": "Switch to version {index}",
     "versions": "All versions",
     "expandVersions": "Expand all versions",
-    "collapseVersions": "Collapse all versions"
+    "collapseVersions": "Collapse all versions",
+    "splitGridMenu": "Split grid",
+    "splitGridAuto": "Auto split grid",
+    "splitGridPreset": "Split {size}x{size} grid"
   },
   "referenceGroup": {
     "roleStart": "Start frame",

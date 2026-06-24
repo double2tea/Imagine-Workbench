@@ -42,6 +42,7 @@ import {
   saveLibraryAssetRecord,
   saveToDB,
   type AssetDatabaseDiagnostics,
+  type AssetCropDerivative,
   type GenerationReferenceMediaSnapshot,
   type GenerationRequestSnapshot,
   type LibraryAssetCategory,
@@ -1133,6 +1134,7 @@ function parseAssetRecord(value: unknown, index: number): WorkspaceBackupAssetRe
     sourceBoardNodeId: readOptionalString(value, "sourceBoardNodeId"),
     sourceBoardResultStackKey: readOptionalString(value, "sourceBoardResultStackKey"),
     libraryItemId: readOptionalString(value, "libraryItemId"),
+    cropDerivative: parseCropDerivative(value.cropDerivative),
     scope: value.scope === "board" ? "board" : "workspace",
     boardId: typeof value.boardId === "string" ? value.boardId : "",
     hasBlob:
@@ -1278,6 +1280,25 @@ function parseGenerationRequest(value: unknown): GenerationRequestSnapshot | und
     runningHubYouchuan: readOptionalRunningHubYouchuanAdvancedSettings(value, "runningHubYouchuan"),
     referenceMedia: parseGenerationReferenceMedia(value.referenceMedia),
     referenceImages: readOptionalStringArray(value, "referenceImages"),
+  };
+}
+
+function parseCropDerivative(value: unknown): AssetCropDerivative | undefined {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) throw new Error("cropDerivative 格式无效");
+  const cropRect = readRecord(value, "cropRect");
+  return {
+    sourceAssetId: readString(value, "sourceAssetId"),
+    sourceWidth: readNumber(value, "sourceWidth"),
+    sourceHeight: readNumber(value, "sourceHeight"),
+    splitIndex: readNumber(value, "splitIndex"),
+    splitCount: readNumber(value, "splitCount"),
+    cropRect: {
+      x: readNumber(cropRect, "x"),
+      y: readNumber(cropRect, "y"),
+      width: readNumber(cropRect, "width"),
+      height: readNumber(cropRect, "height"),
+    },
   };
 }
 
@@ -1806,6 +1827,7 @@ function estimateStorageRecordBytes(item: StorageItemMeta): number {
     operationName: item.operationName,
     errorMessage: item.errorMessage,
     generationRequest: item.generationRequest,
+    cropDerivative: item.cropDerivative,
     contentHash: item.contentHash,
     previewStatus: item.previewStatus,
   }));

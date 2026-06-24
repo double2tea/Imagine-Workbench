@@ -3,6 +3,7 @@ import { memo, useMemo, useRef } from "react";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
 import BoardAudioWaveform from "@/components/board/BoardAudioWaveform";
 import BoardMediaActionBar, { type BoardMediaActionGroup } from "@/components/board/BoardMediaActionBar";
+import { createBoardImageGridSplitActions } from "@/components/board/BoardImageGridSplitActions";
 import BoardMediaNodeShell from "@/components/board/BoardMediaNodeShell";
 import PreviewImage from "@/components/PreviewImage";
 import useBoardAudioItem from "@/components/board/useBoardAudioItem";
@@ -11,6 +12,7 @@ import type { BoardResultNode } from "@/lib/board";
 import { buildStorageItem, type StorageItem } from "@/lib/db";
 import { imageQuickEditProcessingTitleFromPrompt } from "@/lib/image-quick-edit-targets";
 import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
+import type { BoardImageGridSplitMode } from "@/lib/board/image-grid-split";
 import type { CapturedVideoFrame } from "@/lib/video-frame";
 import { useTranslations } from "@/lib/i18n";
 import {
@@ -36,6 +38,7 @@ interface ResultBoardNodeProps {
   onOpenPanorama?: (item: StorageItem) => void;
   onSaveVoiceProfile?: (item: StorageItem) => void;
   onSelectStackAsset?: (assetId: string) => void;
+  onSplitImageGrid?: (nodeId: string, mode: BoardImageGridSplitMode) => void | Promise<void>;
 }
 
 type ResultBoardNodeT = ReturnType<typeof useTranslations>["t"];
@@ -101,6 +104,7 @@ const ResultBoardNode = memo(function ResultBoardNode({
   onOpenPanorama,
   onSaveVoiceProfile,
   onSelectStackAsset,
+  onSplitImageGrid,
 }: ResultBoardNodeProps) {
   const { t } = useTranslations("board");
   const { t: creationT } = useTranslations("creation");
@@ -162,6 +166,9 @@ const ResultBoardNode = memo(function ResultBoardNode({
               title: WORKBENCH_OPERATION_META.voice.title,
               toneClassName: operationToneClassName(WORKBENCH_OPERATION_META.voice.tone),
             }]
+          : []),
+        ...(item.type === "image" && isComplete && onSplitImageGrid
+          ? createBoardImageGridSplitActions(t, mode => void onSplitImageGrid(node.id, mode))
           : []),
       ],
     },

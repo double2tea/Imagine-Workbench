@@ -455,6 +455,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             onSaveVoiceProfile={c.onSaveVoiceProfile}
             onSelectStackAsset={assetId => c.onSelectAssetStackResult(node.id, assetId)}
             onSendToAgent={c.onSendAssetToAgent}
+            onSplitImageGrid={c.onSplitImageGrid}
           />
         )}
         {node.kind === "result" && (
@@ -473,6 +474,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             onOpenPanorama={c.onOpenPanorama}
             onSaveVoiceProfile={c.onSaveVoiceProfile}
             onSelectStackAsset={assetId => c.onSelectAssetStackResult(node.id, assetId)}
+            onSplitImageGrid={c.onSplitImageGrid}
           />
         )}
         {node.kind === "prompt" && (

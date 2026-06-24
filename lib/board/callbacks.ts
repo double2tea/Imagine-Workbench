@@ -1,6 +1,7 @@
 import { createContext, useContext } from "react";
 import type { StorageItem } from "@/lib/db";
 import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
+import type { BoardImageGridSplitMode } from "@/lib/board/image-grid-split";
 import type {
   BoardGenerateNodeUpdate,
   BoardMultiGridItem,
@@ -30,6 +31,7 @@ export interface BoardNodeCallbacks {
   onFocusNode: (nodeId: string) => void;
   onFocusReferenceSource: (nodeId: string) => void;
   onAnalyzeBoardMedia: (nodeId: string) => void | Promise<void>;
+  onSplitImageGrid: (nodeId: string, mode: BoardImageGridSplitMode) => void | Promise<void>;
   onMoveReferenceGroupItem: (nodeId: string, assetId: string, direction: "up" | "down") => void;
   onMoveGenerateReferenceEdge: (nodeId: string, sourceEdgeId: string, targetEdgeId: string) => void;
   onRemoveGenerateReferenceEdge: (edgeId: string) => void;

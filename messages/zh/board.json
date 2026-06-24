@@ -381,6 +381,9 @@
     "selectImageNode": "请选择一个图片资产节点",
     "useAsGenerationReference": "已将选中节点作为生成参考图",
     "referenceMediaReadFailed": "参考媒体读取失败",
+    "gridSplitCreated": "已切分 {count} 张图片",
+    "gridSplitCreatedAndConnected": "已切分 {count} 张图片并连接到选中的生成节点",
+    "gridSplitFailed": "宫格切分失败",
     "multiGridExportSuccess": "多宫格已导出为图片资产",
     "multiGridExportFailed": "多宫格导出失败",
     "onlyVideoCanCapture": "只有视频资产可以截帧",
@@ -515,7 +518,10 @@
     "switchVersion": "切换到版本 {index}",
     "versions": "全部版本",
     "expandVersions": "展开全部版本",
-    "collapseVersions": "收起全部版本"
+    "collapseVersions": "收起全部版本",
+    "splitGridMenu": "宫格切分",
+    "splitGridAuto": "自动切分宫格",
+    "splitGridPreset": "切分 {size}x{size} 宫格"
   },
   "referenceGroup": {
     "roleStart": "首帧",

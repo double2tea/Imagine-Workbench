@@ -4,6 +4,7 @@ import { memo, useMemo, useRef } from "react";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
 import BoardAudioWaveform from "@/components/board/BoardAudioWaveform";
 import BoardMediaActionBar, { type BoardMediaActionGroup } from "@/components/board/BoardMediaActionBar";
+import { createBoardImageGridSplitActions } from "@/components/board/BoardImageGridSplitActions";
 import BoardMediaNodeShell from "@/components/board/BoardMediaNodeShell";
 import PreviewImage from "@/components/PreviewImage";
 import useBoardAudioItem from "@/components/board/useBoardAudioItem";
@@ -12,6 +13,7 @@ import type { BoardAssetNode } from "@/lib/board";
 import { buildStorageItem, type StorageItem } from "@/lib/db";
 import { imageQuickEditProcessingTitleFromPrompt } from "@/lib/image-quick-edit-targets";
 import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
+import type { BoardImageGridSplitMode } from "@/lib/board/image-grid-split";
 import type { CapturedVideoFrame } from "@/lib/video-frame";
 import { useTranslations } from "@/lib/i18n";
 import {
@@ -42,6 +44,7 @@ interface AssetBoardNodeProps {
   onSaveVoiceProfile?: (item: StorageItem) => void;
   onSelectStackAsset?: (assetId: string) => void;
   onSendToAgent?: (nodeId: string) => void;
+  onSplitImageGrid?: (nodeId: string, mode: BoardImageGridSplitMode) => void | Promise<void>;
   stackItems?: StorageItem[];
 }
 
@@ -101,6 +104,7 @@ const AssetBoardNode = memo(function AssetBoardNode({
   onSaveVoiceProfile,
   onSelectStackAsset,
   onSendToAgent,
+  onSplitImageGrid,
   stackItems = [],
 }: AssetBoardNodeProps) {
   const { t } = useTranslations("board");
@@ -195,6 +199,12 @@ const AssetBoardNode = memo(function AssetBoardNode({
               };
             }),
           ]
+        : [],
+    },
+    {
+      id: "media",
+      actions: node.asset.type === "image" && isComplete && onSplitImageGrid
+        ? createBoardImageGridSplitActions(t, mode => void onSplitImageGrid(node.id, mode))
         : [],
     },
     {

@@ -685,6 +685,18 @@ function selectedBoardNodeReferences(
   return Array.from(referenceById.values());
 }
 
+function uniqueBoardReferences(references: ReferenceImageRef[]): ReferenceImageRef[] {
+  const seen = new Set<string>();
+  const uniqueReferences: ReferenceImageRef[] = [];
+  for (const reference of references) {
+    const key = `${reference.id}:${reference.url}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    uniqueReferences.push(reference);
+  }
+  return uniqueReferences;
+}
+
 function readAgentInputSupportPayload(payload: unknown): AgentReferenceInputSupport | null {
   if (typeof payload !== "object" || payload === null || !("inputSupport" in payload)) return null;
   const inputSupport = payload.inputSupport;
@@ -1982,6 +1994,12 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     }
     return { ...storedItem, url: originalUrl };
   }, [items]);
+  const saveBoardDerivedAsset = useCallback(async (item: StorageItem): Promise<StorageItem | null> => {
+    const savedItem = await saveItemOrWarn(item, pushWorkspaceNotice);
+    if (!savedItem) return null;
+    setItems(prev => [savedItem, ...prev.filter(current => current.id !== savedItem.id)]);
+    return savedItem;
+  }, [pushWorkspaceNotice, setItems]);
   const promoteItemToOriginal = useCallback((item: StorageItem): void => {
     if (item.status !== "complete") return;
     if (originalAssetPromoteIdsRef.current.has(item.id)) return;
@@ -4210,12 +4228,18 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     const resolvedPrompt = promptNode?.kind === "prompt"
       ? (getBoardTextDraft(promptNode.id) ?? promptNode.prompt)
       : (getBoardTextDraft(node.id) ?? node.prompt);
-    const references: ReferenceImageRef[] = boardController.board.edges
+    const promptReferences: ReferenceImageRef[] = promptNode?.kind === "prompt"
+      ? boardController.board.edges
+        .filter(edge => edge.to.nodeId === promptNode.id && edge.to.portId === BOARD_PORT_IDS.assetIn)
+        .map(edge => boardController.board.nodes.find(item => item.id === edge.from.nodeId))
+        .flatMap(item => boardNodeReferences(item, boardController.board.nodes, boardController.board.edges, items, resolveBoardReferenceUrl))
+      : [];
+    const directReferences: ReferenceImageRef[] = boardController.board.edges
       .filter(edge => edge.to.nodeId === nodeId && edge.to.portId === "reference-in")
       .map(edge => boardController.board.nodes.find(item => item.id === edge.from.nodeId))
       .flatMap(item => boardNodeReferences(item, boardController.board.nodes, boardController.board.edges, items, resolveBoardReferenceUrl));
 
-    return { node, prompt: resolvedPrompt, references };
+    return { node, prompt: resolvedPrompt, references: uniqueBoardReferences([...promptReferences, ...directReferences]) };
   }, [boardController.board.edges, boardController.board.nodes, items, resolveBoardReferenceUrl]);
 
   const resolveGenerateNodeInputs = useCallback((nodeId: string) => {
@@ -5288,6 +5312,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onOpenFullscreen={handleOpenFullscreen}
         onOpenPanorama={handleOpenPanorama}
         onResolveOriginalAsset={resolveOriginalStorageItem}
+        onSaveDerivedAsset={saveBoardDerivedAsset}
         onSaveVoiceProfile={handleSaveVoiceProfileSource}
         onOpenSettings={handleOpenSettings}
         onRenameBoard={renameBoardPage}
