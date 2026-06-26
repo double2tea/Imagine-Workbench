@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   bootstrapTeamOwner,
   fetchTeamAssets,
+  fetchTeamBoardSummaries,
   fetchTeamStorageHealth,
   fetchTeamSession,
   loginTeamSession,
@@ -115,6 +116,50 @@ test("fetchTeamAssets sends list filters and rejects payload storage keys", asyn
       workspaceId: "workspace_1",
     })),
     /Team asset list response is invalid/,
+  );
+});
+
+test("fetchTeamBoardSummaries sends list filters and validates summaries", async () => {
+  let requestedUrl = "";
+  const result = await fetchTeamBoardSummaries({
+    ids: ["board_1", "board with spaces"],
+    limit: 10,
+    offset: 2,
+  }, async input => {
+    requestedUrl = String(input);
+    return jsonResponse({
+      boards: [{
+        createdAt: "2026-06-26T00:00:00.000Z",
+        id: "board_1",
+        nodeCount: 3,
+        title: "Shared Board",
+        updatedAt: "2026-06-26T01:00:00.000Z",
+      }],
+      limit: 10,
+      offset: 2,
+      targetKind: "postgres",
+      workspaceId: "workspace_1",
+    });
+  });
+
+  assert.equal(
+    requestedUrl,
+    "/api/storage/team/boards?id=board_1&id=board+with+spaces&limit=10&offset=2",
+  );
+  assert.equal(result.boards[0]?.title, "Shared Board");
+
+  await assert.rejects(
+    fetchTeamBoardSummaries(undefined, async () => jsonResponse({
+      boards: [{
+        id: "board_1",
+        title: "Shared Board",
+      }],
+      limit: 100,
+      offset: 0,
+      targetKind: "postgres",
+      workspaceId: "workspace_1",
+    })),
+    /Team board list response is invalid/,
   );
 });
 

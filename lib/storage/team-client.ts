@@ -1,9 +1,11 @@
 import { API_ROUTES } from "@/lib/api/routes";
+import type { BoardSummary } from "@/lib/board/types";
 import { readFetchError } from "@/lib/client-fetch-error";
 import type { StorageItemMeta } from "@/lib/db";
 import type { PublicLocalStorageRuntimeStatus } from "@/lib/storage/local-public-runtime";
 import type { WORKSPACE_STORAGE_SCHEMA_VERSION } from "@/lib/storage/schema";
 import type { PublicTeamAssetPayload, PublicTeamAssetRecord, TeamAssetListResult } from "@/lib/storage/team-asset-types";
+import type { TeamBoardSummaryListResult } from "@/lib/storage/team-board-types";
 
 export interface TeamStorageMigrationStatus {
   appliedMigrationIds: string[];
@@ -54,6 +56,12 @@ export interface TeamAssetListOptions {
   limit?: number;
   offset?: number;
   statuses?: StorageItemMeta["status"][];
+}
+
+export interface TeamBoardSummaryListOptions {
+  ids?: string[];
+  limit?: number;
+  offset?: number;
 }
 
 type Fetcher = typeof fetch;
@@ -110,6 +118,19 @@ export async function fetchTeamAssets(
     throw new Error(error);
   }
   return parseTeamAssetListResult(body);
+}
+
+export async function fetchTeamBoardSummaries(
+  options: TeamBoardSummaryListOptions = {},
+  fetcher: Fetcher = fetch,
+): Promise<TeamBoardSummaryListResult> {
+  const response = await fetcher(teamBoardsUrl(options), { cache: "no-store" });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team board list failed";
+    throw new Error(error);
+  }
+  return parseTeamBoardSummaryListResult(body);
 }
 
 export async function loginTeamSession(
@@ -224,6 +245,11 @@ function parseTeamAssetListResult(value: unknown): TeamAssetListResult {
   return value;
 }
 
+function parseTeamBoardSummaryListResult(value: unknown): TeamBoardSummaryListResult {
+  if (!isTeamBoardSummaryListResult(value)) throw new Error("Team board list response is invalid");
+  return value;
+}
+
 function teamAssetsUrl(options: TeamAssetListOptions): string {
   const searchParams = new URLSearchParams();
   if (options.boardId) searchParams.set("boardId", options.boardId);
@@ -233,6 +259,15 @@ function teamAssetsUrl(options: TeamAssetListOptions): string {
   for (const status of options.statuses ?? []) searchParams.append("status", status);
   const query = searchParams.toString();
   return query ? `${API_ROUTES.storage.teamAssets}?${query}` : API_ROUTES.storage.teamAssets;
+}
+
+function teamBoardsUrl(options: TeamBoardSummaryListOptions): string {
+  const searchParams = new URLSearchParams();
+  for (const id of options.ids ?? []) searchParams.append("id", id);
+  if (options.limit !== undefined) searchParams.set("limit", String(options.limit));
+  if (options.offset !== undefined) searchParams.set("offset", String(options.offset));
+  const query = searchParams.toString();
+  return query ? `${API_ROUTES.storage.teamBoards}?${query}` : API_ROUTES.storage.teamBoards;
 }
 
 function readStringField(value: unknown, field: string): string | null {
@@ -272,6 +307,18 @@ function isTeamAssetListResult(value: unknown): value is TeamAssetListResult {
   );
 }
 
+function isTeamBoardSummaryListResult(value: unknown): value is TeamBoardSummaryListResult {
+  if (!isRecord(value)) return false;
+  return (
+    value.targetKind === "postgres" &&
+    typeof value.workspaceId === "string" &&
+    Number.isInteger(value.limit) &&
+    Number.isInteger(value.offset) &&
+    Array.isArray(value.boards) &&
+    value.boards.every(isBoardSummary)
+  );
+}
+
 function isPublicTeamAssetRecord(value: unknown): value is PublicTeamAssetRecord {
   if (!isRecord(value)) return false;
   const payload = value.payload;
@@ -303,6 +350,17 @@ function isStorageItemMeta(value: unknown): value is StorageItemMeta {
     typeof value.type === "string" &&
     isStorageItemStatus(value.status) &&
     typeof value.hasBlob === "boolean"
+  );
+}
+
+function isBoardSummary(value: unknown): value is BoardSummary {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.id === "string" &&
+    typeof value.title === "string" &&
+    typeof value.nodeCount === "number" &&
+    typeof value.createdAt === "string" &&
+    typeof value.updatedAt === "string"
   );
 }
 
