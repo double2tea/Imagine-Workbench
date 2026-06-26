@@ -80,7 +80,7 @@
     "multiGridCellLabel": "Multi-grid image {index}",
     "multiGridEmptyCellLabel": "Empty cell {index}, drag an image here",
     "selectOrDoubleClickHint": "Select a node or edge to view details; edit Prompt and Agent directly in the canvas node.",
-    "clickHint": "Click a canvas node or edge; double-click empty space to insert quickly. Switch to Local Assets to drag items onto the canvas.",
+    "clickHint": "Click a canvas node or edge; double-click empty space to insert quickly. Switch to Media to drag items onto the canvas.",
     "selectedCount": "{count} node(s) selected · Inspector shows the primary selection",
     "edgeType": "Type · {kindLabel}",
     "edgeFrom": "From ",
@@ -300,7 +300,7 @@
     "collapseLabel": "Collapse"
   },
   "quickEdit": {
-    "editStarted": "{label} started; the result will update in the current node",
+    "editStarted": "{label} started; the output will update in the current node",
     "editComplete": "{label} complete; saved as new board media",
     "maskAppliedToAgent": "Mask applied to Agent reference image; continue describing changes in the conversation",
     "maskAppliedToBoardAsset": "Partial edit media node has been created",
@@ -542,7 +542,7 @@
     "startWithAction": "Start with actions",
     "description": "Add nodes and links to begin.",
     "openInsertMenu": "Right-click the canvas to open insert menu",
-    "topBarOrDrag": "Use the top bar or drag assets onto canvas",
+    "topBarOrDrag": "Use the top bar or drag media onto canvas",
     "doubleClickBlank": "Double-click blank space",
     "generateNode": "Generate node",
     "imageVideoAudio": "Image / Video / Audio mode",

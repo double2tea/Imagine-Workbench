@@ -147,17 +147,18 @@ test("board media/source copy does not expose separate result and asset node cat
   const workspace = readWorkspaceFile("components/board/BoardWorkspace.tsx");
   const generateNode = readWorkspaceFile("components/board/GenerateBoardNode.tsx");
   const page = readWorkspaceFile("components/board/BoardPageClient.tsx");
+  const assetNode = readWorkspaceFile("components/board/AssetBoardNode.tsx");
 
   assert.match(zh, /"asset": "媒体"/);
   assert.match(zh, /"result": "媒体"/);
   assert.match(zh, /"resultOut": "来源输出"/);
   assert.match(zh, /"resultDetachedToMedia": "已解除来源关系，媒体仍保留在画布上"/);
-  assert.doesNotMatch(zh, /图片资产节点|视频资产|音频资产|结果节点|结果输出|生成结果/);
+  assert.doesNotMatch(zh, /图片资产节点|视频资产|音频资产|结果节点|结果输出|生成结果|本地资产|拖入资产|拖拽素材|导入素材|对比素材/);
   assert.match(en, /"asset": "Media"/);
   assert.match(en, /"result": "Media"/);
   assert.match(en, /"resultOut": "Source Output"/);
   assert.match(en, /"resultDetachedToMedia": "Source relationship removed; the media stays on the board"/);
-  assert.doesNotMatch(en, /Generation Result|Image Asset|Video Asset|Audio Asset|asset node|result node|Result Output/);
+  assert.doesNotMatch(en, /Generation Result|Image Asset|Video Asset|Audio Asset|Local Assets|drag assets|image asset|video assets|asset node|result node|Result Output/);
   assert.match(commonZh, /"viewResult": "查看媒体"/);
   assert.match(commonZh, /"focusTaskResultMissingResultNode": "未找到任务对应的媒体节点"/);
   assert.match(commonEn, /"viewResult": "View media"/);
@@ -169,6 +170,8 @@ test("board media/source copy does not expose separate result and asset node cat
   assert.match(generateNode, /node\.generateNode\.mediaCount/);
   assert.match(page, /board\.agent\.imageToVideoNoConnectedMedia/);
   assert.doesNotMatch(page, /Source node has no connected result node/);
+  assert.match(assetNode, /node\.types\.imageAsset/);
+  assert.doesNotMatch(assetNode, /Image asset|Video asset|Audio asset/);
 });
 
 test("generate node run controls expose accessible labels", () => {

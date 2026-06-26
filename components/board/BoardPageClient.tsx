@@ -3969,23 +3969,23 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const handleSelectLibraryAsset = useCallback((entry: LibraryAssetEntry) => {
     const item = entry.item;
     if (!item) {
-      pushWorkspaceNotice("error", "Asset missing media content");
+      pushWorkspaceNotice("error", t("board.import.assetMissingMedia"));
       return;
     }
     try {
       addAssetToBoard(item);
       setIsAssetLibraryOpen(false);
-      pushWorkspaceNotice("success", "Added to current board");
+      pushWorkspaceNotice("success", t("board.import.boardAddedToLibrary"));
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "Add to board failed"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("board.import.boardAddFailed")));
     }
-  }, [addAssetToBoard, pushWorkspaceNotice]);
+  }, [addAssetToBoard, pushWorkspaceNotice, t]);
 
   const handleExportMultiGrid = useCallback(async (nodeId: string): Promise<void> => {
     try {
       const node = boardController.board.nodes.find(item => item.id === nodeId);
       if (node?.kind !== "multi-grid") {
-        throw new Error("Target node is not multi-grid");
+        throw new Error(t("board.workspace.targetNotMultiGrid"));
       }
       const dataUrl = await composeBoardMultiGridImage(node);
       const item = buildStorageItem(
@@ -4011,11 +4011,11 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         x: node.position.x + node.size.width + 40,
         y: node.position.y,
       });
-      pushWorkspaceNotice("success", "Multi-grid exported as image asset");
+      pushWorkspaceNotice("success", t("board.import.multiGridExportSuccess"));
     } catch (error) {
-      pushWorkspaceNotice("error", error instanceof Error ? error.message : "Multi-grid export failed");
+      pushWorkspaceNotice("error", error instanceof Error ? error.message : t("board.import.multiGridExportFailed"));
     }
-  }, [addAssetToBoard, boardController.board, pushWorkspaceNotice]);
+  }, [addAssetToBoard, boardController.board, pushWorkspaceNotice, t]);
 
   const handleCaptureVideoFrame = useCallback(async (
     sourceNodeId: string,
@@ -4023,7 +4023,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     frame: CapturedVideoFrame,
   ): Promise<void> => {
     if (item.type !== "video") {
-      throw new Error("Only video assets can capture frames");
+      throw new Error(t("board.import.onlyVideoCanCapture"));
     }
 
     const frameItem = createVideoFrameStorageItem(item, frame, makeClientId("frame"));
