@@ -1609,3 +1609,69 @@ Restored board media node title double-click editing by keeping hover bridge bel
 ### Next Steps
 
 - None - task complete
+
+
+## Session 167: Automatic multi-grid splitting
+
+**Date**: 2026-06-24
+**Task**: Automatic multi-grid splitting
+**Branch**: `main`
+
+### Summary
+
+Implemented board image grid splitting with auto and preset modes, readable crop placement, optional connection to selected generation nodes, metadata persistence, localization, and tests.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b57a1244` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 168: Fix board prompt reference forwarding
+
+**Date**: 2026-06-26
+**Task**: Fix board prompt reference forwarding
+**Branch**: `main`
+
+### Summary
+
+Forwarded Prompt-node media references into board generation inputs, aligned generate-node input previews, and added a regression test for prompt-linked reference ordering and dedupe.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d044733f` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
