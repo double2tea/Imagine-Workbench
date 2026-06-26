@@ -89,13 +89,24 @@ test("agent image-to-video continuation references result nodes, not result-to-a
 
 test("deleting or detaching result nodes clears source result metadata", () => {
   const source = readWorkspaceFile("hooks/useBoardState.ts");
+  const page = readWorkspaceFile("components/board/BoardPageClient.tsx");
+  const workspace = readWorkspaceFile("components/board/BoardWorkspace.tsx");
   const deletePlan = sourceBetween(source, "function planDeleteBoardNodes", "function createAssetBoardNode");
   const deleteEdge = sourceBetween(source, "const deleteEdge", "const reconnectEdge");
+  const pageDeleteEdge = sourceBetween(page, "const deleteBoardEdge", "const promoteItemToOriginal");
 
   assert.match(source, /function clearSourceResultForDetachedResult/);
   assert.match(deletePlan, /deletedResultNodes/);
   assert.match(deletePlan, /clearSourceResultForDetachedResult/);
   assert.match(deleteEdge, /clearSourceResultForDetachedResult/);
+  assert.match(page, /function detachedSourceResultMetadata/);
+  assert.match(pageDeleteEdge, /await saveToDB\(\{/);
+  assert.match(pageDeleteEdge, /sourceBoardNodeId: undefined/);
+  assert.match(pageDeleteEdge, /sourceBoardResultStackKey: undefined/);
+  assert.match(pageDeleteEdge, /boardController\.deleteEdge\(edgeId\)/);
+  assert.match(workspace, /void onDeleteEdge\(edgeId\)/);
+  assert.match(page, /onDeleteEdge=\{edgeId => void deleteBoardEdge\(edgeId\)\}/);
+  assert.doesNotMatch(page, /onDeleteEdge=\{boardController\.deleteEdge\}/);
 });
 
 test("reconnecting or restoring result edges keeps result ownership metadata consistent", () => {
@@ -126,6 +137,38 @@ test("plain asset compare uses asset derivation edges instead of result provenan
   assert.match(compareReferenceUrl, /asset-out/);
   assert.match(workspaceCompareReference, /BOARD_PORT_IDS\.assetOut/);
   assert.doesNotMatch(page, /selectedAssetCompareReference/);
+});
+
+test("board media/source copy does not expose separate result and asset node categories", () => {
+  const zh = readWorkspaceFile("messages/zh/board.json");
+  const en = readWorkspaceFile("messages/en/board.json");
+  const commonZh = readWorkspaceFile("messages/zh/common.json");
+  const commonEn = readWorkspaceFile("messages/en/common.json");
+  const workspace = readWorkspaceFile("components/board/BoardWorkspace.tsx");
+  const generateNode = readWorkspaceFile("components/board/GenerateBoardNode.tsx");
+  const page = readWorkspaceFile("components/board/BoardPageClient.tsx");
+
+  assert.match(zh, /"asset": "媒体"/);
+  assert.match(zh, /"result": "媒体"/);
+  assert.match(zh, /"resultOut": "来源输出"/);
+  assert.match(zh, /"resultDetachedToMedia": "已解除来源关系，媒体仍保留在画布上"/);
+  assert.doesNotMatch(zh, /图片资产节点|视频资产|音频资产|结果节点|结果输出|生成结果/);
+  assert.match(en, /"asset": "Media"/);
+  assert.match(en, /"result": "Media"/);
+  assert.match(en, /"resultOut": "Source Output"/);
+  assert.match(en, /"resultDetachedToMedia": "Source relationship removed; the media stays on the board"/);
+  assert.doesNotMatch(en, /Generation Result|Image Asset|Video Asset|Audio Asset|asset node|result node|Result Output/);
+  assert.match(commonZh, /"viewResult": "查看媒体"/);
+  assert.match(commonZh, /"focusTaskResultMissingResultNode": "未找到任务对应的媒体节点"/);
+  assert.match(commonEn, /"viewResult": "View media"/);
+  assert.match(commonEn, /"focusTaskResultMissingResultNode": "Task media node was not found"/);
+  assert.match(workspace, /result: "board\.node\.edgeKinds\.result"/);
+  assert.match(page, /board\.workspace\.resultDetachedToMedia/);
+  assert.match(page, /board\.workspace\.resultDetachFailed/);
+  assert.match(generateNode, /node\.generateNode\.connectedMediaCount/);
+  assert.match(generateNode, /node\.generateNode\.mediaCount/);
+  assert.match(page, /board\.agent\.imageToVideoNoConnectedMedia/);
+  assert.doesNotMatch(page, /Source node has no connected result node/);
 });
 
 test("generate node run controls expose accessible labels", () => {

@@ -96,7 +96,14 @@ function contextToneClass(tone: GenerateContextTone): string {
 }
 
 function resultContext(hasResultConnection: boolean, resultCount: number, t: BoardNodeT): { title: string; tone: GenerateContextTone } {
-  if (resultCount > 0) return { title: hasResultConnection ? t("node.types.result") + " " + resultCount : resultCount + " " + t("node.types.result"), tone: hasResultConnection ? "result" : "ok" };
+  if (resultCount > 0) {
+    return {
+      title: hasResultConnection
+        ? t("node.generateNode.connectedMediaCount", { count: resultCount })
+        : t("node.generateNode.mediaCount", { count: resultCount }),
+      tone: hasResultConnection ? "result" : "ok",
+    };
+  }
   return { title: t("node.generateNode.noResult"), tone: "neutral" };
 }
 

@@ -80,6 +80,7 @@ import {
   buildStorageItem,
   clearAllDB,
   deleteFromDB,
+  saveToDB,
   type StorageItem,
 } from "@/lib/db";
 import {
@@ -555,6 +556,36 @@ function activeExecutableResultItem(
     if (resultItem) return resultItem;
   }
   return undefined;
+}
+
+interface DetachedSourceResultMetadata {
+  assetIds: string[];
+  resultStackKey: string;
+  sourceNodeId: string;
+}
+
+function detachedSourceResultMetadata(board: BoardDocument, edgeId: string): DetachedSourceResultMetadata | null {
+  const edge = board.edges.find(item => item.id === edgeId);
+  if (
+    !edge ||
+    edge.from.portId !== BOARD_PORT_IDS.resultOut ||
+    edge.to.portId !== BOARD_PORT_IDS.assetIn
+  ) {
+    return null;
+  }
+  const resultNode = board.nodes.find(node => node.id === edge.to.nodeId);
+  if (resultNode?.kind !== "result") return null;
+  return {
+    assetIds: Array.from(new Set(resultNode.resultAssetIds)),
+    resultStackKey: resultNode.resultStackKey,
+    sourceNodeId: resultNode.sourceNodeId,
+  };
+}
+
+function isDetachedSourceResultItem(item: StorageItem, metadata: DetachedSourceResultMetadata): boolean {
+  return metadata.assetIds.includes(item.id) &&
+    item.sourceBoardNodeId === metadata.sourceNodeId &&
+    (item.sourceBoardResultStackKey ?? "") === metadata.resultStackKey;
 }
 
 function isMediaStorageItem(item: StorageItem): item is StorageItem & { type: MediaReferenceType } {
@@ -1985,6 +2016,36 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     setItems(prev => [savedItem, ...prev.filter(current => current.id !== savedItem.id)]);
     return savedItem;
   }, [pushWorkspaceNotice, setItems]);
+  const deleteBoardEdge = useCallback(async (edgeId: string): Promise<void> => {
+    const detachMetadata = detachedSourceResultMetadata(boardController.board, edgeId);
+    if (detachMetadata) {
+      const itemsToUpdate = items.filter(item => isDetachedSourceResultItem(item, detachMetadata));
+      try {
+        await Promise.all(itemsToUpdate.map(async item => {
+          const originalItem = await resolveOriginalStorageItem(item);
+          await saveToDB({
+            ...originalItem,
+            sourceBoardNodeId: undefined,
+            sourceBoardResultStackKey: undefined,
+          });
+        }));
+      } catch (error) {
+        pushWorkspaceNotice("error", toErrorMessage(error, t("board.workspace.resultDetachFailed")));
+        return;
+      }
+      if (itemsToUpdate.length > 0) {
+        setItems(current => current.map(item =>
+          isDetachedSourceResultItem(item, detachMetadata)
+            ? { ...item, sourceBoardNodeId: undefined, sourceBoardResultStackKey: undefined }
+            : item,
+        ));
+      }
+    }
+    boardController.deleteEdge(edgeId);
+    if (detachMetadata) {
+      pushWorkspaceNotice("info", t("board.workspace.resultDetachedToMedia"));
+    }
+  }, [boardController, items, pushWorkspaceNotice, resolveOriginalStorageItem, setItems, t]);
   const promoteItemToOriginal = useCallback((item: StorageItem): void => {
     if (item.status !== "complete") return;
     if (originalAssetPromoteIdsRef.current.has(item.id)) return;
@@ -2538,7 +2599,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     try {
       compressedMergedImage = await compressReferenceImageDataUrl(output.mergedImageBase64);
     } catch (error) {
-      pushWorkspaceNotice("error", toErrorMessage(error, "Mask reference compression failed"));
+      pushWorkspaceNotice("error", toErrorMessage(error, t("board.quickEdit.maskCompressFailed")));
       return;
     }
 
@@ -2554,12 +2615,12 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         ? boardController.board.nodes.find(node => node.id === maskSourceNodeId)
         : undefined;
       if (sourceNode?.kind !== "asset" || sourceNode.asset.type !== "image") {
-        pushWorkspaceNotice("error", "Image asset node not found for editing");
+        pushWorkspaceNotice("error", t("board.quickEdit.cannotFindEditAssetNode"));
         return;
       }
       const editedTitle = `${sourceNode.title} local edit`;
       const editedPrompt = sourceNode.asset.prompt.trim()
-        ? `${sourceNode.asset.prompt}\n${t("board.localEditPrompt", { title: sourceNode.title })}`
+        ? `${sourceNode.asset.prompt}\n${t("board.quickEdit.localEditPrompt", { title: sourceNode.title })}`
         : editedTitle;
       const editedItem = buildStorageItem(
         {
@@ -2599,10 +2660,10 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     pushWorkspaceNotice(
       "success",
       maskDestination === "agent"
-        ? "Mask applied to Agent reference, continue editing in conversation"
+        ? t("board.quickEdit.maskAppliedToAgent")
         : maskDestination === "board-asset"
-          ? "Local edit asset node created"
-          : "Mask written to reference, continue editing prompt and generate",
+          ? t("board.quickEdit.maskAppliedToBoardAsset")
+          : t("board.quickEdit.maskAppliedToCreative"),
     );
   };
 
@@ -3110,16 +3171,16 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       const promptValue = action.params?.prompt?.trim();
       const model = action.params?.model?.trim();
       if (!targetNodeId) {
-        pushWorkspaceNotice("error", "Select an image node to continue with video");
+        pushWorkspaceNotice("error", t("board.agent.imageToVideoMissingNode"));
         return handledBoardAction(false);
       }
       if (!promptValue || !model) {
-        pushWorkspaceNotice("error", "Image-to-video continuation missing prompt or model");
+        pushWorkspaceNotice("error", t("board.agent.imageToVideoMissingPrompt"));
         return handledBoardAction(false);
       }
       const sourceNode = boardController.board.nodes.find(node => node.id === targetNodeId);
       if (!sourceNode) {
-        pushWorkspaceNotice("error", "Source node for video continuation not found");
+        pushWorkspaceNotice("error", t("board.agent.imageToVideoSourceNotFound"));
         return handledBoardAction(false);
       }
       const sourceResultNode = sourceNode.kind === "image-generate"
@@ -3142,7 +3203,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           })()
           : null;
       if (!sourceReference) {
-        pushWorkspaceNotice("error", "Source node has no completed image assets");
+        pushWorkspaceNotice("error", t("board.agent.imageToVideoNoImageAsset"));
         return handledBoardAction(false);
       }
       const defaults = videoActionDefaults(model, action.params?.aspectRatio);
@@ -3164,7 +3225,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         : sourceResultNode?.id ?? "";
       if (!referenceSourceNodeId) {
         boardController.endUndoGesture();
-        pushWorkspaceNotice("error", "Source node has no connected result node");
+        pushWorkspaceNotice("error", t("board.agent.imageToVideoNoConnectedMedia"));
         return handledBoardAction(false);
       }
       let videoNodeId = "";
@@ -3975,15 +4036,15 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       ? boardNodeAdjacentPosition(boardController.board.nodes, sourceNode)
       : undefined;
     addAssetToBoard(savedFrameItem, position);
-    pushWorkspaceNotice("success", `Saved ${getVideoFrameCaptureLabel(frame.mode)} and inserted to board`);
-  }, [addAssetToBoard, boardController.board.nodes, pushWorkspaceNotice]);
+    pushWorkspaceNotice("success", t("board.import.frameSavedToBoard", { label: getVideoFrameCaptureLabel(frame.mode) }));
+  }, [addAssetToBoard, boardController.board.nodes, pushWorkspaceNotice, t]);
 
   const handleSavePanoramaScreenshots = useCallback(async (
     item: StorageItem,
     screenshots: PanoramaScreenshot[],
   ): Promise<void> => {
     if (item.type !== "image") {
-      throw new Error("Only image assets can enter panorama view");
+      throw new Error(t("board.import.onlyImageCanPanorama"));
     }
 
     const sourceNode = boardController.board.nodes.find(node => (
@@ -4019,13 +4080,13 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           : undefined,
       );
     });
-    pushWorkspaceNotice("success", `Saved ${savedItems.length} panorama screenshots and inserted to board`);
-  }, [addAssetToBoard, boardController.board.nodes, pushWorkspaceNotice, resolvedBoardId]);
+    pushWorkspaceNotice("success", t("board.import.panoramaScreenshotsSaved", { count: savedItems.length }));
+  }, [addAssetToBoard, boardController.board.nodes, pushWorkspaceNotice, resolvedBoardId, t]);
 
   const handleImportBoardFiles = useCallback(async (files: File[], position: BoardPoint): Promise<void> => {
     const boardFiles = files.filter(file => mediaReferenceTypeFromMime(file.type) !== null);
     if (boardFiles.length === 0) {
-      pushWorkspaceNotice("info", "Board only supports importing image, video, or audio files");
+      pushWorkspaceNotice("info", t("board.import.boardUploadNotSupported"));
       return;
     }
 
@@ -4034,7 +4095,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       const file = boardFiles[index];
       try {
         const mediaType = mediaReferenceTypeFromMime(file.type);
-        if (!mediaType) throw new Error("Unsupported media type");
+        if (!mediaType) throw new Error(t("board.workspace.unsupportedMediaType"));
         const item = await createBoardUploadItem(
           file,
           makeClientId(boardUploadIdPrefix(mediaType, index)),
@@ -4065,20 +4126,20 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       ...importedItems.map(imported => imported.item),
       ...prev.filter(item => !importedItems.some(imported => imported.item.id === item.id)),
     ]);
-    pushWorkspaceNotice("success", `Imported ${importedItems.length} files to board`);
-  }, [boardController, pushWorkspaceNotice, resolvedBoardId]);
+    pushWorkspaceNotice("success", t("board.import.filesImported", { count: importedItems.length }));
+  }, [boardController, pushWorkspaceNotice, resolvedBoardId, t]);
 
   const useSelectedBoardAssetAsReference = () => {
     const references = activeBoardReference(boardController.board.nodes, boardController.board.edges, boardController.selectedNodeId, items, resolveBoardReferenceUrl);
     if (references.length === 0) {
-      pushWorkspaceNotice("info", "Please select an image asset node");
+      pushWorkspaceNotice("info", t("board.import.selectImageNode"));
       return;
     }
     void resolveOriginalReferences(references).then(
       originalReferences => {
         setReferenceImage(originalReferences[0].url);
         setReferenceImages(originalReferences);
-        pushWorkspaceNotice("success", "Selected node set as generation reference");
+        pushWorkspaceNotice("success", t("board.import.useAsGenerationReference"));
       },
       error => pushWorkspaceNotice("error", toErrorMessage(error, t("board.agent.referenceMediaReadFailed"))),
     );
@@ -4087,7 +4148,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const useSelectedBoardAssetForAgent = () => {
     const references = activeBoardReference(boardController.board.nodes, boardController.board.edges, boardController.selectedNodeId, items, resolveBoardReferenceUrl);
     if (references.length === 0) {
-      pushWorkspaceNotice("info", "Please select an image asset node");
+      pushWorkspaceNotice("info", t("board.import.selectImageNode"));
       return;
     }
     void resolveOriginalReferences(references).then(
@@ -4104,7 +4165,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const useBoardAssetForAgent = useCallback((nodeId: string) => {
     const references = activeBoardReference(boardController.board.nodes, boardController.board.edges, nodeId, items, resolveBoardReferenceUrl);
     if (references.length === 0) {
-      pushWorkspaceNotice("info", "Please select an image asset node");
+      pushWorkspaceNotice("info", t("board.import.selectImageNode"));
       return;
     }
     void resolveOriginalReferences(references).then(
@@ -4132,7 +4193,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const editBoardAssetImage = useCallback((nodeId: string) => {
     const node = boardController.board.nodes.find(item => item.id === nodeId);
     if (node?.kind !== "asset" || node.asset.type !== "image") {
-      pushWorkspaceNotice("info", "Please select an image asset node");
+      pushWorkspaceNotice("info", t("board.import.selectImageNode"));
       return;
     }
     const item = items.find(entry => entry.id === node.asset.assetId) ?? buildStorageItem(
@@ -5242,6 +5303,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onConnectionError={handleBoardConnectionError}
         onWorkspaceNotice={pushWorkspaceNotice}
         onAnalyzeBoardMedia={handleAnalyzeBoardMedia}
+        onDeleteEdge={deleteBoardEdge}
         onCreateBoard={handleCreateBoard}
         onDeleteBoard={handleDeleteBoard}
         onDownloadAsset={handleDownloadAsset}
@@ -5285,7 +5347,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
               outgoingCount={selectedOutgoingEdges.length}
               selectedNodeCount={selectedNodeIds.length}
               videoModelGroups={videoModelGroups}
-              onDeleteEdge={boardController.deleteEdge}
+              onDeleteEdge={edgeId => void deleteBoardEdge(edgeId)}
               onEditAssetImage={selectedBoardNode?.kind === "asset"
                 ? () => editBoardAssetImage(selectedBoardNode.id)
                 : undefined}

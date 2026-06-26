@@ -130,6 +130,7 @@ interface BoardWorkspaceProps {
   onAnalyzeBoardMedia: (nodeId: string) => void | Promise<void>;
   onCancelAssetTask: (nodeId: string) => void;
   onCancelGenerateNode: (nodeId: string) => void;
+  onDeleteEdge: (edgeId: string) => void | Promise<void>;
   onEditAssetImage: (nodeId: string) => void;
   onImageQuickEdit: (nodeId: string, operation: ImageEditFeature) => void;
   onExecuteGenerateNode: (nodeId: string) => void;
@@ -561,11 +562,11 @@ function boardIntendedSelectionSnapshot(
   return { edgeId: null, nodeId: nodeIds[0] ?? null, nodeIds };
 }
 
-const boardEdgeKindLabels: Record<BoardEdgeKind, string> = {
-  "agent-context": "Agent",
-  prompt: "Prompt",
-  reference: "Reference",
-  result: "Result",
+const boardEdgeKindLabelKeys: Record<BoardEdgeKind, string> = {
+  "agent-context": "board.node.edgeKinds.agentContext",
+  prompt: "board.node.edgeKinds.prompt",
+  reference: "board.node.edgeKinds.reference",
+  result: "board.node.edgeKinds.result",
 };
 
 const BoardEdgeComponent = memo(function BoardEdgeComponent({
@@ -636,7 +637,7 @@ const BoardEdgeComponent = memo(function BoardEdgeComponent({
         >
           {visuallySelected ? (
             <span className="board-edge-kind-pill rounded-full border px-2 py-0.5 text-[9px] font-semibold">
-              {boardEdgeKindLabels[kind]}
+              {t(boardEdgeKindLabelKeys[kind])}
             </span>
           ) : null}
           {processing ? (
@@ -1310,6 +1311,7 @@ export default function BoardWorkspace({
   onConnectionError,
   onWorkspaceNotice,
   onAnalyzeBoardMedia,
+  onDeleteEdge,
   onEditAssetImage,
   onImageQuickEdit,
   onExecuteGenerateNode,
@@ -2659,8 +2661,8 @@ export default function BoardWorkspace({
 
   const deleteBoardEdge = useCallback((edgeId: string): void => {
     beginStructureMutation();
-    deleteEdge(edgeId);
-  }, [beginStructureMutation, deleteEdge]);
+    void onDeleteEdge(edgeId);
+  }, [beginStructureMutation, onDeleteEdge]);
 
   const handleEdgesDelete = useCallback<OnEdgesDelete<BoardFlowEdge>>(edges => {
     for (const edge of edges) deleteBoardEdge(edge.id);
