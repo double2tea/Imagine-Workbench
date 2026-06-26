@@ -20,8 +20,13 @@ import {
 } from "@/lib/data-management";
 import {
   fetchTeamStorageHealth,
+  fetchTeamSession,
+  loginTeamSession,
+  logoutTeamSession,
+  readTeamCsrfToken,
   fetchWorkspaceStorageRuntimeStatus,
   runTeamStorageMigrations,
+  type TeamSessionContext,
   type TeamStorageHealth,
 } from "@/lib/storage/team-client";
 import type { PublicLocalStorageRuntimeStatus } from "@/lib/storage/local-public-runtime";
@@ -159,6 +164,11 @@ export default function SettingsModal({
   const [teamHealthError, setTeamHealthError] = useState<string | null>(null);
   const [teamMigrationBusy, setTeamMigrationBusy] = useState(false);
   const [teamSetupToken, setTeamSetupToken] = useState("");
+  const [teamSession, setTeamSession] = useState<TeamSessionContext | null>(null);
+  const [teamSessionError, setTeamSessionError] = useState<string | null>(null);
+  const [teamSessionBusy, setTeamSessionBusy] = useState(false);
+  const [teamLoginEmail, setTeamLoginEmail] = useState("");
+  const [teamLoginPassword, setTeamLoginPassword] = useState("");
   const tabs: Array<{ key: SettingsTab; label: string }> = [
     { key: "connections", label: t("tabs.connections") },
     { key: "feature-models", label: t("tabs.featureModels") },
@@ -190,13 +200,65 @@ export default function SettingsModal({
       setStorageStatus(status);
       if (status.mode === "postgres") {
         setTeamHealth(await fetchTeamStorageHealth());
+        try {
+          setTeamSessionError(null);
+          setTeamSession(await fetchTeamSession());
+        } catch (error) {
+          setTeamSession(null);
+          setTeamSessionError(formatSettingsError(error, t));
+        }
       } else {
         setTeamHealth(null);
+        setTeamSession(null);
+        setTeamSessionError(null);
       }
     } catch (error) {
       setStorageStatus(null);
       setTeamHealth(null);
+      setTeamSession(null);
       setStorageStatusError(formatSettingsError(error, t));
+    }
+  }, [t]);
+
+  const refreshTeamSession = useCallback(async () => {
+    setTeamSessionBusy(true);
+    try {
+      setTeamSessionError(null);
+      setTeamSession(await fetchTeamSession());
+    } catch (error) {
+      setTeamSession(null);
+      setTeamSessionError(formatSettingsError(error, t));
+    } finally {
+      setTeamSessionBusy(false);
+    }
+  }, [t]);
+
+  const runTeamLogin = useCallback(async () => {
+    setTeamSessionBusy(true);
+    try {
+      setTeamSessionError(null);
+      setTeamSession(await loginTeamSession({ email: teamLoginEmail, password: teamLoginPassword }));
+      setTeamLoginPassword("");
+    } catch (error) {
+      setTeamSession(null);
+      setTeamSessionError(formatSettingsError(error, t));
+    } finally {
+      setTeamSessionBusy(false);
+    }
+  }, [t, teamLoginEmail, teamLoginPassword]);
+
+  const runTeamLogout = useCallback(async () => {
+    setTeamSessionBusy(true);
+    try {
+      setTeamSessionError(null);
+      const csrfToken = readTeamCsrfToken();
+      if (!csrfToken) throw new Error(t("dataManagement.teamSessionCsrfMissing"));
+      await logoutTeamSession(csrfToken);
+      setTeamSession(null);
+    } catch (error) {
+      setTeamSessionError(formatSettingsError(error, t));
+    } finally {
+      setTeamSessionBusy(false);
     }
   }, [t]);
 
@@ -387,6 +449,11 @@ export default function SettingsModal({
                   teamHealthError={teamHealthError}
                   teamMigrationBusy={teamMigrationBusy}
                   teamSetupToken={teamSetupToken}
+                  teamSession={teamSession}
+                  teamSessionBusy={teamSessionBusy}
+                  teamSessionError={teamSessionError}
+                  teamLoginEmail={teamLoginEmail}
+                  teamLoginPassword={teamLoginPassword}
                   onCleanupAssets={onCleanupAssets}
                   onClearAssets={onClearAssets}
                   onClearLocalStorage={onClearLocalStorage}
@@ -402,6 +469,11 @@ export default function SettingsModal({
                   onResetBoards={onResetBoards}
                   onRunTeamMigrations={runTeamMigrations}
                   onTeamSetupTokenChange={setTeamSetupToken}
+                  onRefreshTeamSession={refreshTeamSession}
+                  onTeamLogin={runTeamLogin}
+                  onTeamLoginEmailChange={setTeamLoginEmail}
+                  onTeamLoginPasswordChange={setTeamLoginPassword}
+                  onTeamLogout={runTeamLogout}
                 />
               )}
             </div>

@@ -46,6 +46,17 @@ export function teamAssetMediaUrl(assetId: string, options: { download?: boolean
   return API_ROUTES.storage.teamAssetMedia(assetId, options);
 }
 
+export function readTeamCsrfToken(cookieHeader = typeof document === "undefined" ? "" : document.cookie): string | null {
+  for (const part of cookieHeader.split(";")) {
+    const [rawKey, ...rawValue] = part.split("=");
+    if (rawKey?.trim() === "imagine_team_csrf") {
+      const value = decodeURIComponent(rawValue.join("=").trim());
+      return value || null;
+    }
+  }
+  return null;
+}
+
 export async function fetchWorkspaceStorageRuntimeStatus(fetcher: Fetcher = fetch): Promise<PublicLocalStorageRuntimeStatus> {
   const response = await fetcher(API_ROUTES.storage.localStatus, { cache: "no-store" });
   if (!response.ok) throw new Error(await readFetchError(response, "Storage status failed"));

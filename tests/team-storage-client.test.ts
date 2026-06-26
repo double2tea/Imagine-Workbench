@@ -6,6 +6,7 @@ import {
   fetchTeamSession,
   loginTeamSession,
   logoutTeamSession,
+  readTeamCsrfToken,
   teamAssetMediaUrl,
   fetchWorkspaceStorageRuntimeStatus,
   runTeamStorageMigrations,
@@ -95,6 +96,9 @@ test("team session client parses session context and login requests", async () =
 });
 
 test("team session client requires CSRF token for logout and forwards it as a header", async () => {
+  assert.equal(readTeamCsrfToken("other=1; imagine_team_csrf=csrf%20token"), "csrf token");
+  assert.equal(readTeamCsrfToken("other=1"), null);
+
   await assert.rejects(
     logoutTeamSession(" "),
     /CSRF token is required/,

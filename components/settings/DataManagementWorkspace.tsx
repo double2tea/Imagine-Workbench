@@ -27,7 +27,7 @@ import {
   type WorkspaceDataSummary,
 } from "@/lib/data-management";
 import type { PublicLocalStorageRuntimeStatus } from "@/lib/storage/local-public-runtime";
-import type { TeamStorageHealth } from "@/lib/storage/team-client";
+import type { TeamSessionContext, TeamStorageHealth } from "@/lib/storage/team-client";
 import { getClearWorkspaceAssetsMessage } from "@/lib/workspace-messages";
 
 interface DataManagementWorkspaceProps {
@@ -40,6 +40,11 @@ interface DataManagementWorkspaceProps {
   teamHealthError: string | null;
   teamMigrationBusy: boolean;
   teamSetupToken: string;
+  teamSession: TeamSessionContext | null;
+  teamSessionBusy: boolean;
+  teamSessionError: string | null;
+  teamLoginEmail: string;
+  teamLoginPassword: string;
   onCleanupAssets: (kind: WorkspaceCleanupKind) => Promise<void>;
   onClearAssets: () => Promise<void>;
   onClearLocalStorage: (kind: LocalStorageCleanupKind) => Promise<void>;
@@ -54,6 +59,11 @@ interface DataManagementWorkspaceProps {
   onRepairAssetSources: () => Promise<void>;
   onResetBoards: () => Promise<void>;
   onRunTeamMigrations: () => Promise<void>;
+  onRefreshTeamSession: () => Promise<void>;
+  onTeamLogin: () => Promise<void>;
+  onTeamLoginEmailChange: (value: string) => void;
+  onTeamLoginPasswordChange: (value: string) => void;
+  onTeamLogout: () => Promise<void>;
   onTeamSetupTokenChange: (value: string) => void;
 }
 
@@ -232,6 +242,11 @@ export default function DataManagementWorkspace({
   teamHealthError,
   teamMigrationBusy,
   teamSetupToken,
+  teamSession,
+  teamSessionBusy,
+  teamSessionError,
+  teamLoginEmail,
+  teamLoginPassword,
   onCleanupAssets,
   onClearAssets,
   onClearLocalStorage,
@@ -246,6 +261,11 @@ export default function DataManagementWorkspace({
   onRepairAssetSources,
   onResetBoards,
   onRunTeamMigrations,
+  onRefreshTeamSession,
+  onTeamLogin,
+  onTeamLoginEmailChange,
+  onTeamLoginPasswordChange,
+  onTeamLogout,
   onTeamSetupTokenChange,
 }: DataManagementWorkspaceProps) {
   const backupInputRef = useRef<HTMLInputElement | null>(null);
@@ -300,7 +320,7 @@ export default function DataManagementWorkspace({
   const assetStores = assetSummary?.stores;
   const latestSafetySnapshot = summary?.safety.latestSnapshot ?? null;
   const health = healthCopy(integrity?.status, t);
-  const actionDisabled = busyLabel !== null || teamMigrationBusy;
+  const actionDisabled = busyLabel !== null || teamMigrationBusy || teamSessionBusy;
   const isTeamStorageMode = storageStatus?.mode === "postgres";
   const hasPendingTeamMigrations = (teamHealth?.migrationStatus?.pendingMigrationIds.length ?? 0) > 0;
 
@@ -523,6 +543,78 @@ export default function DataManagementWorkspace({
                   {teamMigrationBusy ? t("dataManagement.teamMigrationBusy") : t("dataManagement.teamRunMigrations")}
                 </button>
               </div>
+            </div>
+
+            <div className="rounded-md border border-[var(--iw-border)] p-2 lg:col-span-2">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="flex items-center gap-2 text-[10px] font-semibold uppercase text-[var(--iw-faint)]">
+                    <Shield className="imagine-tone-icon h-3.5 w-3.5" data-tone={teamSession ? "success" : "warning"} />
+                    {t("dataManagement.teamSession")}
+                  </p>
+                  <p className="mt-2 text-[11px] leading-5 text-[var(--iw-muted)]">
+                    {teamSessionError
+                      ? t("dataManagement.teamSessionError", { error: teamSessionError })
+                      : teamSession
+                        ? t("dataManagement.teamSessionSignedIn", { email: teamSession.email, role: teamSession.role })
+                        : t("dataManagement.teamSessionSignedOut")}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={actionDisabled}
+                  onClick={() => void runAction(t("dataManagement.teamSessionRefreshing"), onRefreshTeamSession)}
+                  className="imagine-secondary-action h-8 rounded-md border border-[var(--iw-border)] px-2 text-[10px] font-semibold text-[var(--iw-text)] disabled:opacity-50"
+                >
+                  {t("dataManagement.teamSessionRefresh")}
+                </button>
+              </div>
+              {teamSession ? (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <div className="rounded-md border border-[var(--iw-border)] px-2 py-1">
+                    <p className="text-[10px] text-[var(--iw-faint)]">{t("dataManagement.teamSessionWorkspace")}</p>
+                    <p className="font-mono text-[11px] text-[var(--iw-text)]">{teamSession.workspaceId}</p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={actionDisabled}
+                    onClick={() => void runAction(t("dataManagement.teamLogoutBusy"), onTeamLogout)}
+                    className="imagine-secondary-action h-8 rounded-md border border-[var(--iw-border)] px-2 text-[10px] font-semibold text-[var(--iw-text)] disabled:opacity-50"
+                  >
+                    {t("dataManagement.teamLogout")}
+                  </button>
+                </div>
+              ) : (
+                <form
+                  className="mt-3 flex flex-wrap items-center gap-2"
+                  onSubmit={event => {
+                    event.preventDefault();
+                    void runAction(t("dataManagement.teamLoginBusy"), onTeamLogin);
+                  }}
+                >
+                  <input
+                    type="email"
+                    value={teamLoginEmail}
+                    onChange={event => onTeamLoginEmailChange(event.target.value)}
+                    placeholder={t("dataManagement.teamLoginEmailPlaceholder")}
+                    className="h-9 min-w-56 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)] px-3 text-[11px] text-[var(--iw-text)] outline-none focus:border-[var(--iw-accent)]"
+                  />
+                  <input
+                    type="password"
+                    value={teamLoginPassword}
+                    onChange={event => onTeamLoginPasswordChange(event.target.value)}
+                    placeholder={t("dataManagement.teamLoginPasswordPlaceholder")}
+                    className="h-9 min-w-56 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)] px-3 text-[11px] text-[var(--iw-text)] outline-none focus:border-[var(--iw-accent)]"
+                  />
+                  <button
+                    type="submit"
+                    disabled={actionDisabled || !teamLoginEmail.trim() || !teamLoginPassword}
+                    className="imagine-secondary-action h-9 rounded-lg border border-[var(--iw-border)] px-3 text-[11px] font-semibold text-[var(--iw-text)] disabled:opacity-50"
+                  >
+                    {t("dataManagement.teamLogin")}
+                  </button>
+                </form>
+              )}
             </div>
           </div>
         ) : (
