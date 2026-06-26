@@ -54,7 +54,11 @@ Implemented typed model parameter descriptors, shared capability controls, and R
 
 ### Main Changes
 
-(Add details)
+- Enforced a single board result rule: generated media is represented by connected media nodes with source lines.
+- Cleared persisted source metadata before detaching source-to-media edges so reload/sync cannot recreate detached lines.
+- Routed canvas and Inspector edge deletion through the same detach handler and notice.
+- Polished board UI copy, accessibility labels, task actions, and side-panel wording around Media/Source.
+- Added regression coverage for detach persistence and user-facing Media/Source copy.
 
 ### Git Commits
 
@@ -64,7 +68,10 @@ Implemented typed model parameter descriptors, shared capability controls, and R
 
 ### Testing
 
-- [OK] (Add test results)
+- [OK] Focused board regression and port tests passed.
+- [OK] `tsc --noEmit` passed.
+- [OK] `oxlint .` passed.
+- [OK] Full compiled Node test suite passed during implementation.
 
 ### Status
 
@@ -1663,6 +1670,40 @@ Forwarded Prompt-node media references into board generation inputs, aligned gen
 | Hash | Message |
 |------|---------|
 | `d044733f` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 169: Unify board media source rules
+
+**Date**: 2026-06-26
+**Task**: Unify board media source rules
+**Branch**: `main`
+
+### Summary
+
+Unified board generated media around source-connected media nodes, fixed source detach persistence, and polished board Media/Source wording.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `900a2ad0` | (see git log) |
+| `63f54d82` | (see git log) |
 
 ### Testing
 
