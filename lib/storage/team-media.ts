@@ -1,8 +1,7 @@
 import { ApiError, requireApiText } from "@/lib/api/errors";
 import type { PostgresStorageConfig } from "@/lib/storage/postgres/config";
 import type { PostgresQueryable } from "@/lib/storage/postgres/connection";
-import { createPostgresWorkspaceStorageRepository } from "@/lib/storage/postgres/repository";
-import { assertTeamRole, requireTeamSession } from "@/lib/storage/team-auth";
+import { createTeamWorkspaceStorageContext } from "@/lib/storage/team-context";
 
 export interface TeamAssetMediaResult {
   body: Blob;
@@ -21,10 +20,7 @@ export async function readTeamAssetMedia(
   options: TeamAssetMediaOptions = { download: false },
 ): Promise<TeamAssetMediaResult> {
   const assetId = requireApiText(assetIdInput, "assetId");
-  const session = await requireTeamSession(queryable, request);
-  assertTeamRole(session, "viewer");
-
-  const repository = createPostgresWorkspaceStorageRepository(queryable, config, session.workspaceId);
+  const { repository } = await createTeamWorkspaceStorageContext(queryable, config, request, { minimumRole: "viewer" });
   const asset = await repository.assets.get(assetId);
   if (!asset) throw new ApiError(404, "asset_not_found", "Asset was not found");
   if (!asset.payload) throw new ApiError(404, "asset_payload_not_found", "Asset payload was not found");
