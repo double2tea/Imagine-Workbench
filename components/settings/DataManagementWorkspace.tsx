@@ -45,6 +45,8 @@ interface DataManagementWorkspaceProps {
   teamSessionError: string | null;
   teamLoginEmail: string;
   teamLoginPassword: string;
+  teamBootstrapEmail: string;
+  teamBootstrapPassword: string;
   onCleanupAssets: (kind: WorkspaceCleanupKind) => Promise<void>;
   onClearAssets: () => Promise<void>;
   onClearLocalStorage: (kind: LocalStorageCleanupKind) => Promise<void>;
@@ -60,6 +62,9 @@ interface DataManagementWorkspaceProps {
   onResetBoards: () => Promise<void>;
   onRunTeamMigrations: () => Promise<void>;
   onRefreshTeamSession: () => Promise<void>;
+  onTeamBootstrap: () => Promise<void>;
+  onTeamBootstrapEmailChange: (value: string) => void;
+  onTeamBootstrapPasswordChange: (value: string) => void;
   onTeamLogin: () => Promise<void>;
   onTeamLoginEmailChange: (value: string) => void;
   onTeamLoginPasswordChange: (value: string) => void;
@@ -247,6 +252,8 @@ export default function DataManagementWorkspace({
   teamSessionError,
   teamLoginEmail,
   teamLoginPassword,
+  teamBootstrapEmail,
+  teamBootstrapPassword,
   onCleanupAssets,
   onClearAssets,
   onClearLocalStorage,
@@ -262,6 +269,9 @@ export default function DataManagementWorkspace({
   onResetBoards,
   onRunTeamMigrations,
   onRefreshTeamSession,
+  onTeamBootstrap,
+  onTeamBootstrapEmailChange,
+  onTeamBootstrapPasswordChange,
   onTeamLogin,
   onTeamLoginEmailChange,
   onTeamLoginPasswordChange,
@@ -585,35 +595,79 @@ export default function DataManagementWorkspace({
                   </button>
                 </div>
               ) : (
-                <form
-                  className="mt-3 flex flex-wrap items-center gap-2"
-                  onSubmit={event => {
-                    event.preventDefault();
-                    void runAction(t("dataManagement.teamLoginBusy"), onTeamLogin);
-                  }}
-                >
-                  <input
-                    type="email"
-                    value={teamLoginEmail}
-                    onChange={event => onTeamLoginEmailChange(event.target.value)}
-                    placeholder={t("dataManagement.teamLoginEmailPlaceholder")}
-                    className="h-9 min-w-56 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)] px-3 text-[11px] text-[var(--iw-text)] outline-none focus:border-[var(--iw-accent)]"
-                  />
-                  <input
-                    type="password"
-                    value={teamLoginPassword}
-                    onChange={event => onTeamLoginPasswordChange(event.target.value)}
-                    placeholder={t("dataManagement.teamLoginPasswordPlaceholder")}
-                    className="h-9 min-w-56 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)] px-3 text-[11px] text-[var(--iw-text)] outline-none focus:border-[var(--iw-accent)]"
-                  />
-                  <button
-                    type="submit"
-                    disabled={actionDisabled || !teamLoginEmail.trim() || !teamLoginPassword}
-                    className="imagine-secondary-action h-9 rounded-lg border border-[var(--iw-border)] px-3 text-[11px] font-semibold text-[var(--iw-text)] disabled:opacity-50"
+                <div className="mt-3 space-y-3">
+                  <form
+                    className="flex flex-wrap items-center gap-2"
+                    onSubmit={event => {
+                      event.preventDefault();
+                      void runAction(t("dataManagement.teamLoginBusy"), onTeamLogin);
+                    }}
                   >
-                    {t("dataManagement.teamLogin")}
-                  </button>
-                </form>
+                    <input
+                      type="email"
+                      value={teamLoginEmail}
+                      onChange={event => onTeamLoginEmailChange(event.target.value)}
+                      placeholder={t("dataManagement.teamLoginEmailPlaceholder")}
+                      className="h-9 min-w-56 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)] px-3 text-[11px] text-[var(--iw-text)] outline-none focus:border-[var(--iw-accent)]"
+                    />
+                    <input
+                      type="password"
+                      value={teamLoginPassword}
+                      onChange={event => onTeamLoginPasswordChange(event.target.value)}
+                      placeholder={t("dataManagement.teamLoginPasswordPlaceholder")}
+                      className="h-9 min-w-56 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)] px-3 text-[11px] text-[var(--iw-text)] outline-none focus:border-[var(--iw-accent)]"
+                    />
+                    <button
+                      type="submit"
+                      disabled={actionDisabled || !teamLoginEmail.trim() || !teamLoginPassword}
+                      className="imagine-secondary-action h-9 rounded-lg border border-[var(--iw-border)] px-3 text-[11px] font-semibold text-[var(--iw-text)] disabled:opacity-50"
+                    >
+                      {t("dataManagement.teamLogin")}
+                    </button>
+                  </form>
+                  <form
+                    className="border-t border-[var(--iw-border)] pt-3"
+                    onSubmit={event => {
+                      event.preventDefault();
+                      void runAction(t("dataManagement.teamBootstrapBusy"), onTeamBootstrap);
+                    }}
+                  >
+                    <p className="text-[10px] font-semibold uppercase text-[var(--iw-faint)]">
+                      {t("dataManagement.teamBootstrapOwner")}
+                    </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <input
+                        type="email"
+                        value={teamBootstrapEmail}
+                        onChange={event => onTeamBootstrapEmailChange(event.target.value)}
+                        placeholder={t("dataManagement.teamBootstrapEmailPlaceholder")}
+                        className="h-9 min-w-56 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)] px-3 text-[11px] text-[var(--iw-text)] outline-none focus:border-[var(--iw-accent)]"
+                      />
+                      <input
+                        type="password"
+                        value={teamBootstrapPassword}
+                        onChange={event => onTeamBootstrapPasswordChange(event.target.value)}
+                        placeholder={t("dataManagement.teamBootstrapPasswordPlaceholder")}
+                        className="h-9 min-w-56 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)] px-3 text-[11px] text-[var(--iw-text)] outline-none focus:border-[var(--iw-accent)]"
+                      />
+                      <button
+                        type="submit"
+                        disabled={
+                          actionDisabled ||
+                          !teamSetupToken.trim() ||
+                          !teamBootstrapEmail.trim() ||
+                          teamBootstrapPassword.length < 12
+                        }
+                        className="imagine-secondary-action h-9 rounded-lg border border-[var(--iw-border)] px-3 text-[11px] font-semibold text-[var(--iw-text)] disabled:opacity-50"
+                      >
+                        {t("dataManagement.teamBootstrap")}
+                      </button>
+                    </div>
+                    <p className="mt-2 text-[10px] leading-5 text-[var(--iw-faint)]">
+                      {t("dataManagement.teamBootstrapSetupTokenHint")}
+                    </p>
+                  </form>
+                </div>
               )}
             </div>
           </div>

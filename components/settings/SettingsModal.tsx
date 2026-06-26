@@ -19,6 +19,7 @@ import {
   type WorkspaceDataSummary,
 } from "@/lib/data-management";
 import {
+  bootstrapTeamOwner,
   fetchTeamStorageHealth,
   fetchTeamSession,
   loginTeamSession,
@@ -169,6 +170,8 @@ export default function SettingsModal({
   const [teamSessionBusy, setTeamSessionBusy] = useState(false);
   const [teamLoginEmail, setTeamLoginEmail] = useState("");
   const [teamLoginPassword, setTeamLoginPassword] = useState("");
+  const [teamBootstrapEmail, setTeamBootstrapEmail] = useState("");
+  const [teamBootstrapPassword, setTeamBootstrapPassword] = useState("");
   const tabs: Array<{ key: SettingsTab; label: string }> = [
     { key: "connections", label: t("tabs.connections") },
     { key: "feature-models", label: t("tabs.featureModels") },
@@ -246,6 +249,24 @@ export default function SettingsModal({
       setTeamSessionBusy(false);
     }
   }, [t, teamLoginEmail, teamLoginPassword]);
+
+  const runTeamBootstrap = useCallback(async () => {
+    setTeamSessionBusy(true);
+    try {
+      setTeamSessionError(null);
+      setTeamSession(await bootstrapTeamOwner({
+        email: teamBootstrapEmail,
+        password: teamBootstrapPassword,
+        setupToken: teamSetupToken,
+      }));
+      setTeamBootstrapPassword("");
+    } catch (error) {
+      setTeamSession(null);
+      setTeamSessionError(formatSettingsError(error, t));
+    } finally {
+      setTeamSessionBusy(false);
+    }
+  }, [t, teamBootstrapEmail, teamBootstrapPassword, teamSetupToken]);
 
   const runTeamLogout = useCallback(async () => {
     setTeamSessionBusy(true);
@@ -454,6 +475,8 @@ export default function SettingsModal({
                   teamSessionError={teamSessionError}
                   teamLoginEmail={teamLoginEmail}
                   teamLoginPassword={teamLoginPassword}
+                  teamBootstrapEmail={teamBootstrapEmail}
+                  teamBootstrapPassword={teamBootstrapPassword}
                   onCleanupAssets={onCleanupAssets}
                   onClearAssets={onClearAssets}
                   onClearLocalStorage={onClearLocalStorage}
@@ -470,6 +493,9 @@ export default function SettingsModal({
                   onRunTeamMigrations={runTeamMigrations}
                   onTeamSetupTokenChange={setTeamSetupToken}
                   onRefreshTeamSession={refreshTeamSession}
+                  onTeamBootstrap={runTeamBootstrap}
+                  onTeamBootstrapEmailChange={setTeamBootstrapEmail}
+                  onTeamBootstrapPasswordChange={setTeamBootstrapPassword}
                   onTeamLogin={runTeamLogin}
                   onTeamLoginEmailChange={setTeamLoginEmail}
                   onTeamLoginPasswordChange={setTeamLoginPassword}

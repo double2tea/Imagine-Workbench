@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  bootstrapTeamOwner,
   fetchTeamStorageHealth,
   fetchTeamSession,
   loginTeamSession,
@@ -93,6 +94,38 @@ test("team session client parses session context and login requests", async () =
 
   assert.equal(login.workspaceId, "workspace_1");
   assert.deepEqual(JSON.parse(requestBody), { email: "owner@example.com", password: "password" });
+});
+
+test("team bootstrap client requires setup token and creates an owner session", async () => {
+  await assert.rejects(
+    bootstrapTeamOwner({ email: "owner@example.com", password: "long password", setupToken: " " }),
+    /Setup token is required/,
+  );
+
+  let setupTokenHeader: string | null = null;
+  let requestBody = "";
+  const session = await bootstrapTeamOwner({
+    email: "owner@example.com",
+    password: "a long bootstrap password",
+    setupToken: "setup-token",
+  }, async (_input, init) => {
+    setupTokenHeader = new Headers(init?.headers).get("x-imagine-setup-token");
+    requestBody = String(init?.body ?? "");
+    return jsonResponse({
+      email: "owner@example.com",
+      role: "owner",
+      teamId: "team_1",
+      userId: "user_1",
+      workspaceId: "workspace_1",
+    });
+  });
+
+  assert.equal(setupTokenHeader, "setup-token");
+  assert.deepEqual(JSON.parse(requestBody), {
+    email: "owner@example.com",
+    password: "a long bootstrap password",
+  });
+  assert.equal(session.role, "owner");
 });
 
 test("team session client requires CSRF token for logout and forwards it as a header", async () => {

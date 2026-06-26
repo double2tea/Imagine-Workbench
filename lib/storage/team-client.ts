@@ -40,6 +40,12 @@ export interface TeamSessionContext {
   workspaceId: string;
 }
 
+export interface TeamBootstrapOwnerInput {
+  email: string;
+  password: string;
+  setupToken: string;
+}
+
 type Fetcher = typeof fetch;
 
 export function teamAssetMediaUrl(assetId: string, options: { download?: boolean } = {}): string {
@@ -96,6 +102,29 @@ export async function loginTeamSession(
   const body: unknown = await response.json();
   if (!response.ok) {
     const error = readStringField(body, "error") ?? "Team session login failed";
+    throw new Error(error);
+  }
+  return parseTeamSessionContext(body);
+}
+
+export async function bootstrapTeamOwner(
+  input: TeamBootstrapOwnerInput,
+  fetcher: Fetcher = fetch,
+): Promise<TeamSessionContext> {
+  const setupToken = input.setupToken.trim();
+  if (!setupToken) throw new Error("Setup token is required");
+  const response = await fetcher(API_ROUTES.storage.teamBootstrap, {
+    cache: "no-store",
+    body: JSON.stringify({ email: input.email, password: input.password }),
+    headers: {
+      "content-type": "application/json",
+      "x-imagine-setup-token": setupToken,
+    },
+    method: "POST",
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team bootstrap failed";
     throw new Error(error);
   }
   return parseTeamSessionContext(body);

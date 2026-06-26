@@ -35,7 +35,9 @@ Run pending migrations from the same panel using the setup token from `.env.team
 
 ## Bootstrap First Owner
 
-After migrations are applied, create the first owner account through the setup-token-protected bootstrap API:
+After migrations are applied, create the first owner account from Settings -> Data. Enter the same setup token used for migrations, then use the team session card's Create First Owner form.
+
+For scripted setup, call the setup-token-protected bootstrap API directly:
 
 ```bash
 curl -i "$APP_URL/api/storage/team/bootstrap" \
@@ -45,7 +47,7 @@ curl -i "$APP_URL/api/storage/team/bootstrap" \
   --data '{"email":"owner@example.com","password":"replace-with-a-long-password"}'
 ```
 
-The route creates the first workspace, team, owner user, server session, and CSRF token only when no owner exists yet. It returns non-secret ids and sets the session/CSRF cookies. Full bootstrap UI and member-management screens are still later implementation slices.
+The route creates the first workspace, team, owner user, server session, and CSRF token only when no owner exists yet. It returns non-secret ids and sets the session/CSRF cookies. Member-management screens are still a later implementation slice.
 
 ## Backup
 
