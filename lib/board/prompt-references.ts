@@ -187,7 +187,14 @@ function generateReferenceCandidatesFromIndex(
   index: BoardPromptReferenceGraphIndex,
   generateNodeId: string,
 ): ReferenceImageRef[] {
-  return uniqueReferences(index.referenceCandidatesByGenerateNode.get(generateNodeId) ?? []);
+  const promptEdge = (index.incomingEdgesByTargetNode.get(generateNodeId) ?? [])
+    .find(edge => edge.to.portId === "prompt-in");
+  const promptNode = promptEdge ? index.nodeById.get(promptEdge.from.nodeId) : undefined;
+  const promptReferences = promptNode?.kind === "prompt"
+    ? index.referenceCandidatesByPromptNode.get(promptNode.id) ?? []
+    : [];
+  const directReferences = index.referenceCandidatesByGenerateNode.get(generateNodeId) ?? [];
+  return uniqueReferences([...promptReferences, ...directReferences]);
 }
 
 function promptReferenceCandidates(

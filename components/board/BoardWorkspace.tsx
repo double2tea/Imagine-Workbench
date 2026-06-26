@@ -956,6 +956,40 @@ function getBoardVar(varName: string, fallback: string): string {
   return val || fallback;
 }
 
+function referencePreviewsFromEdges(
+  index: BoardPromptReferenceGraphIndex,
+  edges: readonly BoardEdge[],
+  options: { includeEdgeControls: boolean },
+): BoardGenerateInputSummary["referencePreviews"] {
+  return edges.flatMap(edge => {
+    const sourceNode = index.nodeById.get(edge.from.nodeId);
+    const sourceEdgeId = options.includeEdgeControls ? edge.id : undefined;
+    if (isBoardMediaSourceNode(sourceNode)) {
+      return [{
+        id: sourceNode.asset.assetId,
+        role: "general" as const,
+        sourceEdgeId,
+        sourceNodeId: sourceNode.id,
+        sourceTitle: sourceNode.title,
+        type: sourceNode.asset.type,
+        url: sourceNode.asset.url,
+      }];
+    }
+    if (sourceNode?.kind === "reference-group") {
+      return sourceNode.references.map(reference => ({
+        id: reference.assetId,
+        role: reference.role,
+        sourceEdgeId,
+        sourceNodeId: sourceNode.id,
+        sourceTitle: sourceNode.title,
+        type: reference.type,
+        url: reference.url,
+      }));
+    }
+    return [];
+  });
+}
+
 function generateInputSummaryForNode(
   node: BoardNodeModel,
   index: BoardPromptReferenceGraphIndex,
@@ -967,34 +1001,19 @@ function generateInputSummaryForNode(
   const promptNode = promptEdge ? index.nodeById.get(promptEdge.from.nodeId) : undefined;
   const promptPreview = promptNode?.kind === "prompt" ? promptNode.prompt : null;
   const seenReferences = new Set<string>();
-  const referencePreviews = incomingEdges
-    .filter(edge => edge.to.portId === BOARD_PORT_IDS.referenceIn)
-    .flatMap(edge => {
-      const sourceNode = index.nodeById.get(edge.from.nodeId);
-      if (isBoardMediaSourceNode(sourceNode)) {
-        return [{
-          id: sourceNode.asset.assetId,
-          role: "general" as const,
-          sourceEdgeId: edge.id,
-          sourceNodeId: sourceNode.id,
-          sourceTitle: sourceNode.title,
-          type: sourceNode.asset.type,
-          url: sourceNode.asset.url,
-        }];
-      }
-      if (sourceNode?.kind === "reference-group") {
-        return sourceNode.references.map(reference => ({
-          id: reference.assetId,
-          role: reference.role,
-          sourceEdgeId: edge.id,
-          sourceNodeId: sourceNode.id,
-          sourceTitle: sourceNode.title,
-          type: reference.type,
-          url: reference.url,
-        }));
-      }
-      return [];
-    })
+  const promptReferencePreviews = promptNode?.kind === "prompt"
+    ? referencePreviewsFromEdges(
+      index,
+      (index.incomingEdgesByTargetNode.get(promptNode.id) ?? []).filter(edge => edge.to.portId === BOARD_PORT_IDS.assetIn),
+      { includeEdgeControls: false },
+    )
+    : [];
+  const directReferencePreviews = referencePreviewsFromEdges(
+    index,
+    incomingEdges.filter(edge => edge.to.portId === BOARD_PORT_IDS.referenceIn),
+    { includeEdgeControls: true },
+  );
+  const referencePreviews = [...promptReferencePreviews, ...directReferencePreviews]
     .filter(reference => {
       const key = `${reference.id}:${reference.url}`;
       if (seenReferences.has(key)) return false;
