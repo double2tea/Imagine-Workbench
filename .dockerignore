@@ -1,0 +1,10 @@
+.git
+.next
+.next.bak-*
+.tmp
+.trellis
+.vercel
+node_modules
+outputs
+*.log
+tsconfig.tsbuildinfo

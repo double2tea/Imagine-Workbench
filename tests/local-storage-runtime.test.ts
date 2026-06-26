@@ -9,12 +9,12 @@ import {
   toPublicLocalStorageRuntimeStatus,
 } from "../lib/storage/local-runtime";
 
-test("resolveLocalWorkspacePaths uses the default local workspace directory", () => {
+test("resolveLocalWorkspacePaths uses the default media workspace directory", () => {
   const paths = resolveLocalWorkspacePaths({ homeDir: "/Users/alice" });
 
   assert.equal(paths.rootDir, "/Users/alice/.imagine-workbench/workspaces/default");
-  assert.equal(paths.databaseFile, "/Users/alice/.imagine-workbench/workspaces/default/imagine-workbench.sqlite");
-  assert.equal(paths.assetDir, "/Users/alice/.imagine-workbench/workspaces/default/assets");
+  assert.equal(paths.mediaDir, "/Users/alice/.imagine-workbench/workspaces/default");
+  assert.equal(paths.assetDir, "/Users/alice/.imagine-workbench/workspaces/default/originals");
   assert.equal(paths.previewDir, "/Users/alice/.imagine-workbench/workspaces/default/previews");
   assert.equal(paths.exportDir, "/Users/alice/.imagine-workbench/workspaces/default/exports");
   assert.equal(paths.trashDir, "/Users/alice/.imagine-workbench/workspaces/default/trash");
@@ -30,69 +30,96 @@ test("resolveLocalStorageRuntimeStatus keeps browser storage as the default", ()
   assert.equal(status.paths, undefined);
 });
 
-test("resolveLocalStorageRuntimeStatus enables local database only when explicitly selected", () => {
+test("resolveLocalStorageRuntimeStatus enables PostgreSQL only when explicitly selected", () => {
   const status = resolveLocalStorageRuntimeStatus({
-    IMAGINE_LOCAL_WORKSPACE_DIR: "~/Creative",
-    IMAGINE_STORAGE_TARGET: "local-database",
+    DATABASE_URL: "postgres://localhost/imagine",
+    IMAGINE_MEDIA_DIR: "/srv/imagine/media",
+    IMAGINE_STORAGE_TARGET: "postgres",
   }, { homeDir: "/Users/alice" });
 
   assert.equal(status.enabled, true);
-  assert.equal(status.targetKind, "local-database");
-  assert.equal(status.reason, "local-database-selected");
-  assert.equal(status.paths?.rootDir, "/Users/alice/Creative");
+  assert.equal(status.targetKind, "postgres");
+  assert.equal(status.reason, "postgres-selected");
+  assert.equal(status.paths?.mediaDir, "/srv/imagine/media");
   assert.equal(status.syncPolicy.bidirectionalSync, false);
   assert.equal(status.cleanupPolicy.automaticStartupCleanup, false);
 });
 
-test("resolvePublicLocalStorageRuntimeStatus does not expose absolute local paths", () => {
+test("resolvePublicLocalStorageRuntimeStatus exposes only PostgreSQL config status", () => {
   const status = resolvePublicLocalStorageRuntimeStatus({
-    IMAGINE_LOCAL_WORKSPACE_DIR: "~/Creative",
-    IMAGINE_STORAGE_TARGET: "local-database",
+    DATABASE_URL: "postgres://localhost/imagine",
+    IMAGINE_MEDIA_DIR: "/srv/imagine/media",
+    IMAGINE_STORAGE_TARGET: "postgres",
   });
 
   assert.equal(Object.hasOwn(status, "paths"), false);
   assert.deepEqual(status.pathPlan, {
-    assetDirectoryName: "assets",
-    databaseFileName: "imagine-workbench.sqlite",
+    databaseUrlConfigured: true,
     exportDirectoryName: "exports",
+    mediaDirectoryConfigured: true,
+    payloadDirectoryName: "originals",
     previewDirectoryName: "previews",
     trashDirectoryName: "trash",
-    workspaceRootConfigured: true,
   });
 });
 
 test("toPublicLocalStorageRuntimeStatus redacts private runtime paths", () => {
   const privateStatus = resolveLocalStorageRuntimeStatus({
-    IMAGINE_LOCAL_WORKSPACE_DIR: "~/Creative",
-    IMAGINE_STORAGE_TARGET: "local-database",
+    DATABASE_URL: "postgres://localhost/imagine",
+    IMAGINE_MEDIA_DIR: "/srv/imagine/media",
+    IMAGINE_STORAGE_TARGET: "postgres",
   }, { homeDir: "/Users/alice" });
   const publicStatus = toPublicLocalStorageRuntimeStatus(privateStatus, {
-    IMAGINE_LOCAL_WORKSPACE_DIR: "~/Creative",
+    DATABASE_URL: "postgres://localhost/imagine",
+    IMAGINE_MEDIA_DIR: "/srv/imagine/media",
   });
 
   assert.equal(Object.hasOwn(publicStatus, "paths"), false);
-  assert.equal(publicStatus.pathPlan?.workspaceRootConfigured, true);
+  assert.equal(publicStatus.pathPlan?.databaseUrlConfigured, true);
+  assert.equal(publicStatus.pathPlan?.mediaDirectoryConfigured, true);
 });
 
-test("resolveLocalStorageRuntimeStatus disables local database on hosted deployments", () => {
-  const status = resolveLocalStorageRuntimeStatus({
-    CF_PAGES: "1",
-    IMAGINE_STORAGE_TARGET: "local-database",
-  }, { homeDir: "/Users/alice" });
+test("resolveLocalStorageRuntimeStatus rejects PostgreSQL on hosted deployments", () => {
+  assert.throws(
+    () => resolveLocalStorageRuntimeStatus({
+      CF_PAGES: "1",
+      DATABASE_URL: "postgres://localhost/imagine",
+      IMAGINE_MEDIA_DIR: "/srv/imagine/media",
+      IMAGINE_STORAGE_TARGET: "postgres",
+    }, { homeDir: "/Users/alice" }),
+    /PostgreSQL storage requires a Node server deployment/,
+  );
+});
 
-  assert.equal(status.enabled, false);
-  assert.equal(status.targetKind, "local-database");
-  assert.equal(status.reason, "hosted-deployment");
-  assert.equal(status.paths, undefined);
+test("resolveLocalStorageRuntimeStatus rejects missing PostgreSQL config", () => {
+  assert.throws(
+    () => resolveLocalStorageRuntimeStatus({ IMAGINE_STORAGE_TARGET: "postgres" }),
+    /DATABASE_URL is required/,
+  );
+  assert.throws(
+    () => resolveLocalStorageRuntimeStatus({
+      DATABASE_URL: "postgres://localhost/imagine",
+      IMAGINE_STORAGE_TARGET: "postgres",
+    }),
+    /IMAGINE_MEDIA_DIR is required/,
+  );
 });
 
 test("parseWorkspaceStorageMode trims selected storage targets", () => {
-  assert.equal(parseWorkspaceStorageMode(" local-database "), "local-database");
+  assert.equal(parseWorkspaceStorageMode(" postgres "), "postgres");
 });
 
-test("parseWorkspaceStorageMode rejects unknown storage targets", () => {
+test("parseWorkspaceStorageMode rejects stale and unknown storage targets", () => {
   assert.throws(
-    () => parseWorkspaceStorageMode("sqlite"),
-    /IMAGINE_STORAGE_TARGET must be "browser" or "local-database"/,
+    () => parseWorkspaceStorageMode("local-database"),
+    /IMAGINE_STORAGE_TARGET must be "browser" or "postgres"/,
+  );
+  assert.throws(
+    () => parseWorkspaceStorageMode("local-folder"),
+    /IMAGINE_STORAGE_TARGET must be "browser" or "postgres"/,
+  );
+  assert.throws(
+    () => parseWorkspaceStorageMode("remote-api"),
+    /IMAGINE_STORAGE_TARGET must be "browser" or "postgres"/,
   );
 });

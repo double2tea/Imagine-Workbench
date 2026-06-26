@@ -1,6 +1,7 @@
-import { LOCAL_DATABASE_STORAGE_ADAPTER } from "../local-storage-targets";
+import { POSTGRES_STORAGE_ADAPTER } from "../local-storage-targets";
 import {
-  IMAGINE_LOCAL_WORKSPACE_DIR_ENV,
+  DATABASE_URL_ENV,
+  IMAGINE_MEDIA_DIR_ENV,
   isHostedDeploymentEnvironment,
   parseWorkspaceStorageMode,
   storageModeToTargetKind,
@@ -24,12 +25,12 @@ export interface LocalWorkspaceSyncPolicy {
 }
 
 export interface PublicLocalWorkspacePathPlan {
-  assetDirectoryName: string;
-  databaseFileName: string;
+  databaseUrlConfigured: boolean;
   exportDirectoryName: string;
+  mediaDirectoryConfigured: boolean;
+  payloadDirectoryName: string;
   previewDirectoryName: string;
   trashDirectoryName: string;
-  workspaceRootConfigured: boolean;
 }
 
 export interface PublicLocalStorageRuntimeStatus {
@@ -39,7 +40,7 @@ export interface PublicLocalStorageRuntimeStatus {
   pathPlan?: PublicLocalWorkspacePathPlan;
   reason: LocalStorageDisabledReason | LocalStorageEnabledReason;
   syncPolicy: LocalWorkspaceSyncPolicy;
-  targetKind: "indexeddb" | "local-database";
+  targetKind: "indexeddb" | "postgres";
 }
 
 export const LOCAL_WORKSPACE_CLEANUP_POLICY: LocalWorkspaceCleanupPolicy = {
@@ -58,15 +59,15 @@ export const LOCAL_WORKSPACE_SYNC_POLICY: LocalWorkspaceSyncPolicy = {
 export function getPublicLocalWorkspacePathPlan(
   env: LocalStorageEnvironment = {},
 ): PublicLocalWorkspacePathPlan {
-  const localDatabase = LOCAL_DATABASE_STORAGE_ADAPTER.localDatabase;
-  if (!localDatabase) throw new Error("Local database storage adapter is missing local database config");
+  const postgres = POSTGRES_STORAGE_ADAPTER.postgres;
+  if (!postgres) throw new Error("PostgreSQL storage adapter is missing PostgreSQL config");
   return {
-    assetDirectoryName: localDatabase.assetDirectoryName,
-    databaseFileName: localDatabase.databaseFileName,
+    databaseUrlConfigured: Boolean(env[DATABASE_URL_ENV]?.trim()),
     exportDirectoryName: "exports",
-    previewDirectoryName: localDatabase.previewDirectoryName,
+    mediaDirectoryConfigured: Boolean(env[IMAGINE_MEDIA_DIR_ENV]?.trim()),
+    payloadDirectoryName: postgres.payloadDirectoryName,
+    previewDirectoryName: postgres.previewDirectoryName,
     trashDirectoryName: "trash",
-    workspaceRootConfigured: Boolean(env[IMAGINE_LOCAL_WORKSPACE_DIR_ENV]?.trim()),
   };
 }
 
@@ -75,19 +76,20 @@ export function resolvePublicLocalStorageRuntimeStatus(
 ): PublicLocalStorageRuntimeStatus {
   const mode = parseWorkspaceStorageMode(env.IMAGINE_STORAGE_TARGET);
   const hosted = isHostedDeploymentEnvironment(env);
-  const enabled = mode === "local-database" && !hosted;
+  if (mode === "postgres" && hosted) {
+    throw new Error("PostgreSQL storage requires a Node server deployment; hosted edge/static deployments are not supported");
+  }
+  const enabled = mode === "postgres";
   const reason =
     mode === "browser"
       ? "browser-storage-selected"
-      : hosted
-        ? "hosted-deployment"
-        : "local-database-selected";
+      : "postgres-selected";
 
   return {
     cleanupPolicy: LOCAL_WORKSPACE_CLEANUP_POLICY,
     enabled,
     mode,
-    pathPlan: mode === "local-database" ? getPublicLocalWorkspacePathPlan(env) : undefined,
+    pathPlan: mode === "postgres" ? getPublicLocalWorkspacePathPlan(env) : undefined,
     reason,
     syncPolicy: LOCAL_WORKSPACE_SYNC_POLICY,
     targetKind: storageModeToTargetKind(mode),

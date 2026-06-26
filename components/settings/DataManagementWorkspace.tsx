@@ -26,12 +26,20 @@ import {
   type WorkspaceCleanupKind,
   type WorkspaceDataSummary,
 } from "@/lib/data-management";
+import type { PublicLocalStorageRuntimeStatus } from "@/lib/storage/local-public-runtime";
+import type { TeamStorageHealth } from "@/lib/storage/team-client";
 import { getClearWorkspaceAssetsMessage } from "@/lib/workspace-messages";
 
 interface DataManagementWorkspaceProps {
   hasCurrentBoard: boolean;
   summary: WorkspaceDataSummary | null;
   summaryError: string | null;
+  storageStatus: PublicLocalStorageRuntimeStatus | null;
+  storageStatusError: string | null;
+  teamHealth: TeamStorageHealth | null;
+  teamHealthError: string | null;
+  teamMigrationBusy: boolean;
+  teamSetupToken: string;
   onCleanupAssets: (kind: WorkspaceCleanupKind) => Promise<void>;
   onClearAssets: () => Promise<void>;
   onClearLocalStorage: (kind: LocalStorageCleanupKind) => Promise<void>;
@@ -42,8 +50,11 @@ interface DataManagementWorkspaceProps {
   onImportLocalAssets: (files: File[]) => Promise<void>;
   onImportWorkspace: (file: File, includeCredentials: boolean) => Promise<void>;
   onRefreshSummary: () => Promise<void>;
+  onRefreshStorageStatus: () => Promise<void>;
   onRepairAssetSources: () => Promise<void>;
   onResetBoards: () => Promise<void>;
+  onRunTeamMigrations: () => Promise<void>;
+  onTeamSetupTokenChange: (value: string) => void;
 }
 
 type TranslateFn = (key: string, params?: Record<string, string | number>) => string;
@@ -125,6 +136,7 @@ const CLEANUP_LABEL_BY_KIND: Record<WorkspaceCleanupKind, string> = {
 const LOCAL_STORAGE_LABEL_BY_KIND: Record<LocalStorageCleanupKind, string> = {
   agent: "dataManagement.localStorageLabels.agent",
   "model-cache": "dataManagement.localStorageLabels.modelCache",
+  "provider-settings": "dataManagement.localStorageLabels.providerSettings",
   "provider-credentials": "dataManagement.localStorageLabels.providerCredentials",
   "ui-preferences": "dataManagement.localStorageLabels.uiPreferences",
 };
@@ -165,6 +177,31 @@ function formatPercent(value: number | undefined): string {
   return `${Math.round(value * 100)}%`;
 }
 
+function formatStorageMode(status: PublicLocalStorageRuntimeStatus | null, t: TranslateFn): string {
+  if (!status) return "--";
+  if (status.mode === "postgres") return t("dataManagement.storageModePostgres");
+  return t("dataManagement.storageModeBrowser");
+}
+
+function formatTeamMigrationSummary(teamHealth: TeamStorageHealth | null, t: TranslateFn): string {
+  const migrationStatus = teamHealth?.migrationStatus;
+  if (!migrationStatus) return t("dataManagement.teamStorageNoMigrationStatus");
+  if (migrationStatus.unsupportedNewerSchema) {
+    return t("dataManagement.teamStorageNewerSchema", {
+      current: migrationStatus.currentSchemaVersion ?? "--",
+      required: migrationStatus.requiredSchemaVersion,
+    });
+  }
+  if (migrationStatus.pendingMigrationIds.length > 0) {
+    return t("dataManagement.teamStoragePendingMigrations", {
+      count: migrationStatus.pendingMigrationIds.length,
+    });
+  }
+  return t("dataManagement.teamStorageUpToDate", {
+    version: migrationStatus.currentSchemaVersion ?? migrationStatus.requiredSchemaVersion,
+  });
+}
+
 function DetailList({ details, t }: { details: string[]; t: TranslateFn }) {
   if (details.length === 0) {
     return <p className="mt-2 text-[11px] text-[var(--iw-muted)]">{t("dataManagement.noDetails")}</p>;
@@ -189,6 +226,12 @@ export default function DataManagementWorkspace({
   hasCurrentBoard,
   summary,
   summaryError,
+  storageStatus,
+  storageStatusError,
+  teamHealth,
+  teamHealthError,
+  teamMigrationBusy,
+  teamSetupToken,
   onCleanupAssets,
   onClearAssets,
   onClearLocalStorage,
@@ -199,8 +242,11 @@ export default function DataManagementWorkspace({
   onImportLocalAssets,
   onImportWorkspace,
   onRefreshSummary,
+  onRefreshStorageStatus,
   onRepairAssetSources,
   onResetBoards,
+  onRunTeamMigrations,
+  onTeamSetupTokenChange,
 }: DataManagementWorkspaceProps) {
   const backupInputRef = useRef<HTMLInputElement | null>(null);
   const localAssetInputRef = useRef<HTMLInputElement | null>(null);
@@ -254,7 +300,9 @@ export default function DataManagementWorkspace({
   const assetStores = assetSummary?.stores;
   const latestSafetySnapshot = summary?.safety.latestSnapshot ?? null;
   const health = healthCopy(integrity?.status, t);
-  const actionDisabled = busyLabel !== null;
+  const actionDisabled = busyLabel !== null || teamMigrationBusy;
+  const isTeamStorageMode = storageStatus?.mode === "postgres";
+  const hasPendingTeamMigrations = (teamHealth?.migrationStatus?.pendingMigrationIds.length ?? 0) > 0;
 
   const issueGroups = useMemo<HealthIssueGroup[]>(() => {
     if (!integrity) return [];
@@ -361,7 +409,7 @@ export default function DataManagementWorkspace({
         <button
           type="button"
           disabled={actionDisabled}
-          onClick={() => void runAction(t("dataManagement.refreshingStatsLabel"), onRefreshSummary)}
+          onClick={() => void runAction(t("dataManagement.refreshingStatsLabel"), onRefreshStorageStatus)}
           className="imagine-secondary-action flex h-9 items-center gap-1.5 rounded-lg border border-[var(--iw-border)] px-3 text-[11px] font-semibold text-[var(--iw-text)] disabled:opacity-50"
         >
           <RefreshCw className="h-3.5 w-3.5" />
@@ -377,6 +425,11 @@ export default function DataManagementWorkspace({
       {summaryError ? (
         <div className="imagine-tone-surface rounded-lg border px-3 py-2 text-[11px] leading-5" data-tone="danger">
           {t("dataManagement.dataStatsError", { error: summaryError })}
+        </div>
+      ) : null}
+      {storageStatusError ? (
+        <div className="imagine-tone-surface rounded-lg border px-3 py-2 text-[11px] leading-5" data-tone="danger">
+          {t("dataManagement.storageStatusError", { error: storageStatusError })}
         </div>
       ) : null}
 
@@ -395,6 +448,90 @@ export default function DataManagementWorkspace({
         </div>
       </section>
 
+      <section className="rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] p-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="flex items-center gap-2 text-xs font-semibold text-[var(--iw-text)]">
+              <Database className="imagine-tone-icon h-3.5 w-3.5" data-tone={isTeamStorageMode ? "accent" : "success"} />
+              {t("dataManagement.storageTarget")}
+            </p>
+            <p className="mt-1 text-[11px] leading-5 text-[var(--iw-muted)]">
+              {storageStatus
+                ? t("dataManagement.storageTargetSummary", {
+                    mode: formatStorageMode(storageStatus, t),
+                    target: storageStatus.targetKind,
+                  })
+                : t("dataManagement.storageTargetWaiting")}
+            </p>
+          </div>
+          <div className="rounded-md border border-[var(--iw-border)] px-2 py-1 font-mono text-[11px] text-[var(--iw-muted)]">
+            {storageStatus?.enabled ? t("dataManagement.storageEnabled") : t("dataManagement.storageBrowserDefault")}
+          </div>
+        </div>
+
+        {isTeamStorageMode ? (
+          <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_1.2fr]">
+            <div className="rounded-md border border-[var(--iw-border)] p-2">
+              <p className="text-[10px] font-semibold uppercase text-[var(--iw-faint)]">{t("dataManagement.teamStorageHealth")}</p>
+              <p className="mt-2 text-[11px] leading-5 text-[var(--iw-muted)]">
+                {teamHealthError
+                  ? t("dataManagement.teamStorageHealthError", { error: teamHealthError })
+                  : teamHealth?.reachable
+                    ? t("dataManagement.teamStorageReachable")
+                    : t("dataManagement.teamStorageChecking")}
+              </p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <div className="rounded-md border border-[var(--iw-border)] px-2 py-1">
+                  <p className="text-[10px] text-[var(--iw-faint)]">{t("dataManagement.teamStorageDatabase")}</p>
+                  <p className="font-mono text-[11px] text-[var(--iw-text)]">
+                    {teamHealth?.databaseConfigured ? t("dataManagement.configured") : "--"}
+                  </p>
+                </div>
+                <div className="rounded-md border border-[var(--iw-border)] px-2 py-1">
+                  <p className="text-[10px] text-[var(--iw-faint)]">{t("dataManagement.teamStorageMedia")}</p>
+                  <p className="font-mono text-[11px] text-[var(--iw-text)]">
+                    {teamHealth?.mediaDirectoryConfigured ? t("dataManagement.configured") : "--"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-md border border-[var(--iw-border)] p-2">
+              <p className="text-[10px] font-semibold uppercase text-[var(--iw-faint)]">{t("dataManagement.teamStorageMigrations")}</p>
+              <p className="mt-2 text-[11px] leading-5 text-[var(--iw-muted)]">
+                {formatTeamMigrationSummary(teamHealth, t)}
+              </p>
+              {teamHealth?.migrationStatus?.pendingMigrationIds.length ? (
+                <p className="mt-1 break-all font-mono text-[10px] text-[var(--iw-faint)]">
+                  {teamHealth.migrationStatus.pendingMigrationIds.join(", ")}
+                </p>
+              ) : null}
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <input
+                  type="password"
+                  value={teamSetupToken}
+                  onChange={event => onTeamSetupTokenChange(event.target.value)}
+                  placeholder={t("dataManagement.teamSetupTokenPlaceholder")}
+                  className="h-9 min-w-56 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)] px-3 text-[11px] text-[var(--iw-text)] outline-none focus:border-[var(--iw-accent)]"
+                />
+                <button
+                  type="button"
+                  disabled={actionDisabled || !hasPendingTeamMigrations || !teamSetupToken.trim()}
+                  onClick={() => void runAction(t("dataManagement.teamMigrationBusy"), onRunTeamMigrations)}
+                  className="imagine-secondary-action h-9 rounded-lg border border-[var(--iw-border)] px-3 text-[11px] font-semibold text-[var(--iw-text)] disabled:opacity-50"
+                >
+                  {teamMigrationBusy ? t("dataManagement.teamMigrationBusy") : t("dataManagement.teamRunMigrations")}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-3 rounded-md border border-[var(--iw-border)] px-3 py-2 text-[11px] leading-5 text-[var(--iw-muted)]">
+            {t("dataManagement.browserStorageModeDetail")}
+          </p>
+        )}
+      </section>
+
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label={t("dataManagement.statCards.assets")}
@@ -410,8 +547,13 @@ export default function DataManagementWorkspace({
         />
         <StatCard
           label={t("dataManagement.statCards.localSettings")}
-          primary={storageSummary ? String(storageSummary.agentKeys + storageSummary.modelCacheKeys + storageSummary.uiPreferenceKeys + storageSummary.credentialKeys) : "--"}
-          secondary={storageSummary ? t("dataManagement.localSettingsDetailTemplate", { agentKeys: storageSummary.agentKeys, modelCacheKeys: storageSummary.modelCacheKeys, credentialKeys: storageSummary.credentialKeys }) : t("dataManagement.statCards.waitingStats")}
+          primary={storageSummary ? String(storageSummary.agentKeys + storageSummary.modelCacheKeys + storageSummary.providerSettingKeys + storageSummary.uiPreferenceKeys + storageSummary.credentialKeys) : "--"}
+          secondary={storageSummary ? t("dataManagement.localSettingsDetailTemplate", {
+            agentKeys: storageSummary.agentKeys,
+            modelCacheKeys: storageSummary.modelCacheKeys,
+            providerSettingKeys: storageSummary.providerSettingKeys,
+            credentialKeys: storageSummary.credentialKeys,
+          }) : t("dataManagement.statCards.waitingStats")}
         />
         <StatCard
           label={t("dataManagement.statCards.browserStorage")}

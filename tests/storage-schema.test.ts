@@ -20,14 +20,28 @@ test("workspace storage schema exposes stable table names for future adapters", 
   const tables: readonly WorkspaceStorageTableName[] = listWorkspaceStorageTables();
 
   assert.deepEqual(tables, [
+    "schema_migrations",
+    "workspaces",
+    "users",
+    "teams",
+    "team_memberships",
+    "sessions",
+    "csrf_tokens",
     "assets",
     "asset_payloads",
     "asset_previews",
     "asset_library",
     "boards",
+    "board_summaries",
     "generation_tasks",
     "settings",
+    "user_preferences",
+    "prompt_templates",
+    "agent_chats",
+    "saved_provider_targets",
     "safety_snapshots",
+    "voice_profiles",
+    "audit_events",
   ]);
 });
 

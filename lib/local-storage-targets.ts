@@ -1,12 +1,13 @@
-export type WorkspaceStorageTargetKind = "indexeddb" | "local-folder" | "local-database" | "remote-api";
+export type WorkspaceStorageTargetKind = "indexeddb" | "postgres";
 export type WorkspaceStorageTargetStatus = "active" | "planned";
-export type WorkspaceLocalDatabaseEngine = "sqlite";
+export type WorkspaceTeamDatabaseEngine = "postgres";
 
-export interface WorkspaceLocalDatabaseConfig {
-  assetDirectoryName: string;
-  databaseFileName: string;
-  engine: WorkspaceLocalDatabaseEngine;
+export interface WorkspacePostgresStorageConfig {
+  engine: WorkspaceTeamDatabaseEngine;
+  mediaDirectoryEnv: "IMAGINE_MEDIA_DIR";
   previewDirectoryName: string;
+  payloadDirectoryName: string;
+  requiredDatabaseUrlEnv: "DATABASE_URL";
 }
 
 export interface WorkspaceStorageCapabilities {
@@ -18,9 +19,9 @@ export interface WorkspaceStorageCapabilities {
 
 export interface WorkspaceStorageAdapterContract {
   capabilities: WorkspaceStorageCapabilities;
-  localDatabase?: WorkspaceLocalDatabaseConfig;
   kind: WorkspaceStorageTargetKind;
   label: string;
+  postgres?: WorkspacePostgresStorageConfig;
   status: WorkspaceStorageTargetStatus;
 }
 
@@ -36,53 +37,28 @@ export const INDEXED_DB_STORAGE_ADAPTER: WorkspaceStorageAdapterContract = {
   status: "active",
 };
 
-export const LOCAL_FOLDER_STORAGE_ADAPTER: WorkspaceStorageAdapterContract = {
+export const POSTGRES_STORAGE_ADAPTER: WorkspaceStorageAdapterContract = {
   capabilities: {
     canReadWorkspace: true,
     canWriteWorkspace: true,
     supportsRealtimeSync: true,
     userVisiblePath: true,
   },
-  kind: "local-folder",
-  label: "本地工作区文件夹",
-  status: "planned",
-};
-
-export const LOCAL_DATABASE_STORAGE_ADAPTER: WorkspaceStorageAdapterContract = {
-  capabilities: {
-    canReadWorkspace: true,
-    canWriteWorkspace: true,
-    supportsRealtimeSync: true,
-    userVisiblePath: true,
-  },
-  kind: "local-database",
-  label: "本地 SQLite 数据库",
-  localDatabase: {
-    assetDirectoryName: "assets",
-    databaseFileName: "imagine-workbench.sqlite",
-    engine: "sqlite",
+  kind: "postgres",
+  label: "PostgreSQL 团队工作区",
+  postgres: {
+    engine: "postgres",
+    mediaDirectoryEnv: "IMAGINE_MEDIA_DIR",
     previewDirectoryName: "previews",
+    payloadDirectoryName: "originals",
+    requiredDatabaseUrlEnv: "DATABASE_URL",
   },
-  status: "planned",
-};
-
-export const REMOTE_API_STORAGE_ADAPTER: WorkspaceStorageAdapterContract = {
-  capabilities: {
-    canReadWorkspace: true,
-    canWriteWorkspace: true,
-    supportsRealtimeSync: true,
-    userVisiblePath: false,
-  },
-  kind: "remote-api",
-  label: "远程数据库 API",
   status: "planned",
 };
 
 export const WORKSPACE_STORAGE_ADAPTERS = [
   INDEXED_DB_STORAGE_ADAPTER,
-  LOCAL_FOLDER_STORAGE_ADAPTER,
-  LOCAL_DATABASE_STORAGE_ADAPTER,
-  REMOTE_API_STORAGE_ADAPTER,
+  POSTGRES_STORAGE_ADAPTER,
 ] as const;
 
 export function listWorkspaceStorageAdapters(): readonly WorkspaceStorageAdapterContract[] {

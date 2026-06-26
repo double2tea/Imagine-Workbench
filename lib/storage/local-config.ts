@@ -1,15 +1,17 @@
 export const IMAGINE_STORAGE_TARGET_ENV = "IMAGINE_STORAGE_TARGET";
-export const IMAGINE_LOCAL_WORKSPACE_DIR_ENV = "IMAGINE_LOCAL_WORKSPACE_DIR";
+export const DATABASE_URL_ENV = "DATABASE_URL";
+export const IMAGINE_MEDIA_DIR_ENV = "IMAGINE_MEDIA_DIR";
 
-export type WorkspaceStorageMode = "browser" | "local-database";
-export type WorkspaceRuntimeStorageTargetKind = "indexeddb" | "local-database";
-export type LocalStorageDisabledReason = "browser-storage-selected" | "hosted-deployment";
-export type LocalStorageEnabledReason = "local-database-selected";
+export type WorkspaceStorageMode = "browser" | "postgres";
+export type WorkspaceRuntimeStorageTargetKind = "indexeddb" | "postgres";
+export type LocalStorageDisabledReason = "browser-storage-selected";
+export type LocalStorageEnabledReason = "postgres-selected";
 
 export interface LocalStorageEnvironment {
   [key: string]: string | undefined;
   CF_PAGES?: string;
-  IMAGINE_LOCAL_WORKSPACE_DIR?: string;
+  DATABASE_URL?: string;
+  IMAGINE_MEDIA_DIR?: string;
   IMAGINE_STORAGE_TARGET?: string;
   NETLIFY?: string;
   NEXT_RUNTIME?: string;
@@ -19,8 +21,8 @@ export interface LocalStorageEnvironment {
 export function parseWorkspaceStorageMode(value: string | undefined): WorkspaceStorageMode {
   const mode = value?.trim();
   if (mode === undefined || mode === "") return "browser";
-  if (mode === "browser" || mode === "local-database") return mode;
-  throw new Error(`${IMAGINE_STORAGE_TARGET_ENV} must be "browser" or "local-database"`);
+  if (mode === "browser" || mode === "postgres") return mode;
+  throw new Error(`${IMAGINE_STORAGE_TARGET_ENV} must be "browser" or "postgres"`);
 }
 
 export function isHostedDeploymentEnvironment(env: LocalStorageEnvironment): boolean {
@@ -29,5 +31,5 @@ export function isHostedDeploymentEnvironment(env: LocalStorageEnvironment): boo
 
 export function storageModeToTargetKind(mode: WorkspaceStorageMode): WorkspaceRuntimeStorageTargetKind {
   if (mode === "browser") return "indexeddb";
-  return "local-database";
+  return "postgres";
 }

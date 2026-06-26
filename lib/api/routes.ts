@@ -25,6 +25,17 @@ export const API_ROUTES = {
     commands: "/api/resolve/commands",
     providerCredentials: "/api/resolve/provider-credentials",
   },
+  storage: {
+    localStatus: "/api/storage/local/status",
+    teamBootstrap: "/api/storage/team/bootstrap",
+    teamAssetMedia: (assetId: string, options: { download?: boolean } = {}) => {
+      const url = `/api/storage/team/assets/${encodeURIComponent(assetId)}/media`;
+      return options.download ? `${url}?download=1` : url;
+    },
+    teamHealth: "/api/storage/team/health",
+    teamMigrations: "/api/storage/team/migrations",
+    teamSession: "/api/storage/team/session",
+  },
   v1: {
     audioSpeech: "/v1/audio/speech",
     audioTranscriptions: "/v1/audio/transcriptions",

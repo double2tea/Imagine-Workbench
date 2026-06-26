@@ -18,6 +18,13 @@ import {
   type WorkspaceCleanupKind,
   type WorkspaceDataSummary,
 } from "@/lib/data-management";
+import {
+  fetchTeamStorageHealth,
+  fetchWorkspaceStorageRuntimeStatus,
+  runTeamStorageMigrations,
+  type TeamStorageHealth,
+} from "@/lib/storage/team-client";
+import type { PublicLocalStorageRuntimeStatus } from "@/lib/storage/local-public-runtime";
 
 export type { ProviderTestState };
 
@@ -146,6 +153,12 @@ export default function SettingsModal({
   const [tab, setTab] = useState<SettingsTab>("connections");
   const [dataSummary, setDataSummary] = useState<WorkspaceDataSummary | null>(null);
   const [dataSummaryError, setDataSummaryError] = useState<string | null>(null);
+  const [storageStatus, setStorageStatus] = useState<PublicLocalStorageRuntimeStatus | null>(null);
+  const [storageStatusError, setStorageStatusError] = useState<string | null>(null);
+  const [teamHealth, setTeamHealth] = useState<TeamStorageHealth | null>(null);
+  const [teamHealthError, setTeamHealthError] = useState<string | null>(null);
+  const [teamMigrationBusy, setTeamMigrationBusy] = useState(false);
+  const [teamSetupToken, setTeamSetupToken] = useState("");
   const tabs: Array<{ key: SettingsTab; label: string }> = [
     { key: "connections", label: t("tabs.connections") },
     { key: "feature-models", label: t("tabs.featureModels") },
@@ -169,13 +182,46 @@ export default function SettingsModal({
     }
   }, []);
 
+  const refreshStorageStatus = useCallback(async () => {
+    try {
+      setStorageStatusError(null);
+      setTeamHealthError(null);
+      const status = await fetchWorkspaceStorageRuntimeStatus();
+      setStorageStatus(status);
+      if (status.mode === "postgres") {
+        setTeamHealth(await fetchTeamStorageHealth());
+      } else {
+        setTeamHealth(null);
+      }
+    } catch (error) {
+      setStorageStatus(null);
+      setTeamHealth(null);
+      setStorageStatusError(formatSettingsError(error, t));
+    }
+  }, [t]);
+
+  const runTeamMigrations = useCallback(async () => {
+    setTeamMigrationBusy(true);
+    try {
+      setTeamHealthError(null);
+      await runTeamStorageMigrations(teamSetupToken);
+      setTeamSetupToken("");
+      await refreshStorageStatus();
+    } catch (error) {
+      setTeamHealthError(formatSettingsError(error, t));
+    } finally {
+      setTeamMigrationBusy(false);
+    }
+  }, [refreshStorageStatus, t, teamSetupToken]);
+
   useEffect(() => {
     if (!open || tab !== "data") return;
     const refreshTimer = window.setTimeout(() => {
       void refreshDataSummary();
+      void refreshStorageStatus();
     }, 0);
     return () => window.clearTimeout(refreshTimer);
-  }, [open, refreshDataSummary, tab]);
+  }, [open, refreshDataSummary, refreshStorageStatus, tab]);
 
   useEffect(() => {
     if (!open) return;
@@ -335,6 +381,12 @@ export default function SettingsModal({
                   hasCurrentBoard={hasCurrentBoard}
                   summary={dataSummary}
                   summaryError={dataSummaryError}
+                  storageStatus={storageStatus}
+                  storageStatusError={storageStatusError}
+                  teamHealth={teamHealth}
+                  teamHealthError={teamHealthError}
+                  teamMigrationBusy={teamMigrationBusy}
+                  teamSetupToken={teamSetupToken}
                   onCleanupAssets={onCleanupAssets}
                   onClearAssets={onClearAssets}
                   onClearLocalStorage={onClearLocalStorage}
@@ -345,8 +397,11 @@ export default function SettingsModal({
                   onImportLocalAssets={onImportLocalAssets}
                   onImportWorkspace={onImportWorkspace}
                   onRefreshSummary={refreshDataSummary}
+                  onRefreshStorageStatus={refreshStorageStatus}
                   onRepairAssetSources={onRepairAssetSources}
                   onResetBoards={onResetBoards}
+                  onRunTeamMigrations={runTeamMigrations}
+                  onTeamSetupTokenChange={setTeamSetupToken}
                 />
               )}
             </div>

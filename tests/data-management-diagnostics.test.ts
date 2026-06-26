@@ -37,6 +37,7 @@ function registerCompiledPathAlias(): void {
 registerCompiledPathAlias();
 
 const {
+  buildManagedLocalStorageInventory,
   buildWorkspaceIntegrityDiagnostics,
   buildWorkspaceIntegrityDiagnosticsWithPayloads,
 } = require("../lib/data-management") as typeof import("../lib/data-management");
@@ -185,4 +186,120 @@ test("payload-aware diagnostics reports complete assets with missing blob payloa
   assert.equal(diagnostics.status, "critical");
   assert.equal(diagnostics.issueCount, 1);
   assert.deepEqual(diagnostics.brokenCompleteAssetIds, ["asset_missing_payload"]);
+});
+
+test("buildManagedLocalStorageInventory classifies current persisted localStorage keys", () => {
+  const inventory = buildManagedLocalStorageInventory({
+    imagine_agent_chat: "[]",
+    "imagine_agent_chat:board_1": "[]",
+    imagine_agent_orb_position: "{\"x\":1,\"y\":2}",
+    imagine_ai_provider: "mimo",
+    "imagine_board_viewed_generated_asset_ids:board_1": "[\"asset_1\"]",
+    imagine_chat_model: "mimo:mimo-vl-7b",
+    imagine_custom_providers: "[]",
+    imagine_custom_prompt_templates: "[]",
+    imagine_default_image_model: "provider:model",
+    imagine_image_edit_feature_models: "{}",
+    imagine_provider_credentials: "{}",
+    imagine_resolve_integration_enabled: "1",
+    imagine_runninghub_saved_targets: "[]",
+    imagine_show_price: "false",
+    unrelated_key: "ignored",
+  });
+
+  assert.deepEqual(
+    inventory.map(entry => ({
+      key: entry.key,
+      kind: entry.kind,
+      migrationPolicy: entry.migrationPolicy,
+      includeCredentialsRequired: entry.includeCredentialsRequired,
+    })),
+    [
+      {
+        key: "imagine_agent_chat",
+        kind: "agent",
+        migrationPolicy: "optional",
+        includeCredentialsRequired: false,
+      },
+      {
+        key: "imagine_agent_chat:board_1",
+        kind: "agent",
+        migrationPolicy: "optional",
+        includeCredentialsRequired: false,
+      },
+      {
+        key: "imagine_agent_orb_position",
+        kind: "ui-preferences",
+        migrationPolicy: "required",
+        includeCredentialsRequired: false,
+      },
+      {
+        key: "imagine_ai_provider",
+        kind: "provider-settings",
+        migrationPolicy: "required",
+        includeCredentialsRequired: false,
+      },
+      {
+        key: "imagine_board_viewed_generated_asset_ids:board_1",
+        kind: "ui-preferences",
+        migrationPolicy: "local-only",
+        includeCredentialsRequired: false,
+      },
+      {
+        key: "imagine_chat_model",
+        kind: "provider-settings",
+        migrationPolicy: "required",
+        includeCredentialsRequired: false,
+      },
+      {
+        key: "imagine_custom_prompt_templates",
+        kind: "ui-preferences",
+        migrationPolicy: "required",
+        includeCredentialsRequired: false,
+      },
+      {
+        key: "imagine_custom_providers",
+        kind: "provider-settings",
+        migrationPolicy: "required",
+        includeCredentialsRequired: false,
+      },
+      {
+        key: "imagine_default_image_model",
+        kind: "model-cache",
+        migrationPolicy: "required",
+        includeCredentialsRequired: false,
+      },
+      {
+        key: "imagine_image_edit_feature_models",
+        kind: "model-cache",
+        migrationPolicy: "required",
+        includeCredentialsRequired: false,
+      },
+      {
+        key: "imagine_provider_credentials",
+        kind: "provider-credentials",
+        migrationPolicy: "optional",
+        includeCredentialsRequired: true,
+      },
+      {
+        key: "imagine_resolve_integration_enabled",
+        kind: "ui-preferences",
+        migrationPolicy: "required",
+        includeCredentialsRequired: false,
+      },
+      {
+        key: "imagine_runninghub_saved_targets",
+        kind: "provider-credentials",
+        migrationPolicy: "optional",
+        includeCredentialsRequired: true,
+      },
+      {
+        key: "imagine_show_price",
+        kind: "ui-preferences",
+        migrationPolicy: "required",
+        includeCredentialsRequired: false,
+      },
+    ],
+  );
+  assert.equal(inventory.every(entry => entry.bytes > 0), true);
 });

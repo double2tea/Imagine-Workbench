@@ -1,6 +1,6 @@
 import os from "node:os";
 import path from "node:path";
-import { LOCAL_DATABASE_STORAGE_ADAPTER } from "../local-storage-targets";
+import { POSTGRES_STORAGE_ADAPTER } from "../local-storage-targets";
 
 export const DEFAULT_LOCAL_WORKSPACE_SEGMENTS = [".imagine-workbench", "workspaces", "default"] as const;
 export const LOCAL_WORKSPACE_EXPORTS_DIR = "exports";
@@ -8,8 +8,8 @@ export const LOCAL_WORKSPACE_TRASH_DIR = "trash";
 
 export interface LocalWorkspacePaths {
   assetDir: string;
-  databaseFile: string;
   exportDir: string;
+  mediaDir: string;
   previewDir: string;
   rootDir: string;
   trashDir: string;
@@ -21,21 +21,19 @@ export interface ResolveLocalWorkspacePathsOptions {
 }
 
 export interface LocalWorkspacePathPlan {
-  assetDirectoryName: string;
-  databaseFileName: string;
   exportDirectoryName: string;
+  payloadDirectoryName: string;
   previewDirectoryName: string;
   trashDirectoryName: string;
 }
 
 export function getLocalWorkspacePathPlan(): LocalWorkspacePathPlan {
-  const localDatabase = LOCAL_DATABASE_STORAGE_ADAPTER.localDatabase;
-  if (!localDatabase) throw new Error("Local database storage adapter is missing local database config");
+  const postgres = POSTGRES_STORAGE_ADAPTER.postgres;
+  if (!postgres) throw new Error("PostgreSQL storage adapter is missing PostgreSQL config");
   return {
-    assetDirectoryName: localDatabase.assetDirectoryName,
-    databaseFileName: localDatabase.databaseFileName,
     exportDirectoryName: LOCAL_WORKSPACE_EXPORTS_DIR,
-    previewDirectoryName: localDatabase.previewDirectoryName,
+    payloadDirectoryName: postgres.payloadDirectoryName,
+    previewDirectoryName: postgres.previewDirectoryName,
     trashDirectoryName: LOCAL_WORKSPACE_TRASH_DIR,
   };
 }
@@ -50,9 +48,9 @@ export function resolveLocalWorkspacePaths(options: ResolveLocalWorkspacePathsOp
   const rootDir = resolveLocalWorkspaceRoot(options);
   const pathPlan = getLocalWorkspacePathPlan();
   return {
-    assetDir: path.join(rootDir, pathPlan.assetDirectoryName),
-    databaseFile: path.join(rootDir, pathPlan.databaseFileName),
+    assetDir: path.join(rootDir, pathPlan.payloadDirectoryName),
     exportDir: path.join(rootDir, pathPlan.exportDirectoryName),
+    mediaDir: rootDir,
     previewDir: path.join(rootDir, pathPlan.previewDirectoryName),
     rootDir,
     trashDir: path.join(rootDir, pathPlan.trashDirectoryName),

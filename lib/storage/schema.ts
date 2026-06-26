@@ -6,14 +6,28 @@ import type { WorkspaceStorageTargetKind } from "@/lib/local-storage-targets";
 export const WORKSPACE_STORAGE_SCHEMA_VERSION = 1;
 
 export const WORKSPACE_STORAGE_TABLE_NAMES = [
+  "schema_migrations",
+  "workspaces",
+  "users",
+  "teams",
+  "team_memberships",
+  "sessions",
+  "csrf_tokens",
   "assets",
   "asset_payloads",
   "asset_previews",
   "asset_library",
   "boards",
+  "board_summaries",
   "generation_tasks",
   "settings",
+  "user_preferences",
+  "prompt_templates",
+  "agent_chats",
+  "saved_provider_targets",
   "safety_snapshots",
+  "voice_profiles",
+  "audit_events",
 ] as const;
 
 export type WorkspaceStorageTableName = (typeof WORKSPACE_STORAGE_TABLE_NAMES)[number];

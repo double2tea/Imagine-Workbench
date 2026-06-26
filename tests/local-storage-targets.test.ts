@@ -3,24 +3,25 @@ import test from "node:test";
 
 import {
   INDEXED_DB_STORAGE_ADAPTER,
-  LOCAL_DATABASE_STORAGE_ADAPTER,
+  POSTGRES_STORAGE_ADAPTER,
   listWorkspaceStorageAdapters,
 } from "../lib/local-storage-targets";
 
-test("workspace storage adapters keep IndexedDB active and future targets planned", () => {
+test("workspace storage adapters expose only IndexedDB and PostgreSQL targets", () => {
   const adapters = listWorkspaceStorageAdapters();
 
-  assert.equal(adapters.length, 4);
+  assert.equal(adapters.length, 2);
   assert.equal(INDEXED_DB_STORAGE_ADAPTER.status, "active");
   assert.deepEqual(
     adapters.filter(adapter => adapter.status === "planned").map(adapter => adapter.kind),
-    ["local-folder", "local-database", "remote-api"],
+    ["postgres"],
   );
-  assert.deepEqual(LOCAL_DATABASE_STORAGE_ADAPTER.localDatabase, {
-    assetDirectoryName: "assets",
-    databaseFileName: "imagine-workbench.sqlite",
-    engine: "sqlite",
+  assert.deepEqual(POSTGRES_STORAGE_ADAPTER.postgres, {
+    engine: "postgres",
+    mediaDirectoryEnv: "IMAGINE_MEDIA_DIR",
+    payloadDirectoryName: "originals",
     previewDirectoryName: "previews",
+    requiredDatabaseUrlEnv: "DATABASE_URL",
   });
   assert.equal(adapters.every(adapter => adapter.capabilities.supportsRealtimeSync), true);
 });

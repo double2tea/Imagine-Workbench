@@ -94,6 +94,10 @@ const MODEL_CACHE_KEYS = [
   "imagine_image_model_options",
   "imagine_video_model_options",
   "imagine_audio_model_options",
+  "imagine_default_audio_model",
+  "imagine_default_image_model",
+  "imagine_default_video_model",
+  "imagine_image_edit_feature_models",
 ] as const;
 
 const PROVIDER_SETTING_KEYS = [
@@ -104,6 +108,7 @@ const PROVIDER_SETTING_KEYS = [
 
 const PROVIDER_CREDENTIAL_KEYS = [
   "imagine_provider_credentials",
+  "imagine_runninghub_saved_targets",
   "imagine_12ai_api_key",
   "imagine_custom_api_key",
   "imagine_grok2api_api_key",
@@ -119,10 +124,14 @@ const AGENT_STORAGE_KEYS = [
 const UI_PREFERENCE_KEYS = [
   "imagine_theme_mode",
   "imagine_language",
+  "imagine_agent_orb_position",
   "imagine_board_last_insert",
   "imagine_board_handles_hint_seen",
   "imagine_board_side_collapsed",
   "imagine_board_side_tab",
+  "imagine_custom_prompt_templates",
+  "imagine_resolve_integration_enabled",
+  "imagine_show_price",
 ] as const;
 
 const MANAGED_EXACT_KEYS = [
@@ -133,7 +142,12 @@ const MANAGED_EXACT_KEYS = [
   ...UI_PREFERENCE_KEYS,
 ] as const;
 
-const MANAGED_PREFIX_KEYS = ["imagine_agent_chat:"] as const;
+const AGENT_PREFIX_KEYS = ["imagine_agent_chat:"] as const;
+const UI_PREFERENCE_PREFIX_KEYS = ["imagine_board_viewed_generated_asset_ids:"] as const;
+const MANAGED_PREFIX_KEYS = [
+  ...AGENT_PREFIX_KEYS,
+  ...UI_PREFERENCE_PREFIX_KEYS,
+] as const;
 
 export type WorkspaceCleanupKind =
   | "failed"
@@ -144,8 +158,19 @@ export type WorkspaceCleanupKind =
 export type LocalStorageCleanupKind =
   | "agent"
   | "model-cache"
+  | "provider-settings"
   | "provider-credentials"
   | "ui-preferences";
+
+export type LocalStorageMigrationPolicy = "required" | "optional" | "local-only";
+
+export interface LocalStorageInventoryEntry {
+  bytes: number;
+  includeCredentialsRequired: boolean;
+  key: string;
+  kind: LocalStorageCleanupKind;
+  migrationPolicy: LocalStorageMigrationPolicy;
+}
 
 export type WorkspaceSafetySnapshotReason =
   | "clear-assets"
@@ -289,7 +314,9 @@ export interface WorkspaceDataSummary {
     agentKeys: number;
     credentialKeys: number;
     modelCacheKeys: number;
+    providerSettingKeys: number;
     uiPreferenceKeys: number;
+    inventory: LocalStorageInventoryEntry[];
     estimatedBytes: number;
   };
   browserStorage?: {
@@ -393,7 +420,9 @@ export async function getWorkspaceDataSummary(items: StorageItem[] = []): Promis
       agentKeys: countLocalStorageKeys(localStorageEntries, isAgentStorageKey),
       credentialKeys: countLocalStorageKeys(localStorageEntries, isProviderCredentialKey),
       modelCacheKeys: countLocalStorageKeys(localStorageEntries, isModelCacheKey),
+      providerSettingKeys: countLocalStorageKeys(localStorageEntries, isProviderSettingKey),
       uiPreferenceKeys: countLocalStorageKeys(localStorageEntries, isUiPreferenceKey),
+      inventory: buildManagedLocalStorageInventory(localStorageEntries),
       estimatedBytes: Object.entries(localStorageEntries).reduce(
         (total, [key, value]) => total + textByteSize(key) + textByteSize(value),
         0,
@@ -591,6 +620,7 @@ export function clearLocalStorageGroup(kind: LocalStorageCleanupKind): number {
   const keys = Object.keys(before).filter(key => {
     if (kind === "agent") return isAgentStorageKey(key);
     if (kind === "model-cache") return isModelCacheKey(key);
+    if (kind === "provider-settings") return isProviderSettingKey(key);
     if (kind === "provider-credentials") return isProviderCredentialKey(key);
     return isUiPreferenceKey(key);
   });
@@ -1672,6 +1702,19 @@ function readManagedLocalStorage(includeCredentials: boolean): Record<string, st
   return entries;
 }
 
+export function buildManagedLocalStorageInventory(entries: Record<string, string>): LocalStorageInventoryEntry[] {
+  return Object.entries(entries)
+    .filter(([key]) => isManagedLocalStorageKey(key))
+    .map(([key, value]) => ({
+      bytes: textByteSize(key) + textByteSize(value),
+      includeCredentialsRequired: isProviderCredentialKey(key),
+      key,
+      kind: classifyLocalStorageKey(key),
+      migrationPolicy: localStorageMigrationPolicy(key),
+    }))
+    .sort((left, right) => left.key.localeCompare(right.key));
+}
+
 function clearManagedLocalStorage(includeCredentials: boolean): void {
   if (typeof window === "undefined") return;
   Object.keys(readManagedLocalStorage(includeCredentials)).forEach(key => window.localStorage.removeItem(key));
@@ -1690,11 +1733,15 @@ function isManagedLocalStorageKey(key: string): boolean {
 }
 
 function isAgentStorageKey(key: string): boolean {
-  return AGENT_STORAGE_KEYS.some(item => item === key) || MANAGED_PREFIX_KEYS.some(prefix => key.startsWith(prefix));
+  return AGENT_STORAGE_KEYS.some(item => item === key) || AGENT_PREFIX_KEYS.some(prefix => key.startsWith(prefix));
 }
 
 function isModelCacheKey(key: string): boolean {
   return MODEL_CACHE_KEYS.some(item => item === key);
+}
+
+function isProviderSettingKey(key: string): boolean {
+  return PROVIDER_SETTING_KEYS.some(item => item === key);
 }
 
 function isProviderCredentialKey(key: string): boolean {
@@ -1702,7 +1749,23 @@ function isProviderCredentialKey(key: string): boolean {
 }
 
 function isUiPreferenceKey(key: string): boolean {
-  return UI_PREFERENCE_KEYS.some(item => item === key);
+  return UI_PREFERENCE_KEYS.some(item => item === key) || UI_PREFERENCE_PREFIX_KEYS.some(prefix => key.startsWith(prefix));
+}
+
+function classifyLocalStorageKey(key: string): LocalStorageCleanupKind {
+  if (isAgentStorageKey(key)) return "agent";
+  if (isModelCacheKey(key)) return "model-cache";
+  if (isProviderSettingKey(key)) return "provider-settings";
+  if (isProviderCredentialKey(key)) return "provider-credentials";
+  if (isUiPreferenceKey(key)) return "ui-preferences";
+  throw new Error(`Unsupported managed localStorage key: ${key}`);
+}
+
+function localStorageMigrationPolicy(key: string): LocalStorageMigrationPolicy {
+  if (isProviderCredentialKey(key)) return "optional";
+  if (isAgentStorageKey(key)) return "optional";
+  if (UI_PREFERENCE_PREFIX_KEYS.some(prefix => key.startsWith(prefix))) return "local-only";
+  return "required";
 }
 
 function countLocalStorageKeys(entries: Record<string, string>, predicate: (key: string) => boolean): number {
